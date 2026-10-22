@@ -277,6 +277,7 @@ ul
 - With `eager: true` each value is the file's module, imported along with the importer; without, a function importing it, `() => Promise<module>`, a chunk of its own in the browser.
 - `import: 'default'` gives that export of each instead of the module, and `T` types what each gives, `unknown` by default.
 - A pattern starts with `./` or `../`, from the importer, or `/`, from the project's root, and its keys start the same way.
+- A pattern `~icons/<set>/<name>` matches the icons of the installed sets ([Icons](images.md#icons)) and keys them `~icons/<set>/<name>`.
 - A list of patterns adds up their files, one starting with `!` leaving its own out: `['./demos/*.kay', '!./demos/draft.kay']`.
 - `node_modules` is only searched by a pattern naming it, and the importer never matches itself.
 - The build expands the call, so its patterns and options are written in it: a pattern built at run time, or another option, is a build error.

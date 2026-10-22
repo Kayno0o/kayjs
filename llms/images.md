@@ -233,3 +233,16 @@ const found = iconNames(tabler)
 ```
 
 - Both are plain functions, so an island can call them too, though a set imported there ships whole to the browser: search on the server and send the props.
+
+An icon known by name at runtime, such as one a record of data names, is bundled alone by `import.meta.glob` with an `~icons/` pattern, which gives the props of each icon it matches by its import path, so an island ships those and not the set:
+
+```ts
+import type { IconProps } from 'kay/icons'
+
+const ICONS = import.meta.glob<IconProps>('~icons/game-icons/{war-pick,axe-swing}', { eager: true, import: 'default' })
+
+const draw = (name: string) => ICONS[`~icons/game-icons/${name}`]
+```
+
+- The pattern is `~icons/<set>/<name>` with a glob's `*`, `{a,b}` and `!` negation, over the installed sets' icons and aliases; without `eager` each value is a function importing the icon.
+- A name written out that no installed set has fails the build (`icon-unresolved`), an alternative of the braces at a time, as a misspelt import does.

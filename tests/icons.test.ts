@@ -4,13 +4,15 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
+import { expandGlobs, globFiles } from '../src/build/glob'
 import { iconProps, iconTypes, installedIconSets } from '../src/build/icons'
 import { iconSetWarnings, thirdPartyNotices } from '../src/build/licenses'
 import { kay } from '../src/build/plugin'
 import { check } from '../src/check'
 import { iconNames, iconProps as setIconProps } from '../src/runtime/icons'
 import { trustHtml } from '../src/runtime/sanitize'
-import { fixtureCopy } from './scratch'
+import { registerLoader } from '../src/server/loader'
+import { fixtureCopy, scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
 const FIXTURE = join(import.meta.dir, 'fixtures/icons')
@@ -70,6 +72,63 @@ describe('icons', () => {
     expect(result.success).toBe(true)
     expect(code).toContain(HOME_PATH)
     expect(code.length).toBeLessThan(2000)
+  })
+
+  it('globs a subset of a set by name, wildcard or braces, each icon keyed by its import', () => {
+    const importer = join(process.cwd(), 'src/icons.ts')
+    const keys = (...patterns: string[]) => [...globFiles(patterns, importer, process.cwd()).keys()]
+
+    expect(keys('~icons/tabler/{mail,home}')).toEqual(['~icons/tabler/home', '~icons/tabler/mail'])
+    expect(keys('~icons/tabler/home-*', '!~icons/tabler/home-2')).toContain('~icons/tabler/home-bolt')
+    expect(keys('~icons/tabler/home-*', '!~icons/tabler/home-2')).not.toContain('~icons/tabler/home-2')
+    expect(keys('~icons/tabler/{home,mail}', '!~icons/tabler/mail')).toEqual(['~icons/tabler/home'])
+    // An alias is an icon of the set as an import takes it.
+    expect(keys('~icons/tabler/hours-12')).toEqual(['~icons/tabler/hours-12'])
+  })
+
+  it('fails the build on a glob naming an icon or a set that is not there, an alternative at a time', () => {
+    const importer = join(process.cwd(), 'src/icons.ts')
+    const expand = (pattern: string) => expandGlobs(`import.meta.glob('${pattern}', { eager: true })`, importer, process.cwd(), 'ts')
+
+    expect(() => expand('~icons/tabler/{home,hom}')).toThrow('~icons/tabler/hom matches no icon of the installed sets')
+    expect(() => expand('~icons/mdi/cat')).toThrow('~icons/mdi/cat matches no icon of the installed sets')
+    expect(() => expand('~icons/tabler/qqq-*')).toThrow('matches no icon')
+  })
+
+  it('bundles the icons a glob names and no others, eager or behind a function', async () => {
+    const dir = await scratchDir('icon-bundle-')
+    const inProject = async (name: string, source: string) => {
+      await Bun.write(join(dir, name), source)
+
+      return Bun.build({ entrypoints: [join(dir, name)], target: 'browser', plugins: [kay({ root: process.cwd() })], throw: false })
+    }
+    const eager = await inProject('eager.ts', 'const icons = import.meta.glob<unknown>(\'~icons/tabler/{home,mail}\', { eager: true, import: \'default\' })\nconsole.log(icons)\n')
+    const code = await eager.outputs[0]!.text()
+
+    expect(eager.success).toBe(true)
+    expect(code).toContain(HOME_PATH)
+    expect(code).toContain('"~icons/tabler/mail"')
+    expect(code).not.toContain('import.meta.glob')
+    expect(code.length).toBeLessThan(4000)
+
+    const lazy = await inProject('lazy.ts', 'const icons = import.meta.glob(\'~icons/tabler/{home,mail}\')\nconsole.log(icons)\n')
+
+    expect(lazy.success).toBe(true)
+    expect((await lazy.outputs[0]!.text()).length).toBeLessThan(4000)
+    await rm(dir, { recursive: true, force: true })
+  })
+
+  it('gives the icons a glob names to a module the server loads, as the props an import gives', async () => {
+    await registerLoader(process.cwd())
+    const dir = await scratchDir('icon-glob-')
+
+    await Bun.write(join(dir, 'picked.ts'), 'export const picked = import.meta.glob<{ viewBox: string }>(\'~icons/tabler/{home,mail}\', { eager: true, import: \'default\' })\nexport const lazy = import.meta.glob<{ viewBox: string }>(\'~icons/tabler/home\', { import: \'default\' })\n')
+    const { lazy, picked } = await import(join(dir, 'picked.ts')) as { lazy: Record<string, () => Promise<{ viewBox: string }>>, picked: Record<string, { viewBox: string, innerHTML: string }> }
+
+    expect(Object.keys(picked)).toEqual(['~icons/tabler/home', '~icons/tabler/mail'])
+    expect(picked['~icons/tabler/home']!.innerHTML).toContain(HOME_PATH)
+    expect((await lazy['~icons/tabler/home']!()).viewBox).toBe('0 0 24 24')
+    await rm(dir, { recursive: true, force: true })
   })
 
   it('fails the bundle on an icon or a set that is not there, naming it', async () => {

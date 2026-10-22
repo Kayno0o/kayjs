@@ -5,6 +5,7 @@ import { parse } from '@babel/parser'
 import { KayError } from '../compiler/errors'
 import { loadTraverse } from '../compiler/rewrite'
 import { GLOBBED } from './globbed'
+import { iconNames, installedIconSets } from './icons'
 
 interface GlobCall {
   start: number
@@ -19,19 +20,23 @@ const GLOB_MAGIC = /[*?[\]{}()!]/
 const RELATIVE = /^\.\.?\//
 const NEGATED = /^!/
 const IDENTIFIER = /^[A-Z_$][\w$]*$/i
+const ICONS = '~icons/'
+const ALTERNATIVES = /\{([^{}]*)\}/
 
 const OPTIONS = new Set(['eager', 'import'])
+const ICON_USAGE = 'import.meta.glob(\'~icons/tabler/{home,mail}\', { eager: true, import: \'default\' })'
 const USAGE = 'import.meta.glob(\'./demos/*.kay\', { eager: true, import: \'default\' })'
 
-// Every file a call's patterns match, by the key it gets: as written from the importer, `./demos/a.kay`, or from the project's root for a pattern starting at it, `/src/demos/a.kay`.
+// Every file a call's patterns match, by the key it gets: as written from the importer, `./demos/a.kay`, or from the project's root for a pattern starting at it, `/src/demos/a.kay`; an icon pattern, `~icons/tabler/{home,mail}`, gives the icon's own import specifier as both.
 // Negated patterns, `!./demos/draft.kay`, leave files out; `node_modules` is only searched by a pattern naming it, and the importer never matches itself.
 export function globFiles(patterns: string[], importer: string, root: string): Map<string, string> {
   const from = dirname(importer)
+  const icons = iconMatches(patterns, root)
   const absolute = (pattern: string) => RELATIVE.test(pattern) ? resolve(from, pattern) : join(root, pattern)
-  const excluded = patterns.filter(pattern => pattern.startsWith('!')).map(pattern => new Bun.Glob(absolute(pattern.slice(1))))
+  const excluded = patterns.filter(pattern => pattern.startsWith('!') && !pattern.startsWith(`!${ICONS}`)).map(pattern => new Bun.Glob(absolute(pattern.slice(1))))
   const files = new Map<string, string>()
 
-  for (const pattern of patterns.filter(pattern => !pattern.startsWith('!'))) {
+  for (const pattern of patterns.filter(pattern => !pattern.startsWith('!') && !pattern.startsWith(ICONS))) {
     const full = absolute(pattern)
     const segments = full.split(sep)
     const magic = segments.findIndex(segment => GLOB_MAGIC.test(segment))
@@ -57,12 +62,58 @@ export function globFiles(patterns: string[], importer: string, root: string): M
     }
   }
 
-  return new Map([...files].sort(([a], [b]) => a < b ? -1 : 1))
+  return new Map([...files, ...icons].sort(([a], [b]) => a < b ? -1 : 1))
+}
+
+// The icons of the installed sets an icon pattern names, `~icons/<set>/<name>` with the wildcards and braces of a glob, each as its import specifier; a negated one leaves its icons out.
+// A name written out, or an alternative of its braces, that no installed set has fails the build, as a misspelt import does.
+function iconMatches(patterns: string[], root: string): Map<string, string> {
+  const wanted = patterns.filter(pattern => pattern.startsWith(ICONS))
+
+  if (wanted.length === 0)
+    return new Map()
+
+  const names = [...installedIconSets(root)].flatMap(([prefix, file]) => iconNames(prefix, file))
+  const matching = (pattern: string) => {
+    const glob = new Bun.Glob(pattern.slice(ICONS.length))
+
+    return names.filter(name => glob.match(name))
+  }
+  const found = new Map<string, string>()
+
+  for (const pattern of wanted) {
+    for (const alternative of expandAlternatives(pattern)) {
+      const matches = matching(alternative)
+
+      if (matches.length === 0)
+        throw new KayError('icon-unresolved', `kay: ${alternative} matches no icon of the installed sets, \`@iconify-json/<prefix>\` packages the project depends on`)
+
+      for (const name of matches)
+        found.set(`${ICONS}${name}`, `${ICONS}${name}`)
+    }
+  }
+
+  for (const pattern of patterns.filter(pattern => pattern.startsWith(`!${ICONS}`))) {
+    for (const name of matching(pattern.slice(1)))
+      found.delete(`${ICONS}${name}`)
+  }
+
+  return found
+}
+
+// `~icons/tabler/{home,mail}` as `~icons/tabler/home` and `~icons/tabler/mail`, each of which must match something.
+function expandAlternatives(pattern: string): string[] {
+  const group = ALTERNATIVES.exec(pattern)
+
+  if (group === null)
+    return [pattern]
+
+  return group[1]!.split(',').flatMap(option => expandAlternatives(pattern.slice(0, group.index) + option + pattern.slice(group.index + group[0].length)))
 }
 
 // The files the module's `import.meta.glob` calls match, for a build that follows imports without running the module, such as the stylesheet build.
 export function globbedFiles(code: string, importer: string, root: string, loader: Bun.JavaScriptLoader): string[] {
-  return code.includes(GLOB_CALL) ? globCalls(code, importer, loader).flatMap(call => [...globFiles(call.patterns, importer, root).values()]) : []
+  return code.includes(GLOB_CALL) ? globCalls(code, importer, loader).flatMap(call => [...globFiles(call.patterns, importer, root).values()].filter(file => !file.startsWith(ICONS))) : []
 }
 
 // The module with each `import.meta.glob` call replaced by the record of the files it matches, as Vite does: each module, or with `import` one of its exports, imported up front when `eager`, else behind a function importing it.
@@ -116,8 +167,8 @@ function globCalls(code: string, importer: string, loader: Bun.JavaScriptLoader)
       if (patterns.length === 0 || patterns.includes(undefined))
         throw refuse('takes its patterns as strings written in the call')
 
-      if (patterns.some(pattern => !RELATIVE.test(pattern!.replace(NEGATED, '')) && !pattern!.replace(NEGATED, '').startsWith('/')))
-        throw refuse('takes patterns starting with ./, ../ or / for the project\'s root')
+      if (patterns.some(pattern => !RELATIVE.test(pattern!.replace(NEGATED, '')) && !pattern!.replace(NEGATED, '').startsWith('/') && !pattern!.replace(NEGATED, '').startsWith(ICONS)))
+        throw refuse(`takes patterns starting with ./, ../ or / for the project's root, or ${ICONS} for icons: ${ICON_USAGE}`)
 
       const options = second === undefined ? [] : objectProperties(second)
       const call: GlobCall = { start: path.node.start!, end: path.node.end!, patterns: patterns as string[], eager: false }

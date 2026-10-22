@@ -468,4 +468,16 @@ svg({...icon})
 
 Search on the server and send the props to an island. A set imported in an island ships whole to the browser.
 
+An icon an island knows by name, from data such as `icon: 'war-pick'`, has `import.meta.glob` bundle just those icons. An `~icons/` pattern matches the icons and aliases of the installed sets with a glob's `*`, `{a,b}` and `!`, and each value is the props an import gives.
+
+```ts
+import type { IconProps } from 'kay/icons'
+
+const ICONS = import.meta.glob<IconProps>('~icons/game-icons/{war-pick,axe-swing}', { eager: true, import: 'default' })
+
+const draw = (name: string) => ICONS[`~icons/game-icons/${name}`]
+```
+
+A name that no installed set has fails the build, as a misspelt import does.
+
 <ReadMore href="/llms/images">Fixed-width images, the limits on remote images, share cards, AVIF settings and `processImage`.</ReadMore>
