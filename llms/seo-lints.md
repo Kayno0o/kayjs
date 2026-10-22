@@ -1,5 +1,11 @@
 # SEO lints
 
+## Common tasks
+
+- Make a site public to read it: set `site` or `seo` in kay.config.ts, or export it with `kay build --static`; `kay check --only seo` lists the ones read without rendering, `kay build` all of them.
+
+## Reference
+
 - The `seo` group reads what search engines and social networks see of a public site: one with `site` or `seo` set, or exported with `kay build --static`.
 - On any other site they are allowed unless `lints` sets them or `seo`.
 - No `// kay-allow` comment reaches them, as no template reports them.
