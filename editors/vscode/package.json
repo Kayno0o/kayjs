@@ -5,11 +5,19 @@
   "version": "1.70.0",
   "description": "Language support for .kay components: highlighting, diagnostics, hover, completion, go-to-definition and formatting through the kay language server",
   "license": "MIT",
+  "homepage": "https://kayjs.kaynooo.fr",
   "repository": {
     "type": "git",
     "url": "https://github.com/Kayno0o/kayjs",
     "directory": "editors/vscode"
   },
+  "keywords": [
+    "kay",
+    "kayjs",
+    "bun",
+    "pug",
+    "template"
+  ],
   "categories": [
     "Programming Languages"
   ],
@@ -121,13 +129,5 @@
     "vscode-languageclient": "10.1.2",
     "vscode-oniguruma": "2.0.1",
     "vscode-textmate": "9.3.2"
-  },
-  "homepage": "https://kayjs.kaynooo.fr",
-  "keywords": [
-    "kay",
-    "kayjs",
-    "bun",
-    "pug",
-    "template"
-  ]
+  }
 }
