@@ -1,10 +1,10 @@
 import type { Guard, GuardContext } from 'kay'
 import { log } from './log'
 
-// The part of kayjs-auth's `ctx.locals.auth` the cms reads: found by its shape, so the cms works without it installed.
 // Set by a kayjs-auth whose `requireUser()` reads `require`; an older one ignores it and would admit every signed-in user.
 const REQUIRES = Symbol.for('kayjs-auth.requires')
 
+// The part of kayjs-auth's `ctx.locals.auth` the cms reads: found by its shape, so the cms works without it installed.
 interface AuthLike {
   bareUser?: () => Promise<MemberLike | null>
   user?: () => Promise<MemberLike | null>
