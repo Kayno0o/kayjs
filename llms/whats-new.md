@@ -4,12 +4,6 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
-- A `--- module` fence holds module-level code whose exports other files import from the `.kay` file, typed for them ([Components](components.md#file-layout)).
-- `kay check` warns of a static component rendering as an island (`promoted-island`), `// kay-island` and `// kay-static` mark what a component is meant to be (`island-marker`), and the editor shows a lens saying whether it is an island and why ([Islands](islands.md#islands)).
-- The language server completes element, attribute, prop and block names, route paths, `t()` keys and lint names, and offers an outline, folding, a fix-all-on-save action and import updates when a `.kay` file is renamed ([Editor](editor-and-agent-commands.md)).
-- `style:prop={value}` sets one CSS property of an element, and `onSubmit|preventDefault={save}` calls `preventDefault` or `stopPropagation` before a handler ([Templates](templates.md)).
-- `bind:group` on radios and checkboxes, `bind:open` on `details` and `dialog`, `bind:files` on file inputs, and a `ref` returning a cleanup ([Templates](templates.md)).
-- A class held in data, `color: 'text-blue-200'` in rows a parent hands a child writing `class={item.color}` or in a JSON file it imports, keeps its rule on the page with no warning and no `@source inline` ([Styles and assets](styles-and-assets.md)).
 - A component call can hand several parts on to the component it calls, `Busy(part="root spinner")`, so a Button with an `onClick` takes the `spinner` part of `button.kay` in `src/ui.ts` like every other Button ([Styling](../llms/styles-and-assets.md)).
 - kayjs-ui `Accordion`, `Skeleton`, `Progress`, `Breadcrumb`, `RadioGroup` and the MarkdownEditor preview take parts, so `src/ui.ts` restyles each piece and a `class` object reaches it ([Setup](../packages/ui/llms/setup.md)).
 - kayjs-ui's `IconButton` takes a snippet for its `icon`, `BareIconButton` draws a button around your own `svg` without the default icons, `Textarea` takes a parent's write while focused with `writeFocused`, and Chat draws its field with Textarea and its Try again button without kayjs-ui's default icons ([Forms](../packages/ui/llms/forms.md)).
@@ -116,6 +110,16 @@ The rest of this release is in [What's new, older releases](whats-new-archive.md
 - A `pg-orm.config.ts` may import the app's `db` module: `kay/test/preload` loads the project modules the config pulled in again once the test database exists, so the tests never run on the original one ([Test databases and setup](testing-setup.md)).
 - [Recipes](recipes.md) build a database CRUD, a dashboard behind sign-in with roles, and a blog with tags, RSS and a sitemap, each with its test.
 - kayjs-auth names its methods `list*`, `get*`, `revoke*` and `delete*` (`listSessions()`, `getOrganization(ref)`, `revokeSession(id)`, `revokeBearerToken(id)`, `updatePasskeyName`, `rejectInvitation` and `updateLocale` answering `{ ok }`), the old names kept three minors ([Setup](../packages/auth/llms/setup.md)).
+- A `--- module` fence holds module-level code whose exports other files import from the `.kay` file, typed for them ([Components](components.md#file-layout)).
+- `kay check` warns of a static component rendering as an island (`promoted-island`), `// kay-island` and `// kay-static` mark what a component is meant to be (`island-marker`), and the editor shows a lens saying whether it is an island and why ([Islands](islands.md#islands)).
+- The language server completes element, attribute, prop and block names, route paths, `t()` keys and lint names, and offers an outline, folding, a fix-all-on-save action and import updates when a `.kay` file is renamed ([Editor](editor-and-agent-commands.md)).
+- `style:prop={value}` sets one CSS property of an element, and `onSubmit|preventDefault={save}` calls `preventDefault` or `stopPropagation` before a handler ([Templates](templates.md)).
+- `bind:group` on radios and checkboxes, `bind:open` on `details` and `dialog`, `bind:files` on file inputs, and a `ref` returning a cleanup ([Templates](templates.md)).
+- A class held in data, `color: 'text-blue-200'` in rows a parent hands a child writing `class={item.color}` or in a JSON file it imports, keeps its rule on the page with no warning and no `@source inline` ([Styles and assets](styles-and-assets.md)).
+- `kay fmt --stdin [path]` formats a source from stdin for an editor's formatter, with the Neovim, Helix and Zed setup in the docs guide Other editors ([Format the templates](check-and-tools.md#format-the-templates)).
+- `kay dev` type-checks the project beside the server after each change, its errors in the dev tool's Problems tab, `.kay/dev/errors.json` (`kind: 'type'`) and the terminal, and `--no-types` turns it off ([kay dev](dev-server.md)).
+- The VS Code extension `kaynooo.kay` is built for the Marketplace and Open VSX and attached to each release as a `.vsix`, serves every project of a monorepo or multi-root workspace, a nested one with its own server, starts once kay is installed, and has commands, `kay.lsp.trace` and snippets; `kay new` recommends it and formats `.kay` on save ([Serve an editor](editor-and-agent-commands.md#serve-an-editor)).
+- `kay check --watch` checks a change to `.kay` files alone in its own process, about 0.4 s faster on a large app, and `kay check` types the project while it reads the collections, a one-line edit of a large app taking about 0.7 s instead of 1.0 s ([Check and tools](check-and-tools.md)).
 - A browser error's stack under `kay dev` is on `.kay` lines in `.kay/dev/errors.json` (`at` filled) and in the dev tool's Problems tab, not on chunk positions ([Errors without a browser](dev-server.md)).
 - The language server checks the edited component first as you type, then the open components importing it after a quiet spell, and no other, so many open files no longer slow each edit; a save still checks them all.
 
