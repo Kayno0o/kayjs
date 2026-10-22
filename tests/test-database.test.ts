@@ -80,6 +80,39 @@ async function run(dir: string, args: string[]): Promise<{ code: number, report:
 }
 
 describe('kay/test/preload\'s database for each test file', () => {
+  it('points a db the config imports from the app at the copy too', async () => {
+    const dir = await project(true)
+
+    await Bun.write(join(dir, 'src', 'db.ts'), `import { Database, defineTable } from '@kaynooo/pg-orm'
+
+export const Member = defineTable('member', f => ({
+  id: f.serial().primaryKey(),
+  name: f.varchar(40).unique(),
+}))
+
+export const db = new Database({ url: process.env.DATABASE_URL, tables: [Member] })
+`)
+    await Bun.write(join(dir, 'pg-orm.config.ts'), "import { defineConfig } from '@kaynooo/pg-orm'\nimport { db } from './src/db'\n\nexport default defineConfig({ db })\n")
+    await Bun.write(join(dir, 'tests', 'seed.ts'), "import { Member } from '../src/db'\n\nexport default async function seed(db) {\n  await db.repo(Member).write.insertOne({ name: 'Ada' })\n}\n")
+    await Bun.write(join(dir, 'tests', 'one.test.ts'), `import { expect, it } from 'bun:test'
+import { Member, db } from '../src/db'
+
+it('queries the copy', async () => {
+  expect((await db.repo(Member).read.findMany()).map(member => member.name)).toEqual(['Ada'])
+  console.log('URL ' + process.env.DATABASE_URL)
+  await db.close()
+})
+`)
+    await rm(join(dir, 'tests', 'two.test.ts'))
+
+    const { code, report } = await run(dir, ['--isolate'])
+
+    expect(report).toContain('1 pass')
+    expect(code).toBe(0)
+    expect(report).not.toContain('URL sqlite://data/test.db')
+  }, 60_000)
+
+
   it('gives each file a copy of the migrated, seeded database, and drops it after, from the config alone', async () => {
     const dir = await project(true)
     const { code, report } = await run(dir, ['--isolate'])

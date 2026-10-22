@@ -21,6 +21,7 @@ export async function copyTestDatabase(root: string): Promise<void> {
     throw new Error('kay: this project has a test database, which every test file would share without isolation and see each other\'s rows in: run the tests as `kay test`, or `bun test --isolate`')
 
   const { testDatabase } = await import('@kaynooo/pg-orm')
+  const before = new Set(Object.keys(require.cache))
   const { db, migrationsDir = 'migrations' } = (await import(configFile) as { default: Partial<PgOrmConfig> | undefined }).default ?? {}
 
   if (db === undefined)
@@ -35,6 +36,12 @@ export async function copyTestDatabase(root: string): Promise<void> {
   const database = await testDatabase({ url, migrationsDir: resolve(root, migrationsDir), tables: [...db.getTablesRegistry().values()], ...seed && { seed } })
 
   process.env.DATABASE_URL = database.url
+
+  // A config importing the app's own modules (`./src/db`) built their `db` on the original url: forgetting them makes the test file's imports build it again on the copy.
+  for (const path of Object.keys(require.cache)) {
+    if (!before.has(path) && path.startsWith(`${root}/`) && !path.includes('/node_modules/'))
+      delete require.cache[path]
+  }
 
   afterAll(async () => {
     await database.drop()
