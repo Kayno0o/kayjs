@@ -17,8 +17,24 @@ async function run(source: string) {
   return { code: await child.exited, output: out + err }
 }
 
+// Source for a nested test to wait until the sleeps exist: a spawn returns before the shell forked or the process executed its command, and the scan at the end of the file finds only what exists by then.
+const SLEEPS_EXIST = `async function sleepsExist(...seconds: string[]) {
+  for (const second of seconds) {
+    for (let tries = 0; Bun.spawnSync(['pgrep', '-f', '^sleep ' + second]).exitCode !== 0; tries++) {
+      if (tries === 400)
+        throw new Error('sleep ' + second + ' never started')
+
+      await Bun.sleep(25)
+    }
+  }
+}`
+
 test('a file that leaves a process running fails, naming its command', async () => {
-  const { code, output } = await run(`test('leaks', () => { Bun.spawn(['sleep', '4711']) })`)
+  const { code, output } = await run(`${SLEEPS_EXIST}
+  test('leaks', async () => {
+    Bun.spawn(['sleep', '4711'])
+    await sleepsExist('4711')
+  })`)
 
   expect(code).not.toBe(0)
   expect(output).toContain('this file left 1 process running')
@@ -26,10 +42,12 @@ test('a file that leaves a process running fails, naming its command', async () 
 }, 30_000)
 
 test('a detached process, one started with its own env and one nested deeper are found', async () => {
-  const { code, output } = await run(`test('leaks', () => {
+  const { code, output } = await run(`${SLEEPS_EXIST}
+  test('leaks', async () => {
     Bun.spawn(['sh', '-c', 'setsid sleep 4712 >/dev/null 2>&1 &'])
     Bun.spawn({ cmd: ['sh', '-c', 'setsid sleep 4713 >/dev/null 2>&1 &'], env: { PATH: process.env.PATH } })
     Bun.spawn(['sh', '-c', 'sh -c "setsid sleep 4714 >/dev/null 2>&1 &" & wait'])
+    await sleepsExist('4712', '4713', '4714')
   })`)
 
   expect(code).not.toBe(0)
