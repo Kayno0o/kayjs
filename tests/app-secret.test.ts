@@ -15,7 +15,7 @@ import { setupPreview, previewUrl } from '${ROOT}/src/server/preview'
 Date.now = () => 1_000_000
 const signature = (secret) => { setupPreview(secret === undefined ? {} : { secret }, ''); return previewUrl('/') }
 const build = (secret) => new Elysia().use(session(secret === undefined ? {} : { secret })).get('/set', async ({ session }) => { await session.set('n', 1); return 'ok' }).get('/get', async ({ session }) => String(await session.get('n') ?? 'none'))
-const cookieOf = async (app) => (await app.handle(new Request('http://localhost/set'))).headers.getSetCookie().find(c => c.startsWith('session=')).split(';')[0]
+const cookieOf = async (app) => (await app.handle(new Request('http://localhost/set'))).headers.getSetCookie().find(c => c.startsWith('kay_session=')).split(';')[0]
 const read = async (app, cookie) => (await (await app.handle(new Request('http://localhost/get', { headers: { cookie } }))).text())
 `
 
