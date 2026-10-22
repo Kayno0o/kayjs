@@ -339,7 +339,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   refuseOptions(options)
 
   const publicModules = options.publicEnv ? await loadPublicModules(root) : []
-  const setup = await setupPages(project, loadClient, false, location => spell(location), scanned => refuseScanned(project, scanned))
+  const setup = await setupPages(project, loadClient, false, location => spell(location), scanned => refuseScanned(project, scanned), exported)
   const { served, table, publicServed, redirects, mcpAt } = setup.claimed
   const { source, client, mounts, matchers, collections, i18n, locales, base, site, scripts, styles, renderOptions, cards, endpoints, appManifest, extensions, api: apiImport } = setup
   const routes = await servedRoutes(setup.routes, setup.claimed.routes, options.requireGuards)
