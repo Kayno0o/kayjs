@@ -8,13 +8,13 @@ export interface CapturedLoad {
 export type CapturedModule = () => { contents: string, loader: 'js' }
 
 // What a plugin set up outside a bundle would register for the runtime, kept instead of registered: the loads it answers and the virtual modules it gives, which a caller runs itself.
-export async function capturedLoads(plugin: BunPlugin): Promise<{ loads: CapturedLoad[], modules: Map<string, CapturedModule> }> {
+export async function capturedLoads(plugin: BunPlugin, onResolve: PluginBuilder['onResolve'] = (() => undefined) as unknown as PluginBuilder['onResolve']): Promise<{ loads: CapturedLoad[], modules: Map<string, CapturedModule> }> {
   const loads: CapturedLoad[] = []
   const modules = new Map<string, CapturedModule>()
   const view = {
     onStart: () => undefined,
     onEnd: () => undefined,
-    onResolve: () => undefined,
+    onResolve,
     config: undefined,
     onLoad: (options: { filter: RegExp, namespace?: string }, callback: CapturedLoad['callback']) => {
       if (options.namespace === undefined)

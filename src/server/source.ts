@@ -32,7 +32,7 @@ export interface ProjectSource {
   has: (file: string) => boolean
   // A server started from the build reads which templates read `ctx` from its record, not from the templates.
   routes: (project: Pick<Project, 'root' | 'mode' | 'paths'>, mounts: RouteMount[]) => Promise<Route[]>
-  fallback: (routesDir: string, mounts: RouteMount[]) => Promise<SpecialPages>
+  fallback: (project: Pick<Project, 'root' | 'mode' | 'paths'>, mounts: RouteMount[]) => Promise<SpecialPages>
   api: (root: string, config: Pick<KayConfig, 'api' | 'extensions'>) => Promise<ApiModule[]>
   endpoints: (routesDir: string, mounts: RouteMount[]) => Promise<Endpoint[]>
   // The file names under `src/plugins`: an executable holds the ones it was built with.
@@ -87,7 +87,7 @@ const DISK: ProjectSource = {
   },
   has: file => existsSync(file),
   routes: async ({ root, mode, paths }, mounts) => scanRoutes(paths.routes, mounts, mode.prebuilt ? await readContextRecord(paths.output, root) : undefined),
-  fallback: async (routesDir, mounts) => specialPagesOf(routeTrees(routesDir, mounts), ''),
+  fallback: async ({ root, mode, paths }, mounts) => specialPagesOf(routeTrees(paths.routes, mounts), '', mode.prebuilt ? await readContextRecord(paths.output, root) : undefined),
   // Imported as it is asked for, as the API modules' actions read the locales, which read this.
   api: async (root, config) => (await import('./api-modules')).projectApi(root, config),
   endpoints: async (routesDir, mounts) => scanEndpoints(routesDir, mounts),

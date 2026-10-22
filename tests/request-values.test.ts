@@ -227,10 +227,10 @@ describe('a production server started from disk', () => {
   }
 
   // The pages of the server started from the build in `options` in a process of its own, with the files of the compiler it loaded.
-  async function boot(options: string, paths: string[], headers: Record<string, string> = { 'x-user': 'Ada', 'x-roles': 'admin' }) {
+  async function boot(options: string, paths: string[], headers: Record<string, string> = { 'x-user': 'Ada', 'x-roles': 'admin' }, warned = false) {
     const script = `const options = ${options}\nconst { pages } = await import(${JSON.stringify(resolve('src/server'))})\nconst app = await pages(options)\nconst answers = []\nfor (const path of ${JSON.stringify(paths)}) {\n  const response = await app.handle(new Request('http://localhost' + path, { headers: ${JSON.stringify(headers)} }))\n  answers.push({ status: response.status, html: await response.text() })\n}\nconsole.log(JSON.stringify({ answers, loaded: Object.keys(require.cache).filter(key => key.includes('@babel/parser')).length }))\n`
 
-    return JSON.parse(await run(script)) as { answers: { status: number, html: string }[], loaded: number }
+    return JSON.parse(await run(script, warned)) as { answers: { status: number, html: string }[], loaded: number }
   }
 
   // The routes a scan finds and the packages of the compiler it loaded, with the record of the build or without.
@@ -325,6 +325,25 @@ describe('a production server started from disk', () => {
     await rm(resolve(outputDir(root), 'server-modules.json'))
 
     const { answers, loaded } = await boot(options, ['/gated'])
+
+    expect(answers[0]!.status).toBe(200)
+    expect(loaded).toBeGreaterThan(0)
+  }, 120_000)
+
+  it('loads the modules through the loader when the record has another shape or names a file outside the build', async () => {
+    const { root, options } = await project([EXTENSION])
+
+    await build(options)
+
+    const file = resolve(outputDir(root), 'server-modules.json')
+    const record = await Bun.file(file).json() as { files: Record<string, { file: string }> }
+
+    for (const found of Object.values(record.files))
+      found.file = '../../../etc/passwd'
+
+    await Bun.write(file, JSON.stringify(record))
+
+    const { answers, loaded } = await boot(options, ['/gated'], undefined, true)
 
     expect(answers[0]!.status).toBe(200)
     expect(loaded).toBeGreaterThan(0)

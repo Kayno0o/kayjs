@@ -1,4 +1,4 @@
-import type { OnLoadArgs, OnLoadResult } from 'bun'
+import type { OnLoadArgs, OnLoadResult, PluginBuilder } from 'bun'
 import type { CapturedLoad } from '../build/captured-loads'
 import { readFileSync, realpathSync } from 'node:fs'
 import { join, relative, resolve, sep } from 'node:path'
@@ -10,6 +10,7 @@ import { readServerRecord, ROOT_TOKEN, SERVER_DIR } from './server-record'
 
 const REGEX_SYNTAX = /[$()*+.?[\\\]^{|}]/g
 const registered = new Map<string, Promise<boolean>>()
+const ROOT_TOKEN_ALL = new RegExp(ROOT_TOKEN, 'g')
 
 // The runtime wants an answer from every load, so a script the loader leaves as it is is read.
 async function asIs(path: string): Promise<OnLoadResult> {
@@ -24,11 +25,15 @@ export async function registerPrebuiltLoader(root: string, output: string): Prom
 
   registered.set(base, known)
 
+  // A build recorded later is looked for again.
+  if (!await known)
+    registered.delete(base)
+
   return known
 }
 
-async function register(base: string, output: string): Promise<boolean> {
-  const root = base
+async function register(root: string, output: string): Promise<boolean> {
+  const base = root
   const record = await readServerRecord(output)
 
   if (record === undefined)
@@ -39,13 +44,14 @@ async function register(base: string, output: string): Promise<boolean> {
   const prefix = base.endsWith(sep) ? base : base + sep
   const scripts = new RegExp(`^${prefix.replace(REGEX_SYNTAX, '\\$&')}(?!(?:.*/)?node_modules/).*\\.(?:m?ts|tsx)$`)
   let loads: Promise<CapturedLoad[]> | undefined
+  let onResolve: PluginBuilder['onResolve'] | undefined
 
   // What the loader would answer: set up on the first module the record cannot answer.
   const compiled = async (args: OnLoadArgs): Promise<OnLoadResult> => {
     loads ??= (async () => {
       const [{ kay }, { capturedLoads }] = await Promise.all([import('../build/plugin'), import('../build/captured-loads')])
 
-      return (await capturedLoads(kay({ target: 'ssr', root, cacheDir: projectPaths(root).cache, settings: record.settings, placeholder: record.placeholder }))).loads
+      return (await capturedLoads(kay({ target: 'ssr', root, cacheDir: projectPaths(root).cache, settings: record.settings, placeholder: record.placeholder }), onResolve)).loads
     })()
 
     return (await loads).find(load => load.filter.test(args.path))?.callback(args) ?? asIs(args.path)
@@ -53,7 +59,7 @@ async function register(base: string, output: string): Promise<boolean> {
 
   const answer = async (args: OnLoadArgs): Promise<OnLoadResult> => {
     const name = relative(base, args.path).split(sep).join('/')
-    const found = record.files[name]
+    const found = Object.hasOwn(record.files, name) ? record.files[name] : undefined
 
     if (found === undefined)
       return covered.has(name) ? asIs(args.path) : compiled(args)
@@ -61,12 +67,13 @@ async function register(base: string, output: string): Promise<boolean> {
     if (Bun.hash(await Bun.file(args.path).bytes()).toString(36) !== found.hash)
       return compiled(args)
 
-    return { contents: (await Bun.file(join(output, SERVER_DIR, found.file)).text()).replaceAll(ROOT_TOKEN, base), loader: found.loader }
+    return { contents: (await Bun.file(join(output, SERVER_DIR, found.file)).text()).replace(ROOT_TOKEN_ALL, () => base), loader: found.loader }
   }
 
   plugin({
     name: 'kay-prebuilt',
     setup(build) {
+      onResolve = build.onResolve.bind(build)
       build.onLoad({ filter: KAY_FILE }, answer)
       build.onLoad({ filter: ASSET_FILE }, answer)
 

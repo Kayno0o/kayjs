@@ -106,7 +106,8 @@ export async function kayLibrariesOf(root: string): Promise<KayLibrary[]> {
     return libraries
   }
   catch (error) {
-    foundLibraries.delete(real)
+    if (foundLibraries.get(real) === entry)
+      foundLibraries.delete(real)
 
     throw error
   }

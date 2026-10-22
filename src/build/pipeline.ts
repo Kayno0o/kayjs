@@ -130,7 +130,6 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
   let bundleMs = 0
 
   resetCacheCounts()
-  await clearServerRecord(project.paths.output)
 
   if (options.fresh)
     await rm(project.paths.cache, { recursive: true, force: true })
@@ -166,6 +165,7 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
 
   // The build's own prerender scans the routes, which must not take the record of the last build.
   await rm(join(output, CONTEXT_RECORD), { force: true })
+  await clearServerRecord(output)
 
   let step: string | undefined
   const report: Report = (progress) => {
@@ -284,7 +284,17 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
   }
 
   await recordContextReads(project)
-  await writeServerRecord(project)
+
+  // Only a faster boot is lost with the record, so a build that cannot make it goes on without.
+  if (!exported) {
+    try {
+      await writeServerRecord(project)
+    }
+    catch (error) {
+      await clearServerRecord(output)
+      console.warn(`kay build could not record the server modules, so a server on disk compiles them as they load: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
 
   if (options.compile) {
     const stage = performance.now()
