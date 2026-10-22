@@ -66,6 +66,13 @@ describe('dates', () => {
     expect(monthTitle('nope', 'en')).toBe('nope')
   })
 
+  test('keeps drawing past the formatter cache cap', () => {
+    for (let index = 0; index < 500; index++)
+      monthTitle('2026-10-21', `en-u-x${index}`)
+
+    expect(monthTitle('2026-10-21', 'fr')).toBe('octobre 2026')
+  })
+
   test('reads a posted pair in order, an empty or invalid box being open', () => {
     expect(dateRangeFrom('2026-10-20', '2026-10-10')).toEqual(['2026-10-10', '2026-10-20'])
     expect(dateRangeFrom('', '2026-10-10')).toEqual([null, '2026-10-10'])

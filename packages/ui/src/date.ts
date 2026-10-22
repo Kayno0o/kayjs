@@ -125,8 +125,9 @@ export function weekdays(locale: string, firstDay: number): { short: string, lon
 }
 
 const formatters = new Map<string, Intl.DateTimeFormat>()
+const FORMATTER_CAP = 200
 
-// A formatter is slow to build and a calendar asks for the same few dozens of times, so each locale and options pair builds one; a locale the runtime rejects is drawn in English.
+// A formatter is slow to build and a calendar asks for the same few dozens of times, so each locale and options pair builds one; a locale the runtime rejects is drawn in English. The cache is emptied past a cap, so a user-controlled locale string cannot grow it without limit.
 function formatter(locale: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
   const key = `${locale}|${JSON.stringify(options)}`
   let found = formatters.get(key)
@@ -138,6 +139,9 @@ function formatter(locale: string, options: Intl.DateTimeFormatOptions): Intl.Da
     catch {
       found = new Intl.DateTimeFormat('en', { ...options, timeZone: 'UTC' })
     }
+
+    if (formatters.size >= FORMATTER_CAP)
+      formatters.clear()
 
     formatters.set(key, found)
   }

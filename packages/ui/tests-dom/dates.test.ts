@@ -68,6 +68,14 @@ describe('DateInput', () => {
     expect(calendar(root).querySelector('tbody tr td button')?.getAttribute('data-day')).toBe('2026-09-28')
   })
 
+  test('puts the focus on the cursor day as soon as the panel opens, a bound moving it into range', async () => {
+    const root = await dates({ min: '2026-12-03' })
+
+    await open(root)
+
+    expect(focused()).toBe('2026-12-03')
+  })
+
   test('starts its weeks on Sunday when asked', async () => {
     const root = await dates({ firstDay: 0 })
 
