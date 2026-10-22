@@ -1,0 +1,8 @@
+---
+import Button from '@kaynooo/kayjs-ui/button.kay'
+
+const sorted = signal(true)
+---
+.flex.gap-2
+  Button(label="Sorted" pressed={sorted()} onClick={() => sorted.set(!sorted())})
+  Button(label="Done" tone="success")

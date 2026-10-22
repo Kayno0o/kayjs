@@ -157,3 +157,17 @@ test('spinner={false} on a static submit button marks it for the stylesheet, whi
 
   expect([root.querySelector('#quietSubmit')!.getAttribute('data-spinner'), root.querySelector('#send')!.getAttribute('data-spinner')]).toEqual(['off', null])
 })
+
+test('pressed writes aria-pressed on a toggle button, true or false, and leaves a plain button without it', async () => {
+  mounted = await mountComponent('src/components/buttons.kay', { onSave: () => undefined, onSubmit: () => undefined })
+
+  const pressed = (id: string) => mounted!.root.querySelector(`#${id}`)!.getAttribute('aria-pressed')
+
+  expect(['on', 'off', 'pressedAsync', 'other'].map(pressed)).toEqual(['true', 'false', 'true', null])
+})
+
+test('tone success draws the success button', async () => {
+  mounted = await mountComponent('src/components/buttons.kay', { onSave: () => undefined, onSubmit: () => undefined })
+
+  expect(mounted.root.querySelector('#success')!.className).toBe('kui-btn kui-btn-success')
+})

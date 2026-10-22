@@ -6,7 +6,7 @@ description: A button or a link styled as one, with an optional icon and a busy 
 
 ## Variants
 
-`variant` names the form: `solid` (the default), `ghost` or `inline`. `tone` names the meaning: `neutral` (the default), `accent` for the main action or `danger` for a destructive one. `size` goes from `xs` to `lg`, `md` by default.
+`variant` names the form: `solid` (the default), `ghost` or `inline`. `tone` names the meaning: `neutral` (the default), `accent` for the main action, `success` for a confirming one or `danger` for a destructive one. `size` goes from `xs` to `lg`, `md` by default.
 
 
 <Demo name="button/variants" />
@@ -26,6 +26,12 @@ Pass `busy` yourself to decide instead: it has the last word, and it only shows 
 <Demo name="button/busy" />
 
 A button that draws its own progress, such as an overlay in its slot, passes `spinner={false}`: the icon and label stay, and the button is still busy and disabled until its promise settles. Passing `busy={false}` instead would switch the automatic disabling off with it.
+
+## Toggle buttons
+
+`pressed` makes a button a toggle: it writes `aria-pressed` and draws an accent keyline while it is `true`, so a grid of options or an on/off switch needs no CSS and tells assistive technology which is on. A button given no `pressed` is no toggle and writes no `aria-pressed`.
+
+<Demo name="button/pressed" />
 
 ## As a link
 

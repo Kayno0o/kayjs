@@ -249,6 +249,14 @@
     }
   }
 
+  .kui-btn-success {
+    @apply text-kui-success;
+
+    &:hover {
+      --kui-shell-line: var(--color-kui-success);
+    }
+  }
+
   .kui-btn-danger {
     @apply text-kui-error;
 
@@ -294,6 +302,11 @@
 
   .kui-btn:where([data-size='lg']:not([data-variant='inline'])) {
     @apply px-4 py-1.5 text-sm;
+  }
+
+  /* A toggle button that is on: the keyline in the accent, after the variants and tones so it shows on each, and over the hover line. A filled accent button shows no difference, its fill being the accent already. */
+  .kui-btn[aria-pressed='true'] {
+    --kui-shell-line: var(--color-kui-accent);
   }
 
   /* A form field's own controls take this look with no class, all but the inputs a text box does not fit. */
