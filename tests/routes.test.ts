@@ -1,6 +1,6 @@
 import type { DevRequest, DevResponse, DevRoutes } from '../src/server/dev'
 import { rm } from 'node:fs/promises'
-import { join, relative } from 'node:path'
+import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
@@ -151,16 +151,16 @@ async function site() {
     Bun.write(join(api, 'stock.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => []).post(\'/:id\', () => null)\n'),
   ])
 
-  return { routes: relative(process.cwd(), routes), api: relative(process.cwd(), api) }
+  return { root: relative(process.cwd(), dir), routes: 'routes', api: 'api', at: relative(process.cwd(), routes) }
 }
 
 describe('the dev tool\'s data', () => {
   it('says in each dev page what served it: the route, the files, the params and how long each load took, the failed route\'s on its error page', async () => {
-    const { routes, api } = await site()
+    const { root, routes, api, at } = await site()
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
-      const dev = await pages({ routes, api, dev: true })
+      const dev = await pages({ root, routes, api, dev: true })
       const request = async (path: string) => {
         const html = await (await dev.handle(new Request(`http://localhost${path}`))).text()
 
@@ -169,12 +169,12 @@ describe('the dev tool\'s data', () => {
 
       const item = await request('/items/a%3C1')
 
-      expect(item).toMatchObject({ route: '/items/:id', page: `${routes}/items/[id].kay`, layouts: [`${routes}/_layout.kay`], params: { id: 'a<1' }, locale: 'en', status: 200 })
-      expect(item.loads.map(load => load.file)).toEqual([`${routes}/_layout.kay`, `${routes}/items/[id].kay`])
+      expect(item).toMatchObject({ route: '/items/:id', page: `${at}/items/[id].kay`, layouts: [`${at}/_layout.kay`], params: { id: 'a<1' }, locale: 'en', status: 200 })
+      expect(item.loads.map(load => load.file)).toEqual([`${at}/_layout.kay`, `${at}/items/[id].kay`])
       expect(item.loads[1]!.ms).toBeGreaterThanOrEqual(4)
 
-      expect(await request('/broken')).toMatchObject({ route: '/broken', page: `${routes}/_error.kay`, status: 500, error: 'No stock', loads: [{ file: `${routes}/_layout.kay` }, { file: `${routes}/broken.kay` }] })
-      expect(await request('/nowhere')).toMatchObject({ page: `${routes}/_error.kay`, status: 404, loads: [] })
+      expect(await request('/broken')).toMatchObject({ route: '/broken', page: `${at}/_error.kay`, status: 500, error: 'No stock', loads: [{ file: `${at}/_layout.kay` }, { file: `${at}/broken.kay` }] })
+      expect(await request('/nowhere')).toMatchObject({ page: `${at}/_error.kay`, status: 404, loads: [] })
       expect((await request('/nowhere')).route).toBeUndefined()
 
       const listed = await (await dev.handle(new Request(`http://localhost${DEV_ROUTES}`))).json() as DevRoutes
@@ -189,13 +189,13 @@ describe('the dev tool\'s data', () => {
       ])
 
       // An app sending no `Server-Timing` still sees its loads timed in the dev tool.
-      const untimed = await pages({ routes, api, dev: true, serverTiming: false })
+      const untimed = await pages({ root, routes, api, dev: true, serverTiming: false })
       const response = await untimed.handle(new Request('http://localhost/items/1'))
 
       expect(response.headers.has('server-timing')).toBe(false)
       expect((JSON.parse(REQUEST_BLOCK.exec(await response.text())![1]!) as DevRequest).loads[1]!.ms).toBeGreaterThanOrEqual(4)
 
-      const served = await pages({ routes, api })
+      const served = await pages({ root, routes, api })
 
       expect(await (await served.handle(new Request('http://localhost/items/1'))).text()).not.toContain('kay-dev-request')
       expect((await served.handle(new Request(`http://localhost${DEV_ROUTES}`))).status).toBe(404)
@@ -207,7 +207,7 @@ describe('the dev tool\'s data', () => {
 })
 
 const CONTENT = 'tests/fixtures/content'
-const FAVICON = 'tests/fixtures/seo/src/favicon.png'
+const FAVICON = resolve('tests/fixtures/seo/src/favicon.png')
 
 async function listedBy(options: Parameters<typeof pages>[0]): Promise<DevRoutes> {
   const dev = await pages({ prebuilt: false, security: false, dev: true, ...options })
@@ -219,8 +219,7 @@ describe('the dev tool\'s routes served by kay', () => {
   it('lists the sitemap, robots.txt, a feed, the manifest and a library\'s pages, each GET path linked', async () => {
     const library = new Elysia().get('/_kay/lib', () => 'lib').post('/_kay/lib/clear', () => 'cleared')
     const { routes, notes } = await listedBy({
-      routes: `${CONTENT}/src/routes`,
-      content: `${CONTENT}/src/content.config.ts`,
+      root: CONTENT,
       site: 'https://blog.example',
       favicon: FAVICON,
       seo: { name: 'Blog' },
@@ -247,7 +246,7 @@ describe('the dev tool\'s routes served by kay', () => {
     await Bun.write(join(dir, 'routes/index.kay'), 'p Home\n')
     await Bun.write(join(dir, 'routes/robots.txt.ts'), 'export function GET() {\n  return \'User-agent: *\'\n}\n')
 
-    const { routes } = await listedBy({ routes: relative(process.cwd(), join(dir, 'routes')), site: 'https://x.example' })
+    const { routes } = await listedBy({ root: relative(process.cwd(), dir), routes: 'routes', site: 'https://x.example' })
 
     expect(routes.filter(route => route.path === '/robots.txt').map(route => route.kind)).toEqual(['endpoint'])
     expect(routes.find(route => route.path === '/sitemap.xml')?.kind).toBe('kay')
@@ -255,39 +254,41 @@ describe('the dev tool\'s routes served by kay', () => {
 
   it('says why there is no sitemap or robots.txt when `seo` is set with no origin, and nothing when there is one', async () => {
     const dir = await scratchDir('dev-routes-origin-')
-    const routes = relative(process.cwd(), join(dir, 'routes'))
+    const root = relative(process.cwd(), dir)
+    const routes = 'routes'
 
     await Bun.write(join(dir, 'routes/index.kay'), 'p Home\n')
 
-    const without = await listedBy({ routes, seo: { name: 'Shop' } })
+    const without = await listedBy({ root, routes, seo: { name: 'Shop' } })
 
     expect(without.notes).toHaveLength(1)
     expect(without.notes[0]).toContain('no sitemap or robots.txt')
     expect(without.routes.some(route => route.path === '/sitemap.xml')).toBe(false)
-    expect((await listedBy({ routes, seo: { name: 'Shop' }, site: 'https://shop.example' })).notes).toEqual([])
-    expect((await listedBy({ routes })).notes).toEqual([])
+    expect((await listedBy({ root, routes, seo: { name: 'Shop' }, site: 'https://shop.example' })).notes).toEqual([])
+    expect((await listedBy({ root, routes })).notes).toEqual([])
   })
 
   it('answers a path the Routes tab lists as the app\'s with the app\'s route, not the health check', async () => {
     const dir = await scratchDir('dev-routes-health-')
-    const routes = relative(process.cwd(), join(dir, 'routes'))
+    const root = relative(process.cwd(), dir)
+    const routes = 'routes'
 
     await Bun.write(join(dir, 'routes/index.kay'), 'p Home\n')
     await Bun.write(join(dir, 'routes/health.kay'), 'p Mine\n')
     await Bun.write(join(dir, 'routes/up.txt.ts'), 'export function GET() {\n  return \'mine\'\n}\n')
 
-    const own = await pages({ routes, dev: true, health: { path: '/health' } })
+    const own = await pages({ root, routes, dev: true, health: { path: '/health' } })
     const listed = (await (await own.handle(new Request(`http://localhost${DEV_ROUTES}`))).json() as DevRoutes).routes
 
     expect(listed.filter(route => route.path === '/health').map(route => route.kind)).toEqual(['page'])
     expect(await (await own.handle(new Request('http://localhost/health'))).text()).toContain('Mine')
 
-    const endpoint = await pages({ routes, dev: true, health: { path: '/up.txt' } })
+    const endpoint = await pages({ root, routes, dev: true, health: { path: '/up.txt' } })
 
     expect(await (await endpoint.handle(new Request('http://localhost/up.txt'))).text()).toBe('mine')
 
-    const custom = await pages({ routes, dev: true, health: { path: '/ping' } })
-    const standard = await pages({ routes, dev: true })
+    const custom = await pages({ root, routes, dev: true, health: { path: '/ping' } })
+    const standard = await pages({ root, routes, dev: true })
 
     expect((await custom.handle(new Request('http://localhost/ping'))).status).toBe(200)
     expect((await standard.handle(new Request('http://localhost/_kay/health'))).status).toBe(200)
@@ -295,7 +296,9 @@ describe('the dev tool\'s routes served by kay', () => {
 
   it('says how a page was answered: the guards that ran and their outcome, a redirect before it, what `kay build` does with it, the headers and the time', async () => {
     const dir = await scratchDir('dev-routes-answered-')
-    const routes = relative(process.cwd(), join(dir, 'routes'))
+    const root = relative(process.cwd(), dir)
+    const routes = 'routes'
+    const at = relative(process.cwd(), join(dir, 'routes'))
     const members = 'import { guard } from \'kay\'\n\nexport default guard(({ request, redirect, deny }) => {\n  if (request.headers.has(\'x-banned\'))\n    deny(403)\n\n  if (!request.headers.has(\'x-member\'))\n    redirect(\'/login\')\n})\n'
     const vip = 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'x-vip\'))\n    deny(403, \'VIPs only\')\n})\n'
 
@@ -314,7 +317,7 @@ describe('the dev tool\'s routes served by kay', () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
-      const dev = await pages({ routes, dev: true, redirects: { '/old': '/static', '/away': 'https://other.example/static' } })
+      const dev = await pages({ root, routes, dev: true, redirects: { '/old': '/static', '/away': 'https://other.example/static' } })
       const visit = async (path: string, headers: Record<string, string> = {}) => {
         const response = await dev.handle(new Request(`http://localhost${path}`, { headers, redirect: 'manual' }))
         const block = REQUEST_BLOCK.exec(await response.text())
@@ -331,7 +334,7 @@ describe('the dev tool\'s routes served by kay', () => {
       expect((await visit('/members/vip', { 'x-member': '1', 'x-vip': '1' })).request).toMatchObject({ guards: [{ outcome: 'passed' }, { outcome: 'passed' }] })
       const member = await visit('/members', { 'x-member': '1' })
 
-      expect(member.request).toMatchObject({ guards: [{ file: `${routes}/members/_guard.ts`, outcome: 'passed' }] })
+      expect(member.request).toMatchObject({ guards: [{ file: `${at}/members/_guard.ts`, outcome: 'passed' }] })
       // The dev tool reads the phases off the `Server-Timing` header the server recorded.
       expect(Object.fromEntries((await recorded(member.request!.id)).headers)['server-timing']).toMatch(/^guards;dur=\d+\.\d, import;dur=\d+\.\d, loads;dur=\d+\.\d, (?:\S+, )*render;dur=\d+\.\d$/)
       // The live reload's fetch is told apart by a Server-Timing entry next to the page's own phases, which a fetch without its header never gets.
@@ -340,7 +343,7 @@ describe('the dev tool\'s routes served by kay', () => {
       expect(reloaded.response.headers.get('server-timing')).toMatch(/^guards;dur=.*render;dur=\d+\.\d, kay-live-reload$/)
       expect(member.response.headers.get('server-timing')).not.toContain('kay-live-reload')
       expect((await visit('/login', { 'x-kay-live-reload': '1' })).response.headers.get('server-timing')).toContain('kay-live-reload')
-      expect((await visit('/members/vip', { 'x-member': '1' })).request).toMatchObject({ status: 403, guards: [{ outcome: 'passed' }, { file: `${routes}/members/vip/_guard.ts`, outcome: 'denied with 403: VIPs only' }] })
+      expect((await visit('/members/vip', { 'x-member': '1' })).request).toMatchObject({ status: 403, guards: [{ outcome: 'passed' }, { file: `${at}/members/vip/_guard.ts`, outcome: 'denied with 403: VIPs only' }] })
 
       // A guard that redirects: the page it sends the visitor to knows where they came from, and by which guard.
       const refused = await visit('/members')
@@ -351,7 +354,7 @@ describe('the dev tool\'s routes served by kay', () => {
       const login = await visit('/login')
       const answered = await recorded(login.request!.id)
 
-      expect(answered.redirects).toEqual([{ from: '/members', status: refused.response.status, by: `the guard ${routes}/members/_guard.ts` }])
+      expect(answered.redirects).toEqual([{ from: '/members', status: refused.response.status, by: `the guard ${at}/members/_guard.ts` }])
       expect(answered.ms).toBeGreaterThan(0)
       expect(answered.headers.map(([name]) => name)).toContain('x-request-id')
 
@@ -383,7 +386,9 @@ describe('the dev tool\'s routes served by kay', () => {
 
   it('notes no redirect in a production server, and answers the health check past an extension\'s global hooks', async () => {
     const dir = await scratchDir('dev-routes-production-')
-    const routes = relative(process.cwd(), join(dir, 'routes'))
+    const root = relative(process.cwd(), dir)
+    const routes = 'routes'
+    const at = relative(process.cwd(), join(dir, 'routes'))
     const guarded = 'import { guard } from \'kay\'\n\nexport default guard(({ redirect }) => {\n  redirect(\'/login\')\n})\n'
 
     await Promise.all([
@@ -395,7 +400,7 @@ describe('the dev tool\'s routes served by kay', () => {
 
     // A global hook refusing a request to the health route, as an auth extension's would the routes after it.
     const closed = new Elysia().onBeforeHandle({ as: 'global' }, ({ request }) => new URL(request.url).pathname === '/_kay/health' ? new Response('closed', { status: 401 }) : undefined)
-    const settings = { routes, redirects: { '/old': '/login' }, trailingSlash: 'never' as const }
+    const settings = { root, routes, redirects: { '/old': '/login' }, trailingSlash: 'never' as const }
     const outcomes = async (dev: boolean, extensions: NonNullable<Parameters<typeof pages>[0]>['extensions'] = []) => {
       const app = await pages({ ...settings, dev, extensions })
       const noted: (string | undefined)[] = []
@@ -412,7 +417,7 @@ describe('the dev tool\'s routes served by kay', () => {
 
     expect((await outcomes(false)).noted).toEqual([undefined, undefined, undefined])
     expect((await outcomes(true)).noted[0]).toBe('the redirect from /old')
-    expect((await outcomes(true)).noted[2]).toBe(`the guard ${routes}/members/_guard.ts`)
+    expect((await outcomes(true)).noted[2]).toBe(`the guard ${at}/members/_guard.ts`)
     expect((await (await pages({ ...settings, extensions: [{ name: 'closed', server: closed }] })).handle(new Request('http://localhost/_kay/health/'))).status).toBe(200)
     expect((await outcomes(false, [{ name: 'closed', server: closed }])).health).toBe(200)
     expect((await outcomes(true, [{ name: 'closed', server: closed }])).health).toBe(200)
@@ -420,12 +425,12 @@ describe('the dev tool\'s routes served by kay', () => {
 })
 
 describe('the dev tool\'s i18n tab data', () => {
-  const MESSAGES = 'tests/fixtures/layout-query/src/messages'
+  const MESSAGES = resolve('tests/fixtures/layout-query/src/messages')
 
   it('lists the page in each locale under the base and the locale paths, and leaves a site without i18n, or with one locale, out', async () => {
-    const { routes } = await site()
+    const { root, routes } = await site()
     const request = async (options: Parameters<typeof pages>[0], path: string) => {
-      const dev = await pages({ routes, dev: true, security: false, ...options })
+      const dev = await pages({ root, routes, dev: true, security: false, ...options })
       const html = await (await dev.handle(new Request(`http://localhost${path}`))).text()
 
       return JSON.parse(REQUEST_BLOCK.exec(html)![1]!) as DevRequest

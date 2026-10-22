@@ -1,10 +1,11 @@
 import type { I18nConfig } from '../src/config'
+import { resolve } from 'node:path'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { pages } from './shared-pages'
 
-const routes = 'tests/fixtures/locale-actions/src/routes'
-const messages = 'tests/fixtures/i18n/src/messages'
+const root = 'tests/fixtures/locale-actions'
+const messages = resolve('tests/fixtures/i18n/src/messages')
 
 // A plain form post, a form kay's script posts by fetch, and an island calling the action.
 type Post = 'form' | 'swap' | 'island'
@@ -15,7 +16,7 @@ interface Variant { base: string, trailingSlash: 'always' | 'never' | 'ignore', 
 async function serve({ base, trailingSlash, prefixDefault, dev }: Variant): Promise<Elysia> {
   const i18n: I18nConfig = { locales: ['fr', 'en'], defaultLocale: 'fr', messages, prefixDefault }
 
-  return new Elysia().use(await pages({ routes, prebuilt: false, security: false, site: 'https://x.example', i18n, base: base || undefined, trailingSlash, dev }))
+  return new Elysia().use(await pages({ root, prebuilt: false, security: false, site: 'https://x.example', i18n, base: base || undefined, trailingSlash, dev }))
 }
 
 // The action's URL as the router serves it, the proxy having taken the base off.

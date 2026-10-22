@@ -15,7 +15,7 @@ import { gif } from './gif'
 import { scratchDir } from './scratch'
 
 const HERO = join(import.meta.dir, 'fixtures/images/src/hero.png')
-const ROUTES = 'tests/fixtures/storage/src/routes'
+const ROOT = 'tests/fixtures/storage'
 const STATIC_FIXTURE = 'tests/fixtures/storage-static'
 // A PNG of one opaque color, or of a transparent one.
 const flat = (alpha = 255) => new File([new Uint8Array(encodePng(new Uint8Array(40 * 30 * 4).map((_, at) => at % 4 === 3 ? alpha : [200, 100, 50][at % 4]!), 40, 30))], 'flat.png', { type: 'image/png' })
@@ -28,7 +28,7 @@ afterAll(async () => {
 })
 
 async function serve(store: FileStore) {
-  const app = await pages({ routes: ROUTES, prebuilt: false, security: false, storage: store })
+  const app = await pages({ root: ROOT, prebuilt: false, security: false, storage: store })
 
   return async (path: string, headers: Record<string, string> = {}) => app.handle(new Request(`http://localhost${path}`, { headers }))
 }
@@ -341,7 +341,7 @@ describe('stored images', () => {
     const get = await serve(memoryFiles())
     const key = await files.put(await hero())
     const url = `/_kay/image?src=${encodeURIComponent(files.url(key))}&w=640`
-    const variants = cacheDir(process.cwd(), `images${testWorker()}`)
+    const variants = cacheDir(resolve(ROOT), `images${testWorker()}`)
     const made = async () => new Set(await readdir(variants))
 
     await mkdir(variants, { recursive: true })
@@ -357,11 +357,11 @@ describe('stored images', () => {
 
   it('drop the social card drawn on a stored image once it is deleted', async () => {
     const store = memoryFiles()
-    const app = await pages({ site: 'https://storage.example', routes: 'tests/fixtures/storage/src/card-routes', fonts: [{ family: 'Archivo Black', src: 'tests/fixtures/cards/src/fonts/archivo-black-latin-400-normal.woff2' }], prebuilt: false, security: false, storage: store })
+    const app = await pages({ site: 'https://storage.example', root: ROOT, routes: 'src/card-routes', fonts: [{ family: 'Archivo Black', src: resolve('tests/fixtures/cards/src/fonts/archivo-black-latin-400-normal.woff2') }], prebuilt: false, security: false, storage: store })
     const key = await files.put(await hero())
     const html = await (await app.handle(new Request(`http://localhost/?key=${encodeURIComponent(key)}`))).text()
     const card = (/<meta property="og:image" content="https:\/\/storage\.example([^"]+)">/).exec(html)![1]!.replaceAll('&amp;', '&')
-    const variants = cacheDir(process.cwd(), `images${testWorker()}`)
+    const variants = cacheDir(resolve(ROOT), `images${testWorker()}`)
     const made = async () => new Set((await readdir(variants)).filter(name => name.endsWith('.jpg')))
 
     await mkdir(variants, { recursive: true })
@@ -509,7 +509,7 @@ describe('files.variants', () => {
     const get = await serve(memoryFiles())
     const key = await files.put(await hero())
     const other = await files.put(await hero())
-    const variants = cacheDir(process.cwd(), `images${testWorker()}`)
+    const variants = cacheDir(resolve(ROOT), `images${testWorker()}`)
 
     await mkdir(variants, { recursive: true })
     expect((await files.variants([key])).get(key)).toEqual([])
@@ -651,14 +651,14 @@ describe('s3Files', () => {
 
 describe('kay/test', () => {
   it('keeps the files an action stores in memory, fresh for each site', async () => {
-    const site = await testSite({ routes: ROUTES })
+    const site = await testSite({ root: ROOT })
     const { upload } = await import(join(import.meta.dir, 'fixtures/storage/src/routes/index.kay')) as { upload: import('../src/runtime').Action<{ photo: File, locked?: boolean }, string> }
     const key = await site.call(upload, { photo: await hero('cat.png'), locked: true })
 
     expect(key).toMatch(/^private\/photos\/[\da-f]{20}\.1000x600\.png$/)
     expect((await files.get(key))?.size).toBe(Bun.file(HERO).size)
 
-    await testSite({ routes: ROUTES })
+    await testSite({ root: ROOT })
     expect(await files.get(key)).toBeUndefined()
   })
 })
@@ -698,7 +698,7 @@ describe('the upload\'s chunk', () => {
 
 describe.skipIf(browser === undefined && (process.env.CI ?? '') === '')('upload progress', () => {
   it('reports how much of a call carrying files the browser sent, then nothing once it settled', async () => {
-    const site = await testSite({ routes: ROUTES, browser: { path: browser } })
+    const site = await testSite({ root: ROOT, browser: { path: browser } })
 
     try {
       const page = await site.open('/')
