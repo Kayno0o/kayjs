@@ -571,8 +571,15 @@ class Validator {
     // A role naming no widget, as a backdrop's `presentation`, was taken as reachable once: a warning, so such apps keep building.
     if (role === undefined)
       this.lint(at, 'unreachable-click', `This \`${element.name}\` reacts to \`onClick\` but is out of reach of the keyboard and screen readers`, { help: 'use a `button`, or give it a widget\'s `role`, such as `button` or `option`, along with a `tabindex` and a key handler; `// kay-allow unreachable-click` keeps a click a keyboard has another way to, such as a backdrop Escape also closes' })
-    else if (!names.has('aria-modal') && !(role.kind === 'static' && role.text.trim().toLowerCase().split(WHITESPACE).some(token => token === 'dialog' || token === 'alertdialog')))
+    else if (!this.modal(element) && !(role.kind === 'static' && role.text.trim().toLowerCase().split(WHITESPACE).some(token => token === 'dialog' || token === 'alertdialog')))
       this.lint(at, 'unannounced-click', `This \`${element.name}\` reacts to \`onClick\` but its \`role\` names no widget, so screen readers do not announce it as one`, { help: 'use a `button`, or a widget\'s `role`, such as `button` or `option`; `// kay-allow unannounced-click` keeps a click a keyboard has another way to, such as a backdrop Escape also closes' })
+  }
+
+  // `aria-modal` written as an expression may be true, and a written `false` is no backdrop.
+  private modal(element: ElementNode): boolean {
+    const attribute = element.attributes.find(attribute => this.text((attribute as NamedAttribute).name) === 'aria-modal')
+
+    return attribute !== undefined && !(attribute.kind === 'static' && attribute.text.trim().toLowerCase() === 'false')
   }
 
   // An `img` or image button that reserves no room for itself. A spread was left alone by the caller, as `image()` gives its size.

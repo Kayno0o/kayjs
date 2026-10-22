@@ -197,15 +197,21 @@ function mask(source: string): string {
 // The offset after the type arguments opening at `at` (a `<`), an arrow's `=>` not closing one, or -1 when they do not close.
 function typeArgumentsEnd(source: string, at: number): number {
   let depth = 0
+  let braces = 0
 
   for (let end = at; end < source.length && end < at + 400; end++) {
     const char = source[end]
 
-    if (char === '<')
+    if (char === '{')
+      braces++
+    else if (char === '}')
+      braces--
+    else if (char === '<')
       depth++
     else if (char === '>' && source[end - 1] !== '=' && --depth === 0)
       return end + 1
-    else if (char === ';')
+    // A `;` outside an object type ends the statement, so it was a comparison and not type arguments.
+    else if (char === ';' && braces <= 0)
       return -1
   }
 

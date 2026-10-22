@@ -169,7 +169,7 @@ export const LINTS = {
   'unannounced-click': {
     level: 'warn',
     group: 'a11y',
-    summary: 'An element with `onClick` whose `role` names no widget, such as `presentation`, `none` or `region`: a screen reader does not announce it as something to press. `// kay-allow unannounced-click` keeps a click the keyboard has another way to, such as a backdrop Escape also closes. A `dialog` or `alertdialog` role, or `aria-modal`, is a backdrop and left alone.',
+    summary: 'An element with `onClick` whose `role` names no widget, such as `presentation`, `none` or `region`: a screen reader does not announce it as something to press. `// kay-allow unannounced-click` keeps a click the keyboard has another way to, such as a backdrop Escape also closes. A `dialog` or `alertdialog` role, or `aria-modal` other than `"false"`, is a backdrop and left alone.',
     wrong: 'div(role="region" onClick={open}) Details',
     right: 'div(role="button" tabindex="0" onClick={open} onKeyDown={openOnEnter}) Details',
   },

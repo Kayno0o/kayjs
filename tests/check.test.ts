@@ -3370,6 +3370,7 @@ describe.concurrent('kay check, unused code', () => {
         'export const c = infiniteList<() => X>(rows, { size: 6 })',
         'export const d = infiniteList<Map<string, Row>>(rows, { size: 7 })',
         'export const e = other<() => X>({ size: 8 })',
+        'export const f = infiniteList<{ a: 1; b: { c: 2; d: 3 } }>(rows, { size: 9 })',
         '',
       ].join('\n'),
       'src/b.kay': '--- server\nconst x = 1\n---\np don\'t stop\np it\'s odd\nbutton(onClick={() => api({ bodyLimit: "1mb" })}) Go\n',
@@ -3387,11 +3388,12 @@ describe.concurrent('kay check, unused code', () => {
       const { output } = await runCheck(root)
 
       expect(output.match(/deprecated-body-limit/g)).toHaveLength(2)
-      expect(output.match(/deprecated-page-size/g)).toHaveLength(3)
+      expect(output.match(/deprecated-page-size/g)).toHaveLength(4)
       expect(output.match(/deprecated-auth-method/g)).toHaveLength(2)
       await runCheck(root, '--fix')
       expect(await Bun.file(join(root, 'src/a.ts')).text()).toContain('infiniteList<() => X>(rows, { pageSize: 6 })')
       expect(await Bun.file(join(root, 'src/a.ts')).text()).toContain('infiniteList<Map<string, Row>>(rows, { pageSize: 7 })')
+      expect(await Bun.file(join(root, 'src/a.ts')).text()).toContain('{ c: 2; d: 3 } }>(rows, { pageSize: 9 })')
       expect(await Bun.file(join(root, 'src/a.ts')).text()).toContain('other<() => X>({ size: 8 })')
       expect(await Bun.file(join(root, 'src/c.ts')).text()).toBe('export async function f(auth: any, x: number, y: number) {\n  await auth.endSession(x)\n  (y)\n  await auth.endSession(y) || x\n}\n')
     }
