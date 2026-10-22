@@ -17,7 +17,7 @@ async function setup(passkeys?: NonNullable<Parameters<typeof testApp>[0]>['pass
   const app = testApp({
     url: 'https://site.test',
     site: 'Site',
-    ...passkeys && { passkeys },
+    ...passkeys !== undefined && { passkeys },
     ...extra,
     onAuthEvent: (info) => {
       events.push(info)
