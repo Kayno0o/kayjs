@@ -116,7 +116,7 @@ describe('the documentation site', () => {
     expect(header.find(part => part.name === 'nav')!.on).toEqual([{ name: 'SiteNav', component: true }])
 
     for (const component of components) {
-      const written = new Set([...readFileSync(join(root, `packages/ui/src/${component.slug}.kay`), 'utf8').matchAll(PART_ATTRIBUTE)].map(([, names]) => names!.trim().split(WHITESPACE)[0]!))
+      const written = new Set([...readFileSync(join(root, `packages/ui/src/${component.slug}.kay`), 'utf8').matchAll(PART_ATTRIBUTE)].flatMap(([, names]) => names!.trim().split(WHITESPACE)))
       const listed = component.data.parts.map(part => part.name).filter(name => name !== 'root')
 
       expect(new Set(listed).has('root'), component.slug).toBe(false)
