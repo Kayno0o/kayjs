@@ -64,6 +64,22 @@ describe('the shared event poller', () => {
     expect(performance.now() - started).toBeLessThan(2000)
   })
 
+  pgIt('cancels a tagged template statement awaited directly, in a transaction too', async () => {
+    const { sql } = await postgres()
+
+    await expect(timeLimited(async () => {
+      await sql`SELECT pg_sleep(11)`
+    }, 100, 'the read')).rejects.toThrow('the read took more than')
+    await expect(timeLimited(async () => sql.begin(async (tx) => {
+      await tx`SELECT pg_sleep(12)`
+    }), 100, 'the write')).rejects.toThrow('the write took more than')
+    await Bun.sleep(150)
+
+    const [{ busy }] = await sql`SELECT count(*)::int AS busy FROM pg_stat_activity WHERE (query LIKE 'SELECT pg_sleep(11)%' OR query LIKE 'SELECT pg_sleep(12)%') AND state = 'active' AND pid != pg_backend_pid()`
+
+    expect(busy).toBe(0)
+  })
+
   it('does not run a task again before its last run ended', async () => {
     const counter = counted({ db: async () => ({}) as SQL })
     let started = 0

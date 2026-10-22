@@ -170,23 +170,34 @@ function statusOf(row: PgStateRow): StoredJobState['status'] {
 // The statements started inside a `timeLimited` run, which giving up on the run cancels.
 export const startedStatements = new AsyncLocalStorage<Set<{ cancel: () => void }>>()
 
+interface Statement { then: (...args: unknown[]) => unknown }
+
+let tracking = false
+
+// Makes every statement awaited inside a `timeLimited` run, tagged template or `unsafe`, on a connection or a transaction, join the run's set: a statement starts where it is awaited, so the current run is its own.
+export function trackStatements(): void {
+  if (tracking)
+    return
+
+  tracking = true
+
+  // A handle connects only when a statement runs, so this one only reaches the class of the statements.
+  const prototype = Object.getPrototypeOf(new Bun.SQL('postgres://kay@127.0.0.1/kay')`SELECT 1`) as Statement
+  // The patch is the point: a statement is a thenable whose `then` starts it.
+  /* eslint-disable kaynooo/no-then */
+  const then = prototype.then
+
+  prototype.then = function (this: Statement, ...args: unknown[]) {
+    startedStatements.getStore()?.add(this as unknown as { cancel: () => void })
+
+    return then.apply(this, args)
+  }
+  /* eslint-enable kaynooo/no-then */
+}
+
 // What a query resolves with, its rows typed.
-export async function rowsOf<Row>(query: PromiseLike<unknown> & { cancel?: () => void }): Promise<Row[]> {
-  const started = startedStatements.getStore()
-
-  if (started === undefined || query.cancel === undefined)
-    return await query as Row[]
-
-  const statement = { cancel: query.cancel.bind(query) }
-
-  started.add(statement)
-
-  try {
-    return await query as Row[]
-  }
-  finally {
-    started.delete(statement)
-  }
+export async function rowsOf<Row>(query: PromiseLike<unknown>): Promise<Row[]> {
+  return await query as Row[]
 }
 
 export function connectionOf(source: PgJobsSource): SQL {

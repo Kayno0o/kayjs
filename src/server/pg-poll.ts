@@ -1,7 +1,7 @@
 import type { SQL } from 'bun'
 import type { PgHandle } from './pg-data'
 import { kayLog } from '../runtime/log'
-import { startedStatements } from './pg-jobs'
+import { startedStatements, trackStatements } from './pg-jobs'
 
 // How often a process reads what the others wrote, and how long a message is kept for one that reads late.
 export const POLL_MS = 500
@@ -11,9 +11,11 @@ export const DB_TIMEOUT_MS = 30_000
 // Ids this far behind the last one read are read again, as a transaction that began earlier may commit its event after a later one.
 export const OVERLAP = 100
 
-// Gives up on `work` after `ms`, cancelling the statements it still has in flight so they free their connection; what else it does keeps running, its result ignored.
+// Gives up on `work` after `ms`, cancelling the statements it started that are still in flight so they free their connection; what else it does keeps running, its result ignored.
 export async function timeLimited<Result>(work: () => Promise<Result>, ms: number, what: string): Promise<Result> {
   const started = new Set<{ cancel: () => void }>()
+
+  trackStatements()
   let timer: ReturnType<typeof setTimeout> | undefined
 
   try {
