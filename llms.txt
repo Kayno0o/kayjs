@@ -48,6 +48,7 @@ To build a site, read [Build a site](llms/site.md) first. The topic files below 
 - [Islands: state to ids](llms/islands-state-to-ids.md): shared state, transitions, context
 - [Browser-only code](llms/browser-only.md): browser globals on the server, server globals in the browser
 - [Navigation and pages kay does not serve](llms/navigation.md): in-place navigation, islands kept across pages
+- [Navigating from code](llms/navigation-from-code.md): `navigate`, `refresh`, `mount`
 - [Pages and routing](llms/routing.md): file-based routes, params, layouts, `ctx`
 - [Endpoint files, redirects, rewrites, base path](llms/routing-endpoints-and-base.md): `GET`, `redirects`, `rewrite`, `base`
 - [Prerendering and static export](llms/prerendering.md): revalidation, server islands, static export
@@ -62,7 +63,7 @@ To build a site, read [Build a site](llms/site.md) first. The topic files below 
 - [Schemas](llms/schemas.md): one schema for the server, its type read by islands
 - [Protecting actions and limiting requests](llms/action-protection.md): cross-site posts, honeypot, proof of work
 - [Rate limits](llms/rate-limits.md): `rateLimit` on actions, guards and API routes, keys, stores
-- [Stored files](llms/files.md): uploads on disk or in S3, links, resizing, private links, progress
+- [Stored files](llms/files.md): uploads on disk or in S3, links, resizing, progress
 - [Locals, sessions and guards](llms/server.md): `ctx.locals`, cookie sessions, `_guard.ts` guards
 - [Environment variables](llms/environment.md): a typed `defineEnv`, variables read by islands
 - [API routes](llms/api-routes.md): Elysia modules under `src/api/`, CORS, OpenAPI, MCP
@@ -77,21 +78,21 @@ To build a site, read [Build a site](llms/site.md) first. The topic files below 
 - [Lints and warnings](llms/lints.md): every lint at its default level, allowing one, its fix
 - [SEO lints](llms/seo-lints.md): the `seo` group and what each lint reads
 - [Deprecated lints](llms/deprecated-lints.md): old forms and their fixes
-- [Errors](llms/errors.md): the codes of the errors that are no lint, and where each fix is documented
-- [Project setup and scaffolding](llms/project.md): `kay.config.ts`, tsconfig, editor setup, migrating from Astro
+- [Errors](llms/errors.md): the codes of the errors that are no lint, and their fixes
+- [Project setup and scaffolding](llms/project.md): `kay.config.ts`, tsconfig, editor, migrating from Astro
 - [kay new and kay add](llms/project-new-and-add.md): presets, features, adding one, `kay generate`
 - [The dev server](llms/dev-server.md): `kay dev` and its error page
 - [The dev tool](llms/dev-tool.md): its tabs and the problems it lists
 - [Building and starting](llms/build-and-start.md): `kay build`, one executable, static export, `kay start`
-- [Check, inspect and tool commands](llms/check-and-tools.md): `check`, `render`, `routes`, `env`, `doctor`, `upgrade`, `explain`, `fmt`
+- [Check, inspect and tool commands](llms/check-and-tools.md): `check`, `render`, `routes`, `env`, `doctor`, `upgrade`, `fmt`
 - [Language server, screenshot and MCP](llms/editor-and-agent-commands.md): `kay lsp`, `screenshot`, `mcp`
-- [Running in production](llms/production.md): logs, tracing, health checks, shutdown, cron and jobs
+- [Running in production](llms/production.md): logs, tracing, health checks, shutdown, cron, jobs
 - [Queues](llms/queues.md): jobs that survive a restart
 - [Proxies, security headers and compression](llms/proxy-and-security.md): headers, CSP, compression
 - [Upgrading](llms/upgrading.md): what each recent minor breaks, and what an app changes
 - [Upgrading, older releases](llms/upgrading-archive.md): the same for the minors before 1.71
 - [What's new](llms/whats-new.md): what each recent release adds
-- [What's new, older releases](llms/whats-new-archive.md): the same for the releases before 1.71, and the end of a cut one
-- [Privacy and personal data](llms/privacy.md): what kay keeps and for how long, erasing a person
-- [Analytics and Web Vitals](llms/analytics.md): visits and real load times through your origin, consent
-- [Eco-design](llms/eco-design.md): the RGESN criteria kay meets, checks or leaves to the app
+- [What's new, older releases](llms/whats-new-archive.md): the releases before 1.71 and the end of a cut one
+- [Privacy and personal data](llms/privacy.md): what kay keeps, for how long, erasing a person
+- [Analytics and Web Vitals](llms/analytics.md): visits and load times through your origin, consent
+- [Eco-design](llms/eco-design.md): the RGESN criteria kay meets or leaves to the app

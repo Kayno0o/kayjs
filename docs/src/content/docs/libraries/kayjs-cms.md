@@ -789,6 +789,7 @@ Topics of the kayjs-cms reference the sections above do not link:
 - [The editor on the page](/llms/kayjs-cms-editor)
 - [The admin screens](/llms/kayjs-cms-admin)
 - [Arranging and replacing the screens](/llms/kayjs-cms-screens)
+- [Replacing a screen and building one from parts](/llms/kayjs-cms-screens-replacing)
 - [History, the trash and the activity log](/llms/kayjs-cms-history)
 - [Loaders and a live CMS](/llms/kayjs-cms-loaders)
 - [Edit this page link](/llms/kayjs-cms-page-links)

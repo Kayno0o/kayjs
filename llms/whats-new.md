@@ -9,14 +9,14 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## 1.71.0
 
 - kayjs-auth `requireUser({ bare: true })` answers the user without `providers` and reads none, which kayjs-cms's `role` guard now uses ([Setup](../packages/auth/llms/setup.md)).
-- A link whose page the server does not answer within 10 seconds is loaded by the browser, and a view transition stuck for 3 seconds is skipped, instead of leaving the click pending ([Navigation](navigation.md)).
-- A link whose page the server does not answer within 10 seconds is loaded by the browser, and a view transition stuck for 3 seconds is skipped, and a link clicked during a transition is followed, instead of leaving the click pending ([Navigation](navigation.md)).
-- A link whose page the server does not send within 10 seconds is loaded by the browser, and a view transition stuck for 3 seconds is skipped, instead of leaving the click pending ([Navigation](navigation.md)).
-- A link clicked during a view transition skips it and is followed, instead of being ignored ([Navigation](navigation.md)).
-- A `refresh()` landing during a link, `navigate()` or Back no longer cancels it: it waits for the swap and is dropped when the swap changed the URL, so an island polling an action needs no `{ refresh: false }` ([Navigation](navigation.md)).
+- A link whose page the server does not answer within 10 seconds is loaded by the browser, and a view transition stuck for 3 seconds is skipped, instead of leaving the click pending ([Navigation](navigation-from-code.md)).
+- A link whose page the server does not answer within 10 seconds is loaded by the browser, and a view transition stuck for 3 seconds is skipped, and a link clicked during a transition is followed, instead of leaving the click pending ([Navigation](navigation-from-code.md)).
+- A link whose page the server does not send within 10 seconds is loaded by the browser, and a view transition stuck for 3 seconds is skipped, instead of leaving the click pending ([Navigation](navigation-from-code.md)).
+- A link clicked during a view transition skips it and is followed, instead of being ignored ([Navigation](navigation-from-code.md)).
+- A `refresh()` landing during a link, `navigate()` or Back no longer cancels it: it waits for the swap and is dropped when the swap changed the URL, so an island polling an action needs no `{ refresh: false }` ([Navigation](navigation-from-code.md)).
 - A server started from disk imports the modules `kay build` recorded in `.kay/client/server-modules.json` and loads no compiler at boot ([Build and start](build-and-start.md)).
-- kayjs-cms's entry screen swaps its form for a notice linking the collection, the renamed entry or the created one when a leave after a delete, a rename or a create is declined, and `createEntryForm` returns `stranded` ([Screens](../packages/cms/llms/screens.md)).
-- `navigate()` resolves to `false` when a leave guard was declined and the page stayed, `true` otherwise ([Navigation](navigation.md)).
+- kayjs-cms's entry screen swaps its form for a notice linking the collection, the renamed entry or the created one when a leave after a delete, a rename or a create is declined, and `createEntryForm` returns `stranded` ([Screens](../packages/cms/llms/screens-replacing.md)).
+- `navigate()` resolves to `false` when a leave guard was declined and the page stayed, `true` otherwise ([Navigation](navigation-from-code.md)).
 - kayjs-ui's `ConfirmDelete` takes `disabled`, which disables its trigger and confirm button while the caller is busy and keeps an open dialog open ([Dialogs](../packages/ui/llms/basics.md)).
 - kayjs-ui's `IconButton` and `BareIconButton` take `href` and render a link with the same look, parts and tooltip ([Basics](../packages/ui/llms/basics.md)).
 - kayjs-ui `SidePanel(modal={false})` shows a detail beside a live view, the page under it staying interactive, and `closeHref` makes its close button a link for a panel the URL drives ([Page layout](../packages/ui/llms/page-layout-palette-and-trees.md)).

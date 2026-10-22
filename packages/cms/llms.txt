@@ -8,7 +8,8 @@
 - [Options of cms()](llms/options.md): `prefix`, `logo`, `role`, `guard`, `files` and the `CMS_*` variables, `uploads` and their checks, `pageSize`, `collections`, `rawHtml`, `author`, `onSave`, sign-in and roles
 - [The editor on the page](llms/editor.md): edit mode, the markers kay writes, the panel, unsaved drafts, the entries API and the dev tool tab
 - [The admin screens](llms/admin.md): each screen under `<prefix>`: content list, entry form, new entry, translations, media, unused uploads and missing pages
-- [Arranging and replacing the screens](llms/screens.md): `cms({ collections })` for a form's field order, rows and hidden fields and a list's columns and row actions; an app's page at a screen's path; `createEntryForm` and the entry parts to build an entry screen
+- [Arranging and replacing the screens](llms/screens.md): `cms({ collections })` for a form's field order, rows and hidden fields and a list's columns and row actions
+- [Replacing a screen and building one from parts](llms/screens-replacing.md): an app page at a screen path, `createEntryForm` and the entry parts, fixing a refused save
 - [Uploads and image fields](llms/uploads.md): what a file or image field does, the upload route and its limits, the picker, alt text and sizes kept beside an image, and the unused-uploads screen
 - [History, the trash and the activity log](llms/history.md): the last 50 saves of a loaded entry and its deleted entries for 30 days, restorable, and who did what, kept by default; `cms({ history })` and a loader's `sibling`
 - [Loaders and a live CMS](llms/loaders.md): `sqliteLoader` and `pgLoader`, seeding, all-or-nothing saves of several entries, the steps to wire editors saving on a running site, how other processes and outside edits are followed (`watch`), and `onSave`
