@@ -48,7 +48,7 @@ export async function renamedOptions(root: string, options: CheckOptions): Promi
   for (const file of await findProjectFiles(root, SOURCE_FILE, { project: true, ownOnly: true })) {
     const source = await Bun.file(file).text()
 
-    if (!source.includes('@kaynooo/kayjs-'))
+    if (!RENAMES.some(rename => source.includes(rename.package) && source.includes(rename.function) && source.includes(rename.from)))
       continue
 
     const parsed = file.endsWith('.kay') ? parseKay(source) : undefined
