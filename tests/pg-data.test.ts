@@ -92,6 +92,31 @@ pgDescribe('pgData', () => {
     expect(await pgData(sql).sessions.get('a')).toEqual({ user: 1 })
   })
 
+  pgIt('creates an index missing on tables that exist, while a poller reads them', async () => {
+    const sql = await fresh()
+
+    await createDataTables(sql)
+
+    const present = async (name: string): Promise<boolean> => (await rows<{ found: boolean }>(sql, `SELECT to_regclass('${name}') IS NOT NULL AS found`))[0]!.found
+    const stop = new AbortController()
+    const poller = (async () => {
+      while (!stop.signal.aborted)
+        await rows(sql, 'SELECT count(*) FROM kay_sessions, kay_jobs, kay_live_events')
+    })()
+
+    await sql.unsafe('DROP INDEX kay_sessions_expires')
+    await sql.unsafe('DROP INDEX kay_jobs_due')
+    await createDataTables(sql)
+    expect(await present('kay_sessions_expires')).toBe(true)
+    expect(await present('kay_jobs_due')).toBe(true)
+
+    await sql.unsafe('DROP INDEX kay_live_events_at')
+    await pgHandle(sql).db()
+    expect(await present('kay_live_events_at')).toBe(true)
+    stop.abort()
+    await poller
+  })
+
   pgIt('creates the tables once when replicas open it at once', async () => {
     await fresh()
 

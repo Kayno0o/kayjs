@@ -22,9 +22,59 @@ export type PgJobsSource = SQL | { sql: SQL } | string
 const MIGRATION_LOCK = 'kay_jobs'
 const LOST_KEY_TRIES = 3
 const INSUFFICIENT_PRIVILEGE = '42501'
+const DUPLICATE_RELATION = '42P07'
 
 // The names of the tables a store keeps its jobs and schedule locks in, for a pg-orm `ignoreTables` of an app that creates them with `createJobTables`: one that lists the table definitions of `jobTables` from `kay/pg-orm` has no use for it.
 export const jobTables = ['kay_jobs', 'kay_locks'] as const
+
+// An index a kay table keeps, created with its table or, on a table already there, on its own.
+export interface PgIndex { name: string, on: string, unique?: boolean }
+
+const JOB_INDEXES: readonly PgIndex[] = [
+  { name: 'kay_jobs_due', on: 'kay_jobs (queue, failed, run_at)' },
+  { name: 'kay_jobs_key', on: 'kay_jobs (queue, job_key) WHERE job_key IS NOT NULL AND NOT failed', unique: true },
+]
+
+export function indexStatement(index: PgIndex, concurrently: boolean): string {
+  return `CREATE ${index.unique === true ? 'UNIQUE ' : ''}INDEX ${concurrently ? 'CONCURRENTLY ' : ''}IF NOT EXISTS ${index.name} ON ${index.on}`
+}
+
+// Gives the database back after creating the indexes it lacks, unless its role may not: the tables are there, and the app is then run without them rather than stopped.
+export async function withMissingIndexes(db: SQL, indexes: readonly PgIndex[]): Promise<SQL> {
+  try {
+    await createMissingIndexes(db, indexes)
+  }
+  catch (error) {
+    if ((error as { errno?: string }).errno !== INSUFFICIENT_PRIVILEGE)
+      throw error
+  }
+
+  return db
+}
+
+// Whether one of these relations does not exist.
+export async function tablesMissing(db: SQL, names: readonly string[]): Promise<boolean> {
+  const [found] = await rowsOf<{ missing: boolean }>(db.unsafe(`SELECT ${names.map(name => `to_regclass('${name}') IS NULL`).join(' OR ')} AS missing`))
+
+  return found?.missing === true
+}
+
+// Creates the indexes missing on tables that exist, each on its own and concurrently: a plain CREATE INDEX locks its table against writes, and inside a transaction with others it would deadlock with a replica writing several tables.
+export async function createMissingIndexes(db: SQL, indexes: readonly PgIndex[]): Promise<void> {
+  for (const index of indexes) {
+    if (!await tablesMissing(db, [index.name]))
+      continue
+
+    try {
+      await db.unsafe(indexStatement(index, true))
+    }
+    catch (error) {
+      // A replica creating the same index at the same moment won it.
+      if ((error as { errno?: string }).errno !== DUPLICATE_RELATION)
+        throw error
+    }
+  }
+}
 
 function toJob(row: PgJobRow): StoredJob {
   return { id: row.id, queue: row.queue, payload: row.payload, attempts: row.attempts, runAt: Number(row.run_at), ...row.error !== null && { error: row.error }, ...row.job_key !== null && { key: row.job_key }, ...row.progress !== null && { progress: row.progress } }
@@ -49,25 +99,26 @@ export function connectionOf(source: PgJobsSource): SQL {
   return 'sql' in source ? source.sql : source
 }
 
-// Creates `kay_jobs` and `kay_locks` and their indexes unless they exist, for an app whose migrations do not: run it as the database's owner, in a boot script, when the app connects with a role that creates nothing (the app template's `app_rw`). `pgJobs` creates them itself when its role may.
+// Creates `kay_jobs` and `kay_locks` and their indexes unless they exist (an index missing on tables already there is created on its own, without a lock that waits on a writer), for an app whose migrations do not: run it as the database's owner, in a boot script, when the app connects with a role that creates nothing (the app template's `app_rw`). `pgJobs` creates them itself when its role may.
 // Replicas running it together take turns, and tables already there are left alone.
 export async function createJobTables(source: PgJobsSource): Promise<void> {
   const db = connectionOf(source)
 
   try {
-    const [found] = await rowsOf<{ missing: boolean }>(db`SELECT (to_regclass('kay_jobs') IS NULL OR to_regclass('kay_locks') IS NULL OR to_regclass('kay_jobs_due') IS NULL OR to_regclass('kay_jobs_key') IS NULL) AS missing`)
+    if (await tablesMissing(db, jobTables)) {
+      await db.begin(async (tx) => {
+        await tx`SELECT pg_advisory_xact_lock(hashtext(${MIGRATION_LOCK}))`
+        await tx`CREATE TABLE IF NOT EXISTS kay_jobs (id text PRIMARY KEY, queue text NOT NULL, payload text NOT NULL, attempts integer NOT NULL, run_at bigint NOT NULL, held_until bigint, failed boolean NOT NULL DEFAULT false, error text, job_key text, progress text)`
+        await tx`CREATE TABLE IF NOT EXISTS kay_locks (name text NOT NULL, slot bigint NOT NULL, PRIMARY KEY (name, slot))`
 
-    // Tables already there are not locked again, as a CREATE INDEX IF NOT EXISTS would wait on a replica writing them.
-    if (found?.missing !== true)
+        for (const index of JOB_INDEXES)
+          await tx.unsafe(indexStatement(index, false))
+      })
+
       return
+    }
 
-    await db.begin(async (tx) => {
-      await tx`SELECT pg_advisory_xact_lock(hashtext(${MIGRATION_LOCK}))`
-      await tx`CREATE TABLE IF NOT EXISTS kay_jobs (id text PRIMARY KEY, queue text NOT NULL, payload text NOT NULL, attempts integer NOT NULL, run_at bigint NOT NULL, held_until bigint, failed boolean NOT NULL DEFAULT false, error text, job_key text, progress text)`
-      await tx`CREATE INDEX IF NOT EXISTS kay_jobs_due ON kay_jobs (queue, failed, run_at)`
-      await tx`CREATE UNIQUE INDEX IF NOT EXISTS kay_jobs_key ON kay_jobs (queue, job_key) WHERE job_key IS NOT NULL AND NOT failed`
-      await tx`CREATE TABLE IF NOT EXISTS kay_locks (name text NOT NULL, slot bigint NOT NULL, PRIMARY KEY (name, slot))`
-    })
+    await createMissingIndexes(db, JOB_INDEXES)
   }
   finally {
     if (typeof source === 'string')
@@ -101,10 +152,8 @@ export function pgJobs(source: PgJobsSource): JobStore {
   }
 
   const create = async (db: SQL): Promise<SQL> => {
-    const [found] = await rowsOf<{ jobs: string | null, locks: string | null, key: string | null }>(db`SELECT to_regclass('kay_jobs')::text AS jobs, to_regclass('kay_locks')::text AS locks, to_regclass('kay_jobs_key')::text AS key`)
-
-    if (found?.jobs !== null && found?.locks !== null && found?.key !== null)
-      return db
+    if (!await tablesMissing(db, jobTables))
+      return withMissingIndexes(db, JOB_INDEXES)
 
     try {
       await createJobTables(db)

@@ -1,9 +1,9 @@
 import type { SQL } from 'bun'
 import type { AppStore } from './app-store'
-import type { PgJobsSource } from './pg-jobs'
+import type { PgIndex, PgJobsSource } from './pg-jobs'
 import type { SessionStore } from './session'
 import { pgCache } from './pg-cache'
-import { connectionOf, createJobTables, jobTables, pgJobs, rowsOf } from './pg-jobs'
+import { connectionOf, createJobTables, createMissingIndexes, indexStatement, jobTables, pgJobs, tablesMissing, withMissingIndexes } from './pg-jobs'
 import { pgLive } from './pg-live'
 import { pgRooms } from './pg-rooms'
 import { pgRates, pgSessions, pgVitals } from './pg-stores'
@@ -15,6 +15,15 @@ const INSUFFICIENT_PRIVILEGE = '42501'
 
 // The tables `pgData` creates besides the jobs' ones.
 const OWN_TABLES = ['kay_sessions', 'kay_cache', 'kay_events', 'kay_rates', 'kay_meta', 'kay_vitals', 'kay_room_members', 'kay_room_processes', 'kay_room_messages', 'kay_room_state', 'kay_live', 'kay_live_events'] as const
+
+const OWN_INDEXES: readonly PgIndex[] = [
+  { name: 'kay_sessions_expires', on: 'kay_sessions (expires)' },
+  { name: 'kay_events_at', on: 'kay_events (at)' },
+  { name: 'kay_rates_reset', on: 'kay_rates (reset_at)' },
+  { name: 'kay_room_members_process', on: 'kay_room_members (process)' },
+  { name: 'kay_room_messages_at', on: 'kay_room_messages (at)' },
+  { name: 'kay_live_events_at', on: 'kay_live_events (at)' },
+]
 
 // The names of the tables `pgData` keeps its data in, the jobs' included, for a pg-orm `ignoreTables` of an app that creates them with `createDataTables`.
 export const dataTables = [...jobTables, ...OWN_TABLES] as readonly string[]
@@ -32,30 +41,30 @@ export async function createDataTables(source: PgJobsSource): Promise<void> {
   try {
     await createJobTables(db)
 
-    // Tables already there are not locked again: a CREATE INDEX IF NOT EXISTS takes a share lock on its table, which would wait on, and deadlock with, a replica writing several tables.
-    if (!await tablesMissing(db, OWN_TABLES))
+    // Tables already there are not locked again: a CREATE INDEX IF NOT EXISTS takes a share lock on its table, which would wait on, and deadlock with, a replica writing several tables. An index they lack is created on its own.
+    if (!await tablesMissing(db, OWN_TABLES)) {
+      await createMissingIndexes(db, OWN_INDEXES)
+
       return
+    }
 
     await db.begin(async (tx) => {
       await tx`SELECT pg_advisory_xact_lock(hashtext(${MIGRATION_LOCK}))`
       await tx`CREATE TABLE IF NOT EXISTS kay_sessions (id text PRIMARY KEY, data text NOT NULL, expires bigint NOT NULL)`
-      await tx`CREATE INDEX IF NOT EXISTS kay_sessions_expires ON kay_sessions (expires)`
       await tx`CREATE TABLE IF NOT EXISTS kay_cache (key text PRIMARY KEY, value text NOT NULL, fresh_until bigint NOT NULL, reads text)`
       await tx`CREATE TABLE IF NOT EXISTS kay_events (id bigserial PRIMARY KEY, origin text NOT NULL, message text NOT NULL, at bigint NOT NULL)`
-      await tx`CREATE INDEX IF NOT EXISTS kay_events_at ON kay_events (at)`
       await tx`CREATE TABLE IF NOT EXISTS kay_rates (key text PRIMARY KEY, count integer NOT NULL, reset_at bigint NOT NULL)`
-      await tx`CREATE INDEX IF NOT EXISTS kay_rates_reset ON kay_rates (reset_at)`
       await tx`CREATE TABLE IF NOT EXISTS kay_meta (name text PRIMARY KEY, value text NOT NULL)`
       await tx`CREATE TABLE IF NOT EXISTS kay_vitals (day integer NOT NULL, route text NOT NULL, vital text NOT NULL, bucket integer NOT NULL, count bigint NOT NULL, PRIMARY KEY (day, route, vital, bucket))`
       await tx`CREATE TABLE IF NOT EXISTS kay_room_members (room text NOT NULL, connection text NOT NULL, process text NOT NULL, member text NOT NULL, at bigint NOT NULL, PRIMARY KEY (room, connection))`
-      await tx`CREATE INDEX IF NOT EXISTS kay_room_members_process ON kay_room_members (process)`
       await tx`CREATE TABLE IF NOT EXISTS kay_room_processes (process text PRIMARY KEY, seen bigint NOT NULL)`
       await tx`CREATE TABLE IF NOT EXISTS kay_room_messages (id bigserial PRIMARY KEY, room text NOT NULL, text text NOT NULL, process text NOT NULL, skipped text, recipient text, at bigint NOT NULL)`
-      await tx`CREATE INDEX IF NOT EXISTS kay_room_messages_at ON kay_room_messages (at)`
       await tx`CREATE TABLE IF NOT EXISTS kay_room_state (room text PRIMARY KEY, state text NOT NULL)`
       await tx`CREATE TABLE IF NOT EXISTS kay_live (id text NOT NULL, key text NOT NULL, value text NOT NULL, PRIMARY KEY (id, key))`
       await tx`CREATE TABLE IF NOT EXISTS kay_live_events (seq bigserial PRIMARY KEY, origin text NOT NULL, id text NOT NULL, key text NOT NULL, at bigint NOT NULL)`
-      await tx`CREATE INDEX IF NOT EXISTS kay_live_events_at ON kay_live_events (at)`
+
+      for (const index of OWN_INDEXES)
+        await tx.unsafe(indexStatement(index, false))
     })
   }
   finally {
@@ -64,19 +73,13 @@ export async function createDataTables(source: PgJobsSource): Promise<void> {
   }
 }
 
-async function tablesMissing(db: SQL, names: readonly string[]): Promise<boolean> {
-  const [found] = await rowsOf<{ missing: boolean }>(db.unsafe(`SELECT ${names.map(name => `to_regclass('${name}') IS NULL`).join(' OR ')} AS missing`))
-
-  return found?.missing === true
-}
-
 // One connection and one table check for every store of a `pgData`.
 export function pgHandle(db: SQL): PgHandle {
   let ready: Promise<SQL> | undefined
 
   const create = async (): Promise<SQL> => {
     if (!await tablesMissing(db, OWN_TABLES))
-      return db
+      return withMissingIndexes(db, OWN_INDEXES)
 
     try {
       await createDataTables(db)
