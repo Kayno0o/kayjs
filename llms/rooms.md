@@ -122,8 +122,8 @@ export default api()
 - `dispatch` works on the server's `body` and on what an island's `socket` receives, `messages.on(message => dispatch(message, { ... }))`.
 - Rooms live in the process's memory by default.
 - `rooms({ store: sqliteRooms('data/rooms.sqlite') })` shares them between every process of the machine opening the file, as `sqliteJobs` does: `members` lists those connected to any of them, and a message published in one reaches the others as the file changes, and at worst within `poll`, a duration, `'250ms'` by default (`'25ms'` where the folder cannot be watched).
-- A process listens from its first `join` on, never handed what was published before.
-- A process that stops without its connections leaving, such as one that crashed, has its members dropped once it has not been heard from for 10 seconds; one only stalled that long writes them back on its next heartbeat. A process with no connection joined neither beats nor polls, so an idle one costs the file nothing (`pgData(db).rooms` also polls the rooms `members` was asked about). Messages one process publishes reach the others in the order they were published.
+- A process listens from its first `join` on, never handed what was published before; what one process publishes reaches the others in the order it was published.
+- A process that stops without its connections leaving, such as one that crashed, has its members dropped once it has not been heard from for 10 seconds; one only stalled that long writes them back on its next heartbeat. A process with no connection joined neither beats nor polls, so an idle one costs the file nothing (`pgData(db).rooms` also polls the rooms `members` was asked about).
 - `close()` on the store stops its timers and lets go of the file.
 - `sqliteData(path).rooms` is such a store (`pgData(db).rooms` its Postgres twin), and `store: { rooms }` in kay.config.ts is where an island's `presence()` keeps who has a page open ([Presence](live-values.md#presence)); `rooms()` does not read it, as two `rooms()` would meet in the same room names there: name it as `rooms({ store })` to share it.
 - Rooms do not reach other machines.

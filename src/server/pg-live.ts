@@ -96,6 +96,7 @@ export function pgLive(pg: PgHandle): LiveStore {
 
   // Where the events stand: the ones in the overlap are noted as known, so they are not heard again.
   const startAt = async (db: SQL) => {
+    // The table column again, as the text of the select list would give the highest of its text.
     const known = await query<{ seq: string }>(db, 'SELECT seq::text AS seq FROM kay_live_events ORDER BY kay_live_events.seq DESC LIMIT $1', [OVERLAP])
 
     events.start(known.map(event => Number(event.seq)))
@@ -112,7 +113,7 @@ export function pgLive(pg: PgHandle): LiveStore {
         changed.set(at, event)
     }
 
-    // Ordered by the table column: a bare `id` is the text of the select list, where '100' sorts before '99'.
+    // Ordered by the table column: a bare `seq` is the text of the select list, where '100' sorts before '99'.
     for (const event of await query<{ seq: string, id: string, key: string }>(db, 'SELECT seq::text AS seq, id, key FROM kay_live_events WHERE seq > $1::bigint AND origin != $2 ORDER BY kay_live_events.seq', [after, self])) {
       const seq = Number(event.seq)
 

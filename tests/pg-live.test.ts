@@ -101,7 +101,7 @@ pgDescribe('pgData live values', () => {
 
     const onSecond = listen(second)
 
-    await sql.unsafe('ALTER SEQUENCE kay_live_events_seq_seq RESTART WITH 90')
+    await sql.unsafe(`SELECT setval('kay_live_events_seq_seq', greatest(89, (SELECT coalesce(max(seq), 0) FROM kay_live_events)))`)
 
     const keys = Array.from({ length: 30 }, (_, at) => `k${at}`)
 

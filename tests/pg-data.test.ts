@@ -508,7 +508,7 @@ pgDescribe('pgCache', () => {
 
       return polling
     }, 'the receiver to poll')
-    await sql.unsafe('ALTER SEQUENCE kay_events_id_seq RESTART WITH 90')
+    await sql.unsafe(`SELECT setval('kay_events_id_seq', greatest(89, (SELECT coalesce(max(id), 0) FROM kay_events)))`)
 
     const messages = Array.from({ length: 30 }, (_, at) => `{"keys":["k${at}"]}`)
 
@@ -609,7 +609,7 @@ pgDescribe('pgRooms', () => {
     }, 'the other poller to run')
     // The ids are text in the read, so '100' sorted before '99' and a message published after another reached the other replica before it.
     await waitFor(async () => (await rows(sql, 'SELECT id FROM kay_room_messages')).length >= 1, 'the probe row')
-    await sql.unsafe('ALTER SEQUENCE kay_room_messages_id_seq RESTART WITH 90')
+    await sql.unsafe(`SELECT setval('kay_room_messages_id_seq', greatest(89, (SELECT coalesce(max(id), 0) FROM kay_room_messages)))`)
 
     const texts = Array.from({ length: 30 }, (_, at) => `m${at}`)
 
