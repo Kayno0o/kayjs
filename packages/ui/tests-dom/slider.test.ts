@@ -72,3 +72,10 @@ test('posts under its name in a plain form and goes back to its start on a reset
 
   expect([new FormData(form).get('delay'), shown()]).toEqual(['40', '40 ms'])
 })
+
+test('hands id, name and disabled to the input, and a disabled slider posts nothing', async () => {
+  const { root } = await open()
+  const locked = root.querySelector<HTMLInputElement>('#locked')!
+
+  expect([locked.name, locked.disabled, new FormData(root.querySelector<HTMLFormElement>('#form')!).get('locked')]).toEqual(['locked', true, null])
+})

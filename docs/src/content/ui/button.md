@@ -29,7 +29,7 @@ A button that draws its own progress, such as an overlay in its slot, passes `sp
 
 ## Toggle buttons
 
-`pressed` makes a button a toggle: it writes `aria-pressed` and draws an accent keyline while it is `true`, so a grid of options or an on/off switch needs no CSS and tells assistive technology which is on. A button given no `pressed` is no toggle and writes no `aria-pressed`.
+`pressed` makes a button a toggle: it writes `aria-pressed` and draws an accent keyline while it is `true`, on every variant, so a grid of options or an on/off switch needs no CSS and tells assistive technology which is on. A button given no `pressed` is no toggle and writes no `aria-pressed`.
 
 <Demo name="button/pressed" />
 

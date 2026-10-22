@@ -9,7 +9,7 @@ Each component spreads the other attributes it is given onto its root element, `
 - `Icon(icon="close")`: an `svg.kui-icon`. It is decorative unless `label` names it for screen readers. `icon` is a slot or an imported `~icons` icon.
 - `Button(label="Save" tone="accent" icon="plus")`:
   - `variant` names the form: `solid` (the default, framed), `ghost` (no frame until hovered) or `inline` (reads as a link). `tone` names the meaning: `neutral` (the default), `accent` for the main action, `success` for a confirming one or `danger` for a destructive one. `size` is `xs`, `sm`, `md` or `lg`.
-  - `pressed` makes it a toggle button: it writes `aria-pressed` (`true` or `false`) and draws an accent keyline while on, so a row of options or an on/off switch needs no CSS. Leave it out for a button that is no toggle.
+  - `pressed` makes it a toggle button: it writes `aria-pressed` (`true` or `false`) and draws an accent keyline while on, on every variant, so a row of options or an on/off switch needs no CSS. Leave it out for a button that is no toggle.
   - Its label stays on one line; a row of buttons wraps whole buttons, as the dialog and panel footers do.
   - A promise returned by `onClick` holds that button alone busy (spinner in place of the icon, `aria-busy`) and disabled until it settles; a rejection is logged. A `type="submit"` button is busy (spinner, `aria-busy`, clicks ignored) the same way, but not disabled, while its `onClick` or its form's `onSubmit` returns a promise.
   - An explicit `busy` shows a spinner and sets `aria-busy` and has the last word; it does not disable the button.
