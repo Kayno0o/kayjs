@@ -1,4 +1,6 @@
-import { join } from 'node:path'
+import { existsSync } from 'node:fs'
+import { mkdir, symlink } from 'node:fs/promises'
+import { dirname, join, relative } from 'node:path'
 import process from 'node:process'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent } from 'kay/test'
@@ -21,7 +23,15 @@ test('mountComponent applies the src/ui.ts of the project it mounts from', async
   mounted.push(plain)
   expect(plain.root.querySelector('.kui-card')?.className).toBe('kui-card')
 
-  process.env.KAY_ROOT = join(import.meta.dir, '..', 'tests', 'restyle-app')
+  const app = join(import.meta.dir, '..', 'tests', 'restyle-app')
+  const link = join(app, 'node_modules', '@kaynooo', 'kayjs-ui')
+
+  if (!existsSync(link)) {
+    await mkdir(dirname(link), { recursive: true })
+    await symlink(relative(dirname(link), join(import.meta.dir, '..')), link)
+  }
+
+  process.env.KAY_ROOT = app
 
   const restyled = await mountComponent(library('card'), { title: 'x' })
 

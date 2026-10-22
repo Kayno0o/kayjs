@@ -19,7 +19,7 @@ const { title, icon, actions, isEmpty = false, empty, ...rest } = props<Omit<JSX
 ---
 // A dashboard tile: a framed body under a head line of icon, title and actions.
 if empty !== undefined || !isEmpty
-  div({...rest} part="root")
+  div(part="root" {...rest})
     if title || icon || actions
       div(part="head")
         if icon

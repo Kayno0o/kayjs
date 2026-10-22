@@ -62,7 +62,7 @@ const highRef = startRef<HTMLInputElement>((element) => {
 // A reset puts the boxes back on their defaults, which the app's `onChange` then hears of.
 onFormReset(() => low, commit)
 ---
-div({...rest} part="root" role="group" aria-label={label})
+div(part="root" {...rest} role="group" aria-label={label})
   input.kui-field-input(part="box" ref={lowRef} type="number" inputmode="decimal" aria-label={fromLabel ?? wording('ui.rangeInput.fromLabel', '{label} from', { label })} placeholder={min?.toString()} min={min} max={max} step={step} value={value[0] ?? ''} onChange={commit})
   span(part="separator" aria-hidden="true") -
   input.kui-field-input(part="box" ref={highRef} type="number" inputmode="decimal" aria-label={toLabel ?? wording('ui.rangeInput.toLabel', '{label} to', { label })} placeholder={max?.toString()} min={min} max={max} step={step} value={value[1] ?? ''} onChange={commit})

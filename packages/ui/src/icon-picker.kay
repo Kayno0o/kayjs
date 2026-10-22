@@ -152,7 +152,7 @@ function keepEnter(event: KeyboardEvent) {
     event.preventDefault()
 }
 ---
-div({...rest} part="root" ref={ref})
+div(part="root" {...rest} ref={ref})
   if name
     input(type="hidden" name={name} value={picked()} ref={element => hidden = element})
   input.kui-field-input(part="search" ref={element => searchBox = element} type="search" data-kui-search placeholder={placeholder} aria-label={searchLabel} value={typed()} onInput={event => typed.set(event.currentTarget.value)} onKeyDown={keepEnter})

@@ -46,7 +46,7 @@ async function press() {
   timer = setTimeout(() => copied.set(false), durationMs(copiedFor))
 }
 ---
-button.kui-btn({...rest} part="root" type="button" data-variant={variant} data-size={size} onClick={press})
+button.kui-btn(part="root" {...rest} type="button" data-variant={variant} data-size={size} onClick={press})
   // The label not showing is drawn invisibly by CSS from `data-other`, so the button keeps the wider label's width while its text and accessible name stay the one showing.
   span(part="text" data-other={copied() ? label : copiedLabel}) {copied() ? copiedLabel : label}
 // A button's new text is not read out, so the copy is said here too.

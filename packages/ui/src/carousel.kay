@@ -86,7 +86,7 @@ function numbered(text: string, position: number) {
   return text.replaceAll('{n}', String(position + 1)).replaceAll('{count}', String(slides.length))
 }
 ---
-section({...rest} part="root" ref={ref} aria-roledescription="carousel" aria-label={label} onPointerEnter={() => pointed.set(true)} onPointerLeave={() => pointed.set(false)} onFocusIn={() => focused.set(true)} onFocusOut={() => focused.set(false)})
+section(part="root" {...rest} ref={ref} aria-roledescription="carousel" aria-label={label} onPointerEnter={() => pointed.set(true)} onPointerLeave={() => pointed.set(false)} onFocusIn={() => focused.set(true)} onFocusOut={() => focused.set(false)})
   div(part="viewport" style={`aspect-ratio: ${ratio}`} aria-live={autoplay ? 'off' : 'polite'})
     for slide, position of slides key={slide.src}
       div(part="slide" role="group" aria-roledescription="slide" aria-label={numbered(slideLabel, position)} aria-hidden={position === active() ? undefined : 'true'} inert={position !== active()} style={`transform: translateX(${(position - active()) * 100}%)`})

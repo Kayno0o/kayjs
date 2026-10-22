@@ -65,7 +65,7 @@ const steps = () => more === undefined ? undefined : openSteps(limit === undefin
 // Plain links, through the query or at the paths `paginate()` gives, so a page renders on the server, its pages crawlable, and needs no island.
 if steps() as open
   if open.previous || open.next
-    nav({...rest} part="root" aria-label={label})
+    nav(part="root" {...rest} aria-label={label})
       if open.previous
         a(part="step" href={open.previous} rel="prev") {previousLabel}
       else
@@ -75,7 +75,7 @@ if steps() as open
       else
         span(part="step") {nextLabel}
 else if total > 1
-  nav({...rest} part="root" aria-label={label})
+  nav(part="root" {...rest} aria-label={label})
     if shown() > 1
       a(part="step" href={href(shown() - 1)} rel="prev") {previousLabel}
     else

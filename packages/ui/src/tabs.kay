@@ -73,7 +73,7 @@ function keyDown(event: KeyboardEvent) {
   list?.querySelectorAll<HTMLElement>('[role="tab"]')[next]?.focus()
 }
 ---
-div({...rest} part="root")
+div(part="root" {...rest})
   div(part="list" ref={element => list = element} role="tablist" aria-label={label} onKeyDown={keyDown})
     for tab, index of tabs key={tab.value}
       button(part="tab" type="button" role="tab" id={`${id}-tab-${index}`} aria-controls={`${id}-panel-${index}`} aria-selected={shown() === tab.value ? 'true' : 'false'} tabindex={shown() === tab.value ? 0 : -1} disabled={tab.disabled} onClick={() => show(tab.value)})

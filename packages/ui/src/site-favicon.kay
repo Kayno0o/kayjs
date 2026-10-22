@@ -21,7 +21,7 @@ effect(() => {
 })
 ---
 // A site's icon, or the globe slot in a colour of the site's own when it has none or it fails to load.
-span({...rest} part="root")
+span(part="root" {...rest})
   if src && !failed()
     // kay-allow unsized-image
     img(part="img" src={src} alt="" onError={() => failed.set(true)})

@@ -166,7 +166,7 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
   })
 
   test('an IconButton and the trigger of a Menu take the restyle, a Menu class string going to the trigger', () => {
-    expect(html).toMatch(/<button id="icon-button"[^>]* class="kui-shell kui-icon-btn rounded-full">/)
+    expect(html).toMatch(/<button[^>]* id="icon-button"[^>]* class="kui-shell kui-icon-btn rounded-full">/)
     expect(html).toMatch(/aria-haspopup="menu"[^>]* class="kui-icon-btn rounded-full menu-trigger">/)
   })
 
@@ -177,6 +177,12 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
   test('the browser build of an island carries the restyled classes as well', () => {
     for (const classes of ['text-xl', 'justify-end', 'uppercase', 'py-4', 'h-12', 'tracking-wide', 'rounded-none', 'w-72', 'h-9'])
       expect(browser).toContain(classes)
+  })
+
+  test('a component used as a part of another keeps the part name its caller hands it', () => {
+    expect(html).toMatch(/<svg[^>]*data-part="spinner"/)
+    expect(html).toMatch(/<button[^>]*data-part="step"[^>]*class="kui-icon-btn rounded-full kui-carousel-step size-12"/)
+    expect(html).toMatch(/<svg[^>]*data-part="sortIcon"/)
   })
 
   test('a part nothing restyles keeps its kui class alone', () => {

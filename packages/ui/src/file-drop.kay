@@ -101,6 +101,6 @@ function pasted(event: ClipboardEvent) {
 
 listen(() => paste ? window : undefined, 'paste', pasted)
 ---
-div({...rest} part="root" role="group" data-compact={compact || undefined} data-dragging={dragging() || undefined} data-disabled={disabled || undefined} onDragOver={dragOver} onDragLeave={dragLeave} onDrop={drop})
+div(part="root" {...rest} role="group" data-compact={compact || undefined} data-dragging={dragging() || undefined} data-disabled={disabled || undefined} onDragOver={dragOver} onDragLeave={dragLeave} onDrop={drop})
   input(part="input" ref={element => input = element} type="file" tabindex="-1" aria-hidden="true" accept={accept} multiple={multiple} disabled={disabled} onChange={picked})
   | {content(zone)}

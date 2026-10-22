@@ -39,7 +39,6 @@ const { message, onConfirm, onOpen, failure, success, refused, tone = 'danger', 
   size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
   // The icon trigger's form, as an IconButton's, which then takes the tone as its own: danger-coloured by default, neutral for `tone="neutral"`. Without it the icon stays neutral.
   variant?: 'solid' | 'ghost' | 'inline' | undefined
-  // Goes on the trigger.
 }>()
 
 const danger = () => tone === 'danger'

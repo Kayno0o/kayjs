@@ -16,7 +16,7 @@ const { title, open = true, boxed = false, meta, ...rest } = props<Omit<JSX.Intr
 }>()
 ---
 // A native disclosure, so it folds without script and a static page can hold it.
-details({...rest} part="root" open={open} data-boxed={boxed || undefined})
+details(part="root" {...rest} open={open} data-boxed={boxed || undefined})
   summary(part="summary")
     span.kui-heading-section(part="title") {title}
     if meta

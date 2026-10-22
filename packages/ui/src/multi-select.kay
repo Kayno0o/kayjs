@@ -148,7 +148,7 @@ function focusLeft(event: FocusEvent) {
     panel.hidePopover()
 }
 ---
-div({...rest} part="root" ref={ref})
+div(part="root" {...rest} ref={ref})
   Popover(id={id} placement={placement} part="panel" role="group" aria-label={label} onOpenChange={toggled} onKeyDown={keyDown} onFocusOut={focusLeft})
     @trigger(attributes)
       // Named by its label and what is picked, which a name of the label alone would hide; a count is described by the labels it stands for.

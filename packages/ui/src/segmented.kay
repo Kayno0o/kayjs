@@ -36,7 +36,7 @@ const { group, picked, busy, ref, pick } = controlledRadios({
 })
 ---
 // Real radios, so the arrow keys move between options and the group submits like any other field.
-div({...rest} part="root" ref={ref} role="radiogroup" aria-label={label} aria-orientation={orientation === 'vertical' ? 'vertical' : undefined} data-orientation={orientation === 'vertical' ? 'vertical' : undefined} aria-busy={busy() ? 'true' : undefined})
+div(part="root" {...rest} ref={ref} role="radiogroup" aria-label={label} aria-orientation={orientation === 'vertical' ? 'vertical' : undefined} data-orientation={orientation === 'vertical' ? 'vertical' : undefined} aria-busy={busy() ? 'true' : undefined})
   for option of options key={option.value}
     label(part="option")
       input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === value)} type="radio" name={group} value={option.value} checked={picked() === option.value} disabled={option.disabled} onChange={() => pick(option.value)})

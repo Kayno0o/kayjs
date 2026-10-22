@@ -145,7 +145,7 @@ const area = () => {
   return `left: ${x * factor}px; top: ${y * factor}px; width: ${w * factor}px; height: ${h * factor}px; background-image: url(${JSON.stringify(src)}); background-size: ${(known?.width ?? 0) * factor}px ${(known?.height ?? 0) * factor}px; background-position: ${-x * factor}px ${-y * factor}px`
 }
 ---
-div({...rest} part="root")
+div(part="root" {...rest})
   div(part="stage" ref={element => { stage = element; stageSize.ref(element) }} role="presentation" onPointerMove={move} onPointerUp={end} onPointerCancel={end})
     // kay-allow unsized-image
     img(part="image" ref={element => image = element} src={src} alt={alt} draggable="false" onLoad={loaded})

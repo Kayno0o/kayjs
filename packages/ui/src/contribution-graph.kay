@@ -32,7 +32,7 @@ const style = (day: ContributionDay, index: number) => {
 }
 ---
 // A year of days as a grid of weeks, each cell shaded by how full its day was.
-div({...rest} part="root" role="group" aria-label={label} class={{ 'kui-contribution-graph-months': months }})
+div(part="root" {...rest} role="group" aria-label={label} class={{ 'kui-contribution-graph-months': months }})
   if months
     for start of monthStarts(days.map(day => day.day)) key={start.column}
       span(part="month" aria-hidden="true" style={`grid-column: ${start.column + 1}`}) {start.label}

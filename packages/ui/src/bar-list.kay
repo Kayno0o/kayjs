@@ -25,7 +25,7 @@ if rows.length === 0
   // The app's id and class stay on whichever element shows.
   p.kui-bar-list-empty(part="root" id={rest.id}) {nothing()}
 else
-  ul({...rest} part="root")
+  ul(part="root" {...rest})
     for row of rows key={row.key}
       li
         if onSelect

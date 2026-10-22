@@ -30,7 +30,7 @@ onMount(() => {
 })
 ---
 // Only the rows in view are drawn, between two stretches of room standing for the others. The box takes the focus to scroll by keyboard; find-in-page sees the drawn rows alone, and a focused row that scrolls out of the window is gone with its focus.
-div({...rest} part="root" ref={element => box = element} role="list" tabindex="0" aria-label={label})
+div(part="root" {...rest} ref={element => box = element} role="list" tabindex="0" aria-label={label})
   div(ref={element => content = element} role="presentation" style={`padding-block: ${list.before()}px ${list.after()}px`})
     for entry of entries() key={keyOf(entry.row, entry.index)}
       div(role="listitem" data-virtual-index={entry.index} aria-posinset={entry.index + 1} aria-setsize={list.count()})

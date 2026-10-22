@@ -18,7 +18,7 @@ const { value, max = 5, label, ...rest } = props<Omit<JSX.IntrinsicElements['spa
 const places = () => Array.from({ length: Math.max(Math.floor(max), 0) }, (_, place) => place)
 const filled = () => max > 0 && Number.isFinite(value) ? Math.min(Math.max(value / max, 0), 1) * 100 : 0
 ---
-span({...rest} part="root" role="img" aria-label={label ?? wording('ui.rating.label', '{value} out of {max}', { value: String(value), max: String(max) })})
+span(part="root" {...rest} role="img" aria-label={label ?? wording('ui.rating.label', '{value} out of {max}', { value: String(value), max: String(max) })})
   span(part="stars")
     for place of places() key={place}
       Icon(icon="star")

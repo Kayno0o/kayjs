@@ -17,4 +17,4 @@ const { icon, label, ...rest } = props<Omit<JSX.IntrinsicElements['svg'], 'class
 
 const drawn = () => typeof icon === 'string' ? settings.icons[icon] ?? addedIcons[icon as keyof typeof addedIcons] : icon
 ---
-svg({...drawn()} {...rest} part="root" role={label === undefined ? undefined : 'img'} aria-label={label} aria-hidden={label === undefined ? 'true' : undefined})
+svg(part="root" {...drawn()} {...rest} role={label === undefined ? undefined : 'img'} aria-label={label} aria-hidden={label === undefined ? 'true' : undefined})

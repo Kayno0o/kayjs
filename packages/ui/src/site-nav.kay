@@ -41,7 +41,7 @@ function marked(href: string) {
 ---
 // The list is a popover its toggle opens, so the browser owns showing it, closing it on a press outside or Escape, and giving the focus back; the page swap closes one left open.
 // The toggle is an IconButton's markup with both icons drawn, so CSS shows the close one while the list is open.
-nav({...rest} part="root" aria-label={label})
+nav(part="root" {...rest} aria-label={label})
   button.kui-icon-btn(part="toggle" type="button" aria-label={menuLabel} data-tooltip={menuLabel} data-size="md" data-variant="ghost" data-tone="neutral" popovertarget={listId} style={`anchor-name: ${anchor}`})
     Icon(icon="menu" part="menuIcon")
     Icon(icon="close" part="closeIcon")

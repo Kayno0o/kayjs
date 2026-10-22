@@ -21,6 +21,6 @@ const { value, label, size, options, inline = false, ...rest } = props<Omit<JSX.
 ---
 // An SVG drawn when the page renders, on the server for a static page: dark modules on a light ground with a quiet zone, which every scanner reads. An image by default, which cannot read the page's CSS; inline, the SVG sits in the page and can.
 if inline
-  div({...rest} part="root" role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : 'true'} style={size === undefined ? undefined : `width: ${size}px; height: ${size}px`} innerHTML={trustHtml(qrCodeSvg(value, options))})
+  div(part="root" {...rest} role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : 'true'} style={size === undefined ? undefined : `width: ${size}px; height: ${size}px`} innerHTML={trustHtml(qrCodeSvg(value, options))})
 else
-  img({...rest} part="root" src={qrCodeDataUri(value, options)} alt={label ?? ''} aria-hidden={label ? undefined : 'true'} width={size} height={size})
+  img(part="root" {...rest} src={qrCodeDataUri(value, options)} alt={label ?? ''} aria-hidden={label ? undefined : 'true'} width={size} height={size})

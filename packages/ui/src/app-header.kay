@@ -23,7 +23,7 @@ const { links, current, label, menuLabel, brand, end, sticky = true, ...rest } =
 }>()
 ---
 // The bar across the top of an app: its brand, its main links, which fold into a menu on a narrow screen, and an area at the far end.
-header({...rest} part="root" data-sticky={sticky ? '' : undefined})
+header(part="root" {...rest} data-sticky={sticky ? '' : undefined})
   if brand
     div(part="brand")
       | {brand}

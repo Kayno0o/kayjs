@@ -112,7 +112,7 @@ function keyDown(event: KeyboardEvent) {
 }
 ---
 // The rows of every open branch in one list, each saying its depth and place for screen readers, so the arrows walk them in reading order.
-ul({...rest} part="root" ref={element => list = element} role="tree" aria-label={label} onKeyDown={keyDown})
+ul(part="root" {...rest} ref={element => list = element} role="tree" aria-label={label} onKeyDown={keyDown})
   for row of rows() key={row.node.id}
     li(part="item" role="treeitem" aria-level={row.level} aria-posinset={row.position} aria-setsize={row.size} aria-expanded={row.node.children ? String(open().has(row.node.id)) : undefined} aria-selected={row.node.id === current() ? 'true' : 'false'} tabindex={row.node.id === stop() ? 0 : -1} style={`--kui-tree-level: ${row.level - 1}`} onFocus={() => focused.set(row.node.id)} onClick={event => click(event, row)})
       if row.node.children

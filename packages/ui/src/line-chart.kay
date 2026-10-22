@@ -375,7 +375,7 @@ function pointerLeave(event: PointerEvent) {
     hovered.set(null)
 }
 ---
-div({...rest} part="root" role="figure" aria-label={label})
+div(part="root" {...rest} role="figure" aria-label={label})
   div(part="frame")
     div(part="plot" ref={element => canvas = element} aria-hidden="true")
     if cursor() !== null

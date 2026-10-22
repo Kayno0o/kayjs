@@ -98,7 +98,7 @@ function resizeByKey(event: KeyboardEvent) {
 }
 ---
 // The sidebar is rendered once: from `md` up a column, below it the overlay `data-sidebar-open` shows.
-div({...rest} part="root" style={`--kui-split-list-width: ${listWidth()}px;${style ? ` ${style}` : ''}`} data-sidebar={sidebar ? '' : undefined} data-sidebar-open={sidebarOpen ? '' : undefined} data-detail-open={detailOpen ? '' : undefined})
+div(part="root" {...rest} style={`--kui-split-list-width: ${listWidth()}px;${style ? ` ${style}` : ''}`} data-sidebar={sidebar ? '' : undefined} data-sidebar-open={sidebarOpen ? '' : undefined} data-detail-open={detailOpen ? '' : undefined})
   if sidebar
     aside(part="sidebar")
       div(part="sidebarHead")
