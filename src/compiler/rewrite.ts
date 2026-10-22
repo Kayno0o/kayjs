@@ -805,8 +805,8 @@ class RewriteFinder {
 
       this.dispatched.add(at)
 
-      // Another write, an `await` or a `yield` inside it would land its text where this one's opens or closes, or leave the arrow it becomes.
-      if (nestsEffects(node))
+      // Another write, an `await` or a `yield` inside it would land its text where this one's opens or closes, or leave the arrow it becomes. A plain `=` to a member takes its right side as an argument, evaluated before the write as the assignment does, so an `await` there is fine.
+      if (plainMemberAwait(node) ? nestsEffects(node.left) || nestsWrites(node.right) : nestsEffects(node))
         continue
 
       const target = node.type === 'AssignmentExpression' ? node.left : node.argument
@@ -985,10 +985,10 @@ function plainLiteral(node: t.Node | null | undefined, typed = false): boolean {
     return false
 
   if (node.type === 'ObjectExpression')
-    return node.properties.length === 0 ? typed : node.properties.every(property => property.type === 'ObjectMethod' || (property.type === 'ObjectProperty' && !property.computed && plainLiteral(property.value)))
+    return node.properties.length === 0 ? typed : node.properties.every(property => property.type === 'ObjectMethod' || (property.type === 'ObjectProperty' && !property.computed && plainLiteral(property.value, typed)))
 
   if (node.type === 'ArrayExpression')
-    return node.elements.length === 0 ? typed : node.elements.every(element => element !== null && element.type !== 'SpreadElement' && plainLiteral(element))
+    return node.elements.length === 0 ? typed : node.elements.every(element => element !== null && element.type !== 'SpreadElement' && plainLiteral(element, typed))
 
   if (node.type === 'NewExpression')
     return node.callee.type === 'Identifier' && PLAIN_CLASSES.test(node.callee.name)
@@ -1026,6 +1026,12 @@ function plainType(type: t.TSType): boolean {
   if (type.type === 'TSArrayType')
     return plainType(type.elementType)
 
+  if (type.type === 'TSTupleType')
+    return type.elementTypes.every(element => plainType(element.type === 'TSNamedTupleMember' ? element.elementType : element))
+
+  if (type.type === 'TSOptionalType' || type.type === 'TSRestType')
+    return plainType(type.typeAnnotation)
+
   if (type.type === 'TSUnionType' || type.type === 'TSIntersectionType')
     return type.types.every(plainType)
 
@@ -1048,6 +1054,22 @@ function valueUnused(path: NodePath): boolean {
   const attribute = parent.type === 'ArrowFunctionExpression' && parent.body === node ? path.parentPath?.parentPath?.parent : undefined
 
   return attribute?.type === 'JSXAttribute' && attribute.name.type === 'JSXIdentifier' && HANDLER.test(attribute.name.name)
+}
+
+// Whether an assignment is a plain `=` to a member, the one write whose right side may hold an `await` or a `yield`.
+function plainMemberAwait(node: t.Node): node is t.AssignmentExpression {
+  return node.type === 'AssignmentExpression' && node.operator === '=' && node.left.type === 'MemberExpression'
+}
+
+// Whether another write sits inside a node, outside the functions it holds.
+function nestsWrites(node: t.Node): boolean {
+  if (FUNCTIONS.has(node.type))
+    return false
+
+  if (node.type === 'AssignmentExpression' || node.type === 'UpdateExpression')
+    return true
+
+  return Object.values(node).some((child: unknown) => Array.isArray(child) ? child.some(item => isNode(item) && nestsWrites(item)) : isNode(child) && nestsWrites(child))
 }
 
 // Whether a write, an `await` or a `yield` sits inside a node, outside the functions it holds.

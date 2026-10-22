@@ -20,34 +20,33 @@ type Keyed = Record<PropertyKey, unknown>
 // What a write to a place holding `T` takes: the value of a signal, anything else as it is.
 type Written<T> = T extends Signal<infer Value> ? Value : T
 
-// What a signal of any value is, to tell it from a function of its type's other members.
-type Writable = (() => unknown) & { set: unknown }
-
-// The value a signal holds, `never` for anything else.
-type Held<S> = S extends Signal<infer Value> ? Value : never
+type Same<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false
+// The keys of `T` a plain assignment may write: a `readonly` property stays an error through the helpers.
+type WritableKey<T> = T extends unknown[] ? keyof T : T extends readonly unknown[] ? never : { [Key in keyof T]-?: Same<Pick<T, Key>, { -readonly [Only in Key]: T[Only] }> extends true ? Key : never }[keyof T]
 
 // What a `let` holds once written: the signal it held, else the value.
 type Kept<Current, Value> = Current extends Signal<infer Held> ? Signal<Held> : Value
 
-// The signal a property holds, found without running an accessor: a getter alone is read, since assigning to it would throw, while a setter is the property's own way to be written.
-function heldAt(object: unknown, key: PropertyKey): Signal<unknown> | undefined {
+// The signal a property holds, found without running an accessor: a getter alone is read, since assigning to it would throw, while a setter is the property's own way to be written. `read` answers what that getter returned, so a caller needing the value does not run it twice.
+function heldAt(object: unknown, key: PropertyKey): { held: Signal<unknown> | undefined, read: boolean, value?: unknown } {
   for (let at = object; at != null; at = Object.getPrototypeOf(at)) {
     const descriptor = Object.getOwnPropertyDescriptor(at, key)
 
     if (!descriptor)
       continue
 
-    const value: unknown = 'value' in descriptor || descriptor.set !== undefined ? descriptor.value : descriptor.get?.call(object)
+    const read = !('value' in descriptor) && descriptor.set === undefined
+    const value: unknown = read ? descriptor.get?.call(object) : descriptor.value
 
-    return isSignal(value) ? value : undefined
+    return { held: isSignal(value) ? value : undefined, read, value }
   }
 
-  return undefined
+  return { held: undefined, read: false }
 }
 
 // An assignment to `object[key]` whose target may hold a signal (a function, a signal included, replaces it, since a signal holds none), which `kay dev` and `kay build` run no types to learn: a signal is written, anything else is assigned as written. Type checking reads the same signature, so the target is typed by what it holds.
-export function writeTo<Target, Key extends keyof Target, Value extends Written<Target[Key]> | Target[Key]>(object: Target, key: Key, value: Value): Value {
-  const held = heldAt(object, key)
+export function writeTo<Target, Key extends WritableKey<Target>, Value extends Written<Target[Key]> | Target[Key]>(object: Target, key: Key, value: Value): Value {
+  const { held } = heldAt(object, key)
 
   if (held !== undefined && typeof value !== 'function')
     held.set(value)
@@ -58,9 +57,15 @@ export function writeTo<Target, Key extends keyof Target, Value extends Written<
 }
 
 // `object[key] += 1` and `object[key]++`: `update` gives the next value from the current one, `post` makes the expression the number it had, and `logical` (`||=`, `??=`) writes nothing when the value stays.
-export function updateTo<Target, Key extends keyof Target>(object: Target, key: Key, update: (current: Written<Target[Key]>) => Written<Target[Key]>, form?: 'post' | 'logical'): Written<Target[Key]> {
-  const held = heldAt(object, key)
-  const before = held === undefined ? (object as Keyed)[key] : untrack(held)
+export function updateTo<Target, Key extends WritableKey<Target>>(object: Target, key: Key, update: (current: Written<Target[Key]>) => Written<Target[Key]>, form?: 'post' | 'logical'): Written<Target[Key]> {
+  const { held, read, value } = heldAt(object, key)
+  let before: unknown
+
+  if (held !== undefined)
+    before = untrack(held)
+  else
+    before = read ? value : (object as Keyed)[key]
+
   const next = update(before as Written<Target[Key]>)
 
   if (form !== 'logical' || !Object.is(next, before)) {
@@ -75,8 +80,7 @@ export function updateTo<Target, Key extends keyof Target>(object: Target, key: 
 }
 
 // A `let` assigned a signal's place, `variable = writeBack(variable, value)`: a signal is written and stays the variable's value, anything else is replaced. What type checking cannot tell a plain `let` from is left unchecked.
-export function writeBack<Current, Value extends Current>(current: Current, value: Value): Value
-export function writeBack<Current extends Writable>(current: Current, value: Held<Current>): Current
+export function writeBack<Current, Value extends Current | Written<Current>>(current: Current, value: Value): Kept<Current, Value>
 export function writeBack(current: unknown, value: unknown): unknown {
   if (!isSignal(current) || typeof value === 'function')
     return value

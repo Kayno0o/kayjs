@@ -121,6 +121,14 @@ describe('assignments left as written', () => {
     expect(code).toContain('box.d = (n = KayWriteBack(n, 2))')
   })
 
+  it('wrap a plain assignment to a member whose right side awaits, since the value is evaluated before the write', () => {
+    const code = compiled('---\nimport { makeBox } from \'./box\'\nconst box = makeBox()\nlet n = makeBox().n\nasync function f() {\n  box.total = await load()\n  box.rows[await at()] = 1\n  n = await load()\n}\n---\nbutton(onClick={f}) go\n', 'dom')
+
+    expect(code).toContain('KayWriteTo(box, "total", await load())')
+    expect(code).toContain('box.rows[await at()] = 1')
+    expect(code).toContain('n = await load()')
+  })
+
   it('leave a field of this, and a postfix a function returns, as written', () => {
     const code = compiled('---\nimport { makeBox } from \'./box\'\nlet n = makeBox().n\nclass Child {\n  private hits = 0\n  bump() {\n    this.hits++\n    this.hits += 1\n  }\n}\nconst next = () => n++\nfunction f() {\n  for (let i = 0; i < 2; i++) n++\n}\n---\nbutton(onClick={f}) go\n', 'dom')
 
@@ -147,6 +155,15 @@ describe('assignments left as written', () => {
     expect(code).toContain('seen.a = 1')
     expect(code).toContain('KayWriteTo(rows, "a", 1)')
     expect(code).toContain('KayWriteTo(again, "x", 1)')
+  })
+})
+
+describe('a literal typed as holding no signal', () => {
+  it('leaves a tuple and the empty containers inside it as written', () => {
+    const code = compiled('---\nconst pair: [number, string?, ...boolean[]] = [1]\nconst named: [a: number, b: string] = [1, \'x\']\nconst nested: { list: number[], more: { rows: string[] } } = { list: [], more: { rows: [] } }\nconst loose = { list: [] }\nfunction f() {\n  pair[0] = 2\n  named[1] = \'y\'\n  nested.list[0] = 1\n  nested.more.rows[0] = \'z\'\n  loose.list[0] = 1\n}\n---\nbutton(onClick={f}) go\n', 'dom')
+
+    expect(code).toContain('pair[0] = 2\n  named[1] = \'y\'\n  nested.list[0] = 1\n  nested.more.rows[0] = \'z\'')
+    expect(code).toContain('KayWriteTo(loose.list, 0, 1)')
   })
 })
 
@@ -207,6 +224,16 @@ describe('the runtime helpers', () => {
     expect(reads).toBe(1)
     expect(writes).toBe(6)
 
+    let getterReads = 0
+    const readOnly = { get level() {
+      getterReads++
+
+      return 1
+    } }
+
+    expect(() => updateTo(readOnly as { level: number }, 'level', current => current + 1)).toThrow()
+    expect(getterReads).toBe(1)
+
     const count = signal(1)
     const exposed = { get count() {
       return count
@@ -224,7 +251,7 @@ describe('the runtime helpers', () => {
   })
 
   it('write a logical assignment only when it changes the value', () => {
-    const frozen = Object.freeze({ a: 1, b: Number('0') })
+    const frozen = Object.freeze({ a: 1, b: Number('0') }) as { a: number, b: number }
 
     expect(updateTo(frozen, 'a', current => current || 2, 'logical')).toBe(1)
     expect(() => updateTo(frozen, 'b', current => current || 2, 'logical')).toThrow(TypeError)

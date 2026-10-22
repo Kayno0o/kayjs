@@ -831,7 +831,53 @@ describe.concurrent('kay check, edge cases', () => {
     const root = await scratchProject({ 'src/box.ts': box, 'src/routes/index.kay': page })
 
     try {
-      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[26, 'TS2345'], [27, 'TS2345'], [28, 'TS2345'], [29, 'TS2322'], [30, 'TS2769'], [34, 'TS2345']])
+      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[26, 'TS2345'], [27, 'TS2345'], [28, 'TS2345'], [29, 'TS2322'], [30, 'TS2345'], [34, 'TS2345']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps a readonly property, a readonly array and a let of a union typed as plain code would', async () => {
+    const box = [
+      'import { signal } from \'kay\'',
+      '',
+      'export function makeBox() {',
+      '  return { id: 1 as number, count: signal(0), rows: [1] as readonly number[], free: 1 as number } as { readonly id: number, count: ReturnType<typeof signal<number>>, readonly rows: readonly number[], free: number }',
+      '}',
+      '',
+    ].join('\n')
+
+    const page = [
+      '---',
+      'import { signal } from \'kay\'',
+      'import { makeBox } from \'../box\'',
+      '',
+      'const box = makeBox()',
+      'let either: number | ReturnType<typeof signal<number>> = makeBox().count',
+      '',
+      'function good() {',
+      '  box.free = 2',
+      '  box.count = 3',
+      '  either = 4',
+      '}',
+      '',
+      'function bad() {',
+      '  box.id = 2',
+      '  box.id++',
+      '  box.rows[0] = 2',
+      '  either = \'x\'',
+      '}',
+      '---',
+      'button(onClick={good}) good',
+      'button(onClick={bad}) bad',
+      '',
+    ].join('\n')
+
+    const root = await scratchProject({ 'src/box.ts': box, 'src/routes/index.kay': page })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[15, 'TS2345'], [16, 'TS2345'], [17, 'TS2345'], [18, 'TS2345']])
     }
     finally {
       await rm(root, { recursive: true, force: true })

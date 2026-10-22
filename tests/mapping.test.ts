@@ -39,4 +39,25 @@ describe('CodeBuilder', () => {
 
     expect([builder.isDynamicTag({ start: 0, end: 3 }), builder.isDynamicTag({ start: 4, end: 7 })]).toEqual([false, true])
   })
+
+  it('keeps a write whole across the segments it is copied in, and maps what it adds to the source it replaced', () => {
+    const source = 'box.count = 5; rest'
+    const rewrites = new Map([
+      [0, { before: 'W(', end: 0 }],
+      [3, { replace: ', "count", ', end: 12 }],
+      [13, { after: ')', end: 13 }],
+    ])
+    const builder = new CodeBuilder(source, rewrites)
+
+    builder.addSource({ start: 0, end: 3 }).add('|').addSource({ start: 3, end: 13 }).add('|').addSource({ start: 13, end: 19 })
+
+    expect(builder.code).toBe('W(box|, "count", 5)|; rest')
+
+    const map = builder.map()
+    const at = builder.code.indexOf('"count"')
+
+    expect(map.toSource(at)).toBe(3)
+    expect(map.toSource(builder.code.indexOf('5'))).toBe(12)
+    expect(map.toSource(builder.code.indexOf('W'))).toBe(0)
+  })
 })
