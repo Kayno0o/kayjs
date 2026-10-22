@@ -1,0 +1,8 @@
+--- server
+export const page = { layouts: false }
+---
+---
+import Gate from '../../lib/gate.kay'
+---
+Gate
+  p#inside Inside

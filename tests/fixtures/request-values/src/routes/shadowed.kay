@@ -1,0 +1,1 @@
+p#local {(() => { const ctx = 7; return ctx })()}

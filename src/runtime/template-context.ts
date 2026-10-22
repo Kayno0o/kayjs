@@ -16,7 +16,7 @@ export function isContextDefinition(value: unknown): value is ContextDefinition 
 }
 
 // The values a `context` module's definition loads, which `kay check` reads off the module itself.
-export type ContextOfModule<Module> = Module extends { default: ContextDefinition<infer Values> } ? Values : never
+export type ContextOfModule<Module> = Module extends { default: ContextDefinition<infer Values> } ? Values : object
 
 // What a template reads off `ctx`: the values of every extension giving a context, none until one does.
 export type TemplateContext = TemplateValues extends { values: infer Values extends object } ? Values : object

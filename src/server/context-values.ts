@@ -11,6 +11,7 @@ interface Provider {
 // The extensions' context modules each request renders with, and what they loaded for it.
 const providers = new WeakMap<Request, Provider>()
 const loaded = new WeakMap<Request, Record<string, unknown>>()
+const pending = new WeakMap<Request, Promise<void>>()
 
 // Called where a render starts, so a layout can load the values of the request being rendered.
 export function useContexts(request: Request, modules: readonly string[], prerendering: boolean): void {
@@ -33,7 +34,7 @@ async function definitionOf(file: string) {
   return definition
 }
 
-// Loads the values of every extension's context once for the request, and marks the page as the visitor's own. A load that fails stops the page, leaving the values empty for the error page.
+// Loads the values of every extension's context once for the request, and marks the page as the visitor's own. A load that fails stops the page and is tried again by the next layout asking, such as an error page's.
 export async function loadContextValues(request: Request): Promise<void> {
   const provider = providers.get(request)
 
@@ -43,16 +44,31 @@ export async function loadContextValues(request: Request): Promise<void> {
   if (provider.prerendering)
     throw new RequestReadError('ctx values')
 
-  readPersonally(request)
-  loaded.set(request, {})
+  const running = pending.get(request) ?? loadAll(request, provider.modules)
 
-  const results = await Promise.all(provider.modules.map(async file => (await definitionOf(file)).load(request)))
+  pending.set(request, running)
+
+  try {
+    await running
+  }
+  finally {
+    pending.delete(request)
+  }
+}
+
+async function loadAll(request: Request, modules: readonly string[]): Promise<void> {
+  readPersonally(request)
+
+  const results = await Promise.all(modules.map(async file => (await definitionOf(file)).load(request)))
   const values: Record<string, unknown> = {}
 
   for (const [index, result] of results.entries()) {
+    if (typeof result !== 'object' || result === null)
+      throw new TypeError(`kay: the context ${modules[index]!} answered ${typeof result}, an object of the request values is what \`defineContext\` loads`)
+
     for (const key of Object.keys(result)) {
-      if (key in values)
-        throw new Error(`kay: two extensions give ctx.${key}, the latter ${provider.modules[index]!}`)
+      if (Object.hasOwn(values, key))
+        throw new Error(`kay: two extensions give ctx.${key}, the latter ${modules[index]!}`)
     }
 
     Object.defineProperties(values, Object.getOwnPropertyDescriptors(result))

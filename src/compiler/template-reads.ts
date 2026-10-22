@@ -33,7 +33,7 @@ function binders(node: Node): Span[] {
   }
 }
 
-// Every name a function inside the expression takes as a parameter, which shadows a value of kay there; none when the expression does not parse.
+// Every name a function inside the expression takes as a parameter, or a declaration or catch inside it binds, which shadows a value of kay there; none when the expression does not parse.
 function parameters(code: string): Set<string> | undefined {
   const names = new Set<string>()
   let expression: t.Expression
@@ -62,7 +62,7 @@ function parameters(code: string): Set<string> | undefined {
       names.add(node.name)
 
     for (const [key, child] of Object.entries(node))
-      walk(child, inParameters || ((node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression') && key === 'params'))
+      walk(child, inParameters || ((node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression') && key === 'params') || (node.type === 'VariableDeclarator' && key === 'id') || (node.type === 'CatchClause' && key === 'param'))
   }
 
   walk(expression, false)

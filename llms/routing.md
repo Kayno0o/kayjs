@@ -65,8 +65,10 @@ export const page = { query: s.Object({ next: s.Optional(s.String()) }) }
 
 if (ctx.params.id === 'latest') ctx.redirect(localPath(ctx.query.next, '/todos/42'))
 if (ctx.params.id === 'secret') ctx.deny(403, 'Members only')
+
+const { id } = ctx.params
 ---
-h1 Todo {ctx.params.id}
+h1 Todo {id}
 ```
 
 ### The request context

@@ -4,6 +4,9 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { findKayFiles, findProjectFiles, KAY_FILE, TS_FILE } from '../build/files'
 import { throughLinks } from '../build/links'
 import { KayError } from '../compiler/errors'
+import { parseKay } from '../compiler/parser'
+import { analyzeScript } from '../compiler/script'
+import { templateReads } from '../compiler/template-reads'
 import { TRAILING_SLASH } from '../runtime/base'
 
 const chains = new WeakMap<string[], { file: string, files: string[], key: string }>()
@@ -476,13 +479,9 @@ function walk(start: string, wanted: (file: string) => boolean, read: LayoutsRea
   return false
 }
 
-// A fence opens with `---` or `--- server` and closes with `---`.
-const FENCE_LINE = /^---(?:[ \t]+\w+)?[ \t]*$/
-// Over-reads a word in text or a string, which only loads the values for a page that did not need them.
-const CTX_WORD = /(?<![\w$.])ctx\b/
 const contextRead = new WeakMap<LayoutsRead, Map<string, boolean>>()
 
-// Whether the template of a `.kay` file, outside its fences, reads `ctx`.
+// Whether the template of a `.kay` file reads `ctx` with no `ctx` of its own, as the compiler decides when it imports the one of kay.
 function readsContext(file: string, read: LayoutsRead): boolean {
   if (!KAY_FILE.test(file))
     return false
@@ -495,20 +494,17 @@ function readsContext(file: string, read: LayoutsRead): boolean {
   let found = memo.get(file)
 
   if (found === undefined) {
-    let inFence = false
-    const template: string[] = []
-
     try {
-      for (const line of readFileSync(file, 'utf8').split('\n')) {
-        if (FENCE_LINE.test(line))
-          inFence = !inFence
-        else if (!inFence)
-          template.push(line)
-      }
-    }
-    catch {}
+      const source = readFileSync(file, 'utf8')
+      const parsed = parseKay(source)
 
-    memo.set(file, found = CTX_WORD.test(template.join('\n')))
+      found = analyzeScript(source, parsed.script, [], templateReads(parsed), parsed.module).implicit.includes('ctx')
+    }
+    catch {
+      found = false
+    }
+
+    memo.set(file, found)
   }
 
   return found

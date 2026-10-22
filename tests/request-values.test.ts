@@ -3,7 +3,9 @@ import { describe, expect, it } from 'bun:test'
 import { compileKay } from '../src/compiler'
 import { loadContextValues, useContexts } from '../src/server/context-values'
 import { routeMounts, scanRoutes } from '../src/server/routes'
+import { kayCheck } from './check-helper'
 import { loads } from './fixtures/request-values/lib/state'
+import { fixtureCopy } from './scratch'
 import { pages } from './shared-pages'
 
 const FIXTURE = 'tests/fixtures/request-values'
@@ -100,7 +102,7 @@ describe('a template reading ctx', () => {
     const root = resolve(FIXTURE)
     const wrapped = async (extensions: { name: string, context?: string }[]) => (await scanRoutes(resolve(FIXTURE, 'src/routes'), routeMounts(root, extensions))).filter(route => route.layouts.some(layout => layout.includes('context-layout'))).map(route => route.pattern).sort()
 
-    expect(await wrapped([EXTENSION])).toEqual(['/deep', '/fenced', '/gated', '/inline', '/inner/page'])
+    expect(await wrapped([EXTENSION])).toEqual(['/bare', '/deep', '/fenced', '/gated', '/inline', '/inner/page'])
     expect(await wrapped([{ name: 'none' }])).toEqual([])
   })
 
@@ -121,5 +123,46 @@ describe('a template reading ctx', () => {
       expect(compiled.diagnostics).toEqual([])
       expect(compiled.tsx).not.toContain('import { ctx }')
     }
+  })
+
+  it('loads for a page setting layouts: false that reaches one, and not for a local named ctx', async () => {
+    const variant = { base: '', dev: false, locale: false }
+    const bare = await get(variant, '/bare', ADA)
+
+    expect(bare.html).toContain('<p id="who">Ada</p>')
+    expect(bare.loads).toHaveLength(1)
+
+    const shadowed = await get(variant, '/shadowed', ADA)
+
+    expect(shadowed.html).toContain('<p id="local">7</p>')
+    expect(shadowed.loads).toEqual([])
+    expect(shadowed.headers.get('cache-control') ?? '').not.toContain('private')
+
+    const source = '---\nimport { signal } from "kay"\nconst n = signal(0)\n---\n' + 'button(click={() => { const ctx = canvas.getContext("2d"); ctx?.fill(); n++ }}) Draw {n()}\n'
+
+    expect(compileKay(source, 'test.kay').diagnostics).toEqual([])
+  })
+
+  it('refuses two extensions giving one key, and a load answering no object', async () => {
+    const twice = new Request('http://localhost/twice')
+
+    useContexts(twice, [CONTEXT, CONTEXT], false)
+    await expect(loadContextValues(twice)).rejects.toThrow('two extensions give ctx.user')
+  })
+
+  it('types ctx from the extension in kay check', async () => {
+    const root = await fixtureCopy('request-values')
+
+    await Bun.write(resolve(root, 'kay.config.ts'), 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [{ name: \'values\', context: \'./lib/context.ts\' }] })\n')
+    await Bun.write(resolve(root, 'tsconfig.json'), await Bun.file('tests/fixtures/action-streams/tsconfig.json').text())
+    await Bun.write(resolve(root, 'src/routes/typed.kay'), 'p#typed {ctx.user?.name}\n')
+    await Bun.write(resolve(root, 'src/routes/untyped.kay'), 'p#untyped {ctx.nope}\n')
+
+    const { output, report } = await kayCheck([root])
+    const text = output + report
+
+    expect(text).toContain('untyped.kay')
+    expect(text).toContain('\'nope\'')
+    expect(text).not.toContain('routes/typed.kay')
   })
 })

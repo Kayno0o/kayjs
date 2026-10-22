@@ -59,9 +59,10 @@ export const spend = action(s.Object({ token: s.String() }), async ({ token }, c
 })
 
 const failure = spend.failed()
+const token = ctx.query.token ?? ''
 ---
 form(action={spend})
-  input(type="hidden" name="token" value={ctx.query.token ?? ''})
+  input(type="hidden" name="token" value={token})
   button Sign in
 if failure
   p.error This link has expired or was already used
