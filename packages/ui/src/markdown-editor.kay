@@ -319,6 +319,8 @@ function drop(event: DragEvent) {
   event.preventDefault()
   void upload(images)
 }
+
+const previewParts = () => previewClass === undefined ? undefined : { body: previewClass }
 ---
 // A markdown field that writes like an editor, under a toolbar and beside a preview if asked: Ctrl+B, Ctrl+I and Ctrl+K wrap the selection, Enter continues a list and Tab indents one, Escape then Tab leaving the field, a pasted page turns into markdown, and pasted or dropped images upload behind a placeholder.
 // The textarea comes first in the document, so the label a form field puts around the editor names it and not the first button; the bar is placed above it by the grid.
@@ -333,4 +335,4 @@ div(part="wrap")
           View(actions={actions()} hasPreview={preview !== undefined} previewing={previewing()} onAction={action => action === 'image' ? pickImage() : runAction(action)} onPreview={togglePreview})
     if previewing() && preview
       for View of previewView() key={View}
-        View(text={text()} render={preview} class={previewClass})
+        View(text={text()} render={preview} class={previewParts()})

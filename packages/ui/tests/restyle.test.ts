@@ -155,6 +155,18 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     'kui-bar-chart-bar rounded-t-md',
     'kui-bar-chart-axis-label font-mono',
     'kui-bar-chart-legend-item gap-2',
+    'kui-accordion gap-5',
+    'kui-skeleton opacity-60',
+    'kui-skeleton-block rounded-full',
+    'kui-progress h-3',
+    'kui-progress-fill bg-lime-500',
+    'kui-breadcrumb-list gap-4',
+    'kui-breadcrumb-link underline',
+    'kui-breadcrumb-text font-bold',
+    'kui-radio-group gap-5',
+    'kui-radio-choice p-2',
+    'kui-radio-label font-medium',
+    'kui-radio-description text-xs',
   ]
 
   test.each(restyled)('draws class="%s"', (classes) => {

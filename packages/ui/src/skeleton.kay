@@ -1,7 +1,10 @@
 ---
+import { recipe } from 'kay'
 import type { JSX } from 'kay'
 
-const { shape = 'text', lines = 1, width, height, label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+const look = recipe({ parts: { root: 'kui-skeleton', block: 'kui-skeleton-block', label: 'kui-skeleton-label' } })
+
+const { shape = 'text', lines = 1, width, height, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   // `text` draws `lines` bars, the last one shorter; `avatar` a round block; `card` a block.
   shape?: 'text' | 'avatar' | 'card' | undefined
   // How many bars `text` draws.
@@ -12,14 +15,13 @@ const { shape = 'text', lines = 1, width, height, label, class: className, ...re
   height?: string | undefined
   // Read out as a status for screen readers, which never see the shapes; leave it out when the pending block already says something.
   label?: string | undefined
-  class?: string | undefined
 }>()
 
 const style = () => width || height ? `${width ? `--kui-skeleton-width: ${width};` : ''}${height ? `--kui-skeleton-height: ${height};` : ''}` : undefined
 const count = () => shape === 'text' ? Number.isFinite(lines) ? Math.max(1, Math.floor(lines)) : 1 : 1
 ---
-.kui-skeleton({...rest} data-shape={shape} style={style()} class={className})
+div(part="root" {...rest} data-shape={shape} style={style()})
   for index of Array.from({ length: count() }, (_, position) => position) key={index}
-    span.kui-skeleton-block(aria-hidden="true" data-last={shape === 'text' && count() > 1 && index === count() - 1 ? '' : undefined})
+    span(part="block" aria-hidden="true" data-last={shape === 'text' && count() > 1 && index === count() - 1 ? '' : undefined})
   if label
-    span.kui-skeleton-label(role="status") {label}
+    span(part="label" role="status") {label}

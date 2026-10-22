@@ -1,6 +1,6 @@
 ---
 import type { JSX, Snippet } from 'kay'
-import { uid, untrack } from 'kay'
+import { recipe, uid, untrack } from 'kay'
 import { stepIndex } from './cycle'
 import CollapsibleSection from './collapsible-section.kay'
 
@@ -11,7 +11,9 @@ const MOVES: Partial<Record<string, (index: number, count: number) => number>> =
   End: (_, count) => count - 1,
 }
 
-const { items, multiple = false, boxed = true, panel, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+const look = recipe({ parts: { root: 'kui-accordion' } })
+
+const { items, multiple = false, boxed = true, panel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   // `open` starts a section unfolded; with one open at a time, the first one flagged wins.
   items: readonly { value: string, title: string, open?: boolean | undefined }[]
   // Lets several sections stay open; by default opening one closes the others.
@@ -20,7 +22,6 @@ const { items, multiple = false, boxed = true, panel, class: className, ...rest 
   boxed?: boolean | undefined
   // Draws each section's body: `@panel(value)`, given the item's value.
   panel: Snippet<[value: string]>
-  class?: string | undefined
 }>()
 
 const group = uid()
@@ -45,7 +46,7 @@ function keyDown(event: KeyboardEvent) {
 }
 ---
 // Native details sharing a `name` close one another without script; the keys need an island.
-.kui-accordion({...rest} ref={element => root = element} onKeyDown={keyDown} class={className})
+div(part="root" {...rest} ref={element => root = element} onKeyDown={keyDown})
   for item, index of items key={item.value}
     CollapsibleSection(title={item.title} name={multiple ? undefined : group} open={multiple ? item.open === true : index === firstOpen()} boxed={boxed})
       | {untrack(() => panel(item.value))}

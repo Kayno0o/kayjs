@@ -64,4 +64,9 @@ export default defineUi({
   '@kaynooo/kayjs-ui/icon-picker.kay': { parts: { grid: 'gap-3', option: 'rounded-xl', bar: 'pt-2' } },
   '@kaynooo/kayjs-ui/markdown-editor.kay': { parts: { grid: 'gap-6', bar: 'px-4' } },
   '@kaynooo/kayjs-ui/bar-chart.kay': { parts: { plot: 'h-64', column: 'px-px', bar: 'rounded-t-md', axisLabel: 'font-mono', legendItem: 'gap-2' } },
+  '@kaynooo/kayjs-ui/accordion.kay': { parts: 'gap-5' },
+  '@kaynooo/kayjs-ui/skeleton.kay': { parts: { root: 'opacity-60', block: 'rounded-full' } },
+  '@kaynooo/kayjs-ui/progress.kay': { parts: { root: 'h-3', fill: 'bg-lime-500' } },
+  '@kaynooo/kayjs-ui/breadcrumb.kay': { parts: { list: 'gap-4', link: 'underline', text: 'font-bold' } },
+  '@kaynooo/kayjs-ui/radio-group.kay': { parts: { root: 'gap-5', choice: 'p-2', label: 'font-medium', description: 'text-xs' } },
 })

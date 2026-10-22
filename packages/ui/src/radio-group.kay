@@ -1,9 +1,11 @@
 --- <Value extends string | number, Held extends Value | null = Value>
 import type { JSX } from 'kay'
-import { uid, untrack } from 'kay'
+import { recipe, uid, untrack } from 'kay'
 import { controlledRadios } from './controlled-radios'
 
-const { options, value, label, name, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+const look = recipe({ parts: { root: 'kui-radio-group', radio: 'kui-radio', choice: 'kui-radio-choice', input: 'kui-radio-input', label: 'kui-radio-label', description: 'kui-radio-description' } })
+
+const { options, value, label, name, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // `description` is a quieter line under the label, which screen readers hear after it; `disabled` keeps that option from being picked.
   options: readonly { value: Value, label: string, description?: string | undefined, disabled?: boolean | undefined }[]
   // The option picked to start with, or `null` for none; a group whose parent passes another follows it.
@@ -16,7 +18,6 @@ const { options, value, label, name, onChange, class: className, ...rest } = pro
   // Typed `unknown`, so a callback answering something else, such as `list.push`, still fits.
   // Hears `null` as well, for a reset to none, only when `value` is typed nullable.
   onChange?: ((value: null extends Held ? Value | null : Value) => unknown) | undefined
-  class?: string | undefined
 }>()
 
 const { group, picked, busy, ref, pick } = controlledRadios({
@@ -32,11 +33,11 @@ const { group, picked, busy, ref, pick } = controlledRadios({
 const prefix = uid()
 ---
 // Real radios, so the arrow keys move between options and the group submits like any other field. The description sits beside the label, not inside it, so the option is named by its label alone.
-.kui-radio-group({...rest} ref={ref} role="radiogroup" aria-label={label} aria-busy={busy() ? 'true' : undefined} class={className})
+div(part="root" {...rest} ref={ref} role="radiogroup" aria-label={label} aria-busy={busy() ? 'true' : undefined})
   for option, index of options key={option.value}
-    .kui-radio
-      label.kui-radio-choice
-        input.kui-radio-input(ref={element => element.defaultChecked = untrack(() => option.value === value)} type="radio" name={group} value={option.value} checked={picked() === option.value} disabled={option.disabled} aria-describedby={option.description ? `${prefix}-${index}` : undefined} onChange={() => pick(option.value)})
-        span.kui-radio-label {option.label}
+    div(part="radio")
+      label(part="choice")
+        input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === value)} type="radio" name={group} value={option.value} checked={picked() === option.value} disabled={option.disabled} aria-describedby={option.description ? `${prefix}-${index}` : undefined} onChange={() => pick(option.value)})
+        span(part="label") {option.label}
       if option.description
-        span.kui-radio-description(id={`${prefix}-${index}`}) {option.description}
+        span(part="description" id={`${prefix}-${index}`}) {option.description}

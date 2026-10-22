@@ -1,14 +1,15 @@
 ---
-import { effect, onCleanup, signal, trustHtml, untrack } from 'kay'
+import { effect, onCleanup, recipe, signal, trustHtml, untrack } from 'kay'
 import { wording } from 'kay/words'
 
 const PREVIEW_DELAY = 250
 
 // The pane beside a MarkdownEditor's field, loaded the first time the preview is shown. It renders the text a pause after the last keystroke.
-const { text, render, class: className } = props<{
+const look = recipe({ parts: { root: 'kui-markdown-preview', failed: 'kui-markdown-preview-failed', body: 'kui-markdown-preview-body' } })
+
+const { text, render } = props<{
   text: string
   render: (markdown: string) => Promise<string>
-  class?: string | undefined
 }>()
 
 const rendered = signal<string | undefined>(undefined)
@@ -39,8 +40,8 @@ effect(() => {
   onCleanup(() => clearTimeout(timer))
 })
 ---
-.kui-markdown-preview(role="region" aria-label={wording('ui.markdownEditor.previewLabel', 'Preview')} aria-busy={rendered() === undefined && !failed() ? 'true' : 'false'})
+div(part="root" role="region" aria-label={wording('ui.markdownEditor.previewLabel', 'Preview')} aria-busy={rendered() === undefined && !failed() ? 'true' : 'false'})
   if failed()
-    p.kui-markdown-preview-failed {wording('ui.markdownEditor.previewFailure', 'The preview could not be shown')}
+    p(part="failed") {wording('ui.markdownEditor.previewFailure', 'The preview could not be shown')}
   else
-    .kui-markdown-preview-body(class={className} innerHTML={trustHtml(rendered() ?? '')})
+    div(part="body" innerHTML={trustHtml(rendered() ?? '')})

@@ -120,7 +120,7 @@ export default defineUi({
 - LineChart has `root`, `frame`, `plot`, `cursor`, `dot`, `band`, `overlay`, `tooltip`, `tooltipLabel`, `tooltipRow`, `tooltipName`, `tooltipValue`, `swatch`, `data`, `hint`, `legend`, `legendItem` and `key`; ScatterChart `root` (the empty message too), `axisLabel`, `plot`, `grid`, `tick`, `guide`, `corner` and `dot`; ContributionGraph `root`, `month` and `cell`.
 - Carousel has `root`, `viewport`, `slide`, `image`, `controls`, `step`, `dot` and `pause`; Masonry `root`; MediaGallery `root` (the empty message too), `stage`, `frame`, `zoom`, `step`, `counter`, `caption`, `strip`, `thumb`, `thumbImage`, `play`, `lightbox`, `full` and `close`; ImageCropper `root`, `stage`, `image`, `crop`, `gridCols`, `gridRows` and `handle`.
 - ZoomPane has `root`, `plate` and `tools`; QrCode, SiteFavicon (`root`, `img`, `icon`), Icon and WhenVisible `root`; IconPicker `root`, `search`, `grid`, `option`, `empty`, `bar`, `selection`, `clear`, `error` and `more`; MarkdownEditor `wrap`, `grid`, `root` (the textarea), `bar` and `barFailed`.
-- Accordion, Skeleton, Progress, Breadcrumb and RadioGroup have no parts yet and still restyle through their `kui-` classes.
+- Accordion `root`; Skeleton `root`, `block` and `label`; Progress `root` and `fill`; Breadcrumb `root`, `list`, `more`, `item`, `link` and `text`; RadioGroup `root`, `radio`, `choice`, `input`, `label` and `description`; MarkdownEditor's preview `root`, `failed` and `body`, its `previewClass` string landing on `body`.
 
 ### Testing an app's use of it
 

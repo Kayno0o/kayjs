@@ -1,15 +1,17 @@
 ---
+import { recipe } from 'kay'
 import type { JSX } from 'kay'
 import BreadcrumbHead from './internal/breadcrumb-head.kay'
 
-const { items, label, structured = false, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & {
+const look = recipe({ parts: { root: 'kui-breadcrumb', list: 'kui-breadcrumb-list', more: 'kui-breadcrumb-more', item: 'kui-breadcrumb-item', link: 'kui-breadcrumb-link', text: 'kui-breadcrumb-text' } })
+
+const { items, label, structured = false, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & {
   // The trail, the top of the site first and the page on screen last. Every item but the last is a link when it has an `href`; the last is marked as the current page and never a link.
   items: readonly { label: string, href?: string | undefined }[]
   // Names the navigation for screen readers.
   label: string
   // Describes the trail to search engines as a `BreadcrumbList` in the head, each `href` made absolute by the site's origin (`site` in kay.config.ts, which it then needs).
   structured?: boolean | undefined
-  class?: string | undefined
 }>()
 
 const last = items.length - 1
@@ -19,13 +21,13 @@ const collapses = items.length > 3
 // A list of links, the page on screen last: the separators are drawn by the style, so a screen reader hears the list and its length.
 if structured
   BreadcrumbHead(items={items})
-nav.kui-breadcrumb({...rest} aria-label={label} class={className})
-  ol.kui-breadcrumb-list
+nav(part="root" {...rest} aria-label={label})
+  ol(part="list")
     for item, index of items key={index}
       if collapses && index === 1
-        li.kui-breadcrumb-more(aria-hidden="true") …
-      li.kui-breadcrumb-item(data-middle={collapses && index > 0 && index < last - 1 ? '' : undefined})
+        li(part="more" aria-hidden="true") …
+      li(part="item" data-middle={collapses && index > 0 && index < last - 1 ? '' : undefined})
         if index < last && item.href !== undefined
-          a.kui-breadcrumb-link(href={item.href}) {item.label}
+          a(part="link" href={item.href}) {item.label}
         else
-          span.kui-breadcrumb-text(aria-current={index === last ? 'page' : undefined}) {item.label}
+          span(part="text" aria-current={index === last ? 'page' : undefined}) {item.label}

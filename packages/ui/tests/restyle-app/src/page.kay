@@ -1,9 +1,11 @@
 ---
+import Accordion from '@kaynooo/kayjs-ui/accordion.kay'
 import AppHeader from '@kaynooo/kayjs-ui/app-header.kay'
 import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
 import Badge from '@kaynooo/kayjs-ui/badge.kay'
 import BarChart from '@kaynooo/kayjs-ui/bar-chart.kay'
 import BarList from '@kaynooo/kayjs-ui/bar-list.kay'
+import Breadcrumb from '@kaynooo/kayjs-ui/breadcrumb.kay'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import Card from '@kaynooo/kayjs-ui/card.kay'
 import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
@@ -36,7 +38,9 @@ import PageHeader from '@kaynooo/kayjs-ui/page-header.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
 import Popover from '@kaynooo/kayjs-ui/popover.kay'
+import Progress from '@kaynooo/kayjs-ui/progress.kay'
 import QrCode from '@kaynooo/kayjs-ui/qr-code.kay'
+import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
 import RangeInput from '@kaynooo/kayjs-ui/range-input.kay'
 import Rating from '@kaynooo/kayjs-ui/rating.kay'
 import SaveForm from '@kaynooo/kayjs-ui/save-form.kay'
@@ -46,6 +50,7 @@ import Select from '@kaynooo/kayjs-ui/select.kay'
 import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
 import SiteFavicon from '@kaynooo/kayjs-ui/site-favicon.kay'
 import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
+import Skeleton from '@kaynooo/kayjs-ui/skeleton.kay'
 import Slider from '@kaynooo/kayjs-ui/slider.kay'
 import SplitLayout from '@kaynooo/kayjs-ui/split-layout.kay'
 import Stat from '@kaynooo/kayjs-ui/stat.kay'
@@ -170,3 +175,10 @@ SiteFavicon#favicon(name="Kay")
 IconPicker#icon-picker(search={async () => []})
 MarkdownEditor#markdown
 BarChart#bars(label="Runs" labels={['a', 'b']} xLabels legend series={[{ name: 'S', values: [1, 2] }, { name: 'T', values: [2, 1] }]})
+Accordion#accordion(items={[{ value: 'a', title: 'A' }]})
+  @panel(value)
+    p {value}
+Skeleton#skeleton(lines={2})
+Progress#progress(value={30} label="Upload")
+Breadcrumb#breadcrumb(label="Trail" items={[{ label: 'Home', href: '/' }, { label: 'Docs', href: '/docs' }, { label: 'Page' }]})
+RadioGroup#radios(label="Plan" value="a" options={[{ value: 'a', label: 'A', description: 'First' }, { value: 'b', label: 'B' }]})
