@@ -243,7 +243,9 @@ details(bind:open={more})
 input(type="file" bind:files={picked})
 ```
 
-`bind:group` on radios holds the checked one's `value`, a string, and on checkboxes the array of the checked ones' values, in the order they were ticked. `bind:open` follows a `details` as it toggles, and a `dialog` as it closes, so a `dialog` opened by the signal opens non-modal. `bind:files` holds the `FileList` the person picked, and setting the signal to `null` clears the input; the server never renders it. The `type` of `bind:group` and `bind:files` is written out, not computed.
+`bind:group` on radios holds the checked one's `value`, a string or a union of strings, and on checkboxes the array of the checked ones' values, in the order they were ticked. `bind:open` follows a `details` as it toggles, and a `dialog` as it closes, so a `dialog` opened by the signal opens non-modal.
+
+`bind:files` holds the `FileList the person picked, and setting the signal to `null` clears the input; the server never renders it. The `type` of `bind:group` and `bind:files` is written out, not computed.
 
 A `bind:` on an element that also spreads props is an error, as the spread may carry the value and the handler itself: bind a child element, or write the value and the handler.
 

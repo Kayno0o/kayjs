@@ -81,13 +81,21 @@ export function bindRead(property: string, inputType: string): BindRead {
 }
 
 // The body of a `bind:` event handler, `(kayEvent) => ` before it: it writes what the element holds back to the signal, which the caller closes.
-export function addBindWrite(b: CodeBuilder, expression: Span, read: BindRead): void {
+export function addBindWrite(b: CodeBuilder, expression: Span, read: BindRead, typed = false): void {
   // An emptied number input has no number: the signal keeps its last one rather than take a NaN, or an undefined its type does not allow.
   if (read === 'valueAsNumber') {
     b.add('{ const kayValue = kayEvent.currentTarget.valueAsNumber; if (!Number.isNaN(kayValue)) (').addSource(expression).add(').set(kayValue) }')
   }
   else if (read === 'radio') {
-    b.add('{ if (kayEvent.currentTarget.checked) (').addSource(expression).add(').set(kayEvent.currentTarget.value) }')
+    // The types ask the signal for a type a string can be, a union of strings included, through `KayRadio`.
+    b.add('{ if (kayEvent.currentTarget.checked) (').addSource(expression).add(').set(')
+
+    if (typed)
+      b.add('KayRadio((').addSource(expression).add(')())(kayEvent.currentTarget.value)')
+    else
+      b.add('kayEvent.currentTarget.value')
+
+    b.add(') }')
   }
   else if (read === 'checkbox') {
     // A box of the group adds or removes its own value, keeping the order the group had.

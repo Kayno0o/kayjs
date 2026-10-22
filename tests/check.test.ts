@@ -1155,6 +1155,8 @@ describe.concurrent('kay check, edge cases', () => {
       'const open = signal(false)',
       'const files = signal<FileList | null>(null)',
       'const count = signal(0)',
+      'const plan = signal<\'free\' | \'pro\'>(\'free\')',
+      'const maybe = signal<string | null>(null)',
       '---',
       'input(type="radio" value="a" aria-label="A" bind:group={choice})',
       'input(type="checkbox" value="a" aria-label="A" bind:group={tags})',
@@ -1165,12 +1167,14 @@ describe.concurrent('kay check, edge cases', () => {
       'input(type="checkbox" value="a" aria-label="A" bind:group={choice})',
       'dialog(bind:open={count}) x',
       'input(type="file" aria-label="File" bind:files={count})',
+      'input(type="radio" value="free" aria-label="Free" bind:group={plan})',
+      'input(type="radio" value="free" aria-label="Free" bind:group={maybe})',
       '',
     ].join('\n')
     const root = await scratchProject({ 'src/routes/index.kay': page })
 
     try {
-      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[15, 'TS2345'], [16, 'TS2322'], [16, 'TS2345'], [17, 'TS2345'], [18, 'TS2345']])
+      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[17, 'TS2345'], [18, 'TS2322'], [18, 'TS2345'], [19, 'TS2345'], [20, 'TS2345']])
     }
     finally {
       await rm(root, { recursive: true, force: true })

@@ -967,7 +967,7 @@ export class JsxTemplate {
       b.wrap(attribute.name, () => b.add(property)).add('={(').addSource(attribute.expression).add(')()}')
 
     b.add(` ${event}={(kayEvent) => `)
-    addBindWrite(b, attribute.expression, bindRead(property, inputType ?? 'text'))
+    addBindWrite(b, attribute.expression, bindRead(property, inputType ?? 'text'), this.options.check)
     b.add('}')
   }
 
