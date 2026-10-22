@@ -132,6 +132,8 @@ export default defineMessages({
       renameTitle: 'Renommer {slug}',
       renamed: 'Cette entrée est renommée.',
       renamedLeave: 'Aller à l\'entrée renommée',
+      created: 'Cette entrée est créée.',
+      createdLeave: 'Aller à la nouvelle entrée',
       body: 'Contenu',
       clearEnd: 'Retirer la date de fin',
       conflict: 'Si vous gardez vos modifications, la prochaine sauvegarde écrasera cet autre enregistrement.',

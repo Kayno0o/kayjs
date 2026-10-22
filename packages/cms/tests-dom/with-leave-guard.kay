@@ -1,0 +1,11 @@
+---
+import type { ScreenCollection } from '../src/kay/contract'
+import { guardLeave } from 'kay'
+import EntryEditor from '../src/components/entry-editor.kay'
+
+// A new entry's form beside something else that holds the leave, as an app's own unsaved form does, in one bundle so both guards meet in the same runtime.
+const { collection } = props<{ collection: ScreenCollection }>()
+
+guardLeave(() => true)
+---
+EntryEditor(prefix="/admin" collection={collection})

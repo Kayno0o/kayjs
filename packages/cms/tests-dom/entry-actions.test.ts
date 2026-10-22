@@ -359,6 +359,46 @@ test('Create and add another creates the entry, then visits the new entry page',
   expect(window.location.pathname).toBe('/admin/new/posts')
 })
 
+test('Create, when leaving is declined over edits not saved elsewhere, locks the form and leaves a notice linking the created entry', async () => {
+  let release: () => void = () => undefined
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const fetched = spyOn(globalThis, 'fetch').mockImplementation((async (_url: string | URL | Request, init?: RequestInit) => {
+    if (init?.method !== 'POST')
+      return Response.json([])
+
+    await held
+
+    return Response.json({ saved: true, version: 'v1' })
+  }) as unknown as typeof fetch)
+  const ask = spyOn(globalThis, 'confirm').mockImplementation(() => false)
+
+  mounted = await mountComponent('../../tests-dom/with-leave-guard.kay', { collection: POSTS })
+
+  const root = mounted.root
+
+  await settle()
+  ;(window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL('http://localhost/admin/start')
+  await type(root, 'Next one')
+  ;(button(root, 'Create') as HTMLButtonElement).click()
+  await pause()
+  release()
+  await pause()
+  await pause()
+  expect(ask).toHaveBeenCalledTimes(1)
+  expect(root.querySelector('.kcms-entry-failure')!.textContent).toContain('This entry is created.')
+  expect(root.querySelector('.kcms-entry-failure a')!.getAttribute('href')).toBe('/admin/collections/posts/next-one')
+  expect(root.querySelector('fieldset')).toBeNull()
+  expect(buttons(root)).toEqual([])
+
+  const sent = fetched.mock.calls.length
+
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true }))
+  await pause()
+  expect(fetched.mock.calls.length).toBe(sent)
+})
+
 test('Rename types a cleaned slug in a dialog, sends it with the version, and opens the entry under it', async () => {
   const { fetched } = server({ saved: true, slug: 'new-name' })
   const root = await open(stored({}))

@@ -31,7 +31,10 @@ form.kcms-entry-editor(novalidate aria-busy={form.saving()} onSubmit={event => {
     EntryLocales(prefix={prefix} entry={form.entry} translations={translations} compared={translations.compare?.locale})
   if form.stranded() as gone
     .kcms-entry-failure(role="alert")
-      if gone.renamed
+      if gone.kind === 'created'
+        p {wording('cms.entry.created', 'This entry is created.')}
+        a(href={gone.to}) {wording('cms.entry.createdLeave', 'Go to the new entry')}
+      else if gone.kind === 'renamed'
         p {wording('cms.entry.renamed', 'This entry is renamed.')}
         a(href={gone.to}) {wording('cms.entry.renamedLeave', 'Go to the renamed entry')}
       else

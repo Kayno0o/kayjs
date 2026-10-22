@@ -4,7 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
-- kayjs-cms's entry screen swaps its form for a notice linking the collection or the renamed entry when a leave after a delete or a rename is declined, and `createEntryForm` returns `stranded` ([Screens](../packages/cms/llms/screens.md)).
+- kayjs-cms's entry screen swaps its form for a notice linking the collection, the renamed entry or the created one when a leave after a delete, a rename or a create is declined, and `createEntryForm` returns `stranded` ([Screens](../packages/cms/llms/screens.md)).
 - `navigate()` resolves to `false` when a leave guard was declined and the page stayed, `true` otherwise ([Navigation](navigation.md)).
 - kayjs-ui's `ConfirmDelete` takes `disabled`, which disables its trigger and confirm button while the caller is busy and keeps an open dialog open ([Dialogs](../packages/ui/llms/basics.md)).
 - kayjs-ui's `IconButton` and `BareIconButton` take `href` and render a link with the same look, parts and tooltip ([Basics](../packages/ui/llms/basics.md)).

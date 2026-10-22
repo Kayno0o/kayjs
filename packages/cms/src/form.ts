@@ -42,6 +42,12 @@ export interface Shown {
   has: (id: string) => boolean
 }
 
+// What a declined leave left behind: where the notice links, and which action it follows.
+export interface Stranded {
+  to: string
+  kind: 'deleted' | 'renamed' | 'created'
+}
+
 export interface EntryForm extends FormScope {
   prefix: string
   // The entry's title, or New entry; its slug and locale beneath, when that is not the title.
@@ -61,8 +67,8 @@ export interface EntryForm extends FormScope {
   // Where the new entry's slug lands among the slugs the collection holds, once they are read; undefined before, and for an entry that is saved or single. Given `typed`, where that slug lands among those of the saved entry's locale: what the Rename dialog checks.
   slugReport: (typed?: string) => SlugReport | undefined
   saving: Signal<boolean>
-  // Where the screen should have gone once the entry was deleted (the collection's screen) or renamed (the entry under its new slug) but the leave was declined over edits not saved, which leaves the form on a slug that is gone; the default screen then shows a notice linking it.
-  stranded: Signal<{ to: string, renamed: boolean } | undefined>
+  // Where the screen should have gone once the entry was deleted (the collection's screen), renamed (the entry under its new slug) or created (the entry under its slug) but the leave was declined over edits not saved, which leaves the form on a slug that is gone or on /new; the default screen then shows a notice linking it.
+  stranded: Signal<Stranded | undefined>
   // Whether the entry has edits not saved yet.
   dirty: () => boolean
   // Whether Save has something to do: edits to save, or a new entry to create, and no save on its way.
@@ -144,7 +150,7 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
   // kay files each entry of a localized collection under one of the site's locales.
   const newLocale = signal(locale ?? collection.locales?.[0] ?? '')
   const saving = signal(false)
-  const stranded = signal<{ to: string, renamed: boolean }>()
+  const stranded = signal<Stranded>()
   // A folder entry's slug is cleaned as it is typed; a loaded collection's is the loader's to judge, so it stays as typed.
   const cleans = collection.kind === 'folder'
   const suggestsSlug = signal(!first && !copy && !collection.single && cleans)
@@ -234,7 +240,8 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
   // `ends` reads the clock, so this follows the date passing.
   const ended = () => endsAt() !== undefined && ends() === undefined
   // A text that does not parse keeps Save enabled, so pressing it says what to fix.
-  const canSave = () => !saving() && (first === undefined || drafts.changed(ref) || drafts.blocked(ref).length > 0)
+  // A stranded new entry exists already, so saving it again would create it twice.
+  const canSave = () => !saving() && stranded() === undefined && (first === undefined || drafts.changed(ref) || drafts.blocked(ref).length > 0)
 
   const lastSave = signal<SavedState>()
   const onSaved = savedHandler(() => stored()?.url, saved => lastSave.set(saved), rebuildFinished)
@@ -280,7 +287,11 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
       if (!await saveDraft(drafts, ref, { slug: created.slug, locale: created.locale, create: true, onSaved }))
         return false
 
-      await navigate(next === 'open' ? entryPath(prefix, created) : anotherPath(created.locale), { replace: true })
+      // Declined over edits not saved elsewhere: the entry exists, so the form is locked rather than left to create it again.
+      if (!await navigate(next === 'open' ? entryPath(prefix, created) : anotherPath(created.locale), { replace: true })) {
+        drafts.reset(ref)
+        stranded.set({ to: entryPath(prefix, created), kind: 'created' })
+      }
 
       return true
     }
@@ -369,7 +380,7 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
       // Declined over the entry's own edits: they are of an entry that is gone, so they no longer hold the leave nor feed a save.
       if (!await navigate(screen, { replace: true })) {
         drafts.reset(ref)
-        stranded.set({ to: screen, renamed: false })
+        stranded.set({ to: screen, kind: 'deleted' })
       }
     },
     async rename(next, onRefused) {
@@ -382,7 +393,7 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
 
       if (!await navigate(to, { replace: true })) {
         drafts.reset(ref)
-        stranded.set({ to, renamed: true })
+        stranded.set({ to, kind: 'renamed' })
       }
 
       return true
