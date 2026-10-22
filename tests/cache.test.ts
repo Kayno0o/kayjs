@@ -164,7 +164,7 @@ describe('cached with a store', () => {
     // Naming it, reading it and an invalidation that drops nothing find nothing and write nothing.
     expect(store.get('a')).toBeUndefined()
     expect(store.keys()).toEqual([])
-    expect(store.dependencies!().size).toBe(0)
+    expect(store.dependencies().size).toBe(0)
     store.delete('a')
     invalidate(key => key.startsWith('b'))
     await Bun.sleep(600)
@@ -312,7 +312,7 @@ describe('cached with a store', () => {
     invalidate(key => key === 'post:1')
     expect(store.keys().sort()).toEqual(['page:2', 'plain'])
     expect(read).not.toHaveBeenCalled()
-    expect(store.dependencies!().get('page:1')).toBeUndefined()
+    expect(store.dependencies().get('page:1')).toBeUndefined()
 
     store.set('page:2', '["rewritten"]', Date.now() + 60_000)
     invalidate(key => key === 'post:2')
@@ -331,7 +331,7 @@ describe('cached with a store', () => {
 
     const store = sqliteCache(path)
 
-    expect([...store.dependencies!()]).toEqual([['page:1', ['post:1']]])
+    expect([...store.dependencies()]).toEqual([['page:1', ['post:1']]])
     invalidate('post:1')
     expect(store.keys()).toEqual(['plain'])
   })
@@ -348,11 +348,11 @@ describe('cached with a store', () => {
     insert('page:1', '#deps ["post:1"]\n["one"]')
     insert('page:2', '#deps ["post:2"]\n["two"]')
     insert('broken', '#deps ["post:3"\n["three"]')
-    expect([...store.dependencies!()].sort()).toEqual([['broken', ['\0all']], ['page:1', ['post:1']], ['page:2', ['post:2']]])
+    expect([...store.dependencies()].sort()).toEqual([['broken', ['\0all']], ['page:1', ['post:1']], ['page:2', ['post:2']]])
 
     insert('page:1', '["one"]')
     other.run('DELETE FROM kay_cache WHERE key = \'page:2\'')
-    expect([...store.dependencies!()]).toEqual([['broken', ['\0all']]])
+    expect([...store.dependencies()]).toEqual([['broken', ['\0all']]])
     other.close()
   })
 
