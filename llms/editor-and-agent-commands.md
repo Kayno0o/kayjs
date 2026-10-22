@@ -12,7 +12,7 @@
 kay lsp --stdio
 ```
 
-The extension starts one server per project, each folder holding a `kay.config.ts` (a monorepo's apps, a multi-root workspace's folders) once kay is installed in it, and adds the commands Kay: Restart the language server, Run kay check, Open the dev server and Show the output, the settings `kay.bun.path`, `kay.server.path`, `kay.routes`, `kay.lsp.trace` and `kay.dev.url`, and the snippets `page`, `pageserver`, `component` and `island`. `kay new` writes `.vscode/extensions.json` recommending it, and format-on-save for `.kay` in `.vscode/settings.json`.
+The extension starts one server per project, each folder holding a `kay.config.ts` (a monorepo's apps, a multi-root workspace's folders, a project nested in another, which owns its files) once kay is installed in it, and adds the commands Kay: Restart the language server, Run kay check, Open the dev server and Show the output, the settings `kay.bun.path`, `kay.server.path`, `kay.routes`, `kay.lsp.trace` and `kay.dev.url`, and the snippets `page`, `pageserver`, `component` and `island`. `kay new` writes `.vscode/extensions.json` recommending it, and format-on-save for `.kay` in `.vscode/settings.json`.
 
 ### Photograph a page of the dev server
 

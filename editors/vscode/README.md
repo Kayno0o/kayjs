@@ -4,7 +4,7 @@ Language support for `.kay` components, the pug-like templates over TypeScript o
 
 - Highlighting for the template and the script and server fences.
 - Errors, hover, completion with auto-import, go-to-definition, references, rename, quick fixes and formatting, from the `kay lsp` of the kay your project installed.
-- One language server per project: every folder with a `kay.config.ts`, monorepos and multi-root workspaces included. The server starts once kay is installed.
+- One language server per project: every folder with a `kay.config.ts`, monorepos, multi-root workspaces and a project nested in another (it has its own server, which the outer one leaves its files to) included. The server starts once kay is installed.
 - Snippets for a page, a component and an island.
 - Commands: Kay: Restart the language server, Run kay check, Open the dev server, Show the output.
 

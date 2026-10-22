@@ -56,7 +56,7 @@ The `.kay` extension for VS Code highlights `.kay` files and runs `kay lsp`. You
 
 Install **Kay** (`kaynooo.kay`) from the VS Code Marketplace, or from Open VSX in VSCodium and other builds. Each release also attaches its `kay-<version>.vsix`, which `code --install-extension` installs. A project made by `kay new` recommends it in `.vscode/extensions.json`, so VS Code offers it when the folder opens, and formats `.kay` files on save with it.
 
-The extension runs the language server of the kay the project installed, one server per project: every folder holding a `kay.config.ts`, in a monorepo or a multi-root workspace too. It always matches the compiler the project builds with, and it starts once kay is installed. A project made by `kay new` needs no setup. These settings change that.
+The extension runs the language server of the kay the project installed, one server per project: every folder holding a `kay.config.ts`, in a monorepo or a multi-root workspace too, and a project nested in another has its own server, which the outer one leaves its files to. It always matches the compiler the project builds with, and it starts once kay is installed. A project made by `kay new` needs no setup. These settings change that.
 
 | Setting | What it does |
 | --- | --- |

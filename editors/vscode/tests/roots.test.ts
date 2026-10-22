@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { registerCommands } from '../src/commands'
-import { clientRoots, COMMANDS, rootOf, serverPath } from '../src/roots'
+import { clientRoots, COMMANDS, holding, owns, rootOf, serverPath } from '../src/roots'
 
 const has = (...paths: string[]) => (path: string): boolean => paths.includes(path)
 const cli = (root: string): string => join(root, 'node_modules/kay/src/cli.ts')
@@ -40,8 +40,8 @@ describe('clientRoots', () => {
     expect(roots.map(({ root, cli: found }) => [root, found])).toEqual([['/repo/apps/a', cli('/repo')], ['/repo/apps/b', cli('/repo')]])
   })
 
-  it('keeps the outermost root when a config lies inside another project', () => {
-    expect(clientRoots(['/repo'], ['/repo/apps/a', '/repo'], '', has(cli('/repo'))).map(({ root }) => root)).toEqual(['/repo'])
+  it('serves a project nested in another with its own server', () => {
+    expect(clientRoots(['/repo'], ['/repo/docs', '/repo'], '', has(cli('/repo'))).map(({ root }) => root)).toEqual(['/repo', '/repo/docs'])
   })
 
   it('keeps a project without kay in the list, with no cli, so the extension waits for it', () => {
@@ -53,6 +53,33 @@ describe('rootOf', () => {
   it('names the deepest root holding a file', () => {
     expect(rootOf('/w/apps/a/src/x.kay', ['/w', '/w/apps/a'])).toBe('/w/apps/a')
     expect(rootOf('/w/apps/ab/x.kay', ['/w/apps/a'])).toBeUndefined()
+  })
+})
+
+describe('owns', () => {
+  const roots = ['/repo', '/repo/docs', '/repo/docs/deep']
+
+  it('gives a file to the innermost root holding it, and only to that one', () => {
+    expect(owns('/repo', '/repo/src/a.kay', roots)).toBe(true)
+    expect(owns('/repo', '/repo/docs/a.kay', roots)).toBe(false)
+    expect(owns('/repo/docs', '/repo/docs/a.kay', roots)).toBe(true)
+    expect(owns('/repo/docs', '/repo/docs/deep/a.kay', roots)).toBe(false)
+    expect(owns('/repo/docs/deep', '/repo/docs/deep/a.kay', roots)).toBe(true)
+  })
+
+  it('does not mistake a sibling sharing a name prefix for a nested project', () => {
+    expect(owns('/repo', '/repo/docs-old/a.kay', roots)).toBe(true)
+  })
+
+  it('leaves a file to the outer root while the nested one is not served', () => {
+    expect(owns('/repo', '/repo/docs/a.kay', ['/repo'])).toBe(true)
+  })
+})
+
+describe('holding', () => {
+  it('names the servers a started or stopped nested root takes files from', () => {
+    expect(holding(['/repo', '/other'], ['/repo/docs'])).toEqual(['/repo'])
+    expect(holding(['/repo', '/repo/docs'], ['/repo/docs'])).toEqual(['/repo'])
   })
 })
 

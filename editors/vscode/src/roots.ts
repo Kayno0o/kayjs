@@ -38,20 +38,20 @@ export function serverPath(root: string, folder: string, configured: string, exi
   return exists(own) ? own : undefined
 }
 
-// One language server per project: every folder holding a kay.config.ts, the outermost when one holds another, else the workspace folder itself when it has a kay to run.
+// One language server per project: every folder holding a kay.config.ts, a project nested in another included (the outer server leaves its files to it, see `owns`), else the workspace folder itself when it has a kay to run.
 export function clientRoots(folders: string[], configDirs: string[], configured: string, exists: (path: string) => boolean): Root[] {
   const found = new Map<string, Root>()
-  const outer = [...new Set(configDirs)].sort().filter((dir, index, all) => !all.slice(0, index).some(parent => inside(parent, dir)))
+  const configs = [...new Set(configDirs)].sort()
 
   for (const folder of folders) {
-    const configs = outer.filter(dir => inside(folder, dir))
+    const inFolder = configs.filter(dir => inside(folder, dir))
 
-    for (const root of configs)
+    for (const root of inFolder)
       found.set(root, { root, cli: serverPath(root, folder, configured, exists), config: true })
 
     const cli = serverPath(folder, folder, configured, exists)
 
-    if (configs.length === 0 && cli !== undefined && exists(cli))
+    if (inFolder.length === 0 && cli !== undefined && exists(cli))
       found.set(folder, { root: folder, cli, config: false })
   }
 
@@ -61,4 +61,14 @@ export function clientRoots(folders: string[], configDirs: string[], configured:
 // The root whose server owns a file: the deepest one holding it.
 export function rootOf(file: string, roots: string[]): string | undefined {
   return roots.filter(root => file === root || file.startsWith(root + sep)).sort((a, b) => b.length - a.length)[0]
+}
+
+// Whether the server of `root` owns a file: no deeper served root holds it, as two servers on one file would report every diagnostic twice.
+export function owns(root: string, file: string, roots: string[]): boolean {
+  return rootOf(file, roots.includes(root) ? roots : [...roots, root]) === root
+}
+
+// The servers whose documents a change of served roots moves: those holding a root that started or stopped, whose open files another server now owns or gives back.
+export function holding(roots: string[], changed: string[]): string[] {
+  return roots.filter(root => changed.some(other => other !== root && inside(root, other)))
 }
