@@ -19,9 +19,9 @@ export interface CacheStore {
   subscribe?: (listener: (message: string) => void) => void
 }
 
-// What one process tells the others: cache keys it dropped, or prerendered page paths it marked stale.
+// What one process tells the others: cache keys it dropped, with the prefixes every key it holds under is dropped by (a `cache()` function's arguments), or prerendered page paths it marked stale.
 // `at` is a clock reading of the sending process, carried by a message naming no page: older processes read it as pages marked stale, none.
-export type Invalidation = { keys: string[] } | { pages: string[], at?: number }
+export type Invalidation = { keys: string[], prefixes?: string[] } | { pages: string[], at?: number }
 
 export interface CacheOptions {
   // Keeps the value across restarts, and for every process sharing the store; the value must survive devalue, as session data does.
@@ -101,16 +101,17 @@ export interface CachedFunction<A extends unknown[], T> {
 }
 
 const AT = /^at /
-const CLOSING_PAREN = /\)$/
 const DIGITS = /^\d+$/
 
 // The path, line and column a stack line names, with a `file://` and a `?` query a reload adds taken off, or nothing for a native frame.
 function frameAt(line: string): { path: string, line: string, column: string } | undefined {
-  const parts = line.trim().replace(AT, '').replace(CLOSING_PAREN, '').split(':')
+  const text = line.trim().replace(AT, '')
+  // A named frame ends in the closing parenthesis; an anonymous one is the place alone, whose path may hold ' ('.
+  const named = text.endsWith(')') && text.includes(' (')
+  const parts = (named ? text.slice(text.indexOf(' (') + 2, -1) : text).split(':')
   const column = parts.pop()
   const row = parts.pop()
-  const place = parts.join(':')
-  const path = (place.includes(' (') ? place.slice(place.lastIndexOf(' (') + 2) : place).replace('file://', '')
+  const path = parts.join(':').replace('file://', '')
 
   return column !== undefined && row !== undefined && DIGITS.test(column) && DIGITS.test(row) && path !== '' ? { path: path.includes('?') ? path.slice(0, path.indexOf('?')) : path, line: row, column } : undefined
 }
@@ -134,14 +135,16 @@ function callSite(kind: string, caller: (...args: never[]) => unknown): string {
 
 // A cached function, its key taken from the module and the place that calls `cache`, so no string is typed twice: call it where it is declared, once, at the top of a module.
 // `await posts()` gives the value as `cached` does, `posts.invalidate()` drops it, and a function taking arguments keeps a value for each.
-export function cache<A extends unknown[], T, const Ttl extends Duration = Duration>(load: (...args: A) => T | Promise<T>, options: CacheFunctionOptions<Ttl>, id?: string): CachedFunction<A, T> {
+export function cache<A extends unknown[], T, const Ttl extends Duration = Duration>(load: (...args: A) => T | Promise<T>, options: CacheFunctionOptions<Ttl>): CachedFunction<A, T>
+// The build adds the module's id as a third argument, which the type keeps from apps.
+export function cache<A extends unknown[], T>(load: (...args: A) => T | Promise<T>, options: CacheFunctionOptions, id?: string): CachedFunction<A, T> {
   const site = id === undefined ? callSite('cache', cache) : `cache:${id}`
   const { ttl, tags = [], ...rest } = options
 
   durationSeconds(ttl, `${site}'s ttl`)
 
   const tagKeys = tags.map(tag => tagKey(tag))
-  const keyOf = (args: unknown[]) => args.length === 0 ? site : `${site}${stringify(args)}`
+  const keyOf = (args: unknown[]) => args.length === 0 ? site : `${site}${argumentsText(site, args)}`
 
   const call = async (...args: A): Promise<T> => cachedFor<T>(keyOf(args), ttl, async () => load(...args), rest, renderingForVisitor(), tagKeys)
 
@@ -150,11 +153,19 @@ export function cache<A extends unknown[], T, const Ttl extends Duration = Durat
       if (args.length > 0)
         return invalidate(keyOf(args))
 
-      // The bare key is named too, so the other processes hear of it even when this one holds no value.
-      invalidate(site)
-      invalidate(key => key.startsWith(`${site}[`))
+      invalidateFunction(site)
     },
   })
+}
+
+// The arguments as devalue writes them, which a function or a class instance cannot be.
+function argumentsText(site: string, args: unknown[]): string {
+  try {
+    return stringify(args)
+  }
+  catch (error) {
+    throw new Error(`kay: ${site} takes arguments devalue can write, plain values: ${error instanceof Error ? error.message : String(error)}`)
+  }
 }
 
 const tagNames = new WeakMap<CacheTag, string>()
@@ -169,6 +180,8 @@ function tagKey(tag: CacheTag): string {
 }
 
 // A group of cached values, for the `tags` of `cache`: `invalidate()` drops all of them with no key typed anywhere.
+export function cacheTag(): CacheTag
+// The build adds the module's id as an argument, which the type keeps from apps.
 export function cacheTag(id?: string): CacheTag {
   const key = id === undefined ? callSite('tag', cacheTag) : `tag:${id}`
   const tag = { invalidate: () => invalidate(key) } as CacheTag
@@ -205,8 +218,13 @@ async function cachedFor<T, const Ttl extends Duration = Duration>(key: string, 
     if (kept) {
       entry = kept
 
-      if (tagKeys.length > 0)
-        kept.deps = [...new Set([...tagKeys, ...kept.deps ?? []])]
+      const deps = [...new Set([...tagKeys, ...kept.deps ?? []])]
+
+      // A tag added since the row was written is written into it, so a restart or another process keeps the link.
+      if (deps.length > (kept.deps?.length ?? 0)) {
+        kept.deps = deps
+        writeRow(key, kept, store)
+      }
 
       remember(key, kept)
       trim()
@@ -319,6 +337,16 @@ export function invalidate(key: string | ((key: string) => boolean)): void {
     broadcast({ keys: [...dropped] })
 }
 
+// Drops a `cache()` function's value for every arguments, and the bare key: the other processes are told the key and the prefix its arguments follow, so they drop theirs even when this one holds none.
+function invalidateFunction(site: string): void {
+  const prefix = `${site}[`
+  const matches = (name: string) => name === site || name.startsWith(prefix)
+  const dropped = new Set([site])
+
+  dropAndTell(matches, matches, dropped)
+  broadcast({ keys: [...dropped], prefixes: [prefix] })
+}
+
 // Drops `key` and what is built from it as `invalidate` does, in this process alone and with nothing sent to the others: for a change every process finds by itself, so none echoes it to the rest.
 export function invalidateLocally(key: string): void {
   const matches = (name: string) => name === key
@@ -409,8 +437,9 @@ function heard(message: string): void {
 
   if ('keys' in invalidation) {
     const named = new Set(invalidation.keys)
+    const prefixes = invalidation.prefixes ?? []
 
-    const has = (key: string) => named.has(key)
+    const has = (key: string) => named.has(key) || prefixes.some(prefix => key.startsWith(prefix))
 
     dropEntries(has)
 
@@ -478,25 +507,28 @@ async function refresh(key: string, ttl: number, entry: Entry, load: () => unkno
 
 // A loaded value: one the store cannot hold throws before memory keeps it; a store that fails to write, locked or full, is logged and the value kept in memory, rather than fetched again by every caller.
 function keep(key: string, entry: Entry, store: CacheStore | undefined): void {
-  if (store) {
-    let text: string
-
-    try {
-      text = stringify(entry.value)
-    }
-    catch (error) {
-      throw new Error(`kay: cached('${key}') cannot keep its value in a store: ${error instanceof Error ? error.message : String(error)}`)
-    }
-
-    try {
-      store.set(key, entry.deps ? `${DEPS_PREFIX}${JSON.stringify(entry.deps)}\n${text}` : text, entry.freshUntil)
-    }
-    catch (error) {
-      kayLog('error', `cached('${key}') could not write its store; keeping the value in memory`, error)
-    }
-  }
+  if (store)
+    writeRow(key, entry, store)
 
   remember(key, entry)
+}
+
+function writeRow(key: string, entry: Entry, store: CacheStore): void {
+  let text: string
+
+  try {
+    text = stringify(entry.value)
+  }
+  catch (error) {
+    throw new Error(`kay: cached('${key}') cannot keep its value in a store: ${error instanceof Error ? error.message : String(error)}`)
+  }
+
+  try {
+    store.set(key, entry.deps ? `${DEPS_PREFIX}${JSON.stringify(entry.deps)}\n${text}` : text, entry.freshUntil)
+  }
+  catch (error) {
+    kayLog('error', `cached('${key}') could not write its store; keeping the value in memory`, error)
+  }
 }
 
 // A value the store kept, or nothing when it has none or one it cannot read, which it forgets.

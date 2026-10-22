@@ -1,10 +1,9 @@
-import type * as t from '@babel/types'
-import { parse } from '@babel/parser'
+import type { Insert } from './insert-ids'
+import { applyInserts, argumentsEnd, parseModule } from './insert-ids'
 import { liveId } from './live-ids'
 
 const MENTIONS_CACHE = /\bcache(?:Tag)?\b/
 const NAMES_KAY_CACHE = /["']kay\/cache["']/
-const SPACE = /\s/
 
 // How many arguments each call is written with, so the id lands after them.
 const ARGUMENTS: Record<string, number> = { cache: 2, cacheTag: 0 }
@@ -14,14 +13,10 @@ export function cacheIds(source: string, file: string, root: string, jsx = false
   if (!MENTIONS_CACHE.test(source) || !NAMES_KAY_CACHE.test(source))
     return source
 
-  let ast: t.File
+  const ast = parseModule(source, jsx)
 
-  try {
-    ast = parse(source, { sourceType: 'module', attachComment: false, plugins: jsx ? ['typescript', 'jsx'] : ['typescript'] })
-  }
-  catch {
+  if (!ast)
     return source
-  }
 
   const locals = new Map<string, number>()
 
@@ -43,8 +38,7 @@ export function cacheIds(source: string, file: string, root: string, jsx = false
   if (locals.size === 0)
     return source
 
-  const comments = ast.comments ?? []
-  const inserts: { at: number, text: string }[] = []
+  const inserts: Insert[] = []
 
   for (const statement of ast.program.body) {
     const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
@@ -58,23 +52,7 @@ export function cacheIds(source: string, file: string, root: string, jsx = false
 
       const text = JSON.stringify(`${id.name}.${liveId(file, root, id.name)}`)
 
-      // After the last token of the last argument, parentheses and a trailing comma included, before any comment closing the call.
-      let at = init.end! - 1
-
-      for (let moved = true; moved;) {
-        moved = false
-
-        while (at > 0 && SPACE.test(source[at - 1]!))
-          at--
-
-        const comment = comments.find(found => found.end === at)
-
-        if (comment) {
-          at = comment.start!
-          moved = true
-        }
-      }
-
+      const at = argumentsEnd(source, ast, init)
       let separator = ''
 
       if (init.arguments.length > 0)
@@ -84,10 +62,5 @@ export function cacheIds(source: string, file: string, root: string, jsx = false
     }
   }
 
-  let result = source
-
-  for (const { at, text } of inserts.sort((a, b) => b.at - a.at))
-    result = result.slice(0, at) + text + result.slice(at)
-
-  return result
+  return applyInserts(source, inserts)
 }

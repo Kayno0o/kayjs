@@ -1,9 +1,9 @@
-import type { CacheStore, CacheTag } from '../src/runtime/cache'
+import type { CachedFunction, CacheFunctionOptions, CacheStore, CacheTag } from '../src/runtime/cache'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterEach, describe, expect, it } from 'bun:test'
-import { cache, cacheTag, invalidate, onKeysInvalidated, trackStore, untrackStore } from '../src/runtime/cache'
+import { cache, cacheTag, invalidate, invalidateLocally, onKeysInvalidated, trackStore, untrackStore } from '../src/runtime/cache'
 import { readsOf } from '../src/server/page-reads'
 import { scratchDir } from './scratch'
 
@@ -147,6 +147,75 @@ describe('cache', () => {
     posts.invalidate()
     untrackStore(store)
     expect(sent).toHaveLength(1)
+  })
+
+  it('makes a process holding values drop every arguments of a function another process invalidated bare', async () => {
+    const sent: string[] = []
+    let hear: ((message: string) => void) | undefined
+    const store: CacheStore = { get: () => undefined, set: () => undefined, delete: () => undefined, keys: () => [], publish: message => void sent.push(message), subscribe: (listener) => {
+      hear = listener
+    } }
+    let loads = 0
+    const post = cache((slug: string) => `${slug}${++loads}`, { ttl: 60, store })
+
+    // The sender holds no value, as another process would not.
+    trackStore(store)
+    post.invalidate()
+    untrackStore(store)
+    expect(sent).toHaveLength(1)
+    await post('a')
+    await post('b')
+    expect(loads).toBe(2)
+    hear?.(sent[0]!)
+    await post('a')
+    await post('b')
+    expect(loads).toBe(4)
+  })
+
+  it('writes a tag added since a row was stored into the row', async () => {
+    const rows = new Map<string, { text: string, freshUntil: number }>()
+    const store: CacheStore = { get: key => rows.get(key), set: (key, text, freshUntil) => void rows.set(key, { text, freshUntil }), delete: key => void rows.delete(key), keys: () => [...rows.keys()] }
+    // The build passes an id as the last argument, which the types hide.
+    const group = (cacheTag as unknown as (id: string) => CacheTag)('rewrite-group')
+    const named = cache as unknown as (load: () => string, options: CacheFunctionOptions, id: string) => CachedFunction<[], string>
+
+    await named(() => 'kept', { ttl: 60, store }, 'rewrite')()
+    expect(rows.get('cache:rewrite')?.text.startsWith('#deps ')).toBe(false)
+
+    // A restart: memory is empty, the row stays, and the module now names a tag.
+    const row = rows.get('cache:rewrite')!
+
+    invalidateLocally('cache:rewrite')
+    rows.set('cache:rewrite', row)
+    expect(await named(() => 'other', { ttl: 60, store, tags: [group] }, 'rewrite')()).toBe('kept')
+    expect(rows.get('cache:rewrite')?.text.startsWith('#deps ')).toBe(true)
+    group.invalidate()
+    expect(rows.has('cache:rewrite')).toBe(false)
+  })
+
+  it('says an argument devalue cannot write is the cause', () => {
+    const post = cache((_value: unknown) => 1, { ttl: 60 })
+
+    expect(post(() => 1)).rejects.toThrow('arguments devalue can write')
+  })
+
+  it('finds the calling module when its path holds a space and a parenthesis', async () => {
+    const root = await scratchDir('cache-paren-')
+
+    try {
+      const dir = join(root, 'a (b)')
+
+      await Bun.write(join(dir, 'app.ts'), `import { cache } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/cache'))}\n\nconst keys: string[] = []\nconst store = { get: () => undefined, set: (key: string) => void keys.push(key), delete: () => undefined, keys: () => [] }\nconst posts = cache(() => 1, { ttl: 60, store })\n\nawait posts()\nconsole.log(keys[0])\n`)
+
+      const run = Bun.spawn([process.execPath, join(dir, 'app.ts')], { stdout: 'pipe', stderr: 'pipe' })
+
+      expect((await new Response(run.stdout).text()).trim()).toMatch(/^cache:.*a \(b\)\/app\.ts:\d+:\d+$/)
+      await run.exited
+      expect(run.exitCode).toBe(0)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 
   it('keeps two caches apart without a build id, bundled with the module as an executable is', async () => {
