@@ -125,6 +125,8 @@ describe('the prebuilt pages', () => {
     const member = await ada.visit('/nav')
 
     expect(member.find('#sign-in')).toHaveLength(0)
+    // No `viewer` option: the page reaches the components, so the user is in the first bytes rather than a streamed block.
+    expect(member.html).not.toContain('kay-await')
     expect(text(member, '#member')).toBe('Member')
     expect(member.find('#admin')).toHaveLength(0)
     expect(text(member, '.kayjs-auth span')).toBe('nav@example.com')

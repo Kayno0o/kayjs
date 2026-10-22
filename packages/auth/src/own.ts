@@ -63,7 +63,7 @@ export interface OwnOptions<Role extends string = string, Prefix extends string 
   email?: EmailOptions | false | undefined
   // The hooks as a module the app loads, `() => import('./src/auth')`, in place of `src/auth.ts` exporting `hooks`, which is read by convention but cannot be baked into an executable.
   hooks?: (() => Promise<{ hooks: AuthHooks }>) | undefined
-  // Reads the signed-in user before every page renders, as with a module: `false` by default.
+  // As with a module: the user is read ahead of the pages reaching `SignedIn`, `SignedOut` or `UserMenu`, of every page for `true`, of none for `false`.
   viewer?: boolean | undefined
 }
 

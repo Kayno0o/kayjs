@@ -92,7 +92,7 @@ An extension may set these fields. Only `name` is required.
 - `transformPage`: rewrites each prerendered page before it is written.
 - `needsServer`: set it when the extension does nothing without a running server, as a tracker posting to a route of its own. `kay build --static` warns about it.
 - `staticFiles`: files a static export writes into the site, by path, for what the extension's server would otherwise serve, such as a script every page loads.
-- `layout`: one `.kay` layout, alone in its directory, wrapping every page outside the app's layouts. It renders its `slot` and then what the library mounts on every page, such as a toaster; its stylesheet comes before the app's, and a page setting `layouts: false` starts afresh without it.
+- `layout`: one `.kay` layout, alone in its directory, wrapping every page outside the app's layouts. It renders its `slot` and then what the library mounts on every page, such as a toaster; its stylesheet comes before the app's, and a page setting `layouts: false` starts afresh without it. `layout: { file, reaching }` wraps only the pages whose imports reach one of the `reaching` files.
 - `editor`: a `.kay` island rendered last on every page in edit mode.
 - `check`: a function returning the problems with how the app configured the extension, as `{ message, file?, severity?, help? }`. `kay check` and the editor show them beside kay's own without starting the server, so a mistake the library would only log once the server listens is seen as you type. A warning at `kay.config.ts` unless it names a file.
 - `devTool`: a browser module adding a tab to the dev tool.

@@ -4,7 +4,7 @@ import { currentUser } from '../viewer'
 const { role } = props<{ role?: string | undefined }>()
 const user = currentUser(role)
 ---
-// A guest is no signed-in user; the user is read ahead with `viewer: true`, else this block streams in once it settles.
+// A guest is no signed-in user; the user is read ahead on the pages reaching this component, else this block streams in once it settles.
 try
   await user then found
     if found

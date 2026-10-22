@@ -12,4 +12,4 @@ The rest is split by topic, each file read whole with one command:
 - [The OAuth server for MCP clients, bearer tokens and forward auth](llms/oauth-server-and-tokens.md): signing an AI agent in through the OAuth server, bearer tokens, and guarding other sites for a reverse proxy
 - [Events, the audit log, admin and organizations](llms/admin-and-organizations.md): auth events and the audit log, the admin pages, organizations and roles
 - [Bots, breached passwords, limits, stores, testing and the dev tool](llms/hardening-and-testing.md): proof of work and breached passwords, limits, the stores, testing an app using it, and the dev tool tab
-- [The signed-in user in templates](llms/signed-in-components.md): SignedIn, SignedOut and UserMenu in a layout or component with no server fence, and `viewer: true`
+- [The signed-in user in templates](llms/signed-in-components.md): SignedIn, SignedOut and UserMenu in a layout or component with no server fence, read in the first bytes of the pages using them

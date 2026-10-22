@@ -1,5 +1,5 @@
 import type { KayExtension } from '../config'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { findKayFiles, findProjectFiles, KAY_FILE, TS_FILE } from '../build/files'
 import { throughLinks } from '../build/links'
@@ -110,6 +110,8 @@ export interface RouteMount {
   apiPath?: string | undefined
   // A layout the extension wraps every page in, outside the app's own: the mount serves no page and holds no other layout.
   outer?: string | undefined
+  // Set with `outer`: the layout wraps only the pages reaching one of these files.
+  reaching?: string[] | undefined
 }
 
 // The nearest `_404.kay` and `_error.kay` up the directory tree.
@@ -370,7 +372,71 @@ function layoutsOf(trees: RouteMount[], at: string, file: string, read: LayoutsR
   // The innermost layout that leaves its parents out starts the chain.
   const reset = layouts.findLastIndex(layout => setsFalse(layout, 'layouts', read))
 
-  return reset === -1 ? [...trees.flatMap(tree => tree.outer ?? []), ...layouts] : layouts.slice(reset)
+  if (reset !== -1)
+    return layouts.slice(reset)
+
+  const outers = trees.flatMap(tree => tree.outer !== undefined && (tree.reaching === undefined || reaches([file, ...layouts], tree.reaching, read)) ? [tree.outer] : [])
+
+  return [...outers, ...layouts]
+}
+
+// Every specifier a module names, static or dynamic; one in a comment or a string only adds a file the walk follows for nothing.
+const IMPORT = /\b(?:from|import)\s*(?:\(\s*)?['"]([^'"]+)['"]/g
+const importsRead = new WeakMap<LayoutsRead, Map<string, string[]>>()
+
+function realFile(file: string): string {
+  try {
+    return realpathSync(file)
+  }
+  catch {
+    return file
+  }
+}
+
+// The files a module imports that the walk follows: components anywhere, scripts of the app only.
+function importsOf(file: string, read: LayoutsRead): string[] {
+  let memo = importsRead.get(read)
+
+  if (memo === undefined)
+    importsRead.set(read, memo = new Map<string, string[]>())
+
+  let found = memo.get(file)
+
+  if (found === undefined) {
+    found = []
+    memo.set(file, found)
+
+    try {
+      for (const [, specifier] of readFileSync(file, 'utf8').matchAll(IMPORT)) {
+        const real = realFile(Bun.resolveSync(specifier!, dirname(file)))
+
+        if (KAY_FILE.test(real) || (TS_FILE.test(real) && !real.split(sep).includes('node_modules')))
+          found.push(real)
+      }
+    }
+    catch {}
+  }
+
+  return found
+}
+
+// Whether the import graph from `starts` reaches one of `targets`.
+function reaches(starts: string[], targets: string[], read: LayoutsRead): boolean {
+  const wanted = new Set(targets.map(realFile))
+  const seen = new Set<string>()
+  const queue = starts.map(realFile)
+
+  for (let file = queue.pop(); file !== undefined; file = queue.pop()) {
+    if (wanted.has(file))
+      return true
+
+    if (!seen.has(file)) {
+      seen.add(file)
+      queue.push(...importsOf(file, read))
+    }
+  }
+
+  return false
 }
 
 function setsFalse(file: string, key: string, read: LayoutsRead): boolean {
@@ -627,8 +693,8 @@ export function routeTrees(routesDir: string, mounts: RouteMount[] = []): RouteM
 // The prefix of an outer layout's mount, which no URL starts with.
 const OUTER_PREFIX = '/\0outer'
 
-function outerMount(layout: string): RouteMount {
-  return { dir: dirname(layout), prefix: OUTER_PREFIX, outer: layout }
+function outerMount(layout: string, reaching?: string[]): RouteMount {
+  return { dir: dirname(layout), prefix: OUTER_PREFIX, outer: layout, ...reaching && { reaching } }
 }
 
 // An extension's layout is a `_layout.kay` alone in its directory, which is mounted as a tree of its own.
@@ -645,7 +711,7 @@ function checkedLayout(root: string, layout: string): string {
 export function routeMounts(root: string, extensions: KayExtension[] = []): RouteMount[] {
   return extensions.flatMap(({ routes, editor, layout }) => [
     ...routes ? [{ dir: throughLinks(root, resolve(root, routes.dir)), prefix: mountPrefix(routes.prefix), ...editor !== undefined && { editor: true as const } }] : [],
-    ...layout === undefined ? [] : [outerMount(throughLinks(root, checkedLayout(root, layout)))],
+    ...layout === undefined ? [] : [typeof layout === 'string' ? outerMount(throughLinks(root, checkedLayout(root, layout))) : outerMount(throughLinks(root, checkedLayout(root, layout.file)), layout.reaching.map(file => resolve(root, file)))],
   ])
 }
 

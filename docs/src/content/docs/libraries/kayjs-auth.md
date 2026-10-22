@@ -205,7 +205,7 @@ nav
 - `role` only hides markup, the page and its data are still served: guard the route with `auth.guard` for access.
 - They read the request being answered, so a page with `prerender: true` fails the build naming them: render it per request. They nest in one another and in the app's own `await` blocks.
 
-`auth({ module: './src/auth', viewer: true })` reads the user before every page renders, so the three show in the first bytes, with JavaScript off too. Without it they stream in after the page, which needs JavaScript, and a page not showing the user costs no read. `viewer: true` reads the session on every page, so no cache shares one between visitors.
+A page whose imports reach one of the three, through its layouts, components and helpers however deep, reads the user before it renders, so they show in the first bytes, with JavaScript off too; no other page reads the session. Such a page is the visitor's own, so no cache shares it between visitors. `viewer: true` in `auth({ ... })` reads it on every page and `viewer: false` on none, the three then streaming in after the page, which needs JavaScript.
 
 ## Signing in with a password
 

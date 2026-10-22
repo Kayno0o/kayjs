@@ -232,6 +232,17 @@ export function authPages(options: AuthPagesOptions & { auth?: (() => Promise<Au
   return Object.assign(extension, { [LOAD_AUTH]: options.auth ? async () => authOfModule(await options.auth!()) as unknown as UserMaker : async () => authOfServer(options.server) })
 }
 
+const VIEWER_LAYOUT = `${import.meta.dir}/../viewer-layout/_layout.kay`
+const VIEWER_COMPONENTS = ['signed-in', 'signed-out', 'user-menu'].map(name => `${import.meta.dir}/../components/${name}.kay`)
+
+// The layout reading the user ahead of the render: on the pages reaching a component showing it, on every page for `true`, on none for `false`.
+function viewerLayout(viewer: boolean | undefined): { layout?: string | { file: string, reaching: string[] } } {
+  if (viewer === false)
+    return {}
+
+  return { layout: viewer === true ? VIEWER_LAYOUT : { file: VIEWER_LAYOUT, reaching: VIEWER_COMPONENTS } }
+}
+
 export interface AuthExtensionOptions extends AuthPagesOptions {
   // The file exporting the app's `auth`, the `createAuth` result, as a path from the project root: `'./src/auth'`. kay imports it as the server starts, never as the config is read, so the config stays off the app's database, and `kay check` types `ctx.locals.auth` and links to kayjs-auth's routes off it.
   module?: string | undefined
@@ -239,7 +250,7 @@ export interface AuthExtensionOptions extends AuthPagesOptions {
   server?: (() => AnyElysia | Promise<AnyElysia>) | undefined
   // `false` leaves out the prebuilt pages and serves the plugin alone, for an app writing every page itself. `true` by default.
   pages?: boolean | undefined
-  // Reads the signed-in user before every page renders, so `SignedIn`, `SignedOut` and `UserMenu` show on the first bytes, even with JavaScript off. Left out, they stream in after the page, which needs JavaScript, and a page not showing the user costs no read. `false` by default: it reads the session on every page, making each one the visitor's own.
+  // `SignedIn`, `SignedOut` and `UserMenu` show on the first bytes, even with JavaScript off, because the user is read before the render of each page whose imports reach one of them, and of no other. `true` reads it on every page, for an app whose own components call `currentUser`; `false` reads it on none, the three then streaming in after the page, which needs JavaScript.
   viewer?: boolean | undefined
   // `false` builds no plugin, for an app mounting the plugin by hand, `new Elysia().use(auth.plugin).use(await pages())`: the extension then serves the pages alone.
   plugin?: false | undefined
@@ -275,7 +286,7 @@ function ownAuth(options: OwnOptions): AuthPages {
     name: '@kaynooo/kayjs-auth',
     server: async () => (await build()).plugin,
     ...options.pages !== false && { routes: { dir: `${import.meta.dir}/routes`, prefix } },
-    ...options.viewer === true && { layout: `${import.meta.dir}/../viewer-layout/_layout.kay` },
+    ...viewerLayout(options.viewer),
     env: ownEnv(options),
     devTool: DEV_TOOL,
     commands: COMMANDS,
@@ -287,7 +298,7 @@ function ownAuth(options: OwnOptions): AuthPages {
 }
 
 function moduleAuth(options: AuthExtensionOptions): AuthPages {
-  const { module, server, pages = true, viewer = false, prefix = DEFAULT_PREFIX, home } = options
+  const { module, server, pages = true, viewer, prefix = DEFAULT_PREFIX, home } = options
 
   if (module !== undefined && server !== undefined)
     throw new Error('kayjs-auth: auth() takes `module` or `server`, not both')
@@ -298,7 +309,7 @@ function moduleAuth(options: AuthExtensionOptions): AuthPages {
     ...module !== undefined && { serverModule: { path: module, export: 'auth', prepare: (exported: unknown) => pages ? authOfExport(exported, module)[PAGES_OF]?.adopt(given) : undefined } },
     ...module === undefined && server !== undefined && { server },
     ...pages && { routes: { dir: `${import.meta.dir}/routes`, prefix } },
-    ...viewer && { layout: `${import.meta.dir}/../viewer-layout/_layout.kay` },
+    ...viewerLayout(viewer),
     devTool: DEV_TOOL,
     commands: COMMANDS,
     prefix,

@@ -28,12 +28,13 @@ nav
 
 ### Show them with the first bytes
 
-`auth({ module: './src/auth', viewer: true })` in `kay.config.ts` reads the user before every page renders, so the three show in the first bytes, with JavaScript off too. Without it they stream in after the page, a block each, which needs JavaScript, and a page not showing the user costs no read.
+A page reads the user before it renders when its imports reach `SignedIn`, `SignedOut` or `UserMenu`, through its layouts, components and helpers however deep, so they show in the first bytes, with JavaScript off too. A page not reaching them reads no session, and no option is needed.
 
-- `viewer: true` reads the session on every page, so none is shared by a cache between visitors and a page kept by the build is rendered per request.
+- A page reading the session is the visitor's own: no cache shares it between visitors, and a page kept by the build is rendered per request.
 - A read that fails there is left to the components, which read again and report it, showing nothing meanwhile.
+- `viewer: true` in `auth({ ... })` reads the user on every page, for an app whose own components call `currentUser`; `viewer: false` reads it on none, and the three stream in after the page, a block each, which needs JavaScript.
 
 ## Reference
 
-- `viewer: true` goes beside `module` and `pages` in `auth({ ... })`; it is `false` by default.
+- `viewer` goes beside `module` and `pages` in `auth({ ... })`: left out, the pages reaching the components read the user; `true` reads it on every page, `false` on none.
 - `SignedIn` takes `role`; `UserMenu` takes `account`; `SignedOut` takes none. All three import from `@kaynooo/kayjs-auth/components/<name>.kay`.
