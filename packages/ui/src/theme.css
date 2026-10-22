@@ -71,16 +71,25 @@
   --tracking-kui-label: 0.15em;
   --tracking-kui-section: 0.18em;
   --tracking-kui-action: 0.16em;
-  --spacing-kui-card: 0.625rem;
-  --spacing-kui-inline: 0.3125rem;
-  --spacing-kui-section: 0.875rem;
+  /* Density scales the card, inline and section gaps and the field insets: 1 by default, 0.75 packs them tighter and 1.25 looser. */
+  --kui-density: 1;
+  --spacing-kui-card: calc(0.625rem * var(--kui-density, 1));
+  --spacing-kui-inline: calc(0.3125rem * var(--kui-density, 1));
+  --spacing-kui-section: calc(0.875rem * var(--kui-density, 1));
   /* The keyline of every framed box, a length: buttons, cards, card rows, widgets, notices, avatars, toasts, dialogs, side panels, tooltips, tables, boxed sections, save bars, segmented controls, file drops, pagination steps, the site nav, chart tooltips, chips, the icon grid, the scatter plot, the crop stage, toggles, the table's filter and selection bars and sort buttons, the palette and popovers. The old name --kui-border-card still sets it. A value that is no length, such as a `2px solid red` shorthand, leaves it at 1px. */
   --kui-border-width: var(--kui-border-card);
   --kui-border-card: 1px;
   --kui-border-input: 1px;
   --radius-kui-card: 0px;
+  /* The steps for what sits inside a framed box: sm for a badge or a toggle's thumb, md for a chip or a toggle's track, full for an avatar, which stays round unless a skin squares it. */
+  --radius-kui-sm: 0px;
+  --radius-kui-md: 0px;
+  --radius-kui-full: 9999px;
 
-  /* A badge's box and type. Its font is the text's unless the app sets --kui-badge-font, such as to var(--font-mono). */
+  /* The text's font for what does not inherit it (labels and fields, unless --kui-label-font is set), set by an app alone and the text's own otherwise, and the monospace of code, the markdown editor and stamps. */
+  --font-kui-mono: var(--font-mono);
+
+  /* A badge's box and type. Its font is the text's unless the app sets --kui-badge-font, such as to var(--font-kui-mono). */
   --kui-border-badge: 1px;
   --spacing-kui-badge-x: 0.375rem;
   --spacing-kui-badge-y: 1px;
@@ -96,8 +105,8 @@
   --kui-border-stamp: 1px;
 
   /* A text field's inset and its look while focused. Its border, the seed above, which buttons, toggles, carousel dots and empty stars draw too, is solid at 3:1 on every surface: an app changing its canvas sets it to match, since overlay0's hairline reads under 3:1. */
-  --spacing-kui-field-x: 0.5625rem;
-  --spacing-kui-field-y: 0.25rem;
+  --spacing-kui-field-x: calc(0.5625rem * var(--kui-density, 1));
+  --spacing-kui-field-y: calc(0.25rem * var(--kui-density, 1));
   --color-kui-field-focus: var(--color-kui-accent);
   --kui-field-focus-shadow: none;
 
@@ -227,17 +236,17 @@
   }
 
   .kui-heading-section {
-    @apply text-kui-2xs font-kui-label tracking-kui-section text-kui-subtext0 [font-family:var(--kui-label-font,inherit)] [text-transform:var(--kui-label-case)];
+    @apply text-kui-2xs font-kui-label tracking-kui-section text-kui-subtext0 [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)];
   }
 
   .kui-label-text {
-    @apply text-kui-micro font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--kui-label-font,inherit)] [text-transform:var(--kui-label-case)];
+    @apply text-kui-micro font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)];
   }
 
   .kui-btn {
     --kui-shell-line: var(--color-kui-field-border);
     --kui-shell-fill: var(--color-kui-canvas);
-    @apply inline-flex cursor-pointer items-center justify-center gap-kui-inline border-0 px-3 py-1 text-xs whitespace-nowrap font-kui-label tracking-kui-action text-kui-text [font-family:var(--kui-label-font,inherit)] [text-transform:var(--kui-label-case)] transition-[color,translate,box-shadow] duration-150;
+    @apply inline-flex cursor-pointer items-center justify-center gap-kui-inline border-0 px-3 py-1 text-xs whitespace-nowrap font-kui-label tracking-kui-action text-kui-text [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)] transition-[color,translate,box-shadow] duration-150;
   }
 
   /* A submit button while its form's onSubmit is pending: a spinner drawn in CSS, the button being static markup. A Button given `busy` draws its own and is left alone. */
@@ -337,7 +346,7 @@
       select,
       textarea
     ) {
-    @apply rounded-kui-card bg-kui-surface0 px-kui-field-x py-kui-field-y text-sm text-kui-text outline-none;
+    @apply rounded-kui-card bg-kui-surface0 px-kui-field-x py-kui-field-y text-sm text-kui-text outline-none [font-family:var(--font-kui-body,inherit)];
     border: var(--kui-border-input) solid var(--color-kui-field-border);
 
     &::placeholder {
@@ -695,7 +704,7 @@
   }
 
   .kui-chip-label {
-    @apply inline-flex items-center gap-1 border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-surface0 px-2.5 py-1 text-xs text-kui-subtext0 transition-colors hover:text-kui-text;
+    @apply inline-flex items-center gap-1 border-solid rounded-kui-md border-(length:--kui-border-width) border-kui-surface2 bg-kui-surface0 px-2.5 py-1 text-xs text-kui-subtext0 transition-colors hover:text-kui-text;
   }
 
   :where(.kui-chip-input:checked) + .kui-chip-label {
@@ -781,7 +790,7 @@
   }
 
   .kui-dialog-title {
-    @apply shrink-0 border-b border-kui-surface2 px-5 py-4 text-lg font-kui-heading tracking-kui-label text-kui-text [font-family:var(--kui-label-font,inherit)] [text-transform:var(--kui-label-case)];
+    @apply shrink-0 border-b border-kui-surface2 px-5 py-4 text-lg font-kui-heading tracking-kui-label text-kui-text [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)];
   }
 
   .kui-dialog-body {
@@ -801,7 +810,7 @@
   }
 
   .kui-empty-state-title {
-    @apply text-xs font-kui-heading tracking-kui-label text-kui-accent [font-family:var(--kui-label-font,inherit)] [text-transform:var(--kui-label-case)];
+    @apply text-xs font-kui-heading tracking-kui-label text-kui-accent [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)];
   }
 
   .kui-empty-state-description {
@@ -1145,7 +1154,7 @@
   }
 
   .kui-line-chart-tooltip-value {
-    @apply ml-auto pl-3 font-mono text-kui-text tabular-nums;
+    @apply ml-auto pl-3 font-kui-mono text-kui-text tabular-nums;
   }
 
   .kui-line-chart-swatch {
@@ -1167,7 +1176,7 @@
 
   /* Takes field-input's look beside its own class, so a text box and the editor stay one style. Grows with its text between about 12 lines and most of the screen, where browsers size a field by its content. */
   .kui-markdown-editor {
-    @apply max-h-[70dvh] min-h-[12lh] w-full resize-y font-mono field-sizing-content;
+    @apply max-h-[70dvh] min-h-[12lh] w-full resize-y font-kui-mono field-sizing-content;
 
     &:where([aria-busy='true']) {
       @apply cursor-progress;
@@ -1263,7 +1272,7 @@
     }
 
     :where(code, pre) {
-      @apply bg-kui-surface0 font-mono text-xs;
+      @apply bg-kui-surface0 font-kui-mono text-xs;
     }
 
     :where(pre) {
@@ -1524,7 +1533,7 @@
   }
 
   .kui-multi-select-action {
-    @apply cursor-pointer text-kui-2xs tracking-kui-label text-kui-subtext0 [font-family:var(--kui-label-font,inherit)] [text-transform:var(--kui-label-case)] hover:text-kui-text disabled:cursor-default disabled:opacity-40;
+    @apply cursor-pointer text-kui-2xs tracking-kui-label text-kui-subtext0 [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)] hover:text-kui-text disabled:cursor-default disabled:opacity-40;
 
     &:focus-visible {
       outline: 2px solid var(--color-kui-accent);
@@ -1600,7 +1609,7 @@
   }
 
   :where(.kui-skeleton[data-shape='avatar']) > .kui-skeleton-block {
-    @apply aspect-square h-auto rounded-full;
+    @apply aspect-square h-auto rounded-kui-full;
   }
 
   :where(.kui-skeleton[data-shape='card']) > .kui-skeleton-block {
@@ -1625,7 +1634,7 @@
   }
 
   .kui-page-header-title {
-    @apply m-0 text-xl font-kui-heading tracking-kui-label text-kui-text [font-family:var(--kui-label-font,inherit)] [text-transform:var(--kui-label-case)];
+    @apply m-0 text-xl font-kui-heading tracking-kui-label text-kui-text [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)];
   }
 
   .kui-page-header-meta {
@@ -1794,7 +1803,7 @@
   }
 
   .kui-date-input-weekday {
-    @apply py-1 text-kui-2xs font-normal text-kui-subtext0 [font-family:var(--kui-label-font,inherit)] [text-transform:var(--kui-label-case)];
+    @apply py-1 text-kui-2xs font-normal text-kui-subtext0 [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)];
   }
 
   .kui-date-input-day {
@@ -1819,7 +1828,7 @@
   }
 
   .kui-date-input-today {
-    @apply mt-1 w-full cursor-pointer rounded-kui-card py-1 text-center text-kui-2xs tracking-kui-label text-kui-subtext0 [font-family:var(--kui-label-font,inherit)] [text-transform:var(--kui-label-case)] hover:text-kui-text disabled:cursor-default disabled:opacity-40;
+    @apply mt-1 w-full cursor-pointer rounded-kui-card py-1 text-center text-kui-2xs tracking-kui-label text-kui-subtext0 [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)] hover:text-kui-text disabled:cursor-default disabled:opacity-40;
 
     &:focus-visible {
       outline: 2px solid var(--color-kui-accent);
@@ -2035,7 +2044,7 @@
   }
 
   .kui-slider-label {
-    @apply text-kui-micro font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--kui-label-font,inherit)] [text-transform:var(--kui-label-case)];
+    @apply text-kui-micro font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)];
   }
 
   .kui-slider-value {
@@ -2151,7 +2160,7 @@
   }
 
   .kui-side-panel-title {
-    @apply min-w-0 flex-1 truncate text-lg font-kui-heading tracking-kui-label text-kui-text [font-family:var(--kui-label-font,inherit)] [text-transform:var(--kui-label-case)];
+    @apply min-w-0 flex-1 truncate text-lg font-kui-heading tracking-kui-label text-kui-text [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)];
   }
 
   .kui-side-panel-body {
@@ -2249,7 +2258,7 @@
     }
 
     & .kui-stat-label {
-      @apply text-kui-micro font-kui-label tracking-kui-label [font-family:var(--kui-label-font,inherit)] [text-transform:var(--kui-label-case)];
+      @apply text-kui-micro font-kui-label tracking-kui-label [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)];
     }
   }
 
@@ -2588,7 +2597,7 @@
   }
 
   .kui-table-head-cell {
-    @apply border-b border-kui-surface2 px-3 py-2 text-left text-xs font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--kui-label-font,inherit)] [text-transform:var(--kui-label-case)];
+    @apply border-b border-kui-surface2 px-3 py-2 text-left text-xs font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)];
 
     &:where([data-align='center']) {
       @apply text-center;
@@ -2604,7 +2613,7 @@
   }
 
   .kui-table-sort-btn {
-    @apply inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-inherit [font-family:var(--kui-label-font,inherit)] [text-transform:var(--kui-label-case)];
+    @apply inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-inherit [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)];
   }
 
   .kui-table-sort-icon {
@@ -2700,7 +2709,7 @@
     }
 
     .kui-table-cell-label {
-      @apply block text-left text-kui-micro font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--kui-label-font,inherit)] [text-transform:var(--kui-label-case)];
+      @apply block text-left text-kui-micro font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)];
     }
 
     /* A long value with no space, such as a file path, breaks inside the card rather than widening it. */
@@ -2806,11 +2815,11 @@
   }
 
   .kui-toggle-track {
-    @apply relative inline-flex h-5 w-9 shrink-0 items-center border-solid border-(length:--kui-border-width) border-kui-field-border bg-kui-surface0 transition-colors;
+    @apply relative inline-flex h-5 w-9 shrink-0 items-center rounded-kui-md border-solid border-(length:--kui-border-width) border-kui-field-border bg-kui-surface0 transition-colors;
 
     &::before {
       content: '';
-      @apply block size-3.5 translate-x-0.5 bg-kui-subtext0 transition-transform;
+      @apply block size-3.5 translate-x-0.5 rounded-kui-sm bg-kui-subtext0 transition-transform;
     }
   }
 
@@ -2900,7 +2909,7 @@
     text-transform: var(--kui-badge-case);
 
     &:where([data-stamp]) {
-      @apply border-kui-stamp bg-kui-stamp-fill px-2.5 py-1 font-mono text-[0.625rem]/[1.4] font-normal tracking-[0.14em] text-kui-stamp uppercase transition-colors duration-150;
+      @apply border-kui-stamp bg-kui-stamp-fill px-2.5 py-1 font-kui-mono text-[0.625rem]/[1.4] font-normal tracking-[0.14em] text-kui-stamp uppercase transition-colors duration-150;
       border-width: var(--kui-border-stamp);
     }
 
@@ -2937,6 +2946,10 @@
     }
   }
 
+  :where(.kui-badge) {
+    @apply rounded-kui-sm;
+  }
+
   :where(.group:hover) .kui-badge:where([data-stamp]) {
     @apply bg-kui-stamp-fill-hover;
   }
@@ -2968,7 +2981,7 @@
   }
 
   .kui-avatar {
-    @apply inline-grid size-8 shrink-0 place-items-center overflow-hidden rounded-full border-solid border-kui-avatar-ring bg-kui-surface1;
+    @apply inline-grid size-8 shrink-0 place-items-center overflow-hidden rounded-kui-full border-solid border-kui-avatar-ring bg-kui-surface1;
     border-width: var(--kui-border-avatar);
 
     &:where([data-size='xs']) {
@@ -3007,7 +3020,7 @@
 
   /* mr-auto rather than ml-auto on what follows: a head that is all control and no title reads from the left, like the body under it. */
   .kui-card-title {
-    @apply mr-auto text-kui-2xs font-kui-label tracking-kui-section text-kui-subtext0 [font-family:var(--kui-label-font,inherit)] [text-transform:var(--kui-label-case)];
+    @apply mr-auto text-kui-2xs font-kui-label tracking-kui-section text-kui-subtext0 [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)];
   }
 
   .kui-card-body {

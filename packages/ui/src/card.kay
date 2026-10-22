@@ -8,7 +8,7 @@ const look = recipe({
     root: 'kui-card flex flex-col rounded-kui-card border-(length:--kui-border-width) border-solid border-kui-surface2 bg-kui-surface0 [box-shadow:var(--kui-shadow-raised)]',
     head: 'flex items-center gap-3 border-b-(length:--kui-border-width) border-solid border-kui-surface2 px-3 py-2',
     // mr-auto rather than ml-auto on what follows: a head that is all control and no title reads from the left, like the body under it.
-    title: 'mr-auto text-kui-2xs font-kui-label tracking-kui-section text-kui-subtext0 [font-family:var(--kui-label-font,inherit)] [text-transform:var(--kui-label-case)]',
+    title: 'mr-auto text-kui-2xs font-kui-label tracking-kui-section text-kui-subtext0 [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)]',
     body: 'p-kui-card',
   },
 })

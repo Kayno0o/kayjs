@@ -63,6 +63,8 @@ Set them on `:root` or `html`, as `@theme` does: a seed set on one element does 
 
 Labels, headings and table heads are uppercase unless `--kui-label-case` is `none`, and `--kui-label-font` sets their font. Two skins ship, `@kaynooo/kayjs-ui/skins/brutalist.css` (which sets the three shadow tokens below) and `soft.css`, imported after `theme.css`; your own `@theme` after them wins.
 
+`--radius-kui-sm`, `--radius-kui-md` and `--radius-kui-full` round what sits inside a framed box (badges and toggle thumbs, chips and toggle tracks, avatars), square except `full`. `--font-kui-mono` is the monospace of the markdown editor, code and stamps, `--font-kui-body` sets the font of labels and text fields when an app wants one, and `--kui-density` (`1`) multiplies the card, inline and section gaps and the field insets.
+
 A few tokens shape boxes rather than colour them. A brutalist skin sets `--kui-shadow-raised` (under cards, rows, widgets and toasts), `--kui-shadow-press` (under framed buttons) and `--kui-press-travel` (how far a pressed button moves down). All three draw nothing by default.
 
 ### Light or dark

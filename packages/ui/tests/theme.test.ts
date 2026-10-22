@@ -458,12 +458,51 @@ describe('theme.css', () => {
     expect(blockOf(theme, ':is(.kui-shell, .kui-btn, .kui-stat-badge)::before')).toContain('border-radius: inherit;')
   })
 
+  test('steps the radius of what sits inside a box by --radius-kui-sm, -md and -full, square except full unless a skin sets them', async () => {
+    const css = await built('@theme { --radius-kui-sm: 2px; --radius-kui-md: 6px; --radius-kui-full: 0px; }')
+
+    expect(theme).toContain('--radius-kui-sm: 0px;')
+    expect(theme).toContain('--radius-kui-md: 0px;')
+    expect(theme).toContain('--radius-kui-full: 9999px;')
+    expect(css).toMatch(/--radius-kui-sm: 2px/)
+    expect(css).toMatch(/--radius-kui-md: 6px/)
+    expect(css).toMatch(/--radius-kui-full: 0px/)
+    expect(blockOf(theme, '.kui-chip-label')).toContain('rounded-kui-md')
+    expect(blockOf(theme, '.kui-toggle-track')).toContain('rounded-kui-md')
+    expect(blockOf(theme, '.kui-avatar')).toContain('rounded-kui-full')
+    expect(blockOf(theme, ':where(.kui-badge)')).toContain('rounded-kui-sm')
+    expect(blockOf(css, '.kui-avatar')).toContain('border-radius: var(--radius-kui-full)')
+  })
+
+  test('reads the monospace from --font-kui-mono and the text font of labels and fields from --font-kui-body, the text\'s own unless set', async () => {
+    const css = await built('@theme { --font-kui-mono: Menlo; }')
+
+    expect(theme).not.toMatch(/(?<![-\w])font-mono\b/)
+    expect(theme).toContain('--font-kui-mono: var(--font-mono);')
+    expect(theme).not.toContain('--font-kui-body:')
+    expect(css).toContain('font-family: var(--font-kui-mono)')
+    expect(css).toContain('--font-kui-mono: Menlo')
+    expect(blockOf(theme, '.kui-btn')).toContain('--font-kui-body,inherit')
+    expect(theme).toContain('[font-family:var(--font-kui-body,inherit)]')
+  })
+
+  test('scales the card, inline and section gaps and the field insets by --kui-density, 1 unless set', async () => {
+    const css = await built('@theme { --kui-density: 0.75; }')
+
+    expect(theme).toContain('--kui-density: 1;')
+
+    for (const token of ['--spacing-kui-card', '--spacing-kui-inline', '--spacing-kui-section', '--spacing-kui-field-x', '--spacing-kui-field-y'])
+      expect(theme, token).toMatch(new RegExp(`${token}: calc\\([\\d.]+rem \\* var\\(--kui-density, 1\\)\\);`))
+
+    expect(css).toContain('--kui-density: 0.75')
+  })
+
   test('sets the case and font of labels, headings and table heads by --kui-label-case and --kui-label-font, uppercase unless a skin sets them', async () => {
     const css = await built('@theme { --kui-label-case: none; --kui-label-font: var(--font-mono); }')
 
     expect(theme).toContain('--kui-label-case: uppercase;')
     expect(blockOf(css, '.kui-btn')).toContain('text-transform: var(--kui-label-case)')
-    expect(blockOf(css, '.kui-btn')).toContain('font-family: var(--kui-label-font,inherit)')
+    expect(blockOf(css, '.kui-btn')).toContain('font-family: var(--kui-label-font,var(--font-kui-body,inherit))')
     expect(css).toContain('--kui-label-case: none')
     // Only the stamp badge, which has --kui-badge-case, and an avatar's initial keep their own case.
     expect(theme.match(/@apply [^\n]* uppercase/g)).toHaveLength(2)
@@ -492,6 +531,8 @@ describe('theme.css', () => {
     }
 
     expect(await built(await Bun.file(`${ROOT}src/skins/soft.css`).text())).toContain('--kui-label-case: none')
+    expect(await built(await Bun.file(`${ROOT}src/skins/soft.css`).text())).toContain('--radius-kui-md: 0.375rem')
+    expect(await built(await Bun.file(`${ROOT}src/skins/brutalist.css`).text())).toMatch(/--radius-kui-full: 0px[\s\S]*--kui-label-font: var\(--font-kui-mono\)/)
   })
 
   test('sizes the keyline of every framed box by --kui-border-width, a length the old --kui-border-card still sets', () => {

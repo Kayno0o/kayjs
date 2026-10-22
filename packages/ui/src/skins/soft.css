@@ -4,6 +4,8 @@
  */
 @theme {
   --radius-kui-card: 0.5rem;
+  --radius-kui-sm: 0.25rem;
+  --radius-kui-md: 0.375rem;
   --kui-label-case: none;
   --tracking-kui-label: 0.02em;
   --tracking-kui-section: 0.04em;
