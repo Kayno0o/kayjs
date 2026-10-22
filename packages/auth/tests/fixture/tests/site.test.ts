@@ -475,7 +475,7 @@ describe('the prebuilt pages', () => {
     const page = await root.submit(impersonate, { id }, { from: await root.visit('/impersonate') })
 
     expect(page).toMatchObject({ url: '/auth/account/data', status: 200 })
-    expect(page.find('form button').map(button => button.text)).toEqual(['Sign out'])
+    expect(page.find('form button').map(button => button.text)).toEqual(['Back to my account', 'Sign out'])
     expect(page.find('p').map(p => p.text)).toContain('Not while acting as another user.')
   })
 

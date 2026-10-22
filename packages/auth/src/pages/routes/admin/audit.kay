@@ -1,0 +1,43 @@
+--- server
+import { formatDate, localize } from 'kay/i18n'
+import { wording } from 'kay/words'
+import { describeAuditEntry } from '../../../auditWording'
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+
+const PAGE_SIZE = 50
+const CURSOR_MAX = 2000
+
+// The cursor a page links older entries with: the last entry of the page as JSON, which the log reads whatever it holds.
+function cursorOf(value: string | null): unknown {
+  if (value === null || value.length > CURSOR_MAX)
+    return undefined
+
+  try {
+    return JSON.parse(value)
+  }
+  catch {
+    return undefined
+  }
+}
+
+const auth = ctx.locals.auth
+const features = auth.features()
+const before = cursorOf(ctx.url.searchParams.get('before'))
+const log = await auth.listAdminAuditLog({ ...before !== undefined && { before: before as never }, limit: PAGE_SIZE })
+const entries = log.ok ? log.entries : []
+const older = entries.length === PAGE_SIZE ? `${localize(`${features.pages?.prefix ?? features.prefix}/admin/audit`)}?before=${encodeURIComponent(JSON.stringify(entries.at(-1)))}` : undefined
+const dateTime = (value: Date) => formatDate(value, { dateStyle: 'medium', timeStyle: 'short' })
+const locale = ctx.locale
+---
+PageSection(title={wording('auth.admin.audit.title', 'Audit log')})
+  .flex.flex-col.gap-2
+    for entry of entries key={entry.id}
+      CardRow
+        span {describeAuditEntry(entry, { locale })}
+        span.text-kui-muted {dateTime(entry.at)}
+    else
+      EmptyState(title={wording('auth.admin.audit.none', 'No entry.')})
+  if older
+    a(href={older} rel="next") {wording('auth.admin.audit.older', 'Older entries')}

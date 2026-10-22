@@ -9,6 +9,10 @@ export interface Viewer {
 const viewers = new WeakMap<Request, Viewer>()
 // The user a layout read ahead of the render, `null` for none: what lets a template show them with no streamed block.
 const loaded = new WeakMap<Request, BareUser | null>()
+// The admin behind an impersonation read ahead of the render, `null` for none.
+const impersonators = new WeakMap<Request, BareUser | null>()
+// The requests whose impersonation banner is already drawn, so a layout and a page both holding one show a single.
+const banners = new WeakSet<Request>()
 let requestReader: (() => Request | undefined) | undefined
 
 // Given by the server code of `createAuth`, so this module imports nothing server-only and a component using it never drags kay's server into a browser build.
@@ -24,10 +28,15 @@ export function registerViewer(request: Request, viewer: Viewer): void {
 // Reads the request's user ahead of the render, for the layout kayjs-auth wraps the pages reaching the components in: a failed read is left to the component, which reads it again and reports it.
 export async function loadViewer(request: Request): Promise<void> {
   try {
-    const user = await viewers.get(request)?.auth.bareUser()
+    const auth = viewers.get(request)?.auth
 
-    if (user !== undefined)
-      loaded.set(request, user)
+    if (auth === undefined)
+      return
+
+    const [user, admin] = await Promise.all([auth.bareUser(), auth.impersonator()])
+
+    loaded.set(request, user)
+    impersonators.set(request, admin)
   }
   catch {}
 }
@@ -59,6 +68,23 @@ export function currentUser(role?: string): BareUser | null | Promise<BareUser |
 
 async function read(auth: Auth, within: (user: BareUser | null) => BareUser | null): Promise<BareUser | null> {
   return within(await auth.bareUser())
+}
+
+// The admin acting as the signed-in user of the page being rendered, null for none: the admin itself once `loadViewer` read it, else a promise.
+export function currentImpersonator(): BareUser | null | Promise<BareUser | null> {
+  const { auth, request } = currentViewer()
+
+  return impersonators.has(request) ? impersonators.get(request)! : auth.impersonator()
+}
+
+// True the first time it is asked for the request being rendered, false after.
+export function claimBanner(): boolean {
+  const { request } = currentViewer()
+  const free = !banners.has(request)
+
+  banners.add(request)
+
+  return free
 }
 
 // Whether the page being rendered is for a visitor with no account or a guest, `SignedOut` showing its children.

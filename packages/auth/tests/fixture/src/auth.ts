@@ -55,7 +55,8 @@ export const auth = createAuth({
     },
     requireVerified: false,
   },
-  roles: { admin: [] },
+  roles: { admin: ['editor'], editor: [] },
   admin: 'admin',
+  audit: true,
   organizations: { roles: { owner: ['admin'], admin: ['member'], member: [] }, owner: 'owner', manage: 'admin' },
 })

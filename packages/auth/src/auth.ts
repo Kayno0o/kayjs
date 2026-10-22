@@ -32,7 +32,7 @@ import { Elysia } from 'elysia'
 import { asConfigError, callHook, configError, configuredSite, durationSeconds, nameUser, overHttps, READ_METHODS, requestOfContext, stoppers, underKayDev } from 'kay/library'
 import { clientAddress, crossSiteRefused, crossSiteResponse, rateKey } from 'kay/server'
 import { changePassword, changeUsername, deleteAccount, unlink } from './account'
-import { adminAuditLog, banUser, changeRole, changingAdmin, deleteUser, getUser, isAdmin, listUsers, unbanUser } from './admin'
+import { actingAdmin, adminAuditLog, banUser, changeRole, changingAdmin, deleteUser, getUser, isAdmin, listUsers, unbanUser } from './admin'
 import { documentFetcher } from './authorize/clients'
 import { approvedClients, revokeClient } from './authorize/grants'
 import { protectedResourceMetadata, rootIsFixed, rootUsable, siteRoot } from './authorize/metadata'
@@ -344,6 +344,16 @@ export class Auth<Scope extends string = string, Role extends string = string, O
       return deny(403)
 
     return !scopeAllows(await this.scopes(), options.scope) ? deny(403) : user
+  }
+
+  // The signed-in admin, as themselves, for an admin page to ask for: 404 while the `admin` option names no one (a `Denied`, which a plain Elysia app answers too), a visitor sent to sign in as `requireUser()` does, and 403 for anyone else, an admin acting as a user and a bearer token included.
+  async requireAdmin(): Promise<User<UserData>> {
+    if (!this.core.admin)
+      return stoppers(this.request).deny(404)
+
+    const user = await this.requireUser()
+
+    return await actingAdmin(this[STATE]) ? user : stoppers(this.request).deny(403)
   }
 
   // The sign-in page with `?redirect=` set to where it should lead back: this request's path and query, or `back`. A `back` that is not a path of this site leads home, so no link built from input sends anyone away.
@@ -1368,6 +1378,12 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     // The sign-out button of any page: a form posting here, with `redirect` for where to go after, a path of the site, else the pages' home or `/`. A post only, so a link or a prefetch signs no one out, and a cross-site one is refused with a 403.
     .post(`${core.prefix}/sign-out` as `${Prefix}/sign-out`, async ({ auth, body, redirect }) => {
       await auth.signOut()
+
+      return redirect(safeRedirect(text((body as Record<string, unknown> | undefined)?.redirect), homeOf(core)), 303)
+    })
+    // The impersonation banner's button: a form posting here signs the admin back in as themselves, then goes to `redirect`, a path of the site, else the pages' home. A post only, as sign-out is.
+    .post(`${core.prefix}/stop-impersonating` as `${Prefix}/stop-impersonating`, async ({ auth, body, redirect }) => {
+      await auth.stopImpersonating()
 
       return redirect(safeRedirect(text((body as Record<string, unknown> | undefined)?.redirect), homeOf(core)), 303)
     })

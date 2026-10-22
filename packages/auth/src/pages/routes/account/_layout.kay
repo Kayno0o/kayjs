@@ -2,6 +2,7 @@
 import { localize } from 'kay/i18n'
 import { wording } from 'kay/words'
 import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
+import ImpersonationBanner from '../../../components/impersonation-banner.kay'
 import UserMenu from '../../../components/user-menu.kay'
 import { loadViewer } from '../../../viewer'
 
@@ -27,6 +28,7 @@ const title = here ? `${here.label} - ${wording('auth.account.title', 'Your acco
 head
   title {title}
 .kayjs-auth.mx-auto.flex.w-full.max-w-3xl.flex-col.gap-6.px-4.py-8
+  ImpersonationBanner
   .flex.flex-wrap.items-center.justify-between.gap-4
     h1.kui-heading-section {wording('auth.account.title', 'Your account')}
     UserMenu(account={false})

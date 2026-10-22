@@ -1,0 +1,60 @@
+--- server
+import { formatDate, localize } from 'kay/i18n'
+import { wording } from 'kay/words'
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+
+const PAGE_SIZE = 25
+const PAGE_MAX = 100_000
+const SEARCH_MAX = 100
+
+// A page number from the query: anything but a whole number from 1 is the first page, and one past the ends is the last.
+function pageOf(value: string | null): number {
+  const page = Number(value)
+
+  return Number.isInteger(page) && page >= 1 ? Math.min(page, PAGE_MAX) : 1
+}
+
+const auth = ctx.locals.auth
+const features = auth.features()
+const search = (ctx.url.searchParams.get('q') ?? '').trim().slice(0, SEARCH_MAX)
+const requested = pageOf(ctx.url.searchParams.get('page'))
+const first = await auth.listUsers({ search, offset: (requested - 1) * PAGE_SIZE, limit: PAGE_SIZE })
+const total = first.ok ? first.total : 0
+const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+const shown = Math.min(requested, pages)
+// A page past the end shows the last one.
+const found = shown === requested ? first : await auth.listUsers({ search, offset: (shown - 1) * PAGE_SIZE, limit: PAGE_SIZE })
+const users = found.ok ? found.users : []
+const base = localize(`${features.pages?.prefix ?? features.prefix}/admin`)
+const date = (value: Date) => formatDate(value, { dateStyle: 'medium' })
+const url = ctx.url
+---
+PageSection(title={wording('auth.admin.nav.users', 'Users')})
+  form.flex.flex-wrap.items-end.gap-3(method="get" action={base} role="search")
+    FormField(label={wording('auth.admin.users.searchLabel', 'Email, username or id')})
+      input(type="search" name="q" value={search} maxlength={String(SEARCH_MAX)})
+    Button(type="submit" label={wording('auth.admin.users.search', 'Search')})
+  p.text-kui-muted {wording('auth.admin.users.total', total === 1 ? '{count} user' : '{count} users', { count: total })}
+  .flex.flex-col.gap-2
+    for user of users key={user.id}
+      CardRow(data-user={user.id})
+        .flex.flex-col
+          span.flex.flex-wrap.items-center.gap-2
+            a(href={`${base}/users/${encodeURIComponent(user.id)}`}) {user.username ?? user.email ?? wording('auth.admin.users.noName', 'No address')}
+            if user.ban
+              Badge(label={wording('auth.admin.users.banned', 'Banned')} tone="danger")
+            if user.guest
+              Badge(label={wording('auth.admin.users.guest', 'Guest')})
+            for role of user.roles key={role}
+              Badge(label={role} tone="accent")
+          span.text-kui-muted
+            | {[user.username ? user.email : undefined, wording('auth.admin.users.joined', 'Joined {date}', { date: date(user.createdAt) })].filter(Boolean).join(' · ')}
+    else
+      EmptyState(title={wording('auth.admin.users.none', 'No user found.')})
+  Pagination(page={shown} pages={pages} url={url} label={wording('auth.admin.users.pagination', 'User pages')})

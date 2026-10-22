@@ -33,6 +33,10 @@ export const ERRORS = {
   'expiry': 'Choose when the token expires.',
   'invalid': 'That did not work.',
   'none': 'No passkey to use.',
+  'forbidden': 'You may not do this.',
+  'unknown-role': 'This role does not exist.',
+  'admin': 'An admin cannot be changed this way: take the admin role away first.',
+  'until': 'Choose a date in the future.',
 } as const
 
 export const OAUTH_ERRORS = {

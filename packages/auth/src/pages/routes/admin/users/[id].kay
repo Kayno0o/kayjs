@@ -1,0 +1,173 @@
+--- server
+import { formatDate, localize } from 'kay/i18n'
+import { wording } from 'kay/words'
+import { describeAuditEntry } from '../../../../auditWording'
+import Message from '../../../components/message.kay'
+import { failure, schemas } from '../../../forms'
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
+
+// The ban ends at the close of the day the form names; no date is for good, and one that is no date or already past is `until`.
+function endOf(day: string | undefined): Date | null | 'until' {
+  if (day === undefined || day === '')
+    return null
+
+  const end = ISO_DAY.test(day) ? new Date(`${day}T23:59:59Z`) : new Date(Number.NaN)
+
+  return Number.isNaN(end.getTime()) || end.getTime() <= Date.now() ? 'until' : end
+}
+
+// Every action answers about the user the route names, never one the input names.
+export const grant = action(schemas.adminRole, async ({ role }, ctx) => {
+  const result = await ctx.locals.auth.grantRole(String(ctx.params.id), role as never)
+
+  return result.ok ? 'done' : ctx.fail(400, { error: result.error })
+})
+
+export const revoke = action(schemas.adminRole, async ({ role }, ctx) => {
+  const result = await ctx.locals.auth.revokeRole(String(ctx.params.id), role as never)
+
+  return result.ok ? 'done' : ctx.fail(400, { error: result.error })
+})
+
+export const ban = action(schemas.adminBan, async ({ reason, until }, ctx) => {
+  const end = endOf(until)
+
+  if (end === 'until')
+    return ctx.fail(400, { error: 'until' })
+
+  const result = await ctx.locals.auth.banUser(String(ctx.params.id), { ...reason?.trim() && { reason: reason.trim() }, ...end && { until: end } })
+
+  return result.ok ? 'done' : ctx.fail(400, { error: result.error })
+})
+
+export const unban = action(async (ctx) => {
+  const result = await ctx.locals.auth.unbanUser(String(ctx.params.id))
+
+  return result.ok ? 'done' : ctx.fail(400, { error: result.error })
+})
+
+export const remove = action(schemas.adminDelete, async ({ confirm }, ctx) => {
+  if (confirm !== true)
+    return ctx.fail(400, { error: 'form' })
+
+  const result = await ctx.locals.auth.deleteUser(String(ctx.params.id))
+
+  if (!result.ok)
+    return ctx.fail(400, { error: result.error })
+
+  const { pages, prefix } = ctx.locals.auth.features()
+
+  return ctx.redirect(localize(`${pages?.prefix ?? prefix}/admin`))
+})
+
+export const impersonate = action(async (ctx) => {
+  const result = await ctx.locals.auth.impersonate(String(ctx.params.id))
+
+  return result.ok ? ctx.redirect(localize(ctx.locals.auth.features().pages?.home ?? '/')) : ctx.fail(400, { error: result.error })
+})
+
+// An admin who signed in long ago signs in again and comes back to this user.
+export const signInAgain = action(async (ctx) => {
+  const { signInPage, pages, prefix } = ctx.locals.auth.features()
+  const signIn = localize(signInPage)
+
+  await ctx.locals.auth.signOut()
+
+  return ctx.redirect(`${signIn}${signIn.includes('?') ? '&' : '?'}redirect=${encodeURIComponent(localize(`${pages?.prefix ?? prefix}/admin/users/${encodeURIComponent(String(ctx.params.id))}`))}`)
+})
+
+const auth = ctx.locals.auth
+const features = auth.features()
+const found = await auth.getUser(String(ctx.params.id))
+
+if (!found.ok)
+  ctx.notFound()
+
+const user = found.user
+const me = await auth.user()
+const own = me?.id === user.id
+const base = localize(`${features.pages?.prefix ?? features.prefix}/admin`)
+const declared = features.admin?.roles ?? []
+const grantable = declared.filter(role => !user.roles.includes(role))
+const log = await auth.listAdminAuditLog({ userId: user.id, limit: 20 })
+const entries = log.ok ? log.entries : []
+const refused = [grant, revoke, ban, unban, remove, impersonate].map(form => form.failed()?.data?.error).find(error => error !== undefined)
+const date = (value: Date) => formatDate(value, { dateStyle: 'medium' })
+const dateTime = (value: Date) => formatDate(value, { dateStyle: 'medium', timeStyle: 'short' })
+const locale = ctx.locale
+---
+head
+  title {`${user.username ?? user.email ?? user.id} - ${wording('auth.admin.title', 'Administration')}`}
+PageSection(title={user.username ?? user.email ?? user.id})
+  @actions
+    a(href={base}) {wording('auth.admin.user.back', 'All users')}
+  .flex.flex-col.gap-2
+    if user.email
+      span {user.email}
+    span.flex.flex-wrap.items-center.gap-2
+      for role of user.roles key={role}
+        Badge(label={role} tone="accent")
+      if user.roles.length === 0
+        span.text-kui-muted {wording('auth.admin.user.noRoles', 'No role.')}
+      if user.guest
+        Badge(label={wording('auth.admin.users.guest', 'Guest')})
+    span.text-kui-muted {wording('auth.admin.users.joined', 'Joined {date}', { date: date(user.createdAt) })}
+    if refused
+      Message(text={failure(refused)})
+      if refused === 'stale'
+        form(action={signInAgain})
+          Button(type="submit" label={wording('auth.admin.user.signInAgain', 'Sign in again')})
+PageSection(title={wording('auth.admin.user.roles', 'Roles')})
+  .flex.flex-col.gap-2
+    for role of user.roles key={role}
+      CardRow(data-role={role})
+        @right
+          form(action={revoke})
+            input(type="hidden" name="role" value={role})
+            Button(type="submit" tone="danger" label={wording('auth.admin.user.revoke', 'Take back')} aria-label={`${wording('auth.admin.user.revoke', 'Take back')}: ${role}`})
+        strong {role}
+    if grantable.length > 0
+      form.flex.flex-wrap.items-end.gap-3(action={grant})
+        FormField(label={wording('auth.admin.user.grantRole', 'Role')})
+          select(name="role")
+            for role of grantable key={role}
+              option(value={role}) {role}
+        Button(type="submit" label={wording('auth.admin.user.grant', 'Give the role')})
+if !own
+  PageSection(title={wording('auth.admin.user.ban', 'Suspend the account')})
+    if user.ban
+      p {user.ban.until ? wording('auth.admin.user.bannedUntil', 'Suspended until {date}.', { date: date(user.ban.until) }) : wording('auth.admin.user.banned', 'Suspended since {date}.', { date: date(user.ban.at) })}
+      if user.ban.reason
+        p.text-kui-muted {user.ban.reason}
+      form(action={unban})
+        Button(type="submit" label={wording('auth.admin.user.unban', 'Lift the suspension')})
+    else
+      form.flex.flex-col.gap-3(action={ban})
+        FormField(label={wording('auth.admin.user.banReason', 'Reason')})
+          input(name="reason" maxlength="500")
+        FormField(label={wording('auth.admin.user.banUntil', 'Until')} hint={wording('auth.admin.user.banUntilHint', 'Leave empty to suspend for good.')})
+          input(type="date" name="until")
+        Button(type="submit" tone="danger" label={wording('auth.admin.user.ban', 'Suspend the account')})
+  PageSection(title={wording('auth.admin.user.impersonate', 'Act as this user')})
+    form(action={impersonate})
+      Button(type="submit" label={wording('auth.admin.user.impersonate', 'Act as this user')})
+  PageSection(title={wording('auth.admin.user.delete', 'Delete the account')})
+    form.flex.flex-col.gap-3(action={remove})
+      p {wording('auth.admin.user.deleteIntro', 'The account and everything tied to it are deleted for good. This cannot be undone.')}
+      label.flex.items-center.gap-2
+        input(type="checkbox" name="confirm" required)
+        | {wording('auth.admin.user.deleteConfirm', 'I understand')}
+      Button(type="submit" tone="danger" label={wording('auth.admin.user.delete', 'Delete the account')})
+if entries.length > 0
+  PageSection(title={wording('auth.admin.user.activity', 'Recent activity')})
+    .flex.flex-col.gap-2
+      for entry of entries key={entry.id}
+        CardRow
+          span {describeAuditEntry(entry, { locale })}
+          span.text-kui-muted  {dateTime(entry.at)}

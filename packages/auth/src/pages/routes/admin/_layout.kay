@@ -1,0 +1,31 @@
+--- server
+import { localize } from 'kay/i18n'
+import { wording } from 'kay/words'
+import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
+import ImpersonationBanner from '../../../components/impersonation-banner.kay'
+import UserMenu from '../../../components/user-menu.kay'
+import { loadViewer } from '../../../viewer'
+
+// Only the admin as themselves passes: a visitor is sent to sign in, anyone else gets a 403, and a site naming no admin a 404.
+await ctx.locals.auth.requireAdmin()
+await loadViewer(ctx.request)
+
+const features = ctx.locals.auth.features()
+const current = ctx.url.pathname
+const base = localize(`${features.pages?.prefix ?? features.prefix}/admin`)
+const links = [
+  { href: base, label: wording('auth.admin.nav.users', 'Users') },
+  { href: `${base}/audit`, label: wording('auth.admin.nav.audit', 'Audit log') },
+]
+const here = links.find(link => link.href.replace(/\/$/, '') === current.replace(/\/$/, ''))
+const title = `${here?.label ?? wording('auth.admin.nav.users', 'Users')} - ${wording('auth.admin.title', 'Administration')}`
+---
+head
+  title {title}
+.kayjs-auth.mx-auto.flex.w-full.max-w-4xl.flex-col.gap-6.px-4.py-8
+  ImpersonationBanner
+  .flex.flex-wrap.items-center.justify-between.gap-4
+    h1.kui-heading-section {wording('auth.admin.title', 'Administration')}
+    UserMenu
+  TabNav(links={links} current={current} label={wording('auth.admin.nav.label', 'Administration')})
+  slot

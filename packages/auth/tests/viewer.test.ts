@@ -2,7 +2,7 @@ import type { Auth } from '../src/auth'
 import type { BareUser as User } from '../src/core'
 import { afterEach, expect, test } from 'bun:test'
 import { requestOfContext } from 'kay/library'
-import { currentUser, isSignedOut, loadViewer, readRequestWith, registerViewer } from '../src/viewer'
+import { claimBanner, currentImpersonator, currentUser, isSignedOut, loadViewer, readRequestWith, registerViewer } from '../src/viewer'
 
 // Bun shares modules between test files, so the reader `createAuth` set goes back after each test.
 afterEach(() => readRequestWith(requestOfContext))
@@ -14,7 +14,7 @@ function answering(found: User | null) {
   const request = new Request('http://localhost/')
   let reads = 0
 
-  registerViewer(request, { auth: { bareUser: async () => {
+  registerViewer(request, { auth: { impersonator: async () => null, bareUser: async () => {
     reads++
 
     return found
@@ -65,7 +65,7 @@ test('a failed read ahead leaves it to the component, which reads again', async 
   const request = new Request('http://localhost/')
   let reads = 0
 
-  registerViewer(request, { auth: { bareUser: async () => {
+  registerViewer(request, { auth: { impersonator: async () => null, bareUser: async () => {
     if (reads++ === 0)
       throw new Error('store down')
 
@@ -75,4 +75,17 @@ test('a failed read ahead leaves it to the component, which reads again', async 
   await loadViewer(request)
 
   expect(await currentUser()).toMatchObject({ id: 'u1' })
+})
+
+test('the admin behind an impersonation is read ahead with the user, and a request draws its banner once', async () => {
+  const request = new Request('http://localhost/')
+  const admin = user({ id: 'root', roles: ['admin'] })
+
+  registerViewer(request, { auth: { impersonator: async () => admin, bareUser: async () => user({}) } as unknown as Auth, isGranted })
+  readRequestWith(() => request)
+
+  expect(currentImpersonator()).toBeInstanceOf(Promise)
+  await loadViewer(request)
+  expect(currentImpersonator()).toMatchObject({ id: 'root' })
+  expect([claimBanner(), claimBanner()]).toEqual([true, false])
 })

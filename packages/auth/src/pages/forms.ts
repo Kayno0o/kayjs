@@ -86,6 +86,9 @@ export const schemas = {
   changeUsername: t.Object({ username: t.String({ maxLength: 128 }) }),
   enableTwoFactor: t.Object({ code, uri: t.String({ maxLength: 1024 }) }),
   id: t.Object({ id: t.String({ maxLength: 128 }) }),
+  adminRole: t.Object({ role: t.String({ maxLength: 100 }) }),
+  adminDelete: t.Object({ confirm: t.Optional(t.Boolean()) }),
+  adminBan: t.Object({ reason: t.Optional(t.String({ maxLength: 500 })), until: t.Optional(t.String({ maxLength: 10 })) }),
   oauthClient: t.Object({ id: t.String({ maxLength: 2048 }) }),
   // The authorization request the consent page was shown for, which the answer is checked against again.
   oauthConsent: t.Object({ client_id: t.String({ maxLength: 2048 }), redirect_uri: t.String({ maxLength: 2048 }), code_challenge: t.String({ maxLength: 128 }), scope: t.String({ maxLength: 2048 }), state: t.String({ maxLength: 2048 }), resource: t.String({ maxLength: 2048 }), decision: t.Union([t.Literal('allow'), t.Literal('deny')]) }),

@@ -1,7 +1,9 @@
 --- server
+import ImpersonationBanner from '../components/impersonation-banner.kay'
 import { loadViewer } from '../viewer'
 
 // Reads the signed-in user before the page renders, so SignedIn, SignedOut and UserMenu show with the first bytes rather than streaming in after them.
 await loadViewer(ctx.request)
 ---
+ImpersonationBanner
 slot

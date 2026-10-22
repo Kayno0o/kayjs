@@ -72,3 +72,19 @@ test('with the app\'s credential rules, the register page hints, constrains and 
     short: ['Use at least 12 characters.'],
   })
 }, 60_000)
+
+test('the admin pages and the impersonation banner link under the base and the prefix, and a member is refused', async () => {
+  const seen = await variant({ FIXTURE_ADMIN: '1', FIXTURE_PREFIX: '/members', FIXTURE_BASE: '/app', FIXTURE_HOME: '/dashboard' })
+
+  expect(seen).toMatchObject({
+    tabs: ['/app/members/admin', '/app/members/admin/audit'],
+    search: '/app/members/admin',
+    refused: 403,
+    home: '/app/dashboard',
+    banner: ['/app/auth/stop-impersonating'],
+    stopped: [303, '/app/members/admin'],
+    back: ['/members/admin'],
+  })
+  expect((seen.list as string[])).toHaveLength(1)
+  expect((seen.list as string[])[0]).toStartWith('/app/members/admin/users/')
+}, 60_000)

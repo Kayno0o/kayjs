@@ -1,0 +1,26 @@
+---
+import { localize } from 'kay/i18n'
+import { wording } from 'kay/words'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import Notice from '@kaynooo/kayjs-ui/notice.kay'
+import { claimBanner, currentImpersonator, currentUser, currentViewer } from '../viewer'
+
+const features = currentViewer().auth.features()
+// Back to the admin pages when they are on, else to the pages' home.
+const back = localize(features.admin && features.pages ? `${features.pages.prefix}/admin` : features.pages?.home ?? '/')
+const admin = claimBanner() ? currentImpersonator() : null
+const user = currentUser()
+---
+// Shown to an admin acting as a user, with the way back; nothing for anyone else. Read ahead by a layout calling `loadViewer`, else streamed in after the page.
+try
+  await admin then actor
+    if actor
+      try
+        await user then found
+          if found
+            Notice.kayjs-auth(tone="warning" data-impersonating)
+              .flex.flex-wrap.items-center.justify-between.gap-3
+                span {wording('auth.impersonation.banner', 'You are acting as {user}.', { user: found.username ?? found.email ?? found.id })}
+                form(method="post" action={`${features.prefix}/stop-impersonating`})
+                  input(type="hidden" name="redirect" value={back})
+                  Button(type="submit" label={wording('auth.impersonation.stop', 'Back to my account')})

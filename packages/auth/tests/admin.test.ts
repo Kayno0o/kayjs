@@ -29,6 +29,12 @@ async function setup(options: Parameters<typeof testApp>[0] = {}) {
     return auth.banUser(id, { ...until === undefined ? {} : { until: new Date(until) }, ...reason === undefined ? {} : { reason } })
   })
 
+  app.app.get('/admin-only', async ({ auth }) => {
+    await auth.requireAdmin()
+
+    return 'admin'
+  })
+
   const member = async (email: string, roles: string[] = []) => {
     const browser = app.browser()
     const { user } = await browser.callHas('user', 'register', { email, password: PASSWORD })
@@ -386,5 +392,44 @@ describe('admin', () => {
 
     expect(new Set(everyone.entries.map((entry: { userId: string }) => entry.userId))).toEqual(new Set([admin.id, ada.id]))
     expect(hers.entries).toEqual([expect.objectContaining({ event: 'role-granted', detail: 'editor', actorId: admin.id })])
+  })
+})
+
+describe('requireAdmin and the stop-impersonating route, which the admin pages stand on', () => {
+  test('a visitor, a member, a site naming no admin, an admin acting as a user and a bearer token are all refused, the admin as themselves is not', async () => {
+    const { admin, ada, browser } = await setup()
+    const status = async (who: { fetch: (path: string) => Promise<Response> }) => (await who.fetch('/admin-only')).status
+
+    expect(await status(admin.browser)).toBe(200)
+    expect(await status(ada.browser)).toBe(403)
+    expect(await status(browser())).toBe(401)
+
+    const { token } = await admin.browser.callOk('createToken', { password: PASSWORD }, 'CLI')
+
+    expect((await browser().fetch('/admin-only', { headers: { authorization: `Bearer ${token}` } })).status).toBe(403)
+
+    await admin.browser.callOk('impersonate', ada.id)
+    expect(await status(admin.browser)).toBe(403)
+
+    const none = await setup({ admin: undefined })
+
+    expect(await status(none.admin.browser)).toBe(404)
+  })
+
+  test('stop-impersonating signs the admin back in and goes where redirect says, a path of the site only', async () => {
+    const { admin, ada } = await setup()
+    const stop = async (redirect: string) => admin.browser.fetch('/auth/stop-impersonating', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ redirect }) })
+
+    await admin.browser.callOk('impersonate', ada.id)
+    expect(await admin.browser.call('impersonator')).toMatchObject({ id: admin.id })
+
+    const back = await stop('https://evil.example/')
+
+    expect([back.status, back.headers.get('location')]).toEqual([303, '/'])
+    expect(await admin.browser.call('impersonator')).toBeFalsy()
+    expect(await admin.browser.json('/me')).toMatchObject({ id: admin.id })
+
+    await admin.browser.callOk('impersonate', ada.id)
+    expect((await stop('/auth/admin')).headers.get('location')).toBe('/auth/admin')
   })
 })

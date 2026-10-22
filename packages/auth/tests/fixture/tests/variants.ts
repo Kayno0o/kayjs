@@ -41,6 +41,40 @@ if (process.env.FIXTURE_RULES) {
   process.exit(0)
 }
 
+if (process.env.FIXTURE_ADMIN) {
+  // The admin pages and the impersonation banner link under the base and the prefix, to the pages' own routes.
+  const { impersonate } = await import(join(PAGES, 'admin', 'users', '[id].kay'))
+  const other = await testSite({ root: ROOT, ...process.env.FIXTURE_BASE && { base: process.env.FIXTURE_BASE } })
+
+  await site.submit(register, { email: 'admin-base@example.com', password: PASSWORD }, { from: await site.visit(`${PAGES_AT}/register`) })
+  await other.submit(register, { email: 'acted-base@example.com', password: PASSWORD }, { from: await other.visit(`${PAGES_AT}/register`) })
+
+  const admin = (await store.users.findByEmail('admin-base@example.com'))!
+  const acted = (await store.users.findByEmail('acted-base@example.com'))!
+
+  await store.users.update(admin.id, { roles: ['admin'] })
+
+  const list = await site.visit(`${PAGES_AT}/admin`)
+  const detail = await site.visit(`${PAGES_AT}/admin/users/${acted.id}`)
+  const refused = await other.visit(`${PAGES_AT}/admin`)
+  const home = await site.submit(impersonate, {}, { from: detail })
+  const banner = await site.visit(`${PAGES_AT}/account`)
+
+  const stopped = await site.fetch(banner.find('[data-impersonating] form')[0]!.attributes.action!, { method: 'POST', body: new URLSearchParams({ redirect: banner.find('[data-impersonating] input[name="redirect"]')[0]!.attributes.value! }) })
+
+  console.log(JSON.stringify({
+    stopped: [stopped.status, stopped.headers.get('location')],
+    list: list.find('[data-user] a').map(link => link.attributes.href).filter(href => href?.endsWith(acted.id)),
+    tabs: list.find('.kui-tab-nav a').map(link => link.attributes.href),
+    search: list.find('form[role="search"]')[0]?.attributes.action,
+    refused: refused.status,
+    home: home.url,
+    banner: banner.find('[data-impersonating] form').map(form => form.attributes.action),
+    back: banner.find('[data-impersonating] input[name="redirect"]').map(input => input.attributes.value),
+  }))
+  process.exit(0)
+}
+
 const out: Record<string, unknown> = { signIn: await shown(`${PAGES_AT}/sign-in`), register: await shown(`${PAGES_AT}/register`) }
 
 // A newcomer lands where the page sends them, and a sign-in with the box left alone lasts what the setting says.

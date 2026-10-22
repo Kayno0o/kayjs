@@ -186,6 +186,7 @@ describe('features', () => {
       prefix: '/auth',
       oauthServer: false,
       signInPage: '/',
+      admin: null,
       pages: null,
       rules: { password: { min: 10, max: 128 }, username: { min: 2, max: 32 } },
     })
@@ -193,6 +194,7 @@ describe('features', () => {
 
   test('says what is missing without mail, providers or a url', async () => {
     expect(await testApp().browser().call('features')).toMatchObject({ providers: [], email: false, codes: null, passkeys: false, scopes: [] })
+    expect(await testApp({ admin: 'admin' }).browser().call('features')).toMatchObject({ admin: { roles: ['admin', 'editor'] } })
   })
 })
 

@@ -43,6 +43,8 @@ With `audit: true`, or `{ maxAge }` as a string such as `'90d'` (a year by defau
 
 ### Admin
 
+The prebuilt pages for the methods below are in [the admin pages](admin-pages.md).
+
 `admin: 'admin'`, any requirement a guard takes, names who may manage users; without it, and to anyone else, to an admin acting as someone or to a bearer token, an admin's included, every method below answers `{ ok: false, error: 'forbidden' }`. The methods changing a user, `grantRole`, `revokeRole`, `banUser`, `unbanUser` and `deleteUser`, also answer `stale` unless the admin signed in or re-proved (`reprove`) in the last ten minutes, so a session left open or stolen changes no one; reading users and the audit log takes no such proof.
 
 - `listUsers({ search, offset, limit })` gives `{ ok: true, users, total }`, newest first, 50 a page by default and 200 at most; `search` matches part of an email or a username whatever its case, or a whole id. `getUser(id)` gives one. Each is a `User` with `createdAt` and `ban`, `{ at, until, reason }` while banned, else null.

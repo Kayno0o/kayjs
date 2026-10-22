@@ -501,6 +501,16 @@ if (found.ok) {
 
 Changing a user needs a sign-in or `reprove()` under ten minutes old. Otherwise the method answers `'stale'`. Reading users takes no such proof.
 
+### Admin pages
+
+With `admin` set, the prebuilt pages also serve an admin area under their prefix, `/auth/admin` by default. It needs nothing more.
+
+- `/auth/admin` lists the users, 25 a page, with a search over part of an email or a username, or a whole id.
+- `/auth/admin/users/<id>` shows one user. There you give or take back a role, suspend the account with a reason and an optional last day, lift a suspension, act as the user, or delete the account. With `audit` on, their latest audit entries show too.
+- `/auth/admin/audit` reads everyone's audit log.
+
+A visitor is sent to sign in, anyone else gets a 403, and a site with no `admin` option gets a 404. While an admin acts as a user, every prebuilt page shows a banner with a button back to their own account. With `viewer: true`, the banner shows on every page of your app; elsewhere, put `ImpersonationBanner` from `@kaynooo/kayjs-auth/components/impersonation-banner.kay` in your layout. `auth.requireAdmin()` gives your own admin pages the same check.
+
 ## Organizations
 
 Organizations are teams or workspaces that users belong to, with roles of their own in each.
@@ -774,4 +784,5 @@ Topics of the kayjs-auth reference the sections above do not link:
 - [The signed-in user in templates](/llms/kayjs-auth-signed-in-components)
 - [The OAuth server for MCP clients, bearer tokens and forward auth](/llms/kayjs-auth-oauth-server-and-tokens)
 - [Events, the audit log, admin and organizations](/llms/kayjs-auth-admin-and-organizations)
+- [The prebuilt admin pages](/llms/kayjs-auth-admin-pages)
 - [Bots, breached passwords, limits, stores, testing and the dev tool](/llms/kayjs-auth-hardening-and-testing)
