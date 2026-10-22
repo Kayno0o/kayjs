@@ -2,8 +2,8 @@ const NAME = /^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$/i
 const FIELD = /^([a-z][a-z0-9]*):([a-z]+)$/i
 const CAMEL_BREAK = /([a-z0-9])([A-Z])/g
 const SEPARATORS = /[-_\s]+/
-// A word ending in a single `s` (`news`, `tags`) is a plural already; `ss` (`class`) is not.
-const PLURAL_S = /[^s]s$/
+// A word ending in a single `s` (`news`, `tags`) is a plural already; `ss` (`class`) and `us`, `is`, `as` (`status`, `analysis`, `gas`) are not.
+const PLURAL_S = /[^aisu]s$/
 const PLURAL_ES = /(?:[sxz]|ch|sh)$/
 const PLURAL_IES = /[^aeiou]y$/
 const LINE_BREAK = /\r?\n/

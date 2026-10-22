@@ -128,6 +128,10 @@ it('adds an action to an existing _actions.kay that holds a server fence alone',
     ['const local = 1\nexport { local as shown }', 'shown', 'already exports'],
     ['export { renamed as other } from \'./x\'', 'other', 'already exports'],
     ['export { default as fromDefault } from \'./x\'', 'fromDefault', 'already exports'],
+    ['export default function defaulted() {}', 'defaulted', 'already declares or imports'],
+    ['export default class Kept {}', 'Kept', 'already declares or imports'],
+    ['declare function ambient(): void', 'ambient', 'already declares or imports'],
+    ['import equal = require(\'./x\')', 'equal', 'already declares or imports'],
   ]
 
   for (const [source, name, message] of declared) {
@@ -139,6 +143,11 @@ it('adds an action to an existing _actions.kay that holds a server fence alone',
   await Bun.write(actions, '--- server\nimport { other as renamed } from \'./x\'\nconst { a: inner } = make()\n')
   await generate(dir, 'action', 'team/other')
   await generate(dir, 'action', 'team/a')
+
+  // A fence that does not parse is reported, not appended to.
+  await Bun.write(actions, '--- server\nexport const broken = {\n')
+  await expect(generate(dir, 'action', 'team/fix')).rejects.toThrow('does not parse')
+  expect(await Bun.file(actions).text()).toBe('--- server\nexport const broken = {\n')
 
   // A name only a comment, a string, a handler's own local, an unexported alias source or a star re-export mentions is free.
   for (const [source, name] of [
@@ -272,6 +281,7 @@ it('writes a resource with the table, the actions, the pages and a test, drawn w
   expect(news.files['src/routes/news/index.kay']).toContain('for news of newsList')
   expect(Object.keys(resourceFiles('address', ['title:string'], PROJECT).files)).toContain('src/routes/addresses/index.kay')
   expect(Object.keys(resourceFiles('tags', ['title:string'], PROJECT).files)).toContain('src/routes/tags/index.kay')
+  expect(Object.keys(resourceFiles('status', ['title:string'], PROJECT).files)).toContain('src/routes/statuses/index.kay')
 })
 
 it('refuses a resource named or fielded wrongly', () => {

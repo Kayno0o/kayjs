@@ -1026,7 +1026,7 @@ async function folderEntries(name: string, dir: string, localized: boolean, filt
   const files = kept(names.map((file, index) => ({ slug: slugs[index]!, file })), localized, filter)
 
   return Promise.all(files.map(async ({ slug, file }) => {
-    const path = repoPath(repoRoot, join(dir, file))
+    const path = repoPath(repoRoot, sourcePath(join(dir, file)))
     const at = { slug, ...path !== undefined && { path } }
 
     return { ...at, ...await readEntry(dir, file) }

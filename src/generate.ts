@@ -209,8 +209,10 @@ function topLevelNames(source: string): { declared: Set<string>, exported: Set<s
 
     if (statement.type === 'VariableDeclaration')
       ids.push(...statement.declarations.map(declarator => declarator.id))
-    else if (statement.type === 'FunctionDeclaration' || statement.type === 'ClassDeclaration' || statement.type === 'TSEnumDeclaration' || statement.type === 'TSModuleDeclaration')
+    else if (statement.type === 'FunctionDeclaration' || statement.type === 'ClassDeclaration' || statement.type === 'TSEnumDeclaration' || statement.type === 'TSModuleDeclaration' || statement.type === 'TSDeclareFunction')
       ids.push(statement.id as t.Node)
+    else if (statement.type === 'TSImportEqualsDeclaration')
+      ids.push(statement.id)
 
     for (const id of ids) {
       bind(id, declared)
@@ -234,6 +236,9 @@ function topLevelNames(source: string): { declared: Set<string>, exported: Set<s
         exported.add(name.type === 'Identifier' ? name.name : name.value)
       }
     }
+    else if (statement.type === 'ExportDefaultDeclaration') {
+      declare(statement.declaration as t.Statement, false)
+    }
     else {
       declare(statement, false)
     }
@@ -253,7 +258,7 @@ function appendedAction(path: string, existing: string, name: string): string | 
   const names = topLevelNames(lines.slice(1).join('\n'))
 
   if (names === undefined)
-    return undefined
+    throw new Error(`kay generate: nothing was written, ${path} does not parse: fix its server fence, or add the action by hand`)
 
   if (names.exported.has(name))
     throw new Error(`kay generate: nothing was written, ${path} already exports \`${name}\``)

@@ -1,7 +1,7 @@
 import { readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test'
-import { entrySource, removeEntry, saveEntry } from '../src/content'
+import { entries, entrySource, removeEntry, saveEntry } from '../src/content'
 import { testSite } from '../src/test'
 import { cms } from './fixtures/cms/src/cms'
 import { notes } from './fixtures/cms/src/content.config'
@@ -34,6 +34,7 @@ describe('the content of a test site', () => {
     expect(file.absolute).toContain('.kay/scratch/')
     expect(file.path).toBe('tests/fixtures/cms/src/content/articles/fr/hello.md')
     expect(file.repoPath).toBe('tests/fixtures/cms/src/content/articles/fr/hello.md')
+    expect((await entries('articles', { slug: 'hello', locale: 'fr' }))[0]!.path).toBe(file.repoPath)
     expect(await Bun.file(join(REAL, 'fr/hello.md')).text()).toBe(before)
     expect((await site.visit('/articles/hello')).text('h1')).toBe('Changed')
   })

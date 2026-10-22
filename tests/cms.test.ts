@@ -869,8 +869,8 @@ describe('the collections a CMS edits', () => {
     expect(result).toEqual({ issues: [{ collection, slug, path: '', message: `holds a ${kind.slice(2)} as its data, not an object of fields` }] })
   })
 
-  // A project whose root is not the cwd, as a monorepo's: `entries()` gives the repository-relative path, which is the `repoPath` of the file, and the file's `path` stays relative to the project root.
-  it('spells one entry\'s file the same through entries(), entryFile() and entrySource() from a root that is not the cwd', async () => {
+  // A project whose content root is not the repository's, as a monorepo's: `entries()` gives the repository-relative path, which is the `repoPath` of the file, and the file's `path` stays relative to the project root.
+  it('spells one entry\'s file the same through entries(), entryFile() and entrySource() from a content root that is not the repository root', async () => {
     const before = contentPlace()
     const [entry] = await entries('articles', { slug: 'hello', locale: 'fr' })
 
