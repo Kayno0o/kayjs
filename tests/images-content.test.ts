@@ -1,7 +1,6 @@
 import { mkdtemp, readdir, rm, stat, symlink, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import process from 'node:process'
 import { Type } from '@sinclair/typebox'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { clientDir } from '../src/build/assets'
@@ -14,6 +13,7 @@ import { image, imageUrl, parseWidths, setImageWidths, setPlaceholders } from '.
 import { placeholderColor } from '../src/runtime/placeholder'
 import { setImageColors } from '../src/server/image-color'
 import { encodePng } from '../src/server/png'
+import { kayBuild } from './check-helper'
 import { countColorReads } from './color-reads'
 import { fixtureCopy } from './scratch'
 import { pages } from './shared-pages'
@@ -672,8 +672,7 @@ describe('Markdown images in a static export', () => {
       await Bun.write(join(root, 'src/content/posts/ghost.png'), Bun.file(HERO))
       await Bun.write(join(root, 'kay.config.ts'), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ site: 'https://x.example', base: '/repo', content: 'src/content.config.ts' })\n`)
 
-      const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--no-check', '--static', '--outdir', out], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'development' } })
-      const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+      const { output: errors, code } = await kayBuild([root, '--no-check', '--static', '--outdir', out], { NODE_ENV: 'development' })
 
       expect(errors).toBe('')
       expect(code).toBe(0)
@@ -698,8 +697,7 @@ describe('Markdown images in a static export', () => {
       await Bun.write(join(root, 'src/content/posts/cat.png'), Bun.file(HERO))
       await Bun.write(join(root, 'kay.config.ts'), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ site: 'https://x.example', base: '/repo', trailingSlash: '${trailingSlash}', content: 'src/content.config.ts', images: { widths: [400, 800] } })\n`)
 
-      const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--no-check', '--static', '--outdir', out], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'development' } })
-      const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+      const { output: errors, code } = await kayBuild([root, '--no-check', '--static', '--outdir', out], { NODE_ENV: 'development' })
 
       expect(errors).toBe('')
       expect(code).toBe(0)

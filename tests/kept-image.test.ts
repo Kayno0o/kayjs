@@ -1,12 +1,11 @@
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { outputDir } from '../src/build/assets'
 import { IMAGE_EXPORTS, keptScan } from '../src/server/pure-page'
+import { kayBuild } from './check-helper'
 import { scratchDir } from './scratch'
 
-const CLI = join(import.meta.dir, '../src/cli.ts')
 const CONFIG = 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false })\n'
 const roots: string[] = []
 
@@ -34,11 +33,10 @@ async function stopOf(files: Record<string, string>, page = 'src/routes/index.ka
 const LOGO = 'export default \'/logo.webp\'\n'
 
 async function built(root: string): Promise<string[]> {
-  const child = Bun.spawn([process.execPath, CLI, 'build', root, '--no-check'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
-  const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  const { code, report, output } = await kayBuild([root, '--no-check'])
 
   if (code !== 0)
-    throw new Error(`${out}${err}`)
+    throw new Error(`${report}${output}`)
 
   const manifest = await Bun.file(join(outputDir(root), 'manifest.json')).json() as { pages: Record<string, unknown> }
 

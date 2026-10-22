@@ -1,6 +1,5 @@
 import { mkdir, readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import process from 'node:process'
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { outputDir } from '../src/build/assets'
@@ -10,6 +9,7 @@ import { imageSize, processImage } from '../src/server'
 import * as avifCodec from '../src/server/avif'
 import { applyImageConfig, writeImageVariants } from '../src/server/image'
 import { imageHeader, isAvif } from '../src/server/image-format'
+import { kayBuild } from './check-helper'
 import { gif } from './gif'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
@@ -215,8 +215,9 @@ describe('images.resolve and images.guard', () => {
       await Bun.write(join(root, 'kay.config.ts'), 'export default { images: { resolve: () => undefined } }\n')
       await Bun.write(join(root, 'src/components/counter.kay'), '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(value => value + 1)}) {count()}\n')
       await Bun.write(join(root, 'src/routes/index.kay'), '--- server\nexport const page = { prerender: true }\n---\n---\nimport Counter from \'../components/counter.kay\'\n---\nCounter\n')
-      // A process of its own, as one process serves one project.
-      expect(await Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--no-check'], { stdout: 'ignore', stderr: 'inherit' }).exited).toBe(0)
+      const built = await kayBuild([root, '--no-check'])
+
+      expect(built.code, built.output).toBe(0)
       expect(await Bun.file(join(outputDir(root), 'pages/index.html')).text()).toContain('<meta name="kay-resolved-images">')
     }
     finally {

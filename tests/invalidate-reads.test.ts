@@ -2,9 +2,9 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
+import { kayBuild } from './check-helper'
 import { scratchDir } from './scratch'
 
-const CLI = join(import.meta.dir, '../src/cli.ts')
 const CONFIG = 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false })\n'
 const TSCONFIG = JSON.stringify({
   compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
@@ -68,11 +68,10 @@ describe('invalidating a data source refreshes the pages built from it', () => {
     roots.push(root)
     await Promise.all(Object.entries({ 'tsconfig.json': TSCONFIG, 'kay.config.ts': CONFIG, ...FILES, 'serve.ts': SERVE(root) }).map(async ([path, content]) => Bun.write(join(root, path), content)))
 
-    const build = Bun.spawn([process.execPath, CLI, 'build', root, '--no-check'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
-    const [built, builtErr, code] = await Promise.all([new Response(build.stdout).text(), new Response(build.stderr).text(), build.exited])
+    const { code, report, output } = await kayBuild([root, '--no-check'])
 
     if (code !== 0)
-      throw new Error(`${built}${builtErr}`)
+      throw new Error(`${report}${output}`)
 
     const child = Bun.spawn([process.execPath, join(root, 'serve.ts')], { cwd: root, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
     const [out, err, served] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
