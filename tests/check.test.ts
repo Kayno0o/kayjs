@@ -376,7 +376,7 @@ describe.concurrent('kay check, edge cases', () => {
       'p {doubled() !== undefined && doubled() + 1}',
       'button(onClick={() => sent.set(1)}) {sent() * 2}',
       'p {sent().toFixed(1)} {sent()?.toFixed(1)}',
-      'button(onClick={() => { if (sent() !== undefined) console.log(sent() * 2) }}) Log',
+      'button(onClick={() => { if (sent() !== undefined) (sent() * 2) }}) Log',
       'p {sent() !== undefined && [1, 2].map(i => sent() * i)}',
       '',
     ].join('\n')
@@ -3352,6 +3352,47 @@ describe.concurrent('kay check, unused code', () => {
         '}',
         '',
       ].join('\n'))
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps finding the old names after a regex literal, a nested template, an apostrophe, and in a template expression', async () => {
+    const root = await scratchProject({
+      'src/a.ts': [
+        'const quote = /"|\'|`/g',
+        'const nested = `a ${`b ${1}`} c`',
+        'const division = (4 / 2) / 1',
+        'export const a = api({ bodyLimit: "1mb" })',
+        'export const b = `${infiniteList(rows, { size: 5 })}`',
+        'export const c = infiniteList<() => X>(rows, { size: 6 })',
+        'export const d = infiniteList<Map<string, Row>>(rows, { size: 7 })',
+        'export const e = other<() => X>({ size: 8 })',
+        '',
+      ].join('\n'),
+      'src/b.kay': '--- server\nconst x = 1\n---\np don\'t stop\np it\'s odd\nbutton(onClick={() => api({ bodyLimit: "1mb" })}) Go\n',
+      'src/c.ts': [
+        'export async function f(auth: any, x: number, y: number) {',
+        '  await auth.endSession(x)',
+        '  (y)',
+        '  await auth.endSession(y) || x',
+        '}',
+        '',
+      ].join('\n'),
+    })
+
+    try {
+      const { output } = await runCheck(root)
+
+      expect(output.match(/deprecated-body-limit/g)).toHaveLength(2)
+      expect(output.match(/deprecated-page-size/g)).toHaveLength(3)
+      expect(output.match(/deprecated-auth-method/g)).toHaveLength(2)
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/a.ts')).text()).toContain('infiniteList<() => X>(rows, { pageSize: 6 })')
+      expect(await Bun.file(join(root, 'src/a.ts')).text()).toContain('infiniteList<Map<string, Row>>(rows, { pageSize: 7 })')
+      expect(await Bun.file(join(root, 'src/a.ts')).text()).toContain('other<() => X>({ size: 8 })')
+      expect(await Bun.file(join(root, 'src/c.ts')).text()).toBe('export async function f(auth: any, x: number, y: number) {\n  await auth.endSession(x)\n  (y)\n  await auth.endSession(y) || x\n}\n')
     }
     finally {
       await rm(root, { recursive: true, force: true })

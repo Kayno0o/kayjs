@@ -7,6 +7,7 @@ import { positionAt } from '../compiler/mapping'
 const SOURCE_FILE = /\.(?:kay|[cm]?tsx?)$/
 const DECLARATION_FILE = /\.d\.[cm]?ts$/
 const WHITESPACE = /\s/
+const WHITESPACE_RUN = /^\s*/
 const AWAIT_BEFORE = /await\s+$/
 
 export interface RenamedName {
@@ -30,7 +31,42 @@ function keyPattern(name: string): RegExp {
   return new RegExp(`(?<=[{,]\\s*)${name}(?=\\s*:)`, 'g')
 }
 
-// The source with strings, template literals and comments blanked out, offset for offset, so a name in one is never matched.
+const REGEX_AFTER_WORD = /(?:^|[^\w$])(?:return|typeof|case|in|of|delete|void|throw|new|else|do|yield|await)$/
+const WORD_CHAR = /[\w$]/
+
+// The offset after the regex literal opening at `at`, or -1 when the line ends first, so a division is not taken for one.
+function regexEnd(source: string, at: number): number {
+  let end = at + 1
+  let inClass = false
+
+  while (end < source.length && source[end] !== '\n') {
+    const char = source[end]!
+
+    if (char === '\\') {
+      end++
+    }
+    else if (char === '[') {
+      inClass = true
+    }
+    else if (char === ']') {
+      inClass = false
+    }
+    else if (char === '/' && !inClass) {
+      end++
+
+      while (end < source.length && WORD_CHAR.test(source[end]!))
+        end++
+
+      return end
+    }
+
+    end++
+  }
+
+  return -1
+}
+
+// The source with strings, regex literals, template text and comments blanked out, offset for offset, so a name in one is never matched. A `${}` of a template stays code.
 function mask(source: string): string {
   const out = source.split('')
   const blank = (from: number, to: number) => {
@@ -39,41 +75,147 @@ function mask(source: string): string {
         out[at] = ' '
     }
   }
-  let at = 0
 
-  while (at < source.length) {
-    const char = source[at]!
-    const next = source[at + 1]
+  // The template literal opening at `at`: its text blanked, its expressions scanned as code. Returns the offset after it.
+  const template = (at: number, expression: (from: number) => number): number => {
+    let end = at + 1
+    let from = at
 
-    if (char === '/' && (next === '/' || next === '*')) {
-      const stop = next === '/' ? source.indexOf('\n', at) : source.indexOf('*/', at + 2)
-      const end = stop === -1 ? source.length : stop + (next === '*' ? 2 : 0)
+    while (end < source.length) {
+      const char = source[end]!
 
-      blank(at, end)
-      at = end
+      if (char === '\\') {
+        end += 2
+      }
+      else if (char === '`') {
+        blank(from, end + 1)
+
+        return end + 1
+      }
+      else if (char === '$' && source[end + 1] === '{') {
+        blank(from, end + 2)
+        end = expression(end + 2)
+        from = end
+        end++
+      }
+      else {
+        end++
+      }
     }
-    else if (char === '"' || char === '\'' || char === '`') {
-      let end = at + 1
-      const stops = char === '`' ? char : `${char}\n`
 
-      while (end < source.length && !stops.includes(source[end]!))
-        end += source[end] === '\\' ? 2 : 1
+    blank(from, source.length)
 
-      blank(at, Math.min(end + 1, source.length))
-      at = end + 1
-    }
-    else {
+    return source.length
+  }
+
+  // Scans code from `at` to the end, or in a template expression to the `}` closing it, whose offset it returns.
+  const code = (start: number, inTemplate: boolean): number => {
+    let at = start
+    let depth = 0
+    let previous = ''
+    let tail = ''
+
+    while (at < source.length) {
+      const char = source[at]!
+      const next = source[at + 1]
+
+      if (char === '/' && (next === '/' || next === '*')) {
+        const stop = next === '/' ? source.indexOf('\n', at) : source.indexOf('*/', at + 2)
+        const end = stop === -1 ? source.length : stop + (next === '*' ? 2 : 0)
+
+        blank(at, end)
+        at = end
+
+        continue
+      }
+
+      if (char === '`') {
+        at = template(at, from => code(from, true))
+        previous = 'a'
+        tail = ''
+
+        continue
+      }
+
+      // An apostrophe after a word character is prose (`don't`), never the start of a string.
+      if (char === '"' || (char === '\'' && !WORD_CHAR.test(source[at - 1] ?? ''))) {
+        let end = at + 1
+
+        while (end < source.length && source[end] !== char && source[end] !== '\n')
+          end += source[end] === '\\' ? 2 : 1
+
+        blank(at, Math.min(end + 1, source.length))
+        at = end + 1
+        previous = 'a'
+        tail = ''
+
+        continue
+      }
+
+      if (char === '/' && (previous === '' || '(,=:[!&|?{;+-*%<>~^'.includes(previous) || REGEX_AFTER_WORD.test(tail))) {
+        const end = regexEnd(source, at)
+
+        if (end !== -1) {
+          blank(at, end)
+          at = end
+          previous = 'a'
+          tail = ''
+
+          continue
+        }
+      }
+
+      if (inTemplate && char === '{') {
+        depth++
+      }
+      else if (inTemplate && char === '}') {
+        if (depth === 0)
+          return at
+
+        depth--
+      }
+
+      if (!WHITESPACE.test(char)) {
+        previous = char
+        tail = WORD_CHAR.test(char) ? tail + char : ''
+      }
+      else if (tail !== '' && char !== '\n') {
+        tail += ' '
+      }
+
       at++
     }
+
+    return source.length
   }
+
+  code(0, false)
 
   return out.join('')
 }
 
-// The offsets of `name` as a key of an object literal passed directly to a call of `callee`, skipping strings and comments.
+// The offset after the type arguments opening at `at` (a `<`), an arrow's `=>` not closing one, or -1 when they do not close.
+function typeArgumentsEnd(source: string, at: number): number {
+  let depth = 0
+
+  for (let end = at; end < source.length && end < at + 400; end++) {
+    const char = source[end]
+
+    if (char === '<')
+      depth++
+    else if (char === '>' && source[end - 1] !== '=' && --depth === 0)
+      return end + 1
+    else if (char === ';')
+      return -1
+  }
+
+  return -1
+}
+
+// The offsets of `name` as a key of an object literal passed directly to a call of `callee`, in `source` with its strings and comments blanked.
 function callKeys(source: string, callee: string, name: string): number[] {
   const found: number[] = []
-  const open = new RegExp(`(?<![\\w$.])${callee}\\s*(?:<[^>]*>)?\\s*\\(`, 'g')
+  const open = new RegExp(`(?<![\\w$.])${callee}\\s*(?=[<(])`, 'g')
   const key = new RegExp(`^${name}(?![\\w$])(?=\\s*[:,}])`)
 
   for (const call of source.matchAll(open)) {
@@ -81,24 +223,19 @@ function callKeys(source: string, callee: string, name: string): number[] {
     let previous = '('
     let at = call.index + call[0].length
 
+    if (source[at] === '<') {
+      const end = typeArgumentsEnd(source, at)
+
+      at = end === -1 ? -1 : end + (WHITESPACE_RUN.exec(source.slice(end))?.[0].length ?? 0)
+
+      if (at === -1 || source[at] !== '(')
+        continue
+    }
+
+    at++
+
     while (at < source.length && stack.length > 0) {
       const char = source[at]!
-
-      if (char === '"' || char === '\'' || char === '`') {
-        at = skipString(source, at)
-        previous = 'a'
-
-        continue
-      }
-
-      if (char === '/' && source[at + 1] === '/') {
-        at = source.indexOf('\n', at)
-
-        if (at === -1)
-          break
-
-        continue
-      }
 
       if (char === '(' || char === '[' || char === '{')
         stack.push(char)
@@ -115,17 +252,6 @@ function callKeys(source: string, callee: string, name: string): number[] {
   }
 
   return found
-}
-
-// The offset after the string or template literal opening at `at`.
-function skipString(source: string, at: number): number {
-  const quote = source[at]!
-  let end = at + 1
-
-  while (end < source.length && source[end] !== quote)
-    end += source[end] === '\\' ? 2 : 1
-
-  return end + 1
 }
 
 // `ctx.failed(add)`, the action a plain name or a path of them.
@@ -153,19 +279,13 @@ function authMethodPattern(name: string): RegExp {
   return pattern
 }
 
-// The offset after the parenthesis closing the one at `open`.
+// The offset after the parenthesis closing the one at `open`, in a source with its strings blanked.
 function closing(source: string, open: number): number {
   let depth = 0
   let at = open
 
   while (at < source.length) {
     const char = source[at]!
-
-    if (char === '"' || char === '\'' || char === '`') {
-      at = skipString(source, at)
-
-      continue
-    }
 
     if (char === '(')
       depth++
@@ -229,6 +349,10 @@ function placesOf(source: string, scan: string, rename: RenamedName): Place[] {
     const call_ = `${source.slice(match.index, start)}${to}${source.slice(end, stop)}`
     const lineStart = scan.lastIndexOf('\n', from_ - 1) + 1
     const alone = scan.slice(lineStart, from_).trim() === '' && STATEMENT_END.test(scan.slice(stop))
+
+    // A line starting with the call would start with a parenthesis, joining the line before it.
+    if (!alone && scan.slice(lineStart, from_).trim() === '')
+      return { start, edits: undefined }
 
     // A statement keeps no `.ok`, which a line starting with a parenthesis would also join to the one before it.
     return { start, edits: [{ start: from_, end: stop, text: alone ? `await ${call_}` : `(await ${call_}).ok` }] }
