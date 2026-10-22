@@ -162,7 +162,7 @@ afterAll(async () => {
     await rm(join((await serverPreset).dir, '..'), { recursive: true, force: true })
 })
 
-const LIBRARIES = ['kayjs-auth', 'kayjs-ui']
+const LIBRARIES = ['kayjs-auth', 'kayjs-mail', 'kayjs-ui']
 
 // Stands in for `bun install` of a packed kay: its source and what `prepack` emits, copied rather than linked so they resolve from the project, beside this checkout's dependencies.
 async function installKay(dir: string) {
@@ -183,7 +183,7 @@ async function installKay(dir: string) {
   await Bun.write(join(modules, '.bin', 'kay'), `#!/bin/sh\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(join(repo, 'src/cli.ts'))} "$@"\n`)
   await chmod(join(modules, '.bin', 'kay'), 0o755)
 
-  // kayjs-auth and kayjs-ui resolve `kay` from where they sit, so copies of the workspace's own go beside the project's kay: linked, they would type-check against the checkout's.
+  // kayjs-auth, kayjs-mail (which auth types a dynamic import of) and kayjs-ui resolve `kay` from where they sit, so copies of the workspace's own go beside the project's kay: linked, they would type-check against the checkout's.
   if (await Bun.file(join(dir, 'src/auth.ts')).exists()) {
     const scope = join(modules, '@kaynooo')
 
