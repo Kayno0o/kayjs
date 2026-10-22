@@ -17,7 +17,7 @@ import { ASSET_FILE, clientDir, MAPS_DIR, outputDir, writeAsset } from '../src/b
 import { writeCacheEntry } from '../src/build/cache'
 import { buildClient, islandManifest, keepMaps, readClientSources } from '../src/build/client'
 import { forgetSources, keepSources, readSource, realPath, writeAtomically, writeIfChanged } from '../src/build/files'
-import { fileWords, importEdges, reachingAny } from '../src/build/libraries'
+import { fileWords, importEdges, reachedFrom, reachingAny } from '../src/build/libraries'
 import { BUNDLED_LICENCES, codecWarnings, thirdPartyNotices, unknownCodecVersions } from '../src/build/licenses'
 import { kay } from '../src/build/plugin'
 import { formatBuildReport, formatRemoved, formatRouteTable, formatSizeReport, gzipSize, shorten, writeStoredReport } from '../src/build/report'
@@ -1742,6 +1742,31 @@ describe('what a build keeps in memory', () => {
 
       await Bun.write(a, 'import \'./e\'\n')
       expect((await reachingAny([a], new Set([renamed]), importEdges(dir, [], graph))).has(a)).toBe(true)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('walks back from the targets, through a cycle, a shared module and a target that imports another', async () => {
+    const dir = resolve(await scratchDir('kay-graph-'))
+    const [a, b, c, d, e, f] = ['a.ts', 'b.ts', 'c.ts', 'd.ts', 'e.ts', 'f.ts'].map(name => join(dir, name)) as [string, string, string, string, string, string]
+
+    try {
+      // a and b share c, which cycles back to b and reaches the target d; e imports nothing; f is a target itself that nothing imports.
+      await Bun.write(a, 'import "./c"\n')
+      await Bun.write(b, 'import "./c"\n')
+      await Bun.write(c, 'import "./b"\nimport "./d"\n')
+      await Bun.write(d, '')
+      await Bun.write(e, '')
+      await Bun.write(f, '')
+
+      const reaching = await reachingAny([a, b, c, d, e, f], new Set([d, f]), importEdges(dir, []))
+
+      expect([...reaching].sort()).toEqual([a, b, c])
+      expect([...await reachingAny([b], new Set([b]), importEdges(dir, []))]).toEqual([b])
+      expect([...await reachingAny([d], new Set([d]), importEdges(dir, []))]).toEqual([])
+      expect([...await reachedFrom([a], importEdges(dir, []))].sort()).toEqual([a, b, c, d])
     }
     finally {
       await rm(dir, { recursive: true, force: true })
