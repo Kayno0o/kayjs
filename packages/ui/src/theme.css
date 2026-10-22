@@ -1823,6 +1823,10 @@
     @apply inline-flex border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-surface0;
   }
 
+  .kui-segmented:where([data-orientation='vertical']) {
+    @apply flex-col;
+  }
+
   /* On the options, whose own pointer cursor would cover the group's. */
   .kui-segmented:where([aria-busy='true']) .kui-segmented-option {
     @apply cursor-progress;

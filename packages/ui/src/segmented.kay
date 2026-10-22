@@ -6,7 +6,7 @@ import { untrack } from 'kay'
 import { controlledRadios } from './controlled-radios'
 import Icon from './icon.kay'
 
-const { options, value, label, name, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+const { options, value, label, name, orientation = 'horizontal', onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // `icon` sits before the label; `disabled` keeps that option from being picked.
   options: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[]
   // The option picked to start with, or `null` for none, such as while what shows matches no option; a group whose parent passes another follows it.
@@ -15,6 +15,8 @@ const { options, value, label, name, onChange, class: className, ...rest } = pro
   label: string
   // The radios' name, which the group submits under inside a form; one unique on the page is drawn when none is given.
   name?: string | undefined
+  // `vertical` stacks the options in a column; the arrow keys keep moving between the radios, up and down as well as left and right.
+  orientation?: 'horizontal' | 'vertical' | undefined
   // A promise holds the group busy until it settles, and puts the previous option back when it resolves to false, rejects or throws (logged): a refused change never shows as made.
   // Typed `unknown`, so a callback answering something else, such as `list.push`, still fits.
   // Hears `null` as well, for a reset to none, only when `value` is typed nullable.
@@ -33,7 +35,7 @@ const { group, picked, busy, ref, pick } = controlledRadios({
 })
 ---
 // Real radios, so the arrow keys move between options and the group submits like any other field.
-.kui-segmented({...rest} ref={ref} role="radiogroup" aria-label={label} aria-busy={busy() ? 'true' : undefined} class={className})
+.kui-segmented({...rest} ref={ref} role="radiogroup" aria-label={label} aria-orientation={orientation === 'vertical' ? 'vertical' : undefined} data-orientation={orientation === 'vertical' ? 'vertical' : undefined} aria-busy={busy() ? 'true' : undefined} class={className})
   for option of options key={option.value}
     label.kui-segmented-option
       input.kui-segmented-input(ref={element => element.defaultChecked = untrack(() => option.value === value)} type="radio" name={group} value={option.value} checked={picked() === option.value} disabled={option.disabled} onChange={() => pick(option.value)})

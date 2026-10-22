@@ -215,7 +215,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'rating': { value: 4.5 },
   'save-form': { action, failure: 'Failed' },
   'scatter-chart': { points: [{ key: 'a', label: 'Hades', x: 1, y: 2 }], label: 'Games' },
-  'segmented': { label: 'Range', options, value: 'mars' },
+  'segmented': { label: 'Range', options, value: 'mars', orientation: 'vertical' },
   'select': { 'aria-label': 'Planet', options, 'value': 'mars' },
   'side-panel': { open: false, title: 'Detail', onOpenChange: noop },
   'site-favicon': { name: 'kaynooo.fr' },

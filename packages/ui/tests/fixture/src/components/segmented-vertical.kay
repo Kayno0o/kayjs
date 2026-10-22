@@ -1,0 +1,8 @@
+---
+import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+
+// A Segmented stacked in a column beside the default row.
+const algorithms = [{ value: 'dfs', label: 'Depth first' }, { value: 'prim', label: 'Prim' }, { value: 'kruskal', label: 'Kruskal' }] as const
+---
+Segmented#column(label="Algorithm" options={algorithms} value="prim" orientation="vertical")
+Segmented#row(label="Row" options={algorithms} value="dfs")

@@ -6,6 +6,10 @@ description: A row of mutually exclusive options, drawn as radio buttons.
 
 An option is `{ value, label, icon?, disabled? }`, the shape of every group: `icon` draws before the label and a `disabled` option cannot be picked.
 
+## Vertical
+
+`orientation="vertical"` stacks the options in a column, for a short list beside a canvas or in a narrow panel. The options stay real radios of one group, so the arrow keys move between them in a column as in a row, and the group says `aria-orientation="vertical"`.
+
 ## Numbers
 
 A `value` may be a number, such as a page size or a count: `onChange` hears the number of the option picked, `0` included, so nothing is turned into text and back. The radios post it as text in a form, as any radio does.

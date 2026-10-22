@@ -62,6 +62,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui adds Combobox, loaded as you type, and Steps for multi-step forms ([Forms](../packages/ui/llms/forms.md), [Forms and Steps](../packages/ui/llms/forms-and-steps.md)).
 - kayjs-ui's Card, Button, Table, kayjs-ai's Chat and more restyle from `src/ui.ts` ([Setup](../packages/ui/llms/setup.md)).
 - kayjs-ui: `Slider` is a single-value range input with a label, a shown value worded by `formatValue` and a `name` that posts in a plain form, drawn from the theme tokens ([Slider](../packages/ui/llms/forms.md#rangeinput-slider-multiselect-combobox-filedrop-menu-iconpicker)).
+- kayjs-ui: `Segmented(orientation="vertical")` stacks its options in a column ([Segmented](../packages/ui/llms/tables-navigation-and-layout.md#segmented-chipgroup-tabnav-breadcrumb-sitenav-appheader-tabs-toggle-checkbox)).
 
 ## 1.69.0
 
