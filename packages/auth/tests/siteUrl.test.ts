@@ -77,17 +77,17 @@ describe('the site\'s origin kayjs-auth builds URLs on', () => {
     const auth = createAuth({ sessions: session<AuthSessionData>({ secret: SECRET }), secret: SECRET, store: memoryStore() })
     const app = new Elysia().use(auth.plugin).get('/core', ({ auth }) => {
       const state = Object.getOwnPropertySymbols(auth).find(symbol => symbol.description === 'kayjs-auth.state')!
-      const { core } = (auth as unknown as Record<symbol, { core: { refreshers: unknown, oauth: unknown, site: string, passkeys: unknown } }>)[state]!
+      const { core } = (auth as unknown as Record<symbol, { core: { refreshers: unknown, oauth: unknown, name: string, passkeys: unknown } }>)[state]!
 
       const [refreshers, oauth] = [core.refreshers, core.oauth]
 
-      return { same: refreshers === core.refreshers && oauth === core.oauth, site: core.site, passkeys: core.passkeys !== undefined }
+      return { same: refreshers === core.refreshers && oauth === core.oauth, name: core.name, passkeys: core.passkeys !== undefined }
     })
 
-    expect(await (await app.handle(new Request('http://localhost/core'))).json()).toEqual({ same: true, site: 'kayjs-auth', passkeys: false })
+    expect(await (await app.handle(new Request('http://localhost/core'))).json()).toEqual({ same: true, name: 'kayjs-auth', passkeys: false })
 
     setSite('https://late.example.com')
 
-    expect(await (await app.handle(new Request('http://localhost/core'))).json()).toEqual({ same: true, site: 'late.example.com', passkeys: true })
+    expect(await (await app.handle(new Request('http://localhost/core'))).json()).toEqual({ same: true, name: 'late.example.com', passkeys: true })
   })
 })

@@ -1,7 +1,12 @@
+import type { AuthSessionData } from '../src/auth'
 import type { Mail } from '../src/mail'
 import { afterEach, describe, expect, test } from 'bun:test'
-import { setSite } from '../../../src/runtime/site'
-import { testApp } from './helpers/app'
+import { Elysia } from 'elysia'
+import { setSite } from 'kay/library'
+import { session } from 'kay/server'
+import { createAuth } from '../src/auth'
+import { memoryAuthStore } from '../src/memoryStore'
+import { SECRET, testApp } from './helpers/app'
 
 const LINKS = { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' }
 
@@ -62,6 +67,8 @@ describe('site and name', () => {
   })
 
   test('a mail with no origin anywhere is refused with the option to set', () => {
-    expect(() => testApp({ email: { mailer: { send: () => undefined }, links: LINKS } })).toThrow('set `site` in kay.config.ts or SITE_URL')
+    const auth = createAuth({ sessions: session<AuthSessionData>({ secret: SECRET }), secret: SECRET, store: memoryAuthStore(), email: { mailer: { send: () => undefined }, links: LINKS } })
+
+    expect(() => new Elysia().use(auth.plugin).listen(0)).toThrow('set `site` in kay.config.ts or SITE_URL')
   })
 })
