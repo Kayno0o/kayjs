@@ -838,7 +838,7 @@ export type Answered<Value> = unknown extends Value ? unknown : Value extends Ev
 export type ApiAnswer<Module, Path, M> = Answered<Received<MethodRoute<Module, Path, Chosen<M>>>>
 
 // Calls a route of a module under `src/api`, from an event handler or any code running in the browser, typed from the route: resolves with what it answered, and throws an `ApiError` when it refused.
-export async function call<Module, const Path extends CallPath<Module>, const M extends CallMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<ApiCallOptions<Module, Path, M>>): Promise<ApiAnswer<Module, Path, M>> {
+async function callApi<Module, const Path extends CallPath<Module>, const M extends CallMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<ApiCallOptions<Module, Path, M>>): Promise<ApiAnswer<Module, Path, M>> {
   const { method = 'get', body, signal, progress } = (options ?? {}) as { method?: string, body?: unknown, signal?: AbortSignal, progress?: (sent: number) => void }
   const url = withBase(routeUrl(module, path, options as UrlInput | undefined))
   const sent = callBody(body)
@@ -872,12 +872,15 @@ export interface TrackedApi<Module, Path> {
   readonly settled: () => Promise<void>
 }
 
-call.track = function track<Module, const Path extends CallPath<Module>>(module: Module, path: Path): TrackedApi<Module, Path> {
+function track<Module, const Path extends CallPath<Module>>(module: Module, path: Path): TrackedApi<Module, Path> {
   return trackCalls(
-    async (options: unknown) => (call as unknown as (module: unknown, path: string, options: unknown) => Promise<unknown>)(module, path, options),
+    async (options: unknown) => (callApi as unknown as (module: unknown, path: string, options: unknown) => Promise<unknown>)(module, path, options),
     error => error instanceof ApiError && error.status >= 400 ? { ok: false, status: error.status, errors: refusedFields(error), data: error.answer } : undefined,
   ) as unknown as TrackedApi<Module, Path>
 }
+
+// `call` with `track` on it, built in its declaration so a bundle dropping `call` drops `track` too.
+export const call = Object.assign(callApi, { track })
 
 // The first segment of a validation path: `/title` and `title.0` name `title`.
 const FIRST_SEGMENT = /^\/?([^/.]*)/

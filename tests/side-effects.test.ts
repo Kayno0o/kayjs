@@ -26,6 +26,7 @@ const KNOWN: Record<string, [name: string, calls: string[], why: string][]> = {
     ['reader', ['Object.assign'], 'adds the setters to the reader the module exports'],
     ['consent', ['markSignal'], 'adds the reader to the set of signals, which matters only once the export is read'],
   ],
+  'live.ts': [['call', ['Object.assign'], 'adds `track` to the function the module exports']],
   'markdown.client.ts': [['marked', ['Marked'], 'builds the renderer the module\'s functions use']],
   'page-swap.ts': [['served', ['servedRoot'], 'reads the page\'s own markup into a map the module\'s functions use']],
   'work.ts': [

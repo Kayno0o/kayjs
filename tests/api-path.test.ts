@@ -86,7 +86,7 @@ describe('apiUrl in a handler', () => {
     try {
       await Bun.write(join(root, 'api/where.ts'), 'import { apiUrl } from \'kay\'\nimport { api } from \'kay/server\'\n\nexport default api({ guards: false }).get(\'/\', ({ request }) => ({ here: apiUrl(request, \'/\'), item: apiUrl(request, \'/items/:id\', { params: { id: 7 }, query: { q: \'a b\' } }) }))\n')
 
-      const site = await testSite({ routes: 'tests/fixtures/openapi/src/routes', api: join(root, 'api'), apiPath: '/v1', base: '/shop' })
+      const site = await testSite({ root: 'tests/fixtures/openapi', api: join(root, 'api'), apiPath: '/v1', base: '/shop' })
 
       try {
         expect(await (await site.fetch('/v1/where')).json()).toEqual({ here: '/v1/where', item: '/v1/where/items/7?q=a+b' })
