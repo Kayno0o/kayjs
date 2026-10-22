@@ -179,6 +179,26 @@ describe('kay test', () => {
     expect(all.code).toBe(0)
   }, 60_000)
 
+  it.each(['SIGTERM', 'SIGINT'] as const)('ends the bun test child when kay test gets %s', async (signal) => {
+    const dir = await project(false)
+    const marker = join(dir, 'child.pid')
+
+    await Bun.write(join(dir, 'tests', 'hang.test.ts'), `import { writeFileSync } from 'node:fs'\nimport { it } from 'bun:test'\n\nit('hangs', async () => {\n  writeFileSync(${JSON.stringify(marker)}, String(process.pid))\n  await new Promise(() => {})\n}, 600_000)\n`)
+
+    const child = Bun.spawn([process.execPath, CLI, 'test', 'tests/hang.test.ts'], { cwd: dir, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', env: { ...env, KAY_ROOT: dir } })
+    const deadline = Date.now() + 40_000
+
+    while (!(await Bun.file(marker).exists()) && Date.now() < deadline)
+      await Bun.sleep(100)
+
+    const pid = Number(await Bun.file(marker).text())
+
+    child.kill(signal)
+    await child.exited
+    await Bun.sleep(300)
+    expect(() => process.kill(pid, 0)).toThrow()
+  }, 60_000)
+
   it('mounts a component with no DOM preload, loading happy-dom on the first mount only', async () => {
     const dir = await project(false)
 

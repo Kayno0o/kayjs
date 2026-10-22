@@ -39,7 +39,9 @@ export const test: Command = {
     })
     // The child gets the signal and ends with its report, which is still relayed, so nothing it holds (databases, ports, Chrome) outlives a cancelled run.
     const forward = (signal: NodeJS.Signals) => () => void child.kill(signal)
-    const handlers = FORWARDED.map(signal => [signal, forward(signal)] as const)
+    // In a terminal Ctrl-C reaches the child through the process group already, so forwarding SIGINT too would send Bun a second one.
+    const forwarded = process.stdin.isTTY ? FORWARDED.filter(signal => signal !== 'SIGINT') : FORWARDED
+    const handlers = forwarded.map(signal => [signal, forward(signal)] as const)
 
     for (const [signal, handler] of handlers)
       process.on(signal, handler)
