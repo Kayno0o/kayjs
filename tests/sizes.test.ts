@@ -23,7 +23,24 @@ describe('the eager JS sizes against their baseline', () => {
 
     expect(rows.map(row => row.shrank)).toEqual([true, false])
     expect(growth(rows)).toBeUndefined()
-    expect(table(rows)).toMatch(/-1000\s+shrank/)
+    expect(table(rows)).toMatch(/-1000\s+3\s+shrank/)
+  })
+
+  it('fails a page that gained an eager file however small, naming the page, the count change and the command, and marks one that lost a file as shrunk', () => {
+    const gained = compare(BASELINE, { home: { gzip: 9010, files: 4 }, other: { gzip: 12_000, files: 2 } })
+    const message = growth(gained)!
+
+    expect(gained.map(row => row.grew)).toEqual([true, false])
+    expect(message).toContain('home 3 -> 4 files')
+    expect(message).not.toContain('other')
+    expect(message).not.toContain(' B,')
+    expect(message).toContain('bun scripts/sizes.ts --update')
+    expect(table(gained)).toContain('3->4')
+
+    const lost = compare(BASELINE, { home: { gzip: 9000, files: 2 }, other: { gzip: 12_000, files: 2 } })
+
+    expect(lost.map(row => row.shrank)).toEqual([true, false])
+    expect(growth(lost)).toBeUndefined()
   })
 
   it('takes a page without a baseline as growing from nothing', () => {
