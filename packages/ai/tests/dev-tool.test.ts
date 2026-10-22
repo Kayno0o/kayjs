@@ -34,7 +34,7 @@ async function failure(reply: PromiseLike<unknown>): Promise<Error> {
 }
 
 async function read(extension = ai()): Promise<Response> {
-  const plugin = await (extension.server as () => { handle: (request: Request) => Promise<Response> })()
+  const plugin = await (extension.server as (app: unknown) => { handle: (request: Request) => Promise<Response> })({ root: process.cwd(), modules: {} })
 
   return plugin.handle(new Request('http://localhost/_kay/ai'))
 }
