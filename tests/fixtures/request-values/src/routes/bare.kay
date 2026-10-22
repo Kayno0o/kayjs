@@ -1,7 +1,6 @@
 --- server
 export const page = { layouts: false }
----
----
+--- script
 import Gate from '../../lib/gate.kay'
 ---
 Gate
