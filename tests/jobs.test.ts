@@ -8,6 +8,7 @@ import process from 'node:process'
 import { afterAll, describe, expect, it, jest, setSystemTime, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
 import { Elysia } from 'elysia'
+import { jobRuns } from '../src/runtime/counters'
 import { openSqlite } from '../src/runtime/sqlite.server'
 import { background, memoryJobs, queue, schedule, shutdown, sqliteJobs } from '../src/server'
 import { drainQueues, forgetQueue, trackDetached } from '../src/server/queue'
@@ -97,6 +98,35 @@ describe('schedule', () => {
       await shutdown(app)
       logged.mockRestore()
       cron.restore()
+    }
+  })
+
+  it('counts each run as ok, failed or skipped for the metrics', async () => {
+    const cron = fakeCron()
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const path = await jobsPath()
+
+    setSystemTime(new Date('2026-01-01T12:00:00Z'))
+
+    const ok = new Elysia().use(schedule('11 * * * *', () => undefined)).listen(0)
+    const failing = new Elysia().use(schedule('12 * * * *', () => {
+      throw new Error('feed down')
+    })).listen(0)
+    const process = () => new Elysia().use(schedule('13 * * * *', () => undefined, { lock: 'counted', store: sqliteJobs(path) })).listen(0)
+    const first = process()
+    const second = process()
+
+    try {
+      await Promise.all(cron.fired.map(async entry => entry.handler()))
+      expect(jobRuns.get('11 * * * *')).toEqual({ ok: 1, failed: 0, skipped: 0 })
+      expect(jobRuns.get('12 * * * *')).toEqual({ ok: 0, failed: 1, skipped: 0 })
+      expect(jobRuns.get('13 * * * *')).toEqual({ ok: 1, failed: 0, skipped: 1 })
+    }
+    finally {
+      setSystemTime()
+      logged.mockRestore()
+      cron.restore()
+      await Promise.all([shutdown(ok), shutdown(failing), shutdown(first), shutdown(second)])
     }
   })
 

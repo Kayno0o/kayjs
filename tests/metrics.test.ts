@@ -1,10 +1,13 @@
 import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
+import { dirname } from 'node:path'
 import process from 'node:process'
-import { afterAll, afterEach, describe, expect, it } from 'bun:test'
+import { afterAll, afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { cacheReads, countJobRun, jobRuns } from '../src/runtime/counters'
-import { metricsAllowed } from '../src/server/metrics'
+import { liveConnections } from '../src/server/live'
+import { statusOf } from '../src/server/log'
+import { metricsAllowed, warnMetricsOpen } from '../src/server/metrics'
 import { dropStore, NOT_FOUND_FILE } from '../src/server/not-found'
 import { pages } from './shared-pages'
 
@@ -14,6 +17,7 @@ const TOKEN = 't'.repeat(40)
 
 // The production servers built here count the paths they answered 404 in the working folder's store, which this file leaves as it found it.
 const storeKept = existsSync(NOT_FOUND_FILE)
+const folderKept = existsSync(dirname(NOT_FOUND_FILE))
 
 type Options = NonNullable<Parameters<typeof pages>[0]>
 
@@ -31,6 +35,10 @@ afterAll(async () => {
 
   if (!storeKept)
     await rm(NOT_FOUND_FILE, { force: true })
+
+  // The store opens its folder too, which stays behind empty.
+  if (!folderKept)
+    await rm(dirname(NOT_FOUND_FILE), { force: true, recursive: true })
 })
 
 // A production server on a real socket, so requests carry the address they came from.
@@ -171,6 +179,48 @@ describe('metrics', () => {
 
     expect(await status(`${url}/metrics/anything`)).toBe(403)
     expect(await status(`${url}/metrics/`)).toBe(200)
+  })
+
+  it('names a path nothing serves unmatched, and counts a string status by its code', async () => {
+    const url = await listening({ metrics: true })
+
+    await fetch(`${url}/missing-one`)
+    await fetch(`${url}/missing-two`)
+
+    const text = await (await fetch(`${url}/metrics`)).text()
+
+    expect(text).toMatch(/^kay_http_requests_total\{method="GET",route="unmatched",status="404"\} 2$/m)
+    expect(statusOf(undefined, { status: 'Not Found' })).toBe(404)
+  })
+
+  it.each(['always', 'never'] as const)('serves and guards the path under trailingSlash %s', async (trailingSlash) => {
+    const url = await listening({ metrics: true, trailingSlash })
+
+    expect(await status(`${url}/metrics`, { 'x-forwarded-for': '203.0.113.9' })).toBe(403)
+    expect(await status(`${url}/metrics/`, { 'x-forwarded-for': '203.0.113.9' })).toBe(403)
+    expect([200, 301, 308]).toContain((await fetch(`${url}/metrics`, { redirect: 'manual' })).status)
+  })
+
+  it('counts no live connection while none is open', async () => {
+    const url = await listening({ metrics: true })
+
+    expect(await (await fetch(`${url}/metrics`)).text()).toMatch(/^kay_live_connections 0$/m)
+    expect(liveConnections()).toBe(0)
+  })
+
+  it('warns at boot of a proxy without a token, and of nothing else', () => {
+    const logged = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      warnMetricsOpen(undefined)
+      warnMetricsOpen({ key: 'x-upstream-key' })
+      process.env.KAY_METRICS_TOKEN = TOKEN
+      warnMetricsOpen({ key: 'x-upstream-key' })
+      expect(logged.mock.calls.flat().filter(line => String(line).includes('metrics is read by any request'))).toHaveLength(1)
+    }
+    finally {
+      logged.mockRestore()
+    }
   })
 
   it('decides by the socket address and the marks of a proxy', () => {

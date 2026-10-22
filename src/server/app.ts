@@ -59,7 +59,7 @@ import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { liveConnections, serveLive } from './live'
 import { announceStart, logRequests, pathOf, requestRefusalLogger, useLogger } from './log'
 import { mcpBodyLimit, receiveDispatched, serveMcp, serveToolCallsThrough } from './mcp'
-import { METRICS_PATH, metricsOf, serveMetrics } from './metrics'
+import { METRICS_PATH, metricsOf, serveMetrics, warnMetricsOpen } from './metrics'
 import { countMissing, knowRedirects } from './not-found'
 import { serveServiceWorker } from './offline'
 import { claimApi, openApiDocument, openApiSettings, serveOpenApi } from './openapi'
@@ -385,6 +385,9 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   // Offered, so an app file at the path keeps it; only a running server counts, as `kay dev` restarts on every change and an export serves nothing.
   const metricsConfig = mode.dev || exported ? undefined : metricsOf(options.metrics)
   const metrics: Claim | undefined = metricsConfig && { path: metricsConfig.path ?? METRICS_PATH, owner: 'the metrics route', kind: 'kay' }
+
+  if (metrics)
+    warnMetricsOpen(checkProxy(options.proxy))
 
   setRequestIdHeader(options.requestIdHeader)
   trustProxy(app, options.proxy)

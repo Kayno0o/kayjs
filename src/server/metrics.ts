@@ -2,6 +2,7 @@ import type { Elysia } from 'elysia'
 import type { MetricsConfig, ProxyConfig } from '../config'
 import process from 'node:process'
 import { cacheReads, jobRuns, pageRoutes } from '../runtime/counters'
+import { kayLog } from '../runtime/log'
 import { routerPath } from './base'
 import { pathOf, statusOf } from './log'
 import { fromPrivateNetwork } from './protection'
@@ -165,6 +166,12 @@ export function serveMetrics(app: Elysia, options: { path: string, base: string,
     if (requests.has(counted) || requests.size < MAX_SERIES * 4)
       requests.set(counted, (requests.get(counted) ?? 0) + 1)
   })
+}
+
+// A proxy in front and no token: a proxy on this host that forwards the path without a mark of its own reads as a collector.
+export function warnMetricsOpen(proxy: ProxyConfig | undefined): void {
+  if (proxy !== undefined && metricsToken() === undefined)
+    kayLog('warn', `metrics is read by any request from this machine or a private network that carries no proxy mark, and a proxy is set: do not forward its path, or set ${TOKEN_VARIABLE} so only a request with the token is answered`)
 }
 
 export function metricsOf(setting: boolean | MetricsConfig | undefined): MetricsConfig | undefined {

@@ -37,6 +37,11 @@ const PROXY_KEY_VARIABLES: EnvVariable[] = [
   { name: 'KAY_PROXY_KEY_FILE', type: 'string', required: false, description: 'the path of a file holding the proxy key, read when `KAY_PROXY_KEY` is unset' },
 ]
 
+// What `metrics` reads: with it set, only a scrape carrying it as a bearer token is answered.
+const METRICS_VARIABLES: EnvVariable[] = [
+  { name: 'KAY_METRICS_TOKEN', type: 'string', required: false, secret: true, description: 'the bearer token a scrape must send to `metrics`; unset, only a request from this machine or a private network that no proxy forwarded is answered' },
+]
+
 // Every variable the project's `defineEnv` schemas, its `publicEnv` and its extensions declare, with whether each is required, in production only or always, and its default. The server entry is not run: the modules under `src` that call `defineEnv` are imported without the server's environment.
 export const env: Command = {
   usage: USAGES.env,
@@ -131,6 +136,7 @@ export async function listEnv(root: string): Promise<{ variables: Listed[], unre
     ...config.publicEnv ? described(config.publicEnv, 'publicEnv in kay.config.ts') : [],
     ...(config.extensions ?? []).flatMap(extension => extension.env === undefined ? [] : described(extension.env, `the extension ${extension.name}`).filter(({ name }) => !declaredNames.has(name))),
     ...KAY_VARIABLES.map(variable => ({ ...variable, source: 'kay' })),
+    ...config.metrics !== undefined && config.metrics !== false ? METRICS_VARIABLES.map(variable => ({ ...variable, source: 'kay' })) : [],
     ...typeof config.proxy === 'object' && config.proxy.key !== undefined ? PROXY_KEY_VARIABLES.map(variable => ({ ...variable, source: 'kay' })) : [],
   ]
 

@@ -22,6 +22,7 @@ import { FAVICON_PATHS, faviconSource, localeManifests } from '../server/favicon
 import { localeCopies, localeSettings, routedSettings } from '../server/i18n'
 import { HEALTH_PATH } from '../server/lifecycle'
 import { registerLoader } from '../server/loader'
+import { METRICS_PATH, metricsOf } from '../server/metrics'
 import { SERVICE_WORKER } from '../server/offline'
 import { reachesServerIsland } from '../server/prerender'
 import { PREVIEW_ROUTE } from '../server/preview'
@@ -202,6 +203,7 @@ function kayRoutes(root: string, config: KayConfig): Listed[] {
 
   return [
     ...config.health === false ? [] : [kay(config.health?.path ?? HEALTH_PATH, 'health check')],
+    ...metricsOf(config.metrics) === undefined ? [] : [kay(metricsOf(config.metrics)?.path ?? METRICS_PATH, 'metrics')],
     ...config.publicEnv ? [kay(PUBLIC_ENV_PATH, 'public environment')] : [],
     kay('/_kay/*', 'build files'),
     kay(IMAGE_ROUTE, 'image variants'),

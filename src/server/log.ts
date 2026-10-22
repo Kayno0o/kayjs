@@ -2,6 +2,7 @@ import type { Elysia } from 'elysia'
 import type { LogLevel } from '../runtime/log'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import process from 'node:process'
+import { StatusMap } from 'elysia'
 import { version } from '../../package.json'
 import { ASSET_PREFIX } from '../build/assets'
 import { describeThrown } from '../build/sourcemap'
@@ -54,6 +55,9 @@ const inFlight = new WeakSet<Request>()
 export function statusOf(responseValue: unknown, set: { status?: unknown }): number {
   if (responseValue instanceof Response)
     return responseValue.status
+
+  if (typeof set.status === 'string')
+    return StatusMap[set.status as keyof typeof StatusMap] ?? 200
 
   return typeof set.status === 'number' ? set.status : 200
 }
