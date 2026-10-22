@@ -4,34 +4,34 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
-- `apiPath: '/v1'` in `kay.config.ts` moves every API module, the OpenAPI document and the reference page off `/api`, islands, the service worker, prefetching and kayjs-cms follow it, and `apiUrl(module, path)` gives a route's URL ([API modules](api-routes.md#api-modules)).
-- A server entry no longer calls `listen`: `kay dev`, `kay start` and the executable listen it on `PORT` and `HOST`, and one that calls `listen` keeps its own ([Build and start](build-and-start.md)).
-- A component call can hand several parts on, `Busy(part="root spinner")`, so a Button with an `onClick` takes the `spinner` part of `button.kay` in `src/ui.ts` ([Styling](../llms/styles-and-assets.md)).
-- kayjs-ui `Accordion`, `Skeleton`, `Progress`, `Breadcrumb`, `RadioGroup` and the MarkdownEditor preview take parts, so `src/ui.ts` restyles each piece and a `class` object reaches it ([Setup](../packages/ui/llms/setup.md)).
+- `apiPath: '/v1'` in `kay.config.ts` moves every API module, the OpenAPI document and the reference page off `/api`, and islands, the service worker, prefetching and kayjs-cms follow ([API modules](api-routes.md#api-modules)).
+- A server entry no longer calls `listen`: `kay dev`, `kay start` and the executable listen it on `PORT` and `HOST` ([Build and start](build-and-start.md)).
+- A component call can hand several parts on, `Busy(part="root spinner")`, so a Button with an `onClick` takes the `spinner` part ([Styling](../llms/styles-and-assets.md)).
+- kayjs-ui `Accordion`, `Skeleton`, `Progress`, `Breadcrumb`, `RadioGroup` and the MarkdownEditor preview take parts that `src/ui.ts` restyles ([Setup](../packages/ui/llms/setup.md)).
 - kayjs-ui's `IconButton` takes a snippet for its `icon`, `BareIconButton` draws a button around your own `svg`, and `Textarea` takes `writeFocused` ([Forms](../packages/ui/llms/forms.md)).
-- kayjs-ui has a `BarChart`: vertical bars over a time or category axis in plain HTML, a bar coloured and annotated from its own status, stacked series ([BarChart](../packages/ui/llms/charts-drag-and-media.md)).
-- A `.kay` file that does not compile fails only the `testSite()` visit of the pages importing it, with the error naming the file, so the tests of other pages stay green ([Test site](testing.md#test-site)).
-- `apiPath: '/v1'` in `kay.config.ts` moves every API module, the OpenAPI document and the reference page off `/api`, and `apiUrl(module, path)` gives a route's URL ([API modules](api-routes.md#api-modules)).
-- Each `src/plugins/<name>.ts` default-exporting an Elysia plugin is used before the pages, in the order of the file names, and types `ctx.locals`, so sessions, jobs and derives need no `src/server.ts` ([Mount a server plugin](server.md#mount-a-server-plugin)).
-- `collection(..., { route: '/blog/:slug' })` gives each entry a typed `url`, a feed item with no `path` links it, and `kay check` reports a route no page serves ([Give each entry its page's path](content.md#give-each-entry-its-pages-path)).
-- A collection `route` is read by the CMS, by `alternate()` on a page that read the entry (its translation's own url), by the locale rule for a dotted slug such as `v1.2`, and by `kay check` against the page prerendering it ([Give each entry its page's path](content.md#give-each-entry-its-pages-path)).
-- `cache(load, { ttl, tags })` and `cacheTag()` from `kay/cache` give a cached function whose key comes from its module and name, with `.invalidate()` on it and tags to drop a group, so no string key can be mistyped ([Cache a function with no key to type](rendering.md#cache-a-function-with-no-key-to-type)).
-- `import.meta.glob('~icons/game-icons/{war-pick,axe-swing}', { eager: true, import: 'default' })` bundles just the icons it names, for an icon known by name at runtime ([Icons](images.md#icons)).
-- An action declared in a page types `ctx.params` from that page's route, a matcher's value as it gives it ([Actions](actions.md#declaring-an-action)); a guard's and a layout's stay `unknown`.
-- A class held in data, `color: 'text-blue-200'` in rows a parent hands a child writing `class={item.color}` or in a JSON file it imports, keeps its rule on the page with no warning and no `@source inline` ([Styles and assets](styles-and-assets.md)).
+- kayjs-ui has a `BarChart`: vertical bars over a time or category axis in plain HTML, coloured from their status, stackable ([BarChart](../packages/ui/llms/charts-drag-and-media.md)).
+- A `.kay` file that does not compile fails only the `testSite()` visit of the pages importing it, with the error naming the file ([Test site](testing.md#test-site)).
+- `apiUrl(module, path)` gives an API route's URL under the configured `apiPath` ([API modules](api-routes.md#api-modules)).
+- Each `src/plugins/<name>.ts` default-exporting an Elysia plugin is used before the pages in file-name order and types `ctx.locals`, so no `src/server.ts` is needed ([Mount a server plugin](server.md#mount-a-server-plugin)).
+- `collection(..., { route: '/blog/:slug' })` gives each entry a typed `url`, a feed item links it, and `kay check` reports a route no page serves ([Give each entry its page's path](content.md#give-each-entry-its-pages-path)).
+- A collection `route` is also read by the CMS, by `alternate()`, by the locale rule for a dotted slug such as `v1.2`, and by `kay check` against the page prerendering it ([Give each entry its page's path](content.md#give-each-entry-its-pages-path)).
+- `cache(load, { ttl, tags })` and `cacheTag()` from `kay/cache` cache a function with a key from its module and name, `.invalidate()` and tags to drop a group ([Cache a function with no key to type](rendering.md#cache-a-function-with-no-key-to-type)).
+- `import.meta.glob('~icons/game-icons/{war-pick,axe-swing}', { eager: true, import: 'default' })` bundles just the icons it names ([Icons](images.md#icons)).
+- An action declared in a page types `ctx.params` from that page's route ([Actions](actions.md#declaring-an-action)); a guard's and a layout's stay `unknown`.
+- A class held in data, such as `color: 'text-blue-200'` in rows or a JSON file, keeps its rule on the page with no warning and no `@source inline` ([Styles and assets](styles-and-assets.md)).
 - `bind:group` on radios and checkboxes, `bind:open` on `details` and `dialog`, `bind:files` on file inputs, and a `ref` returning a cleanup ([Templates](templates.md)).
-- `style:prop={value}` sets one CSS property of an element, and `onSubmit|preventDefault={save}` calls `preventDefault` or `stopPropagation` before a handler ([Templates](templates.md)).
-- The language server completes element, attribute, prop and block names, route paths, `t()` keys and lint names, and offers an outline, folding, a fix-all-on-save action and import updates when a `.kay` file is renamed ([Editor](editor-and-agent-commands.md)).
-- `kay check` warns of a static component rendering as an island (`promoted-island`), `// kay-island` and `// kay-static` mark what a component is meant to be (`island-marker`), and the editor shows a lens saying whether it is an island and why ([Islands](islands.md#islands)).
-- A `--- module` fence holds module-level code whose exports other files import from the `.kay` file, typed for them ([Components](components.md#file-layout)).
-- The VS Code extension `kaynooo.kay` is built for the Marketplace and Open VSX and attached to each release as a `.vsix`, serves every project of a monorepo or multi-root workspace, a nested one with its own server, starts once kay is installed, and has commands, `kay.lsp.trace` and snippets; `kay new` recommends it and formats `.kay` on save ([Serve an editor](editor-and-agent-commands.md#serve-an-editor)).
-- `kay check --watch` checks a change to `.kay` files alone in its own process, about 0.4 s faster on a large app, and `kay check` types the project while it reads the collections, a one-line edit of a large app taking about 0.7 s instead of 1.0 s ([Check and tools](check-and-tools.md)).
-- `kay dev` type-checks the project beside the server after each change, its errors in the dev tool's Problems tab, `.kay/dev/errors.json` (`kind: 'type'`) and the terminal, and `--no-types` turns it off ([kay dev](dev-server.md)).
-- `kay fmt --stdin [path]` formats a source from stdin for an editor's formatter, with the Neovim, Helix and Zed setup in the docs guide Other editors ([Format the templates](check-and-tools.md#format-the-templates)).
-- A browser error's stack under `kay dev` is on `.kay` lines in `.kay/dev/errors.json` (`at` filled) and in the dev tool's Problems tab, not on chunk positions ([Errors without a browser](dev-server.md)).
-- The language server checks the edited component first as you type, then the open components importing it after a quiet spell, and no other, so many open files no longer slow each edit; a save still checks them all.
-- `kay generate page|component|island|action|api|guard <name>` writes a starter file in its folder, with a test when the project has tests ([kay generate](project-new-and-add.md)).
-- `store: sqliteData(path)` in kay.config.ts also keeps the data of every `session()` and the values of every `cached` naming no store of their own, so one line covers sessions, cache, jobs, rate limits, presence and vitals ([Keep a session](server.md#keep-a-session), [Stores](rendering.md#stores)).
+- `style:prop={value}` sets one CSS property, and `onSubmit|preventDefault={save}` calls `preventDefault` or `stopPropagation` first ([Templates](templates.md)).
+- The language server completes element, attribute, prop and block names, route paths, `t()` keys and lint names, and offers an outline, folding, fix-all-on-save and import updates on rename ([Editor](editor-and-agent-commands.md)).
+- `kay check` warns of a static component rendering as an island (`promoted-island`), `// kay-island` and `// kay-static` mark intent (`island-marker`), and the editor shows a lens ([Islands](islands.md#islands)).
+- A `--- module` fence holds module-level code whose exports other files import, typed ([Components](components.md#file-layout)).
+- The VS Code extension `kaynooo.kay` is on the Marketplace and Open VSX and attached to each release as a `.vsix`; `kay new` recommends it and formats `.kay` on save ([Serve an editor](editor-and-agent-commands.md#serve-an-editor)).
+- `kay check --watch` checks a change to `.kay` files alone in its own process, and `kay check` types the project while it reads the collections, both faster ([Check and tools](check-and-tools.md)).
+- `kay dev` type-checks the project beside the server after each change, its errors in the Problems tab, `.kay/dev/errors.json` and the terminal, `--no-types` turns it off ([kay dev](dev-server.md)).
+- `kay fmt --stdin [path]` formats a source from stdin, with Neovim, Helix and Zed setups ([Format the templates](check-and-tools.md#format-the-templates)).
+- A browser error's stack under `kay dev` is on `.kay` lines in `.kay/dev/errors.json` and the Problems tab ([Errors without a browser](dev-server.md)).
+- The language server checks the edited component first as you type, then the open components importing it after a quiet spell, so many open files no longer slow each edit.
+- `kay generate page|component|island|action|api|guard <name>` writes a starter file, with a test when the project has tests ([kay generate](project-new-and-add.md)).
+- `store: sqliteData(path)` in kay.config.ts also keeps the data of every `session()` and `cached` naming no store of their own ([Keep a session](server.md#keep-a-session), [Stores](rendering.md#stores)).
 
 ## 1.70.0
 
