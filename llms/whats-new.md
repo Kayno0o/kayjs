@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - kayjs-auth `requireUser({ bare: true })` answers the user without `providers` and reads none, which kayjs-cms's `role` guard now uses ([Setup](../packages/auth/llms/setup.md)).
+- A `refresh()` landing during a link, `navigate()` or Back no longer cancels it: it waits for the swap and is dropped when the swap changed the URL, so an island polling an action needs no `{ refresh: false }` ([Navigation](navigation.md)).
 - kayjs-cms's entry screen swaps its form for a notice linking the collection, the renamed entry or the created one when a leave after a delete, a rename or a create is declined, and `createEntryForm` returns `stranded` ([Screens](../packages/cms/llms/screens.md)).
 - `navigate()` resolves to `false` when a leave guard was declined and the page stayed, `true` otherwise ([Navigation](navigation.md)).
 - kayjs-ui's `ConfirmDelete` takes `disabled`, which disables its trigger and confirm button while the caller is busy and keeps an open dialog open ([Dialogs](../packages/ui/llms/basics.md)).

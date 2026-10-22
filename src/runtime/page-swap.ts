@@ -184,7 +184,40 @@ function policyOf(swap: Swap): Policy {
 // The fetch of the navigation under way, which a newer one to another page cancels: its page would never be shown. One for the same page leaves it, as it always did.
 let fetching: { controller: AbortController, key: string } | undefined
 
+// The swap a link, a query change or a traversal has under way, which a refresh waits for rather than supersedes: the visitor asked for it, and the refresh's page would be the one being left.
+let settling: Promise<void> | undefined
+
 export async function go(url: URL, swap: Swap): Promise<void> {
+  if (swap.intent === 'refresh' && settling) {
+    const started = navigation.current
+
+    await settling
+
+    // The swap went to another URL or a newer one took over, whose page is as recent as the refresh would give.
+    if (navigation.current !== started || pageKey(new URL(location.href)) !== pageKey(url))
+      return
+  }
+
+  const done = swapTo(url, swap)
+
+  if (swap.intent === 'refresh') {
+    await done
+
+    return
+  }
+
+  settling = done
+
+  try {
+    await done
+  }
+  finally {
+    if (settling === done)
+      settling = undefined
+  }
+}
+
+async function swapTo(url: URL, swap: Swap): Promise<void> {
   navigation.flush?.()
 
   if (swap.focused instanceof HTMLInputElement || swap.focused instanceof HTMLTextAreaElement)

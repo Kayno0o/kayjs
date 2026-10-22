@@ -1,0 +1,12 @@
+---
+import type { Action } from 'kay'
+import { navigate } from 'kay'
+
+const { run } = props<{ run: Action<Record<string, never>, string> }>()
+
+async function act() {
+  await run({})
+}
+---
+button.act(type="button" onClick={act}) Act
+button.tab(type="button" onClick={() => navigate({ query: { view: 'tab' } })}) Tab

@@ -1,0 +1,4 @@
+head
+  title Styled
+  link(rel="stylesheet" href="/slow.css")
+h1 Styled
