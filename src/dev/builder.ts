@@ -17,6 +17,7 @@ import { inSignalsScope } from '../build/signals'
 import { mapBundleToKay } from '../build/sourcemap'
 import { styleSignature } from '../build/styles'
 import { KayCompileError } from '../build/transform'
+import { UI_FILE } from '../build/ui'
 import { withConfig } from '../config'
 import { clientOptionsOf } from '../project'
 import { BUILD_FAILURE, clientOptionsKey, MANIFEST } from '../server/client'
@@ -161,7 +162,8 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
     const texts = new Map(await Promise.all(files.map(async file => [file, await readText(file)] as const)))
     const classTable = await classTableOf(root, sources)
     const classTableText = classTable && JSON.stringify(classTable)
-    const islandsAgain = !previous || !sameEntries(previous.sources.islands, sources.islands) || files.some(file => previous.islandInputs.has(file)) || previous.classTable !== classTableText
+    // `src/ui.ts` is written into the components it restyles, none of which imports it, so no chunk lists it among its inputs.
+    const islandsAgain = !previous || !sameEntries(previous.sources.islands, sources.islands) || files.some(file => previous.islandInputs.has(file) || file === join(realRoot, UI_FILE)) || previous.classTable !== classTableText
     const stylesAgain = !previous || await stylesChanged(previous, sources, texts)
 
     // A rewrite still going stops after the map it is on, so it never writes over the maps of the build that is starting.

@@ -110,8 +110,8 @@ export default defineUi({
 ```
 
 - Classes merge in the order the part's own, the component's recipe base, its variants, `src/ui.ts`'s parts and variants, then the caller's `class`, so `Card(class={{ head: 'p-8' }})` still wins.
-- The file is read as it is written at build time and merged into the component's output: the per-page CSS cut sees the final classes, and an island runs no merge for it. It holds string literals and object literals only, and a variant reads the component's props and the defaults of its recipe.
-- The component must have parts or a recipe, and with a recipe a `src/ui.ts` variant must be one it declares. `kay check` reports an unknown component, part, variant or value, a class that is not a plain string and a file with no default export. The dev server rebuilds when `src/ui.ts` changes.
+- The file is read as it is written at build time and merged into the component's output: the per-page CSS cut sees the final classes, and the parts of an entry without variants are written into the component as static classes, so an island carries nothing for them. It holds string literals and object literals only; a variant reads the component's props and the defaults of its recipe.
+- The component must have parts or a recipe, and a variant must be one its recipe declares, so a component with no recipe takes `parts` alone. `kay check` reports an unknown component, part, variant or value, a page, a layout or a server-fenced file, two keys naming one component, a class that is not a plain string and a file with no default export. The dev server rebuilds when `src/ui.ts` changes.
 
 ### Serve a file at a fixed path
 

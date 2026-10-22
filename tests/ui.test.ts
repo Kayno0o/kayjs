@@ -1,14 +1,17 @@
 import type { Reached } from '../src/build/styles'
-import { rm } from 'node:fs/promises'
+import { readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
+import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, setDefaultTimeout } from 'bun:test'
+import { clientDir } from '../src/build/assets'
 import { kay } from '../src/build/plugin'
 import { styleImports } from '../src/build/styles'
 import { transformKayCached } from '../src/build/transform'
 import { uiEntryOf, uiOf } from '../src/build/ui'
 import { uiProblems } from '../src/check/ui'
 import { compileKay } from '../src/compiler'
+import { devBuilder } from '../src/dev/builder'
 import { projectPaths } from '../src/project'
 import { installClassTable } from '../src/runtime/class-table'
 import { child } from '../src/runtime/html'
@@ -47,6 +50,7 @@ export default defineUi({
     variants: { tone: { plain: { head: 'bg-white' }, danger: { head: 'bg-red-100' } } },
   },
   'uilib/card.kay': { parts: { head: 'p-9' } },
+  './plain.kay': { parts: { head: 'font-bold' } },
 })
 `
 const files: Record<string, string> = {
@@ -130,7 +134,16 @@ describe('src/ui.ts on the server', () => {
 
   it('leaves a component it does not name alone', () => {
     expect(html(server.Untouched!, { title: 't' })).toContain('<section class="card p-4"><header class="p-2" data-part="head">t</header>')
-    expect(html(server.Plain!)).toContain('<section class="card"><header data-part="head">a</header></section>')
+  })
+
+  it('writes the parts of an entry with no variants as static classes of the component', async () => {
+    expect(html(server.Plain!)).toBe('<section class="card"><header class="font-bold" data-part="head">a</header></section>')
+
+    const source = await Bun.file(join(scratch, 'src/plain.kay')).text()
+    const { tsx } = compileKay(source, join(scratch, 'src/plain.kay'), { root: scratch, output: 'html', ui: uiEntryOf(scratch, join(scratch, 'src/plain.kay')) })
+
+    expect(tsx).not.toContain('KayUi')
+    expect(tsx).toContain('"font-bold"')
   })
 
   it('restyles a library component compiled from node_modules', () => {
@@ -179,6 +192,22 @@ describe('the compiled classes', () => {
   })
 })
 
+describe('hostile entries', () => {
+  it('never breaks the generated code or the markup, whatever the classes hold', async () => {
+    const nasty = 'a" onclick="x \u2028 ${1} `b` \\'
+
+    await Bun.write(join(scratch, 'src/ui.ts'), `export default { './plain.kay': { parts: { head: ${JSON.stringify(nasty)} } }, './card.kay': { variants: { __proto__: { x: 'y' }, tone: { plain: { head: ${JSON.stringify(nasty)} } } } } }`)
+
+    const server = await bundle('bun', 'out-hostile')
+
+    expect(html(server.Plain!)).toBe(`<section class="card"><header class="a&quot; onclick=&quot;x \u2028 \${1} \`b\` \\" data-part="head">a</header></section>`)
+    expect(html(server.Card!, { title: 't' })).toContain('data-part="head"')
+    expect(({} as Record<string, unknown>).x).toBeUndefined()
+    expect(Object.hasOwn(uiOf(scratch)!.components[1]!.entry.variants!, '__proto__')).toBe(true)
+    await rm(join(scratch, 'src/ui.ts'))
+  })
+})
+
 describe('the styles a page keeps', () => {
   it('reach src/ui.ts from the components it restyles, so a page using one keeps the rules of the classes written there', async () => {
     await Bun.write(join(scratch, 'src/ui.ts'), UI)
@@ -191,6 +220,41 @@ describe('the styles a page keeps', () => {
     expect(reached.edges.get(join(scratch, 'src/card.kay'))).toContain(join(scratch, 'src/ui.ts'))
     expect(reached.edges.get(join(scratch, 'src/untouched.kay'))).toEqual([])
     await rm(join(scratch, 'src/ui.ts'))
+  })
+})
+
+describe('kay dev', () => {
+  it('rebuilds the islands when src/ui.ts changes', async () => {
+    const project = await scratchDir('ui-dev-')
+    const ui = (head: string) => `export default { './card.kay': { parts: { head: '${head}' }, variants: { tone: { danger: { head: 'x-${head}' } } } } }`
+    const chunks = async () => (await Promise.all((await readdir(clientDir(project))).filter(name => name.endsWith('.js')).map(async name => Bun.file(join(clientDir(project), name)).text()))).join('\n')
+    const cwd = process.cwd()
+
+    await Promise.all(Object.entries({
+      'src/card.kay': CARD,
+      'src/switch.kay': files['src/switch.kay']!,
+      'src/routes/index.kay': '---\nimport Switch from \'../switch.kay\'\n---\nSwitch\n',
+      'src/ui.ts': ui('p-6'),
+    }).map(async ([name, text]) => Bun.write(join(project, name), text)))
+
+    const build = devBuilder(project, { hot: true })
+
+    try {
+      process.chdir(project)
+      expect((await build(null)).failed).toBe(false)
+      expect(await chunks()).toContain('x-p-6')
+
+      await Bun.write(join(project, 'src/ui.ts'), ui('p-7'))
+      expect((await build(['src/ui.ts'])).failed).toBe(false)
+
+      const rebuilt = await chunks()
+
+      expect(rebuilt).toContain('x-p-7')
+    }
+    finally {
+      process.chdir(cwd)
+      await rm(project, { recursive: true, force: true })
+    }
   })
 })
 
@@ -226,6 +290,17 @@ describe('kay check on src/ui.ts', () => {
     ])
     expect(problems[0]!.help).toContain('`head`')
     expect(problems[2]!.help).toContain('`tone`')
+  })
+
+  it('reports two keys naming one component, and a page, a layout or a server-fenced file', async () => {
+    await Bun.write(join(scratch, 'src/_layout.kay'), 'main(part="root") a\n')
+    await Bun.write(join(scratch, 'src/fenced.kay'), '--- server\nconst a = 1\n---\nmain(part="root") {a}\n')
+
+    expect(await messages('export default { \'./card.kay\': { parts: { head: \'a\' } }, \'../src/card.kay\': { parts: { head: \'b\' } }, \'./_layout.kay\': { parts: \'c\' }, \'./fenced.kay\': { parts: \'d\' } }')).toEqual([
+      '`../src/card.kay` names the same component as `./card.kay`',
+      '`./_layout.kay` is a page, a layout or a component with a `--- server` fence',
+      '`./fenced.kay` is a page, a layout or a component with a `--- server` fence',
+    ])
   })
 
   it('reports what it cannot read as written', async () => {

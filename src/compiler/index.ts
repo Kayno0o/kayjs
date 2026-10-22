@@ -116,8 +116,9 @@ const KAY_EXTENSION = /\.kay$/
 const ACTIONS_FILE = '_actions.kay'
 const ERROR_PAGE = '_error.kay'
 const LAYOUT = '_layout.kay'
+
 // Rendered by the server around or instead of a page, never inside an island.
-const ROUTE_FILES = new Set([LAYOUT, '_404.kay', ERROR_PAGE])
+export const ROUTE_FILES = new Set([LAYOUT, '_404.kay', ERROR_PAGE])
 const BACKSLASH = /\\/g
 // An icon of an installed set, `~icons/tabler/home`, which the template may draw as a tag.
 const ICON_IMPORT = /^~icons\//

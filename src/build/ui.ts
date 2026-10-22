@@ -33,9 +33,15 @@ export interface UiSource {
 }
 
 const OBJECT_WRAPPERS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'ParenthesizedExpression'])
-const KAY_EXTENSION = /\.kay$/
+
+export const KAY_EXTENSION = /\.kay$/
 // What `src/ui.ts` was last read as, by file: it is read for every component the build compiles.
 const read = new Map<string, { stamp: string, ui: UiSource | undefined }>()
+
+// A record whose keys are all ordinary, `__proto__` included.
+function record<T>(): Record<string, T> {
+  return Object.create(null) as Record<string, T>
+}
 
 function span(node: t.Node): Span {
   return { start: node.start ?? 0, end: node.end ?? 0 }
@@ -104,10 +110,12 @@ function classesProblem(node: t.Node, problems: UiProblem[]): string | undefined
 
 // A variant value's classes: a string for the root, or a string per part.
 function variantClasses(node: t.Node, problems: UiProblem[]): string | Record<string, string> | undefined {
-  if (classesOf(node) !== undefined)
-    return classesOf(node)
+  const root = classesOf(node)
 
-  const found: Record<string, string> = {}
+  if (root !== undefined)
+    return root
+
+  const found = record<string>()
 
   eachProperty(node, 'A variant value', problems, (part, value) => {
     const classes = classesProblem(value, problems)
@@ -120,7 +128,7 @@ function variantClasses(node: t.Node, problems: UiProblem[]): string | Record<st
 }
 
 function entryOf(node: t.Node, component: UiComponent, problems: UiProblem[]): void {
-  const entry: { parts?: string | Record<string, string>, variants?: Record<string, Record<string, string | Record<string, string>>> } = {}
+  const entry: UiEntry = {}
 
   eachProperty(node, 'A component\'s entry', problems, (key, value, property) => {
     if (key === 'parts') {
@@ -133,7 +141,7 @@ function entryOf(node: t.Node, component: UiComponent, problems: UiProblem[]): v
         return
       }
 
-      const parts: Record<string, string> = {}
+      const parts = record<string>()
 
       eachProperty(value, '`parts`', problems, (part, classes, partProperty) => {
         const text = classesProblem(classes, problems)
@@ -146,10 +154,10 @@ function entryOf(node: t.Node, component: UiComponent, problems: UiProblem[]): v
       entry.parts = parts
     }
     else if (key === 'variants') {
-      const variants: Record<string, Record<string, string | Record<string, string>>> = {}
+      const variants = record<Record<string, string | Record<string, string>>>()
 
       eachProperty(value, '`variants`', problems, (name, values, variantProperty) => {
-        const options: Record<string, string | Record<string, string>> = {}
+        const options = record<string | Record<string, string>>()
         const variant: UiComponent['variants'][number] = { name, span: span(variantProperty.key), values: [] }
 
         eachProperty(values, `The values of \`${name}\``, problems, (option, classes, optionProperty) => {
@@ -194,21 +202,29 @@ function exported(ast: t.File): t.Node | undefined {
   return value
 }
 
-// The component a specifier names, as Bun would load it from `src/ui.ts`.
-function resolveComponent(specifier: string, from: string): string | undefined {
-  if (!KAY_EXTENSION.test(specifier))
-    return undefined
+// The component a component of `src/ui.ts` names, as Bun would load it from there: looked for again until it is found, as a library may be installed and a component written after the file was.
+export function componentFile(ui: UiSource, component: UiComponent): string | undefined {
+  if (component.file !== undefined || !KAY_EXTENSION.test(component.specifier))
+    return component.file
 
   try {
-    return realpathSync(Bun.resolveSync(specifier, dirname(from)))
+    component.file = realpathSync(Bun.resolveSync(component.specifier, dirname(ui.file)))
+  }
+  catch {}
+
+  return component.file
+}
+
+function readUi(file: string): UiSource | undefined {
+  let source: string
+
+  try {
+    source = readFileSync(file, 'utf8')
   }
   catch {
     return undefined
   }
-}
 
-function readUi(file: string): UiSource | undefined {
-  const source = readFileSync(file, 'utf8')
   const problems: UiProblem[] = []
   let ast: t.File
 
@@ -227,7 +243,7 @@ function readUi(file: string): UiSource | undefined {
   }
   else {
     eachProperty(config, 'The default export', problems, (specifier, value, property) => {
-      const component: UiComponent = { specifier, span: span(property.key), file: resolveComponent(specifier, file), entry: {}, parts: [], variants: [] }
+      const component: UiComponent = { specifier, span: span(property.key), entry: {}, parts: [], variants: [] }
 
       entryOf(value, component, problems)
       components.push(component)
@@ -275,31 +291,7 @@ export function uiEntryOf(root: string, file: string): UiEntry | undefined {
   }
   catch {}
 
-  const found = ui.components.filter(component => component.file === real)
-
-  if (found.length === 0)
-    return undefined
-
-  return found.length === 1 ? found[0]!.entry : mergedEntries(found.map(component => component.entry))
-}
-
-// Two specifiers reaching one file, as `./card.kay` and `src/card.kay` would: both apply, the later one after.
-function mergedEntries(entries: UiEntry[]): UiEntry {
-  const parts: Record<string, string> = {}
-  const variants: Record<string, Record<string, string | Record<string, string>>> = {}
-
-  for (const entry of entries) {
-    const own = typeof entry.parts === 'string' ? { root: entry.parts } : entry.parts ?? {}
-
-    for (const [name, classes] of Object.entries(own))
-      parts[name] = parts[name] === undefined ? classes : `${parts[name]} ${classes}`
-
-    for (const [name, values] of Object.entries(entry.variants ?? {})) {
-      variants[name] = { ...variants[name], ...values }
-    }
-  }
-
-  return { parts, variants }
+  return ui.components.findLast(component => componentFile(ui, component) === real)?.entry
 }
 
 // Whatever `src/ui.ts` changes in a component's compiled output, as text for a cache key.

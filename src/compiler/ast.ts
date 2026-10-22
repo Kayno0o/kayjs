@@ -1,3 +1,5 @@
+import type { UiEntry } from '../runtime/ui'
+
 // Offsets index into the whole .kay source, so every node maps back to the file the user wrote.
 export interface Span {
   start: number
@@ -456,6 +458,19 @@ export function isChildrenSlot(node: Node): boolean {
 
 export type TemplateHelper = 'For' | 'componentClass' | 'partClass' | 'partsClass'
 
+// Whether an entry of `src/ui.ts` has variants, which read the component's props: without them its parts are static classes, written into the template as they are.
+export function uiHasVariants(entry: UiEntry): boolean {
+  return Object.keys(entry.variants ?? {}).length > 0
+}
+
+// The classes an entry gives a part when it has no variants.
+export function uiPartClasses(entry: UiEntry, part: string): string | undefined {
+  if (typeof entry.parts === 'string')
+    return part === 'root' ? entry.parts : undefined
+
+  return entry.parts !== undefined && Object.hasOwn(entry.parts, part) ? entry.parts[part] : undefined
+}
+
 // What the template holds that decides the code generated around it, found in one pass and kept on the file, which compiles several times.
 export interface TemplateFacts {
   // An element handles events, binds an input or takes a ref.
@@ -477,8 +492,8 @@ export interface TemplateFacts {
   parts: PartFacts | undefined
   // The recipe the script declares, whose classes every part of the component takes before its `class`.
   recipe?: string | undefined
-  // `src/ui.ts` sets classes for the parts of this component, after its recipe's.
-  ui?: boolean | undefined
+  // What `src/ui.ts` sets for the parts of this component, after its recipe's.
+  ui?: UiEntry | undefined
   // The action of the form each node sits in, from `formTargets`.
   forms: Map<Node, Span>
   // Whether each attribute expression asked about, by where it starts, is a function: filled as the passes ask, each parsed once.

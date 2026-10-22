@@ -7,7 +7,7 @@ import type { PageSettingName } from './page-settings'
 import type { Sites } from './rewrite'
 import type { ImportBinding, PropsDeclaration, ScriptAnalysis, ServerAnalysis } from './script'
 import { actionUrl } from '../runtime/action'
-import { errorMessages, INTERACTIVE_ATTRIBUTE, isHead, someNode, templateFacts, visitNodes } from './ast'
+import { errorMessages, INTERACTIVE_ATTRIBUTE, isHead, someNode, templateFacts, uiHasVariants, visitNodes } from './ast'
 import { domHelperImport, DomTemplate } from './dom'
 import { mayHoldFunction } from './expression'
 import { htmlHelperImport, HtmlTemplate } from './html'
@@ -178,7 +178,7 @@ class ModuleShell {
   // Server values an `await` block renders by name: `load` defers each where it is declared, so the template changes how the server fence runs.
   private readonly deferred: Set<string>
   private jsxTemplate: JsxTemplate | undefined
-  // Whether `src/ui.ts` styles the parts of this component.
+  // Whether `src/ui.ts` sets variants for this component, which its parts read at runtime.
   private readonly styled: boolean
   private typedParts: { type?: string, helper: boolean, recipe: boolean } | undefined
 
@@ -190,9 +190,10 @@ class ModuleShell {
     this.fence = options.includeServer === false ? undefined : server
     const facts = { ...templateFacts(file, script.recipe), bindables: bindableNames(file.source, script.props) }
 
-    this.facts = options.pageFile === true && facts.parts ? { ...facts, parts: { ...facts.parts, merges: false } } : facts
-    this.styled = options.ui !== undefined && this.facts.parts?.merges === true
-    this.facts.ui = this.styled
+    const owned = options.pageFile === true && facts.parts ? { ...facts, parts: { ...facts.parts, merges: false } } : facts
+
+    this.facts = options.ui !== undefined && owned.parts?.merges === true ? { ...owned, ui: options.ui } : owned
+    this.styled = this.facts.ui !== undefined && uiHasVariants(this.facts.ui)
     this.deferred = deferredData(this.facts, this.fence)
   }
 

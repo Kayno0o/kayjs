@@ -4,7 +4,7 @@ import type { CodeBuilder } from './mapping'
 import { resolveClasses } from '../runtime/class-table'
 import { PART_END, PART_START } from '../runtime/markers'
 import { URL_ATTRIBUTES } from '../runtime/url-attributes'
-import { actionOf, bindsOwnProp, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, partAttribute, partsOf, sectionOf } from './ast'
+import { actionOf, bindsOwnProp, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, partAttribute, partsOf, sectionOf, uiHasVariants, uiPartClasses } from './ast'
 import { decodeEntities, isFunctionAt } from './expression'
 import { PROPS } from './names'
 
@@ -504,11 +504,22 @@ export abstract class TemplateWriter {
 
   // The classes the component's recipe, then `src/ui.ts`, give a part, after the element's own and before the `class` prop's entry, so the base gives way to a variant, a variant to the app's `src/ui.ts` and that to the caller.
   private recipeItem(part: string): (() => void)[] {
-    const { recipe } = this.facts
+    const { recipe, ui } = this.facts
     const items: (() => void)[] = recipe === undefined ? [] : [() => this.b.add(`${recipe}(${PROPS}, ${JSON.stringify(part)})`)]
 
-    if (this.facts.ui === true)
+    if (ui === undefined)
+      return items
+
+    if (uiHasVariants(ui)) {
       items.push(() => this.b.add(`${helperName('ui')}(${PROPS}, ${JSON.stringify(part)})`))
+
+      return items
+    }
+
+    const classes = uiPartClasses(ui, part)
+
+    if (classes !== undefined)
+      items.push(() => this.b.add(JSON.stringify(classes)))
 
     return items
   }
