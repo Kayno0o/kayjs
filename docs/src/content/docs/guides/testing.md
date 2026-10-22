@@ -221,7 +221,7 @@ It also loads `kay.config.ts` and every module the config imports, so a module t
 preload = ["./tests/setup.ts", "kay/test/preload"]
 ```
 
-kay keeps the variables your preload set to a value other than the one in `.env`. Listed after kay's preload, it runs too late for what the config imports.
+kay keeps the variables your preload set to a value other than the one in `.env`. A variable set to the same value is dropped with the rest. Listed after kay's preload, it runs too late for what the config imports.
 
 ## A database for each test file
 
