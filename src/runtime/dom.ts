@@ -1140,9 +1140,10 @@ function moveRows(parent: Node, kept: Row[], next: Row[], after: Node | null): v
 // An iterable's parts render at most this often in an island, about once a frame.
 const FRAME_MS = 16
 
-// An `await` block: the pending block while the value is a promise, then the `then` or `catch` block once it settles; a plain value renders `then` at once, and an async iterable renders `then` again with each part, at most once a frame.
-export function awaited(element: Node | null, start: Node | null, end: Node | null, value: () => unknown, pending: (() => unknown) | undefined, ready: (value: unknown) => unknown, failed: ((error: unknown) => unknown) | undefined): void {
-  const block = blockIn(new Region(element, start, end))
+// An `await` block: the pending block while the value is a promise, then the `then` or `catch` block once it settles, or with no `catch` the enclosing `try`'s as `fallback`; a plain value renders `then` at once, and an async iterable renders `then` again with each part, at most once a frame.
+export function awaited(element: Node | null, start: Node | null, end: Node | null, value: () => unknown, pending: (() => unknown) | undefined, ready: (value: unknown) => unknown, failed: ((error: unknown) => unknown) | undefined, fallback?: ((error: unknown) => unknown) | undefined): void {
+  const region = new Region(element, start, end)
+  const block = blockIn(region)
   let version = 0
 
   renderEffect(() => {
@@ -1203,10 +1204,17 @@ export function awaited(element: Node | null, start: Node | null, end: Node | nu
           if (broken)
             return
 
-          if (failed)
+          if (failed) {
             land(() => failed(error))
-          else
-            console.error(error)
+          }
+          // The enclosing `try`'s `catch` takes the place of the block, the error reported as the `try` reports one.
+          else if (fallback) {
+            reportError(error, islandOf(region.parent))
+            land(() => fallback(error))
+          }
+          else {
+            reportError(error, islandOf(region.parent))
+          }
 
           return
         }

@@ -1981,6 +1981,56 @@ describe('snippets called with a loop row', () => {
   })
 })
 
+describe('an await block with no catch, in an island', () => {
+  const mountD = site({
+    'main.kay': [
+      '---',
+      'import { signal } from \'kay\'',
+      '',
+      'const source = signal<Promise<string>>(Promise.resolve(\'fine\'))',
+      ';(globalThis as { setSource?: (next: Promise<string>) => void }).setSource = next => source.set(next)',
+      '---',
+      'try',
+      '  // kay-allow uncaught-await',
+      '  await source() then text',
+      '    p.text {text}',
+      '    // kay-allow uncaught-await',
+      '    await Promise.reject(new Error(\'Inner\')) then inner',
+      '      p.inner {inner}',
+      'catch error',
+      '  p.failed {(error as Error).message}',
+      '// kay-allow uncaught-await',
+      'await source() then text',
+      '  p.bare {text}',
+      '',
+    ].join('\n'),
+  })
+
+  it('renders the catch block of the try around it when the value rejects, also after it resolved, and reports the error', async () => {
+    const errors = spyOn(console, 'error').mockImplementation(() => undefined)
+    const { root, dispose } = await mountD()
+
+    try {
+      await settle()
+      // The inner await rejects within the first value's block, and takes the try's catch in its place.
+      expect(root.querySelector('p.text')!.textContent).toBe('fine')
+      expect(root.querySelector('p.failed')!.textContent).toBe('Inner')
+      expect(root.querySelector('p.bare')!.textContent).toBe('fine')
+      ;(globalThis as unknown as { setSource: (next: Promise<string>) => void }).setSource(Promise.reject(new Error('Late')))
+      await settle()
+      expect(root.querySelector('p.text')).toBeNull()
+      expect(root.querySelector('p.failed')!.textContent).toBe('Late')
+      // Without a try, nothing replaces the block, and the error is reported.
+      expect(root.querySelector('p.bare')).toBeNull()
+      expect(errors.mock.calls.map(call => (call[0] as Error).message).sort()).toEqual(['Inner', 'Late', 'Late'])
+    }
+    finally {
+      errors.mockRestore()
+      await dispose()
+    }
+  })
+})
+
 describe('snippets in loops and blocks', () => {
   const mountB = site({
     'rows.kay': '--- <T>\nimport type { JSX } from \'kay\'\n\nconst { items, row } = props<{ items: T[], row: (item: T, index: number) => JSX.Element }>()\n---\nul.rows\n  for item, i of items key={i}\n    | {row(item, i)}\n',

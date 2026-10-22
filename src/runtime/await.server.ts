@@ -13,6 +13,34 @@ export interface PendingBlock {
   value: Promise<unknown> | AsyncIterable<unknown>
   ready: (value: never) => unknown
   failed?: ((error: unknown) => unknown) | undefined
+  // The `catch` of the `try` around the block, rendered, and the error reported, when the block has no `catch` of its own.
+  fallback?: ((error: unknown) => unknown) | undefined
+  // Where the block was rendered, for the error of a block with no `catch` to name its line.
+  site?: Error | undefined
+}
+
+// A rejection no `catch` of the block takes, with the block's place added to its stack so the dev overlay and `.kay/dev/errors.json` show the `await` line; a rejection that is no error becomes one.
+export function rejectedAt(block: PendingBlock, reason: unknown): unknown {
+  if (block.site === undefined)
+    return reason
+
+  const frames = (block.site.stack ?? '').split('\n').filter(line => line.trimStart().startsWith('at ') && !line.includes('await.server')).join('\n')
+
+  if (reason instanceof Error) {
+    try {
+      reason.stack = `${reason.stack ?? `${reason.name}: ${reason.message}`}\n${frames}`
+    }
+    // A frozen error keeps its own stack.
+    catch {}
+
+    return reason
+  }
+
+  const wrapped = new Error(`kay: an await block's value rejected with ${String(reason)}`, { cause: reason })
+
+  wrapped.stack = `${wrapped.name}: ${wrapped.message}\n${frames}`
+
+  return wrapped
 }
 
 interface EarlyRejections {
@@ -108,7 +136,9 @@ export function Await<T>(props: AwaitProps<T>): JSX.Element {
   const parent = getOwner()
   const failed = props.failed
 
-  collecting.blocks.push({ id, value, ready: (settled: never) => runWithOwner(parent, () => props.ready(settled)), failed: failed && (error => runWithOwner(parent, () => failed(error))) })
+  const fallback = props.fallback
+
+  collecting.blocks.push({ id, value, ready: (settled: never) => runWithOwner(parent, () => props.ready(settled)), failed: failed && (error => runWithOwner(parent, () => failed(error))), fallback: fallback && (error => runWithOwner(parent, () => fallback(error))), site: failed ? undefined : new Error('await') })
   // The streamed block replaces this one whole, so an `await` inside it renders its own pending block and streams nothing.
   deferred = undefined
 

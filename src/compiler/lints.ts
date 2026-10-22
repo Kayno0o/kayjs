@@ -1,6 +1,6 @@
-import type { Diagnostic, ForNode, KayFile, TextChunk } from './ast'
+import type { Diagnostic, ForNode, KayFile, Node, TextChunk } from './ast'
 import { accessibilityLints } from './a11y'
-import { keyedByPosition, walkNodes } from './ast'
+import { keyedByPosition, someNode, walkNodes } from './ast'
 import { positionAt } from './mapping'
 import { VOID_ELEMENTS } from './markup'
 
@@ -289,7 +289,7 @@ export const LINTS = {
   'uncaught-await': {
     level: 'warn',
     group: 'code',
-    summary: 'An `await` block with no `catch`: once its value rejects, the pending block goes and nothing takes its place, so the visitor never learns it failed, and only the log does. A `try` around it does not help, as a streamed block settles after the page has rendered.',
+    summary: 'An `await` block with no `catch` and no `try` around it: once its value rejects, the pending block goes and nothing takes its place, so the visitor never learns it failed, and only the log does. A `try` around the block gives it that `try`\'s `catch`.',
     wrong: 'await comments\n  p Loading comments\nthen list\n  p {list.length} comments',
     right: 'await comments\n  p Loading comments\nthen list\n  p {list.length} comments\ncatch\n  p Comments are unavailable',
   },
@@ -783,6 +783,21 @@ function unknownLints(source: string): Diagnostic[] {
 // The template's own lints: what it can say from the markup alone.
 export function templateLints(file: KayFile): Diagnostic[] {
   const found: Diagnostic[] = []
+  // The `await` blocks inside a `try`, whose `catch` renders when one has none of its own.
+  const guarded = new Set<Node>()
+
+  walkNodes(file.template, false, (node) => {
+    if (node.kind === 'try') {
+      someNode(node.children, (inner) => {
+        if (inner.kind === 'await')
+          guarded.add(inner)
+
+        return false
+      })
+    }
+
+    return false
+  })
 
   // `literal` inside an element whose text shows code, where a tag is meant as written.
   walkNodes(file.template, false, (node, literal) => {
@@ -798,7 +813,7 @@ export function templateLints(file: KayFile): Diagnostic[] {
     else if (node.kind === 'for') {
       positionalKey(file.source, node, found)
     }
-    else if (node.kind === 'await' && !node.rejected) {
+    else if (node.kind === 'await' && !node.rejected && !guarded.has(node)) {
       found.push({ start: node.start, end: node.value.end, code: 'uncaught-await', message: 'Nothing renders in place of this block once its value rejects', note: 'the pending block goes, and the error only reaches the log', help: 'add a `catch` block after it, at the same indentation, saying what failed', checkOnly: true })
     }
 

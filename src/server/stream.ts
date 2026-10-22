@@ -4,7 +4,7 @@ import type { RenderedIslands } from '../runtime/island.server'
 import type { SnapshotReader } from '../runtime/snapshots'
 import type { ClientBuild } from './client'
 import { collectForms } from '../runtime/action'
-import { collectDeferred } from '../runtime/await.server'
+import { collectDeferred, rejectedAt } from '../runtime/await.server'
 import { child } from '../runtime/html'
 import { collectIslands } from '../runtime/island.server'
 import { isSnapshots, lastSnapshot, readSnapshots } from '../runtime/snapshots'
@@ -190,9 +190,12 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
           if (cancelled || broken)
             return
 
-          if (!block.failed) {
-            report(error)
+          const failed = block.failed ?? block.fallback
 
+          if (!block.failed)
+            report(rejectedAt(block, error))
+
+          if (!failed) {
             // What came before the failure stays; with nothing shown yet, the pending block goes.
             if (!shown)
               write(block.id, EMPTY, false)
@@ -200,7 +203,6 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
             return
           }
 
-          const failed = block.failed
           const rendered = renderOrReport(() => failed(error), report, render, block.id)
 
           write(block.id, rendered, false)
@@ -245,7 +247,7 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
   })
 }
 
-// The `then` block once the value resolves, or with an iterable's last part, or the `catch` block once it rejects; without one, the pending block just goes away and the error is reported.
+// The `then` block once the value resolves, or with an iterable's last part, or the `catch` block once it rejects; without one, the error is reported and the enclosing `try`'s `catch` renders, or the pending block just goes away.
 // A block that throws while rendering is a bug in the page, not the value failing, so it is reported rather than shown as `catch`.
 export async function settle(block: PendingBlock, cancelled: () => boolean, report: (error: unknown) => void, render: (view: () => unknown, salt?: string) => Rendered = renderBlock): Promise<Rendered> {
   let value: { value: unknown } | undefined
@@ -254,15 +256,12 @@ export async function settle(block: PendingBlock, cancelled: () => boolean, repo
     value = await lastSnapshot(block.value)
   }
   catch (error) {
-    if (!block.failed) {
-      report(error)
+    if (!block.failed)
+      report(rejectedAt(block, error))
 
-      return EMPTY
-    }
+    const failed = block.failed ?? block.fallback
 
-    const failed = block.failed
-
-    return renderOrReport(() => failed(error), report, render, block.id)
+    return failed ? renderOrReport(() => failed(error), report, render, block.id) : EMPTY
   }
 
   if (cancelled() || value === undefined)

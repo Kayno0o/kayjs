@@ -73,6 +73,9 @@ class Markup {
 
 // A template as code building its markup: what pages, layouts and static components render to outside islands, with no reactive runtime.
 export class HtmlTemplate extends TemplateWriter {
+  // The `try` whose content is being written, which an `await` without a `catch` inside falls back to.
+  private enclosing: { branch: TryNode['rejected'] } | undefined
+
   constructor(b: CodeBuilder, src: string, facts: TemplateFacts, private readonly options: HtmlOptions = {}) {
     super(b, src, facts)
     this.mergesAtRuntime = options.classMerge === true
@@ -317,7 +320,12 @@ export class HtmlTemplate extends TemplateWriter {
 
     b.wrap(node, () => {
       b.add(`${helperName('attempt')}(() => `)
+
+      const outer = this.enclosing
+
+      this.enclosing = { branch: node.rejected }
       this.markup(node.children)
+      this.enclosing = outer
 
       const branch = node.rejected
 
@@ -363,6 +371,23 @@ export class HtmlTemplate extends TemplateWriter {
           b.add(') => ')
           this.value(branch.children)
         })
+      }
+
+      // With no `catch` of its own, a rejection renders the enclosing `try`'s, or nothing when that has none.
+      if (!node.rejected && this.enclosing) {
+        const branch = this.enclosing.branch
+
+        b.add(', fallback: (')
+
+        if (branch?.alias)
+          b.addSource(branch.alias)
+
+        b.add(') => ')
+
+        if (branch)
+          this.value(branch.children)
+        else
+          b.add('\'\'')
       }
 
       b.add(' }))')

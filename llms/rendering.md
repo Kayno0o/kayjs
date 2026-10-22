@@ -175,7 +175,8 @@ catch
 - Each `then` block streams in as its value resolves, in whatever order they do, swapped in by a few bytes of inline script; islands inside it hydrate when it lands.
 - `await value then name` on one line has no pending block.
 - `catch error` binds the rejection.
-- Without `catch`, a rejection removes the pending block and is logged, which `kay check` warns of (`uncaught-await`).
+- Without `catch`, a rejection renders the `catch` block of the nearest `try` around the `await` in the same template, streamed or not, reported like the `try`'s own error; a `try` with no `catch` renders nothing there, and the rest of the page stays.
+- With no `try` either, a rejection removes the pending block and is reported at the `await` line in the dev overlay, `.kay/dev/errors.json` and `onError`, which `kay check` warns of (`uncaught-await`).
 - A `then` block that throws while rendering is a bug, not a rejection: it removes the pending block and is logged too, never showing `catch`.
 - An `await` block takes any promise, whatever made it: a server fence variable, `await data.comments`, a prop or one a component makes; a value that is no promise renders at once.
 - A promise rejecting before its block renders crashes nothing: the server holds every unhandled rejection of its process until a block, or any code, takes it, logs one nothing took within 30 seconds, and a process ending with one held logs it and exits with code 1. `defer()` from `kay` is no longer needed and still works.
@@ -230,7 +231,7 @@ import Receipt from './receipt.kay'
 const html = await renderToString(Receipt, { order })
 ```
 
-- Its `await` blocks are waited for and rendered in place, each `then` block or, once its value rejects, its `catch` block; a value rejecting with no `catch` block rejects the render, so nothing goes out with part of it missing.
+- Its `await` blocks are waited for and rendered in place, each `then` block or, once its value rejects, its `catch` block or the `try`'s around it; a value rejecting with neither rejects the render, so nothing goes out with part of it missing.
 - Islands render their server markup, with no script to run them, and a `head` block sets nothing.
 - The props argument is left out for a component taking no required prop.
 - `t()`, `locale()` and the formatters from `kay/i18n` read the request's locale while an action or a page runs, and the site's default locale elsewhere, as in a job or a component test.

@@ -306,6 +306,8 @@ export interface AwaitProps<T> {
   pending?: (() => JSX.Element) | undefined
   ready: (value: Settled<T>) => JSX.Element
   failed?: ((error: unknown) => JSX.Element) | undefined
+  // The `catch` of the enclosing `try`, rendered, and the error reported, when there is no `failed`.
+  fallback?: ((error: unknown) => JSX.Element) | undefined
 }
 
 type PropsOf<Tag> = Tag extends keyof JSX.IntrinsicElements ? JSX.IntrinsicElements[Tag] : Tag extends Component<infer Props> ? Props : Record<string, unknown>

@@ -38,6 +38,8 @@ export class DomTemplate extends TemplateWriter {
   private counter = 0
   // How many blocks of template `const`s the binding being emitted sits in: a node first reached there is declared with `var`, so the bindings after the block reach it too.
   private constBlocks = 0
+  // The `try` whose content is being written, which an `await` without a `catch` inside falls back to.
+  private enclosing: { branch: TryNode['rejected'] } | undefined
 
   // `errors`: what a refused form's fields are described by.
   // `located`, in development: the source position each element carries for `kay dev`'s inspector.
@@ -260,7 +262,12 @@ export class DomTemplate extends TemplateWriter {
     const branch = node.rejected
 
     b.add(`KayAttempt(${at}, () => `)
+
+    const outer = this.enclosing
+
+    this.enclosing = { branch }
     this.block(node.children)
+    this.enclosing = outer
     b.add(', ')
 
     if (branch) {
@@ -312,6 +319,26 @@ export class DomTemplate extends TemplateWriter {
         b.add(') => ')
         this.block(branch.children)
       })
+    }
+
+    // With no `catch` of its own, a rejection renders the enclosing `try`'s, or nothing when that has none.
+    if (!node.rejected && this.enclosing) {
+      const outer = this.enclosing.branch
+
+      b.add(', ')
+
+      if (outer) {
+        b.add('(')
+
+        if (outer.alias)
+          b.addSource(outer.alias)
+
+        b.add(') => ')
+        this.block(outer.children)
+      }
+      else {
+        b.add('() => null')
+      }
     }
 
     b.add(');')

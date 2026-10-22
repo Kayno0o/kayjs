@@ -77,7 +77,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `async-reply` | warn | code | An `async` function returning kayjs-ai's `ask()`, which awaits the reply so nothing streams |
 | `literal-tag` | warn | code | An HTML tag written in template text, shown as written |
 | `over-budget` | warn | code | A page loading more JavaScript, CSS or weight than `budget` allows, or with a worse EcoIndex grade |
-| `uncaught-await` | warn | code | An `await` block with no `catch` |
+| `uncaught-await` | warn | code | An `await` block with no `catch` and no `try` around it |
 | `unkept-page` | warn | code | A page saying `keep: true` that `kay build` does not keep |
 | `unguarded-route` | deny | security | With `requireGuards`, a route no guard covers that does not set `guards: false` |
 | `unguarded-tool` | warn | security | With `mcp`, a tool action with bot protection that no guard covers |

@@ -1,6 +1,6 @@
 import type { JSX } from '../runtime/jsx'
-import { collectDeferred } from '../runtime/await.server'
-import { child, component } from '../runtime/html'
+import { collectDeferred, rejectedAt } from '../runtime/await.server'
+import { child, component, reportRenderFailure } from '../runtime/html'
 import { collectIslands } from '../runtime/island.server'
 import { localeState, runInLocale } from '../runtime/locale-state'
 import { lastSnapshot } from '../runtime/snapshots'
@@ -40,11 +40,14 @@ async function settled(view: () => unknown): Promise<string> {
       value = await lastSnapshot(block.value)
     }
     catch (error) {
-      // With no `catch` block the mail would go out with the content missing, so the render fails instead.
-      if (!block.failed)
-        throw error
+      // With no `catch` block, nor a `try` around the block, the mail would go out with the content missing, so the render fails instead.
+      if (!block.failed && !block.fallback)
+        throw rejectedAt(block, error)
 
-      const failed = block.failed
+      const failed = block.failed ?? block.fallback!
+
+      if (!block.failed)
+        reportRenderFailure(rejectedAt(block, error))
 
       return { id: block.id, html: await settled(() => failed(error)) }
     }

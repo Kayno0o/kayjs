@@ -442,15 +442,20 @@ export function attempt(render: () => string, fallback?: (error: unknown) => str
     // The head tags and islands the block set go with it: its islands are not in the page.
     restoreHead(checkpoint)
     restoreIslands?.()
-    const server = currentServerScope()
-
-    if (server)
-      server.report(error)
-    else
-      kayLog('error', 'a block failed to render', error)
+    reportRenderFailure(error)
 
     return FAILED_MARKER + failedIds(mark, () => fallback?.(error) ?? '')
   }
+}
+
+// The error of a block that fell back to its `catch`, to the request's `onError` and the log, or the log alone outside a request.
+export function reportRenderFailure(error: unknown): void {
+  const server = currentServerScope()
+
+  if (server)
+    server.report(error)
+  else
+    kayLog('error', 'a block failed to render', error)
 }
 
 // An `if` naming its value: the branch reads it through a function, as the island build of the same template does.
