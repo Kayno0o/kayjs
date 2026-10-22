@@ -89,7 +89,7 @@ type Handlers<Target, Events> = { [Name in keyof Events & string as HandlerName<
 // What every element takes, whatever its tag.
 interface CommonAttributes<Target> {
   'children'?: JSX.Element
-  'ref'?: ((element: Target) => void | (() => void)) | undefined
+  'ref'?: ((element: Target) => unknown) | undefined
   'innerHTML'?: string | undefined
   'textContent'?: string | undefined
   'innerText'?: string | undefined

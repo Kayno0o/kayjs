@@ -410,6 +410,20 @@ describe('static server output', () => {
     expect(html).not.toContain('files')
   })
 
+  it('checks a box of a group by its bound, bare or escaped value', async () => {
+    const source = '---\nimport { signal } from \'kay\'\n\nconst tags = signal([\'a&b\', \'\', \'on\'])\nconst mine = \'q\'\n---\ninput(type="checkbox" value="a&amp;b" bind:group={tags})\ninput(type="checkbox" value bind:group={tags})\ninput(type="checkbox" bind:group={tags})\ninput(type="Checkbox" value={mine} bind:group={tags})'
+    const html = await renderKay(source)
+
+    expect(html.match(/checked/g)).toHaveLength(3)
+    expect(html).toMatch(/value="a&amp;b" checked/)
+    expect(html).toMatch(/value="q"[^>]*><\/?/)
+    expect(html).not.toMatch(/value="q" checked/)
+  })
+
+  it('renders bind:open as nothing when the signal is false', async () => {
+    expect(await renderKay('---\nimport { signal } from \'kay\'\nconst open = signal(false)\n---\ndetails(bind:open={open})\n  summary S')).toContain('<details><summary>S</summary></details>')
+  })
+
   it('leaves a transition out of the markup, which only an island plays', async () => {
     expect(await renderKay('p(transition="fade" transition:enter="duration-200" class="note") x')).toBe('<p class="note">x</p>')
   })

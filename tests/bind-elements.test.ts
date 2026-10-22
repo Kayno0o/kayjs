@@ -105,6 +105,10 @@ describe('bind:group, bind:open and bind:files', () => {
       input.dispatchEvent(new Event('change', { bubbles: true }))
       await settle()
       expect(root.querySelector('#out')!.textContent).toContain(' shut 1')
+      root.querySelector<HTMLButtonElement>('#reset')!.click()
+      await settle()
+      expect(root.querySelector('#out')!.textContent).toContain(' none')
+      expect(input.value).toBe('')
     }
     finally {
       await dispose()
@@ -113,6 +117,8 @@ describe('bind:group, bind:open and bind:files', () => {
 })
 
 describe('ref returning a cleanup', () => {
+  const mountSpread = site({ 'main.kay': '---\nimport { signal } from \'kay\'\nconst n = signal(0)\nconst log: string[] = ((globalThis as any).refLog ??= [])\nconst track = (el: HTMLElement) => {\n  log.push(\'attach \' + el.id)\n  return () => log.push(\'detach \' + el.id)\n}\nconst extra = { ref: track }\n---\nbutton#t(onClick={() => n.set(n() + 1)}) go\np#s(title={String(n())} {...extra}) s\n' })
+
   const mountRef = site({ 'main.kay': '---\nimport { signal } from \'kay\'\nconst on = signal(true)\nconst log: string[] = ((globalThis as any).refLog ??= [])\nconst track = (el: HTMLElement) => {\n  log.push(\'attach \' + el.id)\n  return () => log.push(\'detach \' + el.id)\n}\n---\nbutton#t(onClick={() => on.set(!on())}) toggle\nif on()\n  p#a(ref={track}) a\n' })
 
   it('runs the cleanup when the element goes away', async () => {
@@ -131,5 +137,21 @@ describe('ref returning a cleanup', () => {
     finally {
       await dispose()
     }
+  })
+
+  it('keeps a spread element\'s behaviour attached while another prop changes, and lets go when the component goes', async () => {
+    const log: string[] = ((globalThis as unknown as { refLog?: string[] }).refLog ??= [])
+
+    log.length = 0
+
+    const { root, dispose } = await mountSpread()
+
+    expect(log).toEqual(['attach s'])
+    root.querySelector<HTMLButtonElement>('#t')!.click()
+    await settle()
+    expect(root.querySelector('#s')!.getAttribute('title')).toBe('1')
+    expect(log).toEqual(['attach s'])
+    await dispose()
+    expect(log).toEqual(['attach s', 'detach s'])
   })
 })

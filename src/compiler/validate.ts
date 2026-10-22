@@ -87,7 +87,9 @@ export function headTagProblem(node: Node): [at: Span, message: string] | undefi
 }
 
 // Why `bind:` cannot bind this property of this element, or nothing when it can. `type` is the static `type` of an input, if it has one.
-export function bindProblem(element: ElementNode, property: string, type?: string): [message: string, details: Details] | undefined {
+export function bindProblem(element: ElementNode, property: string, inputType?: string): [message: string, details: Details] | undefined {
+  const type = inputType?.toLowerCase()
+
   if (element.component)
     return ['`bind:` works on elements and, with a `Bindable` prop, on components', { help: 'pass a component a value and a setter' }]
 

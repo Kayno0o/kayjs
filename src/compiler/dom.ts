@@ -660,8 +660,8 @@ export class DomTemplate extends TemplateWriter {
       b.add('))); ')
     }
     else if (property === 'files') {
-      // The signal holds what the person picked; emptying it clears the input.
-      b.add(`KayEffect(() => { const kayFiles = (`).addSource(expression).add(`)(); if (!kayFiles || kayFiles.length === 0) ${variable}.value = '' }); `)
+      // The signal holds what the person picked; emptying it clears the input, but not on the first run, when a file picked before hydration must stay.
+      b.add(`{ let kayFresh = true; KayEffect(() => { const kayFiles = (`).addSource(expression).add(`)(); if (!kayFresh && !kayFiles?.length) ${variable}.value = ''; kayFresh = false }) } `)
     }
     else {
       b.add(`KayEffect(() => KayProperty(${variable}, ${JSON.stringify(property)}, (`).addSource(expression).add(')())); ')

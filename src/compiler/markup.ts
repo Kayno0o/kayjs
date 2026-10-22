@@ -57,6 +57,9 @@ export function groupValue(element: ElementNode, text: (span: Span) => string): 
     if (attribute.kind === 'static')
       return { text: decodeEntities(attribute.text) }
 
+    if (attribute.kind === 'boolean')
+      return { text: '' }
+
     if (attribute.kind === 'expression')
       return { expression: attribute.expression }
   }
@@ -72,7 +75,7 @@ export function bindRead(property: string, inputType: string): BindRead {
     return property
 
   if (property === 'group')
-    return inputType === 'radio' ? 'radio' : 'checkbox'
+    return inputType.toLowerCase() === 'radio' ? 'radio' : 'checkbox'
 
   return NUMERIC_INPUTS.has(inputType) ? 'valueAsNumber' : 'value'
 }

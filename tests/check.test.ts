@@ -1134,12 +1134,23 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('takes a ref that returns whatever its expression gives', async () => {
+    const root = await scratchProject({ 'src/routes/index.kay': '---\nlet list: HTMLElement | undefined\nconst all: HTMLElement[] = []\n---\nol(ref={el => list = el}) a\np(ref={el => all.push(el)}) b\ndiv(ref={el => () => el.remove()}) {String(list)}\n' })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.code])).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('types bind:group, bind:open and bind:files against the signals they write', async () => {
     const page = [
       '---',
-      "import { signal } from 'kay'",
+      'import { signal } from \'kay\'',
       '',
-      "const choice = signal('a')",
+      'const choice = signal(\'a\')',
       'const tags = signal<string[]>([])',
       'const open = signal(false)',
       'const files = signal<FileList | null>(null)',
