@@ -1,4 +1,4 @@
-import type { Mail, Mailer } from '../../src/mail'
+import type { AuthMailMessage as Mail, AuthMailer as Mailer } from '../../src/mail'
 
 // A mailer keeping what it is sent, whose `take` awaits a mail leaving off the response's path rather than sleeping for it.
 export function mailbox() {

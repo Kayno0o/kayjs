@@ -1,4 +1,4 @@
-import type { Mail } from '../src/mail'
+import type { AuthMailMessage as Mail } from '../src/mail'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { base32Decode, base32Encode, otpauthUri, totpCode, totpStep, verifyTotp } from '../src/totp'
 import { sealTotpSecret } from '../src/twoFactor'

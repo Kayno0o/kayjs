@@ -3470,14 +3470,20 @@ describe.concurrent('kay check, unused code', () => {
       'src/cms.ts': 'import type { PostgresLoaderOptions } from \'@kaynooo/kayjs-cms/postgres\'\nimport { postgresLoader, SeedEntry } from \'@kaynooo/kayjs-cms/postgres\'\n\nexport const load = (options: PostgresLoaderOptions) => postgresLoader(options)\nexport type Seed = SeedEntry\n',
       'src/auth.ts': 'import type { Mail } from \'@kaynooo/kayjs-auth\'\nimport { createAuth, memoryStore } from \'@kaynooo/kayjs-auth\'\n\nexport const auth = createAuth({ store: memoryStore() })\nexport const mails: Mail[] = []\n',
       'src/mail.ts': 'import type { Field, Settings } from \'@kaynooo/kayjs-mail\'\nimport { defaults } from \'@kaynooo/kayjs-mail\'\n\nexport const settings: Settings = { ...defaults }\nexport const fields: Field[] = []\n',
+      'src/same.ts': 'import { postgresLoader, type PostgresLoaderOptions, SeedEntry } from \'@kaynooo/kayjs-cms/postgres\'\n\nexport const load = (options: PostgresLoaderOptions) => postgresLoader(options)\nexport type Seed = SeedEntry\n',
+      'src/aliased.ts': 'import { postgresLoader as open } from \'@kaynooo/kayjs-cms/postgres\'\n\nexport const load = open\n',
+      'src/shorthand.ts': 'import { defaults } from \'@kaynooo/kayjs-ui\'\n\nexport const settings = { defaults }\n',
       'src/ui.ts': 'import type { Settings } from \'@kaynooo/kayjs-ui\'\nimport { defaults } from \'@kaynooo/kayjs-ui\'\n\nexport const settings: Settings = { ...defaults }\n',
     })
 
     try {
       const { output } = await runCheck(root)
 
-      expect(output.match(/deprecated-renamed-export/g)).toHaveLength(9)
+      expect(output.match(/deprecated-renamed-export/g)).toHaveLength(13)
       await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/same.ts')).text()).toBe('import { pgLoader, type PgLoaderOptions, SeedEntry } from \'@kaynooo/kayjs-cms/pg\'\n\nexport const load = (options: PgLoaderOptions) => pgLoader(options)\nexport type Seed = SeedEntry\n')
+      expect(await Bun.file(join(root, 'src/aliased.ts')).text()).toBe('import { pgLoader as open } from \'@kaynooo/kayjs-cms/pg\'\n\nexport const load = open\n')
+      expect(await Bun.file(join(root, 'src/shorthand.ts')).text()).toBe('import { uiDefaults as defaults } from \'@kaynooo/kayjs-ui\'\n\nexport const settings = { defaults }\n')
       expect(await Bun.file(join(root, 'src/cms.ts')).text()).toBe('import type { PgLoaderOptions } from \'@kaynooo/kayjs-cms/pg\'\nimport { pgLoader, SeedEntry } from \'@kaynooo/kayjs-cms/pg\'\n\nexport const load = (options: PgLoaderOptions) => pgLoader(options)\nexport type Seed = SeedEntry\n')
       expect(await Bun.file(join(root, 'src/auth.ts')).text()).toBe('import type { AuthMailMessage } from \'@kaynooo/kayjs-auth\'\nimport { createAuth, memoryAuthStore } from \'@kaynooo/kayjs-auth\'\n\nexport const auth = createAuth({ store: memoryAuthStore() })\nexport const mails: AuthMailMessage[] = []\n')
       expect(await Bun.file(join(root, 'src/mail.ts')).text()).toBe('import type { MailField, MailSettings } from \'@kaynooo/kayjs-mail\'\nimport { mailDefaults } from \'@kaynooo/kayjs-mail\'\n\nexport const settings: MailSettings = { ...mailDefaults }\nexport const fields: MailField[] = []\n')

@@ -1,4 +1,4 @@
-import type { Mail } from '../src/mail'
+import type { AuthMailMessage as Mail } from '../src/mail'
 import { describe, expect, setSystemTime, test } from 'bun:test'
 import { Elysia } from 'elysia'
 import { session } from 'kay/server'

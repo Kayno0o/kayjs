@@ -1,6 +1,6 @@
 import type { BareUser, User } from '../src/auth'
 import type { AuthEvent, AuthEventInfo } from '../src/events'
-import type { Mail } from '../src/mail'
+import type { AuthMailMessage as Mail } from '../src/mail'
 import type { AuthStore } from '../src/store'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { memoryAuthStore } from '../src/memoryStore'

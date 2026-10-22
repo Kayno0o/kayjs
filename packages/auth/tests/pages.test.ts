@@ -1,5 +1,5 @@
 import type { AnyElysia } from 'elysia'
-import type { Mail } from '../src/mail'
+import type { AuthMailMessage as Mail } from '../src/mail'
 import { afterEach, describe, expect, setSystemTime, spyOn, test } from 'bun:test'
 import { Elysia } from 'elysia'
 import { session } from 'kay/server'

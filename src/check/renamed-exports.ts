@@ -125,7 +125,7 @@ export async function renamedExports(root: string, options: CheckOptions): Promi
           const start = listStart + specifier.index + specifier[0].indexOf(from)
           const edits = editsOf(file, source, listStart, specifier, from, to)
 
-          // An entry that moved takes every name the statement imports from it along, as the old entry no longer has the new names.
+          // An entry that moved takes every name the statement imports from it along, so the whole statement leaves the deprecated entry.
           if (toModule !== undefined) {
             const at = statement.index + statement[0].lastIndexOf(module)
 

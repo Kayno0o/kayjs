@@ -1,5 +1,5 @@
 import type { CodeMode } from '../src/email'
-import type { Mail } from '../src/mail'
+import type { AuthMailMessage as Mail } from '../src/mail'
 import { describe, expect, test } from 'bun:test'
 import { testApp, userRecord } from './helpers/app'
 import { authenticator } from './helpers/authenticator'

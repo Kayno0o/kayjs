@@ -1,5 +1,5 @@
 import type { CaptchaOptions } from '../src/captcha'
-import type { Mail } from '../src/mail'
+import type { AuthMailMessage as Mail } from '../src/mail'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { testApp, userRecord } from './helpers/app'
 import { authenticator } from './helpers/authenticator'

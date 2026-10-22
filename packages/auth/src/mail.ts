@@ -216,7 +216,7 @@ let aside = 0
 let dropping = false
 
 // Sends the mail `build` makes without making the request wait on the mailer: a slow or down relay costs the response nothing, and a failure, a sync throw included, is logged. The mail is handed to the mailer before the first await, so a mailer that answers at once has it by the time this returns. A mailer silent for 30 seconds is given up on, and with 200 mails waiting on it a new one is dropped.
-export function sendAside(email: EmailCore, build: () => Mail, what: string): void {
+export function sendAside(email: EmailCore, build: () => AuthMailMessage, what: string): void {
   if (aside >= ASIDE_MAX) {
     if (!dropping)
       log.error(`mailing ${what} dropped, and the mails sent aside after it while ${ASIDE_MAX} are waiting on the mailer`)

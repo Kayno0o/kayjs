@@ -1,5 +1,5 @@
 import type { AuthSessionData } from '../../../src/auth'
-import type { Mail } from '../../../src/mail'
+import type { AuthMailMessage as Mail } from '../../../src/mail'
 import { session } from 'kay/server'
 import { createAuth } from '../../../src/auth'
 import { memoryAuthStore } from '../../../src/memoryStore'

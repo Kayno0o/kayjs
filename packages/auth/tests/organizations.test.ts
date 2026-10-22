@@ -1,6 +1,6 @@
 import type { Duration, GuardContext } from 'kay'
 import type { AuthEvent, AuthEventInfo } from '../src/events'
-import type { Mail } from '../src/mail'
+import type { AuthMailMessage as Mail } from '../src/mail'
 import type { TestBrowser } from './helpers/app'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { Elysia } from 'elysia'

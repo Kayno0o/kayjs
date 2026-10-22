@@ -1,4 +1,4 @@
-import type { Mail } from '../src/mail'
+import type { AuthMailMessage as Mail } from '../src/mail'
 import * as utils from '@kaynooo/utils'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { SECRET, testApp } from './helpers/app'

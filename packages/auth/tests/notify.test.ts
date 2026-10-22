@@ -1,6 +1,6 @@
 import type { EmailCore } from '../src/email'
 import type { AuthEvent, AuthEventInfo } from '../src/events'
-import type { Mail } from '../src/mail'
+import type { AuthMailMessage as Mail } from '../src/mail'
 import { describe, expect, jest, spyOn, test } from 'bun:test'
 import { log } from '../src/log'
 import { sendAside } from '../src/mail'
