@@ -198,6 +198,13 @@ describe('attempt', () => {
       return shown().map(({ message }) => message)
     }
 
+    test('reads an ActionError as one, not as the ApiError it extends', async () => {
+      // Read as an ApiError, its text body would be toasted in place of the words the handler and the schema gave.
+      expect(await said(new ActionError(409, 'Taken', { '': 'Schema words' }, { reason: 'Handler words' }), data => data.reason)).toEqual(['Handler words'])
+      expect(await said(new ActionError(409, 'Taken', { '': 'Schema words' }))).toEqual(['Schema words'])
+      expect(await said(new ActionError(500, 'Boom', { '': 'Schema words' }))).toEqual(['Schema words'])
+    })
+
     test('toasts the route\'s own words for a refusal, as for an action\'s', async () => {
       expect(await said(new ApiError(409, 'Still referenced', 'Still referenced'))).toEqual(['Still referenced'])
       expect(await said(new ApiError(422, 'Name is required', { message: 'Name is required' }))).toEqual(['Name is required'])
