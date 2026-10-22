@@ -95,6 +95,12 @@ export interface AsyncRooms<Message, Member = undefined, State = undefined> exte
   update: (room: string, change: (state: State) => State) => Promise<State>
 }
 
+// The rooms over a store of either kind, such as the app store's: `state` and `update` give the state or a promise of it, so `await` them, no narrowing needed.
+export interface StoreRooms<Message, Member = undefined, State = undefined> extends RoomsBase<Message, Member> {
+  state: (room: string) => State | Promise<State>
+  update: (room: string, change: (state: State) => State) => State | Promise<State>
+}
+
 const DEFAULT_WAIT = '50ms'
 // How a connection joined without a member is written, apart from one joined as `null`, which is JSON.
 const NO_MEMBER = ''
@@ -109,8 +115,8 @@ const KEPT = 30_000
 // Rooms of websocket connections, typed by what they send: join one in `open`, leave in `close`, and publish to it from anywhere.
 export function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options?: RoomsOptions<Message, State>] : [options: RoomsOptions<Message, State> & { state: () => State }]): Rooms<Message, Member, State>
 export function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options: RoomsOptions<Message, State, AsyncRoomStore> & { store: AsyncRoomStore }] : [options: RoomsOptions<Message, State, AsyncRoomStore> & { store: AsyncRoomStore, state: () => State }]): AsyncRooms<Message, Member, State>
-export function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options?: RoomsOptions<Message, State, RoomStore | AsyncRoomStore>] : [options: RoomsOptions<Message, State, RoomStore | AsyncRoomStore> & { state: () => State }]): Rooms<Message, Member, State> | AsyncRooms<Message, Member, State>
-export function rooms<Message, Member, State>(...[options = {}]: [options?: RoomsOptions<Message, State, RoomStore | AsyncRoomStore>]): RoomsBase<Message, Member> & { state: (room: string) => State | Promise<State>, update: (room: string, change: (state: State) => State) => State | Promise<State> } {
+export function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options?: RoomsOptions<Message, State, RoomStore | AsyncRoomStore>] : [options: RoomsOptions<Message, State, RoomStore | AsyncRoomStore> & { state: () => State }]): StoreRooms<Message, Member, State>
+export function rooms<Message, Member, State>(...[options = {}]: [options?: RoomsOptions<Message, State, RoomStore | AsyncRoomStore>]): StoreRooms<Message, Member, State> {
   const store: RoomStore | AsyncRoomStore = options.store ?? memoryRooms()
 
   if ((options.state !== undefined || options.snapshot !== undefined) && (store.state === undefined || store.update === undefined))

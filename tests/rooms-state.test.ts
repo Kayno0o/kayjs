@@ -192,7 +192,11 @@ describe('a room\'s state over a store of either kind', () => {
     const live = rooms<Message, string, State>({ ...options, store })
 
     live.join(connection(), 'hall', 'ada')
-    expect(await live.update('hall', state => ({ ...state, round: 1 }))).toEqual({ round: 1, scores: {} })
+    const updated: State | Promise<State> = live.update('hall', state => ({ ...state, round: 1 }))
+    const read: State | Promise<State> = live.state('hall')
+
+    expect(await updated).toEqual({ round: 1, scores: {} })
+    expect(await read).toEqual({ round: 1, scores: {} })
   })
 
   it('treats any thenable a store answers as async, not only a native Promise', async () => {
