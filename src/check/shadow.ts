@@ -145,7 +145,8 @@ export function outerQueries(file: string, source: string, trees: RouteMount[], 
 
   const above: { layout: string, facts: ServerFacts }[] = []
 
-  for (const dir of directoriesUp(virtualDir(trees, dirname(file)))) {
+  // An outer layout has no place in the URL tree, the layouts above it are the root's.
+  for (const dir of directoriesUp(trees.some(tree => tree.outer === file) ? '' : virtualDir(trees, dirname(file)))) {
     const layout = fileAt(trees, dir, LAYOUT)
 
     if (layout !== undefined && layout !== file)
