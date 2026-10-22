@@ -4339,6 +4339,26 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports each renamed option of the table, and a server file without an old name has nothing to report', async () => {
+    const root = await scratchProject({
+      'kay.config.ts': 'export default {}\n',
+      'src/mail.ts': 'import { mailer } from \'@kaynooo/kayjs-mail\'\nexport const a = mailer({ lang: \'fr\' })\n',
+      'src/cms.ts': 'import { forgejo } from \'@kaynooo/kayjs-cms\'\nexport const a = forgejo({ url: \'https://x.test\' })\n',
+      'src/files.ts': 'import { files } from \'kay/server\'\nexport const a = files.url(\'a.png\', { expires: \'1d\' })\n',
+      'src/clean.ts': 'import { files } from \'kay/server\'\nexport const a = files.url(\'a.png\', { maxAge: \'1d\' })\n',
+    })
+
+    try {
+      const { output } = await runCheck(root)
+
+      expect(output.match(/deprecated-option-name/g)).toHaveLength(3)
+      expect(output).not.toContain('clean.ts')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('--fix removes the reason of a sole identity-key kay-allow comment with it, and keeps the reason of one naming other lints', async () => {
     const root = await scratchProject({
       'src/components/list.kay': '---\nconst posts = signal([{ slug: \'a\' }])\n---\n// kay-allow-file identity-key - the whole file\nul\n  // kay-allow identity-key - rows are static\n  for post of posts()\n    li {post.slug}\n  // kay-allow missing-alt, identity-key - rows are static\n  for row of posts()\n    li {row.slug}\nbutton(onClick={() => posts.set([])}) Clear\n',

@@ -11,7 +11,7 @@ afterEach(() => {
   setSystemTime()
 })
 
-function setup(email: { maxAge?: Partial<Record<'verify-email' | 'reset-password' | 'magic-link' | 'change-email' | 'sign-in-code' | 'verify-code', Duration>>, codes?: 'both' | 'code' } = {}, locales?: string[]) {
+function setup(email: { expires?: Partial<Record<'verify-email' | 'magic-link', Duration>>, maxAge?: Partial<Record<'verify-email' | 'reset-password' | 'magic-link' | 'change-email' | 'sign-in-code' | 'verify-code', Duration>>, codes?: 'both' | 'code' } = {}, locales?: string[]) {
   const { mails, mailer } = mailbox()
   const app = testApp({ url: 'https://site.test', site: 'Site', email: { mailer, links: LINKS, requireVerified: false, ...email, ...locales && { locales } } })
 

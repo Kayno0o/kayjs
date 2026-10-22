@@ -35,18 +35,21 @@ const TOKEN_LIFETIMES: Record<TokenType, number> = {
 }
 
 // The lifetimes the `maxAge` option sets over the defaults, in seconds, a bad one failing at boot naming it.
-export function tokenLifetimes(maxAge: EmailOptions['maxAge']): Record<TokenType, number> {
+// `legacy` holds the lifetimes given under the old `expires` name, which an error names as the app wrote them.
+export function tokenLifetimes(maxAge: EmailOptions['maxAge'], legacy: EmailOptions['expires'] = {}): Record<TokenType, number> {
   const lifetimes = { ...TOKEN_LIFETIMES }
-  const unknown = Object.keys(maxAge ?? {}).find(key => !Object.hasOwn(TOKEN_LIFETIMES, key))
+  const merged = { ...legacy, ...maxAge }
+  const named = (key: string): string => `email.${Object.hasOwn(maxAge ?? {}, key) ? 'maxAge' : 'expires'}.${key}`
+  const unknown = Object.keys(merged).find(key => !Object.hasOwn(TOKEN_LIFETIMES, key))
 
   if (unknown !== undefined)
-    throw configError(`email.maxAge.${unknown} is no link or code of kayjs-auth`)
+    throw configError(`${named(unknown)} is no link or code of kayjs-auth`)
 
   for (const type of Object.keys(lifetimes) as TokenType[]) {
-    const wanted = maxAge?.[type]
+    const wanted = merged[type]
 
     if (wanted !== undefined)
-      lifetimes[type] = durationSeconds(wanted, `email.maxAge.${type}`)
+      lifetimes[type] = durationSeconds(wanted, named(type))
   }
 
   return lifetimes
