@@ -1,12 +1,11 @@
 --- server
 import { localize } from 'kay/i18n'
 import { wording } from 'kay/words'
-import Button from '@kaynooo/kayjs-ui/button.kay'
 import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
+import UserMenu from '../../../components/user-menu.kay'
 
 const features = ctx.locals.auth.features()
 const current = ctx.url.pathname
-const home = localize(features.pages?.home ?? '/')
 const base = localize(`${features.pages?.prefix ?? features.prefix}/account`)
 const links = [
   { href: base, label: wording('auth.account.nav.profile', 'Profile') },
@@ -26,8 +25,6 @@ head
 .kayjs-auth.mx-auto.flex.w-full.max-w-3xl.flex-col.gap-6.px-4.py-8
   .flex.flex-wrap.items-center.justify-between.gap-4
     h1.kui-heading-section {wording('auth.account.title', 'Your account')}
-    form(method="post" action={`${features.prefix}/sign-out`})
-      input(type="hidden" name="redirect" value={home})
-      Button(type="submit" label={wording('auth.account.signOut', 'Sign out')})
+    UserMenu(account={false})
   TabNav(links={links} current={current} label={wording('auth.account.nav.label', 'Account')})
   slot

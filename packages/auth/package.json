@@ -30,6 +30,7 @@
       "types": "./types/rules.d.ts",
       "default": "./src/rules.ts"
     },
+    "./components/*.kay": "./src/components/*.kay",
     "./pages/*.kay": "./src/pages/routes/*.kay",
     "./pg": {
       "types": "./types/pg.d.ts",

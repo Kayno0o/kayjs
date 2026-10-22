@@ -1,0 +1,11 @@
+---
+import { currentUser } from '../viewer'
+
+const { role } = props<{ role?: string | undefined }>()
+const user = currentUser(role)
+---
+// Streamed in as the user settles, so no server fence is needed to read them; a guest is no signed-in user.
+try
+  await user then found
+    if found
+      slot

@@ -1,0 +1,16 @@
+--- server
+export const page = { guards: false }
+---
+---
+import SignedIn from '@kaynooo/kayjs-auth/components/signed-in.kay'
+import SignedOut from '@kaynooo/kayjs-auth/components/signed-out.kay'
+import UserMenu from '@kaynooo/kayjs-auth/components/user-menu.kay'
+---
+nav
+  SignedOut
+    a#sign-in(href="/auth/sign-in") Sign in
+  SignedIn
+    p#member Member
+  SignedIn(role="admin")
+    p#admin Admin
+  UserMenu

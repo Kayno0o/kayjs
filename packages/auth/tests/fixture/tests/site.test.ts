@@ -114,6 +114,27 @@ describe('the prebuilt pages', () => {
     expect(text(await ada.visit('/'), '#who')).toBe('Anonymous')
   })
 
+  test('SignedIn, SignedOut and UserMenu show the signed-in user and their roles from a template with no server fence', async () => {
+    const visitor = await browser()
+    const anonymous = await visitor.visit('/nav')
+
+    expect(text(anonymous, '#sign-in')).toBe('Sign in')
+    expect(anonymous.find('#member, #admin, form')).toHaveLength(0)
+
+    const ada = await signedUp('nav@example.com')
+    const member = await ada.visit('/nav')
+
+    expect(member.find('#sign-in')).toHaveLength(0)
+    expect(text(member, '#member')).toBe('Member')
+    expect(member.find('#admin')).toHaveLength(0)
+    expect(text(member, '.kayjs-auth span')).toBe('nav@example.com')
+    expect(member.find('.kayjs-auth form button').map(button => button.text)).toEqual(['Sign out'])
+    expect(member.find('.kayjs-auth a').map(link => link.attributes.href)).toEqual(['/auth/account'])
+
+    await store.users.update((await store.users.findByEmail('nav@example.com'))!.id, { roles: ['admin'] })
+    expect(text(await ada.visit('/nav'), '#admin')).toBe('Admin')
+  })
+
   test('the pages reached before signing in open under the app\'s guard asking for a session, which keeps its own pages', async () => {
     const visitor = await browser()
 

@@ -32,6 +32,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - The language server checks the edited component first as you type, then the open components importing it after a quiet spell, so many open files no longer slow each edit.
 - `kay generate page|component|island|action|api|guard <name>` writes a starter file, with a test when the project has tests ([kay generate](project-new-and-add.md)).
 - `store: sqliteData(path)` in kay.config.ts also keeps the data of every `session()` and `cached` naming no store of their own ([Keep a session](server.md#keep-a-session), [Stores](rendering.md#stores)).
+- kayjs-auth has `SignedIn`, `SignedOut` and `UserMenu` components that show the signed-in user and their roles from any template with no server fence, and `auth({ viewer: true })` loads the user before the page renders ([Templates](../packages/auth/llms/signed-in-components.md)).
 
 ## 1.70.0
 

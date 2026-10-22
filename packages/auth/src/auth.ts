@@ -29,7 +29,7 @@ import type { AuthStore, LinkType, SessionRecord, UserRecord } from './store'
 import type { Proof, ProofFailure, TwoFactorResult, TwoFactorSetup } from './twoFactor'
 import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
-import { asConfigError, callHook, configError, configuredSite, durationSeconds, nameUser, overHttps, READ_METHODS, stoppers, underKayDev } from 'kay/library'
+import { asConfigError, callHook, configError, configuredSite, currentRequest, durationSeconds, nameUser, overHttps, READ_METHODS, stoppers, underKayDev } from 'kay/library'
 import { clientAddress, crossSiteRefused, crossSiteResponse, rateKey } from 'kay/server'
 import { changePassword, changeUsername, deleteAccount, unlink } from './account'
 import { adminAuditLog, banUser, changeRole, changingAdmin, deleteUser, getUser, isAdmin, listUsers, unbanUser } from './admin'
@@ -69,6 +69,7 @@ import { normalizeEmail, normalizeUsername, PROFILE_MAX_LENGTH, resolveRules } f
 import { applyLifetime, chooseRemember, listSessions, liveSession, openSession, revokeBearerTokens } from './sessions'
 import { challenged, completeSignIn, disableTwoFactor, enableTwoFactor, provedLately, regenerateRecoveryCodes, reprove, setUpTwoFactor, verifyTwoFactor } from './twoFactor'
 import { mergedData, userDataRules } from './userData'
+import { readRequestWith, registerViewer } from './viewer'
 
 export type { AuthSessionData, BareUser, OAuthApp, Profile, User } from './core'
 
@@ -1274,6 +1275,8 @@ function signInAsMismatch(core: Core, user: BareUser, given: { email: string | u
     throw new Error(`kayjs-auth: signInAs found a member whose ${differs.join(', ')} differ from the fields given`)
 }
 
+readRequestWith(currentRequest)
+
 // Auth for a kay app or a plain Elysia one, on the app's kay session.
 export function createAuth<Data extends AuthSessionData, Role extends string = string, Prefix extends string = '/auth', const Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>>(options: AuthOptions<Data, Role, Prefix, Scope, OrgRole, UserData>) {
   const core = createCore(options)
@@ -1312,6 +1315,8 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
         return user && !user.guest ? user.id : undefined
       })
+
+      registerViewer(ctx.request, { auth: auth as unknown as Auth, isGranted: (role, user) => isGranted(role, user.roles) })
 
       return { auth }
     })

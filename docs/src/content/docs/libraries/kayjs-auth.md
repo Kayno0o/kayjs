@@ -156,6 +156,31 @@ The request's `Origin` must name its host or the host of `site`. An app behind a
 
 Requests with no `Origin` (scripts, webhooks), safe methods and `Authorization: Bearer` tokens are left alone.
 
+## The signed-in user in templates
+
+`SignedIn`, `SignedOut` and `UserMenu` read the request's user themselves, so a layout or a component shows the user with no `--- server` fence, and can hand an island its slots:
+
+```kay
+---
+import SignedIn from '@kaynooo/kayjs-auth/components/signed-in.kay'
+import SignedOut from '@kaynooo/kayjs-auth/components/signed-out.kay'
+import UserMenu from '@kaynooo/kayjs-auth/components/user-menu.kay'
+---
+nav
+  SignedOut
+    a(href="/auth/sign-in") Sign in
+  SignedIn(role="admin")
+    a(href="/admin") Admin
+  UserMenu
+```
+
+- `SignedIn` renders its children for a signed-in user, and with `role="admin"` for one holding that role, the app's `roles` hierarchy applied. `SignedOut` renders them for a visitor.
+- `UserMenu` shows the username or email, a link to the account when the prebuilt pages are on (`account={false}` leaves it out) and a sign-out button. The account pages' own header is one.
+- A guest is signed out for all three.
+- They read the request being answered, so a prerendered page throws naming them: render the page per request.
+
+`auth({ module: './src/auth', viewer: true })` reads the user before every page renders, so the three show in the first bytes, with JavaScript off too. Without it they stream in after the page, which needs JavaScript, and a page not showing the user costs no read. `viewer: true` reads the session on every page, so no cache shares one between visitors.
+
 ## Signing in with a password
 
 Passwords are 10 to 128 characters and usernames 2 to 32. The `rules` option changes them, and adds a check of your own for the password:
@@ -720,6 +745,7 @@ Topics of the kayjs-auth reference the sections above do not link:
 - [Setup, pages, the signed-in user, sessions and guards](/llms/kayjs-auth-setup)
 - [OAuth sign-in, two-factor, passkeys, re-proof and the account](/llms/kayjs-auth-oauth-passkeys-two-factor)
 - [Passwords, guests, mailed links and security mails](/llms/kayjs-auth-passwords-and-mails)
+- [The signed-in user in templates](/llms/kayjs-auth-signed-in-components)
 - [The OAuth server for MCP clients, bearer tokens and forward auth](/llms/kayjs-auth-oauth-server-and-tokens)
 - [Events, the audit log, admin and organizations](/llms/kayjs-auth-admin-and-organizations)
 - [Bots, breached passwords, limits, stores, testing and the dev tool](/llms/kayjs-auth-hardening-and-testing)

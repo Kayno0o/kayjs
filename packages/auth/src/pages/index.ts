@@ -237,6 +237,8 @@ export interface AuthExtensionOptions extends AuthPagesOptions {
   server?: (() => AnyElysia | Promise<AnyElysia>) | undefined
   // `false` leaves out the prebuilt pages and serves the plugin alone, for an app writing every page itself. `true` by default.
   pages?: boolean | undefined
+  // Reads the signed-in user before every page renders, so `SignedIn`, `SignedOut` and `UserMenu` show on the first bytes, even with JavaScript off. Left out, they stream in after the page, which needs JavaScript, and a page not showing the user costs no read. `false` by default: it reads the session on every page, making each one the visitor's own.
+  viewer?: boolean | undefined
 }
 
 // The `auth` an app's module exports, for `prepare` to hand it the prefix and home `auth()` was given.
@@ -249,7 +251,7 @@ function authOfExport(exported: unknown, module: string): { [PAGES_OF]?: PagesHa
 
 // kayjs-auth for `extensions` in kay.config.ts, as the whole declaration: `auth({ module: './src/auth' })`, the module exporting the `auth` made with `createAuth`. Its plugin is used before the pages, so the app mounts nothing else and declares no `Register`, and `prefix` and `home` reach `createAuth({ pages: true })`; the prebuilt pages come with it unless `pages: false`.
 export function auth(options: AuthExtensionOptions = {}): AuthPages {
-  const { module, server, pages = true, prefix = DEFAULT_PREFIX, home } = options
+  const { module, server, pages = true, viewer = false, prefix = DEFAULT_PREFIX, home } = options
 
   if (module !== undefined && server !== undefined)
     throw new Error('kayjs-auth: auth() takes `module` or `server`, not both')
@@ -260,6 +262,7 @@ export function auth(options: AuthExtensionOptions = {}): AuthPages {
     ...module !== undefined && { serverModule: { path: module, export: 'auth', prepare: (exported: unknown) => pages ? authOfExport(exported, module)[PAGES_OF]?.adopt(given) : undefined } },
     ...module === undefined && server !== undefined && { server },
     ...pages && { routes: { dir: `${import.meta.dir}/routes`, prefix } },
+    ...viewer && { layout: `${import.meta.dir}/../viewer-layout/_layout.kay` },
     devTool: DEV_TOOL,
     commands: COMMANDS,
     prefix,

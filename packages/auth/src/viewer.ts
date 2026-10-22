@@ -1,0 +1,73 @@
+import type { Auth } from './auth'
+import type { User } from './core'
+
+export interface Viewer {
+  auth: Auth
+  isGranted: (role: string, user: User) => boolean
+}
+
+const viewers = new WeakMap<Request, Viewer>()
+// The user a layout read ahead of the render, `null` for none: what lets a template show them with no streamed block.
+const loaded = new WeakMap<Request, User | null>()
+let requestReader: (() => Request | undefined) | undefined
+
+// Given by the server code of `createAuth`, so this module imports nothing server-only and a component using it never drags kay's server into a browser build.
+export function readRequestWith(read: () => Request | undefined): void {
+  requestReader = read
+}
+
+// Called where `createAuth` first sees the request, so a component can read the signed-in user without a server fence.
+export function registerViewer(request: Request, viewer: Viewer): void {
+  viewers.set(request, viewer)
+}
+
+// Reads the request's user ahead of the render, for the layout `auth({ viewer: true })` adds: a failed read is left to the component, which reads it again and reports it.
+export async function loadViewer(request: Request): Promise<void> {
+  try {
+    const user = await viewers.get(request)?.auth.user()
+
+    if (user !== undefined)
+      loaded.set(request, user)
+  }
+  catch {}
+}
+
+// The auth and role check of the page being rendered, for `SignedIn`, `SignedOut` and `UserMenu`.
+export function currentViewer(): Viewer & { request: Request } {
+  const request = requestReader?.()
+  const viewer = request && viewers.get(request)
+
+  if (!viewer)
+    throw new Error('kayjs-auth: SignedIn, SignedOut and UserMenu read the signed-in user of the request being answered, so they cannot render in a prerendered page or outside a request; render the page per request (`prerender: false`)')
+
+  return { ...viewer, request }
+}
+
+const asViewer = (user: User | null) => user && !user.guest ? user : null
+
+// The signed-in user of the page being rendered, none for a visitor or a guest, or one lacking `role` (the app's role hierarchy applies). The user itself once `auth({ viewer: true })` loaded it, else a promise a block waits for.
+export function currentUser(role?: string): User | null | Promise<User | null> {
+  const { auth, isGranted, request } = currentViewer()
+  const within = (user: User | null) => {
+    const signedIn = asViewer(user)
+
+    return signedIn && (role === undefined || isGranted(role, signedIn)) ? signedIn : null
+  }
+
+  return loaded.has(request) ? within(loaded.get(request)!) : read(auth, within)
+}
+
+async function read(auth: Auth, within: (user: User | null) => User | null): Promise<User | null> {
+  return within(await auth.user())
+}
+
+// Whether the page being rendered is for a visitor with no account or a guest, `SignedOut` showing its children.
+export function isSignedOut(): boolean | Promise<boolean> {
+  const user = currentUser()
+
+  return user instanceof Promise ? settled(user) : user === null
+}
+
+async function settled(user: Promise<User | null>): Promise<boolean> {
+  return await user === null
+}
