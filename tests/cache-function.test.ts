@@ -193,10 +193,10 @@ describe('cache', () => {
     expect(rows.has('cache:rewrite')).toBe(false)
   })
 
-  it('says an argument devalue cannot write is the cause', () => {
+  it('says an argument devalue cannot write is the cause', async () => {
     const post = cache((_value: unknown) => 1, { ttl: 60 })
 
-    expect(post(() => 1)).rejects.toThrow('arguments devalue can write')
+    await expect(post(() => 1)).rejects.toThrow('arguments devalue can write')
   })
 
   it('finds the calling module when its path holds a space and a parenthesis', async () => {

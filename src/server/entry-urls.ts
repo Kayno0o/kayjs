@@ -3,6 +3,7 @@ import type { EditSite } from '../content/edit'
 import type { LocaleSettings } from '../runtime/i18n'
 import type { ServedRoute } from './guards'
 import { isCollection } from '../content'
+import { servesRoute } from '../content/claims'
 import { exportNameOf } from '../runtime/fields'
 import { importModule } from './bundle'
 import { localeCopies } from './i18n'
@@ -32,6 +33,15 @@ export function entryUrls(routes: ServedRoute[], base: string, trailingSlash?: T
   }
 
   return async (collection, entry) => {
+    // A collection with a route has its entries at the page serving it, whatever the pages list.
+    const routed = collection.options.route
+
+    if (routed !== undefined) {
+      const page = routes.find(candidate => candidate.params.length === 1 && servesRoute(routed, candidate.pattern))
+
+      return page && urlOf(page, { [page.params[0]!]: entry.slug }, entry.locale)
+    }
+
     listing ??= listingRoutes(routes)
 
     const route = (await listing).get(collection.name)

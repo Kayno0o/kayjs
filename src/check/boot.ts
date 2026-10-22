@@ -138,9 +138,14 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
     diagnostics.push({ file: projectPaths(root, options).content, line: 1, column: 1, message: `kay: the route ${route} of the collection ${collection} is served by no page; add the page that shows its entries, such as src/routes${route.replace('*slug', '[...slug]').replace(':slug', '[slug]')}.kay`, help: 'make the route the pattern of a page' })
 
   // A page listing the entries of a routed collection in `prerender` while another page is the route's: the urls its entries give lead somewhere else.
+  const prerenders = new Map<string, Promise<string | undefined>>()
+
   for (const { collection, route } of collectionRoutes) {
     for (const page of routes.filter(candidate => candidate.params.length > 0 && !servesRoute(route, candidate.pattern))) {
-      if ((await pageFlags(page.file)).prerender?.trim() === collection)
+      if (!prerenders.has(page.file))
+        prerenders.set(page.file, prerenderOf(page.file))
+
+      if (await prerenders.get(page.file) === collection)
         diagnostics.push({ file: page.file, line: 1, column: 1, message: `kay: this page prerenders the collection ${collection}, whose entries have the route ${route} and so link to another page`, help: `prerender the collection from the page serving ${route}, or change the route to ${page.pattern}` })
     }
   }
@@ -175,4 +180,9 @@ export async function actionClashes(root: string, files: string[]): Promise<Chec
   }
 
   return diagnostics
+}
+
+// What a page lists in `prerender`, as its source writes it.
+async function prerenderOf(file: string): Promise<string | undefined> {
+  return (await pageFlags(file)).prerender?.trim()
 }

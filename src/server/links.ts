@@ -1,5 +1,5 @@
 import type { LinkMatcher, LocaleSettings } from '../runtime/i18n'
-import { localePath, pathSegment, prefixed, segmentsOf } from '../runtime/i18n'
+import { localePath, namesFile, pathSegment, prefixed, segmentsOf } from '../runtime/i18n'
 
 const PATH_END = /[?#]/
 const OPTIONAL_MARK = /\?$/
@@ -176,8 +176,7 @@ function resolvedLink(settings: LocaleSettings, href: string, locale: string, cu
 
   const spelled = normalized(segments)
   const { pages, entries } = compiled(settings)
-  // A collection's route takes a dotted slug for an entry's page, not a file.
-  const file = segments.at(-1)?.includes('.') === true && bestMatch(entries, segments, spelled) === undefined
+  const file = namesFile(segments.at(-1), () => bestMatch(entries, segments, spelled) !== undefined)
   const named = bestMatch(pages, segments, spelled)?.named
 
   return named !== undefined && (!file || named === segments.length) ? localePath(settings, href, locale, currentHost) : href

@@ -1,3 +1,4 @@
+import type { ServedRoute } from '../src/server/guards'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -9,10 +10,12 @@ import { collection, entries, entryPage, paginate } from '../src/content'
 import { unservedRoutes } from '../src/content/claims'
 import { registerCollections, registerEditSite } from '../src/content/edit'
 import { feedXml } from '../src/content/feed'
-import { localizedLink } from '../src/runtime/i18n'
+import { localizedLink, matchLinksWith } from '../src/runtime/i18n'
 import { alternate } from '../src/runtime/i18n.server'
 import { runInLocale } from '../src/runtime/locale-state'
+import { entryUrls } from '../src/server/entry-urls'
 import { linkedSettings } from '../src/server/i18n'
+import { compiledLinks } from '../src/server/links'
 import { scratchDir } from './scratch'
 
 const CLI = join(import.meta.dir, '../src/cli.ts')
@@ -181,10 +184,10 @@ describe('a collection route read beyond the entries', () => {
     { slug: 'en/only-en', data: { title: 'Only' } },
   ] }, { schema: t.Object({ title: t.String(), translationKey: t.Optional(t.String()) }), localized: true, route: '/blog/:slug' })
 
-  it('gives the CMS the route before the url option and the guess from prerender', async () => {
+  it('gives the CMS the route before the url option', async () => {
     const posts = collection({ name: 'route-cms', load: () => [{ slug: 'hello', data: { title: 'Hello' } }] }, { schema, route: '/blog/:slug', url: () => '/other' })
     const before = registerCollections([['posts', posts]])
-    const guessing = registerEditSite({ urls: async () => '/guessed' })
+    const guessing = registerEditSite(undefined)
 
     try {
       expect((await entries('posts')).map(entry => entry.url)).toEqual(['/blog/hello'])
@@ -194,6 +197,22 @@ describe('a collection route read beyond the entries', () => {
     finally {
       registerCollections(before)
       registerEditSite(guessing)
+    }
+  })
+
+  it('puts the base, the locale and the trailing slash on the route the CMS gives a served site', async () => {
+    const posts = collection({ name: 'route-served', load: () => [{ slug: 'fr/bonjour', data: { title: 'Bonjour' } }] }, { schema, localized: true, route: '/blog/:slug' })
+    const settings = { locales: ['en', 'fr'], defaultLocale: 'en', prefixDefault: false }
+    const page = { pattern: '/blog/:slug', params: ['slug'], file: 'blog/[slug].kay' } as unknown as ServedRoute
+    const before = registerCollections([['posts', posts]])
+    const served = registerEditSite({ urls: entryUrls([page], '/site', 'always', settings) })
+
+    try {
+      expect((await entries('posts', { locale: 'fr' })).map(entry => entry.url)).toEqual(['/site/fr/blog/bonjour/'])
+    }
+    finally {
+      registerCollections(before)
+      registerEditSite(served)
     }
   })
 
@@ -235,7 +254,17 @@ describe('a collection route read beyond the entries', () => {
 
     expect(linked.entryRoutes).toEqual(['/blog/:slug', '/docs/*'])
     expect(['/blog/v1.2', '/blog/v1.2/', '/docs/a/b.c', '/blog/cover.png'].map(href => localizedLink(base, href, 'fr'))).toEqual(['/blog/v1.2', '/blog/v1.2/', '/docs/a/b.c', '/blog/cover.png'])
-    expect(['/blog/v1.2', '/blog/v1.2/', '/docs/a/b.c', '/blog/hello', '/other.png'].map(href => localizedLink(linked, href, 'fr'))).toEqual(['/fr/blog/v1.2', '/fr/blog/v1.2/', '/fr/docs/a/b.c', '/fr/blog/hello', '/other.png'])
+    expect(['/blog/v1.2', '/blog/v1.2/', '/docs/a/b.c', '/blog/hello', '/other.png', '/blog/cover.png', '/blog/feed.xml'].map(href => localizedLink(linked, href, 'fr'))).toEqual(['/fr/blog/v1.2', '/fr/blog/v1.2/', '/fr/docs/a/b.c', '/fr/blog/hello', '/other.png', '/blog/cover.png', '/blog/feed.xml'])
+
+    // The browser matches links as they come, with no compiled patterns.
+    matchLinksWith(undefined)
+
+    try {
+      expect(['/blog/v1.2', '/blog/cover.png'].map(href => localizedLink(linked, href, 'fr'))).toEqual(['/fr/blog/v1.2', '/blog/cover.png'])
+    }
+    finally {
+      matchLinksWith(compiledLinks)
+    }
   })
 })
 

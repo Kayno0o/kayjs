@@ -38,7 +38,7 @@ export const posts = cache(listPosts, { ttl: '5m', tags: [postTag] })
 export const post = cache(async (slug: string) => findPost(slug), { ttl: '5m', tags: [postTag] })
 ```
 
-`await posts()` gives the value as `cached` does, `posts.invalidate()` drops it, `post('a')` keeps a value per arguments, `post.invalidate('a')` drops one and `post.invalidate()` all of them. `postTag.invalidate()` drops every value naming the tag, with no string key in the app. A prerendered page that read the function or a tag is refreshed by the invalidation, as for `cached`. Arguments are part of the key, kept as devalue writes them, so keep them small and plain: a function or a class instance throws a `kay:` error at the call. `live` and `store` are options beside `ttl`.
+`await posts()` gives the value as `cached` does, `posts.invalidate()` drops it, `post('a')` keeps a value per arguments, `post.invalidate('a')` drops one and `post.invalidate()` all of them. `postTag.invalidate()` drops every value naming the tag, with no string key in the app. A prerendered page that read the function or a tag is refreshed by the invalidation, as for `cached`. Arguments are part of the key, kept as devalue writes them, so keep them small and plain: a function or a class instance rejects the call with a `kay:` error. `live` and `store` are options beside `ttl`.
 
 ### Keep a cached value across restarts
 

@@ -534,7 +534,7 @@ async function pageUrl(collection: Collection<unknown>, entry: { slug: string, l
 
   // The route comes first, as it gives the entry its `url` and the feed its links.
   if (route !== undefined)
-    return entryPath(route, entry.slug)
+    return (site ? await site.urls(collection, entry) : undefined) ?? entryPath(route, entry.slug)
 
   return urlOf && decoded ? urlOf({ slug: entry.slug, locale: entry.locale, data: decoded.data }) : site?.urls(collection, entry)
 }

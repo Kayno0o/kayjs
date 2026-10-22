@@ -601,14 +601,19 @@ function withUrls<Data>(name: string, entries: Entry<Data>[], pattern: string | 
 
   const refused: string[] = []
 
-  const kept = entries.filter((entry) => {
-    entry.url = entryPath(pattern, entry.slug)
+  const kept: Entry<Data>[] = []
 
-    if (entry.url === undefined)
+  for (const entry of entries) {
+    const url = entryPath(pattern, entry.slug)
+
+    if (url === undefined) {
       refused.push(entry.file)
-
-    return entry.url !== undefined
-  })
+    }
+    else {
+      entry.url = url
+      kept.push(entry)
+    }
+  }
 
   if (refused.length > 0)
     kayLog('warn', `${refused.length === 1 ? 'an entry' : `${refused.length} entries`} of ${name} ${refused.length === 1 ? 'has' : 'have'} a slug its route ${pattern} cannot write, and ${refused.length === 1 ? 'is' : 'are'} left out until renamed\n${refused.map(file => `  ${file}`).join('\n')}`)
