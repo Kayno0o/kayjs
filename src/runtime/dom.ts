@@ -1371,10 +1371,18 @@ function outsideProps(props: Record<string, unknown>): Record<string, unknown> {
 // A property where the element has one, such as an input's `value`; an attribute otherwise.
 export function property(element: Element, name: string, value: unknown, written = false): void {
   // The server wrote this value, and what the person typed, ticked or opened since stays for the replayed event to read.
-  if (claim && (name === 'value' || name === 'checked' || name === 'open'))
-    return
+  if (claim && (name === 'value' || name === 'checked' || name === 'open')) {
+    // A toggle or a close does not bubble to the document, so one made before hydrating is never replayed: the element tells its own listener once the island is in.
+    if (name === 'open' && (element as HTMLDetailsElement).open !== Boolean(value))
+      queueMicrotask(() => element.dispatchEvent(new Event(element.localName === 'dialog' ? 'close' : 'toggle')))
 
-  if (VOID_PROPERTIES.has(name) && name in element)
+    return
+  }
+
+  // Dropping the `open` of a modal dialog would leave it in the top layer, inert page and backdrop included.
+  if (name === 'open' && value !== true && element.localName === 'dialog' && (element as HTMLDialogElement).open)
+    (element as HTMLDialogElement).close()
+  else if (VOID_PROPERTIES.has(name) && name in element)
     (element as ElementRecord)[name] = name === 'value' ? (value ?? '') : value
   else if (CONTENT_PROPERTIES.has(name))
     (element as ElementRecord)[name] = value ?? ''

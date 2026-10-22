@@ -1,0 +1,6 @@
+---
+import Prefs from '../components/prefs.kay'
+---
+h1 Preferences
+div(style="height: 3000px")
+Prefs(hydrate="visible")

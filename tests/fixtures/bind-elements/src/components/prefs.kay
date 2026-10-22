@@ -1,0 +1,18 @@
+---
+import { signal } from 'kay'
+
+let modal: HTMLDialogElement | undefined
+const tags = signal<string[]>(['x'])
+const more = signal(false)
+const files = signal<FileList | null>(null)
+const shown = signal(false)
+---
+input.tx(type="checkbox" value="x" aria-label="X" bind:group={tags})
+input.ty(type="checkbox" value="y" aria-label="Y" bind:group={tags})
+details.more(bind:open={more})
+  summary More
+input.pick(type="file" aria-label="File" bind:files={files})
+dialog.modal(ref={element => modal = element} bind:open={shown}) Hello
+button.show(onClick={() => { shown.set(true); modal?.showModal() }}) Show
+button.hide(onClick={() => shown.set(false)}) Hide
+p.out {tags().join(',')} {more() ? 'open' : 'shut'} {files()?.length ?? 0} {shown() ? 'shown' : 'hidden'}
