@@ -11,6 +11,7 @@ export const KAY_VALUES: readonly string[] = [
   'context',
   'debounced',
   'defer',
+  'defineUi',
   'describeField',
   'dispatch',
   'durationMs',
