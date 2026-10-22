@@ -1,0 +1,48 @@
+{
+  "Page": {
+    "prefix": "page",
+    "description": "A page with a title and a heading",
+    "body": [
+      "head",
+      "  title ${1:Title}",
+      "h1 ${1:Title}",
+      "${0}"
+    ]
+  },
+  "Page with a server loader": {
+    "prefix": "pageserver",
+    "description": "A page reading a value on the server",
+    "body": [
+      "--- server",
+      "const ${1:greeting} = '${2:Hello from the server}'",
+      "---",
+      "head",
+      "  title ${3:Title}",
+      "h1 {${1:greeting}}",
+      "${0}"
+    ]
+  },
+  "Component": {
+    "prefix": "component",
+    "description": "A component taking props",
+    "body": [
+      "---",
+      "const { ${1:title} } = props<{ ${1:title}: string }>()",
+      "---",
+      "section",
+      "  h2 {${1:title}}",
+      "  ${0}"
+    ]
+  },
+  "Island": {
+    "prefix": "island",
+    "description": "An interactive component: a signal and a handler",
+    "body": [
+      "---",
+      "const ${1:count} = signal(${2:0})",
+      "---",
+      "button(onClick={() => ${1:count}++}) ${3:Clicked} {${1:count}()} times",
+      "${0}"
+    ]
+  }
+}

@@ -18,7 +18,8 @@
     "vscode": "^1.91.0"
   },
   "activationEvents": [
-    "onLanguage:kay"
+    "onLanguage:kay",
+    "workspaceContains:**/kay.config.ts"
   ],
   "contributes": {
     "languages": [
@@ -51,6 +52,21 @@
           "type": "string",
           "default": "",
           "description": "Directory of the pages, relative to the workspace, so route params and links are typed. Empty takes the project's kay.config.ts, else src/routes."
+        },
+        "kay.lsp.trace": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Traces the messages between the editor and the language server into its output."
+        },
+        "kay.dev.url": {
+          "type": "string",
+          "default": "http://localhost:3000",
+          "description": "The address Kay: Open the dev server opens, the one kay dev listens on."
         }
       }
     },
@@ -63,6 +79,34 @@
           "meta.embedded.block.typescript": "typescript",
           "meta.embedded.expression.kay": "typescript"
         }
+      }
+    ],
+    "commands": [
+      {
+        "command": "kay.restartServer",
+        "title": "Restart the language server",
+        "category": "Kay"
+      },
+      {
+        "command": "kay.check",
+        "title": "Run kay check",
+        "category": "Kay"
+      },
+      {
+        "command": "kay.openDevServer",
+        "title": "Open the dev server",
+        "category": "Kay"
+      },
+      {
+        "command": "kay.showOutput",
+        "title": "Show the output",
+        "category": "Kay"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "kay",
+        "path": "./snippets/kay.json"
       }
     ]
   },

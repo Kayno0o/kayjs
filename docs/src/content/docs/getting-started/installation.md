@@ -54,24 +54,21 @@ bun run start   # kay start: the production server, after a build (server preset
 
 The `.kay` extension for VS Code highlights `.kay` files and runs `kay lsp`. You get errors, hover, completion with auto-import, go-to-definition, references, rename, quick fixes, formatting, an outline, folding, and imports updated when you rename or move a `.kay` file. Completion also offers element, attribute, prop and block names, route paths in `href`, `action` and `navigate()`, `t()` message keys and lint names after `// kay-allow`.
 
-It is not on the Marketplace. Build it from `editors/vscode` in a checkout of the [kay repository](https://github.com/Kayno0o/kayjs), then install the file it writes.
+Install **Kay** (`kaynooo.kay`) from the VS Code Marketplace, or from Open VSX in VSCodium and other builds. Each release also attaches its `kay-<version>.vsix`, which `code --install-extension` installs. A project made by `kay new` recommends it in `.vscode/extensions.json`, so VS Code offers it when the folder opens, and formats `.kay` files on save with it.
 
-```sh
-cd editors/vscode
-bun install
-bun run package   # writes kay.vsix
-code --install-extension kay.vsix
-```
-
-The extension runs the language server of the kay the workspace installed. It always matches the compiler the project builds with, and a project made by `kay new` needs no setup. Three settings change that.
+The extension runs the language server of the kay the project installed, one server per project: every folder holding a `kay.config.ts`, in a monorepo or a multi-root workspace too. It always matches the compiler the project builds with, and it starts once kay is installed. A project made by `kay new` needs no setup. These settings change that.
 
 | Setting | What it does |
 | --- | --- |
 | `kay.bun.path` | The Bun executable running the server, `bun` by default |
 | `kay.server.path` | The kay CLI to run, absolute or relative to the workspace, when it is not the workspace's own |
 | `kay.routes` | The pages directory, so route params and links are typed. By default the one `kay.config.ts` names, else `src/routes` |
+| `kay.lsp.trace` | `off`, `messages` or `verbose`: traces the messages between the editor and the server into its output |
+| `kay.dev.url` | The address the Open the dev server command opens, `http://localhost:3000` by default |
 
-A project made with Tailwind also gets a `.vscode/settings.json` for the Tailwind CSS IntelliSense extension: it reads `.kay` files as HTML and finds the classes of the `.class` shorthand and of `class="..."`, so completion and hover work in both. The extension matches by pattern, so a line of a script fence such as `console.log(` can show Tailwind hovers too.
+The command palette has Kay: Restart the language server, Run kay check (in a terminal), Open the dev server and Show the output. The extension adds snippets too: `page`, `pageserver`, `component` and `island`.
+
+A project made with Tailwind also gets Tailwind CSS IntelliSense settings in `.vscode/settings.json`: it reads `.kay` files as HTML and finds the classes of the `.class` shorthand and of `class="..."`, so completion and hover work in both. The extension matches by pattern, so a line of a script fence such as `console.log(` can show Tailwind hovers too.
 
 Any editor that speaks the Language Server Protocol, such as Neovim, Helix or Zed, can run the same server. Start `bunx kay lsp --stdio` in the project root for `.kay` files.
 
