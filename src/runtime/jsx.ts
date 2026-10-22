@@ -133,6 +133,8 @@ interface CommonAttributes<Target> {
   'transition:leave'?: string | undefined
   'transition:leave-from'?: string | undefined
   'transition:leave-to'?: string | undefined
+  // Sets one CSS property from a value, merged into `style` and left out while it is `null`, `undefined` or `false`: `style:color={color()}`, `style:--gap={gap()}`.
+  [style: `style:${string}`]: string | number | false | null | undefined
   [data: `data-${string}`]: AttributeValue
   [aria: `aria-${string}`]: AttributeValue
 }

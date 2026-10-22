@@ -175,6 +175,19 @@ describe('elements', () => {
     expect(toggle.attributes.map(attribute => attribute.kind === 'expression' ? [text(file, attribute.name), text(file, attribute.expression)] : undefined)).toEqual([['bind:open', 'open'], ['bind:count', 'a.b']])
   })
 
+  it('reads the modifiers after a handler name, and refuses them on any other attribute', () => {
+    const file = parse('form(onSubmit|preventDefault|stopPropagation={save} onInput={f})\n')
+    const [submit, input] = element(file.template[0]).attributes
+
+    expect(file.diagnostics).toEqual([])
+    expect(submit).toMatchObject({ kind: 'expression' })
+    expect(submit && 'name' in submit ? text(file, submit.name) : '').toBe('onSubmit')
+    expect(submit?.kind === 'expression' && submit.modifiers ? text(file, submit.modifiers) : '').toBe('|preventDefault|stopPropagation')
+    expect(input?.kind === 'expression' && input.modifiers).toBeFalsy()
+    expect(parse('form(onSubmit|preventDefault)\n').diagnostics.map(d => d.message)).toEqual([expect.stringContaining('A modifier belongs to an event handler')])
+    expect(parse('form(onSubmit|preventDefault="x")\n').diagnostics.map(d => d.message)).toEqual([expect.stringContaining('A modifier belongs to an event handler')])
+  })
+
   it('reads shorthand classes and id, with div implied', () => {
     const file = parse('.card#main.wide\nsection.a.b')
 

@@ -17,6 +17,10 @@ function format(source: string): string {
 }
 
 describe('formatKay', () => {
+  it('keeps the modifiers of a handler and the style: properties, one attribute list on a line', () => {
+    expect(format('form(onSubmit|preventDefault|stopPropagation={save}   style:--gap={g})\n  button Go\n')).toBe('form(onSubmit|preventDefault|stopPropagation={save} style:--gap={g})\n  button Go\n')
+  })
+
   it('keeps a pending block as written, indenting its lines', () => {
     expect(format('form(action={add})\n    button Add\n    pending\n        p Saving\n')).toBe('form(action={add})\n  button Add\n  pending\n    p Saving\n')
   })

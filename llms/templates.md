@@ -317,6 +317,8 @@ for product of products
 - `bind:open={signal}` on `details` follows its toggling, on `dialog` its closing, a signal set to `true` opening the dialog non-modal.
 - `bind:files={signal}` on `input(type="file")` holds the picked `FileList`, `null` clears the input, and the server renders nothing for it.
 - A `bind:` on an element that also spreads is an error, as the spread may carry the value and the handler: bind a child, or write both.
+- `style:color={value}` sets one property of the `style`, `style:--gap={gap()}` a custom one, merged after the written `style`, and left out while the value is `null`, `undefined` or `false`; on an element only, with no spread next to it.
+- `onSubmit|preventDefault={save}` calls the event method first, `|stopPropagation` likewise, and the two chain; the handler of an element only, run in an island like any handler, so a form posts natively without JavaScript.
 - `ref={el => ...}` receives the DOM element, and may return a cleanup that runs when the element goes away.
 - A function prop that is no handler, `class` or `style` (a slot or a formatter passed to a plain element) writes no attribute on the server either, as in the browser. Only what a component, an element or an island rendered counts as markup in `{}`: an object with a `t` string from JSON, such as a database column, renders nothing, like any other object.
 - `innerHTML` renders its value as markup, unescaped, and so does an `iframe`'s `srcdoc`.

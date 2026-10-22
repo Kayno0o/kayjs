@@ -5,12 +5,15 @@ import type { PageSettingName } from './page-settings'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { RESIZABLE } from '../runtime/image'
 import { WIDGET_ROLES } from './aria'
-import { childBlocks, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, serverIslandOf, templateFacts } from './ast'
+import { childBlocks, EVENT_MODIFIERS, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, modifiersOf, serverIslandOf, templateFacts } from './ast'
 
 type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'special' | 'includeServer' | 'pageFile'>
 
 // The elements each property of an element can be bound to; `group` and `files` also need an input of a type, `radio` or `checkbox` and `file`.
 const BINDABLE: ReadonlyMap<string, ReadonlySet<string>> = new Map([['value', new Set(['input', 'textarea', 'select'])], ['checked', new Set(['input', 'textarea', 'select'])], ['group', new Set(['input'])], ['files', new Set(['input'])], ['open', new Set(['details', 'dialog'])]])
+const EVENT_NAME = /^on[A-Z]/
+const STYLE_PROP = 'style:'
+const STYLE_PROPERTY = /^(?:--[\w-]+|[a-z][a-z-]*)$/i
 const GROUP_TYPES = new Set(['radio', 'checkbox'])
 const TRANSITION_PART = 'transition:'
 
@@ -503,6 +506,12 @@ class Validator {
     if (!element.component && attribute.kind === 'expression')
       this.lowercaseEvent(attribute, name)
 
+    if (attribute.kind === 'expression' && attribute.modifiers)
+      this.modifiers(element, attribute, name)
+
+    if (name.startsWith(STYLE_PROP))
+      this.styleProp(element, attribute, name)
+
     if (!name.startsWith('bind:'))
       return
 
@@ -538,6 +547,38 @@ class Validator {
 
     if (handler)
       this.error(attribute.name, `\`bind:${property}\` already handles \`${event}\``, { related: [{ ...handler.name, label: 'handled here too' }], help: 'drop one of them' })
+  }
+
+  // `style:color={color()}` sets one property of an element's `style`.
+  private styleProp(element: ElementNode, attribute: NamedAttribute, name: string): void {
+    if (element.component)
+      this.error(attribute.name, '`style:` sets a property of an element, not of a component', { help: 'pass the value as a prop and set it on the element the component renders' })
+    else if (attribute.kind !== 'expression')
+      this.error(attribute.name, `\`${name}\` needs a value`, { help: `\`${name}={value}\`, or write the property in \`style\`` })
+    else if (!STYLE_PROPERTY.test(name.slice(STYLE_PROP.length)))
+      this.error(attribute.name, `\`${name}\` names no CSS property`, { help: 'write it as CSS does: `style:background-color={color}`, or a custom property `style:--gap={gap}`' })
+    else if (element.attributes.some(candidate => candidate.kind === 'spread'))
+      this.error(attribute.name, `\`${name}\` next to a spread sets nothing`, { note: 'the spread may carry a `style` of its own, so the element is rendered from its props', help: 'write the property in the `style` object instead' })
+  }
+
+  // `onSubmit|preventDefault={save}` calls the event method first; a handler of an element is the only thing that takes one.
+  private modifiers(element: ElementNode, attribute: Extract<NamedAttribute, { kind: 'expression' }>, name: string): void {
+    if (element.component || !EVENT_NAME.test(name)) {
+      this.error(attribute.modifiers!, 'a modifier belongs to an event handler of an element', { help: '`form(onSubmit|preventDefault={save})`' })
+
+      return
+    }
+
+    const seen = new Set<string>()
+
+    for (const modifier of modifiersOf(attribute, this.src)) {
+      if (!EVENT_MODIFIERS.has(modifier))
+        this.error(attribute.modifiers!, `\`${modifier}\` is no event modifier`, { help: `use ${[...EVENT_MODIFIERS].map(known => `\`|${known}\``).join(' or ')}` })
+      else if (seen.has(modifier))
+        this.error(attribute.modifiers!, `\`|${modifier}\` is written twice`, { help: 'drop one of them' })
+
+      seen.add(modifier)
+    }
   }
 
   // `bind:open={open}` on a component hands it the signal `open` or a `Bindable` prop of the component, named whole or as a member of one.

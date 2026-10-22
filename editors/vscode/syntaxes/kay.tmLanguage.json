@@ -489,12 +489,15 @@
           "include": "#expression"
         },
         {
-          "match": "([A-Za-z_@:][\\w\\-:.@]*)(?:[ \\t]*(=))?",
+          "match": "([A-Za-z_@:][\\w\\-:.@]*)((?:\\|[\\w-]*)*)(?:[ \\t]*(=))?",
           "captures": {
             "1": {
               "name": "entity.other.attribute-name.kay"
             },
             "2": {
+              "name": "storage.modifier.kay"
+            },
+            "3": {
               "name": "punctuation.separator.key-value.kay"
             }
           }

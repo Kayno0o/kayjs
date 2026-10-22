@@ -4,10 +4,10 @@ import type { Declaration, DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
 import type { PlannedAttribute } from './markup'
 import { mayLeaveSite } from '../runtime/outside'
-import { keyedByPosition, marksServerIsland } from './ast'
+import { keyedByPosition, marksServerIsland, modifiersOf } from './ast'
 import { decodeEntities, isFunctionAt } from './expression'
 import { childItems, constDeclaration, errorParagraphArguments, isDeclaration, slotValue, soleDynamic } from './items'
-import { addBindWrite, bindRead, END_MARKER, escapeStaticAttribute, escapeText, GROUP_HAS, groupValue, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
+import { addBindWrite, addHandler, addStyleArguments, bindRead, END_MARKER, escapeStaticAttribute, escapeText, GROUP_HAS, groupValue, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { SUBJECT } from './names'
 import { bindEvent } from './validate'
 
@@ -452,8 +452,15 @@ export class DomTemplate extends TemplateWriter {
 
             break
           case 'class':
+            own.push(variable => b.add(`KayEffect(() => KaySetClass(${variable(node)}, (`).addSource(attribute.expression).add(')));'))
+
+            break
           case 'style':
-            own.push(variable => b.add(`KayEffect(() => ${attribute.kind === 'class' ? 'KaySetClass' : 'KaySetStyle'}(${variable(node)}, (`).addSource(attribute.expression).add(')));'))
+            own.push((variable) => {
+              b.add(`KayEffect(() => KaySetStyle(${variable(node)}, `)
+              addStyleArguments(b, attribute)
+              b.add('));')
+            })
 
             break
           case 'image':
@@ -632,10 +639,7 @@ export class DomTemplate extends TemplateWriter {
       // A `submit` handler is held while it answers a promise, which only an island listening to one loads.
       b.add(`${helperName(name.toLowerCase() === 'onsubmit' ? 'listenSubmit' : 'listen')}(${variable(node)}, ${JSON.stringify(name)}, `)
 
-      if (isFunctionAt(this.src, expression, this.facts.functions))
-        b.add('(').addSource(expression).add(')')
-      else
-        b.add('(kayEvent) => (').addSource(expression).add(')?.(kayEvent)')
+      addHandler(b, expression, modifiersOf(attribute, this.src), isFunctionAt(this.src, expression, this.facts.functions))
 
       b.add(');')
     }

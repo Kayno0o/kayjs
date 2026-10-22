@@ -45,7 +45,8 @@ export interface Fix {
 export type Attribute
   = | { kind: 'static', name: Span, value: Span, text: string }
     // A bare `{title}` is `title={title}`: its name and its expression are the one span, and `shorthand` holds the braces around it.
-    | { kind: 'expression', name: Span, expression: Span, shorthand?: Span }
+    // `modifiers` is the `|preventDefault|stopPropagation` after the name of an event handler, which the name does not include.
+    | { kind: 'expression', name: Span, expression: Span, shorthand?: Span, modifiers?: Span }
     | { kind: 'boolean', name: Span }
     | { kind: 'spread', expression: Span }
 
@@ -194,6 +195,14 @@ export interface PendingNode extends Span {
 export type Node = ElementNode | TextNode | IfNode | MatchNode | ForNode | AwaitNode | TryNode | SlotNode | SnippetNode | ConstNode | ErrorNode | PendingNode
 
 // An attribute written with a name, which a spread is not.
+// The event methods a handler may call before it runs, written after its name: `onSubmit|preventDefault`.
+export const EVENT_MODIFIERS: ReadonlySet<string> = new Set(['preventDefault', 'stopPropagation'])
+
+// The modifiers written on a handler, in order; `validate` refuses the ones that are none.
+export function modifiersOf(attribute: Attribute, source: string): string[] {
+  return attribute.kind === 'expression' && attribute.modifiers ? source.slice(attribute.modifiers.start + 1, attribute.modifiers.end).split('|') : []
+}
+
 export type NamedAttribute = Exclude<Attribute, { kind: 'spread' }>
 
 // `form(action={add})`: the attribute naming the action a form posts to.

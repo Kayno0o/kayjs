@@ -1401,11 +1401,13 @@ export function setClass(element: Element, value: unknown): void {
     element.setAttribute('class', name)
 }
 
-export function setStyle(element: Element, value: unknown): void {
-  if (Boolean(value) === false)
+export function setStyle(element: Element, value: unknown, props?: readonly (readonly [string, unknown])[]): void {
+  const text = styleText(value, props)
+
+  if (text === '')
     element.removeAttribute('style')
   else
-    element.setAttribute('style', styleText(value))
+    element.setAttribute('style', text)
 }
 
 // Set by form-hold when an island loads it, so a `submit` handler given through a spread is held too.

@@ -116,6 +116,50 @@ describe('bind:group, bind:open and bind:files', () => {
   })
 })
 
+describe('style:prop and event modifiers', () => {
+  const mountDirectives = site({ 'main.kay': '---\nimport { signal } from \'kay\'\nconst color = signal(\'red\')\nconst gap = signal<number | null>(4)\nconst log = signal(\'\')\nconst add = (letter: string) => log.set(log() + letter)\n---\np#s(style="top:1px" style:color={color()} style:--gap={gap()}) x\np#plain(style:width={gap() === null ? null : gap() + \'px\'}) y\nform#f(onSubmit|preventDefault={() => add(\'f\')}) z\ndiv#outer(onClick={() => add(\'o\')})\n  button#inner(onClick|stopPropagation={() => add(\'i\')}) i\n  button#both(onClick|preventDefault|stopPropagation={e => add(String(e.defaultPrevented))}) b\n  button#plainbutton(onClick={() => add(\'p\')}) p\nbutton#toggle(onClick={() => { color.set(\'blue\'); gap.set(null) }}) t\np#out {log()}\n' })
+
+  it('merges style:prop into the style, follows the signals and drops a null value', async () => {
+    const { root, dispose } = await mountDirectives()
+    const style = (id: string) => root.querySelector(`#${id}`)!.getAttribute('style')
+
+    try {
+      expect(style('s')).toBe('top:1px;color:red;--gap:4')
+      expect(style('plain')).toBe('width:4px')
+      root.querySelector<HTMLButtonElement>('#toggle')!.click()
+      await settle()
+      expect(style('s')).toBe('top:1px;color:blue')
+      expect(style('plain')).toBeNull()
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  it('calls the event methods before the handler, and stops a click at the element', async () => {
+    const { root, dispose } = await mountDirectives()
+    const out = root.querySelector('#out')!
+
+    try {
+      const submit = new Event('submit', { bubbles: true, cancelable: true })
+
+      root.querySelector('#f')!.dispatchEvent(submit)
+      await settle()
+      expect(submit.defaultPrevented).toBe(true)
+      root.querySelector<HTMLButtonElement>('#inner')!.click()
+      await settle()
+      expect(out.textContent).toBe('fi')
+      root.querySelector<HTMLButtonElement>('#both')!.click()
+      root.querySelector<HTMLButtonElement>('#plainbutton')!.click()
+      await settle()
+      expect(out.textContent).toBe('fitruepo')
+    }
+    finally {
+      await dispose()
+    }
+  })
+})
+
 describe('ref returning a cleanup', () => {
   const mountSpread = site({ 'main.kay': '---\nimport { signal } from \'kay\'\nconst n = signal(0)\nconst log: string[] = ((globalThis as any).refLog ??= [])\nconst track = (el: HTMLElement) => {\n  log.push(\'attach \' + el.id)\n  return () => log.push(\'detach \' + el.id)\n}\nconst extra = { ref: track }\n---\nbutton#t(onClick={() => n.set(n() + 1)}) go\np#s(title={String(n())} {...extra}) s\n' })
 

@@ -810,6 +810,13 @@ export class JsxTemplate {
           return
         }
 
+        // A custom property starts with dashes, which a JSX name cannot, so the types see it after a word.
+        if (name.startsWith('style:--')) {
+          b.wrap(attribute.name, () => b.add(`style:custom${name.slice(6)}`)).add('={').addSource(attribute.expression).add('}')
+
+          return
+        }
+
         // Read at each event rather than once, as the browser build does, so a handler held by a prop, a signal or a loop item stays current.
         if (!element.component && !this.options.check && EVENT_HANDLER.test(name) && !isFunctionAt(this.src, attribute.expression, this.facts.functions)) {
           this.attributeName(attribute).add('={(kayEvent) => (').addSource(attribute.expression).add(')?.(kayEvent)}')

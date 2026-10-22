@@ -4,7 +4,7 @@ import type { CodeBuilder } from './mapping'
 import { resolveClasses } from '../runtime/class-table'
 import { PART_END, PART_START } from '../runtime/markers'
 import { URL_ATTRIBUTES } from '../runtime/url-attributes'
-import { actionOf, bindsOwnProp, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, handedParts, partAttribute, partNames, partsOf, sectionOf, uiHasVariants, uiPartClasses } from './ast'
+import { actionOf, bindsOwnProp, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, handedParts, modifiersOf, partAttribute, partNames, partsOf, sectionOf, uiHasVariants, uiPartClasses } from './ast'
 import { decodeEntities, isFunctionAt } from './expression'
 import { PROPS } from './names'
 
@@ -98,6 +98,16 @@ export function addBindWrite(b: CodeBuilder, expression: Span, read: BindRead): 
   }
 }
 
+// An event handler read at each event, so one a prop, a signal or a loop item holds stays current; its modifiers call their event methods first.
+export function addHandler(b: CodeBuilder, expression: Span, modifiers: string[], literal: boolean): void {
+  if (modifiers.length > 0)
+    b.add(`(kayEvent) => { ${modifiers.map(modifier => `kayEvent.${modifier}();`).join(' ')} return (`).addSource(expression).add(')?.(kayEvent) }')
+  else if (literal)
+    b.add('(').addSource(expression).add(')')
+  else
+    b.add('(kayEvent) => (').addSource(expression).add(')?.(kayEvent)')
+}
+
 // A quoted attribute as JSX reads it, an entity standing for its character, then escaped for markup.
 export function escapeStaticAttribute(text: string): string {
   return text.replace(STATIC_ATTRIBUTE, char => ATTRIBUTE_ENTITY[char] ?? '&amp;')
@@ -108,13 +118,38 @@ export function describedValue(described: { id: string, own?: string }): string 
   return `) ? ${JSON.stringify(described.own === undefined ? described.id : `${described.own} ${described.id}`)} : ${described.own === undefined ? 'undefined' : JSON.stringify(described.own)}`
 }
 
+export interface StyleProp {
+  property: string
+  expression: Span
+}
+
+// What `style` and `setStyle` take: the written `style` as an expression or text, then the `style:prop` pairs.
+export function addStyleArguments(b: CodeBuilder, attribute: Extract<PlannedAttribute, { kind: 'style' }>): void {
+  if (attribute.expression)
+    b.add('(').addSource(attribute.expression).add(')')
+  else
+    b.add(attribute.text === undefined ? 'undefined' : JSON.stringify(attribute.text))
+
+  if (attribute.props.length === 0)
+    return
+
+  b.add(', [')
+
+  for (const [index, { property, expression }] of attribute.props.entries())
+    b.add(`${index > 0 ? ', ' : ''}[${JSON.stringify(property)}, (`).addSource(expression).add(')]')
+
+  b.add(']')
+}
+
 // An attribute of an element without spreads, as both templates read it; a static text is decoded.
 export type PlannedAttribute
   = | { kind: 'boolean', name: string }
     | { kind: 'text', name: string, text: string, bare: boolean }
   // A static path from the site's root, which goes under its base and, for a link, to the page's locale's copy.
     | { kind: 'rooted', name: string, text: string }
-    | { kind: 'class' | 'style', name: string, expression: Span }
+    | { kind: 'class', name: string, expression: Span }
+  // The `style` attribute, written as text or an expression, with the `style:prop` values after it.
+    | { kind: 'style', expression: Span | undefined, text: string | undefined, props: StyleProp[] }
   // An `img` source, which loads the size the image shows at.
     | { kind: 'image', expression: Span, sized: boolean, placeholder: boolean }
   // A `select`'s value, which picks its option.
@@ -189,6 +224,7 @@ export abstract class TemplateWriter {
       described,
     }
 
+    const styleProps: StyleProp[] = []
     const parts = partsOf(element, this.src, this.facts.parts)
     const partAttr = partAttribute(element, this.src)
 
@@ -226,7 +262,10 @@ export abstract class TemplateWriter {
       if (section !== undefined && attributeName === 'section' && (attribute.kind === 'boolean' || attribute.kind === 'expression'))
         continue
 
-      if (attributeName.startsWith('bind:') && attribute.kind === 'expression') {
+      if (attributeName.startsWith('style:') && attribute.kind === 'expression') {
+        styleProps.push({ property: attributeName.slice(6), expression: attribute.expression })
+      }
+      else if (attributeName.startsWith('bind:') && attribute.kind === 'expression') {
         const property = attributeName.slice(5)
 
         if (name === 'textarea' && property === 'value')
@@ -272,8 +311,11 @@ export abstract class TemplateWriter {
         plan.selected = { expression: attribute.expression, bound: false }
         plan.attributes.push({ kind: 'selected', expression: attribute.expression })
       }
-      else if (attributeName === 'class' || attributeName === 'style') {
-        plan.attributes.push({ kind: attributeName, name: attributeName, expression: attribute.expression })
+      else if (attributeName === 'class') {
+        plan.attributes.push({ kind: 'class', name: attributeName, expression: attribute.expression })
+      }
+      else if (attributeName === 'style') {
+        plan.attributes.push({ kind: 'style', expression: attribute.expression, text: undefined, props: [] })
       }
       // An imported image loads the size it shows at, unless the template writes its own `srcset`.
       else if (name === 'img' && attributeName === 'src' && !this.named(element, 'srcset')) {
@@ -282,6 +324,17 @@ export abstract class TemplateWriter {
       else {
         plan.attributes.push({ kind: 'value', name: attributeName, expression: attribute.expression, action: attribute === action })
       }
+    }
+
+    if (styleProps.length > 0) {
+      const written = plan.attributes.findIndex(planned => planned.kind === 'style' || (planned.kind === 'text' && planned.name === 'style'))
+      const own = plan.attributes[written]
+      const merged: PlannedAttribute = { kind: 'style', expression: own?.kind === 'style' ? own.expression : undefined, text: own?.kind === 'text' ? own.text : undefined, props: styleProps }
+
+      if (written === -1)
+        plan.attributes.push(merged)
+      else
+        plan.attributes[written] = merged
     }
 
     for (const [attributeName, text] of this.imageDefaults(element))
@@ -423,8 +476,8 @@ export abstract class TemplateWriter {
         entry(name, () => b.add(JSON.stringify(decodeEntities(attribute.text))), false)
       else if (!element.component && attribute === actionOf(element, this.src))
         entry(name, () => b.add('KayFormAction((').addSource(attribute.expression).add('))'), true)
-      else if (!element.component && name.startsWith('on') && !isFunctionAt(this.src, attribute.expression, this.facts.functions))
-        entry(name, () => b.add('(kayEvent) => (').addSource(attribute.expression).add(')?.(kayEvent)'), false)
+      else if (!element.component && name.startsWith('on') && (attribute.modifiers || !isFunctionAt(this.src, attribute.expression, this.facts.functions)))
+        entry(name, () => addHandler(b, attribute.expression, modifiersOf(attribute, this.src), false), false)
       else
         entry(name, () => b.add('(').addSource(attribute.expression).add(')'), true)
     }

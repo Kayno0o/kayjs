@@ -1177,6 +1177,29 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('types style:prop values and the handler an event modifier leaves', async () => {
+    const page = [
+      '---',
+      'const size = signal<number | null>(1)',
+      '---',
+      'p(style:width={size()} style:color={null}) x',
+      'p(style:--gap={size()} style:color={\'red\'}) y',
+      'p(style:color={{ a: 1 }}) z',
+      'form(onSubmit|preventDefault={event => event.target}) w',
+      'form(onSubmit|preventDefault={event => event.nope}) v',
+      'button(onClick={() => size.set(2)}) b',
+      '',
+    ].join('\n')
+    const root = await scratchProject({ 'src/routes/index.kay': page })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[6, 'TS2322'], [8, 'TS2339']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('types what the fences use of kay unimported', async () => {
     const root = await scratchProject({ 'src/routes/index.kay': '--- server\nimport { s } from \'kay\'\n\nexport const add = action(s.Object({ title: s.String({ maxLength: 9 }) }), async ({ title }) => title.length)\n---\n---\nconst count = signal(0)\nconst label: string = count()\n\neffect(() => count.set(c => c + 1))\n---\nform(action={add})\n  input(name="title" aria-label="Title")\np {label}\n' })
 

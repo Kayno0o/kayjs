@@ -424,6 +424,17 @@ describe('static server output', () => {
     expect(await renderKay('---\nimport { signal } from \'kay\'\nconst open = signal(false)\n---\ndetails(bind:open={open})\n  summary S')).toContain('<details><summary>S</summary></details>')
   })
 
+  it('renders style:prop into the style attribute, after the written one, and leaves out an empty value', async () => {
+    const source = '---\nconst color = \'red\'\nconst gap = 4\nconst none = undefined\n---\np(style="top:1px;" style:color={color} style:--gap={gap + \'px\'} style:width={none} style:flex={false}) a\np(style:color={color}) b\np(style:width={none}) c\np(style={{ top: 0 }} style:z-index={2}) d'
+
+    expect(await renderKay(source)).toBe('<p style="top:1px;color:red;--gap:4px">a</p><p style="color:red">b</p><p>c</p><p style="top:0;z-index:2">d</p>')
+  })
+
+  it('escapes a style:prop value, and drops the handler of a modifier, which only an island runs', async () => {
+    expect(await renderKay('---\nconst bad = \'"><b>\'\n---\np(style:color={bad}) a')).toBe('<p style="color:&quot;>&lt;b>">a</p>')
+    expect(await renderKay('form(onSubmit|preventDefault={save}) x')).toContain('<form>x</form>')
+  })
+
   it('leaves a transition out of the markup, which only an island plays', async () => {
     expect(await renderKay('p(transition="fade" transition:enter="duration-200" class="note") x')).toBe('<p class="note">x</p>')
   })

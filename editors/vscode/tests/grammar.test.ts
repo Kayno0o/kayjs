@@ -84,6 +84,13 @@ describe('kay grammar', () => {
     expect(lines[6]).toEqual(['p: entity.name.tag.kay', 'Hi: meta.element.kay'])
   })
 
+  it('scopes the modifiers of a handler apart from its name', () => {
+    const source = 'form(onSubmit|preventDefault={save})'
+
+    expect(scopesOf(source, 'onSubmit')).toContain('entity.other.attribute-name.kay')
+    expect(scopesOf(source, '|preventDefault')).toContain('storage.modifier.kay')
+  })
+
   it('ends a fence at the labeled line opening the next one', () => {
     const lines = tokenize('--- server\nconst open = 1\n--- script\nconst title = \'x\'\n---\np Hi')
 

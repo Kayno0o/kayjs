@@ -323,6 +323,48 @@ describe('elements', () => {
     expect(errors('details(bind:open={v} {...rest})')).toEqual([expect.stringContaining('next to a spread binds nothing')])
   })
 
+  it('refuses an event modifier that is none, twice, or on anything but the handler of an element', () => {
+    expect(errors('form(onSubmit|preventDefault|stopPropagation={f}) x')).toEqual([])
+    expect(errors('form(onSubmit|prevent={f}) x')).toEqual([expect.stringContaining('`prevent` is no event modifier')])
+    expect(errors('form(onSubmit|preventDefault|preventDefault={f}) x')).toEqual([expect.stringContaining('written twice')])
+    expect(errors('form(onSubmit|={f}) x')).toEqual([expect.stringContaining('is no event modifier')])
+    expect(errors('div(title|preventDefault={f}) x')).toEqual([expect.stringContaining('belongs to an event handler of an element')])
+    expect(errors('Field(onSubmit|preventDefault={f})')).toEqual([expect.stringContaining('belongs to an event handler of an element')])
+  })
+
+  const ISLAND = '---\nconst n = signal(0)\n---\n'
+
+  it('calls the modifiers before a handler in the browser build, written as a function or not, and in a spread element', () => {
+    const dom = (attributes: string) => compileKay(`${ISLAND}form(${attributes}) x\n`, 'test.kay', { output: 'dom' }).tsx
+
+    expect(dom('onSubmit|preventDefault={save}')).toContain('(kayEvent) => { kayEvent.preventDefault(); return (save)?.(kayEvent) }')
+    expect(dom('onSubmit|preventDefault|stopPropagation={e => save(e)}')).toContain('kayEvent.preventDefault(); kayEvent.stopPropagation(); return (e => save(e))?.(kayEvent)')
+    expect(dom('onInput={f}')).toContain('(kayEvent) => (f)?.(kayEvent)')
+    expect(dom('onSubmit|preventDefault={save} {...rest}')).toContain('"onSubmit": (kayEvent) => { kayEvent.preventDefault(); return (save)?.(kayEvent) }')
+    expect(compileKay('form(onSubmit|preventDefault={save}) x\n', 'test.kay', { output: 'html' }).tsx).not.toContain('preventDefault')
+  })
+
+  it('refuses style:prop on a component, without a value, with a bad name or next to a spread', () => {
+    expect(errors('p(style:color={c}) x')).toEqual([])
+    expect(errors('p(style:--gap={c} style:background-color={c}) x')).toEqual([])
+    expect(errors('Card(style:color={c})')).toEqual([expect.stringContaining('not of a component')])
+    expect(errors('p(style:color="red") x')).toEqual([expect.stringContaining('needs a value')])
+    expect(errors('p(style:color) x')).toEqual([expect.stringContaining('needs a value')])
+    expect(errors('p(style:1x={c}) x')).toEqual([expect.stringContaining('names no CSS property')])
+    expect(errors('p(style:color={c} {...rest}) x')).toEqual([expect.stringContaining('next to a spread sets nothing')])
+  })
+
+  it('merges style:prop into the style attribute, the text or the expression, in both builds', () => {
+    const build = (attributes: string, output: 'dom' | 'html') => compileKay(`${ISLAND}p(${attributes}) x\n`, 'test.kay', { output }).tsx
+
+    expect(build('style="top:1px" style:color={c()}', 'dom')).toContain('KaySetStyle(KayN0_0, "top:1px", [["color", (c())]])')
+    expect(build('style:color={c()} style={s()}', 'dom')).toContain('KaySetStyle(KayN0_0, (s()), [["color", (c())]])')
+    expect(build('style:color={c()} style:--gap={g}', 'dom')).toContain('KaySetStyle(KayN0_0, undefined, [["color", (c())], ["--gap", (g)]])')
+    expect(build('style="top:1px" style:color={c()}', 'dom')).not.toContain('style=')
+    expect(build('style="top:1px" style:color={c()}', 'html')).toContain('KayNonEmptyAttribute("style", KayStyle("top:1px", [["color", (c())]]))')
+    expect(build('style={s()}', 'html')).toContain('KayNonEmptyAttribute("style", KayStyle((s())))')
+  })
+
   it('keeps a transition on an element, its phases named as they are, and refuses one on a component', () => {
     expect(jsx('p(transition="fade" transition:leave-to="opacity-0") x')).toBe('<p transition="fade" transition:leave-to="opacity-0">x</p>')
     expect(errors('Card(transition="fade")')).toEqual(['`transition` animates an element, not a component'])

@@ -247,6 +247,10 @@ input(type="file" bind:files={picked})
 
 A `bind:` on an element that also spreads props is an error, as the spread may carry the value and the handler itself: bind a child element, or write the value and the handler.
 
+`style:color={color()}` sets one property of the `style` and `style:--gap={gap()}` a custom one, merged after the written `style` and left out while the value is `null`, `undefined` or `false`.
+
+A modifier after an event name calls an event method before the handler: `form(onSubmit|preventDefault={save})`, and `|stopPropagation`, which chain. In an island it replaces the `event.preventDefault()` line of the handler; the server renders no handler, so the form still posts natively without JavaScript.
+
 A `ref` function may return a cleanup, which runs when the element goes away: `ref={element => { const stop = watch(element); return stop }}`.
 
 On a component, `bind:open={open}` binds a prop typed `Bindable<boolean>` to a signal: see [Components](/essentials/components).

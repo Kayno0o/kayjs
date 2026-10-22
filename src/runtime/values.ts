@@ -199,19 +199,18 @@ export function partClass(props: unknown, part: string): unknown {
   return typeof entry === 'object' && entry !== null && !Array.isArray(entry) ? taggedParts(entry as Record<string, unknown>) : entry
 }
 
-// A `style` value: a string, or an object of properties, each kept unless `null` or `undefined`; empty when it is falsy.
-export function styleText(value: unknown): string {
-  if (Boolean(value) === false)
-    return ''
+// A `style` value: a string, or an object of properties, each kept unless `null` or `undefined`; empty when it is falsy. The `style:prop` pairs follow it, each kept unless `null`, `undefined` or `false`.
+export function styleText(value: unknown, props?: readonly (readonly [string, unknown])[]): string {
+  let result = typeof value === 'string' ? value : ''
 
-  if (typeof value === 'string')
-    return value
+  if (typeof value === 'object' && value !== null) {
+    for (const [name, property] of Object.entries(value))
+      result += property != null ? `${result ? ';' : ''}${name}:${String(property)}` : ''
+  }
 
-  let result = ''
-
-  for (const [name, property] of Object.entries(value as Record<string, unknown>)) {
-    if (property != null)
-      result += `${result ? ';' : ''}${name}:${String(property)}`
+  for (const [name, property] of props ?? []) {
+    if (property != null && property !== false)
+      result += `${result && !result.endsWith(';') ? ';' : ''}${name}:${String(property)}`
   }
 
   return result

@@ -195,8 +195,8 @@ export function className(value: unknown): string {
 }
 
 // A `style` value: a string, or an object of properties, each kept unless `null` or `undefined`.
-export function style(value: unknown): string {
-  return escapeAttribute(styleText(value))
+export function style(value: unknown, props?: readonly (readonly [string, unknown])[]): string {
+  return escapeAttribute(styleText(value, props))
 }
 
 // ` class="..."` from what `className` or `style` made of a value, or nothing for an empty one, which the browser leaves out too.

@@ -5,7 +5,7 @@ import { mayLeaveSite } from '../runtime/outside'
 import { actionOf, FIELD_ELEMENTS, keyedByPosition, marksServerIsland, sectionOf, serverIslandOf, UNCHECKED_TYPES, UNREQUIRABLE_TYPES } from './ast'
 import { decodeEntities } from './expression'
 import { childItems, constDeclaration, errorParagraphArguments, isDeclaration, slotValue, soleDynamic } from './items'
-import { BEHAVIOUR, describedValue, END_MARKER, escapeStaticAttribute, escapeText, fromRoot, GROUP_HAS, groupValue, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
+import { addStyleArguments, BEHAVIOUR, describedValue, END_MARKER, escapeStaticAttribute, escapeText, fromRoot, GROUP_HAS, groupValue, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { SUBJECT } from './names'
 
 // The attribute an image's `src` or a select's `selected` value is written as.
@@ -504,6 +504,16 @@ export class HtmlTemplate extends TemplateWriter {
         continue
       }
 
+      if (attribute.kind === 'style') {
+        markup.dynamic(() => {
+          b.add(`${helperName('nonEmptyAttribute')}("style", ${helperName('style')}(`)
+          addStyleArguments(b, attribute)
+          b.add('))')
+        })
+
+        continue
+      }
+
       const written = attribute.kind === 'image' || attribute.kind === 'selected' ? WRITTEN_AS[attribute.kind] : attribute.name
 
       if (describable && written === 'aria-describedby') {
@@ -556,8 +566,7 @@ export class HtmlTemplate extends TemplateWriter {
 
           break
         case 'class':
-        case 'style':
-          markup.dynamic(() => b.add(`${helperName('nonEmptyAttribute')}(${JSON.stringify(attribute.name)}, ${helperName(attribute.kind === 'class' ? 'className' : 'style')}((`).addSource(attribute.expression).add(')))'))
+          markup.dynamic(() => b.add(`${helperName('nonEmptyAttribute')}(${JSON.stringify(attribute.name)}, ${helperName('className')}((`).addSource(attribute.expression).add(')))'))
 
           break
         case 'image':
