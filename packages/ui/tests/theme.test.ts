@@ -15,7 +15,7 @@ const CLASS_STRING_ATTRIBUTE = /\bclass="([^"]*)"/g
 const CLASS_EXPRESSION = /\bclass=\{((?:[^{}]|\{[^{}]*\})*)\}/g
 // A class name in an expression: a quoted string, unless a comparison makes it a value, or an object key.
 const CLASS_IN_EXPRESSION = /([!=]==\s*)?'([a-z][\w-]*)'|\b([a-z][\w-]*)(?=\s*:)/g
-const KUI_NAME = /(?<![\w-])kui-[a-z][\w-]*/g
+const KUI_NAME = /(?<![\w-])kui-[a-z][a-z0-9-]*(?![\w-])/g
 const WHITESPACE = /\s+/
 const RECIPE_STRING = /'([^']+)'/g
 const COLOUR_TOKEN = /(--color-kui-[\w-]+): ([^;]+);/g
@@ -56,7 +56,7 @@ const tokens = new Set([...theme.matchAll(DEFINED_TOKEN)].map(([, token]) => tok
 const classes = new Set([...theme.matchAll(DEFINED_CLASS)].map(([, name = '']) => name))
 
 // The components whose look is a recipe of utilities (#1885), each with its part classes in REMOVED_UI_CLASSES; theme.css keeps their old rules until 1.74.
-const RECIPE_COMPONENTS = new Set(['src/card.kay', 'src/badge.kay', 'src/notice.kay'])
+const RECIPE_COMPONENTS = new Set(['src/card.kay', 'src/badge.kay', 'src/notice.kay', 'src/avatar.kay', 'src/stat.kay', 'src/page-header.kay', 'src/page-section.kay', 'src/empty-state.kay', 'src/card-row.kay', 'src/widget.kay', 'src/meter.kay', 'src/progress.kay', 'src/skeleton.kay'])
 
 // Every class a component writes: the `.class` shorthand, plain `class` attributes, and the names a `class` expression holds.
 function writtenClasses(path: string, source: string): string[] {
@@ -598,9 +598,9 @@ describe('theme.css', () => {
     for (const path of RECIPE_COMPONENTS) {
       const source = components.find(component => component.path === path)!.source
       const start = source.indexOf('recipe({')
-      const recipe = source.slice(start, Math.min(...['defaults:', '\n})'].map(end => source.indexOf(end, start)).filter(end => end !== -1)))
+      const recipe = source.slice(start, Math.min(...['defaults:', '\n})', '\n\nconst', '\n---'].map(end => source.indexOf(end, start)).filter(end => end !== -1)))
 
-      for (const name of new Set([...recipe.replaceAll('\'\'', '').matchAll(RECIPE_STRING)].flatMap(([, value = '']) => value.split(WHITESPACE)).filter(name => name !== '' && !name.startsWith('kui-')))) {
+      for (const name of new Set([...recipe.replaceAll('\'\'', '').matchAll(RECIPE_STRING)].flatMap(([, value = '']) => value.split(WHITESPACE)).filter(name => name !== '' && !name.startsWith('kui-') && !name.startsWith('group/')))) {
         const next = compiler.build([name])
 
         if (next.length === css.length && !seen.has(name))

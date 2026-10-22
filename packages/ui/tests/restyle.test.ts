@@ -4,6 +4,7 @@ import { dirname, join, relative } from 'node:path'
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { kay } from '../../../src/build/plugin'
 import { uiProblems } from '../../../src/check/ui'
+import { REMOVED_UI_CLASSES } from '../../../src/check/ui-classes'
 import { child } from '../../../src/runtime/html'
 
 // An app of its own, as `src/ui.ts` restyles every instance of a component in the app: the library's fixture app renders the same components untouched, and its contract tests compare them. Built apart from testSite, which serves one project per test process.
@@ -12,6 +13,7 @@ const LIBRARY = join(import.meta.dir, '..')
 const LINK = join(ROOT, 'node_modules', '@kaynooo', 'kayjs-ui')
 const OUT = join(ROOT, 'node_modules', '.cache', 'out')
 const MARKERS = /<!--[[\]]-->/g
+const REMOVED_CLASS = new RegExp(Object.keys(REMOVED_UI_CLASSES).map(name => `\\b${name}\\b`).join('|'))
 
 let html = ''
 let browser = ''
@@ -58,12 +60,6 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     'kui-table-selection mb-2',
     'kui-table-head-cell uppercase',
     'kui-table-cell py-4',
-    'kui-avatar-initial font-bold',
-    'kui-stat-value tabular-nums',
-    'kui-page-header-title tracking-tight',
-    'kui-page-section-head mb-4',
-    'kui-empty-state-description italic',
-    'kui-card-row-body px-4',
     'kui-date-input gap-2',
     'kui-field-input h-12 kui-date-input-box w-44',
     'kui-date-range-input-separator mx-1',
@@ -97,9 +93,6 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     'kui-chip rounded-full',
     'kui-collapsible-section-summary py-3',
     'kui-collapsible-section-body pt-2',
-    'kui-widget-head pb-2',
-    'kui-heading-section kui-widget-title text-sm',
-    'bg-red-500 kui-meter-fill rounded-full',
     'kui-popover shadow-xl',
     'kui-side-panel-head px-6',
     'kui-side-panel-title text-lg',
@@ -153,10 +146,6 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     'kui-bar-chart-axis-label font-mono',
     'kui-bar-chart-legend-item gap-2',
     'kui-accordion gap-5',
-    'kui-skeleton opacity-60',
-    'kui-skeleton-block rounded-full',
-    'kui-progress h-3',
-    'kui-progress-fill bg-lime-500',
     'kui-breadcrumb-list gap-4',
     'kui-breadcrumb-link underline',
     'kui-breadcrumb-text font-bold',
@@ -284,5 +273,57 @@ describe('a SidePanel with modal={false}', () => {
     expect(html.match(/<dialog[^>]*id="beside"[^>]*>/)![0]).toContain('closedby="closerequest"')
     expect(html).toMatch(/<a [^>]*href="\/list"[^>]*aria-label="Close"/)
     expect(html.match(/<dialog[^>]*id="side"[^>]*>/)![0]).not.toMatch(/ open[ >=]/)
+  })
+})
+
+describe('the display components whose recipe holds their look', () => {
+  // The classes of the element an id or a data-part selects, in the order they are written.
+  const classesOfPart = (id: string, part?: string) => {
+    const root = html.indexOf(`id="${id}"`)
+    const start = part === undefined ? root : html.indexOf(`data-part="${part}"`, root)
+    const tag = html.slice(html.lastIndexOf('<', start), html.indexOf('>', start))
+
+    return (tag.match(/ class="([^"]*)"/)?.[1] ?? '').split(' ')
+  }
+
+  test.each([
+    ['avatar', undefined, 'rounded-kui-full', undefined],
+    ['avatar', 'initial', 'font-kui-avatar', 'font-bold'],
+    ['stat', undefined, 'rounded-kui-card', undefined],
+    ['stat', 'value', 'font-semibold', 'tabular-nums'],
+    ['header', undefined, 'gap-2', undefined],
+    ['header', 'title', 'text-xl', 'tracking-tight'],
+    ['section', 'head', 'flex', 'mb-4'],
+    ['empty', undefined, 'py-16', undefined],
+    ['empty', 'description', 'text-kui-overlay1', 'italic'],
+    ['row', undefined, 'group/row', undefined],
+    ['row', 'body', 'min-w-0', 'px-4'],
+    ['widget', undefined, 'p-4', undefined],
+    ['widget', 'head', 'flex', 'pb-2'],
+    ['widget', 'title', 'min-w-0', 'text-sm'],
+    ['meter', undefined, 'bg-kui-surface0', undefined],
+    ['meter', 'fill', 'bg-red-500', 'rounded-full'],
+    ['skeleton', undefined, 'flex', 'opacity-60'],
+    ['skeleton', 'block', 'animate-pulse', 'rounded-full'],
+    ['progress', undefined, 'overflow-hidden', 'h-3'],
+    ['progress', 'fill', 'bg-kui-accent', 'bg-lime-500'],
+  ] as const)('%s %s draws its base, then what src/ui.ts sets after it', (id, part, base, restyle) => {
+    const classes = classesOfPart(id, part)
+
+    expect(classes).toContain(base)
+
+    if (restyle !== undefined)
+      expect(classes.at(-1)).toBe(restyle)
+  })
+
+  test('only a root keeps a kui class, and no part writes the class of its old rule', () => {
+    for (const [id, part] of [['avatar', 'initial'], ['stat', 'value'], ['header', 'title'], ['section', 'head'], ['empty', 'description'], ['row', 'body'], ['widget', 'head'], ['meter', 'fill'], ['skeleton', 'block'], ['progress', 'fill']] as const)
+      expect(classesOfPart(id, part).filter(name => name.startsWith('kui-') && name !== 'kui-heading-section'), `${id} ${part}`).toEqual([])
+
+    expect(html).not.toMatch(REMOVED_CLASS)
+  })
+
+  test('a Meter\'s fillClass comes after the accent it replaces', () => {
+    expect(classesOfPart('meter', 'fill').slice(0, 2)).toEqual(['bg-kui-accent', 'bg-red-500'])
   })
 })

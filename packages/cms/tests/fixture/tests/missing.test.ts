@@ -26,8 +26,8 @@ async function recorded(want: number): Promise<string[]> {
 test('the screen says so when nothing was recorded, and links stay under the prefix', async () => {
   const page = await site.visit('/admin/not-found')
 
-  expect(page.find('.kui-empty-state-title').map(title => title.text)).toEqual(['No missing page recorded'])
-  expect(page.text('.kui-empty-state-description')).toContain('production server records')
+  expect(page.find('.kui-empty-state [data-part=title]').map(title => title.text)).toEqual(['No missing page recorded'])
+  expect(page.text('.kui-empty-state [data-part=description]')).toContain('production server records')
   expect(page.find('a').map(link => link.attributes.href).filter(href => href?.startsWith('//'))).toEqual([])
   expect(page.find('.kcms-admin-home')[0]?.attributes.href).toBe('/admin')
 })
@@ -37,10 +37,10 @@ test('the empty state says kay dev counts nothing under kay dev, and what the pr
 
   try {
     process.env.KAY_DEV_CODE = '0'
-    expect((await site.visit('/admin/not-found')).text('.kui-empty-state-description')).toContain('kay dev counts nothing: the production server records')
+    expect((await site.visit('/admin/not-found')).text('.kui-empty-state [data-part=description]')).toContain('kay dev counts nothing: the production server records')
 
     delete process.env.KAY_DEV_CODE
-    expect((await site.visit('/admin/not-found')).text('.kui-empty-state-description')).not.toContain('kay dev counts nothing')
+    expect((await site.visit('/admin/not-found')).text('.kui-empty-state [data-part=description]')).not.toContain('kay dev counts nothing')
   }
   finally {
     if (before === undefined)
@@ -160,7 +160,7 @@ test('dismisses missing paths one by one or all at once, behind the guard', asyn
 
   expect((await post('/clear', {}, { 'x-deny': '1' })).status).toBe(403)
   expect(((await (await post('/clear', {})).json()) as { cleared: number }).cleared).toBeGreaterThan(0)
-  expect((await site.visit('/admin/not-found')).find('.kui-empty-state-title').map(title => title.text)).toEqual(['No missing page recorded'])
+  expect((await site.visit('/admin/not-found')).find('.kui-empty-state [data-part=title]').map(title => title.text)).toEqual(['No missing page recorded'])
 })
 
 test('removes several added redirects at once', async () => {

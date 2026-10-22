@@ -3,12 +3,34 @@ import { CSS_FILE, findProjectFiles } from '../build/files'
 import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
 
-// The part classes kayjs-ui components stopped setting in 1.71 once their recipes drew the look in utilities, with the component and the part that replaces each. A slice of the move adds its components here; theme.css keeps the rules, and this table goes with them in 1.74.
-export const REMOVED_UI_CLASSES: Record<string, { component: string, part: string }> = {
-  'kui-card-head': { component: 'Card', part: 'head' },
-  'kui-card-title': { component: 'Card', part: 'title' },
-  'kui-card-body': { component: 'Card', part: 'body' },
-  'kui-badge-icon': { component: 'Badge', part: 'icon' },
+// The part classes kayjs-ui components stopped setting once their recipes drew the look in utilities, with the component, the part that replaces each and the minor that dropped it. A slice of the move adds its components here; theme.css keeps the rules, and this table goes with them in 1.74.
+export const REMOVED_UI_CLASSES: Record<string, { component: string, part: string, since: string }> = {
+  'kui-card-head': { component: 'Card', part: 'head', since: '1.71' },
+  'kui-card-title': { component: 'Card', part: 'title', since: '1.71' },
+  'kui-card-body': { component: 'Card', part: 'body', since: '1.71' },
+  'kui-badge-icon': { component: 'Badge', part: 'icon', since: '1.71' },
+  'kui-avatar-image': { component: 'Avatar', part: 'image', since: '1.72' },
+  'kui-avatar-initial': { component: 'Avatar', part: 'initial', since: '1.72' },
+  'kui-stat-value': { component: 'Stat', part: 'value', since: '1.72' },
+  'kui-stat-label': { component: 'Stat', part: 'label', since: '1.72' },
+  'kui-page-header-head': { component: 'PageHeader', part: 'head', since: '1.72' },
+  'kui-page-header-title': { component: 'PageHeader', part: 'title', since: '1.72' },
+  'kui-page-header-meta': { component: 'PageHeader', part: 'meta', since: '1.72' },
+  'kui-page-header-actions': { component: 'PageHeader', part: 'actions', since: '1.72' },
+  'kui-page-header-description': { component: 'PageHeader', part: 'description', since: '1.72' },
+  'kui-page-section-head': { component: 'PageSection', part: 'head', since: '1.72' },
+  'kui-page-section-title': { component: 'PageSection', part: 'title', since: '1.72' },
+  'kui-empty-state-title': { component: 'EmptyState', part: 'title', since: '1.72' },
+  'kui-empty-state-description': { component: 'EmptyState', part: 'description', since: '1.72' },
+  'kui-empty-state-actions': { component: 'EmptyState', part: 'actions', since: '1.72' },
+  'kui-card-row-body': { component: 'CardRow', part: 'body', since: '1.72' },
+  'kui-card-row-actions': { component: 'CardRow', part: 'actions', since: '1.72' },
+  'kui-widget-head': { component: 'Widget', part: 'head', since: '1.72' },
+  'kui-widget-title': { component: 'Widget', part: 'title', since: '1.72' },
+  'kui-meter-fill': { component: 'Meter', part: 'fill', since: '1.72' },
+  'kui-progress-fill': { component: 'Progress', part: 'fill', since: '1.72' },
+  'kui-skeleton-block': { component: 'Skeleton', part: 'block', since: '1.72' },
+  'kui-skeleton-label': { component: 'Skeleton', part: 'label', since: '1.72' },
 }
 
 const KUI_CLASS = /\.(kui-[\w-]+)/g
@@ -42,8 +64,8 @@ export async function removedUiClasses(root: string, options: CheckOptions): Pro
         file,
         ...positionAt(source, match.index),
         end: match.index + match[0].length,
-        message: `\`.${match[1]}\` is no longer set on the \`${removed.part}\` of \`${removed.component}\` since 1.71, and its rule leaves theme.css in 1.74`,
-        help: `select \`[data-part='${removed.part}']\` as a child of the component's root, or restyle the part from src/ui.ts: \`'@kaynooo/kayjs-ui/${removed.component.replace(/[A-Z]/g, (letter, at) => `${at > 0 ? '-' : ''}${letter.toLowerCase()}`)}.kay': { parts: { ${removed.part}: '...' } }\``,
+        message: `\`.${match[1]}\` is no longer set on the \`${removed.part}\` of \`${removed.component}\` since ${removed.since}, and its rule leaves theme.css in 1.74`,
+        help: `select \`[data-part='${removed.part}']\` under the component's root (with \`>\` where the part is a direct child, so a nested component's part is left alone), or restyle the part from src/ui.ts: \`'@kaynooo/kayjs-ui/${removed.component.replace(/[A-Z]/g, (letter, at) => `${at > 0 ? '-' : ''}${letter.toLowerCase()}`)}.kay': { parts: { ${removed.part}: '...' } }\``,
         code: 'deprecated-ui-class',
         severity: level === 'warn' ? 'warning' : 'error',
       })

@@ -24,7 +24,7 @@ test('a Stat is the inline pill unless variant is tile, which marks the root for
 test('a tile keeps the figure first and the label after it, as the pill does', async () => {
   const stat = await stats()
 
-  expect([...stat('tile').children].map(child => child.className)).toEqual(['kui-stat-value', 'kui-stat-label'])
+  expect([...stat('tile').children].map(child => child.getAttribute('data-part'))).toEqual(['value', 'label'])
 })
 
 test('tone colours the value through the root, so an app targets no inner class', async () => {

@@ -2,7 +2,21 @@
 import { recipe } from 'kay'
 import type { JSX } from 'kay'
 
-const look = recipe({ parts: { root: 'kui-skeleton', block: 'kui-skeleton-block', label: 'kui-skeleton-label' } })
+const look = recipe({
+  parts: {
+    root: 'kui-skeleton flex w-(--kui-skeleton-width,100%) flex-col gap-2',
+    block: 'block h-(--kui-skeleton-height,1em) w-full animate-pulse bg-kui-surface1 motion-reduce:animate-none data-last:w-3/5',
+    label: 'sr-only',
+  },
+  variants: {
+    shape: {
+      text: '',
+      avatar: { root: 'w-(--kui-skeleton-width,2.5rem)', block: 'aspect-square h-auto rounded-kui-full' },
+      card: { block: 'h-(--kui-skeleton-height,8rem)' },
+    },
+  },
+  defaults: { shape: 'text' },
+})
 
 const { shape = 'text', lines = 1, width, height, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   // `text` draws `lines` bars, the last one shorter; `avatar` a round block; `card` a block.

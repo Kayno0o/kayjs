@@ -50,7 +50,7 @@ inBrowser('in the browser', () => {
 
     await using page = await site.open('/empty-table')
 
-    expect(await page.count('.kui-empty-state-title')).toBe(2)
+    expect(await page.count('.kui-empty-state [data-part=title]')).toBe(2)
     expect(page.errors).toEqual([])
   }, 120_000)
 

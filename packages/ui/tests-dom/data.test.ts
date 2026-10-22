@@ -50,8 +50,8 @@ describe('Avatar', () => {
     await settle()
 
     expect(root.querySelector('#avatar img')).toBeNull()
-    expect(root.querySelector('#avatar .kui-avatar-initial')?.textContent).toBe('A')
-    expect(root.querySelector<HTMLElement>('#avatar .kui-avatar-initial')?.style.backgroundColor).not.toBe('')
+    expect(root.querySelector('#avatar [data-part=initial]')?.textContent).toBe('A')
+    expect(root.querySelector<HTMLElement>('#avatar [data-part=initial]')?.style.backgroundColor).not.toBe('')
 
     click(root.querySelector('#swap'))
     await settle()

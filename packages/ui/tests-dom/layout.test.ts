@@ -18,19 +18,19 @@ describe('EmptyState', () => {
   test('renders its title as a heading of the level given, and as a paragraph without one', async () => {
     const root = await layout()
 
-    expect(root.querySelector('#missing .kui-empty-state-title')?.outerHTML).toBe('<h1 data-part="title" class="kui-empty-state-title">Not found</h1>')
-    expect(root.querySelector('#empty .kui-empty-state-title')?.tagName).toBe('P')
+    expect(root.querySelector('#missing [data-part=title]')?.outerHTML).toStartWith('<h1 data-part="title" class="')
+    expect(root.querySelector('#empty [data-part=title]')?.tagName).toBe('P')
   })
 })
 
 describe('PageHeader', () => {
   test('sets its meta beside the title, before the actions, and its description under the title\'s line, before the children', async () => {
     const root = await layout()
-    const parts = (selector: string) => [...root.querySelectorAll(`${selector} > *, ${selector} > .kui-page-header-head > *`)].map(part => part.className || part.tagName)
+    const parts = (selector: string) => [...root.querySelectorAll(`${selector} > *, ${selector} > [data-part=head] > *`)].map(part => part.getAttribute('data-part') ?? part.tagName)
 
-    expect(parts('#moons')).toEqual(['kui-page-header-head', 'kui-page-header-title', 'kui-page-header-meta', 'kui-page-header-actions', 'kui-page-header-description', 'P'])
-    expect(root.querySelector('#moons .kui-page-header-description')?.textContent).toBe('Every moon of Jupiter, by distance.')
-    expect(parts('#bare')).toEqual(['kui-page-header-head', 'kui-page-header-title'])
+    expect(parts('#moons')).toEqual(['head', 'title', 'meta', 'actions', 'description', 'P'])
+    expect(root.querySelector('#moons [data-part=description]')?.textContent).toBe('Every moon of Jupiter, by distance.')
+    expect(parts('#bare')).toEqual(['head', 'title'])
   })
 })
 

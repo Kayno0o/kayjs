@@ -2,7 +2,7 @@
 import { recipe } from 'kay'
 import type { JSX, Snippet } from 'kay'
 
-const look = recipe({ parts: { root: 'kui-page-section', head: 'kui-page-section-head', title: 'kui-page-section-title' } })
+const look = recipe({ parts: { root: 'kui-page-section flex flex-col gap-kui-section', head: 'flex items-center gap-3', title: 'min-w-0 flex-1' } })
 
 const { title, level = 2, actions, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'title'> & {
   title: string

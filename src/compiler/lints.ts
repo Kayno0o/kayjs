@@ -706,7 +706,7 @@ export const LINTS = {
     group: 'deprecated',
     since: '1.71',
     site: true,
-    summary: 'A stylesheet of the project selecting a part class a kayjs-ui component no longer sets: since 1.71 the recipes of Card, Badge and Notice draw their look in utilities, so `.kui-card-head`, `.kui-card-title`, `.kui-card-body` and `.kui-badge-icon` are gone from their output, each part carrying `data-part` instead, and the classes of the components that follow join the list as they move. A component\'s root keeps its `kui-` class. The rules stay in theme.css for markup written by hand until 1.74. A selector has no safe rewrite, so the report has no fix. Found in the project\'s `.css` files.',
+    summary: 'A stylesheet of the project selecting a part class a kayjs-ui component no longer sets: the recipes of Card, Badge and Notice (1.71) and of Avatar, Stat, PageHeader, PageSection, EmptyState, CardRow, Widget, Meter, Progress and Skeleton (1.72) draw their look in utilities, so `.kui-card-head`, `.kui-stat-value`, `.kui-page-header-title` and the other part classes are gone from their output, each part carrying `data-part` instead, and the components that follow join the list as they move. A component\'s root keeps its `kui-` class. The rules stay in theme.css for markup written by hand until 1.74. A selector has no safe rewrite, so the report has no fix. Found in the project\'s `.css` files.',
     wrong: '.kui-card-head { padding: 1rem; }',
     right: '.kui-card > [data-part=\'head\'] { padding: 1rem; }',
   },

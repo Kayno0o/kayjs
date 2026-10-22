@@ -63,7 +63,7 @@ test('the editor says when nothing on the page comes from a collection', async (
 test('the screens list each collection with its entry count', async () => {
   const page = await site.visit('/admin')
 
-  expect(page.find('.kui-card-row-body a').map(link => [link.text, link.attributes.href])).toEqual([['Footer', '/admin/new/footer'], ['Guides', '/admin/collections/guides'], ['Journal', '/admin/collections/journal'], ['Ledger', '/admin/collections/ledger'], ['Partners', '/admin/collections/partners'], ['Posts', '/admin/collections/posts'], ['Our products', '/admin/collections/products'], ['Profiles', '/admin/collections/profiles'], ['Scratch', '/admin/collections/scratch'], ['Sections', '/admin/collections/sections'], ['Shop', '/admin/collections/shop'], ['Welcome page', '/admin/collections/welcome/index']])
+  expect(page.find('.kui-card-row [data-part=body] a').map(link => [link.text, link.attributes.href])).toEqual([['Footer', '/admin/new/footer'], ['Guides', '/admin/collections/guides'], ['Journal', '/admin/collections/journal'], ['Ledger', '/admin/collections/ledger'], ['Partners', '/admin/collections/partners'], ['Posts', '/admin/collections/posts'], ['Our products', '/admin/collections/products'], ['Profiles', '/admin/collections/profiles'], ['Scratch', '/admin/collections/scratch'], ['Sections', '/admin/collections/sections'], ['Shop', '/admin/collections/shop'], ['Welcome page', '/admin/collections/welcome/index']])
   expect(page.text('main')).toContain('2 entries')
 })
 
@@ -102,7 +102,7 @@ test('a single collection that cannot be read keeps its list address, which says
   footerDown.down = true
 
   try {
-    expect((await site.visit('/admin')).find('.kui-card-row-body a').map(link => link.attributes.href)).toContain('/admin/collections/footer')
+    expect((await site.visit('/admin')).find('.kui-card-row [data-part=body] a').map(link => link.attributes.href)).toContain('/admin/collections/footer')
 
     const response = await site.fetch('/admin/collections/footer', { redirect: 'manual' })
 
@@ -513,7 +513,7 @@ test('a list sorts, filters and searches across its entries from the URL, and co
   expect(filtered.find('.kcms-count').map(count => count.text)).toEqual(['1 result'])
   expect(filtered.find('.kcms-statuses a').map(link => [link.text, 'aria-current' in link.attributes])).toEqual([['All', false], ['Drafts', false], ['Published', true]])
   expect((await site.visit('/admin/collections/posts')).find('.kcms-count')).toEqual([])
-  expect((await site.visit('/admin/collections/posts?q=zzz')).find('.kui-empty-state-title').map(title => title.text)).toEqual(['No match'])
+  expect((await site.visit('/admin/collections/posts?q=zzz')).find('.kui-empty-state [data-part=title]').map(title => title.text)).toEqual(['No match'])
 })
 
 test('a loaded entry is created and removed through its loader, a slug starting with / opening at its escaped path', async () => {

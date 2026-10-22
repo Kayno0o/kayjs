@@ -4,7 +4,17 @@ import type { JSX } from 'kay'
 import { isDark, stringToHexColor } from '@kaynooo/utils/colors'
 import { effect, signal } from 'kay'
 
-const look = recipe({ parts: { root: 'kui-avatar', image: 'kui-avatar-image', initial: 'kui-avatar-initial' } })
+// 'kui-avatar' is the component's name for an app's CSS and tests, and carries no rule of its own that the utilities do not.
+const look = recipe({
+  parts: {
+    root: 'kui-avatar inline-grid size-8 shrink-0 place-items-center overflow-hidden rounded-kui-full border-solid border-kui-avatar-ring bg-kui-surface1 [border-width:var(--kui-border-avatar)]',
+    image: 'size-full object-cover',
+    // Its colours are set inline, seeded by the name.
+    initial: 'grid size-full place-items-center text-xs font-kui-avatar uppercase',
+  },
+  variants: { size: { xs: { root: 'size-5' }, sm: { root: 'size-6' }, md: '', lg: { root: 'size-12', initial: 'text-base' } } },
+  defaults: { size: 'md' },
+})
 
 const { src, name, size = 'md', label, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children' | 'role'> & {
   src?: string | null | undefined

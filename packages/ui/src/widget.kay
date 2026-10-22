@@ -5,7 +5,13 @@ import type { IconSlot } from './defaults'
 import type { IconProps } from 'kay/icons'
 import Icon from './icon.kay'
 
-const look = recipe({ parts: { root: 'kui-widget', head: 'kui-widget-head', title: 'kui-widget-title' } })
+const look = recipe({
+  parts: {
+    root: 'kui-widget flex w-full flex-col gap-3 rounded-kui-card border-(length:--kui-border-width) border-solid border-kui-surface2 bg-kui-surface0 p-4 [box-shadow:var(--kui-shadow-raised)]',
+    head: 'flex items-center gap-2',
+    title: 'min-w-0 flex-1',
+  },
+})
 
 const { title, icon, actions, isEmpty = false, empty, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'title'> & {
   title?: string | undefined

@@ -288,6 +288,50 @@ describe('recipe colours under Tailwind', () => {
   })
 })
 
+describe('the display components whose recipe holds their look, under Tailwind', () => {
+  // The classes of an element of /tones after the server's merge.
+  async function classes(selector: string): Promise<string[]> {
+    return (await one('/tones', selector)).attributes.class!.split(' ')
+  }
+
+  test('a size, a variant and a class of the page replace the base utility they set, and the root keeps its kui name', async () => {
+    const avatar = await classes('#avatar')
+
+    expect(avatar).toContain('kui-avatar')
+    expect(avatar).toContain('size-16')
+    expect(avatar).not.toContain('size-8')
+    expect(avatar).not.toContain('size-12')
+    expect(await classes('#avatar [data-part=initial]')).toContain('text-base')
+    expect(await classes('#avatar [data-part=initial]')).not.toContain('text-xs')
+
+    const stat = await classes('#stat')
+
+    expect(stat).toEqual(expect.arrayContaining(['kui-stat-badge', 'flex', 'flex-col', 'px-9']))
+    expect(stat).not.toEqual(expect.arrayContaining(['px-kui-field-x']))
+    expect(stat).not.toContain('inline-flex')
+    expect(await classes('#stat [data-part=value]')).toEqual(expect.arrayContaining(['text-2xl/none', 'text-kui-error']))
+    expect(await classes('#stat [data-part=value]')).not.toContain('text-kui-text')
+
+    expect(await classes('#progress')).toContain('h-3')
+    expect(await classes('#progress')).not.toContain('h-2')
+    expect(await classes('#row')).toEqual(expect.arrayContaining(['kui-card-row', 'p-9']))
+    expect(await classes('#row')).not.toContain('p-4')
+  })
+
+  test('a fillClass replaces the accent of the Meter\'s fill, and one that sets no colour keeps it', async () => {
+    expect(await classes('#meter [data-part=fill]')).toContain('bg-kui-error')
+    expect(await classes('#meter [data-part=fill]')).not.toContain('bg-kui-accent')
+    expect(await classes('#meter-rounded [data-part=fill]')).toEqual(expect.arrayContaining(['bg-kui-accent', 'rounded-full']))
+  })
+
+  test('the shape of a Skeleton replaces the height and the width of the text bars', async () => {
+    expect(await classes('#skeleton')).toContain('w-(--kui-skeleton-width,2.5rem)')
+    expect(await classes('#skeleton')).not.toContain('w-(--kui-skeleton-width,100%)')
+    expect(await classes('#skeleton [data-part=block]')).toEqual(expect.arrayContaining(['aspect-square', 'h-auto', 'rounded-kui-full']))
+    expect(await classes('#skeleton [data-part=block]')).not.toContain('h-(--kui-skeleton-height,1em)')
+  })
+})
+
 describe('content', () => {
   test('Card titles its frame at the level given, holds a head block at the far end, and insets its body unless bare', async () => {
     expect((await find('/content', '#card [data-part=head] > *')).map(found => [found.tag, found.text])).toEqual([['h3', 'Moons'], ['span', '3']])
@@ -345,8 +389,8 @@ describe('content', () => {
   })
 
   test('EmptyState holds an @actions block below its description, and none without one', async () => {
-    expect((await find('/content', '#empty-action .kui-empty-state-actions a')).map(link => [link.attributes.href, link.text])).toEqual([['/paging', 'Build one']])
-    expect(await find('/content', '#empty .kui-empty-state-actions')).toEqual([])
+    expect((await find('/content', '#empty-action [data-part=actions] a')).map(link => [link.attributes.href, link.text])).toEqual([['/paging', 'Build one']])
+    expect(await find('/content', '#empty [data-part=actions]')).toEqual([])
   })
 
   test('Select marks its value\'s option selected, after the empty one', async () => {
@@ -405,12 +449,12 @@ describe('layout', () => {
   })
 
   test('PageHeader holds the page h1, its actions past the title only when given, and the children under the title line', async () => {
-    expect((await find('/layout', '#header h1, #header .kui-page-header-actions a, #header p')).map(found => [found.tag, found.text])).toEqual([['h1', 'Moons'], ['a', 'New'], ['p', 'Every moon of Mars.']])
-    expect((await find('/layout', '#bare-header h1, #bare-header .kui-page-header-actions')).map(found => found.tag)).toEqual(['h1'])
+    expect((await find('/layout', '#header h1, #header [data-part=actions] a, #header p')).map(found => [found.tag, found.text])).toEqual([['h1', 'Moons'], ['a', 'New'], ['p', 'Every moon of Mars.']])
+    expect((await find('/layout', '#bare-header h1, #bare-header [data-part=actions]')).map(found => found.tag)).toEqual(['h1'])
   })
 
   test('PageSection titles its stretch and holds an actions block at the end of the head line', async () => {
-    expect((await find('/layout', '#section h2, #section .kui-page-section-head a, #section > section > p')).map(found => [found.tag, found.text])).toEqual([['h2', 'Moons'], ['a', 'New'], ['p', 'Phobos']])
+    expect((await find('/layout', '#section h2, #section [data-part=head] a, #section > section > p')).map(found => [found.tag, found.text])).toEqual([['h2', 'Moons'], ['a', 'New'], ['p', 'Phobos']])
   })
 
   test('CollapsibleSection is a native disclosure, folded when asked, boxed, with its meta before the chevron', async () => {
@@ -424,7 +468,7 @@ describe('layout', () => {
   })
 
   test('Widget heads its body with icon, title and actions, swaps an empty body for its @empty block, and renders nothing empty without one', async () => {
-    const head = async (id: string) => (await find('/layout', `#${id} .kui-widget-head > *`)).map(found => found.tag)
+    const head = async (id: string) => (await find('/layout', `#${id} [data-part=head] > *`)).map(found => found.tag)
 
     expect(await head('widget')).toEqual(['svg', 'h2', 'a'])
     expect((await one('/layout', '#widget p')).text).toBe('42')
@@ -435,7 +479,7 @@ describe('layout', () => {
 
   test('CardRow lays its body between what leads and what trails, its actions last', async () => {
     expect((await find('/layout', '#row .kui-card-row > *')).map(found => found.text)).toEqual(['', 'Mars', '3 moons', 'Edit'])
-    expect((await one('/layout', '#row .kui-card-row-actions a')).attributes.href).toBe('/form')
+    expect((await one('/layout', '#row [data-part=actions] a')).attributes.href).toBe('/form')
   })
 })
 
@@ -450,14 +494,14 @@ describe('data', () => {
 
   test('Progress is a named progressbar, determinate with a value out of max (100 by default) and indeterminate without', async () => {
     expect(await attributes('/data', '#progress [role="progressbar"]', ['aria-valuenow', 'aria-label', 'data-indeterminate'])).toEqual([{ 'aria-valuenow': '43', 'aria-label': 'Export', 'data-indeterminate': null }])
-    expect((await one('/data', '#progress .kui-progress-fill')).attributes.style).toBe('width: 42.6%')
+    expect((await one('/data', '#progress [data-part=fill]')).attributes.style).toBe('width: 42.6%')
     expect(await attributes('/data', '#progress-max [role="progressbar"]', ['aria-valuenow'])).toEqual([{ 'aria-valuenow': '50' }])
-    expect((await one('/data', '#progress-max .kui-progress-fill')).attributes.style).toBe('width: 50%')
+    expect((await one('/data', '#progress-max [data-part=fill]')).attributes.style).toBe('width: 50%')
     expect(await attributes('/data', '#indeterminate [role="progressbar"]', ['aria-valuenow', 'data-indeterminate'])).toEqual([{ 'aria-valuenow': null, 'data-indeterminate': '' }])
   })
 
   test('Skeleton hides its bars from screen readers, shortens the last, and announces its label as a status', async () => {
-    expect((await find('/data', '#skeleton .kui-skeleton-block')).map(found => [attr(found, 'aria-hidden'), attr(found, 'data-last')])).toEqual([['true', null], ['true', null], ['true', '']])
+    expect((await find('/data', '#skeleton [data-part=block]')).map(found => [attr(found, 'aria-hidden'), attr(found, 'data-last')])).toEqual([['true', null], ['true', null], ['true', '']])
     expect((await find('/data', '#skeleton [role="status"]')).map(found => found.text)).toEqual(['Loading'])
     expect((await one('/data', '#avatar-skeleton .kui-skeleton')).attributes).toMatchObject({ 'data-shape': 'avatar', 'style': '--kui-skeleton-width: 4rem;' })
     expect(await find('/data', '#avatar-skeleton [role="status"]')).toEqual([])

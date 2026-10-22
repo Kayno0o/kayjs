@@ -2,7 +2,16 @@
 import { recipe } from 'kay'
 import type { JSX, Snippet } from 'kay'
 
-const look = recipe({ parts: { root: 'kui-page-header', head: 'kui-page-header-head', title: 'kui-page-header-title', meta: 'kui-page-header-meta', actions: 'kui-page-header-actions', description: 'kui-page-header-description' } })
+const look = recipe({
+  parts: {
+    root: 'kui-page-header flex flex-col gap-2',
+    head: 'flex flex-wrap items-center gap-4',
+    title: 'm-0 text-xl font-kui-heading tracking-kui-label text-kui-text [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)]',
+    meta: 'flex flex-wrap items-center gap-2 text-sm text-kui-subtext0',
+    actions: 'flex flex-wrap items-center gap-2 border-l border-kui-surface2 pl-4',
+    description: 'm-0 text-sm text-kui-subtext0',
+  },
+})
 
 const { title, meta, description, actions, ...rest } = props<Omit<JSX.IntrinsicElements['header'], 'class' | 'title'> & {
   // The page's one `h1`.

@@ -2,7 +2,14 @@
 import { recipe } from 'kay'
 import type { JSX, Snippet } from 'kay'
 
-const look = recipe({ parts: { root: 'kui-empty-state', title: 'kui-empty-state-title', description: 'kui-empty-state-description', actions: 'kui-empty-state-actions' } })
+const look = recipe({
+  parts: {
+    root: 'kui-empty-state flex flex-col items-center gap-3 py-16',
+    title: 'text-xs font-kui-heading tracking-kui-label text-kui-accent [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)]',
+    description: 'text-xs text-kui-overlay1',
+    actions: 'flex flex-wrap items-center justify-center gap-2',
+  },
+})
 
 const { title, level, description, actions, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'title' | 'children'> & {
   title: string

@@ -11,6 +11,9 @@ kay and its libraries require Bun 1.4.4 or later (`bun upgrade`, then `bun updat
 ### `markdownHtml` formats in an island once marked has loaded
 
 In an island `markdownHtml` from `kay/markdown` returns the text as written on its first call and the formatted HTML after marked has loaded, which a template or an effect calling it picks up. Read it there; a click handler or the script calls `await markdownReady()` (from `kay/markdown`) before it, else it gets the text as written. An island hydrating keeps the server's formatted markup until then.
+### More kayjs-ui parts are selected by data-part
+
+Avatar, Stat, PageHeader, PageSection, EmptyState, CardRow, Widget, Meter, Progress and Skeleton draw their look in recipe utilities too, as Card, Badge and Notice did in 1.71: their part classes are no longer set (`kui-avatar-image` and `-initial`, `kui-stat-value` and `-label`, `kui-page-header-head`, `-title`, `-meta`, `-actions` and `-description`, `kui-page-section-head` and `-title`, `kui-empty-state-title`, `-description` and `-actions`, `kui-card-row-body` and `-actions`, `kui-widget-head` and `-title`, `kui-meter-fill`, `kui-progress-fill`, `kui-skeleton-block` and `-label`), and the root keeps its `kui-` class. A rule of yours on a removed class selects `[data-part='title']` under the root instead (`.kui-page-header [data-part='title']`, or `>` for a direct child, as `head` and `title` are names other components use too), or moves to `src/ui.ts` as `parts: { title: 'tracking-tight' }`. `deprecated-ui-class` reports the selectors in your `.css` files, with no fix. A Meter's `fillClass` still replaces the accent, and a Stat or Skeleton shape is a recipe variant. `theme.css` keeps the rules for markup written by hand until 1.74 ([Restyle a component](../packages/ui/llms/setup.md#restyle-a-component)).
 
 ## 1.71.0
 

@@ -1,11 +1,24 @@
 ---
+import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
 import Badge from '@kaynooo/kayjs-ui/badge.kay'
 import Card from '@kaynooo/kayjs-ui/card.kay'
+import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
+import Meter from '@kaynooo/kayjs-ui/meter.kay'
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
+import Progress from '@kaynooo/kayjs-ui/progress.kay'
+import Skeleton from '@kaynooo/kayjs-ui/skeleton.kay'
+import Stat from '@kaynooo/kayjs-ui/stat.kay'
 import TonesIsland from '../components/tones-island.kay'
 ---
 main
   Card#card(class="border-kui-error" title="Moons")
     Badge#badge(tone="success" label="New")
   Notice#notice(tone="danger" label="Failed")
+  Avatar#avatar(name="Mars" size="lg" class="size-16")
+  Stat#stat(value={3} label="moons" variant="tile" tone="danger" class="px-9")
+  Meter#meter(value={40} label="Disk" fillClass="bg-kui-error")
+  Meter#meter-rounded(value={40} label="Disk" fillClass="rounded-full")
+  Progress#progress(value={30} label="Upload" class="h-3")
+  Skeleton#skeleton(shape="avatar")
+  CardRow#row(class="p-9") Middle
   TonesIsland

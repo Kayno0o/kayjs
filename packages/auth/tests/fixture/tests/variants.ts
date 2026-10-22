@@ -98,7 +98,7 @@ if (process.env.FIXTURE_ADMIN) {
     search: list.find('form[role="search"]')[0]?.attributes.action,
     refused: refused.status,
     acting: { status: acting.status, banner: acting.find('[data-impersonating]').length, tabs: acting.find('.kui-tab-nav a').length },
-    audit: auditPage.find('.kui-empty-state-title').map(title => title.text),
+    audit: auditPage.find('.kui-empty-state [data-part=title]').map(title => title.text),
     home: home.url,
     banner: banner.find('[data-impersonating] form').map(form => form.attributes.action),
     back: banner.find('[data-impersonating] input[name="redirect"]').map(input => input.attributes.value),

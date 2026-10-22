@@ -244,7 +244,7 @@ body {
 }
 
 /* A section's title and its buttons wrap on a narrow screen instead of reaching past it. */
-.kcms-admin .kui-page-section-head {
+.kcms-admin .kui-page-section > [data-part='head'] {
   flex-wrap: wrap;
 }
 

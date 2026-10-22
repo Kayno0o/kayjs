@@ -6,10 +6,30 @@ import type { IconSlot } from './defaults'
 import Icon from './icon.kay'
 
 const look = recipe({
-  parts: { root: 'kui-stat-badge', value: 'kui-stat-value', label: 'kui-stat-label' },
+  // 'kui-stat-badge' keeps the hairline and the fill of the shell it shares with buttons; the figure alone takes the tone, so the label keeps its text colour. A tile fills its grid cell, the figure large above its label.
+  parts: {
+    root: 'kui-stat-badge inline-flex items-center gap-kui-inline rounded-kui-card px-2.25 py-0.75 text-xs',
+    icon: 'size-4 shrink-0',
+    value: 'font-semibold text-kui-text',
+    label: 'text-kui-subtext0',
+  },
   variants: {
-    variant: { inline: '', tile: '' },
-    tone: { neutral: '', accent: '', success: '', warning: '', danger: '', info: '' },
+    variant: {
+      inline: '',
+      tile: {
+        root: 'flex flex-col items-start gap-1 px-kui-field-x py-3',
+        value: 'text-2xl/none',
+        label: 'text-kui-micro font-kui-label tracking-kui-label [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)]',
+      },
+    },
+    tone: {
+      neutral: '',
+      accent: { value: 'text-kui-accent' },
+      success: { value: 'text-kui-success' },
+      warning: { value: 'text-kui-warning' },
+      danger: { value: 'text-kui-error' },
+      info: { value: 'text-kui-info' },
+    },
   },
   defaults: { variant: 'inline', tone: 'neutral' },
 })
@@ -27,7 +47,7 @@ const { value, label, icon, variant = 'inline', tone = 'neutral', ...rest } = pr
 // A figure and what it counts, read together: "12 moons".
 span({...rest} data-variant={variant === 'tile' ? 'tile' : undefined} data-tone={tone === 'neutral' ? undefined : tone})
   if icon
-    Icon(icon={icon})
+    Icon(icon={icon} part="icon")
   span(part="value") {value}
   if label
     span(part="label") {label}

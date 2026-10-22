@@ -4288,6 +4288,7 @@ describe.concurrent('kay check, unused code', () => {
       '.kui-card-head, .panel .kui-card-body:hover { padding: 1rem; }',
       '.kui-badge .kui-badge-icon { width: 1rem; }',
       '.kui-card-row-body { padding: 0; }',
+      '.kui-btn-danger { color: red; }',
       '',
     ].join('\n')
     const root = await scratchProject({ 'src/routes/index.kay': 'p hi\n', 'src/app.css': css })
@@ -4295,9 +4296,12 @@ describe.concurrent('kay check, unused code', () => {
     try {
       const { output } = await runCheck(root)
 
-      expect(output.match(/deprecated-ui-class/g)).toHaveLength(3)
+      expect(output.match(/deprecated-ui-class/g)).toHaveLength(4)
       expect(output).toContain('.kui-card-head')
-      expect(output).toContain('select `[data-part=\'icon\']` as a child of the component\'s root')
+      expect(output).toContain('.kui-card-row-body')
+      expect(output).toContain('since 1.72')
+      expect(output).not.toContain('.kui-btn-danger')
+      expect(output).toContain('select `[data-part=\'icon\']` under the component\'s root')
       await runCheck(root, '--fix')
       expect(await Bun.file(join(root, 'src/app.css')).text()).toBe(css)
     }
