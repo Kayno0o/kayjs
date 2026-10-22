@@ -556,8 +556,6 @@ it('rewrites the CI workflow on the runner the project was scaffolded with', asy
     const features: Feature[] = [...PRESETS.server.features, 'auth']
 
     await createProject(dir, { kay: '^1.0.0', features, runner: 'docker' })
-    // Its sqlite URL would stop the switch to Postgres, which this test is not about.
-    await rm(join(dir, '.env'))
 
     const { written } = await addFeatures(dir, ['postgres'], { install: false })
 

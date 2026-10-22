@@ -23,7 +23,6 @@ export default function auth(project: Project) {
   const mailed = project.exists('src/mail.ts') && project.read('src/mail.ts')?.includes('export const mail') === true
   const imports = [
     'import type { AuthSessionData } from \'@kaynooo/kayjs-auth\'',
-    'import process from \'node:process\'',
     'import { createAuth } from \'@kaynooo/kayjs-auth\'',
     ownDatabase ? 'import { pgStore } from \'@kaynooo/kayjs-auth/pg\'' : 'import { authTables, pgStore } from \'@kaynooo/kayjs-auth/pg\'',
     ...ownDatabase ? [] : ['import { Database } from \'@kaynooo/pg-orm\''],
@@ -40,7 +39,7 @@ export default function auth(project: Project) {
 export const auth = createAuth({
   sessions: session<AuthSessionData>(),
   store: pgStore(db),
-  site: ${JSON.stringify(siteName(project.name))},
+  site: '${siteName(project.name)}',
   pages: true,${mailed ? '\n  email: { mailer: { send: mail.enqueue } },' : ''}
 })
 `
