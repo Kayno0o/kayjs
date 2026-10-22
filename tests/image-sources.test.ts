@@ -215,6 +215,7 @@ describe('images.resolve and images.guard', () => {
       await Bun.write(join(root, 'kay.config.ts'), 'export default { images: { resolve: () => undefined } }\n')
       await Bun.write(join(root, 'src/components/counter.kay'), '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(value => value + 1)}) {count()}\n')
       await Bun.write(join(root, 'src/routes/index.kay'), '--- server\nexport const page = { prerender: true }\n---\n---\nimport Counter from \'../components/counter.kay\'\n---\nCounter\n')
+      // This build applies the project's image config to the process, which for this project is the defaults the file's app already runs with.
       const built = await kayBuild([root, '--no-check'])
 
       expect(built.code, built.output).toBe(0)

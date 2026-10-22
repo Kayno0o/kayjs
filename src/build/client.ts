@@ -10,7 +10,7 @@ import type { ChunkInputs, IslandWhy } from './report'
 import type { StyleUses, UnresolvedClass } from './style-uses'
 import type { Reached } from './styles'
 import type { FileDiagnostic } from './transform'
-import { existsSync, realpathSync } from 'node:fs'
+import { existsSync, realpathSync, statSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import { builtinModules } from 'node:module'
 import { basename, join, relative, resolve, sep } from 'node:path'
@@ -155,10 +155,27 @@ function rootMargin(value: string | undefined, fallback: string, what: string): 
 
 // What each module imports, kept by the builds of this process: a module whose content is unchanged is not read for its imports again, as the dev builder does across its rebuilds.
 const builtGraph: ImportGraph = new Map()
+// The size and time of the files that decide how a specifier resolves, by root: one changed since the last build of the root drops the graph, as `kay dev` does on a full build.
+const resolution = new Map<string, string>()
+
+function resolutionStamp(root: string): string {
+  return ['package.json', 'tsconfig.json'].map((name) => {
+    const one = statSync(join(root, name), { throwIfNoEntry: false })
+
+    return one === undefined ? '' : `${one.mtimeMs}:${one.size}`
+  }).join('|')
+}
 
 async function bundleClient(root: string, options: ClientOptions): Promise<ClientBuild> {
   rootMargin(options.hydration?.visible, '200px', 'visible')
   rootMargin(options.hydration?.serverIslands, '100% 0px', 'serverIslands')
+
+  const stamp = resolutionStamp(root)
+
+  if (resolution.get(root) !== undefined && resolution.get(root) !== stamp)
+    builtGraph.clear()
+
+  resolution.set(root, stamp)
 
   const sources = await readClientSources(root, options, builtGraph)
 

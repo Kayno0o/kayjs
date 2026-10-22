@@ -23,7 +23,7 @@ export interface KayLibrary {
   extension?: true
 }
 
-// What each module imports while its text stays the same, which `kay dev` keeps from one build to the next: the paths found, and the specifiers not found, looked up again each time as a file written since may answer them.
+// What each module imports while its text stays the same, which `kay dev` keeps from one build to the next and `buildClient` for the life of the process: the paths found, and the specifiers not found, looked up again each time as a file written since may answer them.
 export type ImportGraph = Map<string, Imports>
 
 interface Imports {
