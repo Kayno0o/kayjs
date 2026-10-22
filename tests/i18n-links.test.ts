@@ -55,6 +55,7 @@ describe('an island of an app with locales', () => {
 
     // This build is not minified, so the call is found by name.
     expect(eager.filter(code => code.includes('setErrorReporter((error'))).toHaveLength(1)
+    expect(eager.filter(code => code.includes('"unhandledrejection"'))).toHaveLength(1)
     expect(eager.filter(code => code.includes('unsaved changes'))).toEqual([])
   })
 })
