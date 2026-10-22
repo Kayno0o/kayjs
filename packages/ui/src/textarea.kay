@@ -12,17 +12,17 @@ const { value, onInput, onChange, onBlur, writeFocused = false, ...rest } = prop
   onInput?: ((value: string) => void) | undefined
   // Called once the value is committed, on blur, after `onInput`.
   onChange?: ((value: string) => void) | undefined
-  // Lets any write of the parent land while the box is focused, the caret going to the end, such as a chat putting a refused message back; without it, only an empty text does.
+  // Lets any write of the parent land while the box is focused, the caret going to the end, such as a chat clearing its draft or putting a refused message back.
   writeFocused?: boolean | undefined
 }>()
 
 let box: HTMLTextAreaElement | undefined
 
-// The parent may write back its own reading of the text, such as without the blank line just typed: the box takes it once left, never while focused, which would throw the caret to the end, except an empty text, such as a chat clearing its draft after a send.
+// The parent may write back its own reading of the text, such as without the blank line just typed: the box takes it once left, never while focused, which would throw the caret to the end.
 const { heard, sync } = controlledValue({
   box: () => box,
   value: () => value,
-  writable: element => writeFocused || document.activeElement !== element || value === '',
+  writable: element => writeFocused || document.activeElement !== element,
   report: (element) => {
     heard(element.value)
     ;(onInput ?? onChange)?.(element.value)

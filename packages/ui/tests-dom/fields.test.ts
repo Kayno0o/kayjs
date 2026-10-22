@@ -137,7 +137,7 @@ describe('Textarea', () => {
 })
 
 describe('Textarea cleared by its parent', () => {
-  test('takes an empty write while focused, as a chat clears its draft after a send, and still refuses any other', async () => {
+  test('refuses any write of the parent while focused, an empty one included', async () => {
     const root = await fields()
     const area = root.querySelector<HTMLTextAreaElement>('#draft')!
 
@@ -148,12 +148,11 @@ describe('Textarea cleared by its parent', () => {
 
     root.querySelector<HTMLButtonElement>('#send')!.click()
     await settle()
-    expect(area.value).toBe('')
+    expect(area.value).toBe('Hello')
 
-    area.focus()
     root.querySelector<HTMLButtonElement>('#restore')!.click()
     await settle()
-    expect(area.value).toBe('')
+    expect(area.value).toBe('Hello')
     expect(root.querySelector<HTMLTextAreaElement>('#live')!.value).toBe('Back')
   })
 
