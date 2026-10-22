@@ -120,7 +120,54 @@ export interface ParsedFence {
 
 // Splits a component script into module-level code (imports, types) and the component body, and finds the props macro.
 // `serverNames` are the names the `--- server` fence hands the script, which a type may take the type of, and `templateReads` the values of `kay` the template reads, which the compiler imports like the script's own.
-export function analyzeScript(source: string, script: Span | undefined, serverNames: string[] = [], templateReads: readonly string[] = []): ScriptAnalysis {
+// `module` is the `--- module` fence, whose code stays at module level beside the script's imports and types.
+export function analyzeScript(source: string, script: Span | undefined, serverNames: string[] = [], templateReads: readonly string[] = [], module?: Span): ScriptAnalysis {
+  const analysis = analyzeComponentScript(source, script, serverNames, templateReads)
+
+  return module === undefined ? analysis : withModule(analysis, analyzeModule(source, module))
+}
+
+// The `--- module` fence as module-level code: every statement is hoisted, the exports among them are the file's own.
+function analyzeModule(source: string, module: Span): ScriptAnalysis {
+  const analysis: ScriptAnalysis = { hoisted: [], imports: [], specifiers: [], body: [], broken: [], brokenModule: [], reactive: false, implicit: [], functions: [], diagnostics: [] }
+  const split = splitFence(source, module, [], analysis)
+
+  if (!split)
+    return analysis
+
+  analysis.reactive = analysis.implicit.some(name => !STATIC_EXPORTS.has(name)) || analysis.imports.some(importsReactiveValue)
+
+  for (const { statement, span } of split.statements) {
+    if (propsDeclaration(statement, split.ast.program.body, split.shift, [])) {
+      analysis.diagnostics.push({ ...span, message: 'A `--- module` fence declares no props', help: 'declare them in the component script' })
+
+      continue
+    }
+
+    if (statement.type === 'ExportDefaultDeclaration')
+      analysis.diagnostics.push({ ...span, message: 'The component is the default export of its file', help: 'export a name instead' })
+
+    analysis.functions.push(...functionNames(statement))
+    analysis.hoisted.push(span)
+  }
+
+  return analysis
+}
+
+function withModule(script: ScriptAnalysis, module: ScriptAnalysis): ScriptAnalysis {
+  return {
+    ...script,
+    hoisted: [...script.hoisted, ...module.hoisted].toSorted((a, b) => a.start - b.start),
+    imports: [...script.imports, ...module.imports],
+    specifiers: [...script.specifiers, ...module.specifiers],
+    reactive: script.reactive || module.reactive,
+    implicit: [...new Set([...script.implicit, ...module.implicit])],
+    functions: [...script.functions, ...module.functions],
+    diagnostics: [...script.diagnostics, ...module.diagnostics],
+  }
+}
+
+function analyzeComponentScript(source: string, script: Span | undefined, serverNames: string[], templateReads: readonly string[]): ScriptAnalysis {
   const analysis: ScriptAnalysis = { hoisted: [], imports: [], specifiers: [], body: [], broken: [], brokenModule: [], reactive: false, implicit: [], functions: [], plain: [], diagnostics: [] }
 
   if (!script) {

@@ -146,10 +146,11 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
         loaded?.add(path)
 
         const source = await Bun.file(path).text()
-        const { script, server, template } = parseKay(source)
+        const { script, server, module, template } = parseKay(source)
         const styles = server ? serverStyles(source.slice(server.start, server.end), path) : ''
-        const [contents, content] = await Promise.all([
+        const [contents, moduleContents, content] = await Promise.all([
           script ? imports(source.slice(script.start, script.end), path, 'ts') : '',
+          module ? imports(source.slice(module.start, module.end), path, 'ts') : '',
           server && rendersContent(template) ? contentImports(source.slice(server.start, server.end), path) : '',
           server ? serverAssets(source.slice(server.start, server.end), path, 'ts') : undefined,
         ])
@@ -157,7 +158,7 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
         // A component `src/ui.ts` restyles has the classes written there, which the page using it keeps the rules of.
         const restyled = uiEntryOf(root, path) === undefined ? '' : importing(note(path, [join(root, UI_FILE)]))
 
-        return { contents: classes + contents + styles + content + restyled, loader: 'js' }
+        return { contents: classes + contents + moduleContents + styles + content + restyled, loader: 'js' }
       })
       build.onLoad({ filter: SCRIPT_FILE }, async ({ path }) => {
         loaded?.add(path)

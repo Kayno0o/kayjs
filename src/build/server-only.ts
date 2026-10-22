@@ -113,7 +113,7 @@ function parsed(source: string, fenced: boolean): t.File | undefined {
 function fences(source: string): string {
   const file = parseKay(source)
 
-  return [file.script, file.server].map(span => span ? source.slice(span.start, span.end) : '').join('\n')
+  return [file.script, file.server, file.module].map(span => span ? source.slice(span.start, span.end) : '').join('\n')
 }
 
 // `process.env.NODE_ENV`, which the client build replaces with a literal: a module reading it is not one to go and fix.
@@ -347,9 +347,9 @@ function importsKaySchema(source: string): boolean {
 
 // The component script of a `.kay` file: its server fence never reaches the browser.
 function scriptFence(source: string): string {
-  const { script } = parseKay(source)
+  const { script, module } = parseKay(source)
 
-  return script ? source.slice(script.start, script.end) : ''
+  return [script, module].map(span => span ? source.slice(span.start, span.end) : '').join('\n')
 }
 
 // A module of the chunk kay cannot read, a virtual one for instance, tells nothing about where the read came from.

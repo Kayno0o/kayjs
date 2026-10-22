@@ -281,10 +281,10 @@ async function clientOnlyIsland(source: string, filename: string, cacheDir: stri
 function probedPackages(source: string): string[] {
   const { file } = parseExpanded(source)
 
-  if (file.client || !file.script || file.server)
+  if (file.client || (!file.script && !file.module) || file.server)
     return []
 
-  const script = analyzeScript(file.source, file.script, [], templateReads(file))
+  const script = analyzeScript(file.source, file.script, [], templateReads(file), file.module)
 
   return isInteractive(file, script) ? packagesToProbe(source, script) : []
 }

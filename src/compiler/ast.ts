@@ -517,6 +517,8 @@ export interface KayFile {
   source: string
   script?: Span | undefined
   server?: Span | undefined
+  // The `--- module` fence: code at module level, whose exports are the file's own.
+  module?: Span | undefined
   // Inside the angle brackets of `--- <T extends Row>`: the component function's type parameters.
   typeParameters?: Span | undefined
   // The `client` of `--- client`: the component renders in the browser only.

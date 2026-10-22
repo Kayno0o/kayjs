@@ -179,11 +179,12 @@ ul
 
 ### File layout
 
-- Up to two fences come first, in either order, then the template. Both are optional.
+- Up to three fences come first, in any order, then the template. All are optional.
 - `---` holds the component script: imports, props, signals, functions. It runs wherever the component renders.
 - `--- server` exists on pages and layouts only. It runs on the server for each request and never reaches the browser.
 - `--- client` in place of `---` makes the component render in the browser only, generic ones written `--- client <T>`; see [Islands](islands.md#islands).
-- A fence ends on a `---` line, or on a `--- server`, `--- client` or `--- script` line, which opens the next fence.
+- `--- module` holds module-level code, run once per bundle rather than per render: `export const visits = signal(0)` or `export function label(n: number)` there are values other files import from the `.kay` file, typed as written (`import { label } from './counter.kay'`). It takes no props and no default export, and a `--- client` component has none. Module state is per bundle: the server's copy and the browser's are not shared.
+- A fence ends on a `---` line, or on a `--- server`, `--- client`, `--- script` or `--- module` line, which opens the next fence.
 - `--- script` is `---` spelled out, for a script that follows another fence.
 - Imports, `type` and `interface` declarations are module level, except a type taking the `typeof` a name the script declares, which stays inside the component.
 - Both fences may import the same name; the server fence's copy is dropped.

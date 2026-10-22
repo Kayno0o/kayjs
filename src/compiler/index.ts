@@ -138,7 +138,7 @@ export function rendersAsIsland(original: string, imported?: ImportedSignals): b
   const { file } = parseExpanded(original)
   const source = file.source
   const server = analyzeServer(source, file.server)
-  const script = analyzeScript(source, file.script, server?.data.map(data => data.name), templateReads(file))
+  const script = analyzeScript(source, file.script, server?.data.map(data => data.name), templateReads(file), file.module)
 
   return file.client !== undefined || isInteractive(file, script) || (file.server === undefined && liveImport(script, imported) !== undefined)
 }
@@ -152,7 +152,7 @@ export function browserRole(original: string, filename: string, imported?: Impor
     return undefined
 
   const server = analyzeServer(source, file.server)
-  const script = analyzeScript(source, file.script, server?.data.map(data => data.name), templateReads(file))
+  const script = analyzeScript(source, file.script, server?.data.map(data => data.name), templateReads(file), file.module)
 
   if (file.client !== undefined || isInteractive(file, script) || liveImport(script, imported) !== undefined)
     return 'island'
@@ -165,7 +165,7 @@ export function promotedChecks(original: string): Diagnostic[] {
   const { file } = parseExpanded(original)
   const source = file.source
   const server = analyzeServer(source, file.server)
-  const script = analyzeScript(source, file.script, server?.data.map(data => data.name), templateReads(file))
+  const script = analyzeScript(source, file.script, server?.data.map(data => data.name), templateReads(file), file.module)
   const site = promotionSite(file, script)
   const marker = islandMarker(source)
   const announced = site === undefined || marker !== undefined ? [] : [{ ...site.span, code: 'promoted-island', message: `This component renders as an island: ${site.cause}`, note: 'a function or a block with parameters cannot be sent to the browser as data, so the component hydrates itself', help: 'write `// kay-island` in it to say so, or pass the island what can be serialized', checkOnly: true }]
@@ -179,7 +179,7 @@ export function compileKay(original: string, filename: string, options: CompileO
   const { file, expansion, problems } = parseExpanded(original)
   const source = file.source
   const server = analyzeServer(source, file.server)
-  const script = analyzeScript(source, file.script, server?.data.map(data => data.name), templateReads(file))
+  const script = analyzeScript(source, file.script, server?.data.map(data => data.name), templateReads(file), file.module)
 
   drawIcons(file, new Set([...script.imports, ...server?.imports ?? []].filter(binding => !binding.typeOnly && binding.imported === 'default' && ICON_IMPORT.test(binding.source)).map(binding => binding.local)))
 
@@ -204,7 +204,7 @@ export function compileKay(original: string, filename: string, options: CompileO
   // Only code that runs calls the accessors of rows and aliases; the type checker reads them as values, which it narrows.
   const values = options.output === undefined
   const found = findRewrites({ code: analysis.builder.code, map: analysis.builder.map(), sites: analysis.sites, values, templateStart: file.templateStart, imported, component: componentName(filename), check: options.check, fixedPage: routeFile })
-  const fences = [file.script, file.server].map(span => span ? source.slice(span.start, span.end) : '').join('\n')
+  const fences = [file.script, file.server, file.module].map(span => span ? source.slice(span.start, span.end) : '').join('\n')
   const name = freeName(componentName(filename), fences, found.findings.globalReads)
   const final = generate(file, script, server, { ...generateOptions, name, rewrites: found.plan.rewrites, translates: found.plan.translates, writes: found.plan.writes, values: found.plan.values })
   // A fence that did not parse at all reaches the code unanalysed, so what the rewrites say of its names is only noise beside its syntax error.
@@ -245,6 +245,9 @@ export function compileKay(original: string, filename: string, options: CompileO
 
   if (marker !== undefined)
     diagnostics.push(...markerMismatch(marker, { route: routeFile, island: island !== undefined, why, promotion }))
+
+  if (file.client && file.module)
+    diagnostics.push({ ...file.client, code: 'fence-invalid', message: 'A `--- client` component has no `--- module` fence', note: 'the server loads only its live imports, so its exports would be missing there', help: 'put the shared values in a `.ts` module' })
 
   if (file.client && routeFile)
     diagnostics.push({ ...file.client, code: 'client-route-fence', message: 'A page, layout or special page cannot be `--- client`', note: 'it renders on the server', help: 'move what needs the browser to a component it renders, and make that one `--- client`' })

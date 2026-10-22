@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- A `--- module` fence holds module-level code whose exports other files import from the `.kay` file, typed for them ([Components](components.md#file-layout)).
 - `kay check` warns of a static component rendering as an island (`promoted-island`), `// kay-island` and `// kay-static` mark what a component is meant to be (`island-marker`), and the editor shows a lens saying whether it is an island and why ([Islands](islands.md#islands)).
 - The language server completes element, attribute, prop and block names, route paths, `t()` keys and lint names, and offers an outline, folding, a fix-all-on-save action and import updates when a `.kay` file is renamed ([Editor](editor-and-agent-commands.md)).
 - `style:prop={value}` sets one CSS property of an element, and `onSubmit|preventDefault={save}` calls `preventDefault` or `stopPropagation` before a handler ([Templates](templates.md)).

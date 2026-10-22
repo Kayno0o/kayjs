@@ -4,7 +4,7 @@ import { parseExpression } from '@babel/parser'
 import { scanClassName } from './class-name'
 import { Scanner } from './scanner'
 
-// `--- server`, `--- client`, `--- script`, or `--- <T extends Row>` making the component generic, its type parameters in the third or fourth group: `--- client <T>` takes both.
+// `--- server`, `--- client`, `--- script`, `--- module`, or `--- <T extends Row>` making the component generic, its type parameters in the third or fourth group: `--- client <T>` takes both.
 const FENCE = /---(?:([ \t]*)([a-z]+)(?:[ \t]+<(.*)>)?|[ \t]*<(.*)>)?[ \t]*\r?\n/diy
 const CLOSING_FENCE = /^---(?:[ \t]*$|[ \t]*[a-z<])/gm
 const CLOSING_LINE = /---[ \t]*(?=\r?\n|$)/y
@@ -83,13 +83,13 @@ const KEYWORD = keyword('if|else[ \\t]+if|else|for|await|then|catch|try|pending|
 
 export function parseKay(source: string): KayFile {
   const diagnostics: Diagnostic[] = []
-  const fences: Partial<Record<'script' | 'server', Span>> = {}
+  const fences: Partial<Record<'script' | 'server' | 'module', Span>> = {}
   let typeParameters: Span | undefined
   let client: Span | undefined
   let templateStart = 0
   let unclosedServer: Diagnostic | undefined
 
-  // Fences come first, in any order: `---` or `--- script` holds the component script, `--- client` one rendering in the browser only, `--- server` the code that runs on the server only.
+  // Fences come first, in any order: `---` or `--- script` holds the component script, `--- client` one rendering in the browser only, `--- server` the code that runs on the server only, `--- module` the module-level code, which exports values.
   // A labeled fence line also closes the fence before it, so `--- server` code can run straight into `--- script`.
   while (true) {
     BLANK_LINES.lastIndex = templateStart
@@ -118,16 +118,16 @@ export function parseKay(source: string): KayFile {
         diagnostics.push(unclosed)
     }
 
-    if (!spaced || (kind !== 'script' && kind !== 'server'))
-      diagnostics.push({ start: fence.index, end: bodyStart - 1, code: 'fence-invalid', message: `Unknown fence \`${fence[0].trim()}\``, help: 'use `---` or `--- script` for the component script, `--- client` for one rendering in the browser only, or `--- server` for server code' })
+    if (!spaced || (kind !== 'script' && kind !== 'server' && kind !== 'module'))
+      diagnostics.push({ start: fence.index, end: bodyStart - 1, code: 'fence-invalid', message: `Unknown fence \`${fence[0].trim()}\``, help: 'use `---` or `--- script` for the component script, `--- client` for one rendering in the browser only, `--- server` for server code, or `--- module` for module-level code that exports values' })
     else if (fences[kind])
-      diagnostics.push({ start: fence.index, end: bodyStart - 1, code: 'fence-invalid', message: `A file has one ${kind === 'server' ? '`--- server`' : 'script'} fence` })
+      diagnostics.push({ start: fence.index, end: bodyStart - 1, code: 'fence-invalid', message: `A file has one ${kind === 'script' ? 'script' : `\`--- ${kind}\``} fence` })
     else
       fences[kind] = span
 
     const parameters = fence.indices?.[3] ?? fence.indices?.[4]
 
-    if (kind === 'server' && parameters)
+    if (kind !== 'script' && parameters)
       diagnostics.push({ start: parameters[0], end: parameters[1], code: 'fence-invalid', message: 'Type parameters go on the component script fence', help: '`--- <T>`' })
 
     if (kind === 'script' && fences.script === span) {
@@ -141,7 +141,7 @@ export function parseKay(source: string): KayFile {
 
   const parser = new TemplateParser(source, templateStart, diagnostics)
 
-  return { source, script: fences.script, server: fences.server, typeParameters, client, templateStart, template: parser.parseTemplate(), diagnostics, unclosedServer }
+  return { source, script: fences.script, server: fences.server, module: fences.module, typeParameters, client, templateStart, template: parser.parseTemplate(), diagnostics, unclosedServer }
 }
 
 // The line closing a fence, past any inside a template literal or a comment, such as a markdown front matter the code holds: a `---` line, consumed, or a labeled one opening the next fence, left to it.

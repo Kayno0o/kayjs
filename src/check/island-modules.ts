@@ -15,13 +15,14 @@ const DECLARATION_FILE = /\.d\.[cm]?ts$/
 const OUTSIDE = /^(?:node:|bun:|kay(?:\/|$))/
 
 function scriptImportsOf(source: string): string[] {
-  const { script } = parseKay(source)
+  const { script, module } = parseKay(source)
+  const fences = [script, module].filter(span => span !== undefined)
 
-  if (!script)
+  if (fences.length === 0)
     return []
 
   try {
-    return transpilerFor('ts').scanImports(source.slice(script.start, script.end)).map(entry => entry.path)
+    return fences.flatMap(span => transpilerFor('ts').scanImports(source.slice(span.start, span.end)).map(entry => entry.path))
   }
   catch {
     return []

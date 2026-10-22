@@ -41,6 +41,12 @@ export function documentSymbols(source: string): DocumentSymbol[] {
     fences.push({ label: file.client ? 'client' : 'script', span: file.script, declared: analysis.fence ? declarations(analysis.fence, symbol) : [] })
   }
 
+  if (file.module) {
+    const analysis = analyzeScript(source, file.module)
+
+    fences.push({ label: 'module', span: file.module, declared: analysis.fence ? declarations(analysis.fence, symbol) : [] })
+  }
+
   const fenced = fences.sort((first, second) => first.span.start - second.span.start).map(({ label, span, declared }) => symbol(label, MODULE, { start: fenceLineStart(source, span.start), end: span.end }, { start: fenceLineStart(source, span.start), end: span.start }, undefined, declared))
   const template = file.template.flatMap(node => nodeSymbols(node, source, symbol))
 
@@ -165,7 +171,7 @@ export function foldingRanges(source: string): FoldingRange[] {
       folds.push({ startLine, endLine, ...kind && { kind } })
   }
 
-  for (const span of [file.server, file.script]) {
+  for (const span of [file.server, file.script, file.module]) {
     if (span)
       fold(fenceLineStart(source, span.start), span.end, 'region')
   }

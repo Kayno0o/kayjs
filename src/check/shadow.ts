@@ -217,9 +217,9 @@ function codeIn(shadow: ShadowFile): { fences: Span[], expressions: Span[] } {
   let spans = codeOf.get(shadow)
 
   if (!spans) {
-    const { script, server, template } = parseKay(shadow.source)
+    const { script, server, module, template } = parseKay(shadow.source)
 
-    codeOf.set(shadow, spans = { fences: [script, server].filter(span => span !== undefined), expressions: expressionSpans(template) })
+    codeOf.set(shadow, spans = { fences: [script, server, module].filter(span => span !== undefined), expressions: expressionSpans(template) })
   }
 
   return spans
