@@ -167,7 +167,7 @@ No level applies to an error and no `// kay-allow` comment reaches it. Errors ka
 | `export-private-file` | export | A static export linking a private or stored file, which only a server can serve. | [Static export](/guides/static-export) |
 | `search-page-unreadable` | build | The search index could not read a prerendered page. | [Site search](/essentials/head-and-seo) |
 | `config-default-export` | build | kay.config.ts that does not export its config by default. | [Project setup](/reference/cli) |
-| `content-invalid` | content | Entries of a collection that do not compile or match its schema, a slug two entries share, a component the collection does not name, or a feed entry with an invalid date. | [Collections](/guides/content) |
+| `content-invalid` | content | Entries of a collection that do not compile or match its schema, a slug two entries share, a component the collection does not name, a feed entry with an invalid date, or a feed item with no `path` in a collection with no `route`. | [Collections](/guides/content) |
 | `markdown-invalid` | content | Markdown or data an entry holds that kay cannot read: a component never closed, a component tag or attribute kay cannot read, JSON or YAML that does not parse. | [Components in Markdown](/guides/content) |
 | `content-config-missing` | content | The content config the project names does not exist, or a collection is not exported from it. | [Collections](/guides/content) |
 | `loader-result` | content | A collection's `load` that threw, did not give an array, or gave an entry with no slug. | [Loaded collections](/guides/content) |

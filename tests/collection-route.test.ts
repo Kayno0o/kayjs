@@ -4,10 +4,27 @@ import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
 import { bootProblems } from '../src/check/boot'
-import { collection } from '../src/content'
+import { contentChecks, projectProblems } from '../src/check/project'
+import { collection, paginate } from '../src/content'
 import { unservedRoutes } from '../src/content/claims'
 import { feedXml } from '../src/content/feed'
 import { scratchDir } from './scratch'
+
+const CLI = join(import.meta.dir, '../src/cli.ts')
+const config = (trailingSlash: string) => `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ log: false, site: 'https://x.example', base: '/site', trailingSlash: '${trailingSlash}', i18n: { locales: ['en', 'fr'], defaultLocale: 'en', paths: { '/notes/:slug': { fr: '/remarques/:slug' } } } })\n`
+const TSCONFIG = JSON.stringify({
+  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
+  include: ['src', '.kay/types'],
+})
+const MESSAGES = 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({})\n'
+const FILES: Record<string, string> = {
+  'src/messages/en.ts': MESSAGES,
+  'src/messages/fr.ts': MESSAGES,
+  'src/content.config.ts': 'import { s } from \'kay\'\nimport { collection } from \'kay/content\'\n\nexport const notes = collection(\'content/notes\', { schema: s.Object({ title: s.String(), date: s.Date() }), localized: true, route: \'/notes/:slug\', feed: { path: \'/feeds/notes.xml\', title: \'Notes\', item: note => ({ title: note.data.title, date: note.data.date }) } })\n',
+  'src/content/notes/en/a.md': '---\ntitle: first\ndate: 2026-01-01\n---\nbody\n',
+  'src/content/notes/fr/a.md': '---\ntitle: premier\ndate: 2026-01-01\n---\ncorps\n',
+  'src/routes/notes/[slug].kay': '--- server\nimport { notes } from \'../../content.config\'\n\nexport const page = { prerender: notes }\n\nconst note = await notes.get(ctx.params.slug) ?? ctx.notFound()\n---\nh1 {note.data.title}\na.self(href={note.url}) self\n',
+}
 
 const schema = t.Object({ title: t.String() })
 const item = (title: string) => ({ title, date: new Date('2026-01-01') })
@@ -18,7 +35,7 @@ describe('a collection route', () => {
     const entries = await posts.all()
 
     expect(entries.map(entry => entry.url)).toEqual(['/blog/a%20b%3Fc', '/blog/hello'])
-    expect((await posts.get('hello'))?.url.length).toBe(11)
+    expect((await posts.get('hello'))?.url).toBe('/blog/hello')
   })
 
   it('keeps the folders of a slug under a catch-all route', async () => {
@@ -62,6 +79,24 @@ describe('a collection route', () => {
   })
 })
 
+describe('the types of a collection route', () => {
+  it('types url as a string for a routed collection and a page of it, and a feed path as required without one', async () => {
+    const routed = collection({ name: 'route-types', load: () => [{ slug: 'hello', data: { title: 'Hello' } }] }, { schema, route: '/blog/:slug', feed: { path: '/rss.xml', title: 'T', item: entry => item(entry.data.title) } })
+    const plain = collection({ name: 'route-types-plain', load: () => [{ slug: 'hello', data: { title: 'Hello' } }] }, { schema, feed: { path: '/rss.xml', title: 'T', item: entry => ({ ...item(entry.data.title), path: `/${entry.slug}` }) } })
+
+    // @ts-expect-error a feed with no route says where its items link
+    collection({ name: 'route-types-bare', load: () => [] }, { schema, feed: { path: '/rss.xml', title: 'T', item: entry => item(entry.data.title) } })
+
+    const first: string = (await routed.all())[0]!.url
+    // A page of a paginated list runs only while a page renders: it is typed here, not called.
+    const paged = async (): Promise<string> => (await paginate(routed, 5).page(undefined))!.items[0]!.url
+    // @ts-expect-error without a route the url may be missing
+    const missing: string = (await plain.all())[0]!.url
+
+    expect([first, missing as string | undefined, typeof paged]).toEqual(['/blog/hello', undefined, 'function'])
+  })
+})
+
 describe('unservedRoutes', () => {
   const routes = [{ collection: 'posts', route: '/blog/:slug' }, { collection: 'docs', route: '/docs/*slug' }]
 
@@ -69,10 +104,30 @@ describe('unservedRoutes', () => {
     expect(unservedRoutes(routes, ['/blog/:id', '/docs/*'])).toEqual([])
     expect(unservedRoutes(routes, ['/blog', '/docs/:slug'])).toEqual(routes)
     expect(unservedRoutes(routes, ['/blog/:slug'])).toEqual([routes[1]!])
+    expect(unservedRoutes(routes, ['/*'])).toEqual([])
+    expect(unservedRoutes(routes, ['/blog/*', '/docs/:slug'])).toEqual([routes[1]!])
   })
 })
 
 describe('kay check', () => {
+  it('reads the routes of the collections in the project and reports the unserved one', async () => {
+    const root = await scratchDir('collection-route-probe-')
+
+    try {
+      await Promise.all(Object.entries({ 'tsconfig.json': TSCONFIG, 'kay.config.ts': config('never'), ...FILES, 'src/routes/other.kay': 'h1 Other\n' }).map(async ([path, content]) => Bun.write(join(root, path), content)))
+      await rm(join(root, 'src/routes/notes'), { recursive: true, force: true })
+
+      const options = { site: 'https://x.example' }
+      const content = await contentChecks(root, options)
+
+      expect(content.routes).toEqual([{ collection: 'notes', route: '/notes/:slug' }])
+      expect((await projectProblems(root, options, content)).map(problem => problem.message)).toEqual([expect.stringContaining('the route /notes/:slug of the collection notes is served by no page')])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+
   it('reports a route no page serves, and none when a page does', async () => {
     const root = await scratchDir('collection-route-check-')
 
@@ -91,22 +146,6 @@ describe('kay check', () => {
   })
 })
 
-const CLI = join(import.meta.dir, '../src/cli.ts')
-const config = (trailingSlash: string) => `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ log: false, site: 'https://x.example', base: '/site', trailingSlash: '${trailingSlash}', i18n: { locales: ['en', 'fr'], defaultLocale: 'en' } })\n`
-const TSCONFIG = JSON.stringify({
-  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
-  include: ['src', '.kay/types'],
-})
-const MESSAGES = 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({})\n'
-const FILES: Record<string, string> = {
-  'src/messages/en.ts': MESSAGES,
-  'src/messages/fr.ts': MESSAGES,
-  'src/content.config.ts': 'import { s } from \'kay\'\nimport { collection } from \'kay/content\'\n\nexport const notes = collection(\'content/notes\', { schema: s.Object({ title: s.String(), date: s.Date() }), localized: true, route: \'/notes/:slug\', feed: { path: \'/feeds/notes.xml\', title: \'Notes\', item: note => ({ title: note.data.title, date: note.data.date }) } })\n',
-  'src/content/notes/en/a.md': '---\ntitle: first\ndate: 2026-01-01\n---\nbody\n',
-  'src/content/notes/fr/a.md': '---\ntitle: premier\ndate: 2026-01-01\n---\ncorps\n',
-  'src/routes/notes/[slug].kay': '--- server\nimport { notes } from \'../../content.config\'\n\nexport const page = { prerender: notes }\n\nconst note = await notes.get(ctx.params.slug) ?? ctx.notFound()\n---\nh1 {note.data.title}\na.self(href={note.url}) self\n',
-}
-
 // Serves what the build wrote, asking for the feed and the page of each locale.
 function serve(root: string, trailingSlash: string) {
   return `import { Elysia } from 'elysia'
@@ -120,7 +159,7 @@ const link = (html: string) => html.match(/<a class="self" href="(.*?)"/)?.[1]
 
 console.log(JSON.stringify({
   en: { feed: feed(await text('/feeds/notes.xml')), page: link(await text(\`/notes/a\${slash}\`)) },
-  fr: { feed: feed(await text('/fr/feeds/notes.xml')), page: link(await text(\`/fr/notes/a\${slash}\`)) },
+  fr: { feed: feed(await text('/fr/feeds/notes.xml')), page: link(await text(\`/fr/remarques/a\${slash}\`)) },
 }))
 process.exit(0)
 `
@@ -154,7 +193,7 @@ describe('a collection route in a built site', () => {
 
     expect(JSON.parse(out.slice(out.lastIndexOf('\n{') + 1)) as unknown).toEqual({
       en: { feed: ['https://x.example/site/', `https://x.example/site/notes/a${slash}`], page: '/site/notes/a' },
-      fr: { feed: [`https://x.example/site/fr${slash}`, `https://x.example/site/fr/notes/a${slash}`], page: '/site/fr/notes/a' },
+      fr: { feed: [`https://x.example/site/fr${slash}`, `https://x.example/site/fr/remarques/a${slash}`], page: '/site/fr/remarques/a' },
     })
   }, 120_000)
 })

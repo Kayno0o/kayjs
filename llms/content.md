@@ -17,6 +17,7 @@ export const posts = collection('content/posts', {
     tags: s.Array(s.String(), { default: [] }),
     draft: s.Optional(s.Boolean()),
   }),
+  route: '/blog/:slug',
   draft: post => post.data.draft === true,
   sort: (a, b) => b.data.date.getTime() - a.data.date.getTime(),
 })
@@ -35,7 +36,7 @@ const recent = (await posts.all()).slice(0, 5)
 ul
   for post of recent
     li
-      a(href={`/blog/${post.slug}`}) {post.data.title}
+      a(href={post.url}) {post.data.title}
 ```
 
 ### Show one entry per page
@@ -71,7 +72,8 @@ export const posts = collection('content/posts', {
 })
 ```
 
-- `a(href={post.url}) ...` links it; `url` is the path as `route()` writes it, so kay puts the base and the page's locale on it as on any link, and `localize(post.url, 'fr')` switches the locale. A localized entry's `url` has its own slug, so `(await posts.translation(post, 'fr'))?.url` is its translation's page.
+- `a(href={post.url}) ...` links it; `url` is the path as `route()` writes it, so kay puts the base and the page's locale on it as on any link.
+- A localized entry's `url` has its own slug, so `(await posts.translation(post, 'fr'))?.url` is the page of its translation, which `localize(post.url, 'fr')` would not find. A slug whose last segment has a dot, `v1.2`, is taken for a file by kay's locale rule and linked without the locale prefix, as a hand-written path is.
 - A feed item with no `path` links the entry's `url`, absolute on the site, in the locale's feed under its prefix, as `trailingSlash` writes a page's address.
 - The route has one param, the slug: `:slug`, or `*slug` for slugs with folders, and `collection()` refuses any other.
 - `kay check` reports a route no page's pattern matches (`src/routes/blog/[slug].kay`, whatever its param is named); the page listing the entries is still the one with `prerender: posts`, which the sitemap reads.
@@ -93,7 +95,7 @@ export const page = { prerender: blog }
 const list = await blog.page(ctx.params.page) ?? ctx.notFound()
 ---
 for post of list.items
-  a(href={`/blog/${post.slug}`}) {post.data.title}
+  a(href={post.url}) {post.data.title}
 if list.prev
   a(href={list.prev}) Newer
 if list.next

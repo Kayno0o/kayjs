@@ -259,7 +259,7 @@ for post of entries
   a(href={post.url}) {post.data.title}
 ```
 
-`url` is the path as `route()` writes it, so kay puts the base and the page's locale on it as on any link. A localized entry's `url` has its own slug, and `localize(post.url, 'fr')` switches the locale. The route has one param, the slug, and `kay check` reports a route no page matches, such as one with `src/routes/blog/[slug].kay` missing. A collection with no `route` has no `url`.
+`url` is the path as `route()` writes it, so kay puts the base and the page's locale on it as on any link. A localized entry's `url` has its own slug, so `(await posts.translation(post, 'fr'))?.url` is the page of its translation. The route has one param, the slug, and `kay check` reports a route no page matches, such as one with `src/routes/blog/[slug].kay` missing. A collection with no `route` has no `url`.
 
 ## Feeds
 

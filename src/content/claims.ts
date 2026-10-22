@@ -35,8 +35,14 @@ export interface CollectionRoute {
 // The routes no page's pattern serves, `/blog/:slug` by the page `blog/[slug].kay` and `/docs/*slug` by `docs/[...slug].kay`.
 export function unservedRoutes(routes: CollectionRoute[], patterns: string[]): CollectionRoute[] {
   const served = new Set(patterns.map(routerKey))
+  // A catch-all page serves every path under its folder.
+  const folders = [...served].filter(pattern => pattern.endsWith('*')).map(pattern => pattern.slice(0, -1))
 
-  return routes.filter(({ route }) => !served.has(routerKey(route.replace(CATCH_ALL, '*'))))
+  return routes.filter(({ route }) => {
+    const key = routerKey(route.replace(CATCH_ALL, '*'))
+
+    return !served.has(key) && !folders.some(folder => key.startsWith(folder))
+  })
 }
 
 // Claims where a collection's feed is served: at its path, or a localized collection's under each locale's prefix, the locale then known; with domains, each host serves its own at the path.

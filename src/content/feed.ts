@@ -13,7 +13,10 @@ export interface FeedItem {
   author?: string | undefined
 }
 
-export interface FeedOptions<Data> {
+// A collection with no `route` must say where each item links.
+export type FeedItemOf<Routed extends boolean> = Routed extends false ? FeedItem & { path: string } : FeedItem
+
+export interface FeedOptions<Data, Routed extends boolean = boolean> {
   // Where the feed is served, such as `/blog/rss.xml`.
   path: string
   title: string
@@ -25,7 +28,7 @@ export interface FeedOptions<Data> {
   // The newest this many items, 20 by default.
   limit?: number | undefined
   // What an entry shows as, or undefined to leave it out, such as a draft.
-  item: (entry: Entry<Data>) => FeedItem | undefined
+  item: (entry: Entry<Data>) => FeedItemOf<Routed> | undefined
 }
 
 const DEFAULT_LIMIT = 20
@@ -34,7 +37,7 @@ const DEFAULT_LIMIT = 20
 const INVALID_XML = /[\u0000-\u0008\v\f\u000E-\u001F\uFFFE\uFFFF]/g
 
 // What the feed shows an entry as, its page the `item`'s `path` or else the entry's `url`.
-export function feedItem<Data>(options: FeedOptions<Data>, entry: Entry<Data>): (FeedItem & { path: string }) | undefined {
+export function feedItem<Data>(options: FeedOptions<Data, boolean>, entry: Entry<Data>): (FeedItem & { path: string }) | undefined {
   const item = options.item(entry)
 
   if (!item)

@@ -1,6 +1,6 @@
 import type { LocaleSettings } from '../runtime/i18n'
 import type { Component } from '../runtime/jsx'
-import type { Collection, Entry } from './index'
+import type { Collection, EntryOf } from './index'
 import { KayError } from '../compiler/errors'
 import { localize } from '../runtime/i18n.server'
 import { localeState, runInLocale } from '../runtime/locale-state'
@@ -36,7 +36,7 @@ export interface Paginated<Item> {
 type Items<Item> = readonly Item[] | (() => readonly Item[] | Promise<readonly Item[]>)
 
 // Splits a collection, a list or a function returning one into pages of `size` items, for a page such as `blog/[[page=integer]].kay`; exported as `prerender`, it lists every page.
-export function paginate<Data>(source: Collection<Data, Record<string, Component<never>>, string>, size: number): Paginated<Entry<Data>>
+export function paginate<Data, Routed extends boolean>(source: Collection<Data, Record<string, Component<never>>, string, boolean, Routed>, size: number): Paginated<EntryOf<Data, Routed>>
 export function paginate<Item>(source: Items<Item>, size: number): Paginated<Item>
 export function paginate<Item>(source: Collection<unknown, Record<string, Component<never>>, string> | Items<Item>, size: number): Paginated<Item> {
   if (!Number.isSafeInteger(size) || size < 1)

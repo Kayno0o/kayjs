@@ -70,7 +70,7 @@ export interface Entry<Data> {
 // An entry of a collection with a `route`, whose `url` is always there.
 export type RoutedEntry<Data> = Entry<Data> & { url: string }
 
-type EntryOf<Data, Routed extends boolean> = Routed extends true ? RoutedEntry<Data> : Entry<Data>
+export type EntryOf<Data, Routed extends boolean> = Routed extends true ? RoutedEntry<Data> : Entry<Data>
 
 // One entry a loader gives: its data, read against the schema as a file's, and its body as Markdown or as HTML.
 export interface LoadedEntry {
@@ -121,7 +121,7 @@ type BooleanField<Data> = { [Name in keyof Data]-?: Data[Name] extends boolean |
 // The fields of the data holding a date, which `publishAt` may name.
 type DateField<Data> = { [Name in keyof Data]-?: Data[Name] extends Date | null | undefined ? Name : never }[keyof Data] & string
 
-export interface CollectionOptions<Schema extends TSchema> {
+export interface CollectionOptions<Schema extends TSchema, Routed extends boolean = boolean> {
   // The name a CMS screen titles the collection with, `Produits`; the export's name, humanized, when left out. The name still keeps the URLs, the markers and the upload folder.
   title?: string | undefined
   // A line telling an editor what the collection holds, which a CMS shows above its entries and its form.
@@ -151,7 +151,7 @@ export interface CollectionOptions<Schema extends TSchema> {
   // The order `all()` lists entries in; by `order`, else by slug.
   sort?: ((a: Entry<Static<Schema>>, b: Entry<Static<Schema>>) => number) | undefined
   // An RSS or Atom feed of the collection, served at its path.
-  feed?: FeedOptions<Static<Schema>> | undefined
+  feed?: FeedOptions<Static<Schema>, Routed> | undefined
   // Each entry sits in a folder named after its locale, `fr/hello.md`, a translation sharing its slug: `all()` and `get()` read the request's locale, the default locale's entry standing in for one it lacks, and the feed is served once per locale.
   localized?: boolean | undefined
   // The path of the page showing an entry, under the base, which a CMS opens it on; by default the page whose `prerender` lists the collection.
@@ -203,7 +203,7 @@ interface Entries<Data> {
 
 // A folder of Markdown files, or of JSON and YAML data files, read against a schema: `collection('src/content/posts', { schema })`; or the entries a loader gives, `collection({ name: 'posts', load }, { schema })`.
 // File entries compile once, each cached by its content, so a change recompiles only that entry; `kay build` compiles them all ahead for production. Loaded entries are read when first asked for, and kept as `cached` keeps a value.
-export function collection<Schema extends TSchema, Components extends Record<string, Component<never>> = Record<never, never>, const FeedPath extends string = string, Seed extends Static<Schema> | undefined = undefined, const Route extends string = never>(source: string | ContentLoader<Stored<Static<Schema>>>, options: CollectionOptions<Schema> & { components?: Components, feed?: { path: FeedPath } | undefined, seed?: Seed, route?: Route }): Collection<Static<Schema>, Components, FeedPath, undefined extends Seed ? false : true, [Route] extends [never] ? false : true> {
+export function collection<Schema extends TSchema, Components extends Record<string, Component<never>> = Record<never, never>, const FeedPath extends string = string, Seed extends Static<Schema> | undefined = undefined, const Route extends string = never>(source: string | ContentLoader<Stored<Static<Schema>>>, options: CollectionOptions<Schema, [Route] extends [never] ? false : true> & { components?: Components, feed?: { path: FeedPath } | undefined, seed?: Seed, route?: Route | undefined }): Collection<Static<Schema>, Components, FeedPath, undefined extends Seed ? false : true, [Route] extends [never] ? false : true> {
   type Data = Static<Schema>
   let loading: Promise<Entries<Data>> | undefined
   const components = options.components ?? {}
@@ -587,8 +587,8 @@ const SLUG_PARAM = /^[:*]slug$/
 function checkRoute(name: string, pattern: string): void {
   const params = pattern.split('/').filter(part => part.startsWith(':') || part.startsWith('*'))
 
-  if (!pattern.startsWith('/') || params.length !== 1 || !SLUG_PARAM.test(params[0]!))
-    throw new KayError('config-invalid', `kay: the collection ${name}'s route ${pattern} must start with / and hold one param named slug, \`:slug\`, or \`*slug\` for slugs with folders`)
+  if (!pattern.startsWith('/') || pattern.endsWith('/') || params.length !== 1 || !SLUG_PARAM.test(params[0]!))
+    throw new KayError('config-invalid', `kay: the collection ${name}'s route ${pattern} must start with /, not end with one, and hold one param named slug, \`:slug\`, or \`*slug\` for slugs with folders`)
 }
 
 // The entry with the path of its page, when the collection has a route.
