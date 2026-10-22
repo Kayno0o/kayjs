@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { $, Glob } from 'bun'
 import { addedMarkers } from './merge-markers'
+import { subprocessTests } from './subprocess-tests'
 import { failedTests } from './test-failures'
 
 // `just land`: this branch rebased on origin's main, linted, checked and run through the tests its changes reach, then pushed as main, and the main checkout moved to it. The full suite is CI's, on every push, which `just ci` follows.
@@ -215,6 +216,11 @@ async function verify(): Promise<string> {
     await step('tests the changes reach', ['bun', 'run', 'test', `--changed=${base}`, WORKERS])
 
     const readers = new Set(READERS.flatMap(([folder, tests]) => changed.some(path => folder.test(path)) ? tests : []))
+
+    // A change under src/ also reaches the tests running kay in a subprocess or loading it by path, which the import graph does not show.
+    for (const test of await subprocessTests(process.cwd(), changed))
+      readers.add(test)
+
     const fixtures = [...new Set(changed.map(path => FIXTURE.exec(path)?.[1]).filter(name => name !== undefined))]
     // A fixture's name as a path segment or a quoted string, as in `fixtures/site`, `join(fixtures, 'site')` or `fixtureCopy('site')`.
     const names = fixtures.map(name => new RegExp(`[/'"\`]${name}[/'"\`]`))

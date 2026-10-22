@@ -5,6 +5,7 @@ import process from 'node:process'
 import { $ } from 'bun'
 import { describe, expect, it } from 'bun:test'
 import { addedMarkers } from '../scripts/merge-markers'
+import { subprocessTests } from '../scripts/subprocess-tests'
 import { scratchDir } from './scratch'
 
 const ROOT = join(import.meta.dir, '..')
@@ -330,4 +331,19 @@ describe('landing', () => {
     await $`chmod +x ${join(origin, 'hooks/pre-receive')}`
     expect((await land('a').done()).code).toBe(5)
   }, 120_000)
+})
+
+describe('tests running kay in a subprocess', () => {
+  it('are reached by a change to a module their subprocess loads, though no import shows it', async () => {
+    expect(await subprocessTests(ROOT, ['src/server/i18n.ts'])).toContain('tests/check-load.test.ts')
+  })
+
+  it('are left out for a change their subprocess does not load, and for one outside src', async () => {
+    expect(await subprocessTests(ROOT, ['src/runtime/dom.ts'])).not.toContain('tests/check-load.test.ts')
+    expect(await subprocessTests(ROOT, ['llms/lints.md'])).toEqual([])
+  })
+
+  it('leave out a test whose own imports already reach the change', async () => {
+    expect(await subprocessTests(ROOT, ['src/check/index.ts'])).not.toContain('tests/check.test.ts')
+  })
 })
