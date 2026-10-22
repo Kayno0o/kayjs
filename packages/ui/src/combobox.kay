@@ -79,13 +79,13 @@ effect(() => {
   if (!enhanced() || label !== undefined || rest['aria-labelledby'] !== undefined)
     return
 
-  const text = input?.closest('label')?.querySelector('.kui-label-text')
+  const labelText = input?.closest('label')?.querySelector('.kui-label-text')
 
-  if (!text)
+  if (!labelText)
     return
 
-  text.id ||= uid()
-  input?.setAttribute('aria-labelledby', text.id)
+  labelText.id ||= uid()
+  input?.setAttribute('aria-labelledby', labelText.id)
 })
 
 // The option whose value goes in a hidden field of its own, once the browser runs: one posting its label alone is the input's text.
