@@ -17,7 +17,7 @@
   - The right option stays chosen when the options arrive after the value.
   - `submit` submits the form holding it once an option is picked, after `onChange`, for a GET filter form (see Forms). A pointer pick submits at once; a keyboard pick, reported by some browsers on each arrow key, waits for Enter or blur.
 
-### RangeInput, MultiSelect, FileDrop, Menu, IconPicker
+### RangeInput, MultiSelect, Combobox, FileDrop, Menu, IconPicker
 
 - `RangeInput(label="Hours" min={0} max={24} unit="h" value={[2, null]} onChange={hours.set})`: two number boxes for a range, each bound open when empty (`null`). `onChange([from, to])` runs once a box is committed, on blur or Enter, and only when the range changed; a reversed pair is put back in order in the boxes too. Each box is named `{label} from` and `{label} to`, or `fromLabel` and `toLabel`. `rangeFrom(low, high)` reads two strings the same way, for a server reading the posted boxes.
 - `MultiSelect(label="Planets" options={planets} value={['mars']} name="planet" onChange={picked.set})`:
@@ -55,7 +55,7 @@
 - `Combobox(label="Planet" options={planets} value={planet()} onChange={planet.set} name="planet" create)`: a text input with a listbox, filtered from the list as the visitor types.
   - `options` is a list of `{ value, label, disabled? }`, or a function handed `{ q }` once `minLength` (1) characters are typed, after a 200 ms pause, answering the options: an action, or an API call in a function. Only the latest answer lands; a failed call says `failureLabel`. `onChange(value, option)` runs on a pick, and with `''` when typing drops it.
   - `create` offers the typed text as a last row (`createLabel(text)`) unless an option bears it; picking it hands the text as the value and to `onCreate(text)`.
-  - `name` submits the value picked, else the text typed. Without JavaScript it is a text field posting its text, a list offered as the browser's own suggestions. A form reset puts back the text and pick.
+  - `name` submits the value picked, else the text typed; a label typed whole counts as a pick. Without JavaScript it is a text field posting its text, a list offered as the browser's own suggestions. A form reset puts back the text and pick.
   - The combobox pattern: the input stays focused, ArrowDown and ArrowUp open and move through the rows (disabled ones skipped, wrapping), Alt+ArrowDown opens, Enter picks, Escape closes then clears; a status line reads the count, `loadingLabel`, `emptyLabel` and `failureLabel`. Parts: `list`, `option`, `status`.
 
 ### RadioGroup
@@ -75,7 +75,7 @@
   - It shows about 12 lines and grows with its text up to 70% of the screen, where the browser sizes a field by its content (Chromium); it can be resized by hand.
   - `onInput(value)` reports the text after every change, typed or applied. A parent passing other text replaces it; passing back what it was given leaves the caret alone.
 
-### Forms
+### Forms and Steps
 
 FormField frames a control with its label, hint and messages; inside an island a `group` given a message marks each input, select and textarea in it `aria-invalid` and described by the message, so `focusInvalid` reveals its tab and focuses its first field. A `required` FormField gives its control, each field of a `group`, `aria-required="true"` unless it sets its own, as the `*` is hidden from screen readers. FormDialog calls a page's action from a dialog and shows the message of each refused field on its FormField. SaveForm does the same for an editor page, with a sticky bar of unsaved changes.
 
@@ -129,7 +129,7 @@ SaveForm is the form of an editor page: `SaveForm(action={rename} failure="Could
 A form in steps keeps the step in the URL: `Steps(steps={[{ key: 'account', label: 'Account' }]} current={current} done={done} url={ctx.url} label="Signup")` draws the numbered row, a step before the current one or in `done` a link back (`param`, `step` by default; `doneLabel`). Parts: `list`, `item`, `link`, `marker`, `label`.
 
 - `currentStep(ctx.url, keys, done)` reads the step off the URL, never past the first one not done; `stepHref(url, key)` links to a step, keeping the other params.
-- Each step posts to an action whose schema is its part of the form. The action calls `stepDraft(ctx.cookies, 'signup', { check }).save('account', input)` and redirects to `stepHref(ctx.url, 'profile')`; the last reads `merged()` and calls `clear()`. The draft is an `httpOnly` cookie of about 3,000 JSON characters at most (`maxAge`, an hour), and a step counts as `done()` only while `check(step, values)` accepts its values, as the visitor can edit the cookie. The full flow is in the [Steps page](/ui/steps).
+- Each step posts to an action whose schema is its part of the form. The action calls `stepDraft(ctx.cookies, 'signup', { check }).save('account', input)` and redirects to `stepHref(ctx.url, 'profile')`; the last reads `merged()` and calls `clear()`. The draft is an `httpOnly` cookie for an hour (`maxAge`, `path`), `save` throwing a `RangeError` past 3,800 encoded bytes, and a step counts as `done()` only while the required `check(step, values)` accepts its values (a schema with `additionalProperties: false`), as the visitor can edit the cookie. The full flow is in the [Steps page](/ui/steps).
 
 FormField also works outside a dialog, in a plain form posting to an action:
 

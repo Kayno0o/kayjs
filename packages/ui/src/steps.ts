@@ -14,8 +14,11 @@ export interface StepCookies {
 
 const STEP_PARAM = 'step'
 
-// A cookie holds about 4 KB once encoded, so a draft past this many characters of JSON is refused rather than dropped by the browser.
-const DRAFT_LIMIT = 3000
+// A browser drops a cookie past about 4 KB, and the value goes out percent-encoded, so a draft past this many encoded bytes is refused rather than lost.
+const DRAFT_LIMIT = 3800
+
+// Keys that would reach the prototype of the object the values are merged into.
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
 
 // The page at `url` with its `step` param set to `key`, every other param kept and the hash dropped.
 export function stepHref(url: string | URL, key: string, param: string = STEP_PARAM): string {
@@ -51,19 +54,21 @@ export interface StepDraft {
 }
 
 export interface StepDraftOptions {
-  // Whether the values kept for `step` still pass that step's schema: the cookie is the visitor's to edit, so a step failing it is not done.
-  check?: ((step: string, values: Values) => boolean) | undefined
+  // Whether the values kept for `step` pass that step's schema, an `additionalProperties: false` one so no key slips in: the cookie is the visitor's to edit, so a step failing it is not done.
+  check: (step: string, values: Values) => boolean
   // Seconds the draft lives; an hour by default.
   maxAge?: number | undefined
+  // The path the cookie is sent to; the whole site by default, so a form living under one path narrows it.
+  path?: string | undefined
 }
 
 // The values of a multi-step form kept in a cookie of their own between posts, read and written from `ctx.cookies` in an action.
-export function stepDraft(cookies: StepCookies, name: string, { check, maxAge = 3600 }: StepDraftOptions = {}): StepDraft {
+export function stepDraft(cookies: StepCookies, name: string, { check, maxAge = 3600, path = '/' }: StepDraftOptions): StepDraft {
   const cookie = `ksteps_${name}`
 
   function read(): Record<string, Values> {
     try {
-      const parsed: unknown = JSON.parse(cookies.get(cookie) ?? '{}')
+      const parsed: unknown = JSON.parse(cookies.get(cookie) ?? '{}', (key, value: unknown) => UNSAFE_KEYS.has(key) ? undefined : value)
 
       return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed) ? parsed as Record<string, Values> : {}
     }
@@ -72,7 +77,7 @@ export function stepDraft(cookies: StepCookies, name: string, { check, maxAge = 
     }
   }
 
-  const values = () => Object.fromEntries(Object.entries(read()).filter(([step, held]) => typeof held === 'object' && held !== null && (check?.(step, held) ?? true)))
+  const values = () => Object.fromEntries(Object.entries(read()).filter(([step, held]) => typeof held === 'object' && held !== null && !Array.isArray(held) && check(step, held)))
 
   return {
     done: () => Object.keys(values()),
@@ -81,11 +86,11 @@ export function stepDraft(cookies: StepCookies, name: string, { check, maxAge = 
     save(step, held) {
       const text = JSON.stringify({ ...read(), [step]: held })
 
-      if (text.length > DRAFT_LIMIT)
-        throw new RangeError(`The draft of ${name} is over ${DRAFT_LIMIT} characters, too much for a cookie`)
+      if (encodeURIComponent(text).length > DRAFT_LIMIT)
+        throw new RangeError(`The draft of ${name} is over ${DRAFT_LIMIT} bytes once encoded, too much for a cookie`)
 
-      cookies.set(cookie, text, { path: '/', httpOnly: true, sameSite: 'lax', maxAge })
+      cookies.set(cookie, text, { path, httpOnly: true, sameSite: 'lax', maxAge })
     },
-    clear: () => cookies.delete(cookie, { path: '/' }),
+    clear: () => cookies.delete(cookie, { path }),
   }
 }

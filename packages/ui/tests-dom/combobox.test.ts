@@ -217,3 +217,67 @@ test('hands the browser\'s own suggestions over to the listbox once the script r
   expect(input.hasAttribute('list')).toBe(false)
   expect([...root.querySelectorAll('datalist option')].map(option => option.getAttribute('value'))).toEqual(['Mars', 'Moon', 'Earth'])
 })
+
+test('a label typed whole is a pick on Enter and on leaving the input', async () => {
+  const { root, input } = await combobox()
+
+  type(input, 'earth')
+  await settle()
+  key(input, 'Enter')
+  await settle()
+
+  expect([input.value, changes]).toEqual(['Earth', ['earth']])
+  expect(root.querySelector<HTMLInputElement>('input[type="hidden"]')?.value).toBe('earth')
+
+  type(input, 'mars')
+  await settle()
+  input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+  await settle()
+
+  expect([input.value, changes]).toEqual(['Mars', ['earth', '', 'mars']])
+})
+
+test('says expanded only while a list is shown, and leaves Escape to the page once the list and the text are gone', async () => {
+  const { root, input } = await combobox(PLANETS, undefined, false)
+
+  type(input, 'zzz')
+  await settle()
+
+  expect(input.getAttribute('aria-expanded')).toBe('false')
+  expect(root.querySelector('[role="status"]')?.textContent).toBe('No match')
+
+  type(input, '')
+  await settle()
+
+  expect(key(input, 'Escape').defaultPrevented).toBe(true)
+  expect(key(input, 'Escape').defaultPrevented).toBe(false)
+})
+
+test('reads one result in the singular', async () => {
+  const { root, input } = await combobox(PLANETS, undefined, false)
+
+  type(input, 'ear')
+  await settle()
+
+  expect(root.querySelector('[role="status"]')?.textContent).toBe('1 result')
+})
+
+test('drops the rows of an older text at once and offers no new option before the answer', async () => {
+  const answers = new Map<string, (rows: unknown[]) => void>()
+  const { input, rows } = await combobox(async ({ q }: { q: string }) => new Promise<unknown[]>(resolve => answers.set(q, resolve)))
+
+  type(input, 'par')
+  await Bun.sleep(260)
+
+  expect(rows()).toEqual([])
+
+  answers.get('par')!([{ value: 'paris', label: 'Paris' }])
+  await settle()
+
+  expect(rows()).toEqual(['Paris', 'Create "par"'])
+
+  type(input, 'pari')
+  await settle()
+
+  expect(rows()).toEqual([])
+})

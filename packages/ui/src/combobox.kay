@@ -2,7 +2,7 @@
 import type { JSX } from 'kay'
 import type { ComboboxOption, ComboboxOptions } from './combobox'
 import { effect, onCleanup, signal, uid, untrack } from 'kay'
-import { enabledIndex, matchingOptions, offersCreate } from './combobox'
+import { enabledIndex, exactOption, matchingOptions, offersCreate } from './combobox'
 import { onFormReset, startRef } from './form-reset'
 import { wording } from 'kay/words'
 
@@ -44,7 +44,8 @@ const picked = signal<ComboboxOption<Value> | undefined>(startOption() ?? (value
 const open = signal(false)
 const active = signal(-1)
 const found = signal<readonly ComboboxOption<Value>[]>([])
-const loading = signal(false)
+// The text the answers held in `found` are for.
+const answered = signal<string | undefined>(undefined)
 const failed = signal(false)
 // Set once the browser runs, so the first render is the page without JavaScript: the text posts as it is and the browser's own suggestions apply, which the listbox drawn here replaces.
 const enhanced = signal(false)
@@ -77,7 +78,10 @@ const carried = () => {
 }
 
 const rows = () => remote ? found() : matchingOptions(known(), text())
-const offered = () => create && offersCreate(remote ? found() : known(), text())
+// A remote list is asked for once the text reaches `minLength`, and is waiting until its answer lands.
+const waiting = () => remote && text().trim().length >= minLength && answered() !== text()
+const offered = () => create && !waiting() && offersCreate(remote ? found() : known(), text())
+const shown = () => open() && count() > 0
 const count = () => rows().length + (offered() ? 1 : 0)
 const optionId = (index: number) => `${listId}-option-${index}`
 const flags = () => [...rows().map(option => option.disabled === true), ...offered() ? [false] : []]
@@ -86,13 +90,13 @@ const status = () => {
   if (!open() || (remote && text().trim().length < minLength))
     return ''
 
-  if (loading())
+  if (waiting())
     return loadingLabel
 
   if (failed())
     return failureLabel
 
-  return count() === 0 ? emptyLabel : wording('ui.combobox.resultsLabel', '{count} results', { count: count() })
+  return count() === 0 ? emptyLabel : wording('ui.combobox.resultsLabel', count() === 1 ? '1 result' : '{count} results', { count: count() })
 }
 
 // Only the latest question lands: an answer arriving after a newer key press is dropped.
@@ -100,13 +104,11 @@ async function load(query: string) {
   const mine = ++request
 
   if (typeof options !== 'function' || query.trim().length < minLength) {
-    loading.set(false)
     found.set([])
+    answered.set(query)
 
     return
   }
-
-  loading.set(true)
 
   try {
     const answer = await options({ q: query })
@@ -115,18 +117,17 @@ async function load(query: string) {
       return
 
     found.set(answer)
+    answered.set(query)
     failed.set(false)
     active.set(-1)
   }
   catch (error) {
     if (mine === request) {
       console.error('kayjs-ui: a Combobox could not load its options', error)
+      found.set([])
+      answered.set(query)
       failed.set(true)
     }
-  }
-  finally {
-    if (mine === request)
-      loading.set(false)
   }
 }
 
@@ -142,10 +143,16 @@ effect(() => {
   onCleanup(() => clearTimeout(timer))
 })
 
+// A new key drops the rows and the answer still on its way: they are for an older text.
 function type(next: string) {
+  request++
   open.set(true)
   text.set(next)
   active.set(-1)
+  failed.set(false)
+
+  if (remote)
+    found.set([])
 
   if (picked()) {
     picked.set(undefined)
@@ -169,6 +176,23 @@ function pick(index: number) {
     onCreate?.(option.label)
 
   onChange?.(option.value, option)
+}
+
+// Typing a label whole is a pick, for the visitor who never reaches for the list.
+function adopt(): boolean {
+  if (picked())
+    return false
+
+  const option = exactOption(remote ? found() : known(), text())
+
+  if (!option)
+    return false
+
+  picked.set(option)
+  text.set(option.label)
+  onChange?.(option.value, option)
+
+  return true
 }
 
 function move(step: 1 | -1) {
@@ -204,14 +228,17 @@ function keyDown(event: KeyboardEvent) {
       move(-1)
       break
     case 'Enter':
-      if (open() && active() !== -1) {
+      if (shown() && active() !== -1) {
         event.preventDefault()
         pick(active())
+      }
+      else if (adopt()) {
+        open.set(false)
       }
 
       break
     case 'Escape':
-      if (open()) {
+      if (shown()) {
         event.preventDefault()
         open.set(false)
         active.set(-1)
@@ -245,6 +272,7 @@ function focusIn() {
 
 // A click on an option keeps focus in the input, so the list closes on focus leaving rather than on that press.
 function focusOut() {
+  adopt()
   open.set(false)
   active.set(-1)
 }
@@ -252,7 +280,7 @@ function focusOut() {
 effect(() => {
   const index = active()
 
-  if (index !== -1 && open())
+  if (index !== -1 && shown())
     document.getElementById(optionId(index))?.scrollIntoView({ block: 'nearest' })
 })
 
@@ -277,11 +305,10 @@ const ref = startRef<HTMLInputElement>(element => input = element, rest.ref)
     disabled={disabled}
     list={!remote && !enhanced() ? `${listId}-native` : undefined}
     aria-label={label}
-    aria-expanded={open() ? 'true' : 'false'}
+    aria-expanded={shown() ? 'true' : 'false'}
     aria-controls={listId}
     aria-autocomplete="list"
-    aria-activedescendant={open() && active() !== -1 ? optionId(active()) : undefined}
-    aria-busy={loading() ? 'true' : undefined}
+    aria-activedescendant={shown() && active() !== -1 ? optionId(active()) : undefined}
     onInput={event => type(event.currentTarget.value)}
     onKeyDown={keyDown}
     onFocusIn={focusIn}
@@ -293,10 +320,11 @@ const ref = startRef<HTMLInputElement>(element => input = element, rest.ref)
     datalist(id={`${listId}-native`})
       for option of known() key={option.value}
         option(value={option.label})
-  ul.kui-combobox-list(part="list" id={listId} role="listbox" aria-label={label} hidden={!open() || count() === 0})
+  // Pressing the list, its scrollbar included, keeps focus in the input.
+  ul.kui-combobox-list(part="list" id={listId} role="listbox" aria-label={label} aria-busy={waiting() ? 'true' : undefined} hidden={!shown()} onMouseDown={event => event.preventDefault()})
     for option, index of rows() key={option.value}
-      li.kui-combobox-option(part="option" id={optionId(index)} role="option" aria-selected={active() === index ? 'true' : 'false'} aria-disabled={option.disabled ? 'true' : undefined} data-selected={picked()?.value === option.value ? '' : undefined} onMouseDown={event => event.preventDefault()} onClick={() => pick(index)}) {option.label}
+      li.kui-combobox-option(part="option" id={optionId(index)} role="option" aria-selected={active() === index ? 'true' : 'false'} aria-disabled={option.disabled ? 'true' : undefined} data-selected={picked()?.value === option.value ? '' : undefined} onClick={() => pick(index)}) {option.label}
     if offered()
-      li.kui-combobox-option(part="option" id={optionId(rows().length)} role="option" aria-selected={active() === rows().length ? 'true' : 'false'} data-create="" onMouseDown={event => event.preventDefault()} onClick={() => pick(rows().length)}) {createLabel(text().trim())}
+      li.kui-combobox-option(part="option" id={optionId(rows().length)} role="option" aria-selected={active() === rows().length ? 'true' : 'false'} data-create="" onClick={() => pick(rows().length)}) {createLabel(text().trim())}
   // Read out as the list loads and settles, which otherwise changes in silence.
   p.kui-combobox-status(part="status" role="status") {status()}

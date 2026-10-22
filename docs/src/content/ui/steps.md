@@ -18,8 +18,8 @@ import { currentStep, stepDraft, stepHref } from '@kaynooo/kayjs-ui'
 import { TypeCompiler } from 'elysia/type-system'
 
 const KEYS = ['account', 'profile', 'review'] as const
-const account = s.Object({ email: s.String({ format: 'email', error: 'Enter an email' }) })
-const profile = s.Object({ name: s.String({ minLength: 2, error: 'Two letters at least' }) })
+const account = s.Object({ email: s.String({ format: 'email', maxLength: 200, error: 'Enter an email' }) }, { additionalProperties: false })
+const profile = s.Object({ name: s.String({ minLength: 2, maxLength: 80, error: 'Two letters at least' }) }, { additionalProperties: false })
 const checks: Record<string, ReturnType<typeof TypeCompiler.Compile>> = { account: TypeCompiler.Compile(account), profile: TypeCompiler.Compile(profile) }
 
 // The cookie is the visitor's to edit, so a step counts as done only while its values still pass its schema.
@@ -71,7 +71,7 @@ else
     button Create the account
 ```
 
-- The draft is a cookie of its own, `httpOnly`, an hour long by default (`maxAge`) and about 3,000 characters of JSON at most, so it suits text fields; a file or a long text goes through its own upload.
+- The draft is a cookie of its own, `httpOnly`, sent with every request under `path` (the whole site by default) for an hour (`maxAge`). A browser drops a cookie past about 4 KB, so `save` throws a `RangeError` past 3,800 bytes once encoded, around 1,500 characters of text: give the schemas a `maxLength`, and send a file or a long text through its own upload. Keep no password in it.
 - Back keeps what was typed, since the values come from the draft. A step posted again replaces its values.
-- `done()` lists only the steps whose values pass `check`, and `currentStep` sends the visitor back to the first one that does not, so a hand-edited cookie or URL skips nothing.
+- `check` is required: `done()` lists only the steps whose values pass it, and `currentStep` sends the visitor back to the first one that does not, so a hand-edited cookie or URL skips nothing. The schemas say `additionalProperties: false`, so an edited cookie adds no key either.
 - `Steps` takes the standard parts: `list`, `item`, `link`, `marker` and `label`.

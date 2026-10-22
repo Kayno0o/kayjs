@@ -31,7 +31,7 @@ nav.kui-steps({...rest} aria-label={label})
           a.kui-steps-link(part="link" href={stepHref(url, step.key, param)})
             span.kui-steps-marker(part="marker" aria-hidden="true") {index + 1}
             span.kui-steps-label(part="label") {step.label}
-            span.kui-steps-state {doneLabel}
+            span.kui-steps-state(part="state") {doneLabel}
         else
           span.kui-steps-link(part="link" aria-current={step.key === current ? 'step' : undefined})
             span.kui-steps-marker(part="marker" aria-hidden="true") {index + 1}

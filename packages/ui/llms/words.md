@@ -31,9 +31,9 @@ ui: { sidePanel: { closeLabel: 'Fermer' } }
 
 - `ui.barList.*`: `emptyLabel` (`No data yet.`)
 - `ui.carousel.*`: `dotLabel` (`Go to slide {n}`), `label` (`Carousel`), `nextLabel` (`Next slide`), `pauseLabel` (`Pause`), `playLabel` (`Play`), `previousLabel` (`Previous slide`), `slideLabel` (`Slide {n} of {count}`)
+- `ui.combobox.*`: `createLabel` (`Create "{text}"`), `emptyLabel` (`No match`), `failureLabel` (`Could not load the options`), `loadingLabel` (`Loading…`), `resultsLabel` (`{count} results`, `1 result` for one)
 - `ui.commandPalette.*`: `emptyLabel` (`No results`), `label` (`Search`), `placeholder` (`Search`), `recentLabel` (`Recent`), `resultsLabel` (`{count} results, `1 result` for one`), `siteSearchError` (`The pages could not be searched`), `siteSearchLabel` (`In the pages`), `siteSearchMore` (`{count} more matches`, `1 more match` for one)
 - `ui.confirmDelete.*`: `cancelLabel` (`Cancel`), `confirmLabel` (`Confirm`), `deleteLabel` (`Delete`), `pendingLabel` (`Deleting…`), `title` (`Confirm Deletion`)
-- `ui.combobox.*`: `createLabel` (`Create "{text}"`), `emptyLabel` (`No match`), `failureLabel` (`Could not load the options`), `loadingLabel` (`Loading…`), `resultsLabel` (`{count} results`)
 - `ui.contactForm.*`: `consentLabel` (`I agree that my details are used to answer my message.`), `emailLabel` (`Email`), `messageLabel` (`Message`), `nameLabel` (`Name`), `privacyLabel` (`Privacy policy`), `sentLabel` (`Thank you, your message has been sent.`), `submitLabel` (`Send`)
 - `ui.contributionGraph.*`: `label` (`Contributions`)
 - `ui.copyButton.*`: `copiedLabel` (`Copied!`), `failure` (`Could not copy to the clipboard`)

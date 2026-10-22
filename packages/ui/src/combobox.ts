@@ -27,6 +27,14 @@ export function offersCreate(options: readonly ComboboxOption[], text: string): 
   return typed !== '' && !options.some(option => option.label.trim().toLowerCase() === typed)
 }
 
+// The one enabled option whose label is the text typed, any case, or undefined when none or several are.
+export function exactOption<Value extends string>(options: readonly ComboboxOption<Value>[], text: string): ComboboxOption<Value> | undefined {
+  const typed = text.trim().toLowerCase()
+  const same = typed === '' ? [] : options.filter(option => !option.disabled && option.label.trim().toLowerCase() === typed)
+
+  return same.length === 1 ? same[0] : undefined
+}
+
 // The index after `from` in `step` direction that is not disabled, wrapping at both ends, or -1 when every row is. `from` of -1 starts before the first row, or past the last going up.
 export function enabledIndex(disabled: readonly boolean[], from: number, step: 1 | -1): number {
   const count = disabled.length

@@ -6,6 +6,8 @@ description: A text input with a listbox of options, filtered from a list or loa
 
 `options` is a list of `{ value, label, disabled? }`, filtered by what is typed. `value` is the value picked, empty while nothing is, and `onChange(value, option)` runs when one is picked or the pick is dropped by typing again. With `create`, the text typed is offered as a last row, `Create "text"`, unless an option already bears it; picking it hands the text as the value and to `onCreate(text)`.
 
+A label typed whole, with no row chosen, counts as a pick of that option once the input loses focus or Enter is pressed.
+
 ## Options loaded as the visitor types
 
 Give `options` a function instead of a list. It is called with `{ q }` a moment after the last key, once `minLength` characters (one by default) are typed, and answers the options. An action or an API call wrapped in a function fits; only the latest answer is shown, so a slow answer to an older question never replaces a newer one. A failed call says `failureLabel` in the status line and the list stays closed.
