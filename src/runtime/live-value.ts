@@ -147,7 +147,7 @@ interface ServerState {
 }
 
 const STATE = Symbol.for('kay.live.state')
-// The most rows kept for values no module declared: the oldest id goes beyond it, as a value nobody declares is not one this process shows.
+// The most rows kept for values no module declared: the id heard from longest ago goes beyond it, as a value nobody declares is not one this process shows.
 const UNDECLARED_ROWS = 10_000
 
 function state(): ServerState {
@@ -194,8 +194,11 @@ function keepUndeclared(id: string, key: string, text: string | undefined, atSta
   const kept = state()
   let held = kept.undeclared.get(id)
 
-  if (atStart)
+  // An id with rows heard before joins the set that is never dropped: they stop counting.
+  if (atStart && !kept.startup.has(id)) {
+    kept.undeclaredRows -= held?.size ?? 0
     kept.startup.add(id)
+  }
 
   const counted = !kept.startup.has(id)
 
@@ -206,8 +209,11 @@ function keepUndeclared(id: string, key: string, text: string | undefined, atSta
     return
   }
 
-  if (held === undefined)
-    kept.undeclared.set(id, held = new Map<string, string>())
+  // Reinserted last, so the id dropped first is the one heard from longest ago.
+  if (held === undefined || counted) {
+    kept.undeclared.delete(id)
+    kept.undeclared.set(id, held ??= new Map<string, string>())
+  }
 
   if (!held.has(key) && counted)
     kept.undeclaredRows++

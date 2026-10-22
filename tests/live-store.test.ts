@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
-import { afterAll, describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { live, liveSlot, liveStoreReady, setLiveStore, watchSlot } from '../src/runtime/live-value'
 import { setupStore } from '../src/server/app-store'
 import { sqliteLive } from '../src/server/sqlite-live'
@@ -229,6 +229,82 @@ process.exit(0)`)
     expect(declare(0, 'test:evicted', 'evicted')()).toBe(0)
     expect(declare(0, 'test:recent', 'recent')()).toBe(2)
     setLiveStore(undefined)
+  })
+
+  it('stops counting the rows of an id the store holds when it is attached again', () => {
+    const keyed = live as unknown as (initial: (key: string) => number, id: string, name: string) => (key: string) => number
+    let hear: ((id: string, key: string, text: string | undefined) => void) | undefined
+    const first = { entries: () => [], set: () => undefined, delete: () => undefined, subscribe: (listener: typeof hear) => {
+      hear = listener
+    } }
+
+    setLiveStore(first)
+
+    for (let row = 0; row < 6_000; row++)
+      hear!('test:again', String(row), '[1]')
+
+    // A hot reload attaches a store again, which now holds the rows the id was heard with.
+    const second = { entries: () => [['test:again', '0', '[1]']] as [string, string, string][], set: () => undefined, delete: () => undefined, subscribe: (listener: typeof hear) => {
+      hear = listener
+    } }
+
+    setLiveStore(second)
+
+    const surviving = (id: string) => keyed(() => 0, id, id)
+
+    for (let row = 0; row < 9_000; row++)
+      hear!('test:other', String(row), '[2]')
+
+    hear!('test:last', '0', '[3]')
+
+    expect(surviving('test:other')('0')).toBe(2)
+    expect(surviving('test:last')('0')).toBe(3)
+    setLiveStore(undefined)
+  })
+
+  it('drops the id heard from longest ago, not the first one inserted', () => {
+    const keyed = live as unknown as (initial: (key: string) => number, id: string, name: string) => (key: string) => number
+    let hear: ((id: string, key: string, text: string | undefined) => void) | undefined
+
+    setLiveStore({ entries: () => [], set: () => undefined, delete: () => undefined, subscribe: (listener) => {
+      hear = listener
+    } })
+    hear!('test:old', '0', '[1]')
+
+    for (let row = 0; row < 9_999; row++)
+      hear!('test:quiet', String(row), '[2]')
+
+    hear!('test:old', '1', '[1]')
+    hear!('test:new', '0', '[3]')
+
+    const old = keyed(() => 0, 'test:old', 'old')
+
+    expect([old('0'), old('1')]).toEqual([1, 1])
+    expect(keyed(() => 0, 'test:quiet', 'quiet')('0')).toBe(0)
+    setLiveStore(undefined)
+  })
+
+  it('ends the poll of a real sqliteLive it replaces', async () => {
+    const store = sqliteLive(await storePath())
+    const started = spyOn(globalThis, 'setInterval')
+    const cleared = spyOn(globalThis, 'clearInterval')
+
+    try {
+      setLiveStore(store)
+
+      const polls = started.mock.results.map(result => result.value)
+
+      expect(polls.length).toBeGreaterThan(0)
+      setLiveStore(undefined)
+
+      for (const poll of polls)
+        expect(cleared.mock.calls.map(call => call[0] as unknown)).toContain(poll)
+    }
+    finally {
+      started.mockRestore()
+      cleared.mockRestore()
+      setLiveStore(undefined)
+    }
   })
 
   it('keeps every row the store held at the start, however many', () => {
