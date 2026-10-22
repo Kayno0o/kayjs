@@ -262,6 +262,7 @@ export default defineMessages({
       'enabled': 'La validation en deux étapes est déjà activée.',
       'not-set-up': 'Configurez d’abord la validation en deux étapes.',
       'disabled': 'La validation en deux étapes est désactivée.',
+      'off': 'Cette fonction est désactivée sur ce site.',
       'not-linked': 'Ce compte n’est pas lié.',
       'last-way-in': 'C’est votre seul moyen de connexion : ajoutez-en un autre d’abord.',
       'self': 'Impossible sur votre propre compte.',

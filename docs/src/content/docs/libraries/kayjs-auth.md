@@ -383,6 +383,14 @@ A `label` is a string, or an object by locale such as `{ en: 'Bio', fr: 'Biograp
 
 A page of your own calls `auth.profile(locale)` and `auth.saveProfile(values)`. `saveProfile` throws when `pages` has no `profile`.
 
+## Switching features off
+
+`auth({ password: false, passkeys: false, magicLink: false, twoFactor: false })` turns a feature off, and `createAuth` takes the same four keys. Each is on by default wherever it works today.
+
+A feature that is off is gone from the prebuilt pages: no password form, no mail form for sign-in links, no passkey button, no two-step section on the account page, and the register and password reset pages answer 404. Its methods answer `{ ok: false, error: 'off' }`, and `auth.features()` says `false` for it, so your own pages can follow.
+
+Turning `twoFactor` off only stops new users from setting it up. A user who already turned it on is still asked for the code when they sign in, so switching it off never weakens an account.
+
 ## Passkeys in `createAuth`
 
 `passkeys: { rpName, userVerification }` in `createAuth` sets the name the authenticator shows, `name` by default, and whether answering a second factor with a passkey requires a PIN or a biometric: `'required'`, `'preferred'` (the default) or `'discouraged'`. Adding a passkey, signing in with one and re-proving always require it.

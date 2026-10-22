@@ -68,6 +68,12 @@ catch (caught) {
 - `regenerateRecoveryCodes(proof)` voids the old set, `recoveryCodesLeft()` counts the unused ones, `disableTwoFactor(proof)` turns the factor off and voids the codes. TOTP secrets are stored encrypted, bound to their user.
 - A user with a passkey may answer the `twoFactorPage` with it instead of a code: see Passkeys.
 
+### Switching features off
+
+- `auth({ password: false, passkeys: false, magicLink: false, twoFactor: false })`, and the same keys of `createAuth`, switch a feature off; each is on by default where it works. A method of a feature that is off answers `{ ok: false, error: 'off' }`: `register`, `signInWithPassword`, `requestPasswordReset`, `resetPassword` and `changePassword` for `password`; `requestMagicLink`, `signInWithMagicLink` and `signInWithEmailCode` for `magicLink`; the passkey sign-in, adding and proof methods for `passkeys`; `setUpTwoFactor`, `enableTwoFactor` and `regenerateRecoveryCodes` for `twoFactor`. `passkeySignInOptions` throws.
+- `features()` has `password`, `magicLink` and `twoFactor` besides `passkeys`, false for a feature off (`magicLink` also without mail), and the prebuilt pages show none of it: no password form, mail form, passkey button or account section, and the register and reset pages answer 404.
+- `twoFactor: false` stops new enrolments only: a user who turned it on is still asked for the code at sign-in, and can still turn it off.
+
 ### Passkey rules
 
 Passkeys are made for `site`'s host and checked against its origin: `passkeys: { rpId, origins }` widens them to a parent domain, or lists every origin the pages are served from. `passkeys: { rpName }` is the name the authenticator shows, `name` by default. `passkeys: { userVerification }` (`'required'`, `'preferred'` by default, or `'discouraged'`) is how hard answering a second factor with a passkey asks for a PIN or a biometric; `'required'` also refuses an answer given without it. Adding a passkey, signing in with one and re-proving always require it, as a passkey alone is two factors, so a passkey made without it never exists to count as a way in. Each method below gives the options for the browser, kept as a challenge in the session that works once, for five minutes.

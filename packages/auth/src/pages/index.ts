@@ -79,7 +79,14 @@ export interface AuthFeatures {
   signUp: boolean
   // Whether password sign-in waits for a verified address, the default with mail.
   requireVerified: boolean
+  // Whether passkeys work: switched on and the site has an origin.
   passkeys: boolean
+  // Whether password sign-in, registering, resets and changes are on, `password: false` switching them off.
+  password: boolean
+  // Whether a sign-in link or code can be mailed: mail is set up and `magicLink` is not false.
+  magicLink: boolean
+  // Whether users can turn on two-step verification, `twoFactor: false` switching that off.
+  twoFactor: boolean
   // The CAPTCHA widget to show where `captchaRequired` says one is needed, `'proof-of-work'` for kay's, whose field carries `captchaChallenge`, or null without one.
   captcha: CaptchaWidget | 'proof-of-work' | null
   // What a bearer token may be limited to; any token may do anything without them.
@@ -120,7 +127,10 @@ export function featuresOf(core: Core): AuthFeatures {
     codes: core.email?.codes ?? null,
     signUp: core.signUp,
     requireVerified: core.email?.requireVerified ?? false,
-    passkeys: core.passkeys !== undefined,
+    passkeys: core.switches.passkeys && core.passkeys !== undefined,
+    password: core.switches.password,
+    magicLink: core.switches.magicLink && core.email !== undefined,
+    twoFactor: core.switches.twoFactor,
     captcha: captchaFeature(core.captcha),
     scopes: [...core.scopes],
     prefix: core.prefix,

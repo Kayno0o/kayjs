@@ -29,7 +29,7 @@ export const register = action(schemas.register, async (input, ctx) => {
 const auth = ctx.locals.auth
 const features = auth.features()
 
-if (!features.signUp)
+if (!features.signUp || !features.password)
   ctx.notFound()
 
 const prefix = features.pages?.prefix ?? features.prefix

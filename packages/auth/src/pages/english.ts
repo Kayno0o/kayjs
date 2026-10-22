@@ -22,6 +22,7 @@ export const ERRORS = {
   'enabled': 'Two-step verification is already on.',
   'not-set-up': 'Set up two-step verification first.',
   'disabled': 'Two-step verification is off.',
+  'off': 'This is switched off on this site.',
   'not-linked': 'This account is not connected.',
   'last-way-in': 'This is your only way to sign in: add another first.',
   'self': 'You cannot do this to your own account.',

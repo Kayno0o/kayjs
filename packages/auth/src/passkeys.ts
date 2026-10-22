@@ -54,7 +54,7 @@ export interface Passkey {
   lastUsedAt: Date | null
 }
 
-export type PasskeyOptionsResult<Options, Failure extends string = 'signed-out' | 'none' | 'expired'> = { ok: true, options: Options } | { ok: false, error: Failure }
+export type PasskeyOptionsResult<Options, Failure extends string = 'signed-out' | 'none' | 'expired' | 'off'> = { ok: true, options: Options } | { ok: false, error: Failure }
 
 export type RegisterPasskeyResult = { ok: true, passkey: Passkey } | { ok: false, error: 'signed-out' | 'expired' | 'invalid' }
 

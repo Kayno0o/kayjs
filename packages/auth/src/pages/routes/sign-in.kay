@@ -39,7 +39,7 @@ export const emailCode = action(schemas.emailCode, async ({ code }, ctx) => {
   return ctx.redirect(localize(result.redirect))
 })
 
-export const passkeyOptions = action(async (ctx) => ctx.locals.auth.passkeySignInOptions())
+export const passkeyOptions = action(async ctx => ctx.locals.auth.features().passkeys ? ctx.locals.auth.passkeySignInOptions() : ctx.fail(404, { error: 'not-found' }))
 
 export const passkey = action(schemas.passkey, async (input, ctx) => {
   const result = await ctx.locals.auth.signInWithPasskey(input.response, { redirect: input.redirect, remember: remembered(ctx.locals.auth.features(), input.remember) })
@@ -84,27 +84,29 @@ Panel(title={wording('auth.signIn.title', 'Sign in')})
       if codeError
         Message(text={failure(codeError)})
       Button(type="submit" tone="accent" label={wording('auth.signIn.codeSubmit', 'Sign in')})
-  form.flex.flex-col.gap-3(action={password})
-    input(type="hidden" name="redirect" value={redirect})
-    FormField(label={wording('auth.signIn.identifier', 'Email or username')} required)
-      input(name="identifier" autocomplete="username webauthn" required)
-    FormField(label={wording('auth.password', 'Password')} required)
-      input(name="password" type="password" autocomplete="current-password" required)
-    if askRemember
-      label.flex.items-center.gap-2
-        input(name="remember" type="checkbox")
-        span {wording('auth.remember', 'Keep me signed in')}
-    if features.captcha && captchaSignIn.shown
-      Captcha(widget={features.captcha} challenge={captchaSignIn.challenge} action="sign-in")
-    if signInError
-      Message(text={signInError})
-    Button(type="submit" tone="accent" label={wording('auth.signIn.submit', 'Sign in')})
-    if features.email
-      a(href={localize(`${prefix}/reset-password?redirect=${encodeURIComponent(redirect)}`)}) {wording('auth.signIn.forgot', 'Forgot your password?')}
+  if features.password
+    form.flex.flex-col.gap-3(action={password})
+      input(type="hidden" name="redirect" value={redirect})
+      FormField(label={wording('auth.signIn.identifier', 'Email or username')} required)
+        input(name="identifier" autocomplete="username webauthn" required)
+      FormField(label={wording('auth.password', 'Password')} required)
+        input(name="password" type="password" autocomplete="current-password" required)
+      if askRemember
+        label.flex.items-center.gap-2
+          input(name="remember" type="checkbox")
+          span {wording('auth.remember', 'Keep me signed in')}
+      if features.captcha && captchaSignIn.shown
+        Captcha(widget={features.captcha} challenge={captchaSignIn.challenge} action="sign-in")
+      if signInError
+        Message(text={signInError})
+      Button(type="submit" tone="accent" label={wording('auth.signIn.submit', 'Sign in')})
+      if features.email
+        a(href={localize(`${prefix}/reset-password?redirect=${encodeURIComponent(redirect)}`)}) {wording('auth.signIn.forgot', 'Forgot your password?')}
   if features.passkeys
     PasskeySignIn(redirect={redirect} label={wording('auth.signIn.passkey', 'Sign in with a passkey')} failed={failure('invalid')})
-  if features.email
-    Separator
+  if features.magicLink
+    if features.password || features.passkeys
+      Separator
     if mailedTo && codes === 'link'
       Message(tone="success" text={wording('auth.signIn.sent', 'If an account has this address, a mail is on its way.')})
     form.flex.flex-col.gap-3(action={magicLink})
@@ -120,6 +122,6 @@ Panel(title={wording('auth.signIn.title', 'Sign in')})
       if mailError
         Message(text={mailError})
       Button(type="submit" label={codes === 'link' ? wording('auth.signIn.magic', 'Mail me a sign-in link') : wording('auth.signIn.magicCode', 'Mail me a sign-in code')})
-  if features.signUp
+  if features.signUp && features.password
     p.text-center
       | {wording('auth.signIn.noAccount', 'No account yet?')} #[a(href={localize(`${prefix}/register?redirect=${encodeURIComponent(redirect)}`)}) {wording('auth.signIn.register', 'Create one')}]

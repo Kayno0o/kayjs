@@ -18,6 +18,31 @@ async function variant(env: Record<string, string>): Promise<Record<string, unkn
   }
 }
 
+test('with password and magicLink off, the sign-in page keeps the provider buttons alone and the pages that only serve them answer 404', async () => {
+  expect(await variant({ FIXTURE_SWITCHES: 'password,magicLink' })).toEqual({
+    signIn: { password: 0, magic: 0, passkey: true, register: false },
+    pages: { 'register': 404, 'reset-password': 404 },
+    mailed: 0,
+  })
+}, 60_000)
+
+test('with twoFactor and passkeys off, the account page offers neither', async () => {
+  expect(await variant({ FIXTURE_SWITCHES: 'twoFactor,passkeys' })).toEqual({
+    signIn: { password: 1, magic: 1, passkey: false, register: true },
+    pages: { 'register': 200, 'reset-password': 200 },
+    security: { password: true, twoFactor: false, passkeys: false },
+  })
+}, 60_000)
+
+test('with magicLink off, the sign-in page has no mail form and the account page keeps the rest', async () => {
+  expect(await variant({ FIXTURE_SWITCHES: 'magicLink' })).toEqual({
+    signIn: { password: 1, magic: 0, passkey: true, register: true },
+    pages: { 'register': 200, 'reset-password': 200 },
+    security: { password: true, twoFactor: true, passkeys: true },
+    mailed: 0,
+  })
+}, 60_000)
+
 test('with pages.remember always, the pages show no box, the provider links carry remember=1, every sign-in lasts rememberMaxAge, and each flow lands on home in the page\'s language', async () => {
   expect(await variant({ FIXTURE_HOME: '/dashboard', FIXTURE_REMEMBER: 'always' })).toEqual({
     'signIn': { boxes: 0, links: ['/auth/discord?redirect=%2Fdashboard&remember=1'] },

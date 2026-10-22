@@ -89,6 +89,22 @@ export interface User<Data extends object = Record<string, unknown>> extends Bar
   providers: Record<string, { id: string }>
 }
 
+// What a sign-in or account method answers when its feature is switched off.
+export interface Off {
+  ok: false
+  error: 'off'
+}
+
+export const OFF: Off = { ok: false, error: 'off' }
+
+// The features `auth({ password, passkeys, magicLink, twoFactor })` switch, on unless set to false.
+export interface Switches {
+  password: boolean
+  passkeys: boolean
+  magicLink: boolean
+  twoFactor: boolean
+}
+
 // What every request's `Auth` shares.
 export interface Core {
   store: AuthStore
@@ -119,6 +135,7 @@ export interface Core {
   locate?: ((ip: string) => string | null | undefined | Promise<string | null | undefined>) | undefined
   // The scopes a bearer token may be given.
   scopes: Set<string>
+  switches: Switches
   // Who passkeys are made for, from `url`; none without it.
   passkeys?: Relying | undefined
   captcha?: CaptchaOptions | undefined

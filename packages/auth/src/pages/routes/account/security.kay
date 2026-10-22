@@ -85,50 +85,53 @@ const passkeys = features.passkeys ? await auth.listPasskeys() : []
 const removeRefused = removePasskey.failed()?.data
 const passkeyErrors = Object.fromEntries((['proof', 'stale', 'limited', 'impersonating', 'expired', 'invalid', 'signed-out'] as const).map(code => [code, failure(code)]))
 ---
-PageSection(title={wording('auth.account.password.title', 'Password')})
-  form.flex.flex-col.gap-3(action={changePassword})
-    if !user.hasPassword
-      p {wording('auth.account.password.none', 'You sign in without a password. Set one to sign in with your address too.')}
-    Proof(user={user})
-    FormField(label={wording('auth.newPassword', 'New password')} hint={wording('auth.passwordHint', 'At least {min} characters', { min: features.rules.password.min })} issue={passwordRefused && 'password' in passwordRefused ? issue('password', passwordRefused.password, features.rules) : undefined} required)
-      input(name="newPassword" type="password" autocomplete="new-password" minlength={features.rules.password.min} required)
-    if passwordSaved
-      Message(tone="success" text={wording('auth.account.password.changed', 'Your password is saved. Your other sessions were signed out.')})
-    if passwordRefused && 'error' in passwordRefused
-      Message(text={failure(passwordRefused.error)})
-    Button(type="submit" label={user.hasPassword ? wording('auth.account.password.change', 'Change the password') : wording('auth.account.password.set', 'Set a password')})
-PageSection(title={wording('auth.account.twoFactor.title', 'Two-step verification')})
-  @actions
-    Badge(label={user.twoFactor ? wording('auth.account.twoFactor.on', 'On') : wording('auth.account.twoFactor.off', 'Off')} tone={user.twoFactor ? 'success' : 'neutral'})
-  .flex.flex-col.gap-3
-    if recoveryCodes
-      RecoveryCodes(codes={recoveryCodes})
-    if twoFactorError
-      Message(text={failure(twoFactorError)})
-    if user.twoFactor
-      p#kauth-codes-left {wording('auth.account.twoFactor.codesLeft', codesLeft === 0 ? 'No recovery code left' : codesLeft === 1 ? '{count} recovery code left' : '{count} recovery codes left', { count: codesLeft })}
-      form.flex.flex-col.gap-3(action={regenerate})
-        Proof(user={user} secondFactor)
-        Button(type="submit" label={wording('auth.account.twoFactor.regenerate', 'Make new recovery codes')})
-      form.flex.flex-col.gap-3(action={disable})
-        Proof(user={user} secondFactor)
-        Button(type="submit" tone="danger" label={wording('auth.account.twoFactor.disable', 'Turn off')})
-    else if setupUri
-      p {wording('auth.account.twoFactor.scan', 'Scan this code with your authenticator app, or type the key, then type the code it shows.')}
-      QrCode(value={setupUri} label={wording('auth.account.twoFactor.qr', 'QR code for your authenticator app')} size={192})
-      if setupKey
-        p
-          | {wording('auth.account.twoFactor.key', 'Key')}: #[code#kauth-key {setupKey}]
-      form.flex.flex-col.gap-3(action={enable})
-        input(type="hidden" name="uri" value={setupUri})
-        FormField(label={wording('auth.code', 'Code')} required)
-          input(name="code" inputmode="numeric" autocomplete="one-time-code" required)
-        Button(type="submit" tone="accent" label={wording('auth.account.twoFactor.enable', 'Turn on')})
-    else
-      form.flex.flex-col.gap-3(action={setUp})
-        p {wording('auth.account.twoFactor.intro', 'Ask for a code from an authenticator app at each sign-in.')}
-        Proof(user={user})
-        Button(type="submit" tone="accent" label={wording('auth.account.twoFactor.setUp', 'Set up two-step verification')})
+if features.password
+  PageSection(title={wording('auth.account.password.title', 'Password')})
+    form.flex.flex-col.gap-3(action={changePassword})
+      if !user.hasPassword
+        p {wording('auth.account.password.none', 'You sign in without a password. Set one to sign in with your address too.')}
+      Proof(user={user})
+      FormField(label={wording('auth.newPassword', 'New password')} hint={wording('auth.passwordHint', 'At least {min} characters', { min: features.rules.password.min })} issue={passwordRefused && 'password' in passwordRefused ? issue('password', passwordRefused.password, features.rules) : undefined} required)
+        input(name="newPassword" type="password" autocomplete="new-password" minlength={features.rules.password.min} required)
+      if passwordSaved
+        Message(tone="success" text={wording('auth.account.password.changed', 'Your password is saved. Your other sessions were signed out.')})
+      if passwordRefused && 'error' in passwordRefused
+        Message(text={failure(passwordRefused.error)})
+      Button(type="submit" label={user.hasPassword ? wording('auth.account.password.change', 'Change the password') : wording('auth.account.password.set', 'Set a password')})
+if features.twoFactor || user.twoFactor
+  PageSection(title={wording('auth.account.twoFactor.title', 'Two-step verification')})
+    @actions
+      Badge(label={user.twoFactor ? wording('auth.account.twoFactor.on', 'On') : wording('auth.account.twoFactor.off', 'Off')} tone={user.twoFactor ? 'success' : 'neutral'})
+    .flex.flex-col.gap-3
+      if recoveryCodes
+        RecoveryCodes(codes={recoveryCodes})
+      if twoFactorError
+        Message(text={failure(twoFactorError)})
+      if user.twoFactor
+        p#kauth-codes-left {wording('auth.account.twoFactor.codesLeft', codesLeft === 0 ? 'No recovery code left' : codesLeft === 1 ? '{count} recovery code left' : '{count} recovery codes left', { count: codesLeft })}
+        if features.twoFactor
+          form.flex.flex-col.gap-3(action={regenerate})
+            Proof(user={user} secondFactor)
+            Button(type="submit" label={wording('auth.account.twoFactor.regenerate', 'Make new recovery codes')})
+        form.flex.flex-col.gap-3(action={disable})
+          Proof(user={user} secondFactor)
+          Button(type="submit" tone="danger" label={wording('auth.account.twoFactor.disable', 'Turn off')})
+      else if setupUri && features.twoFactor
+        p {wording('auth.account.twoFactor.scan', 'Scan this code with your authenticator app, or type the key, then type the code it shows.')}
+        QrCode(value={setupUri} label={wording('auth.account.twoFactor.qr', 'QR code for your authenticator app')} size={192})
+        if setupKey
+          p
+            | {wording('auth.account.twoFactor.key', 'Key')}: #[code#kauth-key {setupKey}]
+        form.flex.flex-col.gap-3(action={enable})
+          input(type="hidden" name="uri" value={setupUri})
+          FormField(label={wording('auth.code', 'Code')} required)
+            input(name="code" inputmode="numeric" autocomplete="one-time-code" required)
+          Button(type="submit" tone="accent" label={wording('auth.account.twoFactor.enable', 'Turn on')})
+      else if features.twoFactor
+        form.flex.flex-col.gap-3(action={setUp})
+          p {wording('auth.account.twoFactor.intro', 'Ask for a code from an authenticator app at each sign-in.')}
+          Proof(user={user})
+          Button(type="submit" tone="accent" label={wording('auth.account.twoFactor.setUp', 'Set up two-step verification')})
 if features.passkeys
   PageSection(title={wording('auth.account.passkeys.title', 'Passkeys')})
     .flex.flex-col.gap-3

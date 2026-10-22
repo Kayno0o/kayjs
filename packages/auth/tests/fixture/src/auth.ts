@@ -26,6 +26,8 @@ export const auth = createAuth({
   forwardAuth: 'example.test',
   // A run of tests/variants.ts serves the fixture with the app's own credential rules.
   ...process.env.FIXTURE_RULES && { rules: { password: { min: 12, check: (value: string) => DIGIT.test(value) ? undefined : 'Add a digit.' }, username: { min: 3, max: 16 } } },
+  // A run of tests/variants.ts switches the features it lists off, such as FIXTURE_SWITCHES=password,magicLink.
+  ...Object.fromEntries((process.env.FIXTURE_SWITCHES?.split(',') ?? []).map(name => [name, false])),
   pages: {
     // A run of tests/variants.ts serves the fixture with another landing page and another remember setting, through the environment.
     ...process.env.FIXTURE_HOME && { home: process.env.FIXTURE_HOME },

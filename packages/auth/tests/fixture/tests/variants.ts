@@ -41,6 +41,33 @@ if (process.env.FIXTURE_RULES) {
   process.exit(0)
 }
 
+if (process.env.FIXTURE_SWITCHES) {
+  // A feature switched off leaves its form off the pages, and the pages that only serve it answer 404.
+  const { magicLink } = await import(join(PAGES, 'sign-in.kay'))
+  const signIn = await site.visit(`${PAGES_AT}/sign-in`)
+  const out: Record<string, unknown> = {
+    signIn: { password: signIn.find('input[name="password"]').length, magic: signIn.find('input[name="email"]').length, passkey: signIn.html.includes('Sign in with a passkey'), register: signIn.html.includes('Create one') },
+    pages: Object.fromEntries(await Promise.all(['register', 'reset-password'].map(async path => [path, (await site.visit(`${PAGES_AT}/${path}`)).status]))),
+  }
+
+  if (!process.env.FIXTURE_SWITCHES.includes('password')) {
+    await site.submit(register, { email: 'switches@example.com', password: PASSWORD }, { from: await site.visit(`${PAGES_AT}/register`) })
+
+    const security = (await site.visit(`${PAGES_AT}/account/security`)).text() ?? ''
+
+    out.security = { password: security.includes('Change the password') || security.includes('Set a password'), twoFactor: security.includes('Two-step verification'), passkeys: security.includes('Passkeys') }
+  }
+
+  if (process.env.FIXTURE_SWITCHES.includes('magicLink')) {
+    await site.submit(magicLink, { email: 'switches@example.com' }, { from: await site.visit(`${PAGES_AT}/sign-in`) })
+
+    out.mailed = mails.filter(mail => mail.kind === 'magic-link').length
+  }
+
+  console.log(JSON.stringify(out))
+  process.exit(0)
+}
+
 if (process.env.FIXTURE_ADMIN) {
   // The admin pages and the impersonation banner link under the base and the prefix, to the pages' own routes.
   const { impersonate } = await import(join(PAGES, 'admin', 'users', '[id].kay'))

@@ -8,7 +8,7 @@ import type { ApprovedClient } from './authorize/grants'
 import type { AuthorizeOutcome, AuthorizeParams } from './authorize/request'
 import type { BearerToken, CreateTokenResult, IssueTokenResult, TokenOptions } from './bearer'
 import type { CaptchaAction, CaptchaOptions } from './captcha'
-import type { AuthSessionData, BareUser, Core, OAuthApp, Profile, SignedIn, User } from './core'
+import type { AuthSessionData, BareUser, Core, OAuthApp, Off, Profile, SignedIn, User } from './core'
 import type { ChangeEmailResult, CodeResult, EmailOptions, LinkResult, MailRequestResult, ResetPasswordResult, VerifyEmailResult } from './email'
 import type { AuditCursorInput, AuditEntry, AuthEventInfo } from './events'
 import type { DataExport } from './export'
@@ -41,7 +41,7 @@ import { serveOAuthServer } from './authorize/routes'
 import { bearerRequest, bearerUser, createToken, issueToken, listTokens, revokeToken, tokenUser } from './bearer'
 import { pwnedPassword } from './breached'
 import { admit, captchaChallenge, captchaRequired, proofOfWork } from './captcha'
-import { backOf, banned, guardPageOf, homeOf, isNavigation, linkedProviders, linkedUser, newUserRecord, publicUser, unlinked, withBack, withQuery } from './core'
+import { backOf, banned, guardPageOf, homeOf, isNavigation, linkedProviders, linkedUser, newUserRecord, OFF, publicUser, unlinked, withBack, withQuery } from './core'
 import { changeEmail, confirmEmailChange, pendingCode, requestMagicLink, requestPasswordReset, resetPassword, sendVerification, signInWithEmailCode, signInWithMagicLink, tokenLifetimes, verifyEmail, verifyEmailCode } from './email'
 import { soleOwned } from './erase'
 import { auditEntries, report } from './events'
@@ -204,7 +204,13 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   // The old name of `rateLimit`, taken until 1.73: where both name a limit, `rateLimit` wins.
   limits?: LimitsOption | undefined
   // Passkeys are made for `site`'s host and its origin; `rpId` widens them to a parent domain, `origins` lists every origin the site's pages are served from, and `rpName` is the name the authenticator shows (`name` by default). `userVerification` is how hard answering a second factor with a passkey asks for a PIN or a biometric, `'preferred'` by default: adding a passkey, signing in with one and re-proving always require it, as a passkey alone is two factors.
-  passkeys?: { rpId?: string, origins?: string[], rpName?: string, userVerification?: 'required' | 'preferred' | 'discouraged' } | undefined
+  passkeys?: { rpId?: string, origins?: string[], rpName?: string, userVerification?: 'required' | 'preferred' | 'discouraged' } | false | undefined
+  // Password sign-in, registering, resets and changes; false answers `{ ok: false, error: 'off' }` from their methods and hides them from the prebuilt pages. On by default.
+  password?: boolean | undefined
+  // Sign-in links and codes mailed to the address (they need `email`); false answers `off` from their methods and the pages show none. On by default.
+  magicLink?: boolean | undefined
+  // Authenticator-app two-step verification: false answers `off` from setting it up, turning it on and new recovery codes, and the account page offers none. A user who turned it on before is still asked for the code at sign-in. On by default.
+  twoFactor?: boolean | undefined
   // A CAPTCHA asked of registering, password sign-in, password resets and magic links: kay's proof of work by default, `proofOfWork({ difficulty })` to tune it, `{ verify: turnstile(secret) }` for a third party's, false for none.
   captcha?: CaptchaOptions | false | undefined
   // Refuses a new password Have I Been Pwned lists, with `true`, or that a check of the app's own finds.
@@ -529,14 +535,20 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
   // A new user with an email and a password, signed in on this session; field errors come back as codes.
   // With `redirect`, the mail verifying the address leads on to that page.
-  async register(input: RegisterInput, options?: Pick<SignInOptions, 'remember' | 'captcha' | 'redirect'>): Promise<RegisterResult> {
+  async register(input: RegisterInput, options?: Pick<SignInOptions, 'remember' | 'captcha' | 'redirect'>): Promise<RegisterResult | Off> {
+    if (!this.core.switches.password)
+      return OFF
+
     await chooseRemember(this[STATE], options?.remember)
 
     return register(this[STATE], input, options)
   }
 
   // Signs in with an email or a username and a password; a wrong password and an unknown account answer alike.
-  async signInWithPassword(input: PasswordSignInInput, options?: SignInOptions): Promise<PasswordSignInResult> {
+  async signInWithPassword(input: PasswordSignInInput, options?: SignInOptions): Promise<PasswordSignInResult | Off> {
+    if (!this.core.switches.password)
+      return OFF
+
     await chooseRemember(this[STATE], options?.remember)
 
     return signInWithPassword(this[STATE], input, options ?? {})
@@ -553,30 +565,36 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // Mails a reset link to that address when an account has it; answers alike when none does. The reset signs in to `redirect` when given.
-  async requestPasswordReset(email: string, options: Pick<SignInOptions, 'captcha' | 'redirect'> = {}): Promise<MailRequestResult> {
+  async requestPasswordReset(email: string, options: Pick<SignInOptions, 'captcha' | 'redirect'> = {}): Promise<MailRequestResult | Off> {
+    if (!this.core.switches.password)
+      return OFF
+
     return requestPasswordReset(this[STATE], email, options.captcha, options.redirect)
   }
 
   // Spends a reset link's token on a new password, signing the user out everywhere else and in here.
-  async resetPassword(token: string, password: string): Promise<ResetPasswordResult> {
-    return resetPassword(this[STATE], token, password)
+  async resetPassword(token: string, password: string): Promise<ResetPasswordResult | Off> {
+    return !this.core.switches.password ? OFF : resetPassword(this[STATE], token, password)
   }
 
   // Mails a sign-in link to that address when an account has it; answers alike when none does. `remember` holds for the link opened in this browser, or the code typed in it.
-  async requestMagicLink(email: string, options: SignInOptions = {}): Promise<MailRequestResult> {
+  async requestMagicLink(email: string, options: SignInOptions = {}): Promise<MailRequestResult | Off> {
+    if (!this.core.switches.magicLink)
+      return OFF
+
     await chooseRemember(this[STATE], options.remember)
 
     return requestMagicLink(this[STATE], email, options.redirect, options.captcha)
   }
 
   // Spends a magic link's token, signing its user in.
-  async signInWithMagicLink(token: string): Promise<LinkResult> {
-    return signInWithMagicLink(this[STATE], token)
+  async signInWithMagicLink(token: string): Promise<LinkResult | Off> {
+    return !this.core.switches.magicLink ? OFF : signInWithMagicLink(this[STATE], token)
   }
 
   // Signs in with the code a magic link mail carried, typed in the browser that asked for it.
-  async signInWithEmailCode(code: string): Promise<CodeResult> {
-    return signInWithEmailCode(this[STATE], code)
+  async signInWithEmailCode(code: string): Promise<CodeResult | Off> {
+    return !this.core.switches.magicLink ? OFF : signInWithEmailCode(this[STATE], code)
   }
 
   // Verifies the address with the code its verification mail carried, typed in the browser that asked for it.
@@ -704,13 +722,13 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // A secret for the signed-in user's authenticator, as text and as a QR code; the second factor turns on once `enableTwoFactor` gets a code from it.
-  async setUpTwoFactor(proof: Proof): Promise<{ ok: true, setup: TwoFactorSetup } | { ok: false, error: ProofFailure | 'enabled' }> {
-    return setUpTwoFactor(this[STATE], proof)
+  async setUpTwoFactor(proof: Proof): Promise<{ ok: true, setup: TwoFactorSetup } | { ok: false, error: ProofFailure | 'enabled' } | Off> {
+    return !this.core.switches.twoFactor ? OFF : setUpTwoFactor(this[STATE], proof)
   }
 
   // Turns the second factor on with a code from the authenticator just set up; answers the recovery codes, to show this once.
-  async enableTwoFactor(code: string): Promise<{ ok: true, recoveryCodes: string[] } | { ok: false, error: 'signed-out' | 'not-set-up' | 'enabled' | 'invalid' | 'limited' }> {
-    return enableTwoFactor(this[STATE], code)
+  async enableTwoFactor(code: string): Promise<{ ok: true, recoveryCodes: string[] } | { ok: false, error: 'signed-out' | 'not-set-up' | 'enabled' | 'invalid' | 'limited' } | Off> {
+    return !this.core.switches.twoFactor ? OFF : enableTwoFactor(this[STATE], code)
   }
 
   async disableTwoFactor(proof: Proof): Promise<{ ok: true } | { ok: false, error: ProofFailure }> {
@@ -718,8 +736,8 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // A new set of recovery codes, the old ones void.
-  async regenerateRecoveryCodes(proof: Proof): Promise<{ ok: true, recoveryCodes: string[] } | { ok: false, error: ProofFailure | 'disabled' }> {
-    return regenerateRecoveryCodes(this[STATE], proof)
+  async regenerateRecoveryCodes(proof: Proof): Promise<{ ok: true, recoveryCodes: string[] } | { ok: false, error: ProofFailure | 'disabled' } | Off> {
+    return !this.core.switches.twoFactor ? OFF : regenerateRecoveryCodes(this[STATE], proof)
   }
 
   // How many unused recovery codes the signed-in user has, to warn when few are left.
@@ -730,8 +748,8 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // Sets the signed-in user's password, or a first one, and ends their other sessions.
-  async changePassword(proof: Proof, password: string): Promise<{ ok: true } | { ok: false, error: ProofFailure } | { ok: false, errors: { password: PasswordProblem | 'breached' } }> {
-    return changePassword(this[STATE], proof, password)
+  async changePassword(proof: Proof, password: string): Promise<{ ok: true } | { ok: false, error: ProofFailure } | { ok: false, errors: { password: PasswordProblem | 'breached' } } | Off> {
+    return !this.core.switches.password ? OFF : changePassword(this[STATE], proof, password)
   }
 
   // Names the signed-in user, or renames them, under the rules register checks; no proof, a name being no credential.
@@ -804,13 +822,13 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // The options for `makePasskey` of `@kaynooo/kayjs-auth/browser`, to make a passkey for the signed-in user once `proof` re-proves them, the second factor when it is on.
-  async passkeyRegistrationOptions(proof: Proof): Promise<PasskeyOptionsResult<PublicKeyCredentialCreationOptionsJSON, ProofFailure>> {
-    return passkeyRegistrationOptions(this[STATE], proof)
+  async passkeyRegistrationOptions(proof: Proof): Promise<PasskeyOptionsResult<PublicKeyCredentialCreationOptionsJSON, ProofFailure | Off['error']>> {
+    return !this.core.switches.passkeys ? OFF : passkeyRegistrationOptions(this[STATE], proof)
   }
 
   // Keeps the passkey `makePasskey` made, under `name` or the browser and system it was made on.
-  async registerPasskey(response: RegistrationResponseJSON, name?: string): Promise<RegisterPasskeyResult> {
-    return registerPasskey(this[STATE], response, name)
+  async registerPasskey(response: RegistrationResponseJSON, name?: string): Promise<RegisterPasskeyResult | Off> {
+    return !this.core.switches.passkeys ? OFF : registerPasskey(this[STATE], response, name)
   }
 
   async listPasskeys(): Promise<Passkey[]> {
@@ -828,11 +846,17 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
   // The options for `askPasskey` of `@kaynooo/kayjs-auth/browser`, naming no account; with its `autofill` the browser offers the passkeys in the sign-in field's autofill.
   async passkeySignInOptions(): Promise<PublicKeyCredentialRequestOptionsJSON> {
+    if (!this.core.switches.passkeys)
+      throw configError('passkeys are switched off: `passkeys: false` in the options of createAuth or auth()')
+
     return passkeySignInOptions(this[STATE])
   }
 
   // Signs in with the passkey that answered `passkeySignInOptions`, with no second factor after it.
-  async signInWithPasskey(response: AuthenticationResponseJSON, options: Pick<SignInOptions, 'redirect' | 'remember'> = {}): Promise<PasskeySignInResult> {
+  async signInWithPasskey(response: AuthenticationResponseJSON, options: Pick<SignInOptions, 'redirect' | 'remember'> = {}): Promise<PasskeySignInResult | Off> {
+    if (!this.core.switches.passkeys)
+      return OFF
+
     await chooseRemember(this[STATE], options.remember)
 
     return signInWithPasskey(this[STATE], response, options.redirect, async (record, method) => this.establish(record, method))
@@ -840,16 +864,19 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
   // The options for answering a pending sign-in's second factor with a passkey; `none` when the user has none.
   async twoFactorPasskeyOptions(): Promise<PasskeyOptionsResult<PublicKeyCredentialRequestOptionsJSON>> {
-    return twoFactorPasskeyOptions(this[STATE])
+    return !this.core.switches.passkeys ? OFF : twoFactorPasskeyOptions(this[STATE])
   }
 
-  async verifyTwoFactorPasskey(response: AuthenticationResponseJSON): Promise<TwoFactorResult> {
+  async verifyTwoFactorPasskey(response: AuthenticationResponseJSON): Promise<TwoFactorResult | Off> {
+    if (!this.core.switches.passkeys)
+      return OFF
+
     return verifyTwoFactorPasskey(this[STATE], response, async (record, method) => this.establish(record, method))
   }
 
   // The options for re-proving with a passkey, its answer then passed as `{ passkey }` wherever a proof is asked.
   async passkeyProofOptions(): Promise<PasskeyOptionsResult<PublicKeyCredentialRequestOptionsJSON>> {
-    return passkeyProofOptions(this[STATE])
+    return !this.core.switches.passkeys ? OFF : passkeyProofOptions(this[STATE])
   }
 
   // The signed-in user's own audit log, newest first, a page of `limit` (50 by default) before `before`, an instant or the last entry of the page (which tells entries of one millisecond apart); empty without the `audit` option.
@@ -1770,6 +1797,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
   const given = origin?.replace(TRAILING_SLASH, '')
   const locales = options.email?.locales !== undefined && options.email.locales.length > 0 ? [...options.email.locales] : ['en']
   const pages = pagesOf(options.pages)
+  const passkeyOptions = options.passkeys === false ? undefined : options.passkeys
   const paths = pages && pagePaths(pages.prefix)
 
   const needsUrl = oauthApps.length > 0 || options.email !== undefined
@@ -1800,9 +1828,9 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
       oauth: clients,
       refreshers: new Map(),
       name: name ?? (url === undefined ? 'kayjs-auth' : new URL(url).host),
-      passkeys: url === undefined
+      passkeys: url === undefined || options.passkeys === false
         ? undefined
-        : { id: options.passkeys?.rpId ?? new URL(url).hostname, name: options.passkeys?.rpName ?? name ?? new URL(url).host, origins: options.passkeys?.origins ?? [new URL(url).origin], userVerification: options.passkeys?.userVerification ?? 'preferred' },
+        : { id: passkeyOptions?.rpId ?? new URL(url).hostname, name: passkeyOptions?.rpName ?? name ?? new URL(url).host, origins: passkeyOptions?.origins ?? [new URL(url).origin], userVerification: passkeyOptions?.userVerification ?? 'preferred' },
     }
 
     if (url === undefined)
@@ -1842,6 +1870,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     get passkeys() {
       return bind().passkeys
     },
+    switches: { password: options.password !== false, passkeys: options.passkeys !== false, magicLink: options.magicLink !== false, twoFactor: options.twoFactor !== false },
     captcha: options.captcha === false ? undefined : options.captcha ?? proofOfWork(),
     breached: breachedCheck(options.breachedPasswords),
     email: options.email && {
