@@ -5,7 +5,7 @@ import { parse } from '@babel/parser'
 import { KayError } from '../compiler/errors'
 import { loadTraverse } from '../compiler/rewrite'
 import { GLOBBED } from './globbed'
-import { iconNames, installedIconSets } from './icons'
+import { ICON_IMPORT, iconNames, installedIconSets } from './icons'
 
 interface GlobCall {
   start: number
@@ -73,7 +73,8 @@ function iconMatches(patterns: string[], root: string): Map<string, string> {
   if (wanted.length === 0)
     return new Map()
 
-  const names = [...installedIconSets(root)].flatMap(([prefix, file]) => iconNames(prefix, file))
+  // An icon whose name an import cannot spell is not one a glob offers either.
+  const names = [...installedIconSets(root)].flatMap(([prefix, file]) => iconNames(prefix, file)).filter(name => ICON_IMPORT.test(`${ICONS}${name}`))
   const matching = (pattern: string) => {
     const glob = new Bun.Glob(pattern.slice(ICONS.length))
 
@@ -113,7 +114,7 @@ function expandAlternatives(pattern: string): string[] {
 
 // The files the module's `import.meta.glob` calls match, for a build that follows imports without running the module, such as the stylesheet build.
 export function globbedFiles(code: string, importer: string, root: string, loader: Bun.JavaScriptLoader): string[] {
-  return code.includes(GLOB_CALL) ? globCalls(code, importer, loader).flatMap(call => [...globFiles(call.patterns, importer, root).values()].filter(file => !file.startsWith(ICONS))) : []
+  return code.includes(GLOB_CALL) ? globCalls(code, importer, loader).flatMap(call => [...globFiles(call.patterns.filter(pattern => !pattern.replace(NEGATED, '').startsWith(ICONS)), importer, root).values()]) : []
 }
 
 // The module with each `import.meta.glob` call replaced by the record of the files it matches, as Vite does: each module, or with `import` one of its exports, imported up front when `eager`, else behind a function importing it.

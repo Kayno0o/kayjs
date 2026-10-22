@@ -245,4 +245,4 @@ const draw = (name: string) => ICONS[`~icons/game-icons/${name}`]
 ```
 
 - The pattern is `~icons/<set>/<name>` with a glob's `*`, `{a,b}` and `!` negation, over the installed sets' icons and aliases; without `eager` each value is a function importing the icon.
-- A name written out that no installed set has fails the build (`icon-unresolved`), an alternative of the braces at a time, as a misspelt import does.
+- A pattern, or an alternative of its braces, that matches no icon of the installed sets fails the build (`icon-unresolved`), as a misspelt import does.

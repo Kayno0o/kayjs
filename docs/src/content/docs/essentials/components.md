@@ -86,7 +86,7 @@ for Card of Object.values(cards)
   Card
 ```
 
-Without `eager`, each value is a function that imports the file when called. Write the patterns and options in the call itself, because the build reads them there.
+Without `eager`, each value is a function that imports the file when called. Write the patterns and options in the call itself, because the build reads them there. A pattern starting with `~icons/` matches icons instead, see [an icon known at runtime](styling-and-assets.md#an-icon-known-at-runtime).
 
 ## Slots and blocks
 

@@ -2591,6 +2591,7 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
       'src/routes/[org]/items/[id=integer]/[[slug]].kay': page,
       'src/routes/[org]/_layout.kay': '--- server\nimport { action } from \'kay\'\n\nexport const own = action(async (ctx) => ctx.params.anything)\n---\nslot\n',
       'src/routes/_actions.kay': '--- server\nimport { action } from \'kay\'\n\nexport const shared = action(async (ctx) => ctx.params.anything)\n',
+      'src/routes/many/[id].kay': '--- server\nexport const page = { prerender: true }, first = action(async ctx => ctx.params.id.toUpperCase()), second = action(async ctx => ctx.params.nope)\n---\np hi\n',
       'src/routes/plain.kay': '--- server\nexport const hello = action(async (ctx) => ctx.params.nothing)\n---\np hi\n',
     })
 
@@ -2599,6 +2600,7 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
 
       expect(diagnostics.map(d => [d.file.slice(root.length + 1), d.line, d.code])).toEqual([
         ['src/routes/[org]/items/[id=integer]/[[slug]].kay', 8, 'TS2339'],
+        ['src/routes/many/[id].kay', 2, 'TS2339'],
         ['src/routes/plain.kay', 2, 'TS2339'],
       ])
     }

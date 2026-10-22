@@ -478,6 +478,6 @@ const ICONS = import.meta.glob<IconProps>('~icons/game-icons/{war-pick,axe-swing
 const draw = (name: string) => ICONS[`~icons/game-icons/${name}`]
 ```
 
-A name that no installed set has fails the build, as a misspelt import does.
+A pattern, or an alternative of its braces, that matches no icon fails the build, as a misspelt import does.
 
 <ReadMore href="/llms/images">Fixed-width images, the limits on remote images, share cards, AVIF settings and `processImage`.</ReadMore>

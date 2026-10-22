@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
-import { expandGlobs, globFiles } from '../src/build/glob'
+import { expandGlobs, globbedFiles, globFiles } from '../src/build/glob'
 import { iconProps, iconTypes, installedIconSets } from '../src/build/icons'
 import { iconSetWarnings, thirdPartyNotices } from '../src/build/licenses'
 import { kay } from '../src/build/plugin'
@@ -116,6 +116,14 @@ describe('icons', () => {
     expect(lazy.success).toBe(true)
     expect((await lazy.outputs[0]!.text()).length).toBeLessThan(4000)
     await rm(dir, { recursive: true, force: true })
+  })
+
+  it('mixes file and icon patterns in one call, and leaves the icons out of the files a style scan follows', () => {
+    const importer = join(FIXTURE, 'src/other.ts')
+    const code = 'import.meta.glob([\'/src/routes/*.kay\', \'~icons/tabler/home\', \'!~icons/tabler/mail\'])'
+
+    expect([...globFiles(['/src/routes/*.kay', '~icons/tabler/home'], importer, FIXTURE).keys()]).toEqual(['/src/routes/index.kay', '~icons/tabler/home'])
+    expect(globbedFiles(code, importer, FIXTURE, 'ts')).toEqual([join(FIXTURE, 'src/routes/index.kay')])
   })
 
   it('gives the icons a glob names to a module the server loads, as the props an import gives', async () => {
