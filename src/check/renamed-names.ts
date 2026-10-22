@@ -67,7 +67,7 @@ function regexEnd(source: string, at: number): number {
 }
 
 // The source with strings, regex literals, template text and comments blanked out, offset for offset, so a name in one is never matched. A `${}` of a template stays code.
-function mask(source: string): string {
+export function mask(source: string): string {
   const out = source.split('')
   const blank = (from: number, to: number) => {
     for (let at = from; at < to; at++) {

@@ -14,6 +14,10 @@ This page already renders the `TooltipHost`.
 
 </Callout>
 
+## Hints on read-only text
+
+`data-hint` is a tooltip for the pointer alone, for the explanation of a figure the keyboard has no stop on, such as a stat. It shows on hover, never on focus, and `unreachable-tooltip` leaves it alone. It must only add to what the element already says, as neither the keyboard nor a screen reader brings it up.
+
 ## Placement
 
 `data-tooltip-placement` sets where the tooltip sits, as a CSS `position-area`: `top` by default, or `bottom`, `left`, `right`.

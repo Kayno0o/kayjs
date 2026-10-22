@@ -6,11 +6,13 @@ import { findProjectFiles } from '../build/files'
 import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
 import { importsOf, walk } from './ast'
+import { mask } from './renamed-names'
 
 const SOURCE_FILE = /(?<!\.d)\.tsx?$/
 const NAME_BREAK = /[^A-Z0-9]+/i
 const LEADING_DOT = /^\./
 const LEADING_DIGIT = /^\d/
+const BACKSLASH = /\\/g
 
 // `mountComponent('src/components/toggle.kay', props)` of `kay/test`: the string form, found in the project's TypeScript files, which takes the component imported in the file instead.
 // The fix imports the component under its name in Pascal case and writes it in place of the path, unless the file already uses that name for something else.
@@ -38,7 +40,8 @@ export async function mountComponentPaths(root: string, options: CheckOptions): 
     }
 
     const { locals, namespaces } = importsOf(ast, from => from === 'kay/test', 'mountComponent')
-    const calls = new Map<string, t.StringLiteral[]>()
+    // By the file a path names, so `./src/a.kay` and `src/a.kay` are one component.
+    const calls = new Map<string, { path: string, literals: t.StringLiteral[] }>()
 
     if (locals.size === 0 && namespaces.size === 0)
       continue
@@ -52,17 +55,22 @@ export async function mountComponentPaths(root: string, options: CheckOptions): 
       const argument = node.arguments[0]
 
       if (mounts && argument?.type === 'StringLiteral' && argument.value.endsWith('.kay'))
-        calls.set(argument.value, [...calls.get(argument.value) ?? [], argument])
+        calls.set(resolve(root, argument.value), { path: argument.value, literals: [...calls.get(resolve(root, argument.value))?.literals ?? [], argument] })
     })
 
     const imports = ast.program.body.filter((statement): statement is t.ImportDeclaration => statement.type === 'ImportDeclaration')
 
-    for (const [path, literals] of calls) {
-      const target = resolve(root, path)
+    const code = mask(source)
+    // The names this pass already gave an import: two files of one name cannot both be imported as it.
+    const claimed = new Set<string>()
+
+    for (const [target, { path, literals }] of calls) {
       const imported = imports.flatMap(statement => statement.importKind !== 'type' && resolve(dirname(file), statement.source.value) === target ? statement.specifiers.filter(specifier => specifier.type === 'ImportDefaultSpecifier') : [])[0]
       const name = imported?.local.name ?? componentName(path)
-      const specifier = relative(dirname(file), target).replace(/\\/g, '/')
-      const taken = imported === undefined && new RegExp(`(?<![\\w$.])${name}(?![\\w$])`).test(source)
+      const specifier = relative(dirname(file), target).replace(BACKSLASH, '/')
+      const taken = imported === undefined && (claimed.has(name) || new RegExp(`(?<![\\w$.])${name}(?![\\w$])`).test(code))
+
+      claimed.add(name)
       const last = imports.at(-1)
       const edits = [
         ...literals.map(literal => ({ start: literal.start!, end: literal.end!, text: name })),

@@ -82,7 +82,7 @@ export async function mountComponent(source: string | ((props: never) => unknown
   const file = typeof source === 'string' ? source : componentFiles()?.get(source)
 
   if (file === undefined)
-    throw new TypeError('kay: mountComponent takes a .kay component imported in a test, or the path of its file; this function was not built from a .kay file the test loader loaded')
+    throw new TypeError('kay: mountComponent takes a .kay component imported in a test, or the path of its file; this function was not built from a .kay file the test loader loaded (the loader notes components under NODE_ENV=test, which `bun test` sets)')
 
   const props = (given[0] ?? {}) as Record<string, unknown>
   const path = resolve(root, file)

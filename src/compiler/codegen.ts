@@ -24,6 +24,7 @@ import { headTagProblem, sharedImports } from './validate'
 
 const WRITE_NAMES: Record<keyof typeof WRITE_HELPERS, KayHelper> = { to: 'writeTo', update: 'updateTo', back: 'writeBack', updateBack: 'updateBack' }
 
+const WORD = /[\p{ID_Start}$_][\p{ID_Continue}$\u200C\u200D]*/gu
 const TEXT_ATTRIBUTE = /\bwith\s*\{\s*type\s*:\s*(['"])text\1/
 
 export interface GenerateOptions {
@@ -249,8 +250,47 @@ class ModuleShell {
   // The names of the project's own files imported as text, `import waves from './waves.svg' with { type: 'text' }`: markup the app made, as a written-out `innerHTML` is.
   private ownMarkup(): Set<string> {
     const bindings = [...this.script.imports, ...this.fence?.imports ?? []]
+    const own = bindings.filter(binding => !binding.typeOnly && binding.imported === 'default' && binding.source.startsWith('.') && !binding.source.split('/').includes('node_modules') && TEXT_ATTRIBUTE.test(this.src.slice(binding.declaration.start, binding.declaration.end))).map(binding => binding.local)
 
-    return new Set(bindings.filter(binding => !binding.typeOnly && binding.imported === 'default' && binding.source.startsWith('.') && TEXT_ATTRIBUTE.test(this.src.slice(binding.declaration.start, binding.declaration.end))).map(binding => binding.local))
+    if (own.length === 0)
+      return new Set()
+
+    // A loop item, a snippet or slot parameter, an alias or a `const` of the template may take an import's name, and then holds any string.
+    const shadowed = new Set<string>()
+    const bound = (span: Span | undefined) => {
+      for (const [name] of span === undefined ? [] : this.src.slice(span.start, span.end).matchAll(WORD))
+        shadowed.add(name)
+    }
+
+    visitNodes(this.file.template, (node) => {
+      if (node.kind === 'for') {
+        bound(node.item)
+        bound(node.index)
+      }
+      else if (node.kind === 'slot') {
+        bound(node.params)
+      }
+      else if (node.kind === 'snippet') {
+        bound(node.params)
+      }
+      else if (node.kind === 'await') {
+        bound(node.resolved?.alias)
+        bound(node.rejected?.alias)
+      }
+      else if (node.kind === 'try') {
+        bound(node.rejected?.alias)
+      }
+      else if (node.kind === 'const') {
+        bound(node.pattern)
+      }
+      else if (node.kind === 'if') {
+        for (const branch of node.branches) {
+          bound(branch.alias)
+        }
+      }
+    })
+
+    return new Set(own.filter(name => !shadowed.has(name)))
   }
 
   run(): Generated {

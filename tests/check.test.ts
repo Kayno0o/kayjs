@@ -2929,10 +2929,32 @@ describe.concurrent('kay check, markup', () => {
       'div(innerHTML={`<g>${waves}</g>`})',
       '',
     ].join('\n')
-    const root = await scratchProject({ 'src/card.kay': page, 'src/public/waves.svg': '<svg/>', 'node_modules/vendor/logo.svg': '<svg/>', 'node_modules/vendor/package.json': '{"name":"vendor"}' })
+    const shadowed = [
+      '---',
+      'import logo from \'../node_modules/vendor/logo.svg\' with { type: \'text\' }',
+      'import waves from \'../public/waves.svg\' with { type: \'text\' }',
+      'const { rows } = props<{ rows: string[] }>()',
+      '---',
+      'p {waves.length}',
+      'div(innerHTML={logo})',
+      'for waves of rows',
+      '  div(innerHTML={waves})',
+      '',
+    ].join('\n')
+    const snippet = [
+      '---',
+      'import waves from \'../public/waves.svg\' with { type: \'text\' }',
+      '---',
+      'p {waves.length}',
+      'snippet row(waves: string)',
+      '  div(innerHTML={waves})',
+      '{row(\'x\')}',
+      '',
+    ].join('\n')
+    const root = await scratchProject({ 'src/card.kay': page, 'src/shadowed.kay': shadowed, 'src/snippet.kay': snippet, 'src/public/waves.svg': '<svg/>', 'node_modules/vendor/logo.svg': '<svg/>', 'node_modules/vendor/package.json': '{"name":"vendor"}' })
 
     try {
-      expect((await check(root)).map(d => d.line)).toEqual([7, 8, 9])
+      expect((await check(root)).map(d => [basename(d.file), d.line])).toEqual([['card.kay', 7], ['card.kay', 8], ['card.kay', 9], ['shadowed.kay', 7], ['shadowed.kay', 9], ['snippet.kay', 6]])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -3776,7 +3798,14 @@ describe.concurrent('kay check, unused code', () => {
     const reused = 'import Switch from \'../src/components/toggle-group.kay\'\nimport * as kayTest from \'kay/test\'\n\nvoid Switch\nconst reused = await kayTest.mountComponent(\'src/components/toggle-group.kay\')\n'
     const taken = 'import { mountComponent } from \'kay/test\'\n\nconst Menu = 1\nconst held = await mountComponent(\'src/components/menu.kay\')\nvoid Menu\n'
     const component = 'import { mountComponent } from \'kay/test\'\n\nconst by = await mountComponent(Toggle)\nconst other = await foo.mountComponent(\'src/components/toggle-group.kay\')\n'
+    const same = 'import { mountComponent } from \'kay/test\'\n\nconst a = await mountComponent(\'src/a/card.kay\')\nconst again = await mountComponent(\'./src/a/card.kay\')\nconst b = await mountComponent(\'src/b/card.kay\')\nvoid [a, again, b]\n'
+    const pascal = 'import { mountComponent } from \'kay/test\'\n\n// Toggle is also a word here\nconst shown = await mountComponent(\'src/components/Toggle.kay\')\n'
     const root = await scratchProject({
+      'src/a/card.kay': 'p A\n',
+      'src/b/card.kay': 'p B\n',
+      'src/components/Toggle.kay': 'p T\n',
+      'tests/same.ts': same,
+      'tests/pascal.ts': pascal,
       'src/components/toggle-group.kay': 'button Go\n',
       'tests/mounts.ts': mounts,
       'tests/reused.ts': reused,
@@ -3787,13 +3816,15 @@ describe.concurrent('kay check, unused code', () => {
     try {
       const { output } = await runCheck(root)
 
-      expect(output.match(/deprecated-mount-component/g)).toHaveLength(3)
+      expect(output.match(/deprecated-mount-component/g)).toHaveLength(6)
       await runCheck(root, '--fix')
       expect(await Bun.file(join(root, 'tests/mounts.ts')).text()).toBe('import { mountComponent } from \'kay/test\'\nimport ToggleGroup from \'../src/components/toggle-group.kay\'\n\nconst first = await mountComponent(ToggleGroup, { label: \'a\' })\nconst second = await mountComponent(ToggleGroup)\n')
       expect(await Bun.file(join(root, 'tests/reused.ts')).text()).toContain('kayTest.mountComponent(Switch)')
       expect(await Bun.file(join(root, 'tests/taken.ts')).text()).toBe(taken)
       expect(await Bun.file(join(root, 'tests/other.ts')).text()).toBe(component)
-      expect((await runCheck(root)).output.match(/deprecated-mount-component/g)).toHaveLength(1)
+      expect(await Bun.file(join(root, 'tests/same.ts')).text()).toBe('import { mountComponent } from \'kay/test\'\nimport Card from \'../src/a/card.kay\'\n\nconst a = await mountComponent(Card)\nconst again = await mountComponent(Card)\nconst b = await mountComponent(\'src/b/card.kay\')\nvoid [a, again, b]\n')
+      expect(await Bun.file(join(root, 'tests/pascal.ts')).text()).toContain('mountComponent(Toggle)')
+      expect((await runCheck(root)).output.match(/deprecated-mount-component/g)).toHaveLength(2)
     }
     finally {
       await rm(root, { recursive: true, force: true })

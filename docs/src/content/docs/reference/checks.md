@@ -64,7 +64,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `missing-captions` | warn | a11y | A `video` with no captions |
 | `unannounced-click` | warn | a11y | An `onClick` on an element whose `role` names no widget, a `dialog` or `aria-modal` (not `"false"`) backdrop excepted |
 | `dangling-aria` | warn | a11y | An `aria-labelledby` or `aria-describedby` pointing at no id |
-| `unreachable-tooltip` | warn | a11y | A `data-tooltip` the keyboard never reaches and no screen reader hears |
+| `unreachable-tooltip` | warn | a11y | A `data-tooltip` the keyboard never reaches and no screen reader hears; `data-hint` is the pointer-only form |
 | `uncontrolled-autoplay` | warn | a11y | Media playing by itself with no `controls` |
 | `meta-refresh` | warn | a11y | A `meta` refresh with a delay |
 | `ungrouped-radios` | warn | a11y | Radios sharing a name outside a `fieldset` |

@@ -86,7 +86,17 @@ describe('TooltipHost', () => {
     const figure = root.querySelector<HTMLElement>('#figure')!
     const tooltip = root.querySelector<HTMLElement>('.kui-tooltip')!
 
-    root.querySelector<HTMLElement>('#focusable')!.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+    // A focus the browser rings opens a data-tooltip, so the hint staying shut is the hint's own doing.
+    root.querySelector<HTMLElement>('#delete')!.focus()
+    await clock.elapse(100)
+    await clock.settle()
+
+    expect(tooltip.matches(':popover-open')).toBe(true)
+    root.querySelector<HTMLElement>('#delete')!.blur()
+    document.dispatchEvent(new Event('pointerdown'))
+    await clock.settle()
+
+    root.querySelector<HTMLElement>('#focusable')!.focus()
     await clock.elapse(100)
     await clock.settle()
 
