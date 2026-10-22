@@ -68,7 +68,7 @@ The extension puts both islands on every page, so each page loads the hydration 
 
 ### Settings
 
-The icons the components draw come from slots, each named for what it means: `alert`, `back`, `calendar`, `chevron`, `close`, `delete`, `globe`, `info`, `menu`, `pause`, `play`, `plus`, `search`, `spinner`, `star`, `success`, `zoomFit`, `zoomIn`, `zoomOut`. The app replaces any of them through kay's library settings, spreading the defaults:
+The icons the components draw come from slots, each named for what it means: `alert`, `back`, `calendar`, `chat`, `chevron`, `close`, `collapse`, `delete`, `expand`, `globe`, `info`, `menu`, `pause`, `play`, `plus`, `search`, `send`, `spinner`, `star`, `stop`, `success`, `zoomFit`, `zoomIn`, `zoomOut`. The app replaces any of them through kay's library settings, spreading the defaults:
 
 ```ts
 // kay.config.ts

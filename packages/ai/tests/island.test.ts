@@ -35,8 +35,8 @@ test('a page asking in its server fence builds, and an island importing ask does
   expect(island.output).toContain('Browser build cannot import')
 }, 120_000)
 
-// The send and stop buttons draw their own svg, so the island ships none of kayjs-ui's default icons: this marker is the spinner's drawing, which a build holding them carries.
-test('the Chat island ships none of the default icons of kayjs-ui', async () => {
+// The send and stop buttons draw kayjs-ui's `send` and `stop` slots, so the island carries the icons of the app's settings: this marker is the send arrow's drawing.
+test('the Chat island draws its icons from kayjs-ui\'s settings', async () => {
   const fixture = join(import.meta.dir, 'fixture')
   const run = Bun.spawn([process.execPath, CLI, 'build', fixture, '--no-check', '--quiet'], { cwd: fixture, stdout: 'pipe', stderr: 'pipe' })
   const output = await new Response(run.stdout).text() + await new Response(run.stderr).text()
@@ -48,6 +48,7 @@ test('the Chat island ships none of the default icons of kayjs-ui', async () => 
 
   expect(scripts.some(file => (/^chat-\w+\.js$/).test(file))).toBe(true)
 
-  for (const file of scripts)
-    expect(await Bun.file(join(dist, file)).text(), file).not.toContain('M12 3a9 9 0 1 0 9 9')
+  const code = await Promise.all(scripts.map(async file => Bun.file(join(dist, file)).text()))
+
+  expect(code.some(text => text.includes('M12 5v14m6-8l-6-6m-6 6l6-6'))).toBe(true)
 }, 180_000)

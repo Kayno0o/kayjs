@@ -3,6 +3,7 @@ import type { Action, ActionStream, Failure, SanitizeOptions, Snippet } from 'ka
 import type { CodeBlock, Message, Progress, ToolCall } from './types'
 import { ActionError, effect, onCleanup, onMount, recipe, sanitizeHtml, signal, trustHtml, untrack } from 'kay'
 import BareIconButton from '@kaynooo/kayjs-ui/bare-icon-button.kay'
+import Icon from '@kaynooo/kayjs-ui/icon.kay'
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
 import { markdownHtml } from 'kay/markdown'
@@ -417,7 +418,6 @@ function scrolled() {
   pinned = log !== undefined && log.scrollHeight - log.scrollTop - log.clientHeight < PINNED_PX
 }
 ---
-// The inline icons follow Tabler Icons and Feather (MIT), whose notices are in THIRD-PARTY-NOTICES.md.
 section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !busy()} data-variant={variant} data-tone={tone} data-size={size} ref={element => element.addEventListener('kai-chat-new', reset)})
   if history().length === 0 && !busy()
     div(part="empty")
@@ -466,10 +466,8 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
     if busy()
       BareIconButton(part="send" variant="inline" label={stopLabel} onClick={stop})
         slot stopIcon
-          svg.kui-icon(viewBox="0 0 24 24" fill="currentColor" aria-hidden="true")
-            rect(x="6" y="6" width="12" height="12" rx="2")
+          Icon(icon="stop")
     else
       BareIconButton(part="send" variant="inline" type="submit" label={sendLabel})
         slot sendIcon
-          svg.kui-icon(viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true")
-            path(d="M12 19V5M5 12l7-7 7 7")
+          Icon(icon="send")

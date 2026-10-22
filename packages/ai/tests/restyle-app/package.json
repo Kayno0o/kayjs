@@ -1,6 +1,9 @@
 {
   "name": "kayjs-ai-restyle-app",
   "private": true,
+  "devDependencies": {
+    "@iconify-json/tabler": "^1.2.42"
+  },
   "dependencies": {
     "@kaynooo/kayjs-ai": "link:../..",
     "@kaynooo/kayjs-ui": "link:../../../ui"

@@ -31,7 +31,6 @@
   "files": [
     "LICENSE",
     "README.md",
-    "THIRD-PARTY-NOTICES.md",
     "llms",
     "llms.txt",
     "src",
