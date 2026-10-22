@@ -84,7 +84,7 @@ async function chosen(input: HTMLInputElement) {
     return
   }
 
-  // A parent that moved `value` onto the colour chosen, other than by echoing it before, holds it whatever the answer.
+  // A `value` already equal to the colour at the start is an echo; one that moved onto it since, even from inside `onChange`, is the parent holding it whatever the answer.
   if (accepted || (heldBefore !== next && untrack(() => normal(value)) === next)) {
     settled = next
   }
@@ -108,6 +108,6 @@ onFormReset(() => box, resetting.reset)
 ---
 // A native colour input drawn as a swatch, so the picker, the keyboard and the form post come with it. A click while a change is under way opens nothing.
 label(part="root")
-  input({...rest} part="input" ref={boxRef} type="color" aria-label={rest['aria-label'] ?? label} value={shown()} aria-busy={busy() ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onInput={moved} onChange={event => chosen(event.currentTarget)})
+  input({...rest} part="input" ref={boxRef} type="color" aria-label={rest['aria-label'] || label} value={shown()} aria-busy={busy() ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onInput={moved} onChange={event => chosen(event.currentTarget)})
   span(part="label") {label}
   span(part="value" aria-hidden="true") {shown()}

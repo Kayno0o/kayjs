@@ -8,6 +8,7 @@ const { onChange } = props<{ onChange?: (value: string) => unknown }>()
 const light = signal('#ff8800')
 ---
 form#form
+  h2#tint-heading Tint heading
   ColorInput#light(label="Light" name="light" value={light()} onChange={(value: string) => onChange ? onChange(value) : light.set(value)})
   ColorInput#named(label="Accent" name="named" aria-label="Accent colour of the theme" value="#445566")
   ColorInput#labelled(label="Tint" name="labelled" aria-labelledby="tint-heading" value="#778899")

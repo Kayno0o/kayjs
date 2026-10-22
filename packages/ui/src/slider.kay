@@ -89,7 +89,7 @@ async function released(input: HTMLInputElement) {
     return
   }
 
-  // A parent that moved `value` onto the number chosen, other than by echoing it from `onInput`, holds it whatever the answer.
+  // A `value` already equal to the number at release is the `onInput` echo; one that moved onto it since, even from inside `onChange`, is the parent holding it whatever the answer.
   if (accepted || (heldBefore !== next && untrack(() => value) === next)) {
     settled = next
   }
@@ -130,7 +130,7 @@ function held(event: Event) {
 ---
 div(part="root")
   span(part="label") {label}
-  input({...rest} part="input" ref={sliderRef} type="range" aria-label={label} aria-valuetext={formatValue ? words(shown()) : undefined} min={min} max={max} step={step} value={shown()} aria-busy={busy() ? 'true' : undefined} onInput={moved} onChange={event => released(event.currentTarget)} onMouseDown={held} onTouchStart={held} onKeyDown={held})
+  input({...rest} part="input" ref={sliderRef} type="range" aria-label={rest['aria-label'] || label} aria-valuetext={formatValue ? words(shown()) : undefined} min={min} max={max} step={step} value={shown()} aria-busy={busy() ? 'true' : undefined} onInput={moved} onChange={event => released(event.currentTarget)} onMouseDown={held} onTouchStart={held} onKeyDown={held})
   if showValue
     // Not an `output`, which a form reset empties; the input itself speaks the value.
     span(part="value" aria-hidden="true") {words(shown())}

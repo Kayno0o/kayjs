@@ -12,12 +12,12 @@ The field is a native `input type="color"`, so the browser draws its own picker 
 
 ## Async change
 
-Return a promise from `onChange` to hold the input busy until it settles, for a colour sent to a device that takes seconds to answer. A click opens no picker while it is busy. If the promise rejects or resolves to `false`, the previous colour is put back, so a refused change never shows as made. A `value` the parent sets meanwhile has the last word.
+Return a promise from `onChange` to hold the input busy until it settles, for a colour sent to a device that takes seconds to answer. A click opens no picker while it is busy. If the promise rejects or resolves to `false`, the previous colour is put back, so a refused change never shows as made. A `value` the parent sets meanwhile has the last word, one set to the colour being changed (even from inside `onChange`) included, so a parent that holds it keeps it when the change is refused.
 
 <Demo name="color-input/busy" />
 
 ## Label
 
-`label` is required. It names the input for screen readers, which do not hear the hex beside it.
+`label` is required. It names the input for screen readers, which do not hear the hex beside it. An `aria-label` or `aria-labelledby` passed to ColorInput names the input in its place.
 
 `id`, `disabled` and the other input attributes go on the input. A `value` that is not `#rrggbb` shows as black, as the native input does.

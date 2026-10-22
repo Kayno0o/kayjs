@@ -18,6 +18,10 @@ The value is written beside the label; `showValue={false}` hides it, and `format
 
 Use `onChange` to save or send the value instead of debouncing `onInput`. Like the one on Toggle, a promise it returns holds the slider busy until it settles, and the thumb goes back to the last accepted value when the promise resolves to false, rejects or throws (logged), so a refused change never shows as made; an `onInput` that follows the slider is told the value put back.
 
-A `value` the parent passes later is followed. With a `name` the input posts its number in a plain form, and `id`, `disabled` and the other input attributes go on the input.
+A `value` the parent passes later is followed.
+
+One that moves onto the value being changed while the promise is pending (set from `onChange`, or an `onInput` echo arriving after the release) is the parent holding it, and is kept when the change is refused; an `onInput` echo before the release is not, and the thumb goes back.
+
+An `aria-label` passed to Slider names the input in place of `label`. With a `name` the input posts its number in a plain form, and `id`, `disabled` and the other input attributes go on the input.
 
 The track and the thumb are drawn from the theme tokens, so an app styles no `::-webkit-slider-thumb` itself.

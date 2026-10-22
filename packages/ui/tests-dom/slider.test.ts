@@ -223,6 +223,32 @@ test('still puts back a refused value the parent only echoed from onInput', asyn
   expect(input.value).toBe('40')
 })
 
+test('an app\'s aria-label wins over the label as the input\'s name', async () => {
+  const { root } = await open()
+
+  expect(root.querySelector('input[name="named"]')!.getAttribute('aria-label')).toBe('Pause between two sends')
+})
+
+test('keeps the value a parent set from inside onChange when that change is refused', async () => {
+  let settle1: (answer: boolean) => void = () => undefined
+  let page: HTMLElement | undefined
+  const { release, input, root } = await open(undefined, async () => {
+    click(page!.querySelector('#set'))
+
+    return new Promise<boolean>((resolve) => {
+      settle1 = resolve
+    })
+  })
+
+  page = root
+  input.value = '60'
+  await release()
+  settle1(false)
+  await settle()
+
+  expect(input.value).toBe('80')
+})
+
 test('tells onChange of a form reset that moved the thumb', async () => {
   const change: number[] = []
   const { drag, release, root, input } = await open(undefined, value => void change.push(value))

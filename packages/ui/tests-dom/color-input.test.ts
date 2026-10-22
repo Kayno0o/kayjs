@@ -203,6 +203,20 @@ test('keeps the colour the parent set to the very one pending, even when that ch
   expect([input.value, shown()]).toEqual(['#abcdef', '#abcdef'])
 })
 
+test('keeps the colour a parent set from inside onChange when that change is refused', async () => {
+  let page: HTMLElement | undefined
+  const { input, commit, shown, root } = await open(async () => {
+    click(page!.querySelector('#upper'))
+
+    return Promise.resolve(false)
+  })
+
+  page = root
+  await commit('#abcdef')
+
+  expect([input.value, shown()]).toEqual(['#abcdef', '#abcdef'])
+})
+
 test('a form reset puts the colour back on its start and tells onChange', async () => {
   const told: string[] = []
   const { input, commit, root, shown } = await open((value) => {
