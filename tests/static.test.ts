@@ -15,7 +15,8 @@ const BASE = '/repo'
 // The runtime is split by who imports each name, which costs the import statements between its chunks, about 12 bytes here.
 // Keeping a pending block shown while a reload or another document replaces the page costs 19 bytes here, raised for it as it keeps a slow submit from looking dead.
 // Reading whether the visitor asks to save data, so an island with no `hydrate` waits for the viewport, costs about 105 bytes here: it runs before the first island hydrates, so it cannot wait in a chunk.
-const EAGER_JS_BUDGET = 8_805
+// Marking each signal so an assignment to a property or a let holding one writes it costs 36 bytes here, raised for it as it is what lets `box.count = 1` write the signal.
+const EAGER_JS_BUDGET = 8_841
 const LAZY_CHUNKS = ['fetch-island', 'forms', 'hydrate-when', 'live-cache', 'live-props', 'page-swap', 'prefetch', 'static-slots']
 const SCRIPT_URL = /<(?:script type="module" src|link rel="modulepreload" href)="([^"]+)"/g
 
