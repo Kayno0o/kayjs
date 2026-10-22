@@ -1,16 +1,14 @@
 import { describe, expect, test } from 'bun:test'
 import { bodyHtml, MarkdownError } from '../src/kay/content'
-import { scriptInBody } from '../src/unsafe'
+import { scriptIn, scriptInBody } from '../src/unsafe'
 
 describe('scriptInBody', () => {
   test('finds what would run as the site, however the browser tokenizes it', async () => {
     for (const [body, found] of [
       ['Hi <script>alert(1)</script>', 'a <script> tag'],
-      ['<script/x>alert(1)</script>', 'a <script> tag'],
       ['<img src="x>" onerror=alert(1)>', 'the attribute onerror'],
       ['a <img alt=">" src=x onerror=alert(1)> b', 'the attribute onerror'],
       ['a <img alt="<" src=x onerror=alert(1)> b', 'the attribute onerror'],
-      ['<div/onclick=alert(1)>x', 'the attribute onclick'],
       ['<div>\n<svg/onload=alert(1)>\n</div>', 'a <svg> tag'],
       ['<div>\n<img/src=x onerror=alert(1)>\n</div>', 'the attribute onerror'],
       ['<dIV ONMOUSEOVER="alert(1)">x</dIV>', 'the attribute onmouseover'],
@@ -37,6 +35,16 @@ describe('scriptInBody', () => {
       ['Text\n\n<div class="the layout up to its next quote', 'a tag left open'],
     ] as const)
       expect(await scriptInBody(body), body).toBe(found)
+  })
+
+  test('reads a slash for a space in a tag as a browser does, and a Markdown renderer that escapes such a tag leaves nothing to run', async () => {
+    for (const [html, found] of [['<script/x>alert(1)</script>', 'a <script> tag'], ['<div/onclick=alert(1)>x', 'the attribute onclick']] as const) {
+      expect(await scriptIn(html), html).toBe(found)
+      // Bun's Markdown renderer may keep the tag raw or escape it as text, depending on its version; what it renders must be named only when a browser would run it.
+      const rendered = await bodyHtml(html)
+
+      expect(await scriptInBody(html), html).toBe(rendered.includes('&lt;') ? undefined : found)
+    }
   })
 
   test('keeps Markdown, safe HTML, code showing HTML and the collection\'s own components', async () => {
