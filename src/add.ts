@@ -367,6 +367,11 @@ async function planCore(dir: string, core: readonly Feature[]): Promise<Plan> {
         writes.set(path, content)
       else if (disk === undefined)
         notes.push(`${path} was deleted, so it is not written back: add it by hand if the feature needs it`)
+      // The config carries kayjs-auth's store line, which a project of the former form keeps in src/auth.ts and an edited config is not rewritten for: a hand edit to apply, never a reason to refuse the rest.
+      else if (path === 'kay.config.ts' && existsSync(join(dir, 'src/auth.ts')))
+        continue
+      else if (path === 'kay.config.ts')
+        notes.push(`${path} is not what \`kay new\` wrote, so apply this by hand:\n${handEdit(was, content)}`)
       else if (!SOFT_FILES.has(path))
         conflicts.push(`${path} is not what \`kay new\` wrote, so apply this by hand:\n${handEdit(was, content)}`)
     }

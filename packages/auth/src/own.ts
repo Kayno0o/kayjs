@@ -70,7 +70,7 @@ export interface OwnOptions<Role extends string = string, Prefix extends string 
 
 export type OwnPlugin<Role extends string, Prefix extends string, Scope extends string, OrgRole extends string, UserData extends object> = ReturnType<typeof CreateAuth<AuthSessionData, Role, Prefix, Scope, OrgRole, UserData>>['plugin']
 
-const MAIL_REGISTERED = /\bmail\(/
+const MAIL_REGISTERED = /\bmail(?:Extension)?\(/
 // A relative SQLite path: `sqlite://data/auth.db`, not `sqlite:///srv/auth.db` or `sqlite://:memory:`.
 const SQLITE_FILE = /^sqlite:(?:\/\/)?(?![/:])([^?]+)$/
 

@@ -572,6 +572,27 @@ it('rewrites the CI workflow on the runner the project was scaffolded with', asy
   }
 })
 
+it('adds postgres to a kayjs-auth app whose config was edited, with the store line as a note and not a refusal', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'kay-add-'))
+
+  try {
+    const dir = join(root, 'app')
+
+    await createProject(dir, { kay: '^1.0.0', features: [...PRESETS.server.features, 'auth'] })
+    await writeFile(join(dir, 'kay.config.ts'), `${await Bun.file(join(dir, 'kay.config.ts')).text()}// edited\n`)
+
+    const { written, notes } = await addFeatures(dir, ['postgres'], { install: false })
+
+    expect(written).toContain('compose.dev.yaml')
+    expect(written).not.toContain('kay.config.ts')
+    expect(notes.join('\n')).toContain('kay.config.ts is not what `kay new` wrote')
+    expect(notes.join('\n')).toContain('pgStore')
+  }
+  finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 it('names a file the author deleted rather than skipping it silently', async () => {
   const root = await mkdtemp(join(tmpdir(), 'kay-add-'))
 

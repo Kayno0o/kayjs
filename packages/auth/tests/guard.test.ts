@@ -51,6 +51,10 @@ function guardContext(locals: object, path = '/', method = 'GET'): GuardContext 
 }
 
 describe('guard() from kayjs-auth', () => {
+  test('names the missing plugin when the request has no auth', async () => {
+    expect(await run(guardContext({}))).toContain('no `auth` in this context')
+  })
+
   test('stops an anonymous visitor as auth.guard() does, with no import of the createAuth result', async () => {
     const { auth } = testApp({ pages: true })
     const anonymous = await contextOf(auth.plugin)

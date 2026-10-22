@@ -261,6 +261,20 @@ describe('the store', () => {
     expect(existsSync(join(root, 'data'))).toBe(false)
   })
 
+  test('takes an empty KAYJS_AUTH_DATABASE_URL, as .env.example lists it, for none', async () => {
+    process.env.KAYJS_AUTH_DATABASE_URL = ''
+    process.env.NODE_ENV = 'development'
+
+    try {
+      await registerOn({})
+    }
+    finally {
+      process.env.NODE_ENV = 'test'
+    }
+
+    expect(existsSync(join(root, 'data/auth.db'))).toBe(true)
+  })
+
   test('is in memory under test, so no file is kept between runs', async () => {
     await registerOn({})
 
