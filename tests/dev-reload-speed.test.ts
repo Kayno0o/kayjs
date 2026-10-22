@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { expect, it } from 'bun:test'
 import { dev } from '../src/dev'
 import { planReload } from '../src/dev/reload'
+import { freePort } from './free-port'
 import { scratchDir } from './scratch'
 
 // A loose backstop only: a new process costs about 250 ms on an idle host and far more under load, so time cannot tell a reload from a restart. The real guard is that no edit starts a server process.
@@ -19,12 +20,9 @@ async function until(condition: () => boolean | Promise<boolean>, timeout = 15_0
 
 it('reloads a server component, a post and a dependency of the content config in place, within the budget', async () => {
   const root = await scratchDir('dev-reload-speed-')
-  const probe = Bun.listen({ hostname: 'localhost', port: 0, socket: { data: () => undefined } })
-  const { port } = probe
+  const port = freePort()
   const lines: string[] = []
   const children: Subprocess[] = []
-
-  probe.stop(true)
 
   await Promise.all(Object.entries({
     'src/dep.ts': 'export const label = \'one\'\n',

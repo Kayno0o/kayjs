@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { dev } from '../src/dev'
 import { planReload } from '../src/dev/reload'
+import { freePort } from './free-port'
 import { scratchDir } from './scratch'
 
 async function until(condition: () => boolean | Promise<boolean>, timeout = 15_000) {
@@ -12,16 +13,6 @@ async function until(condition: () => boolean | Promise<boolean>, timeout = 15_0
     if (Date.now() - start > timeout)
       throw new Error('timed out')
   }
-}
-
-// A free port, so the servers of one run all take the same.
-function freePort(): number {
-  const probe = Bun.listen({ hostname: 'localhost', port: 0, socket: { data: () => undefined } })
-  const { port } = probe
-
-  probe.stop(true)
-
-  return port
 }
 
 // The response at `url`, or none while nothing listens.

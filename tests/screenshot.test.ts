@@ -12,6 +12,7 @@ import { McpServer } from '../src/mcp/protocol'
 import { projectCapabilities } from '../src/mcp/tools'
 import { encodePng } from '../src/server/png'
 import { browserPath } from '../src/test'
+import { freePort } from './free-port'
 import { scratchDir } from './scratch'
 
 const cli = join(import.meta.dir, '..', 'src', 'cli.ts')
@@ -28,15 +29,6 @@ async function run(cwd: string, args: string[], env: Record<string, string> = {}
   const [stdout, stderr] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()])
 
   return { code: await child.exited, stdout, stderr }
-}
-
-function freePort(): number {
-  const probe = Bun.listen({ hostname: '127.0.0.1', port: 0, socket: { data: () => undefined } })
-  const { port } = probe
-
-  probe.stop(true)
-
-  return port
 }
 
 // A square image of one colour, with a rectangle of another.

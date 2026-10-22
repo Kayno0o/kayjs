@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { environmentWithoutDotenv } from '../src/dev/sources'
+import { freePort } from './free-port'
 import { scratchDir } from './scratch'
 
 const CWD = process.cwd()
@@ -15,15 +16,6 @@ async function until(condition: () => boolean | Promise<boolean>, timeout = 20_0
     if (Date.now() - start > timeout)
       throw new Error('timed out')
   }
-}
-
-function freePort(): number {
-  const probe = Bun.listen({ hostname: 'localhost', port: 0, socket: { data: () => undefined } })
-  const { port } = probe
-
-  probe.stop(true)
-
-  return port
 }
 
 function lines(file: string): string[] {

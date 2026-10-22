@@ -5,6 +5,7 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { outputDir } from '../src/build/assets'
 import { holdsRunning, loadExecutable, verifyExecutable } from '../src/build/verify'
 import { LINT_GROUPS, LINTS } from '../src/compiler/lints'
+import { freePort } from './free-port'
 import { scratchDir } from './scratch'
 
 const cli = join(import.meta.dir, '../src/cli.ts')
@@ -133,10 +134,7 @@ describe('kay build --format json', () => {
     // The executable runs where the project is gone, so the plugin can only come from what it holds.
     await rm(join(root, 'src/own.ts'))
 
-    const probe = Bun.serve({ port: 0, fetch: () => new Response('') })
-    const port = probe.port
-
-    await probe.stop(true)
+    const port = freePort()
 
     const child = Bun.spawn([join(root, 'server')], { cwd: await project({}), env: { ...process.env, PORT: String(port) }, stdout: 'ignore', stderr: 'pipe' })
 

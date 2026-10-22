@@ -6,6 +6,7 @@ import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { dev } from '../src/dev'
 import { browse, browserPath } from '../src/test'
+import { freePort } from './free-port'
 
 // CI installs Chromium and names it in BUN_CHROME_PATH, where a missing browser fails rather than skipping.
 const browserInstalled = browserPath() !== undefined
@@ -92,10 +93,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
 
     await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(root, path), content)))
     // A free port, handed to the servers through the environment `kay dev` passes on.
-    const probe = Bun.listen({ hostname: 'localhost', port: 0, socket: { data: () => undefined } })
-
-    process.env.KAY_HOT_PORT = String(probe.port)
-    probe.stop(true)
+    process.env.KAY_HOT_PORT = String(freePort())
     // An editor named as VS Code's, which takes the position as `-g file:line:column`, noting what it was asked to open in a hidden file.
     await Bun.write(join(root, 'bin/code'), `#!${process.execPath}\nawait Bun.write(${JSON.stringify(join(root, '.opened'))}, JSON.stringify(process.argv.slice(2)))\n`)
     await chmod(join(root, 'bin/code'), 0o755)

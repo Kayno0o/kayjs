@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { dev } from '../src/dev'
 import { rootOf } from '../src/server/auto-listen'
+import { freePort } from './free-port'
 import { scratchDir } from './scratch'
 
 const cli = join(import.meta.dir, '..', 'src', 'cli.ts')
@@ -59,15 +60,6 @@ export const app = new Elysia().get('/mine', () => 'mine').use(await pages())
 
 Bun.serve({ port: Number(process.env.METRICS_PORT), hostname: '127.0.0.1', fetch: () => new Response('metrics') })
 `
-
-function freePort(): number {
-  const probe = Bun.serve({ port: 0, fetch: () => new Response() })
-  const { port } = probe
-
-  void probe.stop(true)
-
-  return port!
-}
 
 async function until<T>(read: () => Promise<T | undefined>): Promise<T> {
   for (const limit = Date.now() + 20_000; Date.now() < limit; await Bun.sleep(50)) {

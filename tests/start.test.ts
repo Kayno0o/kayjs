@@ -6,6 +6,7 @@ import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { outputDir } from '../src/build/assets'
 import { alive } from './alive'
+import { freePort } from './free-port'
 import { scratchDir } from './scratch'
 
 const cli = join(import.meta.dir, '..', 'src', 'cli.ts')
@@ -153,15 +154,6 @@ async function until(holds: () => boolean | Promise<boolean>): Promise<void> {
 
     await Bun.sleep(20)
   }
-}
-
-function freePort(): number {
-  const probe = Bun.serve({ port: 0, fetch: () => new Response() })
-  const { port } = probe
-
-  void probe.stop(true)
-
-  return port!
 }
 
 describe('kay start', () => {

@@ -17,6 +17,7 @@ import { InspectorAddressInUseError, inspectorProxy } from '../src/dev/inspector
 import { TypesProcess } from '../src/dev/types-process'
 import { bootFailure, hotSwap } from '../src/server/dev'
 import { editorCommand } from '../src/server/editor'
+import { freePort } from './free-port'
 
 // The parent's pid in /proc/<pid>/stat, after the command name and the state.
 const PARENT_PID = /\) \S+ (\d+)/
@@ -2000,10 +2001,7 @@ describe.concurrent('kay dev', () => {
     await Bun.write(join(root, 'src/counter.kay'), counter)
     await Bun.write(join(root, 'src/routes/index.kay'), page)
     // One port for every server, which a port of 0 would change at each restart.
-    const probe = Bun.listen({ hostname: 'localhost', port: 0, socket: { data: () => undefined } })
-    const port = probe.port
-
-    probe.stop(true)
+    const port = freePort()
     const stop = await dev(root, { port, log: line => lines.push(line), onRestart: child => children.push(child) })
 
     try {

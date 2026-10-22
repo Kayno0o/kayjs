@@ -4,6 +4,7 @@ import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { browse, browserPath } from '../src/test'
 import { takeDocsBuilt } from './docs-build'
+import { freePort } from './free-port'
 import { drainOutput, spawnSuiteServer, stopSuiteServer } from './listening'
 
 const CLI = resolve('src/cli.ts')
@@ -32,10 +33,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs a
   beforeAll(async () => {
     release = await takeDocsBuilt()
 
-    const probe = Bun.serve({ port: 0, fetch: () => new Response() })
-    const port = probe.port!
+    const port = freePort()
 
-    await probe.stop(true)
     server = spawnSuiteServer([process.execPath, CLI, 'start', 'docs', '--port', String(port)])
     drainOutput(server)
     origin = `http://localhost:${port}/`

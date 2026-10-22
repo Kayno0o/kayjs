@@ -8,6 +8,7 @@ import { testWorker } from '../src/build/assets'
 import { ConfigRefusedError, dev } from '../src/dev'
 import * as fingerprint from '../src/dev/fingerprint'
 import { FINGERPRINT } from '../src/dev/fingerprint'
+import { freePort } from './free-port'
 
 const PARENT_PID = /\) \S+ (\d+)/
 
@@ -28,15 +29,6 @@ async function until(condition: () => boolean, timeout = 20_000) {
     if (Date.now() - start > timeout)
       throw new Error('timed out')
   }
-}
-
-async function freePort(): Promise<number> {
-  const probe = Bun.listen({ hostname: 'localhost', port: 0, socket: { data: () => undefined } })
-  const { port } = probe
-
-  probe.stop(true)
-
-  return port
 }
 
 // A project under node_modules/.cache, where it resolves kay as the fixtures do.
@@ -84,7 +76,7 @@ it('leaves the server alone for an edit of package.json that resolves nothing, a
   const bundle = () => readdirSync(join(dist(root), 'dist'), { withFileTypes: true }).filter(entry => entry.isFile() && entry.name.endsWith('.js')).map(entry => entry.name).map(file => readFileSync(join(dist(root), 'dist', file), 'utf8')).join('\n')
   const restarts = () => lines.filter(line => line.includes('package.json: restarted'))
   const pkg = async (changes: Record<string, unknown>) => Bun.write(join(root, 'package.json'), JSON.stringify({ name: 'package-edits', version: '1.0.0', scripts: { dev: 'kay dev' }, imports: { '#label': './src/label-a.ts' }, ...changes }))
-  const stop = await dev(root, { port: await freePort(), log: line => lines.push(line), onRestart: child => children.push(child) })
+  const stop = await dev(root, { port: freePort(), log: line => lines.push(line), onRestart: child => children.push(child) })
 
   try {
     await until(() => lines.some(line => line.includes('ready in')))
@@ -139,7 +131,7 @@ it('answers a burst of inert package.json edits with one scan, and one more for 
 
     return false
   })
-  const stop = await dev(root, { port: await freePort(), log: line => lines.push(line) })
+  const stop = await dev(root, { port: freePort(), log: line => lines.push(line) })
 
   try {
     await until(() => lines.some(line => line.includes('ready in')))
@@ -205,7 +197,7 @@ it('leaves the client build of an earlier run as it is when nothing the build re
   const root = await project('dev-warm-', { ...PAGES, 'package.json': JSON.stringify({ name: 'warm', imports: { '#label': './src/label-a.ts' } }), 'src/app.css': 'h1 { color: red }\n' })
   const run = async (action?: () => Promise<void>) => {
     const lines: string[] = []
-    const port = await freePort()
+    const port = freePort()
     const stop = await dev(root, { port, log: line => lines.push(line) })
 
     try {
@@ -307,7 +299,7 @@ it('follows the entry the types name when the config now names another than the 
     await Bun.write(join(flags, 'two.flag'), '')
 
     const lines: string[] = []
-    const port = await freePort()
+    const port = freePort()
     const stop = await dev(root, { port, log: line => lines.push(line) })
 
     try {
@@ -350,7 +342,7 @@ it('reloads a module that imports package.json when only its version changed, an
     'src/routes/index.kay': '---\nimport Counter from \'../counter.kay\'\n---\nCounter\n',
   })
   const lines: string[] = []
-  const port = await freePort()
+  const port = freePort()
   const bundle = () => readdirSync(join(dist(root), 'dist'), { withFileTypes: true }).filter(entry => entry.isFile() && entry.name.endsWith('.js')).map(entry => entry.name).map(file => readFileSync(join(dist(root), 'dist', file), 'utf8')).join('\n')
   const stop = await dev(root, { port, log: line => lines.push(line) })
 
@@ -378,7 +370,7 @@ async function answers(port: number): Promise<boolean> {
 
 it('stops the whole run, server included, on SIGHUP as on SIGINT', async () => {
   const root = await project('dev-hangup-', { 'src/server.ts': 'import { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nexport const app = new Elysia().use(await pages()).listen(Number(process.env.PORT))\n', 'src/routes/index.kay': 'h1 Home\n', 'kay.config.ts': 'export default {}\n' })
-  const port = await freePort()
+  const port = freePort()
   const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'dev', '--port', String(port)], { cwd: root, stdout: 'ignore', stderr: 'ignore' })
 
   try {

@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { outputDir } from '../src/build/assets'
 import { browse, browserPath } from '../src/test'
 import { kayBuild } from './check-helper'
+import { freePort } from './free-port'
 import { listeningPort } from './listening'
 import { pages } from './shared-pages'
 
@@ -87,10 +88,7 @@ async function project(config: string, i18n = false, only?: Record<string, strin
 }
 
 async function serve(root: string, base = ''): Promise<Site> {
-  const probe = Bun.serve({ port: 0, fetch: () => new Response() })
-  const port = probe.port!
-
-  await probe.stop(true)
+  const port = freePort()
 
   const server = Bun.spawn([process.execPath, CLI, 'start', root, '--port', String(port)], { stdout: 'ignore', stderr: 'ignore' })
   const origin = `http://127.0.0.1:${port}`

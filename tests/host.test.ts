@@ -6,6 +6,7 @@ import { Elysia } from 'elysia'
 import { dev } from '../src/dev'
 import { createProject, PRESETS } from '../src/new'
 import { probeHealth } from '../src/server/lifecycle'
+import { freePort } from './free-port'
 import { fixtureCopy, scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
@@ -20,15 +21,6 @@ function binds(hostname: string): boolean {
   catch {
     return false
   }
-}
-
-function freePort(): number {
-  const probe = Bun.listen({ hostname: '127.0.0.1', port: 0, socket: { data: () => undefined } })
-  const { port } = probe
-
-  probe.stop(true)
-
-  return port
 }
 
 async function reaches(address: string, port: number): Promise<boolean> {
