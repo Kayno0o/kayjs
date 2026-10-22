@@ -4,9 +4,10 @@ import { Glob } from 'bun'
 // `bun test --changed` follows a test's imports, so a test that runs kay in a subprocess (`src/cli.ts build ...`) or loads a module by path at run time is not reached by a change under `src/`. This maps each such test to the files its subprocesses load: the entries it names by path, and for the CLI the commands it passes, followed through static and dynamic imports.
 const EXTENSIONS = ['', '.ts', '.tsx', '/index.ts']
 const transpiler = new Bun.Transpiler({ loader: 'ts' })
-// An entry named as a path to a source file or folder: `'../src/cli.ts'`, `'src/dev/preload.ts'`, or relative to a `SRC` constant as in `join(SRC, 'check/index.ts')`.
+// An entry named as a path to a source file or folder: `'../src/cli.ts'`, `'src/dev/preload.ts'`, or relative to a `SRC` constant as in `join(SRC, 'check/index.ts')`; a module loaded through another form is not seen.
 const ENTRY = /['"`]((?:\.\.\/)*src\/[\w/.-]+|(?<=\bSRC, ['"`])[\w/.-]+)['"`]/g
 const SOURCE = /\.[jt]sx?$/
+const AFTER_WORD = / .*/
 const SHEBANG = /^#!.*/
 const LEADING_PARENTS = /^(?:\.\.\/)*/
 const COMMAND = /^\s+'([a-z-]+(?: [a-z]+)?)': async \(\) => \(await import\('\.\/commands\/([\w-]+)'\)\)/gm
@@ -84,7 +85,7 @@ export async function subprocessTests(root: string, changed: string[]) {
 
     if (entries.includes(cli)) {
       for (const [name, file] of commands) {
-        if (new RegExp(`['"\`]${name.slice(0, (`${name} `).indexOf(' '))}['"\`]`).test(text)) {
+        if (new RegExp(`[\\[,(] *['"\`]${name.replace(AFTER_WORD, '')}['"\`]`).test(text)) {
           const entry = await resolveFile(join(root, 'src/commands', file))
 
           if (entry !== undefined)
