@@ -6,7 +6,10 @@ import { keepRequestId, requestId } from './protection'
 import { isInternal, markInternal } from './visit'
 
 // Returns the path, query included, to serve the request from instead, or undefined to serve it as it came.
-export type Rewrite = (url: URL, request: Request) => string | undefined
+export type Rewrite = ((url: URL, request: Request) => string | undefined) & {
+  // A cheap test on the raw request URL: false means the rewrite gives undefined for it, so the URL is not parsed.
+  mayRewrite?: (href: string) => boolean
+}
 
 // Marks a request kay rewrote, so it is not rewritten again; one value per process, so no client can send it.
 const REWRITTEN = 'x-kay-rewritten'
@@ -49,6 +52,9 @@ export function rewriteRequests(app: Elysia, rewrite: Rewrite, fallback: Elysia)
 
       return undefined
     }
+
+    if (rewrite.mayRewrite && !rewrite.mayRewrite(request.url))
+      return undefined
 
     const url = new URL(request.url)
 
@@ -93,13 +99,13 @@ export function rewriteRequests(app: Elysia, rewrite: Rewrite, fallback: Elysia)
   })
 }
 
-// `rewrite`, after the paths under `apiPath` that an extension moved under `/_kay` answer as the paths they moved to, so an older page or client still reaches them.
-// A path an API module of the app serves (`served`, filled as the modules are known) is left to it.
+// `rewrite` first, then the paths under `apiPath` that an extension moved under `/_kay` answer as the paths they moved to, so an older page or client still reaches them; the app's own rewrite of such a path wins, and what it gives is aliased in turn when the rewritten request comes back.
+// A path an API module of the app serves (`served`, filled as the modules are known) is left to it; a module mounted above the former prefix, `/api` itself, serves no path below it.
 export function withMovedApi(rewrite: Rewrite | undefined, moved: { former: string, prefix: string }[], apiPath: string, base: string, served: readonly string[] = []): Rewrite | undefined {
   if (moved.length === 0)
     return rewrite
 
-  return (url, request) => {
+  const alias: Rewrite = (url) => {
     const path = routerPath(url.pathname, base)
 
     for (const { former, prefix } of moved) {
@@ -109,6 +115,16 @@ export function withMovedApi(rewrite: Rewrite | undefined, moved: { former: stri
         return `${url.pathname.slice(0, url.pathname.length - path.length)}${prefix}${path.slice(from.length)}${url.search}`
     }
 
-    return rewrite?.(url, request)
+    return undefined
   }
+
+  if (!rewrite) {
+    const froms = moved.map(({ former }) => `${apiPath}${former}`)
+
+    alias.mayRewrite = href => froms.some(from => href.includes(from))
+
+    return alias
+  }
+
+  return (url, request) => rewrite(url, request) ?? alias(url, request)
 }

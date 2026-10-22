@@ -31,11 +31,12 @@ it('rewrites a path under the former prefix to the new one, query kept, the base
   expect(withMovedApi(undefined, MOVED, '/v1', '/site')!(url('/site/api/cms/dev'), request)).toBeUndefined()
 })
 
-it('leaves the app\'s own rewrite in charge of every other path, and is none when nothing moved', () => {
-  const own = (path: URL) => path.pathname === '/old' ? '/new' : undefined
+it('lets the app\'s own rewrite go first, and is none when nothing moved', () => {
+  const own = (path: URL) => ({ '/old': '/new', '/api/cms/mine': '/elsewhere' })[path.pathname]
   const rewrite = withMovedApi(own, MOVED, '/api', '')!
 
   expect(rewrite(url('/old'), request)).toBe('/new')
+  expect(rewrite(url('/api/cms/mine'), request)).toBe('/elsewhere')
   expect(rewrite(url('/api/cms/dev'), request)).toBe('/_kay/cms/dev')
   expect(withMovedApi(own, [], '/api', '')).toBe(own)
   expect(withMovedApi(undefined, [], '/api', '')).toBeUndefined()
@@ -51,4 +52,19 @@ it('leaves a path an API module of the app serves to it, and aliases the rest be
   expect(below(url('/api/cms/hook/x'), request)).toBeUndefined()
   expect(below(url('/api/cms/entries'), request)).toBe('/_kay/cms/entries')
   expect(below(url('/api/cms'), request)).toBe('/_kay/cms')
+})
+
+it('has a cheap gate on the raw URL when the app has no rewrite, so other requests are not parsed', () => {
+  const rewrite = withMovedApi(undefined, MOVED, '/v1', '/site')!
+
+  expect(rewrite.mayRewrite!('http://site.test/site/v1/cms/dev')).toBe(true)
+  expect(rewrite.mayRewrite!('http://site.test/site/pricing?x=1')).toBe(false)
+  expect(withMovedApi(() => undefined, MOVED, '/api', '')!.mayRewrite).toBeUndefined()
+})
+
+it('does not take a module mounted at /api for one serving /api/cms', () => {
+  const rewrite = withMovedApi(undefined, MOVED, '/api', '', ['/api'])!
+
+  expect(rewrite(url('/api/cms/entries'), request)).toBe('/_kay/cms/entries')
+  expect(rewrite(url('/api'), request)).toBeUndefined()
 })
