@@ -104,5 +104,6 @@ export function pgData(source: PgJobsSource) {
 
   const handle = pgHandle(db)
 
-  return { sessions: pgSessions(handle), cache: pgCache(handle), jobs: pgJobs(db), rates: pgRates(handle), rooms: pgRooms(handle), vitals: pgVitals(handle) } satisfies { [Kind in keyof AppStore]-?: NonNullable<AppStore[Kind]> } & { sessions: SessionStore & { deleteWhere: NonNullable<SessionStore['deleteWhere']> } }
+  // Live values stay in the process until Postgres keeps them too: kaynooo/kayjs#1873.
+  return { sessions: pgSessions(handle), cache: pgCache(handle), jobs: pgJobs(db), rates: pgRates(handle), rooms: pgRooms(handle), vitals: pgVitals(handle) } satisfies { [Kind in Exclude<keyof AppStore, 'live'>]-?: NonNullable<AppStore[Kind]> } & { sessions: SessionStore & { deleteWhere: NonNullable<SessionStore['deleteWhere']> } }
 }
