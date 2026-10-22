@@ -5,13 +5,15 @@ import { controlledRadios } from './controlled-radios'
 
 const look = recipe({ parts: { root: 'kui-radio-group', radio: 'kui-radio', choice: 'kui-radio-choice', input: 'kui-radio-input', label: 'kui-radio-label', description: 'kui-radio-description' } })
 
-const { options, value, label, name, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+const { options, value, label, name, disabled = false, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // `description` is a quieter line under the label, which screen readers hear after it; `disabled` keeps that option from being picked.
   options: readonly { value: Value, label: string, description?: string | undefined, disabled?: boolean | undefined }[]
   // The option picked to start with, or `null` for none; a group whose parent passes another follows it.
   value: Held
   // Names the group for screen readers; omit it and pass `aria-label` or `aria-labelledby` instead, such as inside a FormField that names it.
   label?: string | undefined
+  // Disables every option; an option's own `disabled` still applies when this is false.
+  disabled?: boolean | undefined
   // The radios' name, which the group submits under inside a form, and which a FormField reads the field's message by; one unique on the page is drawn when none is given.
   name?: string | undefined
   // A promise holds the group busy until it settles, and puts the previous option back when it resolves to false, rejects or throws (logged): a refused change never shows as made.
@@ -37,7 +39,7 @@ div(part="root" {...rest} ref={ref} role="radiogroup" aria-label={label} aria-bu
   for option, index of options key={option.value}
     div(part="radio")
       label(part="choice")
-        input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === value)} type="radio" name={group} value={option.value} checked={picked() === option.value} disabled={option.disabled} aria-describedby={option.description ? `${prefix}-${index}` : undefined} onChange={() => pick(option.value)})
+        input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === value)} type="radio" name={group} value={option.value} checked={picked() === option.value} disabled={disabled || option.disabled} aria-describedby={option.description ? `${prefix}-${index}` : undefined} onChange={() => pick(option.value)})
         span(part="label") {option.label}
       if option.description
         span(part="description" id={`${prefix}-${index}`}) {option.description}
