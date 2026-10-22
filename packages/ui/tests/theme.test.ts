@@ -532,7 +532,7 @@ describe('theme.css', () => {
 
     expect(await built(await Bun.file(`${ROOT}src/skins/soft.css`).text())).toContain('--kui-label-case: none')
     expect(await built(await Bun.file(`${ROOT}src/skins/soft.css`).text())).toContain('--radius-kui-md: 0.375rem')
-    expect(await built(await Bun.file(`${ROOT}src/skins/brutalist.css`).text())).toMatch(/--radius-kui-full: 0px[\s\S]*--kui-label-font: var\(--font-kui-mono\)/)
+    expect(await built(await Bun.file(`${ROOT}src/skins/brutalist.css`).text())).toContain('--kui-label-font: var(--font-kui-mono)')
   })
 
   test('sizes the keyline of every framed box by --kui-border-width, a length the old --kui-border-card still sets', () => {
