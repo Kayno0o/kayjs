@@ -2,7 +2,7 @@
 import { t } from 'elysia'
 import { action } from 'kay'
 
-export const solve = action(t.Object({ name: t.String({ minLength: 3 }) }), () => undefined, { proofOfWork: 50 })
+export const solve = action(t.Object({ name: t.String({ minLength: 3 }) }), () => undefined, { protect: { proofOfWork: 50 } })
 
 async function* words() {
   yield 'one'

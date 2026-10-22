@@ -1,5 +1,5 @@
 import type { Static, TSchema } from 'elysia'
-import type { ActionContext, ActionProtection, Failure, JSX } from 'kay'
+import type { ActionContext, ActionProtect, ActionProtection, Failure, JSX } from 'kay'
 import type { Mailer } from './mailer'
 import type { Address, MailField } from './types'
 import { s } from 'kay'
@@ -60,7 +60,7 @@ export interface ContactOptions<Extra extends Record<string, TSchema> = Record<n
   // A required `consent` checkbox, for a form collecting personal data: a post with it unticked is refused with the `mail.contact.errors.consent` message, and it is left out of the mail. `ContactForm` from kayjs-ui renders it, linking its `privacy` page.
   consent?: Consent | undefined
   // Replaces the defaults of the protection, `rateLimit` 30 posts every 10 minutes and 5 that went through, `minTime` of 3 seconds.
-  protection?: Omit<ActionProtection<Honeypot>, 'honeypot' | 'messages'> | undefined
+  protection?: Omit<ActionProtect<Honeypot>, 'honeypot'> & Pick<ActionProtection, 'tool' | 'maxSize'> | undefined
 }
 
 export type ContactInput<Extra extends Record<string, TSchema> = Record<never, TSchema>, Consent extends boolean = false> = { name: string, email: string, message: string } & (Consent extends true ? { consent: true } : unknown) & Static<ReturnType<typeof s.Object<Extra>>>
@@ -142,11 +142,16 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
     return undefined
   }
 
+  const { tool, maxSize, ...guards } = options.protection ?? {}
   const protection: ActionProtection<Honeypot> = {
-    rateLimit: [{ max: 30, window: '10m' }, { max: 5, window: '10m', count: 'succeeded' }],
-    minTime: '3s',
-    ...options.protection,
-    honeypot: { field: honeypot, pretend: true },
+    ...tool !== undefined && { tool },
+    ...maxSize !== undefined && { maxSize },
+    protect: {
+      rateLimit: [{ max: 30, window: '10m' }, { max: 5, window: '10m', count: 'succeeded' }],
+      minTime: '3s',
+      ...guards,
+      honeypot: { field: honeypot, pretend: true },
+    },
     messages: {
       rateLimit: () => reach === undefined ? wording('mail.contact.rateLimit', 'Too many messages sent from here in a short time: try again in a few minutes.') : wording('mail.contact.rateLimitReach', 'Too many messages sent from here in a short time: try again in a few minutes, or write to {reach}.', words),
       minTime: reason => reason === 'early' ? wording('mail.contact.early', 'One moment: read your message again, then send it.') : wording('mail.contact.expired', 'This page has expired: reload it, then send your message again.'),

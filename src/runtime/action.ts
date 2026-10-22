@@ -140,9 +140,8 @@ export interface ActionTool {
   description?: string | undefined
 }
 
-export interface ActionProtection<Field extends string = never> {
-  // Offers the action to agents as an MCP tool when `mcp` is set in kay.config.ts: `true`, its description, or `{ name, description }`. An action without it is never offered. A call runs the action as a form post would, its guards and rate limits included, except that `honeypot`, `minTime` and `proofOfWork` are skipped, as they only make sense for a form a person filled in.
-  tool?: boolean | string | ActionTool | undefined
+// The checks that keep scripts from an action: `action(schema, handler, { protect: { rateLimit, honeypot, minTime, proofOfWork } })`.
+export interface ActionProtect<Field extends string = never> {
   // At most `max` posts from one client every `window`, seconds or a string such as '1m'; past that a post fails with 429 without reaching the handler. `store` shares the count between processes.
   // Several limits all apply, such as one on every attempt and a tighter one on the posts that went through.
   rateLimit?: ActionRateLimit | ActionRateLimit[] | undefined
@@ -152,11 +151,38 @@ export interface ActionProtection<Field extends string = never> {
   minTime?: Duration | MinTimeOptions | undefined
   // A challenge kay's script solves in a worker while the visitor fills the form in, so each post costs CPU: `true`, the difficulty, or options. A post without the solution fails with 422 without reaching the handler, a form posted without JavaScript included unless `minTime` is set too.
   proofOfWork?: boolean | number | ProofOfWorkOptions | undefined
+}
+
+// What an action reads of its third argument, grouped by concern: `protect` for the checks above, `messages` for their refusals, `tool` for agents and `maxSize` for the body.
+export interface ActionProtection<Field extends string = never> {
+  // Offers the action to agents as an MCP tool when `mcp` is set in kay.config.ts: `true`, its description, or `{ name, description }`. An action without it is never offered. A call runs the action as a form post would, its guards and rate limits included, except that the `honeypot`, `minTime` and `proofOfWork` of `protect` are skipped, as they only make sense for a form a person filled in.
+  tool?: boolean | string | ActionTool | undefined
+  protect?: ActionProtect<Field> | undefined
   // The most a post may send, files included, bytes or a size such as `'20mb'`, in place of the app's `maxSize`; a bigger one fails with 413 before it is read.
   maxSize?: ByteSize | undefined
+  // What the visitor reads when one of these refuses a post, in place of kay's English, as a schema's `error` is for a field.
+  messages?: ProtectionMessages | undefined
+  /** @deprecated The old place of `protect.rateLimit`, kept three minors. */
+  rateLimit?: ActionRateLimit | ActionRateLimit[] | undefined
+  /** @deprecated The old place of `protect.honeypot`, kept three minors. */
+  honeypot?: Field | HoneypotOptions<Field> | undefined
+  /** @deprecated The old place of `protect.minTime`, kept three minors. */
+  minTime?: Duration | MinTimeOptions | undefined
+  /** @deprecated The old place of `protect.proofOfWork`, kept three minors. */
+  proofOfWork?: boolean | number | ProofOfWorkOptions | undefined
   /** @deprecated The old name of `maxSize`, kept three minors. */
   bodyLimit?: ByteSize | undefined
-  // What the visitor reads when one of these refuses a post, in place of kay's English, as a schema's `error` is for a field.
+}
+
+// An action's options once `protect` is read, the checks on a level with the rest: what the server reads.
+export interface ResolvedProtection {
+  tool?: boolean | string | ActionTool | undefined
+  rateLimit?: ActionRateLimit | ActionRateLimit[] | undefined
+  honeypot?: string | HoneypotOptions | undefined
+  minTime?: Duration | MinTimeOptions | undefined
+  proofOfWork?: boolean | number | ProofOfWorkOptions | undefined
+  maxSize?: ByteSize | undefined
+  bodyLimit?: ByteSize | undefined
   messages?: ProtectionMessages | undefined
 }
 
@@ -311,7 +337,7 @@ export interface Action<Input, Output, Honeypot extends string = never> {
 export interface ServerAction<Schema extends TSchema, Output, Honeypot extends string = never> extends Action<Static<Schema>, Output, Honeypot> {
   readonly schema: Schema
   readonly handler: (input: Static<Schema>, ctx: ActionContext) => Output | Promise<Output>
-  readonly protection?: ActionProtection<string>
+  readonly protection?: ResolvedProtection
 }
 
 export class ActionError<Data = unknown> extends ApiError {
@@ -382,7 +408,19 @@ export function action(first: unknown, second?: unknown, third?: ActionProtectio
   return declare(first as TSchema, second as (input: unknown, ctx: ActionContext) => unknown, third)
 }
 
-function declare(schema: TSchema, handler: (input: unknown, ctx: ActionContext) => unknown, protection: ActionProtection<string> | undefined): ServerAction<TSchema, unknown> {
+// The options with `protect` read: its checks on a level with the rest, which the old flat form (`{ honeypot, rateLimit }`, read until 1.74) already is, `protect` winning where both set one.
+export function resolveProtection(options: ActionProtection<string> | undefined): ResolvedProtection | undefined {
+  if (options === undefined)
+    return undefined
+
+  const { protect, ...rest } = options
+
+  return protect === undefined ? rest : { ...rest, ...Object.fromEntries(Object.entries(protect).filter(([, value]) => value !== undefined)) }
+}
+
+function declare(schema: TSchema, handler: (input: unknown, ctx: ActionContext) => unknown, options: ActionProtection<string> | undefined): ServerAction<TSchema, unknown> {
+  const protection = resolveProtection(options)
+
   // Refused as the module loads, rather than on the first post.
   if (protection?.minTime !== undefined)
     minTimeOf(protection)
@@ -547,7 +585,7 @@ export function setStamper(sign: typeof stamper): void {
 }
 
 // `proofOfWork` with its defaults, `maxAge` in milliseconds; undefined when it is off.
-export function workOf(protection: ActionProtection<string>): { difficulty: number, maxAge: number, pretend: boolean, store: RateStore | undefined } | undefined {
+export function workOf(protection: ResolvedProtection): { difficulty: number, maxAge: number, pretend: boolean, store: RateStore | undefined } | undefined {
   const { proofOfWork } = protection
 
   if (proofOfWork === undefined || proofOfWork === false)
@@ -564,7 +602,7 @@ export function workOf(protection: ActionProtection<string>): { difficulty: numb
 }
 
 // `minTime` in milliseconds, read once it is set.
-export function minTimeOf(protection: ActionProtection<string>): { after: number, maxAge: number, pretend: boolean } | undefined {
+export function minTimeOf(protection: ResolvedProtection): { after: number, maxAge: number, pretend: boolean } | undefined {
   const { minTime } = protection
 
   if (minTime === undefined)
@@ -575,7 +613,7 @@ export function minTimeOf(protection: ActionProtection<string>): { after: number
   return { after: durationSeconds(options.after, 'minTime') * 1000, maxAge: durationSeconds(options.maxAge ?? DAY, 'minTime.maxAge') * 1000, pretend: options.pretend === true }
 }
 
-export function honeypotField(protection: ActionProtection<string> | undefined): string | undefined {
+export function honeypotField(protection: ResolvedProtection | undefined): string | undefined {
   const honeypot = protection?.honeypot
 
   return typeof honeypot === 'object' ? honeypot.field : honeypot

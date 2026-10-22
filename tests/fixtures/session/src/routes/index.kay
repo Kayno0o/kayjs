@@ -20,9 +20,9 @@ export const signOut = action(t.Object({}), async (_input, ctx) => {
 })
 
 // Read from a form's fields whether a form posts it or an island sends them.
-export const profile = action(t.Object({ age: t.Number(), admin: t.Boolean(), tags: t.Array(t.String({ maxLength: 200 })), rank: t.Optional(t.Number()), avatar: t.Optional(t.File()) }), async ({ avatar, ...input }) => ({ ...input, avatar: avatar?.name }), { honeypot: 'website' })
+export const profile = action(t.Object({ age: t.Number(), admin: t.Boolean(), tags: t.Array(t.String({ maxLength: 200 })), rank: t.Optional(t.Number()), avatar: t.Optional(t.File()) }), async ({ avatar, ...input }) => ({ ...input, avatar: avatar?.name }), { protect: { honeypot: 'website' } })
 
-export const limited = action(t.Object({}), async () => 'ok', { rateLimit: { max: 1, window: 60 } })
+export const limited = action(t.Object({}), async () => 'ok', { protect: { rateLimit: { max: 1, window: 60 } } })
 
 const name = await (ctx.locals.session as Session<{ name: string }>).get('name')
 const failure = signIn.failed()

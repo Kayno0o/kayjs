@@ -11,7 +11,7 @@ const log = logFrom('docs-chat')
 export const searchDocs = action(
   s.Object({ query: s.String({ minLength: 2, maxLength: 200 }) }),
   async ({ query }) => ({ hits: await searchPages(query) }),
-  { tool: 'Searches the documentation and returns the best matching sections, each with the path of its page', rateLimit: TOOL_LIMIT },
+  { tool: 'Searches the documentation and returns the best matching sections, each with the path of its page', protect: { rateLimit: TOOL_LIMIT } },
 )
 
 export const readDocsPage = action(
@@ -29,7 +29,7 @@ export const readDocsPage = action(
 
     return { path: found.href, title: found.title, part: part ?? 1, parts, text }
   },
-  { tool: { name: 'read_page', description: 'Reads one documentation page in full, given its path such as /essentials/islands or /llms/actions. A long page comes in parts: the result says how many there are, and part picks the next one' }, rateLimit: TOOL_LIMIT },
+  { tool: { name: 'read_page', description: 'Reads one documentation page in full, given its path such as /essentials/islands or /llms/actions. A long page comes in parts: the result says how many there are, and part picks the next one' }, protect: { rateLimit: TOOL_LIMIT } },
 )
 
 const Messages = s.Object({
@@ -49,6 +49,6 @@ export const reply = action(
       return ctx.fail(400, 'The chat is not available on this site right now. Search the docs with Ctrl K instead.')
     }
   },
-  { rateLimit: { max: 8, window: '1m' } },
+  { protect: { rateLimit: { max: 8, window: '1m' } } },
 )
 ---

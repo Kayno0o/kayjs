@@ -469,7 +469,7 @@ An api route refuses the same way, saying `request` where this says `action`.
 
 The third argument of `action` protects it from scripts.
 
-`rateLimit` answers 429 past `max` posts per `window`. `honeypot` names a hidden field that kay renders for you and bots fill in. `minTime` refuses a form posted sooner than that after its page rendered.
+These checks sit under `protect` in the action's third argument, beside `maxSize`, `messages` and `tool`. `rateLimit` answers 429 past `max` posts per `window`. `honeypot` names a hidden field that kay renders for you and bots fill in. `minTime` refuses a form posted sooner than that after its page rendered.
 
 `minTime` checks a form posted without JavaScript, and an island's call carries no stamp. Write `minTime: { after: '3s', plain: true }` to check only the plain post. The page swap and an island's call then go through, which suits a form whose script already proves something, such as a proof of work.
 
@@ -481,9 +481,11 @@ import { send } from '../mail'
 import { schema } from '../schema'
 
 export const contact = action(schema, send, {
-  rateLimit: { max: 5, window: '1m' },
-  honeypot: 'website',
-  minTime: '3s',
+  protect: {
+    rateLimit: { max: 5, window: '1m' },
+    honeypot: 'website',
+    minTime: '3s',
+  },
   maxSize: '5mb',
 })
 ---

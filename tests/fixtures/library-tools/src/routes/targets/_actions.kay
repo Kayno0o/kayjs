@@ -23,14 +23,12 @@ export const language = action(s.Object({}), (_input, ctx) => ({ locale: ctx.loc
 export const upload = action(s.Object({ photo: s.File() }), () => 'stored')
 
 export const signup = action(s.Object({ email: s.String(), website: s.Optional(s.String()) }), ({ email }) => ({ email }), {
-  honeypot: 'website',
-  minTime: '1h',
-  rateLimit: { max: 2, window: '1m' },
+  protect: { honeypot: 'website', minTime: '1h', rateLimit: { max: 2, window: '1m' } },
 })
 
 export const vetoed = action(s.Object({}), () => 'vetoed', { tool: false })
 
-export const limited = action(s.Object({}), () => 'counted', { rateLimit: { max: 2, window: '1m' } })
+export const limited = action(s.Object({}), () => 'counted', { protect: { rateLimit: { max: 2, window: '1m' } } })
 
-export const solve = action(s.Object({}), () => 'solved', { proofOfWork: true })
+export const solve = action(s.Object({}), () => 'solved', { protect: { proofOfWork: true } })
 ---

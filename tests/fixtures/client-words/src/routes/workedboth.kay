@@ -2,8 +2,8 @@
 import { t } from 'elysia'
 import { action } from 'kay'
 
-export const solve = action(t.Object({ name: t.String({ minLength: 3 }) }), () => undefined, { proofOfWork: 50 })
-export const other = action(t.Object({ title: t.String({ minLength: 2 }) }), () => undefined, { proofOfWork: 60 })
+export const solve = action(t.Object({ name: t.String({ minLength: 3 }) }), () => undefined, { protect: { proofOfWork: 50 } })
+export const other = action(t.Object({ title: t.String({ minLength: 2 }) }), () => undefined, { protect: { proofOfWork: 60 } })
 
 const rows = Promise.resolve([1])
 ---

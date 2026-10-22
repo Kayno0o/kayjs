@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.71.0
 
+### An action's options are grouped by concern
+
+`rateLimit`, `honeypot`, `minTime` and `proofOfWork` move under `protect` in an action's third argument: `{ protect: { rateLimit: { max: 5, window: '1m' }, honeypot: 'website' }, maxSize, messages, tool }`. The flat form works until 1.74, and `deprecated-action-options` moves the keys with `kay upgrade` ([Protecting actions](action-protection.md#protecting-an-action)). kayjs-mail's `contactForm({ protection })` keeps its keys.
+
 ### `src/plugins` holds server plugins
 
 Every `src/plugins/<name>.ts` (not `_*`, `*.test.ts`, `*.d.ts`) is now used as a server plugin before the pages, and the server stops with a message naming the file when its default export is not an Elysia plugin. An app keeping other code there (a Bun build plugin, a helper) moves it elsewhere or renames it to start with `_`. No `kay check` lint can recognise it, as any file there may be meant either way.

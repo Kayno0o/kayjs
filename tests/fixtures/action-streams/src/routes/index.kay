@@ -49,7 +49,7 @@ export const endless = action(async function* () {
 
 export const limited = action(async function* () {
   yield 'ok'
-}, { rateLimit: { max: 1, window: '1m' } })
+}, { protect: { rateLimit: { max: 1, window: '1m' } } })
 
 export const baked = action(async function* (ctx) {
   ctx.cookies.set('baked', 'yes', { path: '/' })
@@ -92,15 +92,15 @@ export const counted = action(t.Object({ fail: t.Boolean() }), async function* (
     throw new Error('before the first value')
 
   yield 'ok'
-}, { rateLimit: { max: 1, window: '1m', count: 'succeeded' } })
+}, { protect: { rateLimit: { max: 1, window: '1m', count: 'succeeded' } } })
 
 export const trapped = action(t.Object({ name: t.String() }), async function* ({ name }) {
   yield name
-}, { honeypot: 'website' })
+}, { protect: { honeypot: 'website' } })
 
 export const pretending = action(t.Object({ name: t.String() }), async function* ({ name }) {
   yield name
-}, { honeypot: { field: 'website', pretend: true } })
+}, { protect: { honeypot: { field: 'website', pretend: true } } })
 
 export const sendsAway = action(async function* (ctx) {
   ctx.redirect('/done')

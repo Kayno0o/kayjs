@@ -123,6 +123,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `deprecated-mount-component` | warn | deprecated | `mountComponent` given the path of a `.kay` file, now the imported component |
 | `deprecated-markup-prop` | warn | deprecated | A markup prop typed `JSX.Element` or a function returning it, now a `Snippet` from `kay` |
 | `deprecated-hook-shape` | warn | deprecated | An `on*` hook with positional arguments, which takes one event object since 1.70 |
+| `deprecated-action-options` | warn | deprecated | An action's `rateLimit`, `honeypot`, `minTime` or `proofOfWork` outside `protect`, the form before 1.71 |
 
 ## Errors
 

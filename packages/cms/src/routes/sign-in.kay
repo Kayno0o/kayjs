@@ -30,7 +30,7 @@ export const signIn = action(s.Object({
   ctx.redirect(localPath(redirect, settings().prefix))
 }, {
   // Ten tries per visitor every quarter of an hour: plenty for a typo, far too few to guess a password.
-  rateLimit: { max: 10, window: '15m' },
+  protect: { rateLimit: { max: 10, window: '15m' } },
 })
 
 // Where to go after: a path of this site, never another one.

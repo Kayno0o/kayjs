@@ -788,10 +788,21 @@ function toolOptions(args: t.CallExpression['arguments']): { botProtected: boole
 
     // A spread may bring any of them, so it counts as one; options that are not an object literal cannot be read, and the action is not taken for a tool.
     if (tool !== undefined && !(tool.type === 'BooleanLiteral' && !tool.value))
-      return { botProtected: arg.properties.some(property => property.type === 'SpreadElement') || [...keys.keys()].some(key => key !== undefined && BOT_PROTECTIONS.has(key)) }
+      return { botProtected: arg.properties.some(property => property.type === 'SpreadElement') || [...keys.keys()].some(key => key !== undefined && BOT_PROTECTIONS.has(key)) || protectsBots(keys.get('protect')) }
   }
 
   return undefined
+}
+
+// Whether the `protect` group sets one of the bot protections; one that is not an object literal cannot be read, so it counts as setting one.
+function protectsBots(protect: t.Node | undefined): boolean {
+  if (protect === undefined)
+    return false
+
+  if (protect.type !== 'ObjectExpression')
+    return true
+
+  return protect.properties.some(property => property.type === 'SpreadElement' || property.computed || (keyName(property.key) !== undefined && BOT_PROTECTIONS.has(keyName(property.key)!)))
 }
 
 function keyName(key: t.Node): string | undefined {

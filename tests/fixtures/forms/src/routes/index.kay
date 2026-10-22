@@ -11,7 +11,7 @@ export const save = action(t.Object({
   news: t.Boolean(),
   terms: t.Optional(t.Boolean()),
   website: t.Optional(t.String({ maxLength: 200 })),
-}), (_input, ctx) => ctx.fail(409, { message: 'Taken' }), { honeypot: 'website' })
+}), (_input, ctx) => ctx.fail(409, { message: 'Taken' }), { protect: { honeypot: 'website' } })
 
 export const ping = action(t.Object({}), () => 'Saved')
 

@@ -3,8 +3,8 @@ import { t } from 'elysia'
 import { action } from 'kay'
 
 // A person takes 3 s to ask; a post sooner is refused, or answered as sent for `quick`.
-export const ask = action(t.Object({ message: t.String({ maxLength: 200 }) }), ({ message }) => message.length, { minTime: '3s' })
-export const quick = action(t.Object({ message: t.String({ maxLength: 200 }) }), ({ message }) => message.length, { minTime: { after: '3s', maxAge: '1h', pretend: true } })
+export const ask = action(t.Object({ message: t.String({ maxLength: 200 }) }), ({ message }) => message.length, { protect: { minTime: '3s' } })
+export const quick = action(t.Object({ message: t.String({ maxLength: 200 }) }), ({ message }) => message.length, { protect: { minTime: { after: '3s', maxAge: '1h', pretend: true } } })
 
 const failure = ask.failed()
 const asked = ask.succeeded()

@@ -358,8 +358,8 @@ describe('the browser\'s form check in the page\'s locale', () => {
 
   it('solves the challenge a streamed block brought, past the shell\'s and one still streaming', async () => {
     const { spendWork } = await import('../src/runtime/work.client')
-    const first = action(t.Object({ name: t.String() }), () => undefined, { proofOfWork: 20 })
-    const second = action(t.Object({ title: t.String() }), () => undefined, { proofOfWork: 20 })
+    const first = action(t.Object({ name: t.String() }), () => undefined, { protect: { proofOfWork: 20 } })
+    const second = action(t.Object({ title: t.String() }), () => undefined, { protect: { proofOfWork: 20 } })
 
     ;(first as { url: string }).url = '/first'
     ;(second as { url: string }).url = '/second'

@@ -703,7 +703,7 @@ describe('the test helper', () => {
 })
 
 describe('kay check', () => {
-  const COVERED = '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const covered = action(t.Object({}), () => 1, { tool: true, honeypot: \'website\' })\n---\nh1 Covered\n'
+  const COVERED = '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const covered = action(t.Object({}), () => 1, { tool: true, protect: { honeypot: \'website\' } })\n---\nh1 Covered\n'
 
   const reported = async (dir: string, mcp: boolean, lints?: object) => (await writeShadowTypes(dir, { routes: 'src/routes', api: 'src/api', mcp, lints })).problems.filter(found => found.code === 'unguarded-tool').map(found => [relative(dir, found.file), found.message.match(/`(\w+)`/)![1]])
 
@@ -713,6 +713,15 @@ describe('kay check', () => {
     await Bun.write(join(dir, 'src/routes/admin/covered.kay'), COVERED)
 
     expect(await reported(dir, true)).toEqual([['src/routes/index.kay', 'signup'], ['src/routes/index.kay', 'solve']])
+  })
+
+  it('counts a bot protection under protect, and not a rate limit', async () => {
+    const dir = await fixtureCopy('mcp')
+    const page = (options: string) => `--- server\nimport { action } from 'kay'\n\nexport const grouped = action(() => 1, ${options})\n---\nh1 Grouped\n`
+
+    await Bun.write(join(dir, 'src/routes/grouped.kay'), page('{ tool: true, protect: { minTime: \'1s\' } }'))
+    await Bun.write(join(dir, 'src/routes/limited.kay'), page('{ tool: true, protect: { rateLimit: { max: 1, window: \'1m\' } } }').replace('grouped', 'limited'))
+    expect((await reported(dir, true)).filter(([file]) => file !== 'src/routes/index.kay')).toEqual([['src/routes/grouped.kay', 'grouped']])
   })
 
   it('counts an options spread as bot protection, and leaves out options it cannot read', async () => {

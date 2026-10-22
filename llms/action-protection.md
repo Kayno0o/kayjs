@@ -8,7 +8,7 @@
 
 ### Keep scripts from flooding a form
 
-A third argument limits attempts and traps bots, `rateLimit` answering 429 past `max` posts every `window` and `honeypot` failing a form that fills a hidden field:
+A third argument limits attempts and traps bots, its `protect` group holding `rateLimit` answering 429 past `max` posts every `window` and `honeypot` failing a form that fills a hidden field:
 
 ```kay
 --- server
@@ -17,7 +17,7 @@ import { s } from 'kay'
 export const contact = action(
   s.Object({ message: s.String({ maxLength: 2000 }) }),
   async ({ message }) => message.length,
-  { rateLimit: { max: 5, window: '1m' }, honeypot: 'website', minTime: '3s' },
+  { protect: { rateLimit: { max: 5, window: '1m' }, honeypot: 'website', minTime: '3s' } },
 )
 ---
 form(action={contact})
@@ -40,7 +40,8 @@ See [Rate limits](rate-limits.md#limit-attempts-in-a-guard-or-an-api-route).
 
 ### Protecting an action
 
-- A third argument protects an action from scripts: `action(schema, handler, { rateLimit: { max: 5, window: '1m' }, honeypot: 'website' })`.
+- A third argument protects an action from scripts: `action(schema, handler, { protect: { rateLimit: { max: 5, window: '1m' }, honeypot: 'website' } })`.
+- Its options are grouped by concern: `protect` holds `rateLimit`, `honeypot`, `minTime` and `proofOfWork`, beside `messages`, `tool` and `maxSize`. Before 1.71 the four sat on the third argument itself, which works until 1.74 and which `deprecated-action-options` moves under `protect`.
 - None of these reaches the handler.
 
 #### Rate limits

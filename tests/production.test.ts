@@ -1048,7 +1048,7 @@ console.log(JSON.stringify(store.hit('ada@example.com', '60000ms').count))
     ['a window it cannot read', { max: 1, window: 'soon' as never }, 'kay: rateLimit.window is \'soon\'; it takes a positive duration'],
     ['a store without peek on a limit counting successes', [{ max: 1, window: '1m' }, { max: 1, window: '1m', count: 'succeeded', store: { hit: () => ({ count: 1, resetAt: 0 }) } }] as never, 'needs a peek(key) method'],
   ])('refuses %s as the action is declared', (_name, rateLimit, message) => {
-    expect(() => action(t.Object({}), () => 1, { rateLimit })).toThrow(message)
+    expect(() => action(t.Object({}), () => 1, { protect: { rateLimit } })).toThrow(message)
   })
 
   it.each([

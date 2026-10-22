@@ -42,8 +42,7 @@ const captcha = {
 
 // What kay checks of a post from the pages open to visitors without JavaScript, which sends no proof of work: a field bots fill in, and a least time to fill the form in.
 export const guarded = {
-  honeypot: 'website',
-  minTime: { after: '2s', plain: true },
+  protect: { honeypot: 'website', minTime: { after: '2s', plain: true } },
   messages: { minTime: (reason: MinTimeRefusal) => MIN_TIME + reason },
 } as const
 

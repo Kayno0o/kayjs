@@ -1903,7 +1903,7 @@ describe.concurrent('kay check, edge cases', () => {
       '  if (code === \'x\')',
       '    return ctx.fail(400, { error: \'bad\' })',
       '  ctx.redirect(\'/\')',
-      '}, { honeypot: \'website\' })',
+      '}, { protect: { honeypot: \'website\' } })',
       'export const save = action(t.Object({ code: t.String({ maxLength: 200 }) }), async ({ code }, ctx) => {',
       '  if (code === \'x\')',
       '    return ctx.fail(400, { error: \'bad\' })',
@@ -1942,7 +1942,7 @@ describe.concurrent('kay check, edge cases', () => {
       '  if (code === \'x\')',
       '    return ctx.fail(400, { error: \'bad\' })',
       '  return 1',
-      '}, { honeypot: \'website\' })',
+      '}, { protect: { honeypot: \'website\' } })',
       '---',
       'p {save.error(\'code\')} {save.error(\'website\')} {save.error()} {save.failed()?.data?.error} {save.succeeded()?.data}',
       'p {save.error(\'cod\')}',
@@ -2747,7 +2747,7 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
       '  return { id, org, slug, typo }',
       '})',
       'export const rename = action(s.Object({ name: s.String({ maxLength: 20 }) }), async ({ name }, ctx) => ({ name, id: ctx.params.id satisfies number }))',
-      'export const mixed = action(async ({ params }) => params.id.toFixed(0), { minTime: \'1s\' })',
+      'export const mixed = action(async ({ params }) => params.id.toFixed(0), { protect: { minTime: \'1s\' } })',
       '---',
       'p hi',
       '',
@@ -3557,7 +3557,7 @@ describe.concurrent('kay check, unused code', () => {
       'kay.config.ts': 'export default {\n  bodyLimit: "4mb",\n}\n',
       'src/api/up.ts': 'const bodyLimit = 1024\n\nexport default api({ bodyLimit }).post("/", () => 1, { detail: { bodyLimit: "4kb" } })\n',
       'src/other.ts': 'const bodyLimit = 1\n\nexport const a = [bodyLimit, bodyLimit]\nexport const b = `max ${bodyLimit}`\nexport const c = "{ bodyLimit: 1 }" // { bodyLimit: 2 }\nexport const d = { bodyLimit }\n',
-      'src/routes/index.kay': '--- server\nexport const send = action(t.Object({}), () => 1, { honeypot: "x", bodyLimit: "20mb", messages: { bodyLimit: bytes => String(bytes) } })\n---\np bodyLimit in prose\n',
+      'src/routes/index.kay': '--- server\nexport const send = action(t.Object({}), () => 1, { protect: { honeypot: "x" }, bodyLimit: "20mb", messages: { bodyLimit: bytes => String(bytes) } })\n---\np bodyLimit in prose\n',
     })
 
     try {
@@ -3566,7 +3566,7 @@ describe.concurrent('kay check, unused code', () => {
       expect(await Bun.file(join(root, 'src/other.ts')).text()).toBe('const bodyLimit = 1\n\nexport const a = [bodyLimit, bodyLimit]\nexport const b = `max ${bodyLimit}`\nexport const c = "{ bodyLimit: 1 }" // { bodyLimit: 2 }\nexport const d = { bodyLimit }\n')
       expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('export default {\n  maxSize: "4mb",\n}\n')
       expect(await Bun.file(join(root, 'src/api/up.ts')).text()).toBe('const bodyLimit = 1024\n\nexport default api({ maxSize: bodyLimit }).post("/", () => 1, { detail: { maxSize: "4kb" } })\n')
-      expect(await Bun.file(join(root, 'src/routes/index.kay')).text()).toBe('--- server\nexport const send = action(t.Object({}), () => 1, { honeypot: "x", maxSize: "20mb", messages: { maxSize: bytes => String(bytes) } })\n---\np bodyLimit in prose\n')
+      expect(await Bun.file(join(root, 'src/routes/index.kay')).text()).toBe('--- server\nexport const send = action(t.Object({}), () => 1, { protect: { honeypot: "x" }, maxSize: "20mb", messages: { maxSize: bytes => String(bytes) } })\n---\np bodyLimit in prose\n')
       expect((await runCheck(root)).output).not.toContain('deprecated-body-limit')
     }
     finally {
@@ -3716,6 +3716,33 @@ describe.concurrent('kay check, unused code', () => {
 
     try {
       expect(await check(root)).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('reports the checks of an action set outside protect and --fix groups them, leaving a protect, a spread or a comment unfixed', async () => {
+    const root = await scratchProject({
+      'src/routes/index.kay': '--- server\nexport const a = action(s.Object({ m: s.String() }), send, { rateLimit: { max: 5, window: \'1m\' }, honeypot: \'website\', minTime: \'3s\', messages: { honeypot: \'No\' } })\nexport const b = action(send, { tool: true, proofOfWork: true })\nexport const c = action(send, { protect: { minTime: \'3s\' }, honeypot: \'x\' })\nexport const d = action(send, { ...shared, rateLimit: { max: 1, window: \'1m\' } })\nexport const e = action(send, {\n  rateLimit: { max: 5, window: \'1m\' }, // five a minute\n  tool: true,\n})\nexport const f = action(send, { protect: { rateLimit: { max: 5, window: \'1m\' } }, maxSize: \'1mb\' })\nexport const g = other(send, { honeypot: \'x\' })\n---\np\n',
+      'src/actions.ts': 'export const h = action(send, {\n  rateLimit: { max: 5, window: \'1m\' },\n  tool: true,\n  proofOfWork: 1000,\n})\n',
+    })
+
+    try {
+      const { output } = await runCheck(root)
+
+      expect(output.match(/deprecated-action-options/g)).toHaveLength(6)
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/actions.ts')).text()).toBe('export const h = action(send, {\n  protect: { rateLimit: { max: 5, window: \'1m\' }, proofOfWork: 1000 },\n  tool: true,\n})\n')
+
+      const page = await Bun.file(join(root, 'src/routes/index.kay')).text()
+
+      expect(page).toContain('export const a = action(s.Object({ m: s.String() }), send, { protect: { rateLimit: { max: 5, window: \'1m\' }, honeypot: \'website\', minTime: \'3s\' }, messages: { honeypot: \'No\' } })')
+      expect(page).toContain('export const b = action(send, { tool: true, protect: { proofOfWork: true } })')
+      expect(page).toContain('export const c = action(send, { protect: { minTime: \'3s\' }, honeypot: \'x\' })')
+      expect(page).toContain('export const d = action(send, { ...shared, rateLimit: { max: 1, window: \'1m\' } })')
+      expect(page).toContain('  rateLimit: { max: 5, window: \'1m\' }, // five a minute\n  tool: true,')
+      expect(page).toContain('export const g = other(send, { honeypot: \'x\' })')
     }
     finally {
       await rm(root, { recursive: true, force: true })

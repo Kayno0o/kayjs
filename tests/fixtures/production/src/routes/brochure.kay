@@ -5,7 +5,7 @@ import { action } from 'kay'
 export const page = { prerender: true }
 
 // Rendered once at build, its form still takes 3 s from each visit.
-export const order = action(t.Object({ address: t.String({ maxLength: 200 }) }), ({ address }) => address.length, { minTime: '3s' })
+export const order = action(t.Object({ address: t.String({ maxLength: 200 }) }), ({ address }) => address.length, { protect: { minTime: '3s' } })
 ---
 form(action={order})
   input(name="address" aria-label="Address")

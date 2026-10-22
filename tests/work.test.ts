@@ -160,7 +160,7 @@ describe('proof-of-work', () => {
   })
 
   it('leaves a prerendered page a mark the server fills in with a fresh challenge per visit', async () => {
-    const solve = action({} as never, () => 0, { proofOfWork: { difficulty: 50, maxAge: '1m' } })
+    const solve = action({} as never, () => 0, { protect: { proofOfWork: { difficulty: 50, maxAge: '1m' } } })
 
     ;(solve as { url: string }).url = '/_kay/action/a'
 
@@ -180,8 +180,8 @@ describe('proof-of-work', () => {
   })
 
   it('refuses a difficulty it cannot use as the action is declared', () => {
-    expect(() => action({} as never, () => 0, { proofOfWork: 0 })).toThrow('proofOfWork\'s difficulty is 0')
-    expect(() => action({} as never, () => 0, { proofOfWork: 1.5 })).toThrow('whole number')
+    expect(() => action({} as never, () => 0, { protect: { proofOfWork: 0 } })).toThrow('proofOfWork\'s difficulty is 0')
+    expect(() => action({} as never, () => 0, { protect: { proofOfWork: 1.5 } })).toThrow('whole number')
   })
 })
 

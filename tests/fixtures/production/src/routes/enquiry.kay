@@ -11,7 +11,7 @@ export const enquire = action(t.Object({ message: t.String({ maxLength: 200 }) }
     ctx.redirect('/contact')
 
   return message === 'fail' ? ctx.fail(502, 'Not sent; try again later') : message.length
-}, { rateLimit: [{ max: 4, window: '1m' }, { max: 1, window: '1m', count: 'succeeded' }], honeypot: { field: 'nectar', pretend: true } })
+}, { protect: { rateLimit: [{ max: 4, window: '1m' }, { max: 1, window: '1m', count: 'succeeded' }], honeypot: { field: 'nectar', pretend: true } } })
 
 const sent = enquire.succeeded()
 ---

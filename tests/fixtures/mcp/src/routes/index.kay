@@ -27,9 +27,7 @@ export const upload = action(t.Object({ photo: t.File() }), () => 'stored', { to
 
 export const signup = action(t.Object({ email: t.String(), website: t.Optional(t.String()) }), ({ email }) => ({ email }), {
   tool: 'Sign up',
-  honeypot: 'website',
-  minTime: '1h',
-  rateLimit: { max: 2, window: '1m' },
+  protect: { honeypot: 'website', minTime: '1h', rateLimit: { max: 2, window: '1m' } },
 })
 
 export const listing = action(t.Object({
@@ -45,7 +43,7 @@ export const listing = action(t.Object({
   either: t.Union([t.Integer(), t.String()]),
 }), input => input, { tool: 'List things' })
 
-export const solve = action(t.Object({}), () => 'solved', { tool: true, proofOfWork: true })
+export const solve = action(t.Object({}), () => 'solved', { tool: true, protect: { proofOfWork: true } })
 
 export const long = action(t.Object({}), () => 'long', { tool: { name: 'a'.repeat(100) } })
 ---

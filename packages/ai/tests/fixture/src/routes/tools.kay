@@ -25,7 +25,7 @@ export const slow = action(s.Object({}), async () => {
   return 'slow done'
 })
 
-export const limited = action(s.Object({}), () => 'counted', { rateLimit: { max: 1, window: '1m' } })
+export const limited = action(s.Object({}), () => 'counted', { protect: { rateLimit: { max: 1, window: '1m' } } })
 
 export const vetoed = action(s.Object({}), () => 'vetoed', { tool: false })
 

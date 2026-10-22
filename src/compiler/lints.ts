@@ -683,6 +683,15 @@ export const LINTS = {
     wrong: 'auth({ onSignUp: (user, profile) => seed(user) })',
     right: 'auth({ onSignUp: ({ user, profile }) => seed(user) })',
   },
+  'deprecated-action-options': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.71',
+    site: true,
+    summary: 'An action whose third argument sets `rateLimit`, `honeypot`, `minTime` or `proofOfWork` on the options themselves, the form before 1.71: the checks that keep scripts from an action now sit under `protect`, beside `messages`, `tool` and `maxSize`, so the options are grouped by concern. The old form works until 1.74. The options are read as an object literal at the call, in the project\'s TypeScript files and `.kay` fences. The fix moves the keys into `protect: { ... }`; an object that already has a `protect`, a spread, a computed key or a comment between its properties is reported with no fix.',
+    wrong: 'export const contact = action(schema, send, { rateLimit: { max: 5, window: \'1m\' }, honeypot: \'website\' })',
+    right: 'export const contact = action(schema, send, { protect: { rateLimit: { max: 5, window: \'1m\' }, honeypot: \'website\' } })',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS

@@ -26,7 +26,7 @@ export const ping = action((ctx) => {
   return 'pong'
 })
 
-export const trap = action(() => 'passed', { honeypot: 'website' })
+export const trap = action(() => 'passed', { protect: { honeypot: 'website' } })
 
 export const fails = action(t.Object({ status: t.Number() }), ({ status }, ctx) => ctx.fail(status, 'Refused'))
 

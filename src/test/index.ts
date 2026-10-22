@@ -1,6 +1,6 @@
 import type { AnyElysia } from 'elysia'
 import type { ClientOptions } from '../build/client'
-import type { Action, ActionError, ActionProtection, FailuresOf, ResultOf, Settles, Success } from '../runtime/action'
+import type { Action, ActionError, FailuresOf, ResolvedProtection, ResultOf, Settles, Success } from '../runtime/action'
 import type { Duration } from '../runtime/duration'
 import type { ApiAnswer, ApiRequest, CallMethod, CallPath, EventReader, NodeAt, Optional, SocketOf, SocketOptions, SocketPath, StreamMethod, StreamOf, StreamOptions, StreamPath, StreamStatus } from '../runtime/live'
 import type { PagesOptions } from '../server/app'
@@ -221,7 +221,7 @@ function renderedStamp(page: PageReading, url: URL): string | undefined {
 }
 
 // The stamp `minTime` reads, as the browser sends the form it was rendered in: dated `openedFor` ago when given, else the page's own made no younger than the action asks, so a test about something else is not refused as too fast.
-function postedStamp(action: Action<never, unknown> & { protection?: ActionProtection<string> }, rendered: string | undefined, openedFor: Duration | 0 | undefined): string | undefined {
+function postedStamp(action: Action<never, unknown> & { protection?: ResolvedProtection }, rendered: string | undefined, openedFor: Duration | 0 | undefined): string | undefined {
   if (openedFor !== undefined)
     return signStamp(action.url, Date.now() - (openedFor === 0 ? 0 : durationSeconds(openedFor, 'openedFor') * 1000))
 

@@ -20,9 +20,9 @@ export const listed = action(t.Object({
   after: t.String({ pattern: '^[a-z]+$', format: 'email' }),
 }), () => undefined)
 
-export const guarded = action(t.Object({ website: t.Optional(t.String()) }), () => undefined, { honeypot: 'website', rateLimit: { max: 1, window: '1m' }, maxSize: 200 })
+export const guarded = action(t.Object({ website: t.Optional(t.String()) }), () => undefined, { protect: { honeypot: 'website', rateLimit: { max: 1, window: '1m' } }, maxSize: 200 })
 
-export const owned = action(t.Object({ website: t.Optional(t.String()) }), () => undefined, { honeypot: 'website', messages: { honeypot: 'Own words' } })
+export const owned = action(t.Object({ website: t.Optional(t.String()) }), () => undefined, { protect: { honeypot: 'website' }, messages: { honeypot: 'Own words' } })
 
 export const boom = action(t.Object({}), () => {
   throw new Error('down')
