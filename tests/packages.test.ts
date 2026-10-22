@@ -52,7 +52,7 @@ describe('kay\'s libraries', () => {
     expect([...ranges].filter(([, named]) => named.size > 1).map(([name, named]) => [name, [...named]])).toEqual([])
   })
 
-  // `kay/pg-orm` is the one module reaching pg-orm, so an app without it installs, builds and runs; the app template only writes the import into the files of a new app, and `kay/test/preload` imports it only for a project with a `pg-orm.config.ts`.
+  // `kay/pg-orm` is the one module reaching pg-orm, so an app without it installs, builds and runs; the app template and `kay generate resource` only write the import into the files of a new app, and `kay/test/preload` imports it only for a project with a `pg-orm.config.ts`.
   it('asks for pg-orm as an optional peer, imported by kay/pg-orm alone', async () => {
     expect(root.peerDependencies?.['@kaynooo/pg-orm']).toBeDefined()
     expect((root as Manifest & { peerDependenciesMeta: Record<string, unknown> }).peerDependenciesMeta['@kaynooo/pg-orm']).toEqual({ optional: true })
@@ -61,7 +61,7 @@ describe('kay\'s libraries', () => {
     const importers: string[] = []
 
     for (const file of await Array.fromAsync(new Glob('src/**/*.{ts,kay}').scan())) {
-      if (file !== 'src/new.ts' && file !== 'src/templates.ts' && (/(?:from|import)\s*(?:\(\s*)?['"]@kaynooo\/pg-orm['"]/).test(await Bun.file(file).text()))
+      if (!['src/new.ts', 'src/templates.ts', 'src/generate-resource.ts'].includes(file) && (/(?:from|import)\s*(?:\(\s*)?['"]@kaynooo\/pg-orm['"]/).test(await Bun.file(file).text()))
         importers.push(file)
     }
 
