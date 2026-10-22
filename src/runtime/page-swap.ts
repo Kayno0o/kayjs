@@ -2,6 +2,7 @@ import type { FetchedIsland } from './fetch-island'
 import type { FetchedPage, HeadElement, Intent, Swap } from './navigation'
 import { ISLAND } from './markers'
 import { moves, place } from './move'
+import { followable, followAsked, linkIn, plainClick } from './navigate'
 import { historyState, leave, leaving, navigation, pageKey, prefetched, restoreScroll, saveScroll, takeFormChecks } from './navigation'
 import { forgetPageData } from './page-data'
 import { ROOT_ATTRIBUTES } from './root'
@@ -426,8 +427,9 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
     const transition = (document as Document & { startViewTransition: (update: () => void) => ViewTransition }).startViewTransition(commit)
 
     const skip = () => transition.skipTransition()
+    const onRoot = (event: MouseEvent) => linkUnderTransition(event, skip)
 
-    navigation.skipTransition = skip
+    document.addEventListener('click', onRoot)
 
     try {
       // A transition stuck, as in a tab the browser keeps from painting, is skipped, which still runs the commit.
@@ -438,13 +440,29 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
       }
     }
     finally {
-      if (navigation.skipTransition === skip)
-        navigation.skipTransition = undefined
+      document.removeEventListener('click', onRoot)
     }
   }
   else {
     commit()
   }
+}
+
+// A click during a view transition lands on the root, not on the link under the pointer: the transition is skipped, which gives the page its elements back, and the link is looked for where the click was made. Any click on the root cuts the transition short, as the page needs its elements back to answer it.
+function linkUnderTransition(event: MouseEvent, skip: () => void): void {
+  if (event.target !== document.documentElement || !plainClick(event))
+    return
+
+  skip()
+
+  const link = linkIn(document.elementFromPoint(event.clientX, event.clientY))
+  const url = link && followable(link)
+
+  if (!url)
+    return
+
+  event.preventDefault()
+  void followAsked(url, { intent: 'visit', link })
 }
 
 // The entry a swap adds or replaces, holding where the page it leaves was scrolled to.

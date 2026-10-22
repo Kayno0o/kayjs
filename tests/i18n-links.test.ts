@@ -16,7 +16,7 @@ const chrome = browserPath()
 // The file test of a link, `FILE_EXTENSION` and `namesFile` (a collection route takes a dotted slug, an entry file stays a page), costs about 186 bytes here: an island writes links, so it cannot wait in a chunk.
 // `swappable` reading the page's API path from a meta tag (apiPath) costs about 40 bytes here (44 on CI, as gzip sizes differ by a few bytes from one host to another): navigation runs before any island.
 // A refresh waiting on a swap in flight, a page that never answers loaded by the browser and a stuck or interrupted view transition skipped (#1972, #1973, #1974) cost about 106 bytes here: navigation runs before any island.
-const EAGER_JS_BUDGET = 15_782
+const EAGER_JS_BUDGET = 15_741
 
 // Apart from tests/i18n.test.ts, as one process serves one project and this one serves a copy whose island imports nothing of kay/i18n.
 describe('an island of an app with locales', () => {

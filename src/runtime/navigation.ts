@@ -86,8 +86,6 @@ export const navigation: {
   loads: number
   // A response showed the server runs another build than this page's: the next link loads in full, as the new build's pages are not this page's to swap in.
   stale?: boolean
-  // Set while a view transition runs, whose pseudo-elements take the pointer: a click on the page then lands on `<html>`, so it skips the transition to find the link under the pointer.
-  skipTransition?: (() => void) | undefined
   // Lands the query param writes held back to be spaced out, which run before the address is read to leave or change it.
   flush?: () => void
   // Development: set while `kay dev` refreshes the page for an edit, where a field the edit leaves as it was keeps what was typed into it.

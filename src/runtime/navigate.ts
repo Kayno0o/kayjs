@@ -119,19 +119,7 @@ export async function follow(url: URL, swap: Swap): Promise<void> {
   await swapper.go(url, swap)
 }
 
-// A click during a view transition lands on the root, not on the link under the pointer: the transition is skipped, which gives the page its elements back, and the link is looked for where the click was made. Any click on the root cuts the transition short, as the page needs its elements back to answer it.
-function linkUnderTransition(event: MouseEvent): HTMLAnchorElement | undefined {
-  if (event.target !== document.documentElement || !navigation.skipTransition)
-    return undefined
-
-  navigation.skipTransition()
-
-  const under = document.elementFromPoint(event.clientX, event.clientY)
-
-  return linkIn(under)
-}
-
-function linkIn(element: Element | null): HTMLAnchorElement | undefined {
+export function linkIn(element: Element | null): HTMLAnchorElement | undefined {
   const link = element?.closest?.('a[href]')
 
   return link instanceof HTMLAnchorElement ? link : undefined
@@ -155,11 +143,16 @@ export function followable(link: HTMLAnchorElement): URL | undefined {
   return url.hash !== '' && url.pathname === location.pathname && url.search === location.search ? undefined : url
 }
 
+// A click nothing has taken and no key or button turns into something else.
+export function plainClick(event: MouseEvent): boolean {
+  return !event.defaultPrevented && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey
+}
+
 function onClick(event: MouseEvent): void {
-  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+  if (!plainClick(event))
     return
 
-  const link = linkOf(event) ?? linkUnderTransition(event)
+  const link = linkOf(event)
   const url = link && followable(link)
 
   if (!url)
@@ -169,7 +162,7 @@ function onClick(event: MouseEvent): void {
   void followAsked(url, { intent: 'visit', link })
 }
 
-async function followAsked(url: URL, swap: Swap): Promise<void> {
+export async function followAsked(url: URL, swap: Swap): Promise<void> {
   if (await mayLeave(url))
     await follow(url, swap)
 }
