@@ -6,13 +6,16 @@ const EXTENSIONS = ['', '.ts', '.tsx', '/index.ts']
 const transpiler = new Bun.Transpiler({ loader: 'ts' })
 // An entry named as a path to a source file or folder: `'../src/cli.ts'`, `'src/dev/preload.ts'`, or relative to a `SRC` constant as in `join(SRC, 'check/index.ts')`.
 const ENTRY = /['"`]((?:\.\.\/)*src\/[\w/.-]+|(?<=\bSRC, ['"`])[\w/.-]+)['"`]/g
+const SOURCE = /\.[jt]sx?$/
+const SHEBANG = /^#!.*/
+const LEADING_PARENTS = /^(?:\.\.\/)*/
 const COMMAND = /^\s+'([a-z-]+(?: [a-z]+)?)': async \(\) => \(await import\('\.\/commands\/([\w-]+)'\)\)/gm
 
 async function resolveFile(base: string) {
   for (const extension of EXTENSIONS) {
     const path = base + extension
 
-    if ((/\.[jt]sx?$/).test(path) && await Bun.file(path).exists())
+    if (SOURCE.test(path) && await Bun.file(path).exists())
       return path
   }
 }
@@ -33,7 +36,7 @@ async function closure(entries: string[], edges: Map<string, Promise<string[]>>)
         const text = await Bun.file(file).text()
         const found: string[] = []
 
-        for (const { path } of transpiler.scanImports(text.replace(/^#!.*/, ''))) {
+        for (const { path } of transpiler.scanImports(text.replace(SHEBANG, ''))) {
           const target = path.startsWith('.') ? await resolveFile(resolve(dirname(file), path)) : undefined
 
           if (target !== undefined)
@@ -52,7 +55,7 @@ async function closure(entries: string[], edges: Map<string, Promise<string[]>>)
 
 // The test files, among `tests`, whose subprocesses or by-path loads reach a file in `changed` (paths from `root`) that the test's own imports do not.
 export async function subprocessTests(root: string, changed: string[]) {
-  const sources = changed.filter(path => path.startsWith('src/') && (/\.[jt]sx?$/).test(path)).map(path => join(root, path))
+  const sources = changed.filter(path => path.startsWith('src/') && SOURCE.test(path)).map(path => join(root, path))
 
   if (sources.length === 0)
     return []
@@ -72,7 +75,7 @@ export async function subprocessTests(root: string, changed: string[]) {
     const entries: string[] = []
 
     for (const [, literal] of text.matchAll(ENTRY)) {
-      const path = literal!.replace(/^(?:\.\.\/)*/, '')
+      const path = literal!.replace(LEADING_PARENTS, '')
       const file = await resolveFile(join(root, path.startsWith('src/') ? path : `src/${path}`))
 
       if (file !== undefined)
@@ -81,7 +84,7 @@ export async function subprocessTests(root: string, changed: string[]) {
 
     if (entries.includes(cli)) {
       for (const [name, file] of commands) {
-        if (new RegExp(`['"\`]${name.split(' ')[0]}['"\`]`).test(text)) {
+        if (new RegExp(`['"\`]${name.slice(0, (`${name} `).indexOf(' '))}['"\`]`).test(text)) {
           const entry = await resolveFile(join(root, 'src/commands', file))
 
           if (entry !== undefined)
