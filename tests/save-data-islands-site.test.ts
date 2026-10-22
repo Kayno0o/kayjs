@@ -1,11 +1,12 @@
 import type { TestSite } from '../src/test'
+import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { browserPath, testSite } from '../src/test'
 import { scratchBuild } from './prerendered'
 import { pages } from './shared-pages'
 
-const ROUTES = 'tests/fixtures/save-data-islands/src/routes'
+const ROOT = 'tests/fixtures/save-data-islands'
 const PRELOAD = /<link rel="modulepreload" href="([^"]*)"(?: data-load)?>/g
 const WHEN = /hydrate-when-\w+\.js/
 const ON = { 'save-data': 'on' }
@@ -19,12 +20,12 @@ describe.each([
   ['prerendered', 'prerendered'],
 ] as const)('the head of a page %s', (_name, kind) => {
   const served = async (config: Record<string, unknown> = {}) => {
-    const options = { routes: ROUTES, ...config }
+    const options = { ...config }
 
     if (kind === 'request')
-      return { app: await pages({ ...options, prebuilt: false }), remove: async () => undefined }
+      return { app: await pages({ root: ROOT, ...options, prebuilt: false }), remove: async () => undefined }
 
-    const build = await scratchBuild(options)
+    const build = await scratchBuild(options, false, join(process.cwd(), ROOT))
 
     await build.prerender(options)
 
@@ -258,7 +259,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('islands in
   let site: TestSite
 
   beforeAll(async () => {
-    site = await testSite({ routes: ROUTES, browser: { path } })
+    site = await testSite({ root: ROOT, browser: { path } })
   }, 60_000)
 
   afterAll(async () => site?.close())

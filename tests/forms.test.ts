@@ -23,7 +23,7 @@ function fakeElement(): Element {
 // What a page being left reports, as a page mid-navigation cannot be asked.
 const reported: string[] = []
 // The islands built for the island form's tests, which load pages in Chromium only once they open one.
-const site = await testSite({ routes: 'tests/fixtures/forms/src/routes', browser: true, use: [new Elysia().get('/reported/:state', ({ params }) => {
+const site = await testSite({ root: 'tests/fixtures/forms', browser: true, use: [new Elysia().get('/reported/:state', ({ params }) => {
   reported.push(params.state)
 
   return ''
@@ -48,7 +48,7 @@ describe('a form posting to an action', () => {
     expect(html).toContain('<input type="radio" name="size" value="s" checked>')
     expect(html).toContain('<input type="checkbox" name="terms" checked>')
     expect(html).not.toContain('aria-invalid')
-    expect(html).toContain('<form class="busy" action="/_kay/action/tests/fixtures/forms/src/routes/index.kay/busy" method="post" enctype="multipart/form-data">')
+    expect(html).toContain('<form class="busy" action="/_kay/action/src/routes/index.kay/busy" method="post" enctype="multipart/form-data">')
   })
 
   it('shows a refused post again with what was sent, refused fields marked, a password never echoed', async () => {
@@ -76,14 +76,14 @@ describe('a form posting to an action', () => {
     expect(html).toContain('<p id="topic-problem">Too short</p>')
     expect(html).toContain('<input name="note" value="long" aria-invalid="true" aria-describedby="note-help busy-note-error">')
     expect(html).toContain('<p id="busy-note-error" class="note-error">Too long</p>')
-    expect(html).toContain('<form class="busy" action="/_kay/action/tests/fixtures/forms/src/routes/index.kay/busy?kay_back=%2F" method="post" enctype="multipart/form-data">')
+    expect(html).toContain('<form class="busy" action="/_kay/action/src/routes/index.kay/busy?kay_back=%2F" method="post" enctype="multipart/form-data">')
   })
 
   it('describes a form by its own message once the handler refused it', async () => {
     const { status, html } = await site.submit(busy, { topic: 'abc' }, { from: '/' })
 
     expect(status).toBe(503)
-    expect(html).toContain('<form class="busy" action="/_kay/action/tests/fixtures/forms/src/routes/index.kay/busy?kay_back=%2F" method="post" enctype="multipart/form-data" aria-describedby="busy-error">')
+    expect(html).toContain('<form class="busy" action="/_kay/action/src/routes/index.kay/busy?kay_back=%2F" method="post" enctype="multipart/form-data" aria-describedby="busy-error">')
     expect(html).toContain('<p id="busy-error" class="busy-error">Try later</p>')
     expect(html).toContain('<input name="topic" value="abc">')
   })
@@ -141,8 +141,8 @@ describe('an action passed to a static component', () => {
   it('drives its form, whatever the action takes, through a prop typed Action<never, unknown> or NoInputAction<unknown>', async () => {
     const { html } = await site.visit('/passed')
 
-    expect(html).toContain('<form action="/_kay/action/tests/fixtures/forms/src/routes/passed.kay/leave" method="post" enctype="multipart/form-data">')
-    expect(html).toContain('<form action="/_kay/action/tests/fixtures/forms/src/routes/passed.kay/rename" method="post" enctype="multipart/form-data">')
+    expect(html).toContain('<form action="/_kay/action/src/routes/passed.kay/leave" method="post" enctype="multipart/form-data">')
+    expect(html).toContain('<form action="/_kay/action/src/routes/passed.kay/rename" method="post" enctype="multipart/form-data">')
   })
 })
 
@@ -753,7 +753,7 @@ describe('a pending block under a strict style-src', () => {
   let strict: Awaited<ReturnType<typeof testSite>>
 
   beforeAll(async () => {
-    strict = await testSite({ routes: 'tests/fixtures/forms/src/routes', browser: true, security: { csp: { 'style-src': ['\'self\''] } } })
+    strict = await testSite({ root: 'tests/fixtures/forms', browser: true, security: { csp: { 'style-src': ['\'self\''] } } })
   }, 60_000)
 
   afterAll(async () => strict?.close())

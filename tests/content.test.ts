@@ -1,7 +1,7 @@
 import type { Collection } from '../src/content'
 import { mkdtemp, readdir, rm, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { Elysia, t } from 'elysia'
@@ -21,10 +21,9 @@ import { fixtureCopy } from './scratch'
 import { pages } from './shared-pages'
 
 const FIXTURE = 'tests/fixtures/content'
-const routes = `${FIXTURE}/src/routes`
-const content = `${FIXTURE}/src/content.config.ts`
+const content = 'src/content.config.ts'
 const SITE = 'https://blog.example'
-const app = new Elysia().use(await pages({ routes, content, prebuilt: false, security: false, site: SITE }))
+const app = new Elysia().use(await pages({ root: FIXTURE, content, prebuilt: false, security: false, site: SITE }))
 
 async function get(path: string): Promise<{ status: number, html: string, type: string | null }> {
   const response = await app.handle(new Request(`http://localhost${path}`))
@@ -41,7 +40,7 @@ describe('Markdown entries', () => {
     expect(html).toContain('<h2 id="getting-started"><a href="#getting-started">Getting started</a></h2>')
     expect(html).toContain('<aside class="callout warn">\n<p>Mind the <strong>gap</strong>.</p>\n</aside>')
     expect(html).toContain('<pre class="highlighted" data-language="ts">const less = 1 &lt; 2\n</pre>')
-    expect(html).toContain(`<slot data-component="tests/fixtures/content/src/components/counter.kay" data-props='[{"start":1},2]' data-chunk="${(/data-chunk="(counter-\w+\.js)"/).exec(html)![1]}"><button>Count <!--[-->2<!--]--></button></slot>`)
+    expect(html).toContain(`<slot data-component="src/components/counter.kay" data-props='[{"start":1},2]' data-chunk="${(/data-chunk="(counter-\w+\.js)"/).exec(html)![1]}"><button>Count <!--[-->2<!--]--></button></slot>`)
     expect(html).toMatch(/<link rel="modulepreload" href="\/_kay\/counter-[\w-]+\.js">/)
     expect((await get('/blog/missing')).status).toBe(404)
   })
@@ -54,11 +53,11 @@ describe('Markdown entries', () => {
   })
 
   it('read their frontmatter against the schema, defaults filled in and dates decoded', async () => {
-    const { posts } = await import(`../${content}`) as { posts: Collection<{ title: string, date: Date, tags: string[], draft?: boolean }> }
+    const { posts } = await import(resolve(FIXTURE, content)) as { posts: Collection<{ title: string, date: Date, tags: string[], draft?: boolean }> }
     const second = await posts.get('second')
 
     expect(second?.data).toEqual({ title: 'Second post', date: new Date('2026-09-15'), tags: [] })
-    expect(second?.file).toBe('tests/fixtures/content/src/content/posts/second.md')
+    expect(second?.file).toBe('src/content/posts/second.md')
     // A draft only shows in `kay dev`.
     expect((await posts.all()).map(post => post.slug)).toEqual(['second', 'hello'])
     expect(await posts.get('draft')).toBeUndefined()
@@ -68,7 +67,7 @@ describe('Markdown entries', () => {
     const previous = process.env.NODE_ENV
     const draftStatus = async (env: string, dev: boolean) => {
       process.env.NODE_ENV = env
-      const served = await pages({ routes, content, prebuilt: false, dev, security: false, site: SITE })
+      const served = await pages({ root: FIXTURE, content, prebuilt: false, dev, security: false, site: SITE })
 
       return (await served.handle(new Request('http://localhost/blog/draft'))).status
     }
@@ -90,7 +89,7 @@ describe('Markdown entries', () => {
 
 describe('the content mode', () => {
   it('asks the loaders for their preview in development, reads the build\'s entries when prebuilt, and goes back to NODE_ENV as its server stops', async () => {
-    const root = process.cwd()
+    const root = resolve(FIXTURE)
     const asked: boolean[] = []
     const probe = (name: string) => collection({ name, load: ({ preview }) => {
       asked.push(preview)
@@ -112,7 +111,7 @@ describe('the content mode', () => {
       setContentMode({ dev: false, prebuilt: true })
       expect(await authors()).toEqual(['Built'])
 
-      const served = await pages({ routes, content, prebuilt: false, dev: true, security: false, log: false, site: SITE })
+      const served = await pages({ root: FIXTURE, content, prebuilt: false, dev: true, security: false, log: false, site: SITE })
 
       expect(contentMode().dev).toBe(true)
       served.listen(0)
@@ -296,18 +295,18 @@ describe('feeds', () => {
   })
 
   it('need the site\'s URL, and a content config kay.config.ts names must exist', async () => {
-    await expect(pages({ routes, content: 'tests/fixtures/content/src/missing.config.ts', prebuilt: false })).rejects.toThrow('names tests/fixtures/content/src/missing.config.ts as the content config, and there is no such file')
-    await expect(pages({ routes, content, prebuilt: false })).rejects.toThrow('has a feed, whose links need the site\'s URL')
+    await expect(pages({ root: FIXTURE, content: 'src/missing.config.ts', prebuilt: false })).rejects.toThrow('names src/missing.config.ts as the content config, and there is no such file')
+    await expect(pages({ root: FIXTURE, content, prebuilt: false })).rejects.toThrow('has a feed, whose links need the site\'s URL')
   })
 })
 
 describe('prerendering a collection', () => {
   it('renders a page for every entry of the collection it exports as prerender, from what kay build compiled', async () => {
-    const build = await scratchBuild({ routes, content })
+    const build = await scratchBuild({ content }, false, resolve(FIXTURE))
 
     try {
-      expect(await writeContentManifests(process.cwd(), build.dir, content)).toBe(5)
-      expect(await build.prerender({ routes, content })).toBe(2)
+      expect(await writeContentManifests(resolve(FIXTURE), build.dir, content)).toBe(5)
+      expect(await build.prerender({ content })).toBe(2)
       expect(await Bun.file(join(build.pages, 'blog/hello.html')).text()).toContain('<h1 class="title">Hello world</h1>')
       expect(await Bun.file(join(build.pages, 'blog/draft.html')).exists()).toBe(false)
     }
@@ -551,7 +550,7 @@ describe('compiling Markdown', () => {
       await expect(collection('.', { schema: t.Object({}) }).all()).rejects.toThrow(/has the slug guides, as .*guides.* does; rename one/)
     }
     finally {
-      setContentPlace(process.cwd(), join(process.cwd(), FIXTURE, 'src'))
+      setContentPlace(resolve(FIXTURE), resolve(FIXTURE, 'src'))
       await rm(dir, { recursive: true, force: true })
     }
   })
@@ -580,7 +579,7 @@ describe('compiling Markdown', () => {
       expect(highlighted).toBe(3)
     }
     finally {
-      setContentPlace(process.cwd(), join(process.cwd(), FIXTURE, 'src'))
+      setContentPlace(resolve(FIXTURE), resolve(FIXTURE, 'src'))
       await rm(dir, { recursive: true, force: true })
     }
   })
@@ -588,7 +587,7 @@ describe('compiling Markdown', () => {
 
 describe('Markdown entries\' length', () => {
   it('counts the words of the rendered text, components\' own output left out, and reads them at 230 a minute', async () => {
-    const { posts } = await import(`../${content}`) as { posts: Collection<{ title: string }> }
+    const { posts } = await import(resolve(FIXTURE, content)) as { posts: Collection<{ title: string }> }
     const hello = await posts.get('hello')
 
     // Headings and paragraphs count, the code's symbols and the Counter and Callout elements do not; the Callout's Markdown does.
@@ -739,7 +738,7 @@ describe('Markdown outside collections', () => {
       expect(await loaded()).toContain('data-by="new"')
     }
     finally {
-      setContentPlace(process.cwd(), join(process.cwd(), FIXTURE, 'src'))
+      setContentPlace(resolve(FIXTURE), resolve(FIXTURE, 'src'))
       await rm(dir, { recursive: true, force: true })
     }
   })

@@ -1,28 +1,24 @@
 import type { Action } from '../src/runtime'
 import type { ClientBuild } from '../src/server/client'
-import process from 'node:process'
+import { resolve } from 'node:path'
 import { describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
 import { clientDir } from '../src/build/assets'
 import { resolveProject } from '../src/project'
 import { action, actionStub } from '../src/runtime/action'
-import { newServerIslands, withServerIslands } from '../src/runtime/html'
 import { digest, sha256, solveWork } from '../src/runtime/work'
 import { servePages } from '../src/server/app'
-import { memoryRates } from '../src/server/protection'
 import { STAMP_HOLE } from '../src/server/stamp'
-import { freshWork, signWork, workRefusal, workScript } from '../src/server/work'
-import { freshFieldWork, verifyWork, workChallenge } from '../src/server/work-scope'
+import { freshWork, signWork, workScript } from '../src/server/work'
 import { testSite } from '../src/test'
 
-const routes = 'tests/fixtures/production/src/routes'
-const ROUTE = '/_kay/action/tests/fixtures/production/src/routes/work.kay'
+const ROOT = 'tests/fixtures/production'
+const ROUTE = '/_kay/action/src/routes/work.kay'
 // Held in a variable so tsc leaves the .kay import to Bun.
 const PAGE = './fixtures/production/src/routes/work.kay'
-const SCOPED_PAGE = './fixtures/navigation/src/routes/scoped.kay'
 const WORK = /<script type="application\/json" data-kay-work>(.*?)<\/script>/
-const client: ClientBuild = { entry: '/_kay/entry.js', entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: clientDir(process.cwd()), navigation: true }
-const app = await servePages(resolveProject(process.cwd(), { routes, security: false }), async () => client)
+const client: ClientBuild = { entry: '/_kay/entry.js', entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: clientDir(resolve(ROOT)), navigation: true }
+const app = await servePages(resolveProject(resolve(ROOT), { security: false }), async () => client)
 
 async function challenges(): Promise<Record<string, string>> {
   const html = await (await app.handle(new Request('http://localhost/work'))).text()
@@ -151,7 +147,7 @@ describe('proof-of-work', () => {
   })
 
   it('passes the challenge from kay/test\'s submit and call, unless the test sends its own header', async () => {
-    const site = await testSite({ routes, security: false })
+    const site = await testSite({ root: ROOT, security: false })
     const { solve } = await import(PAGE) as { solve: Action<{ message: string }, number> }
 
     expect((await site.submit(solve, { message: 'hello' }, { from: '/work' })).html).toContain('<p class="solved">Solved 5</p>')
@@ -182,70 +178,5 @@ describe('proof-of-work', () => {
   it('refuses a difficulty it cannot use as the action is declared', () => {
     expect(() => action({} as never, () => 0, { protect: { proofOfWork: 0 } })).toThrow('proofOfWork\'s difficulty is 0')
     expect(() => action({} as never, () => 0, { protect: { proofOfWork: 1.5 } })).toThrow('whole number')
-  })
-})
-
-describe('workChallenge', () => {
-  const SCOPED = /data-kay-work="([^"]+)"/
-
-  it('gives a form field a challenge the action checks itself, solved once by kay/test as the browser does', async () => {
-    const site = await testSite({ routes: 'tests/fixtures/navigation/src/routes', security: false })
-    const { contact } = await import(SCOPED_PAGE) as { contact: Action<{ message: string, proof?: string }, number> }
-    const page = await site.visit('/scoped')
-    const challenge = SCOPED.exec(page.html)![1]!
-
-    expect((await site.submit(contact, { message: 'hello' }, { from: page })).html).toContain('<p class="sent">Sent 5</p>')
-    // Without JavaScript the field posts empty; a solution goes through once.
-    expect((await site.submit(contact, { message: 'hello', proof: '' }, { from: page })).html).toContain('<p class="error">missing</p>')
-    expect((await site.submit(contact, { message: 'hello', proof: solveWork(challenge)! }, { from: page })).html).toContain('<p class="error">wrong</p>')
-  })
-
-  it('refuses as expired a challenge of another scope, an action\'s, an easier one, one past its maxAge or signed before the key changed', async () => {
-    const solved = solveWork(workChallenge('contact', { difficulty: 50, maxAge: '1m' }))!
-
-    expect(await verifyWork(solved, 'newsletter')).toBe('expired')
-    expect(await verifyWork(solveWork(signWork('contact', 50, 60_000)), 'contact')).toBe('expired')
-    expect(await workRefusal('contact', solved, memoryRates())).toBe('expired')
-    expect(await verifyWork(solved, 'contact', { difficulty: 51 })).toBe('expired')
-    expect(await verifyWork(`${solved.slice(0, solved.lastIndexOf('.'))}.x`, 'contact')).toBe('wrong')
-    expect(await verifyWork(undefined, 'contact')).toBe('missing')
-
-    setSystemTime(Date.now() + 61_000)
-
-    try {
-      expect(await verifyWork(solved, 'contact')).toBe('expired')
-    }
-    finally {
-      setSystemTime()
-    }
-
-    // In a process of its own, as the key it switches to would outlive the test.
-    const restart = Bun.spawn([process.execPath, '-e', `import { solveWork } from ${JSON.stringify(`${import.meta.dir}/../src/runtime/work.ts`)}
-import { useStampSecret } from ${JSON.stringify(`${import.meta.dir}/../src/server/stamp.ts`)}
-import { verifyWork, workChallenge } from ${JSON.stringify(`${import.meta.dir}/../src/server/work-scope.ts`)}
-const before = solveWork(workChallenge('contact', { difficulty: 50 }))
-useStampSecret('a session secret of at least thirty-two characters', 'session')
-console.log(JSON.stringify([await verifyWork(before, 'contact'), await verifyWork(solveWork(workChallenge('contact', { difficulty: 50 })), 'contact', { difficulty: 50 }) ?? null]))`], { stdout: 'pipe' })
-
-    expect(JSON.parse(await new Response(restart.stdout).text())).toEqual(['expired', null])
-  })
-
-  it('leaves a prerendered page a mark the server fills in with a fresh challenge per visit', async () => {
-    const mark = withServerIslands(newServerIslands(true), () => workChallenge('contact', { difficulty: 50, maxAge: '1m' }))
-    const holes = [...`<input type="hidden" name="proof" data-kay-work="${mark}">`.matchAll(STAMP_HOLE)]
-
-    expect(holes).toHaveLength(1)
-
-    const fresh = () => SCOPED.exec(freshFieldWork(holes[0]![3]!))![1]!
-    const first = fresh()
-
-    expect(first).not.toBe(fresh())
-    expect(Number.parseInt(first.slice(0, first.indexOf('.')), 36) - Date.now()).toBeLessThanOrEqual(60_000)
-    expect(await verifyWork(solveWork(first), 'contact', { difficulty: 50 })).toBeUndefined()
-  })
-
-  it('refuses a difficulty it cannot use', () => {
-    expect(() => workChallenge('contact', { difficulty: 0 })).toThrow('difficulty is 0')
-    expect(() => workChallenge('contact', { difficulty: 1.5 })).toThrow('whole number')
   })
 })

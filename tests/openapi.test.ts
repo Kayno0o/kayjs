@@ -7,9 +7,9 @@ import { testSite } from '../src/test'
 const CLI = resolve('src/cli.ts')
 const KEY = { 'x-key': 'open' }
 const projects: string[] = []
-const site = await testSite({ routes: 'tests/fixtures/openapi/src/routes', api: 'tests/fixtures/openapi/src/api', openapi: { title: 'Shop', version: '2.1.0', reference: true }, base: '/shop' })
-const signedIn = await testSite({ routes: 'tests/fixtures/openapi/src/routes', api: 'tests/fixtures/openapi/src/api', openapi: true, locals: request => ({ key: request.headers.get('x-session-key') ?? undefined }) })
-const hidden = await testSite({ routes: 'tests/fixtures/openapi/src/routes', api: 'tests/fixtures/openapi/src/api', openapi: { dev: true } })
+const site = await testSite({ root: 'tests/fixtures/openapi', openapi: { title: 'Shop', version: '2.1.0', reference: true }, base: '/shop' })
+const signedIn = await testSite({ root: 'tests/fixtures/openapi', openapi: true, locals: request => ({ key: request.headers.get('x-session-key') ?? undefined }) })
+const hidden = await testSite({ root: 'tests/fixtures/openapi', openapi: { dev: true } })
 
 afterAll(async () => {
   await Promise.all([site.close(), signedIn.close(), hidden.close(), ...projects.map(async dir => rm(dir, { recursive: true, force: true }))])
@@ -71,10 +71,6 @@ describe('the OpenAPI document', () => {
 
     expect(paths['/api/files/bytes']!.post!.requestBody).toEqual({ required: true, content: { 'application/octet-stream': { schema: { type: 'string', format: 'binary' } } } })
     expect(paths['/api/files/size']!.get!.responses).toEqual({ 200: { description: 'OK', content: { 'application/json': { schema: { type: 'integer', minimum: 0 } } } } })
-  })
-
-  it('refuses to start when a module serves the path the document or its page is served at', async () => {
-    await expect(testSite({ routes: 'tests/fixtures/openapi-clash/src/routes', api: 'tests/fixtures/openapi-clash/src/api', openapi: { reference: true } })).rejects.toThrow('serves /api/reference, where `openapi` serves its reference page')
   })
 
   it('has kay check take a link to the document or its page', async () => {

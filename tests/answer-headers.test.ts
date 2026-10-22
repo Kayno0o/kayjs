@@ -49,11 +49,12 @@ describe('the headers of every kind of answer', () => {
   let asset: string
   let action: string
   let page: string
+  let dir: string
 
   beforeAll(async () => {
-    const dir = await fixtureCopy('answers')
+    dir = await fixtureCopy('answers')
 
-    app = await pages({ routes: `${dir}/src/routes`, api: `${dir}/src/api`, prebuilt: false, log: false, compress: true, storage: memoryFiles() })
+    app = await pages({ root: dir, prebuilt: false, log: false, compress: true, storage: memoryFiles() })
     key = await files.put(new File([new Uint8Array(2000)], 'a.png', { type: 'image/png' }))
 
     const first = await app.handle(new Request(`${ORIGIN}/`))
@@ -173,9 +174,8 @@ describe('the headers of every kind of answer', () => {
   })
 
   it('hands Elysia the response the route made, with no copy of it', async () => {
-    const dir = await fixtureCopy('answers')
     let made = Promise.withResolvers<unknown>()
-    const inner = await pages({ routes: `${dir}/src/routes`, api: `${dir}/src/api`, prebuilt: false, log: false, compress: false, storage: memoryFiles() })
+    const inner = await pages({ root: dir, prebuilt: false, log: false, compress: false, storage: memoryFiles() })
     const stored = await files.put(new File([new Uint8Array(2000)], 'b.png', { type: 'image/png' }))
     const outer = new Elysia().onAfterResponse({ as: 'global' }, ({ responseValue }) => {
       made.resolve(responseValue)
@@ -208,7 +208,7 @@ describe('the headers of every kind of answer', () => {
 
   it('keeps them on a file route whose store throws', async () => {
     const store = memoryFiles()
-    const broken = await pages({ routes: `${await fixtureCopy('answers')}/src/routes`, prebuilt: false, log: false, storage: { ...store, read: async () => {
+    const broken = await pages({ root: await fixtureCopy('answers'), prebuilt: false, log: false, storage: { ...store, read: async () => {
       throw new Error('store down')
     } } })
     const response = await broken.handle(new Request(`${ORIGIN}/_kay/files/0123456789abcdef0123.png`))
@@ -223,7 +223,7 @@ describe('the headers of every kind of answer', () => {
 describe('HSTS on every kind of answer of an https site', () => {
   it('reaches the pages, build assets, stored files, their errors and the API', async () => {
     const dir = await fixtureCopy('answers')
-    const app = await pages({ routes: `${dir}/src/routes`, api: `${dir}/src/api`, prebuilt: false, log: false, site: 'https://shop.example', dev: false, storage: memoryFiles() })
+    const app = await pages({ root: dir, prebuilt: false, log: false, site: 'https://shop.example', dev: false, storage: memoryFiles() })
     const key = await files.put(new File([new Uint8Array(2000)], 'a.png', { type: 'image/png' }))
     const html = await (await app.handle(new Request(`${ORIGIN}/`))).text()
     const asset = (/\/_kay\/entry-[^"]+\.js/).exec(html)![0]

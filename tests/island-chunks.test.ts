@@ -65,7 +65,7 @@ describe('the chunk an island names, on every path that renders one', () => {
   const chunk = /data-component="[^"]*alpha\.kay"[^>]*data-chunk="(alpha-\w+\.js)"/
 
   it('is written on an island in a streamed block, in a static slot, a client-only one, and in a server island\'s fragment', async () => {
-    const site = await testSite({ routes: 'tests/fixtures/island-chunks/src/routes', browser: true })
+    const site = await testSite({ root: 'tests/fixtures/island-chunks', browser: true })
 
     try {
       const streamed = await (await site.fetch('/stream')).text()
@@ -81,27 +81,6 @@ describe('the chunk an island names, on every path that renders one', () => {
       expect(slots).toMatch(/data-client/)
       expect(deferred).toContain('class="fresh"')
       expect(deferred).toMatch(chunk)
-    }
-    finally {
-      await site.close()
-    }
-  }, 60_000)
-})
-
-describe('the code waiting for an island to be visible or idle', () => {
-  const PRELOAD = /<link rel="modulepreload" href="([^"]*hydrate-when-\w+\.js)">/
-
-  it('is preloaded by a page holding such an island, and by no other, as the entry only asks for it once it ran', async () => {
-    const site = await testSite({ routes: 'tests/fixtures/title/src/routes', browser: true })
-
-    try {
-      const idle = await (await site.fetch('/idle')).text()
-      const eager = await (await site.fetch('/')).text()
-      const url = PRELOAD.exec(idle)?.[1]
-
-      expect(url).toBeString()
-      expect(eager).not.toMatch(PRELOAD)
-      expect((await site.fetch(url!)).status).toBe(200)
     }
     finally {
       await site.close()

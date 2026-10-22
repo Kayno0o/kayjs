@@ -34,8 +34,8 @@ export interface ScratchBuild {
 
 // The build is the file's shared one for `config` (`tests/shared-pages.ts`), as the test files' own servers no longer build into the default output.
 // `manifestOnly` leaves the client build's files out, for a prerender refused before it reads any.
-export async function scratchBuild(config: KayConfig = {}, manifestOnly = false): Promise<ScratchBuild> {
-  const root = process.cwd()
+// `root` is the project it builds, the checkout by default.
+export async function scratchBuild(config: KayConfig = {}, manifestOnly = false, root = process.cwd()): Promise<ScratchBuild> {
   const source = projectSource()
   const mode = modeOf({ prebuilt: false })
   const built = dirname((await sharedClient(root, clientOptionsOf(await source.config(root, config), mode))).dir)
@@ -98,12 +98,12 @@ export interface Prerendered extends ScratchBuild {
 }
 
 // The routes prerendered once for a describe's tests, which read that one render through `serve` and the files under `pages`; a test changing the render goes through `keeping`.
-export function prerendered(config: KayConfig, client: (built: ClientBuild) => ClientBuild = built => built): Prerendered {
+export function prerendered(config: KayConfig, client: (built: ClientBuild) => ClientBuild = built => built, root = process.cwd()): Prerendered {
   let count = 0
   let build: ScratchBuild | undefined
 
   beforeAll(async () => {
-    build = await scratchBuild(config)
+    build = await scratchBuild(config, false, root)
     count = await build.prerender(config, undefined, client(await build.client()))
   })
 
@@ -127,8 +127,8 @@ export function prerendered(config: KayConfig, client: (built: ClientBuild) => C
 }
 
 // A prerender a test expects refused, which throws before it writes the manifest or reads the build's files: only the manifest is copied.
-export async function refusedPrerender(config: KayConfig, client: ClientBuild, options?: PrerenderOptions): Promise<number> {
-  const build = await scratchBuild(config, true)
+export async function refusedPrerender(config: KayConfig, client: ClientBuild, options?: PrerenderOptions, root = process.cwd()): Promise<number> {
+  const build = await scratchBuild(config, true, root)
 
   try {
     return await build.prerender(config, options, client)

@@ -17,7 +17,7 @@ async function closesPromptly(close: () => Promise<void>): Promise<void> {
 
 describe('testSite close with connections the site opened', () => {
   it('closes with a socket left open', async () => {
-    const site = await testSite({ api })
+    const site = await testSite({ root: fixture, api })
     const room = site.socket(chat, '/:room', { params: { room: 'open' } })
 
     room.send({ text: 'hi' })
@@ -27,7 +27,7 @@ describe('testSite close with connections the site opened', () => {
   })
 
   it('closes right after the sockets were closed, one of them before it connected', async () => {
-    const site = await testSite({ api })
+    const site = await testSite({ root: fixture, api })
     const first = site.socket(chat, '/:room', { params: { room: 'a' } })
     const second = site.socket(chat, '/:room', { params: { room: 'b' } })
     const early = site.socket(chat, '/:room', { params: { room: 'c' } })
@@ -43,7 +43,7 @@ describe('testSite close with connections the site opened', () => {
   })
 
   it('does not reconnect a socket the server dropped once the site closed', async () => {
-    const site = await testSite({ api })
+    const site = await testSite({ root: fixture, api })
     const room = site.socket(chat, '/:room', { params: { room: 'flaky' } })
 
     room.send({ text: 'drop' })
@@ -56,7 +56,7 @@ describe('testSite close with connections the site opened', () => {
   })
 
   it('closes with a stream left reading', async () => {
-    const site = await testSite({ api })
+    const site = await testSite({ root: fixture, api })
     const ticks = site.stream(chat, '/forever')
 
     await ticks.next()
@@ -65,7 +65,7 @@ describe('testSite close with connections the site opened', () => {
   })
 
   it('closes a site under a base with a socket and a stream open', async () => {
-    const site = await testSite({ api, base: '/blog' })
+    const site = await testSite({ root: fixture, api, base: '/blog' })
     const room = site.socket(chat, '/:room', { params: { room: 'based' } })
     const ticks = site.stream(chat, '/forever')
 
@@ -76,7 +76,7 @@ describe('testSite close with connections the site opened', () => {
   })
 
   it('closes a site with browser: true with a socket open', async () => {
-    const site = await testSite({ api, browser: true })
+    const site = await testSite({ root: fixture, api, browser: true })
     const room = site.socket(chat, '/:room', { params: { room: 'browser' } })
 
     room.send({ text: 'hi' })
@@ -85,7 +85,7 @@ describe('testSite close with connections the site opened', () => {
   })
 
   it('closes twice', async () => {
-    const site = await testSite({ api })
+    const site = await testSite({ root: fixture, api })
 
     await site.close()
     await site.close()

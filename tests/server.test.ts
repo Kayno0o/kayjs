@@ -19,7 +19,7 @@ import { ActionError } from '../src/runtime'
 import { currentPage } from '../src/runtime/html'
 import { inlineScriptHashes } from '../src/server'
 import { crossSiteResponse } from '../src/server/actions'
-import { chooseInlineStyles, INLINE_LIMIT, readClient, readInlineStyles, readManifest } from '../src/server/client'
+import { chooseInlineStyles, INLINE_LIMIT, readInlineStyles, readManifest } from '../src/server/client'
 import { compressFiles, preferredEncoding } from '../src/server/compress'
 import { requestCookies } from '../src/server/cookies'
 import { sourceHash } from '../src/server/csp'
@@ -196,7 +196,7 @@ describe('pages', () => {
   })
 
   it('links the stylesheets of a page whose together compress past the limit, and inlines those of a page below it', async () => {
-    const scratch = await scratchBuild({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public' })
+    const scratch = await scratchBuild({}, false, resolve('tests/fixtures/site'))
 
     try {
       const client = await scratch.client()
@@ -208,7 +208,7 @@ describe('pages', () => {
 
       await Bun.write(file, `${await Bun.file(file).text()}\n/* ${noise} */`)
       for (const base of [undefined, '/docs']) {
-        const served = await scratch.serve({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public', base, compress: true })
+        const served = await scratch.serve({ base, compress: true })
         const page = async (path: string) => (await served.handle(new Request(`http://localhost${path}`))).text()
         const long = await page('/')
         const short = await page('/about')
@@ -225,7 +225,7 @@ describe('pages', () => {
   })
 
   it('inlines the stylesheets of a page that compress to exactly the limit together, and links them one byte over', async () => {
-    const scratch = await scratchBuild({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public' })
+    const scratch = await scratchBuild({}, false, resolve('tests/fixtures/site'))
     // Base 36 digits of an LCG's high bits, which gzip cannot shrink much below their entropy; the length is searched until the gzip lands on the target exactly.
     const padding = (base: string, target: number): string => {
       for (let seed = 1; seed < 200; seed++) {
@@ -267,7 +267,7 @@ describe('pages', () => {
 
         expect(Bun.gzipSync(sheets.get(home)!).length + layout).toBe(INLINE_LIMIT + extra)
 
-        const served = await scratch.serve({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public', compress: false })
+        const served = await scratch.serve({ compress: false })
         const html = await (await served.handle(new Request('http://localhost/'))).text()
 
         expect(html.includes('<style>'), `${INLINE_LIMIT + extra} bytes together`).toBe(inlined)
@@ -829,10 +829,11 @@ describe('route params in guards and actions', () => {
   })
 
   it('reads the client build under the project\'s output directory, not the checkout\'s', async () => {
-    const build = await scratchBuild()
+    const root = resolve('tests/fixtures/bare')
+    const build = await scratchBuild({}, false, root)
 
     try {
-      const project = resolveProject(process.cwd(), {})
+      const project = resolveProject(root, {})
       const read = await projectSource().client({ ...project, paths: { ...project.paths, output: build.dir } })
 
       expect(read.dir).toBe(join(build.dir, 'dist'))
@@ -843,7 +844,7 @@ describe('route params in guards and actions', () => {
   })
 
   it('gives a prerendered page\'s guards its params', async () => {
-    const build = await scratchBuild({ routes: dir })
+    const build = await scratchBuild({ routes: dir }, false, dirname(dir))
 
     try {
       await build.prerender({ routes: dir })
@@ -1150,15 +1151,15 @@ describe('await blocks', () => {
 
 describe('prerendering', () => {
   const routes = 'tests/fixtures/site/src/routes'
-  const root = process.cwd()
-  const build = prerendered({ routes })
+  const root = resolve('tests/fixtures/site')
+  const build = prerendered({}, undefined, root)
 
   it('renders the pages marked prerender once at build time and serves them behind their guards', async () => {
     // The four that mark prerender or reach a server island, and the two that read nothing from a request.
     expect(build.count()).toBe(6)
 
     const file = await Bun.file(join(build.pages, 'admin/report.html')).text()
-    const signedIn = new Elysia().use(auth).use(await build.serve({ routes, publicDir: 'tests/fixtures/site/public' }))
+    const signedIn = new Elysia().use(auth).use(await build.serve({}))
     const visit = async (user: string, headers: Record<string, string> = {}) => signedIn.handle(new NativeRequest('http://localhost/admin/report', { headers: { 'x-user': user, ...headers } }))
     const served = await visit('ada')
     const etag = served.headers.get('etag')!
@@ -1174,12 +1175,12 @@ describe('prerendering', () => {
 
   it('prerenders the pages with their small stylesheets inlined by default and linked with inlineStyles: false', async () => {
     await build.keeping(async () => {
-      await build.prerender({ routes })
+      await build.prerender({})
       const inlined = await Bun.file(join(build.pages, 'admin/report.html')).text()
 
       expect(inlined).toContain('<style>')
       expect(inlined).not.toContain('rel="stylesheet"')
-      await build.prerender({ routes, inlineStyles: false })
+      await build.prerender({ inlineStyles: false })
       const linked = await Bun.file(join(build.pages, 'admin/report.html')).text()
 
       expect(linked).toContain('rel="stylesheet"')
@@ -1189,7 +1190,7 @@ describe('prerendering', () => {
 
   it('writes the stylesheets into the pages it prerenders with inlineStyles', async () => {
     await build.keeping(async () => {
-      await build.prerender({ routes, inlineStyles: true })
+      await build.prerender({ inlineStyles: true })
       const file = await Bun.file(join(build.pages, 'admin/report.html')).text()
 
       expect(file).toContain('<style>')
@@ -1199,7 +1200,7 @@ describe('prerendering', () => {
   })
 
   it('renders a dynamic route for each params its prerender export lists, and the others per request', async () => {
-    const served = new Elysia().use(await build.serve({ routes, publicDir: 'tests/fixtures/site/public' }))
+    const served = new Elysia().use(await build.serve({}))
     const visit = async (path: string) => {
       const response = await served.handle(new NativeRequest(`http://localhost${path}`))
 
@@ -1224,7 +1225,7 @@ describe('prerendering', () => {
 
     try {
       await Promise.all([compressFiles(client.dir), compressFiles(prerenderedDir)])
-      const served = new Elysia().use(await build.serve({ routes, publicDir: 'tests/fixtures/site/public' }))
+      const served = new Elysia().use(await build.serve({}))
       const fetch = async (path: string, headers: Record<string, string> = {}) => served.handle(new NativeRequest(`http://localhost${path}`, { headers }))
       const plain = await fetch(manifest.entry!)
       const brotli = await fetch(manifest.entry!, { 'accept-encoding': 'gzip, deflate, br, zstd' })
@@ -1268,7 +1269,7 @@ describe('prerendering', () => {
       expect(await (await fetch('/docs/guide/intro')).text()).toBe(file)
       expect(new TextDecoder().decode(Bun.gunzipSync(await (await fetch('/docs/guide/intro', { 'accept-encoding': 'gzip' })).bytes()))).toBe(file)
 
-      const signedIn = new Elysia().use(auth).use(await build.serve({ routes, publicDir: 'tests/fixtures/site/public' }))
+      const signedIn = new Elysia().use(auth).use(await build.serve({}))
       const report = await signedIn.handle(new NativeRequest('http://localhost/admin/report', { headers: { 'x-user': 'ada', 'accept-encoding': 'br' } }))
 
       expect(report.headers.get('content-encoding')).toBe('br')
@@ -1344,7 +1345,7 @@ describe('prerendering', () => {
         await Promise.all(Object.entries(files).map(async ([file, source]) => Bun.write(join(dir, file), source)))
 
         // The one render that goes through writes the manifest, so it is put back after; a refused one throws before.
-        const rendering = typeof outcome === 'number' ? build.keeping(async () => build.prerender({ routes: dir, ...config })) : refusedPrerender({ routes: dir, ...config }, (await readClient(root))!)
+        const rendering = typeof outcome === 'number' ? build.keeping(async () => build.prerender({ routes: dir, ...config })) : refusedPrerender({ routes: dir, ...config }, await build.client(), undefined, root)
 
         if (typeof outcome === 'number')
           expect(await rendering).toBe(outcome)
@@ -1366,7 +1367,7 @@ describe('prerendering', () => {
 
     try {
       const account = (await scanRoutes(join(process.cwd(), routes))).find(route => route.pattern === '/account')!
-      const response = await renderPage({ ...account, guards: [] }, { request: new Request('http://localhost/account') }, {}, (await readClient(process.cwd()))!, { prerendering: true })
+      const response = await renderPage({ ...account, guards: [] }, { request: new Request('http://localhost/account') }, {}, await build.client(), { prerendering: true })
 
       expect(response.status).toBe(500)
       expect(logged).toHaveBeenCalledWith(expect.stringContaining('a prerendered page renders once, at build time, so it has no ctx.locals'))

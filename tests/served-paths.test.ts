@@ -61,12 +61,12 @@ describe('served paths', () => {
 
   it('refuses a public file at a path a page serves in a locale, and one a redirect takes', async () => {
     const dir = await scratchDir('served-public-')
-    const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' }
+    const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') }
 
     await Bun.write(join(dir, 'en/about'), 'shadowed')
     await Bun.write(join(dir, 'old'), 'moved')
-    await expect(pages({ routes: 'tests/fixtures/i18n/src/routes', publicDir: dir, prebuilt: false, i18n })).rejects.toThrow('and a page both serve /en/about')
-    await expect(pages({ routes: 'tests/fixtures/site/src/routes', publicDir: dir, prebuilt: false, redirects: { '/old': '/about' } })).rejects.toThrow('/old and the redirect from /old both serve /old; remove one')
+    await expect(pages({ root: 'tests/fixtures/i18n', publicDir: dir, prebuilt: false, i18n })).rejects.toThrow('and a page both serve /en/about')
+    await expect(pages({ root: 'tests/fixtures/site', publicDir: dir, prebuilt: false, redirects: { '/old': '/about' } })).rejects.toThrow('/old and the redirect from /old both serve /old; remove one')
   })
 
   it('serves a public file at a path an HTML file or a translated page only offered', async () => {
@@ -81,7 +81,7 @@ describe('served paths', () => {
       Bun.write(join(publicDir, 'about'), 'about file'),
     ])
 
-    const app = await pages({ routes, publicDir, prebuilt: false, redirects: { '/old': '/' }, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages', paths: { '/about': { fr: '/a-propos' } } } })
+    const app = await pages({ root: dir, routes: 'routes', publicDir, prebuilt: false, redirects: { '/old': '/' }, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/i18n/src/messages'), paths: { '/about': { fr: '/a-propos' } } } })
     const visit = async (path: string) => app.handle(new Request(`http://localhost${path}`))
 
     expect((await visit('/old')).headers.get('location')).toBe('/')

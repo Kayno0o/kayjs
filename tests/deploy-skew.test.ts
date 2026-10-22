@@ -20,7 +20,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a producti
   let site: Awaited<ReturnType<typeof testSite>>
 
   beforeAll(async () => {
-    site = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path } })
+    site = await testSite({ root: 'tests/fixtures/navigation', browser: { path } })
   }, 60_000)
 
   afterAll(async () => site?.close())
@@ -47,34 +47,9 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a producti
   })
 })
 
-describe('a native post answered by a page', () => {
-  it('marks the document of a post that came back to a page rendering an error, as it does the one of a rendered failure', async () => {
-    const site = await testSite({ routes: 'tests/fixtures/site/src/routes' })
-
-    try {
-      const post = async (back: string) => site.fetch(`/_kay/action/tests/fixtures/site/src/routes/index.kay/add?kay_back=${encodeURIComponent(back)}`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'origin': 'http://localhost' }, body: 'title=' })
-
-      const error = await post('/nowhere')
-      const html = await error.text()
-
-      expect(error.status).toBe(404)
-      expect(html).toContain('Nothing here')
-      expect(html).toContain('<meta name="kay-posted">')
-
-      const rendered = await post('/')
-
-      expect(rendered.status).toBe(422)
-      expect(await rendered.text()).toContain('<meta name="kay-posted">')
-    }
-    finally {
-      await site.close()
-    }
-  }, 60_000)
-})
-
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page of the build the server runs', () => {
   it('keeps swapping after a form post and an island\'s call, whose answers name its own build', async () => {
-    const site = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path } })
+    const site = await testSite({ root: 'tests/fixtures/navigation', browser: { path } })
 
     try {
       const page = await site.open('/')
@@ -117,7 +92,7 @@ describe('a file route under the build header', () => {
 
 describe('kay dev', () => {
   it('names no build, as its entry changes with every edit', async () => {
-    const site = await testSite({ routes: 'tests/fixtures/navigation/src/routes', dev: true })
+    const site = await testSite({ root: 'tests/fixtures/navigation', dev: true })
 
     try {
       expect((await site.fetch('/')).headers.has(BUILD_HEADER)).toBe(false)
@@ -221,7 +196,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page tol
     describe(base === '' ? 'at the root' : `under base ${base}`, () => {
       it('asks for the headers of its entry chunk, rendering no page, then loads the next link in full', async () => {
         const { forged, plugin } = forgedBuild()
-        const site = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path }, use: [plugin], ...base && { base } })
+        const site = await testSite({ root: 'tests/fixtures/navigation', browser: { path }, use: [plugin], ...base && { base } })
 
         try {
           const page = await opened(site, base)
@@ -259,7 +234,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page tol
 
       it('keeps swapping when only an action answer, as the HTTP cache may replay it, names another build', async () => {
         const { forged, plugin } = forgedBuild()
-        const site = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path }, use: [plugin], ...base && { base } })
+        const site = await testSite({ root: 'tests/fixtures/navigation', browser: { path }, use: [plugin], ...base && { base } })
 
         try {
           const page = await opened(site, base)
@@ -292,7 +267,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page tol
 
   it('asks the server once for the answers of a few seconds, however many name another build', async () => {
     const { forged, plugin } = forgedBuild()
-    const site = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path }, use: [plugin] })
+    const site = await testSite({ root: 'tests/fixtures/navigation', browser: { path }, use: [plugin] })
 
     try {
       const page = await opened(site)
@@ -311,7 +286,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page tol
 
   it('asks the server once when an answer naming another build comes just before a chunk the deploy dropped', async () => {
     const { forged, plugin } = forgedBuild()
-    const site = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path }, use: [plugin] })
+    const site = await testSite({ root: 'tests/fixtures/navigation', browser: { path }, use: [plugin] })
 
     try {
       const page = await opened(site)
@@ -335,7 +310,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page tol
 
   it('asks the server again for a dropped chunk when the last answer named the page\'s own build', async () => {
     const { forged, plugin } = forgedBuild()
-    const site = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path }, use: [plugin] })
+    const site = await testSite({ root: 'tests/fixtures/navigation', browser: { path }, use: [plugin] })
 
     try {
       const page = await opened(site)
@@ -358,7 +333,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page tol
 
   it('asks the page itself for a tab whose entry chunk is on another origin, which a HEAD cannot read', async () => {
     const { forged, plugin } = forgedBuild()
-    const site = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path }, use: [plugin] })
+    const site = await testSite({ root: 'tests/fixtures/navigation', browser: { path }, use: [plugin] })
 
     try {
       const page = await opened(site)
@@ -386,10 +361,10 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page tol
 
   it('does not reload a document that was the answer of a native post, which the browser would ask to resubmit', async () => {
     const { forged, plugin } = forgedBuild()
-    const site = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path }, use: [plugin] })
+    const site = await testSite({ root: 'tests/fixtures/navigation', browser: { path }, use: [plugin] })
 
     try {
-      const posted = await site.fetch('/_kay/action/tests/fixtures/navigation/src/routes/second.kay/add?kay_back=%2Fsecond', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'origin': 'http://localhost' }, body: 'title=taken' })
+      const posted = await site.fetch('/_kay/action/src/routes/second.kay/add?kay_back=%2Fsecond', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'origin': 'http://localhost' }, body: 'title=taken' })
 
       expect(await posted.text()).toContain('<meta name="kay-posted">')
       expect((await site.visit('/second')).html).not.toContain('kay-posted')

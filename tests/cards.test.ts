@@ -26,8 +26,8 @@ const CLI = resolve('src/cli.ts')
 const config = {
   site: 'https://cards.example',
   seo: { name: 'Cards' },
-  fonts: [{ family: 'Archivo Black', src: 'tests/fixtures/cards/src/fonts/archivo-black-latin-400-normal.woff2' }],
-  routes: 'tests/fixtures/cards/src/routes',
+  fonts: [{ family: 'Archivo Black', src: join(FONTS, 'archivo-black-latin-400-normal.woff2') }],
+  root: FIXTURE,
   prebuilt: false,
 }
 const woff = await Bun.file(join(FONTS, 'archivo-black-latin-400-normal.woff')).bytes()
@@ -223,7 +223,7 @@ describe('share cards', () => {
   })
 
   it('draws on an image from images.dirs, revalidated since it may change in place', async () => {
-    const uploaded = await pages({ ...config, routes: 'tests/fixtures/cards/src/upload-routes', images: { dirs: { '/uploads/': uploads } } })
+    const uploaded = await pages({ ...config, routes: 'src/upload-routes', images: { dirs: { '/uploads/': uploads } } })
     const card = await uploaded.handle(new Request(`http://localhost${await cardPath('/', uploaded)}`))
 
     expect(card.status).toBe(200)
@@ -240,7 +240,7 @@ describe('share cards', () => {
 
   it('draws images.card.logo at the top left, an SVG or a raster image, on a card with or without an image', async () => {
     const near = (actual: number[], expected: number[]) => actual.every((channel, index) => Math.abs(channel - expected[index]!) < 24)
-    const svg = await pages({ ...config, images: { card: { logo: 'tests/fixtures/cards/src/logo.svg' } } })
+    const svg = await pages({ ...config, images: { card: { logo: join(FIXTURE, 'src/logo.svg') } } })
     const plain = await pixelsOf(await (await svg.handle(new Request(`http://localhost${await cardPath('/plain', svg)}`))).bytes())
 
     expect(near(plain(100, 100), [0, 255, 0])).toBe(true)
@@ -252,7 +252,7 @@ describe('share cards', () => {
 
     expect(near(covered(160, 160), [255, 0, 0])).toBe(true)
 
-    const png = await pages({ ...config, images: { card: { logo: 'tests/fixtures/cards/src/logo.png' } } })
+    const png = await pages({ ...config, images: { card: { logo: join(FIXTURE, 'src/logo.png') } } })
     const blue = await pixelsOf(await (await png.handle(new Request(`http://localhost${await cardPath('/plain', png)}`))).bytes())
 
     expect(near(blue(128, 128), [0, 0, 255])).toBe(true)
@@ -262,7 +262,7 @@ describe('share cards', () => {
     ['not square', 'hero.png', 'is 1000x600; it has to be square'],
     ['no image', 'fonts/archivo-black-latin-400-normal.woff', 'which is no SVG, PNG, JPEG or WebP kay can draw'],
   ])('refuses a logo that is %s', async (_name, file, message) => {
-    await expect(pages({ ...config, images: { card: { logo: `tests/fixtures/cards/src/${file}` } } })).rejects.toThrow(message)
+    await expect(pages({ ...config, images: { card: { logo: join(FIXTURE, 'src', file) } } })).rejects.toThrow(message)
   })
 
   it('reports in kay check a logo the boot refuses, and warns of one with text, which it draws as nothing', async () => {
@@ -294,11 +294,11 @@ describe('share cards', () => {
 
   it('keeps the logo\'s drawing at build time for an executable, which draws with it, and drops it once no logo is named', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-card-logo-'))
-    const client = clientDir(process.cwd())
+    const client = clientDir(FIXTURE)
     const built = join(dir, 'card-logo.png')
 
     try {
-      const fonts = await prepareFonts(process.cwd(), config.fonts, dir)
+      const fonts = await prepareFonts(FIXTURE, config.fonts, dir)
       const build = await setupCards({ dir, clientDir: client, fonts, logo: join(FIXTURE, 'src/logo.svg'), collect: true })
 
       expect(await Bun.file(built).exists()).toBe(true)
@@ -347,7 +347,7 @@ describe('share cards', () => {
   })
 
   it('draws in the fonts the config lists, whatever fonts an earlier boot recorded', async () => {
-    const recorded = join(clientDir(process.cwd()), '..', 'fonts.json')
+    const recorded = join(clientDir(FIXTURE), '..', 'fonts.json')
 
     await Bun.write(recorded, JSON.stringify({ css: '', preload: [], faces: [] }))
 
@@ -357,14 +357,14 @@ describe('share cards', () => {
   })
 
   it('writes at build time the cards prerendered pages asked for, which the route then serves as files', async () => {
-    const client = clientDir(process.cwd())
+    const client = clientDir(FIXTURE)
     const hero = registerImage('/_kay/assets/card-hero.png', 1000, 600)
     const cache = await mkdtemp(join(tmpdir(), 'kay-cards-'))
     let name: string | undefined
 
     try {
       await Bun.write(join(client, 'assets', 'card-hero.png'), Bun.file(join(FIXTURE, 'src/hero.png')))
-      await setupCards({ dir: join(client, '..'), clientDir: client, fonts: await prepareFonts(process.cwd(), config.fonts, cache), name: 'Cards', collect: true })
+      await setupCards({ dir: join(client, '..'), clientDir: client, fonts: await prepareFonts(FIXTURE, config.fonts, cache), name: 'Cards', collect: true })
 
       const url = shareCard({ title: 'Built   at\nbuild time', image: hero })
 
@@ -391,10 +391,10 @@ describe('share cards', () => {
 
   it('reads the face and makes its key only once a card is linked, the key readable by its owner alone', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-card-key-'))
-    const client = clientDir(process.cwd())
+    const client = clientDir(FIXTURE)
 
     try {
-      await setupCards({ dir, clientDir: client, fonts: await prepareFonts(process.cwd(), config.fonts, dir) })
+      await setupCards({ dir, clientDir: client, fonts: await prepareFonts(FIXTURE, config.fonts, dir) })
 
       expect(await Bun.file(join(dir, 'card.key')).exists()).toBe(false)
 
@@ -459,7 +459,7 @@ describe('share cards', () => {
 })
 
 describe('share cards of a site with a name per locale', () => {
-  const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' }
+  const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') }
   const localized = async () => pages({ ...config, i18n, seo: { name: { fr: 'Les cartes', en: 'The cards' } } })
   const written = async () => pages({ ...config, i18n, seo: { name: 'Cards' } })
   const linked = async (page: string, server: Awaited<ReturnType<typeof localized>>) => new URL(await cardPath(page, server), 'http://localhost')
@@ -509,13 +509,13 @@ describe('share cards of a site with a name per locale', () => {
   })
 
   it('writes at build time the card of each locale\'s name', async () => {
-    const client = clientDir(process.cwd())
+    const client = clientDir(FIXTURE)
     const cache = await mkdtemp(join(tmpdir(), 'kay-cards-'))
     const settings = { locales: ['fr', 'en'], defaultLocale: 'fr', prefixDefault: false }
     const state = (locale: string) => ({ settings, path: '/', locale, messages: new Map() })
 
     try {
-      await setupCards({ dir: join(client, '..'), clientDir: client, fonts: await prepareFonts(process.cwd(), config.fonts, cache), name: { fr: 'Les cartes', en: 'The cards' }, defaultLocale: 'fr', collect: true })
+      await setupCards({ dir: join(client, '..'), clientDir: client, fonts: await prepareFonts(FIXTURE, config.fonts, cache), name: { fr: 'Les cartes', en: 'The cards' }, defaultLocale: 'fr', collect: true })
 
       const urls = ['fr', 'en'].map(locale => runInLocale(state(locale), () => shareCard({ title: 'Same title' })))
 
@@ -553,7 +553,7 @@ describe('share cards on an imported SVG', () => {
   }
 
   beforeEach(async () => {
-    cardsBefore = new Set(await cardFiles(clientDir(process.cwd())))
+    cardsBefore = new Set(await cardFiles(clientDir(FIXTURE)))
   })
 
   // The files these tests added to the client build, which the font the cards are drawn in shares.
@@ -569,7 +569,7 @@ describe('share cards on an imported SVG', () => {
 
   // The card of `image` written at build time, as a JPEG; `image` has to be a file of the client build.
   async function built(dir: string, client: string, cache: string, images: string[], extra: { bundled?: boolean } = {}): Promise<string[]> {
-    await setupCards({ dir, clientDir: client, fonts: await prepareFonts(process.cwd(), config.fonts, cache), name: 'Cards', collect: true, ...extra })
+    await setupCards({ dir, clientDir: client, fonts: await prepareFonts(FIXTURE, config.fonts, cache), name: 'Cards', collect: true, ...extra })
 
     const urls = images.map(image => shareCard({ title: 'On a banner', image }))
 
@@ -580,7 +580,7 @@ describe('share cards on an imported SVG', () => {
 
   it('draws a card on an SVG with only a viewBox, covered and cut to the card as the PNG of the same picture is', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-card-svg-'))
-    const client = clientDir(process.cwd())
+    const client = clientDir(FIXTURE)
     const cache = join(dir, 'cache')
 
     try {
@@ -606,12 +606,12 @@ describe('share cards on an imported SVG', () => {
 
   it('serves a card on an SVG a server signed, and refuses one outside the build\'s assets', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-card-svg-'))
-    const client = clientDir(process.cwd())
+    const client = clientDir(FIXTURE)
 
     try {
       await Bun.write(join(client, 'assets', 'card-test-banner.svg'), Bun.file(banner))
 
-      const cards = await setupCards({ dir, clientDir: client, fonts: await prepareFonts(process.cwd(), config.fonts, dir), name: 'Cards' })
+      const cards = await setupCards({ dir, clientDir: client, fonts: await prepareFonts(FIXTURE, config.fonts, dir), name: 'Cards' })
       const server = new Elysia()
 
       serveCards(server, cards, { clientDir: client, cacheDir: join(dir, 'cache') })
@@ -633,7 +633,7 @@ describe('share cards on an imported SVG', () => {
 
   it('keeps the build\'s drawing of the SVG for an executable, which fails for a card it holds no drawing of', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-card-svg-'))
-    const client = clientDir(process.cwd())
+    const client = clientDir(FIXTURE)
     const cache = join(dir, 'cache')
 
     try {
@@ -649,7 +649,7 @@ describe('share cards on an imported SVG', () => {
       for (const file of await written(client))
         await rm(join(client, 'images', file), { force: true })
 
-      const cards = await setupCards({ dir, clientDir: client, fonts: await prepareFonts(process.cwd(), config.fonts, dir), name: 'Cards', bundled: true })
+      const cards = await setupCards({ dir, clientDir: client, fonts: await prepareFonts(FIXTURE, config.fonts, dir), name: 'Cards', bundled: true })
       const server = new Elysia()
 
       serveCards(server, cards, { clientDir: client, cacheDir: join(dir, 'cache-2') })
@@ -658,7 +658,7 @@ describe('share cards on an imported SVG', () => {
       expect((await server.handle(new Request(`http://localhost${shareCard({ title: 'On a banner', image: `${asset}-other.svg` })}`))).status).toBe(500)
 
       // A build no longer asking for the SVG drops its drawing.
-      await setupCards({ dir, clientDir: client, fonts: await prepareFonts(process.cwd(), config.fonts, dir), name: 'Cards', collect: true })
+      await setupCards({ dir, clientDir: client, fonts: await prepareFonts(FIXTURE, config.fonts, dir), name: 'Cards', collect: true })
       await writeCards(client, cache)
       expect(await drawings()).toEqual([])
     }
@@ -669,7 +669,7 @@ describe('share cards on an imported SVG', () => {
 
   it('renames the cards of a changed SVG', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-card-svg-'))
-    const client = clientDir(process.cwd())
+    const client = clientDir(FIXTURE)
     const cache = join(dir, 'cache')
     const files = new Map<string, string>()
 
@@ -691,12 +691,12 @@ describe('share cards on an imported SVG', () => {
 
   it('draws a build\'s SVG again after a failed drawing, rather than keeping the rejection', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-card-svg-'))
-    const client = clientDir(process.cwd())
+    const client = clientDir(FIXTURE)
     const cache = join(dir, 'cache')
 
     try {
       await Bun.write(join(client, 'assets', 'card-test-banner.svg'), 'not an svg')
-      await setupCards({ dir, clientDir: client, fonts: await prepareFonts(process.cwd(), config.fonts, cache), name: 'Cards', collect: true })
+      await setupCards({ dir, clientDir: client, fonts: await prepareFonts(FIXTURE, config.fonts, cache), name: 'Cards', collect: true })
       shareCard({ title: 'On a banner', image: `${asset}.svg` })
       await expect(writeCards(client, cache)).rejects.toThrow('is not an SVG kay can draw')
 
@@ -709,7 +709,7 @@ describe('share cards on an imported SVG', () => {
   })
 
   it('refuses an SVG that is not imported, naming what is taken', async () => {
-    await setupCards({ dir: join(clientDir(process.cwd()), '..'), clientDir: clientDir(process.cwd()), fonts: await prepareFonts(process.cwd(), config.fonts, uploads), name: 'Cards' })
+    await setupCards({ dir: join(clientDir(FIXTURE), '..'), clientDir: clientDir(FIXTURE), fonts: await prepareFonts(FIXTURE, config.fonts, uploads), name: 'Cards' })
 
     for (const image of ['/uploads/banner.svg', '/_kay/files/abc.svg', 'https://cdn.example/banner.svg?v=2'])
       expect(() => shareCard({ title: 'Hello', image })).toThrow('an SVG is taken only when imported, not from images.dirs, images.remote or a stored file')
@@ -717,7 +717,7 @@ describe('share cards on an imported SVG', () => {
 
   it('covers an SVG of any ratio, warns of its text, and refuses one with no size or too far from the card\'s ratio', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-card-svg-'))
-    const client = clientDir(process.cwd())
+    const client = clientDir(FIXTURE)
     const svg = async (name: string, markup: string) => {
       await Bun.write(join(dir, name), markup)
 

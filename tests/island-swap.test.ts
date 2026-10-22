@@ -1,11 +1,12 @@
 import type { TestPage } from '../src/test'
+import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { browse, browserPath } from '../src/test'
 import { scratchBuild } from './prerendered'
 import { pages } from './shared-pages'
 
-const routes = 'tests/fixtures/island-swap/src/routes'
+const ROOT = 'tests/fixtures/island-swap'
 const browserInstalled = browserPath() !== undefined
 const VIEWPORT = { width: 1280, height: 720 }
 const FETCHED = 'slot[data-kay-server]:not([inert]) form[action]'
@@ -64,11 +65,11 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
 
       // One page for the tests of a mode, as every page a test opens is a tab the later tests of the file pay for.
       beforeAll(async () => {
-        await pages({ routes, prebuilt: false, ...site })
-        build = await scratchBuild({ routes, ...site })
-        await build.prerender({ routes, ...site })
+        await pages({ root: ROOT, prebuilt: false, ...site })
+        build = await scratchBuild({ ...site }, false, join(process.cwd(), ROOT))
+        await build.prerender({ ...site })
 
-        const app = await build.serve({ routes, security: false, ...site })
+        const app = await build.serve({ security: false, ...site })
 
         // The front of a real deploy takes the base off, as it does for an app under one.
         server = Bun.serve({
