@@ -168,7 +168,8 @@ function statusOf(row: PgStateRow): StoredJobState['status'] {
 }
 
 // The statements started inside a `timeLimited` run, which giving up on the run cancels.
-export const startedStatements = new AsyncLocalStorage<Set<{ cancel: () => void }>>()
+// Once the run is over, a statement that its abandoned work starts later is cancelled as it starts.
+export const startedStatements = new AsyncLocalStorage<{ statements: Set<{ cancel: () => void }>, over: boolean }>()
 
 interface Statement { then: (...args: unknown[]) => unknown }
 
@@ -188,7 +189,13 @@ export function trackStatements(): void {
   const then = prototype.then
 
   prototype.then = function (this: Statement, ...args: unknown[]) {
-    startedStatements.getStore()?.add(this as unknown as { cancel: () => void })
+    const run = startedStatements.getStore()
+    const statement = this as unknown as { cancel: () => void }
+
+    if (run?.over)
+      statement.cancel()
+    else
+      run?.statements.add(statement)
 
     return then.apply(this, args)
   }

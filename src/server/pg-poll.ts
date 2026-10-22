@@ -13,13 +13,13 @@ export const OVERLAP = 100
 
 // Gives up on `work` after `ms`, cancelling the statements it started that are still in flight so they free their connection; what else it does keeps running, its result ignored.
 export async function timeLimited<Result>(work: () => Promise<Result>, ms: number, what: string): Promise<Result> {
-  const started = new Set<{ cancel: () => void }>()
+  const run = { statements: new Set<{ cancel: () => void }>(), over: false }
 
   trackStatements()
   let timer: ReturnType<typeof setTimeout> | undefined
 
   try {
-    return await Promise.race([startedStatements.run(started, work), new Promise<never>((_, reject) => {
+    return await Promise.race([startedStatements.run(run, work), new Promise<never>((_, reject) => {
       timer = setTimeout(() => reject(new Error(`${what} took more than ${ms / 1000} seconds`)), ms)
       timer.unref()
     })])
@@ -27,7 +27,9 @@ export async function timeLimited<Result>(work: () => Promise<Result>, ms: numbe
   finally {
     clearTimeout(timer)
 
-    for (const statement of started)
+    run.over = true
+
+    for (const statement of run.statements)
       statement.cancel()
   }
 }

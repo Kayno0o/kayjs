@@ -80,6 +80,20 @@ describe('the shared event poller', () => {
     expect(busy).toBe(0)
   })
 
+  pgIt('cancels a statement that abandoned work starts after the limit', async () => {
+    const { sql } = await postgres()
+
+    await expect(timeLimited(async () => {
+      await Bun.sleep(150)
+      await sql`SELECT pg_sleep(13)`
+    }, 50, 'the read')).rejects.toThrow('the read took more than')
+    await Bun.sleep(400)
+
+    const [{ busy }] = await sql`SELECT count(*)::int AS busy FROM pg_stat_activity WHERE query LIKE 'SELECT pg_sleep(13)%' AND state = 'active' AND pid != pg_backend_pid()`
+
+    expect(busy).toBe(0)
+  })
+
   it('does not run a task again before its last run ended', async () => {
     const counter = counted({ db: async () => ({}) as SQL })
     let started = 0
