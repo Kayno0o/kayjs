@@ -469,7 +469,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
       uploading.close()
     }
 
-    const quick = await site.open('/posted', { timeout: '300ms' })
+    // The page's timeout is the upload's too, so it stays short but above what a busy runner takes to load the page.
+    const quick = await site.open('/posted', { timeout: '2s' })
 
     try {
       await expect(quick.upload('nothing-here', file)).rejects.toThrow('timed out')
