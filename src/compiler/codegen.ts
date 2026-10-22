@@ -188,7 +188,7 @@ class ModuleShell {
   private jsxTemplate: JsxTemplate | undefined
   // Whether `src/ui.ts` sets variants for this component, which its parts read at runtime.
   private readonly styled: boolean
-  private typedParts: { type?: string, helper: boolean, recipe: boolean, added: string[] } | undefined
+  private typedParts: { type?: string, helper: boolean, recipe: boolean } | undefined
   private readonly params: string
   // An action declared in a page reads the params of that page's route, so its `action` is read as the one taking them; a layout's or a shared file's has no single route.
   private readonly actionsTyped: boolean
@@ -470,7 +470,10 @@ class ModuleShell {
       b.add('import type { HandedPart as KayHandedPart, PartClass as KayPartOf } from \'kay\'\n')
 
     if (this.partsType().recipe)
-      b.add('import type { RecipeProps as KayRecipeProps, ReplacedProps as KayReplaced } from \'kay\'\n')
+      b.add('import type { RecipeProps as KayRecipeProps } from \'kay\'\n')
+
+    if (this.widening() !== undefined)
+      b.add('import type { WidenedProps as KayWidened } from \'kay\'\n')
 
     if (this.kind === 'island' && this.genericComponent)
       b.add(`import type { IslandBrand as KayIslandBrand, IslandOptions as KayIslandOptions } from 'kay'\n`)
@@ -501,15 +504,15 @@ class ModuleShell {
   }
 
   // The `class` prop the template's parts give a component, typed from them so the app declares nothing: a string for the root, when there is one, or an object of a string per part, and of the called component's own `class` for a part that is one.
-  private partsType(): { type?: string, helper: boolean, recipe: boolean, added: string[] } {
+  private partsType(): { type?: string, helper: boolean, recipe: boolean } {
     return this.typedParts ??= this.buildPartsType()
   }
 
-  private buildPartsType(): { type?: string, helper: boolean, recipe: boolean, added: string[] } {
+  private buildPartsType(): { type?: string, helper: boolean, recipe: boolean } {
     const parts = this.facts.parts
 
     if (!parts?.merges)
-      return { helper: false, recipe: false, added: [] }
+      return { helper: false, recipe: false }
 
     const imported = new Set(this.script.imports.map(binding => binding.local))
     let helper = false
@@ -541,12 +544,9 @@ class ModuleShell {
 
     const type = `{ class?: ${parts.root === 'none' ? `${object} | { kayError: 'A template with several top elements takes an object of its parts: mark one with part="root" to take a string' }` : `string | ${object}`} | undefined }`
     const recipe = this.facts.recipe
-    const variants = this.options.uiAdded?.variants ?? {}
-    const added = Object.keys(variants)
-    const values = `{ ${added.map(name => `${JSON.stringify(name)}: ${Object.keys(variants[name] ?? {}).map(value => JSON.stringify(value)).join(' | ') || 'never'}`).join('; ')} }`
 
-    // The variants of the recipe, typed off it, so the component declares them once, and the values `src/ui.ts` adds.
-    return { type: recipe === undefined && added.length === 0 ? type : `${type} & KayRecipeProps<${recipe === undefined ? 'never' : `typeof ${recipe}`}${added.length === 0 ? '' : `, ${values}`}>`, helper, recipe: recipe !== undefined || added.length > 0, added }
+    // The variants of the recipe, typed off it, so the component declares them once.
+    return { type: recipe === undefined ? type : `${type} & KayRecipeProps<typeof ${recipe}>`, helper, recipe: recipe !== undefined }
   }
 
   // The component function's head: its type parameters and props, read off `__props`.
@@ -554,10 +554,10 @@ class ModuleShell {
     const { b, script, server } = this
     const { childrenSlot } = this.facts
     const childrenType = ' & { children?: KayJSX.Element }'
-    const { type: parts, added } = this.partsType()
+    const parts = this.partsType().type
     const typed = parts !== undefined
 
-    b.add(`\n${this.wrapped ? '' : 'export default '}function ${this.options.name}`)
+    b.add(`\n${this.wrapped || this.widening() !== undefined ? '' : 'export default '}function ${this.options.name}`)
 
     if (this.file.typeParameters && !server)
       b.add('<').addSource(this.file.typeParameters).add('>')
@@ -570,10 +570,7 @@ class ModuleShell {
     else if (script.props) {
       b.add(childrenSlot || typed ? `${PROPS}: (` : `${PROPS}: `)
 
-      // A variant `src/ui.ts` widens is typed from the recipe and `src/ui.ts` alone, so a union written beside it does not narrow it back.
-      if (script.props.type && added.length > 0)
-        b.add(`KayReplaced<`).addSource(script.props.type).add(`, ${added.map(name => JSON.stringify(name)).join(' | ')}>`)
-      else if (script.props.type)
+      if (script.props.type)
         b.addSource(script.props.type)
       else
         b.add('Record<string, unknown>')
@@ -617,15 +614,35 @@ class ModuleShell {
     }
   }
 
+  // The values `src/ui.ts` adds to the variants of a component's props, as a type: a call accepts them, while the component's own body keeps the props it declares, so a library component forwarding a variant to a child that lacks the value does not fail in its own file.
+  private widening(): string | undefined {
+    const variants = this.options.uiAdded?.variants
+
+    if (variants === undefined || Object.keys(variants).length === 0 || this.partsType().type === undefined || this.genericComponent)
+      return undefined
+
+    return `{ ${Object.entries(variants).map(([variant, values]) => `${JSON.stringify(variant)}: ${Object.keys(values).map(value => JSON.stringify(value)).join(' | ') || 'never'}`).join('; ')} }`
+  }
+
+  // The call signature a widened component adds to its own type, beside the one it declares.
+  private widenedCall(of: string): string {
+    return ` & ((props: KayWidened<Parameters<typeof ${of}>[0], ${this.widening()}>) => ReturnType<typeof ${of}>)`
+  }
+
   // An island, or a static component with a hydratable twin, exports its function wrapped.
   private exports(): void {
     const { b, src } = this
     const { name } = this.options
+    const widened = this.widening() !== undefined
 
     if (this.kind === 'promotable twin')
-      b.add(`\nexport default KayPromote(${JSON.stringify(this.options.promote)}, ${name} as never, KayHydrated as never${this.takesActions ? `, ${JSON.stringify(messageKeys(src))}, true` : islandMessages(src)}) as typeof ${name}\n`)
+      b.add(`\nexport default KayPromote(${JSON.stringify(this.options.promote)}, ${name} as never, KayHydrated as never${this.takesActions ? `, ${JSON.stringify(messageKeys(src))}, true` : islandMessages(src)}) as typeof ${name}${widened ? this.widenedCall(name) : ''}\n`)
     else if (this.kind === 'twin')
-      b.add(`\nexport default ((props: never) => KayInsideIsland() ? KayHydrated(props) : ${name}(props)) as typeof ${name}\n`)
+      b.add(`\nexport default ((props: never) => KayInsideIsland() ? KayHydrated(props) : ${name}(props)) as typeof ${name}${widened ? this.widenedCall(name) : ''}\n`)
+    else if (this.kind === 'island' && widened)
+      b.add(`\nconst KayExported = KayIsland(${JSON.stringify(this.options.island)}, ${name}${islandMessages(src, this.options.client, this.options.output === 'html' ? this.options.lives : undefined, this.options.output === 'html' && this.takesActions)})\nexport default KayExported as typeof KayExported${this.widenedCall('KayExported')}\n`)
+    else if (widened && this.kind !== 'island')
+      b.add(`\nexport default ${name} as typeof ${name}${this.widenedCall(name)}\n`)
     else if (this.kind === 'island')
       b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${this.genericComponent ? ' as never' : ''}${islandMessages(src, this.options.client, this.options.output === 'html' ? this.options.lives : undefined, this.options.output === 'html' && this.takesActions)})${this.genericIslandType()}\n`)
   }

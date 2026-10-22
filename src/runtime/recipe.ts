@@ -14,15 +14,17 @@ type NumberOf<Name> = Name extends `${infer Number extends number}` ? Number : n
 
 type VariantValues<Variants extends VariantTable> = { [Name in keyof Variants]?: VariantValue<Variants[Name]> | undefined }
 
-type RecipeValues<Recipe> = [Recipe] extends [never] ? Record<never, never> : Recipe extends (values?: infer Values, part?: string) => string ? NonNullable<Values> : Record<never, never>
+// The variant props a recipe adds to a component's props, inferred from the recipe so the component declares them once.
+export type RecipeProps<Recipe> = Recipe extends (values?: infer Values, part?: string) => string ? NonNullable<Values> : never
 
-// The variant props a recipe adds to a component's props, inferred from the recipe so the component declares them once; `Added` holds the values `src/ui.ts` adds, by variant, which join the recipe's or open a variant of their own.
-export type RecipeProps<Recipe, Added extends Record<string, string> = Record<never, never>> = [keyof Added] extends [never]
-  ? RecipeValues<Recipe>
-  : Omit<RecipeValues<Recipe>, keyof Added> & { [Name in keyof Added]?: (Name extends keyof RecipeValues<Recipe> ? RecipeValues<Recipe>[Name] : never) | VariantValue<Record<Added[Name], unknown>> | undefined }
+type Without<Props, Names> = { [Key in keyof Props as Key extends Names ? never : Key]: Props[Key] }
 
-// A component's props without the variants `src/ui.ts` widens, whose type the recipe and `src/ui.ts` give.
-export type ReplacedProps<Props, Names extends string> = Props extends unknown ? Omit<Props, Names> : never
+// A component's props with the values `src/ui.ts` adds, by variant: a variant the props declare gains them in its union, one they lack becomes a prop of its own.
+export type WidenedProps<Props, Added> = Props extends unknown
+  ? Without<Props, keyof Added>
+  & { [Name in keyof Pick<Props, keyof Added & keyof Props>]: Pick<Props, keyof Added & keyof Props>[Name] | VariantValue<Record<Added[Name & keyof Added] & string, unknown>> }
+  & { [Name in Exclude<keyof Added, keyof Props>]?: VariantValue<Record<Added[Name] & string, unknown>> | undefined }
+  : never
 
 export interface Recipe<Variants extends VariantTable> {
   // The classes of a part, `root` unless named: its base, then the variant of each value given, in the order the variants are declared.

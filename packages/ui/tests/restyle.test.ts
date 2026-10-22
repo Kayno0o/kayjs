@@ -225,7 +225,7 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     expect(html).toMatch(/<svg[^>]*data-part="sortIcon"/)
   })
 
-  test('kay check reports a part, a variant and a value a component of kayjs-ui does not have', async () => {
+  test('kay check reports a part a component of kayjs-ui does not have, and takes a variant or value it lacks', async () => {
     const project = join(ROOT, 'node_modules', '.cache', 'bad-ui')
 
     await mkdir(join(project, 'src'), { recursive: true })
@@ -233,8 +233,6 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
 
     expect(uiProblems(project).map(problem => problem.message)).toEqual([
       '`@kaynooo/kayjs-ui/card.kay` has no part `foot`',
-      '`@kaynooo/kayjs-ui/card.kay` has no variant `size`',
-      'The variant `tone` of `@kaynooo/kayjs-ui/button.kay` has no value `loud`',
     ])
     expect(uiProblems(ROOT)).toEqual([])
   })
