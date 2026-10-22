@@ -4,6 +4,7 @@ import { describe, expect, it } from 'bun:test'
 import { logSink, setLogSink } from '../src/runtime/log'
 import { pgCache } from '../src/server/pg-cache'
 import { pgHandle } from '../src/server/pg-data'
+import { rowsOf } from '../src/server/pg-jobs'
 import { pgLive } from '../src/server/pg-live'
 import { pollerOf, timeLimited } from '../src/server/pg-poll'
 import { pgRooms } from '../src/server/pg-rooms'
@@ -46,8 +47,21 @@ describe('the shared event poller', () => {
   })
 
   it('gives up on work that takes longer than its limit, and lets work within it answer', async () => {
-    await expect(timeLimited(Bun.sleep(300), 30, 'the read')).rejects.toThrow('the read took more than 0.03 seconds')
-    await expect(timeLimited((async () => 'done')(), 30, 'the read')).resolves.toBe('done')
+    await expect(timeLimited(async () => Bun.sleep(300), 30, 'the read')).rejects.toThrow('the read took more than 0.03 seconds')
+    await expect(timeLimited(async () => 'done', 30, 'the read')).resolves.toBe('done')
+  })
+
+  pgIt('cancels the statement it gave up on, so it frees its connection', async () => {
+    const { sql } = await postgres()
+    const started = performance.now()
+
+    await expect(timeLimited(async () => rowsOf(sql.unsafe('SELECT pg_sleep(10)')), 100, 'the read')).rejects.toThrow('the read took more than')
+    await Bun.sleep(100)
+
+    const [{ busy }] = await sql`SELECT count(*)::int AS busy FROM pg_stat_activity WHERE query LIKE 'SELECT pg_sleep(10)%' AND state = 'active' AND pid != pg_backend_pid()`
+
+    expect(busy).toBe(0)
+    expect(performance.now() - started).toBeLessThan(2000)
   })
 
   it('does not run a task again before its last run ended', async () => {

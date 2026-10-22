@@ -140,7 +140,7 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
       return
 
     const names = [...watched.keys()]
-    const rows = await query<{ room: string, connection: string, member: string, at: string }>(db, `SELECT m.room, m.connection, m.member, m.at FROM kay_room_members m JOIN kay_room_processes p ON p.process = m.process WHERE m.room IN (SELECT jsonb_array_elements_text($1::text::jsonb)) AND m.process <> $2 AND p.seen > ${NOW} - ${EXPIRY}`, [JSON.stringify(names), self])
+    const rows = await query<{ room: string, connection: string, member: string, at: string }>(db, `SELECT m.room, m.connection, m.member, m.at FROM kay_room_members m JOIN kay_room_processes p ON p.process = m.process WHERE m.room = ANY($1::text[]) AND m.process <> $2 AND p.seen > ${NOW} - ${EXPIRY}`, [names, self])
     const byRoom = new Map<string, Own[]>()
 
     for (const row of rows)

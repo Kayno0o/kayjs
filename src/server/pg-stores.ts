@@ -81,7 +81,7 @@ export function pgSessions(pg: PgHandle): SessionStore & { deleteWhere: NonNulla
       const ids = live.filter(row => matchesSession(row.data, match)).map(row => row.id)
 
       if (ids.length > 0)
-        await query(db, 'DELETE FROM kay_sessions WHERE id IN (SELECT jsonb_array_elements_text($1::text::jsonb))', [JSON.stringify(ids)])
+        await query(db, 'DELETE FROM kay_sessions WHERE id = ANY($1::text[])', [ids])
 
       return ids.length
     },

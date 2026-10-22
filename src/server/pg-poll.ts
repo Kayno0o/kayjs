@@ -1,6 +1,7 @@
 import type { SQL } from 'bun'
 import type { PgHandle } from './pg-data'
 import { kayLog } from '../runtime/log'
+import { startedStatements } from './pg-jobs'
 
 // How often a process reads what the others wrote, and how long a message is kept for one that reads late.
 export const POLL_MS = 500
@@ -10,18 +11,22 @@ export const DB_TIMEOUT_MS = 30_000
 // Ids this far behind the last one read are read again, as a transaction that began earlier may commit its event after a later one.
 export const OVERLAP = 100
 
-// Gives up on `work` after `ms`; the work itself keeps running, its result ignored.
-export async function timeLimited<Result>(work: Promise<Result>, ms: number, what: string): Promise<Result> {
+// Gives up on `work` after `ms`, cancelling the statements it still has in flight so they free their connection; what else it does keeps running, its result ignored.
+export async function timeLimited<Result>(work: () => Promise<Result>, ms: number, what: string): Promise<Result> {
+  const started = new Set<{ cancel: () => void }>()
   let timer: ReturnType<typeof setTimeout> | undefined
 
   try {
-    return await Promise.race([work, new Promise<never>((_, reject) => {
+    return await Promise.race([startedStatements.run(started, work), new Promise<never>((_, reject) => {
       timer = setTimeout(() => reject(new Error(`${what} took more than ${ms / 1000} seconds`)), ms)
       timer.unref()
     })])
   }
   finally {
     clearTimeout(timer)
+
+    for (const statement of started)
+      statement.cancel()
   }
 }
 
@@ -124,7 +129,7 @@ function createPoller(pg: PgHandle): Poller {
 
   const runEntry = async (entry: Entry, db: Promise<SQL>) => {
     try {
-      const outcome = await timeLimited((async () => entry.task.run(await db))(), DB_TIMEOUT_MS, 'reading the events')
+      const outcome = await timeLimited(async () => entry.task.run(await db), DB_TIMEOUT_MS, 'reading the events')
 
       if (outcome !== 'busy')
         entry.failing = false
@@ -156,7 +161,7 @@ function createPoller(pg: PgHandle): Poller {
         continue
 
       entry.running = true
-      db ??= timeLimited(pg.db(), DB_TIMEOUT_MS, 'reaching the database')
+      db ??= timeLimited(async () => pg.db(), DB_TIMEOUT_MS, 'reaching the database')
       // A database that fails fails every task of the tick, each logging its own streak.
       void runEntry(entry, db)
     }

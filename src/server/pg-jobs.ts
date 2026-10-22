@@ -1,5 +1,6 @@
 import type { SQL } from 'bun'
 import type { JobStore, StoredJob, StoredJobState } from './queue'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { onReload } from './reload'
 
 interface PgJobRow {
@@ -166,9 +167,26 @@ function statusOf(row: PgStateRow): StoredJobState['status'] {
   return row.held ? 'running' : 'waiting'
 }
 
+// The statements started inside a `timeLimited` run, which giving up on the run cancels.
+export const startedStatements = new AsyncLocalStorage<Set<{ cancel: () => void }>>()
+
 // What a query resolves with, its rows typed.
-export async function rowsOf<Row>(query: PromiseLike<unknown>): Promise<Row[]> {
-  return await query as Row[]
+export async function rowsOf<Row>(query: PromiseLike<unknown> & { cancel?: () => void }): Promise<Row[]> {
+  const started = startedStatements.getStore()
+
+  if (started === undefined || query.cancel === undefined)
+    return await query as Row[]
+
+  const statement = { cancel: query.cancel.bind(query) }
+
+  started.add(statement)
+
+  try {
+    return await query as Row[]
+  }
+  finally {
+    started.delete(statement)
+  }
 }
 
 export function connectionOf(source: PgJobsSource): SQL {

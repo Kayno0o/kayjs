@@ -70,7 +70,7 @@ export function pgLive(pg: PgHandle): LiveStore {
 
     try {
       // A write given up at the time limit may still commit later, after the next write of its key.
-      await ordered(async () => timeLimited((async () => {
+      await ordered(async () => timeLimited(async () => {
         const db = await pg.db()
 
         await db.begin(async (tx) => {
@@ -78,7 +78,7 @@ export function pgLive(pg: PgHandle): LiveStore {
           await query(tx, `INSERT INTO kay_live_events (origin, id, key, at) VALUES ($1, $2, $3, ${NOW})`, [self, escaped(id), escaped(key)])
           await query(tx, `DELETE FROM kay_live_events WHERE at < ${NOW} - ${EVENT_TTL_MS}`)
         })
-      })(), DB_TIMEOUT_MS, 'the write'))
+      }, DB_TIMEOUT_MS, 'the write'))
     }
     catch (error) {
       kayLog('error', `${what} the live value ${id} failed`, error)
@@ -135,7 +135,7 @@ export function pgLive(pg: PgHandle): LiveStore {
     const values = new Map<string, string>()
 
     if (wanted.length > 0) {
-      const rows = await query<{ id: string, key: string, value: string }>(db, 'SELECT id, key, value FROM kay_live WHERE (id, key) IN (SELECT e->>0, e->>1 FROM jsonb_array_elements($1::text::jsonb) e)', [JSON.stringify(wanted.map(([, entry]) => entry))])
+      const rows = await query<{ id: string, key: string, value: string }>(db, 'SELECT id, key, value FROM kay_live WHERE (id, key) IN (SELECT * FROM unnest($1::text[], $2::text[]))', [wanted.map(([, [id]]) => id), wanted.map(([, [, key]]) => key)])
 
       for (const row of rows)
         values.set(`${row.id}\0${row.key}`, row.value)

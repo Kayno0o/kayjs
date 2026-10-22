@@ -5,6 +5,6 @@ import { rowsOf } from './pg-jobs'
 export const NOW = 'floor(extract(epoch FROM statement_timestamp()) * 1000)::bigint'
 
 // A query whose text carries the clock, its values `$1` on.
-export async function query<Row>(db: SQL, text: string, values: (string | number | null)[] = []): Promise<Row[]> {
+export async function query<Row>(db: SQL, text: string, values: (string | number | null | string[])[] = []): Promise<Row[]> {
   return rowsOf<Row>(db.unsafe(text, values))
 }
