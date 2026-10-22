@@ -511,6 +511,14 @@ describe('theme.css', () => {
     expect(blockOf(toast, '&:where([data-tone=\'success\'])')).toContain('--kui-toast-tone: var(--color-kui-success);')
   })
 
+  // The recipes read these as a tone of their own element: inherited, a Badge or a Notice inside a toned one would take its colours, and a theme rule setting one would hide the recipe's neutral fallback.
+  test('registers the tone variables of the recipes as not inherited, and leaves them out of the old rules', () => {
+    for (const name of ['--kui-badge-color', '--kui-notice-tone', '--kui-notice-ground']) {
+      expect(theme, name).toMatch(new RegExp(`@property ${name} \\{\\s*syntax: '\\*';\\s*inherits: false;\\s*\\}`))
+      expect(theme.replace(/@property[^}]*\}/g, ''), name).not.toContain(name)
+    }
+  })
+
   // Tailwind drops a utility reading a token the theme lacks without a word, so a recipe naming one would only lose its look.
   test('compiles every utility of a recipe component against the theme', async () => {
     const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
@@ -537,7 +545,7 @@ describe('theme.css', () => {
 
     expect(missing).toEqual([])
     // A tone sets a variable the colours of the base and of the stamp read, so it beats neither by the order of the classes.
-    expect(css).toContain('--kui-badge-tone')
-    expect(css).toMatch(/\[data-stamp\]\s*\{[^}]*border-color: var\(--kui-badge-tone,var\(--color-kui-stamp\)\)/)
+    expect(css).toContain('--kui-badge-color')
+    expect(css).toMatch(/\[data-stamp\]\s*\{[^}]*border-color: var\(--kui-badge-color,var\(--color-kui-stamp\)\)/)
   })
 })

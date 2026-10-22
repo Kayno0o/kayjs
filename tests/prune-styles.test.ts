@@ -429,4 +429,13 @@ describe('sourceWords', () => {
     expect(words.toSorted()).toEqual(['[font-family:var(--a,b)]', 'border-(length:--x)', 'x'])
     expect(new Set(words).size).toBe(words.length)
   })
+
+  it('finds each class of a shorthand chain that holds an arbitrary value', () => {
+    expect(sourceWords('div.size-[10px].flex')).toEqual(expect.arrayContaining(['div', 'size-[10px]', 'flex']))
+    expect(sourceWords('div.p-4.hover:bg-[#fff]')).toEqual(expect.arrayContaining(['p-4', 'hover:bg-[#fff]']))
+    expect(sourceWords('div.[&>svg]:size-4')).toEqual(expect.arrayContaining(['div', '[&>svg]:size-4']))
+    expect(sourceWords('div.bg-(--brand)/50.flex')).toEqual(expect.arrayContaining(['div', 'bg-(--brand)/50', 'flex']))
+    expect(sourceWords('div.w-[calc(100%-2rem)].mt-2(class="gap-1.5")')).toEqual(expect.arrayContaining(['w-[calc(100%-2rem)]', 'mt-2', 'gap-1.5']))
+    expect(sourceWords('clsx(a,b)')).toEqual(expect.arrayContaining(['clsx', 'a', 'b']))
+  })
 })

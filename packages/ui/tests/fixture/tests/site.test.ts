@@ -241,16 +241,31 @@ function recipeRoot(bundle: string, name: string): string {
 }
 
 describe('recipe colours under Tailwind', () => {
-  test('a tone and an override of the page replace the base class they set, on the server', async () => {
+  // The classes an element of /tones was served with, after the server's merge.
+  async function served(id: string): Promise<string> {
     const html = (await visit('/tones')).html
-    const classes = (id: string) => (/class="([^"]*)"/).exec(new RegExp(`<[a-z]+ [^>]*id="${id}"[^>]*>`).exec(html)![0])![1]!.split(' ')
 
-    expect(classes('card')).toContain('border-kui-error')
-    expect(classes('card')).not.toContain('border-kui-surface2')
-    expect(classes('badge')).toContain('[--kui-badge-tone:var(--color-kui-success)]')
-    expect(classes('badge')).not.toContain('border-kui-success')
-    expect(classes('notice')).toContain('[--kui-notice-tone:var(--color-kui-error)]')
-    expect(classes('notice')).not.toContain('border-kui-error')
+    return (/class="([^"]*)"/).exec(new RegExp(`<[a-z]+ [^>]*id="${id}"[^>]*>`).exec(html)![0])![1]!
+  }
+
+  test('a tone and an override of the page replace the base class they set, on the server', async () => {
+    const card = (await served('card')).split(' ')
+
+    expect(card).toContain('border-kui-error')
+    expect(card).not.toContain('border-kui-surface2')
+  })
+
+  test('a tone leaves nothing for the merge to drop: the root of the recipe is served whole', async () => {
+    const { text } = await islandBundle()
+
+    for (const [id, name] of [['badge', 'kui-badge'], ['notice', 'kui-notice']] as const) {
+      const classes = (await served(id)).split(' ')
+
+      expect(classes, id).toEqual(expect.arrayContaining(recipeRoot(text, name).split(' ')))
+    }
+
+    expect(await served('badge')).toContain('[--kui-badge-color:var(--color-kui-success)]')
+    expect(await served('notice')).toContain('[--kui-notice-tone:var(--color-kui-error)]')
   })
 
   test('an island drops them the same through the class table of its bundle, and keeps both without it', async () => {
@@ -264,12 +279,12 @@ describe('recipe colours under Tailwind', () => {
     expect(resolveClasses(card, table).split(' ')).toContain('border-kui-error')
     expect(resolveClasses(card, { sets: [], classes: {} }).split(' ')).toEqual(expect.arrayContaining(['border-kui-surface2', 'border-kui-error']))
 
-    // A tone sets a variable the base colours read, so nothing is left for the table to drop and the tone works without it.
-    const badge = `${recipeRoot(text, 'kui-badge')} [--kui-badge-tone:var(--color-kui-success)]`
-    const notice = `${recipeRoot(text, 'kui-notice')} [--kui-notice-ground:var(--color-kui-canvas)] [--kui-notice-tone:var(--color-kui-error)]`
+    // What the page served for a tone is what the island would render, and the table leaves it whole.
+    for (const id of ['badge', 'notice']) {
+      const classes = await served(id)
 
-    for (const classes of [badge, notice])
-      expect(resolveClasses(classes, table)).toBe(classes)
+      expect(resolveClasses(classes, table), id).toBe(classes)
+    }
   })
 })
 

@@ -10,6 +10,22 @@
   initial-value: 1px;
 }
 
+/* A tone of a Badge or a Notice is read by the colours of its own element alone: without inheritance, a Badge or a Notice inside a toned one keeps its neutral colours. */
+@property --kui-badge-color {
+  syntax: '*';
+  inherits: false;
+}
+
+@property --kui-notice-tone {
+  syntax: '*';
+  inherits: false;
+}
+
+@property --kui-notice-ground {
+  syntax: '*';
+  inherits: false;
+}
+
 @theme default {
   /* Each colour is light-dark(light, dark), following the color-scheme set below. Eight are seeds a skin sets alone: canvas, text, accent, success, warning, info, error and field-border. The others derive from them with color-mix, and each stays overridable on its own. */
   --color-kui-canvas: light-dark(#faf8f4, #111111);

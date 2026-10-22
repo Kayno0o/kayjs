@@ -213,9 +213,7 @@ function exportTargets(exports: unknown): [string, string][] | undefined {
 // What separates a class from the next in a string: Tailwind's own, so `border-(length:--x)`, `px-2.5` and `[font-family:var(--a,b)]` stay whole.
 const CLASS_SEPARATOR = /[\s'"`{}]+/
 // What a template also separates words by: parentheses, commas and the dots of the shorthand.
-const TEMPLATE_SEPARATOR = /[(),=.]+/
-// A word holding an arbitrary value or property, whose parts are no classes of their own.
-const ARBITRARY_WORD = /\[|-\(/
+const TEMPLATE_SEPARATOR = /[(),=.]/
 
 // The library files the project's own files reach through their imports, scripts of both in between: only those components ship to the browser, and only their errors are the project's to see.
 // A barrel module re-exporting every component reaches them all.
@@ -400,7 +398,7 @@ export function sourceWords(source: string): string[] {
       continue
     }
 
-    const parts = word.split(TEMPLATE_SEPARATOR).filter(part => part !== '')
+    const parts = shorthandParts(word)
 
     // A word of nothing but separators, such as `=`, is no class.
     if (parts.length === 0)
@@ -408,14 +406,43 @@ export function sourceWords(source: string): string[] {
 
     words.add(word)
 
-    // The shorthand `div.p-4(class=` holds several classes; an arbitrary value is one whole, and its parts would only be noise in the class list.
-    if (!ARBITRARY_WORD.test(word)) {
-      for (const part of parts)
-        words.add(part)
-    }
+    for (const part of parts)
+      words.add(part)
   }
 
   return [...words]
+}
+
+// The classes a word holds when a template writes them together, `div.p-4.w-[2px](class=`: split at the separators outside an arbitrary value, which stays whole in its class (`size-[0.5rem]`, `bg-(--brand)/50`).
+function shorthandParts(word: string): string[] {
+  const parts: string[] = []
+  let start = 0
+  let depth = 0
+
+  for (let index = 0; index < word.length; index++) {
+    const char = word[index]!
+
+    if (depth > 0) {
+      if (char === '[' || char === '(')
+        depth++
+      else if (char === ']' || char === ')')
+        depth--
+    }
+    else if (char === '[' || (char === '(' && word[index - 1] === '-')) {
+      depth++
+    }
+    else if (TEMPLATE_SEPARATOR.test(char)) {
+      if (index > start)
+        parts.push(word.slice(start, index))
+
+      start = index + 1
+    }
+  }
+
+  if (start < word.length)
+    parts.push(word.slice(start))
+
+  return parts
 }
 
 // The words of a file as `sourceWords` finds them, kept with its text while the file stays.
