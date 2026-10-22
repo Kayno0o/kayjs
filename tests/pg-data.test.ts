@@ -430,7 +430,9 @@ pgDescribe('pgRooms', () => {
 
     live.join(ada, 'lobby')
     live.leave(ada)
-    await Bun.sleep(150)
+    // The store answers in the order asked: once this state is read, the one read for the first join is too, and its snapshot had its turn.
+    await live.state('lobby')
+    await Bun.sleep(0)
     expect(received).toEqual([])
     live.join(ada, 'lobby')
     await waitFor(() => received.length === 1, 'the snapshot')
