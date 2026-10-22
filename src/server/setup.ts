@@ -96,8 +96,8 @@ export async function setupPages<Claimed = undefined>(project: Project, loadClie
 
 async function setupWith<Claimed>(project: Project, loadClient: () => Promise<ClientBuild>, prerendering: boolean, redirectSpelling: RenderOptions['redirectSpelling'], refuse: ((scanned: Scanned) => Claimed) | undefined): Promise<PageSetup & { claimed: Claimed }> {
   const { root, config, paths, mode } = project
-  const mounts = routeMounts(root, config.extensions)
   const source = projectSource()
+  const mounts = routeMounts(root, config.extensions, !source.embedded)
   // Drawn while the project is scanned, unless a build or an executable holds the drawing; a logo kay cannot draw refuses the config before the build starts.
   const logoFile = config.images?.card?.logo === undefined ? undefined : resolve(root, config.images.card.logo)
   const logoDrawn = logoFile !== undefined && !source.embedded && !mode.prebuilt ? drawLogo(logoFile) : undefined

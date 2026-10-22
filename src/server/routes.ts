@@ -726,11 +726,11 @@ function outerMount(layout: string, reaching?: string[]): RouteMount {
 }
 
 // The files a layout's `reaching` names, which must exist: a typo would wrap no page and say nothing.
-function reachingFiles(root: string, files: string[]): string[] {
+function reachingFiles(root: string, files: string[], verify: boolean): string[] {
   return files.map((file) => {
     const found = resolve(root, file)
 
-    if (!existsSync(found))
+    if (verify && !existsSync(found))
       throw new KayError('route-invalid', `kay: the layout of an extension reaches ${file}, which does not exist`)
 
     return found
@@ -738,20 +738,21 @@ function reachingFiles(root: string, files: string[]): string[] {
 }
 
 // An extension's layout is a `_layout.kay` alone in its directory, which is mounted as a tree of its own.
-function checkedLayout(root: string, layout: string): string {
+function checkedLayout(root: string, layout: string, verify: boolean): string {
   const file = resolve(root, layout)
 
-  if (basename(file) !== LAYOUT || !existsSync(file))
+  if (basename(file) !== LAYOUT || (verify && !existsSync(file)))
     throw new KayError('route-invalid', `kay: the layout ${layout} of an extension is not an existing ${LAYOUT}`)
 
   return file
 }
 
 // The routes each extension in `extensions` mounts, its directory as the project reaches it under `node_modules`, where a linked library's real path would name its actions after a path outside the project.
-export function routeMounts(root: string, extensions: KayExtension[] = []): RouteMount[] {
+// `verify` is false in an executable, whose library code names the folders it was bundled from and whose routes are embedded already.
+export function routeMounts(root: string, extensions: KayExtension[] = [], verify = true): RouteMount[] {
   return extensions.flatMap(({ routes, editor, layout }) => [
     ...routes ? [{ dir: throughLinks(root, resolve(root, routes.dir)), prefix: mountPrefix(routes.prefix), ...editor !== undefined && { editor: true as const } }] : [],
-    ...layout === undefined ? [] : [typeof layout === 'string' ? outerMount(throughLinks(root, checkedLayout(root, layout))) : outerMount(throughLinks(root, checkedLayout(root, layout.file)), reachingFiles(root, layout.reaching))],
+    ...layout === undefined ? [] : [typeof layout === 'string' ? outerMount(throughLinks(root, checkedLayout(root, layout, verify))) : outerMount(throughLinks(root, checkedLayout(root, layout.file, verify)), reachingFiles(root, layout.reaching, verify))],
   ])
 }
 

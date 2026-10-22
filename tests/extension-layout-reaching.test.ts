@@ -65,3 +65,11 @@ test('a special page reaching the files is wrapped, a page setting layouts: fals
   expect(routes.find(route => route.pattern === '/plain')!.special.notFound!.layouts.length).toBe(1)
   expect(() => routeMounts(root, [{ name: 'lib', layout: { file: 'lib/_layout.kay', reaching: ['lib/missing.kay'] } }])).toThrow('does not exist')
 })
+
+test('an executable names the layout and reaching files of a bundled library without finding them on disk', async () => {
+  const root = await project()
+  const layout = { file: '/$bunfs/root/../viewer-layout/_layout.kay', reaching: ['/$bunfs/root/../components/signed-in.kay'] }
+
+  expect(() => routeMounts(root, [{ name: 'lib', layout }])).toThrow('not an existing _layout.kay')
+  expect(routeMounts(root, [{ name: 'lib', layout }], false)).toHaveLength(1)
+})
