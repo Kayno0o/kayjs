@@ -24,6 +24,8 @@ import { headTagProblem, sharedImports } from './validate'
 
 const WRITE_NAMES: Record<keyof typeof WRITE_HELPERS, KayHelper> = { to: 'writeTo', update: 'updateTo', back: 'writeBack', updateBack: 'updateBack' }
 
+const TEXT_ATTRIBUTE = /\bwith\s*\{\s*type\s*:\s*(['"])text\1/
+
 export interface GenerateOptions {
   name: string
   classTable?: ClassTable | undefined
@@ -240,7 +242,15 @@ class ModuleShell {
       staticLoops: this.staticLoops,
       sendsIslandProps: this.kind === 'static' || this.kind === 'twin',
       plain: this.plainNames(),
+      ownMarkup: this.ownMarkup(),
     }, this.sites)
+  }
+
+  // The names of the project's own files imported as text, `import waves from './waves.svg' with { type: 'text' }`: markup the app made, as a written-out `innerHTML` is.
+  private ownMarkup(): Set<string> {
+    const bindings = [...this.script.imports, ...this.fence?.imports ?? []]
+
+    return new Set(bindings.filter(binding => !binding.typeOnly && binding.imported === 'default' && binding.source.startsWith('.') && TEXT_ATTRIBUTE.test(this.src.slice(binding.declaration.start, binding.declaration.end))).map(binding => binding.local))
   }
 
   run(): Generated {

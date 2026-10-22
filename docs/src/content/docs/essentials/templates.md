@@ -250,6 +250,8 @@ A spread sets `innerHTML` only from markup that `sanitizeHtml`, `trustHtml` or a
 
 An icon keeps drawing, `svg({...Home})`, while a record's plain-string `innerHTML` is dropped.
 
+On an element, `innerHTML={waves}` takes a project file imported as text, `import waves from '../public/waves.svg' with { type: 'text' }`, as it takes markup written out. A string from a package or a request still goes through `sanitizeHtml` or `trustHtml`.
+
 A string built from a vouched one, such as `markup + '<b>'`, is plain again.
 
 To render a string as markup, pass it through one of two helpers first. `sanitizeHtml(text)` is for markup a user wrote. `trustHtml(text)` is for markup the app made.

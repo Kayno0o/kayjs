@@ -316,7 +316,7 @@ for product of products
 - `ref={el => ...}` receives the DOM element.
 - A function prop that is no handler, `class` or `style` (a slot or a formatter passed to a plain element) writes no attribute on the server either, as in the browser. Only what a component, an element or an island rendered counts as markup in `{}`: an object with a `t` string from JSON, such as a database column, renders nothing, like any other object.
 - `innerHTML` renders its value as markup, unescaped, and so does an `iframe`'s `srcdoc`.
-- Written out, `innerHTML="<b>hi</b>"` or `innerHTML={'<b>hi</b>'}`, it is the app's own.
+- Written out, `innerHTML="<b>hi</b>"` or `innerHTML={'<b>hi</b>'}`, it is the app's own, and so is a project file imported as text, `import waves from '../public/waves.svg' with { type: 'text' }` then `innerHTML={waves}`; a package's file or a derived string is not.
 - Bound to a computed string, a template literal with values in it included, `kay check` and the editor report it unless the value is a `SafeHtml`, which `sanitizeHtml(markup)` and `trustHtml(markup)` from `kay` return.
 - `sanitizeHtml` is for markup a user wrote: it keeps `p`, `br`, `hr`, `b`, `strong`, `i`, `em`, `u`, `s`, `del`, `ins`, `small`, `sub`, `sup`, `code`, `pre`, `blockquote`, `h1` to `h6`, `ul`, `ol`, `li` and `a`, balanced and without attributes, a link's `href` kept when it is an http(s), `mailto:` or site URL and given `rel="nofollow ugc"`.
 - It drops other tags, keeping their text, and `script`, `style`, `iframe`, `svg` and comments whole, and gives the same result on the server and in an island.

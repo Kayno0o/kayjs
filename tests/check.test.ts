@@ -2915,6 +2915,29 @@ describe.concurrent('kay check, markup', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  it('accepts a project file imported as text for innerHTML, and still reports one from a package or imported as a URL', async () => {
+    const page = [
+      '---',
+      'import waves from \'../public/waves.svg\' with { type: \'text\' }',
+      'import url from \'../public/waves.svg\'',
+      'import vendor from \'vendor/logo.svg\' with { type: \'text\' }',
+      '---',
+      'div(innerHTML={waves})',
+      'div(innerHTML={url})',
+      'div(innerHTML={vendor})',
+      'div(innerHTML={`<g>${waves}</g>`})',
+      '',
+    ].join('\n')
+    const root = await scratchProject({ 'src/card.kay': page, 'src/public/waves.svg': '<svg/>', 'node_modules/vendor/logo.svg': '<svg/>', 'node_modules/vendor/package.json': '{"name":"vendor"}' })
+
+    try {
+      expect((await check(root)).map(d => d.line)).toEqual([7, 8, 9])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 })
 
 describe.concurrent('kay check, unused code', () => {
