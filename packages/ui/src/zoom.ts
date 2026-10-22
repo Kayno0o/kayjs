@@ -19,6 +19,9 @@ export interface Frame {
 // How far in a plate may be taken before it stops answering.
 export const MOST = 8
 
+// The smallest a plate may be drawn whatever `least` asks, as a scale of 0 would leave nothing to zoom back in from.
+const MIN_SCALE = 0.05
+
 // How far one notch of the wheel, or one press of a zoom button, takes it.
 export const NOTCH_ZOOM = 1.15
 
@@ -43,7 +46,7 @@ export function wheelZoom(deltaY: number, deltaMode = 0, notch = NOTCH_ZOOM): nu
 
 // The plate drawn closer or further off, held still at the point of the frame under the pointer.
 export function zoomedAt(plate: Plate, at: { x: number, y: number }, by: number, most = MOST, least = 1): Plate {
-  const scale = Math.min(Math.max(plate.scale * by, least), most)
+  const scale = Math.min(Math.max(plate.scale * by, least, MIN_SCALE), most)
   // What the scale really changed by, since the clamp may have swallowed part of the gesture.
   const real = scale / plate.scale
 

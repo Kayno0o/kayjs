@@ -135,7 +135,8 @@ inBrowser('virtual Table', () => {
 
     await page.click('#wide #grow')
     await page.waitUntil((() => [...document.querySelectorAll('#wide .kui-table-row')].some(row => row.getBoundingClientRect().height > 80)) as never)
-    await page.evaluate((async () => new Promise(resolve => setTimeout(resolve, 300))) as never)
+    await page.waitUntil((() => document.querySelector('#wide .kui-table-wrap')!.scrollHeight > 0 && [...document.querySelectorAll('#wide .kui-table-row')].every(row => row.getBoundingClientRect().height > 80)) as never)
+    await page.evaluate((async () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))) as never)
     const after = await placed(before.index)
 
     expect(after).not.toBeNull()
@@ -179,7 +180,50 @@ inBrowser('HoverCard and ZoomPane', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 
-  test('ZoomPane reports its plate on every zoom and key, and zooms out below fitted down to least', async () => {
+  test('keeps the card on an SVG node while the pane zooms, and lets go of the node once it is left', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/hover-card')
+    // Both events are sent by hand, as a zoom moves the node from under a real pointer and would end the hover.
+    const sendTo = async (selector: string, type: string) => page.evaluate(((target: string, name: string) => document.querySelector(target)!.dispatchEvent(new PointerEvent(name))) as never, selector as never, type as never)
+    const gap = async () => page.evaluate((() => {
+      const card = document.querySelector('#card')!.getBoundingClientRect()
+      const node = document.querySelector('#node-1')!.getBoundingClientRect()
+
+      return Math.abs((card.left + card.right) / 2 - (node.left + node.right) / 2) + Math.abs(card.top - node.bottom)
+    }) as never) as Promise<number>
+
+    await page.waitFor('#node-1')
+    await sendTo('#node-1', 'pointerenter')
+    await page.waitUntil((() => document.querySelector('#card')?.matches(':popover-open')) as never)
+    await page.waitUntil((() => document.querySelector('#card')!.getBoundingClientRect().top > 100) as never)
+    expect(await gap()).toBeLessThan(8)
+
+    await page.evaluate((() => document.querySelector<HTMLElement>('[aria-label="Zoom in"]')!.click()) as never)
+    await page.waitUntil((() => Number(document.querySelector<HTMLElement>('#plate')!.dataset.scale) > 1) as never)
+    await page.waitUntil((() => {
+      const card = document.querySelector('#card')!.getBoundingClientRect()
+      const node = document.querySelector('#node-1')!.getBoundingClientRect()
+
+      return Math.abs((card.left + card.right) / 2 - (node.left + node.right) / 2) < 4
+    }) as never)
+    expect(await gap()).toBeLessThan(8)
+
+    await sendTo('#node-1', 'pointerleave')
+    await page.waitUntil((() => !document.querySelector('#card')!.matches(':popover-open')) as never)
+    expect(await page.evaluate((() => document.querySelector<HTMLElement>('#card + span')!.style.getPropertyValue('anchor-name')) as never)).toBe('')
+
+    // An HTML element takes the name itself and gives it back.
+    await page.click('#plain')
+    await page.waitUntil((() => document.querySelector('#card')?.matches(':popover-open')) as never)
+    expect(await page.evaluate((() => document.querySelector<HTMLElement>('#plain')!.style.getPropertyValue('anchor-name')) as never)).not.toBe('')
+    await page.evaluate((() => document.querySelector<HTMLElement>('#plain')!.blur()) as never)
+    await page.waitUntil((() => !document.querySelector('#card')!.matches(':popover-open')) as never)
+    expect(await page.evaluate((() => document.querySelector<HTMLElement>('#plain')!.style.getPropertyValue('anchor-name')) as never)).toBe('')
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
+  test('ZoomPane reports its plate on every zoom and fit, and zooms out below fitted down to least', async () => {
     const site = await shared()
 
     await using page = await site.open('/hover-card')

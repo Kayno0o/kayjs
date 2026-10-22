@@ -1,1 +1,3 @@
-export type HoverCardPlacement = 'top' | 'bottom' | 'left' | 'right' | 'top-start' | 'top-end' | 'bottom-start' | 'bottom-end'
+import type { PopoverPlacement } from './popover'
+
+export type HoverCardPlacement = PopoverPlacement | 'top' | 'bottom' | 'left' | 'right'

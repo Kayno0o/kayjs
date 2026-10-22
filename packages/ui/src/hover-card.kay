@@ -20,20 +20,33 @@ let panel: HTMLDivElement | undefined
 let marked: HTMLElement | undefined
 let stand: HTMLSpanElement | undefined
 let frame = 0
+// Where the stand-in was last put, so a frame with nothing moved writes nothing.
+let placed = ''
 
 function unmark() {
   cancelAnimationFrame(frame)
   marked?.style.removeProperty('anchor-name')
   marked = undefined
+  placed = ''
   stand?.style.removeProperty('anchor-name')
 }
 
 // An SVG shape is no CSS box, so the browser cannot anchor to it: a fixed, invisible box laid over it stands in, kept on it frame by frame as a pan, a zoom or a scroll moves it.
 function follow(target: Element) {
-  const box = target.getBoundingClientRect()
+  if (!target.isConnected) {
+    unmark()
+    panel?.hidePopover()
 
-  if (stand)
-    stand.style.cssText = `position: fixed; pointer-events: none; visibility: hidden; anchor-name: ${name}; left: ${box.left}px; top: ${box.top}px; width: ${box.width}px; height: ${box.height}px`
+    return
+  }
+
+  const box = target.getBoundingClientRect()
+  const at = `${box.left},${box.top},${box.width},${box.height}`
+
+  if (stand && at !== placed) {
+    placed = at
+    stand.style.cssText = `anchor-name: ${name}; left: ${box.left}px; top: ${box.top}px; width: ${box.width}px; height: ${box.height}px`
+  }
 
   frame = requestAnimationFrame(() => follow(target))
 }
@@ -70,4 +83,4 @@ onCleanup(unmark)
 ---
 div(part="root" {...rest} ref={element => panel = element} id={panelId} popover="manual" data-placement={placement} style={`position-anchor: ${name}`})
   slot
-span(ref={element => stand = element} aria-hidden="true")
+span(ref={element => stand = element} aria-hidden="true" class="kui-hover-card-stand")

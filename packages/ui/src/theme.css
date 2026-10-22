@@ -1698,6 +1698,11 @@
     }
   }
 
+  /* Stands in for an SVG shape a hover card is anchored to, which the browser cannot anchor to itself: a box laid over the shape, never seen or hit. */
+  .kui-hover-card-stand {
+    @apply pointer-events-none invisible fixed size-0;
+  }
+
   .kui-range-input {
     @apply inline-flex items-center gap-1.5;
   }

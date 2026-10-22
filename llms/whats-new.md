@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- `kay add auth` sends mails through `authMailer(mail.enqueue)` once `mail({ module })` is registered, creates a missing `.gitignore` for `data`, and edits an empty or multi-line `tables` list; the ui() shell declares tailwind's layer order, so a utility passed through `class` beats a component's rule ([Project and add](project-new-and-add.md)).
 - kayjs-ui `HoverCard` anchors a card to an element chosen at run time, an SVG shape included, and ZoomPane takes `onChange({ scale, x, y })` and `least` so what stands on its plate can follow it ([HoverCard](../packages/ui/llms/basics.md)).
 - A component call can hand several parts on to the component it calls, `Busy(part="root spinner")`, so a Button with an `onClick` takes the `spinner` part of `button.kay` in `src/ui.ts` like every other Button ([Styling](../llms/styles-and-assets.md)).
 - kayjs-ui `Accordion`, `Skeleton`, `Progress`, `Breadcrumb`, `RadioGroup` and the MarkdownEditor preview take parts, so `src/ui.ts` restyles each piece and a `class` object reaches it ([Setup](../packages/ui/llms/setup.md)).

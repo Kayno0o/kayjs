@@ -546,11 +546,16 @@ function mergeExample(disk: string | undefined, keys: readonly string[], plan: P
     plan.writes.set('.env.example', withLines(plan.writes.get('.env.example') ?? disk ?? '', missing.map(key => `${key}=`).join('\n')))
 }
 
+// `String.replace` takes the string or the function, and not the union of both.
+function replaced(text: string, { find, replace }: LibraryEdit): string {
+  return typeof replace === 'string' ? text.replace(find, replace) : text.replace(find, replace)
+}
+
 function applyEdit(edit: LibraryEdit, library: string, plan: Plan, text: string | undefined): void {
   if (text?.includes(edit.done) === true)
     return
 
-  const changed = text === undefined || !edit.find.test(text) ? undefined : text.replace(edit.find, edit.replace as string)
+  const changed = text === undefined || !edit.find.test(text) ? undefined : replaced(text, edit)
 
   if (changed === undefined) {
     plan.notes.push(`${edit.file} is not the shape ${library} edits: add \`${edit.done}\` to it by hand`)
