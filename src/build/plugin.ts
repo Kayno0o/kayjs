@@ -48,6 +48,8 @@ export interface KayPluginOptions {
   direct?: boolean | undefined
   // An executable's modules carry their own source map, for it to map the stacks of the errors it meets to `.kay` lines with no compiler: they register it under the path Bun shows for the file, relative to the working directory.
   embedMaps?: boolean | undefined
+  // Server modules note the file each component comes from, for `mountComponent(Component)` to find it: the loader sets it under `bun test`.
+  componentFiles?: boolean | undefined
   // Rewrites a project module's source before the rest of the plugin reads it: the executable's `kay.config.ts` without its build plugins.
   rewrite?: ((file: string, source: string) => string) | undefined
 }
@@ -223,9 +225,10 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
         const contents = await pointed(await shippingFiles(expandGlobs(code, withoutTwin(file), root, 'ts'), withoutTwin(file), 'ts'))
 
         const anchored = options.anchor !== undefined && options.anchor !== '' ? `${contents}\nimport ${JSON.stringify(options.anchor)}\n` : contents
+        const noted = options.componentFiles === true && !twin ? `${anchored}\nimport KayNotedComponent from ${JSON.stringify(file)}\n;(globalThis as any)[Symbol.for('kay.component-files')] ??= new WeakMap()\n;(globalThis as any)[Symbol.for('kay.component-files')].set(KayNotedComponent, ${JSON.stringify(file)})\n` : anchored
         const map = options.embedMaps === true ? await embeddedMapCached(source, file, code, options.cacheDir) : undefined
 
-        return { contents: map === undefined ? anchored : `${anchored}\nimport { registerEmbeddedMap } from 'kay/internal/server'\nregisterEmbeddedMap(${JSON.stringify(twin ? `${TWIN_NAMESPACE}:${file}` : relative(process.cwd(), file))}, ${JSON.stringify(map)})\n`, loader: 'ts' as const }
+        return { contents: map === undefined ? noted : `${noted}\nimport { registerEmbeddedMap } from 'kay/internal/server'\nregisterEmbeddedMap(${JSON.stringify(twin ? `${TWIN_NAMESPACE}:${file}` : relative(process.cwd(), file))}, ${JSON.stringify(map)})\n`, loader: 'ts' as const }
       }
 
       build.onLoad({ filter: KAY_FILE }, async ({ path }) => load(path))

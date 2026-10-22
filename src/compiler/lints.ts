@@ -579,6 +579,15 @@ export const LINTS = {
     wrong: 'action(schema, handler, { bodyLimit: \'20mb\' })',
     right: 'action(schema, handler, { maxSize: \'20mb\' })',
   },
+  'deprecated-mount-component': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.70',
+    site: true,
+    summary: '`mountComponent(\'src/components/toggle.kay\', props)` of `kay/test`, which takes the component a test imports since 1.70: `mountComponent(Toggle, props)` types the props and follows a rename. The string form works three minors. The fix imports the component under its name in Pascal case and passes it, unless the file uses that name already for something else.',
+    wrong: 'mountComponent(\'src/components/toggle.kay\', { label: \'Menu\' })',
+    right: 'import Toggle from \'../src/components/toggle.kay\'\n\nmountComponent(Toggle, { label: \'Menu\' })',
+  },
   'deprecated-page-size': {
     level: 'warn',
     group: 'deprecated',

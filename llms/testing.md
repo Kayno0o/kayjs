@@ -153,14 +153,15 @@ A test never writes into the project's `src/content`: a folder collection moves 
 
 ### Test a component's handlers
 
-`mountComponent(file, props)` renders one component built for the browser into `document`, and `settle()` lets effects land before the DOM is read. The first `mountComponent` of a file registers happy-dom's DOM, `@happy-dom/global-registrator` installed as a dev dependency (20.14.6, or 21.0.3 and later); a file that mounts nothing never loads it. Registering replaces `setTimeout` and makes `document` exist, so a file stubbing timers or rendering pages before its first mount imports `kay/test/dom` instead, last among its imports as the lint preset sorts a side-effect import, which runs before any test body; an earlier import capturing `setTimeout` at load needs it first.
+`mountComponent(Component, props)` renders one component built for the browser into `document`, and `settle()` lets effects land before the DOM is read. The first `mountComponent` of a file registers happy-dom's DOM, `@happy-dom/global-registrator` installed as a dev dependency (20.14.6, or 21.0.3 and later); a file that mounts nothing never loads it. Registering replaces `setTimeout` and makes `document` exist, so a file stubbing timers or rendering pages before its first mount imports `kay/test/dom` instead, last among its imports as the lint preset sorts a side-effect import, which runs before any test body; an earlier import capturing `setTimeout` at load needs it first.
 
 ```ts
 import { expect, it } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Toggle from '../src/components/toggle.kay'
 
 it('opens its panel on a click', async () => {
-  const { root, unmount } = await mountComponent('src/components/toggle.kay', { label: 'Menu' })
+  const { root, unmount } = await mountComponent(Toggle, { label: 'Menu' })
 
   root.querySelector('button')!.click()
   await settle()
@@ -251,8 +252,8 @@ it('shows why a todo was refused', async () => {
 
 ### Mounting a component
 
-- `mountComponent(file, props)` from `kay/test` renders one component built for the browser, as an island renders, into `document`, and resolves with `{ root, unmount }` once its effects ran: for what handlers and effects do, such as a dialog opening on a click.
-- `file` is the `.kay` file relative to the project, since importing it through the preload gives its server build.
+- `mountComponent(Component, props)` from `kay/test` renders one component built for the browser, as an island renders, into `document`, and resolves with `{ root, unmount }` once its effects ran: for what handlers and effects do, such as a dialog opening on a click.
+- `Component` is the one the test imports, whose props are typed; the browser build is made from its file. The path of the `.kay` file relative to the project, `mountComponent('src/components/toggle.kay', props)`, works three minors and `kay upgrade` replaces it (`deprecated-mount-component`).
 - On a French site (a `lang` or locale of `fr`) it writes the non-breaking spaces an island does, once `document.documentElement.lang` is `fr`; the other client defines (`KAY_BROWSER`, `KAY_STATIC_EXPORT`) are left out.
 - Props may be functions, and the component runs on a kay of its own, so a signal of the test reaches it through a callback rather than as a prop.
 - A library's settings apply as `kay.config.ts` sets them.

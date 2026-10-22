@@ -180,7 +180,7 @@ if (created.ok)
 
 ## One component
 
-`mountComponent(file, props)` renders one component into `document`. Use it to test what its handlers and effects do.
+`mountComponent(Component, props)` renders one component into `document`, its props typed. Use it to test what its handlers and effects do.
 
 Install `@happy-dom/global-registrator` as a dev dependency. The first `mountComponent` of a file registers happy-dom's DOM, and a file that mounts nothing never loads it. The popover API happy-dom lacks comes with it.
 
@@ -191,9 +191,10 @@ A test that reads `document` before its first mount imports `kay/test/dom`, whic
 ```ts
 import { expect, it } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Toggle from '../src/components/toggle.kay'
 
 it('opens its panel on a click', async () => {
-  const { root, unmount } = await mountComponent('src/components/toggle.kay')
+  const { root, unmount } = await mountComponent(Toggle)
 
   root.querySelector('button')!.click()
   await settle()

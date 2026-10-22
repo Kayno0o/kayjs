@@ -64,13 +64,27 @@ async function registerDom(): Promise<void> {
   }
 }
 
+// What `mountComponent(Component, props)` takes the props of: required unless the component takes none or all optional.
+type MountArguments<Component> = Component extends (props: infer Props) => unknown ? (Record<never, never> extends Props ? [props?: Props] : [props: Props]) : never
+
+// The file each server component the loader built under `bun test` comes from.
+const componentFiles = (): WeakMap<object, string> | undefined => (globalThis as Record<symbol, unknown>)[Symbol.for('kay.component-files')] as WeakMap<object, string> | undefined
+
 // Renders a component compiled for the browser, as an island renders, into the document a DOM such as happy-dom's registered: for testing what its handlers and effects do.
-// `file` is the `.kay` file relative to the project, since importing it through the preload gives its server build.
-export async function mountComponent(file: string, props: Record<string, unknown> = {}): Promise<Mounted> {
+// The component is the one a test imports, `import Toggle from '../src/components/toggle.kay'`, from which the browser build is made. The `.kay` file relative to the project still works, but is deprecated.
+export async function mountComponent<Component extends (props: never) => unknown>(component: Component, ...props: MountArguments<Component>): Promise<Mounted>
+export async function mountComponent(file: string, props?: Record<string, unknown>): Promise<Mounted>
+export async function mountComponent(source: string | ((props: never) => unknown), ...given: unknown[]): Promise<Mounted> {
   if (typeof document === 'undefined')
     await registerDom()
 
   const root = testRoot()
+  const file = typeof source === 'string' ? source : componentFiles()?.get(source)
+
+  if (file === undefined)
+    throw new TypeError('kay: mountComponent takes a .kay component imported in a test, or the path of its file; this function was not built from a .kay file the test loader loaded')
+
+  const props = (given[0] ?? {}) as Record<string, unknown>
   const path = resolve(root, file)
   const key = `${path}\0${await fileVersion(path)}`
   let bundled = bundles.get(key)

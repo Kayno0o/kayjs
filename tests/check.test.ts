@@ -3765,6 +3765,41 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports mountComponent given a path and --fix imports the component, reusing its import and leaving a name the file already uses', async () => {
+    const mounts = [
+      'import { mountComponent } from \'kay/test\'',
+      '',
+      'const first = await mountComponent("src/components/toggle-group.kay", { label: \'a\' })',
+      'const second = await mountComponent(\'src/components/toggle-group.kay\')',
+      '',
+    ].join('\n')
+    const reused = 'import Switch from \'../src/components/toggle-group.kay\'\nimport * as kayTest from \'kay/test\'\n\nvoid Switch\nconst reused = await kayTest.mountComponent(\'src/components/toggle-group.kay\')\n'
+    const taken = 'import { mountComponent } from \'kay/test\'\n\nconst Menu = 1\nconst held = await mountComponent(\'src/components/menu.kay\')\nvoid Menu\n'
+    const component = 'import { mountComponent } from \'kay/test\'\n\nconst by = await mountComponent(Toggle)\nconst other = await foo.mountComponent(\'src/components/toggle-group.kay\')\n'
+    const root = await scratchProject({
+      'src/components/toggle-group.kay': 'button Go\n',
+      'tests/mounts.ts': mounts,
+      'tests/reused.ts': reused,
+      'tests/taken.ts': taken,
+      'tests/other.ts': component,
+    })
+
+    try {
+      const { output } = await runCheck(root)
+
+      expect(output.match(/deprecated-mount-component/g)).toHaveLength(3)
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'tests/mounts.ts')).text()).toBe('import { mountComponent } from \'kay/test\'\nimport ToggleGroup from \'../src/components/toggle-group.kay\'\n\nconst first = await mountComponent(ToggleGroup, { label: \'a\' })\nconst second = await mountComponent(ToggleGroup)\n')
+      expect(await Bun.file(join(root, 'tests/reused.ts')).text()).toContain('kayTest.mountComponent(Switch)')
+      expect(await Bun.file(join(root, 'tests/taken.ts')).text()).toBe(taken)
+      expect(await Bun.file(join(root, 'tests/other.ts')).text()).toBe(component)
+      expect((await runCheck(root)).output.match(/deprecated-mount-component/g)).toHaveLength(1)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports the rate limit options under their old names and --fix renames them, leaving a call that gives both and an object held elsewhere', async () => {
     const config = 'import { ai, ask } from \'@kaynooo/kayjs-ai\'\nimport * as auths from \'@kaynooo/kayjs-auth\'\nimport { createAuth } from \'@kaynooo/kayjs-auth\'\nimport { mailer, smtp } from \'@kaynooo/kayjs-mail\'\n\nconst limit = { max: 1, window: \'1m\' }\nconst held = { limit }\n\nexport const extensions = [ai({ limit, visitor: request => request.headers.get(\'x-user\') ?? undefined })]\nexport const both = ai({ limit, rateLimit: limit })\nexport const unread = ai(held)\nexport const auth = createAuth({ limits: { signIn: { max: 3, window: \'1h\' } } })\nexport const asked = ask(\'hi\', { visitor: \'job\' })\nexport const spaced = auths.createAuth({ "limits": {} })\nexport const sent = smtp({ host: \'mail.test\', rateLimit: 5 })\nexport const nested = mailer({ smtp: { rateLimit: 2 } })\nexport const done = smtp({ host: \'mail.test\', rateLimit: { max: 5, window: \'1s\' } })\nexport const other = ai({ budget: { tokens: 1, window: \'1d\' } })\n'
     const root = await scratchProject({

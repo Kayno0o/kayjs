@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
+import { registerLoader } from '../src/server/loader'
 import { mountComponent, readPersisted, settle, writePersisted } from '../src/test'
 import { scratchDir } from './scratch'
 
@@ -15,6 +16,26 @@ afterAll(async () => {
 })
 
 describe('mount', () => {
+  it('mounts the component itself, imported through the loader, as it mounts its file', async () => {
+    await registerLoader(process.cwd())
+
+    const fixture = './fixtures/mount/toggle.kay'
+    const { default: Toggle } = await import(fixture) as { default: (props: { label: string, onChange: (open: boolean) => void, onDispose: () => void }) => unknown }
+    const changes: boolean[] = []
+    const { root, unmount } = await mountComponent(Toggle, { label: 'Menu', onChange: (open: boolean) => changes.push(open), onDispose: () => undefined })
+
+    root.querySelector('button')!.click()
+    await settle()
+
+    expect(root.querySelector('.panel')?.textContent).toBe('Open')
+    expect(changes).toEqual([false, true])
+    unmount()
+  })
+
+  it('refuses a function that is no component of the project', async () => {
+    await expect(mountComponent((() => undefined) as never)).rejects.toThrow('kay: mountComponent takes a .kay component imported in a test, or the path of its file')
+  })
+
   it('renders a component built for the browser, runs its handlers and effects, and disposes of it', async () => {
     const changes: boolean[] = []
     let disposed = false
