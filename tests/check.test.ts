@@ -3074,6 +3074,31 @@ describe.concurrent('kay check, markup', () => {
     }
   })
 
+  it('scopes a name a block rebinds to that block, and takes a destructuring key for no binding', async () => {
+    const page = [
+      '---',
+      'import waves from \'../public/waves.svg\' with { type: \'text\' }',
+      'const { rows, objects } = props<{ rows: string[], objects: { waves: string }[] }>()',
+      '---',
+      'for waves of rows',
+      '  div(innerHTML={waves})',
+      'div(innerHTML={waves})',
+      'for row of objects',
+      '  const { waves: label } = row',
+      '  div(innerHTML={waves})',
+      '  div(innerHTML={label})',
+      '',
+    ].join('\n')
+    const root = await scratchProject({ 'src/scoped.kay': page, 'src/public/waves.svg': '<svg/>' })
+
+    try {
+      expect((await check(root)).map(d => [basename(d.file), d.line])).toEqual([['scoped.kay', 6], ['scoped.kay', 11]])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('accepts a project file imported as text for innerHTML, and still reports one from a package or imported as a URL', async () => {
     const page = [
       '---',
@@ -3578,6 +3603,8 @@ describe.concurrent('kay check, unused code', () => {
         'export const d = infiniteList<Map<string, Row>>(rows, { size: 7 })',
         'export const e = other<() => X>({ size: 8 })',
         'export const f = infiniteList<{ a: 1; b: { c: 2; d: 3 } }>(rows, { size: 9 })',
+        'if (infiniteList < limit) { a(); b() }',
+        'export const g = n > ({ size: 3 })',
         '',
       ].join('\n'),
       'src/b.kay': '--- server\nconst x = 1\n---\np don\'t stop\np it\'s odd\nbutton(onClick={() => api({ bodyLimit: "1mb" })}) Go\n',
@@ -3602,6 +3629,7 @@ describe.concurrent('kay check, unused code', () => {
       expect(await Bun.file(join(root, 'src/a.ts')).text()).toContain('infiniteList<Map<string, Row>>(rows, { pageSize: 7 })')
       expect(await Bun.file(join(root, 'src/a.ts')).text()).toContain('{ c: 2; d: 3 } }>(rows, { pageSize: 9 })')
       expect(await Bun.file(join(root, 'src/a.ts')).text()).toContain('other<() => X>({ size: 8 })')
+      expect(await Bun.file(join(root, 'src/a.ts')).text()).toContain('n > ({ size: 3 })')
       expect(await Bun.file(join(root, 'src/c.ts')).text()).toBe('export async function f(auth: any, x: number, y: number) {\n  await auth.endSession(x)\n  (y)\n  await auth.endSession(y) || x\n}\n')
     }
     finally {

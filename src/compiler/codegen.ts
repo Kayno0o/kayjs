@@ -7,7 +7,7 @@ import type { PageSettingName } from './page-settings'
 import type { Sites } from './rewrite'
 import type { ImportBinding, PropsDeclaration, ScriptAnalysis, ServerAnalysis } from './script'
 import { actionUrl } from '../runtime/action'
-import { errorMessages, INTERACTIVE_ATTRIBUTE, isHead, someNode, templateFacts, uiHasVariants, visitNodes } from './ast'
+import { childBlocks, errorMessages, INTERACTIVE_ATTRIBUTE, isHead, someNode, templateFacts, uiHasVariants, visitNodes } from './ast'
 import { domHelperImport, DomTemplate } from './dom'
 import { mayHoldFunction } from './expression'
 import { htmlHelperImport, HtmlTemplate } from './html'
@@ -25,6 +25,7 @@ import { headTagProblem, sharedImports } from './validate'
 const WRITE_NAMES: Record<keyof typeof WRITE_HELPERS, KayHelper> = { to: 'writeTo', update: 'updateTo', back: 'writeBack', updateBack: 'updateBack' }
 
 const WORD = /[\p{ID_Start}$_][\p{ID_Continue}$\u200C\u200D]*/gu
+const KEY_COLON = /^\s*:/
 const TEXT_ATTRIBUTE = /\bwith\s*\{\s*type\s*:\s*(['"])text\1/
 
 export interface GenerateOptions {
@@ -252,50 +253,70 @@ class ModuleShell {
     }, this.sites)
   }
 
-  // The names of the project's own files imported as text, `import waves from './waves.svg' with { type: 'text' }`: markup the app made, as a written-out `innerHTML` is.
-  private ownMarkup(): Set<string> {
+  // Whether `name` at `at` is a project file imported as text, `import waves from './waves.svg' with { type: 'text' }`: markup the app made, as a written-out `innerHTML` is.
+  private ownMarkup(): (name: string, at: number) => boolean {
     const bindings = [...this.script.imports, ...this.fence?.imports ?? []]
-    const own = bindings.filter(binding => !binding.typeOnly && binding.imported === 'default' && binding.source.startsWith('.') && !binding.source.split('/').includes('node_modules') && TEXT_ATTRIBUTE.test(this.src.slice(binding.declaration.start, binding.declaration.end))).map(binding => binding.local)
+    const own = new Set(bindings.filter(binding => !binding.typeOnly && binding.imported === 'default' && binding.source.startsWith('.') && !binding.source.split('/').includes('node_modules') && TEXT_ATTRIBUTE.test(this.src.slice(binding.declaration.start, binding.declaration.end))).map(binding => binding.local))
 
-    if (own.length === 0)
-      return new Set()
+    if (own.size === 0)
+      return () => false
 
-    // A loop item, a snippet or slot parameter, an alias or a `const` of the template may take an import's name, and then holds any string.
-    const shadowed = new Set<string>()
-    const bound = (span: Span | undefined) => {
-      for (const [name] of span === undefined ? [] : this.src.slice(span.start, span.end).matchAll(WORD))
-        shadowed.add(name)
+    // A loop item, a snippet or slot parameter, an alias or a `const` of the template may take an import's name, and then holds any string there: the span it is bound in, which is its block.
+    const shadows = new Map<string, Span[]>()
+    const bound = (span: Span | undefined, scope: Span, destructured = false) => {
+      if (span === undefined)
+        return
+
+      const text = this.src.slice(span.start, span.end)
+
+      for (const match of text.matchAll(WORD)) {
+        // The key of `{ key: name }` binds nothing.
+        if (destructured && KEY_COLON.test(text.slice(match.index + match[0].length)))
+          continue
+
+        if (own.has(match[0]))
+          shadows.set(match[0], [...shadows.get(match[0]) ?? [], scope])
+      }
+    }
+    const scan = (nodes: readonly Node[]) => {
+      for (const node of nodes) {
+        if (node.kind === 'for') {
+          bound(node.item, node, true)
+          bound(node.index, node)
+        }
+        else if (node.kind === 'slot') {
+          bound(node.params, node, true)
+        }
+        else if (node.kind === 'snippet') {
+          bound(node.params, node)
+        }
+        else if (node.kind === 'await') {
+          for (const branch of [node.resolved, node.rejected]) {
+            if (branch)
+              bound(branch.alias, branch, true)
+          }
+        }
+        else if (node.kind === 'try') {
+          if (node.rejected)
+            bound(node.rejected.alias, node.rejected, true)
+        }
+        else if (node.kind === 'const') {
+          // Seen by the lines after it at its indentation and by their children.
+          bound(node.pattern, { start: node.start, end: nodes.at(-1)?.end ?? node.end }, true)
+        }
+        else if (node.kind === 'if') {
+          for (const branch of node.branches)
+            bound(branch.alias, branch, true)
+        }
+
+        for (const block of childBlocks(node))
+          scan(block)
+      }
     }
 
-    visitNodes(this.file.template, (node) => {
-      if (node.kind === 'for') {
-        bound(node.item)
-        bound(node.index)
-      }
-      else if (node.kind === 'slot') {
-        bound(node.params)
-      }
-      else if (node.kind === 'snippet') {
-        bound(node.params)
-      }
-      else if (node.kind === 'await') {
-        bound(node.resolved?.alias)
-        bound(node.rejected?.alias)
-      }
-      else if (node.kind === 'try') {
-        bound(node.rejected?.alias)
-      }
-      else if (node.kind === 'const') {
-        bound(node.pattern)
-      }
-      else if (node.kind === 'if') {
-        for (const branch of node.branches) {
-          bound(branch.alias)
-        }
-      }
-    })
+    scan(this.file.template)
 
-    return new Set(own.filter(name => !shadowed.has(name)))
+    return (name, at) => own.has(name) && !shadows.get(name)?.some(span => at >= span.start && at < span.end)
   }
 
   run(): Generated {

@@ -198,6 +198,7 @@ export function mask(source: string): string {
 function typeArgumentsEnd(source: string, at: number): number {
   let depth = 0
   let braces = 0
+  let parens = 0
 
   for (let end = at; end < source.length && end < at + 400; end++) {
     const char = source[end]
@@ -206,6 +207,11 @@ function typeArgumentsEnd(source: string, at: number): number {
       braces++
     else if (char === '}')
       braces--
+    else if (char === '(')
+      parens++
+    // A `)` the type arguments never opened closes the call they were read from, so it was a comparison.
+    else if (char === ')' && --parens < 0)
+      return -1
     else if (char === '<')
       depth++
     else if (char === '>' && source[end - 1] !== '=' && --depth === 0)

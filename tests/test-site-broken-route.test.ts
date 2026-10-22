@@ -1,7 +1,7 @@
 import { join, resolve } from 'node:path'
 import { expect, it } from 'bun:test'
 import { clientDir } from '../src/build/assets'
-import { PRODUCTION, resolveProject } from '../src/project'
+import { resolveProject } from '../src/project'
 import { servePages } from '../src/server/app'
 import { scratchDir } from './scratch'
 
@@ -103,7 +103,7 @@ it('serves no page of a project with a route that does not compile unless asked 
   await Bun.write(join(dir, 'src', 'routes', 'broken.kay'), BROKEN)
   await Bun.write(join(dir, 'kay.config.ts'), 'export default {}\n')
 
-  const project = resolveProject(dir, { dev: false, prebuilt: false }, PRODUCTION)
+  const project = resolveProject(dir, {}, { dev: false, prebuilt: false, underKayDev: false })
   const client = { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: clientDir(dir) }
 
   await expect(servePages(project, () => client)).rejects.toThrow('broken.kay')

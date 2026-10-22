@@ -25,8 +25,8 @@ export interface JsxOptions {
   sendsIslandProps: boolean
   // Names the script declares as plain data written out, which an island prop check takes as serializable whatever type the declaration gives them.
   plain: ReadonlySet<string>
-  // Names bound to a project file imported as text, which `innerHTML` takes as it takes markup written out.
-  ownMarkup: ReadonlySet<string>
+  // Whether a name at an offset is bound to a project file imported as text, which `innerHTML` takes as it takes markup written out.
+  ownMarkup: (name: string, at: number) => boolean
 }
 
 // JSX collapses a run of spaces in text, which `pre` and `textarea` would show, so a run goes out as a string.
@@ -879,7 +879,7 @@ export class JsxTemplate {
     }
 
     if (!element.component && attribute.kind === 'expression' && MARKUP_ATTRIBUTES.has(name)) {
-      const own = this.options.ownMarkup.has(this.src.slice(attribute.expression.start, attribute.expression.end).trim())
+      const own = this.options.ownMarkup(this.src.slice(attribute.expression.start, attribute.expression.end).trim(), attribute.expression.start)
 
       this.attributeName(attribute).add('={KayHtml((').addSource(attribute.expression).add(own ? ') as import("kay").SafeHtml)}' : '))}')
 
