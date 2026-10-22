@@ -25,7 +25,7 @@ export class TypesProcess {
   // The project modules the running process loaded, as its last answer reported them.
   private modules: Set<string> | undefined
   // `env` is the environment the process starts with, which leaves out what the `.env` files hold so it reads them itself on every start.
-  constructor(private root: string, private entry: string | undefined, private env: Record<string, string | undefined> = process.env) {}
+  constructor(private root: string, private entry: string | undefined, private env: Record<string, string | undefined> = process.env, private idleMs = IDLE_MS) {}
 
   // The project modules the last answer reported, undefined before the first.
   loadedModules(): string[] | undefined {
@@ -65,7 +65,7 @@ export class TypesProcess {
     const answer = await this.ask(refuse, command)
 
     if (answer !== undefined) {
-      this.idle = setTimeout(() => this.kill(), IDLE_MS)
+      this.idle = setTimeout(() => this.kill(), this.idleMs)
       this.idle.unref()
 
       return answer

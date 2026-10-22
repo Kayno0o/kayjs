@@ -69,6 +69,10 @@ const TYPES_GRACE_MS = 2000
 const FIRST_TREE_WAIT_MS = 3000
 // How long the type check waits for the last change before it starts, so a burst of saves is checked once.
 const CHECK_DEBOUNCE_MS = 300
+// How long the process checking waits for the next edit before it exits: longer than the tree writer's, as a boot costs it the config and the collections it read.
+const CHECK_IDLE_MS = 120_000
+// The type errors the pages and the server carry, as `errors.json` does.
+const MAX_SENT_ERRORS = 50
 // The type errors the terminal lists before it counts the rest.
 const MAX_TYPE_LINES = 10
 const LINE_BREAK = /\r?\n/
@@ -164,7 +168,10 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   let configRefused = false
   // Set once the type check is defined, below the helpers it says its errors with.
   let typesWritten: (() => void) | undefined
+  // A write of the tree started since the check began, which makes its answer old.
+  let checkStale = false
   const writeTypes = async () => {
+    checkStale = true
     // Any write of the tree is the first one, so none is left waiting for a server.
     writeFirstTree = undefined
     clearTimeout(treeTimer)
@@ -273,7 +280,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     typeProblems = problems
 
     if (child !== undefined)
-      tell(child, { typeErrors: problems })
+      tell(child, { typeErrors: problems.slice(0, MAX_SENT_ERRORS) })
 
     if (problems.length === 0) {
       if (options.quiet !== true)
@@ -289,7 +296,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   }
   // The type check runs in a process of its own beside the server, once the tree it types is written: a reload never waits for it, and its errors reach the open pages, errors.json and the terminal when it ends.
   const typeChecking = options.types !== false && options.config === undefined && existsSync(join(root, 'tsconfig.json'))
-  const checkProcess = new TypesProcess(root, options.entry, env)
+  const checkProcess = new TypesProcess(root, options.entry, env, CHECK_IDLE_MS)
   let checkFresh = true
   let checkTimer: Timer | undefined
   let checking: Promise<void> | undefined
@@ -306,6 +313,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
           while (checkAgain) {
             checkAgain = false
             await typesWriting
+            checkStale = false
 
             const fresh = checkFresh
 
@@ -317,9 +325,12 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
               break
 
             // A change came meanwhile, whose check follows and says what holds.
-            if (!checkAgain && code !== CHECK_SKIPPED)
+            if (!checkStale && !checkAgain && code !== CHECK_SKIPPED)
               publishTypeErrors(checkProcess.problems)
           }
+        }
+        catch (error) {
+          console.error(error)
         }
         finally {
           checking = undefined
@@ -501,9 +512,9 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     if (server === child && 'listening' in message) {
       listening = true
 
-      // A new process starts without the errors the last check found.
-      if (typeProblems.length > 0)
-        tell(server, { typeErrors: typeProblems })
+      // A new process starts without the errors the last check found; with no check running it clears those a previous run left in `errors.json`.
+      if (!typeChecking || typeKey !== undefined)
+        tell(server, { typeErrors: typeProblems.slice(0, MAX_SENT_ERRORS) })
     }
 
     if (server === child && 'reloaded' in message)
@@ -666,7 +677,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     // The entry is the config's, which the types read: the new process starts on the one known, and another process follows once the types tell the config now names another.
     const configEdited = files.includes(CONFIG_FILE)
 
-    if (configEdited || files.some(file => !file.endsWith('.kay') && (!CODE_FILE.test(file) || checkProcess.loaded(file))))
+    // A check needs a new process as the tree writer does, for a change to the config or to something the process loaded.
+    if (configEdited || (typesRead(files) && (files.length === 0 || files.some(file => !file.endsWith('.kay') && (!CODE_FILE.test(file) || checkProcess.loaded(file))))))
       checkFresh = true
 
     let entryWrite: Promise<void> | undefined
@@ -908,7 +920,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     checkAgain = false
     checkProcess.close()
     typesProcess.close()
-    await Promise.all([child?.exited, waiting?.exited, builder?.stop()])
+    await Promise.all([checking, child?.exited, waiting?.exited, builder?.stop()])
     await inspector?.stop()
   }
 
@@ -1105,7 +1117,7 @@ async function reloadConfig(root: string, last: KayConfig): Promise<KayConfig> {
   }
 }
 
-// Keeps editors and `tsgo` in step with the `.kay` sources; type errors themselves are `kay check`'s job.
+// Keeps editors and `tsgo` in step with the `.kay` sources; the type errors are the check beside the server's.
 // Without a `config` it is written by a process of its own from kay.config.ts as it is now, which keeps the checker out of this one and reads again every module the config imports.
 // Whether, asked to `refuse`, the process found kay.config.ts does not load.
 async function regenerateTypes(root: string, { entry, config }: DevOptions, refuse: boolean, types: TypesProcess, fresh: boolean): Promise<boolean> {

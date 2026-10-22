@@ -9,7 +9,7 @@ import { loadConfig } from '../config'
 import { projectPaths } from '../project'
 import { ANSWER, CHECK, CHECK_SKIPPED, CONFIG_REFUSED, ENTRY, LOAD, MODULES, PROBLEMS, REFUSE } from './refuse'
 
-// Writes the shadow tree of the project for `kay dev` from the config as it is now, in a process of its own so `kay dev` holds no checker and every module the config imports is read again.
+// Writes the shadow tree of the project for `kay dev`, or types the project as `kay check` does, from the config as it is now, in a process of its own so `kay dev` holds no checker and every module the config imports is read again.
 // It stays up between writes: each line `kay dev` sends but `load` writes the tree once more with the config this process loaded, and the line it answers with is the exit code that write would have had.
 const [root, entry, refuse] = process.argv.slice(2)
 let loaded: KayConfig | undefined
@@ -80,8 +80,10 @@ async function write(): Promise<number> {
 
 // The collections and messages the checks read, kept between them as `kay check --watch` does: read again only when a file they read changed.
 const probes: ProbeMemory = new Map()
-// The code of a diagnostic tsgo reported, or none: the lints `kay check` finds in the .kay files are the dev tool's already, from the compile.
+// The diagnostics tsgo reported, with or without a code of its own, and the lints made of its errors: the other lints `kay check` finds in the .kay files are the dev tool's already, from the compile.
 const TYPE_CODE = /^TS\d+$/
+// The lints only the types find, which the compile does not report.
+const TYPE_LINTS = new Set(['uncalled-signal', 'island-action', 'secret-prop', 'incomplete-match'])
 
 // Types the project as `kay check` does, with the config this process loaded, and says the type errors on a line of their own.
 async function typecheck(): Promise<number> {
@@ -92,7 +94,7 @@ async function typecheck(): Promise<number> {
     if (loaded === undefined || refused)
       return CHECK_SKIPPED
 
-    const found = (await check(root!, { ...configCheckOptions(config), entry: entry === '' ? config.entry : entry }, probes)).filter(({ code, severity }) => severity !== 'warning' && (code === undefined || TYPE_CODE.test(code)))
+    const found = (await check(root!, { ...configCheckOptions(config), entry: entry === '' ? config.entry : entry }, probes)).filter(({ code }) => code === undefined || TYPE_CODE.test(code) || TYPE_LINTS.has(code))
     const problems = found.map((diagnostic): TypeProblem => {
       const source = readText(diagnostic.file)
 
@@ -119,10 +121,11 @@ function readText(file: string): string | undefined {
   }
 }
 
+const COMMANDS: Record<string, () => Promise<number>> = { [LOAD]: load, [CHECK]: typecheck }
+
 // What `kay dev` reads of a write: the modules loaded, then the exit code.
 async function answer(line: string): Promise<void> {
-  const commands: Record<string, () => Promise<number>> = { [LOAD]: load, [CHECK]: typecheck }
-  const code = await (commands[line] ?? write)()
+  const code = await (COMMANDS[line] ?? write)()
 
   process.stdout.write(`\n${MODULES}${JSON.stringify(loadedModules())}\n\n${ANSWER}${code}\n`)
 }

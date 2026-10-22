@@ -67,6 +67,29 @@ describe('the type check beside kay dev', () => {
     }
   }, 120_000)
 
+  it('shows the lints only the types find, a warning too, and keeps the errors listed in errors.json through a restart of the server', async () => {
+    const root = await project({ 'src/routes/index.kay': '---\nconst count: 1 | 2 = Math.random() > 0.5 ? 1 : 2\n---\nmatch count\n  when 1\n    p One\n' })
+    const events: Event[] = []
+    const stop = await dev(root, { format: 'json', port: 0, log: line => void events.push(JSON.parse(line) as Event) })
+
+    try {
+      await until(() => events.some(({ event }) => event === 'types'))
+      expect(events.find(({ event }) => event === 'types')!.errors).toEqual([expect.objectContaining({ code: 'incomplete-match', file: 'src/routes/index.kay' })])
+      await until(() => listedTypeErrors(root).length === 1)
+
+      // A new server process starts from the file and is told the set again.
+      const before = events.length
+
+      await Bun.write(join(root, '.env'), 'A=1\n')
+      await until(() => events.slice(before).some(({ event }) => event === 'restart'))
+      await Bun.sleep(1500)
+      expect(listedTypeErrors(root)).toHaveLength(1)
+    }
+    finally {
+      await stop()
+    }
+  }, 120_000)
+
   it('checks nothing with --no-types, and in a project without a tsconfig', async () => {
     const off = await project({ 'src/routes/index.kay': '---\nconst count: number = \'one\'\n---\np {count}\n' })
     const bare = await scratchDir('dev-types-')

@@ -224,8 +224,7 @@ function readErrors(file: string): [string, DevError][] {
   try {
     const { errors } = JSON.parse(readFileSync(file, 'utf8')) as { errors: DevError[] }
 
-    // A type error is the check's to list again: `kay dev` tells each new server the ones it holds, so a previous run's do not outlive its fix.
-    return errors.filter(error => error.kind !== 'type').map(error => [keyOf(error), error])
+    return errors.map(error => [keyOf(error), error])
   }
   catch {
     return []
