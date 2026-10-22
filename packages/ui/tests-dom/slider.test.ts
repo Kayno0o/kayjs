@@ -197,6 +197,32 @@ test('puts back the last accepted value, not the start, and leaves one its paren
   expect(input.value).toBe('80')
 })
 
+test('keeps the value the parent set to the very one pending, even when that change is refused', async () => {
+  let settle1: (answer: boolean) => void = () => undefined
+  const { release, input, root } = await open(undefined, async () => new Promise<boolean>((resolve) => {
+    settle1 = resolve
+  }))
+
+  // Only `change` fires, so the parent has not heard the value yet.
+  input.value = '80'
+  await release()
+  click(root.querySelector('#set'))
+  await settle()
+  settle1(false)
+  await settle()
+
+  expect(input.value).toBe('80')
+})
+
+test('still puts back a refused value the parent only echoed from onInput', async () => {
+  const { drag, release, input } = await open(undefined, async () => Promise.resolve(false))
+
+  await drag('60')
+  await release()
+
+  expect(input.value).toBe('40')
+})
+
 test('tells onChange of a form reset that moved the thumb', async () => {
   const change: number[] = []
   const { drag, release, root, input } = await open(undefined, value => void change.push(value))

@@ -76,6 +76,7 @@ async function released(input: HTMLInputElement) {
   const next = Number(input.value)
   const before = settled
   const syncedBefore = synced
+  const heldBefore = untrack(() => value)
 
   shown.set(next)
 
@@ -88,7 +89,8 @@ async function released(input: HTMLInputElement) {
     return
   }
 
-  if (accepted) {
+  // A parent that moved `value` onto the number chosen, other than by echoing it from `onInput`, holds it whatever the answer.
+  if (accepted || (heldBefore !== next && untrack(() => value) === next)) {
     settled = next
   }
   else {

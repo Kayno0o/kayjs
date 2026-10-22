@@ -71,6 +71,7 @@ async function chosen(input: HTMLInputElement) {
   const next = input.value
   const before = settled
   const syncedBefore = synced
+  const heldBefore = untrack(() => normal(value))
 
   shown.set(next)
 
@@ -83,7 +84,8 @@ async function chosen(input: HTMLInputElement) {
     return
   }
 
-  if (accepted) {
+  // A parent that moved `value` onto the colour chosen, other than by echoing it before, holds it whatever the answer.
+  if (accepted || (heldBefore !== next && untrack(() => normal(value)) === next)) {
     settled = next
   }
   else {
@@ -106,6 +108,6 @@ onFormReset(() => box, resetting.reset)
 ---
 // A native colour input drawn as a swatch, so the picker, the keyboard and the form post come with it. A click while a change is under way opens nothing.
 label(part="root")
-  input({...rest} part="input" ref={boxRef} type="color" aria-label={label} value={shown()} aria-busy={busy() ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onInput={moved} onChange={event => chosen(event.currentTarget)})
+  input({...rest} part="input" ref={boxRef} type="color" aria-label={rest['aria-label'] ?? label} value={shown()} aria-busy={busy() ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onInput={moved} onChange={event => chosen(event.currentTarget)})
   span(part="label") {label}
   span(part="value" aria-hidden="true") {shown()}

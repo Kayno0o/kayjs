@@ -13,6 +13,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui `Slider` takes `onChange(value)` once on release or key press, a promise holding it busy and `false` putting the thumb back ([Slider](../packages/ui/llms/forms.md)).
 - `unsized-image` no longer warns of an `img` whose static classes or `style` reserve its box, as `aspect-video w-full` ([Checks](checks.md)).
 - kayjs-ui `ColorInput` picks a `#rrggbb` colour on a native input drawn as a swatch, holds itself busy on a promise from `onChange` and puts the colour back when refused ([Forms](../packages/ui/llms/forms.md)).
+- kayjs-ui `ColorInput` takes an `aria-label` or `aria-labelledby` that names the input in place of `label` ([Forms](../packages/ui/llms/forms.md)).
 - kayjs-ui `ChipGroup` takes number values as `Segmented` does, and `Segmented`, `ChipGroup` and `RadioGroup` take `disabled` for the whole group ([ChipGroup](../packages/ui/llms/tables-navigation-and-layout.md)).
 - `pgData` replicas hear room messages, invalidations and live values in the order they were made, also when their ids gain a digit, where a message could arrive before an earlier one and twice ([Rooms](rooms.md)).
 - `pgData` replicas hear room messages, invalidations and live values in the order they were made, also when their ids gain a digit, where a message could arrive before an earlier one, or twice ([Rooms](rooms.md)).

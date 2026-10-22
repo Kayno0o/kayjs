@@ -43,6 +43,18 @@ test('names the input by its label alone, not by the hex beside it', async () =>
   expect(input.getAttribute('aria-label')).toBe('Light')
 })
 
+test('an app\'s aria-label wins over the label as the input\'s name, and aria-labelledby is passed on', async () => {
+  const { root } = await open()
+
+  expect([root.querySelector('input[name="named"]')!.getAttribute('aria-label'), root.querySelector('input[name="labelled"]')!.getAttribute('aria-labelledby')]).toEqual(['Accent colour of the theme', 'tint-heading'])
+})
+
+test('hides the hex text from screen readers, the input being named already', async () => {
+  const { root } = await open()
+
+  expect(root.querySelector('.kui-color-input-value')?.getAttribute('aria-hidden')).toBe('true')
+})
+
 test('shows an upper case or invalid parent colour as the input holds it', async () => {
   mounted = await mountComponent('src/components/color-input.kay', {})
 
@@ -176,6 +188,19 @@ test('keeps the colour the parent set while a change was under way, even when th
   await settle()
 
   expect([input.value, shown()]).toEqual(['#00ff00', '#00ff00'])
+})
+
+test('keeps the colour the parent set to the very one pending, even when that change is refused', async () => {
+  const gate = Promise.withResolvers<boolean>()
+  const { input, commit, shown, root } = await open(async () => gate.promise)
+
+  await commit('#abcdef')
+  click(root.querySelector('#upper'))
+  await settle()
+  gate.resolve(false)
+  await settle()
+
+  expect([input.value, shown()]).toEqual(['#abcdef', '#abcdef'])
 })
 
 test('a form reset puts the colour back on its start and tells onChange', async () => {
