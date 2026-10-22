@@ -21,13 +21,13 @@ const ENTRY = 'src/app.css'
 const PARTS_IMPORT = /@import\s+(?:url\(\s*)?['"]tailwindcss\/(?:theme|utilities)\.css['"]/
 const PACKAGE_NAME = /^(?:@[^/]+\/)?[^/]+/
 
-// A design system and every stylesheet it read with the time each was last changed, so an edit to any of them loads it again.
+// A design system and every stylesheet it read with the stamp of each, so an edit to any of them loads it again.
 interface Loaded {
   sorter: ClassSorter | undefined
   design: Design | undefined
   // Why the design system did not load.
   failure?: string | undefined
-  files: Map<string, number>
+  files: Map<string, string>
 }
 
 const loads = new Map<string, { entry: string, loaded: Promise<Loaded> }>()
@@ -55,7 +55,7 @@ async function tailwindLoad(root: string, parts: boolean, references: string[]):
   if (known?.entry === entry) {
     const loaded = await known.loaded
 
-    if (loaded.sorter && [...loaded.files].every(([file, stamp]) => Bun.file(file).lastModified === stamp))
+    if (loaded.sorter && [...loaded.files].every(([file, stamp]) => stampOf(file) === stamp))
       return loaded
   }
 
@@ -129,15 +129,22 @@ function assertResolvable(id: string, from: string): void {
     throw new Error(`${name} is not installed`)
 }
 
+// The size beside the time, as two writes in one millisecond share a time.
+function stampOf(path: string): string {
+  const file = Bun.file(path)
+
+  return `${file.lastModified}:${file.size}`
+}
+
 async function loadDesign(entry: string, root: string, references: string[]): Promise<Loaded> {
-  const files = new Map([[entry, Bun.file(entry).lastModified]])
+  const files = new Map([[entry, stampOf(entry)]])
   const { design, failure } = await loadDesignSystem(entry, files, root, references)
 
   return { sorter: design && (classes => design.getClassOrder(classes).toSorted(([, a], [, b]) => compareIndex(a, b)).map(([name]) => name)), design, failure, files }
 }
 
 // Runs the project's own Tailwind plugin and config modules, as its build does, so the order holds for the utilities they add; none that is not installed.
-async function loadDesignSystem(entry: string, files: Map<string, number>, root: string, references: string[]): Promise<{ design?: Design, failure?: string }> {
+async function loadDesignSystem(entry: string, files: Map<string, string>, root: string, references: string[]): Promise<{ design?: Design, failure?: string }> {
   try {
     const base = dirname(entry)
 
@@ -152,7 +159,7 @@ async function loadDesignSystem(entry: string, files: Map<string, number>, root:
 
         const path = await stylesheetPath(id, from)
 
-        files.set(path, Bun.file(path).lastModified)
+        files.set(path, stampOf(path))
 
         return { path, base: dirname(path), content: await Bun.file(path).text() }
       },
