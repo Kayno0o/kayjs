@@ -389,16 +389,16 @@ class RewriteFinder {
   }
 
   // Text added at `at`, after a rewrite ending there or before one starting there.
-  private insert(at: number, text: string) {
+  private insert(at: number, text: string, probe?: Span) {
     const found = this.rewrites.get(at)
 
     if (!found) {
-      this.rewrites.set(at, { after: text, end: at })
+      this.rewrites.set(at, { after: text, end: at, probe })
 
       return
     }
 
-    this.rewrites.set(at, found.end === at ? { ...found, after: `${found.after ?? ''}${text}` } : { ...found, before: `${text}${found.before ?? ''}` })
+    this.rewrites.set(at, found.end === at ? { ...found, after: `${found.after ?? ''}${text}`, probe: probe ?? found.probe } : { ...found, before: `${text}${found.before ?? ''}` })
   }
 
   // An assignment to a signal writes it: `count = 1` through `count.set(1)`, `count += 1` and `count++` through an updater, so an effect writing it does not track it too.
@@ -854,6 +854,7 @@ class RewriteFinder {
 
     const [from, opening, closing] = pieces.map(piece => map.toSource(piece)) as [number, number, number | undefined]
     const { start, last, rightFrom } = this.writeSpans(node)
+    const keySpan = this.input.check === true && map.isExact(property.start!) ? { start: map.toSource(property.start!)!, end: map.toSource(property.start!)! + property.end! - property.start! } : undefined
     const key = computed ? undefined : JSON.stringify((property as t.Identifier).name)
 
     if (start === undefined || last === undefined)
@@ -872,10 +873,10 @@ class RewriteFinder {
 
       if (computed) {
         rewrites.set(opening, { replace: ', ', end: opening + 1 })
-        rewrites.set(closing!, { replace: `, ${tail}`, end: last + 1 })
+        rewrites.set(closing!, { replace: `, ${tail}`, end: last + 1, probe: keySpan })
       }
       else {
-        rewrites.set(opening, { replace: `, ${key}, ${tail}`, end: last + 1 })
+        rewrites.set(opening, { replace: `, ${key}, ${tail}`, end: last + 1, probe: keySpan })
       }
 
       writes.add('update')
@@ -903,11 +904,11 @@ class RewriteFinder {
     const probe = this.input.check === true ? `, ${PROBE}` : ''
 
     if (LOGICAL.has(operator))
-      this.insert(last + 1, `), "logical"${probe})`)
+      this.insert(last + 1, `), "logical"${probe})`, keySpan)
     else if (compound)
-      this.insert(last + 1, `)${probe ? `, undefined${probe}` : ''})`)
+      this.insert(last + 1, `)${probe ? `, undefined${probe}` : ''})`, keySpan)
     else
-      this.insert(last + 1, `${probe})`)
+      this.insert(last + 1, `${probe})`, keySpan)
 
     writes.add(compound ? 'update' : 'to')
   }

@@ -990,6 +990,39 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('points a readonly key error at the key itself, for a plain, a compound, an update and a multi-line write', async () => {
+    const box = 'export const box = { id: 1, rows: [1] as readonly number[] } as { readonly id: number, readonly rows: readonly number[] }\n'
+
+    const page = [
+      '---',
+      'import { box } from \'../box\'',
+      '',
+      'function write() {',
+      '  box.id = 2',
+      '  box.id += 1',
+      '  box.id++',
+      '  --box.id',
+      '  box[\'id\'] = 3',
+      '  box.rows[0] = 4',
+      '  box.id = [',
+      '    1,',
+      '  ].length',
+      '}',
+      '---',
+      'button(onClick={write}) write',
+      '',
+    ].join('\n')
+
+    const root = await scratchProject({ 'src/box.ts': box, 'src/routes/index.kay': page })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.column, d.code])).toEqual([[5, 7, 'TS2540'], [6, 7, 'TS2540'], [7, 7, 'TS2540'], [8, 9, 'TS2540'], [9, 7, 'TS2540'], [10, 12, 'TS2542'], [11, 7, 'TS2540']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('leaves plain code as typed: generics, a private field, a narrowed let and a logical assignment', async () => {
     const box = [
       'export function makeBox() {',

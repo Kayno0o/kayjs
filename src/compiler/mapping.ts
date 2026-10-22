@@ -1,5 +1,6 @@
 import type { Span } from './ast'
 import type { Expansion } from './markdown-block'
+import { PROBE } from './names'
 
 // A run of generated code copied character for character from the source.
 export interface Mapping {
@@ -21,6 +22,8 @@ export interface Rewrite {
   after?: string | undefined
   // The name is a component tag the rewrite cannot spell as one: it opens as `KayDynamic component={...}`.
   dynamic?: boolean | undefined
+  // The write probe the text holds maps to this source span, the key written, so an error on it lands there.
+  probe?: Span | undefined
 }
 
 const BLANK = /^\s*$/
@@ -85,6 +88,13 @@ export class CodeBuilder {
       }
 
       this.code += rewrite.after ?? ''
+
+      if (rewrite.probe) {
+        const at = this.code.lastIndexOf(PROBE, this.code.length)
+
+        this.ranges.push({ generated: { start: at, end: at + PROBE.length }, source: rewrite.probe })
+      }
+
       cursor = rewrite.end
     }
     this.copy(cursor, span.end)
