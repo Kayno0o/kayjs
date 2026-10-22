@@ -3,6 +3,9 @@ import { dirname, relative, resolve, sep } from 'node:path'
 import { parseKay } from '../compiler/parser'
 import { analyzeScript, analyzeServer } from '../compiler/script'
 
+// The relative specifier after `from`, `import` or `import(`, in the second group.
+const MODULE_SPECIFIER = /(?:\bfrom\s*|\bimport\s*(?:\(\s*)?)(['"])(\.[^'"\n]*)\1/g
+
 export interface ImportEdit extends Span {
   text: string
 }
@@ -61,9 +64,18 @@ function editsFor(file: string, source: string, spans: Span[], moves: ReadonlyMa
 
 // The relative imports of a file that point somewhere else once `moves` happen, whether the imported file moved or the importing one did. `file` is where the source is now.
 export function importEdits(file: string, source: string, moves: ReadonlyMap<string, string>): ImportEdit[] {
+  return editsFor(file, source, quotedSpecifiers(source), moves)
+}
+
+function quotedSpecifiers(source: string): Span[] {
   const parsed = parseKay(source)
 
-  return editsFor(file, source, [...analyzeScript(source, parsed.script, [], [], parsed.module).specifiers, ...analyzeServer(source, parsed.server)?.specifiers ?? []], moves)
+  return [...analyzeScript(source, parsed.script, [], [], parsed.module).specifiers, ...analyzeServer(source, parsed.server)?.specifiers ?? []]
+}
+
+// The text between the quotes of every import and re-export in the fences of a `.kay` file.
+export function importSpecifiers(source: string): Span[] {
+  return quotedSpecifiers(source).map(span => ({ start: span.start + 1, end: span.end - 1 }))
 }
 
 // The same for a TypeScript or JavaScript module, whose imports of a moved `.kay` file need the new path.

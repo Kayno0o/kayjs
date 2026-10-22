@@ -7,14 +7,14 @@ import type { Span } from '../compiler/ast'
 import type { KayConfig } from '../config'
 import type { RouteMount } from '../server/routes'
 import type { ComponentInterface } from './component-props'
-import type { CodeAction, CodeActionParams, CodeLens, CompletionItem, CompletionList, Diagnostic, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, DocumentSymbol, FileEvent, FoldingRange, Hover, InitializeParams, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, WorkspaceEdit } from './protocol'
+import type { CodeAction, CodeActionParams, CodeLens, CompletionItem, CompletionList, Diagnostic, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, DocumentLink, DocumentSymbol, FileEvent, FoldingRange, Hover, InitializeParams, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, WorkspaceEdit } from './protocol'
 import type { TemplateData, Wanted } from './template-completion'
 import { existsSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { KAY_DIR } from '../build/assets'
-import { findKayFiles, findProjectFiles, inWalkScope, realPath } from '../build/files'
+import { findKayFiles, findProjectFiles, inWalkScope, realPath, resolveFrom } from '../build/files'
 import { throughNodeModules } from '../build/libraries'
 import { importedSignals } from '../build/signals'
 import { configCheckOptions, configProblems, contentChecks, generatedChecks, generatedProblem, projectProblems, stopProbes, writeShadowTypes } from '../check'
@@ -37,7 +37,7 @@ import { componentInterface } from './component-props'
 import { islandLens } from './island-lens'
 import { documentSymbols, foldingRanges } from './outline'
 import { toOffset, toPosition } from './positions'
-import { importEdits, moduleImportEdits } from './renames'
+import { importEdits, importSpecifiers, moduleImportEdits } from './renames'
 import { Connection } from './rpc'
 import { templateContext, templateItems } from './template-completion'
 
@@ -189,6 +189,7 @@ export class KayLanguageServer {
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/formatting', async ({ textDocument }) => this.format(textDocument.uri))
     client.onRequest<CodeActionParams>('textDocument/codeAction', async params => this.codeActions(params))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/documentSymbol', ({ textDocument }) => this.symbols(textDocument.uri))
+    client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/documentLink', ({ textDocument }) => this.links(textDocument.uri))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/foldingRange', ({ textDocument }) => this.folds(textDocument.uri))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/codeLens', ({ textDocument }) => this.lenses(textDocument.uri))
     client.onRequest<{ files: { oldUri: string, newUri: string }[] }>('workspace/willRenameFiles', async ({ files }) => this.renamedFiles(files))
@@ -247,6 +248,7 @@ export class KayLanguageServer {
         documentFormattingProvider: true,
         documentSymbolProvider: true,
         foldingRangeProvider: true,
+        documentLinkProvider: {},
         codeLensProvider: {},
       },
       workspace: { fileOperations: { willRename: { filters: [{ pattern: { glob: '**/*.kay' } }, { pattern: { glob: '**', matches: 'folder' } }] } } },
@@ -962,6 +964,21 @@ export class KayLanguageServer {
     const route = path.startsWith(`${project.routesDir}${sep}`)
 
     return islandLens(document.source, path, { route, insideIsland: project.islandOnly.has(path), signals: importedSignals(path, document.source) })
+  }
+
+  // The files a relative import names, so the editor opens them from the specifier.
+  private links(uri: string): DocumentLink[] {
+    const document = this.documents.get(uri)
+
+    if (!document)
+      return []
+
+    return importSpecifiers(document.source).flatMap((span) => {
+      const specifier = document.source.slice(span.start, span.end)
+      const target = specifier.startsWith('.') ? resolveFrom(specifier, document.file) : undefined
+
+      return target === undefined ? [] : [{ range: { start: toPosition(document.source, span.start), end: toPosition(document.source, span.end) }, target: this.clientUri(target) }]
+    })
   }
 
   private folds(uri: string): FoldingRange[] {

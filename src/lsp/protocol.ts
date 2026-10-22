@@ -141,6 +141,11 @@ export interface FoldingRange {
   kind?: 'comment' | 'imports' | 'region' | undefined
 }
 
+export interface DocumentLink {
+  range: Range
+  target: string
+}
+
 export interface CodeLens {
   range: Range
   command: { title: string, command: string }

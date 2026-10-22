@@ -1,5 +1,5 @@
 import type { CheckDiagnostic } from '../src/check'
-import type { CodeAction, CompletionItem, CompletionList, Diagnostic, DocumentHighlight, DocumentSymbol, FoldingRange, Hover, Location, LocationLink, Range, TextEdit, WorkspaceEdit } from '../src/lsp/protocol'
+import type { CodeAction, CompletionItem, CompletionList, Diagnostic, DocumentHighlight, DocumentLink, DocumentSymbol, FoldingRange, Hover, Location, LocationLink, Range, TextEdit, WorkspaceEdit } from '../src/lsp/protocol'
 import { cp, mkdir, mkdtemp, readdir, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -323,6 +323,16 @@ describe('kay lsp', () => {
     const folds = await editor.connection.request<FoldingRange[]>('textDocument/foldingRange', { textDocument: { uri: editor.uri(path) } })
 
     expect(folds).toEqual(expect.arrayContaining([expect.objectContaining({ startLine: 0, kind: 'region' })]))
+  })
+
+  it('links the relative imports of a file to the files they name', async () => {
+    const path = 'site/src/routes/index.kay'
+
+    await editor.open(path)
+
+    const links = await editor.connection.request<DocumentLink[]>('textDocument/documentLink', { textDocument: { uri: editor.uri(path) } })
+
+    expect(links.map(link => link.target)).toContain(editor.uri('site/src/components/card.kay'))
   })
 
   it('fixes every safe problem of a file at once', async () => {
