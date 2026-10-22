@@ -69,7 +69,7 @@ export function requireProxyKey(app: Elysia, proxy: ProxyConfig | undefined, opt
     const metrics = options.metrics?.()
 
     // The metrics route answers by its own rule, so a collector on the private network needs no key.
-    if (isInternal(request) || isOpen(path, open) || (metrics !== undefined && isOpen(path, [metrics])))
+    if (isInternal(request) || isOpen(path, open) || (metrics !== undefined && (path === metrics || path === `${metrics}/`)))
       return
 
     const given = request.headers.get(header)

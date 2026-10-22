@@ -83,7 +83,7 @@ describe('metrics', () => {
     expect(text).toMatch(/^kay_http_request_duration_seconds_bucket\{method="GET",route="\/contact",le="\+Inf"\} 2$/m)
     expect(text).toMatch(/^kay_cache_reads_total\{result="hit"\} \d+$/m)
     expect(text).toMatch(/^kay_live_connections \d+$/m)
-    expect(text).toMatch(/^kay_job_runs_total|^# TYPE kay_job_runs_total counter$/m)
+    expect(text).toMatch(/^# TYPE kay_job_runs_total counter$/m)
     // The scrape and the health probe are no traffic of the site.
     expect(text).not.toContain('route="/metrics"')
     expect(text).not.toContain('/_kay/health')
@@ -128,6 +128,7 @@ describe('metrics', () => {
     expect(await status(`${url}/metrics`)).toBe(403)
     expect(await status(`${url}/metrics`, { authorization: 'Bearer wrong' })).toBe(403)
     expect(await status(`${url}/metrics`, { authorization: TOKEN })).toBe(403)
+    expect(await status(`${url}/metrics`, { authorization: `bearer ${TOKEN}` })).toBe(200)
     expect(await status(`${url}/metrics`, { authorization: `Bearer ${TOKEN}` })).toBe(200)
     expect(await status(`${url}/metrics`, { 'authorization': `Bearer ${TOKEN}`, 'x-forwarded-for': '203.0.113.9' })).toBe(200)
   })
@@ -160,8 +161,16 @@ describe('metrics', () => {
 
     expect(await status(`${url}/metrics`)).toBe(200)
     expect(await status(`${url}/metrics`, { 'x-forwarded-for': '203.0.113.9' })).toBe(403)
+    expect(await status(`${url}/metrics`, { 'x-upstream-key': KEY })).toBe(403)
     expect(await status(`${url}/contact`)).toBe(403)
     expect(await status(`${url}/contact`, { 'x-upstream-key': KEY })).toBe(200)
+  })
+
+  it('keeps the proxy key on everything under the metrics path', async () => {
+    const url = await listening({ metrics: true, proxy: { key: 'x-upstream-key' } }, { KAY_PROXY_KEY: KEY })
+
+    expect(await status(`${url}/metrics/anything`)).toBe(403)
+    expect(await status(`${url}/metrics/`)).toBe(200)
   })
 
   it('decides by the socket address and the marks of a proxy', () => {
@@ -174,6 +183,7 @@ describe('metrics', () => {
     expect(metricsAllowed(plain, '203.0.113.9')).toBe(false)
     expect(metricsAllowed(plain, '2001:db8::1')).toBe(false)
     expect(metricsAllowed(plain, undefined)).toBe(false)
+    expect(metricsAllowed(new Request('http://localhost/metrics', { headers: { 'x-upstream-key': 'k' } }), '127.0.0.1', { key: 'x-upstream-key' })).toBe(false)
     expect(metricsAllowed(new Request('http://localhost/metrics', { headers: { 'x-forwarded-for': '203.0.113.9' } }), '127.0.0.1')).toBe(false)
   })
 })

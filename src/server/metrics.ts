@@ -3,7 +3,7 @@ import type { MetricsConfig, ProxyConfig } from '../config'
 import process from 'node:process'
 import { cacheReads, jobRuns, pageRoutes } from '../runtime/counters'
 import { routerPath } from './base'
-import { statusOf } from './log'
+import { pathOf, statusOf } from './log'
 import { fromPrivateNetwork } from './protection'
 import { sameText } from './seal'
 
@@ -15,6 +15,8 @@ const BUCKETS = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]
 const MAX_SERIES = 500
 // What a proxy in front adds to a request it forwards: a request carrying one did not come straight from a collector.
 const FORWARDED_HEADERS = ['x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-real-ip', 'forwarded', 'via', 'cf-connecting-ip']
+const BEARER = /^bearer /i
+const METHODS = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'])
 const BACKSLASH = /\\/g
 const QUOTE = /"/g
 const NEWLINE = /\n/g
@@ -39,13 +41,13 @@ export function metricsAllowed(request: Request, address: string | undefined, pr
   if (token !== undefined) {
     const given = request.headers.get('authorization')
 
-    return given !== null && given.startsWith('Bearer ') && sameText(given.slice('Bearer '.length), token)
+    return given !== null && BEARER.test(given) && sameText(given.slice('Bearer '.length), token)
   }
 
   if (address === undefined || !fromPrivateNetwork(address))
     return false
 
-  return !FORWARDED_HEADERS.some(name => request.headers.has(name)) && (proxy?.header === undefined || !request.headers.has(proxy.header))
+  return !FORWARDED_HEADERS.some(name => request.headers.has(name)) && [proxy?.header, proxy?.key].every(name => name === undefined || !request.headers.has(name))
 }
 
 function labelled(value: string): string {
@@ -63,7 +65,7 @@ export function serveMetrics(app: Elysia, options: { path: string, base: string,
     if (!options.holds() || (request.method !== 'GET' && request.method !== 'HEAD'))
       return false
 
-    const pathname = new URL(request.url).pathname
+    const pathname = pathOf(request.url)
 
     // A trailing slash is the same route, as Elysia routes it, and the path is read with or without the base a proxy keeps.
     return [pathname, routerPath(pathname, options.base)].some(path => path === options.path || path === `${options.path}/`)
@@ -112,7 +114,7 @@ export function serveMetrics(app: Elysia, options: { path: string, base: string,
   app.onRequest(({ request, server }) => {
     if (!asked(request)) {
       // The health route is polled every few seconds and says nothing of the site.
-      if (new URL(request.url).pathname !== options.health)
+      if (pathOf(request.url) !== options.health)
         timing.set(request, { at: performance.now() })
 
       return undefined
@@ -138,7 +140,8 @@ export function serveMetrics(app: Elysia, options: { path: string, base: string,
       return
 
     const seconds = ((time.answered ?? performance.now()) - time.at) / 1000
-    const labels = (name: string) => `{method="${request.method}",route="${labelled(name)}"`
+    const method = METHODS.has(request.method) ? request.method : 'OTHER'
+    const labels = (name: string) => `{method="${method}",route="${labelled(name)}"`
     const matched = pageRoutes.get(request) ?? route
     let name = typeof matched === 'string' && matched !== '' ? matched : 'unmatched'
 
@@ -158,7 +161,9 @@ export function serveMetrics(app: Elysia, options: { path: string, base: string,
 
     const counted = `${labels(name)},status="${statusOf(responseValue, set)}"}`
 
-    requests.set(counted, (requests.get(counted) ?? 0) + 1)
+    // Statuses are few, but a cap keeps the page bounded whatever an app answers.
+    if (requests.has(counted) || requests.size < MAX_SERIES * 4)
+      requests.set(counted, (requests.get(counted) ?? 0) + 1)
   })
 }
 
