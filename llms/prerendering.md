@@ -126,7 +126,7 @@ invalidatePage('/blog/hello')
 invalidatePage(path => path.startsWith('/blog/'))
 ```
 
-- Which call: `collection.invalidate()` or `invalidate(key)` when data changed, `invalidatePage` when only a page did, `revalidate` for a page that may drift with no event to tell of it.
+- Which call: `collection.invalidate()`, `fn.invalidate()` of a `cache()` function or `tag.invalidate()` of a `cacheTag()`, or `invalidate(key)` of a string key, when data changed, `invalidatePage` when only a page did, `revalidate` for a page that may drift with no event to tell of it.
 - The path is the one the routes serve, without the base, a locale's page under its segment, `/fr/blog/hello`.
 - Requests arriving while the render runs wait for the same one; a render that fails or answers 5xx is logged, leaves the page as it was, and no request waits on another before a minute has passed.
 - Processes sharing a `sqliteCache` (see [Caching](rendering.md#caching)) mark the same pages, those a key read by `invalidate` or a collection names included within about half a second: a path given as it is reaches them all, a function the paths it matched in this process, which serves the same build.

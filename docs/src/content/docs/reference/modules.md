@@ -103,7 +103,7 @@ Types include `BrowserError` and `CspViolationError`, the browser errors and CSP
 | `kay/words` | `wording`, `pageLocale`, `sizeText`: the lookup a library words its default texts through. See [Internationalization](/guides/i18n) |
 | `kay/params` | The route matchers `integer`, `uuid` and `slug` |
 | `kay/pg-orm` | `jobTables`, with `KayJobs` and `KayLocks`: the job queue's tables as pg-orm definitions, for the app's `new Database({ tables })`. Needs `@kaynooo/pg-orm`. See [Background jobs](/guides/background-jobs#postgres) |
-| `kay/cache` | `cached`, `invalidate`, `invalidatePage`, `sqliteCache`. See [Caching and streaming](/guides/caching-and-streaming) |
+| `kay/cache` | `cached`, `cache`, `cacheTag`, `invalidate`, `invalidatePage`, `sqliteCache`. See [Caching and streaming](/guides/caching-and-streaming) |
 | `kay/analytics` | `analytics`, the extension counting visits through your own origin, `consent`, the visitor's answer to its notice, and `vitals` with `vitalsReport`, the real visitors' Web Vitals. See [Privacy](/guides/privacy#counting-visits) |
 | `kay/library` | What a library's extension, commands and dev routes use: `KayCommand`, `underKayDev`, `missingTranslations`, `writeDraftMessages`, `escapeHtml` and more. See [Component libraries](/guides/component-libraries#extensions) |
 | `kay/image` | `image`, `shareImage`, `shareCard` |

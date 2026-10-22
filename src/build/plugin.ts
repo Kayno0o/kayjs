@@ -12,6 +12,7 @@ import { RESIZABLE } from '../runtime/image'
 import { dominantColorOf } from '../server/image-color'
 import { imageHeader } from '../server/image-format'
 import { ASSET_FILE, clientDir, RENDER_OUTPUT, writeAsset } from './assets'
+import { cacheIds } from './cache-ids'
 import { directImports } from './direct-imports'
 import { SCRIPT_FILE, scriptLoader } from './files'
 import { expandGlobs } from './glob'
@@ -281,7 +282,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
         const original = await Bun.file(path).text()
         const source = options.rewrite?.(path, original) ?? original
         const loader = scriptLoader(path)
-        const contents = anchoring(path, await pointed(await shippingFiles(liveIds(expandGlobs(source, path, root, loader), path, realRoot, loader === 'tsx' || loader === 'jsx', build.config?.target !== 'browser'), path, loader), loader))
+        const contents = anchoring(path, await pointed(await shippingFiles(cacheIds(liveIds(expandGlobs(source, path, root, loader), path, realRoot, loader === 'tsx' || loader === 'jsx', build.config?.target !== 'browser'), path, realRoot, loader === 'tsx' || loader === 'jsx'), path, loader), loader))
 
         return contents === original && build.config !== undefined ? undefined : { contents, loader }
       })

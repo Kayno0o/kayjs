@@ -40,6 +40,20 @@ invalidate('posts')
 invalidate(key => key.startsWith('post:'))
 ```
 
+### A function that invalidates itself
+
+`cache(load, { ttl })` returns a function with its key taken from the module and its name, so a mistyped string cannot silently miss. Declare it as a top-level `const` in a `.ts` module.
+
+```ts
+import { cache, cacheTag } from 'kay/cache'
+
+export const postTag = cacheTag()
+export const posts = cache(listPosts, { ttl: '5m', tags: [postTag] })
+export const post = cache(async (slug: string) => findPost(slug), { ttl: '5m', tags: [postTag] })
+```
+
+`await posts()` gives the value, `posts.invalidate()` drops it, and `post('a')` keeps a value for each argument, `post.invalidate('a')` dropping one and `post.invalidate()` all. `postTag.invalidate()` drops every value naming the tag, with no string key in the app. Pages that read either are refreshed as for `cached`, and `live` and `store` go beside `ttl`. Use `cached` and `invalidate('key')` for keys built at runtime, such as `post:${id}`.
+
 To have the pages that show a value change in every open tab when you drop it, add `live: true` to the `cached` call. See [Data from the cache](/guides/live-and-realtime#data-from-the-cache).
 
 To keep a value across restarts, name a store.
@@ -76,7 +90,7 @@ Pass every message on exactly as it came, and never back to the process that pub
 
 The cache lives in the process, and every caller shares the value, so never mutate it. A `sqliteCache` is shared by the processes of one machine. It creates its file when the first value is stored, not when your code names it, so a build, a check or a test that loads the module writes nothing.
 
-In the browser, `kay/cache` has `cached` and `invalidate` only. `kay check` reports `invalidatePage` or `sqliteCache` imported by an island.
+In the browser, `kay/cache` has `cached`, `cache`, `cacheTag` and `invalidate` only. `kay check` reports `invalidatePage` or `sqliteCache` imported by an island.
 
 </Callout>
 
@@ -84,7 +98,7 @@ In the browser, `kay/cache` has `cached` and `invalidate` only. `kay check` repo
 
 A page that is the same for everyone is rendered once with `prerender: true` in its `page` object. Add `revalidate: '1h'` to rebuild it in the background. See [Routing](/essentials/routing#prerendering).
 
-After a change, `invalidate('posts')` or `news.invalidate()` refreshes the prerendered pages that read that value or collection. Use `invalidatePage(path => path.startsWith('/news'))` from `kay/cache` for a page no data explains.
+After a change, `invalidate('posts')`, `posts.invalidate()` of a `cache()` function, `tag.invalidate()` or `news.invalidate()` refreshes the prerendered pages that read that value or collection. Use `invalidatePage(path => path.startsWith('/news'))` from `kay/cache` for a page no data explains.
 
 A page rendered per request that read the session, a cookie or how a form post went goes out as `Cache-Control: private, no-cache` with `Vary: cookie`. So does every answer behind a guard, whatever the guard read, such as an `Authorization` header, and every endpoint or API route answer behind one or that read the session, refusals included. A route that sets its own `cache-control` keeps it. A CDN caching HTML then never hands one visitor's page to another.
 

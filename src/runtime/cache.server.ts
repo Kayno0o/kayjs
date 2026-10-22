@@ -12,8 +12,8 @@ const EVENT_TTL_MS = 60_000
 const PROCESS = crypto.randomUUID()
 
 export { invalidatePage } from '../server/stale-pages'
-export type { CacheOptions, CacheStore } from './cache'
-export { cached, invalidate } from './cache'
+export type { CachedFunction, CacheFunctionOptions, CacheOptions, CacheStore, CacheTag } from './cache'
+export { cache, cached, cacheTag, invalidate } from './cache'
 
 // The keys a stored line names, or every key when it does not parse, which no invalidation then misses.
 function readsOf(line: string): string[] {

@@ -80,10 +80,94 @@ export async function cachedPublished<T, const Ttl extends Duration = Duration>(
   return cachedFor(key, ttl, load, options, previewing())
 }
 
-async function cachedFor<T, const Ttl extends Duration = Duration>(key: string, ttl: Ttl & PositiveDuration<Ttl>, load: () => T | Promise<T>, options: CacheOptions, bypass: boolean): Promise<T> {
+export interface CacheFunctionOptions<Ttl extends Duration = Duration> extends CacheOptions {
+  ttl: Ttl & PositiveDuration<Ttl>
+  // Groups to drop together: `invalidate()` of any tag drops every value that names it, and the pages that read them.
+  tags?: CacheTag[] | undefined
+}
+
+// A group of cached values to drop together, made once and named in the `tags` of each `cache` call that belongs to it.
+export interface CacheTag {
+  invalidate: () => void
+}
+
+// The function `cache` gives: calling it gives the cached value, `invalidate()` drops every value it holds and `invalidate(...args)` the one for those arguments.
+export interface CachedFunction<A extends unknown[], T> {
+  (...args: A): Promise<T>
+  invalidate: (...args: A | []) => void
+}
+
+const CLOSING_PAREN = /\)$/
+const DIGITS = /^\d+$/
+const OWN_FRAME = /\/runtime\/cache(?:\.server)?\.ts:/
+
+// The path, line and column a stack line names, with a `file://` and a `?` query a reload adds taken off, or nothing for a native frame.
+function frameAt(line: string): { path: string, line: string, column: string } | undefined {
+  const parts = line.trim().replace(CLOSING_PAREN, '').split(':')
+  const column = parts.pop()
+  const row = parts.pop()
+  const place = parts.join(':')
+  const path = place.slice(Math.max(place.lastIndexOf('('), place.lastIndexOf('at ') + 2) + 1).replace('file://', '')
+
+  return column !== undefined && row !== undefined && DIGITS.test(column) && DIGITS.test(row) && path !== '' ? { path: path.includes('?') ? path.slice(0, path.indexOf('?')) : path, line: row, column } : undefined
+}
+
+// The module, line and column of the code calling the function that calls this one, which names a cache or a tag the same in every process and after a restart.
+function callSite(kind: string): string {
+  const found = (new Error('call site').stack ?? '').split('\n').slice(1).filter(line => !OWN_FRAME.test(line)).map(frameAt).find(frame => frame !== undefined)
+
+  if (!found)
+    throw new Error(`kay: ${kind} could not tell which module calls it`)
+
+  const cwd = `${globalThis.process?.cwd() ?? ''}/`
+  const path = found.path.startsWith(cwd) ? found.path.slice(cwd.length) : found.path
+
+  return `${kind}:${path}:${found.line}:${found.column}`
+}
+
+// A cached function, its key taken from the module and the place that calls `cache`, so no string is typed twice: call it where it is declared, once, at the top of a module.
+// `await posts()` gives the value as `cached` does, `posts.invalidate()` drops it, and a function taking arguments keeps a value for each.
+export function cache<A extends unknown[], T, const Ttl extends Duration = Duration>(load: (...args: A) => T | Promise<T>, options: CacheFunctionOptions<Ttl>, id?: string): CachedFunction<A, T> {
+  const site = id === undefined ? callSite('cache') : `cache:${id}`
+  const { ttl, tags = [], ...rest } = options
+  const tagKeys = tags.map(tag => tagKey(tag))
+  const keyOf = (args: unknown[]) => args.length === 0 ? site : `${site}${JSON.stringify(args)}`
+
+  const call = async (...args: A): Promise<T> => cachedFor<T>(keyOf(args), ttl, async () => load(...args), rest, renderingForVisitor(), tagKeys)
+
+  return Object.assign(call, {
+    invalidate: (...args: A | []) => invalidate(args.length === 0 ? (key: string) => key === site || key.startsWith(`${site}[`) : keyOf(args)),
+  })
+}
+
+const tagNames = new WeakMap<CacheTag, string>()
+
+function tagKey(tag: CacheTag): string {
+  const key = tagNames.get(tag)
+
+  if (key === undefined)
+    throw new Error('kay: `tags` takes what `cacheTag()` gives')
+
+  return key
+}
+
+// A group of cached values, for the `tags` of `cache`: `invalidate()` drops all of them with no key typed anywhere.
+export function cacheTag(id?: string): CacheTag {
+  const key = id === undefined ? callSite('tag') : `tag:${id}`
+  const tag: CacheTag = { invalidate: () => invalidate(key) }
+
+  tagNames.set(tag, key)
+
+  return tag
+}
+
+async function cachedFor<T, const Ttl extends Duration = Duration>(key: string, ttl: Ttl & PositiveDuration<Ttl>, load: () => T | Promise<T>, options: CacheOptions, bypass: boolean, tagKeys: string[] = []): Promise<T> {
   const seconds = durationSeconds(ttl, `cached('${key}')'s ttl`)
 
   noteRead(key)
+
+  for (const tag of tagKeys)
+    noteRead(tag)
 
   if (options.live)
     noteLive(key)
@@ -114,7 +198,7 @@ async function cachedFor<T, const Ttl extends Duration = Duration>(key: string, 
     entries.set(key, pending)
     trim()
 
-    pending.loading = firstLoad(key, seconds, pending, load, store)
+    pending.loading = firstLoad(key, seconds, pending, load, store, tagKeys)
 
     return waited<T>(key, pending)
   }
@@ -126,7 +210,7 @@ async function cachedFor<T, const Ttl extends Duration = Duration>(key: string, 
     noteRead(dep)
 
   if (Date.now() >= entry.freshUntil && !entry.loading)
-    void refresh(key, seconds, entry, load, store)
+    void refresh(key, seconds, entry, load, store, tagKeys)
 
   return entry.value as T
 }
@@ -326,9 +410,10 @@ function heard(message: string): void {
   }
 }
 
-async function firstLoad<T>(key: string, ttl: number, pending: Entry, load: () => T | Promise<T>, store: CacheStore | undefined): Promise<T> {
+async function firstLoad<T>(key: string, ttl: number, pending: Entry, load: () => T | Promise<T>, store: CacheStore | undefined, tagKeys: string[]): Promise<T> {
   try {
-    const { result: value, reads, invalidated } = await trackedLoad(load)
+    const { result: value, reads: loaded, invalidated } = await trackedLoad(load)
+    const reads = [...tagKeys, ...loaded]
 
     // A key the load read was invalidated meanwhile, so what it built is not kept.
     if (invalidated && entries.get(key) === pending)
@@ -348,13 +433,14 @@ async function firstLoad<T>(key: string, ttl: number, pending: Entry, load: () =
   }
 }
 
-async function refresh(key: string, ttl: number, entry: Entry, load: () => unknown, store: CacheStore | undefined): Promise<void> {
+async function refresh(key: string, ttl: number, entry: Entry, load: () => unknown, store: CacheStore | undefined, tagKeys: string[]): Promise<void> {
   const loading = trackedLoad(load)
 
   entry.loading = loading
 
   try {
-    const { result: value, reads, invalidated } = await loading
+    const { result: value, reads: loaded, invalidated } = await loading
+    const reads = [...tagKeys, ...loaded]
 
     // Only when nothing invalidated or replaced the key meanwhile, nor a key the load read.
     if (!invalidated && entries.get(key) === entry)

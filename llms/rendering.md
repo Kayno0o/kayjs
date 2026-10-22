@@ -26,6 +26,20 @@ invalidate('posts')
 invalidate(key => key.startsWith('post:'))
 ```
 
+### Cache a function with no key to type
+
+`cache(load, { ttl })` from `kay/cache` returns a function whose key is its module and name, so `invalidate` is a method on it and a mistyped string cannot miss. Declare it as a top-level `const`, in a module of its own (a `.ts` file): the build gives it the id, the same in every process and after a restart.
+
+```ts
+import { cache, cacheTag } from 'kay/cache'
+
+export const postTag = cacheTag()
+export const posts = cache(listPosts, { ttl: '5m', tags: [postTag] })
+export const post = cache(async (slug: string) => findPost(slug), { ttl: '5m', tags: [postTag] })
+```
+
+`await posts()` gives the value as `cached` does, `posts.invalidate()` drops it, `post('a')` keeps a value per arguments, `post.invalidate('a')` drops one and `post.invalidate()` all of them. `postTag.invalidate()` drops every value naming the tag, with no string key in the app. A prerendered page that read the function or a tag is refreshed by the invalidation, as for `cached`. `live` and `store` are options beside `ttl`.
+
 ### Keep a cached value across restarts
 
 A store named in the options keeps the value on disk, so a restart or a deploy starts from what was kept:
@@ -118,6 +132,7 @@ const posts = await cached('posts', '5m', listPosts)
 - A refresh that throws is logged and keeps the stale value, trying again a minute later at most.
 - For a visitor in preview mode (see [Preview mode](content-cms.md#preview-mode)), every call runs `load` and keeps nothing, so they see what it gives now.
 - `invalidate(key)` from `kay/cache`, or `invalidate(key => key.startsWith('post:'))`, drops keys so the next call loads afresh, and marks stale every prerendered page that read a dropped key: call it from the action that changed what they hold.
+- `cache(load, { ttl, live, store, tags })` is `cached` with the key derived and `.invalidate()` on the result; a `cacheTag()` in `tags` is a key like any other that the value depends on, so dropping it drops the value and refreshes the pages that read it. Called outside a top-level `const` (or without the build, as a bare unit test), the key is the calling line and column, right for one process only; `cached` and `invalidate(key)` stay for keys built at runtime, such as `post:${id}`.
 - `{ live: true }` as the fourth argument has every open page that read the key in its server fence follow it: an `invalidate` of the key, or of one it was built from, shows the page afresh in each tab (see [Following cached values](live-values.md#following-cached-values)).
 - A value also depends on the keys and collections its own `load` read: dropping `news` drops a `cached('latest', ...)` built from `news.all()`, and the pages hitting it. Not tracked: module-level data, and a store's value another process loaded.
 - A load already running for a dropped key never lands in the cache.
@@ -145,7 +160,7 @@ const reviews = await cached('reviews', 86_400, fetchReviews, { store: disk })
 - A store that fails to write, locked or full, is logged and the value kept in memory.
 - Rows are never swept, since a stale one is still served: `invalidate` keys a site stops using, such as those of deleted posts.
 - The value goes through devalue, as session data does: dates, maps and sets survive, and a value holding a function or a class instance throws on its first load, keeping nothing; on a refresh, it is logged and the stale value kept.
-- `sqliteCache` is server-only: in the browser, `kay/cache` has `cached` and `invalidate` alone, and `kay check` reports `invalidatePage` or `sqliteCache` imported by an island's script, a `--- client` fence, a component only islands render, a static component the build promotes to an island (one that passes a function and imports, directly or through others, an island), or a `.ts` module any of them imports, directly or through others (`server-only-import`); a name read off a namespace import or destructured from one is reported too.
+- `sqliteCache` is server-only: in the browser, `kay/cache` has `cached`, `cache`, `cacheTag` and `invalidate` alone, and `kay check` reports `invalidatePage` or `sqliteCache` imported by an island's script, a `--- client` fence, a component only islands render, a static component the build promotes to an island (one that passes a function and imports, directly or through others, an island), or a `.ts` module any of them imports, directly or through others (`server-only-import`); a name read off a namespace import or destructured from one is reported too.
 - `CacheStore` is the shape of a store, synchronous so that `invalidate` is done when it returns: `get(key)` giving `{ text, freshUntil }`, `set(key, text, freshUntil)`, `delete(key)` and `keys()`, plus, optionally, `publish(message)` and `subscribe(listener)` carrying invalidations between processes, as a Redis channel would (a message may also carry the clock of the sender, so replicas on machines whose clocks differ still date a live page's invalidation after its read; relay every message as it is, never to its sender), and `dependencies()` giving a `Map` of the keys a stored value was built from, so `invalidate` reads those and calls `get` for no row it holds nowhere in memory (`sqliteCache` keeps them in a table of their own); `text` is opaque, to be given back as `set` received it (a value built from a collection or another key starts with a line naming them).
 - In the `server` and `app` templates' image the app runs as `nobody`, so the store's directory is a mounted volume it can write.
 
