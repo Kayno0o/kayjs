@@ -203,7 +203,7 @@ nav
 - `UserMenu` shows the username or email, a link to the account when the prebuilt pages are on (`account={false}` leaves it out) and a sign-out button. The account pages' own header is one.
 - A guest is signed out for all three.
 - `role` only hides markup, the page and its data are still served: guard the route with `auth.guard` for access.
-- They read the request being answered, so a page with `prerender: true` fails the build naming them: render it per request. They nest in one another and in the app's own `await` blocks.
+- They read the request being answered, so a page with `prerender: true` fails the build asking you to render it per request. They nest in one another and in the app's own `await` blocks.
 
 A page whose imports reach one of the three, through its layouts, components and helpers however deep, reads the user before it renders, so they show in the first bytes, with JavaScript off too; no other page reads the session. Such a page is the visitor's own, so no cache shares it between visitors. `viewer: true` in `auth({ ... })` reads it on every page and `viewer: false` on none, the three then streaming in after the page, which needs JavaScript.
 

@@ -383,6 +383,7 @@ function layoutsOf(trees: RouteMount[], at: string, file: string, read: LayoutsR
 // Every specifier a module names, static or dynamic; one in a comment or a string only adds a file the walk follows for nothing.
 const IMPORT = /\b(?:from|import)\s*(?:\(\s*)?['"]([^'"]+)['"]/g
 const importsRead = new WeakMap<LayoutsRead, Map<string, string[]>>()
+const reachRead = new WeakMap<LayoutsRead, Map<string, boolean>>()
 
 function realFile(file: string): string {
   try {
@@ -406,15 +407,23 @@ function importsOf(file: string, read: LayoutsRead): string[] {
     found = []
     memo.set(file, found)
 
+    let source = ''
+
     try {
-      for (const [, specifier] of readFileSync(file, 'utf8').matchAll(IMPORT)) {
+      source = readFileSync(file, 'utf8')
+    }
+    catch {}
+
+    // Text such as `from 'Bob'` matches too, so each specifier resolves on its own and one that does not is skipped.
+    for (const [, specifier] of source.matchAll(IMPORT)) {
+      try {
         const real = realFile(Bun.resolveSync(specifier!, dirname(file)))
 
         if (KAY_FILE.test(real) || (TS_FILE.test(real) && !real.split(sep).includes('node_modules')))
           found.push(real)
       }
+      catch {}
     }
-    catch {}
   }
 
   return found
@@ -422,9 +431,28 @@ function importsOf(file: string, read: LayoutsRead): string[] {
 
 // Whether the import graph from `starts` reaches one of `targets`.
 function reaches(starts: string[], targets: string[], read: LayoutsRead): boolean {
+  let memo = reachRead.get(read)
+
+  if (memo === undefined)
+    reachRead.set(read, memo = new Map<string, boolean>())
+
   const wanted = new Set(targets.map(realFile))
+  const key = targets.join('\0')
+
+  return starts.some((start) => {
+    const at = `${key}\0${start}`
+    let found = memo.get(at)
+
+    if (found === undefined)
+      memo.set(at, found = walk(realFile(start), wanted, read))
+
+    return found
+  })
+}
+
+function walk(start: string, wanted: Set<string>, read: LayoutsRead): boolean {
   const seen = new Set<string>()
-  const queue = starts.map(realFile)
+  const queue = [start]
 
   for (let file = queue.pop(); file !== undefined; file = queue.pop()) {
     if (wanted.has(file))
@@ -697,6 +725,18 @@ function outerMount(layout: string, reaching?: string[]): RouteMount {
   return { dir: dirname(layout), prefix: OUTER_PREFIX, outer: layout, ...reaching && { reaching } }
 }
 
+// The files a layout's `reaching` names, which must exist: a typo would wrap no page and say nothing.
+function reachingFiles(root: string, files: string[]): string[] {
+  return files.map((file) => {
+    const found = resolve(root, file)
+
+    if (!existsSync(found))
+      throw new KayError('route-invalid', `kay: the layout of an extension reaches ${file}, which does not exist`)
+
+    return found
+  })
+}
+
 // An extension's layout is a `_layout.kay` alone in its directory, which is mounted as a tree of its own.
 function checkedLayout(root: string, layout: string): string {
   const file = resolve(root, layout)
@@ -711,7 +751,7 @@ function checkedLayout(root: string, layout: string): string {
 export function routeMounts(root: string, extensions: KayExtension[] = []): RouteMount[] {
   return extensions.flatMap(({ routes, editor, layout }) => [
     ...routes ? [{ dir: throughLinks(root, resolve(root, routes.dir)), prefix: mountPrefix(routes.prefix), ...editor !== undefined && { editor: true as const } }] : [],
-    ...layout === undefined ? [] : [typeof layout === 'string' ? outerMount(throughLinks(root, checkedLayout(root, layout))) : outerMount(throughLinks(root, checkedLayout(root, layout.file)), layout.reaching.map(file => resolve(root, file)))],
+    ...layout === undefined ? [] : [typeof layout === 'string' ? outerMount(throughLinks(root, checkedLayout(root, layout))) : outerMount(throughLinks(root, checkedLayout(root, layout.file)), reachingFiles(root, layout.reaching))],
   ])
 }
 

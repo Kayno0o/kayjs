@@ -21,7 +21,7 @@ export function registerViewer(request: Request, viewer: Viewer): void {
   viewers.set(request, viewer)
 }
 
-// Reads the request's user ahead of the render, for the layout `auth({ viewer: true })` adds: a failed read is left to the component, which reads it again and reports it.
+// Reads the request's user ahead of the render, for the layout kayjs-auth wraps the pages reaching the components in: a failed read is left to the component, which reads it again and reports it.
 export async function loadViewer(request: Request): Promise<void> {
   try {
     const user = await viewers.get(request)?.auth.bareUser()
@@ -45,7 +45,7 @@ export function currentViewer(): Viewer & { request: Request } {
 
 const asViewer = (user: BareUser | null) => user && !user.guest ? user : null
 
-// The signed-in user of the page being rendered, none for a visitor or a guest, or one lacking `role` (the app's role hierarchy applies). The user itself once `auth({ viewer: true })` loaded it, else a promise a block waits for.
+// The signed-in user of the page being rendered, none for a visitor or a guest, or one lacking `role` (the app's role hierarchy applies). The user itself once the layout loaded it, else a promise a block waits for.
 export function currentUser(role?: string): BareUser | null | Promise<BareUser | null> {
   const { auth, isGranted, request } = currentViewer()
   const within = (user: BareUser | null) => {
