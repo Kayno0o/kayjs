@@ -92,6 +92,8 @@ Layout(title="Blog")
 
 ## Finish by hand
 
+Kay's `tsconfig.json` turns on `noUncheckedIndexedAccess`, so `cells[index]` is typed `Cell | undefined`, and plain modules written without it report errors in files no `.kay` touches. Add `"noUncheckedIndexedAccess": false` to the app's own `compilerOptions` to keep them as they are, or write the `!` where the index is known to exist.
+
 The command ends with a list of what it could not translate, each item at its line in the Astro file.
 
 In the `.kay` file, the code an item concerns is commented out under a `// kay migrate:` line. A search for `kay migrate:` finds every place left. Each kind has its kay counterpart.

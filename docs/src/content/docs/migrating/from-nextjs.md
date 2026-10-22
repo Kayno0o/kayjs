@@ -213,6 +213,10 @@ export default guard(({ locals, redirect }) => {
 
 See [Sessions and guards](/guides/sessions-and-guards).
 
+## Stricter TypeScript
+
+Kay's `tsconfig.json` turns on `noUncheckedIndexedAccess`, so `cells[index]` is typed `Cell | undefined`, and plain modules written without it report errors `kay check` finds in files no `.kay` touches. Add `"noUncheckedIndexedAccess": false` to the app's own `compilerOptions` to keep them as they are, or write the `!` where the index is known to exist.
+
 ## What has no equivalent
 
 - **React and its libraries.** A `.kay` file is its own template language, so React components do not run in it. Rewrite each one. A plain browser library, such as a chart, runs inside an island.

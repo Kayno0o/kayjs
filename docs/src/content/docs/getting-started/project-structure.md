@@ -59,4 +59,6 @@ export default defineConfig({
 { "extends": "kay/tsconfig.json" }
 ```
 
+It is as strict as kay itself, `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` included: `cells[index]` is typed `Cell | undefined`. Code ported as it is can turn either off with `"noUncheckedIndexedAccess": false` in the app's own `compilerOptions`.
+
 <ReadMore href="/llms/project">Every config option, and how the server, the config and `pages()` options combine.</ReadMore>

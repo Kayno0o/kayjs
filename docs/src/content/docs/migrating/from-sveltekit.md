@@ -227,6 +227,10 @@ A component imports its stylesheet in its script, `import './card.css'`. Svelte'
 
 Tailwind works as in SvelteKit. See [Styling and assets](/essentials/styling-and-assets).
 
+## Stricter TypeScript
+
+Kay's `tsconfig.json` turns on `noUncheckedIndexedAccess`, so `cells[index]` is typed `Cell | undefined`, and plain modules written without it report errors `kay check` finds in files no `.kay` touches. Add `"noUncheckedIndexedAccess": false` to the app's own `compilerOptions` to keep them as they are, or write the `!` where the index is known to exist.
+
 ## What has no equivalent
 
 - **A universal `load`** (`+page.ts`). A kay load runs on the server only. The browser asks for data through an [API route](/guides/api-routes) and `resource`.

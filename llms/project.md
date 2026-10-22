@@ -115,6 +115,7 @@ export default defineConfig({
 { "extends": "kay/tsconfig.json" }
 ```
 
+- Kay's tsconfig is as strict as kay itself: `noUncheckedIndexedAccess` types `cells[index]` as `Cell | undefined`, and `exactOptionalPropertyTypes` makes an optional field passed `undefined` say `?: T | undefined`, so plain TypeScript written without them reports errors in files no `.kay` touches. Add `"noUncheckedIndexedAccess": false` (or `"exactOptionalPropertyTypes": false`) to the app's `compilerOptions` to keep such code as it is, or write the `!` or the `?.` where the index is known to exist.
 - It includes `src`, `tests`, the `*.config.ts` files beside it, such as `kay.config.ts`, `eslint.config.ts` and `pg-orm.config.ts`, and `.kay/types`, relative to the project's tsconfig.
 - A project adds its own `compilerOptions` beside `extends`, and an `include` of its own replaces kay's, so it lists `.kay/types` again; one setting up its tsconfig by hand needs `"jsx": "preserve"`, `"jsxImportSource": "kay"`, `"module": "Preserve"`, `"moduleResolution": "bundler"` and `"rootDirs": [".", ".kay/types"]`.
 
