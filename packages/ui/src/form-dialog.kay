@@ -24,13 +24,13 @@ const { open, title, action, submitLabel, savingLabel = wording('ui.formDialog.s
   // What a refusal of the action's handler says, from the data it passed to `ctx.fail`: a message per field, each shown on its FormField, or one message, toasted. Without it, or when it answers undefined or an empty message, `failure` is toasted.
   refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined
   // What the action returned, for the page to patch into what it shows. The dialog closes once it has run.
-  onSaved?: ((result: Answer<Success<Output>>) => void) | undefined
+  onSaved?: ((result: Answer<Success<Output>>) => unknown) | undefined
   // The left end of the footer, for a delete button.
   extra?: Snippet
   // Pairs the footer's submit button with the form; one unique on the page is drawn when none is given.
   id?: string | undefined
   // Called with `false` however the dialog closes, saved or not.
-  onOpenChange: (open: boolean) => void
+  onOpenChange: (open: boolean) => unknown
 }>()
 
 const formId = id ?? uid()

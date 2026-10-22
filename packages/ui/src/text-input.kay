@@ -11,9 +11,9 @@ const look = recipe({ parts: { root: 'kui-field-input' } })
 type AsText = Field & {
   // Without it, the box starts empty and keeps what is typed, for a form posting it by its `name`.
   value?: string | undefined
-  onInput?: ((value: string) => void) | undefined
+  onInput?: ((value: string) => unknown) | undefined
   // Called once the value is committed, on blur or Enter, after `onInput`.
-  onChange?: ((value: string) => void) | undefined
+  onChange?: ((value: string) => unknown) | undefined
   type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url' | 'date' | 'datetime-local' | 'time' | 'month' | 'week' | undefined
 }
 
@@ -21,8 +21,8 @@ type AsText = Field & {
 type AsNumber = Field & {
   type: 'number'
   value?: number | string | null | undefined
-  onInput?: ((value: number | null) => void) | undefined
-  onChange?: ((value: number | null) => void) | undefined
+  onInput?: ((value: number | null) => unknown) | undefined
+  onChange?: ((value: number | null) => unknown) | undefined
 }
 
 const { value, onInput, onChange, onBlur, type = 'text', ...rest } = props<AsText | AsNumber>()
@@ -52,7 +52,7 @@ function read(input: HTMLInputElement): string | number | null {
 }
 
 // Each shape's callback takes what its own box reads, so either is handed `read`.
-function report(callback: ((value: never) => void) | undefined, input: HTMLInputElement) {
+function report(callback: ((value: never) => unknown) | undefined, input: HTMLInputElement) {
   if (halfTyped(input))
     return
 

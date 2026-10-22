@@ -38,7 +38,7 @@ const { value, min, max, firstDay, openLabel = wording('ui.dateInput.openLabel',
   nextLabel?: string | undefined
   todayLabel?: string | undefined
   // Called with the new date, or `''` once emptied, however it was set: typed, picked in the calendar or reset by a form.
-  onChange?: ((value: string) => void) | undefined
+  onChange?: ((value: string) => unknown) | undefined
 }>()
 
 // The calendar is drawn once the island runs, so the server renders the plain date field alone and a form posts it without JavaScript.

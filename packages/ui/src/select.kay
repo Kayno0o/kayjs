@@ -7,18 +7,20 @@ import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: 'kui-field-input' } })
 
-const { value, options, onChange, submit = false, emptyOption, loading = false, loadingLabel = wording('ui.select.loadingLabel', 'Loading…'), onBlur, onKeyDown, onPointerDown, ...rest } = props<Omit<JSX.IntrinsicElements['select'], 'value' | 'options' | 'class' | 'children' | 'onChange'> & {
+const { value, options, onChange, submit = false, emptyOption, busy = false, loading = false, loadingLabel = wording('ui.select.loadingLabel', 'Loading…'), onBlur, onKeyDown, onPointerDown, ...rest } = props<Omit<JSX.IntrinsicElements['select'], 'value' | 'options' | 'class' | 'children' | 'onChange'> & {
   // One of the options' values, or the empty string once there is an `emptyOption`.
   value: Value | (Empty extends string | true ? '' : never)
   // `disabled` keeps that option from being picked. A native option draws no icon, so it has none.
   options: readonly { value: Value, label: string, disabled?: boolean | undefined }[]
   // Handed the option's own value, a number for a number option, or the empty string for the `emptyOption`.
-  onChange?: ((value: Value | (Empty extends string | true ? '' : never)) => void) | undefined
+  onChange?: ((value: Value | (Empty extends string | true ? '' : never)) => unknown) | undefined
   // Submits the form holding it once an option is picked, after `onChange`: a GET filter form then needs no ref to itself. A pick by keyboard, which some browsers report on each arrow key, waits for Enter or for the select to lose focus.
   submit?: boolean | undefined
   // A first option worth the empty string: a string is its label, `true` leaves it blank.
   emptyOption?: Empty
-  // Shows a disabled row saying the options are on their way.
+  // Shows a disabled row saying the options are on their way, and marks the select busy.
+  busy?: boolean | undefined
+  // The old name of `busy`, which still works until 1.73.
   loading?: boolean | undefined
   loadingLabel?: string | undefined
 }>()
@@ -85,10 +87,10 @@ function left(event: FocusEvent & { currentTarget: HTMLSelectElement }) {
 const ref = startRef<HTMLSelectElement>(element => box = element, rest.ref)
 ---
 // Each option says whether it is selected, so the right one stays chosen when the options arrive after the value.
-select({...rest} ref={ref} onChange={event => picked(event.currentTarget)} onKeyDown={submit ? pressed : onKeyDown} onPointerDown={submit ? grabbed : onPointerDown} onBlur={submit ? left : onBlur})
+select({...rest} aria-busy={busy || loading ? 'true' : undefined} ref={ref} onChange={event => picked(event.currentTarget)} onKeyDown={submit ? pressed : onKeyDown} onPointerDown={submit ? grabbed : onPointerDown} onBlur={submit ? left : onBlur})
   if emptyOption !== undefined && emptyOption !== false
     option(value="") {typeof emptyOption === 'string' ? emptyOption : ''}
-  if loading
+  if busy || loading
     option(value="" disabled) {loadingLabel}
   for choice of options key={choice.value}
     option(ref={element => element.toggleAttribute('selected', untrack(() => String(choice.value) === String(value)))} value={choice.value} disabled={choice.disabled} selected={String(choice.value) === String(value)}) {choice.label}

@@ -50,6 +50,7 @@ import { deprecatedSignalProps } from './signal-props'
 import { siteNames } from './site-name'
 import { untypedSockets } from './socket-routes'
 import { typingOptions } from './tsgo'
+import { renamedUiProps } from './ui-props'
 
 // Imports each page of the extensions kay check reports as the app's own, so TypeScript checks them.
 const EXTENSION_PAGES = 'kay-extension-pages.ts'
@@ -134,7 +135,7 @@ async function writeShadows(projectRoot: string, options: CheckOptions): Promise
 
   // A types-only write discards the problems, so none of their checks run.
   if (options.typesOnly !== true)
-    problems.push(...redirectChecks(root, options, served), ...await unguardedRoutes(options, served), ...await unreadOpenSettings(served), ...await unguardedTools(options, served), ...await mcpRoutes(options, served), ...await largePublicImages(options, root, served), ...await untypedSockets(options, served), ...await retiredIdentityKey(root, options), ...oldRegistrations(root, options), ...await rateLimitNames(root, options), ...await siteNames(root, options), ...await mountComponentPaths(root, options), ...await renamedExports(root, options), ...await renameChecks(root, options), ...await deprecatedSignalProps(root, options), ...await renamedOptions(root, options), ...await hookShapes(root, options))
+    problems.push(...redirectChecks(root, options, served), ...await unguardedRoutes(options, served), ...await unreadOpenSettings(served), ...await unguardedTools(options, served), ...await mcpRoutes(options, served), ...await largePublicImages(options, root, served), ...await untypedSockets(options, served), ...await retiredIdentityKey(root, options), ...oldRegistrations(root, options), ...await rateLimitNames(root, options), ...await siteNames(root, options), ...await mountComponentPaths(root, options), ...await renamedExports(root, options), ...await renameChecks(root, options), ...await deprecatedSignalProps(root, options), ...await renamedOptions(root, options), ...await renamedUiProps(root, options), ...await hookShapes(root, options))
 
   // A script rather than a module, which is what lets it declare a wildcard module.
   await tree.write('kay-assets.d.ts', ASSET_TYPES)

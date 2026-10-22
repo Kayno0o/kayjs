@@ -21,7 +21,7 @@ const { search, value = '', name, onChange, searchLabel = wording('ui.iconPicker
   // Submits the chosen icon's name under this name, for a picker inside a form.
   name?: string | undefined
   // Hands over a pick, or an empty string for a cleared one.
-  onChange?: ((name: string) => void) | undefined
+  onChange?: ((name: string) => unknown) | undefined
   // What the picker says: the search box's name and placeholder, the grid's name, its states, and its two buttons.
   searchLabel?: string | undefined
   placeholder?: string | undefined

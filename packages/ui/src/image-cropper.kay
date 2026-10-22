@@ -29,9 +29,9 @@ const { src, ratio = 1, minSize = 32, grid = false, alt = '', cropLabel = wordin
   // Reads the crop out as it changes, `{w}`, `{h}`, `{x}` and `{y}` standing for its size and place in natural pixels.
   cropText?: string | undefined
   // The crop in the image's natural pixels, ready for a canvas draw, after every change.
-  onCrop?: ((crop: CropRect) => void) | undefined
+  onCrop?: ((crop: CropRect) => unknown) | undefined
   // The image's natural size, once it has decoded.
-  onLoad?: ((size: ImageSize) => void) | undefined
+  onLoad?: ((size: ImageSize) => unknown) | undefined
   // Shown under the image: `@footer(reset)`, where `reset()` centres the crop again.
   footer?: Snippet<[reset: () => void]> | undefined
 }>()

@@ -27,7 +27,7 @@ const { value = '', onInput, onImage, toolbar = true, preview, previewClass, upl
   // The text to start with; an editor whose parent passes other text follows it.
   value?: string | undefined
   // The text after every change, typed or applied by a shortcut, a paste or an upload.
-  onInput?: ((value: string) => void) | undefined
+  onInput?: ((value: string) => unknown) | undefined
   // Uploads a pasted or dropped image and returns the url to embed it by. Without it, images are left to the browser.
   onImage?: ((file: File) => Promise<string>) | undefined
   // Toasted when an upload throws.

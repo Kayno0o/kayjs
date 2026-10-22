@@ -20,7 +20,7 @@ const { list, detail, listHead, detailHead, sidebar, sidebarTitle = '', detailOp
   detailOpen?: boolean | undefined
   // Below `md`, whether the sidebar covers the layout; its back button calls `onSidebarClose` for the parent to set it back to false.
   sidebarOpen?: boolean | undefined
-  onSidebarClose?: (() => void) | undefined
+  onSidebarClose?: (() => unknown) | undefined
   // A handle on the list's right edge, from `md` up, dragged or moved with the arrow keys.
   resizableList?: boolean | undefined
   // The `localStorage` key the list's width is kept under, from one visit to the next.

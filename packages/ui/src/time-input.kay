@@ -9,7 +9,7 @@ const { value, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 
   // The time as `HH:MM`, or `HH:MM:SS` with a `step` under a minute, and `''` for none. Without it, the box starts empty and keeps what is typed, for a form posting it by its `name`.
   value?: string | undefined
   // Called with the new time, or `''` once emptied, as soon as the box holds a whole time.
-  onChange?: ((value: string) => void) | undefined
+  onChange?: ((value: string) => unknown) | undefined
 }>()
 ---
 TextInput(part="root" {...rest} type="time" value={value} onInput={onChange})

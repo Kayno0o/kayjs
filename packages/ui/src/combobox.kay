@@ -31,9 +31,9 @@ const { id, options, value = '', valueLabel, label, name, minLength = 1, create 
   emptyLabel?: string | undefined
   failureLabel?: string | undefined
   disabled?: boolean | undefined
-  onChange?: ((value: Value | '', option: ComboboxOption<Value> | undefined) => void) | undefined
+  onChange?: ((value: Value | '', option: ComboboxOption<Value> | undefined) => unknown) | undefined
   // Called with the text of a created option, once it is picked.
-  onCreate?: ((text: string) => void) | undefined
+  onCreate?: ((text: string) => unknown) | undefined
 }>()
 
 const listId = id ?? uid()

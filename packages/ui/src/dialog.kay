@@ -22,7 +22,7 @@ const { open, title, level = 2, size = 'md', bare = false, dirty = false, onOpen
   dirty?: boolean | undefined
   footer?: Snippet
   // Called with `false` however the dialog closes, a click outside and Escape included. Closed by Escape or a click outside, its content is still there to read; closed by the parent setting `open` to false, it is already gone.
-  onOpenChange: (open: boolean) => void
+  onOpenChange: (open: boolean) => unknown
 }>()
 
 // Set by any typing inside, and cleared however the dialog closes, since every way ends in its `close` event.

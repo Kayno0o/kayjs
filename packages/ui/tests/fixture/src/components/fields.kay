@@ -32,7 +32,7 @@ TextInput#amount(type="number" value={amount()} onInput={amount.set} onChange={n
 p#figure {amount() === null ? 'none' : `${typeof amount()} ${amount()}`}
 button#reset(onClick={() => amount.set(null)}) Reset
 button#clear(onClick={() => name.set('')}) Clear
-Select#planet(value="mars" loading options={[{ value: 'mars', label: 'Mars' }, { value: 'earth', label: 'Earth' }]} onChange={onPlanet})
+Select#planet(value="mars" busy options={[{ value: 'mars', label: 'Mars' }, { value: 'earth', label: 'Earth' }]} onChange={onPlanet})
 Select#level(value={1} options={LEVELS} onChange={level})
 Select#kind(value={kind()} options={KINDS} emptyOption="Any" onChange={pickKind})
 TextInput#plain(name="email" aria-label="Email")

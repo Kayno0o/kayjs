@@ -40,7 +40,7 @@ const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, em
   // Rows already sorted by the data source: the table reflects the sort in its headers and never reorders them itself.
   serverSort?: boolean | undefined
   // Called with each sort a header click asks for, to fetch the rows sorted that way when `serverSort` is set.
-  onSort?: ((sort: SortState) => void) | undefined
+  onSort?: ((sort: SortState) => unknown) | undefined
   // Draws the cells of the columns it covers, see `Column.cell`.
   cell?: Snippet<[row: Row, column: Column<Row>]> | undefined
   // Shown in place of the rows when there are none.
@@ -63,7 +63,7 @@ const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, em
   // The keys of the rows picked to start from, as `rowKey` reads them; a table whose parent passes another list follows it. A key whose row is no longer in `rows` leaves the selection.
   selected?: RowKeyValue<Row, Key>[] | undefined
   // Called with the keys picked, in the rows' order, each time the selection changes, a row leaving `rows` included.
-  onSelect?: ((keys: RowKeyValue<Row, Key>[]) => void) | undefined
+  onSelect?: ((keys: RowKeyValue<Row, Key>[]) => unknown) | undefined
   // Drawn beside the count while something is picked, with the keys and a function emptying the selection: the page's bulk actions.
   bulk?: Snippet<[keys: RowKeyValue<Row, Key>[], clear: () => void]> | undefined
   // Names the select-all box, and the column's header for screen readers.

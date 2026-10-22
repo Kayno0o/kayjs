@@ -15,7 +15,7 @@ const { open, title, actions, footer, onOpenChange, closeLabel = wording('ui.sid
   footer?: Snippet
   closeLabel?: string | undefined
   // Called with `false` however the panel closes, a click outside and Escape included. Closed by either of those or its close button, its content is still there to read; closed by the parent, it is already gone.
-  onOpenChange: (open: boolean) => void
+  onOpenChange: (open: boolean) => unknown
 }>()
 
 let panel: HTMLDialogElement | undefined

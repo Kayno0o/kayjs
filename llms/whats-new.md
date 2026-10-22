@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-ui `Select` takes `busy` (`loading` still works), callback props accept any return type, `SiteNav` and `AppHeader` take `current` as a URL too, and the HoverCard anchors through a top-layer stand-in so a transformed ancestor or an own `anchor-name` no longer misplaces it ([upgrading](./upgrading.md)).
 - `kay add auth` sends mails through `authMailer(mail.enqueue)` once `mail({ module })` is registered, creates a missing `.gitignore` for `data`, and edits an empty or multi-line `tables` list; the ui() shell declares tailwind's layer order, so a utility passed through `class` beats a component's rule ([Project and add](project-new-and-add.md)).
 - kayjs-ui `HoverCard` anchors a card to an element chosen at run time, an SVG shape included, and ZoomPane takes `onChange({ scale, x, y })` and `least` so what stands on its plate can follow it ([HoverCard](../packages/ui/llms/basics.md)).
 - A component call can hand several parts on to the component it calls, `Busy(part="root spinner")`, so a Button with an `onClick` takes the `spinner` part of `button.kay` in `src/ui.ts` like every other Button ([Styling](../llms/styles-and-assets.md)).

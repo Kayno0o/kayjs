@@ -9,9 +9,9 @@ const look = recipe({ parts: { root: 'kui-field-input' } })
 const { value, onInput, onChange, onBlur, writeFocused = false, ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onChange'> & {
   // Without it, the box starts empty and keeps what is typed, for a form posting it by its `name`.
   value?: string | undefined
-  onInput?: ((value: string) => void) | undefined
+  onInput?: ((value: string) => unknown) | undefined
   // Called once the value is committed, on blur, after `onInput`.
-  onChange?: ((value: string) => void) | undefined
+  onChange?: ((value: string) => unknown) | undefined
   // Lets any write of the parent land while the box is focused, the caret going to the end, such as a chat clearing its draft or putting a refused message back.
   writeFocused?: boolean | undefined
 }>()

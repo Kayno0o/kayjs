@@ -9,7 +9,7 @@ const look = recipe({ parts: { root: 'kui-app-header', brand: 'kui-app-header-br
 const { links, current, label, menuLabel, brand, end, sticky = true, ...rest } = props<Omit<JSX.IntrinsicElements['header'], 'class' | 'children'> & {
   links: readonly NavLink[]
   // The path of the page on screen, as for `SiteNav`.
-  current: string
+  current: string | URL
   // Names the navigation for screen readers.
   label: string
   // Names the button opening the links on a narrow screen.

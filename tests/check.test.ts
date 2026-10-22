@@ -3888,6 +3888,31 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports Select(loading) of kayjs-ui and --fix renames it to busy, leaving a tag that gives both', async () => {
+    const page = [
+      '---',
+      'import Select from \'@kaynooo/kayjs-ui/select.kay\'',
+      'import Other from \'./other.kay\'',
+      'const loading = true',
+      '---',
+      'Select(value="a" options={[]} loading={loading})',
+      'Select(value="a" options={[]} {loading})',
+      'Select(value="a" options={[]} loading={true} busy={false})',
+      'Other(loading={loading})',
+      '',
+    ].join('\n')
+    const root = await scratchProject({ 'src/routes/index.kay': page, 'src/routes/other.kay': '---\nconst { loading } = props<{ loading: boolean }>()\n---\np {loading}\n' })
+
+    try {
+      expect((await runCheck(root)).output.match(/deprecated-ui-prop/g)).toHaveLength(3)
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/routes/index.kay')).text()).toBe(page.replace('options={[]} loading={loading})', 'options={[]} busy={loading})').replace('options={[]} {loading})', 'options={[]} busy={loading})'))
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports the lifetimes renamed to maxAge and --fix writes the new form, leaving a call that gives both', async () => {
     const config = [
       'import { createAuth } from \'@kaynooo/kayjs-auth\'',

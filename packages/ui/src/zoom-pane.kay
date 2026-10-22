@@ -21,7 +21,7 @@ const { label, most = MOST, least = 1, onChange, tools = true, zoomInLabel = wor
   // How far out it may be taken, as a multiple of fitted: 1 (the default) is fitted, 0.5 lets the plate shrink to half the pane.
   least?: number | undefined
   // Called with the new `{ scale, x, y }` whenever the plate moves or zooms, however it did: a gesture, a key or a button. `x` and `y` are where the plate's top-left corner sits in pixels, so what stands on the plate can follow it.
-  onChange?: ((plate: Plate) => void) | undefined
+  onChange?: ((plate: Plate) => unknown) | undefined
   // Whether the buttons are drawn. The gestures work either way.
   tools?: boolean | undefined
   zoomInLabel?: string | undefined

@@ -25,9 +25,9 @@ const { action, refused, saved, onSaved, onDiscard, dirty, onSave, status, failu
   // Toasted as a success once the action has run.
   saved?: string | undefined
   // What the action returned, for the page to patch into what it shows. The form is clean again once it has run.
-  onSaved?: ((result: Answer<Success<Output>>) => void) | undefined
+  onSaved?: ((result: Answer<Success<Output>>) => unknown) | undefined
   // Called after Discard has put the controls back to their initial values, for state the page keeps beyond them: the library's controls and their `onChange` need nothing from it.
-  onDiscard?: (() => void) | undefined
+  onDiscard?: (() => unknown) | undefined
   // The bar's texts: unsaved changes, nothing to save, the save under way, and the two buttons.
   dirtyLabel?: string | undefined
   cleanLabel?: string | undefined

@@ -15,9 +15,9 @@ const { accept, multiple = false, paste = false, disabled = false, compact = fal
   // A slim row, its content from the left, to sit inline beside other fields rather than as a large target of its own.
   compact?: boolean | undefined
   // The files picked, dropped or pasted: one unless `multiple`, and never an empty list.
-  onFiles: (files: File[]) => void
+  onFiles: (files: File[]) => unknown
   // The files dropped or picked that were left out, those missing `accept` and, without `multiple`, the matching ones beyond the first, so the page can say why; never called for pasted files, which may be anything on the clipboard.
-  onReject?: ((files: File[]) => void) | undefined
+  onReject?: ((files: File[]) => unknown) | undefined
   // What the zone shows: `@content(zone)`, where `zone.open()` opens the picker and `zone.dragging()` reads whether files hover the zone.
   content: Snippet<[zone: { open: () => void, dragging: () => boolean }]>
 }>()

@@ -23,7 +23,7 @@ const { value = [null, null], min, max, step, label, fromLabel, toLabel, unit, o
   // Written after the boxes, such as `h` or `%`.
   unit?: string | undefined
   // Runs once a box is committed, on blur or Enter, rather than on every keystroke, and only when the range changed.
-  onChange?: ((value: RangeValue) => void) | undefined
+  onChange?: ((value: RangeValue) => unknown) | undefined
 }>()
 
 let low: HTMLInputElement | undefined

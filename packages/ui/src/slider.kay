@@ -19,7 +19,7 @@ const { value, min = 0, max = 100, step, label, showValue = true, formatValue, o
   // Words the value for the display and for screen readers, such as `value => `${value} ms``.
   formatValue?: ((value: number) => string) | undefined
   // Runs on every move of the thumb, with the number, and after a form reset with the value it went back to.
-  onInput?: ((value: number) => void) | undefined
+  onInput?: ((value: number) => unknown) | undefined
 }>()
 
 const shown = signal(untrack(() => value))

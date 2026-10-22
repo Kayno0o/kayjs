@@ -64,7 +64,7 @@ const { id, options, value = [], label, placeholder = wording('ui.multiSelect.pl
   search?: boolean | undefined
   disabled?: boolean | undefined
   placement?: PopoverPlacement | undefined
-  onChange?: ((value: Value[]) => void) | undefined
+  onChange?: ((value: Value[]) => unknown) | undefined
 }>()
 
 const picked = signal<readonly Value[]>(value)

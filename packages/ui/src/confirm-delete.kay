@@ -12,9 +12,9 @@ const { message, onConfirm, onOpen, failure, success, refused, tone = 'danger', 
   // The dialog's question; asked inline, the armed pair's name for screen readers and the confirm button's tooltip.
   message: string
   // Deletes, or does what a neutral confirm asks. The dialog stays open, its buttons disabled, until a returned promise settles, and closes once it resolves.
-  onConfirm: () => void | Promise<void>
+  onConfirm: () => unknown
   // Runs when the trigger is pressed, for a message that is read then rather than at render.
-  onOpen?: (() => void) | undefined
+  onOpen?: (() => unknown) | undefined
   // Toasted when `onConfirm` throws, which leaves the dialog open, unless the call carries a message of its own: see `attempt`.
   failure: string
   // Toasted once `onConfirm` went through.

@@ -101,7 +101,7 @@ describe('the documentation site', () => {
     expect(props.get('href')).toMatchObject({ type: 'string', optional: true })
     expect(props.get('variant')).toMatchObject({ type: '"solid" | "ghost" | "inline"', default: '\'solid\'' })
     expect(props.has('disabled')).toBe(false)
-    expect(components.find(component => component.slug === 'table')!.data.props.find(prop => prop.name === 'onSort')!.type).toBe('(sort: SortState) => void')
+    expect(components.find(component => component.slug === 'table')!.data.props.find(prop => prop.name === 'onSort')!.type).toBe('(sort: SortState) => unknown')
   })
 
   it('resolves every internal link and anchor of llms/, the docs content, the home page and llms.txt to a page the site serves', async () => {

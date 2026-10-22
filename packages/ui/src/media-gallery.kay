@@ -17,7 +17,7 @@ const { items, index = 0, onIndexChange, ratio = '16 / 9', emptyLabel, previousL
   items: MediaItem[]
   // The item on the stage to start with; a gallery whose parent passes another follows it, and `onIndexChange` reports each turn.
   index?: number | undefined
-  onIndexChange?: ((index: number) => void) | undefined
+  onIndexChange?: ((index: number) => unknown) | undefined
   // The stage's CSS `aspect-ratio`.
   ratio?: string | undefined
   // What the gallery reads with no items.

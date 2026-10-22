@@ -521,7 +521,7 @@ function leaveJson(): void {
         if choices() === null || current.collection === ''
           TextInput(placeholder={current.placeholder} value={text()} onInput={typed} onBlur={() => touched = true} required={starred()})
         else
-          Select(required={starred()} value={text()} options={picks()} loading={choices() === undefined} emptyOption={!current.required || value() === undefined} onChange={next => set(next === '' ? cleared : next)})
+          Select(required={starred()} value={text()} options={picks()} busy={choices() === undefined} emptyOption={!current.required || value() === undefined} onChange={next => set(next === '' ? cleared : next)})
     when 'custom'
       const Kind = kindOf(current.name)
       if Kind

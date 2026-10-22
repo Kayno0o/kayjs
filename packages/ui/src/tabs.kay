@@ -25,7 +25,7 @@ const { tabs, value, label, onChange, panel, ...rest } = props<Omit<JSX.Intrinsi
   value: Value
   // Names the tab list for screen readers.
   label: string
-  onChange?: ((value: Value) => void) | undefined
+  onChange?: ((value: Value) => unknown) | undefined
   // Draws each tab's panel: `@panel(tab)`, given the tab's value. Every panel is drawn once and hidden while its tab is not shown, so what it holds survives a switch.
   // A hidden panel is hidden until found: find in page, a link to an id inside it, or kay's `focusInvalid` reaching a field in it shows its tab.
   panel: Snippet<[value: Value]>

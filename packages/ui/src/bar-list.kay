@@ -9,7 +9,7 @@ const look = recipe({ parts: { root: 'kui-bar-list', row: 'kui-bar-list-row', la
 const { rows, onSelect, emptyLabel, ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'onSelect'> & {
   rows: Row[]
   // Makes every row a button handing back the row it was pressed on.
-  onSelect?: ((row: Row) => void) | undefined
+  onSelect?: ((row: Row) => unknown) | undefined
   // What the list reads with no rows.
   emptyLabel?: string | undefined
 }>()

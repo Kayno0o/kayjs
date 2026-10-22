@@ -641,6 +641,15 @@ export const LINTS = {
     wrong: 'forgejo({ url: \'https://git.example.com\', repo: \'me/site\', token })',
     right: 'forgejo({ baseUrl: \'https://git.example.com\', repo: \'me/site\', token })',
   },
+  'deprecated-ui-prop': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.70',
+    site: true,
+    summary: 'A prop of a kayjs-ui component under its old name: `loading` of `Select`, which is `busy` since 1.70, as a control waiting on work is busy across kayjs-ui. The old name works three minors. The tag is found through the default import of the component from `@kaynooo/kayjs-ui/` in the project\'s `.kay` files, and the fix renames the prop, unless the new name is given beside it.',
+    wrong: 'Select(value={size} options={sizes} loading={sizes.length === 0})',
+    right: 'Select(value={size} options={sizes} busy={sizes.length === 0})',
+  },
   'deprecated-bare-duration': {
     level: 'warn',
     group: 'deprecated',

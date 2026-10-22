@@ -12,7 +12,7 @@ const { slides, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = wo
   slides: readonly { src: string, alt: string }[]
   // The slide shown first; a carousel whose parent passes another follows it.
   index?: number | undefined
-  onIndexChange?: ((index: number) => void) | undefined
+  onIndexChange?: ((index: number) => unknown) | undefined
   // Moves to the next slide this often, `'5s'`, held while the pointer or the focus is on the carousel, stopped by its pause button, and never for a visitor asking for reduced motion.
   autoplay?: Duration | undefined
   // The slides' aspect ratio, as CSS writes it.

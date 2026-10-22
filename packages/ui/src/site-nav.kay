@@ -14,8 +14,8 @@ const { id, links, current, label, menuLabel = wording('ui.siteNav.menuLabel', '
   id?: string | undefined
   // `icon` is drawn before the label, for the reader who sees it; the label still names the link.
   links: readonly NavLink[]
-  // The path of the page on screen: its link is marked as the page, and a link to a section holding it as current.
-  current: string
+  // The path of the page on screen, or its URL, `ctx.url`: its link is marked as the page, and a link to a section holding it as current.
+  current: string | URL
   // Names the navigation for screen readers.
   label: string
   // Names the button opening the links on a narrow screen.
@@ -31,7 +31,7 @@ const trimmed = (path: string) => path.length > 1 ? path.replace(TRAILING_SLASHE
 // The home page holds every path, so only an exact match marks it.
 function marked(href: string) {
   const own = trimmed(href)
-  const here = trimmed(current)
+  const here = trimmed(typeof current === 'string' ? current : current.pathname)
 
   if (own === here)
     return 'page'

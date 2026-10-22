@@ -53,6 +53,10 @@ A setting kayjs-cms, kayjs-mail, kayjs-auth or kayjs-ai refuses at boot, or a ba
 
 `mountComponent('src/components/toggle.kay', props)` of `kay/test` is `mountComponent(Toggle, props)` with `Toggle` imported in the test, which types the props. The path works three minors, and `kay upgrade` imports the component and passes it (the `deprecated-mount-component` lint).
 
+### kayjs-ui `Select` takes `busy`
+
+`Select(loading={...})` is `busy`, as a control waiting on work is busy across kayjs-ui; it also marks the select `aria-busy` now. The old name works three minors, and `kay upgrade` renames it (the `deprecated-ui-prop` lint). Every callback prop of kayjs-ui (`onChange`, `onSaved`, `onOpenChange`, ...) now accepts a function returning anything, and `SiteNav` and `AppHeader` take `current` as a path or a URL like `TabNav`.
+
 ### Lists paged by number take `pageSize`
 
 `infiniteList(first, { size })` of kayjs-ui is `pageSize`, and the `size` of what `paginate()` returns is `pageSize` too; `limit` and `offset` stay for a window onto a list. The old names work three minors, and `kay upgrade` renames the `infiniteList` option (the `deprecated-page-size` lint); no lint can tell a read of `.size` from another object's, so rename those by hand.

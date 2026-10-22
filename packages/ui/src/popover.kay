@@ -15,7 +15,7 @@ const { id, open = false, placement = 'bottom-start', trigger, onOpenChange, ...
   // Renders the button that toggles the panel, which spreads the attributes it is handed: `@trigger(attributes)`, then `button({...attributes})`.
   trigger: Snippet<[attributes: PopoverTriggerProps]>
   // Called with the new state whenever the panel shows or hides, however it did.
-  onOpenChange?: ((open: boolean) => void) | undefined
+  onOpenChange?: ((open: boolean) => unknown) | undefined
 }>()
 
 const panelId = id ?? uid()

@@ -15,7 +15,7 @@ const { points, x = {}, y = {}, quadrant, corners, onSelect, emptyLabel, label, 
   quadrant?: { x: number, y: number } | undefined
   corners?: { topLeft?: string, topRight?: string, bottomLeft?: string, bottomRight?: string } | undefined
   // Makes every dot a button handing back its point.
-  onSelect?: ((point: Point) => void) | undefined
+  onSelect?: ((point: Point) => unknown) | undefined
   // What the chart reads with no points.
   emptyLabel?: string | undefined
   // Describes the chart for screen readers.
