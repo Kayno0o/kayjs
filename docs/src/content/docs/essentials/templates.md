@@ -332,7 +332,9 @@ It works on the server and in an island. On the server the error still goes to t
 
 `catch` may leave out the error name. A `try` with no `catch` renders nothing when it throws.
 
-An `await` block inside a `try` of the same template needs no `catch` of its own, while a component's own `await` does not reach the `try` around the component: when its value rejects, even after the page went out, the `try`'s `catch` takes the block's place and the error is reported.
+An `await` block inside a `try` of the same template needs no `catch` of its own. When its value rejects, even after the page went out, the `try`'s `catch` takes the block's place and the error is reported.
+
+A component's own `await` does not reach the `try` around the component.
 
 <ReadMore href="/llms/islands#error-fallbacks">How an island reports the error to the server, and what the head keeps.</ReadMore>
 

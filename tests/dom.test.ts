@@ -2029,6 +2029,53 @@ describe('an await block with no catch, in an island', () => {
   })
 })
 
+describe('an await block with no catch, in a catch block and in a nested try, in an island', () => {
+  const mountN = site({
+    'main.kay': [
+      '---',
+      'function broken(): string {',
+      '  throw new Error(\'Broken\')',
+      '}',
+      '---',
+      'try',
+      '  try',
+      '    p {broken()}',
+      '  catch',
+      '    await Promise.reject(new Error(\'InCatch\')) then text',
+      '      p.in-catch {text}',
+      'catch error',
+      '  p.outer {(error as Error).message}',
+      'try',
+      '  try',
+      '    await Promise.reject(new Error(\'Nested\')) then text',
+      '      p.nested {text}',
+      '  catch error',
+      '    p.inner {(error as Error).message}',
+      'catch',
+      '  p.unreached Unreached',
+      '',
+    ].join('\n'),
+  })
+
+  it('hands an await in a catch block to the try around it, and an await in a nested try to the nearest one', async () => {
+    const errors = spyOn(console, 'error').mockImplementation(() => undefined)
+    const { root, dispose } = await mountN()
+
+    try {
+      await settle()
+      expect(root.querySelector('p.in-catch')).toBeNull()
+      expect(root.querySelector('p.outer')!.textContent).toBe('InCatch')
+      expect(root.querySelector('p.nested')).toBeNull()
+      expect(root.querySelector('p.inner')!.textContent).toBe('Nested')
+      expect(root.querySelector('p.unreached')).toBeNull()
+    }
+    finally {
+      errors.mockRestore()
+      await dispose()
+    }
+  })
+})
+
 describe('snippets in loops and blocks', () => {
   const mountB = site({
     'rows.kay': '--- <T>\nimport type { JSX } from \'kay\'\n\nconst { items, row } = props<{ items: T[], row: (item: T, index: number) => JSX.Element }>()\n---\nul.rows\n  for item, i of items key={i}\n    | {row(item, i)}\n',

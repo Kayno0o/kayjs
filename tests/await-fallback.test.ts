@@ -149,6 +149,11 @@ describe('an await block in a snippet and in a catch block', () => {
   })
 })
 
+// The catch each await block is handed, in source order.
+function fallbacks(code: string): string[] {
+  return [...code.matchAll(/fallback: \(error\) => KayHtml\((KayCatch\d+)\(error\)\)|, (KayCatch\d+)\); \}/g)].map(match => match[1] ?? match[2]!)
+}
+
 describe('compiling an await block with no catch', () => {
   it('hands each block the catch of the nearest try above it, an await in a catch block taking the try around that one', () => {
     const source = '---\nconst a = Promise.resolve(1)\n---\ntry\n  try\n    await a then x\n      p {x}\n  catch\n    await a then y\n      p {y}\ncatch\n  p Outer\n'
@@ -157,9 +162,7 @@ describe('compiling an await block with no catch', () => {
       const code = compileKay(source, 'nest.kay', { output }).tsx
 
       // Two tries name their catch apart, the inner await using the inner one and the one in its catch block the outer.
-      expect(code).toContain('KayCatch1')
-      expect(code).toContain('KayCatch0')
-      expect(code.indexOf('KayCatch1')).toBeLessThan(code.lastIndexOf('KayCatch0'))
+      expect(fallbacks(code)).toEqual(['KayCatch1', 'KayCatch0'])
     }
   })
 })
