@@ -51,6 +51,8 @@ export async function readFromTerminal(label: string): Promise<string | undefine
     process.exit(143)
   }
 
+  // Taken before the prompt shows, so a termination once it is asked puts the terminal back.
+  process.once('SIGTERM', onTerminate)
   process.stderr.write(label)
 
   // A terminal that went away before the first read refuses raw mode.
@@ -58,6 +60,7 @@ export async function readFromTerminal(label: string): Promise<string | undefine
     stdin.setRawMode(true)
   }
   catch {
+    process.off('SIGTERM', onTerminate)
     process.stderr.write('\n')
 
     return undefined
@@ -65,7 +68,6 @@ export async function readFromTerminal(label: string): Promise<string | undefine
 
   stdin.setEncoding('utf8')
   stdin.resume()
-  process.once('SIGTERM', onTerminate)
 
   let finish: (typed: string | undefined) => void = () => undefined
   let value = ''
