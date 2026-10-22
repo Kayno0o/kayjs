@@ -64,14 +64,22 @@ export async function relationsMissing(db: SQL, names: readonly string[]): Promi
 }
 
 // Creates the indexes missing on tables that exist, each on its own and concurrently: a plain CREATE INDEX locks its table against writes, and inside a transaction with others it would deadlock with a replica writing several tables.
-// One replica at a time: two concurrent builds of one index deadlock each other, so a replica that finds another one at it leaves the indexes to it and waits for the unique ones to be valid, as a keyed job enqueued before kay_jobs_key is enforced could be enqueued twice. It waits at most INDEX_WAIT_MS, then goes on: a build that failed is taken over by the next try of the lock.
+// One replica at a time: two concurrent builds of one index deadlock each other, so a replica that finds another one at it leaves the indexes to it. Whoever built or not, it then waits for the unique ones to be valid, as a keyed job enqueued before kay_jobs_key is enforced could be enqueued twice. It waits at most INDEX_WAIT_MS, then warns and goes on: a build that failed is taken over by the next try of the lock.
 // The lock is a session one, held on the connection that builds. Behind a transaction-mode pooler it is not held across statements, so a replica that deadlocked (40P01) with another's build counts as having lost it, and the same wait applies; the lock only keeps builds apart on a direct or session-mode connection.
 export async function createMissingIndexes(db: SQL, indexes: readonly PgIndex[]): Promise<void> {
   const deadline = Date.now() + INDEX_WAIT_MS
 
-  while (!await buildMissingIndexes(db, indexes)) {
-    if (await uniqueIndexesValid(db, indexes) || Date.now() >= deadline)
+  while (true) {
+    await buildMissingIndexes(db, indexes)
+
+    if (await uniqueIndexesValid(db, indexes))
       return
+
+    if (Date.now() >= deadline) {
+      console.warn('kay: a unique index of the job tables is still not valid, so a keyed job may be enqueued twice until it is; the index build may be stuck, or a lock held by a pooled connection')
+
+      return
+    }
 
     await Bun.sleep(INDEX_POLL_MS)
   }
@@ -92,8 +100,8 @@ async function uniqueIndexesValid(db: SQL, indexes: readonly PgIndex[]): Promise
   return true
 }
 
-// Builds the indexes that are missing under the lock and says whether it did: false when another replica holds the lock or its build deadlocked with ours.
-async function buildMissingIndexes(db: SQL, indexes: readonly PgIndex[]): Promise<boolean> {
+// Builds the indexes that are missing under the lock, doing nothing when another replica holds it or its build deadlocked with ours.
+async function buildMissingIndexes(db: SQL, indexes: readonly PgIndex[]): Promise<void> {
   // It runs all its queries on the one connection holding the lock, so a pool of one connection does not wait on itself.
   const session = await db.reserve()
 
@@ -101,7 +109,7 @@ async function buildMissingIndexes(db: SQL, indexes: readonly PgIndex[]): Promis
     const [lock] = await rowsOf<{ taken: boolean }>(session`SELECT pg_try_advisory_lock(hashtext(${INDEX_LOCK})) AS taken`)
 
     if (lock?.taken !== true)
-      return false
+      return
 
     try {
       for (const index of indexes) {
@@ -129,14 +137,10 @@ async function buildMissingIndexes(db: SQL, indexes: readonly PgIndex[]): Promis
             throw error
         }
       }
-
-      return true
     }
     catch (error) {
-      if ((error as { errno?: string }).errno === DEADLOCK_DETECTED)
-        return false
-
-      throw error
+      if ((error as { errno?: string }).errno !== DEADLOCK_DETECTED)
+        throw error
     }
     finally {
       // The pooled connection goes back holding the lock otherwise; a dead one frees it by ending.

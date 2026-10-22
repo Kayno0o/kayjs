@@ -242,12 +242,43 @@ pgDescribe('pgData', () => {
       done = true
     })()
 
-    await Bun.sleep(1000)
-    expect(done).toBe(false)
-    await reserved.unsafe('SELECT pg_advisory_unlock(hashtext(\'kay_indexes\'))')
-    reserved.release()
+    try {
+      await Bun.sleep(1000)
+      expect(done).toBe(false)
+    }
+    finally {
+      await reserved.unsafe('SELECT pg_advisory_unlock(hashtext(\'kay_indexes\'))')
+      reserved.release()
+    }
+
     await waiting
     expect(await rows(sql, 'SELECT indisvalid FROM pg_index WHERE indexrelid = to_regclass(\'kay_jobs_key\')')).toEqual([{ indisvalid: true }])
+  })
+
+  pgIt('counts a build that deadlocks with another as lost, and waits for the index', async () => {
+    let builds = 0
+    const session = Object.assign(async () => [{ taken: true }], {
+      unsafe: async (text: string) => {
+        if (text.startsWith('SELECT to_regclass'))
+          return [{ missing: true }]
+
+        if (text.startsWith('CREATE')) {
+          builds++
+
+          throw Object.assign(new Error('deadlock detected'), { errno: '40P01' })
+        }
+
+        return []
+      },
+      release: () => undefined,
+    })
+    const db = {
+      reserve: async () => session,
+      unsafe: async () => [{ valid: builds > 0 }],
+    } as unknown as SQL
+
+    await createMissingIndexes(db, [{ name: 'kay_jobs_key', on: 'kay_jobs (queue, job_key)', unique: true }])
+    expect(builds).toBe(1)
   })
 
   pgIt('creates a missing index once when replicas start at once, neither failing', async () => {
