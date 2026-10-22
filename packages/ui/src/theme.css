@@ -1479,6 +1479,34 @@
     @apply h-full bg-kui-accent transition-[width];
   }
 
+  .kui-skeleton {
+    @apply flex w-(--kui-skeleton-width,100%) flex-col gap-2;
+
+    &:where([data-shape='avatar']) {
+      @apply w-(--kui-skeleton-width,2.5rem);
+    }
+  }
+
+  .kui-skeleton-block {
+    @apply block h-(--kui-skeleton-height,1em) w-full animate-pulse motion-reduce:animate-none bg-kui-surface1;
+
+    &:where([data-last]) {
+      @apply w-3/5;
+    }
+  }
+
+  :where(.kui-skeleton[data-shape='avatar']) > .kui-skeleton-block {
+    @apply aspect-square h-auto rounded-full;
+  }
+
+  :where(.kui-skeleton[data-shape='card']) > .kui-skeleton-block {
+    @apply h-(--kui-skeleton-height,8rem);
+  }
+
+  .kui-skeleton-label {
+    @apply sr-only;
+  }
+
   .kui-page-header {
     @apply flex flex-col gap-2;
   }

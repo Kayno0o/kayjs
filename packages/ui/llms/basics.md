@@ -94,9 +94,10 @@ Popover(placement="bottom-end")
 - `open` opens or closes it from the page, and `onOpenChange(open)` runs however it changed: a page driving `open` sets its own value back there, or it could not open the panel again after a click outside closed it.
 - TooltipHost shows the `data-tooltip` of whichever element the pointer or a tab lands on. `data-tooltip-placement`, a CSS `position-area`, says where it sits, `top` by default: `button(data-tooltip="Copy link" data-tooltip-placement="bottom")`. IconButton sets `data-tooltip` to its label. While a tooltip shows, its element gets `aria-describedby` pointing at the tooltip, so a screen reader focusing it hears the text too. `TooltipHost(showDelay="200ms" hideDelay="300ms")` sets how long a tooltip waits to show (`80ms`) and to hide (`150ms`), a duration with its unit, as `"200ms"` or `"1s"`; a bare number is a type error. The pointer can cross onto the tooltip without it closing, and Escape closes it until the pointer or the focus moves to another element.
 
-### Stat, Meter, BarList, SiteFavicon, CopyButton, Rating
+### Stat, Meter, Skeleton, BarList, SiteFavicon, CopyButton, Rating
 
 - `Stat(value={12} label="moons" icon="info")`: a figure read with what it counts.
+- `Skeleton(shape lines width height label)`: a placeholder for a pending block: `shape` is `text` (`lines` bars, the last shorter, 1 by default), `avatar` or `card`, `width` and `height` CSS lengths. The shapes are `aria-hidden`; `label` adds a visually hidden `role="status"` the pending block announces. The pulse stops under `prefers-reduced-motion`.
 - `Meter(value={usage} label="Disk" fillClass="bg-kui-warning")`: a `role="meter"` bar named by the required `label`, holding `value` between 0 and 100. `fillClass` styles the fill alone, such as a colour picked by threshold.
 - `BarList(rows={[{ key: 'fr', label: 'France', value: 120, display: '120 visits' }]})`: a bar per row, each measured against the largest value, reading `display` or else the value. `onSelect(row)` makes each row a button, from an island; `emptyLabel` is what it reads with no rows. Its rows are typed `BarListRow`, or any type extending it.
 - `SiteFavicon(src={site.favicon} name={site.name})`: a site's icon, or the `globe` slot in a colour drawn from `name` when `src` is missing or fails to load.

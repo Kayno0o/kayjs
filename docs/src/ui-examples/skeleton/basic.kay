@@ -1,0 +1,6 @@
+---
+import Skeleton from '@kaynooo/kayjs-ui/skeleton.kay'
+---
+.flex.items-center.gap-3
+  Skeleton(shape="avatar")
+  Skeleton(lines={3})

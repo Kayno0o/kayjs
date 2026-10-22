@@ -1,0 +1,11 @@
+---
+import Skeleton from '@kaynooo/kayjs-ui/skeleton.kay'
+
+const comments = new Promise<string[]>(resolve => setTimeout(resolve, 2000, ['Great telescope.', 'Sharp at high power.']))
+---
+await comments
+  Skeleton(lines={2} label="Loading comments")
+then list
+  ul
+    for comment of list key={comment}
+      li {comment}

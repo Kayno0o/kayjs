@@ -50,6 +50,7 @@ import Select from '@kaynooo/kayjs-ui/select.kay'
 import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
 import SiteFavicon from '@kaynooo/kayjs-ui/site-favicon.kay'
 import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
+import Skeleton from '@kaynooo/kayjs-ui/skeleton.kay'
 import SplitLayout from '@kaynooo/kayjs-ui/split-layout.kay'
 import Stat from '@kaynooo/kayjs-ui/stat.kay'
 import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
@@ -131,6 +132,7 @@ export const COMPONENTS = {
   'site-favicon': SiteFavicon,
   'site-nav': SiteNav,
   'split-layout': SplitLayout,
+  'skeleton': Skeleton,
   'stat': Stat,
   'tab-nav': TabNav,
   'table': Table,
@@ -201,6 +203,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'site-favicon': { name: 'kaynooo.fr' },
   'site-nav': { links: [{ href: '/', label: 'Home' }], current: '/', label: 'Main' },
   'split-layout': { list: 'L', detail: 'D' },
+  'skeleton': { lines: 2, label: 'Loading' },
   'stat': { value: 12, label: 'moons' },
   'tab-nav': { links: [{ href: '/', label: 'Home' }], current: '/', label: 'Sections' },
   'table': { columns, rows: planets, rowKey: 'name' },

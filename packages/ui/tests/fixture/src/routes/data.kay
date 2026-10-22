@@ -5,6 +5,7 @@ import MediaGallery from '@kaynooo/kayjs-ui/media-gallery.kay'
 import Meter from '@kaynooo/kayjs-ui/meter.kay'
 import Rating from '@kaynooo/kayjs-ui/rating.kay'
 import SiteFavicon from '@kaynooo/kayjs-ui/site-favicon.kay'
+import Skeleton from '@kaynooo/kayjs-ui/skeleton.kay'
 import Stat from '@kaynooo/kayjs-ui/stat.kay'
 ---
 main
@@ -12,6 +13,10 @@ main
     Stat(value={12} label="moons" icon="info")
   article#meter
     Meter(value={140} label="Disk" fillClass="bg-kui-error")
+  article#skeleton
+    Skeleton(lines={3} label="Loading")
+  article#avatar-skeleton
+    Skeleton(shape="avatar" width="4rem")
   article#bars
     BarList(rows={[{ key: 'mars', label: 'Mars', value: 2 }, { key: 'earth', label: 'Earth', value: 1, display: 'one' }, { key: 'venus', label: 'Venus', value: 0 }]})
   article#no-bars-label

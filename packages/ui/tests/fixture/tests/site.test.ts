@@ -377,6 +377,13 @@ describe('data', () => {
     expect(await attributes('/data', '#meter [role="meter"]', ['aria-valuenow', 'aria-valuemin', 'aria-valuemax', 'aria-label'])).toEqual([{ 'aria-valuenow': '100', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-label': 'Disk' }])
   })
 
+  test('Skeleton hides its bars from screen readers, shortens the last, and announces its label as a status', async () => {
+    expect((await find('/data', '#skeleton .kui-skeleton-block')).map(found => [attr(found, 'aria-hidden'), attr(found, 'data-last')])).toEqual([['true', null], ['true', null], ['true', '']])
+    expect((await find('/data', '#skeleton [role="status"]')).map(found => found.text)).toEqual(['Loading'])
+    expect((await one('/data', '#avatar-skeleton .kui-skeleton')).attributes).toMatchObject({ 'data-shape': 'avatar', 'style': '--kui-skeleton-width: 4rem;' })
+    expect(await find('/data', '#avatar-skeleton [role="status"]')).toEqual([])
+  })
+
   test('BarList measures each row against the largest, reads its display, and says when it has none', async () => {
     const bars = (await one('/data', '#bars')).html
 
