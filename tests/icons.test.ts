@@ -95,6 +95,25 @@ describe('icons', () => {
     expect(() => expand('~icons/tabler/qqq-*')).toThrow('matches no icon')
   })
 
+  it('fails with an icon-unresolved error on a malformed glob or a negated one with nothing to narrow', () => {
+    const importer = join(process.cwd(), 'src/icons.ts')
+    const thrown = (...patterns: string[]): unknown => {
+      try {
+        globFiles(patterns, importer, process.cwd())
+      }
+      catch (error) {
+        return error
+      }
+
+      return undefined
+    }
+
+    expect(thrown('~icons/tabler/[')).toMatchObject({ name: 'KayError', code: 'icon-unresolved' })
+    expect(thrown('!~icons/tabler/home')).toMatchObject({ name: 'KayError', code: 'icon-unresolved' })
+    expect(thrown('/src/routes/*.kay', '!~icons/tabler/home')).toMatchObject({ code: 'icon-unresolved' })
+    expect(thrown('~icons/tabler/home', '!~icons/tabler/home')).toBeUndefined()
+  })
+
   it('bundles the icons a glob names and no others, eager or behind a function', async () => {
     const dir = await scratchDir('icon-bundle-')
     const inProject = async (name: string, source: string) => {

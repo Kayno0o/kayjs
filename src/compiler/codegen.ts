@@ -186,6 +186,9 @@ class ModuleShell {
   // Whether `src/ui.ts` sets variants for this component, which its parts read at runtime.
   private readonly styled: boolean
   private typedParts: { type?: string, helper: boolean, recipe: boolean } | undefined
+  private readonly params: string
+  // An action declared in a page reads the params of that page's route, so its `action` is read as the one taking them; a layout's or a shared file's has no single route.
+  private readonly actionsTyped: boolean
 
   constructor(private readonly file: KayFile, private readonly script: ScriptAnalysis, private readonly server: ServerAnalysis | undefined, private readonly options: GenerateOptions) {
     this.src = file.source
@@ -200,6 +203,8 @@ class ModuleShell {
     this.facts = options.ui !== undefined && owned.parts?.merges === true ? { ...owned, ui: options.ui } : owned
     this.styled = this.facts.ui !== undefined && uiHasVariants(this.facts.ui)
     this.deferred = deferredData(this.facts, this.fence)
+    this.params = paramsType(options)
+    this.actionsTyped = this.mode === 'check' && options.params !== undefined && (server?.actionCallees.length ?? 0) > 0
   }
 
   // The plain data the scripts write out, but for a name a block of the template binds again, which then stands for something else.
@@ -355,7 +360,7 @@ class ModuleShell {
     }
 
     if (server)
-      b.add(`import type { ${this.options.errorPage ? 'ErrorPageContext' : 'PageContext'} as KayPageContext, PageData as KayPageData${this.declaresQuery() !== undefined ? ', QueryOf as KayQueryOf' : ''}${this.settingType(PRERENDER) !== undefined ? ', PrerenderedContext as KayPrerenderedContext' : ''}${mode === 'check' && server.page ? ', PageSettings as KayPageSettings' : ''}${this.typesActions() ? ', ActionFor as KayActionFor' : ''} } from 'kay'\n`)
+      b.add(`import type { ${this.options.errorPage ? 'ErrorPageContext' : 'PageContext'} as KayPageContext, PageData as KayPageData${this.declaresQuery() !== undefined ? ', QueryOf as KayQueryOf' : ''}${this.settingType(PRERENDER) !== undefined ? ', PrerenderedContext as KayPrerenderedContext' : ''}${mode === 'check' && server.page ? ', PageSettings as KayPageSettings' : ''}${this.actionsTyped ? ', ActionFor as KayActionFor' : ''} } from 'kay'\n`)
 
     const kayHelpers: KayHelper[] = facts.actionForm ? ['formAction'] : []
     const actions = server?.exportNames.filter(name => !NOT_ACTIONS.has(name)) ?? []
@@ -698,9 +703,9 @@ class ModuleShell {
       if (page && page.start >= span.start && page.end <= span.end)
         cuts.push({ at: page.end, text: ' satisfies KayPageSettings' })
 
-      if (this.typesActions()) {
+      if (this.actionsTyped) {
         for (const callee of server.actionCallees.filter(callee => callee.start >= span.start && callee.end <= span.end))
-          cuts.push({ at: callee.start, text: '(' }, { at: callee.end, text: ` as KayActionFor<${this.paramsType()}>)` })
+          cuts.push({ at: callee.start, text: '(' }, { at: callee.end, text: ` as KayActionFor<${this.params}>)` })
       }
 
       let at = from
@@ -720,7 +725,7 @@ class ModuleShell {
     if (server.exportNames.length > 0)
       b.add(`KayRegisterActions(${JSON.stringify(this.options.moduleId)}, { ${server.exportNames.join(', ')} })\n`)
 
-    const params = this.paramsType()
+    const params = this.params
 
     // An unused parameter would trip `noUnusedParameters` in the user's tsconfig, so it is named `_ctx` when the fence never reads it.
     const ctx = server.body.some(span => CTX_REFERENCE.test(this.text(span))) ? 'ctx' : '_ctx'
@@ -742,16 +747,6 @@ class ModuleShell {
     b.add('\n')
     this.sites.handOver = { start: b.code.length, end: b.code.length + handOver.length }
     b.add(`${handOver}\n}\n`)
-  }
-
-  // The params of the route this file serves, each typed as its matcher gives it.
-  private paramsType(): string {
-    return this.options.params ? `{ ${this.options.params.map(name => `${JSON.stringify(name)}: ${this.options.paramTypes?.[name] ?? 'string'}`).join(', ')} }` : 'Record<string, string>'
-  }
-
-  // An action declared in a page reads the params of that page's route, so its `action` is read as the one taking them; a layout's or a shared file's has no single route.
-  private typesActions(): boolean {
-    return this.mode === 'check' && this.options.params !== undefined && (this.server?.actionCallees.length ?? 0) > 0
   }
 
   // Right where a deferred value is declared, so a promise rejecting while a later statement awaits crashes nothing; a statement an export reads runs at module level.
@@ -1150,4 +1145,9 @@ function deferredData(facts: TemplateFacts, server: ServerAnalysis | undefined):
   const data = new Set(server?.data.map(binding => binding.name))
 
   return new Set([...facts.awaited].filter(name => data.has(name)))
+}
+
+// The params of the route a file serves, each typed as its matcher gives it.
+function paramsType(options: GenerateOptions): string {
+  return options.params ? `{ ${options.params.map(name => `${JSON.stringify(name)}: ${options.paramTypes?.[name] ?? 'string'}`).join(', ')} }` : 'Record<string, string>'
 }

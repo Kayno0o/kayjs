@@ -66,19 +66,41 @@ export function globFiles(patterns: string[], importer: string, root: string): M
 }
 
 // The icons of the installed sets an icon pattern names, `~icons/<set>/<name>` with the wildcards and braces of a glob, each as its import specifier; a negated one leaves its icons out.
-// A name written out, or an alternative of its braces, that no installed set has fails the build, as a misspelt import does.
+// A name written out, or an alternative of its braces, that no installed set has fails the build, as a misspelt import does; so does a negated pattern with no icon pattern to leave icons out of.
 function iconMatches(patterns: string[], root: string): Map<string, string> {
   const wanted = patterns.filter(pattern => pattern.startsWith(ICONS))
+  const negated = patterns.filter(pattern => pattern.startsWith(`!${ICONS}`))
 
-  if (wanted.length === 0)
+  if (wanted.length === 0 && negated.length === 0)
     return new Map()
 
-  // An icon whose name an import cannot spell is not one a glob offers either.
-  const names = [...installedIconSets(root)].flatMap(([prefix, file]) => iconNames(prefix, file)).filter(name => ICON_IMPORT.test(`${ICONS}${name}`))
-  const matching = (pattern: string) => {
-    const glob = new Bun.Glob(pattern.slice(ICONS.length))
+  if (wanted.length === 0)
+    throw new KayError('icon-unresolved', `kay: ${negated[0]} leaves out icons of a pattern that offers none, add the \`~icons/...\` pattern it narrows: ${ICON_USAGE}`)
 
-    return names.filter(name => glob.match(name))
+  const sets = installedIconSets(root)
+  const names = new Map<string, string[]>()
+  const glob = (pattern: string) => {
+    try {
+      return new Bun.Glob(pattern)
+    }
+    catch {
+      throw new KayError('icon-unresolved', `kay: ${pattern} is not a valid glob`)
+    }
+  }
+  // Only the sets the pattern's first segment names are read, and each once; an icon whose name an import cannot spell is not one a glob offers either.
+  const setNames = (prefix: string, file: string) => {
+    if (!names.has(prefix))
+      names.set(prefix, iconNames(prefix, file).filter(name => ICON_IMPORT.test(`${ICONS}${name}`)))
+
+    return names.get(prefix)!
+  }
+  const matching = (pattern: string) => {
+    const path = pattern.slice(ICONS.length)
+    const slash = path.indexOf('/')
+    const named = glob(slash === -1 ? path : path.slice(0, slash))
+    const matcher = glob(path)
+
+    return [...sets].filter(([prefix]) => named.match(prefix)).flatMap(([prefix, file]) => setNames(prefix, file)).filter(name => matcher.match(name))
   }
   const found = new Map<string, string>()
 
@@ -94,7 +116,7 @@ function iconMatches(patterns: string[], root: string): Map<string, string> {
     }
   }
 
-  for (const pattern of patterns.filter(pattern => pattern.startsWith(`!${ICONS}`))) {
+  for (const pattern of negated) {
     for (const name of matching(pattern.slice(1)))
       found.delete(`${ICONS}${name}`)
   }
