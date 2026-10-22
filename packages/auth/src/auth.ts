@@ -345,10 +345,11 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   async requireUser(options: RequireUserOptions<Scope, Role> & { bare: true }): Promise<BareUser<UserData>>
   async requireUser(options?: RequireUserOptions<Scope, Role>): Promise<User<UserData>>
   async requireUser(options: RequireUserOptions<Scope, Role> = {}): Promise<User<UserData> | BareUser<UserData>> {
-    const user = await this.bareUser()
+    const record = await this.record()
+    const user = record && publicUser(record) as BareUser<UserData>
     const { redirect, deny } = stoppers(this.request)
 
-    if (!user) {
+    if (!record || !user) {
       const signIn = options.redirect === undefined || options.redirect === '' ? guardPageOf(this.core) : options.redirect
 
       if (signIn !== undefined && isNavigation(this.request))
@@ -363,7 +364,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     if (!scopeAllows(await this.scopes(), options.scope))
       return deny(403)
 
-    return options.bare ? user : { ...user, providers: await this.providersOf((await this.record())!) }
+    return options.bare ? user : { ...user, providers: await this.providersOf(record) }
   }
 
   // The signed-in admin, as themselves, for an admin page to ask for: 404 while the `admin` option names no one (a `Denied`, which a plain Elysia app answers too), a visitor sent to sign in as `requireUser()` does, and 403 for anyone else, an admin acting as a user and a bearer token included.
