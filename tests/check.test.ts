@@ -4352,7 +4352,7 @@ describe.concurrent('kay check, unused code', () => {
     try {
       const { output } = await runCheck(root)
 
-      expect(output.match(/deprecated-option-name/g)).toHaveLength(3)
+      expect(output.match(/deprecated-option-name/g)).toHaveLength(6)
       expect(output).not.toContain('clean.ts')
     }
     finally {
