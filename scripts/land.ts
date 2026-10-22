@@ -10,6 +10,8 @@ import { failedTests } from './test-failures'
 // `just land`: this branch rebased on origin's main, linted, checked and run through the tests its changes reach, then pushed as main, and the main checkout moved to it. The full suite is CI's, on every push, which `just ci` follows.
 // Landings verify side by side and queue only for the push: the one that finds origin's main where its rebase left it pushes at once under the landing lock, one that finds it moved rebases and verifies again under the lock.
 // It prints one line per step, their output going to a log in the worktree's git folder, and a failure ends on the step's last lines, exiting with one of EXIT's codes.
+// The Bun running this script: a PATH starting with node_modules/.bin would resolve a bare `bun` to the npm package's old one (#1946).
+const BUN = process.execPath
 const EXIT = { unlandable: 2, conflict: 3, step: 4, refused: 5 }
 const LOG = join((await $`git rev-parse --absolute-git-dir`.text()).trim(), 'land.log')
 // Lines of a failing step's output shown, the rest staying in the log: its last ones, or after its failed tests only bun test's summary.
@@ -194,26 +196,26 @@ async function verify(): Promise<string> {
     fail(`the branch adds merge markers: ${markers.map(({ file, line, text }) => `${file}:${line} (${text})`).join(', ')}`, EXIT.unlandable)
 
   // Main may have moved the lockfile under this branch.
-  await step('bun install', ['bun', 'install', '--silent', '--frozen-lockfile'])
-  await step('lint', ['bun', 'run', 'lint'])
-  await step('check', ['bun', 'run', 'check'])
+  await step('bun install', [BUN, 'install', '--silent', '--frozen-lockfile'])
+  await step('lint', [BUN, 'run', 'lint'])
+  await step('check', [BUN, 'run', 'check'])
 
   if (changed.some(path => path.startsWith('bench/') || path === 'bun.lock')) {
-    await step('bench:check', ['bun', 'run', 'bench:check'])
-    await step('bench hydration markers', ['bun', 'test', './bench', '-t', 'leave hydration markers'])
+    await step('bench:check', [BUN, 'run', 'bench:check'])
+    await step('bench hydration markers', [BUN, 'test', './bench', '-t', 'leave hydration markers'])
   }
   else if (changed.some(path => path.startsWith('src/'))) {
-    await step('bench:check:kay', ['bun', 'run', 'bench:check:kay'])
+    await step('bench:check:kay', [BUN, 'run', 'bench:check:kay'])
   }
 
   if (changed.some(path => path.startsWith('.forgejo/')))
     await step('lint-actions', ['just', 'lint-actions'])
 
   if (changed.some(path => WHOLE_SUITE.test(path))) {
-    await step('tests, the whole suite', ['bun', 'run', 'test', WORKERS])
+    await step('tests, the whole suite', [BUN, 'run', 'test', WORKERS])
   }
   else {
-    await step('tests the changes reach', ['bun', 'run', 'test', `--changed=${base}`, WORKERS])
+    await step('tests the changes reach', [BUN, 'run', 'test', `--changed=${base}`, WORKERS])
 
     const readers = new Set(READERS.flatMap(([folder, tests]) => changed.some(path => folder.test(path)) ? tests : []))
 
@@ -235,12 +237,12 @@ async function verify(): Promise<string> {
     }
 
     if (readers.size > 0)
-      await step('tests reading the changed files', ['bun', 'run', 'test', ...readers, WORKERS])
+      await step('tests reading the changed files', [BUN, 'run', 'test', ...readers, WORKERS])
   }
 
   for (const name of new Set(changed.map(path => PACKAGE.exec(path)?.[1]).filter(name => name !== undefined))) {
-    await step(`packages/${name} check`, ['bun', 'run', 'check'], `packages/${name}`)
-    await step(`packages/${name} tests`, ['bun', 'run', 'test'], `packages/${name}`)
+    await step(`packages/${name} check`, [BUN, 'run', 'check'], `packages/${name}`)
+    await step(`packages/${name} tests`, [BUN, 'run', 'test'], `packages/${name}`)
   }
 
   return base
@@ -297,7 +299,7 @@ async function followMain() {
   for (const lockfile of (await $`git -C ${main} diff --name-only ${before} ${head} -- bun.lock ${'bench/apps/*/bun.lock'}`.text()).split('\n').filter(Boolean)) {
     const dir = join(main, dirname(lockfile))
 
-    if ((await $`bun install --silent --frozen-lockfile`.cwd(dir).nothrow().quiet()).exitCode !== 0)
+    if ((await $`${BUN} install --silent --frozen-lockfile`.cwd(dir).nothrow().quiet()).exitCode !== 0)
       console.warn(`the main checkout's packages at ${dir} are behind its lockfile: run \`bun install --frozen-lockfile\` there`)
   }
 }

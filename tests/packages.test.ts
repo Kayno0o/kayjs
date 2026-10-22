@@ -416,3 +416,21 @@ describe('the llms topic files', () => {
     expect(found).toEqual([])
   })
 })
+
+// bun-plugin-tailwind's peer auto-installs npm's `bun` into node_modules/.bin, which a script's PATH puts first: a bare `bun` runs that old Bun, not the one running the script (#1946).
+describe('package scripts', () => {
+  it('reach the running Bun through $npm_execpath, never a bare bun', async () => {
+    const found: string[] = []
+
+    for (const path of await Array.fromAsync(new Glob('{package.json,{packages,editors,examples,bench/apps}/*/package.json}').scan())) {
+      const { scripts = {} } = await Bun.file(path).json() as { scripts?: Record<string, string> }
+
+      for (const [name, command] of Object.entries(scripts)) {
+        if ((/(?:^|[\s&|;(])bun\s/).test(command))
+          found.push(`${path}: ${name}: ${command}`)
+      }
+    }
+
+    expect(found).toEqual([])
+  })
+})

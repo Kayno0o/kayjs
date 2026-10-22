@@ -202,16 +202,16 @@
   },
   "scripts": {
     "check": "$npm_execpath check",
-    "build:types": "rm -rf types && bun src/tsgo.ts -p tsconfig.build.json",
-    "build:eslint": "bun build src/eslint/index.ts --target node --packages external --outfile dist/eslint.js",
-    "prepack": "bun run build:types && bun run build:eslint",
+    "build:types": "rm -rf types && $npm_execpath src/tsgo.ts -p tsconfig.build.json",
+    "build:eslint": "$npm_execpath build src/eslint/index.ts --target node --packages external --outfile dist/eslint.js",
+    "prepack": "$npm_execpath run build:types && $npm_execpath run build:eslint",
     "postpack": "rm -rf types dist",
-    "prelint": "bun run build:eslint",
+    "prelint": "$npm_execpath run build:eslint",
     "lint": "$npm_execpath scripts/lint.ts && $npm_execpath run --filter './packages/*' --sequential lint",
-    "prelint:fix": "bun run build:eslint",
+    "prelint:fix": "$npm_execpath run build:eslint",
     "lint:fix": "$npm_execpath scripts/lint.ts --fix && $npm_execpath run --filter './packages/*' --sequential lint:fix",
-    "test": "bun scripts/timings.ts && bun test --parallel --timings=.kay/timings.json",
-    "test:timings": "bun scripts/timings.ts && bun test --parallel --timings=.kay/timings.json --update-timings",
+    "test": "$npm_execpath scripts/timings.ts && $npm_execpath test --parallel --timings=.kay/timings.json",
+    "test:timings": "$npm_execpath scripts/timings.ts && $npm_execpath test --parallel --timings=.kay/timings.json --update-timings",
     "bench": "$npm_execpath bench/run.ts",
     "bench:paint": "$npm_execpath bench/paint.ts",
     "bench:origins": "$npm_execpath bench/origins.ts",
@@ -223,7 +223,7 @@
     "docs:start": "$npm_execpath src/cli.ts start docs",
     "bench:check": "$npm_execpath run bench:check:kay && $npm_execpath run bench:check:apps",
     "bench:check:kay": "$npm_execpath src/cli.ts check bench/apps/kay",
-    "bench:check:apps": "bun src/tsgo.ts --noEmit -p bench/apps/solid && bun src/tsgo.ts --noEmit -p bench/apps/svelte && bun src/tsgo.ts --noEmit -p bench/apps/next && $npm_execpath --cwd=bench/apps/nuxt --bun run check && $npm_execpath --cwd=bench/apps/astro --bun run check"
+    "bench:check:apps": "$npm_execpath src/tsgo.ts --noEmit -p bench/apps/solid && $npm_execpath src/tsgo.ts --noEmit -p bench/apps/svelte && $npm_execpath src/tsgo.ts --noEmit -p bench/apps/next && $npm_execpath --cwd=bench/apps/nuxt --bun run check && $npm_execpath --cwd=bench/apps/astro --bun run check"
   },
   "peerDependencies": {
     "@happy-dom/global-registrator": "^20.14.6 || ^21.0.3",

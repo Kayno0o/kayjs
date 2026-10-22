@@ -119,10 +119,10 @@
     ]
   },
   "scripts": {
-    "build": "bun build.ts",
-    "check": "bun ../../src/tsgo.ts --noEmit -p tsconfig.json",
-    "package": "bun build.ts && bunx @vscode/vsce@4.0.0 package --no-dependencies -o kay.vsix",
-    "test": "bun test"
+    "build": "$npm_execpath build.ts",
+    "check": "$npm_execpath ../../src/tsgo.ts --noEmit -p tsconfig.json",
+    "package": "$npm_execpath build.ts && bunx @vscode/vsce@4.0.0 package --no-dependencies -o kay.vsix",
+    "test": "$npm_execpath test"
   },
   "devDependencies": {
     "@types/vscode": "~1.91.0",

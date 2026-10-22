@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "kay dev",
     "check": "kay check",
-    "test": "bun test --isolate",
+    "test": "$npm_execpath test --isolate",
     "compile": "kay build --compile server",
     "db:generate": "pg-orm generate",
     "db:migrate": "pg-orm apply"

@@ -59,7 +59,7 @@ try {
   await Promise.all(texts.map(async ({ path, text }) => Bun.write(path, text.replace(VERSION, () => `"version": "${version}"`).replace(KAY_PEER, (_, head: string) => `${head}"${peer}"`))))
   await Promise.all([...pages].map(async ([path, text]) => Bun.write(path, text)))
   // bun.lock records each workspace's version and ranges, which the CI's frozen install compares against.
-  await $`bun install`.quiet()
+  await $`${process.execPath} install`.quiet()
   await $`git add bun.lock ${manifests} ${INDEX} ${ARCHIVES.flat()}`
   await $`git commit -q -m ${tag}`
   await $`git tag ${tag}`
