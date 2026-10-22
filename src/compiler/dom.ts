@@ -12,7 +12,7 @@ import { SUBJECT } from './names'
 import { bindEvent } from './validate'
 
 // The `kay/dom` helpers browser output calls, each imported under a `Kay` name; `image` and `pendingCall` are in modules of their own, as their runtimes weigh on a page with no image or no pending block.
-const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'choose', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'errorParagraph', 'fragment', 'holdSubmits', 'insert', 'listen', 'listenSubmit', 'loop', 'markers', 'memo', 'merge', 'omit', 'outside', 'partClass', 'partHanded', 'partsClass', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'spreadAttributes', 'template', 'text', 'transition', 'untrack']
+const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'choose', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'errorParagraph', 'fragment', 'holdSubmits', 'insert', 'listen', 'listenSubmit', 'loop', 'markers', 'memo', 'merge', 'omit', 'outside', 'partClass', 'partHanded', 'partsClass', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'spreadAttributes', 'spreadWith', 'template', 'text', 'transition', 'untrack']
 const TRANSITION_PART = 'transition:'
 
 export function domHelperImport(): string {
@@ -664,8 +664,7 @@ export class DomTemplate extends TemplateWriter {
       b.add('))); ')
     }
     else if (property === 'files') {
-      // The signal holds what the person picked; emptying it clears the input, but not on the first run, when a file picked before hydration must stay.
-      b.add(`{ let kayFresh = true; KayEffect(() => { const kayFiles = (`).addSource(expression).add(`)(); if (!kayFresh && !kayFiles?.length) ${variable}.value = ''; kayFresh = false }) } `)
+      this.bindFiles(expression, variable)
     }
     else {
       b.add(`KayEffect(() => KayProperty(${variable}, ${JSON.stringify(property)}, (`).addSource(expression).add(')())); ')
@@ -676,6 +675,11 @@ export class DomTemplate extends TemplateWriter {
     b.add(');')
   }
 
+  // The signal holds what the person picked; emptying it clears the input, but not on the first run, when a file picked before hydration must stay.
+  private bindFiles(expression: Span, variable: string): void {
+    this.b.add(`{ let kayFresh = true; KayEffect(() => { const kayFiles = (`).addSource(expression).add(`)(); if (!kayFresh && !kayFiles?.length) ${variable}.value = ''; kayFresh = false }) } `)
+  }
+
   private spreadBinding(element: ElementNode, variable: string, content: boolean): void {
     const { b } = this
 
@@ -684,12 +688,20 @@ export class DomTemplate extends TemplateWriter {
 
     const link = element.name === 'a'
 
-    b.add(`KaySpread(${variable}, () => [`)
-    this.leadingImageDefaults(element)
-    this.sources(element, false)
-    this.formDefaults(element)
+    // A bound file input is emptied when its signal is, which no prop does.
+    for (const attribute of element.attributes) {
+      if (attribute.kind === 'expression' && this.source(attribute.name) === 'bind:files')
+        this.bindFiles(attribute.expression, variable)
+    }
 
-    b.add(`]${content || link ? `, ${content}` : ''}${link ? ', true' : ''});`)
+    b.add(`KaySpread(${variable}, () => `)
+    this.spreadOver(element, () => {
+      this.leadingImageDefaults(element)
+      this.sources(element, false)
+      this.formDefaults(element)
+    })
+
+    b.add(`${content || link ? `, ${content}` : ''}${link ? ', true' : ''});`)
   }
 
   private component(element: ElementNode): void {
@@ -714,15 +726,6 @@ export class DomTemplate extends TemplateWriter {
   // Inside an island a server island is a component as any other.
   protected skips(element: ElementNode, name: string): boolean {
     return marksServerIsland(element, name, this.src)
-  }
-
-  private staticAttribute(element: ElementNode, name: string): string | undefined {
-    for (const attribute of element.attributes) {
-      if (attribute.kind === 'static' && this.source(attribute.name) === name)
-        return attribute.text
-    }
-
-    return undefined
   }
 
   // A link that may leave the site, and so opens in a new tab unless it sets its own `target`.

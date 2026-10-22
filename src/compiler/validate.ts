@@ -536,12 +536,6 @@ class Validator {
       return
     }
 
-    if (element.attributes.some(candidate => candidate.kind === 'spread')) {
-      this.error(attribute.name, `\`bind:${property}\` next to a spread binds nothing`, { note: 'the spread may carry the value and the handler itself, so the element is rendered from its props', help: 'bind on a child element, or write the value and the handler' })
-
-      return
-    }
-
     const event = bindEvent(element, property)
     const handler = element.attributes.find(candidate => candidate.kind !== 'spread' && this.text(candidate.name) === event) as NamedAttribute | undefined
 
@@ -557,8 +551,6 @@ class Validator {
       this.error(attribute.name, `\`${name}\` takes an expression`, { help: `\`${name}={value}\`, or write the property in \`style\`` })
     else if (!STYLE_PROPERTY.test(name.slice(STYLE_PROP.length)))
       this.error(attribute.name, `\`${name}\` names no CSS property`, { help: 'write it as CSS does: `style:background-color={color}`, or a custom property `style:--gap={gap}`' })
-    else if (element.attributes.some(candidate => candidate.kind === 'spread'))
-      this.error(attribute.name, `\`${name}\` next to a spread sets nothing`, { note: 'the spread may carry a `style` of its own, so the element is rendered from its props', help: 'write the property in the `style` object instead' })
   }
 
   // `onSubmit|preventDefault={save}` calls the event method first; a handler of an element is the only thing that takes one.

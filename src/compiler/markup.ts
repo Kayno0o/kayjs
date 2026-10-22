@@ -7,6 +7,7 @@ import { URL_ATTRIBUTES } from '../runtime/url-attributes'
 import { actionOf, bindsOwnProp, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, handedParts, modifiersOf, partAttribute, partNames, partsOf, sectionOf, uiHasVariants, uiPartClasses } from './ast'
 import { decodeEntities, isFunctionAt } from './expression'
 import { PROPS } from './names'
+import { bindEvent } from './validate'
 
 export const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'])
 export const RAW_ELEMENTS = new Set(['script', 'style'])
@@ -553,6 +554,10 @@ export abstract class TemplateWriter {
         continue
       }
 
+      // Laid over the sources by `spreadOver`.
+      if (!element.component && attribute.kind === 'expression' && (name.startsWith('style:') || name.startsWith('bind:')))
+        continue
+
       if (this.skips(element, name))
         continue
 
@@ -620,6 +625,84 @@ export abstract class TemplateWriter {
       items.push(() => this.b.add(JSON.stringify(classes)))
 
     return items
+  }
+
+  protected staticAttribute(element: ElementNode, name: string): string | undefined {
+    for (const attribute of element.attributes) {
+      if (attribute.kind === 'static' && this.source(attribute.name) === name)
+        return attribute.text
+    }
+
+    return undefined
+  }
+
+  // The sources of an element with a spread, with its `style:prop` pairs and `bind:` bindings laid over what the spreads bring, so they merge into the props object as they do on an element without one.
+  protected spreadOver(element: ElementNode, sources: () => void): void {
+    const { b } = this
+    const named = (prefix: string) => element.attributes.filter((attribute): attribute is Extract<NamedAttribute, { kind: 'expression' }> => attribute.kind === 'expression' && this.source(attribute.name).startsWith(prefix))
+    const styles = named('style:')
+    const binds = named('bind:')
+
+    if (styles.length === 0 && binds.length === 0) {
+      b.add('[')
+      sources()
+      b.add(']')
+
+      return
+    }
+
+    const type = this.staticAttribute(element, 'type') ?? 'text'
+
+    b.add(`${helperName('spreadWith')}([`)
+    sources()
+    b.add(']')
+
+    if (styles.length > 0) {
+      b.add(', [')
+
+      for (const [index, attribute] of styles.entries())
+        b.add(`${index > 0 ? ', ' : ''}[${JSON.stringify(this.source(attribute.name).slice(6))}, (`).addSource(attribute.expression).add(')]')
+
+      b.add(']')
+    }
+    else if (binds.length > 0) {
+      b.add(', undefined')
+    }
+
+    if (binds.length > 0) {
+      b.add(', [')
+
+      for (const [index, attribute] of binds.entries()) {
+        const property = this.source(attribute.name).slice(5)
+
+        b.add(index > 0 ? ', [' : '[')
+        b.add(property === 'files' ? 'undefined' : JSON.stringify(property === 'group' ? 'checked' : property)).add(', () => ')
+
+        if (property === 'group') {
+          const value = groupValue(element, span => this.source(span))
+
+          b.add(`${GROUP_HAS}((`).addSource(attribute.expression).add(')(), ')
+
+          if ('text' in value)
+            b.add(JSON.stringify(value.text))
+          else
+            b.add('(').addSource(value.expression).add(')')
+
+          b.add(')')
+        }
+        else {
+          b.add('(').addSource(attribute.expression).add(')()')
+        }
+
+        b.add(`, ${JSON.stringify(bindEvent(element, property))}, (kayEvent) => `)
+        addBindWrite(b, attribute.expression, bindRead(property, type))
+        b.add(']')
+      }
+
+      b.add(']')
+    }
+
+    b.add(')')
   }
 
   // The `method` and `enctype` a form posting to an action takes unless it sets its own, as one more props object.

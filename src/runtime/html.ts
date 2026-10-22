@@ -32,7 +32,7 @@ export { memo, untrack } from './reactive'
 export { html, isRendered } from './rendered'
 
 export type { Html } from './rendered'
-export { componentClass, merge, omit, partClass, partHanded, partsClass } from './values'
+export { componentClass, merge, omit, partClass, partHanded, partsClass, spreadWith } from './values'
 
 // Leads the markup of a `try` block the server rendered its `catch` block for.
 export const FAILED_MARKER = `<!--${FAILED}-->`

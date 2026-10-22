@@ -80,6 +80,30 @@ export function merge(...sources: readonly object[]): Record<string, unknown> {
   return props
 }
 
+// The sources of an element with a spread, with its `style:prop` pairs laid over the `style` the sources bring and its `bind:` bindings over their value and handler: a handler the sources bring for the same event runs first.
+export function spreadWith(sources: readonly object[], styles?: readonly (readonly [string, unknown])[], binds?: readonly (readonly [name: string | undefined, read: () => unknown, event: string, write: (event: Event) => void])[]): object[] {
+  const over: Record<string, unknown> = {}
+
+  for (const [name, read, event, write] of binds ?? []) {
+    if (name !== undefined)
+      Object.defineProperty(over, name, { get: read, enumerable: true })
+
+    over[event] = (kayEvent: Event) => {
+      const handler = merge(...sources)[event]
+
+      if (typeof handler === 'function')
+        (handler as (event: Event) => void)(kayEvent)
+
+      write(kayEvent)
+    }
+  }
+
+  if (styles)
+    Object.defineProperty(over, 'style', { get: () => styleText(merge(...sources).style, styles) || undefined, enumerable: true })
+
+  return [...sources, over]
+}
+
 // The props a component left out of its destructuring, getters kept.
 export function omit(props: object, ...keys: string[]): Record<string, unknown> {
   const descriptors = Object.getOwnPropertyDescriptors(props)

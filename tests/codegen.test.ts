@@ -316,11 +316,21 @@ describe('elements', () => {
     expect(errors('input(bind:name={v})')).toEqual([expect.stringContaining('is not supported')])
   })
 
-  it('refuses bind: on an element that also spreads', () => {
-    for (const attribute of ['bind:value={v}', 'type="checkbox" bind:checked={v}', 'type="radio" bind:group={v}', 'type="file" bind:files={v}'])
-      expect(errors(`input(${attribute} {...rest})`)).toEqual([expect.stringContaining('next to a spread binds nothing')])
+  it('lays bind: over the props a spread brings, in both builds', () => {
+    const compiled = (attributes: string, output: 'dom' | 'html') => compileKay(`---\nconst n = signal(0)\n---\ninput(${attributes} {...rest})\n`, 'test.kay', { output }).tsx
 
-    expect(errors('details(bind:open={v} {...rest})')).toEqual([expect.stringContaining('next to a spread binds nothing')])
+    for (const output of ['dom', 'html'] as const) {
+      expect(errors('input(bind:value={v} {...rest})')).toEqual([])
+      expect(compiled('bind:value={n}', output)).toContain('KaySpreadWith([KaySpreadAttributes(rest)], undefined, [["value", () => (n)(), "onInput", (kayEvent) => (n).set(kayEvent.currentTarget.value)]])')
+      expect(compiled('type="checkbox" bind:checked={n}', output)).toContain('["checked", () => (n)(), "onChange"')
+      expect(compiled('type="radio" value="a" bind:group={n}', output)).toContain('["checked", () => ')
+      expect(compiled('type="file" bind:files={n}', output)).toContain('[undefined, () => (n)(), "onChange"')
+    }
+
+    expect(compiled('type="file" bind:files={n}', 'dom')).toContain('kayFresh')
+    expect(compiled('type="file" bind:files={n}', 'html')).not.toContain('kayFresh')
+    expect(errors('details(bind:open={v} {...rest})')).toEqual([])
+    expect(errors('input(bind:value={v} onInput={f} {...rest})')).toEqual([expect.stringContaining('already handles')])
   })
 
   it('refuses an event modifier that is none, twice, or on anything but the handler of an element', () => {
@@ -344,7 +354,7 @@ describe('elements', () => {
     expect(compileKay('form(onSubmit|preventDefault={save}) x\n', 'test.kay', { output: 'html' }).tsx).not.toContain('preventDefault')
   })
 
-  it('refuses style:prop on a component, without a value, with a bad name or next to a spread', () => {
+  it('refuses style:prop on a component, without a value or with a bad name', () => {
     expect(errors('p(style:color={c}) x')).toEqual([])
     expect(errors('p(style:--gap={c} style:background-color={c}) x')).toEqual([])
     expect(errors('Card(style:color={c})')).toEqual([expect.stringContaining('not of a component')])
@@ -353,7 +363,12 @@ describe('elements', () => {
     expect(errors('p(style:backgroundColor={c}) x')).toEqual([expect.stringContaining('names no CSS property')])
     expect(errors('p(style:-webkit-line-clamp={c}) x')).toEqual([])
     expect(errors('p(style:1x={c}) x')).toEqual([expect.stringContaining('names no CSS property')])
-    expect(errors('p(style:color={c} {...rest}) x')).toEqual([expect.stringContaining('next to a spread sets nothing')])
+    expect(errors('p(style:color={c} {...rest}) x')).toEqual([])
+  })
+
+  it('lays style:prop over the style a spread brings, in both builds', () => {
+    for (const output of ['dom', 'html'] as const)
+      expect(compileKay(`${ISLAND}p(style="top:1px" style:color={n()} {...rest}) x\n`, 'test.kay', { output }).tsx).toContain('KaySpreadWith([{ "style": "top:1px" }, KaySpreadAttributes(rest)], [["color", (n())]])')
   })
 
   it('merges style:prop into the style attribute, the text or the expression, in both builds', () => {

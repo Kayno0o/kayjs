@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { kay } from '../src/build/plugin'
+import { element, spreadWith } from '../src/runtime/html'
 import { settle } from '../src/test'
 import { scratchDir } from './scratch'
 
@@ -157,6 +158,53 @@ describe('style:prop and event modifiers', () => {
     finally {
       await dispose()
     }
+  })
+})
+
+describe('style:prop and bind: next to a spread', () => {
+  const mountSpreads = site({ 'main.kay': '---\nimport { signal } from \'kay\'\nconst color = signal(\'red\')\nconst text = signal(\'a\')\nconst on = signal(false)\nconst pick = signal(\'b\')\nconst log = signal(\'\')\nconst carried = { style: \'top:1px\', onInput: () => log.set(log() + \'s\') }\n---\ninput#t(bind:value={text} style:color={color()} {...carried})\ninput#c(type="checkbox" bind:checked={on} {...carried})\ninput#ra(type="radio" name="p" value="a" bind:group={pick} {...carried})\ninput#rb(type="radio" name="p" value="b" bind:group={pick} {...carried})\nbutton#toggle(onClick={() => { color.set(\'blue\'); text.set(\'z\'); on.set(true); pick.set(\'a\') }}) t\np#out {text()} {on() ? \'on\' : \'off\'} {pick()} {log()}\n' })
+
+  it('merges the style props into the style a spread brings, and binds beside its handler', async () => {
+    const { root, dispose } = await mountSpreads()
+    const text = root.querySelector<HTMLInputElement>('#t')!
+    const output = root.querySelector('#out')!
+
+    try {
+      expect(text.getAttribute('style')).toBe('top:1px;color:red')
+      expect(text.value).toBe('a')
+      text.value = 'typed'
+      text.dispatchEvent(new Event('input', { bubbles: true }))
+      await settle()
+      expect(output.textContent).toBe('typed off b s')
+
+      const box = root.querySelector<HTMLInputElement>('#c')!
+
+      box.checked = true
+      box.dispatchEvent(new Event('change', { bubbles: true }))
+      await settle()
+      expect(output.textContent).toContain('typed on b')
+
+      root.querySelector<HTMLInputElement>('#ra')!.checked = true
+      root.querySelector<HTMLInputElement>('#ra')!.dispatchEvent(new Event('change', { bubbles: true }))
+      await settle()
+      expect(output.textContent).toContain('typed on a')
+      root.querySelector<HTMLButtonElement>('#toggle')!.click()
+      await settle()
+      expect(text.getAttribute('style')).toBe('top:1px;color:blue')
+      expect(text.value).toBe('z')
+      expect(box.checked).toBe(true)
+      expect(root.querySelector<HTMLInputElement>('#rb')!.checked).toBe(false)
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  it('renders them on the server', () => {
+    const sources = spreadWith([{ style: 'top:1px', onInput: () => undefined }], [['color', 'red']], [['value', () => 'v', 'onInput', () => undefined]])
+
+    expect(element('input', sources).t).toBe('<input value="v" style="top:1px;color:red">')
+    expect(element('input', spreadWith([{}], [['color', null]])).t).toBe('<input>')
   })
 })
 
