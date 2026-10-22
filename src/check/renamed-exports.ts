@@ -38,8 +38,29 @@ interface Edit {
   text: string
 }
 
-// The places a script uses `name` as a binding, or undefined when one cannot be told from a key or an exported name (a shorthand property, a re-export), or the file is no script babel parses.
-function uses(file: string, source: string, name: string): number[] | undefined {
+const BINDING_KEYS: Record<string, string[] | undefined> = {
+  VariableDeclarator: ['id'],
+  ClassDeclaration: ['id'],
+  ClassExpression: ['id'],
+  FunctionDeclaration: ['id', 'params'],
+  FunctionExpression: ['id', 'params'],
+  TSDeclareFunction: ['id', 'params'],
+  ArrowFunctionExpression: ['params'],
+  ObjectMethod: ['params'],
+  ClassMethod: ['params'],
+  CatchClause: ['param'],
+  TSTypeAliasDeclaration: ['id'],
+  TSInterfaceDeclaration: ['id'],
+  TSEnumDeclaration: ['id'],
+}
+
+// Whether the child of `node` under `key` is where a declaration puts its names: a pattern may nest, so everything under it counts.
+function binds(node: t.Node, key: string): boolean {
+  return BINDING_KEYS[node.type]?.includes(key) ?? false
+}
+
+// The places a script uses `name` as a binding, or undefined when one cannot be told from a key or an exported name (a shorthand property, a re-export), a local declares `name` or the new name `to` anywhere, or the file is no script babel parses.
+function uses(file: string, source: string, name: string, to: string): number[] | undefined {
   if (file.endsWith('.kay'))
     return undefined
 
@@ -54,9 +75,15 @@ function uses(file: string, source: string, name: string): number[] | undefined 
 
   const found: number[] = []
   let ambiguous = false
-  const visit = (node: t.Node, parent: t.Node | undefined): void => {
-    if (node.type === 'ImportDeclaration')
+  const visit = (node: t.Node, parent: t.Node | undefined, binding = false): void => {
+    if (node.type === 'ImportDeclaration') {
+      ambiguous ||= node.specifiers.some(specifier => specifier.local.name === to)
+
       return
+    }
+
+    if (binding && node.type === 'Identifier' && (node.name === name || node.name === to))
+      ambiguous = true
 
     if (node.type === 'Identifier' && node.name === name) {
       const isKey = parent !== undefined && ('key' in parent && parent.key === node && !('computed' in parent && parent.computed === true))
@@ -76,7 +103,7 @@ function uses(file: string, source: string, name: string): number[] | undefined 
 
       for (const child of Array.isArray(value) ? value : [value]) {
         if (child !== null && typeof child === 'object' && typeof (child as { type?: unknown }).type === 'string')
-          visit(child as t.Node, node)
+          visit(child as t.Node, node, (binding && key !== 'typeAnnotation') || binds(node, key))
       }
     }
   }
@@ -89,7 +116,7 @@ function uses(file: string, source: string, name: string): number[] | undefined 
 // The edits renaming one imported specifier, and its uses in the file when it is not aliased.
 function editsOf(file: string, source: string, listStart: number, specifier: RegExpMatchArray, from: string, to: string): Edit[] {
   const start = listStart + specifier.index! + specifier[0].indexOf(from)
-  const places = specifier[2] === undefined ? uses(file, source, from) : []
+  const places = specifier[2] === undefined ? uses(file, source, from, to) : []
 
   return places === undefined ? [{ start, end: start + from.length, text: `${to} as ${from}` }] : [{ start, end: start + from.length, text: to }, ...places.map(at => ({ start: at, end: at + from.length, text: to }))]
 }

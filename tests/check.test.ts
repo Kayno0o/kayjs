@@ -3494,6 +3494,25 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('keeps the name when a local shadows it or the new name is already declared, importing the new name under the old one', async () => {
+    const root = await scratchProject({
+      'kay.config.ts': 'export default {}\n',
+      'src/shadow.ts': 'import { defaults } from \'@kaynooo/kayjs-mail\'\n\nexport const use = (defaults: number) => defaults + 1\nexport const all = { ...defaults }\n',
+      'src/declared.ts': 'import { defaults } from \'@kaynooo/kayjs-mail\'\n\nconst mailDefaults = { own: true }\nexport const all = [defaults, mailDefaults]\n',
+      'src/imported.ts': 'import { defaults } from \'@kaynooo/kayjs-mail\'\nimport { mailDefaults } from \'./mine\'\n\nexport const all = [defaults, mailDefaults]\n',
+    })
+
+    try {
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/shadow.ts')).text()).toBe('import { mailDefaults as defaults } from \'@kaynooo/kayjs-mail\'\n\nexport const use = (defaults: number) => defaults + 1\nexport const all = { ...defaults }\n')
+      expect(await Bun.file(join(root, 'src/declared.ts')).text()).toBe('import { mailDefaults as defaults } from \'@kaynooo/kayjs-mail\'\n\nconst mailDefaults = { own: true }\nexport const all = [defaults, mailDefaults]\n')
+      expect(await Bun.file(join(root, 'src/imported.ts')).text()).toContain('{ mailDefaults as defaults }')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports the dropped identity-key in a kay-allow comment and in lints, and --fix removes the name only', async () => {
     const root = await scratchProject({
       'kay.config.ts': 'export default {\n  lints: { \'identity-key\': \'allow\', \'missing-alt\': \'warn\' },\n}\n',
