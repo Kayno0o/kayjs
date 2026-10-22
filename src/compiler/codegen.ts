@@ -1055,7 +1055,7 @@ export function promotionCause(file: KayFile, script: ScriptAnalysis): string | 
 
 // The call that makes a static component promotable, with the span of its tag.
 export function promotionSite(file: KayFile, script: ScriptAnalysis): { cause: string, span: Span } | undefined {
-  const names = new Set([...script.functions, ...script.imports.filter(binding => !binding.typeOnly).map(binding => binding.local)])
+  const names = new Set([...script.functions, ...script.imports.filter(binding => !binding.typeOnly && !binding.source.startsWith('~icons/')).map(binding => binding.local)])
   let cause: string | undefined
   let span: Span | undefined
 

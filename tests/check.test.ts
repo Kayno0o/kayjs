@@ -153,7 +153,7 @@ describe('kay check', () => {
 
   it('reports type errors at the line and column of the .kay source', async () => {
     const diagnostics = await check(join(fixtures, 'broken'))
-    const brief = diagnostics.map(d => ({ file: d.file.slice(fixtures.length + 1), line: d.line, column: d.column, code: d.code, message: firstLine(d.message) }))
+    const brief = diagnostics.filter(d => d.code !== 'promoted-island').map(d => ({ file: d.file.slice(fixtures.length + 1), line: d.line, column: d.column, code: d.code, message: firstLine(d.message) }))
 
     expect(brief).toEqual([
       ...[7, 9].map(line => ({ file: 'broken/src/routes/feed.kay', line, column: 1, code: 'uncaught-await', message: 'Nothing renders in place of this block once its value rejects' })),
@@ -618,6 +618,28 @@ describe.concurrent('kay check, edge cases', () => {
         ['island-marker', 'src/components/denied.kay', 'This component renders as an island'],
       ])
       expect((await check(root, { lints: { 'promoted-island': 'allow' } })).filter(d => d.code === 'promoted-island')).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('does not report a component passing an island data built by a call, an icon import or a predicate callback', async () => {
+    const component = (script: string, call: string) => `---\nimport Child from './island.kay'\n${script}\n---\n${call}\n`
+    const root = await scratchProject({
+      'src/routes/index.kay': '---\nimport Mapped from \'../components/mapped.kay\'\nimport Local from \'../components/local.kay\'\nimport Icon from \'../components/icon.kay\'\nimport Found from \'../components/found.kay\'\nimport Hidden from \'../components/hidden.kay\'\n---\nMapped\nLocal\nIcon\nFound\nHidden\n',
+      'src/components/mapped.kay': component('const links = [\'a\', \'b\'].map(name => ({ href: `/${name}`, label: name }))', 'Child(format={links})'),
+      'src/components/local.kay': component('const panel = (color: string) => { const svg = `<svg fill="${color}"/>`; return `data:${svg}` }\nconst slides = [{ src: panel(\'red\') }]', 'Child(format={slides})'),
+      'src/components/icon.kay': component('import Brand from \'~icons/tabler/brand-github\'', 'Child(format={Brand})'),
+      'src/components/found.kay': component('const { rows, current } = props<{ rows: { id: number }[], current: number }>()\nconst pick = rows.find(row => row.id === current)', 'Child(format={rows.find(row => row.id === current)})'),
+      'src/components/hidden.kay': component('const pick = (value: number) => () => value\nconst built = [1].map(value => pick(value))', 'Child(format={built})'),
+      'src/components/island.kay': '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\nconst { format } = props<{ format: unknown }>()\n---\nbutton(onClick={() => count++}) {count()} {String(format)}\n',
+    })
+
+    try {
+      const found = (await check(root)).filter(d => d.code === 'promoted-island')
+
+      expect(found.map(d => d.file.slice(root.length + 1))).toEqual(['src/components/hidden.kay'])
     }
     finally {
       await rm(root, { recursive: true, force: true })

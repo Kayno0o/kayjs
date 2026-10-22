@@ -61,7 +61,7 @@ The effect and its cleanups live until `stop()` is called, and `root` returns wh
 
 A static component that passes an island a function is listed too, as `format passed to Picker, line 8`. That prop may turn it into an island, which the page decides as it renders.
 
-`kay check` warns of such a component as `promoted-island`, naming the call. Write `// kay-island` on a line of its own in the component to say it is meant, or `// kay-static` to say it is not: `kay check` reports a marker the component contradicts as `island-marker`.
+`kay check` warns of such a component as `promoted-island`, naming the call: data built by a list method (`map`, `filter`, `Array.from`) or by a function of the script returning data, and an `~icons/` import, are not functions. Write `// kay-island` on a line of its own in the component to say it is meant, or `// kay-static` to say it is not: `kay check` reports a marker the component contradicts as `island-marker`.
 
 The editor shows a lens on the first line of a component saying whether it is an island and why.
 
