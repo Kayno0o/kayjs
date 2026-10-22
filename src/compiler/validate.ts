@@ -9,7 +9,9 @@ import { childBlocks, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, serverIsl
 
 type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'special' | 'includeServer' | 'pageFile'>
 
-const BINDABLE = new Set(['input', 'textarea', 'select'])
+// The elements each property of an element can be bound to; `group` and `files` also need an input of a type, `radio` or `checkbox` and `file`.
+const BINDABLE: ReadonlyMap<string, ReadonlySet<string>> = new Map([['value', new Set(['input', 'textarea', 'select'])], ['checked', new Set(['input', 'textarea', 'select'])], ['group', new Set(['input'])], ['files', new Set(['input'])], ['open', new Set(['details', 'dialog'])]])
+const GROUP_TYPES = new Set(['radio', 'checkbox'])
 const TRANSITION_PART = 'transition:'
 
 const TRANSITION_PARTS = new Set(['enter', 'enter-from', 'enter-to', 'leave', 'leave-from', 'leave-to'])
@@ -84,20 +86,34 @@ export function headTagProblem(node: Node): [at: Span, message: string] | undefi
   return nested && [nested, `\`${node.name}\` holds text only`]
 }
 
-// Why `bind:` cannot bind this property of this element, or nothing when it can.
-export function bindProblem(element: ElementNode, property: string): [message: string, details: Details] | undefined {
-  if (element.component || !BINDABLE.has(element.name))
-    return ['`bind:` works on <input>, <textarea> and <select> only', { help: 'pass a component a value and a setter' }]
+// Why `bind:` cannot bind this property of this element, or nothing when it can. `type` is the static `type` of an input, if it has one.
+export function bindProblem(element: ElementNode, property: string, type?: string): [message: string, details: Details] | undefined {
+  if (element.component)
+    return ['`bind:` works on elements and, with a `Bindable` prop, on components', { help: 'pass a component a value and a setter' }]
 
-  if (property !== 'value' && property !== 'checked')
-    return [`\`bind:${property}\` is not supported`, { help: 'use `bind:value` or `bind:checked`' }]
+  const elements = BINDABLE.get(property)
+
+  if (elements === undefined)
+    return [`\`bind:${property}\` is not supported`, { help: 'use `bind:value`, `bind:checked`, `bind:group`, `bind:files` or `bind:open`' }]
+
+  if (!elements.has(element.name))
+    return [`\`bind:${property}\` works on ${[...elements].map(name => `<${name}>`).join(', ')} only`, { help: 'pass a component a value and a setter' }]
+
+  if (property === 'group' && !GROUP_TYPES.has(type ?? ''))
+    return ['`bind:group` needs an input with a static type="radio" or type="checkbox"', { help: '`input(type="radio" value="a" bind:group={choice})`' }]
+
+  if (property === 'files' && type !== 'file')
+    return ['`bind:files` needs an input with a static type="file"', { help: '`input(type="file" bind:files={files})`' }]
 
   return undefined
 }
 
-// The event `bind:` writes the signal back from.
+// The event `bind:` writes the signal back from: a dialog closes with `close`, a details toggles.
 export function bindEvent(element: ElementNode, property: string): string {
-  return property === 'checked' || element.name === 'select' ? 'onChange' : 'onInput'
+  if (property === 'open')
+    return element.name === 'dialog' ? 'onClose' : 'onToggle'
+
+  return property === 'checked' || property === 'group' || property === 'files' || element.name === 'select' ? 'onChange' : 'onInput'
 }
 
 // The index of the quote closing the string literal opened at `start`.
@@ -501,7 +517,7 @@ class Validator {
     }
 
     const property = name.slice(5)
-    const problem = bindProblem(element, property)
+    const problem = bindProblem(element, property, this.staticType(element))
 
     if (problem) {
       this.error(attribute.name, ...problem)
@@ -610,6 +626,13 @@ class Validator {
 
   private isImageInput(element: ElementNode): boolean {
     return element.name === 'input' && element.attributes.some(attribute => attribute.kind === 'static' && this.text(attribute.name) === 'type' && attribute.text === 'image')
+  }
+
+  // The text of the static `type` of an element, if it has one.
+  private staticType(element: ElementNode): string | undefined {
+    const type = element.attributes.find(candidate => candidate.kind === 'static' && this.text(candidate.name) === 'type')
+
+    return type?.kind === 'static' ? type.text : undefined
   }
 
   private text(span: Span): string {

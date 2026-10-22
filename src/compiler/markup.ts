@@ -45,21 +45,54 @@ export function escapeText(text: string): string {
 
 const NUMERIC_INPUTS = new Set(['number', 'range'])
 
-// What a `bind:` reads from the input on its event: a checkbox's `checked`, a number or range input's number, else its text.
-export function bindRead(property: string, inputType: string): 'checked' | 'valueAsNumber' | 'value' {
-  if (property === 'checked')
-    return 'checked'
+// Whether a group (the signal of a `bind:group`, a string for radios or an array for checkboxes) holds a value, as the checked state of the box reads it.
+export const GROUP_HAS = '((kayGroup: unknown, kayValue: string) => Array.isArray(kayGroup) ? kayGroup.includes(kayValue) : kayGroup === kayValue)'
+
+// The value a box of a `bind:group` stands for: its static `value`, the expression of a bound one, else the `on` a box without one submits.
+export function groupValue(element: ElementNode, text: (span: Span) => string): { text: string } | { expression: Span } {
+  for (const attribute of element.attributes) {
+    if (attribute.kind === 'spread' || text(attribute.name) !== 'value')
+      continue
+
+    if (attribute.kind === 'static')
+      return { text: decodeEntities(attribute.text) }
+
+    if (attribute.kind === 'expression')
+      return { expression: attribute.expression }
+  }
+
+  return { text: 'on' }
+}
+
+export type BindRead = 'checked' | 'valueAsNumber' | 'value' | 'open' | 'files' | 'radio' | 'checkbox'
+
+// What a `bind:` reads from the element on its event: a checkbox's `checked`, a details' `open`, a file input's `files`, the `value` of a radio or the values of the checkboxes of a group, a number or range input's number, else its text.
+export function bindRead(property: string, inputType: string): BindRead {
+  if (property === 'checked' || property === 'open' || property === 'files')
+    return property
+
+  if (property === 'group')
+    return inputType === 'radio' ? 'radio' : 'checkbox'
 
   return NUMERIC_INPUTS.has(inputType) ? 'valueAsNumber' : 'value'
 }
 
-// The body of a `bind:` event handler, `(kayEvent) => ` before it: it writes what the input holds back to the signal, which the caller closes.
-export function addBindWrite(b: CodeBuilder, expression: Span, read: string): void {
+// The body of a `bind:` event handler, `(kayEvent) => ` before it: it writes what the element holds back to the signal, which the caller closes.
+export function addBindWrite(b: CodeBuilder, expression: Span, read: BindRead): void {
   // An emptied number input has no number: the signal keeps its last one rather than take a NaN, or an undefined its type does not allow.
-  if (read === 'valueAsNumber')
+  if (read === 'valueAsNumber') {
     b.add('{ const kayValue = kayEvent.currentTarget.valueAsNumber; if (!Number.isNaN(kayValue)) (').addSource(expression).add(').set(kayValue) }')
-  else
+  }
+  else if (read === 'radio') {
+    b.add('{ if (kayEvent.currentTarget.checked) (').addSource(expression).add(').set(kayEvent.currentTarget.value) }')
+  }
+  else if (read === 'checkbox') {
+    // A box of the group adds or removes its own value, keeping the order the group had.
+    b.add('{ const kayBox = kayEvent.currentTarget; const kayGroup: string[] = (').addSource(expression).add(')(); (').addSource(expression).add(').set(kayBox.checked ? (kayGroup.includes(kayBox.value) ? kayGroup : [...kayGroup, kayBox.value]) : kayGroup.filter(kayItem => kayItem !== kayBox.value)) }')
+  }
+  else {
     b.add('(').addSource(expression).add(`).set(kayEvent.currentTarget.${read})`)
+  }
 }
 
 // A quoted attribute as JSX reads it, an entity standing for its character, then escaped for markup.

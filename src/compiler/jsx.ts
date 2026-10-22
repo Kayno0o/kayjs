@@ -946,15 +946,21 @@ export class JsxTemplate {
       return
     }
 
-    if (bindProblem(element, property))
+    const inputType = this.staticAttribute(element, 'type')
+
+    if (bindProblem(element, property, inputType))
       return
 
-    const inputType = this.staticAttribute(element, 'type') ?? 'text'
     const event = bindEvent(element, property)
 
-    b.wrap(attribute.name, () => b.add(property))
-    b.add('={(').addSource(attribute.expression).add(`)()} ${event}={(kayEvent) => `)
-    addBindWrite(b, attribute.expression, bindRead(property, inputType))
+    // A group is read as the checked state of its box and files only written, so the types ask the signal for a string or strings and a FileList.
+    if (property === 'group')
+      b.wrap(attribute.name, () => b.add('checked')).add('={(').addSource(attribute.expression).add(')() !== undefined}')
+    else if (property !== 'files')
+      b.wrap(attribute.name, () => b.add(property)).add('={(').addSource(attribute.expression).add(')()}')
+
+    b.add(` ${event}={(kayEvent) => `)
+    addBindWrite(b, attribute.expression, bindRead(property, inputType ?? 'text'))
     b.add('}')
   }
 

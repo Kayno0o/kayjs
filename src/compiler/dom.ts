@@ -7,7 +7,7 @@ import { mayLeaveSite } from '../runtime/outside'
 import { keyedByPosition, marksServerIsland } from './ast'
 import { decodeEntities, isFunctionAt } from './expression'
 import { childItems, constDeclaration, errorParagraphArguments, isDeclaration, slotValue, soleDynamic } from './items'
-import { addBindWrite, bindRead, END_MARKER, escapeStaticAttribute, escapeText, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
+import { addBindWrite, bindRead, END_MARKER, escapeStaticAttribute, escapeText, GROUP_HAS, groupValue, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { SUBJECT } from './names'
 import { bindEvent } from './validate'
 
@@ -647,7 +647,26 @@ export class DomTemplate extends TemplateWriter {
     const inputType = this.staticAttribute(element, 'type') ?? 'text'
     const event = bindEvent(element, property)
 
-    b.add(`KayEffect(() => KayProperty(${variable}, ${JSON.stringify(property)}, (`).addSource(expression).add(')())); ')
+    if (property === 'group') {
+      const value = groupValue(element, span => this.source(span))
+
+      b.add(`KayEffect(() => KayProperty(${variable}, "checked", ${GROUP_HAS}((`).addSource(expression).add(')(), ')
+
+      if ('text' in value)
+        b.add(JSON.stringify(value.text))
+      else
+        b.add('(').addSource(value.expression).add(')')
+
+      b.add('))); ')
+    }
+    else if (property === 'files') {
+      // The signal holds what the person picked; emptying it clears the input.
+      b.add(`KayEffect(() => { const kayFiles = (`).addSource(expression).add(`)(); if (!kayFiles || kayFiles.length === 0) ${variable}.value = '' }); `)
+    }
+    else {
+      b.add(`KayEffect(() => KayProperty(${variable}, ${JSON.stringify(property)}, (`).addSource(expression).add(')())); ')
+    }
+
     b.add(`KayListen(${variable}, ${JSON.stringify(event)}, (kayEvent) => `)
     addBindWrite(b, expression, bindRead(property, inputType))
     b.add(');')

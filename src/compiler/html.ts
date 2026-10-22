@@ -5,7 +5,7 @@ import { mayLeaveSite } from '../runtime/outside'
 import { actionOf, FIELD_ELEMENTS, keyedByPosition, marksServerIsland, sectionOf, serverIslandOf, UNCHECKED_TYPES, UNREQUIRABLE_TYPES } from './ast'
 import { decodeEntities } from './expression'
 import { childItems, constDeclaration, errorParagraphArguments, isDeclaration, slotValue, soleDynamic } from './items'
-import { BEHAVIOUR, describedValue, END_MARKER, escapeStaticAttribute, escapeText, fromRoot, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
+import { BEHAVIOUR, describedValue, END_MARKER, escapeStaticAttribute, escapeText, fromRoot, GROUP_HAS, groupValue, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { SUBJECT } from './names'
 
 // The attribute an image's `src` or a select's `selected` value is written as.
@@ -469,8 +469,27 @@ export class HtmlTemplate extends TemplateWriter {
     }
 
     for (const attribute of plan.attributes) {
-      if (attribute.kind === 'behaviour' || (attribute.kind === 'bind' && name === 'textarea' && attribute.property === 'value'))
+      // A file input is never given a value, and a textarea's value is its content.
+      if (attribute.kind === 'behaviour' || (attribute.kind === 'bind' && ((name === 'textarea' && attribute.property === 'value') || attribute.property === 'files')))
         continue
+
+      // A box of a group is checked when the group holds its value.
+      if (attribute.kind === 'bind' && attribute.property === 'group') {
+        const value = groupValue(element, span => this.source(span))
+
+        markup.dynamic(() => {
+          b.add(`${helperName('attribute')}("checked", ${GROUP_HAS}((`).addSource(attribute.expression).add(')(), ')
+
+          if ('text' in value)
+            b.add(JSON.stringify(value.text))
+          else
+            b.add('(').addSource(value.expression).add(')')
+
+          b.add('))')
+        })
+
+        continue
+      }
 
       // A bound value renders as the property it binds, read off its signal.
       if (attribute.kind === 'bind') {

@@ -1464,9 +1464,15 @@ export function dispatch(event: Event): void {
   }
 }
 
+// A function ref may return a cleanup, which runs when the element's owner is disposed, so a reusable behaviour (a tooltip, an observer) lets go of what it attached.
 export function ref(element: Element, target: unknown): void {
-  if (typeof target === 'function')
-    (target as (element: Element) => void)(element)
+  if (typeof target !== 'function')
+    return
+
+  const cleanup: unknown = (target as (element: Element) => unknown)(element)
+
+  if (typeof cleanup === 'function')
+    onCleanup(cleanup as () => void)
 }
 
 // Attributes and handlers from objects only known at render time; with `content`, a `children`, `innerHTML` or `textContent` among them sets the element's content.

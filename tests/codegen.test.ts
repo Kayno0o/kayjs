@@ -305,6 +305,17 @@ describe('elements', () => {
     expect(errors('input(bind:value={v} onInput={f})')).toEqual([expect.stringContaining('already handles')])
   })
 
+  it('refuses bind:group, bind:files and bind:open where the element cannot take them', () => {
+    expect(errors('input(type="text" bind:group={v})')).toEqual([expect.stringContaining('static type="radio" or type="checkbox"')])
+    expect(errors('input(bind:group={v})')).toEqual([expect.stringContaining('static type="radio"')])
+    expect(errors('input(type="text" bind:files={v})')).toEqual([expect.stringContaining('type="file"')])
+    expect(errors('div(bind:open={v})')).toEqual([expect.stringContaining('<details>, <dialog> only')])
+    expect(errors('input(bind:open={v})')).toEqual([expect.stringContaining('works on')])
+    expect(errors('details(bind:open={v} onToggle={f})')).toEqual([expect.stringContaining('already handles `onToggle`')])
+    expect(errors('dialog(bind:open={v} onClose={f})')).toEqual([expect.stringContaining('already handles `onClose`')])
+    expect(errors('input(bind:name={v})')).toEqual([expect.stringContaining('is not supported')])
+  })
+
   it('keeps a transition on an element, its phases named as they are, and refuses one on a component', () => {
     expect(jsx('p(transition="fade" transition:leave-to="opacity-0") x')).toBe('<p transition="fade" transition:leave-to="opacity-0">x</p>')
     expect(errors('Card(transition="fade")')).toEqual(['`transition` animates an element, not a component'])

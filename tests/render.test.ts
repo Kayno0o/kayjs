@@ -397,6 +397,19 @@ describe('static server output', () => {
     expect(html).toEndWith('data-props="[{}]"><input value=""><input type="checkbox" checked><textarea>&lt;i></textarea><select value="b"><option value="a">A</option><option value="b" selected>B</option></select></slot>')
   })
 
+  it('renders bind:group as the checked box, bind:open as the open attribute and leaves bind:files out', async () => {
+    const source = '---\nimport { signal } from \'kay\'\n\nconst pick = signal(\'b\')\nconst tags = signal([\'x\', \'z\'])\nconst open = signal(true)\nconst files = signal<FileList | null>(null)\nconst value = \'z\'\n---\ninput(type="radio" value="a" bind:group={pick})\ninput(type="radio" value="b" bind:group={pick})\ninput(type="checkbox" value="x" bind:group={tags})\ninput(type="checkbox" value={value} bind:group={tags})\ninput(type="checkbox" value="y" bind:group={tags})\ndetails(bind:open={open})\n  summary S\ndialog(bind:open={open})\ninput(type="file" bind:files={files})'
+    const html = await renderKay(source)
+
+    expect(html).toMatch(/<input type="radio" value="a"[^>]*><input type="radio" value="b" checked/)
+    expect(html).toMatch(/<input type="checkbox" value="x" checked[^>]*><input type="checkbox" value="z" checked[^>]*><input type="checkbox" value="y"[^>]*><details open>/)
+    expect(html).not.toMatch(/value="a" checked/)
+    expect(html).not.toMatch(/value="y" checked/)
+    expect(html).toContain('<dialog open></dialog>')
+    expect(html).toMatch(/<input type="file"[^>]*>/)
+    expect(html).not.toContain('files')
+  })
+
   it('leaves a transition out of the markup, which only an island plays', async () => {
     expect(await renderKay('p(transition="fade" transition:enter="duration-200" class="note") x')).toBe('<p class="note">x</p>')
   })

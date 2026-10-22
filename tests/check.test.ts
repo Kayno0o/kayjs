@@ -1134,6 +1134,38 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('types bind:group, bind:open and bind:files against the signals they write', async () => {
+    const page = [
+      '---',
+      "import { signal } from 'kay'",
+      '',
+      "const choice = signal('a')",
+      'const tags = signal<string[]>([])',
+      'const open = signal(false)',
+      'const files = signal<FileList | null>(null)',
+      'const count = signal(0)',
+      '---',
+      'input(type="radio" value="a" aria-label="A" bind:group={choice})',
+      'input(type="checkbox" value="a" aria-label="A" bind:group={tags})',
+      'details(bind:open={open})',
+      '  summary S',
+      'input(type="file" aria-label="File" bind:files={files})',
+      'input(type="radio" value="a" aria-label="A" bind:group={count})',
+      'input(type="checkbox" value="a" aria-label="A" bind:group={choice})',
+      'dialog(bind:open={count}) x',
+      'input(type="file" aria-label="File" bind:files={count})',
+      '',
+    ].join('\n')
+    const root = await scratchProject({ 'src/routes/index.kay': page })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[15, 'TS2345'], [16, 'TS2322'], [16, 'TS2345'], [17, 'TS2345'], [18, 'TS2345']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('types what the fences use of kay unimported', async () => {
     const root = await scratchProject({ 'src/routes/index.kay': '--- server\nimport { s } from \'kay\'\n\nexport const add = action(s.Object({ title: s.String({ maxLength: 9 }) }), async ({ title }) => title.length)\n---\n---\nconst count = signal(0)\nconst label: string = count()\n\neffect(() => count.set(c => c + 1))\n---\nform(action={add})\n  input(name="title" aria-label="Title")\np {label}\n' })
 
