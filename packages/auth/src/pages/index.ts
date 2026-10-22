@@ -3,6 +3,7 @@ import type { ExtensionApp, KayExtension } from 'kay/server'
 import type { CaptchaWidget } from '../captcha'
 import type { BareUser, Core } from '../core'
 import type { CodedLink, CodeMode } from '../email'
+import type { OrganizationsCore } from '../organizations'
 import type { OwnOptions, OwnPlugin } from '../own'
 import type { CreateUserInput, CreateUserResult } from '../password'
 import type { LinkType } from '../store'
@@ -97,8 +98,8 @@ export interface AuthFeatures {
   oauthServer: boolean
   // Whether the `admin` option names who manages users. The prebuilt admin pages answer 404 without it.
   admin: boolean
-  // The `organizations` option as the prebuilt organization pages need it: every role in declaration order, who owns an organization and who manages it; null without the option, when the pages answer 404.
-  organizations: { roles: string[], owner: string, manage: string } | null
+  // The `organizations` option as the prebuilt organization pages need it: every role in declaration order, who owns an organization, who manages it and, per role, the roles holding it grants through the hierarchy (itself included); null without the option, when the pages answer 404.
+  organizations: { roles: string[], owner: string, manage: string, grants: Record<string, string[]> } | null
   // Whether the `audit` option keeps the audit log.
   audit: boolean
   // Where a sign-in that failed goes, and where a guard sends an anonymous visitor once the prebuilt pages are on.
@@ -124,6 +125,10 @@ function captchaFeature(captcha: Core['captcha']): AuthFeatures['captcha'] {
   return 'proofOfWork' in captcha ? 'proof-of-work' : captcha.widget ?? null
 }
 
+function grantsOf(organizations: OrganizationsCore): Record<string, string[]> {
+  return Object.fromEntries([...organizations.roles].map(role => [role, [...organizations.roles].filter(granted => organizations.isGranted(granted, [role]))]))
+}
+
 export function featuresOf(core: Core): AuthFeatures {
   return {
     providers: [...core.oauth].map(([name, { app }]) => ({ name, label: app.label ?? app.provider.label ?? name })),
@@ -141,7 +146,7 @@ export function featuresOf(core: Core): AuthFeatures {
     oauthServer: core.oauthServer !== undefined,
     signInPage: core.signInPage,
     admin: core.admin !== undefined,
-    organizations: core.organizations ? { roles: [...core.organizations.roles], owner: core.organizations.owner, manage: core.organizations.manage } : null,
+    organizations: core.organizations ? { roles: [...core.organizations.roles], owner: core.organizations.owner, manage: core.organizations.manage, grants: grantsOf(core.organizations) } : null,
     audit: core.audit !== undefined,
     rules: { password: { min: core.rules.password.min, max: core.rules.password.max }, username: { ...core.rules.username } },
     pages: core.pages ? { prefix: core.pages.prefix, home: core.pages.home, remember: core.pages.remember } : null,

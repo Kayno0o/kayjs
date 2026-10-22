@@ -21,7 +21,7 @@ export const rename = action(schemas.organization, async ({ name, slug }, ctx) =
 
   const { organization } = result
 
-  return ctx.redirect(organizationPage(auth.features(), organization.slug ?? organization.id))
+  return ctx.redirect(organizationPage(auth.features(), organization))
 })
 
 export const setRoles = action(schemas.memberRoles, async ({ userId, roles }, ctx) => {
@@ -78,12 +78,8 @@ if (found === null)
 
 const { organization } = found
 const me = await auth.user()
-const held = new Set<string>()
-
-for (const role of settings.roles) {
-  if (await auth.isMember(organization.id, role as never))
-    held.add(role)
-}
+// The roles the viewer holds, through the hierarchy.
+const held = new Set(found.roles.flatMap(role => settings.grants[role] ?? []))
 
 const manages = held.has(settings.manage)
 const owns = held.has(settings.owner)

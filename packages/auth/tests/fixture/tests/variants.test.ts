@@ -126,10 +126,17 @@ test('the organization pages and the invitation page link under the base and the
 
   expect(seen).toEqual({
     made: '/app/members/account/organizations/base-co',
+    joined: '/app/members/account/organizations/base-co',
+    left: '/app/members/account/organizations',
+    removed: '/app/members/account/organizations',
     tabs: ['/app/members/account/organizations'],
     row: ['/app/members/account/organizations/base-co'],
     back: ['/app/members/account/organizations', '/app/members/account/organizations'],
     mailed: '/members/invitation',
     links: [expect.stringMatching(/^\/app\/members\/sign-in\?redirect=%2Fmembers%2Finvitation/), expect.stringMatching(/^\/app\/members\/register\?redirect=%2Fmembers%2Finvitation/)],
   })
+}, 60_000)
+
+test('without the organizations option, the invitation page and its actions answer 404', async () => {
+  expect(await variant({ FIXTURE_NO_ORG: '1' })).toEqual({ pages: [404, 404], actions: [404, 404, 404] })
 }, 60_000)

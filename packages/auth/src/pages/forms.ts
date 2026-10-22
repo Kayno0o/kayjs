@@ -66,6 +66,9 @@ export function rememberOf(features: Pick<AuthFeatures, 'pages' | 'prefix'>, red
   }
 }
 
+// The longest id an invitation or another record id field accepts.
+export const ID_MAX = 128
+
 export const schemas = {
   signIn: t.Object({ identifier: email, password, remember, redirect, ...captcha }),
   magicLink: t.Object({ email, remember, redirect, ...captcha }),
@@ -85,7 +88,7 @@ export const schemas = {
   changeEmail: t.Object({ ...proof, email }),
   changeUsername: t.Object({ username: t.String({ maxLength: 128 }) }),
   enableTwoFactor: t.Object({ code, uri: t.String({ maxLength: 1024 }) }),
-  id: t.Object({ id: t.String({ maxLength: 128 }) }),
+  id: t.Object({ id: t.String({ maxLength: ID_MAX }) }),
   adminRole: t.Object({ role: t.String({ maxLength: 100 }) }),
   adminDelete: t.Object({ confirm: t.Optional(t.Boolean()) }),
   adminBan: t.Object({ reason: t.Optional(t.String({ maxLength: 500 })), until: t.Optional(t.String({ maxLength: 10 })) }),

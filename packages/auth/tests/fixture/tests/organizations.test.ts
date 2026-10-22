@@ -159,16 +159,19 @@ describe('the organization pages', () => {
     expect((await owner.visitor.visit(from)).status).toBe(404)
     expect(await owner.visitor.call(removeMember, { userId: ada.id }, { from: `${LIST}/renamed-cycle` })).toBe('done')
     expect((await ada.visitor.visit(LIST)).find('[data-organization]')).toHaveLength(0)
-    // A member leaving goes back to the list and is no longer in it.
-    const bob = await member('renamed-cycle', owner, 'cycle-bob@example.com', ['member'])
-
-    expect((await bob.visitor.refusal(leave, {}, { from: `${LIST}/renamed-cycle` })).data).toEqual({ error: 'form' })
-    expect((await bob.visitor.visit(LIST)).find('[data-organization]')).toHaveLength(1)
-    expect((await bob.visitor.submit(leave, { confirm: 'on' }, { from: `${LIST}/renamed-cycle` })).url).toBe(LIST)
-    expect((await bob.visitor.visit(LIST)).find('[data-organization]')).toHaveLength(0)
     expect((await owner.visitor.refusal(remove, {}, { from: `${LIST}/renamed-cycle` })).data).toEqual({ error: 'form' })
     expect((await owner.visitor.submit(remove, { confirm: 'on' }, { from: `${LIST}/renamed-cycle` })).url).toBe(LIST)
     expect(await store.organizations!.findBySlug('renamed-cycle')).toBeUndefined()
+  })
+
+  test('a member leaving needs the ticked box, goes back to the list and is no longer in it', async () => {
+    const { owner, from } = await founded('Leave Co', 'leave-co')
+    const bob = await member('leave-co', owner, 'leave-bob@example.com', ['member'])
+
+    expect((await bob.visitor.refusal(leave, {}, { from })).data).toEqual({ error: 'form' })
+    expect((await bob.visitor.visit(LIST)).find('[data-organization]')).toHaveLength(1)
+    expect((await bob.visitor.submit(leave, { confirm: 'on' }, { from })).url).toBe(LIST)
+    expect((await bob.visitor.visit(LIST)).find('[data-organization]')).toHaveLength(0)
   })
 
   test('the page and its words follow the locale', async () => {
@@ -216,12 +219,20 @@ describe('inviting', () => {
     expect(page.find('p').map(p => p.text)).toContain('You are invited to join Back Co.')
     expect(page.find('a').map(a => a.attributes.href)).toEqual(expect.arrayContaining([`/auth/sign-in?redirect=${here}`, `/auth/register?redirect=${here}`]))
     expect(page.find('form')).toHaveLength(0)
+    // The id sits in the address, which no Referer header may carry to another site.
+    expect((await visitor.fetch(link.pathname + link.search)).headers.get('referrer-policy')).toBe('same-origin')
     expect((await visitor.refusal(accept, { id: link.searchParams.get('invitation')! }, { from: page.url })).data).toEqual({ error: 'signed-out' })
 
     // Registering with the invited address comes back to the invitation; the address is verified, then the invitation is accepted.
     const back = await visitor.submit(register, { email: 'back-invitee@example.com', password: PASSWORD, redirect: `/auth/invitation${link.search}` }, { from: await visitor.visit(`/auth/register?redirect=${here}`) })
 
     expect(back.url).toBe(`/auth/invitation${link.search}`)
+
+    // Unverified, the page says so up front instead of offering Join.
+    const unverified = await visitor.visit(back.url)
+
+    expect(unverified.find('p.kauth-error').map(p => p.text)).toEqual(['Verify your address first: open the link mailed to you.'])
+    expect(unverified.find('form button').map(button => button.text)).toEqual(['Decline'])
 
     const { id } = (await store.users.findByEmail('back-invitee@example.com'))!
 

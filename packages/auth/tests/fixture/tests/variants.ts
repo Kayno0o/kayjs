@@ -106,10 +106,27 @@ if (process.env.FIXTURE_ADMIN) {
   process.exit(0)
 }
 
+if (process.env.FIXTURE_NO_ORG) {
+  // Without the `organizations` option, the organization pages and the invitation page answer 404, and so do their actions.
+  const { switchAccount, accept, reject } = await import(join(PAGES, 'invitation.kay'))
+
+  await site.submit(register, { email: 'no-org@example.com', password: PASSWORD }, { from: await site.visit(`${PAGES_AT}/register`) })
+
+  const from = `${PAGES_AT}/invitation?invitation=x`
+  const statuses = await Promise.all([switchAccount, accept, reject].map(async action => (await site.refusal(action, { id: 'x' }, { from })).status))
+
+  console.log(JSON.stringify({
+    pages: [(await site.visit(from)).status, (await site.visit(`${PAGES_AT}/account/organizations/x`)).status],
+    actions: statuses,
+  }))
+  process.exit(0)
+}
+
 if (process.env.FIXTURE_ORG) {
   // The organization pages and the invitation page link under the base and the prefix, and the invitation mail opens the prebuilt page.
   const { create } = await import(join(PAGES, 'account', 'organizations', 'index.kay'))
-  const { invite } = await import(join(PAGES, 'account', 'organizations', '[org].kay'))
+  const { invite, leave, remove } = await import(join(PAGES, 'account', 'organizations', '[org].kay'))
+  const { accept } = await import(join(PAGES, 'invitation.kay'))
 
   await site.submit(register, { email: 'org-base@example.com', password: PASSWORD }, { from: await site.visit(`${PAGES_AT}/register`) })
 
@@ -127,8 +144,19 @@ if (process.env.FIXTURE_ORG) {
   const visitor = await testSite({ root: ROOT, ...process.env.FIXTURE_BASE && { base: process.env.FIXTURE_BASE } })
   const invitation = await visitor.visit(`${PAGES_AT}/invitation${link.search}`)
 
+  // The invited address joins, leaves, and the owner deletes: each redirect keeps the base and the prefix.
+  await visitor.submit(register, { email: 'org-guest@example.com', password: PASSWORD }, { from: await visitor.visit(`${PAGES_AT}/register`) })
+  await store.users.update((await store.users.findByEmail('org-guest@example.com'))!.id, { emailVerifiedAt: new Date() })
+
+  const joined = await visitor.submit(accept, { id: link.searchParams.get('invitation')! }, { from: invitation })
+  const left = await visitor.submit(leave, { confirm: 'on' }, { from: joined })
+  const removed = await site.submit(remove, { confirm: 'on' }, { from: detail })
+
   console.log(JSON.stringify({
     made: made.url,
+    joined: joined.url,
+    left: left.url,
+    removed: removed.url,
     tabs: list.find('.kui-tab-nav a').map(a => a.attributes.href).filter(href => href?.includes('organizations')),
     row: list.find('[data-organization] a').map(a => a.attributes.href),
     back: detail.find('a').map(a => a.attributes.href).filter(href => href?.endsWith('/organizations')),

@@ -3,14 +3,12 @@ import { localize } from 'kay/i18n'
 import { wording } from 'kay/words'
 import Message from '../components/message.kay'
 import Panel from '../components/panel.kay'
-import { failure, schemas } from '../forms'
+import { failure, ID_MAX, schemas } from '../forms'
 import { organizationPage, organizationsPage } from '../organizationPage'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 
 // Whoever holds the link opens this page, signed in or not, so none of the app's guards run here. The id sits in the address, which no Referer header may carry to another site.
 export const page = { guards: false, security: { headers: { 'referrer-policy': 'same-origin' } } }
-
-const ID_MAX = 128
 
 // The id the form posts is the one in the address, read again by the method, which answers for the signed-in user's address only.
 export const accept = action(schemas.id, async ({ id }, ctx) => {
@@ -26,7 +24,7 @@ export const accept = action(schemas.id, async ({ id }, ctx) => {
 
   const { organization } = result.membership
 
-  return ctx.redirect(organizationPage(auth.features(), organization.slug ?? organization.id))
+  return ctx.redirect(organizationPage(auth.features(), organization))
 })
 
 export const reject = action(schemas.id, async ({ id }, ctx) => {
@@ -68,6 +66,7 @@ const invitation = id !== '' ? await auth.getInvitation(id) : null
 const user = invitation && await auth.via() === 'session' ? await auth.user() : null
 const signedIn = user !== null && !user.guest
 const mine = signedIn && user.email === invitation?.email
+const unverified = mine && !user.emailVerified
 const back = encodeURIComponent(`${prefix}/invitation?invitation=${encodeURIComponent(id)}`)
 const refused = [accept, reject].map(form => form.failed()?.data?.error).find(error => error !== undefined)
 ---
@@ -82,9 +81,12 @@ Panel(title={wording('auth.invitation.title', 'Invitation')})
     if refused
       Message(text={failure(refused)})
     if mine
-      form.flex.flex-wrap.gap-3(action={accept})
-        input(type="hidden" name="id" value={invitation.id})
-        Button(type="submit" tone="accent" label={wording('auth.invitation.accept', 'Join')})
+      if unverified
+        Message(text={failure('unverified')})
+      else
+        form.flex.flex-wrap.gap-3(action={accept})
+          input(type="hidden" name="id" value={invitation.id})
+          Button(type="submit" tone="accent" label={wording('auth.invitation.accept', 'Join')})
       form(action={reject})
         input(type="hidden" name="id" value={invitation.id})
         Button(type="submit" label={wording('auth.invitation.reject', 'Decline')})

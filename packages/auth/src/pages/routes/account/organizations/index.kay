@@ -19,7 +19,7 @@ export const create = action(schemas.organization, async ({ name, slug }, ctx) =
 
   const { organization } = result.membership
 
-  return ctx.redirect(organizationPage(ctx.locals.auth.features(), organization.slug ?? organization.id))
+  return ctx.redirect(organizationPage(ctx.locals.auth.features(), organization))
 })
 
 // An invitation is accepted or turned down by its id, which only the signed-in user's own open ones answer to.
@@ -31,7 +31,7 @@ export const accept = action(schemas.id, async ({ id }, ctx) => {
 
   const { organization } = result.membership
 
-  return ctx.redirect(organizationPage(ctx.locals.auth.features(), organization.slug ?? organization.id))
+  return ctx.redirect(organizationPage(ctx.locals.auth.features(), organization))
 })
 
 export const reject = action(schemas.id, async ({ id }, ctx) => {
@@ -52,7 +52,7 @@ PageSection(title={wording('auth.organizations.title', 'Organizations')})
     for membership of memberships key={membership.organization.id}
       CardRow(data-organization={membership.organization.id})
         .flex.flex-col
-          a(href={organizationPage(features, membership.organization.slug ?? membership.organization.id)}) {membership.organization.name}
+          a(href={organizationPage(features, membership.organization)}) {membership.organization.name}
           span.flex.flex-wrap.items-center.gap-2
             for role of membership.roles key={role}
               Badge(label={role} tone="accent")
