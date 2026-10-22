@@ -101,7 +101,7 @@ test('tells onChange once with the value let go of, while onInput hears every st
 
   expect([input, change, shown()]).toEqual([[50, 60, 70], [70], '70 ms'])
 
-  // A key press moves the thumb one step and fires `change` at once.
+  // A key press steps the thumb and the browser fires `change` at once, which the two events here stand for.
   await drag('80')
   await release()
 
@@ -121,7 +121,18 @@ test('holds the slider busy while onChange is pending, and ignores a gesture mea
 
   input.dispatchEvent(keydown)
 
-  expect(keydown.defaultPrevented).toBe(true)
+  const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+
+  input.dispatchEvent(tab)
+
+  expect([keydown.defaultPrevented, tab.defaultPrevented]).toEqual([true, false])
+
+  // A move that got past the held gestures goes back and starts nothing.
+  await drag('90')
+  await release()
+
+  expect(input.value).toBe('60')
+  expect(settles.length).toBe(1)
 
   settles[0]!(undefined)
   await settle()
@@ -153,6 +164,7 @@ test('puts the thumb back when onChange resolves to false, rejects or throws', a
     await release()
 
     expect([input.value, shown(), logged.mock.calls.map(([, error]) => error as unknown)]).toEqual(['40', '40 ms', [new Error('offline'), new Error('broken')]])
+    expect(root.querySelector('#state')?.textContent).toBe('40')
   }
   finally {
     logged.mockRestore()
@@ -196,4 +208,25 @@ test('tells onChange of a form reset that moved the thumb', async () => {
   await settle()
 
   expect([input.value, change]).toEqual(['40', [20, 40]])
+})
+
+test('keeps what the parent set during a change that was accepted', async () => {
+  const settles: ((answer: boolean) => void)[] = []
+  const { drag, release, input, root } = await open(undefined, async () => new Promise<boolean>(resolve => settles.push(resolve)))
+
+  await drag('60')
+  await release()
+  click(root.querySelector('#set'))
+  await settle()
+  settles[0]!(true)
+  await settle()
+
+  expect(input.value).toBe('80')
+
+  await drag('20')
+  await release()
+  settles[1]!(false)
+  await settle()
+
+  expect(input.value).toBe('80')
 })

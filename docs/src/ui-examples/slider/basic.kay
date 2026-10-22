@@ -2,6 +2,7 @@
 import Slider from '@kaynooo/kayjs-ui/slider.kay'
 
 const delay = signal(200)
+const saved = signal(200)
 ---
 .flex.max-w-sm.flex-col.gap-2
   Slider(
@@ -13,4 +14,6 @@ const delay = signal(200)
     value={delay()}
     formatValue={value => `${value} ms`}
     onInput={delay.set}
+    onChange={saved.set}
   )
+  p.text-sm Let go at {saved()} ms

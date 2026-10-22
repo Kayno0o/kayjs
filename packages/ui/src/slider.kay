@@ -51,13 +51,28 @@ const sliderRef = startRef<HTMLInputElement>((element) => {
 })
 
 function moved(event: Event) {
-  const next = Number((event.currentTarget as HTMLInputElement).value)
+  const input = event.currentTarget as HTMLInputElement
+
+  // Whatever input method got past the held gestures moves nothing while a change is under way.
+  if (busy()) {
+    input.value = String(shown())
+
+    return
+  }
+
+  const next = Number(input.value)
 
   shown.set(next)
   onInput?.(next)
 }
 
 async function released(input: HTMLInputElement) {
+  if (busy()) {
+    input.value = String(shown())
+
+    return
+  }
+
   const next = Number(input.value)
   const before = settled
   const syncedBefore = synced
@@ -67,12 +82,20 @@ async function released(input: HTMLInputElement) {
   // Put back unless the parent set `value` meanwhile, which has the last word.
   const accepted = await changeAccepted('Slider', () => onChange?.(next), busy.set)
 
+  if (synced !== syncedBefore) {
+    resetting.idle()
+
+    return
+  }
+
   if (accepted) {
     settled = next
   }
-  else if (synced === syncedBefore) {
+  else {
     shown.set(before)
     input.value = String(before)
+    // The app that follows `onInput` is told the value put back, as after a reset.
+    onInput?.(before)
   }
 
   resetting.idle()
@@ -95,9 +118,11 @@ const resetting = resetWhenIdle(busy, () => {
 
 onFormReset(() => slider, resetting.reset)
 
-// A busy slider takes no new gesture, as a Toggle takes no click.
+const STEPS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'])
+
+// A busy slider takes no new gesture, as a Toggle takes no click; the keys that do not step it, Tab first, go through.
 function held(event: Event) {
-  if (busy())
+  if (busy() && (!(event instanceof KeyboardEvent) || STEPS.has(event.key)))
     event.preventDefault()
 }
 ---
