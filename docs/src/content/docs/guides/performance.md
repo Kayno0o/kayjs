@@ -44,7 +44,7 @@ Each tab answers one question about the page in view. A tab with a red or amber 
 
 A library can add a tab of its own, with nothing to declare in the app. kayjs-auth shows who is signed in, kayjs-mail lists the mails sent to the outbox, and kayjs-cms toggles edit mode.
 
-<ReadMore href="/llms/component-libraries#a-tab-for-a-library">Writing a tab for your own library.</ReadMore>
+<ReadMore href="/llms/dev-tool#a-tab-for-a-library">Writing a tab for your own library.</ReadMore>
 
 ## Problems
 
