@@ -179,3 +179,23 @@ test('with the audit log on, a user\'s page and the audit page word what happene
   expect((await root.visitor.visit('/auth/admin/audit')).find('.kui-card-row span').map(span => span.text)).toContain('Role editor granted')
   expect((await root.visitor.visit(`/fr/auth/admin/users/${ada.id}`)).status).toBe(200)
 })
+
+test('the audit page pages through entries with a link carrying only the last one\'s time and id, whatever a user agent holds', async () => {
+  const root = await member('root-paging@example.com', ['admin'])
+  const base = Date.UTC(2001, 0, 1)
+
+  for (let index = 0; index < 60; index++)
+    await store.audit!.add({ id: `paging-${String(index).padStart(3, '0')}`, userId: 'someone', event: 'signed-out', detail: null, ip: '1.2.3.0', userAgent: 'x'.repeat(3000), actorId: null, at: new Date(base + index) })
+
+  const first = await root.visitor.visit('/auth/admin/audit')
+  const older = first.find('a[rel="next"]')[0]!.attributes.href!
+
+  expect(decodeURIComponent(older)).not.toContain('xxxx')
+  expect(first.find('.kui-card-row').length).toBe(50)
+
+  const second = await root.visitor.visit(older)
+
+  expect(second.status).toBe(200)
+  expect(second.find('.kui-card-row').length).toBeGreaterThan(0)
+  expect(second.find('.kui-card-row').length).toBeLessThanOrEqual(50)
+})

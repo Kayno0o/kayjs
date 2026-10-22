@@ -48,7 +48,7 @@ PageSection(title={wording('auth.admin.nav.users', 'Users')})
           span.flex.flex-wrap.items-center.gap-2
             a(href={`${base}/users/${encodeURIComponent(user.id)}`}) {user.username ?? user.email ?? wording('auth.admin.users.noName', 'No address')}
             if user.ban
-              Badge(label={wording('auth.admin.users.banned', 'Banned')} tone="danger")
+              Badge(label={wording('auth.admin.users.banned', 'Suspended')} tone="danger")
             if user.guest
               Badge(label={wording('auth.admin.users.guest', 'Guest')})
             for role of user.roles key={role}

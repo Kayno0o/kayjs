@@ -27,7 +27,7 @@ const features = auth.features()
 const before = cursorOf(ctx.url.searchParams.get('before'))
 const log = await auth.listAdminAuditLog({ ...before !== undefined && { before: before as never }, limit: PAGE_SIZE })
 const entries = log.ok ? log.entries : []
-const older = entries.length === PAGE_SIZE ? `${localize(`${features.pages?.prefix ?? features.prefix}/admin/audit`)}?before=${encodeURIComponent(JSON.stringify(entries.at(-1)))}` : undefined
+const older = entries.length === PAGE_SIZE ? `${localize(`${features.pages?.prefix ?? features.prefix}/admin/audit`)}?before=${encodeURIComponent(JSON.stringify({ at: entries.at(-1)!.at, id: entries.at(-1)!.id }))}` : undefined
 const dateTime = (value: Date) => formatDate(value, { dateStyle: 'medium', timeStyle: 'short' })
 const locale = ctx.locale
 ---

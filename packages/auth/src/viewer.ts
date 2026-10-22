@@ -33,10 +33,8 @@ export async function loadViewer(request: Request): Promise<void> {
     if (auth === undefined)
       return
 
-    const [user, admin] = await Promise.all([auth.bareUser(), auth.impersonator()])
-
-    loaded.set(request, user)
-    impersonators.set(request, admin)
+    loaded.set(request, await auth.bareUser())
+    impersonators.set(request, await auth.impersonator())
   }
   catch {}
 }

@@ -12,7 +12,7 @@ extensions: [auth({ admin: 'admin', roles: { admin: ['editor'], editor: [] }, au
 ```
 
 - `/auth/admin`: the users, newest first, 25 a page, with a search over part of an email or a username or a whole id (`?q=`, `?page=`).
-- `/auth/admin/users/<id>`: one user, with their roles (give one of the declared `roles`, take one back), a ban with a reason and an optional last day, the lift of a ban, `Act as this user`, and the deletion behind a ticked box. With `audit` on, their last 20 audit entries show too.
+- `/auth/admin/users/<id>`: one user, with their roles (give one of the declared `roles`, so declare them to grant from the page; take one back), a ban with a reason and an optional last day, the lift of a ban, `Act as this user`, and the deletion behind a ticked box. With `audit` on, their last 20 audit entries show too.
 - `/auth/admin/audit`: everyone's audit log, 50 entries a page, an `Older entries` link paging by the last entry.
 - Each page is as open as the method behind it: a visitor is sent to sign in, anyone else (a member, an admin already acting as a user, a bearer token) gets a 403, and a site naming no `admin` gets a 404. The actions answer the same through the methods, so a post that skips the page changes nothing.
 - A change asks for a sign-in under ten minutes old, as the methods do: the page says so with a `Sign in again` button that comes back to the user.
