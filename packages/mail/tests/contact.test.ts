@@ -1,8 +1,8 @@
 import type { Action } from 'kay'
+import type { ContactMailProps } from '../src/contact'
 import { beforeEach, describe, expect, it } from 'bun:test'
 import { action, s } from 'kay'
 import { testSite } from 'kay/test'
-import type { ContactMailProps } from '../src/contact'
 import { contactForm } from '../src/contact'
 import { mailer } from '../src/mailer'
 import { outbox } from '../src/outbox'
@@ -34,7 +34,7 @@ async function site() {
 
 describe('the default contact mail', () => {
   it('renders from `site` alone, without the deprecated `origin`', async () => {
-    const { default: view } = await import('../src/contact-mail.kay' as string) as { default: never }
+    const { default: view } = await import('../src/contact-mail.kay') as { default: never }
     const props = { subject: 'Hi', name: 'Ada', email: 'ada@example.com', message: 'Hello', fields: [], site: 'https://fixture.test' } satisfies ContactMailProps
 
     await mailer({ from: 'a@fixture.test' }).send({ to: 'team@fixture.test', subject: props.subject, view, props })
