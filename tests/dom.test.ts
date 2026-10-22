@@ -1941,6 +1941,46 @@ describe('snippets', () => {
   })
 })
 
+describe('snippets called with a loop row', () => {
+  const mountC = site({
+    'row-comp.kay': '---\nconst { row } = props<{ row: { n: number } }>()\n---\nspan.comp {row.n}\n',
+    'main.kay': [
+      '---',
+      'import { signal } from \'kay\'',
+      'import RowComp from \'./row-comp.kay\'',
+      '',
+      'const rows = signal([{ n: 1 }, { n: 2 }])',
+      ';(globalThis as { bumpRows?: () => void }).bumpRows = () => rows.set(rows().map(row => ({ n: row.n + 1 })))',
+      '---',
+      'snippet show(row: { n: number })',
+      '  span.snip {row.n}',
+      'for row, index of rows() key={index}',
+      '  {show(row)}',
+      '  RowComp(row={row})',
+      '',
+    ].join('\n'),
+  })
+
+  it('draw the call again when the row is replaced, where a component updates its nodes in place', async () => {
+    const { root, dispose } = await mountC()
+
+    try {
+      const snip = root.querySelector('.snip')
+      const comp = root.querySelector('.comp')
+
+      ;(globalThis as unknown as { bumpRows: () => void }).bumpRows()
+      await settle()
+      expect([...root.querySelectorAll('.snip')].map(node => node.textContent)).toEqual(['2', '3'])
+      expect([...root.querySelectorAll('.comp')].map(node => node.textContent)).toEqual(['2', '3'])
+      expect(root.querySelector('.comp')).toBe(comp)
+      expect(root.querySelector('.snip')).not.toBe(snip)
+    }
+    finally {
+      await dispose()
+    }
+  })
+})
+
 describe('snippets in loops and blocks', () => {
   const mountB = site({
     'rows.kay': '--- <T>\nimport type { JSX } from \'kay\'\n\nconst { items, row } = props<{ items: T[], row: (item: T, index: number) => JSX.Element }>()\n---\nul.rows\n  for item, i of items key={i}\n    | {row(item, i)}\n',

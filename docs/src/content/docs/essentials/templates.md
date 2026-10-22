@@ -202,6 +202,8 @@ snippet item(name: string, i: number)
 List(items={['Milk', 'Eggs']} row={item})
 ```
 
+A snippet called with a loop row, `{show(row)}`, is drawn again whenever a new copy of the row replaces the old one, where a component updates the same nodes in place. Make per-row markup that is replaced often, or animated, a component.
+
 A snippet is for markup used in one file. Markup used by several files is a component.
 
 <ReadMore href="/llms/templates#snippets">How a snippet is scoped, what a name clash reports, and what an argument that reads a signal redraws.</ReadMore>
