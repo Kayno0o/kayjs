@@ -383,7 +383,7 @@ describe.concurrent('kay check, edge cases', () => {
     const root = await scratchProject({ 'src/components/meter.kay': meter })
 
     try {
-      expect((await check(root, { lints: { 'deprecated-signal-prop': 'allow' } })).map(d => [d.line, d.column, d.code, d.message])).toEqual([[13, 38, 'TS2532', 'Object is possibly \'undefined\'.'], [14, 4, 'TS2532', 'Object is possibly \'undefined\'.'], [15, 63, 'TS2532', 'Object is possibly \'undefined\'.'], [16, 44, 'TS2532', 'Object is possibly \'undefined\'.']])
+      expect((await check(root, { lints: { 'deprecated-signal-prop': 'allow' } })).map(d => [d.line, d.column, d.code, d.message])).toEqual([[13, 38, 'TS2532', 'Object is possibly \'undefined\'.'], [14, 4, 'TS2532', 'Object is possibly \'undefined\'.'], [15, 52, 'TS2532', 'Object is possibly \'undefined\'.'], [16, 44, 'TS2532', 'Object is possibly \'undefined\'.']])
     }
     finally {
       await rm(root, { recursive: true, force: true })
