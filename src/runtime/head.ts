@@ -38,6 +38,8 @@ export interface RenderedHead {
   html: string
   // The attributes `<html>` takes from the `html` tags, each with a space before it.
   root: string
+  // The language a page set with `html(lang)`, which the server uses when there is no i18n.
+  lang?: string | undefined
   // Whether the page set its own charset or viewport, which then replace the defaults.
   charset: boolean
   viewport: boolean
@@ -126,6 +128,7 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
   let titleGroup = -1
   // An attribute a later group sets on `<html>` replaces an earlier one's, `false` or `null` taking it off; `class` gathers every group's tokens instead.
   const root: Record<string, unknown> = {}
+  let lang: string | undefined
 
   for (let index = 0; index < collected.length; index++) {
     const group = collected[index]!
@@ -138,6 +141,12 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
       if (tag.tag === 'html') {
         for (const [name, value] of Object.entries(tag.props)) {
           const key = name.toLowerCase()
+
+          if (key === 'lang') {
+            lang = typeof value === 'string' && value !== '' ? value : lang
+
+            continue
+          }
 
           if (LOCALE_ATTRIBUTES.has(key))
             continue
@@ -237,7 +246,7 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
   if (rootAttributes.size > 0)
     metas += tagMarkup({ tag: 'meta', props: { name: ROOT_ATTRIBUTES, content: servedJson(rootAttributes) } })
 
-  return { prelude: prelude + viewportTag, styles, html: resourcesHtml + links + metas + others + scripts + title, root: markupOf(rootAttributes), charset: winners.has(CHARSET), viewport: winners.has(VIEWPORT) }
+  return { prelude: prelude + viewportTag, styles, html: resourcesHtml + links + metas + others + scripts + title, root: markupOf(rootAttributes), lang, charset: winners.has(CHARSET), viewport: winners.has(VIEWPORT) }
 }
 
 // The tokens of both, each once where first set, a Tailwind class the later ones override left out, or none when there is no token at all.

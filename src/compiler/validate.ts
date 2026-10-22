@@ -4,7 +4,6 @@ import type { LintName } from './lints'
 import type { PageSettingName } from './page-settings'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { RESIZABLE } from '../runtime/image'
-import { LOCALE_ATTRIBUTES } from '../runtime/root'
 import { WIDGET_ROLES } from './aria'
 import { childBlocks, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, serverIslandOf, templateFacts } from './ast'
 
@@ -221,11 +220,11 @@ class Validator {
     return this.diagnostics
   }
 
-  // `lang` and `dir` follow the page's locale, which an `html` tag cannot set apart from its messages and dates.
+  // `dir` follows the page's language, and `lang` follows the locale under `i18n`, where an `html` tag cannot set it apart from the messages and dates.
   private rootAttributes(tag: ElementNode): void {
     for (const attribute of tag.attributes) {
-      if (attribute.kind !== 'spread' && LOCALE_ATTRIBUTES.has(this.text(attribute.name).toLowerCase()))
-        this.error(attribute.name, `kay sets \`${this.text(attribute.name)}\` on \`<html>\` from the page's locale`, { help: 'set `lang` in kay.config.ts, or the locales of `i18n`' })
+      if (attribute.kind !== 'spread' && this.text(attribute.name).toLowerCase() === 'dir')
+        this.error(attribute.name, `kay sets \`${this.text(attribute.name)}\` on \`<html>\` from the page's language`, { help: 'set `lang` on the page, or in kay.config.ts' })
     }
   }
 

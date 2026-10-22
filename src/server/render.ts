@@ -1011,7 +1011,9 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const shipsEntry = hasIslands || posts || follows || defers
   const checked = posts ? formsScript(forms, options.dev) : ''
   const scripts = shipsEntry ? islandScripts(client, islands.eager, streamed, hasIslands, islands.lazy > 0 || defers, options.islandPreloads === undefined ? undefined : islands) + checked + workScript(forms, options.prerendering === true) : ''
-  const lang = localeState()?.locale ?? options.lang ?? DEFAULT_LANG
+  const state = localeState()
+  // Without `i18n` the page may say its own language; with it, the locale decides.
+  const lang = (state === undefined || state.implicit ? head.lang : undefined) ?? state?.locale ?? options.lang ?? DEFAULT_LANG
   const polish = typographyFor(lang, options.typography)
   const body = polish ? polish(markup) : markup
   const headHtml = polish ? polish(head.html) : head.html

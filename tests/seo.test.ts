@@ -116,6 +116,13 @@ describe('seo head', () => {
     expect((await headOf('/about')).head).not.toContain('kay-html')
   })
 
+  it('lets a page set its own html lang, with its direction, kept out of the names for the page swap', async () => {
+    const arabic = await (await app.handle(new Request('http://localhost/themed/arabic'))).text()
+
+    expect(arabic).toStartWith('<!doctype html><html lang="ar" dir="rtl" class="dark" data-theme="light" data-section="arabic" data-banner><head>')
+    expect(arabic).not.toContain('&quot;lang&quot;')
+  })
+
   it('shows the site name for a title that comes out empty, not the template around nothing', async () => {
     expect((await headOf('/blank')).head).toContain('<title>Kay site</title>')
   })

@@ -1,0 +1,6 @@
+--- server
+export const page = { sitemap: false }
+---
+head
+  html(lang="ar")
+p Arabic
