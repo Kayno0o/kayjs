@@ -16,7 +16,7 @@ import { Elysia } from 'elysia'
 import { clientDir, inOutput, testWorker } from '../build/assets'
 import { buildClient } from '../build/client'
 import { KayCompileError } from '../build/transform'
-import { withConfig } from '../config'
+import { buildingTestSite, withConfig } from '../config'
 import { clientOptionsOf, PRODUCTION, resolveProject } from '../project'
 import { encodeCall, minTimeOf, readActionResponse, SETTLED, STAMP_FIELD } from '../runtime/action'
 import { joinBase } from '../runtime/base'
@@ -325,11 +325,11 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   // Without a browser the pages render their islands' markup and load no script, so the build was only a check.
   const client: ClientBuild = inBrowser && wanted ? wanted : { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: clientDir(root) }
   const browser = typeof options.browser === 'object' ? options.browser : {}
-  const pages = await servePages(project, () => client, true)
+  const jar = cookieJar()
+  const pages = await buildingTestSite(jar.cookies, async () => servePages(project, () => client, true))
   const locals = options.locals
   const before = [...options.use ?? [], ...locals ? [new Elysia().derive({ as: 'global' }, async ({ request }) => locals(request))] : []]
   const app = before.length === 0 ? pages : before.reduce<AnyElysia>((served, plugin) => served.use(plugin), new Elysia()).use(pages)
-  const jar = cookieJar()
   const { content, release } = await testContent(root, config.content)
   const base = basePath(config.base)
   let address = nextClient()

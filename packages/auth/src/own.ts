@@ -196,11 +196,11 @@ export async function emailOf(email: OwnOptions['email'], app: ExtensionApp): Pr
   }
 }
 
-// The auth the latest `auth()` with no module built, which `authTest` signs a test site in through.
-let latest: OwnTest | undefined
+// The auth each test site's `auth()` with no module built, by the site's cookies, which `authTest` signs that site in through.
+const builtFor = new WeakMap<Bun.CookieMap, OwnTest>()
 
-export function builtOwn(): OwnTest | undefined {
-  return latest
+export function builtOwn(site: { cookies: Bun.CookieMap }): OwnTest | undefined {
+  return builtFor.get(site.cookies)
 }
 
 /** The `createAuth` an `auth()` with no module makes as the server starts: kay's session, the store, the mailer and the hooks found, the pages on. */
@@ -224,7 +224,8 @@ export async function buildOwn(options: OwnOptions, app: ExtensionApp): Promise<
     pages: pages === false ? undefined : { prefix: prefix ?? '/auth', home: home ?? '/', ...typeof pages === 'object' && pages },
   })
 
-  latest = made
+  if (app.testCookies)
+    builtFor.set(app.testCookies, made)
 
   return made as unknown as UserMaker & { plugin: AnyElysia }
 }

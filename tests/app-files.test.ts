@@ -3,7 +3,7 @@ import { mkdir, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
-import { appModules, declaredAppFiles, extensionAppFiles, extensionServers } from '../src/config'
+import { appModules, buildingTestSite, declaredAppFiles, extensionAppFiles, extensionServers } from '../src/config'
 import { scratchDir } from './scratch'
 
 const CLI = resolve('src/cli.ts')
@@ -76,6 +76,27 @@ describe('the files an extension names in appFiles', () => {
       expect(modules.folder).toBeUndefined()
       expect(extensionAppFiles(root, [extension])).toEqual([join(root, 'src/hooks.ts')])
       expect(declaredAppFiles(root, [extension])).toHaveLength(3)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('hand a server function the cookies of the test site being built, and none otherwise', async () => {
+    const root = await written({})
+
+    try {
+      const seen: unknown[] = []
+      const cookies = new Bun.CookieMap()
+      const extension = { name: 'probe', server: (given: { testCookies?: unknown }) => {
+        seen.push(given.testCookies)
+
+        return {} as never
+      } }
+
+      await buildingTestSite(cookies, async () => extensionServers([extension], root))
+      await extensionServers([extension], root)
+      expect(seen).toEqual([cookies, undefined])
     }
     finally {
       await rm(root, { recursive: true, force: true })

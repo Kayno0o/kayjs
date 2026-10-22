@@ -22,6 +22,7 @@ import type { Rewrite } from './server/rewrite'
 import type { Prefetch } from './server/speculation'
 import type { FileStore } from './server/storage'
 import type { Tracer } from './server/trace'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { existsSync, readdirSync, realpathSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
@@ -410,6 +411,8 @@ export interface ExtensionApp {
   root: string
   // The `name` of every extension the config lists, the app's `src/plugins` files included, for an extension to tell which libraries the app registered, in an executable too.
   extensions: string[]
+  // The cookies of the test site this app is built for, set by `testSite()` only: what a library tells that site by.
+  testCookies?: Bun.CookieMap | undefined
   modules: Record<string, Record<string, unknown> | undefined>
 }
 
@@ -475,9 +478,17 @@ export function serverExtensions(root: string, extensions: KayExtension[] | unde
   return [...files.map(name => ({ name: `${PLUGINS_DIR}/${name}`, serverModule: { path: `./${PLUGINS_DIR}/${name}` } })), ...extensions ?? []]
 }
 
+const testSites = new AsyncLocalStorage<Bun.CookieMap>()
+
+// Runs `build` as the app of the test site holding `cookies`, so the extensions it builds are handed them.
+export async function buildingTestSite<T>(cookies: Bun.CookieMap, build: () => Promise<T>): Promise<T> {
+  return testSites.run(cookies, build)
+}
+
 // The server plugins the extensions carry, in their order, those given as a function built now.
 export async function extensionServers(extensions: KayExtension[] | undefined, root: string): Promise<{ name: string, server: AnyElysia }[]> {
   // An extension carrying only a catalog of messages is what an installed library's `kay.messages` adds to every app, not something the config lists.
+  const testCookies = testSites.getStore()
   const names = (extensions ?? []).filter(extension => Object.keys(extension).some(key => key !== 'name' && key !== 'messages')).map(extension => extension.name)
 
   return Promise.all((extensions ?? []).flatMap((extension) => {
@@ -486,7 +497,7 @@ export async function extensionServers(extensions: KayExtension[] | undefined, r
     if (serverModule !== undefined)
       return [(async () => ({ name, server: await serverFromModule(name, serverModule, root) }))()]
 
-    return server === undefined ? [] : [(async () => ({ name, server: typeof server === 'function' ? await server({ root: bundled() ? process.cwd() : root, modules: await appModules(root, extension), extensions: names }) : server }))()]
+    return server === undefined ? [] : [(async () => ({ name, server: typeof server === 'function' ? await server({ root: bundled() ? process.cwd() : root, modules: await appModules(root, extension), extensions: names, testCookies }) : server }))()]
   }))
 }
 

@@ -18,13 +18,13 @@ export interface OwnTest {
   test: (site: Site) => AuthTest
 }
 
-// The `auth.test(site)` of an app whose kay.config.ts holds `auth()` and no `src/auth.ts` module: the auth `testSite()` built, found as a call needs it, so call it after `testSite()`.
+// The `auth.test(site)` of an app whose kay.config.ts holds `auth()` and no `src/auth.ts` module: the auth that site's `testSite()` built, found as a call needs it, so call it after `testSite()`.
 export function authTest(site: Site): AuthTest {
   const made = () => {
-    const own = builtOwn()
+    const own = builtOwn(site)
 
     if (!own)
-      throw new Error('kayjs-auth: authTest found no `auth()` built by the test site: await `testSite()` first, in a project whose kay.config.ts registers `auth()` with no `module`')
+      throw new Error('kayjs-auth: authTest found no `auth()` built for this test site: await `testSite()` first, and give `authTest` the site it returned, of a project whose kay.config.ts registers `auth()` with no `module`')
 
     return own.test(site)
   }
