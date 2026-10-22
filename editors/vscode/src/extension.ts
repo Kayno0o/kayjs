@@ -119,7 +119,8 @@ async function start(root: string, cli: string, several: boolean): Promise<void>
   const server: ServerOptions = { run, debug: run }
   const options: LanguageClientOptions = {
     documentSelector: [{ scheme: 'file', language: 'kay', pattern: { baseUri: Uri.file(root).toString(), pattern: '**' } }],
-    workspaceFolder: workspace.getWorkspaceFolder(Uri.file(root)),
+    // The project's own root, which the server takes as its root: the enclosing workspace folder would give two apps of a monorepo the same one.
+    workspaceFolder: { uri: Uri.file(root), name: basename(root), index: 0 },
     initializationOptions: { routes: config.get<string>('routes') || undefined },
   }
   const client = new LanguageClient('kay', several ? `Kay (${basename(root)})` : 'Kay', server, options)
@@ -134,6 +135,7 @@ async function start(root: string, cli: string, several: boolean): Promise<void>
   catch (error) {
     clients.delete(root)
     clis.delete(root)
+    await stop(client)
     channel?.appendLine(`Kay: the language server of ${root} did not start: ${String(error)}`)
   }
 }
