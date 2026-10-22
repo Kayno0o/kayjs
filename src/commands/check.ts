@@ -89,47 +89,92 @@ export const check: Command = {
       ]
 
       // The text report goes to stderr; the other formats are left whole for what reads them.
-      await watchChecks(root, [CLI, 'check', ...positionals, ...flags, '--format', format], format)
+      let config: KayConfig | undefined
+
+      await watchChecks(root, [CLI, 'check', ...positionals, ...flags, '--format', format], format, async () => checkOnce(root, async () => config ??= await loadConfig(root), { project, entry, values, only, since, format, scope }))
 
       return 0
     }
 
-    // The checking machine lacks the server's environment, as `kay build` does, which kay.config.ts may import.
-    buildingWithoutEnv()
-
-    const started = performance.now()
-
-    try {
-      const { failing, found } = await checkProject(root, await loadConfig(root), typeof project === 'string' ? project : 'tsconfig.json', typeof entry === 'string' ? relative(root, resolve(entry)) : undefined, { denyWarnings: values['deny-warnings'] === true, fix: values.fix === true || values['dry-run'] === true, dryRun: values['dry-run'] === true, only, since, launch: only === 'seo', format, scope, quiet: values.quiet === true })
-
-      if (found === 0 && format !== 'json')
-        done('checked', 'with no problems', performance.now() - started)
-
-      return failing > 0 ? 1 : 0
-    }
-    catch (error) {
-      printFailure('check', error, format)
-
-      return 1
-    }
+    return checkOnce(root, async () => loadConfig(root), { project, entry, values, only, since, format, scope })
   },
+}
+
+interface CheckRun {
+  project: unknown
+  entry: unknown
+  values: { 'deny-warnings'?: boolean, 'fix'?: boolean, 'quiet'?: boolean }
+  only: LintGroup | undefined
+  since: string | undefined
+  format: ProblemFormat
+  scope: string[]
+}
+
+// One check of the project, printed, answering the exit code: 1 for a problem that fails it or an error thrown.
+async function checkOnce(root: string, config: () => Promise<KayConfig>, { project, entry, values, only, since, format, scope }: CheckRun): Promise<number> {
+  // The checking machine lacks the server's environment, as `kay build` does, which kay.config.ts may import.
+  buildingWithoutEnv()
+
+  const started = performance.now()
+
+  try {
+    const { failing, found } = await checkProject(root, await config(), typeof project === 'string' ? project : 'tsconfig.json', typeof entry === 'string' ? relative(root, resolve(entry)) : undefined, { denyWarnings: values['deny-warnings'] === true, fix: values.fix === true || values['dry-run'] === true, dryRun: values['dry-run'] === true, only, since, launch: only === 'seo', format, scope, quiet: values.quiet === true })
+
+    if (found === 0 && format !== 'json')
+      done('checked', 'with no problems', performance.now() - started)
+
+    return failing > 0 ? 1 : 0
+  }
+  catch (error) {
+    printFailure('check', error, format)
+
+    return 1
+  }
 }
 
 // Checks now and again on every change to the project, its tests included, a change during a check bringing one more; until interrupted.
 // Each check is a `kay check` of its own, so an edit to kay.config.ts or a module it imports is read again, which a process's import cache would not, and a check that throws or exits leaves the watch going.
-async function watchChecks(root: string, args: string[], format: ProblemFormat): Promise<never> {
+// Once one of them has reported, a change to `.kay` files alone is checked in the watch's own process with the config it first read, which spares the spawn and the config's load.
+async function watchChecks(root: string, args: string[], format: ProblemFormat, inProcess: () => Promise<number>): Promise<never> {
   const clear = format === 'text' && takesControlCodes(process.stderr)
   let changed = false
   let running: Promise<void> | undefined
   let timer: Timer | undefined
   let child: Subprocess | undefined
   let stopping = false
+  // Whether a change reached anything but a `.kay` file, and whether the last check ended in a report, which a check run in this process relies on the config of.
+  let beyondKay = true
+  let reported = false
+  let inside = false
   const checks = async () => {
     do {
       changed = false
 
+      const here = reported && !beyondKay
+
+      beyondKay = false
+
       if (clear)
         process.stderr.write(CLEAR_SCREEN)
+
+      if (here) {
+        inside = true
+
+        try {
+          await inProcess()
+        }
+        catch {
+          // A check that throws is reported by itself; the next one is a process of its own.
+          reported = false
+        }
+
+        inside = false
+
+        if (stopping)
+          break
+
+        continue
+      }
 
       // A process group of its own, so an interrupt stops what it runs too, such as the type checker.
       child = Bun.spawn([process.execPath, ...args], { stdio: ['ignore', 'inherit', 'inherit'], detached: true })
@@ -139,6 +184,8 @@ async function watchChecks(root: string, args: string[], format: ProblemFormat):
       // Stopped by the watch, which exits starting no other.
       if (stopping)
         break
+
+      reported = code <= 1
 
       // A config or a module it imports calling `process.exit()`, or a crash, leaves no report of its own.
       if (code > 1)
@@ -162,11 +209,17 @@ async function watchChecks(root: string, args: string[], format: ProblemFormat):
     if (stopping) {
       if (child)
         signalGroup(child, 'SIGKILL')
+      else if (inside)
+        process.exit(code)
 
       return
     }
 
     stopping = true
+
+    // A check in this process ends on its own, the type checker it started with it.
+    if (inside)
+      await running
 
     const check = child
 
@@ -185,8 +238,12 @@ async function watchChecks(root: string, args: string[], format: ProblemFormat):
     process.on(signal, () => void stop(signal, code))
 
   running = checks()
-  watchProject(root, () => {
+  watchProject(root, (file) => {
     changed = true
+
+    if (!file.endsWith('.kay'))
+      beyondKay = true
+
     clearTimeout(timer)
     timer = setTimeout(() => {
       if (!stopping)

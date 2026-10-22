@@ -363,7 +363,7 @@ The type check is Bun's own (`bun check`), on every core, and runs even when you
 | Option | Effect |
 | --- | --- |
 | `--deny-warnings` | Fails on warnings too, not only on errors |
-| `--watch` | Checks again on every change to the project |
+| `--watch` | Checks again on every change to the project, a change to `.kay` files alone without a new process |
 | `--fix` | Applies the fixes that change nothing else, then reports what is left. With `env` in `kay.config.ts` it also declares raw `process.env` reads |
 | `--dry-run` | Counts the fixes `--fix` would apply and writes nothing |
 | `--only <group>` | Reports one group's lints alone, such as `seo`, as an audit |

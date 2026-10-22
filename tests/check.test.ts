@@ -4506,6 +4506,36 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('checks an edit to .kay files alone in the watch itself, reading kay.config.ts again only for any other change', async () => {
+    const config = 'import { appendFileSync } from \'node:fs\'\n\nappendFileSync(import.meta.dir + \'/loads\', \'x\')\n\nexport default {}\n'
+    const root = await scratchProject({ 'kay.config.ts': config, 'src/a.kay': 'p a\n' })
+    const loads = async () => (await Bun.file(join(root, 'loads')).text()).length
+    const watch = watchChecks(root)
+
+    try {
+      expect(await watch.report()).toMatchObject({ errors: 0 })
+      expect(await loads()).toBe(1)
+      await Bun.write(join(root, 'src/a.kay'), 'img(src="/a.png" width="1" height="1")\n')
+      expect(await watch.report()).toMatchObject({ errors: 1, problems: [{ code: 'missing-alt' }] })
+      await Bun.write(join(root, 'src/a.kay'), 'p a\n')
+      expect(await watch.report()).toMatchObject({ errors: 0 })
+      // The watch read the config once for its own checks, the two edits sharing it.
+      expect(await loads()).toBe(2)
+      await Bun.write(join(root, 'src/b.kay'), 'img(src="/b.png" width="1" height="1")\n')
+      expect(await watch.report()).toMatchObject({ errors: 1 })
+      await Bun.write(join(root, 'src/b.kay'), 'p b\n')
+      await rm(join(root, 'src/b.kay'))
+      expect(await watch.report()).toMatchObject({ errors: 0 })
+      await Bun.write(join(root, 'kay.config.ts'), `${config}// changed\n`)
+      expect(await watch.report()).toMatchObject({ errors: 0 })
+      expect(await loads()).toBe(3)
+    }
+    finally {
+      await watch.stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   // Root writes a read-only file, as in a CI container, and nothing else makes a write fail for it.
   it.skipIf(process.getuid?.() === 0)('keeps watching after a check that throws, as a fix it cannot write', async () => {
     const root = await scratchProject({ 'src/a.kay': '---\nfunction go() {}\n---\nbutton(onclick={go}) x\n' })
@@ -4527,19 +4557,20 @@ describe.concurrent('kay check, unused code', () => {
   })
 
   it('keeps watching after a check that exits or dies, as a kay.config.ts calling process.exit(), saying so', async () => {
-    const root = await scratchProject({ 'kay.config.ts': 'const crash = Bun.file(import.meta.dir + \'/crash\')\n\nif (await crash.exists() && await crash.text() === \'kill\')\n  process.kill(process.pid, \'SIGKILL\')\nelse if (await crash.exists())\n  process.exit(9)\n\nexport default {}\n', 'src/a.kay': 'p a\n' })
+    const config = 'const crash = Bun.file(import.meta.dir + \'/crash\')\n\nif (await crash.exists() && await crash.text() === \'kill\')\n  process.kill(process.pid, \'SIGKILL\')\nelse if (await crash.exists())\n  process.exit(9)\n\nexport default {}\n'
+    const root = await scratchProject({ 'kay.config.ts': config, 'src/a.kay': 'p a\n' })
     const watch = watchChecks(root)
 
     try {
       expect(await watch.report()).toMatchObject({ errors: 0 })
       await Bun.write(join(root, 'crash'), '')
-      await Bun.write(join(root, 'src/a.kay'), 'img(src="/a.png" width="1" height="1")\n')
+      await Bun.write(join(root, 'kay.config.ts'), `${config}// 1\n`)
       expect(await watch.report()).toMatchObject({ errors: 1, problems: [{ code: null, message: 'the check stopped with exit code 9 before reporting' }] })
       await Bun.write(join(root, 'crash'), 'kill')
-      await Bun.write(join(root, 'src/a.kay'), 'img(src="/b.png" width="1" height="1")\n')
+      await Bun.write(join(root, 'kay.config.ts'), `${config}// 2\n`)
       expect(await watch.report()).toMatchObject({ errors: 1, problems: [{ code: null, message: 'the check died of SIGKILL before reporting' }] })
       await rm(join(root, 'crash'))
-      await Bun.write(join(root, 'src/a.kay'), 'p a\n')
+      await Bun.write(join(root, 'kay.config.ts'), `${config}// 3\n`)
       expect(await watch.report()).toMatchObject({ errors: 0 })
     }
     finally {
