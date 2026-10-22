@@ -1100,11 +1100,10 @@ inBrowser('a non-modal SidePanel and the space skin on a served page', () => {
     const site = await shared()
 
     await using page = await site.open('/space')
-    await page.click('.kui-multi-select-trigger')
-    await page.waitFor('.kui-multi-select-checkbox')
-
-    // A Tab inside the open panel makes the focus the next calls move a keyboard one, which :focus-visible follows.
+    // Everything opens by keyboard: a click would leave the focus moved after it as a pointer's, which :focus-visible does not follow.
     await page.press('Tab')
+    await page.evaluate(() => document.querySelector<HTMLElement>('.kui-multi-select-trigger')!.focus())
+    await page.press('Enter')
     await page.waitFor('.kui-multi-select-checkbox')
 
     const seen = await page.evaluate(() => {
@@ -1125,7 +1124,7 @@ inBrowser('a non-modal SidePanel and the space skin on a served page', () => {
 
       return {
         boxes,
-        select: { appearance: select.appearance, image: select.backgroundImage, supported: CSS.supports('appearance', 'base-select'), pickerIcon: getComputedStyle(one('#kind'), '::picker-icon').display },
+        select: { appearance: select.appearance, image: select.backgroundImage, supported: CSS.supports('appearance', 'base-select'), pickerIcon: getComputedStyle(one('#kind'), '::picker-icon').content },
         // The open panel first: focusing a control outside it closes the panel.
         focus: { multiSelect: focusRing(one('.kui-multi-select-checkbox'), one('.kui-multi-select-option')), checkbox: focusRing(one('#ticked')), select: focusRing(one('#kind')), key: focusRing(one('#key')), iconKey: focusRing(one('#icon-key')) },
       }
@@ -1140,6 +1139,7 @@ inBrowser('a non-modal SidePanel and the space skin on a served page', () => {
     expect(ticked!.tick.transform).toBe('matrix(1, 0, 0, 1, 0, 0)')
     expect(ticked!.tick.opacity).toBe('1')
     expect(ticked!.tick.colour).not.toBe(ticked!.ground)
+    expect(ticked!.tick.colour).not.toBe('rgba(0, 0, 0, 0)')
     expect(plain!.tick.transform).toBe('matrix(0, 0, 0, 0, 0, 0)')
     // A browser with base-select draws its own picker icon, so the gradient chevron is off; otherwise the two gradients are the one chevron.
     expect(seen.select.appearance).toBe(seen.select.supported ? 'base-select' : 'none')
