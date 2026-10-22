@@ -2,7 +2,7 @@
   "publisher": "kaynooo",
   "name": "kay",
   "displayName": "Kay",
-  "version": "1.70.0",
+  "version": "1.71.0",
   "description": "Language support for .kay components: highlighting, diagnostics, hover, completion, go-to-definition and formatting through the kay language server",
   "license": "MIT",
   "homepage": "https://kayjs.kaynooo.fr",
