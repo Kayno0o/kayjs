@@ -32,6 +32,13 @@ export async function timeLimited<Result>(work: () => Promise<Result>, ms: numbe
       timer.unref()
     })])
   }
+  catch (error) {
+    // Work that failed by itself frees the statements it left in flight, but is not over: its timers keep their context.
+    for (const statement of run.statements)
+      statement.cancel()
+
+    throw error
+  }
   finally {
     clearTimeout(timer)
   }

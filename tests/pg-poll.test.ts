@@ -112,6 +112,17 @@ describe('the shared event poller', () => {
     expect(((await later) as { seven: number }[])[0]?.seven).toBe(7)
   })
 
+  pgIt('cancels the slow statement left in flight when another one of the run fails', async () => {
+    const { sql } = await postgres()
+
+    await expect(timeLimited(async () => Promise.all([sql`SELECT pg_sleep(14)`, sql`SELECT 1/0`]), 5000, 'the read')).rejects.toThrow()
+    await Bun.sleep(150)
+
+    const [{ busy }] = await sql`SELECT count(*)::int AS busy FROM pg_stat_activity WHERE query LIKE 'SELECT pg_sleep(14)%' AND state = 'active' AND pid != pg_backend_pid()`
+
+    expect(busy).toBe(0)
+  })
+
   it('does not run a task again before its last run ended', async () => {
     const counter = counted({ db: async () => ({}) as SQL })
     let started = 0
