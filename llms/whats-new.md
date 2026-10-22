@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - `metrics: true` serves `/metrics` for Prometheus: requests by route and status, durations, job runs, cache reads and live connections, read only from the machine or a private network, or with a bearer `KAY_METRICS_TOKEN` ([Metrics for a collector](production.md#metrics-for-a-collector)).
+- `kay/test/preload` keeps a variable an earlier preload pinned, so `preload = ["./tests/setup.ts", "kay/test/preload"]` reaches the modules `kay.config.ts` imports ([Test setup](testing-setup.md)).
 - `mountComponent` names the island and the imports down to the server module a browser cannot take, as `kay build` does, and the error says an island cannot import a server module ([Browser-only components](browser-only.md#browser-only-components)).
 - `markdownHtml` from `kay/markdown` loads marked in an island on its first call instead of with the island, showing the text as written until it arrives, which takes about 17 KB gzip off every chat island ([Content](content.md)).
 - A page whose islands use no `for`, `await`, `try` or spread ships about 1.4 KB less JS: the code of each block loads only with the islands compiled to it ([Build and start](build-and-start.md#build-and-start-commands)).

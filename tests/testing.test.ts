@@ -393,3 +393,28 @@ describe('the test preload', () => {
     }
   })
 })
+
+describe('the test preload after an app preload', () => {
+  it('keeps a variable an earlier preload set to another value than .env, for what kay.config.ts imports', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-env-order-'))
+
+    try {
+      await Bun.write(join(dir, '.env'), 'KAY_PINNED=real\nKAY_DEV_ONLY=dev\n')
+      await Bun.write(join(dir, 'setup.ts'), 'process.env.KAY_PINNED = \'temp\'\n')
+      await Bun.write(join(dir, 'paths.ts'), 'export const pinned = process.env.KAY_PINNED\nexport const devOnly = process.env.KAY_DEV_ONLY\n')
+      await Bun.write(join(dir, 'kay.config.ts'), 'import { devOnly, pinned } from \'./paths\'\n\nexport default {}\n;(globalThis as Record<string, unknown>).KAY_SEEN = [pinned, devOnly]\n')
+      await Bun.write(join(dir, 'bunfig.toml'), `[test]\npreload = ["./setup.ts", "${join(import.meta.dir, '../src/test/preload.ts')}"]\n`)
+      await Bun.write(join(dir, 'env.test.ts'), 'import { expect, it } from \'bun:test\'\nit(\'env\', () => expect([(globalThis as Record<string, unknown>).KAY_SEEN, process.env.KAY_PINNED, process.env.KAY_DEV_ONLY]).toEqual([[\'temp\', undefined], \'temp\', undefined]))\n')
+
+      const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => name !== 'NODE_ENV'))
+      const child = Bun.spawn([process.execPath, 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env })
+      const [code, output] = await Promise.all([child.exited, new Response(child.stderr).text()])
+
+      expect(output).toContain('1 pass')
+      expect(code).toBe(0)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+})

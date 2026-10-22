@@ -210,6 +210,19 @@ On a French site, the component writes the same non-breaking spaces before `: ; 
 
 A component that calls a route of an API module, your own, can be mounted too. The call goes out as a `fetch`, so stub `fetch` in the test to answer it.
 
+## The environment of the tests
+
+`kay/test/preload` drops every variable only your `.env` sets, so a test never reaches the mail server or database you use in development. The shell's and the CI's variables and `.env.test` stay.
+
+It also loads `kay.config.ts` and every module the config imports, so a module that reads the environment through `defineEnv` reads it at that point. A preload of your own that pins the test environment, such as a temp directory or an in-memory database, goes before kay's:
+
+```toml
+[test]
+preload = ["./tests/setup.ts", "kay/test/preload"]
+```
+
+kay keeps the variables your preload set to a value other than the one in `.env`. Listed after kay's preload, it runs too late for what the config imports.
+
 ## A database for each test file
 
 An app that keeps its data with `@kaynooo/pg-orm` and has a `pg-orm.config.ts` and a `DATABASE_URL` (in `.env.test`) gets a database for each test file with nothing to declare. `kay/test/preload` copies the database your migrations build, points `DATABASE_URL` at the copy and drops it when the file is done. `kay new --template app --with postgres` is set up this way.

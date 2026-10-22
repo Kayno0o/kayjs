@@ -30,7 +30,7 @@ function shellEnv(): Set<string> | undefined {
 }
 
 // `bun test` loads the developer's `.env` as well as `.env.test` and `.env.test.local`, whatever NODE_ENV says, so a test would reach the real mail server or database it names.
-// Every variable only `.env` sets is dropped: the shell's, the CI's and the test files' stay, as Bun gave them.
+// Every variable only `.env` sets is dropped: the shell's, the CI's, the test files' and an earlier preload's stay, as they were given.
 export function isolateEnv(dir = process.cwd()): void {
   const own = envOf(dir, ['.env'])
 
@@ -44,7 +44,10 @@ export function isolateEnv(dir = process.cwd()): void {
     // Without Linux's record of the starting environment, a value `.env` does not give is the shell's.
     const fromShell = shell ? shell.has(name) : process.env[name] !== value
 
-    if (!(name in test) && !fromShell)
+    // An earlier preload that pinned the variable left a value other than `.env`'s.
+    const fromPreload = process.env[name] !== value
+
+    if (!(name in test) && !fromShell && !fromPreload)
       delete process.env[name]
   }
 }
