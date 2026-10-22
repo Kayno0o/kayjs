@@ -27,6 +27,8 @@ export interface BrowserOptions {
   colorScheme?: 'light' | 'dark' | undefined
   // The motion preference the page is asked for from its first load, `prefers-reduced-motion` and `matchMedia` alike.
   reducedMotion?: 'reduce' | 'no-preference' | undefined
+  // The size the page is laid out at from its first load: `'phone'` (390 by 844, twice the pixel density, as a mobile browser), `'tablet'` (820 by 1180) or your own, `mobile` making the page a mobile one that reads its meta viewport.
+  viewport?: 'phone' | 'tablet' | { width: number, height: number, deviceScaleFactor?: number | undefined, mobile?: boolean | undefined } | undefined
   // `false` turns JavaScript off for the page, as a visitor who disabled it: its scripts never run, so a test sees what the server rendered, and `evaluate` and the waits still read the page.
   javaScript?: boolean | undefined
   // Cookies the page's first load carries, for a site's origin, such as a session's: a `Cookie` header string, as `auth.sessionCookie` returns, or a list.
@@ -55,7 +57,12 @@ export interface WaitOptions {
   timeout?: Duration | undefined
 }
 
-export interface ClickOptions extends WaitOptions {
+// Where in an element a pointer aims: CSS pixels from its top-left corner, for a point of a canvas the element's middle is not.
+export interface PointerOptions extends WaitOptions {
+  at?: { x: number, y: number } | undefined
+}
+
+export interface ClickOptions extends PointerOptions {
   // Keys held down during the click, such as `['Alt']`.
   modifiers?: Bun.WebView.Modifier[] | undefined
 }
@@ -116,7 +123,8 @@ export interface TestPage {
   type: (text: string) => Promise<void>
   press: (key: Parameters<Bun.WebView['press']>[0], options?: Parameters<Bun.WebView['press']>[1]) => Promise<void>
   // Moves the pointer onto the middle of the element, scrolled into view, and leaves it there.
-  hover: (selector: string, options?: WaitOptions) => Promise<void>
+  // `at` aims at a point of the element, scrolled into view, instead of its middle.
+  hover: (selector: string, options?: PointerOptions) => Promise<void>
   // The first match's text, or null when nothing matches.
   text: (selector: string) => Promise<string | null>
   // The first match's form value, or null when nothing matches.
@@ -167,6 +175,11 @@ const CRASHED = Symbol('crashed')
 // The files the page failed to load, such as the scripts that would hydrate its islands: refused, or a script answered as another type, which the browser does not run.
 const FAILED_FILES = `performance.getEntriesByType('resource').flatMap(entry => { const path = new URL(entry.name).pathname; return entry.responseStatus >= 400 ? [path + ' answered ' + entry.responseStatus] : (path.endsWith('.js') || path.endsWith('.mjs')) && entry.contentType && !entry.contentType.includes('javascript') ? [path + ' answered as ' + entry.contentType] : [] })`
 const FAILED_WAIT_MS = 1000
+const VIEWPORTS = {
+  phone: { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
+  tablet: { width: 820, height: 1180, deviceScaleFactor: 2, mobile: true },
+}
+
 // How long one try of a click waits for its element to be actionable before the page scrolls it into place again, and what Bun's message for running out of it ends with.
 const CLICK_WAIT_MS = 1000
 const ACTIONABLE = /to be actionable$/
@@ -471,6 +484,22 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     return [left + width / 2, top + height / 2]
   }, [selector, options.javaScript !== false]))
 
+  // The point `at` of the element, scrolled so it is in the view, in viewport pixels.
+  const pointAt = async (selector: string, at: { x: number, y: number }) => inView<[number, number]>(script((target: string, x: number, y: number) => {
+    const element = document.querySelector(target)!
+    const place = () => {
+      const { left, top } = element.getBoundingClientRect()
+
+      return [left + x, top + y] as [number, number]
+    }
+    const [px, py] = place()
+
+    if (px < 0 || py < 0 || px >= innerWidth || py >= innerHeight)
+      scrollBy({ left: px - innerWidth / 2, top: py - innerHeight / 2, behavior: 'instant' })
+
+    return place()
+  }, [selector, at.x, at.y]))
+
   // Where a click reaches the element: scrolled to each alignment in turn, the point of its box that nothing covers first at the middle and then nearer each side, and whether it is the middle. What keeps a click from reaching it (nothing drawn, another element over every point) comes back as a reason instead.
   // The element is waited on for stillness once, at the alignment where a point reaches it, as Bun's own click does for the middle: its box must stay put across two frames, and the point is found again where it stopped.
   const reach = async (selector: string) => inView<[number, number, boolean] | string>(script(async (target: string, frames: boolean, alignments: string[], points: number[][]) => {
@@ -569,11 +598,11 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     initScript: async (run, ...args) => serial(async () => {
       await cdp('Page.addScriptToEvaluateOnNewDocument', { source: script(run, args) })
     }),
-    hover: async (selector, wait = {}) => serial(async () => {
+    hover: async (selector, { at, ...wait } = {}) => serial(async () => {
       await untilLoaded()
       await poll(script(scrolledTo, [selector, true]), selector, waitMs(wait.timeout))
 
-      const [x, y] = await center(selector)
+      const [x, y] = at === undefined ? await center(selector) : await pointAt(selector, at)
 
       await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y })
     }),
@@ -602,7 +631,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       await settle(ready, `${target.pathname} to load and hydrate its islands`)
     }),
     path: async () => serial(async () => inView<string>('location.pathname + location.search')),
-    click: async (selector, { modifiers, ...wait } = {}) => serial(async () => {
+    click: async (selector, { modifiers, at: aim, ...wait } = {}) => serial(async () => {
       await untilLoaded()
 
       const budget = waitMs(wait.timeout) ?? timeout
@@ -622,7 +651,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
         const tried = Date.now()
 
         try {
-          const at = await reach(selector)
+          const at = aim === undefined ? await reach(selector) : [...await pointAt(selector, aim), false] as [number, number, boolean]
 
           if (typeof at === 'string') {
             await Bun.sleep(POLL_MS)
@@ -770,6 +799,12 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 
     if (media.length > 0)
       await cdp('Emulation.setEmulatedMedia', { features: media })
+
+    if (options.viewport !== undefined) {
+      const { width, height, deviceScaleFactor = 1, mobile = false } = typeof options.viewport === 'string' ? VIEWPORTS[options.viewport] : options.viewport
+
+      await cdp('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor, mobile })
+    }
 
     if (options.javaScript === false)
       await cdp('Emulation.setScriptExecutionDisabled', { value: true })

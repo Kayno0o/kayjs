@@ -308,7 +308,7 @@ The page clicks and types as a user does.
 | Call | Does |
 | --- | --- |
 | `click(selector, { modifiers })` | Scrolls to the element once the page finished loading, waits until it is visible, still and not covered, and clicks, holding the keys in `modifiers` such as `['Alt']`. Covered at the middle of the view, by a fixed bar for instance, it is scrolled to the other alignments and aimed at the first point of its box nothing covers, once it keeps still (up to about a second); covered everywhere, it fails naming what covers it |
-| `hover(selector)` | Scrolls to the element once the page finished loading and moves the pointer onto its middle, where it stays |
+| `hover(selector, { at })` | Scrolls to the element once the page finished loading and moves the pointer onto its middle, where it stays; `at: { x, y }` aims at a point in CSS pixels from its top-left corner instead, such as a spot of a canvas, and `click` takes `at` too |
 | `fill(selector, text)` | Replaces a field's text, as typing does |
 | `type(text)`, `press(key)` | Type or press a key in the focused element |
 | `text(selector)`, `value(selector)`, `count(selector)` | Read the page at once |
@@ -335,6 +335,8 @@ const page = await site.open('/account', { cookies: await auth.sessionCookie(use
 ```
 
 A page opens as a visitor with other settings through the same options. `colorScheme: 'dark'` and `reducedMotion: 'reduce'` set the preferences the page reads, `javaScript: false` turns JavaScript off so a test sees what the server rendered, and `page.warnings` lists the console warnings the way `page.errors` lists the errors.
+
+`viewport: 'phone'` (390 by 844 at twice the density, as a mobile browser), `'tablet'` or `{ width, height, deviceScaleFactor, mobile }` lays the page out at that size from its first load.
 
 ```ts
 const plain = await site.open('/signup', { javaScript: false })
