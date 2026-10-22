@@ -16,13 +16,14 @@ export interface NavigateOptions {
 export type QueryChanges = Readonly<Record<string, string | number | null | undefined>>
 
 // The current page with `query` merged into its own, keeping the scroll and the focus as `refresh()` does: a filter or a sort picked in place.
-export async function navigate(to: { query: QueryChanges }, options?: NavigateOptions): Promise<void>
+// Both forms resolve to `false` when a leave guard was declined, so the page stayed, and `true` otherwise.
+export async function navigate(to: { query: QueryChanges }, options?: NavigateOptions): Promise<boolean>
 // Goes to a page as following a link does: one of the app's swapped in place, under the site's mount point as a link is, another site's loaded. A literal path is checked as a link's is.
 // Last, so a path no page serves is reported against it.
-export async function navigate<const Href extends string>(href: Href & CheckedHref<Href>, options?: NavigateOptions): Promise<void>
-export async function navigate(to: string | { query: QueryChanges }, options: NavigateOptions = {}): Promise<void> {
+export async function navigate<const Href extends string>(href: Href & CheckedHref<Href>, options?: NavigateOptions): Promise<boolean>
+export async function navigate(to: string | { query: QueryChanges }, options: NavigateOptions = {}): Promise<boolean> {
   if (typeof document === 'undefined')
-    return
+    return true
 
   navigation.flush?.()
 
@@ -43,17 +44,19 @@ export async function navigate(to: string | { query: QueryChanges }, options: Na
   }
 
   if (!await mayLeave(url))
-    return
+    return false
 
   navigation.navigations = (navigation.navigations ?? 0) + 1
 
   if (!navigation.hooks || !swappable(url)) {
     leave(url)
 
-    return
+    return true
   }
 
   await follow(url, typeof to === 'string' ? { ...options, intent: 'visit' } : { ...options, intent: 'query', focused: document.activeElement })
+
+  return true
 }
 
 // Runs the page's loads again and shows what they return, keeping scroll, focus and every island whose props did not change.

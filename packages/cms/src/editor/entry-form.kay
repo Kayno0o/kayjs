@@ -169,10 +169,8 @@ async function remove(): Promise<void> {
     return
   }
 
-  await navigate(screen, { replace: true })
-
-  // Still here: the editor declined to leave over edits of other entries, so the form stays locked and the notice offers the way on.
-  if (isShown(url!))
+  // Declined over edits of other entries: the form stays locked and the notice offers the way on.
+  if (!await navigate(screen, { replace: true }))
     stranded.set(screen)
 }
 
@@ -194,11 +192,12 @@ section.kcms-entry(aria-busy={saving()} ref={element => box = element})
       .kcms-entry-more
         EntryState(draftField={draftField()} draft={isDraft()} dirty={unsaved()} saving={saving() || removed()} denied={can.value()?.denied} title={title()} url={answer.entry.url} referrers={referrers()} deletable={!isSingle() && !answer.seeded} onPublish={() => setDraft(false)} onUnpublish={() => setDraft(true)} onRemove={remove} onAskReferrers={askReferrers})
   EntryPresence(room={room.room} member={room.member})
-  if source.status() === 'failed'
-    p.kcms-entry-failure {wording('cms.entry.loadFailure', 'Could not load this entry: {message}', { message: source.error()?.message ?? '' })}
-  else if stranded() as screen
-    p.kcms-entry-failure(role="alert") {wording('cms.entry.deleted', 'This entry is deleted.')}
+  if stranded() as screen
+    .kcms-entry-failure(role="alert")
+      p {wording('cms.entry.deleted', 'This entry is deleted.')}
       a(href={screen}) {wording('cms.entry.deletedLeave', 'Go to the collection')}
+  else if source.status() === 'failed'
+    p.kcms-entry-failure {wording('cms.entry.loadFailure', 'Could not load this entry: {message}', { message: source.error()?.message ?? '' })}
   else if source.value() as answer
     if answer.entry.problem as problem
       p.kcms-entry-failure(role="alert") {wording('cms.entry.problem', 'This entry\'s file does not parse: {problem}. Saving writes the form over it.', { problem })}

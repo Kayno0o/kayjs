@@ -292,7 +292,7 @@ test('Delete from the entry\'s own page leads to the collection\'s screen, not t
   expect(await leftFor()).toBe('/admin/collections/posts')
   expect(writes.map(write => write.method)).toEqual(['DELETE'])
   expect(reload).not.toHaveBeenCalled()
-  expect(root.querySelector<HTMLFieldSetElement>('fieldset')?.disabled ?? true).toBe(true)
+  expect(root.querySelector<HTMLFieldSetElement>('fieldset')!.disabled).toBe(true)
   expect(([...root.querySelectorAll('.kcms-entry-actions button')].find(each => each.textContent?.trim() === 'Save') as HTMLButtonElement).disabled).toBe(true)
   expect((button(root, 'Publish') as HTMLButtonElement).disabled).toBe(true)
 })
@@ -366,6 +366,7 @@ test('Delete from the entry\'s own page, when leaving is declined over edits of 
   await until(() => root.querySelector('.kcms-entry-failure a'))
 
   expect(writes.map(write => write.method)).toEqual(['DELETE'])
+  expect(root.querySelector('.kcms-entry-failure')!.textContent).toContain('This entry is deleted.')
   expect(root.querySelector('.kcms-entry-failure a')!.getAttribute('href')).toBe('/admin/collections/posts')
   expect(root.querySelectorAll('.kcms-entry')[0]!.querySelector('fieldset')).toBeNull()
   expect(assign).not.toHaveBeenCalled()

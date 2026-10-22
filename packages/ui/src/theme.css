@@ -716,7 +716,7 @@
   }
 
   .kui-confirm-delete-link {
-    @apply cursor-pointer text-xs text-kui-subtext0 underline transition-colors hover:text-kui-text;
+    @apply cursor-pointer text-xs text-kui-subtext0 underline transition-colors hover:text-kui-text disabled:cursor-default disabled:opacity-40;
   }
 
   .kui-confirm-delete-message {
