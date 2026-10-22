@@ -231,7 +231,7 @@ export async function scanRoutes(routesDir: string, mounts: RouteMount[] = []): 
     return found
   }
 
-  for (const tree of trees.filter(tree => tree.outer === undefined)) {
+  for (const tree of pageTrees(trees)) {
     const own: Route[] = []
 
     for (const file of existsSync(tree.dir) ? await findKayFiles(tree.dir) : []) {
@@ -266,7 +266,7 @@ export async function scanEndpoints(routesDir: string, mounts: RouteMount[] = []
   const read: LayoutsRead = new Map()
   const served = new Set<string>()
 
-  for (const tree of trees.filter(tree => tree.outer === undefined)) {
+  for (const tree of pageTrees(trees)) {
     const own: Endpoint[] = []
 
     for (const file of existsSync(tree.dir) ? await findProjectFiles(tree.dir, ENDPOINT_FILE) : []) {
@@ -385,7 +385,10 @@ function layoutAccess(trees: RouteMount[], layout: string, read: LayoutsRead): L
   if (setsFalse(layout, 'guards', read))
     return { guards: [], open: true }
 
-  return { guards: guardsOf(trees, virtualDir(trees, dirname(layout)), read), ...!layout.startsWith(trees[0]!.dir + sep) && { open: true } }
+  // An outer layout has no place in the URL tree: it wraps every page, so the guards from the root cover it.
+  const at = trees.some(tree => tree.outer === layout) ? '' : virtualDir(trees, dirname(layout))
+
+  return { guards: guardsOf(trees, at, read), ...!layout.startsWith(trees[0]!.dir + sep) && { open: true } }
 }
 
 // The keys set to `false` in the object literal `head` opens, `export const page = { ... }` unless named, read without parsing the module: the server never loads a compiler.
@@ -673,14 +676,19 @@ export function fileAt(trees: RouteMount[], at: string, name: string): string | 
   return tree && join(tree.dir, at.slice(tree.prefix.length), name)
 }
 
+// The trees that serve pages and endpoints: an outer layout's mount holds one file and no URL starts with its prefix.
+function pageTrees(trees: RouteMount[]): RouteMount[] {
+  return trees.filter(tree => tree.outer === undefined)
+}
+
 // The first of the trees holding `name` at a directory of the URL tree.
 function treeHolding(trees: RouteMount[], at: string, name: string): RouteMount | undefined {
-  return trees.find(({ dir, prefix, outer }) => outer === undefined && (at === prefix || at.startsWith(`${prefix}/`)) && existsSync(join(dir, at.slice(prefix.length), name)))
+  return pageTrees(trees).find(({ dir, prefix }) => (at === prefix || at.startsWith(`${prefix}/`)) && existsSync(join(dir, at.slice(prefix.length), name)))
 }
 
 // Where a directory of one of the trees sits in the URL tree.
 export function virtualDir(trees: RouteMount[], dir: string): string {
-  const tree = trees.find(({ dir: root }) => dir === root || dir.startsWith(root + sep))!
+  const tree = pageTrees(trees).find(({ dir: root }) => dir === root || dir.startsWith(root + sep))!
   const rest = relative(tree.dir, dir).split(sep).filter(Boolean).join('/')
 
   return rest === '' ? tree.prefix : `${tree.prefix}/${rest}`

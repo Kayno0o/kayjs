@@ -57,6 +57,15 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the ui ext
     expect(page.errors).toEqual([])
   }, 60_000)
 
+  it('lets a utility passed through class beat the component\'s own rule beside the app\'s stylesheet', async () => {
+    const page = await site.open('/shell-class')
+    const display = async (id: string) => page.evaluate((selector: string) => getComputedStyle(document.querySelector(selector)!).display, id as never)
+
+    expect(await display('#plain')).toBe('inline-flex')
+    expect(await display('#utility')).toBe('block')
+    expect(page.errors).toEqual([])
+  }, 60_000)
+
   it('lets the app\'s own theme import and tokens win over the extension\'s', async () => {
     const page = await site.open('/skin')
 

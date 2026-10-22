@@ -698,12 +698,84 @@ it('adds kayjs-auth over the project\'s pg-orm tables and its mailer', async () 
     const source = await Bun.file(join(dir, 'src/auth.ts')).text()
 
     expect(source).toContain('import { db } from \'./db\'')
-    expect(source).toContain('email: { mailer: { send: mail.enqueue } },')
+    expect(source).toContain('email: { mailer: authMailer(mail.enqueue) },')
+    expect(source).toContain('import { authMailer } from \'@kaynooo/kayjs-mail\'')
     expect(source).not.toContain('sqlite://')
     expect((await addFeatures(dir, ['mail', 'auth'], { install: false })).written).toEqual([])
   }
   finally {
     await rm(join(dir, '..'), { recursive: true, force: true })
+  }
+})
+
+it('keeps the bare mailer while kayjs-mail is not registered, and names a non-ASCII package whole', async () => {
+  const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'café-du-coin')
+
+  try {
+    await linkedProject(dir, PRESETS.server.features, ['auth', 'ui', 'mail'])
+    await writeFile(join(dir, 'src/mail.ts'), 'export const mail = {}\n')
+
+    const manifest = await Bun.file(join(dir, 'package.json')).json() as { name: string }
+
+    manifest.name = 'café-du-coin'
+    await writeFile(join(dir, 'package.json'), JSON.stringify(manifest))
+    await addFeatures(dir, ['auth'], { install: false })
+
+    const source = await Bun.file(join(dir, 'src/auth.ts')).text()
+
+    expect(source).toContain('email: { mailer: { send: mail.enqueue } },')
+    expect(source).not.toContain('authMailer')
+    expect(source).toContain('name: \'Café Du Coin\'')
+  }
+  finally {
+    await rm(join(dir, '..'), { recursive: true, force: true })
+  }
+})
+
+it('puts the auth tables first in an empty, a single-line and a multi-line list', async () => {
+  const lists = [['[]', '[...authTables]'], ['[Member, Notice]', '[...authTables, Member, Notice]'], ['[\n  Member,\n  Notice,\n]', '[\n  ...authTables,\n  Member,\n  Notice,\n]']] as const
+
+  for (const [given, expected] of lists) {
+    const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'app')
+
+    try {
+      await linkedProject(dir, PRESETS.server.features, ['auth', 'ui'])
+      await mkdir(join(dir, 'src/db'), { recursive: true })
+      await writeFile(join(dir, 'src/db/index.ts'), `import { Database } from '@kaynooo/pg-orm'\n\nexport const tables = ${given}\n\nexport const db = new Database({ url: process.env.DATABASE_URL!, tables })\n`)
+
+      const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies: Record<string, string> }
+
+      manifest.dependencies['@kaynooo/pg-orm'] = '^7.0.0'
+      await writeFile(join(dir, 'package.json'), JSON.stringify(manifest))
+      await addFeatures(dir, ['auth'], { install: false })
+      expect(await Bun.file(join(dir, 'src/db/index.ts')).text()).toContain(`export const tables = ${expected}\n`)
+    }
+    finally {
+      await rm(join(dir, '..'), { recursive: true, force: true })
+    }
+  }
+})
+
+it('creates the .gitignore data goes in, and takes /data and data/ as ignored already', async () => {
+  for (const [ignore, wanted] of [[undefined, true], ['/data\n', false], ['data/\n', false], ['node_modules\n', true]] as const) {
+    const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'app')
+
+    try {
+      await linkedProject(dir, PRESETS.server.features, ['auth', 'ui'])
+      await rm(join(dir, '.gitignore'), { force: true })
+
+      if (ignore !== undefined)
+        await writeFile(join(dir, '.gitignore'), ignore)
+
+      await addFeatures(dir, ['auth'], { install: false })
+
+      const lines = (await Bun.file(join(dir, '.gitignore')).text()).split('\n')
+
+      expect(lines.includes('data'), String(ignore)).toBe(wanted)
+    }
+    finally {
+      await rm(join(dir, '..'), { recursive: true, force: true })
+    }
   }
 })
 

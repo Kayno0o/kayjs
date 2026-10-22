@@ -5,9 +5,18 @@ interface Project {
   depends: (name: string) => boolean
 }
 
-const NAME_TAIL = /[^a-z0-9]+/i
+const NAME_TAIL = /[^\p{L}\p{N}]+/u
 const SCOPE = /^@[^/]+\//
-const TABLES = /(export const tables = \[)/
+const TABLES = /(export const tables = \[)(\s*)(\]?)/
+const MAIL_REGISTERED = /\bmail(?:Extension)?\(/
+
+// Puts authTables first in the list: alone in an empty one, on a line of its own in a multi-line one, ahead of the others otherwise.
+function withAuthTables(_match: string, open: string, space: string, close: string): string {
+  if (close !== '')
+    return `${open}...authTables${close}`
+
+  return space.includes('\n') ? `${open}${space}...authTables,${space}` : `${open}...authTables, `
+}
 
 // The site's name for mails and authenticator apps, from the package name.
 function siteName(name: string): string {
@@ -22,10 +31,13 @@ export default function auth(project: Project) {
   // A project kay new scaffolded keeps the tables apart from `db`, so pg-orm.config.ts reads them without building `db`.
   const tablesFile = project.read('src/db/tables.ts')?.includes('export const tables') === true ? 'src/db/tables.ts' : 'src/db/index.ts'
   const mailed = project.exists('src/mail.ts') && project.read('src/mail.ts')?.includes('export const mail') === true
+  // kayjs-mail registered in kay.config.ts brings the wording and views of authMailer; without it the mail library only sends kayjs-auth's own html.
+  const themed = mailed && MAIL_REGISTERED.test(project.read('kay.config.ts') ?? '')
   const imports = [
     'import type { AuthSessionData } from \'@kaynooo/kayjs-auth\'',
     'import { createAuth } from \'@kaynooo/kayjs-auth\'',
     ownDatabase ? 'import { pgStore } from \'@kaynooo/kayjs-auth/pg\'' : 'import { authTables, pgStore } from \'@kaynooo/kayjs-auth/pg\'',
+    ...themed ? ['import { authMailer } from \'@kaynooo/kayjs-mail\''] : [],
     ...ownDatabase ? [] : ['import { Database } from \'@kaynooo/pg-orm\''],
     'import { session } from \'kay/server\'',
     ...ownDatabase ? ['import { db } from \'./db\''] : [],
@@ -41,7 +53,7 @@ export const auth = createAuth({
   sessions: session<AuthSessionData>(),
   store: pgStore(db),
   name: '${siteName(project.name)}',
-  pages: true,${mailed ? '\n  email: { mailer: { send: mail.enqueue } },' : ''}
+  pages: true,${mailed ? `\n  email: { mailer: ${themed ? 'authMailer(mail.enqueue)' : '{ send: mail.enqueue }'} },` : ''}
 })
 `
 
@@ -52,14 +64,14 @@ export const auth = createAuth({
       'src/routes/_guard.ts': 'import { auth } from \'../auth\'\n\n// Every page below needs a signed-in visitor; the sign-in and register pages stay open. Delete this file for a public site, or move it into the folder to protect.\nexport default auth.guard()\n',
     },
     edits: ownDatabase
-      ? [{ file: tablesFile, find: TABLES, replace: '$1...authTables, ', done: '...authTables', import: 'import { authTables } from \'@kaynooo/kayjs-auth/pg\'' }]
+      ? [{ file: tablesFile, find: TABLES, replace: withAuthTables, done: '...authTables', import: 'import { authTables } from \'@kaynooo/kayjs-auth/pg\'' }]
       : [],
     example: ['KAY_SECRET', 'SITE_URL'],
     ignore: ownDatabase ? [] : ['data'],
     extension: { import: 'import { auth } from \'@kaynooo/kayjs-auth\'', expression: 'auth({ module: \'./src/auth\' })' },
     notes: [
       ownDatabase ? 'Run your migration generator (bun run db:generate) for the auth_* tables kayjs-auth added to the tables.' : 'kayjs-auth keeps its users in data/auth.db: point the Database in src/auth.ts at Postgres before production.',
-      ...mailed ? [] : ['Without a mailer, password resets, magic links and verification mails cannot be sent: run `kay add mail` and pass `email: { mailer: { send: mail.enqueue } }` to createAuth.'],
+      ...mailed ? [] : ['Without a mailer, password resets, magic links and verification mails cannot be sent: run `kay add mail` and pass `email: { mailer: authMailer(mail.enqueue) }` to createAuth.'],
       'Set KAY_SECRET and SITE_URL in production.',
     ],
   }

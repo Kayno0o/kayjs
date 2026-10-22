@@ -17,6 +17,7 @@ const CLOSED = /^\s*\]/
 const DEFINE_CONFIG = /defineConfig\(\{[ \t]*\n?/
 const EXTENSIONS = /extensions:\s*\[/
 const NEWLINE = /\r?\n/
+const EDGE_SLASHES = /^\/|\/$/g
 // A `KEY=value` line of a .env file, with the `export ` some write before it.
 const ENV_LINE = /^\s*(?:export\s+)?([A-Za-z_]\w*)\s*=(.*)$/
 const QUOTED = /^(['"])(.*?)\1(?:\s+#.*)?$/
@@ -26,7 +27,8 @@ const INLINE_COMMENT = /\s+#.*$/
 export interface LibraryEdit {
   file: string
   find: RegExp
-  replace: string
+  // A function gets the match and its groups, for an edit whose text depends on the shape it found.
+  replace: string | ((match: string, ...groups: string[]) => string)
   done: string
   import?: string | undefined
 }
@@ -516,8 +518,7 @@ async function installPackages(dir: string, missing: readonly string[], bun: str
 }
 
 // What the project holds for a library to read: the files on disk, as an earlier library of the run is about to change them.
-async function projectOf(dir: string, plan: Plan): Promise<LibraryProject> {
-  const { manifest: onDiskManifest } = await readManifest(dir)
+async function projectOf(dir: string, plan: Plan, onDiskManifest: Manifest): Promise<LibraryProject> {
   const planned = plan.writes.get('package.json')
   const manifest = planned === undefined ? onDiskManifest : JSON.parse(planned) as Manifest
   const held = new Map<string, string | undefined>()
@@ -549,7 +550,7 @@ function applyEdit(edit: LibraryEdit, library: string, plan: Plan, text: string 
   if (text?.includes(edit.done) === true)
     return
 
-  const changed = text === undefined || !edit.find.test(text) ? undefined : text.replace(edit.find, edit.replace)
+  const changed = text === undefined || !edit.find.test(text) ? undefined : text.replace(edit.find, edit.replace as string)
 
   if (changed === undefined) {
     plan.notes.push(`${edit.file} is not the shape ${library} edits: add \`${edit.done}\` to it by hand`)
@@ -562,8 +563,10 @@ function applyEdit(edit: LibraryEdit, library: string, plan: Plan, text: string 
 
 // Asks each installed library what it writes, adding its files, its changes, its extension and its notes to the plan.
 async function planLibraries(dir: string, libraries: readonly string[], plan: Plan): Promise<void> {
+  const { manifest: onDiskManifest } = await readManifest(dir)
+
   for (const library of libraries) {
-    const project = await projectOf(dir, plan)
+    const project = await projectOf(dir, plan, onDiskManifest)
     const feature = await loadLibrary(dir, library, project)
 
     for (const [path, content] of Object.entries(feature.files ?? {})) {
@@ -585,14 +588,13 @@ async function planLibraries(dir: string, libraries: readonly string[], plan: Pl
       mergeExample(project.read('.env.example'), [...Object.keys(feature.env ?? {}), ...feature.example ?? []], plan)
 
     if (feature.ignore !== undefined) {
-      const ignored = project.read('.gitignore')
+      const ignored = project.read('.gitignore') ?? ''
+      // A folder written `/data` or `data/` is as ignored as `data`.
+      const have = new Set(ignored.split(NEWLINE).map(line => line.replace(EDGE_SLASHES, '')))
+      const merged = withLines(ignored, feature.ignore.filter(line => !have.has(line)).join('\n'))
 
-      if (ignored !== undefined) {
-        const merged = withLines(ignored, feature.ignore.join('\n'))
-
-        if (merged !== ignored)
-          plan.writes.set('.gitignore', merged)
-      }
+      if (merged !== ignored)
+        plan.writes.set('.gitignore', merged)
     }
 
     if (feature.extension !== undefined) {

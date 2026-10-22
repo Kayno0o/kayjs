@@ -1,5 +1,7 @@
+import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { routeMounts, scanRoutes } from '../src/server/routes'
+import { fixtureCopy } from './scratch'
 import { pages } from './shared-pages'
 
 const FIXTURE = 'tests/fixtures/outer-layout'
@@ -50,5 +52,18 @@ describe('an extension layout wrapping every page', () => {
 
     expect(routes.map(route => route.pattern).sort()).toEqual(['/', '/own'])
     expect(routes.find(route => route.pattern === '/')!.layouts.map(file => file.split('/').slice(-3).join('/'))).toEqual(['outer/_layout.kay', 'routes/_layout.kay'].map(name => name.startsWith('outer') ? `lib/${name}` : `src/${name}`))
+  })
+
+  it('covers the outer layout\'s actions with the guard on the routes directory', async () => {
+    const root = resolve(await fixtureCopy('outer-layout'))
+    const extensions = routeMounts(root, [{ name: 'outer', layout: join(root, 'lib/outer/_layout.kay') }])
+
+    await Bun.write(join(root, 'src/routes/_guard.ts'), 'export default () => undefined\n')
+
+    const [route] = await scanRoutes(join(root, 'src/routes'), extensions)
+    const [outer] = route!.layoutAccess!
+
+    expect(route!.layouts[0]).toContain('outer')
+    expect(outer!.guards.map(guard => guard.file)).toEqual([join(root, 'src/routes/_guard.ts')])
   })
 })
