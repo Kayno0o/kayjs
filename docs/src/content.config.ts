@@ -29,11 +29,12 @@ export const reference = collection({ name: 'reference', load: async () => [...a
   sort: byOrder,
 })
 
+const part = s.Object({ name: s.String(), on: s.Array(s.Object({ name: s.String(), component: s.Boolean() })), handedTo: s.Array(s.String()) })
 const prop = s.Object({ name: s.String(), type: s.String(), optional: s.Boolean(), default: s.Optional(s.String()), comment: s.Optional(s.String()) })
 
-// One page per kayjs-ui component: its usage from src/content/ui, its props read from its source.
+// One page per kayjs-ui component: its usage from src/content/ui, its props and parts read from its source.
 export const components = collection({ name: 'components', load: () => loadComponents() }, {
-  schema: s.Object({ title: s.String(), order: s.Number(), description: s.String(), props: s.Array(prop) }),
+  schema: s.Object({ title: s.String(), order: s.Number(), description: s.String(), props: s.Array(prop), parts: s.Array(part) }),
   components: { Callout, Demo, ReadMore },
   sort: byOrder,
 })

@@ -7,7 +7,7 @@ export const page = { prerender: components }
 
 const component = await components.get(ctx.params.component) ?? ctx.notFound()
 const { Content } = component
-const { title, description, props } = component.data
+const { title, description, props, parts } = component.data
 const version = (await reference.get('kayjs-ui'))?.data.version
 const sections = [
   ...component.headings.filter(heading => heading.depth === 2 || heading.depth === 3),
@@ -64,4 +64,31 @@ head
       p.spread Attributes it does not declare go onto its root element.
     else
       p It takes no props.
+    if parts.some(part => part.name !== 'root')
+      details.props
+        summary Parts ({parts.length})
+        table
+          thead
+            tr
+              th Part
+              th On
+          tbody
+            for part of parts key={part.name}
+              tr
+                td: code {part.name}
+                td
+                  for target, i of part.on key={target.name}
+                    if i > 0
+                      | ,{' '}
+                    code {target.name}
+                    if target.component
+                      |  (a component)
+                  for call, i of part.handedTo key={call}
+                    if i > 0 || part.on.length > 0
+                      | ;{' '}
+                    | handed to{' '}
+                    code {call}
+      p.spread #[code class] takes a string for the root, or an object of these parts. See #[a(href="/essentials/styling-and-assets/#style-a-part-of-a-component") Style a part of a component].
+    else
+      p.spread It has no part other than its root: #[code class] takes a string. See #[a(href="/essentials/styling-and-assets/#style-a-part-of-a-component") Style a part of a component] for components that have parts.
   Pager(previous={previous} next={next} source={`${libraryRoot('kayjs-ui')}/src/${component.slug}.kay`})

@@ -1,6 +1,8 @@
+import type { Part } from './ui-parts'
 import type { Prop } from './ui-props'
 import { join } from 'node:path'
 import { crossLinked } from './reference'
+import { partsOfComponent } from './ui-parts'
 import { propsOf } from './ui-props'
 
 export interface LibraryReference {
@@ -11,7 +13,7 @@ export interface LibraryReference {
 
 export interface ComponentPage {
   slug: string
-  data: { title: string, order: number, description: string, props: Prop[] }
+  data: { title: string, order: number, description: string, props: Prop[], parts: Part[] }
   body: string
 }
 
@@ -51,7 +53,7 @@ export async function loadLibraries(): Promise<LibraryReference[]> {
   return pages.flat()
 }
 
-// One page per component kayjs-ui ships: its usage from src/content/ui/<slug>.md, and its props read from its source, which `withProps: false` leaves empty for a caller that reads only the usage.
+// One page per component kayjs-ui ships: its usage from src/content/ui/<slug>.md, and its props and parts read from its source, which `withProps: false` leaves empty for a caller that reads only the usage.
 export async function loadComponents({ withProps = true } = {}): Promise<ComponentPage[]> {
   const source = join(PACKAGES, 'kayjs-ui/src')
   const files = [...new Bun.Glob('*.kay').scanSync(source)].sort()
@@ -64,6 +66,6 @@ export async function loadComponents({ withProps = true } = {}): Promise<Compone
     const text = await usage.exists() ? await usage.text() : ''
     const { description = '' } = Bun.YAML.parse(FRONTMATTER.exec(text)?.[1] ?? '') as { description?: string } | null ?? {}
 
-    return { slug, data: { title, order, description, props: props.get(join(source, file)) ?? [] }, body: text.replace(FRONTMATTER, '') }
+    return { slug, data: { title, order, description, props: props.get(join(source, file)) ?? [], parts: withProps ? partsOfComponent(join(source, file)) : [] }, body: text.replace(FRONTMATTER, '') }
   }))
 }

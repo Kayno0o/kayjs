@@ -1,4 +1,5 @@
 import type { RenderedPage } from 'kay/server'
+import { readFileSync } from 'node:fs'
 import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -28,6 +29,8 @@ const KAY_BLOCK = /```kay\n([\s\S]*?)```/g
 const pagesDir = join(root, 'docs/src/content/docs')
 const pageBlocks = (await Promise.all([...new Bun.Glob('**/*.md').scanSync(pagesDir)].toSorted().map(async file => [...(await Bun.file(join(pagesDir, file)).text()).matchAll(KAY_BLOCK)].map((match, index) => [`${file} #${index + 1}`, match[1]!] as const)))).flat()
 const CARD_LINK = /ModuleCard\([^)]*\bhref="([^"]+)"/g
+const PART_ATTRIBUTE = /\bpart="([^"]+)"/g
+const WHITESPACE = /\s+/
 const FRONTMATTER_PATH = /^path: (.+)$/m
 const FENCE = /^```[\s\S]+?^```/gm
 const CLOSED_FENCE = /\n---$/m
@@ -102,6 +105,23 @@ describe('the documentation site', () => {
     expect(props.get('variant')).toMatchObject({ type: '"solid" | "ghost" | "inline"', default: '\'solid\'' })
     expect(props.has('disabled')).toBe(false)
     expect(components.find(component => component.slug === 'table')!.data.props.find(prop => prop.name === 'onSort')!.type).toBe('(sort: SortState) => unknown')
+  })
+
+  // The parts are read by the compiler; this reads `part="..."` again, so a page that lists others than its source writes fails.
+  it('lists the parts each kayjs-ui component names in its source, root first', async () => {
+    const components = await loadComponents()
+    const header = components.find(component => component.slug === 'app-header')!.data.parts
+
+    expect(header.map(part => part.name)).toEqual(['root', 'brand', 'nav', 'end'])
+    expect(header.find(part => part.name === 'nav')!.on).toEqual([{ name: 'SiteNav', component: true }])
+
+    for (const component of components) {
+      const written = new Set([...readFileSync(join(root, `packages/ui/src/${component.slug}.kay`), 'utf8').matchAll(PART_ATTRIBUTE)].map(([, names]) => names!.trim().split(WHITESPACE)[0]!))
+      const listed = component.data.parts.map(part => part.name).filter(name => name !== 'root')
+
+      expect(new Set(listed).has('root'), component.slug).toBe(false)
+      expect(listed.sort(), component.slug).toEqual([...written].filter(name => name !== 'root').sort())
+    }
   })
 
   it('resolves every internal link and anchor of llms/, the docs content, the home page and llms.txt to a page the site serves', async () => {
