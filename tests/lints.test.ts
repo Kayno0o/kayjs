@@ -206,6 +206,37 @@ describe('async-reply', () => {
     expect(lints(server(`// kay-allow async-reply\n${reply}`)).filter(d => d.code === 'async-reply')).toEqual([])
   })
 
+  it('takes a binding named like the import, in any parameter pattern or inside the function, for something else', () => {
+    const found = (body: string) => lints(server(body)).filter(d => d.code === 'async-reply')
+
+    expect(found('export const a = async ({ ask }: { ask: (m: never) => never }, m: never) => ask(m)')).toEqual([])
+    expect(found('export const a = async ([ask]: ((m: never) => never)[], m: never) => ask(m)')).toEqual([])
+    expect(found('export const a = async (...ask: never[]) => (ask as never as (m: never) => never)(1 as never)')).toEqual([])
+    expect(found('export const a = async ({ x: { ask } }: { x: { ask: (m: never) => never } }, m: never) => ask(m)')).toEqual([])
+    expect(found('export const a = async (m: never) => { const ask = (x: never) => x; return ask(m) }')).toEqual([])
+    expect(found('export const a = async (m: never) => { const { ask } = load(); return ask(m) }')).toEqual([])
+    expect(found('export const a = async (m: never) => { function ask(x: never) { return x } return ask(m) }')).toEqual([])
+    expect(found('export const a = async (m: never) => { try { load() } catch (ask) { return ask(m) } }')).toEqual([])
+    expect(found('export const a = async (ai: { ask: (m: never) => never }, m: never) => ai.ask(m)')).toHaveLength(0)
+    expect(lints(server('export const a = async (ai: { ask: (m: never) => never }, m: never) => ai.ask(m)', 'import * as ai from \'@kaynooo/kayjs-ai\'')).filter(d => d.code === 'async-reply')).toEqual([])
+    expect(found('export const a = async (m: never) => { const x = 1; return ask(m) }')).toHaveLength(1)
+  })
+
+  it('reports a local holding the reply and returned, and gives no fix where the returned value may be something else', () => {
+    const found = (body: string) => lints(server(body)).filter(d => d.code === 'async-reply')
+
+    expect(found('export const a = async (m: never) => { const r = ask(m); return r }')).toHaveLength(1)
+    expect(fixed(server('export const a = async (m: never) => { const r = ask(m); return r }'))).toEqual([server('export const a = (m: never) => { const r = ask(m); return r }')])
+    expect(found('export const a = async (m: never) => { const r = ask(m); return await r }')).toEqual([])
+    expect(found('export const a = async (m: never) => { let r = ask(m); r = other(); return r }')).toEqual([])
+    expect(found('export const a = async (m: never) => { const r = other(m); return r }')).toEqual([])
+    expect(found('export const a = async (m: never, x: boolean) => x ? ask(m) : other(m)')).toHaveLength(1)
+    expect(fixed(server('export const a = async (m: never, x: boolean) => x ? ask(m) : other(m)'))).toEqual([])
+    expect(fixed(server('export const a = async (m: never, x: boolean) => { if (x) return ask(m); return other(m) }'))).toEqual([])
+    expect(fixed(server('export const a = async (m: never, x: boolean) => x ? ask(m) : ask(m)'))).toEqual([server('export const a = (m: never, x: boolean) => x ? ask(m) : ask(m)')])
+    expect(fixed(server('export const a = async (m: never, x: never) => x ?? ask(m)'))).toEqual([])
+  })
+
   it('reads a plain module, where an API route is written', () => {
     const route = 'import { ask } from \'@kaynooo/kayjs-ai\'\nimport { api } from \'kay/server\'\n\nexport default api().post(\'/chat\', async ({ body }) => ask(body.messages))\n'
     const found = moduleChecks(route)

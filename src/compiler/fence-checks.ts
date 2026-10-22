@@ -310,31 +310,92 @@ function candidates(node: t.Node): t.Node[] {
   return [node]
 }
 
+// The names a binding pattern declares.
+function patternNames(pattern: t.Node | null | undefined, into: Set<string>): void {
+  if (!pattern)
+    return
+
+  if (pattern.type === 'Identifier') {
+    into.add(pattern.name)
+  }
+  else if (pattern.type === 'AssignmentPattern') {
+    patternNames(pattern.left, into)
+  }
+  else if (pattern.type === 'RestElement') {
+    patternNames(pattern.argument, into)
+  }
+  else if (pattern.type === 'ArrayPattern') {
+    for (const element of pattern.elements) {
+      patternNames(element, into)
+    }
+  }
+  else if (pattern.type === 'ObjectPattern') {
+    for (const property of pattern.properties) {
+      patternNames(property.type === 'RestElement' ? property.argument : property.value, into)
+    }
+  }
+}
+
+interface Body {
+  returned: t.Node[]
+  awaits: boolean
+  // The names the function declares itself, parameters included, and the `const` locals with their initializer.
+  declared: Set<string>
+  consts: Map<string, t.Node>
+}
+
 // What the function itself returns and whether it awaits, its inner functions left alone.
-function returnsAndAwaits(fn: FunctionNode): { returned: t.Node[], awaits: boolean } {
+function returnsAndAwaits(fn: FunctionNode): Body {
   const returned: t.Node[] = fn.body.type === 'BlockStatement' ? [] : [fn.body]
+  const declared = new Set<string>()
+  const consts = new Map<string, t.Node>()
   let awaits = false
 
-  eachNode(fn.body, (node) => {
-    if (isFunction(node))
-      return false
+  for (const param of fn.params)
+    patternNames(param, declared)
 
-    if (node.type === 'ReturnStatement' && node.argument)
+  eachNode(fn.body, (node) => {
+    if (isFunction(node)) {
+      if (node.type === 'FunctionDeclaration' && node.id)
+        declared.add(node.id.name)
+
+      return false
+    }
+
+    if (node.type === 'ReturnStatement' && node.argument) {
       returned.push(node.argument)
-    else if (node.type === 'AwaitExpression' || (node.type === 'ForOfStatement' && node.await))
+    }
+    else if (node.type === 'AwaitExpression' || (node.type === 'ForOfStatement' && node.await)) {
       awaits = true
+    }
+    else if (node.type === 'VariableDeclarator') {
+      patternNames(node.id, declared)
+    }
+    else if (node.type === 'CatchClause') {
+      patternNames(node.param, declared)
+    }
+    else if (node.type === 'ClassDeclaration' && node.id) {
+      declared.add(node.id.name)
+    }
+    else if (node.type === 'VariableDeclaration' && node.kind === 'const') {
+      for (const declaration of node.declarations) {
+        if (declaration.id.type === 'Identifier' && declaration.init)
+          consts.set(declaration.id.name, declaration.init)
+      }
+    }
 
     return true
   })
 
-  return { returned: returned.flatMap(candidates), awaits }
+  return { returned: returned.flatMap(candidates), awaits, declared, consts }
 }
 
-// Whether a parameter of the function is named like the call's callee, so the call is not the import's.
-function shadowed(fn: FunctionNode, call: t.CallExpression): boolean {
-  const name = call.callee.type === 'Identifier' ? call.callee.name : undefined
+// Whether the call's callee, or the namespace it is read from, is declared by the function itself, so the call is not the import's.
+function shadowed(declared: Set<string>, call: t.CallExpression): boolean {
+  const { callee } = call
+  const root = callee.type === 'MemberExpression' ? callee.object : callee
 
-  return name !== undefined && fn.params.some(param => (param.type === 'Identifier' && param.name === name) || (param.type === 'AssignmentPattern' && param.left.type === 'Identifier' && param.left.name === name))
+  return root.type === 'Identifier' && declared.has(root.name)
 }
 
 // An `async` function returning `ask()` from kayjs-ai: the async function awaits the reply, which is a thenable, so the answer arrives as its whole text and the action or `await` block reading it never streams. Without an `await` in it, `async` can go; with one, the reply is returned as `.stream()`.
@@ -369,19 +430,21 @@ export function asyncReplies(fence: ParsedFence): Diagnostic[] {
     if (!isFunction(node) || !node.async || ('generator' in node && node.generator))
       return
 
-    const { returned, awaits } = returnsAndAwaits(node)
+    const { returned, awaits, declared, consts } = returnsAndAwaits(node)
     const keyword = ASYNC_KEYWORD.exec(fence.code.slice(node.start!))
-    const call = returned.find(isAsk)
+    // A local `const` holding the reply and returned is the reply.
+    const values = returned.flatMap(value => value.type === 'Identifier' && consts.has(value.name) ? candidates(consts.get(value.name)!) : [value])
+    const call = values.find(isAsk)
 
-    // A parameter named like the import is something else.
-    if (call && !shadowed(node, call)) {
+    // A binding named like the import is something else.
+    if (call && !shadowed(declared, call)) {
       diagnostics.push({
         ...fence.shift(call),
         code: 'async-reply',
         message: 'This `ask()` is returned from an `async` function, which awaits it: the answer arrives as its whole text, with no streaming',
         note: 'the reply is a thenable async iterable, and an action or an `await` block streams it only when it is returned as it is',
         help: awaits ? 'return `ask(...).stream()`, which an `async` function hands on as it is; `return await ask(...)` says the whole text is meant' : 'remove `async`, or write `return await ask(...)` when the whole text is meant',
-        fixes: !awaits && keyword && !node.returnType ? [{ title: 'Remove `async`', edits: [{ start: fence.offset + node.start! + keyword.index + keyword[0].length - keyword[1]!.length, end: fence.offset + node.start! + keyword[0].length, text: '' }], safe: true }] : [],
+        fixes: !awaits && keyword && !node.returnType && values.every(isAsk) ? [{ title: 'Remove `async`', edits: [{ start: fence.offset + node.start! + keyword.index + keyword[0].length - keyword[1]!.length, end: fence.offset + node.start! + keyword[0].length, text: '' }], safe: true }] : [],
       })
     }
   })
