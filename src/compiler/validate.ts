@@ -527,6 +527,12 @@ class Validator {
       return
     }
 
+    if (element.attributes.some(candidate => candidate.kind === 'spread')) {
+      this.error(attribute.name, `\`bind:${property}\` next to a spread binds nothing`, { note: 'the spread may carry the value and the handler itself, so the element is rendered from its props', help: 'bind on a child element, or write the value and the handler' })
+
+      return
+    }
+
     const event = bindEvent(element, property)
     const handler = element.attributes.find(candidate => candidate.kind !== 'spread' && this.text(candidate.name) === event) as NamedAttribute | undefined
 

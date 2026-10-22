@@ -316,6 +316,13 @@ describe('elements', () => {
     expect(errors('input(bind:name={v})')).toEqual([expect.stringContaining('is not supported')])
   })
 
+  it('refuses bind: on an element that also spreads', () => {
+    for (const attribute of ['bind:value={v}', 'type="checkbox" bind:checked={v}', 'type="radio" bind:group={v}', 'type="file" bind:files={v}'])
+      expect(errors(`input(${attribute} {...rest})`)).toEqual([expect.stringContaining('next to a spread binds nothing')])
+
+    expect(errors('details(bind:open={v} {...rest})')).toEqual([expect.stringContaining('next to a spread binds nothing')])
+  })
+
   it('keeps a transition on an element, its phases named as they are, and refuses one on a component', () => {
     expect(jsx('p(transition="fade" transition:leave-to="opacity-0") x')).toBe('<p transition="fade" transition:leave-to="opacity-0">x</p>')
     expect(errors('Card(transition="fade")')).toEqual(['`transition` animates an element, not a component'])
