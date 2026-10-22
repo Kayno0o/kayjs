@@ -712,3 +712,14 @@ Each `testSite` keeps its own cookies. `memoryAuthStore()` keeps each test's use
 Under `kay dev`, the dev tool has an Auth tab with nothing to set up. It shows who is signed in, how, and their roles, with a Sign out button.
 
 <ReadMore href="/llms/kayjs-auth">Every option, error code, passkeys, API gates, roles and the full store contract are in the kayjs-auth reference.</ReadMore>
+
+## Reference
+
+Topics of the kayjs-auth reference the sections above do not link:
+
+- [Setup, pages, the signed-in user, sessions and guards](/llms/kayjs-auth-setup)
+- [OAuth sign-in, two-factor, passkeys, re-proof and the account](/llms/kayjs-auth-oauth-passkeys-two-factor)
+- [Passwords, guests, mailed links and security mails](/llms/kayjs-auth-passwords-and-mails)
+- [The OAuth server for MCP clients, bearer tokens and forward auth](/llms/kayjs-auth-oauth-server-and-tokens)
+- [Events, the audit log, admin and organizations](/llms/kayjs-auth-admin-and-organizations)
+- [Bots, breached passwords, limits, stores, testing and the dev tool](/llms/kayjs-auth-hardening-and-testing)

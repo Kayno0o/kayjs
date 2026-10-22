@@ -373,3 +373,9 @@ Under `kay dev`, the dev tool has a Mail tab with nothing to set up. It lists th
 The mails are kept in `.kay` for your checkout, the last 500, so they are still there after you refresh the page and after `kay dev` restarts the server for an edit. Clear in the tab empties the list and the file. Under `bun test` and in production the outbox stays in memory, so each test run starts empty. The file holds each mail in full, reset links included, so keep `.kay` out of git.
 
 <ReadMore href="/llms/kayjs-mail-writing-and-sending">Every message field, the queue's retry options, the settings and the full contact form are in the kayjs-mail reference.</ReadMore>
+
+## Reference
+
+Topics of the kayjs-mail reference the sections above do not link:
+
+- [The contact form, testing, development and kayjs-auth](/llms/kayjs-mail-contact-form-and-testing)

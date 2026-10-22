@@ -147,7 +147,7 @@ export default defineMessages({
 
 Your own key wins over the French kayjs-ui ships, and a prop you pass to one component still replaces the message for that component. The months and days a chart draws follow the page's locale too.
 
-<ReadMore href="/llms/kayjs-ui">Every `ui.*` key and its English is in the full kayjs-ui reference.</ReadMore>
+<ReadMore href="/llms/kayjs-ui-words">Every `ui.*` key and its English is in the full kayjs-ui reference.</ReadMore>
 
 ## Components
 
@@ -168,3 +168,13 @@ Media: [MediaGallery](/ui/media-gallery), [Carousel](/ui/carousel), [ZoomPane](/
 Drag and drop (`Sortable`, `Board`, `DropTargets`) comes from `@kaynooo/kayjs-ui/dnd` and is in the full reference. A move by arrow key is said to screen readers: where the item landed, as `Moved to 2 of 3`. A handle with no label or text of its own is named `Reorder` and the item's label or text, such as `Reorder Milk`, without the text of the buttons beside it, and it follows the item's text when that changes; give it an `aria-label` to say more.
 
 <ReadMore href="/llms/kayjs-ui">Every component's props, forms with FormDialog, drag and drop, label translation and testing are in the full kayjs-ui reference.</ReadMore>
+
+## Reference
+
+Topics of the kayjs-ui reference the sections above do not link:
+
+- [Setup, settings and testing](/llms/kayjs-ui-setup)
+- [Icons, buttons, toasts, dialogs, cards, popovers and stats](/llms/kayjs-ui-basics)
+- [Inputs, selects, editors and forms](/llms/kayjs-ui-forms)
+- [Tables, tabs, pagination, page layout, command palette and trees](/llms/kayjs-ui-tables-navigation-and-layout)
+- [Charts, drag and drop, galleries and image tools](/llms/kayjs-ui-charts-drag-and-media)

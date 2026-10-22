@@ -426,7 +426,7 @@ Replacing or removing a file leaves the old upload stored. The unused-uploads sc
 
 Check each upload before you confirm. A URL written by hand in a page, or a file outside the collections, is not seen as a use.
 
-<ReadMore href="/llms/kayjs-cms">Which uploads the unused-uploads screen holds back, and when it lists nothing.</ReadMore>
+<ReadMore href="/llms/kayjs-cms-uploads">Which uploads the unused-uploads screen holds back, and when it lists nothing.</ReadMore>
 
 ## Pages visitors cannot find
 
@@ -470,7 +470,7 @@ kayjs-cms ships the French of all of them. A site whose locale is `fr` shows Fre
 
 A key a locale lacks reads the English, and `kay check` leaves the `cms` keys out of its comparison between locales. The API's refusals are worded in the locale of the page that called.
 
-<ReadMore href="/llms/kayjs-cms">Every `cms.*` key and its English is in the full kayjs-cms reference.</ReadMore>
+<ReadMore href="/llms/kayjs-cms-words">Every `cms.*` key and its English is in the full kayjs-cms reference.</ReadMore>
 
 ## Raw HTML in a body
 
@@ -767,3 +767,19 @@ An island marked `persist` keeps its state when the page refreshes in place and 
 Under `kay dev`, the dev tool has a CMS tab with nothing to set up. It says whether you are in edit mode. One button takes you into edit mode on the page you are viewing, as long as the guard lets you in, and another leaves it. The tab speaks the page's language, from the `cms.dev.*` words. You can reword them like the other `cms` words.
 
 <ReadMore href="/llms/kayjs-cms">Every option, the CMS API and the rules that are easy to get wrong are in the full kayjs-cms reference.</ReadMore>
+
+## Reference
+
+Topics of the kayjs-cms reference the sections above do not link:
+
+- [Setup and saving files](/llms/kayjs-cms-setup)
+- [Options of cms()](/llms/kayjs-cms-options)
+- [The editor on the page](/llms/kayjs-cms-editor)
+- [The admin screens](/llms/kayjs-cms-admin)
+- [Arranging and replacing the screens](/llms/kayjs-cms-screens)
+- [History, the trash and the activity log](/llms/kayjs-cms-history)
+- [Loaders and a live CMS](/llms/kayjs-cms-loaders)
+- [Edit this page link](/llms/kayjs-cms-page-links)
+- [Field kinds and entering a field](/llms/kayjs-cms-fields)
+- [Form fields and drafts](/llms/kayjs-cms-api)
+- [Renaming an entry's slug](/llms/kayjs-cms-rename)

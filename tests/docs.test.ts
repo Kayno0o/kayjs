@@ -71,6 +71,16 @@ describe('the documentation site', () => {
     expect(pages.find(page => page.slug === 'whats-new')!.body).toContain('](/llms/kayjs-cms-')
   })
 
+  it('links every topic page of a library from its guide', async () => {
+    const libraries = await loadLibraries()
+
+    for (const topic of libraries.filter(library => library.data.source !== 'llms.txt')) {
+      const guide = await Bun.file(join(pagesDir, 'libraries', `${topic.data.library}.md`)).text()
+
+      expect(guide.includes(`/llms/${topic.slug}"`) || guide.includes(`/llms/${topic.slug})`), `the ${topic.data.library} guide links /llms/${topic.slug}`).toBe(true)
+    }
+  })
+
   it('gives each library its full reference, and each kayjs-ui component a page with its usage and the props it declares', async () => {
     const components = await loadComponents()
     const button = components.find(component => component.slug === 'button')!
