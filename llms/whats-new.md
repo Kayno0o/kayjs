@@ -85,46 +85,5 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui: a `Breadcrumb` nav with `aria-current`, a phone collapse and optional `BreadcrumbList` JSON-LD ([Navigation](../packages/ui/llms/tables-navigation-and-layout.md)).
 
 The rest of this release is in [What's new, older releases](whats-new-archive.md).
-- Every duration is a `Duration` string, `'5m'` or `'250ms'`, never a bare number: `kay check --fix` rewrites the old ones (`deprecated-bare-duration`) ([Lints](lints.md), [Upgrading](upgrading.md)).
-- kayjs-cms: the admin logo is set in the cms settings module as `{ src, alt, width?, height? }`, like kayjs-mail's, whose `width` is now optional; `cms({ logo })` works until 1.73 ([Options](../packages/cms/llms/options.md)).
-- `s.Public(...)` on a `defineEnv` field lets an island read it as `publicEnv`, with no config key; `publicEnv` in kay.config.ts is deprecated ([Environment](environment.md)).
-- `kay dev` sets the site to `http://localhost:<port>` when `SITE_URL` is unset, so kayjs-auth OAuth and mailed links need no `SITE_URL` in development ([Head](head.md)).
-- One `KAY_SECRET` seals sessions, signs stamps and private links and keys preview; `SITE_URL` is the one public origin, which kayjs-auth and kayjs-mail build on; `MAIL_URL` replaces the `SMTP_*` server variables, the sender defaulting to `noreply@` the site's host; `kay env --write` fills `.env.example` and `kay check` compares compose files by default, which `env: false` turns off ([Environment](environment.md), [Upgrading](upgrading.md)).
-- An action reads its outcome as `add.failed()` and `add.succeeded()`, and `ActionError` extends `ApiError` ([Reading the outcome](actions.md#reading-the-outcome)).
-- A static page hands an island a declared `Column<Row>[]` written out as literals, and `kay check` names the function field of a prop it refuses, `[].sortValue` ([Props to an island](islands.md#props-to-an-island)).
-- Exports that clashed across libraries are renamed (`memoryAuthStore`, `MailSettings`, `mailDefaults`, `UiSettings`, `uiDefaults`, `AuthMailer`...), and kayjs-cms's `postgresLoader` is `pgLoader` of `@kaynooo/kayjs-cms/pg`: `kay check --fix --since 1.70` renames the old ones ([Upgrading](upgrading.md)).
-- A page of a site without `i18n` sets its own `<html lang>` with `html(lang="fr")` in its `head`, `dir` following ([Head](head.md#head)).
-- kayjs-auth and kayjs-mail word their texts through `wording()` with the English in the code and ship only the French, keys unchanged, so an app's own `src/messages/en.ts` still overrides them and a default locale needs no catalog while a library ships one ([Texts](component-libraries.md)).
-- kayjs-ai's chat words its texts through `ai.chat.*` messages and ships the French, with every `*Label` prop still overriding ([kayjs-ai](libraries/kayjs-ai.md)).
-- The session cookie is `kay_session`, kayjs-auth's page ids are `kauth-*` and the cms edit link attribute is `data-kcms-edit-page`; [upgrading](upgrading.md).
-- `kay check` reports a `readonly` property or array element holding no signal assigned in a script, as plain code does, and types a generic target's `+=` and `++` ([Assigning](components.md)).
-- kayjs-ui `Progress` is a progress bar taking an upload's `progress()`, indeterminate without a value ([Progress](../packages/ui/llms/basics.md)).
-- kayjs-ui `Progress` is a progress bar with `value` and `max`, indeterminate without a value ([Progress](../packages/ui/llms/basics.md)).
-- kayjs-ui `Skeleton` is a placeholder for a pending block, as text lines, an avatar or a card, still under reduced motion ([Skeleton](../packages/ui/llms/basics.md)).
-- kayjs-ui `Accordion` groups collapsible sections, one open at a time or several, with arrow keys between headers ([Accordion](../packages/ui/llms/tables-navigation-and-layout.md)).
-- `site` is the origin everywhere: kayjs-auth's `createAuth({ site, name })` takes kay's own `site` by default and `url` goes ([kayjs-auth](../packages/auth/llms/setup.md)); `kay upgrade` renames the old form.
-- kayjs-ui: DateInput, DateRangeInput and TimeInput ([Forms](../packages/ui/llms/forms.md)).
-- kayjs-ui's Card, Button, Table and more restyle from `src/ui.ts` ([Setup](../packages/ui/llms/setup.md)).
-- kayjs-ui adds Combobox, loaded as you type, and Steps for multi-step forms ([Forms](../packages/ui/llms/forms.md), [Forms and Steps](../packages/ui/llms/forms-and-steps.md)).
-- kayjs-ui's Card, Button, Table, kayjs-ai's Chat and more restyle from `src/ui.ts` ([Setup](../packages/ui/llms/setup.md)).
-- kayjs-ui: `Slider` is a single-value range input with a label, a shown value worded by `formatValue` and a `name` that posts in a plain form, drawn from the theme tokens ([Slider](../packages/ui/llms/forms.md#rangeinput-slider-multiselect-combobox-filedrop-menu-iconpicker)).
-- kayjs-ui: `Segmented(orientation="vertical")` stacks its options in a column ([Segmented](../packages/ui/llms/tables-navigation-and-layout.md#segmented-chipgroup-tabnav-breadcrumb-sitenav-appheader-tabs-toggle-checkbox)).
-- kayjs-ui: `Button(spinner={false})` keeps its label and icon while it is busy and still disables itself, where `busy={false}` also switched the disabling off ([Button](../packages/ui/llms/basics.md#icon-button-iconbutton)).
-- kayjs-ui: `Stat(variant="tile")` is a framed box with the figure above its label, and `Stat(tone)` colours the figure ([Stat](../packages/ui/llms/basics.md#stat-meter-progress-skeleton-barlist-sitefavicon-copybutton-rating)).
-- kayjs-ui: `Button(pressed)` makes a toggle button, writing `aria-pressed` and drawing an accent keyline while on, and `tone="success"` joins `accent` and `danger` ([Button](../packages/ui/llms/basics.md#icon-button-iconbutton)).
-- kayjs-ui: `Dialog(size="sm"|"md"|"lg"|"full")` sets its width, `full` its height too, and `Dialog(bare)` drops the body inset and scroll for content that fills it ([Dialog](../packages/ui/llms/basics.md#dialog-confirmdelete)).
-- kayjs-ui `Select` takes `busy` (`loading` still works), callback props accept any return type, `SiteNav` and `AppHeader` take `current` as a URL too, and the HoverCard anchors through a top-layer stand-in so a transformed ancestor or an own `anchor-name` no longer misplaces it ([upgrading](./upgrading.md)).
-- `kay add auth` sends mails through `authMailer(mail.enqueue)` once `mail({ module })` is registered, creates a missing `.gitignore` for `data`, and edits an empty or multi-line `tables` list; the ui() shell declares tailwind's layer order, so a utility passed through `class` beats a component's rule ([Project and add](project-new-and-add.md)).
-- kayjs-ui `HoverCard` anchors a card to an element chosen at run time, an SVG shape included, and ZoomPane takes `onChange({ scale, x, y })` and `least` so what stands on its plate can follow it ([HoverCard](../packages/ui/llms/basics.md)).
-- `mountComponent(Toggle, props)` of `kay/test` takes the imported component, its props typed; the path form is deprecated ([Testing](testing.md)).
-- `persisted(name, value, { storage: 'query', values })` reads a param outside `values` as the default and types the signal as their union ([Islands](islands.md)).
-- kayjs-ui's `TooltipHost` shows a `data-hint` under the pointer, a hover explanation of read-only text that `unreachable-tooltip` leaves alone ([Icons, buttons, toasts, dialogs](../packages/ui/llms/basics.md)).
-- `innerHTML={waves}` takes a project file imported as text, `import waves from './waves.svg' with { type: 'text' }`, with no `trustHtml` ([Templates](templates.md)).
-- `unannounced-click` leaves a `dialog` or `alertdialog` role, or `aria-modal` other than `"false"`, alone, as a backdrop closing on a click is a pointer shortcut for Escape ([Checks](checks.md)).
-- An `await` block with no `catch` renders the `catch` of the `try` around it when its value rejects, streamed or not, and `uncaught-await` only warns without one; with no `try` the error is reported at the `await` line ([Streaming](rendering.md#streaming), [Error fallbacks](islands.md#error-fallbacks)).
-- A snippet called with a loop row is drawn again when a new copy of the row replaces the old one, a component updates its nodes in place ([Snippets](templates.md#snippets)).
-- A `pg-orm.config.ts` may import the app's `db` module: `kay/test/preload` loads the project modules the config pulled in again once the test database exists, so the tests never run on the original one ([Test databases and setup](testing-setup.md)).
-- [Recipes](recipes.md) build a database CRUD, a dashboard behind sign-in with roles, and a blog with tags, RSS and a sitemap, each with its test.
-- kayjs-auth names its methods `list*`, `get*`, `revoke*` and `delete*` (`listSessions()`, `getOrganization(ref)`, `revokeSession(id)`, `revokeBearerToken(id)`, `updatePasskeyName`, `rejectInvitation` and `updateLocale` answering `{ ok }`), the old names kept three minors ([Setup](../packages/auth/llms/setup.md)).
 
 Releases before 1.70 are in [What's new, older releases](whats-new-archive.md).
