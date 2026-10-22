@@ -1,4 +1,5 @@
 import type { SocketOf } from '../src/runtime/live'
+import type { Rooms } from '../src/server/rooms'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -7,7 +8,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { TypeCompiler } from 'elysia/type-system'
 import { s } from '../src/runtime'
 import { api } from '../src/server/api'
-import type { Rooms } from '../src/server/rooms'
 import { memoryRooms, rooms, sqliteRooms } from '../src/server/rooms'
 
 interface State { round: number, scores: Record<string, number>, at?: Date }

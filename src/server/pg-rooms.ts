@@ -86,6 +86,12 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
     return run
   }
 
+  // Waits for the room's lock for 5 seconds at most, so a stuck update elsewhere fails this one rather than holding the store's writes, the heartbeat's included.
+  const lockRoom = async (tx: SQL, room: string) => {
+    await query(tx, 'SET LOCAL lock_timeout = \'5s\'')
+    await query(tx, 'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`kay_room_state\n${room}`])
+  }
+
   // The states of rooms with no member left.
   const dropStates = async (db: SQL) => {
     await query(db, 'DELETE FROM kay_room_state s WHERE NOT EXISTS (SELECT 1 FROM kay_room_members m WHERE m.room = s.room)')
@@ -253,7 +259,11 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
       sync()
       enqueue('removing a member from the rooms store', async (db) => {
         await query(db, 'DELETE FROM kay_room_members WHERE room = $1 AND connection = $2', [room, connection])
-        await dropStates(db)
+        // Under the room's lock, so an update storing a state for the member that just left finishes first.
+        await db.begin(async (tx) => {
+          await lockRoom(tx, room)
+          await query(tx, 'DELETE FROM kay_room_state WHERE room = $1 AND NOT EXISTS (SELECT 1 FROM kay_room_members WHERE room = $1)', [room])
+        })
       })
     },
     async state(room) {
@@ -264,15 +274,13 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
     // The transaction's advisory lock makes updates of one room wait for each other across replicas, a room with no row yet included.
     async update(room, change) {
       return ordered(async db => db.begin(async (tx) => {
-        await query(tx, 'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`kay_room_state\n${room}`])
+        await lockRoom(tx, room)
 
         const [row] = await query<{ state: string }>(tx, 'SELECT state FROM kay_room_state WHERE room = $1', [room])
         const next = change(row?.state)
-        const [held] = await query<{ present: boolean }>(tx, `SELECT EXISTS (SELECT 1 FROM kay_room_members m JOIN kay_room_processes p ON p.process = m.process WHERE m.room = $1 AND p.seen > ${NOW} - ${EXPIRY}) AS present`, [room])
 
         // A room no live process has a member in keeps nothing, so a room named by a client costs no row.
-        if (held?.present === true)
-          await query(tx, 'INSERT INTO kay_room_state (room, state) VALUES ($1, $2) ON CONFLICT (room) DO UPDATE SET state = excluded.state', [room, next])
+        await query(tx, `INSERT INTO kay_room_state (room, state) SELECT $1, $2 WHERE EXISTS (SELECT 1 FROM kay_room_members m JOIN kay_room_processes p ON p.process = m.process WHERE m.room = $1 AND p.seen > ${NOW} - ${EXPIRY}) ON CONFLICT (room) DO UPDATE SET state = excluded.state`, [room, next])
 
         return next
       }))
@@ -324,11 +332,12 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
       listeners.clear()
       own.clear()
 
-      if (had)
+      if (had) {
         enqueue('leaving the rooms store', async (db) => {
           await query(db, 'DELETE FROM kay_room_members WHERE process = $1', [self])
           await dropStates(db)
         })
+      }
     },
   }
 

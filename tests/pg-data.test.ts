@@ -392,6 +392,33 @@ pgDescribe('pgRooms', () => {
     store.close()
   })
 
+  pgIt('sends an async coalesce snapshot, and no snapshot to a joiner that left while the state was read', async () => {
+    await fresh()
+
+    const [handle] = handles(1)
+    const store = pgRooms(handle!, { poll: '20ms' })
+    const live = rooms<string, undefined, { count: number }>({ store, state: () => ({ count: 0 }), snapshot: state => `snap${state.count}` })
+    const received: string[] = []
+    const ada = { raw: { sendText: (text: string) => void received.push(text) } }
+
+    live.join(ada, 'lobby')
+    live.leave(ada)
+    await Bun.sleep(150)
+    expect(received).toEqual([])
+    live.join(ada, 'lobby')
+    await waitFor(() => received.length === 1, 'the snapshot')
+
+    const send = live.coalesce(async room => `now${(await live.state(room)).count}`, { wait: '10ms' })
+
+    await live.update('lobby', () => ({ count: 4 }))
+    send('lobby')
+    send('lobby')
+    await waitFor(() => received.length === 2, 'the coalesced snapshot')
+    await Bun.sleep(100)
+    expect(received).toEqual(['snap0', 'now4'])
+    store.close()
+  })
+
   pgIt('rejects an update whose function throws and keeps the old state', async () => {
     await fresh()
 

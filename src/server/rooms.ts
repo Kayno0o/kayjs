@@ -121,7 +121,7 @@ export function rooms<Message, Member, State>(...[options = {}]: [options?: Room
 
     return (text === undefined ? undefined : JSON.parse(text)) as State
   }
-  const readState = (room: string) => after(store.state!(room), kept => (kept === undefined ? initial() : JSON.parse(kept) as State))
+  const readState = (room: string): State | Promise<State> => after(store.state!(room), kept => (kept === undefined ? initial() : JSON.parse(kept) as State))
   // The connections of this process in each room, by their id, with their member as JSON, or empty without one.
   const local = new Map<string, Map<string, { raw: RoomConnection['raw'], member: string }>>()
   const ids = new WeakMap<object, string>()
@@ -179,7 +179,11 @@ export function rooms<Message, Member, State>(...[options = {}]: [options?: Room
 
       // The member is listed first, so a change made while it joins reaches it as the snapshot or as what is published after.
       if (options.snapshot) {
-        const send = (state: State) => ws.raw.sendText(messageText(options.snapshot!(state, room)))
+        // A connection that left while an async state was read gets nothing.
+        const send = (state: State) => {
+          if (local.get(room)?.has(id))
+            ws.raw.sendText(messageText(options.snapshot!(state, room)))
+        }
         const sent = after(readState(room), send)
 
         if (sent instanceof Promise)
@@ -193,7 +197,7 @@ export function rooms<Message, Member, State>(...[options = {}]: [options?: Room
     roomsOf: ws => [...joined.get(ws.raw) ?? []],
     members: room => store.members(room).map(member => (member === NO_MEMBER ? undefined : JSON.parse(member)) as Member),
     state: readState,
-    update: (room, change) => after(store.update!(room, (kept) => {
+    update: (room, change): State | Promise<State> => after(store.update!(room, (kept) => {
       const next = JSON.stringify(change(kept === undefined ? initial() : JSON.parse(kept) as State))
 
       if (next === undefined)
@@ -230,11 +234,7 @@ export function rooms<Message, Member, State>(...[options = {}]: [options?: Room
 
 // What `next` makes of a value, at once for a value and once it resolved for a promise, so a sync store stays sync.
 function after<T, R>(value: T | Promise<T>, next: (value: T) => R): R | Promise<R> {
-  if (value instanceof Promise) {
-    return (async () => next(await value))()
-  }
-
-  return next(value)
+  return value instanceof Promise ? (async () => next(await value))() : next(value)
 }
 
 // Awaits a promise nobody else holds, its error logged.
