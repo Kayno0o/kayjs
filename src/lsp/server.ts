@@ -5,7 +5,7 @@ import type { ShadowFile, SpanMode } from '../check/shadow'
 import type { Diagnostic as KayDiagnostic } from '../compiler'
 import type { Span } from '../compiler/ast'
 import type { KayConfig } from '../config'
-import type { RouteMount } from '../server/routes'
+import type { Route, RouteMount } from '../server/routes'
 import type { ComponentInterface } from './component-props'
 import type { CodeAction, CodeActionParams, CodeLens, CompletionItem, CompletionList, Diagnostic, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, DocumentLink, DocumentSymbol, FileEvent, FoldingRange, Hover, InitializeParams, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, WorkspaceEdit } from './protocol'
 import type { TemplateData, Wanted } from './template-completion'
@@ -32,12 +32,13 @@ import { analyzeScript, analyzeServer } from '../compiler/script'
 import { CONFIG_FILE, loadConfig } from '../config'
 import { tailwindSorter } from '../format/tailwind'
 import { projectPaths, projectRootOf, SHADOW_DIR } from '../project'
-import { routeMounts } from '../server/routes'
+import { routeMounts, scanRoutes } from '../server/routes'
 import { componentInterface } from './component-props'
 import { islandLens } from './island-lens'
 import { documentSymbols, foldingRanges } from './outline'
 import { toOffset, toPosition } from './positions'
 import { importEdits, importSpecifiers, moduleImportEdits } from './renames'
+import { routeLinks } from './route-links'
 import { Connection } from './rpc'
 import { templateContext, templateItems } from './template-completion'
 
@@ -70,7 +71,7 @@ interface Project {
   types?: ShadowTypes
   configured: boolean
   // What template completion looked up, dropped on a save and when the config is read again: the route table, the message catalog, the interface of each component read from disk and the props TypeScript gives a tag.
-  lookups: { paths?: Promise<string[]>, messages?: Promise<string[]>, interfaces: Map<string, ComponentInterface | undefined>, typedProps: Map<string, Promise<ComponentInterface['props'] | undefined>> }
+  lookups: { paths?: Promise<string[]>, messages?: Promise<string[]>, routes?: Promise<Route[]>, interfaces: Map<string, ComponentInterface | undefined>, typedProps: Map<string, Promise<ComponentInterface['props'] | undefined>> }
 }
 
 interface Document extends ShadowFile {
@@ -189,7 +190,7 @@ export class KayLanguageServer {
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/formatting', async ({ textDocument }) => this.format(textDocument.uri))
     client.onRequest<CodeActionParams>('textDocument/codeAction', async params => this.codeActions(params))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/documentSymbol', ({ textDocument }) => this.symbols(textDocument.uri))
-    client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/documentLink', ({ textDocument }) => this.links(textDocument.uri))
+    client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/documentLink', async ({ textDocument }) => this.links(textDocument.uri))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/foldingRange', ({ textDocument }) => this.folds(textDocument.uri))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/codeLens', ({ textDocument }) => this.lenses(textDocument.uri))
     client.onRequest<{ files: { oldUri: string, newUri: string }[] }>('workspace/willRenameFiles', async ({ files }) => inWalkScope(async () => this.renamedFiles(files)))
@@ -828,10 +829,10 @@ export class KayLanguageServer {
   }
 
   // A lookup kept until the next save, forgotten when it fails so the next completion asks again; only its own failed promise is dropped, not a newer one a save put there.
-  private async remembered(lookups: Project['lookups'], key: 'paths' | 'messages', ask: () => Promise<string[]>): Promise<string[]> {
-    const kept = lookups[key] ?? ask()
+  private async remembered<Key extends 'paths' | 'messages' | 'routes'>(lookups: Project['lookups'], key: Key, ask: () => Promise<Awaited<NonNullable<Project['lookups'][Key]>>>): Promise<Awaited<NonNullable<Project['lookups'][Key]>>> {
+    const kept = (lookups[key] ?? ask()) as Promise<Awaited<NonNullable<Project['lookups'][Key]>>>
 
-    lookups[key] = kept
+    lookups[key] = kept as Project['lookups'][Key]
 
     try {
       return await kept
@@ -967,19 +968,34 @@ export class KayLanguageServer {
     return islandLens(document.source, path, { route, insideIsland: project.islandOnly.has(path), signals: importedSignals(path, document.source) })
   }
 
-  // The files a relative import names, so the editor opens them from the specifier.
-  private links(uri: string): DocumentLink[] {
+  // The files a relative import names, and the pages the route paths written in the text lead to, so the editor opens them from the specifier or the path.
+  private async links(uri: string): Promise<DocumentLink[]> {
     const document = this.documents.get(uri)
 
     if (!document)
       return []
 
-    return importSpecifiers(document.source).flatMap((span) => {
+    const range = (span: Span) => ({ start: toPosition(document.source, span.start), end: toPosition(document.source, span.end) })
+    const imports = importSpecifiers(document.source).flatMap((span) => {
       const specifier = document.source.slice(span.start, span.end)
       const target = specifier.startsWith('.') ? resolveFrom(specifier, document.file) : undefined
 
-      return target === undefined ? [] : [{ range: { start: toPosition(document.source, span.start), end: toPosition(document.source, span.end) }, target: this.clientUri(target) }]
+      return target === undefined ? [] : [{ range: range(span), target: this.clientUri(target) }]
     })
+    const project = this.projectAt(projectRootOf(document.file, this.root))
+    const routes = await this.routeTable(project)
+
+    return [...imports, ...routeLinks(document.source, routes, project.locales).map(link => ({ range: range(link), target: this.clientUri(link.file) }))]
+  }
+
+  // The pages of the project, none while its route files are ones the router refuses, which `kay check` reports itself.
+  private async routeTable(project: Project): Promise<Route[]> {
+    try {
+      return await this.remembered(project.lookups, 'routes', async () => scanRoutes(project.routesDir, project.mounts))
+    }
+    catch {
+      return []
+    }
   }
 
   private folds(uri: string): FoldingRange[] {

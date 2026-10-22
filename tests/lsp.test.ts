@@ -1730,3 +1730,80 @@ describe('kay lsp lookup caches', () => {
     expect(lookups.typedProps.get(key)).toBe(fresh)
   })
 })
+
+const LINKS_PAGE = [
+  'a(href="/about") About',
+  'a(href="/posts/42/") Post',
+  'a(href="/posts/new") New',
+  'a(href="/nowhere") Missing',
+  'a(href="/blog/about") Based',
+  'a(href="https://example.com/about") Out',
+  'a(href={`/posts/${1}`}) Built',
+  'a(title="😀é" href="/about?x=1#top") Unicode',
+  'form(action="/docs/a/b")',
+  '',
+].join('\n')
+
+describe('kay lsp editor features of an app under a base', () => {
+  let editor: Editor
+  let dir: string
+
+  beforeAll(async () => {
+    dir = await scratchDir('lsp-features-')
+    await Promise.all([
+      Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
+      Bun.write(join(dir, 'kay.config.ts'), 'export default { base: \'/blog\', trailingSlash: \'always\' }\n'),
+      Bun.write(join(dir, 'src/routes/index.kay'), 'p Home\n'),
+      Bun.write(join(dir, 'src/routes/about.kay'), 'p About\n'),
+      Bun.write(join(dir, 'src/routes/posts/[id].kay'), 'p Post\n'),
+      Bun.write(join(dir, 'src/routes/posts/new.kay'), 'p New\n'),
+      Bun.write(join(dir, 'src/routes/docs/[...path].kay'), 'p Docs\n'),
+      Bun.write(join(dir, 'src/routes/links.kay'), LINKS_PAGE),
+      Bun.write(join(dir, 'src/routes/broken.kay'), 'ul\n  for of [1, 2]\n    li x\na(href="/about") About\n'),
+      Bun.write(join(dir, 'src/routes/empty.kay'), ''),
+    ])
+    editor = new Editor(dir)
+    await editor.start()
+  })
+
+  afterAll(async () => {
+    await editor.stop()
+    await rm(dir, { recursive: true, force: true })
+  })
+
+  const request = async <Result>(method: string, path: string, params: object = {}) => editor.connection.request<Result>(method, { textDocument: { uri: editor.uri(path) }, ...params })
+
+  describe('route links', () => {
+    it('links route paths to the pages serving them, params, catch-alls and a trailing slash included', async () => {
+      await editor.open('src/routes/links.kay')
+
+      const links = await request<DocumentLink[]>('textDocument/documentLink', 'src/routes/links.kay')
+
+      expect(links.map(link => [link.range.start.line, link.range.start.character, link.range.end.character, decodeURIComponent(link.target.slice(editor.uri('').length + 1))])).toEqual([
+        [0, 8, 14, 'src/routes/about.kay'],
+        [1, 8, 18, 'src/routes/posts/[id].kay'],
+        [2, 8, 18, 'src/routes/posts/new.kay'],
+        // The range starts past the emoji, which count two UTF-16 units each in the editor.
+        [7, 20, 26, 'src/routes/about.kay'],
+        [8, 13, 22, 'src/routes/docs/[...path].kay'],
+      ])
+    })
+
+    it('leaves a path nothing serves, one under the base, an outside link and a built path unlinked', async () => {
+      const links = await request<DocumentLink[]>('textDocument/documentLink', 'src/routes/links.kay')
+
+      expect(links.map(link => link.range.start.line)).not.toContain(3)
+      expect(links.map(link => link.range.start.line)).not.toContain(4)
+      expect(links.map(link => link.range.start.line)).not.toContain(5)
+      expect(links.map(link => link.range.start.line)).not.toContain(6)
+    })
+
+    it('links a file with a syntax error and gives an empty file none', async () => {
+      await editor.open('src/routes/broken.kay')
+      await editor.open('src/routes/empty.kay')
+
+      expect((await request<DocumentLink[]>('textDocument/documentLink', 'src/routes/broken.kay')).map(link => link.target.slice(-9))).toEqual(['about.kay'])
+      expect(await request<DocumentLink[]>('textDocument/documentLink', 'src/routes/empty.kay')).toEqual([])
+    })
+  })
+})
