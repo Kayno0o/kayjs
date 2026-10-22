@@ -87,6 +87,8 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     'kui-copy-btn-text font-mono',
     'kui-menu-item py-3',
     'kui-menu-list min-w-48',
+    'kui-color-input-label font-medium',
+    'kui-color-input-value tabular-nums',
     'kui-slider-label font-medium',
     'kui-slider-value tabular-nums',
     'kui-bar-list-row py-1',

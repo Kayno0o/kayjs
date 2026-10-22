@@ -1,0 +1,18 @@
+---
+import ColorInput from '@kaynooo/kayjs-ui/color-input.kay'
+
+const light = signal('#ff8800')
+
+// A slow device that refuses a dark colour.
+async function send(colour: string) {
+  await new Promise(done => setTimeout(done, 1500))
+
+  if (colour < '#404040')
+    return false
+
+  light.set(colour)
+}
+---
+.flex.max-w-sm.flex-col.gap-2
+  ColorInput(label="Light" value={light()} onChange={send})
+  p Sent: {light()}.

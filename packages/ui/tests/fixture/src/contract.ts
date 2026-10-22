@@ -14,6 +14,7 @@ import Carousel from '@kaynooo/kayjs-ui/carousel.kay'
 import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
 import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
 import CollapsibleSection from '@kaynooo/kayjs-ui/collapsible-section.kay'
+import ColorInput from '@kaynooo/kayjs-ui/color-input.kay'
 import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
 import CommandPalette from '@kaynooo/kayjs-ui/command-palette.kay'
 import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
@@ -112,6 +113,7 @@ export const COMPONENTS = {
   'checkbox': Checkbox,
   'chip-group': ChipGroup,
   'collapsible-section': CollapsibleSection,
+  'color-input': ColorInput,
   'combobox': Combobox,
   'command-palette': CommandPalette,
   'confirm-delete': ConfirmDelete,
@@ -193,6 +195,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'checkbox': { label: 'I agree', hint: 'v2' },
   'chip-group': { label: 'Decks', options, value: ['mars'] },
   'collapsible-section': { title: 'Older', boxed: true, children: 'Deimos' },
+  'color-input': { label: 'Light', value: '#ff8800', name: 'light' },
   'combobox': { options: [{ value: 'mars', label: 'Mars' }, { value: 'earth', label: 'Earth' }], label: 'Planet', value: 'mars', name: 'planet' },
   'command-palette': { open: false, entries: [{ label: 'Home', group: 'Go', href: '/' }, { label: 'Do', group: 'Act', onSelect: noop }] },
   'confirm-delete': { message: 'Delete this?', failure: 'Could not delete', onConfirm: noop },

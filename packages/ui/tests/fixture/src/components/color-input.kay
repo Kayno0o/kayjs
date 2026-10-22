@@ -1,0 +1,15 @@
+---
+import { signal } from 'kay'
+import ColorInput from '@kaynooo/kayjs-ui/color-input.kay'
+
+// A ColorInput the page keeps in a signal, inside a form with a second field to prove the name posts, and a button moving the colour from outside.
+const { onChange } = props<{ onChange?: (value: string) => unknown }>()
+
+const light = signal('#ff8800')
+---
+form#form
+  ColorInput#light(label="Light" name="light" value={light()} onChange={(value: string) => onChange ? onChange(value) : light.set(value)})
+  ColorInput#locked(label="Locked" name="locked" value="#112233" disabled)
+  button#set(type="button" onClick={() => light.set('#00ff00')}) Set
+  button#reset(type="reset") Reset
+  p#state {light()}

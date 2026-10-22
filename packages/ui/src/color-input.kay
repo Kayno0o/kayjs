@@ -1,0 +1,109 @@
+---
+import type { JSX } from 'kay'
+import { effect, recipe, signal, untrack } from 'kay'
+import { changeAccepted } from './change'
+import { onFormReset, resetWhenIdle, startRef } from './form-reset'
+
+const look = recipe({ parts: { root: 'kui-color-input', input: 'kui-color-input-input', label: 'kui-color-input-label', value: 'kui-color-input-value' } })
+
+const { value, label, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'class' | 'children' | 'type' | 'value' | 'onInput' | 'onChange'> & {
+  // The colour as `#rrggbb`, which is what the native picker and a form hold; a box whose parent passes another one follows it.
+  value: string
+  // Written beside the swatch and naming the input for screen readers.
+  label: string
+  // Runs once with the colour chosen as `#rrggbb`, when the picker commits it and after a form reset that moved it, not on each shade dragged over.
+  // A promise holds the input busy until it settles, and puts the previous colour back when it rejects (logged) or resolves to false: a refused change never shows as made.
+  // Typed `unknown`, so a callback answering something else, such as `list.push`, still fits.
+  onChange?: ((value: string) => unknown) | undefined
+}>()
+
+// The input only holds lowercase `#rrggbb`.
+const hex = (colour: string) => colour.toLowerCase()
+
+const shown = signal(untrack(() => hex(value)))
+const busy = signal(false)
+let box: HTMLInputElement | undefined
+// The colour the app last accepted, which a refused change puts back.
+let settled = untrack(() => hex(value))
+// How often the parent's `value` reached the input, so a change under way knows whether the parent answered it.
+let synced = 0
+
+// A parent echoing the colour chosen from `onChange` is not setting it, so only one other than the shown colour counts.
+effect(() => {
+  const wanted = hex(value)
+
+  if (wanted === untrack(shown))
+    return
+
+  shown.set(wanted)
+  settled = wanted
+  synced++
+})
+
+const boxRef = startRef<HTMLInputElement>((element) => {
+  box = element
+  element.defaultValue = hex(untrack(() => value))
+}, rest.ref)
+
+// The swatch follows the picker while it is dragged over, without telling the app.
+function moved(event: Event) {
+  const input = event.currentTarget as HTMLInputElement
+
+  // Whatever got past the held click moves nothing while a change is under way.
+  if (busy()) {
+    input.value = shown()
+
+    return
+  }
+
+  shown.set(input.value)
+}
+
+async function chosen(input: HTMLInputElement) {
+  if (busy()) {
+    input.value = shown()
+
+    return
+  }
+
+  const next = input.value
+  const before = settled
+  const syncedBefore = synced
+
+  shown.set(next)
+
+  const accepted = await changeAccepted('ColorInput', () => onChange?.(next), busy.set)
+
+  // The parent set `value` meanwhile, which has the last word.
+  if (synced !== syncedBefore) {
+    resetting.idle()
+
+    return
+  }
+
+  if (accepted) {
+    settled = next
+  }
+  else {
+    shown.set(before)
+    input.value = before
+  }
+
+  resetting.idle()
+}
+
+// A reset puts the colour back on its default, which the app's `onChange` then hears of; one meeting a change under way waits for it.
+const resetting = resetWhenIdle(busy, () => {
+  if (!box || box.value === shown())
+    return
+
+  void chosen(box)
+})
+
+onFormReset(() => box, resetting.reset)
+---
+// A native colour input drawn as a swatch, so the picker, the keyboard and the form post come with it. A click while a change is under way opens nothing.
+label(part="root")
+  input({...rest} part="input" ref={boxRef} type="color" value={shown()} aria-busy={busy() ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onInput={moved} onChange={event => chosen(event.currentTarget)})
+  span(part="label") {label}
+  span(part="value") {shown()}

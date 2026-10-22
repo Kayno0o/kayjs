@@ -1,0 +1,7 @@
+---
+import ColorInput from '@kaynooo/kayjs-ui/color-input.kay'
+
+const light = signal('#ff8800')
+---
+.flex.max-w-sm.flex-col.gap-2
+  ColorInput(label="Light" name="light" value={light()} onChange={light.set})

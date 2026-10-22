@@ -31,6 +31,7 @@ export default defineUi({
   '@kaynooo/kayjs-ui/icon-button.kay': { parts: 'rounded-full' },
   '@kaynooo/kayjs-ui/copy-button.kay': { parts: { text: 'font-mono' }, variants: { tone: { accent: { root: 'ring-2' } } } },
   '@kaynooo/kayjs-ui/menu.kay': { parts: { item: 'py-3', list: 'min-w-48' } },
+  '@kaynooo/kayjs-ui/color-input.kay': { parts: { label: 'font-medium', value: 'tabular-nums' } },
   '@kaynooo/kayjs-ui/slider.kay': { parts: { label: 'font-medium', value: 'tabular-nums' } },
   '@kaynooo/kayjs-ui/bar-list.kay': { parts: { root: 'text-gray-500', track: 'h-2', label: 'font-medium', row: 'py-1' } },
   '@kaynooo/kayjs-ui/chip-group.kay': { parts: { chip: 'rounded-full', icon: 'size-3' } },

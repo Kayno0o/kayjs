@@ -129,7 +129,7 @@ export default defineUi({
 })
 ```
 
-- The components with parts: Button, Card, Dialog, Table, TextInput, Textarea, DateInput, DateRangeInput, TimeInput, Badge, Notice, Avatar, Stat, PageHeader, PageSection, EmptyState, CardRow, FormField, Checkbox, Toggle, Select, MultiSelect, RangeInput, Segmented, Rating, FileDrop, IconButton, CopyButton, Menu, Slider, Popover, HoverCard, TooltipHost, Toaster, SidePanel, CommandPalette, ConfirmDelete, FormDialog.
+- The components with parts: Button, Card, Dialog, Table, TextInput, Textarea, DateInput, DateRangeInput, TimeInput, Badge, Notice, Avatar, Stat, PageHeader, PageSection, EmptyState, CardRow, FormField, Checkbox, Toggle, Select, MultiSelect, RangeInput, Segmented, Rating, FileDrop, IconButton, CopyButton, Menu, Slider, ColorInput, Popover, HoverCard, TooltipHost, Toaster, SidePanel, CommandPalette, ConfirmDelete, FormDialog.
 - Also with parts: SaveForm, ContactForm, CollapsibleSection, Widget, Meter, BarList, ChipGroup, Tabs, TabNav, SiteNav, AppHeader, Pagination, SplitLayout, TreeView, LoadMore, VirtualList, BarChart, LineChart, ScatterChart, ContributionGraph, Carousel, Masonry, MediaGallery, ImageCropper, ZoomPane, QrCode, SiteFavicon, Icon, IconPicker, MarkdownEditor and WhenVisible.
 - A part keeps its `kui-` class and the rules of `theme.css` until its component's recipe holds the look. Card, Badge and Notice do: their root keeps `kui-card`, `kui-badge` and `kui-notice` as a name for your CSS, and their other parts carry `data-part` alone (`.kui-card > [data-part='head']`, a child selector, as `head`, `title` and `body` are names other components use too).
 - A recipe holds the look as utilities, so `src/ui.ts` or `class` replaces the one it sets, such as `p-6` for `p-kui-card`, instead of overriding a rule. `kay check` reports a stylesheet selecting a removed part class (`deprecated-ui-class`). A utility of `src/ui.ts` or of `class` wins over a theme rule on the same property.
@@ -138,7 +138,7 @@ export default defineUi({
 - DateInput has `root`, `input`, `trigger`, `panel`, `head`, `title`, `step`, `grid`, `weekday`, `day` and `today`, DateRangeInput `root` and `separator`, TimeInput `root`.
 - The variants are the props that already exist: `tone` (Button, Badge, Notice, CopyButton), `variant` and `size` (Button). `kay check` reports a part or variant that does not exist.
 - A Button with an `onClick` hands its root and spinner classes to its busy button, so `button.kay` reaches both.
-- FormField has `root`, `label`, `head`, `text`, `required`, `action`, `hint`, `issues` and `issue`; Checkbox `root`, `input`, `label` and `hint`; Toggle `root`, `input`, `track` and `label`; Select `root`; Slider `root`, `label`, `input` and `value`.
+- FormField has `root`, `label`, `head`, `text`, `required`, `action`, `hint`, `issues` and `issue`; Checkbox `root`, `input`, `label` and `hint`; Toggle `root`, `input`, `track` and `label`; Select `root`; Slider `root`, `label`, `input` and `value`; ColorInput `root`, `input`, `label` and `value`.
 - RangeInput has `root`, `box`, `separator` and `unit`; Segmented `root`, `option`, `input`, `label` and `icon`; Rating `root`, `stars` and `fill`; FileDrop `root` and `input`; IconButton and BareIconButton `root`; CopyButton `root`, `text` and `live`, with `tone` as its variant.
 - MultiSelect has `root`, `panel`, `trigger`, `summary`, `chevron`, `search`, `bar`, `action`, `options`, `option`, `checkbox`, `icon`, `label` and `empty`.
 - Menu has `menu` (the popover), `list`, `separator` and `item`; its `root` is the trigger, where a `class` string has always gone.
@@ -211,7 +211,7 @@ Overlays: [Dialog](/ui/dialog), [FormDialog](/ui/form-dialog), [SidePanel](/ui/s
 
 Forms: [FormField](/ui/form-field), [SaveForm](/ui/save-form), [ContactForm](/ui/contact-form), [TextInput](/ui/text-input), [Checkbox](/ui/checkbox), [ChipGroup](/ui/chip-group), [RadioGroup](/ui/radio-group), [Select](/ui/select), [MultiSelect](/ui/multi-select), [Combobox](/ui/combobox), [Textarea](/ui/textarea)
 
-More inputs: [RangeInput](/ui/range-input), [Slider](/ui/slider), [FileDrop](/ui/file-drop), [IconPicker](/ui/icon-picker), [MarkdownEditor](/ui/markdown-editor), [ImageCropper](/ui/image-cropper), [Rating](/ui/rating).
+More inputs: [RangeInput](/ui/range-input), [Slider](/ui/slider), [ColorInput](/ui/color-input), [FileDrop](/ui/file-drop), [IconPicker](/ui/icon-picker), [MarkdownEditor](/ui/markdown-editor), [ImageCropper](/ui/image-cropper), [Rating](/ui/rating).
 
 Dates and times: [DateInput](/ui/date-input), [DateRangeInput](/ui/date-range-input), [TimeInput](/ui/time-input).
 

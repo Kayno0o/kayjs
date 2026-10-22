@@ -15,6 +15,7 @@ import Carousel from '@kaynooo/kayjs-ui/carousel.kay'
 import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
 import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
 import CollapsibleSection from '@kaynooo/kayjs-ui/collapsible-section.kay'
+import ColorInput from '@kaynooo/kayjs-ui/color-input.kay'
 import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
 import CommandPalette from '@kaynooo/kayjs-ui/command-palette.kay'
 import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
@@ -206,6 +207,7 @@ FormDialog#form-dialog(open={true} title="Rename" action={fakeAction} submitLabe
   TextInput(name="name")
 ContactForm#contact(action={fakeAction})
 LoadMore#more(list={feed})
+ColorInput#colour(label="Light" value="#ff8800")
 Combobox#combobox(label="Planet" options={[{ value: 'earth', label: 'Earth' }]})
 Steps#steps(label="Signup" steps={[{ key: 'a', label: 'A' }, { key: 'b', label: 'B' }]} current="b" url="/signup" done={['a']})
 WhenVisible#visible(onVisible={() => undefined})
