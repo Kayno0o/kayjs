@@ -256,23 +256,51 @@ test('a time the clocks of the editor\'s zone skip is stored an hour on, and a r
 
 const TALKS: ScreenCollection = { name: 'talks', kind: 'folder', localized: false, components: [], publishField: 'at', draftField: 'draft', schema: { properties: { title: { type: 'string' }, at: { type: 'string', format: 'date-time' }, draft: { type: 'boolean' } } } }
 const talk = (at: string) => ({ slug: 'talk', locale: undefined, data: { title: 'Talk', at }, draft: false, version: 'v1', url: '/talks/talk' }) as unknown as StoredEntry
+
+// The component reads Date.now() for the date and a timer for the wake-up, so a test pins the date it reads and moves it past the scheduled time, rather than racing a wall-clock window a slow mount can outlast.
+const clock = { now: Date.parse('2026-10-20T10:00:00Z') }
+const realNow = Date.now.bind(Date)
+let pinned: { mockRestore: () => void } | undefined
+
+afterEach(() => {
+  pinned?.mockRestore()
+  pinned = undefined
+})
+
+function pinDate(): void {
+  clock.now = Date.parse('2026-10-20T10:00:00Z')
+
+  pinned = spyOn(Date, 'now').mockImplementation(() => clock.now)
+}
+
+// Moves the pinned date a minute on, then waits for the timer that was set to wake the component to show `done`.
+async function passDate(done: () => boolean): Promise<void> {
+  clock.now += 60_000
+
+  const giveUp = realNow() + 5000
+
+  while (!done() && realNow() < giveUp) {
+    await Bun.sleep(20)
+    await settle()
+  }
+
+  expect(done()).toBe(true)
+}
+
 const badge = () => (/Scheduled for \d{4}-\d\d-\d\d \d\d:\d\d (?:UTC|GMT[+-][\d:]+)/).exec(mounted!.root.textContent ?? '')?.[0]
 
 test('the scheduled badge of an entry screen names the time in the editor\'s zone and goes when the date passes, with no reload', async () => {
   process.env.TZ = 'Europe/Paris'
 
-  const at = new Date(Date.now() + 1200)
+  pinDate()
+
+  const at = new Date(clock.now + 100)
 
   mounted = await mountComponent('src/components/scheduled-entry.kay', { collection: TALKS, entry: talk(at.toISOString()) })
   await settle()
   expect(badge()).toMatch(new RegExp(`^Scheduled for ${inputValue(at.toISOString(), 'Europe/Paris').replace('T', ' ')} GMT\\+[12]$`))
 
-  for (let wait = 0; badge() !== undefined && wait < 60; wait++) {
-    await Bun.sleep(50)
-    await settle()
-  }
-
-  expect(badge()).toBeUndefined()
+  await passDate(() => badge() === undefined)
 })
 
 test('the badge comes back for a date typed ahead and goes for a date typed in the past', async () => {
@@ -325,18 +353,15 @@ test('the list names a time in UTC for an editor in UTC and the offset of a half
 test('the list\'s badge turns to Published when its date passes, with no reload', async () => {
   process.env.TZ = 'Europe/Paris'
 
-  const at = Date.now() + 1200
+  pinDate()
+
+  const at = clock.now + 100
 
   mounted = await mountComponent('src/components/scheduled-rows.kay', { collection: TALKS, rows: [{ ...rowOf('later', undefined), scheduledAt: at }] })
   await settle()
   expect(statusOf('later')).toStartWith('Scheduled for ')
 
-  for (let wait = 0; statusOf('later') !== 'Published' && wait < 60; wait++) {
-    await Bun.sleep(50)
-    await settle()
-  }
-
-  expect(statusOf('later')).toBe('Published')
+  await passDate(() => statusOf('later') === 'Published')
 })
 
 const UPLOADED = '/_kay/files/posts/abc.40x30.png'
