@@ -6,6 +6,10 @@ description: A row of mutually exclusive options, drawn as radio buttons.
 
 An option is `{ value, label, icon?, disabled? }`, the shape of every group: `icon` draws before the label and a `disabled` option cannot be picked.
 
+## Disabled
+
+`disabled` on the group disables every option, as on [Toggle](/ui/toggle) and [Button](/ui/button). An option's own `disabled` still applies when the group's is false.
+
 ## Vertical
 
 `orientation="vertical"` stacks the options in a column, for a short list beside a canvas or in a narrow panel. The options stay real radios of one group, so the arrow keys move between them in a column as in a row, and the group says `aria-orientation="vertical"`.

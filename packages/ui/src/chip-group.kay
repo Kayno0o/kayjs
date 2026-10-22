@@ -1,4 +1,4 @@
---- <Value extends string>
+--- <Value extends string | number>
 import type { JSX } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
@@ -9,13 +9,15 @@ import Icon from './icon.kay'
 
 const look = recipe({ parts: { root: 'kui-chip-group', chip: 'kui-chip', input: 'kui-chip-input', label: 'kui-chip-label', icon: 'kui-chip-icon' } })
 
-const { options, value, label, name, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+const { options, value, label, name, disabled = false, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // `icon` sits before the label; `disabled` keeps that chip as it is.
   options: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[]
   // The options picked to start with, in any order; a group whose parent passes others follows them.
   value: readonly Value[]
   // Names the group for screen readers.
   label: string
+  // Disables every chip; an option's own `disabled` still applies when this is false.
+  disabled?: boolean | undefined
   // The checkboxes' name, which the group submits under inside a form, once per picked option; one unique on the page is drawn when none is given.
   name?: string | undefined
   // Gets every picked option, in the order of `options`.
@@ -25,8 +27,8 @@ const { options, value, label, name, onChange, ...rest } = props<Omit<JSX.Intrin
 }>()
 
 const group = name ?? uid()
-// Held as strings: a signal cannot take a type parameter that might be a function.
-const picked = signal<readonly string[]>(value)
+// Held as string or number: a signal cannot take a type parameter that might be a function.
+const picked = signal<readonly (string | number)[]>(value)
 const busy = signal(false)
 let root: HTMLElement | undefined
 // How often the parent's `value` reached the group, so a change under way knows whether the parent answered it.
@@ -40,9 +42,12 @@ effect(() => {
 const boxes = () => [...root?.querySelectorAll<HTMLInputElement>('.kui-chip-input') ?? []]
 
 // Ticks the boxes of `wanted` again, in this group only: the binding may never have seen the box that took the click.
-function check(wanted: readonly string[]) {
+// A box holds its value as text, so a number option is found by its text.
+function check(wanted: readonly (string | number)[]) {
+  const texts = new Set(wanted.map(String))
+
   for (const box of boxes())
-    box.checked = wanted.includes(box.value)
+    box.checked = texts.has(box.value)
 }
 
 async function pick(next: Value[]) {
@@ -69,7 +74,7 @@ const ref = startRef<HTMLElement>(element => root = element, rest.ref)
 // A reset puts the boxes back on their defaults, which the app's `onChange` then hears of; one meeting a change under way waits for it.
 const resetting = resetWhenIdle(busy, () => {
   const ticked = new Set(boxes().filter(box => box.defaultChecked).map(box => box.value))
-  const next = options.map(one => one.value).filter(one => ticked.has(one))
+  const next = options.map(one => one.value).filter(one => ticked.has(String(one)))
 
   check(next)
 
@@ -83,7 +88,7 @@ onFormReset(() => root, resetting.reset)
 div(part="root" {...rest} ref={ref} role="group" aria-label={label} aria-busy={busy() ? 'true' : undefined})
   for option of options key={option.value}
     label(part="chip")
-      input(part="input" ref={element => element.defaultChecked = untrack(() => value.includes(option.value))} type="checkbox" name={group} value={option.value} checked={picked().includes(option.value)} disabled={option.disabled} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => toggle(event.currentTarget, option.value)})
+      input(part="input" ref={element => element.defaultChecked = untrack(() => value.includes(option.value))} type="checkbox" name={group} value={option.value} checked={picked().includes(option.value)} disabled={disabled || option.disabled} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => toggle(event.currentTarget, option.value)})
       span(part="label")
         if option.icon
           Icon(icon={option.icon} part="icon")

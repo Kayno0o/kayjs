@@ -1,0 +1,12 @@
+---
+import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
+import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+
+// Number values on both groups, and the group-wide `disabled` on each, with one option disabled of its own.
+const { onDays, disabled = false } = props<{ onDays: (days: number[]) => unknown, disabled?: boolean }>()
+
+const days = [{ value: 0, label: 'Sun' }, { value: 1, label: 'Mon', disabled: true }, { value: 2, label: 'Tue' }]
+---
+ChipGroup#days(options={days} value={[0]} label="Days" onChange={onDays})
+Segmented#one(options={days} value={0} label="Day" disabled={disabled})
+ChipGroup#all(options={days} value={[0]} label="All days" disabled={disabled})
