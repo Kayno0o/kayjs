@@ -328,12 +328,13 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
       const add = document.addEventListener.bind(document)
       const remove = document.removeEventListener.bind(document)
       const start = document.startViewTransition.bind(document)
-      const held = window as { kayLive?: Set<unknown>, kayPeak?: number, kayEnd?: () => void }
+      const held = window as { kayLive?: Set<unknown>, kayPeak?: number, kayStarts?: number, kayEnd?: () => void }
       const live = new Set<unknown>()
       const ends: (() => void)[] = []
 
       held.kayLive = live
       held.kayPeak = 0
+      held.kayStarts = 0
       held.kayEnd = () => {
         for (const end of ends.splice(0)) {
           end()
@@ -356,6 +357,9 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
       // Each transition finishes only when kayEnd says so.
       document.startViewTransition = ((update: () => void) => {
         const real = start(update)
+
+        held.kayStarts!++
+
         const gate = new Promise<void>((resolve) => {
           ends.push(resolve)
         })
@@ -373,23 +377,19 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
 
       return { live: held.kayLive!.size, peak: held.kayPeak! }
     })
-    const overlapping = await state()
 
     await page.evaluate(() => (window as { kayEnd?: () => void }).kayEnd!())
-    await page.waitUntil(() => !document.documentElement.hasAttribute('aria-busy'), { timeout: '5s' })
+    await page.waitUntil(() => !document.documentElement.hasAttribute('aria-busy') && document.getAnimations().length === 0, { timeout: '5s' })
 
     const ended = await state()
+    const starts = await page.evaluate(() => (window as { kayStarts?: number }).kayStarts)
 
-    // A click after the end is the eager listener's alone, none of the transitions'.
+    // A click once the transitions ended is the eager listener's alone: it starts one transition and none of the ended ones is left to follow the link too.
     await page.click('a.cross')
     await page.waitFor('h1', { text: 'Other' })
-    await page.evaluate(() => (window as { kayEnd?: () => void }).kayEnd!())
-    await page.waitUntil(() => !document.documentElement.hasAttribute('aria-busy'), { timeout: '5s' })
 
-    expect(overlapping.live).toBe(1)
-    expect(overlapping.peak).toBe(1)
-    expect(ended.live).toBe(0)
-    expect(await state()).toEqual({ live: 0, peak: 1 })
+    expect(ended).toEqual({ live: 0, peak: 1 })
+    expect(await page.evaluate(() => (window as { kayStarts?: number }).kayStarts)).toBe(starts! + 1)
     expect(await page.path()).toBe('/other')
     expect(page.errors).toEqual([])
   }, 30_000)
