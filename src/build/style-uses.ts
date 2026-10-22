@@ -291,20 +291,24 @@ export interface UnresolvedClass extends RuntimeClass {
 
 // `sheets` is the text of every stylesheet the build wrote, `shorthand` the classes each component writes as `div.flex.w-1/2`, which the words of its source cannot tell from a name with a dot.
 // `markup` lists the files that can write markup into a page without being a component it imports: scripts such as a Markdown plugin, Markdown and data files. A page rendering a collection's Markdown may show the classes of any of them, so it names theirs besides its components'.
-export function styleUses(root: string, entries: readonly string[], sheets: Iterable<string>, reached: Reached, shorthand: ReadonlyMap<string, Iterable<string>>, markup: readonly string[] = [], options: StyleUsesOptions = {}): StyleUses {
+export function styleUses(root: string, entries: readonly string[], sheets: Iterable<string>, built: Reached, shorthand: ReadonlyMap<string, Iterable<string>>, markup: readonly string[] = [], options: StyleUsesOptions = {}): StyleUses {
   const styled = new Set<string>()
 
-  // The bundler follows a linked package's pages by their real path, which an entry reached through node_modules does not share, so the entry takes on the edges of its real path.
+  // The bundler follows a linked package's pages by their real path, which an entry reached through node_modules does not share, so the entry takes on the edges and `open` flag of its real path, in a copy that leaves the caller's Reached as built.
+  const reached: Reached = { edges: new Map(built.edges), open: new Set(built.open) }
+
   for (const entry of entries) {
     const real = existsSync(entry) ? realpathSync(entry) : entry
 
     if (real === entry)
       continue
 
-    if (!reached.edges.has(entry) && reached.edges.has(real))
-      reached.edges.set(entry, reached.edges.get(real)!)
+    const edges = built.edges.get(real)
 
-    if (reached.open.has(real))
+    if (edges !== undefined)
+      reached.edges.set(entry, [...new Set([...built.edges.get(entry) ?? [], ...edges])])
+
+    if (built.open.has(real))
       reached.open.add(entry)
   }
 

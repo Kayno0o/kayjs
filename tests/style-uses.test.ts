@@ -78,6 +78,45 @@ describe('which classes a page gets from the components it renders', () => {
     expect((entries[relative(root, linked)] as number[]).map(index => classes[index]!)).toEqual(['mt-1'])
   })
 
+  it('leaves the Reached it is given as built, merges the edges of an entry with those of its real path and carries the open flag to a linked page', async () => {
+    const root = await scratchDir('style-uses-overlay-')
+    const real = join(root, 'package', 'page.kay')
+    const linked = join(root, 'node_modules', 'package', 'page.kay')
+    const card = join(root, 'package', 'card.kay')
+    const own = join(root, 'own.kay')
+    const plugin = join(root, 'plugin.ts')
+
+    await mkdir(join(root, 'node_modules'), { recursive: true })
+    await Bun.write(real, 'Card\n')
+    await Bun.write(card, 'p.mt-1 a\n')
+    await Bun.write(own, 'p.p-1 a\n')
+    await Bun.write(plugin, 'export const html = \'<i class="btn-primary"></i>\'\n')
+    await symlink(join(root, 'package'), join(root, 'node_modules', 'package'))
+
+    const reached = { edges: new Map([[real, [card]], [linked, [own]]]), open: new Set([real]) }
+    const { classes, entries } = styleUses(root, [linked], [CSS], reached, new Map(), [plugin])
+
+    expect((entries[relative(root, linked)] as number[]).map(index => classes[index]!).sort()).toEqual(['btn-primary', 'mt-1', 'p-1'])
+    expect([...reached.edges.keys()]).toEqual([real, linked])
+    expect(reached.edges.get(linked)).toEqual([own])
+    expect([...reached.open]).toEqual([real])
+  })
+
+  it('takes an entry that is its own real path and an entry file that is missing as they are', async () => {
+    const root = await scratchDir('style-uses-plain-')
+    const page = join(root, 'page.kay')
+    const card = join(root, 'card.kay')
+    const missing = join(root, 'missing.kay')
+
+    await Bun.write(page, 'Card\n')
+    await Bun.write(card, 'p.mt-1 a\n')
+
+    const { classes, entries } = styleUses(root, [page, missing], [CSS], { edges: new Map([[page, [card]]]), open: new Set() }, new Map())
+
+    expect((entries['page.kay'] as number[]).map(index => classes[index]!)).toEqual(['mt-1'])
+    expect(entries['missing.kay'] ?? []).toEqual([])
+  })
+
   it('takes the literal a parent passes as a prop, whichever side writes it', async () => {
     expect(await reaching('Card(tone="btn-primary")\n', { 'card.kay': 'const { tone } = props<{ tone: string }>()\n---\np(class={tone}) a\n' })).toEqual(['btn-primary'])
   })
