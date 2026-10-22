@@ -33,7 +33,7 @@ export function receiveInternal(request: Request): void {
 }
 
 export function isInternal(request: Request): boolean {
-  return received.has(request) || request.headers.get(INTERNAL) === INTERNAL_TOKEN
+  return received.has(request)
 }
 
 // Sends `visit` through the app that received `request`, as if the browser had sent it: through the server's own fetch handler when there is one, else through `fallback`.

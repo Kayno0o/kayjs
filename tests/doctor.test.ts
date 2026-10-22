@@ -147,6 +147,15 @@ describe('kay doctor', () => {
       expect(result.check('env').fix).toContain('.env')
     })
 
+    it('takes KAY_PROXY_KEY_FILE for the proxy key a production server with proxy.key needs', async () => {
+      const root = await project({ 'kay.config.ts': 'export default { favicon: false, proxy: { key: "x-upstream-key" } }\n' })
+      const production = { NODE_ENV: 'production' }
+
+      expect((await doctor(root, [], production)).check('env').message).toContain('KAY_PROXY_KEY')
+      expect((await doctor(root, [], { ...production, KAY_PROXY_KEY_FILE: '/run/secrets/key' })).check('env').ok).toBe(true)
+      expect((await doctor(root, [], { ...production, KAY_PROXY_KEY: 'k' })).check('env').ok).toBe(true)
+    })
+
     it('sees every schema of a module whose first one is unset', async () => {
       const second = 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const first = defineEnv(s.Object({ FIRST_KEY: s.String() }))\nexport const second = defineEnv(s.Object({ SECOND_KEY: s.String() }))\n'
       const result = await doctor(await project({ 'src/env.ts': second }))

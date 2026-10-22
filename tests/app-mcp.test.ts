@@ -36,12 +36,14 @@ const PROXY_KEY = 'k'.repeat(40)
 
 process.env.KAY_PROXY_KEY = PROXY_KEY
 const keyed = await testSite({ routes, api, mcp: true, islands: false, locals, proxy: { key: 'x-upstream-key' }, headers: { 'x-upstream-key': PROXY_KEY } })
+// A rewrite sends the dispatched call through the app again, still as the server's own.
+const keyedRewritten = await testSite({ routes, api, mcp: true, islands: false, locals, proxy: { key: 'x-upstream-key' }, headers: { 'x-upstream-key': PROXY_KEY }, rewrite: url => url.pathname === '/api/notes/who' ? '/api/notes/who?rewritten=1' : undefined })
 
 delete process.env.KAY_PROXY_KEY
 const localized = await testSite({ routes, api, mcp: true, islands: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' } })
 
 afterAll(async () => {
-  await Promise.all([site.close(), keyed.close(), off.close(), mounted.close(), localized.close(), openapi.close(), guarded.close(), guardedMounted.close(), strict.close(), uncovered.close(), noApi.close(), documentOnly.close(), limited.close(), names.close()])
+  await Promise.all([site.close(), keyed.close(), keyedRewritten.close(), off.close(), mounted.close(), localized.close(), openapi.close(), guarded.close(), guardedMounted.close(), strict.close(), uncovered.close(), noApi.close(), documentOnly.close(), limited.close(), names.close()])
 })
 
 async function post(target: typeof site, body: unknown, headers: Record<string, string> = {}) {
@@ -276,6 +278,7 @@ describe('behind proxy.key', () => {
     expect((await keyed.fetch('/mcp', { method: 'POST', headers: { 'content-type': 'application/json', 'x-upstream-key': '' }, body: '{}' })).status).toBe(403)
     // The marks that let it by are dropped from the request, so a handler echoing its headers cannot expose them.
     expect((await rpc(keyed, 'tools/call', { name: 'get_notes_who' }, BEARER)).body.result).toMatchObject({ structuredContent: { tool: 'get_notes_who', leaked: [] } })
+    expect((await rpc(keyedRewritten, 'tools/call', { name: 'get_notes_who' }, BEARER)).body.result).toMatchObject({ structuredContent: { tool: 'get_notes_who', leaked: [] } })
     expect((await keyed.fetch('/mcp', { method: 'POST', headers: { 'x-kay-internal': 'guess', 'x-upstream-key': '' }, body: '{}' })).status).toBe(403)
   })
 })

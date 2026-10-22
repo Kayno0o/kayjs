@@ -191,7 +191,8 @@ async function envCheck(root: string, dotenv: Record<string, string>): Promise<C
     const { variables, unread } = await listEnv(root)
     const production = process.env.NODE_ENV === 'production'
     const needed = (required: string | false) => required === 'always' || (production && required === 'production')
-    const unset = variables.filter(variable => needed(variable.required) && (process.env[variable.name] ?? '') === '' && dotenv[variable.name] === undefined).map(variable => variable.name)
+    const isSet = (name: string) => (process.env[name] ?? '') !== '' || dotenv[name] !== undefined
+    const unset = variables.filter(variable => needed(variable.required) && !isSet(variable.name) && !(variable.name === 'KAY_PROXY_KEY' && isSet('KAY_PROXY_KEY_FILE'))).map(variable => variable.name)
 
     if (unset.length > 0)
       return { name: 'env', ok: false, message: `${unset.join(', ')} declared and required, but not set`, fix: `set ${unset.length === 1 ? 'it' : 'them'} in the shell or in .env (\`kay env\` lists every variable)` }

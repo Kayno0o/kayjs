@@ -3,6 +3,7 @@ import { ASSET_PREFIX } from '../build/assets'
 import { kayLog } from '../runtime/log'
 import { routerPath } from './base'
 import { keepRequestId, requestId } from './protection'
+import { isInternal, markInternal } from './visit'
 
 // Returns the path, query included, to serve the request from instead, or undefined to serve it as it came.
 export type Rewrite = (url: URL, request: Request) => string | undefined
@@ -72,6 +73,10 @@ export function rewriteRequests(app: Elysia, rewrite: Rewrite, fallback: Elysia)
       return undefined
 
     const headers = new Headers(request.headers)
+
+    // The mark was dropped from this request by the key check, which the rewritten one passes again.
+    if (isInternal(request))
+      markInternal(headers)
 
     headers.set(REWRITTEN, TOKEN)
     headers.set(ID, requestId(request))
