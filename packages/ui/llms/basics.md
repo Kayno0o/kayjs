@@ -82,7 +82,7 @@ Dialog(open={editing()} title="Rename" onOpenChange={() => editing.set(false)})
 - `Notice(tone="danger" label={failure})`: a form's outcome or a refusal, in place. `tone` is `info`, `success`, `warning` or `danger`; a danger is `role="alert"`, read out at once, the others `role="status"`. Children render after `label`, for a link to follow up. It is a bordered box, for a page section; `compact` drops the box, for a line under a form.
 - `Avatar(src={user.avatar} name={user.name} size="sm")`: the picture, or the name's first letter on a colour seeded by the name when `src` is empty or fails to load; a new `src` is tried again. `size` is `xs`, `sm`, `md` (the default) or `lg`. It is decorative, the name being written beside it, unless `label` names it for screen readers.
 
-### Popover, TooltipHost
+### Popover, HoverCard, TooltipHost
 
 ```kay
 Popover(placement="bottom-end")
@@ -95,6 +95,7 @@ Popover(placement="bottom-end")
 - `@trigger(attributes)` renders the trigger, which spreads `attributes`: `popovertarget`, `aria-expanded` and its anchor.
 - `placement` is `bottom-start`, `bottom-end`, `top-start` or `top-end`, and the browser flips it when there is no room.
 - `open` opens or closes it from the page, and `onOpenChange(open)` runs however it changed: a page driving `open` sets its own value back there, or it could not open the panel again after a click outside closed it.
+- `HoverCard(anchor={hovered()} placement="bottom")` is a card for an element chosen at run time, with no trigger markup: set `anchor` to the element the pointer or focus is on (`onPointerEnter`, `onFocus`) and back to `undefined` on leave, and one card serves many elements, an SVG shape included, following it as a ZoomPane pans. It shows while there is an anchor and never takes the pointer. `placement` is `top` (default), `bottom`, `left`, `right` or the four Popover values, flipped when there is no room; `id` as for Popover.
 - TooltipHost shows the `data-tooltip` of whichever element the pointer or a tab lands on. `data-tooltip-placement`, a CSS `position-area`, says where it sits, `top` by default: `button(data-tooltip="Copy link" data-tooltip-placement="bottom")`. IconButton sets `data-tooltip` to its label. While a tooltip shows, its element gets `aria-describedby` pointing at the tooltip, so a screen reader focusing it hears the text too. `TooltipHost(showDelay="200ms" hideDelay="300ms")` sets how long a tooltip waits to show (`80ms`) and to hide (`150ms`), a duration with its unit, as `"200ms"` or `"1s"`; a bare number is a type error. The pointer can cross onto the tooltip without it closing, and Escape closes it until the pointer or the focus moves to another element. `data-hint` is a tooltip for the pointer alone, shown the same way but never as focus lands, for a hover explanation of read-only text such as a stat, which `kay check` does not report as `unreachable-tooltip`: it must only add to what the element already says, since neither the keyboard nor a screen reader brings it up.
 
 ### Stat, Meter, Progress, Skeleton, BarList, SiteFavicon, CopyButton, Rating

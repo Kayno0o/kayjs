@@ -17,3 +17,7 @@ The `@trigger(attributes)` block renders the button, which spreads the `attribut
 ## Id
 
 `id` is the panel's id, unique on the page. kay draws one when you give none.
+
+## Anchored to another element
+
+A Popover opens from its own trigger. For a card that follows the pointer or focus over many elements, with no trigger markup, use [HoverCard](/ui/hover-card).

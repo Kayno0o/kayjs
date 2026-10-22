@@ -27,6 +27,7 @@ import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
 import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import HoverCard from '@kaynooo/kayjs-ui/hover-card.kay'
 import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
 import IconPicker from '@kaynooo/kayjs-ui/icon-picker.kay'
 import Icon from '@kaynooo/kayjs-ui/icon.kay'
@@ -117,6 +118,7 @@ export const COMPONENTS = {
   'file-drop': FileDrop,
   'form-dialog': FormDialog,
   'form-field': FormField,
+  'hover-card': HoverCard,
   'icon-button': IconButton,
   'icon-picker': IconPicker,
   'icon': Icon,
@@ -197,6 +199,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'file-drop': { 'aria-label': 'Photos', 'onFiles': noop, 'content': () => 'Drop files' },
   'form-dialog': { open: false, title: 'Rename', action, submitLabel: 'Save', failure: 'Failed', onOpenChange: noop },
   'form-field': { label: 'Name', hint: 'As shown', children: '' },
+  'hover-card': {},
   'icon-button': { icon, label: 'Add' },
   'icon-picker': { search: async () => new Promise<never[]>(() => undefined), searchLabel: 'Search icons' },
   'icon': { icon, label: 'Add' },

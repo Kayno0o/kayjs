@@ -13,11 +13,15 @@ const KEY_STEP = 40
 
 const look = recipe({ parts: { root: 'kui-zoom-pane', plate: 'kui-zoom-plate', tools: 'kui-zoom-tools' } })
 
-const { label, most = MOST, tools = true, zoomInLabel = wording('ui.zoomPane.zoomInLabel', 'Zoom in'), zoomOutLabel = wording('ui.zoomPane.zoomOutLabel', 'Zoom out'), fitLabel = wording('ui.zoomPane.fitLabel', 'Fit'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'role' | 'tabindex'> & {
+const { label, most = MOST, least = 1, onChange, tools = true, zoomInLabel = wording('ui.zoomPane.zoomInLabel', 'Zoom in'), zoomOutLabel = wording('ui.zoomPane.zoomOutLabel', 'Zoom out'), fitLabel = wording('ui.zoomPane.fitLabel', 'Fit'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'role' | 'tabindex' | 'onChange'> & {
   // Names the view for screen readers, since what it holds is a picture rather than words.
   label: string
   // How far in it may be taken, as a multiple of fitted.
   most?: number | undefined
+  // How far out it may be taken, as a multiple of fitted: 1 (the default) is fitted, 0.5 lets the plate shrink to half the pane.
+  least?: number | undefined
+  // Called with the new `{ scale, x, y }` whenever the plate moves or zooms, however it did: a gesture, a key or a button. `x` and `y` are where the plate's top-left corner sits in pixels, so what stands on the plate can follow it.
+  onChange?: ((plate: Plate) => void) | undefined
   // Whether the buttons are drawn. The gestures work either way.
   tools?: boolean | undefined
   zoomInLabel?: string | undefined
@@ -40,12 +44,22 @@ function at(point: { clientX: number, clientY: number }, rect = pane?.getBoundin
   return { x: point.clientX - (rect?.left ?? 0), y: point.clientY - (rect?.top ?? 0) }
 }
 
+function put(next: Plate) {
+  const was = plate()
+
+  if (next.scale === was.scale && next.x === was.x && next.y === was.y)
+    return
+
+  plate.set(next)
+  onChange?.(next)
+}
+
 function take(next: Plate) {
-  plate.set(held(next, frame()))
+  put(held(next, frame()))
 }
 
 function zoom(by: number, around = { x: frame().width / 2, y: frame().height / 2 }) {
-  take(zoomedAt(plate(), around, by, most))
+  take(zoomedAt(plate(), around, by, most, least))
 }
 
 function middle(): { x: number, y: number } {
@@ -99,7 +113,7 @@ function move(event: PointerEvent) {
   }
 
   if (was > 0 && now > 0)
-    take(zoomedAt(plate(), to, now / was, most))
+    take(zoomedAt(plate(), to, now / was, most, least))
 
   take(movedBy(plate(), to.x - from.x, to.y - from.y))
 }
@@ -129,7 +143,7 @@ const KEYS: Partial<Record<string, () => void>> = {
   '+': () => zoom(NOTCH_ZOOM),
   '=': () => zoom(NOTCH_ZOOM),
   '-': () => zoom(1 / NOTCH_ZOOM),
-  '0': () => plate.set(fitted()),
+  '0': () => put(fitted()),
   'ArrowLeft': () => take(movedBy(plate(), KEY_STEP, 0)),
   'ArrowRight': () => take(movedBy(plate(), -KEY_STEP, 0)),
   'ArrowUp': () => take(movedBy(plate(), 0, KEY_STEP)),
@@ -163,7 +177,7 @@ onMount(() => {
 })
 ---
 // Fitted, the page still scrolls over it on a touch screen; taken in, the gestures are the pane's own. The group is focusable on purpose: the arrows and +/- are its own, and the buttons say the same for everyone else.
-div(part="root" {...rest} ref={element => pane = element} role="group" aria-label={label} tabindex="0" data-dragging={dragging() || undefined} style={`touch-action: ${plate().scale > 1 ? 'none' : 'pan-y'}`} onPointerDown={grab} onPointerMove={move} onPointerUp={drop} onPointerCancel={drop} onDblClick={doubleClick} onDragStart={event => event.preventDefault()} onKeyDown={keyDown})
+div(part="root" {...rest} ref={element => pane = element} role="group" aria-label={label} tabindex="0" data-dragging={dragging() || undefined} style={`touch-action: ${plate().scale !== 1 ? 'none' : 'pan-y'}`} onPointerDown={grab} onPointerMove={move} onPointerUp={drop} onPointerCancel={drop} onDblClick={doubleClick} onDragStart={event => event.preventDefault()} onKeyDown={keyDown})
   // The scale is published too, so a mark standing on the plate can hold its own size with `calc(1 / var(--kui-zoom-scale))`.
   div(part="plate" style={`--kui-zoom-scale: ${plate().scale}; transform: translate(${plate().x}px, ${plate().y}px) scale(${plate().scale})`})
     slot
@@ -171,4 +185,4 @@ div(part="root" {...rest} ref={element => pane = element} role="group" aria-labe
     div(part="tools")
       IconButton(icon="zoomIn" label={zoomInLabel} size="sm" onClick={() => zoom(NOTCH_ZOOM ** 2)})
       IconButton(icon="zoomOut" label={zoomOutLabel} size="sm" onClick={() => zoom(1 / NOTCH_ZOOM ** 2)})
-      IconButton(icon="zoomFit" label={fitLabel} size="sm" disabled={plate().scale === 1} onClick={() => plate.set(fitted())})
+      IconButton(icon="zoomFit" label={fitLabel} size="sm" disabled={plate().scale === 1} onClick={() => put(fitted())})

@@ -1,0 +1,73 @@
+---
+import type { JSX } from 'kay'
+import type { HoverCardPlacement } from './hover-card'
+import { effect, onCleanup, recipe, uid } from 'kay'
+
+const look = recipe({ parts: { root: 'kui-hover-card' } })
+
+const { id, anchor, placement = 'top', ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'id' | 'popover' | 'class' | 'children' | 'role'> & {
+  // The panel's id, unique on the page; one is drawn when none is given.
+  id?: string | undefined
+  // The element the card sits beside, set from the page whenever the pointer or focus lands on another one, and `undefined` or `null` for none: the card shows while there is one. An element of an SVG works too.
+  anchor?: Element | null | undefined
+  // Which side of the anchor it sits on, flipped by the browser when there is no room there.
+  placement?: HoverCardPlacement | undefined
+}>()
+
+const panelId = id ?? uid()
+const name = `--kui-hover-card-${panelId}`
+let panel: HTMLDivElement | undefined
+let marked: HTMLElement | undefined
+let stand: HTMLSpanElement | undefined
+let frame = 0
+
+function unmark() {
+  cancelAnimationFrame(frame)
+  marked?.style.removeProperty('anchor-name')
+  marked = undefined
+  stand?.style.removeProperty('anchor-name')
+}
+
+// An SVG shape is no CSS box, so the browser cannot anchor to it: a fixed, invisible box laid over it stands in, kept on it frame by frame as a pan, a zoom or a scroll moves it.
+function follow(target: Element) {
+  const box = target.getBoundingClientRect()
+
+  if (stand)
+    stand.style.cssText = `position: fixed; pointer-events: none; visibility: hidden; anchor-name: ${name}; left: ${box.left}px; top: ${box.top}px; width: ${box.width}px; height: ${box.height}px`
+
+  frame = requestAnimationFrame(() => follow(target))
+}
+
+// The browser's anchor positioning follows the element named by `anchor-name`, so the name moves from the element the card left to the one it lands on.
+effect(() => {
+  const target = anchor ?? undefined
+
+  unmark()
+
+  if (!panel)
+    return
+
+  if (!target) {
+    if (panel.matches(':popover-open'))
+      panel.hidePopover()
+
+    return
+  }
+
+  if (target instanceof HTMLElement) {
+    target.style.setProperty('anchor-name', name)
+    marked = target
+  }
+  else {
+    follow(target)
+  }
+
+  if (!panel.matches(':popover-open'))
+    panel.showPopover()
+})
+
+onCleanup(unmark)
+---
+div(part="root" {...rest} ref={element => panel = element} id={panelId} popover="manual" data-placement={placement} style={`position-anchor: ${name}`})
+  slot
+span(ref={element => stand = element} aria-hidden="true")

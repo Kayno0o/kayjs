@@ -115,7 +115,7 @@ export default defineUi({
 })
 ```
 
-- The components with parts: Button, Card, Dialog, Table, TextInput, Textarea, DateInput, DateRangeInput, TimeInput, Badge, Notice, Avatar, Stat, PageHeader, PageSection, EmptyState, CardRow, FormField, Checkbox, Toggle, Select, MultiSelect, RangeInput, Segmented, Rating, FileDrop, IconButton, CopyButton, Menu, Slider, Popover, TooltipHost, Toaster, SidePanel, CommandPalette, ConfirmDelete, FormDialog.
+- The components with parts: Button, Card, Dialog, Table, TextInput, Textarea, DateInput, DateRangeInput, TimeInput, Badge, Notice, Avatar, Stat, PageHeader, PageSection, EmptyState, CardRow, FormField, Checkbox, Toggle, Select, MultiSelect, RangeInput, Segmented, Rating, FileDrop, IconButton, CopyButton, Menu, Slider, Popover, HoverCard, TooltipHost, Toaster, SidePanel, CommandPalette, ConfirmDelete, FormDialog.
 - Also with parts: SaveForm, ContactForm, CollapsibleSection, Widget, Meter, BarList, ChipGroup, Tabs, TabNav, SiteNav, AppHeader, Pagination, SplitLayout, TreeView, LoadMore, VirtualList, BarChart, LineChart, ScatterChart, ContributionGraph, Carousel, Masonry, MediaGallery, ImageCropper, ZoomPane, QrCode, SiteFavicon, Icon, IconPicker, MarkdownEditor and WhenVisible.
 - Each part keeps its `kui-` class, so a rule of yours on `.kui-card-head` keeps working beside the utilities. A utility of `src/ui.ts` or of `class` wins over a theme rule on the same property.
 - A part is named after what its `kui-` class draws: Card has `root`, `head`, `title` and `body`, Dialog `root`, `title`, `body` and `footer`, Button `root` and `spinner`.
@@ -127,7 +127,7 @@ export default defineUi({
 - RangeInput has `root`, `box`, `separator` and `unit`; Segmented `root`, `option`, `input`, `label` and `icon`; Rating `root`, `stars` and `fill`; FileDrop `root` and `input`; IconButton and BareIconButton `root`; CopyButton `root`, `text` and `live`, with `tone` as its variant.
 - MultiSelect has `root`, `panel`, `trigger`, `summary`, `chevron`, `search`, `bar`, `action`, `options`, `option`, `checkbox`, `icon`, `label` and `empty`.
 - Menu has `menu` (the popover), `list`, `separator` and `item`; its `root` is the trigger, where a `class` string has always gone.
-- Popover has `root` (the panel) and TooltipHost `root`; Toaster `root`, `live`, `toast`, `icon`, `message` and `dismiss`; SidePanel `root`, `head`, `title`, `body` and `footer`; CollapsibleSection `root`, `summary`, `title`, `meta`, `chevron` and `body`; Widget `root`, `head` and `title`.
+- Popover has `root` (the panel), HoverCard `root` and TooltipHost `root`; Toaster `root`, `live`, `toast`, `icon`, `message` and `dismiss`; SidePanel `root`, `head`, `title`, `body` and `footer`; CollapsibleSection `root`, `summary`, `title`, `meta`, `chevron` and `body`; Widget `root`, `head` and `title`.
 - Meter has `root` and `fill` (its `fillClass` still works); BarList `root`, `row`, `label`, `value`, `track` and `fill`, `root` being the empty message too; ChipGroup `root`, `chip`, `input`, `label` and `icon`; SaveForm `root`, `grid`, `bar`, `status` and `actions`.
 - CommandPalette has `root`, `search`, `input`, `list`, `heading`, `option`, `text`, `label`, `snippet`, `more`, `group`, `empty` and `count`; FormDialog `root` (the Dialog), `footer`, `actions` and `form`; ContactForm `root`, `consent`, `box`, `boxInput`, `boxLabel`, `issues` and `issue`.
 - ConfirmDelete has `root` (the trigger, where `class` has always gone), `armed` and `message`.
@@ -192,7 +192,7 @@ Your own key wins over the French kayjs-ui ships, and a prop you pass to one com
 
 Actions: [Button](/ui/button), [IconButton](/ui/icon-button), [BareIconButton](/ui/bare-icon-button), [ConfirmDelete](/ui/confirm-delete), [CopyButton](/ui/copy-button), [Menu](/ui/menu), [Toggle](/ui/toggle).
 
-Overlays: [Dialog](/ui/dialog), [FormDialog](/ui/form-dialog), [SidePanel](/ui/side-panel), [Popover](/ui/popover), [TooltipHost](/ui/tooltip-host), [Toaster](/ui/toaster), [CommandPalette](/ui/command-palette).
+Overlays: [Dialog](/ui/dialog), [FormDialog](/ui/form-dialog), [SidePanel](/ui/side-panel), [Popover](/ui/popover), [HoverCard](/ui/hover-card), [TooltipHost](/ui/tooltip-host), [Toaster](/ui/toaster), [CommandPalette](/ui/command-palette).
 
 Forms: [FormField](/ui/form-field), [SaveForm](/ui/save-form), [ContactForm](/ui/contact-form), [TextInput](/ui/text-input), [Checkbox](/ui/checkbox), [ChipGroup](/ui/chip-group), [RadioGroup](/ui/radio-group), [Select](/ui/select), [MultiSelect](/ui/multi-select), [Combobox](/ui/combobox), [Textarea](/ui/textarea)
 

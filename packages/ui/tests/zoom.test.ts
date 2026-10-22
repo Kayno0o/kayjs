@@ -26,6 +26,14 @@ describe('a plate under its frame', () => {
     expect(zoomedAt({ scale: 4, x: -100, y: 0 }, { x: 0, y: 0 }, 10, 8).x).toBe(-200)
   })
 
+  test('goes out below fitted down to `least`, and keeps a smaller plate inside its frame', () => {
+    const out = zoomedAt(fitted(), { x: 200, y: 200 }, 0.1, 8, 0.5)
+
+    expect(out.scale).toBe(0.5)
+    expect(held(movedBy(out, -300, 500), FRAME)).toEqual({ scale: 0.5, x: 0, y: 200 })
+    expect(held(movedBy(out, 50, -500), FRAME)).toEqual({ scale: 0.5, x: 150, y: 0 })
+  })
+
   test('cannot be dragged off its own frame', () => {
     const taken = { scale: 2, x: 0, y: 0 }
 

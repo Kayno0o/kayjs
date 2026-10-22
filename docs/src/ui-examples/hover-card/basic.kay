@@ -1,0 +1,18 @@
+---
+import { signal } from 'kay'
+import HoverCard from '@kaynooo/kayjs-ui/hover-card.kay'
+
+const planets = [{ name: 'Mars', moons: 2 }, { name: 'Earth', moons: 1 }, { name: 'Venus', moons: 0 }]
+const hovered = signal<{ element: Element, moons: number } | null>(null)
+---
+.flex.gap-3.p-12
+  for planet of planets
+    button.rounded-lg.border.border-kui-overlay1.px-3.py-1(
+      onPointerEnter={event => hovered.set({ element: event.currentTarget, moons: planet.moons })}
+      onPointerLeave={() => hovered.set(null)}
+      onFocus={event => hovered.set({ element: event.currentTarget, moons: planet.moons })}
+      onBlur={() => hovered.set(null)}
+    )
+      | {planet.name}
+HoverCard(anchor={hovered()?.element} placement="bottom" class="px-3 py-1 text-sm")
+  | {hovered()?.moons} moons

@@ -1,0 +1,6 @@
+---
+import '../app.css'
+import HoverNodes from '../components/hover-nodes.kay'
+---
+main.p-24
+  HoverNodes

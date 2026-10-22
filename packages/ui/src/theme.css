@@ -126,6 +126,7 @@
 .kui-command-palette:not([open]),
 .kui-side-panel:not([open]),
 .kui-popover:not(:popover-open),
+.kui-hover-card:not(:popover-open),
 :is(.kui-btn, .kui-icon-btn, .kui-confirm-delete-link)[hidden] {
   display: none;
 }
@@ -169,7 +170,7 @@
   }
 
   /* One radius, --radius-kui-card, for the boxes the library frames: buttons, cards, notices and the overlays over the page. Square by default; a docked side panel stays square. */
-  :is(.kui-shell, .kui-btn, .kui-stat-badge, .kui-card, .kui-card-row, .kui-widget, .kui-notice, .kui-toast, .kui-dialog, .kui-command-palette, .kui-popover) {
+  :is(.kui-shell, .kui-btn, .kui-stat-badge, .kui-card, .kui-card-row, .kui-widget, .kui-notice, .kui-toast, .kui-dialog, .kui-command-palette, .kui-popover, .kui-hover-card) {
     @apply rounded-kui-card;
   }
 
@@ -1652,6 +1653,47 @@
     }
 
     &:where([data-placement='top-end']) {
+      position-area: block-start span-inline-start;
+    }
+  }
+
+  /* A card anchored to an element the page picks at run time, placed beside it through CSS anchor positioning and flipped by the browser when it would overflow. It never takes the pointer, so it cannot flicker the hover that shows it. */
+  .kui-hover-card {
+    @apply border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-mantle p-0 text-kui-text;
+    inset: auto;
+    margin: 0.25rem;
+    pointer-events: none;
+    position-try-fallbacks: flip-block, flip-inline;
+
+    &:where([data-placement=top]) {
+      position-area: block-start;
+    }
+
+    &:where([data-placement=bottom]) {
+      position-area: block-end;
+    }
+
+    &:where([data-placement=left]) {
+      position-area: inline-start;
+    }
+
+    &:where([data-placement=right]) {
+      position-area: inline-end;
+    }
+
+    &:where([data-placement=bottom-start]) {
+      position-area: block-end span-inline-end;
+    }
+
+    &:where([data-placement=bottom-end]) {
+      position-area: block-end span-inline-start;
+    }
+
+    &:where([data-placement=top-start]) {
+      position-area: block-start span-inline-end;
+    }
+
+    &:where([data-placement=top-end]) {
       position-area: block-start span-inline-start;
     }
   }

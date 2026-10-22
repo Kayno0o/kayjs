@@ -1,0 +1,16 @@
+---
+import type { Plate } from '@kaynooo/kayjs-ui'
+import { signal } from 'kay'
+import ZoomPane from '@kaynooo/kayjs-ui/zoom-pane.kay'
+
+const plate = signal<Plate>({ scale: 1, x: 0, y: 0 })
+---
+ZoomPane(
+  label="Grid with its scale"
+  least={0.5}
+  onChange={plate.set}
+  class="h-56 w-full rounded-lg border border-kui-overlay1 bg-kui-surface0"
+)
+  svg(viewBox="0 0 100 60" width="100%" height="100%")
+    circle(cx="50" cy="30" r="6" fill="currentColor")
+p.text-sm Scale {plate().scale.toFixed(2)}, offset {Math.round(plate().x)}, {Math.round(plate().y)}

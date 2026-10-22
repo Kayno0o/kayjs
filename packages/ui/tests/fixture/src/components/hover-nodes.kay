@@ -1,0 +1,16 @@
+---
+import type { Plate } from '@kaynooo/kayjs-ui'
+import { signal } from 'kay'
+import HoverCard from '@kaynooo/kayjs-ui/hover-card.kay'
+import ZoomPane from '@kaynooo/kayjs-ui/zoom-pane.kay'
+
+const hovered = signal<Element | null>(null)
+const plate = signal<Plate>({ scale: 1, x: 0, y: 0 })
+---
+#plate(data-scale={plate().scale} data-x={plate().x} data-y={plate().y})
+  ZoomPane(label="Nodes" least={0.5} most={4} class="h-72 w-96" onChange={plate.set})
+    svg(viewBox="0 0 100 100" width="100%" height="100%")
+      for node of [1, 2]
+        circle(id={`node-${node}`} cx={node * 30} cy="50" r="8" onPointerEnter={event => hovered.set(event.currentTarget)} onPointerLeave={() => hovered.set(null)})
+  button#plain(onFocus={event => hovered.set(event.currentTarget)} onBlur={() => hovered.set(null)}) Plain
+  HoverCard#card(anchor={hovered()} placement="bottom") Detail

@@ -70,6 +70,69 @@ inBrowser('in the browser', () => {
   }, 120_000)
 })
 
+inBrowser('HoverCard and ZoomPane', () => {
+  // The card's box and the anchor's, with whether the card is open.
+  const boxes = async (page: { evaluate: (...args: never[]) => Promise<unknown> }, anchor: string) => page.evaluate(((selector: string) => {
+    const card = document.querySelector<HTMLElement>('#card')!
+    const box = card.getBoundingClientRect()
+    const target = document.querySelector(selector)!.getBoundingClientRect()
+
+    return { open: card.matches(':popover-open'), card: { left: box.left, right: box.right, top: box.top, bottom: box.bottom }, target: { left: target.left, right: target.right, top: target.top, bottom: target.bottom } }
+  }) as never, anchor as never) as Promise<{ open: boolean, card: { left: number, right: number, top: number, bottom: number }, target: { left: number, right: number, top: number, bottom: number } }>
+
+  test('sits below the SVG node the pointer is on, follows the focused button, and closes when nothing is hovered', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/hover-card')
+
+    await page.hover('#node-1')
+    await page.waitUntil(() => document.querySelector('#card')?.matches(':popover-open'))
+    const node = await boxes(page, '#node-1')
+
+    expect(node.card.top).toBeGreaterThanOrEqual(node.target.bottom - 1)
+    expect(Math.abs((node.card.left + node.card.right) / 2 - (node.target.left + node.target.right) / 2)).toBeLessThan(2)
+
+    await page.hover('#node-2')
+    await page.waitUntil(() => Math.abs(document.querySelector('#card')!.getBoundingClientRect().left + document.querySelector('#card')!.getBoundingClientRect().width / 2 - (document.querySelector('#node-2')!.getBoundingClientRect().left + document.querySelector('#node-2')!.getBoundingClientRect().width / 2)) < 2)
+
+    await page.click('#plain')
+    await page.waitUntil(() => document.querySelector('#card')!.getBoundingClientRect().top >= document.querySelector('#plain')!.getBoundingClientRect().bottom - 1)
+    expect((await boxes(page, '#plain')).open).toBe(true)
+
+    await page.evaluate((() => document.querySelector<HTMLElement>('#plain')!.blur()) as never)
+    await page.waitUntil(() => !document.querySelector('#card')!.matches(':popover-open'))
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
+  test('ZoomPane reports its plate on every zoom and key, and zooms out below fitted down to least', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/hover-card')
+    const plate = async () => page.evaluate((() => {
+      const element = document.querySelector<HTMLElement>('#plate')!
+
+      return { scale: Number(element.dataset.scale), x: Number(element.dataset.x), y: Number(element.dataset.y) }
+    }) as never) as Promise<{ scale: number, x: number, y: number }>
+
+    expect(await plate()).toEqual({ scale: 1, x: 0, y: 0 })
+    await page.click('[aria-label="Zoom in"]')
+    await page.waitUntil(() => Number(document.querySelector<HTMLElement>('#plate')!.dataset.scale) > 1)
+    const taken = await plate()
+
+    expect(taken.scale).toBeCloseTo(1.15 ** 2)
+    expect(taken.x).toBeLessThan(0)
+
+    await page.click('[aria-label="Fit"]')
+    await page.waitUntil(() => Number(document.querySelector<HTMLElement>('#plate')!.dataset.scale) === 1)
+    for (let step = 0; step < 6; step++)
+      await page.click('[aria-label="Zoom out"]')
+
+    await page.waitUntil(() => Number(document.querySelector<HTMLElement>('#plate')!.dataset.scale) <= 0.51)
+    expect((await plate()).scale).toBe(0.5)
+    expect(page.errors).toEqual([])
+  }, 120_000)
+})
+
 inBrowser('LineChart tooltip', () => {
   // Hovers a chart at a pointer position and reads the tooltip's box, heading and the viewport it sits in.
   const hover = async (page: { evaluate: (...args: never[]) => Promise<unknown>, waitFor: (selector: string) => Promise<void> }, id: string, at: { x: number | 'left' | 'right', y?: number }) => {

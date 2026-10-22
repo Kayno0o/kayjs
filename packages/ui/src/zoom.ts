@@ -42,8 +42,8 @@ export function wheelZoom(deltaY: number, deltaMode = 0, notch = NOTCH_ZOOM): nu
 }
 
 // The plate drawn closer or further off, held still at the point of the frame under the pointer.
-export function zoomedAt(plate: Plate, at: { x: number, y: number }, by: number, most = MOST): Plate {
-  const scale = Math.min(Math.max(plate.scale * by, 1), most)
+export function zoomedAt(plate: Plate, at: { x: number, y: number }, by: number, most = MOST, least = 1): Plate {
+  const scale = Math.min(Math.max(plate.scale * by, least), most)
   // What the scale really changed by, since the clamp may have swallowed part of the gesture.
   const real = scale / plate.scale
 
@@ -54,11 +54,12 @@ export function movedBy(plate: Plate, dx: number, dy: number): Plate {
   return { ...plate, x: plate.x + dx, y: plate.y + dy }
 }
 
-// The plate held against its frame, so no gesture can leave a gap down one side: fitted, it sits still; taken in, it may only be moved as far as its own edges.
+// The plate held against its frame, so no gesture can leave a gap down one side: fitted, it sits still; taken in, it may only be moved as far as its own edges; taken out, it stays inside the frame.
 export function held(plate: Plate, frame: Frame): Plate {
-  return {
-    scale: plate.scale,
-    x: Math.min(Math.max(plate.x, frame.width - frame.width * plate.scale), 0),
-    y: Math.min(Math.max(plate.y, frame.height - frame.height * plate.scale), 0),
-  }
+  return { scale: plate.scale, x: within(plate.x, frame.width * (1 - plate.scale)), y: within(plate.y, frame.height * (1 - plate.scale)) }
+}
+
+// A plate drawn smaller than its frame may sit anywhere inside it, the same bounds read the other way round.
+function within(offset: number, edge: number): number {
+  return Math.min(Math.max(offset, Math.min(edge, 0)), Math.max(edge, 0))
 }
