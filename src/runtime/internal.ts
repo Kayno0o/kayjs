@@ -23,6 +23,9 @@ type Written<T> = T extends Signal<infer Value> ? Value : T
 // What a `let` holds once written: the signal it held, else the value.
 type Kept<Current, Value> = Current extends Signal<infer Held> ? Signal<Held> : Value
 
+// What a `let` may be assigned through the helper: a signal it holds takes its value or another signal; anything else is left to the assignment the helper sits in, which the declaration types, as the argument is narrowed where it is written.
+type BackValue<Current> = true extends (Current extends Signal<unknown> ? true : false) ? Current | Written<Current> : unknown
+
 // The signal a property holds, found without running an accessor: a getter alone is read, since assigning to it would throw, while a setter is the property's own way to be written. `read` answers what that getter returned, so a caller needing the value does not run it twice.
 function heldAt(object: unknown, key: PropertyKey): { held: Signal<unknown> | undefined, read: boolean, value?: unknown } {
   for (let at = object; at != null; at = Object.getPrototypeOf(at)) {
@@ -53,7 +56,8 @@ export function writeTo<Target, Key extends keyof Target, Value extends Written<
 }
 
 // `object[key] += 1` and `object[key]++`: `update` gives the next value from the current one, `post` makes the expression the number it had, and `logical` (`||=`, `??=`) writes nothing when the value stays.
-export function updateTo<Target, Key extends keyof Target>(object: Target, key: Key, update: (current: Written<Target[Key]>) => Written<Target[Key]>, form?: 'post' | 'logical'): Written<Target[Key]> {
+// The expression is typed by what `update` gives, so `(box.list ??= []).push(item)` reads a list where the place may hold none.
+export function updateTo<Target, Key extends keyof Target, Next extends Written<Target[Key]>>(object: Target, key: Key, update: (current: Written<Target[Key]>) => Next, form?: 'post' | 'logical'): Next {
   const { held, read, value } = heldAt(object, key)
   let before: unknown
 
@@ -72,12 +76,12 @@ export function updateTo<Target, Key extends keyof Target>(object: Target, key: 
   }
 
   // `++` answers the number it read, not the string or the object it was.
-  return form === 'post' ? (typeof before === 'bigint' ? before : Number(before)) as Written<Target[Key]> : next
+  return form === 'post' ? (typeof before === 'bigint' ? before : Number(before)) as Next : next
 }
 
 // A `let` assigned a signal's place, `variable = writeBack(variable, value)`: a signal is written and stays the variable's value, anything else is replaced. What type checking cannot tell a plain `let` from is left unchecked.
 // The type of the variable can be given as `Current`, since the argument is narrowed where a plain assignment is typed by the declaration.
-export function writeBack<Current, Value extends Current | Written<Current> = Current | Written<Current>>(current: Current, value: Value): Kept<Current, Value>
+export function writeBack<Current, Value extends BackValue<Current> = Current | Written<Current>>(current: Current, value: Value): Kept<Current, Value>
 export function writeBack(current: unknown, value: unknown): unknown {
   if (!isSignal(current) || typeof value === 'function')
     return value
