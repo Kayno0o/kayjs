@@ -1,6 +1,6 @@
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { hydrate, property } from '../src/runtime/dom'
+import { fresh, hydrate, property } from '../src/runtime/dom'
 import { flush, renderEffect, root } from '../src/runtime/reactive'
 
 // Each test gets its own copy of the shell, whose renderer has not loaded yet.
@@ -48,6 +48,27 @@ describe('markdownHtml in an island', () => {
 
     await settled(() => element.innerHTML === '<h1>Title</h1>\n')
     expect(element.innerHTML).toBe('<h1>Title</h1>\n')
+  })
+
+  it('draws the text as written in a client-only component of a hydrating island, which has no server markup', async () => {
+    const { markdownHtml } = await shell('fresh')
+    const container = document.createElement('div')
+
+    container.innerHTML = '<div></div>'
+
+    const element = container.firstElementChild!
+
+    root(() => hydrate(() => fresh(() => renderEffect(() => property(element, 'innerHTML', markdownHtml('*a*')))), container))
+    flush()
+    expect(element.innerHTML).toBe('<p>*a*</p>\n')
+  })
+
+  it('lets a call outside an effect wait for the renderer', async () => {
+    const { markdownHtml, markdownReady } = await shell('ready')
+
+    expect<string>(markdownHtml('*a*')).toBe('<p>*a*</p>\n')
+    await markdownReady()
+    expect<string>(markdownHtml('*a*')).toBe('<p><em>a</em></p>\n')
   })
 
   it('gives the text as written to a call outside any effect', async () => {

@@ -155,7 +155,7 @@ export const posts = collection('content/posts', {
 
 ### Render Markdown a user writes
 
-`markdownHtml(text)` from `kay/markdown` renders it as it comes, in an island too, as a `SafeHtml`. In an island marked (about 15 KB gzip) loads on the first call: the text shows as written until it arrives, then a template or effect that called it runs again formatted, and a failed load leaves the text as written.
+`markdownHtml(text)` from `kay/markdown` renders it as it comes, in an island too, as a `SafeHtml`. In an island marked (about 15 KB gzip) loads on the first call: the text shows as written until it arrives, then a template or effect that called it runs again formatted, and a failed load leaves the text as written. A call outside a template or effect, such as a click handler, awaits `markdownReady()` from `kay/markdown` first.
 
 ```kay
 ---

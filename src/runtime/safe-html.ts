@@ -8,8 +8,20 @@ let young = new Set<string>()
 let old = new Set<string>()
 let size = 0
 
-// What an island hydrating returns for markup it has not got yet: `property` leaves the server's own markup in place for it.
-export const SERVER_MARKUP = '<!--kay-server-markup-->'
+// Set by markup an island hydrating cannot draw yet, such as Markdown whose renderer is loading, which stands in as text: the next `property` call leaves the server's own markup in place instead of writing it. A flag rather than a marker in the string, which would print wherever the string went.
+let held = false
+
+export function holdServerMarkup(): void {
+  held = true
+}
+
+export function takeHeldMarkup(): boolean {
+  const was = held
+
+  held = false
+
+  return was
+}
 
 export function vouch(markup: string, always = false): SafeHtml {
   if (always) {
