@@ -97,7 +97,7 @@ describe('the type check beside kay dev', () => {
 
     await Bun.write(file, JSON.stringify({ errors: [stale] }))
 
-    const stop = await dev(root, { format: 'json', port: 0, log: () => {} })
+    const stop = await dev(root, { format: 'json', port: 0, log: () => undefined })
 
     try {
       await until(() => listedTypeErrors(root).length === 0)
