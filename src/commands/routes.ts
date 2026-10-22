@@ -105,7 +105,7 @@ export async function listRoutes(root: string): Promise<{ routes: Listed[], unli
 async function appRoutes(root: string, config: KayConfig): Promise<Listed[]> {
   const { routes: routesDir } = projectPaths(root, config)
   const mounts = routeMounts(root, config.extensions)
-  const [pages, endpoints] = await Promise.all([scanRoutes(routesDir, mounts, root), scanEndpoints(routesDir, mounts)])
+  const [pages, endpoints] = await Promise.all([scanRoutes(routesDir, mounts), scanEndpoints(routesDir, mounts)])
   const listed: Listed[] = []
   const actionFiles = new Set<string>()
   const settings = config.i18n && routedSettings(localeSettings(config.i18n), pages)

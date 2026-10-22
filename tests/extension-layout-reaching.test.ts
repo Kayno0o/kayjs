@@ -1,7 +1,7 @@
 import { mkdir, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, test } from 'bun:test'
-import { routeMounts, scanRoutes } from '../src/server/routes'
+import { routeMounts, routeTrees, scanRoutes, specialPagesOf } from '../src/server/routes'
 import { scratchDir } from './scratch'
 
 async function project() {
@@ -82,14 +82,19 @@ test('an import.meta.glob pattern of a library script expands against the projec
     'lib/parts.ts': 'export const parts = import.meta.glob([\'/src/parts/*.kay\', \'!/src/parts/draft.kay\'], { eager: true })\n',
     'src/parts/ready.kay': '---\nimport Widget from \'../../lib/widget.kay\'\n---\nWidget\n',
     'src/parts/draft.kay': '---\nimport Other from \'../../lib/other.kay\'\n---\nOther\n',
+    'src/routes/_404.kay': '---\nimport { parts } from \'../../lib/parts.ts\'\n---\np {Object.keys(parts).length}\n',
     'src/routes/globbed.kay': '---\nimport { parts } from \'../../lib/parts.ts\'\n---\np {Object.keys(parts).length}\n',
   }
 
   for (const [path, text] of Object.entries(files))
     await Bun.write(join(root, path), text)
 
-  const wrapping = async (target: string) => (await scanRoutes(join(root, 'src/routes'), routeMounts(root, [{ name: 'lib', layout: { file: 'lib/_layout.kay', reaching: [target] } }]), root)).filter(route => route.layouts.length > 0).map(route => route.pattern)
+  const mountsReaching = (target: string) => routeMounts(root, [{ name: 'lib', layout: { file: 'lib/_layout.kay', reaching: [target] } }])
+  const wrapping = async (target: string) => (await scanRoutes(join(root, 'src/routes'), mountsReaching(target))).filter(route => route.layouts.length > 0).map(route => route.pattern)
+  const fallback = (target: string) => specialPagesOf(routeTrees(join(root, 'src/routes'), mountsReaching(target)), '').notFound!.layouts.length
 
   expect(await wrapping('lib/widget.kay')).toContain('/globbed')
   expect(await wrapping('lib/other.kay')).not.toContain('/globbed')
+  expect(fallback('lib/widget.kay')).toBe(1)
+  expect(fallback('lib/other.kay')).toBe(0)
 })

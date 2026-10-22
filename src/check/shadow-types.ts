@@ -405,7 +405,7 @@ async function extensionPackages(root: string, libraries: KayLibrary[], extensio
 // The pages, public files, API modules and endpoints, with the locale settings, each with the reason the server would refuse it reported.
 async function servedProject(root: string, options: CheckOptions, problems: CheckDiagnostic[], mounts: RouteMount[]): Promise<ServedProject> {
   const paths = projectPaths(root, options)
-  const [routes, found, apiModules, { endpoints, failure }] = await Promise.all([scanRoutes(paths.routes, mounts, root), publicFiles(paths.public), apiModulesOf(root, options, problems), endpointsOf(paths.routes, mounts)])
+  const [routes, found, apiModules, { endpoints, failure }] = await Promise.all([scanRoutes(paths.routes, mounts), publicFiles(paths.public), apiModulesOf(root, options, problems), endpointsOf(paths.routes, mounts)])
   const settings = options.i18n && i18nSettings(root, options.i18n, problems)
 
   return { routes, found, publicPaths: [...found, ...htmlFallbacks(found, servedPaths(routes))], apiModules, endpoints, endpointFailure: failure, settings }

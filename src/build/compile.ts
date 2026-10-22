@@ -88,7 +88,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
     throw new KayError('executable-invalid', `kay: an executable embeds its public files and the client build side by side, so the public directory cannot be named ${CLIENT_ASSETS}`)
 
   const mounts = routeMounts(root, config.extensions)
-  const routes = await scanRoutes(routesDir, mounts, root)
+  const routes = await scanRoutes(routesDir, mounts)
 
   refuseClashes(routesDir, routes)
 

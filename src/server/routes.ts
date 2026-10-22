@@ -221,20 +221,13 @@ export function servedPaths(routes: Route[]): Set<string> {
   return new Set(routes.flatMap(route => patternShapes(route.pattern)))
 }
 
-// The project root of a scan, which the walk expands `import.meta.glob` patterns against.
-const globRoots = new WeakMap<LayoutsRead, string>()
-
-// The app's pages, then each mounted library's that no page of the app serves the path of. The `root` is the project's, which an `import.meta.glob` pattern of a file the walk reaches expands against as the build does.
-export async function scanRoutes(routesDir: string, mounts: RouteMount[] = [], root?: string): Promise<Route[]> {
+// The app's pages, then each mounted library's that no page of the app serves the path of.
+export async function scanRoutes(routesDir: string, mounts: RouteMount[] = []): Promise<Route[]> {
   await loadContextReader(mounts)
 
   const trees = routeTrees(routesDir, mounts)
   const routes: Route[] = []
-  const read: LayoutsRead = new Map()
-
-  if (root !== undefined)
-    globRoots.set(read, root)
-
+  const read = readFor(trees)
   const served = new Set<string>()
   const access = new Map<string, LayoutAccess<GuardFile>>()
   const accessOf = (layout: string) => {
@@ -278,7 +271,7 @@ export async function scanRoutes(routesDir: string, mounts: RouteMount[] = [], r
 export async function scanEndpoints(routesDir: string, mounts: RouteMount[] = []): Promise<Endpoint[]> {
   const trees = routeTrees(routesDir, mounts)
   const endpoints: Endpoint[] = []
-  const read: LayoutsRead = new Map()
+  const read = readFor(trees)
   const served = new Set<string>()
 
   for (const tree of pageTrees(trees)) {
@@ -374,6 +367,20 @@ export function paramsIn(shape: string, route: Pick<Route, 'catchAll'>): string[
 
 // The keys each file read so far sets to `false` in its `page`, so a scan reads a layout once however many pages it wraps.
 type LayoutsRead = Map<string, Set<string>>
+
+// The project root of the mounts `routeMounts` built, which the walk expands an `import.meta.glob` pattern against as the build does.
+const mountRoots = new WeakMap<RouteMount, string>()
+const globRoots = new WeakMap<LayoutsRead, string>()
+
+function readFor(trees: RouteMount[]): LayoutsRead {
+  const read: LayoutsRead = new Map()
+  const root = trees.map(tree => mountRoots.get(tree)).find(found => found !== undefined)
+
+  if (root !== undefined)
+    globRoots.set(read, root)
+
+  return read
+}
 
 // The layouts around a page, outermost first. The one loading the values of `ctx` stays first even for a page leaving the chain, as it has no place in what it draws.
 function layoutsOf(trees: RouteMount[], at: string, file: string, read: LayoutsRead): string[] {
@@ -771,7 +778,7 @@ function withoutLayouts(special: SpecialPages): SpecialPages {
 }
 
 // The special pages for a directory of the URL tree, `''` for the root, `/account` below it.
-export function specialPagesOf(trees: RouteMount[], at: string, read: LayoutsRead = new Map()): SpecialPages {
+export function specialPagesOf(trees: RouteMount[], at: string, read: LayoutsRead = readFor(trees)): SpecialPages {
   const nearest = (name: string): SpecialPage | undefined => {
     for (const dir of directoriesUp(at)) {
       const tree = treeHolding(trees, dir, name)
@@ -831,10 +838,15 @@ function checkedLayout(root: string, layout: string, verify: boolean): string {
 export function routeMounts(root: string, extensions: KayExtension[] = [], verify = true): RouteMount[] {
   const contexts = extensions.some(extension => extension.context !== undefined) ? [outerMount(CONTEXT_LAYOUT, 'context')] : []
 
-  return [...contexts, ...extensions.flatMap(({ routes, editor, layout }) => [
+  const mounts = [...contexts, ...extensions.flatMap(({ routes, editor, layout }) => [
     ...routes ? [{ dir: throughLinks(root, resolve(root, routes.dir)), prefix: mountPrefix(routes.prefix), ...editor !== undefined && { editor: true as const } }] : [],
     ...layout === undefined ? [] : [typeof layout === 'string' ? outerMount(throughLinks(root, checkedLayout(root, layout, verify))) : outerMount(throughLinks(root, checkedLayout(root, layout.file, verify)), reachingFiles(root, layout.reaching, verify))],
   ])]
+
+  for (const mount of mounts)
+    mountRoots.set(mount, root)
+
+  return mounts
 }
 
 // The API directories each extension in `extensions` mounts, reached as its routes are.
