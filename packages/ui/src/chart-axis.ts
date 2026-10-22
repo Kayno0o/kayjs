@@ -99,6 +99,22 @@ export function headings(labels: string[], times: number[] | null, format?: Labe
   })
 }
 
+// Each label as the x-axis draws it: a date as a day and month, or a time of day when the labels span under a day, any other label as written; an app's `format` writes them itself.
+export function tickTexts(labels: string[], times: number[] | null, format?: LabelFormat): string[] {
+  const seconds = secondsApart(labels)
+  const span = spanOf(times)
+
+  return labels.map((label, index) => {
+    if (format)
+      return format(label, { index, place: 'tick', span, seconds })
+
+    if (times)
+      return span < DAY_MS ? timeOfDay(new Date(times[index]!), false) : dayMonth(new Date(times[index]!))
+
+    return axisLabel(label)
+  })
+}
+
 // Each series laid on top of the ones before it: a point's height is the sum of its own value and the ones below, a `null` counting as 0.
 export function stackValues(series: (number | null)[][]): number[][] {
   const totals: number[] = []

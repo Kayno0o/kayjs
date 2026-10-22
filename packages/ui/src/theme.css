@@ -1853,7 +1853,7 @@
 
   /* The plot leaves its left margin for the value labels, which hang outside it as ScatterChart's do. */
   .kui-bar-chart {
-    @apply m-0 flex flex-col gap-2;
+    @apply m-0 flex flex-col gap-2 pt-2 pr-3;
   }
 
   .kui-bar-chart-plot {
@@ -1883,6 +1883,11 @@
 
   .kui-bar-chart-bar {
     @apply min-h-px min-w-px flex-1 rounded-t-sm;
+  }
+
+  /* The mark a column keeps where its series gives it a colour or a note but no height. */
+  .kui-bar-chart-bar:where([data-stub]) {
+    @apply h-1;
   }
 
   .kui-bar-chart-column:where([data-stacked]) .kui-bar-chart-bar {

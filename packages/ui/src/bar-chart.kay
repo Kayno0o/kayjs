@@ -1,19 +1,21 @@
 ---
 import type { JSX } from 'kay'
+import type { LabelFormat } from './chart-axis'
 import type { BarSeries } from './plot'
-import { memo, recipe } from 'kay'
-import { barRatios, labelSlots, PALETTE, valueTicks } from './plot'
+import { memo, recipe, signal } from 'kay'
+import { headings, labelTimes, tickIndices, tickTexts } from './chart-axis'
+import { barRatios, PALETTE, steppedPoint, valueTicks } from './plot'
 import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: 'kui-bar-chart', plot: 'kui-bar-chart-plot', grid: 'kui-bar-chart-grid', tick: 'kui-bar-chart-tick', columns: 'kui-bar-chart-columns', column: 'kui-bar-chart-column', bar: 'kui-bar-chart-bar', axis: 'kui-bar-chart-axis', axisLabel: 'kui-bar-chart-axis-label', legend: 'kui-bar-chart-legend', legendItem: 'kui-bar-chart-legend-item', key: 'kui-bar-chart-key' } })
 
-const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel = (label: string) => label, xLabels = false, stacked = false, totalLabel = wording('ui.barChart.total', 'Total'), legend, emptyLabel, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children'> & {
+const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.barChart.total', 'Total'), legend, emptyLabel, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children'> & {
   labels: string[]
   series: BarSeries[]
   // Formats the y-axis labels, the tooltips and the readings screen readers hear.
   formatValue?: ((value: number) => string) | undefined
-  // Formats a label for the x-axis, the tooltips and what screen readers hear.
-  formatLabel?: ((label: string, index: number) => string) | undefined
+  // Formats a label for the tooltips, the x-axis and what screen readers hear, as LineChart's: a label that is a date reads in the page's locale by default.
+  formatLabel?: LabelFormat | undefined
   // Draws up to five x-axis labels.
   xLabels?: boolean | undefined
   // Piles the series of a label on one bar instead of setting them side by side, and adds a total to its tooltip.
@@ -28,10 +30,17 @@ const { labels, series, formatValue = (value: number) => value.toLocaleString(),
   label: string
 }>()
 
-const ratios = memo(() => barRatios(series.map(item => item.values), stacked))
+const ratios = memo(() => barRatios(series.map(item => item.values), stacked, labels.length))
 const ticks = memo(() => valueTicks(ratios().top))
-const slots = memo(() => xLabels ? labelSlots(labels.length) : new Set<number>())
+const times = memo(() => labelTimes(labels))
+const shown = memo(() => new Set(xLabels ? tickIndices(labels.length) : []))
+const axisTexts = memo(() => tickTexts(labels, times(), formatLabel))
+const headingTexts = memo(() => headings(labels, times(), formatLabel))
 const colors = (item: BarSeries, index: number, at: number) => item.colors?.[at] ?? item.color ?? PALETTE[index % PALETTE.length]!
+
+// The bar the keyboard stands at, the latest one until it moves.
+const stop = signal<number | null>(null)
+const current = () => stop() ?? Math.max(0, labels.length - 1)
 
 const reading = (item: BarSeries, at: number) => {
   const value = item.values[at]
@@ -40,11 +49,33 @@ const reading = (item: BarSeries, at: number) => {
 }
 
 // What a bar column reads on hover and focus, and to screen readers: the label, each series' reading and the notes the series carry for it.
-const summary = (at: number) => {
+const summaries = memo(() => labels.map((_, at) => {
   const total = stacked ? [`${totalLabel} ${formatValue(series.reduce((sum, item) => sum + (item.values[at] ?? 0), 0))}`] : []
   const notes = series.map(item => item.notes?.[at]).filter(Boolean)
 
-  return `${formatLabel(labels[at]!, at)}: ${[...series.map(item => `${item.name} ${reading(item, at)}`), ...total].join(', ')}${notes.length > 0 ? `; ${notes.join('; ')}` : ''}`
+  return `${headingTexts()[at]}: ${[...series.map(item => `${item.name} ${reading(item, at)}`), ...total].join(', ')}${notes.length > 0 ? `; ${notes.join('; ')}` : ''}`
+}))
+
+// A column with no height still shows a stub where its series gives it a colour or a note, so a failed run recorded as 0 stands out as much as a long one.
+const marked = (item: BarSeries, at: number) => Boolean(item.colors?.[at] || item.notes?.[at])
+
+// The arrows walk the columns, one tab stop in all, and Home and End reach either end.
+function keyDown(event: KeyboardEvent) {
+  if (event.altKey || event.ctrlKey || event.metaKey)
+    return
+
+  const next = steppedPoint(event.key, current(), labels.length)
+
+  if (next === undefined || labels.length === 0)
+    return
+
+  event.preventDefault()
+  stop.set(next)
+
+  const target = (event.currentTarget as HTMLElement).parentElement?.children[next]
+
+  if (target instanceof HTMLElement)
+    target.focus()
 }
 
 const nothing = () => emptyLabel ?? wording('ui.barChart.emptyLabel', 'No data yet.')
@@ -56,18 +87,20 @@ else
   figure(part="root" {...rest} aria-label={label})
     div(part="plot")
       for tick of ticks() key={tick.ratio}
-        span(part="grid" style={`bottom: ${tick.ratio * 100}%`})
+        span(part="grid" aria-hidden="true" style={`bottom: ${tick.ratio * 100}%`})
           span(part="tick") {formatValue(tick.ratio * ratios().top)}
       div(part="columns")
-        for name, at of labels key={at}
-          span(part="column" role="img" tabindex="0" aria-label={summary(at)} data-tooltip={summary(at)} data-stacked={stacked ? '' : undefined})
+        for _, at of labels key={at}
+          span(part="column" role="img" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={summaries()[at]} data-stacked={stacked ? '' : undefined} onKeyDown={keyDown} onFocus={() => stop.set(at)})
             for item, index of series key={item.name}
               if ratios().heights[index]![at]
-                span(part="bar" data-series={index} style={`height: ${ratios().heights[index]![at]! * 100}%; background-color: ${colors(item, index, at)}`})
+                span(part="bar" style={`height: ${ratios().heights[index]![at]! * 100}%; background-color: ${colors(item, index, at)}`})
+              else if marked(item, at)
+                span(part="bar" data-stub style={`background-color: ${colors(item, index, at)}`})
     if xLabels
-      div(part="axis")
-        for name, at of labels key={at}
-          span(part="axisLabel") {slots().has(at) ? formatLabel(name, at) : ''}
+      div(part="axis" aria-hidden="true")
+        for _, at of labels key={at}
+          span(part="axisLabel") {shown().has(at) ? axisTexts()[at] : ''}
     if legend ?? series.length > 1
       ul(part="legend")
         for item, index of series key={item.name}

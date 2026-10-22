@@ -119,12 +119,23 @@ export interface BarSeries extends ChartSeries {
   notes?: (string | null | undefined)[]
 }
 
-// The height of each bar as a share of the plot (0 to 1), a stacked series laid on the ones before it, and the top value the plot spans. Only positive readings draw a bar.
-export function barRatios(values: readonly (readonly (number | null)[])[], stacked: boolean): { heights: number[][], top: number } {
-  const count = Math.max(0, ...values.map(row => row.length))
-  const positive = (row: readonly (number | null)[], at: number) => Math.max(0, row[at] ?? 0)
-  const tops = Array.from({ length: count }, (_, at) => stacked ? values.reduce((sum, row) => sum + positive(row, at), 0) : Math.max(0, ...values.map(row => positive(row, at))))
-  const top = Math.max(0, ...tops)
+// The height of each of `count` bars as a share of the plot (0 to 1), a stacked series laid on the ones before it, and the top value the plot spans. Only positive, finite readings draw a bar.
+export function barRatios(values: readonly (readonly (number | null)[])[], stacked: boolean, count: number): { heights: number[][], top: number } {
+  const positive = (row: readonly (number | null)[], at: number) => {
+    const value = row[at]
+
+    return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : 0
+  }
+  let top = 0
+
+  for (let at = 0; at < count; at++) {
+    let own = 0
+
+    for (const row of values)
+      own = stacked ? own + positive(row, at) : Math.max(own, positive(row, at))
+
+    top = Math.max(top, own)
+  }
 
   return { heights: values.map(row => Array.from({ length: count }, (_, at) => top > 0 ? positive(row, at) / top : 0)), top }
 }
@@ -132,14 +143,4 @@ export function barRatios(values: readonly (readonly (number | null)[])[], stack
 // The grid lines of a bar plot as shares of its height: the baseline, the middle and the top, or the baseline alone when nothing is positive.
 export function valueTicks(top: number): { ratio: number }[] {
   return top > 0 ? [{ ratio: 0 }, { ratio: 0.5 }, { ratio: 1 }] : [{ ratio: 0 }]
-}
-
-// Which of `count` bars carry an x-axis label: up to five, spread evenly and including both ends.
-export function labelSlots(count: number): Set<number> {
-  if (count <= 1)
-    return new Set(count === 1 ? [0] : [])
-
-  const shown = Math.min(5, count)
-
-  return new Set(Array.from({ length: shown }, (_, step) => Math.round(step * (count - 1) / (shown - 1))))
 }

@@ -163,3 +163,32 @@ describe('ScatterChart', () => {
     expect(selected).toEqual(['Celeste'])
   })
 })
+
+describe('BarChart', () => {
+  const key = (column: Element, name: string) => column.dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true }))
+
+  test('is one tab stop on the latest column, the arrows and Home and End walking the others', async () => {
+    const root = await charts()
+    const columns = () => [...root.querySelectorAll('#bars .kui-bar-chart-column')] as HTMLElement[]
+
+    expect(columns().map(column => column.tabIndex)).toEqual([-1, -1, 0])
+
+    columns()[2]!.focus()
+    key(columns()[2]!, 'ArrowLeft')
+    await settle()
+    expect(columns().map(column => column.tabIndex)).toEqual([-1, 0, -1])
+    expect(document.activeElement).toBe(columns()[1]!)
+
+    key(columns()[1]!, 'Home')
+    await settle()
+    expect(columns().map(column => column.tabIndex)).toEqual([0, -1, -1])
+  })
+
+  test('keeps a stub where a zero reading has a colour, so a failed run does not vanish', async () => {
+    const root = await charts()
+    const second = root.querySelectorAll('#bars .kui-bar-chart-column')[1]!
+
+    expect(second.querySelectorAll('.kui-bar-chart-bar[data-stub]')).toHaveLength(1)
+    expect(second.getAttribute('data-tooltip')).toBe('Tue: Minutes 0')
+  })
+})

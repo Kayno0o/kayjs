@@ -8,7 +8,6 @@ import { chartData, headings, indexAt, labelTimes, positionOf, stackValues, tota
 import { dashSample, PALETTE, SERIES_DASHES, steppedPoint } from './plot'
 import { wording } from 'kay/words'
 
-
 // Which attribute of each drawn part takes its series' colour.
 const PAINT: Record<string, string> = { line: 'stroke', point: 'stroke', area: 'fill' }
 

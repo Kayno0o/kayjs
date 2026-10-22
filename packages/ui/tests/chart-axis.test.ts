@@ -1,7 +1,7 @@
 import type { LabelContext } from '../src/chart-axis'
 import { describe, expect, test } from 'bun:test'
 import { FixedScaleAxis } from 'chartist'
-import { chartData, headings, indexAt, labelTimes, positionOf, stackValues, tickIndices, totalAt, xAxisOptions } from '../src/chart-axis'
+import { chartData, headings, indexAt, labelTimes, positionOf, stackValues, tickIndices, tickTexts, totalAt, xAxisOptions } from '../src/chart-axis'
 
 const DAYS = ['2026-01-01', '2026-01-02', '2026-01-11']
 
@@ -121,5 +121,17 @@ describe('chart axis', () => {
     expect(stackValues([[null], [null]])).toEqual([[0], [0]])
     expect(stackValues([[-1, 2], [1, -3]])).toEqual([[-1, 2], [0, -1]])
     expect(totalAt([], 0)).toBe(0)
+  })
+})
+
+describe('tickTexts', () => {
+  test('writes a date as its day and month, a time of day when the labels span under a day, any other label as written', () => {
+    expect(tickTexts(DAYS, labelTimes(DAYS)).map(text => text.length > 0)).toEqual([true, true, true])
+    expect(tickTexts(['Mon', 'Tue'], null)).toEqual(['Mon', 'Tue'])
+    expect(tickTexts(['2026-01-01T10:00:00Z', '2026-01-01T12:30:00Z'], labelTimes(['2026-01-01T10:00:00Z', '2026-01-01T12:30:00Z'])).join(' ')).toMatch(/\d.*\d/)
+  })
+
+  test('hands the app its own format the tick place', () => {
+    expect(tickTexts(['a', 'b'], null, (label, context) => `${label}${context.index}${context.place}`)).toEqual(['a0tick', 'b1tick'])
   })
 })
