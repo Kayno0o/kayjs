@@ -1,4 +1,4 @@
-import { cp, mkdir } from 'node:fs/promises'
+import { cp, mkdir, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { expect, test } from 'bun:test'
@@ -34,3 +34,18 @@ test('a page asking in its server fence builds, and an island importing ask does
   expect(island.code).not.toBe(0)
   expect(island.output).toContain('Browser build cannot import')
 }, 120_000)
+
+// The send and stop buttons draw their own svg, so the island ships none of kayjs-ui's default icons: this marker is the spinner's drawing, which a build holding them carries.
+test('the Chat island ships none of the default icons of kayjs-ui', async () => {
+  const fixture = join(import.meta.dir, 'fixture')
+  const run = Bun.spawn([process.execPath, CLI, 'build', fixture, '--no-check', '--quiet'], { cwd: fixture, stdout: 'pipe', stderr: 'pipe' })
+  const output = await new Response(run.stdout).text() + await new Response(run.stderr).text()
+
+  expect(await run.exited, output).toBe(0)
+
+  const dist = join(fixture, '.kay/client/dist')
+  const chunk = (await readdir(dist)).find(file => (/^chat-\w+\.js$/).test(file))
+
+  expect(chunk).toBeDefined()
+  expect(await Bun.file(join(dist, chunk!)).text()).not.toContain('M12 3a9 9 0 1 0 9 9')
+}, 180_000)

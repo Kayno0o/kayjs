@@ -2,7 +2,6 @@
   "name": "kayjs-ai-fixture",
   "private": true,
   "dependencies": {
-    "@iconify-json/tabler": "*",
     "@kaynooo/kayjs-ai": "link:../..",
     "@kaynooo/kayjs-ui": "link:../../../ui"
   }

@@ -60,7 +60,6 @@
       "name": "@kaynooo/kayjs-ai",
       "version": "1.69.0",
       "devDependencies": {
-        "@iconify-json/tabler": "^1.2.42",
         "@kaynooo/eslint": "^7.0.4",
         "@kaynooo/kayjs-ui": "workspace:~",
         "@types/bun": "^1.4.3",
@@ -70,6 +69,9 @@
         "@kaynooo/kayjs-ui": "workspace:~",
         "kay": "~1.69.0",
       },
+      "optionalPeers": [
+        "@kaynooo/kayjs-ui",
+      ],
     },
     "packages/auth": {
       "name": "@kaynooo/kayjs-auth",
