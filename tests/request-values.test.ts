@@ -530,8 +530,21 @@ describe('a production server started from disk', () => {
 
     const { answers, loaded } = await boot(options.replaceAll(resolve(root), link), ['/wasm'])
 
-    expect(answers[0]!.html).toContain('<p id="path">')
+    expect(answers[0]!.html).toContain(`<p id="path">${realpathSync(resolve(root, 'lib/add.wasm'))}</p>`)
     expect(loaded).toBe(0)
+  }, 120_000)
+
+  it('keeps the path of a wasm file imported by it when the file changed since the build', async () => {
+    const { root, options } = await project([EXTENSION])
+
+    await Bun.write(resolve(root, 'lib/add.wasm'), Bun.file(WASM))
+    await Bun.write(resolve(root, 'src/routes/wasm.kay'), '--- server\nimport path from \'../../lib/add.wasm\' with { type: \'file\' }\n---\np#path {path}\np#who {ctx.user?.name}\n')
+    await build(options)
+    await Bun.write(resolve(root, 'lib/add.wasm'), new Uint8Array([...await Bun.file(WASM).bytes(), 0]))
+
+    const { answers } = await boot(options, ['/wasm'])
+
+    expect(answers[0]!.html).toContain(`<p id="path">${realpathSync(resolve(root, 'lib/add.wasm'))}</p>`)
   }, 120_000)
 
   it('keeps the maps of the recorded components in files of their own, read when a stack needs them', async () => {

@@ -88,12 +88,23 @@ export function embeddedMapTail(name: string, blob: string): string {
   return `\nimport { registerEmbeddedMap } from 'kay/internal/server'\nregisterEmbeddedMap(${JSON.stringify(name)}, ${JSON.stringify(blob)})\n`
 }
 
-const EMBEDDED_MAP_TAIL = /\nimport \{ registerEmbeddedMap \} from 'kay\/internal\/server'\nregisterEmbeddedMap\("(?:[^"\\]|\\.)*", ("(?:[^"\\]|\\.)*")\)\n$/
+const EMBEDDED_MAP_ARGUMENT = /^"(?:[^"\\]|\\.)*", /
+const EMBEDDED_MAP_START = '\nimport { registerEmbeddedMap } from \'kay/internal/server\'\nregisterEmbeddedMap('
 
+// The module without its map and the map, cut at the last tail by position so a large map is no pattern to match.
 export function splitEmbeddedMap(contents: string): { code: string, blob?: string } {
-  const found = EMBEDDED_MAP_TAIL.exec(contents)
+  const start = contents.lastIndexOf(EMBEDDED_MAP_START)
+  const argument = start < 0 ? undefined : contents.slice(start + EMBEDDED_MAP_START.length).match(EMBEDDED_MAP_ARGUMENT)
 
-  return found === null ? { code: contents } : { code: contents.slice(0, found.index), blob: JSON.parse(found[1]!) as string }
+  if (start < 0 || argument === null || argument === undefined || !contents.endsWith(')\n'))
+    return { code: contents }
+
+  try {
+    return { code: contents.slice(0, start), blob: JSON.parse(contents.slice(start + EMBEDDED_MAP_START.length + argument[0].length, -2)) as string }
+  }
+  catch {
+    return { code: contents }
+  }
 }
 
 // The text with every character but its line breaks blanked: offsets, lines and columns stay the same.

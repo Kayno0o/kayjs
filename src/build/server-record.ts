@@ -33,7 +33,7 @@ export async function clearServerRecord(output: string): Promise<void> {
 }
 
 // Records the modules a server started from this build loads, compiled as the `.kay` loader would: the modules of the routes, the API, the extensions and the content config, and everything they import that the loader changes, `.kay` components, imported assets, `import.meta.glob` calls and the library settings the app replaces.
-// A server on disk imports them from the record instead of compiling them as they load, so it loads no compiler; one the record lacks is compiled then, and a build whose modules the record cannot hold, a load answering with something else than code, writes none.
+// A server on disk imports them from the record instead of compiling them as they load, so it loads no compiler; one the record lacks is compiled then, and a build whose modules the record cannot hold, such as a load answering with something else than code or a module already holding a token, writes none.
 export async function writeServerRecord(project: Project): Promise<void> {
   const { root, config, paths } = project
   const record = join(paths.output, SERVER_RECORD)
@@ -110,7 +110,7 @@ export async function writeServerRecord(project: Project): Promise<void> {
       recorded.add(path)
 
       if (SCRIPT_FILE.test(path) && contents === scanned && result.loader === loader) {
-        covered[name] = hash
+        covered[name] = Bun.hash(contents).toString(36)
       }
       else {
         const { code, blob } = splitEmbeddedMap(contents)
@@ -151,7 +151,8 @@ export async function writeServerRecord(project: Project): Promise<void> {
     }
   }
 
-  if (unsupported)
+  // A module already holding a token would be rewritten when it loads.
+  if (unsupported || [...written.values()].some(({ contents }) => contents.includes(ROOT_TOKEN) || contents.includes(UP_TOKEN)))
     return
 
   // The directory the token stands for: the root, or the one above holding every recorded module, which a library outside the root needs.

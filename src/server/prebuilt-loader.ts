@@ -9,6 +9,7 @@ import { registerEmbeddedMapFile } from '../build/sourcemap'
 import { projectPaths } from '../project'
 import { readServerRecord, recordName, ROOT_TOKEN, SERVER_DIR, UP_TOKEN } from './server-record'
 
+const WASM_FILE = /\.wasm$/i
 const REGEX_SYNTAX = /[$()*+.?[\\\]^{|}]/g
 const registered = new Map<string, Promise<boolean>>()
 const TOKENS = new RegExp(`${ROOT_TOKEN}|${UP_TOKEN}`, 'g')
@@ -64,13 +65,16 @@ async function register(root: string, output: string): Promise<boolean> {
     const name = recordName(base, args.path)
     const found = Object.hasOwn(record.files, name) ? record.files[name] : undefined
 
-    const unchanged = async (hash: string | undefined) => hash !== undefined && Bun.hash(await Bun.file(args.path).bytes()).toString(36) === hash
     const kept = Object.hasOwn(record.covered, name) ? record.covered[name] : undefined
 
-    if (found === undefined)
-      return await unchanged(kept) ? asIs(args.path) : compiled(args)
+    if (found === undefined) {
+      const text = kept === undefined ? undefined : await Bun.file(args.path).text()
 
-    if (!await unchanged(found.hash))
+      return text !== undefined && Bun.hash(text).toString(36) === kept ? { contents: text, loader: scriptLoader(args.path) } : compiled(args)
+    }
+
+    // A wasm file's record is its import's shape, a path or an asset URL, which the file's bytes do not change: asking the loader for it again would lose whether the import wanted the path.
+    if (!WASM_FILE.test(args.path) && Bun.hash(await Bun.file(args.path).bytes()).toString(36) !== found.hash)
       return compiled(args)
 
     // Read when a stack first needs it, and named by the path the module has now.
