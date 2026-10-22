@@ -12,13 +12,15 @@ const SHEBANG = /^#!.*/
 const LEADING_PARENTS = /^(?:\.\.\/)*/
 const COMMAND = /^\s+'([a-z-]+(?: [a-z]+)?)': async \(\) => \(await import\('\.\/commands\/([\w-]+)'\)\)/gm
 
-async function resolveFile(base: string) {
+async function resolveFile(base: string): Promise<string | undefined> {
   for (const extension of EXTENSIONS) {
     const path = base + extension
 
     if (SOURCE.test(path) && await Bun.file(path).exists())
       return path
   }
+
+  return undefined
 }
 
 // Every source file reachable from `entries` through relative imports, dynamic ones included, memoised per file in `edges`.
