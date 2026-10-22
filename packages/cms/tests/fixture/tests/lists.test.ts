@@ -71,8 +71,15 @@ function barsStill(page: Page) {
   }))
 }
 
+// The tooltip of the button last pressed stays while the pointer rests on it, and can cover a button of the next bar for as long as it is open, so a click right after fails as covered. The pointer is sent off it and the wait ends when it has closed.
+async function closeTooltip(page: Page) {
+  await page.evaluate(() => document.body.dispatchEvent(new PointerEvent('pointerover', { bubbles: true })))
+  await page.waitUntil(() => document.querySelector('#kui-tooltip:popover-open') === null)
+}
+
 // The editor docks at the bottom of a short window, so the item is scrolled to the top, clear of it, and the pointer is moved onto it there (a hover would scroll it back to the middle, under the editor's edge).
 async function showBar(page: Page, selector: string, bars = 1) {
+  await closeTooltip(page)
   await page.evaluate((target: string) => {
     const element = document.querySelector(target)!
 
