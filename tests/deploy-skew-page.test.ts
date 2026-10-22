@@ -164,7 +164,7 @@ describe('a page noticing a deploy', () => {
   })
 
   it('keeps a page whose leave guard holds unsaved changes', async () => {
-    const guard = { dirty: () => true }
+    const guard = { dirty: () => true, confirm: () => true }
 
     leaveGuards.add(guard)
     fetched.mockResolvedValue(answer('bbb'))

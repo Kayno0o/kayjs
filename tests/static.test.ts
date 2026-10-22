@@ -249,6 +249,14 @@ describe('kay build --static', () => {
     await expectEagerJsWithin(EAGER_JS_BUDGET, (await get('/')).text, async url => Bun.file(join(out, url.slice(BASE.length))).text())
   })
 
+  it('ships no error reporter and no leave question in the files loaded up front, a page with no leave guard having none to ask', async () => {
+    const eager = await expectEagerJsWithin(EAGER_JS_BUDGET, (await get('/')).text, async url => Bun.file(join(out, url.slice(BASE.length))).text())
+
+    // The default reporter only logs, so a closure logging an error and installed beside it is the page\'s own reporter.
+    expect(eager.filter(code => (/\(\w+,\w+\)=>\{console\.error\(\w+\)\}/).test(code))).toEqual([])
+    expect(eager.filter(code => code.includes('unsaved changes'))).toEqual([])
+  })
+
   it('keeps what reloads a tab opened before a deploy in the files loaded up front, and in no chunk loaded after idle', async () => {
     const read = async (url: string) => Bun.file(join(out, url.slice(BASE.length))).text()
     const eager = await expectEagerJsWithin(EAGER_JS_BUDGET, (await get('/')).text, read)

@@ -49,4 +49,12 @@ describe('an island of an app with locales', () => {
   it('keeps the JS a page loads up front within its budget, kay/i18n\'s messages and formatters left to the islands using them', async () => {
     await expectEagerJsWithin(EAGER_JS_BUDGET, await (await site.fetch('/en')).text(), async url => (await site.fetch(url)).text())
   })
+
+  it('ships the error reporter of a server page, and no leave question while no island guards the page', async () => {
+    const eager = await expectEagerJsWithin(EAGER_JS_BUDGET, await (await site.fetch('/en')).text(), async url => (await site.fetch(url)).text())
+
+    // This build is not minified, so the call is found by name.
+    expect(eager.filter(code => code.includes('setErrorReporter((error'))).toHaveLength(1)
+    expect(eager.filter(code => code.includes('unsaved changes'))).toEqual([])
+  })
 })

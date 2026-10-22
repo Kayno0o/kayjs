@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
-import { joinBase } from '../src/runtime/base'
+import { joinBase, withBase, withoutBase } from '../src/runtime/base'
 import { rebaseHtml } from '../src/server/base'
 import { pages } from './shared-pages'
 
@@ -14,6 +14,12 @@ describe('base on a server', () => {
     const html = await rebaseHtml(new Response('<img srcset="/a.webp 320w, /b.webp 640w"><style>body { background: url("/bg.png") }</style><object data="/x.svg"></object>'), '/repo').text()
 
     expect(html).toBe('<img srcset="/repo/a.webp 320w, /repo/b.webp 640w"><style>body { background: url("/repo/bg.png") }</style><object data="/repo/x.svg"></object>')
+  })
+
+  it('reads no mount point off a page on the server, where kay put the paths under it already', () => {
+    expect(typeof document).toBe('undefined')
+    expect(withBase('/about')).toBe('/about')
+    expect(withoutBase('/repo/about')).toBe('/repo/about')
   })
 
   it('rewrites whole bodies through one rewriter per base without one page leaking into the next, and streams apart', async () => {

@@ -7,6 +7,8 @@ export interface LeaveGuardOptions {
   confirm?: ((to: URL) => boolean | Promise<boolean>) | undefined
 }
 
+const LEAVE_MESSAGE = 'This page has unsaved changes. Leave it anyway?'
+
 // Only while one holds unsaved changes is the page listened for unloading: a `beforeunload` listener can keep it out of the back-forward cache.
 const dirtyGuards = new Set<LeaveGuard>()
 
@@ -15,7 +17,7 @@ export function guardLeave(dirty: () => boolean, options: LeaveGuardOptions = {}
   if (typeof document === 'undefined')
     return
 
-  const guard: LeaveGuard = { dirty, confirm: options.confirm }
+  const guard: LeaveGuard = { dirty, confirm: options.confirm ?? askLeave }
 
   leaveGuards.add(guard)
   effect(() => {
@@ -31,6 +33,11 @@ export function guardLeave(dirty: () => boolean, options: LeaveGuardOptions = {}
     dirtyGuards.delete(guard)
     listenUnload()
   })
+}
+
+function askLeave(): boolean {
+  // eslint-disable-next-line no-alert -- the default question is the browser's own, which an app replaces through `confirm`
+  return confirm(LEAVE_MESSAGE)
 }
 
 function listenUnload(): void {

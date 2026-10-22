@@ -46,24 +46,26 @@ export interface HotSwap {
   entry?: string | undefined
 }
 
-setErrorReporter((error, island) => {
-  console.error(error)
+// A static export has no server to report to, so it keeps the default reporter, which logs.
+if (typeof KAY_STATIC_EXPORT === 'undefined') {
+  setErrorReporter((error, island) => {
+    console.error(error)
 
-  // The dev tool lists what kay caught too, as the browser fires nothing for it.
-  if (process.env.NODE_ENV !== 'production')
-    (globalThis as { $kayProblems?: DevProblems }).$kayProblems?.push({ level: 'error', kind: 'uncaught', text: String(error), error, island })
+    // The dev tool lists what kay caught too, as the browser fires nothing for it.
+    if (process.env.NODE_ENV !== 'production')
+      (globalThis as { $kayProblems?: DevProblems }).$kayProblems?.push({ level: 'error', kind: 'uncaught', text: String(error), error, island })
 
-  if (typeof KAY_STATIC_EXPORT === 'undefined')
     void reportLazily(error, island)
-})
-
-if (typeof window !== 'undefined' && typeof KAY_STATIC_EXPORT === 'undefined') {
-  // An error with no error object is another origin's script, whose details the browser hides: nothing to report.
-  window.addEventListener('error', (event) => {
-    if (event.error !== undefined && event.error !== null)
-      void reportLazily(event.error)
   })
-  window.addEventListener('unhandledrejection', event => void reportLazily(event.reason))
+
+  if (typeof window !== 'undefined') {
+    // An error with no error object is another origin's script, whose details the browser hides: nothing to report.
+    window.addEventListener('error', (event) => {
+      if (event.error !== undefined && event.error !== null)
+        void reportLazily(event.error)
+    })
+    window.addEventListener('unhandledrejection', event => void reportLazily(event.reason))
+  }
 }
 
 // Loads the code posting errors to the server on the first one, so a page that never fails never ships it.

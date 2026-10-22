@@ -46,7 +46,7 @@ export interface Swap {
 // A guard `guardLeave` registers, which a leave asks once it holds unsaved changes.
 export interface LeaveGuard {
   dirty: () => boolean
-  confirm?: ((to: URL) => boolean | Promise<boolean>) | undefined
+  confirm: (to: URL) => boolean | Promise<boolean>
 }
 
 // A head element the server put in, holding as `_$s` how it put it, which the swap tells what a script changed or added since by: those of the page loaded first are read as navigation starts.
@@ -65,7 +65,6 @@ const KAY_PATHS = /^\/_kay(?:\/|$)/
 const ACTION_PATH = /^\/_kay\/action\//
 const HASH = /#.*/
 const SCROLL_SAVE_MS = 150
-const LEAVE_MESSAGE = 'This page has unsaved changes. Leave it anyway?'
 
 // `hooks` are set once the swap took over the app's links, which an action call then shows its effects through.
 // `shown` is the page shown, by URL without its hash, since going back to an entry of the same page only scrolls; `at` the place of its entry; `page` how many other pages were shown since, which an action call's outcome belongs to one of; `current` the latest swap started, which an earlier one gives way to; `visits` how many swaps to another path started, unset before the first, which an answer the page awaited reads to tell whether the visitor went elsewhere meanwhile.
@@ -110,7 +109,7 @@ let scrollTimer: ReturnType<typeof setTimeout> | undefined
 export async function mayLeave(to: URL): Promise<boolean> {
   const guard = dirtyGuard()
 
-  return guard ? (guard.confirm ?? askLeave)(to) : true
+  return guard ? guard.confirm(to) : true
 }
 
 export function dirtyGuard(): LeaveGuard | undefined {
@@ -120,11 +119,6 @@ export function dirtyGuard(): LeaveGuard | undefined {
   }
 
   return undefined
-}
-
-function askLeave(): boolean {
-  // eslint-disable-next-line no-alert -- the default question is the browser's own, which an app replaces through `confirm`
-  return confirm(LEAVE_MESSAGE)
 }
 
 // A full load instead, taking the place of the current entry when `replace`, as one going back already made.
