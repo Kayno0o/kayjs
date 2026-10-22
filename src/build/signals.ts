@@ -122,7 +122,7 @@ function signalsOf(path: string): Record<string, SignalKind> {
 }
 
 function kayModuleSignals(text: string): Record<string, SignalKind> {
-  const { module } = text.includes('--- module') ? parseKay(text) : {}
+  const { module } = parseKay(text)
 
   return module ? moduleSignals(text.slice(module.start, module.end)) : {}
 }
