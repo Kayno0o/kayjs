@@ -386,6 +386,42 @@ test('Rename types a cleaned slug in a dialog, sends it with the version, and op
   expect(window.location.pathname).toBe('/admin/collections/posts/new-name')
 })
 
+test('Rename with edits typed meanwhile, when leaving is declined, locks the form and leaves a notice linking the renamed entry', async () => {
+  const { fetched, release } = server({ saved: true, slug: 'new-name' }, true)
+
+  spyOn(window.location, 'assign').mockImplementation(() => undefined)
+
+  const ask = spyOn(globalThis, 'confirm').mockImplementation(() => false)
+  const root = await open(stored({}))
+
+  ;(window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL('http://localhost/admin/collections/posts/hello')
+  button(root, 'Rename')!.click()
+  await settle()
+
+  const input = document.querySelector<HTMLInputElement>('dialog input')!
+
+  input.value = 'new-name'
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle()
+  ;[...document.querySelectorAll('dialog button')].find(each => each.textContent?.trim() === 'Rename')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  await settle()
+  await type(root, 'Hello again')
+  release()
+  await pause()
+  await pause()
+  expect(ask).toHaveBeenCalledTimes(1)
+  expect(root.querySelector('.kcms-entry-failure')!.textContent).toContain('This entry is renamed.')
+  expect(root.querySelector('.kcms-entry-failure a')!.getAttribute('href')).toBe('/admin/collections/posts/new-name')
+  expect(root.querySelector('fieldset')).toBeNull()
+  expect(buttons(root)).toEqual([])
+
+  const sent = fetched.mock.calls.length
+
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true }))
+  await pause()
+  expect(fetched.mock.calls.length).toBe(sent)
+})
+
 test('Rename is off for a single collection, and with edits not saved yet', async () => {
   const single = await open(stored({}), { ...POSTS, single: true })
 

@@ -29,10 +29,14 @@ form.kcms-entry-editor(novalidate aria-busy={form.saving()} onSubmit={event => {
     EntryPresence(room={presence.room} member={presence.member})
   if translations && entry
     EntryLocales(prefix={prefix} entry={form.entry} translations={translations} compared={translations.compare?.locale})
-  if form.stranded() as screen
+  if form.stranded() as gone
     .kcms-entry-failure(role="alert")
-      p {wording('cms.entry.deleted', 'This entry is deleted.')}
-      a(href={screen}) {wording('cms.entry.deletedLeave', 'Go to the collection')}
+      if gone.renamed
+        p {wording('cms.entry.renamed', 'This entry is renamed.')}
+        a(href={gone.to}) {wording('cms.entry.renamedLeave', 'Go to the renamed entry')}
+      else
+        p {wording('cms.entry.deleted', 'This entry is deleted.')}
+        a(href={gone.to}) {wording('cms.entry.deletedLeave', 'Go to the collection')}
   else
     // Locked while a save is on its way, so what is typed meanwhile is not left out of it.
     fieldset.kcms-entry-fields(disabled={form.saving()})

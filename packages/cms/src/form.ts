@@ -61,8 +61,8 @@ export interface EntryForm extends FormScope {
   // Where the new entry's slug lands among the slugs the collection holds, once they are read; undefined before, and for an entry that is saved or single. Given `typed`, where that slug lands among those of the saved entry's locale: what the Rename dialog checks.
   slugReport: (typed?: string) => SlugReport | undefined
   saving: Signal<boolean>
-  // The collection's screen once the entry is deleted but the leave to it was declined over edits not saved, which leaves the form dead; the default screen then shows a notice linking it.
-  stranded: Signal<string | undefined>
+  // Where the screen should have gone once the entry was deleted (the collection's screen) or renamed (the entry under its new slug) but the leave was declined over edits not saved, which leaves the form on a slug that is gone; the default screen then shows a notice linking it.
+  stranded: Signal<{ to: string, renamed: boolean } | undefined>
   // Whether the entry has edits not saved yet.
   dirty: () => boolean
   // Whether Save has something to do: edits to save, or a new entry to create, and no save on its way.
@@ -144,7 +144,7 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
   // kay files each entry of a localized collection under one of the site's locales.
   const newLocale = signal(locale ?? collection.locales?.[0] ?? '')
   const saving = signal(false)
-  const stranded = signal<string>()
+  const stranded = signal<{ to: string, renamed: boolean }>()
   // A folder entry's slug is cleaned as it is typed; a loaded collection's is the loader's to judge, so it stays as typed.
   const cleans = collection.kind === 'folder'
   const suggestsSlug = signal(!first && !copy && !collection.single && cleans)
@@ -369,7 +369,7 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
       // Declined over the entry's own edits: they are of an entry that is gone, so they no longer hold the leave nor feed a save.
       if (!await navigate(screen, { replace: true })) {
         drafts.reset(ref)
-        stranded.set(screen)
+        stranded.set({ to: screen, renamed: false })
       }
     },
     async rename(next, onRefused) {
@@ -378,7 +378,12 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
       if (renamed === undefined)
         return false
 
-      await navigate(entryPath(prefix, { ...ref, slug: renamed }), { replace: true })
+      const to = entryPath(prefix, { ...ref, slug: renamed })
+
+      if (!await navigate(to, { replace: true })) {
+        drafts.reset(ref)
+        stranded.set({ to, renamed: true })
+      }
 
       return true
     },

@@ -130,6 +130,8 @@ export default defineMessages({
       renameReferrers: 'Référencée par {names}, qui suivent le nouveau slug quand elles le peuvent',
       renameSlug: 'Nouveau slug',
       renameTitle: 'Renommer {slug}',
+      renamed: 'Cette entrée est renommée.',
+      renamedLeave: 'Aller à l\'entrée renommée',
       body: 'Contenu',
       clearEnd: 'Retirer la date de fin',
       conflict: 'Si vous gardez vos modifications, la prochaine sauvegarde écrasera cet autre enregistrement.',
