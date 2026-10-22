@@ -2,6 +2,7 @@ import type { Subprocess } from 'bun'
 import { join } from 'node:path'
 import process from 'node:process'
 import { scratchDir } from 'kay/test'
+import { freePort } from '../../../../tests/free-port'
 
 const RESTARTED = /: restarted in /g
 const CLI = join(import.meta.dir, '../../../../src/cli.ts')
@@ -12,16 +13,6 @@ const FILES: Record<string, string> = {
   'src/server.ts': `import { Elysia } from 'elysia'\nimport { pages } from 'kay/server'\nimport { mail } from './mail'\n\nexport const app = new Elysia().get('/send/:n', async ({ params }) => {\n  await mail.send({ to: 'ada@example.com', subject: \`Mail \${params.n}\`, text: 'Hello' })\n\n  return 'sent'\n}).use(await pages()).listen(Number(process.env.PORT))\n`,
   'src/routes/index.kay': `---\n---\nh1 Home\na.other(href="/other") Other\n`,
   'src/routes/other.kay': `---\n---\nh1 Other\na.home(href="/") Home\n`,
-}
-
-// A free port, so the server's address is known before it starts.
-function freePort(): number {
-  const probe = Bun.listen({ hostname: 'localhost', port: 0, socket: { data: () => undefined } })
-  const { port } = probe
-
-  probe.stop(true)
-
-  return port
 }
 
 async function answers(url: string): Promise<boolean> {
