@@ -2,8 +2,9 @@ import type { Judge, RuntimeClass } from './dynamic-classes'
 import type { Reached } from './styles'
 import { existsSync } from 'node:fs'
 import { dirname, relative, resolve } from 'node:path'
+import { parseKay } from '../compiler/parser'
 import { styledClassNames } from './class-rules'
-import { classModules, runtimeClasses } from './dynamic-classes'
+import { classModules, moduleFile, runtimeClasses } from './dynamic-classes'
 import { CSS_FILE, readSource, SCRIPT_FILE } from './files'
 import { parse } from './supports'
 
@@ -32,9 +33,11 @@ const SCRIPT_OR_KAY = /\.(?:kay|[cm]?[jt]sx?)$/
 const RENDERED_FRAGMENT = 'language-'
 // A relative named import, the only one whose values a class is read from.
 const IMPORTS_MODULE = /\bimport\s+(?:[\w$]+\s*,\s*)?\{[^}]*\}\s*from\s*["']\./
-// A relative import of a JSON file, whose strings are data a class may be read from.
-const IMPORTS_JSON = /\bfrom\s*["'](\.[^"']*\.json)["']/g
-const AFTER_CLASS = /\bclass\s*[=:]\s*$/
+// A relative import, of a script or of a JSON file: the data a class may be read from.
+const IMPORTS_RELATIVE = /\bfrom\s*["'](\.[^"']*)["']/g
+const JSON_FILE = /\.json$/
+// A utility name carries a hyphen or a variant colon; a plain word such as `hidden` or `table` is as often prose or an attribute value.
+const UTILITY_NAME = /[-:]/
 const CSS_IMPORT = /@import\s*(?:url\(\s*)?["']([^"']+)["']/g
 // Tailwind 4.1's `@source inline("...")`, which names classes to generate whatever the sources say; `@source not inline` leaves them out and is not matched.
 const SOURCE_INLINE = /@source\s+inline\(\s*(["'])((?:\\.|(?!\1)[^\\])*)\1\s*\)/g
@@ -77,27 +80,35 @@ function literalWords(file: string): string[] {
   return found
 }
 
-// The JSON files a script or component imports by a relative path.
-function jsonImports(text: string, file: string): string[] {
-  return [...text.matchAll(IMPORTS_JSON)].map(match => resolve(dirname(file), match[1]!)).filter(path => existsSync(path))
-}
+const importsByFile = new WeakMap<object, string[]>()
 
-// The class-like words of the strings a file holds as data, leaving out the value of a `class` it writes itself: `class="mt-1"` styles that element, it says nothing of a value read elsewhere.
-function dataWords(file: string): string[] {
-  const { text } = readSource(file)
-  const found: string[] = []
+// The scripts and JSON files a script or component imports by a relative path.
+function relativeImports(file: string): string[] {
+  const read = readSource(file)
+  let found = importsByFile.get(read)
 
-  for (const literal of text.matchAll(STRING_LITERAL)) {
-    if (AFTER_CLASS.test(text.slice(Math.max(0, literal.index - 24), literal.index)))
-      continue
+  if (found === undefined) {
+    found = [...read.text.matchAll(IMPORTS_RELATIVE)].flatMap((match) => {
+      const module = moduleFile(file, match[1]!)
 
-    for (const word of literal[0].slice(1, -1).split(COARSE)) {
-      if (word !== '')
-        found.push(word)
-    }
+      return module !== undefined && (SCRIPT_FILE.test(module) || JSON_FILE.test(module)) ? [module] : []
+    })
+    importsByFile.set(read, found)
   }
 
   return found
+}
+
+// The text a file holds data in: all of a script or JSON file, the fences of a component, never its template, where a string is an attribute value or prose.
+function dataText(file: string): string {
+  const { text } = readSource(file)
+
+  if (!file.endsWith('.kay'))
+    return text
+
+  const { script, server } = parseKay(text)
+
+  return [script, server].map(span => span === undefined ? '' : text.slice(span.start, span.end)).join('\n')
 }
 
 // The words of a source, and the fragments of names built at runtime among them: `btn-` from `btn-${kind}` or `:flex` from `${screen}:flex`.
@@ -350,8 +361,8 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
           found.add(name)
       }
 
-      // Rows read from a JSON file the module imports are where its classes come from.
-      for (const module of jsonImports(text, file)) {
+      // Rows kept in a script a component imports, or in a JSON file a module does, are where its classes come from; a script's own imports are not followed, as the modules of a build or a plugin reach far.
+      for (const module of relativeImports(file).filter(imported => JSON_FILE.test(imported) || file.endsWith('.kay'))) {
         for (const name of named(module))
           found.add(name)
       }
@@ -359,22 +370,53 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
 
     return found
   }
-  // Whether the pages reaching a file all hold, in another module of the app they reach or a JSON file one imports, a string that is a styled class: a value read from that data has its rule on the page, whichever component builds the value.
-  const dataByEntry = new Map<string, string[] | true>()
+  const holds = new Map<string, boolean>()
+  // Whether a file holds, as a string, the name of a styled class with a hyphen or a variant colon in it.
+  const holdsStyledName = (file: string): boolean => {
+    let found = holds.get(file)
+
+    if (found === undefined) {
+      found = dataText(file).match(STRING_LITERAL)?.some(literal => literal.slice(1, -1).split(COARSE).some(word => UTILITY_NAME.test(word) && styled.has(word))) ?? false
+      holds.set(file, found)
+    }
+
+    return found
+  }
+  const dataByEntry = new Map<string, { markup: boolean, holders: string[] }>()
+  // Whether every page reaching a file holds, in another module of the app it reaches, a script or JSON file one of them imports, or the Markdown a collection renders, a string that is a styled class: a value read from that data has its rule on the page, whichever component builds the value.
   const dataVouched = (entry: string, own: StyleUsesOptions['own'], setter: string): boolean => {
     let found = dataByEntry.get(entry)
 
     if (found === undefined) {
       const reach = closure([entry], reached)
-      const open = [...reach].some(module => reached.open.has(module))
-      const files = [...reach].filter(module => own?.(module) === true && existsSync(module))
-      const holders = files.filter(module => SCRIPT_OR_KAY.test(module)).flatMap(module => [module, ...jsonImports(readSource(module).text, module)])
+      const modules = new Set<string>()
+      const pending = [...reach].filter(module => own?.(module) === true && SCRIPT_OR_KAY.test(module) && existsSync(module))
 
-      found = open && markup.some(module => named(module).size > 0) ? true : holders.filter(module => dataWords(module).some(word => styled.has(word)))
+      for (const module of pending) {
+        if (modules.has(module))
+          continue
+
+        modules.add(module)
+        pending.push(...relativeImports(module).filter(imported => own?.(imported) === true))
+      }
+
+      found = {
+        markup: [...reach].some(module => reached.open.has(module)) && markup.some(module => [...named(module)].some(name => UTILITY_NAME.test(name))),
+        holders: [...modules].filter(module => holdsStyledName(module)),
+      }
       dataByEntry.set(entry, found)
     }
 
-    return found === true || found.some(module => module !== setter)
+    // What the file itself imports is judged by the value's own reading, not vouched for.
+    const itsOwn = new Set([setter])
+
+    for (const module of itsOwn) {
+      for (const imported of relativeImports(module)) {
+        itsOwn.add(imported)
+      }
+    }
+
+    return found.markup || found.holders.some(module => !itsOwn.has(module))
   }
   // Whether a file reaches a stylesheet of the app and a script of the app writing out, as a string, a class that stylesheet declares: that script is the vocabulary the value is read from, and the stylesheet keeps the rule of each class whatever builds it.
   const vouchedByFile = new Map<string, boolean>()

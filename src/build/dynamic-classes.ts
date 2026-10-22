@@ -567,7 +567,7 @@ const MODULE_ENDINGS = ['', '.ts', '.tsx', '.mts', '.js', '.mjs', '/index.ts', '
 const JS_ENDING = /\.(?:js|mjs)$/
 
 // The module file a relative specifier names, as the bundler finds it: `./data.js` is written for the `data.ts` next to it.
-function moduleFile(from: string, specifier: string): string | undefined {
+export function moduleFile(from: string, specifier: string): string | undefined {
   const base = resolve(dirname(from), specifier)
   const candidates = MODULE_ENDINGS.map(ending => base + ending)
 

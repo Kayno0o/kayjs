@@ -4,7 +4,7 @@ import { describe, expect, it } from 'bun:test'
 import { expandInline, styleUses } from '../src/build/style-uses'
 import { scratchDir } from './scratch'
 
-const CSS = '.mt-1{margin-top:1px}.p-1{padding:1px}.btn-primary{color:red}.md\\:flex{display:flex}'
+const CSS = '.hidden{display:none}.table{display:table}.mt-1{margin-top:1px}.p-1{padding:1px}.btn-primary{color:red}.md\\:flex{display:flex}'
 
 // The classes the page at `source` names, as the class attribute writes them.
 async function namedBy(source: string): Promise<string[]> {
@@ -466,9 +466,21 @@ describe('which classes a page keeps when its data holds them', () => {
     expect(await held({ 'page.kay': page, 'child.kay': child, 'rows.json': '[{"color":"mt-1"},{"color":"btn-primary"}]' }, { 'page.kay': ['child.kay'] })).toEqual({ warned: [], classes: { 'page.kay': ['btn-primary', 'mt-1'] } })
   })
 
-  it('still warns when the strings are no class, or only the element itself writes one', async () => {
-    expect(await held({ 'page.kay': rows.replace('mt-1', 'banana').replace('p-1', 'apple'), 'child.kay': child }, { 'page.kay': ['child.kay'] })).toMatchObject({ warned: ['child.kay class attribute'] })
-    expect(await held({ 'page.kay': 'div(class="mt-1")\nChild(items={x})\n', 'child.kay': child }, { 'page.kay': ['child.kay'] })).toMatchObject({ warned: ['child.kay class attribute'] })
+  it('reads rows kept in a script the server code imports, and a row keyed `class`', async () => {
+    const page = '--- server\nimport { rows } from "./rows"\n---\nChild(items={rows})\n'
+
+    expect(await held({ 'page.kay': page, 'child.kay': child, 'rows.ts': 'export const rows = [{ color: \'mt-1\' }]\n' }, { 'page.kay': ['child.kay'] })).toEqual({ warned: [], classes: { 'page.kay': ['mt-1'] } })
+    expect(await held({ 'page.kay': page, 'child.kay': child.replaceAll('color', 'class').replace('item.class', 'item["class"]'), 'rows.ts': 'export const rows = [{ class: \'p-1\' }]\n' }, { 'page.kay': ['child.kay'] })).toMatchObject({ warned: [] })
+  })
+
+  it('still warns when the strings are no styled class, a plain word or markup, or the setter holds them itself', async () => {
+    const edges = { 'page.kay': ['child.kay'] }
+
+    expect(await held({ 'page.kay': rows.replace('mt-1', 'banana').replace('p-1', 'apple'), 'child.kay': child }, edges)).toMatchObject({ warned: ['child.kay class attribute'] })
+    expect(await held({ 'page.kay': 'div(class="mt-1")\nChild(items={x})\n', 'child.kay': child }, edges)).toMatchObject({ warned: ['child.kay class attribute'] })
+    expect(await held({ 'page.kay': 'div(class={on ? "mt-1" : "p-1"} data-x="btn-primary")\nChild(items={x})\n', 'child.kay': child }, edges)).toMatchObject({ warned: ['child.kay class attribute'] })
+    expect(await held({ 'page.kay': '--- server\nconst label = "the .table of rows, hidden"\n---\nChild(items={label})\n', 'child.kay': child }, edges, ['page.kay'], {})).toMatchObject({ warned: ['child.kay class attribute'] })
+    expect(await held({ 'page.kay': 'Child(items={x})\n', 'child.kay': child.replace('props<', '[\'mt-1\']\nprops<') }, edges)).toMatchObject({ warned: ['child.kay class attribute'] })
   })
 
   it('warns when one of the pages reaching the component holds no such string', async () => {

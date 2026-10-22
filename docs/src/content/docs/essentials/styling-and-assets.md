@@ -50,7 +50,7 @@ A value read back from `this.el`, a call result such as `document.querySelector(
 
 Rules you write in a stylesheet are never cut by class. A page keeps every rule of a stylesheet it reaches, so `.maze td.t { @apply border-t-2 }` stays whatever builds `t`, with no `@source inline`. A value then gives no warning once a script of yours its file reaches writes out a class (`cls.push('t')`) such a stylesheet declares.
 
-Classes held in data need no listing either. A class written as a string in another file of the page, such as the `color: 'text-blue-200'` of rows a parent hands to a child that writes `class={item.color}`, or in a JSON file one of them imports, keeps its rule on the page and gives no warning. The same goes for a page rendering a collection whose Markdown names a class. A string inside a `class="..."` the file writes itself does not count.
+Classes held in data need no listing either. A class written as a string with a hyphen or a variant in it (`text-blue-200`, `md:flex`) in the script of another file of the page, such as the `color: 'text-blue-200'` of rows a parent hands to a child that writes `class={item.color}`, in a module or JSON file one of them imports, keeps its rule on the page and gives no warning. The same goes for a page rendering a collection whose Markdown names such a class. A template, a plain word such as `hidden` and the file that sets the class itself do not count, and every page reaching the component must hold one.
 
 A static export has no server to render pages, so it gives no warning for a class a server template builds.
 
