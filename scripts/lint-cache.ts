@@ -27,16 +27,20 @@ export async function installFingerprint(root: string): Promise<string> {
   return hasher.digest('hex')
 }
 
-// Drops every `.eslintcache*` of `root` when the install changed since they were written, and records the install the next lint runs against.
-export async function dropStaleLintCache(root: string): Promise<boolean> {
+// Drops every `.eslintcache*` of `folder` (default `root`) when the install changed since they were written, and records the install the next lint runs against. A library passes its own folder with the repo root, as the workspace installs its dependencies there. A bumped dependency always moves the lockfile or the `node_modules` mtime, so the fingerprint covers it.
+export async function dropStaleLintCache(root: string, folder = root): Promise<boolean> {
   const current = await installFingerprint(root)
-  const state = Bun.file(join(root, STATE))
+  const state = Bun.file(join(folder, STATE))
   const stale = !await state.exists() || await state.text() !== current
 
   if (stale) {
-    await Promise.all((await readdir(root)).filter(name => name.startsWith('.eslintcache') && name !== STATE).map(async name => rm(join(root, name), { force: true })))
+    await Promise.all((await readdir(folder)).filter(name => name.startsWith('.eslintcache') && name !== STATE).map(async name => rm(join(folder, name), { force: true })))
     await Bun.write(state, current)
   }
 
   return stale
 }
+
+// `bun ../../scripts/lint-cache.ts` from a library drops that library's caches when the install changed.
+if (import.meta.main)
+  await dropStaleLintCache(join(import.meta.dir, '..'), process.cwd())

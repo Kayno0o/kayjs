@@ -45,9 +45,9 @@
     "prepare": "$npm_execpath ../../scripts/link-fixture.ts",
     "check": "$npm_execpath check",
     "prelint": "$npm_execpath run --cwd ../.. build:eslint",
-    "lint": "keslint --cache",
+    "lint": "bun ../../scripts/lint-cache.ts && keslint --cache",
     "prelint:fix": "$npm_execpath run --cwd ../.. build:eslint",
-    "lint:fix": "keslint --fix --cache",
+    "lint:fix": "bun ../../scripts/lint-cache.ts && keslint --fix --cache",
     "test": "$npm_execpath test --timeout 20000 && $npm_execpath run test:dom",
     "test:dom": "$npm_execpath --config=tests-dom/bunfig.toml test"
   },
