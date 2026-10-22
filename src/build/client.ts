@@ -36,6 +36,7 @@ import { throughLinks } from './links'
 import { kay } from './plugin'
 import { buildFiles, promotedFiles } from './promotion'
 import { unusedLibraryClasses } from './prune'
+import { referencesOf, registerReferences } from './references'
 import { sizeReport } from './report'
 import { ANCHOR, runtimeAnchor, runtimeChunk } from './runtime-chunk'
 import { builtinChains, refusedBuiltins, refuseServerOnlyReads } from './server-only'
@@ -157,6 +158,7 @@ function rootMargin(value: string | undefined, fallback: string, what: string): 
 const builtGraph: ImportGraph = new Map()
 
 async function bundleClient(root: string, options: ClientOptions): Promise<ClientBuild> {
+  registerReferences(root, options.extensions)
   rootMargin(options.hydration?.visible, '200px', 'visible')
   rootMargin(options.hydration?.serverIslands, '100% 0px', 'serverIslands')
 
@@ -569,7 +571,7 @@ export async function bundleStyles(root: string, { pages, libraries, classes, sh
     minify: options.minify ?? false,
     metafile: true,
     naming: { entry: '[name]-[hash].[ext]', chunk: '[name]-[hash].[ext]', asset: '[name]-[hash].[ext]' },
-    plugins: [styleImports(root, libraries, shrunk, reached), ...mergingSupports(options.plugins ?? [], async nodes => pruneNodes(nodes, await unusedClasses))],
+    plugins: [styleImports(root, libraries, shrunk, reached), ...mergingSupports(options.plugins ?? [], async nodes => pruneNodes(nodes, await unusedClasses), { root, files: referencesOf(root) })],
   }), unusedClasses])
 
   if (!build.success)

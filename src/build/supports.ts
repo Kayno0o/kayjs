@@ -1,5 +1,6 @@
 import type { BunPlugin, PluginBuilder } from 'bun'
 import { CSS_FILE } from './files'
+import { readingAs, withReferences } from './references'
 
 const SUPPORTS_PRELUDE = /^@supports\b/i
 const SPACES = /\s+/g
@@ -147,14 +148,22 @@ function atRule(node: { prelude: string }): boolean {
   return node.prelude.replace(COMMENTS, '').trim().startsWith('@')
 }
 
+// Runs `load`, a plugin reading the stylesheet at `path` by itself, with the stylesheet starting with the references the extensions ask for.
+async function referenced<T>(path: string, references: { root: string, files: string[] }, load: () => Promise<T>): Promise<T> {
+  const text = await Bun.file(path).text()
+  const given = withReferences(text, path, references.root, references.files)
+
+  return given === text ? load() : readingAs(path, given, load)
+}
+
 // The stylesheet build's plugins, each stylesheet one returns merged, and a last one merging those no plugin loads; `transform` runs on the parsed stylesheet first, as kay prunes a library's unused classes, so each output is parsed and printed once.
-export function mergingSupports(plugins: BunPlugin[], transform: (nodes: Node[]) => Node[] | Promise<Node[]> = nodes => nodes): BunPlugin[] {
+export function mergingSupports(plugins: BunPlugin[], transform: (nodes: Node[]) => Node[] | Promise<Node[]> = nodes => nodes, references: { root: string, files: string[] } = { root: '', files: [] }): BunPlugin[] {
   const rewrite = async (css: string) => css.includes('{') ? print(merge(await transform(parse(css)), false)) : css
   const wrapped = plugins.map((plugin): BunPlugin => ({
     ...plugin,
     async setup(build) {
       const onLoad: PluginBuilder['onLoad'] = (constraints, callback) => build.onLoad(constraints, async (args) => {
-        const result = await (callback)(args)
+        const result = await (references.files.length > 0 && CSS_FILE.test(args.path) ? referenced(args.path, references, async () => callback(args)) : callback(args))
 
         return result && 'contents' in result && typeof result.contents === 'string' && (result.loader === 'css' || (result.loader === undefined && CSS_FILE.test(args.path))) ? { ...result, contents: await rewrite(result.contents) } : result
       })

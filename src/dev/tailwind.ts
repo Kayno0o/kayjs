@@ -1,6 +1,7 @@
 import { dirname, join, resolve } from 'node:path'
 import { CSS_FILE } from '../build/files'
 import { sourceWords } from '../build/libraries'
+import { referencesOf, withReferences } from '../build/references'
 
 // Whether the words an edit brought into a file, given its text, may be Tailwind classes, which only building the stylesheets again puts in.
 export type ClassWords = (words: string[], text: string) => boolean
@@ -17,10 +18,10 @@ const NOT_IN_CANDIDATE = /[\s'"`]+/
 
 // Tailwind's compiler for each stylesheet importing it among `inputs`, from the app's own `tailwindcss`, asked which words make classes; undefined when none does or it cannot load, which leaves any new word to build the stylesheets again.
 // A word only counts once Tailwind compiles it into a rule, so building again after a class keeps the next answer true: the stylesheet build compiles a fresh one.
-export async function tailwindClasses(inputs: Iterable<string>): Promise<ClassWords | undefined> {
+export async function tailwindClasses(root: string, inputs: Iterable<string>): Promise<ClassWords | undefined> {
   try {
     const sheets = await Promise.all([...inputs].filter(file => CSS_FILE.test(file)).map(async file => ({ file, text: await Bun.file(file).text() })))
-    const compilers = await Promise.all(sheets.filter(({ text }) => TAILWIND_IMPORT.test(text)).map(async ({ file, text }) => compiled(file, text)))
+    const compilers = await Promise.all(sheets.filter(({ text }) => TAILWIND_IMPORT.test(text)).map(async ({ file, text }) => compiled(file, withReferences(text, file, root, referencesOf(root)))))
 
     if (compilers.length === 0)
       return undefined

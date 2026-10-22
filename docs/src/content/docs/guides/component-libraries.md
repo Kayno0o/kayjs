@@ -97,6 +97,7 @@ An extension may set these fields. Only `name` is required.
 - `editor`: a `.kay` island rendered last on every page in edit mode.
 - `check`: a function returning the problems with how the app configured the extension, as `{ message, file?, severity?, help? }`. `kay check` and the editor show them beside kay's own without starting the server, so a mistake the library would only log once the server listens is seen as you type. A warning at `kay.config.ts` unless it names a file.
 - `devTool`: a browser module adding a tab to the dev tool.
+- `references`: stylesheets the app's own can `@apply` and read `theme()` tokens of with no `@reference` line, as if each began with one. kayjs-ui lists its `theme.css`. kay adds the line only to a stylesheet of the app that uses `@apply`, `@variant` or a theme function, so the stylesheet you write stays as it is and no rule is written twice.
 - `commands`: commands added to `kay`, such as `kay i18n translate`. Each names a module whose default export is a `KayCommand` from `kay/library`. It runs in the project of the current directory and gets its root and config.
 
 Type the result `KayExtension<typeof plugin>` when it has a `server` of its own, so the plugin's locals reach the app's types.
