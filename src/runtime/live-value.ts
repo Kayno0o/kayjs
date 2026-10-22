@@ -264,7 +264,7 @@ export async function liveStoreReady(): Promise<void> {
   await state().reading
 }
 
-// Reads a store that answers late: a value set here meanwhile is newer than its rows,.
+// Reads a store that answers late: a value set here meanwhile is newer than its rows.
 async function readLater(store: LiveStore, pending: Promise<Entries>): Promise<void> {
   const kept = state()
   const written = new Set<string>()
