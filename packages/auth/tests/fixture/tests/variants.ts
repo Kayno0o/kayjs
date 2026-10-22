@@ -89,6 +89,7 @@ if (process.env.FIXTURE_ADMIN) {
   const acting = await site.visit(`${PAGES_AT}/admin`)
   const banner = await site.visit(`${PAGES_AT}/account`)
 
+  const nav = await site.visit('/nav')
   const stopped = await site.fetch(banner.find('[data-impersonating] form')[0]!.attributes.action!, { method: 'POST', body: new URLSearchParams({ redirect: banner.find('[data-impersonating] input[name="redirect"]')[0]!.attributes.value! }) })
 
   console.log(JSON.stringify({
@@ -101,6 +102,7 @@ if (process.env.FIXTURE_ADMIN) {
     audit: auditPage.find('.kui-empty-state [data-part=title]').map(title => title.text),
     home: home.url,
     banner: banner.find('[data-impersonating] form').map(form => form.attributes.action),
+    navBanner: nav.find('[data-impersonating] form').map(form => form.attributes.action),
     back: banner.find('[data-impersonating] input[name="redirect"]').map(input => input.attributes.value),
   }))
   process.exit(0)

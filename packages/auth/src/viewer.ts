@@ -43,9 +43,10 @@ export async function loadViewer(request: Request): Promise<void> {
   }
 }
 
-// What templates read off `ctx`: `ctx.user`, the signed-in user (none for a visitor or a guest), and `ctx.can(role)`, whether they hold the role under the app's `roles` hierarchy.
+// What templates read off `ctx`: `ctx.user`, the signed-in user (none for a visitor or a guest), `ctx.can(role)`, whether they hold the role under the app's `roles` hierarchy, and `ctx.impersonator`, the admin acting as that user (null for none).
 export interface ViewerValues {
   user: BareUser | null
+  impersonator: BareUser | null
   can: (role: string) => boolean
 }
 
@@ -55,7 +56,7 @@ export async function viewerValues(request: Request): Promise<ViewerValues> {
   const viewer = viewers.get(request)
   const user = loaded.has(request) ? asViewer(loaded.get(request)!) : null
 
-  return { user, can: role => user !== null && viewer !== undefined && viewer.isGranted(role, user) }
+  return { user, impersonator: user && (impersonators.get(request) ?? null), can: role => user !== null && viewer !== undefined && viewer.isGranted(role, user) }
 }
 
 // The auth and role check of the page being rendered, for `SignedIn`, `SignedOut` and `UserMenu`.

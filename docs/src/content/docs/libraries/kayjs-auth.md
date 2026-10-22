@@ -183,7 +183,7 @@ Requests with no `Origin` (scripts, webhooks), safe methods and `Authorization: 
 
 ## The signed-in user in templates
 
-`SignedIn`, `SignedOut` and `UserMenu` read the request's user themselves, so a layout or a component shows the user with no `--- server` fence. They are sugar over `ctx.user` and `ctx.can(role)`, which any template reads the same way, `if ctx.user as user` or `if ctx.can('admin')`, typed in `kay check` and the editor:
+`SignedIn`, `SignedOut` and `UserMenu` read the request's user themselves, so a layout or a component shows the user with no `--- server` fence. They are sugar over `ctx.user`, `ctx.can(role)` and `ctx.impersonator`, which any template reads the same way, `if ctx.user as user` or `if ctx.can('admin')`, typed in `kay check` and the editor:
 
 ```kay
 ---
@@ -204,6 +204,21 @@ nav
 - A guest is signed out for all three.
 - `role` only hides markup, the page and its data are still served: guard the route with `auth.guard` for access.
 - They read the request being answered, so a page with `prerender: true` fails the build asking you to render it per request. They nest in one another and in the app's own `await` blocks.
+
+### Show the impersonation banner
+
+`ImpersonationBanner` shows an admin acting as a user, with a button back to their own account, and nothing for anyone else. The prebuilt pages carry it already; put it in a layout of your own with no fence and no option:
+
+```kay
+---
+import ImpersonationBanner from '@kaynooo/kayjs-auth/components/impersonation-banner.kay'
+---
+ImpersonationBanner
+slot
+```
+
+- It reads `ctx.impersonator`, the admin behind the session (null for none), so a page reaching it shows the banner in the first bytes, once per request even in a layout and a page both holding one.
+- The button posts to `<prefix>/stop-impersonating` under the base and back to the admin pages (the pages' home when the admin pages are off), worded in the page's locale.
 
 A page whose imports reach one of the three, or any template reading `ctx`, through its layouts, components and helpers however deep, reads the user before it renders, so they show in the first bytes, with JavaScript off too; no other page reads the session. Such a page is the visitor's own, so no cache shares it between visitors. `viewer: true` in `auth({ ... })` reads it on every page, for an app whose own components call `currentUser`.
 

@@ -108,6 +108,7 @@ test('the admin pages and the impersonation banner link under the base and the p
     acting: { status: 403, banner: 1, tabs: 0 },
     home: '/app/dashboard',
     banner: ['/app/auth/stop-impersonating'],
+    navBanner: ['/app/auth/stop-impersonating'],
     stopped: [303, '/app/members/admin'],
     back: ['/members/admin'],
   })

@@ -486,6 +486,38 @@ describe('the prebuilt pages', () => {
     }
   })
 
+  test('ImpersonationBanner in a template of the app shows while an admin acts as a user, once, in the first bytes, and nothing otherwise', async () => {
+    const root = await signedUp('banner-admin@example.com')
+    const { id: rootId } = (await store.users.findByEmail('banner-admin@example.com'))!
+
+    await signedUp('banner-acted@example.com')
+    await store.users.update(rootId, { roles: ['admin'] })
+
+    const { id } = (await store.users.findByEmail('banner-acted@example.com'))!
+
+    expect((await root.visit('/nav')).find('[data-impersonating]')).toHaveLength(0)
+    expect((await (await browser()).visit('/nav')).find('[data-impersonating]')).toHaveLength(0)
+
+    await root.submit(impersonate, { id }, { from: await root.visit('/impersonate') })
+
+    const page = await root.visit('/nav')
+
+    expect(page.html).not.toContain('kay-await')
+    expect(page.find('[data-impersonating]')).toHaveLength(1)
+    expect(text(page, '[data-impersonating] span')).toBe('You are acting as banner-acted@example.com.')
+    expect(page.find('[data-impersonating] form').map(form => form.attributes.action)).toEqual(['/auth/stop-impersonating'])
+    expect(page.find('#member')).toHaveLength(1)
+
+    const french = await root.visit('/fr/nav')
+
+    expect(text(french, '[data-impersonating] span')).toBe('Vous agissez comme banner-acted@example.com.')
+
+    const stopped = await root.fetch('/auth/stop-impersonating', { method: 'POST', body: new URLSearchParams({ redirect: '/nav' }) })
+
+    expect(stopped.status).toBe(303)
+    expect((await root.visit('/nav')).find('[data-impersonating]')).toHaveLength(0)
+  })
+
   test('the data page offers neither the export nor the deletion to an admin acting as the user', async () => {
     const root = await signedUp('data-admin@example.com')
     const { id: rootId } = (await store.users.findByEmail('data-admin@example.com'))!

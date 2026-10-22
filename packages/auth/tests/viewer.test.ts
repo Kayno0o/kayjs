@@ -2,7 +2,7 @@ import type { Auth } from '../src/auth'
 import type { BareUser as User } from '../src/core'
 import { afterEach, expect, test } from 'bun:test'
 import { requestOfContext } from 'kay/library'
-import { claimBanner, currentImpersonator, currentUser, isSignedOut, loadViewer, readRequestWith, registerViewer } from '../src/viewer'
+import { claimBanner, currentImpersonator, currentUser, isSignedOut, loadViewer, readRequestWith, registerViewer, viewerValues } from '../src/viewer'
 
 // Bun shares modules between test files, so the reader `createAuth` set goes back after each test.
 afterEach(() => readRequestWith(requestOfContext))
@@ -88,4 +88,15 @@ test('the admin behind an impersonation is read ahead with the user, and a reque
   await loadViewer(request)
   expect(currentImpersonator()).toMatchObject({ id: 'root' })
   expect([claimBanner(), claimBanner()]).toEqual([true, false])
+})
+
+test('ctx.impersonator is the admin acting as the signed-in user, and null for anyone else', async () => {
+  const acted = new Request('http://localhost/acted')
+  const plain = new Request('http://localhost/plain')
+
+  registerViewer(acted, { auth: { impersonator: async () => user({ id: 'root', roles: ['admin'] }), bareUser: async () => user({}) } as unknown as Auth, isGranted })
+  registerViewer(plain, { auth: { impersonator: async () => null, bareUser: async () => user({}) } as unknown as Auth, isGranted })
+
+  expect((await viewerValues(acted)).impersonator).toMatchObject({ id: 'root' })
+  expect((await viewerValues(plain)).impersonator).toBeNull()
 })
