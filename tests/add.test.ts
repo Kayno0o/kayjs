@@ -621,7 +621,7 @@ it('refuses ui in a project without Tailwind, naming the command that adds both'
   }
 })
 
-it('adds kayjs-auth over a SQLite file of its own, with the guard, the secret and the ui extension', async () => {
+it('adds kayjs-auth over a SQLite file of its own, with the guard and the ui extension', async () => {
   const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'my-shop')
 
   try {
@@ -629,7 +629,7 @@ it('adds kayjs-auth over a SQLite file of its own, with the guard, the secret an
 
     const result = await addFeatures(dir, ['auth'], { install: false })
 
-    expect(result.written).toEqual(['.env', '.env.example', '.gitignore', 'kay.config.ts', 'src/auth.ts', 'src/routes/_guard.ts'])
+    expect(result.written).toEqual(['.env.example', '.gitignore', 'kay.config.ts', 'src/auth.ts', 'src/routes/_guard.ts'])
 
     const source = await Bun.file(join(dir, 'src/auth.ts')).text()
 
@@ -642,17 +642,12 @@ it('adds kayjs-auth over a SQLite file of its own, with the guard, the secret an
 
     expect(config).toContain('authPages({ auth: () => import(\'./src/auth\') })')
     expect(config).toContain('ui()')
-    expect(await Bun.file(join(dir, '.env')).text()).toMatch(/^SESSION_SECRET=[0-9a-f]{64}$/m)
-    expect(await Bun.file(join(dir, '.env.example')).text()).toMatch(/^SESSION_SECRET=$/m)
     expect(await Bun.file(join(dir, '.env.example')).text()).toMatch(/^SITE_URL=$/m)
     expect(await Bun.file(join(dir, '.gitignore')).text()).toMatch(/^data$/m)
     expect(result.notes.join('\n')).toContain('kay add mail')
 
-    // A second run changes nothing, the secret included.
-    const secret = (await Bun.file(join(dir, '.env')).text()).match(SECRET)![0]
-
+    // A second run changes nothing.
     expect((await addFeatures(dir, ['auth'], { install: false })).written).toEqual([])
-    expect((await Bun.file(join(dir, '.env')).text()).match(SECRET)![0]).toBe(secret)
   }
   finally {
     await rm(join(dir, '..'), { recursive: true, force: true })

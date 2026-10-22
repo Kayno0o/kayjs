@@ -1,4 +1,3 @@
-import { randomBytes } from 'node:crypto'
 
 interface Project {
   name: string
@@ -39,10 +38,8 @@ export default function auth(project: Project) {
 
   const source = `${imports.join('\n')}\n${database}
 export const auth = createAuth({
-  sessions: session<AuthSessionData>({ secret: process.env.SESSION_SECRET! }),
+  sessions: session<AuthSessionData>(),
   store: pgStore(db),
-  // The public origin of the site, which the mailed links and the OAuth callbacks start from.
-  url: process.env.SITE_URL ?? 'http://localhost:3000',
   site: ${JSON.stringify(siteName(project.name))},
   pages: true,${mailed ? '\n  email: { mailer: { send: mail.enqueue } },' : ''}
 })
@@ -57,14 +54,13 @@ export const auth = createAuth({
     edits: ownDatabase
       ? [{ file: 'src/db/index.ts', find: TABLES, replace: '$1...authTables, ', done: '...authTables', import: 'import { authTables } from \'@kaynooo/kayjs-auth/pg\'' }]
       : [],
-    env: { SESSION_SECRET: randomBytes(32).toString('hex') },
-    example: ['SITE_URL'],
+    example: ['KAY_SECRET', 'SITE_URL'],
     ignore: ownDatabase ? [] : ['data'],
     extension: { import: 'import { authPages } from \'@kaynooo/kayjs-auth\'', expression: 'authPages({ auth: () => import(\'./src/auth\') })' },
     notes: [
       ownDatabase ? 'Run your migration generator (bun run db:generate) for the auth_* tables kayjs-auth added to the tables.' : 'kayjs-auth keeps its users in data/auth.db: point the Database in src/auth.ts at Postgres before production.',
       ...mailed ? [] : ['Without a mailer, password resets, magic links and verification mails cannot be sent: run `kay add mail` and pass `email: { mailer: { send: mail.enqueue } }` to createAuth.'],
-      'Set SESSION_SECRET and SITE_URL in production.',
+      'Set KAY_SECRET and SITE_URL in production.',
     ],
   }
 }
