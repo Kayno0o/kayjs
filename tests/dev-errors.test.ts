@@ -8,6 +8,7 @@ import { outputDir } from '../src/build/assets'
 import { runCommand } from '../src/commands/command'
 import { dev as devCommand } from '../src/commands/dev'
 import { answeredWithoutError, DEV_ERRORS_FILE, recordRequestError, trackDevErrors } from '../src/server/dev-errors'
+import { freePort } from './free-port'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
@@ -207,10 +208,8 @@ describe('kay dev --format json', () => {
     await throwingPage(project, 'src/routes/index.kay')
     // Read by the process building the client as by the server, whose output goes to stderr alike.
     await Bun.write(join(project, 'kay.config.ts'), 'console.log(\'config read\')\nexport default {}\n')
-    const free = Bun.serve({ port: 0, fetch: () => new Response() })
-    const port = free.port!
+    const port = freePort()
 
-    await free.stop()
     const child = Bun.spawn([process.execPath, CLI, 'dev', project, '--port', String(port), '--format', 'json'], { stdout: 'pipe', stderr: 'pipe' })
     const lines: string[] = []
     let errors = ''
