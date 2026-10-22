@@ -208,12 +208,15 @@ let settling: Promise<void> | undefined
 
 export async function go(url: URL, swap: Swap): Promise<void> {
   if (swap.intent === 'refresh' && settling) {
-    const started = navigation.current
+    const [started, loads] = [navigation.current, navigation.loads]
 
-    await settling
+    try {
+      await settling
+    }
+    catch {}
 
-    // The swap went to another URL or a newer one took over, whose page is as recent as the refresh would give.
-    if (navigation.current !== started || pageKey(new URL(location.href)) !== pageKey(url))
+    // The swap went to another URL, ended in a full load or a newer one took over, whose page is as recent as the refresh would give.
+    if (navigation.current !== started || navigation.loads !== loads || pageKey(new URL(location.href)) !== pageKey(url))
       return
   }
 
@@ -275,18 +278,24 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
     let page: FetchedPage
 
     try {
-      const fetched = await bounded(pageFor(url, controller.signal), PAGE_TIMEOUT_MS)
+      const asked = pageFor(url, controller.signal)
+      // A refresh runs in the background and may be slow: only a visit is given up on.
+      const fetched = swap.intent === 'refresh' ? await asked : await bounded(asked, PAGE_TIMEOUT_MS)
 
+      // A page that never answered is loaded by the browser.
       if (fetched === LATE) {
         controller.abort()
 
-        throw new Error('kay: the page did not answer in time')
+        if (isCurrent())
+          leave(url)
+
+        return
       }
 
       page = fetched
     }
     catch {
-      // A fetch a newer navigation cancelled leaves nothing to load, one that never answered is loaded by the browser.
+      // A fetch a newer navigation cancelled leaves nothing to load.
       if (isCurrent())
         leave(url)
 
@@ -422,8 +431,11 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
 
     try {
       // A transition stuck, as in a tab the browser keeps from painting, is skipped, which still runs the commit.
-      if (await bounded(transition.finished, TRANSITION_TIMEOUT_MS) === LATE)
+      if (await bounded(transition.finished, TRANSITION_TIMEOUT_MS) === LATE) {
         skip()
+        // Skipping before the commit ran schedules it: it is awaited so the swap ends after it.
+        await transition.updateCallbackDone
+      }
     }
     finally {
       if (navigation.skipTransition === skip)

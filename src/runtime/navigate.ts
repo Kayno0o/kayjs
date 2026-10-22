@@ -119,7 +119,7 @@ export async function follow(url: URL, swap: Swap): Promise<void> {
   await swapper.go(url, swap)
 }
 
-// A click during a view transition lands on the root, not on the link under the pointer: the transition is skipped, which gives the page its elements back, and the link is looked for where the click was made.
+// A click during a view transition lands on the root, not on the link under the pointer: the transition is skipped, which gives the page its elements back, and the link is looked for where the click was made. Any click on the root cuts the transition short, as the page needs its elements back to answer it.
 function linkUnderTransition(event: MouseEvent): HTMLAnchorElement | undefined {
   if (event.target !== document.documentElement || !navigation.skipTransition)
     return undefined

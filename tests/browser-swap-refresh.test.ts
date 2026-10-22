@@ -30,7 +30,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
   const isPage = (target: string) => (url: URL, request: Request) => request.headers.has(NAVIGATE) && url.pathname + url.search === target
 
   async function until(condition: () => boolean | Promise<boolean>, what: string): Promise<void> {
-    for (let tries = 0; tries < 100; tries++) {
+    for (let attempt = 0; attempt < 100; attempt++) {
       if (await condition())
         return
 
@@ -186,12 +186,12 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
   }, 30_000)
 
   // Makes the page's wait for a page or a transition last a moment, as a timer of exactly that length fires at once.
-  async function shorten(page: TestPage, ...bounds: number[]): Promise<void> {
-    await page.evaluate((lengths) => {
+  async function shorten(page: TestPage, bounds: number[], to = 100): Promise<void> {
+    await page.evaluate((lengths, to) => {
       const original = window.setTimeout.bind(window)
 
-      window.setTimeout = ((handler: TimerHandler, delay?: number, ...rest: unknown[]) => original(handler, delay !== undefined && lengths.includes(delay) ? 100 : delay, ...rest)) as typeof window.setTimeout
-    }, bounds)
+      window.setTimeout = ((handler: TimerHandler, delay?: number, ...rest: unknown[]) => original(handler, delay !== undefined && lengths.includes(delay) ? to : delay, ...rest)) as typeof window.setTimeout
+    }, bounds, to)
   }
 
   it('a link whose page never answers is loaded by the browser', async () => {
@@ -200,7 +200,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
     await page.evaluate(() => {
       (window as { kayAlive?: boolean }).kayAlive = true
     })
-    await shorten(page, PAGE_TIMEOUT_MS)
+    await shorten(page, [PAGE_TIMEOUT_MS])
     // The browser's own load waits behind the held fetch in its HTTP cache, so the server answers once the swap gave up: a swap still waiting would then show the page itself.
     const release = hold(isPage('/other'))
 
@@ -214,10 +214,35 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
     expect(page.errors).toEqual([])
   }, 30_000)
 
+  it('a refresh waiting for a link that ends in a full load does not take the visitor back', async () => {
+    await using page = await opened(false)
+
+    // Long enough for the action's refresh to start waiting before the swap gives up.
+    await shorten(page, [PAGE_TIMEOUT_MS, 1500])
+
+    const releaseAction = hold(isAction)
+    const releasePage = hold(isPage('/?view=b'))
+
+    await page.click('button.act')
+    await until(requested(url => url.startsWith('POST /_kay/action')), 'the action to be sent')
+    await page.click('a.query')
+    await until(requested(url => url === 'GET /?view=b nav'), 'the page to be asked for')
+    seen.length = 0
+    releaseAction()
+    await Bun.sleep(2500)
+    releasePage()
+    await Bun.sleep(500)
+    await page.waitFor('p.view', { text: 'b' })
+
+    expect(seen).not.toContain('GET / nav')
+    expect(await page.path()).toBe('/?view=b')
+    expect(page.errors).toEqual([])
+  }, 30_000)
+
   it('a view transition that never finishes is skipped and the swap still commits', async () => {
     await using page = await opened(true)
 
-    await shorten(page, TRANSITION_TIMEOUT_MS)
+    await shorten(page, [TRANSITION_TIMEOUT_MS])
     await page.evaluate(() => {
       const start = document.startViewTransition.bind(document)
       const counted = window as { kaySkipped?: number }
@@ -228,6 +253,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
 
         return {
           finished: new Promise<void>(() => undefined),
+          updateCallbackDone: real.updateCallbackDone,
           skipTransition: () => {
             counted.kaySkipped!++
             real.skipTransition()
