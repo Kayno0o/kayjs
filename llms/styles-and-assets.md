@@ -95,22 +95,26 @@ section
 
 ### Restyle a component from src/ui.ts
 
-`src/ui.ts` sets the parts and variants of any component, the app's own or a library's, with no change to the component. Key each by the specifier `src/ui.ts` would import it with, and write what a recipe takes, without its `defaults`:
+`src/ui.ts` sets the parts and variants of any component, the app's own or a library's, with no change to the component. Key each by the name a template calls it, `Card` for kayjs-ui's or `Panel` for the app's `src/components/panel.kay`, and write what a recipe takes, without its `defaults`:
 
 ```ts
 import { defineUi } from 'kay'
 
 export default defineUi({
-  '@kaynooo/kayjs-ui/card.kay': {
+  Card: {
     parts: { root: 'rounded-xl', head: 'p-6' },
-    variants: { tone: { danger: { head: 'bg-red-100' } } },
   },
-  './components/panel.kay': { parts: 'shadow-lg' },
+  Badge: {
+    variants: { tone: { danger: { root: 'bg-red-100' } } },
+  },
+  Panel: { parts: 'shadow-lg' },
 })
 ```
 
 - Classes merge in the order the part's own, the component's recipe base, its variants, `src/ui.ts`'s parts and variants, then the caller's `class`, so `Card(class={{ head: 'p-8' }})` still wins.
 - The file is read as it is written at build time and merged into the component's output: the per-page CSS cut sees the final classes, and the parts of an entry without variants are written into the component as static classes, so an island carries nothing for them. It holds string literals and object literals only; a variant reads the component's props and the defaults of its recipe.
+- A name matches the app's components under `src/` and kayjs-ui's. For one two components bear, or one from another package, key the specifier `src/ui.ts` would import it with: `'@kaynooo/kayjs-ui/card.kay'`, `'./components/card.kay'`. `kay check` reports a name no component bears, a name two bear (naming their specifiers) and two keys naming one component.
+- `defineUi` is typed from the components `kay check` writes to `.kay/types/kay-ui.d.ts`: each key completes, and a part, a variant or a value the component lacks fails `bun run check`.
 - The component must have parts or a recipe, and a variant must be one its recipe declares, so a component with no recipe takes `parts` alone. `kay check` reports an unknown component, part, variant or value, a page, a layout or a server-fenced file, two keys naming one component, a class that is not a plain string and a file with no default export. The dev server rebuilds when `src/ui.ts` changes.
 
 ### Serve a file at a fixed path

@@ -97,14 +97,14 @@ export default settings
 
 ### Restyle a component
 
-A component with parts takes its `class` as a string for the root or an object of parts, `Card(class={{ head: 'p-6' }})`. `src/ui.ts` restyles every instance of one, keyed by its import path ([Restyle a component from src/ui.ts](../../../llms/styles-and-assets.md#restyle-a-component-from-srcuits)):
+A component with parts takes its `class` as a string for the root or an object of parts, `Card(class={{ head: 'p-6' }})`. `src/ui.ts` restyles every instance of one, keyed by its name, with its import path as the fallback ([Restyle a component from src/ui.ts](../../../llms/styles-and-assets.md#restyle-a-component-from-srcuits)):
 
 ```ts
 import { defineUi } from 'kay'
 
 export default defineUi({
-  '@kaynooo/kayjs-ui/card.kay': { parts: { root: 'rounded-xl', head: 'p-6' } },
-  '@kaynooo/kayjs-ui/button.kay': { variants: { tone: { danger: { root: 'bg-red-600' } } } },
+  Card: { parts: { root: 'rounded-xl', head: 'p-6' } },
+  Button: { variants: { tone: { danger: { root: 'bg-red-600' } } } },
 })
 ```
 

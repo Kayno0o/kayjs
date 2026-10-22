@@ -2,8 +2,8 @@ import type { CheckDiagnostic } from '.'
 import type { UiComponent, UiSource } from '../build/ui'
 import type { Diagnostic, Span } from '../compiler/ast'
 import { readFileSync } from 'node:fs'
-import { basename } from 'node:path'
-import { componentFile, KAY_EXTENSION, uiOf } from '../build/ui'
+import { basename, dirname, relative, sep } from 'node:path'
+import { componentFile, componentMatches, isComponentName, KAY_EXTENSION, uiOf } from '../build/ui'
 import { ROUTE_FILES } from '../compiler'
 import { templateFacts } from '../compiler/ast'
 import { parseKay } from '../compiler/parser'
@@ -15,7 +15,7 @@ function listed(names: Iterable<string>): string {
 }
 
 // What a component offers `src/ui.ts` to set: its parts, and the variants of its recipe with their values; none of either when it declares neither, and `page` for a page or a layout, which the build gives no entry.
-function offered(file: string): { parts: Set<string>, variants: Record<string, string[]> | undefined } | 'page' | undefined {
+export function offered(file: string): { parts: Set<string>, variants: Record<string, string[]> | undefined } | 'page' | undefined {
   const source = readFileSync(file, 'utf8')
   const parsed = parseKay(source)
 
@@ -28,11 +28,29 @@ function offered(file: string): { parts: Set<string>, variants: Record<string, s
   return parts?.merges === true ? { parts: new Set(parts.names.keys()), variants: script.recipe === undefined ? {} : script.recipeVariants } : undefined
 }
 
+// The specifier `src/ui.ts` writes a component by: a path from it for the app's own, the package's for a library's.
+function specifierOf(ui: UiSource, file: string): string {
+  const from = dirname(ui.file)
+
+  return file.startsWith(from + sep) ? `./${relative(from, file).split(sep).join('/')}` : `@kaynooo/kayjs-ui/${basename(file)}`
+}
+
 function componentProblems(ui: UiSource, component: UiComponent, report: (span: Span, message: string, help?: string) => void): void {
   const file = componentFile(ui, component)
 
+  if (file === undefined && isComponentName(component.specifier)) {
+    const matches = componentMatches(ui, component)
+
+    if (matches.length === 0)
+      report(component.span, `\`${component.specifier}\` names no component`, 'write the name a template calls a component by, `Card`, or the specifier src/ui.ts would import it with')
+    else
+      report(component.span, `\`${component.specifier}\` names ${matches.length} components`, `write the specifier of the one you mean: ${listed(matches.map(match => specifierOf(ui, match)))}`)
+
+    return
+  }
+
   if (file === undefined) {
-    report(component.span, `\`${component.specifier}\` names no component`, KAY_EXTENSION.test(component.specifier) ? 'write the specifier src/ui.ts would import the component with: a package\'s path, or a path relative to src/ui.ts' : 'a component is a `.kay` file')
+    report(component.span, `\`${component.specifier}\` names no component`, KAY_EXTENSION.test(component.specifier) ? 'write the specifier src/ui.ts would import the component with: a package\'s path, or a path relative to src/ui.ts' : 'a component is a `.kay` file, or a name such as `Card`')
 
     return
   }

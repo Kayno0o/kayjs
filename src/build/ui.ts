@@ -1,9 +1,12 @@
 import type * as t from '@babel/types'
+import type { Dirent } from 'node:fs'
 import type { Span } from '../compiler/ast'
 import type { UiEntry } from '../runtime/ui'
-import { readFileSync, realpathSync, statSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { readdirSync, readFileSync, realpathSync, statSync } from 'node:fs'
+import { basename, dirname, join } from 'node:path'
 import { parse } from '@babel/parser'
+import { componentName, ROUTE_FILES } from '../compiler'
+import { parseKay } from '../compiler/parser'
 
 // Where an app sets the parts and variants of its components and its libraries'.
 export const UI_FILE = 'src/ui.ts'
@@ -17,7 +20,7 @@ export interface UiComponent {
   // The key as `src/ui.ts` writes it, and where it points.
   specifier: string
   span: Span
-  // The component's file, as Bun loads it, when the specifier resolves to one.
+  // The component's file, as Bun loads it, when a specifier resolves to one.
   file?: string | undefined
   entry: UiEntry
   // The span of each part and of each variant and its values, for the check to point at.
@@ -30,11 +33,18 @@ export interface UiSource {
   source: string
   components: UiComponent[]
   problems: UiProblem[]
+  // The components each name stood for when first found, which stay until `src/ui.ts` is read again.
+  named?: Map<string, string[]> | undefined
 }
 
 const OBJECT_WRAPPERS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'ParenthesizedExpression'])
 
 export const KAY_EXTENSION = /\.kay$/
+// A key written as a component's name, `Card`, rather than as a specifier.
+const COMPONENT_NAME = /^[A-Z_$][\w$]*$/i
+const WORD_BOUNDARY = /(?<=[a-z0-9])(?=[A-Z])/g
+// The package whose components a bare name reaches besides the app's own.
+const UI_LIBRARY = '@kaynooo/kayjs-ui'
 // What `src/ui.ts` was last read as, by file: it is read for every component the build compiles.
 const read = new Map<string, { stamp: string, ui: UiSource | undefined }>()
 
@@ -202,8 +212,100 @@ function exported(ast: t.File): t.Node | undefined {
   return value
 }
 
-// The component a component of `src/ui.ts` names, as Bun would load it from there: looked for again until it is found, as a library may be installed and a component written after the file was.
+export function isComponentName(key: string): boolean {
+  return COMPONENT_NAME.test(key)
+}
+
+// The app's `.kay` files by component name, from `src/` down, skipping dependencies and dot folders.
+function appComponents(dir: string, found: Map<string, string[]>): void {
+  let entries: Dirent[]
+
+  try {
+    entries = readdirSync(dir, { withFileTypes: true })
+  }
+  catch {
+    return
+  }
+
+  for (const entry of entries) {
+    if (entry.isDirectory() && entry.name !== 'node_modules' && !entry.name.startsWith('.')) {
+      appComponents(join(dir, entry.name), found)
+    }
+    else if (entry.isFile() && KAY_EXTENSION.test(entry.name)) {
+      const name = componentName(entry.name)
+
+      found.set(name, [...found.get(name) ?? [], join(dir, entry.name)])
+    }
+  }
+}
+
+function isPage(file: string): boolean {
+  try {
+    return ROUTE_FILES.has(basename(file)) || parseKay(readFileSync(file, 'utf8')).server !== undefined
+  }
+  catch {
+    return false
+  }
+}
+
+function realOf(file: string): string {
+  try {
+    return realpathSync(file)
+  }
+  catch {
+    return file
+  }
+}
+
+// The files a bare name stands for: the app's components of that name and kayjs-ui's, a page or a layout left out when another component bears the name. None is a name no component bears yet, looked for again next time.
+export function componentsNamed(ui: UiSource, name: string): string[] {
+  const kept = ui.named?.get(name)
+
+  if (kept !== undefined)
+    return kept
+
+  const app = new Map<string, string[]>()
+
+  appComponents(dirname(ui.file), app)
+
+  const found = (app.get(name) ?? []).map(realOf)
+
+  try {
+    const library = realpathSync(Bun.resolveSync(`${UI_LIBRARY}/${name.replace(WORD_BOUNDARY, '-').toLowerCase()}.kay`, dirname(ui.file)))
+
+    if (componentName(library) === name && !found.includes(library))
+      found.push(library)
+  }
+  catch {}
+
+  const components = found.filter(file => !isPage(file))
+  const matches = components.length > 0 ? components : found
+
+  if (matches.length > 0)
+    (ui.named ??= new Map()).set(name, matches)
+
+  return matches
+}
+
+// The files a key of `src/ui.ts` names: one for a specifier that resolves as Bun would load it from there, any number for a component name.
+export function componentMatches(ui: UiSource, component: UiComponent): string[] {
+  if (isComponentName(component.specifier))
+    return componentsNamed(ui, component.specifier)
+
+  const file = componentFile(ui, component)
+
+  return file === undefined ? [] : [file]
+}
+
+// The component a key of `src/ui.ts` names; none for a name two components bear.
 export function componentFile(ui: UiSource, component: UiComponent): string | undefined {
+  if (isComponentName(component.specifier)) {
+    const matches = componentsNamed(ui, component.specifier)
+
+    return matches.length === 1 ? matches[0] : undefined
+  }
+
+  // A specifier is looked for again until it is found, as a library may be installed and a component written after the file was.
   if (component.file !== undefined || !KAY_EXTENSION.test(component.specifier))
     return component.file
 

@@ -316,3 +316,47 @@ describe('kay check on src/ui.ts', () => {
     expect(uiProblems(scratch)).toEqual([])
   })
 })
+
+describe('a component keyed by its name', () => {
+  const write = async (ui: string) => Bun.write(join(scratch, 'src/ui.ts'), ui)
+
+  it('takes the entry the specifier would, for an app component at the top of src/ and one nested', async () => {
+    await Bun.write(join(scratch, 'src/deep/inner-box.kay'), 'section\n  header(part="head") a\n')
+    await write('export default { Plain: { parts: { head: \'font-bold\' } }, InnerBox: { parts: { head: \'p-2\' } } }')
+
+    expect(uiEntryOf(scratch, join(scratch, 'src/plain.kay'))).toEqual({ parts: { head: 'font-bold' } })
+    expect(uiEntryOf(scratch, join(scratch, 'src/deep/inner-box.kay'))).toEqual({ parts: { head: 'p-2' } })
+    expect(uiProblems(scratch)).toEqual([])
+  })
+
+  it('renders as the specifier key renders', async () => {
+    await write('export default { \'./plain.kay\': { parts: { head: \'p-9\' } } }')
+
+    const bySpecifier = html((await bundle('bun', 'out-by-specifier')).Plain!, {})
+
+    await write('export default { Plain: { parts: { head: \'p-9\' } } }')
+    expect(html((await bundle('bun', 'out-by-name')).Plain!, {})).toBe(bySpecifier)
+    expect(bySpecifier).toContain('class="p-9"')
+  })
+
+  it('stands for nothing when two components bear the name, and the check names the specifiers that tell them apart', async () => {
+    await write('export default { Card: { parts: { head: \'p-9\' } } }')
+
+    expect(uiEntryOf(scratch, join(scratch, 'src/card.kay'))).toBeUndefined()
+
+    const [problem] = uiProblems(scratch)
+
+    expect(problem!.message).toBe('`Card` names 2 components')
+    expect(problem!.help).toContain('`./card.kay`')
+    expect(problem!.help).toContain('`@kaynooo/kayjs-ui/card.kay`')
+  })
+
+  it('reports a name no component bears, and finds a component written after the file', async () => {
+    await write('export default { Latecomer: { parts: \'p-2\' } }')
+    expect(uiProblems(scratch).map(problem => problem.message)).toEqual(['`Latecomer` names no component'])
+
+    await Bun.write(join(scratch, 'src/latecomer.kay'), 'section.card\n  header(part="head") a\n')
+    expect(uiProblems(scratch)).toEqual([])
+    expect(uiEntryOf(scratch, join(scratch, 'src/latecomer.kay'))).toEqual({ parts: 'p-2' })
+  })
+})

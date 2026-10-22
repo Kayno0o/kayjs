@@ -54,6 +54,7 @@ import { untypedSockets } from './socket-routes'
 import { typingOptions } from './tsgo'
 import { removedUiClasses } from './ui-classes'
 import { renamedUiProps } from './ui-props'
+import { uiTypes } from './ui-types'
 
 // Imports each page of the extensions kay check reports as the app's own, so TypeScript checks them.
 const EXTENSION_PAGES = 'kay-extension-pages.ts'
@@ -144,6 +145,7 @@ async function writeShadows(projectRoot: string, options: CheckOptions): Promise
   await tree.write('kay-assets.d.ts', ASSET_TYPES)
   await tree.write('kay-icons.d.ts', iconTypes(root))
   await tree.write('kay-packages.d.ts', packageTypes(root, libraries.libraries))
+  await tree.write('kay-ui.d.ts', uiTypes(root, libraries.libraries, own.files))
 
   const replaced = settingsCheck(root, options.settings ?? {}, problems)
   const exported = exportsCheck(root, routesDir, served.routes, served.apiModules, served.endpoints)
