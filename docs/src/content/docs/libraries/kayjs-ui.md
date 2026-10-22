@@ -41,6 +41,8 @@ An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never
 }
 ```
 
+To use a theme utility in `@apply`, such as `@apply border border-kui-surface2 bg-kui-mantle`, start the stylesheet with `@reference '@kaynooo/kayjs-ui/theme.css';`. It gives Tailwind the tokens and writes no rule, so the theme is not loaded a second time. Without it, the build fails with `Cannot apply unknown utility class`.
+
 Your stylesheet ships only the rules of the components you render. kay drops every `kui-` rule whose class no file of your app, and no component it renders, writes whole.
 
 A class you put together at runtime, such as `kui-btn-${tone}`, is not seen. Write it in full in any file of your app, such as a comment in `app.css`, to keep its rules.
