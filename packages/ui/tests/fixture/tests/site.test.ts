@@ -442,8 +442,8 @@ describe('inputs', () => {
     const form = (await element('/inputs', 'form')).replaceAll(/<!--[^>]*-->/g, '')
 
     expect([...form.matchAll(/aria-label="(Hours \w+)" placeholder="(\d+)" min="0" max="24" value="(\d*)"/g)].map(match => match.slice(1))).toEqual([['Hours from', '0', '2'], ['Hours to', '24', '']])
-    expect(form).toContain('<span class="kui-multi-select-summary">Mars</span>')
-    expect(form).toContain('<input class="kui-multi-select-checkbox" type="checkbox" checked><span class="kui-multi-select-label">Mars</span>')
+    expect(form).toContain('<span class="kui-multi-select-summary" data-part="summary">Mars</span>')
+    expect(form).toContain(`<input class="kui-multi-select-checkbox" data-part="checkbox" type="checkbox" checked><span class="kui-multi-select-label" data-part="label">Mars</span>`)
     expect(form).not.toContain('kui-multi-select-search')
     expect(form).toContain('<input type="hidden" name="planet" value="mars">')
   })
@@ -645,7 +645,7 @@ describe('ContactForm', () => {
 
     const refused = await site.submit(contact, { name: 'Ada', email: 'nope', message: 'Bonjour' }, { from: '/fr/contact-words' })
 
-    expect(refused.html).toContain('<span class="kui-form-field-issue">Merci d\'écrire une adresse e-mail valide.</span>')
+    expect(refused.html).toContain('<span class="kui-form-field-issue" data-part="issue">Merci d\'écrire une adresse e-mail valide.</span>')
   })
 
   test('draws the consent checkbox of an action asking for one, with the privacy link and the renamed honeypot, and no box without', async () => {
@@ -678,9 +678,9 @@ describe('ContactForm', () => {
     const { contact } = await import('../src/routes/contact.kay')
     const refused = await site.submit(contact, { name: 'A', email: 'nope', topic: 'quote', message: 'Hi' }, { from: '/contact' })
 
-    expect(refused.html).toContain('<span class="kui-form-field-issue">Tell us your name</span>')
-    expect(refused.html).toContain('<span class="kui-form-field-issue">Not an email address</span>')
-    expect(refused.html).toContain('<span class="kui-form-field-issue">A few words at least</span>')
+    expect(refused.html).toContain('<span class="kui-form-field-issue" data-part="issue">Tell us your name</span>')
+    expect(refused.html).toContain('<span class="kui-form-field-issue" data-part="issue">Not an email address</span>')
+    expect(refused.html).toContain('<span class="kui-form-field-issue" data-part="issue">A few words at least</span>')
 
     const sent = await site.submit(contact, { name: 'Ada', email: 'ada@example.com', topic: 'quote', message: 'Hello there' }, { from: '/contact' })
 

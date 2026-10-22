@@ -1,11 +1,13 @@
 --- <Value extends string | number, Empty extends string | boolean | undefined = undefined>
 import type { JSX } from 'kay'
-import { untrack } from 'kay'
+import { recipe, untrack } from 'kay'
 import { controlledValue } from './controlled-value'
 import { startRef } from './form-reset'
 import { wording } from 'kay/words'
 
-const { value, options, onChange, submit = false, emptyOption, loading = false, loadingLabel = wording('ui.select.loadingLabel', 'Loading…'), class: className, onBlur, onKeyDown, onPointerDown, ...rest } = props<Omit<JSX.IntrinsicElements['select'], 'value' | 'options' | 'class' | 'children' | 'onChange'> & {
+const look = recipe({ parts: { root: 'kui-field-input' } })
+
+const { value, options, onChange, submit = false, emptyOption, loading = false, loadingLabel = wording('ui.select.loadingLabel', 'Loading…'), onBlur, onKeyDown, onPointerDown, ...rest } = props<Omit<JSX.IntrinsicElements['select'], 'value' | 'options' | 'class' | 'children' | 'onChange'> & {
   // One of the options' values, or the empty string once there is an `emptyOption`.
   value: Value | (Empty extends string | true ? '' : never)
   // `disabled` keeps that option from being picked. A native option draws no icon, so it has none.
@@ -19,7 +21,6 @@ const { value, options, onChange, submit = false, emptyOption, loading = false, 
   // Shows a disabled row saying the options are on their way.
   loading?: boolean | undefined
   loadingLabel?: string | undefined
-  class?: string | undefined
 }>()
 
 let box: HTMLSelectElement | undefined
@@ -84,7 +85,7 @@ function left(event: FocusEvent & { currentTarget: HTMLSelectElement }) {
 const ref = startRef<HTMLSelectElement>(element => box = element, rest.ref)
 ---
 // Each option says whether it is selected, so the right one stays chosen when the options arrive after the value.
-select.kui-field-input({...rest} ref={ref} class={className} onChange={event => picked(event.currentTarget)} onKeyDown={submit ? pressed : onKeyDown} onPointerDown={submit ? grabbed : onPointerDown} onBlur={submit ? left : onBlur})
+select({...rest} ref={ref} onChange={event => picked(event.currentTarget)} onKeyDown={submit ? pressed : onKeyDown} onPointerDown={submit ? grabbed : onPointerDown} onBlur={submit ? left : onBlur})
   if emptyOption !== undefined && emptyOption !== false
     option(value="") {typeof emptyOption === 'string' ? emptyOption : ''}
   if loading

@@ -1,9 +1,11 @@
 ---
 import type { JSX, Snippet } from 'kay'
-import { listen, signal } from 'kay'
+import { listen, recipe, signal } from 'kay'
 import { acceptsFile } from './accept'
 
-const { accept, multiple = false, paste = false, disabled = false, compact = false, onFiles, onReject, content, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
+const look = recipe({ parts: { root: 'kui-file-drop', input: 'kui-file-drop-input' } })
+
+const { accept, multiple = false, paste = false, disabled = false, compact = false, onFiles, onReject, content, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
   // The files the zone takes, as an `accept` attribute: the picker filters on it, and dropped or pasted files that miss it are ignored.
   accept?: string | undefined
   multiple?: boolean | undefined
@@ -18,7 +20,6 @@ const { accept, multiple = false, paste = false, disabled = false, compact = fal
   onReject?: ((files: File[]) => void) | undefined
   // What the zone shows: `@content(zone)`, where `zone.open()` opens the picker and `zone.dragging()` reads whether files hover the zone.
   content: Snippet<[zone: { open: () => void, dragging: () => boolean }]>
-  class?: string | undefined
 }>()
 
 const dragging = signal(false)
@@ -100,6 +101,6 @@ function pasted(event: ClipboardEvent) {
 
 listen(() => paste ? window : undefined, 'paste', pasted)
 ---
-.kui-file-drop({...rest} role="group" class={className} data-compact={compact || undefined} data-dragging={dragging() || undefined} data-disabled={disabled || undefined} onDragOver={dragOver} onDragLeave={dragLeave} onDrop={drop})
-  input.kui-file-drop-input(ref={element => input = element} type="file" tabindex="-1" aria-hidden="true" accept={accept} multiple={multiple} disabled={disabled} onChange={picked})
+div({...rest} part="root" role="group" data-compact={compact || undefined} data-dragging={dragging() || undefined} data-disabled={disabled || undefined} onDragOver={dragOver} onDragLeave={dragLeave} onDrop={drop})
+  input(part="input" ref={element => input = element} type="file" tabindex="-1" aria-hidden="true" accept={accept} multiple={multiple} disabled={disabled} onChange={picked})
   | {content(zone)}

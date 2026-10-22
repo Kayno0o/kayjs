@@ -1,9 +1,11 @@
 ---
 import type { JSX } from 'kay'
-import { effect, untrack } from 'kay'
+import { effect, recipe, untrack } from 'kay'
 import { controlledCheckbox } from './controlled-checkbox'
 
-const { checked = false, indeterminate = false, label, hint, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'type' | 'checked' | 'class' | 'children' | 'onChange' | 'ref'> & {
+const look = recipe({ parts: { root: 'kui-checkbox', input: 'kui-checkbox-input', label: 'kui-checkbox-label', hint: 'kui-checkbox-hint' } })
+
+const { checked = false, indeterminate = false, label, hint, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'type' | 'checked' | 'class' | 'children' | 'onChange' | 'ref'> & {
   // Whether it starts ticked; a box whose parent passes another value follows it.
   checked?: boolean | undefined
   // Neither ticked nor not, for a box standing over a partly ticked set; a click toggles it from `checked`, and the box stays drawn so while the parent keeps it.
@@ -15,7 +17,6 @@ const { checked = false, indeterminate = false, label, hint, onChange, class: cl
   // A promise holds the box busy until it settles, and puts it back where it was when it rejects (logged) or resolves to false: a refused change never shows as made.
   // Typed `unknown`, so a callback answering something else, such as `list.push`, still fits.
   onChange?: ((checked: boolean) => unknown) | undefined
-  class?: string | undefined
 }>()
 
 let box: HTMLInputElement | undefined
@@ -39,9 +40,9 @@ effect(() => {
 })
 ---
 // A native checkbox, so it submits inside a form and the keyboard and screen readers know it. A click while a change is under way ticks nothing.
-label.kui-checkbox(class={className})
-  input.kui-checkbox-input({...rest} ref={ref} type="checkbox" checked={on()} aria-busy={busy() ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => change(event.currentTarget)})
+label(part="root")
+  input({...rest} part="input" ref={ref} type="checkbox" checked={on()} aria-busy={busy() ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => change(event.currentTarget)})
   if label
-    span.kui-checkbox-label {label}
+    span(part="label") {label}
   if hint !== undefined
-    span.kui-checkbox-hint {hint}
+    span(part="hint") {hint}

@@ -6,16 +6,29 @@ import Card from '@kaynooo/kayjs-ui/card.kay'
 import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
 import DateInput from '@kaynooo/kayjs-ui/date-input.kay'
 import DateRangeInput from '@kaynooo/kayjs-ui/date-range-input.kay'
+import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
+import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
 import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+import Menu from '@kaynooo/kayjs-ui/menu.kay'
+import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import PageHeader from '@kaynooo/kayjs-ui/page-header.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import RangeInput from '@kaynooo/kayjs-ui/range-input.kay'
+import Rating from '@kaynooo/kayjs-ui/rating.kay'
+import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+import Select from '@kaynooo/kayjs-ui/select.kay'
+import Slider from '@kaynooo/kayjs-ui/slider.kay'
 import Stat from '@kaynooo/kayjs-ui/stat.kay'
 import Table from '@kaynooo/kayjs-ui/table.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
 import TimeInput from '@kaynooo/kayjs-ui/time-input.kay'
+import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
 
 const planets = [{ id: 1, name: 'Mars' }]
 ---
@@ -46,3 +59,21 @@ CardRow#row(left="L") Middle
 DateInput#date(aria-label="Day" name="day")
 DateRangeInput#dates(label="Stay")
 TimeInput#time(aria-label="Start" name="start")
+FormField#field(label="Name" hint="Required" required)
+  TextInput(name="n")
+FormField#field-group(label="Pick" group)
+  TextInput(name="m")
+Checkbox#checkbox(label="Agree" hint="1")
+Toggle#toggle(label="On")
+Select#select(value="a" options={[{ value: 'a', label: 'A' }]})
+MultiSelect#multi(label="Tags" options={[{ value: 'a', label: 'A' }]} value={['a']})
+RangeInput#range(label="Price" unit="€")
+Segmented#segmented(label="Mode" value="a" options={[{ value: 'a', label: 'A', icon: 'info' }, { value: 'b', label: 'B' }]})
+Rating#rating(value={3})
+FileDrop#drop(onFiles={() => undefined})
+  @content(_zone)
+    p drop
+IconButton#icon-button(icon="info" label="Info")
+CopyButton#copy(text="x" label="Copy" tone="accent")
+Menu#menu(label="More" icon="info" items={[{ label: 'Go', onSelect: () => undefined }, 'separator']} class="menu-trigger")
+Slider#slider(label="Delay" value={5})

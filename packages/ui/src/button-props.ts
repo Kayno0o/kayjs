@@ -50,7 +50,3 @@ export function buttonOf(attributes: TagAttributes) {
 
   return { ...others, 'type': type, 'aria-expanded': expanded === undefined ? undefined : String(expanded), 'aria-pressed': pressed === undefined ? undefined : String(pressed) }
 }
-
-export function lookOf(tone: Look['tone'], className: string | undefined) {
-  return [{ 'kui-btn-accent': tone === 'accent', 'kui-btn-success': tone === 'success', 'kui-btn-danger': tone === 'danger' }, className]
-}

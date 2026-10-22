@@ -1,9 +1,11 @@
 ---
 import type { JSX } from 'kay'
-import { effect, signal, untrack } from 'kay'
+import { effect, recipe, signal, untrack } from 'kay'
 import { onFormReset, startRef } from './form-reset'
 
-const { value, min = 0, max = 100, step, label, showValue = true, formatValue, onInput, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'class' | 'children' | 'type' | 'value' | 'min' | 'max' | 'step' | 'onInput' | 'onChange'> & {
+const look = recipe({ parts: { root: 'kui-slider', label: 'kui-slider-label', input: 'kui-slider-input', value: 'kui-slider-value' } })
+
+const { value, min = 0, max = 100, step, label, showValue = true, formatValue, onInput, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'class' | 'children' | 'type' | 'value' | 'min' | 'max' | 'step' | 'onInput' | 'onChange'> & {
   // The value to start with; a slider whose parent passes another follows it.
   value: number
   // The bounds, 0 and 100 by default.
@@ -18,7 +20,6 @@ const { value, min = 0, max = 100, step, label, showValue = true, formatValue, o
   formatValue?: ((value: number) => string) | undefined
   // Runs on every move of the thumb, with the number, and after a form reset with the value it went back to.
   onInput?: ((value: number) => void) | undefined
-  class?: string | undefined
 }>()
 
 const shown = signal(untrack(() => value))
@@ -55,9 +56,9 @@ onFormReset(() => slider, () => {
   onInput?.(next)
 })
 ---
-.kui-slider(class={className})
-  span.kui-slider-label {label}
-  input.kui-slider-input({...rest} ref={sliderRef} type="range" aria-label={label} aria-valuetext={formatValue ? words(shown()) : undefined} min={min} max={max} step={step} value={shown()} onInput={moved})
+div(part="root")
+  span(part="label") {label}
+  input({...rest} part="input" ref={sliderRef} type="range" aria-label={label} aria-valuetext={formatValue ? words(shown()) : undefined} min={min} max={max} step={step} value={shown()} onInput={moved})
   if showValue
     // Not an `output`, which a form reset empties; the input itself speaks the value.
-    span.kui-slider-value(aria-hidden="true") {words(shown())}
+    span(part="value" aria-hidden="true") {words(shown())}

@@ -73,6 +73,27 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     'kui-field-input h-12 kui-date-input-box w-44',
     'kui-date-range-input-separator mx-1',
     'kui-field-input h-12 kui-time-input w-32',
+    'kui-form-field-hint text-xs',
+    'kui-form-field-label gap-1',
+    'kui-checkbox-input size-5',
+    'kui-checkbox-hint opacity-70',
+    'kui-toggle-track w-12',
+    'kui-field-input pr-8',
+    'kui-field-input kui-multi-select-trigger min-w-40',
+    'kui-multi-select-option py-2',
+    'kui-multi-select-action underline',
+    'kui-field-input kui-range-input-box w-24',
+    'kui-range-input-unit ml-1',
+    'kui-segmented-option px-5',
+    'kui-icon kui-segmented-icon size-3',
+    'kui-rating-stars text-amber-500',
+    'kui-file-drop border-dashed',
+    'kui-btn kui-copy-btn kui-btn-accent ring-2',
+    'kui-copy-btn-text font-mono',
+    'kui-menu-item py-3',
+    'kui-menu-list min-w-48',
+    'kui-slider-label font-medium',
+    'kui-slider-value tabular-nums',
   ]
 
   test.each(restyled)('draws class="%s"', (classes) => {
@@ -86,6 +107,11 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
   test('a busy button and a busy link draw the spinner part restyled, a button with an onClick its own spinner part', () => {
     expect(html.match(/class="kui-icon kui-spinner size-5"/g)).toHaveLength(2)
     expect(html.match(/class="kui-icon kui-spinner"/g)).toHaveLength(1)
+  })
+
+  test('an IconButton and the trigger of a Menu take the restyle, a Menu class string going to the trigger', () => {
+    expect(html).toMatch(/<button id="icon-button"[^>]* class="kui-shell kui-icon-btn rounded-full">/)
+    expect(html).toMatch(/aria-haspopup="menu"[^>]* class="kui-icon-btn rounded-full menu-trigger">/)
   })
 
   test('a class string on a button with an onClick joins the restyle', () => {

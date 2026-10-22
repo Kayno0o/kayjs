@@ -90,7 +90,7 @@ export default settings
 
 ### Restyle a component
 
-Button, Card, Dialog, Table, TextInput, Textarea, DateInput, DateRangeInput, TimeInput, Badge, Notice, Avatar, Stat, PageHeader, PageSection, EmptyState and CardRow have parts, and take their `class` as a string for the root or an object of parts, `Card(class={{ head: 'p-6' }})`. `src/ui.ts` restyles every instance of one, keyed by its import path ([Restyle a component from src/ui.ts](../../../llms/styles-and-assets.md#restyle-a-component-from-srcuits)):
+A component with parts takes its `class` as a string for the root or an object of parts, `Card(class={{ head: 'p-6' }})`. `src/ui.ts` restyles every instance of one, keyed by its import path ([Restyle a component from src/ui.ts](../../../llms/styles-and-assets.md#restyle-a-component-from-srcuits)):
 
 ```ts
 import { defineUi } from 'kay'
@@ -101,9 +101,14 @@ export default defineUi({
 })
 ```
 
+- The components with parts: Button, Card, Dialog, Table, TextInput, Textarea, DateInput, DateRangeInput, TimeInput, Badge, Notice, Avatar, Stat, PageHeader, PageSection, EmptyState, CardRow, FormField, Checkbox, Toggle, Select, MultiSelect, RangeInput, Segmented, Rating, FileDrop, IconButton, CopyButton, Menu and Slider.
 - Each part keeps its `kui-` class, so a rule of yours on `.kui-card-head` keeps working beside the utilities. A utility of `src/ui.ts` or of `class` wins over a theme rule on the same property.
 - A part is named after what its `kui-` class draws: Card has `root`, `head`, `title` and `body`; Dialog `root`, `title`, `body` and `footer`; Table `root` (the wrapper), `table`, `headCell`, `row`, `cell`, `cellBody`, `sortButton`, `sortIcon`, `filter`, `filterInput`, `count`, `selection`, `bulk` and `emptyCell`; Button `root` and `spinner`; DateInput `root`, `input`, `trigger`, `panel`, `head`, `title`, `step`, `grid`, `weekday`, `day` and `today`, DateRangeInput `root` and `separator`. The variants are the props that already exist: `tone` (Button, Badge, Notice), `variant` and `size` (Button). `kay check` reports a part or variant that does not exist.
 - A Button with an `onClick` hands its root classes to its busy button, so `button.kay` reaches it, but its `spinner` part is set through the `@kaynooo/kayjs-ui/internal/busy-button.kay` key, `class={{ spinner: ... }}` included.
+- FormField has `root`, `label`, `head`, `text`, `required`, `action`, `hint`, `issues` and `issue`; Checkbox `root`, `input`, `label` and `hint`; Toggle `root`, `input`, `track` and `label`; Select `root`; Slider `root`, `label`, `input` and `value`.
+- RangeInput has `root`, `box`, `separator` and `unit`; Segmented `root`, `option`, `input`, `label` and `icon`; Rating `root`, `stars` and `fill`; FileDrop `root` and `input`; IconButton `root`; CopyButton `root`, `text` and `live`, with `tone` as its variant.
+- MultiSelect has `root`, `panel`, `trigger`, `summary`, `chevron`, `search`, `bar`, `action`, `options`, `option`, `checkbox`, `icon`, `label` and `empty`.
+- Menu has `menu` (the popover), `list`, `separator` and `item`; its `root` is the trigger, where a `class` string has always gone.
 - The other components have no parts yet and still restyle through their `kui-` classes.
 
 ### Testing an app's use of it

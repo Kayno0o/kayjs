@@ -1,26 +1,28 @@
 ---
 import type { JSX } from 'kay'
+import { recipe } from 'kay'
 import Icon from './icon.kay'
 import { wording } from 'kay/words'
 
-const { value, max = 5, label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children' | 'role'> & {
+const look = recipe({ parts: { root: 'kui-rating', stars: 'kui-rating-stars', fill: 'kui-rating-fill' } })
+
+const { value, max = 5, label, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children' | 'role'> & {
   // Any number from 0 to `max`, so an average such as 4.6 fills part of its fifth star.
   value: number
   max?: number | undefined
   // What screen readers read; `4 out of 5` by default.
   label?: string | undefined
-  class?: string | undefined
 }>()
 
 // One place per star; a value that is no number fills none.
 const places = () => Array.from({ length: Math.max(Math.floor(max), 0) }, (_, place) => place)
 const filled = () => max > 0 && Number.isFinite(value) ? Math.min(Math.max(value / max, 0), 1) * 100 : 0
 ---
-span.kui-rating({...rest} role="img" aria-label={label ?? wording('ui.rating.label', '{value} out of {max}', { value: String(value), max: String(max) })} class={className})
-  span.kui-rating-stars
+span({...rest} part="root" role="img" aria-label={label ?? wording('ui.rating.label', '{value} out of {max}', { value: String(value), max: String(max) })})
+  span(part="stars")
     for place of places() key={place}
       Icon(icon="star")
-  span.kui-rating-fill(style={`width: ${filled()}%`})
-    span.kui-rating-stars
+  span(part="fill" style={`width: ${filled()}%`})
+    span(part="stars")
       for place of places() key={place}
         Icon(icon="star")

@@ -6,7 +6,7 @@ import { browserPath, testSite } from 'kay/test'
 const ROOT = join(import.meta.dir, '..')
 const path = browserPath()
 // The server's control, described by its own note and the hint it renders after it.
-const SERVED = /aria-describedby="name-note (k[\w-]+)">.*class="kui-form-field-hint" id="\1"/
+const SERVED = /aria-describedby="name-note (k[\w-]+)">.*class="kui-form-field-hint" data-part="hint" id="\1"/
 // What the controls of the form-reset page hold when it loads.
 const START = { agree: true, power: false, free: false, decks: ['films'], size: 'm', sort: null, level: 'b', tags: ['x', 'y'], title: 'Ada', bio: 'Hello', notes: '# Notes', range: [2, 8], icon: 'star', bare: 'star', heard: 'b', refd: true, form: 'x' }
 // One site and one browser for every test of the file; each test opens and closes its own page.

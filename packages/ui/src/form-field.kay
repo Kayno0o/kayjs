@@ -1,8 +1,11 @@
 ---
 import type { Snippet } from 'kay'
+import { recipe } from 'kay'
 import { fieldLinks, formIssues } from './forms'
 
-const { label, name, issue, hint, required = false, group = false, compact = false, action, class: className } = props<{
+const look = recipe({ parts: { root: 'kui-form-field', head: 'kui-form-field-head', label: 'kui-form-field-label', text: 'kui-label-text', required: 'kui-form-field-required', action: 'kui-form-field-action', hint: 'kui-form-field-hint', issues: 'kui-form-field-issues', issue: 'kui-form-field-issue' } })
+
+const { label, name, issue, hint, required = false, group = false, compact = false, action } = props<{
   label: string
   // The field the control posts as: inside a FormDialog, the message its call was refused with for that field shows here.
   name?: string | undefined
@@ -17,7 +20,6 @@ const { label, name, issue, hint, required = false, group = false, compact = fal
   compact?: boolean | undefined
   // Sits on the label's line, pushed right: a preset button, a unit, a count.
   action?: Snippet
-  class?: string | undefined
 }>()
 
 const refused = formIssues.use()
@@ -28,37 +30,37 @@ const links = fieldLinks(group, hint !== undefined && hint !== '', messages, req
 // The control, as children, takes the `kui-field-input` look with no class of its own.
 // The hint and the messages sit outside the label, so the control is named by its label alone; the action too, since a button inside a label would take the label from the control.
 if group
-  fieldset.kui-form-field.kui-form-field-group(data-kui-field={links.frame} aria-describedby={links.described().join(' ') || undefined} data-compact={compact ? '' : undefined} class={className})
-    legend.kui-form-field-head
-      span.kui-label-text
+  fieldset.kui-form-field-group(part="root" data-kui-field={links.frame} aria-describedby={links.described().join(' ') || undefined} data-compact={compact ? '' : undefined})
+    legend(part="head")
+      span(part="text")
         | {label}
         if required
-          span.kui-form-field-required(aria-hidden="true") *
+          span(part="required" aria-hidden="true") *
     slot
     if action
-      span.kui-form-field-action
+      span(part="action")
         | {action}
     if hint
-      span.kui-form-field-hint(id={links.hint}) {hint}
+      span(part="hint" id={links.hint}) {hint}
     if reports()
-      span.kui-form-field-issues(id={messages().length > 0 ? links.issues : undefined} aria-live="polite" data-field={name})
+      span(part="issues" id={messages().length > 0 ? links.issues : undefined} aria-live="polite" data-field={name})
         for message, index of messages() key={index}
-          span.kui-form-field-issue {message}
+          span(part="issue") {message}
 else
-  .kui-form-field(data-kui-field={links.frame} data-compact={compact ? '' : undefined} class={className})
-    label.kui-form-field-label
-      span.kui-form-field-head
-        span.kui-label-text
+  div(part="root" data-kui-field={links.frame} data-compact={compact ? '' : undefined})
+    label(part="label")
+      span(part="head")
+        span(part="text")
           | {label}
           if required
-            span.kui-form-field-required(aria-hidden="true") *
+            span(part="required" aria-hidden="true") *
       slot
     if action
-      span.kui-form-field-action
+      span(part="action")
         | {action}
     if hint
-      span.kui-form-field-hint(id={links.hint}) {hint}
+      span(part="hint" id={links.hint}) {hint}
     if reports()
-      span.kui-form-field-issues(id={messages().length > 0 ? links.issues : undefined} aria-live="polite" data-field={name})
+      span(part="issues" id={messages().length > 0 ? links.issues : undefined} aria-live="polite" data-field={name})
         for message, index of messages() key={index}
-          span.kui-form-field-issue {message}
+          span(part="issue") {message}

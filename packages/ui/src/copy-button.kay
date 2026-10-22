@@ -1,12 +1,16 @@
 ---
 import type { Duration, JSX } from 'kay'
 import { copy } from '@kaynooo/utils/browser/clipboard'
-import { durationMs, onCleanup, signal } from 'kay'
-import { lookOf } from './button-props'
+import { durationMs, onCleanup, recipe, signal } from 'kay'
 import { attempt } from './toast'
 import { wording } from 'kay/words'
 
-const { text, label, html, variant = 'solid', tone, size = 'md', copiedFor = '2s', copiedLabel = wording('ui.copyButton.copiedLabel', 'Copied!'), failure = wording('ui.copyButton.failure', 'Could not copy to the clipboard'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'onClick' | 'type'> & {
+const look = recipe({
+  parts: { root: 'kui-copy-btn', text: 'kui-copy-btn-text', live: 'kui-copy-btn-live' },
+  variants: { tone: { neutral: '', accent: 'kui-btn-accent', success: 'kui-btn-success', danger: 'kui-btn-danger' } },
+})
+
+const { text, label, html, variant = 'solid', size = 'md', copiedFor = '2s', copiedLabel = wording('ui.copyButton.copiedLabel', 'Copied!'), failure = wording('ui.copyButton.failure', 'Could not copy to the clipboard'), ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'onClick' | 'type'> & {
   text: string
   label: string
   // A rendered version copied alongside `text`, which rich editors paste instead.
@@ -21,7 +25,6 @@ const { text, label, html, variant = 'solid', tone, size = 'md', copiedFor = '2s
   copiedLabel?: string | undefined
   // Toasted when the browser refuses the copy.
   failure?: string | undefined
-  class?: string | undefined
 }>()
 
 const copied = signal(false)
@@ -43,8 +46,8 @@ async function press() {
   timer = setTimeout(() => copied.set(false), durationMs(copiedFor))
 }
 ---
-button.kui-btn.kui-copy-btn({...rest} type="button" class={lookOf(tone, className)} data-variant={variant} data-size={size} onClick={press})
+button.kui-btn({...rest} part="root" type="button" data-variant={variant} data-size={size} onClick={press})
   // The label not showing is drawn invisibly by CSS from `data-other`, so the button keeps the wider label's width while its text and accessible name stay the one showing.
-  span.kui-copy-btn-text(data-other={copied() ? label : copiedLabel}) {copied() ? copiedLabel : label}
+  span(part="text" data-other={copied() ? label : copiedLabel}) {copied() ? copiedLabel : label}
 // A button's new text is not read out, so the copy is said here too.
-span.kui-copy-btn-live(role="status") {copied() ? copiedLabel : ''}
+span(part="live" role="status") {copied() ? copiedLabel : ''}

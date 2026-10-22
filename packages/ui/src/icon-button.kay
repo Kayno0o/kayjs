@@ -1,10 +1,13 @@
 ---
 import type { JSX } from 'kay'
+import { recipe } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
 import Icon from './icon.kay'
 
-const { icon, label, size = 'md', variant = 'solid', tone = 'neutral', type = 'button', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'type' | 'class' | 'children'> & {
+const look = recipe({ parts: { root: 'kui-icon-btn' } })
+
+const { icon, label, size = 'md', variant = 'solid', tone = 'neutral', type = 'button', ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'type' | 'class' | 'children'> & {
   icon: IconSlot | IconProps
   // Names the action for screen readers and, as its tooltip, for everyone else, since the button shows nothing but the icon.
   label: string
@@ -14,11 +17,10 @@ const { icon, label, size = 'md', variant = 'solid', tone = 'neutral', type = 'b
   // What the button means: `accent` for the main action, `danger` for a destructive one.
   tone?: 'neutral' | 'accent' | 'danger' | undefined
   type?: 'button' | 'submit' | 'reset' | undefined
-  class?: string | undefined
 }>()
 
 // Only the solid form is framed by the shell's hairline.
 const framed = () => variant === 'solid'
 ---
-button.kui-icon-btn({...rest} type={type} aria-label={label} data-tooltip={label} data-size={size} data-variant={variant} data-tone={tone} class={[{ 'kui-shell': framed(), 'kui-shell-danger': framed() && tone === 'danger' }, className]})
+button({...rest} part="root" type={type} aria-label={label} data-tooltip={label} data-size={size} data-variant={variant} data-tone={tone} class={{ 'kui-shell': framed(), 'kui-shell-danger': framed() && tone === 'danger' }})
   Icon(icon={icon})
