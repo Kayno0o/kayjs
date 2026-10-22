@@ -112,7 +112,7 @@ kay generate guard admin
 | `api notes` | `src/api/notes.ts`, served at `/api/notes` |
 | `guard admin` | `src/routes/admin/_guard.ts` (`/` for the root one), letting every request through until you write the rule, with a test visiting the shallowest page below the folder when there is one |
 
-A project with tests gets `tests/<name>.test.ts` for a page, `tests/action-<name>.test.ts` for an action and `tests/api-<name>.test.ts` for an API module and `tests/guard-<name>.test.ts` for a guard with a page below it; a project with `auth` gets the page test only, which expects the redirect to sign in. What it writes passes `kay check` and the lint. `--dry-run` lists the files without writing them, and `--format json` prints `{ kind, name, written, dryRun }`.
+A project with tests gets `tests/<name>.test.ts` for a page, `tests/action-<name>.test.ts` for an action and `tests/api-<name>.test.ts` for an API module, and `tests/guard-<name>.test.ts` for a guard with a page below it; a project with `auth` gets the page and guard tests only, which expect the redirect to sign in. What it writes passes `kay check` and the lint. `--dry-run` lists the files without writing them, and `--format json` prints `{ kind, name, written, dryRun }`.
 
 ## kay add
 

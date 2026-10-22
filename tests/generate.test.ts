@@ -104,6 +104,12 @@ it('adds an action to an existing _actions.kay that holds a server fence alone',
   await generate(dir, 'action', 'team/third')
   expect(await Bun.file(actions).text()).toStartWith('--- server\nimport { s } from \'kay\'\n\nexport const legacy')
 
+  await Bun.write(actions, '--- server\r\nimport { a } from \'a\'\r\nexport function* team() {}\r\n')
+  await generate(dir, 'action', 'team/crlf')
+  expect(await Bun.file(actions).text()).toStartWith('--- server\r\nimport { a } from \'a\'\r\nimport { s } from \'kay\'\r\nexport function* team() {}\r\n\r\nexport const crlf = action(')
+  expect(await Bun.file(actions).text()).not.toMatch(/[^\r]\n/)
+  await expect(generate(dir, 'action', 'team/team')).rejects.toThrow('already exports `team`')
+
   await Bun.write(actions, '--- server\nimport { s } from \'kay\'\n\nexport const sent = action(s.Object({}), () => 1)\n---\nbutton Go\n')
   await expect(generate(dir, 'action', 'team/fourth')).rejects.toThrow('add the action by hand')
   expect(await Bun.file(actions).text()).toContain('button Go')
@@ -119,6 +125,8 @@ it('writes a guard test visiting a page below the folder when there is one', asy
 
   expect((await generate(dir, 'guard', 'admin')).written).toEqual(['src/routes/admin/_guard.ts', 'tests/guard-admin.test.ts'])
   expect(await Bun.file(join(dir, 'tests/guard-admin.test.ts')).text()).toContain('site.visit(\'/admin/users\')')
+  await rm(join(dir, 'src/routes'), { recursive: true })
+  expect((await generate(dir, 'guard', 'norouts')).written).toEqual(['src/routes/norouts/_guard.ts'])
   expect((await generate(dir, 'guard', 'empty')).written).toEqual(['src/routes/empty/_guard.ts'])
   expect(generatedFiles('guard', 'admin', { tailwind: false, tests: true, auth: true, guardPage: '/admin' })['tests/guard-admin.test.ts']).toContain('/auth/sign-in')
 })

@@ -14,8 +14,10 @@ const ACTION_NAME = /^[a-z][a-z0-9]*$/i
 const WORD_BREAK = /[-_]+/g
 // Words an action cannot be exported as, or that its own file already names: the `action` and `s` it calls, `title` its handler reads.
 const RESERVED = new Set(['action', 's', 'title', 'await', 'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger', 'default', 'delete', 'do', 'else', 'enum', 'export', 'extends', 'false', 'finally', 'for', 'function', 'if', 'import', 'in', 'instanceof', 'let', 'new', 'null', 'return', 'static', 'super', 'switch', 'this', 'throw', 'true', 'try', 'typeof', 'var', 'void', 'while', 'with', 'yield', 'implements', 'interface', 'package', 'private', 'protected', 'public', 'eval', 'arguments'])
-// The `_actions.kay` fence an action is added to, for the hint printed when the file exists.
+// The action added to an `_actions.kay`, or printed for the author to add when the file holds more than a server fence.
 const ACTION_BODY = (name: string) => `export const ${name} = action(\n  s.Object({ title: s.String({ minLength: 1, maxLength: 200 }) }),\n  ({ title }) => title,\n)\n`
+const LINE_BREAK = /\r?\n/
+const LINE_BREAKS = /\r?\n/g
 const SERVER_FENCE = '--- server'
 const ANY_FENCE = /^---(?:\s|$)/
 const IMPORT_END = /^(?:import\s.*\sfrom\s.*|\}\s*from\s.*)$/
@@ -123,7 +125,7 @@ function guardFiles(segments: readonly string[], page: string | undefined, tests
   return files
 }
 
-// The files `kay generate <kind> <name>` writes, by path from the project root. Tailwind adds its shorthand classes to a page, and a project with tests gets a test of a page, an action or an API module, which a guard, a component or an island has no URL of its own to be tested at.
+// The files `kay generate <kind> <name>` writes, by path from the project root. Tailwind adds its shorthand classes to a page, and a project with tests gets a test of a page, an action or an API module, and a guard with a page below it; a component or an island has no URL of its own to be tested at.
 export function generatedFiles(kind: Kind, name: string, project: { tailwind: boolean, tests: boolean, auth: boolean, guardPage?: string | undefined }): Record<string, string> {
   // `/` names the root guard, which every page and action sits below.
   const segments = kind === 'guard' && name === '/' ? [] : segmentsOf(kind === 'guard' ? 'page' : kind, name)
@@ -150,6 +152,10 @@ async function pageBelow(dir: string, name: string): Promise<string | undefined>
   const root = join(dir, 'src/routes')
   const found: string[][] = []
 
+  // The name is validated later by `generatedFiles`; a glob is built only from a valid one.
+  if (!existsSync(root) || !folder.every(segment => ROUTE_SEGMENT.test(segment)))
+    return undefined
+
   for await (const file of new Bun.Glob(`${folder.map(segment => `${segment}/`).join('')}**/*.kay`).scan({ cwd: root })) {
     const segments = file.slice(0, -'.kay'.length).split('/')
 
@@ -164,12 +170,13 @@ async function pageBelow(dir: string, name: string): Promise<string | undefined>
 
 // The `_actions.kay` text with `name` added, when the file is a server fence alone and does not export it yet; `undefined` when it holds a template or other fences. A name it exports already throws.
 function appendedAction(path: string, existing: string, name: string): string | undefined {
-  const lines = existing.split('\n')
+  const eol = existing.includes('\r\n') ? '\r\n' : '\n'
+  const lines = existing.split(LINE_BREAK)
 
   if (lines[0]?.trimEnd() !== SERVER_FENCE || lines.slice(1).some(line => ANY_FENCE.test(line)))
     return undefined
 
-  if (new RegExp(`\\bexport\\s+(?:(?:const|let|var|class|(?:async\\s+)?function\\*?)\\s+${name}\\b|\\{[^}]*\\b${name}\\b)`).test(existing))
+  if (new RegExp(`\\bexport\\s+(?:(?:const|let|var|class)\\s+${name}\\b|(?:async\\s+)?function(?:\\s*\\*\\s*|\\s+)${name}\\b|\\{[^}]*\\b${name}\\b)`).test(existing))
     throw new Error(`kay generate: nothing was written, ${path} already exports \`${name}\``)
 
   if (!S_IMPORT.test(existing)) {
@@ -178,7 +185,7 @@ function appendedAction(path: string, existing: string, name: string): string | 
     lines.splice(Math.max(after + 1, 1), 0, 'import { s } from \'kay\'', ...after === -1 ? [''] : [])
   }
 
-  return `${lines.join('\n').trimEnd()}\n\n${ACTION_BODY(name)}`
+  return `${lines.join(eol).trimEnd()}${eol}${eol}${ACTION_BODY(name)}`.replaceAll(LINE_BREAKS, eol)
 }
 
 // The other file that serves the same URL as a page file: `pricing.kay` and `pricing/index.kay` both serve /pricing, which `kay check` refuses.
@@ -217,7 +224,7 @@ export async function generate(dir: string, kind: string, name: string, options:
   const taken = [...Object.keys(files), ...kind === 'page' ? rivalRoutes(Object.keys(files)[0]!) : []].filter(path => existsSync(join(dir, path)))
 
   if (taken.length > 0) {
-    const hint = taken.some(path => path.endsWith('_actions.kay')) ? `: its fences hold more than a server fence, so add the action by hand, from this shape:\n\n${ACTION_BODY(name.split('/').at(-1)!)}` : ''
+    const hint = taken.some(path => path.endsWith('_actions.kay')) ? `: it is not a server fence alone, so add the action by hand, from this shape:\n\n${ACTION_BODY(name.split('/').at(-1)!)}` : ''
 
     throw new Error(`kay generate: nothing was written, ${taken.join(', ')} already exist${taken.length === 1 ? 's' : ''}${hint}`)
   }
