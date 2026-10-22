@@ -5,7 +5,7 @@ import { loadContextValues, useContexts } from '../src/server/context-values'
 import { routeMounts, scanRoutes } from '../src/server/routes'
 import { kayCheck } from './check-helper'
 import { loads } from './fixtures/request-values/lib/state'
-import { fixtureCopy } from './scratch'
+import { fixtureCopy, scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
 const FIXTURE = 'tests/fixtures/request-values'
@@ -148,6 +148,19 @@ describe('a template reading ctx', () => {
 
     useContexts(twice, [CONTEXT, CONTEXT], false)
     await expect(loadContextValues(twice)).rejects.toThrow('two extensions give ctx.user')
+  })
+
+  it('tries a failed load again for the next layout asking, and loads once for concurrent callers', async () => {
+    const dir = await scratchDir('request-values-retry-')
+    const file = resolve(dir, 'flaky.ts')
+
+    await Bun.write(file, 'import { defineContext } from \'kay/library\'\n\nlet calls = 0\n\nexport default defineContext(async () => {\n  calls++\n  await Bun.sleep(5)\n\n  if (calls === 1)\n    throw new Error(\'store down\')\n\n  return { calls }\n})\n')
+    const request = new Request('http://localhost/flaky')
+
+    useContexts(request, [file], false)
+    await expect(loadContextValues(request)).rejects.toThrow('store down')
+    await Promise.all([loadContextValues(request), loadContextValues(request)])
+    await loadContextValues(request)
   })
 
   it('types ctx from the extension in kay check', async () => {

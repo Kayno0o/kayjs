@@ -14,8 +14,8 @@ When the bar scrolls, the current tab is centred in it, without moving the page.
 
 ## Params the tabs share
 
-Tabs over one set of filters, such as a period or a site, keep them from tab to tab. Pass the page's URL as `current` and name the params in `keep`. Each link carries them, unless it sets that param itself. With a URL, the current tab is the one whose path matches, along with any param its link sets.
+Tabs over one set of filters, such as a period or a site, keep them from tab to tab. Pass the page's URL, read in the server fence as `const url = ctx.url`, as `current` and name the params in `keep`. Each link carries them, unless it sets that param itself. With a URL, the current tab is the one whose path matches, along with any param its link sets.
 
 ```kay
-TabNav(links={TABS} current={ctx.url} keep={['period', 'site']} label="Traffic")
+TabNav(links={TABS} current={url} keep={['period', 'site']} label="Traffic")
 ```

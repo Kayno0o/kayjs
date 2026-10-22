@@ -52,8 +52,9 @@ export const finish = action(async (ctx) => {
 const done = draft(ctx).done()
 const current = currentStep(ctx.url, KEYS, done)
 const values = draft(ctx).merged()
+const url = ctx.url
 ---
-Steps(steps={[{ key: 'account', label: 'Account' }, { key: 'profile', label: 'Profile' }, { key: 'review', label: 'Review' }]} current={current} done={done} url={ctx.url} label="Signup")
+Steps(steps={[{ key: 'account', label: 'Account' }, { key: 'profile', label: 'Profile' }, { key: 'review', label: 'Review' }]} current={current} done={done} url={url} label="Signup")
 
 if current === 'account'
   form(action={saveAccount})
