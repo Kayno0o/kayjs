@@ -124,6 +124,29 @@ describe('kay check', () => {
     }
   })
 
+  it('rewrites the shadow of the component that changed alone', async () => {
+    const root = await scratchProject({ 'src/routes/index.kay': 'p hi\n', 'src/a.kay': 'p a\n', 'src/b.kay': 'p b\n' })
+    const stamps = async () => Promise.all(['src/a.kay', 'src/b.kay', 'src/routes/index.kay'].map(async name => (await Bun.file(shadowPath(root, join(root, name))).stat()).mtimeMs))
+
+    try {
+      await writeShadowTypes(root)
+
+      const first = await stamps()
+
+      await Bun.sleep(20)
+      await Bun.write(join(root, 'src/a.kay'), 'p changed\n')
+      await writeShadowTypes(root)
+
+      const second = await stamps()
+
+      expect(second[0]).toBeGreaterThan(first[0]!)
+      expect(second.slice(1)).toEqual(first.slice(1))
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('passes a site of pages, layouts and islands, with route params and server data typed', async () => {
     expect(await check(join(fixtures, 'site'))).toEqual([])
   })
@@ -4533,6 +4556,33 @@ describe.concurrent('kay check, unused code', () => {
       await Bun.write(join(root, 'src/a.kay'), 'img(src="/a.png" width="1" height="1")\n')
       expect(await watch.report()).toMatchObject({ errors: 1 })
       expect(await loads()).toBe(4)
+    }
+    finally {
+      await watch.stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('reads the collections again in the watch only when a file they read changed', async () => {
+    const config = 'import { appendFileSync } from "node:fs"\nimport { t } from "elysia"\nimport { collection } from "kay/content"\nimport Note from "./note.kay"\n\nappendFileSync(import.meta.dir + "/../loads", "x")\n\nexport const notes = collection("content/notes", { schema: t.Object({}), components: { Note } })\n'
+    const root = await scratchProject({ 'src/content.config.ts': config, 'src/note.kay': 'aside\n  slot\n', 'src/content/notes/a.md': 'Text\n', 'src/a.kay': 'p a\n' })
+    const loads = async () => (await Bun.file(join(root, 'loads')).text()).length
+    const watch = watchChecks(root)
+
+    try {
+      expect(await watch.report()).toMatchObject({ errors: 0 })
+      expect(await loads()).toBe(1)
+      await Bun.write(join(root, 'src/a.kay'), 'img(src="/a.png" width="1" height="1")\n')
+      expect(await watch.report()).toMatchObject({ errors: 1, problems: [{ code: 'missing-alt' }] })
+      // The first check is a process of its own, so the watch reads the collections once for the checks it runs itself.
+      expect(await loads()).toBe(2)
+      await Bun.write(join(root, 'src/a.kay'), 'p a\n')
+      expect(await watch.report()).toMatchObject({ errors: 0 })
+      expect(await loads()).toBe(2)
+      // A component the collection loads is read again.
+      await Bun.write(join(root, 'src/note.kay'), 'aside\n  slot\n\n')
+      expect(await watch.report()).toMatchObject({ errors: 0 })
+      expect(await loads()).toBe(3)
     }
     finally {
       await watch.stop()

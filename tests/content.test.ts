@@ -342,6 +342,24 @@ describe('kay check', () => {
       await rm(copy, { recursive: true, force: true })
     }
   }, 30_000)
+
+  it('types an entry\'s props again when a run follows one that left the props check, as a watch\'s second save does', async () => {
+    const copy = await fixtureCopy('content')
+    const entry = join(copy, 'src/content/posts/props.md')
+    const props = async () => (await check(copy, { site: SITE, lints: { seo: 'allow' } })).filter(({ file }) => file.endsWith('props.md')).map(({ line, message }) => ({ line, message }))
+
+    try {
+      await Bun.write(entry, '---\ntitle: Props\ndate: 2026-01-01\n---\n\n<Counter start={2} />\n')
+      expect(await props()).toEqual([])
+      await Bun.write(entry, '---\ntitle: Props\ndate: 2026-01-01\n---\n\n<Counter start="2" />\n')
+      expect(await props()).toEqual([{ line: 6, message: expect.stringMatching(/^<Counter> takes other props: Type 'string' is not assignable to type 'number'/) }])
+      await Bun.write(entry, '---\ntitle: Props\ndate: 2026-01-01\n---\n\n<Counter start={2} />\n')
+      expect(await props()).toEqual([])
+    }
+    finally {
+      await rm(copy, { recursive: true, force: true })
+    }
+  }, 60_000)
 })
 
 describe('compiling Markdown', () => {

@@ -1,5 +1,5 @@
 import type { Subprocess } from 'bun'
-import type { CheckDiagnostic } from '../check'
+import type { CheckDiagnostic, ProbeMemory } from '../check'
 import type { Lint, LintGroup } from '../compiler/lints'
 import type { KayConfig } from '../config'
 import type { Command, ProblemFormat } from './command'
@@ -91,6 +91,8 @@ export const check: Command = {
       // The text report goes to stderr; the other formats are left whole for what reads them.
       let config: KayConfig | undefined
       let failed = false
+      // The collections and messages are read again only when a file they read changed.
+      const probes: ProbeMemory = new Map()
       const inProcess = async () => {
         failed = false
 
@@ -103,7 +105,7 @@ export const check: Command = {
 
             throw error
           }
-        }, { project, entry, values, only, since, format, scope })
+        }, { project, entry, values, only, since, format, scope, probes })
 
         // A config that does not load is read again by the next check, a process of its own.
         return failed ? 2 : code
@@ -126,17 +128,19 @@ interface CheckRun {
   since: string | undefined
   format: ProblemFormat
   scope: string[]
+  // Kept by a watch between its checks.
+  probes?: ProbeMemory
 }
 
 // One check of the project, printed, answering the exit code: 1 for a problem that fails it or an error thrown.
-async function checkOnce(root: string, config: () => Promise<KayConfig>, { project, entry, values, only, since, format, scope }: CheckRun): Promise<number> {
+async function checkOnce(root: string, config: () => Promise<KayConfig>, { project, entry, values, only, since, format, scope, probes }: CheckRun): Promise<number> {
   // The checking machine lacks the server's environment, as `kay build` does, which kay.config.ts may import.
   buildingWithoutEnv()
 
   const started = performance.now()
 
   try {
-    const { failing, found } = await checkProject(root, await config(), typeof project === 'string' ? project : 'tsconfig.json', typeof entry === 'string' ? relative(root, resolve(entry)) : undefined, { denyWarnings: values['deny-warnings'] === true, fix: values.fix === true || values['dry-run'] === true, dryRun: values['dry-run'] === true, only, since, launch: only === 'seo', format, scope, quiet: values.quiet === true })
+    const { failing, found } = await checkProject(root, await config(), typeof project === 'string' ? project : 'tsconfig.json', typeof entry === 'string' ? relative(root, resolve(entry)) : undefined, { denyWarnings: values['deny-warnings'] === true, fix: values.fix === true || values['dry-run'] === true, dryRun: values['dry-run'] === true, only, since, launch: only === 'seo', format, scope, quiet: values.quiet === true, probes })
 
     if (found === 0 && format !== 'json')
       done('checked', 'with no problems', performance.now() - started)
@@ -311,11 +315,11 @@ function inScope(diagnostic: CheckDiagnostic, scope: string[]): boolean {
 
 // Prints what `kay check` finds in the project and answers how many it found and how many of those fail it: the errors, and the warnings too with `denyWarnings`.
 // With `fix`, applies the safe fixes first, then checks again and prints what is left; with `only`, prints that group's lints alone; with a `scope`, the problems in those files and directories alone, the project still checked as a whole.
-async function checkProject(root: string, config: KayConfig, tsconfig: string, entry: string | undefined, { denyWarnings, fix, dryRun, only, since, launch, format, scope, quiet }: { denyWarnings: boolean, fix: boolean, dryRun: boolean, only: LintGroup | undefined, since: string | undefined, launch: boolean, format: ProblemFormat, scope: string[], quiet: boolean }): Promise<{ failing: number, found: number }> {
+async function checkProject(root: string, config: KayConfig, tsconfig: string, entry: string | undefined, { denyWarnings, fix, dryRun, only, since, launch, format, scope, quiet, probes }: { probes: ProbeMemory | undefined, denyWarnings: boolean, fix: boolean, dryRun: boolean, only: LintGroup | undefined, since: string | undefined, launch: boolean, format: ProblemFormat, scope: string[], quiet: boolean }): Promise<{ failing: number, found: number }> {
   const options = { ...configCheckOptions(config), tsconfig, entry: entry ?? config.entry, launch }
-  let everything = await checkTypes(root, options)
+  let everything = await checkTypes(root, options, probes)
   const checkScope = async () => {
-    everything = await checkTypes(root, options)
+    everything = await checkTypes(root, options, probes)
 
     return everything.filter(diagnostic => inScope(diagnostic, scope))
   }

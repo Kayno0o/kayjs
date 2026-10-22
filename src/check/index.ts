@@ -9,18 +9,20 @@ import type { EnvSchema } from '../server/env'
 import type { OpenApiConfig } from '../server/openapi'
 import type { Redirects } from '../server/redirects'
 import type { TypeScope } from './diagnose'
+import type { ProbeMemory } from './project'
 import type { ShadowFile } from './shadow'
 import type { ExtensionProgram } from './shadow-types'
-import { relative, resolve, sep } from 'node:path'
+import { join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { inWalkScope } from '../build/files'
 import { formatReport } from '../compiler/frame'
 import { lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { bareDuration } from './bare-duration'
+import { projectPaths } from '../project'
 import { diagnoseShadow, reportsTypeErrors, servedByTheApp, shownOutsideKay, unusedCodesOf } from './diagnose'
 import { unknownNameHelp } from './export-homes'
-import { generatedProblem } from './generated'
+import { CONTENT_CHECK, generatedProblem } from './generated'
 import { configProblems, contentChecks, lintConfigTypeError, projectProblems } from './project'
 import { writeShadowTypes } from './shadow-types'
 import { parseTscOutput, resolvedConfig, tsgoCode, tsgoDiagnostic, typecheck } from './tsgo'
@@ -117,19 +119,54 @@ export function configCheckOptions(config: KayConfig): CheckOptions {
 }
 
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.
-export async function check(root: string, options: CheckOptions = {}): Promise<CheckDiagnostic[]> {
-  return inWalkScope(async () => runCheck(root, options))
+export async function check(root: string, options: CheckOptions = {}, probes?: ProbeMemory): Promise<CheckDiagnostic[]> {
+  return inWalkScope(async () => runCheck(root, options, probes))
 }
 
-async function runCheck(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
+async function runCheck(root: string, options: CheckOptions, probes?: ProbeMemory): Promise<CheckDiagnostic[]> {
   const tsconfig = options.tsconfig ?? 'tsconfig.json'
   // The props entries give their components are typed with the rest, so the collections are read before the type check; their probe does not wait for the shadow tree, which leaves the file it writes alone.
   // The tsconfig includes the shadow tree, so its files are listed once the tree is written.
-  const [content, [types, shown]] = await Promise.all([contentChecks(root, options), shadowedConfig(root, tsconfig, options)])
+  const contentFile = join(projectPaths(root).types, CONTENT_CHECK)
+  const props = await textOf(contentFile)
+  const reading = contentChecks(root, options, probes)
+  const shadowing = shadowedConfig(root, tsconfig, options)
+  // Where the last run left the props check, tsgo types the project while the collections are read, and again only when they changed it, which is rare.
+  const speculative = props === undefined ? undefined : (async () => typecheck(root, tsconfig, (await shadowing)[1]))()
+  // Everything but the feeds waits for nothing the probe reads.
+  const problemsRun = (async () => projectProblems(root, options, reading, probes, (await shadowing)[0].served))()
+  // Settled, so neither ends in a rejection nothing awaits.
+  const started = Promise.allSettled([speculative, problemsRun])
+  let content: Awaited<typeof reading>
+  let types: Awaited<typeof shadowing>[0]
+  let shown: Awaited<typeof shadowing>[1]
+
+  try {
+    [content, [types, shown]] = await Promise.all([reading, shadowing])
+  }
+  catch (error) {
+    // What was started is left to end, not to fail unseen.
+    await started
+
+    throw error
+  }
+
   const { files, diagnostics, unreached, libraries, mounts, locales, programs } = types
   const projectUnused = unusedCodesOf(shown)
+  const typed = async () => {
+    if (speculative === undefined)
+      return typecheck(root, tsconfig, shown)
+
+    if (await textOf(contentFile) === props)
+      return speculative
+
+    // Typed against the props check the collections replaced, so it ends before the second run uses the same state.
+    await Promise.allSettled([speculative])
+
+    return typecheck(root, tsconfig, shown)
+  }
   // An extension whose options differ from the app's is checked apart, so its pages are typed as it is written for.
-  const [{ output, errors, code }, problems, ...apart] = await Promise.all([typecheck(root, tsconfig, shown), projectProblems(root, options, content, undefined, types.served), ...programs.map(async program => runProgram(root, program))])
+  const [{ output, errors, code }, problems, ...apart] = await Promise.all([typed(), problemsRun, ...programs.map(async program => runProgram(root, program))])
   const config = resolve(root, tsconfig)
   const inProgram = (file: string) => programs.some(({ dir }) => file.startsWith(dir + sep))
   const printed = parseTscOutput(output, config, root)
@@ -194,6 +231,15 @@ async function runCheck(root: string, options: CheckOptions): Promise<CheckDiagn
     diagnostics.push({ file: config, line: 1, column: 1, message: `bun check exited with code ${code} and no diagnostics` })
 
   return diagnostics
+}
+
+async function textOf(file: string): Promise<string | undefined> {
+  try {
+    return await Bun.file(file).text()
+  }
+  catch {
+    return undefined
+  }
 }
 
 async function shadowedConfig(root: string, tsconfig: string, options: CheckOptions) {

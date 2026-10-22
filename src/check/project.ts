@@ -91,9 +91,10 @@ export function configProblems(root: string, options: CheckOptions, types: Shado
 }
 
 // The collections, the messages, what the server refuses when it boots and the lints of the project's scripts, reported after the type errors.
-export async function projectProblems(root: string, options: CheckOptions, content: ContentChecks, memory?: ProbeMemory, scanned?: ServedProject): Promise<CheckDiagnostic[]> {
+// The collections may still be read, which only the feeds and their own problems wait for.
+export async function projectProblems(root: string, options: CheckOptions, collections: ContentChecks | Promise<ContentChecks>, memory?: ProbeMemory, scanned?: ServedProject): Promise<CheckDiagnostic[]> {
   return inWalkScope(async () => {
-    const [messages, boot, modules] = await Promise.all([checkMessages(root, options, memory), bootProblems(resolve(root), options, content.feeds, scanned, content.routes), moduleLints(root, options)])
+    const [content, messages, boot, modules] = await Promise.all([collections, checkMessages(root, options, memory), (async () => { const read = await collections; return bootProblems(resolve(root), options, read.feeds, scanned, read.routes) })(), moduleLints(root, options)])
 
     return [...content.problems, ...messages, ...boot, ...modules, ...uiProblems(root)]
   })
