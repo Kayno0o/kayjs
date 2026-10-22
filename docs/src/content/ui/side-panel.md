@@ -26,4 +26,4 @@ Escape and the close button still close it through `onOpenChange(false)`. It ren
 
 <Demo name="side-panel/beside" />
 
-`closeHref` makes the close button a link to that URL, so such a page closes it with no JavaScript too. With JavaScript it still calls `onOpenChange(false)`.
+`closeHref` makes the close button a link to that URL, so such a page closes it with no JavaScript too. With JavaScript the link navigates and `onOpenChange(false)` is called as well, so its handler need not navigate.

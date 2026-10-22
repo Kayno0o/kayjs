@@ -278,9 +278,8 @@ describe('a component whose recipe holds its look', () => {
 
 describe('a SidePanel with modal={false}', () => {
   test('renders open on the server with a close link, and a modal one has neither', () => {
-    expect(html).toMatch(/<dialog[^>]* id="beside"[^>]*>/)
-    expect(html.match(/<dialog[^>]*id="beside"[^>]*>/)![0]).toMatch(/ open[ >=]| open$/)
-    expect(html.match(/<dialog[^>]*id="beside"[^>]*>/)![0]).toContain('closedby="none"')
+    expect(html.match(/<dialog[^>]*id="beside"[^>]*>/)![0]).toMatch(/ open(?=[ >])/)
+    expect(html.match(/<dialog[^>]*id="beside"[^>]*>/)![0]).toContain('closedby="closerequest"')
     expect(html).toMatch(/<a [^>]*href="\/list"[^>]*aria-label="Close"/)
     expect(html.match(/<dialog[^>]*id="side"[^>]*>/)![0]).not.toMatch(/ open[ >=]/)
   })

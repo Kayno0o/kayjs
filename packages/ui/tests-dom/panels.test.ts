@@ -1,5 +1,5 @@
 import type { Mounted } from 'kay/test'
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import { click } from './dom'
 
@@ -64,13 +64,19 @@ describe('SidePanel with modal={false}', () => {
   test('shows beside the page, stays open on a click outside, and closes on Escape or its close link through onClose', async () => {
     const root = await panels()
     const panel = root.querySelector<HTMLDialogElement>('#beside')!
+    const show = spyOn(HTMLDialogElement.prototype, 'show')
 
     click(root.querySelector('#open-beside'))
     await settle()
 
     expect(panel.open).toBe(true)
+    const calls = show.mock.calls.length
+
+    show.mockRestore()
+
+    expect(calls).toBe(1)
     expect(panel.hasAttribute('data-modal')).toBe(true)
-    expect(panel.getAttribute('closedby')).toBe('none')
+    expect(panel.getAttribute('closedby')).toBe('closerequest')
     expect(panel.matches(':modal')).toBe(false)
 
     click(root.querySelector('#open'))
@@ -92,11 +98,19 @@ describe('SidePanel with modal={false}', () => {
     expect(close.getAttribute('href')).toBe('/list')
     expect(close.getAttribute('aria-label')).toBe('Close')
 
-    close.addEventListener('click', event => event.preventDefault())
+    let prevented: boolean | undefined
+
+    document.addEventListener('click', event => prevented = event.defaultPrevented, { once: true })
     click(close)
     await settle()
 
+    expect(prevented).toBe(false)
     expect(panel.open).toBe(false)
+    expect(closes).toBe(2)
+
+    key(document.body, 'Escape')
+    await settle()
+
     expect(closes).toBe(2)
   })
 })

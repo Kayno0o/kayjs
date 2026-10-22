@@ -17,7 +17,7 @@ const { open, title, actions, footer, modal = true, closeHref, onOpenChange, clo
   closeLabel?: string | undefined
   // `false` shows the panel beside the page instead of over it: the page under it stays interactive, a click outside leaves it open and only Escape or the close control closes it. It renders open on the server, so a page driven by the URL shows it with no JavaScript.
   modal?: boolean | undefined
-  // Makes the close control a link to this URL, for a panel open on the server whose close needs no JavaScript; with JavaScript it still closes through `onOpenChange(false)`.
+  // Makes the close control a link to this URL, for a panel open on the server whose close needs no JavaScript; the link navigates and `onOpenChange(false)` is called as well, so its handler need not navigate.
   closeHref?: string | undefined
   // Called with `false` however the panel closes, a click outside and Escape included. Closed by either of those or its close button, its content is still there to read; closed by the parent, it is already gone.
   onOpenChange: (open: boolean) => unknown
@@ -42,14 +42,20 @@ effect(() => {
   }
 })
 
-// A dialog shown with `show()` has no Escape of its own.
+// What the server renders, so a page driven by the URL shows the panel open before any script runs; the client opens and closes it with `show()` and `close()`.
+const renderedOpen = !modal && open
+
+// A browser with `closedby` closes a non-modal panel on Escape, stacked with the layers above it. Without it the panel listens itself, and leaves an Escape that belongs to a modal dialog or an open popover.
 listen(document, 'keydown', event => {
-  if (event.key === 'Escape' && !modal && open && !event.defaultPrevented)
+  if (event.key !== 'Escape' || modal || !open || event.defaultPrevented || event.isComposing || 'closedBy' in HTMLDialogElement.prototype)
+    return
+
+  if (!document.querySelector(':modal, :popover-open'))
     panel?.close()
 })
 ---
 // Named by its title for screen readers. Every way of closing it ends in the dialog's `close` event, the close button included, so `onOpenChange` is the one place the parent learns of it.
-dialog(part="root" aria-label={title} {...rest} open={!modal && open} data-modal={modal ? undefined : 'false'} ref={element => panel = element} closedby={modal ? 'any' : 'none'} onClose={() => onOpenChange(false)})
+dialog(part="root" aria-label={title} {...rest} open={renderedOpen} data-modal={modal ? undefined : 'false'} ref={element => panel = element} closedby={modal ? 'any' : 'closerequest'} onClose={() => onOpenChange(false)})
   if open
     header(part="head")
       h2(part="title") {title}
