@@ -12,4 +12,4 @@ const { value, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 
   onChange?: ((value: string) => void) | undefined
 }>()
 ---
-TextInput({...rest} part="root" type="time" value={value} onInput={onChange})
+TextInput(part="root" {...rest} type="time" value={value} onInput={onChange})

@@ -456,7 +456,7 @@ describe('date and time inputs', () => {
     expect(form).toContain('name="day" data-part="input" min="2026-10-01" type="date" value="2026-10-21"')
     expect(form).toContain('name="from" aria-label="Stay from" data-part="input" type="date" value="2026-10-02"')
     expect(form).toContain('name="to" aria-label="Stay to" data-part="input" type="date"')
-    expect(form).toContain('name="start" data-part="root" type="time" value="09:30"')
+    expect(form).toContain('data-part="root" aria-label="Start" name="start" type="time" value="09:30"')
     expect(form).not.toContain('popover')
   })
 })

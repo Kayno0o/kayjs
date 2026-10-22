@@ -179,6 +179,12 @@ test('a Button used as a part of another component keeps the part name its calle
   expect(mounted.root.querySelector('#busy')?.getAttribute('data-part')).toBe('busyCta')
 })
 
+test('a TimeInput used as a part of another component keeps the part name its caller hands it', async () => {
+  mounted = await mountComponent('src/components/button-part.kay', {})
+
+  expect(mounted.root.querySelector('#start')?.getAttribute('data-part')).toBe('cta')
+})
+
 test('an IconButton draws the snippet it is handed in place of an icon of the set', async () => {
   mounted = await mountComponent('src/components/button-part.kay', {})
 
