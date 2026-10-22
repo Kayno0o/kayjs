@@ -2174,7 +2174,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('bind: on c
   let bound: TestSite
 
   beforeAll(async () => {
-    bound = await testSite({ root: 'tests/fixtures/bind-elements', browser: { path } })
+    bound = await testSite({ routes: 'tests/fixtures/bind-elements/src/routes', browser: { path } })
   }, 120_000)
 
   afterAll(async () => bound?.close())

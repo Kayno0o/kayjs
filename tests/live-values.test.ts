@@ -24,7 +24,8 @@ const SECRET = idOf('secret')
 // The live runtime is a chunk of the islands reading it, not of every page: the home page pays for that chunk, about 180 bytes, where the pages reading no live value save its whole runtime; the hooks letting `presence()` keep a hidden tab's connection open and name the tab cost 46 bytes of it.
 // `swappable` reading the page's API path from a meta tag (apiPath) costs about 12 bytes of it, 4 more on CI than here as gzip sizes differ by a few bytes from one host to another.
 // The `style:prop` pairs `setStyle` merges, a dialog bound to a signal closing itself, and a details or dialog told once hydrated of the toggle made before it cost 66 bytes of it.
-const LIVE_EAGER_JS_BUDGET = 12_844
+// Measured again at 12,866 bytes once these sat on the import graph the builds of a process share (#1140), a run of the whole suite reading a few bytes more.
+const LIVE_EAGER_JS_BUDGET = 12_866
 
 // The live values of the fixture, imported once a site is up: its plugin gives them their ids.
 type Values = typeof import('./fixtures/live-values/src/live')

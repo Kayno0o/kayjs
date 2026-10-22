@@ -228,7 +228,7 @@ export function sqliteRates(path: string): SyncRates {
 }
 
 // Answered at once, as a store reading SQLite needs no promise.
-interface SyncRates { hit: (key: string, window: Duration, weight?: number) => RateWindow, peek: (key: string) => RateWindow | undefined }
+export interface SyncRates { hit: (key: string, window: Duration, weight?: number) => RateWindow, peek: (key: string) => RateWindow | undefined }
 type OpenRates = SyncRates & { close: () => void }
 
 function openRates(path: string): OpenRates {
