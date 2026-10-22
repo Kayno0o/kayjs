@@ -44,14 +44,8 @@ afterAll(async () => rm(OUT, { recursive: true, force: true }))
 describe('restyling a component of kayjs-ui from src/ui.ts', () => {
   // Each part keeps the kui class theme.css styles, then takes what the app's src/ui.ts sets on it, and the caller's class object comes last.
   const restyled = [
-    'kui-card rounded-xl',
-    'kui-card-head p-6',
-    'kui-card-title italic',
-    'kui-card-body p-9',
     'kui-btn kui-btn-danger bg-red-600',
     'kui-btn tracking-wide',
-    'kui-badge bg-green-100',
-    'kui-notice border-2',
     'kui-field-input h-12',
     'kui-field-input min-h-32',
     'kui-dialog-title text-xl',
@@ -257,5 +251,27 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
   test('a part nothing restyles keeps its kui class alone', () => {
     expect(html).toContain('class="kui-dialog-body"')
     expect(html).toContain('class="kui-table-row"')
+  })
+})
+
+describe('a component whose recipe holds its look', () => {
+  const classesOf = (tag: string) => (html.match(new RegExp(`<[a-z0-9]+[^>]*${tag}[^>]*>`))?.[0].match(/ class="([^"]*)"/)?.[1] ?? '').split(' ')
+
+  test('keeps the kui class of its root as a name, writes the base as utilities and puts src/ui.ts after them', () => {
+    const card = classesOf('id="card"')
+
+    expect(card[0]).toBe('kui-card')
+    expect(card).toContain('rounded-kui-card')
+    expect(card.at(-1)).toBe('rounded-xl')
+    expect(card.indexOf('rounded-kui-card')).toBeLessThan(card.indexOf('rounded-xl'))
+    expect(classesOf('id="badge"')).toEqual(expect.arrayContaining(['kui-badge', 'border-kui-success', 'bg-green-100']))
+    expect(classesOf('id="notice"')).toEqual(expect.arrayContaining(['kui-notice', 'border-kui-error', 'border-2']))
+  })
+
+  test('sets no kui class on its other parts, which carry data-part to select them by', () => {
+    expect(html).toMatch(/<div class="[^"]*\bp-6" data-part="head">/)
+    expect(html).toMatch(/<h3 class="[^"]*\bitalic" data-part="title">/)
+    expect(html).toMatch(/<div class="p-kui-card p-9" data-part="body">/)
+    expect(html).not.toMatch(/kui-card-(?:head|title|body)|kui-badge-icon/)
   })
 })

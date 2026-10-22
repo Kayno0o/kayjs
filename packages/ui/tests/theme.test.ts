@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { compileKay } from 'kay/compiler'
 import { compile } from 'tailwindcss'
+import { REMOVED_UI_CLASSES } from '../../../src/check/ui-classes'
 
 const ROOT = new URL('..', import.meta.url).pathname
 
@@ -14,7 +15,9 @@ const CLASS_STRING_ATTRIBUTE = /\bclass="([^"]*)"/g
 const CLASS_EXPRESSION = /\bclass=\{((?:[^{}]|\{[^{}]*\})*)\}/g
 // A class name in an expression: a quoted string, unless a comparison makes it a value, or an object key.
 const CLASS_IN_EXPRESSION = /([!=]==\s*)?'([a-z][\w-]*)'|\b([a-z][\w-]*)(?=\s*:)/g
+const KUI_NAME = /(?<![\w-])kui-[a-z][\w-]*/g
 const WHITESPACE = /\s+/
+const RECIPE_STRING = /'([^']+)'/g
 const COLOUR_TOKEN = /(--color-kui-[\w-]+): ([^;]+);/g
 // A colour holds a light and a dark value, or names another colour that does.
 const PAIRED = /^light-dark\(|^var\(--color-kui-[\w-]+\)$|^color-mix\(in (?:oklab|srgb), /
@@ -52,13 +55,19 @@ const scripts = await Promise.all((await Array.fromAsync(new Bun.Glob('src/**/*.
 const tokens = new Set([...theme.matchAll(DEFINED_TOKEN)].map(([, token]) => token))
 const classes = new Set([...theme.matchAll(DEFINED_CLASS)].map(([, name = '']) => name))
 
+// The components whose look is a recipe of utilities (#1885), each with its part classes in REMOVED_UI_CLASSES; theme.css keeps their old rules until 1.74.
+const RECIPE_COMPONENTS = new Set(['src/card.kay', 'src/badge.kay', 'src/notice.kay'])
+
 // Every class a component writes: the `.class` shorthand, plain `class` attributes, and the names a `class` expression holds.
 function writtenClasses(path: string, source: string): string[] {
   const template = source.slice(source.lastIndexOf('\n---\n') + 1)
   const plain = [...template.matchAll(CLASS_STRING_ATTRIBUTE)].flatMap(([, value = '']) => value.split(WHITESPACE))
   const expressions = [...template.matchAll(CLASS_EXPRESSION)].flatMap(([, expression = '']) => [...expression.matchAll(CLASS_IN_EXPRESSION)].filter(([, compared]) => compared === undefined).map(([, , quoted, key]) => quoted ?? key!))
 
-  return [...compileKay(source, path).classes, ...plain, ...expressions].filter(Boolean)
+  const all = [...compileKay(source, path).classes, ...plain, ...expressions].filter(Boolean)
+
+  // A recipe holds the utilities of a component it moved; only its `kui-` hook is a class theme.css defines.
+  return RECIPE_COMPONENTS.has(path) ? [...all, ...source.match(KUI_NAME) ?? []].filter(name => name.startsWith('kui-')) : all
 }
 
 // The seeds a skin sets alone; every other colour derives from them.
@@ -364,7 +373,7 @@ describe('theme.css', () => {
     const written = new Set(components.flatMap(({ path, source }) => writtenClasses(path, source)))
     const quoted = new Set([...components.map(({ source }) => source), ...scripts].flatMap(source => [...source.matchAll(QUOTED)].map(([, name]) => name)))
 
-    expect([...classes].filter(name => !written.has(name) && !quoted.has(name) && !THIRD_PARTY.test(name))).toEqual([])
+    expect([...classes].filter(name => !written.has(name) && !quoted.has(name) && !THIRD_PARTY.test(name) && !(name in REMOVED_UI_CLASSES))).toEqual([])
   })
 
   // kay leaves out the rules of the classes no file writes whole, so a class put together at runtime would lose its own.
@@ -500,5 +509,35 @@ describe('theme.css', () => {
     expect(blockOf(toast, '&:where([data-tone=\'info\'])')).toContain('--kui-toast-tone: var(--color-kui-info);')
     expect(blockOf(toast, '&:where([data-tone=\'danger\'])')).toContain('--kui-toast-tone: var(--color-kui-error);')
     expect(blockOf(toast, '&:where([data-tone=\'success\'])')).toContain('--kui-toast-tone: var(--color-kui-success);')
+  })
+
+  // Tailwind drops a utility reading a token the theme lacks without a word, so a recipe naming one would only lose its look.
+  test('compiles every utility of a recipe component against the theme', async () => {
+    const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
+    const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${theme}\n@tailwind utilities;`, { base: ROOT, loadStylesheet: async (_, base) => ({ path: tailwind, base, content: await Bun.file(tailwind).text() }) })
+    let css = compiler.build([])
+    const missing: string[] = []
+    const seen = new Set<string>()
+
+    for (const path of RECIPE_COMPONENTS) {
+      const source = components.find(component => component.path === path)!.source
+      const start = source.indexOf('recipe({')
+      const recipe = source.slice(start, Math.min(...['defaults:', '\n})'].map(end => source.indexOf(end, start)).filter(end => end !== -1)))
+
+      for (const name of new Set([...recipe.replaceAll('\'\'', '').matchAll(RECIPE_STRING)].flatMap(([, value = '']) => value.split(WHITESPACE)).filter(name => name !== '' && !name.startsWith('kui-')))) {
+        const next = compiler.build([name])
+
+        if (next.length === css.length && !seen.has(name))
+          missing.push(`${path} ${name}`)
+
+        seen.add(name)
+        css = next
+      }
+    }
+
+    expect(missing).toEqual([])
+    // The tone of a stamp beats the stamp's own colour, so a tone writes it again under data-stamp.
+    expect(css).toContain('--kui-badge-tone')
+    expect(css).toMatch(/\.data-stamp\\:border-kui-error\[data-stamp\]\s*\{/)
   })
 })

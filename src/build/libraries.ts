@@ -212,6 +212,8 @@ function exportTargets(exports: unknown): [string, string][] | undefined {
 
 // What separates candidate class names in a template: whitespace, quotes, braces, parentheses, commas and the dots of the shorthand.
 const NOT_IN_CLASS = /[\s'"`{}(),=.]+/
+// What separates a class from the next in a string: Tailwind's own, so `border-(length:--x)`, `px-2.5` and `[font-family:var(--a,b)]` stay whole.
+const CLASS_SEPARATOR = /[\s'"`{}]+/
 
 // The library files the project's own files reach through their imports, scripts of both in between: only those components ship to the browser, and only their errors are the project's to see.
 // A barrel module re-exporting every component reaches them all.
@@ -385,7 +387,7 @@ function resolvedPath(specifier: string, importer: string): string | undefined {
 
 // The words of a file, as Tailwind would read them off a file of the app: class names among them, in a template or a string of a script.
 export function sourceWords(source: string): string[] {
-  return source.split(NOT_IN_CLASS).filter(word => word !== '')
+  return [...new Set([...source.split(NOT_IN_CLASS), ...source.split(CLASS_SEPARATOR)])].filter(word => word !== '')
 }
 
 // The words of a file as `sourceWords` finds them, kept with its text while the file stays.

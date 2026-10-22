@@ -225,14 +225,14 @@ describe('layout', () => {
 
 describe('content', () => {
   test('Card titles its frame at the level given, holds a head block at the far end, and insets its body unless bare', async () => {
-    expect((await find('/content', '#card .kui-card-head > *')).map(found => [found.tag, found.text])).toEqual([['h3', 'Moons'], ['span', '3']])
+    expect((await find('/content', '#card [data-part=head] > *')).map(found => [found.tag, found.text])).toEqual([['h3', 'Moons'], ['span', '3']])
     expect((await attributes('/content', '#card .kui-badge', ['data-tone']))).toEqual([{ 'data-tone': 'success' }])
-    expect((await one('/content', '#card .kui-card-body')).text).toBe('Phobos and Deimos')
-    expect(await find('/content', '#bare .kui-card-body')).toEqual([])
+    expect((await one('/content', '#card [data-part=body]')).text).toBe('Phobos and Deimos')
+    expect(await find('/content', '#bare [data-part=body]')).toEqual([])
     expect((await one('/content', '#bare p')).text).toBe('Edge to edge')
-    expect((await one('/content', '#outlined .kui-card-title')).tag).toBe('h2')
-    expect((await find('/content', '#page .kui-card-head > *')).map(found => [found.tag, found.text])).toEqual([['h1', '<i>Sign in</i>'], ['span', '1']])
-    expect(await find('/content', '#untitled h1, #untitled h2, #untitled h3, #untitled .kui-card-head')).toEqual([])
+    expect((await one('/content', '#outlined [data-part=title]')).tag).toBe('h2')
+    expect((await find('/content', '#page [data-part=head] > *')).map(found => [found.tag, found.text])).toEqual([['h1', '<i>Sign in</i>'], ['span', '1']])
+    expect(await find('/content', '#untitled h1, #untitled h2, #untitled h3, #untitled [data-part=head]')).toEqual([])
   })
 
   test('Notice is a status, or an alert for a danger, drawn as a box or as a bare line', async () => {

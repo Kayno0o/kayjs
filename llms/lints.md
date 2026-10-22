@@ -168,6 +168,7 @@ kay check --only seo
 | `deprecated-markup-prop` | warn | deprecated | A props type of a `.kay` script writing a markup prop as `JSX.Element` or a function returning it, since 1.70: it is a `Snippet` from `kay`. `kay upgrade` rewrites the type and the import. |
 | `deprecated-hook-shape` | warn | deprecated | An `on*` hook with positional arguments, since 1.70: `onSignUp`, `onDelete`, `onError` and a queue's `onFailed` take one event object, and `onExport`, `onProviderProfile` are `exportData`, `profileFields`. Read until 1.73. `kay upgrade` destructures the parameters. Found in `.ts` files importing kayjs-auth, `kay/server` or kayjs-mail, and `kay.config.ts`. |
 | `deprecated-action-options` | warn | deprecated | An action's third argument setting `rateLimit`, `honeypot`, `minTime` or `proofOfWork` outside `protect`, since 1.71. Read until 1.74. `kay upgrade` moves them into `protect: { ... }`. Found in `action(...)` calls with an object literal, in `.ts` files and `.kay` fences. |
+| `deprecated-ui-class` | warn | deprecated | A `.css` file selecting a part class kayjs-ui stopped setting in 1.71, such as `.kui-card-head`. No fix. |
 
 ### SEO lints
 

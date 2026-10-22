@@ -43,7 +43,7 @@ it('pins a notice, which every open board hears of at once and confirmed members
 
   const home = await site.visit('/')
 
-  expect(home.find('.kui-card-title').map(title => title.text)).toEqual(['Bake sale'])
+  expect(home.find('.kui-card [data-part=title]').map(title => title.text)).toEqual(['Bake sale'])
   expect(home.find('.kui-card p')[0]?.text).toBe('Saturday at ten, in the hall.')
   expect((await site.visit(`/notices/${id}`)).title()).toBe('Bake sale | Noticeboard')
 

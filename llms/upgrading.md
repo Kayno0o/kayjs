@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.71.0
 
+### kayjs-ui parts are selected by data-part
+
+Card, Badge and Notice draw their look in recipe utilities: `kui-card-head`, `kui-card-title`, `kui-card-body` and `kui-badge-icon` are no longer set on their parts, and a component's root keeps its `kui-` class. A rule of yours on a removed class selects `[data-part='head']` inside the component instead, or moves to `src/ui.ts` as `parts: { head: 'p-6' }`. `deprecated-ui-class` reports the selectors in your `.css` files, with no fix. `theme.css` keeps the rules for markup written by hand until 1.74, and the components that follow join the list as they move ([Restyle a component](../packages/ui/llms/setup.md#restyle-a-component)).
+
 ### An action's options are grouped by concern
 
 `rateLimit`, `honeypot`, `minTime` and `proofOfWork` move under `protect` in an action's third argument: `{ protect: { rateLimit: { max: 5, window: '1m' }, honeypot: 'website' }, maxSize, messages, tool }`. The flat form works until 1.74, and `deprecated-action-options` moves the keys with `kay upgrade` ([Protecting actions](action-protection.md#protecting-an-action)). kayjs-mail's `contactForm({ protection })` keeps its keys.

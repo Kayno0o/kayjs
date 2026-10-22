@@ -6,7 +6,7 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { clientDir, outputDir } from '../src/build/assets'
 import { pruneNodes, pruneUnescaped, selectors, styledClassNames } from '../src/build/class-rules'
 import { buildClient } from '../src/build/client'
-import { findKayLibraries } from '../src/build/libraries'
+import { findKayLibraries, sourceWords } from '../src/build/libraries'
 import { classTokens, unusedLibraryClasses } from '../src/build/prune'
 import { mergingSupports, parse, print } from '../src/build/supports'
 import { devBuilder } from '../src/dev/builder'
@@ -306,6 +306,22 @@ describe('a library\'s stylesheet in an app', () => {
     expect(libraryRules(await pageCss(root, {}))).toEqual([...KEPT, '.ui-part-used'].sort())
   })
 
+  it('builds the utilities of a library recipe, the ones with parentheses, commas and dots included', async () => {
+    const root = await newProject(TAILWIND_CSS)
+    const page = join(root, 'src/routes/index.kay')
+
+    await Promise.all([
+      Bun.write(join(root, 'node_modules/ui-lib/src/recipe.kay'), '---\nimport { recipe } from \'kay\'\n\nconst look = recipe({ parts: { root: \'px-2.5 border-(length:--ui-line) [font-family:var(--ui-font,inherit)]\' } })\n---\ndiv recipe\n'),
+      Bun.write(page, (await Bun.file(page).text()).replace('import Toggle', 'import Recipe from \'ui-lib/recipe.kay\'\nimport Toggle').replace('  Toggle\n', '  Recipe\n  Toggle\n')),
+    ])
+
+    const css = await pageCss(root, { plugins: [tailwind] })
+
+    expect(css).toContain('padding-inline: calc(var(--spacing) * 2.5)')
+    expect(css).toContain('border-width: var(--ui-line)')
+    expect(css).toContain('font-family: var(--ui-font, inherit)')
+  })
+
   it('prunes what Tailwind inlines of it as well', async () => {
     const root = await newProject(TAILWIND_CSS)
     const css = await pageCss(root, { plugins: [tailwind] })
@@ -397,5 +413,13 @@ describe('a library\'s stylesheet in an app', () => {
 describe('styledClassNames', () => {
   it('reads a class whose escape ends in a space, as 2xl: writes it', () => {
     expect([...styledClassNames(parse('.\\32 xl\\:p-4 { padding: 1rem }\n.a\\:b.c { color: red }'))].toSorted()).toEqual(['2xl:p-4', 'a:b', 'c'])
+  })
+})
+
+describe('sourceWords', () => {
+  it('keeps a utility with parentheses, commas and dots whole beside the words of a template, so the arbitrary values of a library recipe reach Tailwind', () => {
+    const words = sourceWords('const look = recipe({ parts: { root: \'flex border-(length:--kui-border-width) px-2.5 [font-family:var(--kui-label-font,inherit)]\' } })\ndiv.p-4(class="gap-1.5")')
+
+    expect(words).toEqual(expect.arrayContaining(['flex', 'border-(length:--kui-border-width)', 'px-2.5', '[font-family:var(--kui-label-font,inherit)]', 'p-4', 'gap-1.5']))
   })
 })

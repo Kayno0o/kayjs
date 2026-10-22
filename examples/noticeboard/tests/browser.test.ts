@@ -24,14 +24,14 @@ describe.skipIf(browserPath() === undefined)('in a browser', () => {
     await page.fill('dialog textarea[name="body"]', 'Saturday at ten.')
     await page.click('dialog button[type="submit"]')
     await page.waitFor('.kui-toast-message', { text: 'Pinned' })
-    await page.waitFor('.kui-card-title', { text: 'Bake sale' })
+    await page.waitFor('.kui-card [data-part=title]', { text: 'Bake sale' })
 
     await page.evaluate(() => {
       document.querySelector('main p[aria-live]')!.setAttribute('data-before', '')
     })
     await site.call(post, { title: 'Lost keys', body: 'Found by the door.' })
     await page.waitFor('.kui-toast-message', { text: 'Grace pinned "Lost keys"' })
-    await page.waitFor('.kui-card-title', { text: 'Lost keys' })
+    await page.waitFor('.kui-card [data-part=title]', { text: 'Lost keys' })
     // Rendered afresh around the island, whose props did not change: the same element, its connection and what it heard kept.
     expect(await page.count('main p[aria-live][data-before]')).toBe(1)
     expect(await page.text('main p[aria-live]')).toBe('Reading now: Ada')

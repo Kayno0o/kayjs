@@ -21,7 +21,7 @@ test('mountComponent applies the src/ui.ts of the project it mounts from', async
   const plain = await mountComponent(library('card'), { title: 'x' })
 
   mounted.push(plain)
-  expect(plain.root.querySelector('.kui-card')?.className).toBe('kui-card')
+  expect(plain.root.querySelector('.kui-card')?.className).toStartWith('kui-card ')
 
   const app = join(import.meta.dir, '..', 'tests', 'restyle-app')
   const link = join(app, 'node_modules', '@kaynooo', 'kayjs-ui')
@@ -36,8 +36,10 @@ test('mountComponent applies the src/ui.ts of the project it mounts from', async
   const restyled = await mountComponent(library('card'), { title: 'x' })
 
   mounted.push(restyled)
-  expect(restyled.root.querySelector('.kui-card')?.className).toBe('kui-card rounded-xl')
-  expect(restyled.root.querySelector('.kui-card-head')?.className).toBe('kui-card-head p-6')
+  const classes = (selector: string) => (restyled.root.querySelector(selector)?.className ?? '').split(' ')
+
+  expect(classes('.kui-card')).toContain('rounded-xl')
+  expect(classes('[data-part=head]')).toContain('p-6')
 })
 
 test('an inline ConfirmDelete draws its armed pair with the restyle once a click arms it', async () => {

@@ -3,8 +3,8 @@ import type { JSX } from 'kay'
 import { recipe } from 'kay'
 
 const look = recipe({
-  parts: { root: 'kui-notice' },
-  variants: { tone: { info: '', success: '', warning: '', danger: '' } },
+  parts: { root: 'kui-notice rounded-kui-card border-solid border-kui-overlay0 bg-kui-surface1 px-4 py-3 text-sm font-kui-notice text-kui-text [border-width:var(--kui-border-notice)] data-compact:border-0 data-compact:bg-transparent data-compact:p-0' },
+  variants: { tone: { info: '', success: 'border-kui-success text-kui-success', warning: 'border-kui-warning text-kui-warning', danger: 'border-kui-error bg-kui-canvas text-kui-error' } },
   defaults: { tone: 'info' },
 })
 

@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - kayjs-auth's `SignedIn`, `SignedOut` and `UserMenu` show the user in the first bytes with no `viewer: true`: a page reads the session only when its imports reach one of them, and an extension's `layout: { file, reaching }` wraps only the pages reaching its files ([Templates](../packages/auth/llms/signed-in-components.md), [Extensions](component-libraries.md#extensions)).
+- kayjs-ui Card, Badge and Notice draw their look in recipe utilities, so `src/ui.ts` replaces a value instead of fighting a rule; their part classes are gone (`deprecated-ui-class`, [Setup](../packages/ui/llms/setup.md)).
 - kayjs-ui labels take `--kui-label-case` and `--kui-label-font`, and two skins ship: `@kaynooo/kayjs-ui/skins/brutalist.css` and `soft.css` ([Setup](../packages/ui/llms/setup.md)).
 - An extension names optional app files with `appFiles: { hooks: 'src/auth.ts' }` and gets their modules in `server({ root, modules })`: kay bakes them into `kay build --compile` and reloads them under `kay dev`, so `auth()` reads `src/auth.ts` and `src/mail.ts` in an executable too ([Extensions](component-libraries.md#extensions)).
 - kayjs-auth serves admin pages (users with search, roles, bans, impersonation, audit log) behind its `admin` option, and an impersonation banner with the way back ([Admin pages](../packages/auth/llms/admin-pages.md)).
