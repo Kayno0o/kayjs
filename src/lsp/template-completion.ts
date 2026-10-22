@@ -132,7 +132,7 @@ function openParenthesis(prefix: string): { index: number, text: string } | unde
 function earlierParenthesis(source: string, lineStart: number, prefix: string): { index: number, text: string } | undefined {
   let start = lineStart
 
-  for (let step = 0; step < MAX_ATTRIBUTE_LINES && start > 0; step++) {
+  for (let step = 0; step < MAX_ATTRIBUTE_LINES && start > 1; step++) {
     start = source.lastIndexOf('\n', start - 2) + 1
 
     const text = source.slice(start, lineStart) + prefix

@@ -145,6 +145,8 @@ export class KayLanguageServer {
   private readonly projects = new Map<string, Project>()
   private tsgo?: { connection: Connection, process: Subprocess<'pipe', 'pipe', 'ignore'> }
   private readonly documents = new Map<string, Document>()
+  // Numbers the probe documents, so two asked at once never share one.
+  private probeCount = 0
   // The quiet spell since the last change, and whether another came during it, which publishes again once it ends.
   private diagnosticsTimer: Timer | undefined
   private diagnosticsDue = false
@@ -810,10 +812,10 @@ export class KayLanguageServer {
       data.lints = Object.entries(LINTS).filter(([, lint]) => !('site' in lint)).map(([name]) => name)
     }
     else if (wanted.kind === 'path') {
-      data.paths = await (project.lookups.paths ??= this.servedRoutes(project))
+      data.paths = await this.remembered(project.lookups, 'paths', async () => this.servedRoutes(project))
     }
     else if (wanted.kind === 'message') {
-      data.messages = await (project.lookups.messages ??= project.options.i18n ? messageKeys(project.root, project.options.i18n, project.options.extensions) : Promise.resolve([]))
+      data.messages = await this.remembered(project.lookups, 'messages', async () => project.options.i18n ? messageKeys(project.root, project.options.i18n, project.options.extensions) : [])
     }
     else {
       data.elements = [...HTML_ELEMENTS]
@@ -821,6 +823,22 @@ export class KayLanguageServer {
     }
 
     return data
+  }
+
+  // A lookup kept until the next save, forgotten when it fails so the next completion asks again.
+  private async remembered(lookups: Project['lookups'], key: 'paths' | 'messages', ask: () => Promise<string[]>): Promise<string[]> {
+    const kept = lookups[key] ?? ask()
+
+    lookups[key] = kept
+
+    try {
+      return await kept
+    }
+    catch (error) {
+      delete lookups[key]
+
+      throw error
+    }
   }
 
   private async servedRoutes(project: Project): Promise<string[]> {
@@ -856,10 +874,12 @@ export class KayLanguageServer {
     if (open)
       return componentInterface(open.source)
 
-    if (!project.lookups.interfaces.has(path))
-      project.lookups.interfaces.set(path, existsSync(path) ? componentInterface(await Bun.file(path).text()) : undefined)
+    const { interfaces } = project.lookups
 
-    return project.lookups.interfaces.get(path)
+    if (!interfaces.has(path))
+      interfaces.set(path, existsSync(path) ? componentInterface(await Bun.file(path).text()) : undefined)
+
+    return interfaces.get(path)
   }
 
   // The props TypeScript gives a tag, asked of a copy of the file's shadow with the tag written once more at its end, since the cursor of a completion is not in the shadow itself.
@@ -870,17 +890,24 @@ export class KayLanguageServer {
     if (cached)
       return cached
 
+    const { typedProps } = project.lookups
     const asked = this.askProps(document, tag)
 
-    project.lookups.typedProps.set(key, asked)
+    typedProps.set(key, asked)
 
-    return asked
+    const props = await asked
+
+    // A failed probe is asked again.
+    if (props === undefined)
+      typedProps.delete(key)
+
+    return props
   }
 
   private async askProps(document: Document, tag: string): Promise<ComponentInterface['props'] | undefined> {
     const call = `void (<${tag}  />)`
     const text = `${document.tsx}\n${call}\n`
-    const uri = `${document.shadowUri}.props.tsx`
+    const uri = `${document.shadowUri}.props${++this.probeCount}.tsx`
     const position = toPosition(text, text.length - call.length - 1 + call.indexOf('  ') + 1)
 
     this.server.notify('textDocument/didOpen', { textDocument: { uri, languageId: 'typescriptreact', version: 1, text } })

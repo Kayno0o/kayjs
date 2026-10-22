@@ -289,6 +289,27 @@ describe('kay lsp', () => {
     }
   })
 
+  it('keeps the route paths it offered until a save', async () => {
+    const path = 'site/src/routes/search.kay'
+    const text = await Bun.file(join(workspace, path)).text()
+    const labels = async () => (await editor.request<CompletionList>('textDocument/completion', path, 0, 9)).items.map(item => item.label)
+
+    await editor.open(path)
+    await editor.change(path, 'a(href="/")\n', 2)
+
+    try {
+      expect(await labels()).not.toContain('/cached-probe')
+      await Bun.write(join(workspace, 'site/src/routes/cached-probe.kay'), 'p x\n')
+      expect(await labels()).not.toContain('/cached-probe')
+      await editor.filesChanged(path, [{ path: 'site/src/routes/cached-probe.kay', type: 1 }])
+      expect(await labels()).toContain('/cached-probe')
+    }
+    finally {
+      await rm(join(workspace, 'site/src/routes/cached-probe.kay'), { force: true })
+      await editor.change(path, text, 3)
+    }
+  })
+
   it('lists the outline and the folds of a file', async () => {
     const path = 'site/src/routes/index.kay'
 

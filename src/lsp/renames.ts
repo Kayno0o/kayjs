@@ -1,5 +1,5 @@
 import type { Span } from '../compiler/ast'
-import { dirname, extname, relative, resolve, sep } from 'node:path'
+import { dirname, relative, resolve, sep } from 'node:path'
 import { parseKay } from '../compiler/parser'
 import { analyzeScript, analyzeServer } from '../compiler/script'
 
@@ -27,13 +27,14 @@ const MODULE_SPECIFIER = /(?:\bfrom\s*|\bimport\s*(?:\(\s*)?)(["'])([^"'\n]+)\1/
 // Where a relative import ends up once `moves` happen: a `.kay` file imported without its extension moves with it, and keeps being written without.
 function movedSpecifier(file: string, specifier: string, moves: ReadonlyMap<string, string>): string {
   const target = resolve(dirname(file), specifier)
-  const bare = extname(specifier) === ''
-  const moved = movedPath(bare ? `${target}.kay` : target, moves)
+  const moved = movedPath(target, moves)
 
-  if (!bare)
+  if (moved !== target || KAY_EXTENSION.test(specifier))
     return moved
 
-  return KAY_EXTENSION.test(moved) ? moved.replace(KAY_EXTENSION, '') : movedPath(target, moves)
+  const bare = movedPath(`${target}.kay`, moves)
+
+  return KAY_EXTENSION.test(bare) ? bare.replace(KAY_EXTENSION, '') : target
 }
 
 function editsFor(file: string, source: string, spans: Span[], moves: ReadonlyMap<string, string>): ImportEdit[] {
