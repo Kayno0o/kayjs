@@ -3,6 +3,7 @@ import type { Action, Failure } from 'kay'
 import type { Message, Progress } from '@kaynooo/kayjs-ai'
 import Chat from '@kaynooo/kayjs-ai/chat.kay'
 import Calls from '@kaynooo/kayjs-ai/chat-calls.kay'
+import Launcher from '@kaynooo/kayjs-ai/chat-launcher.kay'
 import Panel from '@kaynooo/kayjs-ai/chat-panel.kay'
 
 // Never called: the page is only rendered.
@@ -12,6 +13,7 @@ const calls = [{ id: 'a', name: 'search', status: 'done' as const, input: {}, re
 //- Renders the chat `src/ui.ts` restyles, for the library's restyle test.
 Chat(action={reply} initial={[{ role: 'user', content: 'Hello' }, { role: 'assistant', content: 'Hi there' }]} class={{ log: 'max-h-96' }})
 Chat(action={reply} suggestions={['One']} variant="plain" tone="neutral" size="sm" class="rounded-lg")
+Launcher(action={reply} variant="plain" tone="neutral" size="lg" class="mb-2")
 Calls(calls={calls} labels={{}} details={true} runningLabel="Running" doneLabel="Done" failedLabel="Failed" argumentsLabel="Arguments" resultLabel="Result")
 Panel(label="Ask" icon={() => undefined} closeIcon={() => undefined} newIcon={() => undefined} expandIcon={() => undefined} collapseIcon={() => undefined})
   p body

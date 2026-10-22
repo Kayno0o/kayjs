@@ -1,468 +1,475 @@
 /* A chat on kayjs-ui's tokens: the app imports its theme.css, and nothing else is needed. A site restyles it through these custom properties on any ancestor, all optional: --kai-chat-radius, --kai-chat-shadow, --kai-chat-accent, --kai-chat-bubble (the visitor's message), --kai-chat-width, --kai-chat-width-large, --kai-chat-height, --kai-chat-height-large. */
-.kai-chat {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  min-height: 0;
-}
-
-.kai-chat-log {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  max-height: 32rem;
-  overflow-y: auto;
-  padding: 0.25rem 0.125rem;
-  color: var(--color-kui-text);
-}
-
-/* Before the first message the greeting stands in for the list, which has nothing to show. */
-.kai-chat-log:not(:has(.kai-chat-turn)) {
-  display: none;
-}
-
-.kai-chat-log:focus-visible,
-.kai-chat-form textarea:focus-visible {
-  outline: 2px solid var(--kai-chat-accent, var(--color-kui-accent));
-  outline-offset: 2px;
-}
-
-.kai-chat-empty {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding-block: 0.5rem;
-}
-
-.kai-chat-greeting {
-  margin: 0;
-  font-size: 0.9375rem;
-  color: var(--color-kui-text);
-}
-
-.kai-chat-suggestions {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.5rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.kai-chat-suggestion {
-  max-width: 100%;
-  padding: 0.375rem 0.75rem;
-  border: 1px solid var(--color-kui-surface2);
-  border-radius: 9999px;
-  background-color: transparent;
-  color: var(--color-kui-text);
-  font: inherit;
-  font-size: 0.8125rem;
-  line-height: 1.4;
-  text-align: start;
-  cursor: pointer;
-  transition: background-color 0.15s, border-color 0.15s;
-}
-
-.kai-chat-suggestion:hover {
-  border-color: var(--kai-chat-accent, var(--color-kui-accent));
-  background-color: var(--color-kui-row-hover);
-}
-
-.kai-chat-suggestion:focus-visible {
-  outline: 2px solid var(--kai-chat-accent, var(--color-kui-accent));
-  outline-offset: 2px;
-}
-
-.kai-chat-turn {
-  font-size: 0.875rem;
-  line-height: 1.55;
-  overflow-wrap: anywhere;
-}
-
-/* The visitor's message is a tinted bubble at the right; an answer is the page itself, the full width of the log. */
-.kai-chat-turn[data-role='user'] {
-  align-self: flex-end;
-  max-width: 85%;
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--kai-chat-radius, 0.75rem);
-  border-end-end-radius: 0.25rem;
-  background-color: var(--kai-chat-bubble, color-mix(in srgb, var(--kai-chat-accent, var(--color-kui-accent)) 16%, var(--color-kui-canvas)));
-  white-space: pre-wrap;
-}
-
-.kai-chat-turn[data-role='user'] .kai-chat-text {
-  margin: 0;
-}
-
-.kai-chat-turn[data-role='assistant'] {
-  align-self: stretch;
-  min-width: 0;
-}
-
-.kai-chat-text > :first-child {
-  margin-top: 0;
-}
-
-.kai-chat-text > :last-child {
-  margin-bottom: 0;
-}
-
-.kai-chat-text :where(p, ul, ol, pre, table, blockquote) {
-  margin-block: 0.5rem;
-}
-
-.kai-chat-text :where(ul, ol) {
-  padding-inline-start: 1.25rem;
-}
-
-.kai-chat-text :where(pre) {
-  overflow-x: auto;
-  padding: 0.5rem 0.625rem;
-  border-radius: 0.5rem;
-  background-color: var(--color-kui-mantle);
-  font-size: 0.75rem;
-  line-height: 1.5;
-}
-
-.kai-chat-text :where(code) {
-  font-family: ui-monospace, monospace;
-  font-size: 0.75rem;
-}
-
-.kai-chat-text :where(a) {
-  color: var(--color-kui-accent-hi);
-}
-
-.kai-chat-text :where(th, td) {
-  padding: 0.25rem 0.5rem;
-  border: 1px solid var(--color-kui-surface2);
-}
-
-/* A table wider than the log scrolls inside it; its cells keep their words whole, since breaking them anywhere would squeeze it to fit. */
-.kai-chat-table {
-  max-width: 100%;
-  margin-block: 0.5rem;
-  overflow-x: auto;
-  overflow-wrap: normal;
-}
-
-.kai-chat-table:focus-visible {
-  outline: 2px solid var(--kai-chat-accent, var(--color-kui-accent));
-  outline-offset: 2px;
-}
-
-.kai-chat-table > table {
-  margin: 0;
-}
-
-/* Three pulsing dots in place of the thinking label, which stays for screen readers in the status line. */
-.kai-chat-thinking {
-  margin: 0;
-  padding-block: 0.25rem;
-  font-size: 0;
-}
-
-.kai-chat-thinking::before {
-  content: '';
-  display: block;
-  width: 0.4375rem;
-  height: 0.4375rem;
-  border-radius: 9999px;
-  background-color: var(--color-kui-muted);
-  box-shadow: 0.875rem 0 var(--color-kui-muted), 1.75rem 0 var(--color-kui-muted);
-  animation: kai-chat-dot 1.2s ease-in-out infinite;
-}
-
-@keyframes kai-chat-dot {
-  0%, 100% {
-    opacity: 0.3;
+/* In the components layer like kayjs-ui's theme, so the utilities of src/ui.ts or a `class` object win and an app's unlayered rule does too. */
+@layer components {
+  .kai-chat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-height: 0;
   }
 
-  50% {
-    opacity: 1;
+  .kai-chat-log {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-height: 32rem;
+    overflow-y: auto;
+    padding: 0.25rem 0.125rem;
+    color: var(--color-kui-text);
   }
-}
 
-@media (prefers-reduced-motion: reduce) {
-  .kai-chat-thinking::before {
-    animation: none;
-  }
-}
-
-.kai-chat-note {
-  display: block;
-  margin-top: 0.25rem;
-  color: var(--color-kui-muted);
-}
-
-.kai-chat-disclosure {
-  margin: 0;
-  padding: 0 0.25rem;
-  font-size: 0.75rem;
-  color: var(--color-kui-muted);
-}
-
-.kai-chat-form {
-  display: flex;
-  align-items: flex-end;
-  gap: 0.5rem;
-}
-
-.kai-chat-form textarea {
-  flex: 1;
-  box-sizing: border-box;
-  min-width: 0;
-  min-height: 2.5rem;
-  max-height: 10rem;
-  border-radius: 1.25rem;
-  padding-inline: 0.875rem;
-  line-height: 1.5;
-  field-sizing: content;
-  resize: none;
-}
-
-/* The send and stop button: a filled circle as tall as the field's first line. */
-.kai-chat-send {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  padding: 0;
-  border: 0;
-  border-radius: 9999px;
-  background-color: var(--kai-chat-accent, var(--color-kui-accent));
-  color: var(--color-kui-on-accent);
-  cursor: pointer;
-  transition: background-color 0.15s;
-}
-
-.kai-chat-send:hover {
-  background-color: var(--color-kui-accent-hi);
-}
-
-.kai-chat-send:focus-visible {
-  outline: 2px solid var(--kai-chat-accent, var(--color-kui-accent));
-  outline-offset: 2px;
-}
-
-/* Read by screen readers alone. */
-.kai-chat-status {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
-/* The tools a reply called fold into one muted line, which opens to the list. */
-.kai-chat-calls {
-  margin: 0 0 0.5rem;
-  font-size: 0.75rem;
-  color: var(--color-kui-muted);
-}
-
-.kai-chat-calls-summary {
-  cursor: pointer;
-}
-
-.kai-chat-calls-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  margin: 0.375rem 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.kai-chat-call summary {
-  cursor: pointer;
-}
-
-.kai-chat-call-name {
-  font-family: ui-monospace, monospace;
-}
-
-.kai-chat-call-status {
-  margin-inline-start: 0.5rem;
-}
-
-.kai-chat-call[data-status='failed'] .kai-chat-call-status {
-  color: var(--color-kui-error);
-}
-
-.kai-chat-call-title {
-  margin: 0.5rem 0 0.25rem;
-}
-
-.kai-chat-call-code {
-  margin: 0;
-  overflow-x: auto;
-  white-space: pre-wrap;
-  font-family: ui-monospace, monospace;
-}
-
-/* The launcher: a button at the bottom right of the page and the panel it opens above it. */
-.kai-launcher {
-  position: fixed;
-  inset-block-end: max(1rem, env(safe-area-inset-bottom));
-  inset-inline-end: max(1rem, env(safe-area-inset-right));
-  z-index: 40;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 1rem;
-  max-width: calc(100vw - 2rem);
-}
-
-.kai-launcher-button {
-  width: 3.25rem;
-  height: 3.25rem;
-  border: 0;
-  border-radius: 9999px;
-  background-color: var(--kai-chat-accent, var(--color-kui-accent));
-  color: var(--color-kui-on-accent);
-  box-shadow: 0 0.25rem 1rem rgb(0 0 0 / 25%);
-  cursor: pointer;
-}
-
-.kai-launcher-button:hover {
-  background-color: var(--color-kui-accent-hi);
-}
-
-.kai-launcher-button:focus-visible {
-  outline: 2px solid var(--kai-chat-accent, var(--color-kui-accent));
-  outline-offset: 3px;
-}
-
-.kai-launcher-glyph {
-  display: inline-flex;
-}
-
-.kai-launcher-glyph[hidden] {
-  display: none;
-}
-
-.kai-launcher-button .kui-icon {
-  width: 1.5rem;
-  height: 1.5rem;
-}
-
-.kai-launcher-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  box-sizing: border-box;
-  width: min(var(--kai-chat-width, 36rem), calc(100vw - 2rem));
-  height: min(var(--kai-chat-height, 40rem), calc(100dvh - 7.5rem));
-  padding: 0 1rem 0.75rem;
-  border: 1px solid var(--color-kui-surface2);
-  border-radius: calc(var(--kai-chat-radius, 0.75rem) + 0.25rem);
-  background-color: var(--color-kui-canvas);
-  color: var(--color-kui-text);
-  box-shadow: var(--kai-chat-shadow, 0 0.75rem 2.5rem rgb(0 0 0 / 22%), 0 0 0 1px light-dark(transparent, rgb(255 255 255 / 6%)));
-}
-
-.kai-launcher-panel[data-large] {
-  width: min(var(--kai-chat-width-large, 56rem), calc(100vw - 2rem));
-  height: min(var(--kai-chat-height-large, 100dvh), calc(100dvh - 7.5rem));
-}
-
-.kai-launcher-panel[hidden] {
-  display: none;
-}
-
-.kai-launcher-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-inline: -1rem;
-  padding: 0.5rem 0.75rem 0.5rem 1rem;
-  border-bottom: 1px solid var(--color-kui-surface2);
-}
-
-.kai-launcher-title {
-  margin: 0;
-  font-size: 0.9375rem;
-}
-
-.kai-launcher-actions {
-  display: flex;
-  gap: 0.125rem;
-}
-
-/* A phone has no room for a second size. */
-@media (max-width: 40rem) {
-  .kai-launcher-expand {
+  /* Before the first message the greeting stands in for the list, which has nothing to show. */
+  .kai-chat-log:not(:has(.kai-chat-turn)) {
     display: none;
   }
-}
 
-.kai-launcher-body {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-height: 0;
-}
+  .kai-chat-log:focus-visible,
+  .kai-chat-form textarea:focus-visible {
+    outline: 2px solid var(--kai-chat-accent, var(--color-kui-accent));
+    outline-offset: 2px;
+  }
 
-.kai-launcher-body .kai-chat {
-  flex: 1;
-}
+  .kai-chat-empty {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding-block: 0.5rem;
+  }
 
-.kai-launcher-body .kai-chat-log {
-  flex: 1;
-  min-height: 0;
-  max-height: none;
-}
+  .kai-chat-greeting {
+    margin: 0;
+    font-size: 0.9375rem;
+    color: var(--color-kui-text);
+  }
 
-/* The panel's height is fixed, so the form stays at the bottom while the greeting, or the log, fills what is above it. */
-.kai-launcher-body .kai-chat-form {
-  margin-top: auto;
-}
+  .kai-chat-suggestions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
 
-.kai-launcher-body .kai-chat-empty {
-  overflow-y: auto;
-}
+  .kai-chat-suggestion {
+    max-width: 100%;
+    padding: 0.375rem 0.75rem;
+    border: 1px solid var(--color-kui-surface2);
+    border-radius: 9999px;
+    background-color: transparent;
+    color: var(--color-kui-text);
+    font: inherit;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    text-align: start;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s;
+  }
 
-.kai-launcher-note {
-  margin-top: 0.5rem;
-  font-size: 0.75rem;
-  line-height: 1.4;
-  color: var(--color-kui-muted);
-  text-align: start;
-}
+  .kai-chat-suggestion:hover {
+    border-color: var(--kai-chat-accent, var(--color-kui-accent));
+    background-color: var(--color-kui-row-hover);
+  }
 
-.kai-launcher-note :where(a) {
-  color: inherit;
-  text-decoration: underline;
-}
+  .kai-chat-suggestion:focus-visible {
+    outline: 2px solid var(--kai-chat-accent, var(--color-kui-accent));
+    outline-offset: 2px;
+  }
 
-/* The chat's props: `tone="neutral"` draws the send button and the visitor's bubble in the text colour instead of the accent, `variant="plain"` draws the visitor's message as bare text, `size` scales the type of the turns and the suggestions. */
-.kai-chat[data-tone='neutral'] {
-  --kai-chat-accent: var(--color-kui-text);
-}
+  .kai-chat-turn {
+    font-size: 0.875rem;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+  }
 
-.kai-chat[data-tone='neutral'] .kai-chat-send {
-  color: var(--color-kui-canvas);
-}
+  /* The visitor's message is a tinted bubble at the right; an answer is the page itself, the full width of the log. */
+  .kai-chat-turn[data-role='user'] {
+    align-self: flex-end;
+    max-width: 85%;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--kai-chat-radius, 0.75rem);
+    border-end-end-radius: 0.25rem;
+    background-color: var(--kai-chat-bubble, color-mix(in srgb, var(--kai-chat-accent, var(--color-kui-accent)) 16%, var(--color-kui-canvas)));
+    white-space: pre-wrap;
+  }
 
-.kai-chat[data-variant='plain'] .kai-chat-turn[data-role='user'] {
-  max-width: none;
-  padding: 0;
-  border-radius: 0;
-  background-color: transparent;
-  font-weight: 600;
-}
+  .kai-chat-turn[data-role='user'] .kai-chat-text {
+    margin: 0;
+  }
 
-.kai-chat[data-size='sm'] :where(.kai-chat-turn, .kai-chat-suggestion) {
-  font-size: 0.8125rem;
-}
+  .kai-chat-turn[data-role='assistant'] {
+    align-self: stretch;
+    min-width: 0;
+  }
 
-.kai-chat[data-size='lg'] :where(.kai-chat-turn, .kai-chat-suggestion) {
-  font-size: 1rem;
+  .kai-chat-text > :first-child {
+    margin-top: 0;
+  }
+
+  .kai-chat-text > :last-child {
+    margin-bottom: 0;
+  }
+
+  .kai-chat-text :where(p, ul, ol, pre, table, blockquote) {
+    margin-block: 0.5rem;
+  }
+
+  .kai-chat-text :where(ul, ol) {
+    padding-inline-start: 1.25rem;
+  }
+
+  .kai-chat-text :where(pre) {
+    overflow-x: auto;
+    padding: 0.5rem 0.625rem;
+    border-radius: 0.5rem;
+    background-color: var(--color-kui-mantle);
+    font-size: 0.75rem;
+    line-height: 1.5;
+  }
+
+  .kai-chat-text :where(code) {
+    font-family: ui-monospace, monospace;
+    font-size: 0.75rem;
+  }
+
+  .kai-chat-text :where(a) {
+    color: var(--color-kui-accent-hi);
+  }
+
+  .kai-chat-text :where(th, td) {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--color-kui-surface2);
+  }
+
+  /* A table wider than the log scrolls inside it; its cells keep their words whole, since breaking them anywhere would squeeze it to fit. */
+  .kai-chat-table {
+    max-width: 100%;
+    margin-block: 0.5rem;
+    overflow-x: auto;
+    overflow-wrap: normal;
+  }
+
+  .kai-chat-table:focus-visible {
+    outline: 2px solid var(--kai-chat-accent, var(--color-kui-accent));
+    outline-offset: 2px;
+  }
+
+  .kai-chat-table > table {
+    margin: 0;
+  }
+
+  /* Three pulsing dots in place of the thinking label, which stays for screen readers in the status line. */
+  .kai-chat-thinking {
+    margin: 0;
+    padding-block: 0.25rem;
+    font-size: 0;
+  }
+
+  .kai-chat-thinking::before {
+    content: '';
+    display: block;
+    width: 0.4375rem;
+    height: 0.4375rem;
+    border-radius: 9999px;
+    background-color: var(--color-kui-muted);
+    box-shadow: 0.875rem 0 var(--color-kui-muted), 1.75rem 0 var(--color-kui-muted);
+    animation: kai-chat-dot 1.2s ease-in-out infinite;
+  }
+
+  @keyframes kai-chat-dot {
+    0%, 100% {
+      opacity: 0.3;
+    }
+
+    50% {
+      opacity: 1;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .kai-chat-thinking::before {
+      animation: none;
+    }
+  }
+
+  .kai-chat-note {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--color-kui-muted);
+  }
+
+  .kai-chat-disclosure {
+    margin: 0;
+    padding: 0 0.25rem;
+    font-size: 0.75rem;
+    color: var(--color-kui-muted);
+  }
+
+  .kai-chat-form {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+  }
+
+  .kai-chat-form textarea {
+    flex: 1;
+    box-sizing: border-box;
+    min-width: 0;
+    min-height: 2.5rem;
+    max-height: 10rem;
+    border-radius: 1.25rem;
+    padding-inline: 0.875rem;
+    line-height: 1.5;
+    field-sizing: content;
+    resize: none;
+  }
+
+  /* The send and stop button: a filled circle as tall as the field's first line. */
+  .kai-chat-send {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    border: 0;
+    border-radius: 9999px;
+    background-color: var(--kai-chat-accent, var(--color-kui-accent));
+    color: var(--color-kui-on-accent);
+    cursor: pointer;
+    transition: background-color 0.15s;
+  }
+
+  .kai-chat-send:hover {
+    background-color: var(--color-kui-accent-hi);
+  }
+
+  .kai-chat-send:focus-visible {
+    outline: 2px solid var(--kai-chat-accent, var(--color-kui-accent));
+    outline-offset: 2px;
+  }
+
+  /* Read by screen readers alone. */
+  .kai-chat-status {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* The tools a reply called fold into one muted line, which opens to the list. */
+  .kai-chat-calls {
+    margin: 0 0 0.5rem;
+    font-size: 0.75rem;
+    color: var(--color-kui-muted);
+  }
+
+  .kai-chat-calls-summary {
+    cursor: pointer;
+  }
+
+  .kai-chat-calls-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin: 0.375rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .kai-chat-call summary {
+    cursor: pointer;
+  }
+
+  .kai-chat-call-name {
+    font-family: ui-monospace, monospace;
+  }
+
+  .kai-chat-call-status {
+    margin-inline-start: 0.5rem;
+  }
+
+  .kai-chat-call[data-status='failed'] .kai-chat-call-status {
+    color: var(--color-kui-error);
+  }
+
+  .kai-chat-call-title {
+    margin: 0.5rem 0 0.25rem;
+  }
+
+  .kai-chat-call-code {
+    margin: 0;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    font-family: ui-monospace, monospace;
+  }
+
+  /* The launcher: a button at the bottom right of the page and the panel it opens above it. */
+  .kai-launcher {
+    position: fixed;
+    inset-block-end: max(1rem, env(safe-area-inset-bottom));
+    inset-inline-end: max(1rem, env(safe-area-inset-right));
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1rem;
+    max-width: calc(100vw - 2rem);
+  }
+
+  .kai-launcher .kai-launcher-button {
+    width: 3.25rem;
+    height: 3.25rem;
+    border: 0;
+    border-radius: 9999px;
+    background-color: var(--kai-chat-accent, var(--color-kui-accent));
+    color: var(--color-kui-on-accent);
+    box-shadow: 0 0.25rem 1rem rgb(0 0 0 / 25%);
+    cursor: pointer;
+  }
+
+  .kai-launcher .kai-launcher-button:hover {
+    background-color: var(--color-kui-accent-hi);
+  }
+
+  .kai-launcher .kai-launcher-button:focus-visible {
+    outline: 2px solid var(--kai-chat-accent, var(--color-kui-accent));
+    outline-offset: 3px;
+  }
+
+  .kai-launcher-glyph {
+    display: inline-flex;
+  }
+
+  .kai-launcher-glyph[hidden] {
+    display: none;
+  }
+
+  .kai-launcher .kai-launcher-button .kui-icon {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  .kai-launcher-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    box-sizing: border-box;
+    width: min(var(--kai-chat-width, 36rem), calc(100vw - 2rem));
+    height: min(var(--kai-chat-height, 40rem), calc(100dvh - 7.5rem));
+    padding: 0 1rem 0.75rem;
+    border: 1px solid var(--color-kui-surface2);
+    border-radius: calc(var(--kai-chat-radius, 0.75rem) + 0.25rem);
+    background-color: var(--color-kui-canvas);
+    color: var(--color-kui-text);
+    box-shadow: var(--kai-chat-shadow, 0 0.75rem 2.5rem rgb(0 0 0 / 22%), 0 0 0 1px light-dark(transparent, rgb(255 255 255 / 6%)));
+  }
+
+  .kai-launcher-panel[data-large] {
+    width: min(var(--kai-chat-width-large, 56rem), calc(100vw - 2rem));
+    height: min(var(--kai-chat-height-large, 100dvh), calc(100dvh - 7.5rem));
+  }
+
+  .kai-launcher-panel[hidden] {
+    display: none;
+  }
+
+  .kai-launcher-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-inline: -1rem;
+    padding: 0.5rem 0.75rem 0.5rem 1rem;
+    border-bottom: 1px solid var(--color-kui-surface2);
+  }
+
+  .kai-launcher-title {
+    margin: 0;
+    font-size: 0.9375rem;
+  }
+
+  .kai-launcher-actions {
+    display: flex;
+    gap: 0.125rem;
+  }
+
+  /* A phone has no room for a second size. */
+  @media (max-width: 40rem) {
+    .kai-launcher-actions .kai-launcher-expand {
+      display: none;
+    }
+  }
+
+  .kai-launcher-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .kai-launcher-body .kai-chat {
+    flex: 1;
+  }
+
+  .kai-launcher-body .kai-chat-log {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+  }
+
+  /* The panel's height is fixed, so the form stays at the bottom while the greeting, or the log, fills what is above it. */
+  .kai-launcher-body .kai-chat-form {
+    margin-top: auto;
+  }
+
+  .kai-launcher-body .kai-chat-empty {
+    overflow-y: auto;
+  }
+
+  .kai-launcher-note {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: var(--color-kui-muted);
+    text-align: start;
+  }
+
+  .kai-launcher-note :where(a) {
+    color: inherit;
+    text-decoration: underline;
+  }
+
+  /* The chat's props: `tone="neutral"` draws the send button and the visitor's bubble in the text colour instead of the accent, `variant="plain"` draws the visitor's message as bare text, `size` scales the type of the turns and the suggestions. */
+  .kai-chat[data-tone='neutral'] {
+    --kai-chat-accent: var(--color-kui-text);
+  }
+
+  .kai-chat[data-tone='neutral'] .kai-chat-send {
+    color: var(--color-kui-canvas);
+  }
+
+  .kai-chat[data-tone='neutral'] .kai-chat-send:hover {
+    background-color: color-mix(in srgb, var(--color-kui-text) 85%, var(--color-kui-canvas));
+  }
+
+  .kai-chat[data-variant='plain'] .kai-chat-turn[data-role='user'] {
+    max-width: none;
+    padding: 0;
+    border-radius: 0;
+    background-color: transparent;
+    font-weight: 600;
+  }
+
+  .kai-chat[data-size='sm'] :where(.kai-chat-turn, .kai-chat-suggestion) {
+    font-size: 0.8125rem;
+  }
+
+  .kai-chat[data-size='lg'] :where(.kai-chat-turn, .kai-chat-suggestion) {
+    font-size: 1rem;
+  }
 }

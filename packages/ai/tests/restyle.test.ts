@@ -65,6 +65,20 @@ describe('restyling the chat from src/ui.ts', () => {
     expect(html).toMatch(/<section class="kai-chat rounded-xl opacity-90 rounded-lg"[^>]* data-variant="plain" data-tone="neutral" data-size="sm"/)
   })
 
+  test('the launcher hands the shared props to its chat and its class string to its wrapper', () => {
+    expect(html).toMatch(/<div class="kai-launcher mb-2"[\s\S]*?<section class="kai-chat[^"]*"[^>]* data-variant="plain" data-tone="neutral" data-size="lg"/)
+  })
+
+  // Unlayered rules beat Tailwind's utilities layer whatever their specificity, which would leave the utilities above with no effect.
+  test('the stylesheet sits in the components layer, so a utility of src/ui.ts wins over it', async () => {
+    const css = await Bun.file(join(LIBRARY, 'src/chat.css')).text()
+    const outside = css.replace(/\/\*[\s\S]*?\*\//g, '').trim()
+
+    expect(outside.startsWith('@layer components {')).toBe(true)
+    expect(outside.endsWith('}')).toBe(true)
+    expect(outside.match(/^\S/gm)?.length).toBe(2)
+  })
+
   test('a part nothing restyles keeps its kai class alone', () => {
     expect(html).toContain('class="kai-chat-disclosure"')
     expect(html).toContain('class="kai-chat-form"')

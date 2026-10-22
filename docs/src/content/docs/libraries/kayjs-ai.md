@@ -84,7 +84,7 @@ Messages take only the roles `user` and `assistant`. The system prompt goes in t
 
 ## A chat for your site
 
-`Chat` is an island that talks to your action. It keeps the history, streams the reply in as Markdown and has a Stop button. It is built on kayjs-ui (its `Notice` and `Button`), so import that library's `theme.css` once. `variant` (`bubble` or `plain`), `tone` (`accent` or `neutral`) and `size` (`sm`, `md` or `lg`) set its look as they do for kayjs-ui's components.
+`Chat` is an island that talks to your action. It keeps the history, streams the reply in as Markdown and has a Stop button. It is built on kayjs-ui (its `Notice` and `Button`, installed by `kay add ui`), so import that library's `theme.css` once; an app that only calls `ask()` needs none of it. `variant` (`bubble` or `plain`), `tone` (`accent` or `neutral`) and `size` (`sm`, `md` or `lg`) set its look as they do for kayjs-ui's components.
 
 ```kay
 ---
