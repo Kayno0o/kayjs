@@ -468,6 +468,15 @@
     @apply gap-4 p-kui-card;
   }
 
+  /* Boxed sections stacked in an accordion share their borders. */
+  .kui-accordion {
+    @apply flex flex-col;
+
+    & > :where(.kui-collapsible-section[data-boxed] + .kui-collapsible-section[data-boxed]) {
+      @apply -mt-[length:var(--kui-border-width)];
+    }
+  }
+
   .kui-command-palette {
     @apply mx-auto mt-[10vh] mb-auto flex max-h-[min(70dvh,40rem)] w-full max-w-[min(36rem,calc(100vw-2rem))] flex-col overflow-hidden border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-surface0 p-0 text-kui-text;
   }

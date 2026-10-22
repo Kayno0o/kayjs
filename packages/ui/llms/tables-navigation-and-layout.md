@@ -87,7 +87,7 @@ Tabs(tabs={[{ value: 'details', label: 'Details' }, { value: 'reviews', label: '
   - `inline` draws the SVG in the page instead of an image, so the colours in `options` may be CSS ones and follow the page: `QrCode(value={url} inline options={{ foreground: 'currentColor', eyeColor: 'var(--color-accent)', background: null }})`. A `label` then makes it `role="img"`; `size` sets the box's width and height.
   - It keeps dark modules on a light ground with a quiet zone, which every scanner reads, whatever the theme. `options` takes what `qrCodeSvg` from @kaynooo/utils does, `ecc`, `moduleShape`, `eyeColor`, `foreground`, `background`, `margin` and the rest, its colours written out since the image cannot read the page's CSS, unless it is `inline`.
 
-### PageHeader, PageSection, CollapsibleSection, Widget, CardRow, SidePanel, SplitLayout
+### PageHeader, PageSection, CollapsibleSection, Accordion, Widget, CardRow, SidePanel, SplitLayout
 
 ```kay
 PageSection(title="Moons")
@@ -110,6 +110,7 @@ PageSection(title="Moons")
 - `PageHeader(title)`: the head of a page, its one `h1`. `@meta` sits beside the title, for a badge, a count or a link back, `@actions` after it, past a divider, `description` is a quieter line under the title's, and the children come under that.
 - `PageSection(title)`: a titled `section` of a page, its `h2` one level under the page's own, or the heading `level` given, `1` for a section holding a whole page. `@actions` sits at the end of the head line.
 - `CollapsibleSection(title)`: a native `details`, so it folds without script. `open` is whether it starts unfolded, `true` by default. It takes no `onOpenChange`, which would make it an island on every page: listen to the native `toggle` event of its `details` in an island of your own. `boxed` draws it as a card whose title is a band over a padded body. `@meta` sits in the band before the chevron, for a count the folded section would hide.
+- `Accordion(items)`: CollapsibleSections as one group, `items` listing each `{ value, title, open? }` and `@panel(value)` drawing its body. The sections share a native `details` `name`, so opening one closes the others without script; `multiple` lets several stay open. `boxed` is `true` by default. Arrow, Home and End move between the headers, which makes it an island.
 - `Widget(title icon)`: a dashboard tile, a framed body under a head line of icon, title and `@actions`. `isEmpty` swaps the body for the `@empty` block, keeping the frame; with no `@empty` block, an empty widget renders nothing.
 - `CardRow`: one line of a list drawn as cards. Children are its body, `@left` leads, `@right` trails, and `@actions` comes last, dimmed until the row is hovered or focused.
 - `SidePanel(open title onOpenChange)`: a modal `dialog` along the edge, driven by `open` like Dialog and named by its title. `@actions` sits in its head before the close button, such as previous and next; `@footer` under its body. A click outside, Escape and its close button all close it through `onOpenChange(false)`; `closeLabel` names that button, `Close` by default.

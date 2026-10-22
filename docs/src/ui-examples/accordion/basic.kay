@@ -1,0 +1,17 @@
+---
+import Accordion from '@kaynooo/kayjs-ui/accordion.kay'
+
+const items = [
+  { value: 'shipping', title: 'Shipping', open: true },
+  { value: 'returns', title: 'Returns' },
+  { value: 'warranty', title: 'Warranty' },
+]
+---
+Accordion(items={items})
+  @panel(value)
+    if value === 'shipping'
+      p Ships within two days.
+    else if value === 'returns'
+      p Free returns for 30 days.
+    else
+      p Two years on every telescope.

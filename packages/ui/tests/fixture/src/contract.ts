@@ -1,4 +1,5 @@
 import type { JSX } from 'kay'
+import Accordion from '@kaynooo/kayjs-ui/accordion.kay'
 import AppHeader from '@kaynooo/kayjs-ui/app-header.kay'
 import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
 import Badge from '@kaynooo/kayjs-ui/badge.kay'
@@ -78,6 +79,7 @@ const planets = [{ name: 'Mars', moons: 2 }, { name: 'Earth', moons: 1 }]
 
 // The component each file under `src` of the library exports, drawn by `components/contract.kay`.
 export const COMPONENTS = {
+  'accordion': Accordion,
   'app-header': AppHeader,
   'avatar': Avatar,
   'badge': Badge,
@@ -147,6 +149,7 @@ export const COMPONENTS = {
 
 // Every component the library exports, with props that draw it.
 export const CASES: Record<string, Record<string, unknown>> = {
+  'accordion': { items: [{ value: 'mars', title: 'Mars' }, { value: 'venus', title: 'Venus', open: true }], panel: (value: string) => value },
   'app-header': { links: [{ href: '/', label: 'Home', icon }, { href: '/data', label: 'Data' }], current: '/data', label: 'Main', brand: 'Moons', end: 'Ada' },
   'avatar': { name: 'Grace', label: 'Grace' },
   'badge': { label: 'Draft', icon },

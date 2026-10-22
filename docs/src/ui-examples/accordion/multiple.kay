@@ -1,0 +1,11 @@
+---
+import Accordion from '@kaynooo/kayjs-ui/accordion.kay'
+
+const items = [
+  { value: 'lens', title: 'Lens', open: true },
+  { value: 'mount', title: 'Mount', open: true },
+]
+---
+Accordion(items={items} multiple)
+  @panel(value)
+    p {value === 'lens' ? '70 mm, f/10.' : 'Alt-azimuth, with a tripod.'}

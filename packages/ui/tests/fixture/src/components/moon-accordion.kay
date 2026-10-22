@@ -1,0 +1,8 @@
+---
+import Accordion from '@kaynooo/kayjs-ui/accordion.kay'
+
+const items = [{ value: 'mars', title: 'Mars' }, { value: 'venus', title: 'Venus', open: true }, { value: 'earth', title: 'Earth' }]
+---
+Accordion(items={items})
+  @panel(value)
+    p {value}
