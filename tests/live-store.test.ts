@@ -253,12 +253,14 @@ process.exit(0)`)
     const surviving = (id: string) => keyed(() => 0, id, id)
 
     for (let row = 0; row < 9_000; row++)
-      hear!('test:other', String(row), '[2]')
+      hear!('test:crowd', String(row), '[2]')
 
-    hear!('test:last', '0', '[3]')
+    hear!('test:after', '0', '[3]')
 
-    expect(surviving('test:other')('0')).toBe(2)
-    expect(surviving('test:last')('0')).toBe(3)
+    expect(surviving('test:crowd')('0')).toBe(2)
+    expect(surviving('test:after')('0')).toBe(3)
+    // Declared, so no later test meets them among the undeclared.
+    expect(surviving('test:again')('0')).toBe(1)
     setLiveStore(undefined)
   })
 
@@ -281,6 +283,7 @@ process.exit(0)`)
 
     expect([old('0'), old('1')]).toEqual([1, 1])
     expect(keyed(() => 0, 'test:quiet', 'quiet')('0')).toBe(0)
+    expect(keyed(() => 0, 'test:new', 'new')('0')).toBe(3)
     setLiveStore(undefined)
   })
 
