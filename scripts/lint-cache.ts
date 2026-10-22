@@ -41,6 +41,6 @@ export async function dropStaleLintCache(root: string, folder = root): Promise<b
   return stale
 }
 
-// `bun ../../scripts/lint-cache.ts` from a library drops that library's caches when the install changed.
+// `$npm_execpath ../../scripts/lint-cache.ts` from a library drops that library's caches when the install changed.
 if (import.meta.main)
   await dropStaleLintCache(join(import.meta.dir, '..'), process.cwd())

@@ -58,9 +58,9 @@
     "prepack": "$npm_execpath run build:types",
     "postpack": "rm -rf types",
     "prelint": "$npm_execpath run --cwd ../.. build:eslint",
-    "lint": "bun ../../scripts/lint-cache.ts && keslint --cache",
+    "lint": "$npm_execpath ../../scripts/lint-cache.ts && keslint --cache",
     "prelint:fix": "$npm_execpath run --cwd ../.. build:eslint",
-    "lint:fix": "bun ../../scripts/lint-cache.ts && keslint --fix --cache",
+    "lint:fix": "$npm_execpath ../../scripts/lint-cache.ts && keslint --fix --cache",
     "test": "$npm_execpath test --isolate --timeout 20000"
   },
   "peerDependencies": {
