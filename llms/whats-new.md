@@ -4,25 +4,11 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
-- An action reads its outcome as `add.failed()` and `add.succeeded()`, and `ActionError` extends `ApiError` ([Reading the outcome](actions.md#reading-the-outcome)).
-- A static page hands an island a declared `Column<Row>[]` written out as literals, and `kay check` names the function field of a prop it refuses, `[].sortValue` ([Props to an island](islands.md#props-to-an-island)).
-- Exports that clashed across libraries are renamed (`memoryAuthStore`, `MailSettings`, `mailDefaults`, `UiSettings`, `uiDefaults`, `AuthMailer`...), and kayjs-cms's `postgresLoader` is `pgLoader` of `@kaynooo/kayjs-cms/pg`: `kay check --fix --since 1.70` renames the old ones ([Upgrading](upgrading.md)).
-- A page of a site without `i18n` sets its own `<html lang>` with `html(lang="fr")` in its `head`, `dir` following ([Head](head.md#head)).
-- kayjs-auth and kayjs-mail word their texts through `wording()` with the English in the code and ship only the French, keys unchanged, so an app's own `src/messages/en.ts` still overrides them and a default locale needs no catalog while a library ships one ([Texts](component-libraries.md)).
-- kayjs-ai's chat words its texts through `ai.chat.*` messages and ships the French, with every `*Label` prop still overriding ([kayjs-ai](libraries/kayjs-ai.md)).
-- The session cookie is `kay_session`, kayjs-auth's page ids are `kauth-*` and the cms edit link attribute is `data-kcms-edit-page`; [upgrading](upgrading.md).
-- `kay check` reports a `readonly` property or array element assigned in a script, as plain code does, and types a generic target's `+=` and `++` ([Assigning](components.md)).
-- `kay check` reports a `readonly` property or array element holding no signal assigned in a script, as plain code does, and types a generic target's `+=` and `++` ([Assigning](components.md)).
-- kayjs-ui `Progress` is a progress bar taking an upload's `progress()`, indeterminate without a value ([Progress](../packages/ui/llms/basics.md)).
-- kayjs-ui `Progress` is a progress bar with `value` and `max`, indeterminate without a value ([Progress](../packages/ui/llms/basics.md)).
-- kayjs-ui `Skeleton` is a placeholder for a pending block, as text lines, an avatar or a card, still under reduced motion ([Skeleton](../packages/ui/llms/basics.md)).
-- kayjs-ui `Accordion` groups collapsible sections, one open at a time or several, with arrow keys between headers ([Accordion](../packages/ui/llms/tables-navigation-and-layout.md)).
 - With Tailwind, a class passed to a component, or an expression or spread merged with the shorthand, overrides an earlier one setting the same property, `Button(class="px-2")` over `px-4`, with no `twMerge` ([Override a class](styles-and-assets.md#override-a-class-a-component-sets)).
 - Every value `kay` exports needs no import in a script or a server fence, `kay check` names the entry of a name that comes from another one, and `kay/server` exports `s` beside `defineEnv` ([Imports kay adds](components.md)); a page importing `action` is kept for prerendering like one that does not.
 - A value of `kay` only a template expression reads, such as `route` in a link, needs no import, and `route`, `localPath`, `withBase`, `s`, `durationMs` and `refusalMessage` keep a component static ([Imports kay adds](components.md)).
 - `kay add ui` and `kay add auth` add kayjs-ui and kayjs-auth: `ui()` mounts the theme, one Toaster and one TooltipHost on every page, and an extension may name a `layout` wrapping every page ([Scaffold with kay new and kay add](project-new-and-add.md), [Extensions](component-libraries.md#extensions), [Setup](../packages/ui/llms/setup.md)).
 - kayjs-auth and kayjs-mail register like every library, with `auth({ module: './src/auth' })` and `mail({ module: './src/mail' })`, and `kay check` types the module's locals ([Component libraries](component-libraries.md), [Setup](../packages/auth/llms/setup.md), [Writing and sending](../packages/mail/llms/writing-and-sending.md)).
-- `site` is the origin everywhere: kayjs-auth's `createAuth({ site, name })` takes kay's own `site` by default and `url` goes ([kayjs-auth](../packages/auth/llms/setup.md)); `kay upgrade` renames the old form.
 - Rate limits are named `rateLimit` and `key` across the libraries: kayjs-ai's `ai({ rateLimit, key })` and `ask({ key })`, kayjs-auth's `createAuth({ rateLimit })`, kayjs-mail's `smtp({ rateLimit: { max, window } })` ([Limits](../packages/ai/llms/limits.md)); `kay upgrade` renames the old names.
 - kayjs-ui: a SaveForm over signal state takes `dirty` and `onSave` instead of `action`, and `status` for the bar ([Forms](../packages/ui/llms/forms.md)).
 - An extension's `check` hands `kay check` and the editor the problems with how the app configured it, with no server started; kayjs-cms reports its collection and layout warnings through it ([Component libraries](component-libraries.md)).
@@ -58,6 +44,19 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `s.Public(...)` on a `defineEnv` field lets an island read it as `publicEnv`, with no config key; `publicEnv` in kay.config.ts is deprecated ([Environment](environment.md)).
 - `kay dev` sets the site to `http://localhost:<port>` when `SITE_URL` is unset, so kayjs-auth OAuth and mailed links need no `SITE_URL` in development ([Head](head.md)).
 - One `KAY_SECRET` seals sessions, signs stamps and private links and keys preview; `SITE_URL` is the one public origin, which kayjs-auth and kayjs-mail build on; `MAIL_URL` replaces the `SMTP_*` server variables, the sender defaulting to `noreply@` the site's host; `kay env --write` fills `.env.example` and `kay check` compares compose files by default, which `env: false` turns off ([Environment](environment.md), [Upgrading](upgrading.md)).
+- An action reads its outcome as `add.failed()` and `add.succeeded()`, and `ActionError` extends `ApiError` ([Reading the outcome](actions.md#reading-the-outcome)).
+- A static page hands an island a declared `Column<Row>[]` written out as literals, and `kay check` names the function field of a prop it refuses, `[].sortValue` ([Props to an island](islands.md#props-to-an-island)).
+- Exports that clashed across libraries are renamed (`memoryAuthStore`, `MailSettings`, `mailDefaults`, `UiSettings`, `uiDefaults`, `AuthMailer`...), and kayjs-cms's `postgresLoader` is `pgLoader` of `@kaynooo/kayjs-cms/pg`: `kay check --fix --since 1.70` renames the old ones ([Upgrading](upgrading.md)).
+- A page of a site without `i18n` sets its own `<html lang>` with `html(lang="fr")` in its `head`, `dir` following ([Head](head.md#head)).
+- kayjs-auth and kayjs-mail word their texts through `wording()` with the English in the code and ship only the French, keys unchanged, so an app's own `src/messages/en.ts` still overrides them and a default locale needs no catalog while a library ships one ([Texts](component-libraries.md)).
+- kayjs-ai's chat words its texts through `ai.chat.*` messages and ships the French, with every `*Label` prop still overriding ([kayjs-ai](libraries/kayjs-ai.md)).
+- The session cookie is `kay_session`, kayjs-auth's page ids are `kauth-*` and the cms edit link attribute is `data-kcms-edit-page`; [upgrading](upgrading.md).
+- `kay check` reports a `readonly` property or array element holding no signal assigned in a script, as plain code does, and types a generic target's `+=` and `++` ([Assigning](components.md)).
+- kayjs-ui `Progress` is a progress bar taking an upload's `progress()`, indeterminate without a value ([Progress](../packages/ui/llms/basics.md)).
+- kayjs-ui `Progress` is a progress bar with `value` and `max`, indeterminate without a value ([Progress](../packages/ui/llms/basics.md)).
+- kayjs-ui `Skeleton` is a placeholder for a pending block, as text lines, an avatar or a card, still under reduced motion ([Skeleton](../packages/ui/llms/basics.md)).
+- kayjs-ui `Accordion` groups collapsible sections, one open at a time or several, with arrow keys between headers ([Accordion](../packages/ui/llms/tables-navigation-and-layout.md)).
+- `site` is the origin everywhere: kayjs-auth's `createAuth({ site, name })` takes kay's own `site` by default and `url` goes ([kayjs-auth](../packages/auth/llms/setup.md)); `kay upgrade` renames the old form.
 
 ## 1.69.0
 
