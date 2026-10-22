@@ -38,7 +38,7 @@ export default defineConfig({
 
 - The session is kay's `session()`, on the app secret ([The app secret](/guides/sessions-and-guards#the-app-secret)).
 - The site's public origin, which OAuth callbacks, mailed links and passkeys are built on, is the `site` of `kay.config.ts` (or `SITE_URL`).
-- The store is a SQLite file `data/auth.db` kept through pg-orm, and in memory under `bun test`. Set `KAYJS_AUTH_DATABASE_URL` to a Postgres or SQLite database of kayjs-auth's own, where it creates its tables. To use your app's database, give `store: () => pgStore(db)`; `store` also takes `{ url }` or a store.
+- The store is a SQLite file `data/auth.db` kept through pg-orm, and in memory under `bun test`. Set `KAYJS_AUTH_DATABASE_URL` to a Postgres or SQLite database of kayjs-auth's own, where it creates its tables. To use your app's database, give `store: async () => pgStore((await import('./src/db')).db)`; `store` also takes `{ url }` or a store.
 - Mail goes through `mail.enqueue` of `src/mail.ts` when it exports `mail` (kayjs-mail, themed when `mail()` is in `kay.config.ts`). `email: false` sends none, and an `email` of your own replaces it.
 - `oauth: { github: true }` reads `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` from the environment, and `kay env` lists them. The presets are github, discord, google, microsoft and gitlab. An object adds `label`, `scopes` or `keepTokens`, and `clientId` and `clientSecret` skip the environment.
 - Hooks such as `onSignUp` and `onDelete` are options too, and win over the file. Hooks that need your database go in an optional `src/auth.ts` that exports `hooks` (`satisfies AuthHooks`), which kay finds by itself, or in `hooks: () => import('./src/auth')`. An executable from `kay build --compile` carries both files, and `kay dev` reloads them when you edit, add or remove one.
@@ -46,9 +46,9 @@ export default defineConfig({
 
 Every page, action and guard can now read `ctx.locals.auth`, typed. A file of yours at a page's path, such as `src/routes/auth/sign-in.kay`, replaces that page.
 
-An app that keeps session data of its own, or wires its store by hand, writes the auth object itself. `kay add auth` writes it for a project with a server and Tailwind.
+`kay add auth` writes the one-line setup for a project with a server and Tailwind: `auth({ name })` in `kay.config.ts` with kayjs-ui's `ui()`, a `store` loading your pg-orm `Database` when the project has one (with `...authTables` added to its tables), a root `src/routes/_guard.ts` exporting `guard()`, and the session secret, `SITE_URL` and `KAYJS_AUTH_DATABASE_URL` in `.env.example`. There is no `src/auth.ts`, and the mailer is found by itself when `src/mail.ts` exists.
 
-That is `src/auth.ts` over your pg-orm `Database` (with `...authTables` added to its tables) or a SQLite file of its own, using kayjs-mail as the mailer when `src/mail.ts` exists. It also adds a root `src/routes/_guard.ts`, a session secret in `.env`, and the extension below with kayjs-ui's `ui()`. The rest of this section is what it writes.
+An app that keeps session data of its own, or wires its store by hand, writes the auth object itself. The rest of this section is that form.
 
 `src/auth.ts` creates the auth object. `memoryAuthStore()` keeps users in the process, for trying it out.
 

@@ -15,6 +15,8 @@ export type { ChangeEmailResult, CodedLink, CodeMode, CodeResult, EmailOptions, 
 export type { ActivityEvent, AuditEntry, AuthEvent, AuthEventInfo, EventContext, EventFields } from './events'
 export type { DataExport } from './export'
 export * from './gate'
+export { guard } from './guard'
+export type { GuardOptions } from './guard'
 export { DEFAULT_LIMITS } from './limits'
 export type { Limit, LimitOption, Limits, LimitsOption } from './limits'
 export { defaultTemplates, frenchTemplates, lifetime } from './mail'

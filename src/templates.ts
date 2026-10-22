@@ -312,6 +312,9 @@ it('${has('starter') ? 'greets from the server' : 'renders the home page'}', asy
 `
 }
 
+// Over the app's own database, loaded as the server starts so the config stays off it.
+const POSTGRES_STORE = ', store: async () => (await import(\'@kaynooo/kayjs-auth/pg\')).pgStore((await import(\'./src/db\')).db)'
+
 function config({ has, settings }: Setup): string {
   const server = has('server')
   const base = settings.base === undefined ? undefined : quote(settings.base)
@@ -325,7 +328,7 @@ function config({ has, settings }: Setup): string {
     '',
     !server && '// Set when building, as the Pages workflow does: the path the site is published under; kay reads the host it is published on from SITE_URL.',
     'export default defineConfig({',
-    has('auth') && '  extensions: [auth({ module: \'./src/auth\' }), ui()],',
+    has('auth') && `  extensions: [auth({ name: '__SITE__'${has('postgres') ? POSTGRES_STORE : ''} }), ui()],`,
     `  lang: ${quote(settings.lang ?? 'en')},`,
     settings.site !== undefined && `  site: ${quote(settings.site)},`,
     server ? base !== undefined && `  base: ${base},` : `  base: process.env.SITE_BASE${base === undefined ? '' : ` ?? ${base}`},`,
@@ -728,39 +731,14 @@ function authFiles({ has }: Setup): Record<string, string> {
 
   return {
     // What production sets, for compose.prod.yaml; development's own settings are in the .env `kay new` wrote.
-    '.env.example': `# Each one generated and kept out of the repository: \`bun -e "console.log((crypto.randomUUID() + crypto.randomUUID()).replaceAll('-', ''))"\`.\nKAY_SECRET=\nSITE_URL=\n${postgres ? 'POSTGRES_PASSWORD=\nAPP_DB_PASSWORD=\n' : ''}`,
-    'src/auth.ts': authModule(postgres),
-    'src/routes/_guard.ts': `import { auth } from '../auth'
+    '.env.example': `# Each one generated and kept out of the repository: \`bun -e "console.log((crypto.randomUUID() + crypto.randomUUID()).replaceAll('-', ''))"\`.\nKAY_SECRET=\nSITE_URL=\n${postgres ? 'POSTGRES_PASSWORD=\nAPP_DB_PASSWORD=\n' : 'KAYJS_AUTH_DATABASE_URL=\n'}`,
+    'src/routes/_guard.ts': `import { guard } from '@kaynooo/kayjs-auth'
 
 // Every page below needs a signed-in visitor; the sign-in and register pages stay open. Delete this file for a public site, or move it into the folder to protect.
-export default auth.guard()
+export default guard()
 `,
     ...postgres && postgresFiles(),
   }
-}
-
-// What `kay add auth` writes as src/auth.ts, over the app's own database with `postgres` and a SQLite file of its own without.
-function authModule(postgres: boolean): string {
-  const imports = [
-    'import type { AuthSessionData } from \'@kaynooo/kayjs-auth\'',
-    'import { createAuth } from \'@kaynooo/kayjs-auth\'',
-    postgres ? 'import { pgStore } from \'@kaynooo/kayjs-auth/pg\'' : 'import { authTables, pgStore } from \'@kaynooo/kayjs-auth/pg\'',
-    ...postgres ? [] : ['import { Database } from \'@kaynooo/pg-orm\''],
-    'import { session } from \'kay/server\'',
-    ...postgres ? ['import { db } from \'./db\''] : [],
-  ]
-  const database = postgres
-    ? ''
-    : '\n// A SQLite file of its own, created below; point `url` at Postgres, or add `...authTables` to the tables of the app\'s own `Database`, for the app\'s database.\nexport const db = new Database({ url: \'sqlite://data/auth.db\', tables: [...authTables] })\n\nawait db.sync()\n'
-
-  return `${imports.join('\n')}\n${database}
-export const auth = createAuth({
-  sessions: session<AuthSessionData>(),
-  store: pgStore(db),
-  name: '__SITE__',
-  pages: true,
-})
-`
 }
 
 // kayjs-auth's tables in a Postgres of the app's own, which a migration creates: the owner changes the schema, the app connects as app_rw.

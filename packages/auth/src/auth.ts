@@ -1,6 +1,6 @@
 import type { AuthenticationResponseJSON, PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequestOptionsJSON, RegistrationResponseJSON } from '@simplewebauthn/server'
 import type { DefinitionBase, EphemeralType, MetadataBase, RouteBase, SingletonBase, TSchema } from 'elysia'
-import type { Duration, Guard } from 'kay'
+import type { Duration, Guard, GuardContext } from 'kay'
 import type { KayConfig, Session } from 'kay/server'
 import type { ChangeUsernameResult } from './account'
 import type { AdminFailure, BanResult, DeleteResult, ManagedUser, RoleResult, UnbanResult } from './admin'
@@ -354,6 +354,11 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     const user = await this.requireUser()
 
     return await actingAdmin(this[STATE]) ? user : stoppers(this.request).deny(403)
+  }
+
+  // The `guard()` of kayjs-auth, for a `_guard.ts` that cannot import the `createAuth` result: the guard of the one behind this request.
+  async guarded(ctx: GuardContext, options: Parameters<NonNullable<Core['guard']>>[0]): Promise<void> {
+    await this.core.guard!(options)(ctx)
   }
 
   // The sign-in page with `?redirect=` set to where it should lead back: this request's path and query, or `back`. A `back` that is not a path of this site leads home, so no link built from input sends anyone away.
@@ -1651,6 +1656,8 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       }
     },
   })
+
+  core.guard = guardOptions => instance.guard(guardOptions as Parameters<typeof instance.guard>[0])
 
   return Object.assign(instance, {
     // The test calls on one test site, so a test names the site once: `const as = auth.test(site)`, then `await as.signInAs({ email })` and `as.signOut()`.

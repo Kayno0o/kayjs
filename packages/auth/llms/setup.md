@@ -21,7 +21,7 @@ export default defineConfig({
 
 `auth()` takes `createAuth`'s options (see Setup rules) and finds the rest. The session is kay's `session()` on the app secret. The site is kay's `site`. The store is a SQLite file `data/auth.db` through pg-orm (in memory under `bun test`), or the database at `KAYJS_AUTH_DATABASE_URL` (a Postgres or SQLite url of kayjs-auth's own: it syncs its tables there), or `store`: `{ url }`, a `pgStore(db)` over the app's own database in a function, or an `AuthStore`. The mailer is `mail.enqueue` of `src/mail.ts` when it exports `mail`, through `authMailer` when kay.config.ts registers `mail()`; `email: false` sends no mail, and an `email` of your own replaces it. `oauth: { github: true }` reads `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` (presets: github, discord, google, microsoft, gitlab), which `kay env` lists; an object adds preset options, `label`, `keepTokens` or the credentials. Hooks (`onSignUp`, `onDelete`, `profileFields`, `exportData`, `onAuthEvent`, `allow`, `authorize`, `locate`) are options too (they win), or `export const hooks = {...} satisfies AuthHooks` in an optional `src/auth.ts`, found by convention, or `hooks: () => import('./src/auth')`. An executable carries both files, and `kay dev` reloads them. The pages are on under `prefix` (`/auth`), sign-ins and sign-outs going to `home` (`/`); `pages: false` leaves them out and `pages: { remember, profile }` tunes them. Session data of its own, or a hand-wired store, takes the longer form.
 
-`kay add auth` writes the longer form for a project with `server` and `tailwind`: it installs the packages and writes `src/auth.ts` (over the project's pg-orm `Database`, to which it adds `...authTables`, or over a SQLite file of its own; kayjs-mail's `mail.enqueue` as the mailer when `src/mail.ts` exists), a root `src/routes/_guard.ts` exporting `auth.guard()`, `KAY_SECRET` and `SITE_URL` in `.env.example`, and lists `auth({ module })` and kayjs-ui's `ui()` in kay.config.ts. Delete the guard for public pages.
+`kay add auth` (needs `server` and `tailwind`) writes `auth({ name })` and kayjs-ui's `ui()` in kay.config.ts (with a `store` over the project's pg-orm `Database`, to which it adds `...authTables`), a root `src/routes/_guard.ts` exporting `guard()`, and `KAY_SECRET`, `SITE_URL` and `KAYJS_AUTH_DATABASE_URL` in `.env.example`, with no `src/auth.ts`. Delete the guard for public pages.
 
 ```ts
 // src/auth.ts
@@ -74,12 +74,12 @@ else
 
 ### Guards and gates
 
-A `_guard.ts` default-exports kayjs-auth's guard:
+A `_guard.ts` default-exports kayjs-auth's guard, `guard({ redirect, require, scope })` from the package, which asks the request's `auth`, so imports no module (`auth.guard()` is the same):
 
 ```ts
-import { auth } from '../../auth'
+import { guard } from '@kaynooo/kayjs-auth'
 
-export default auth.guard({ redirect: '/login', require: 'editor' })
+export default guard({ redirect: '/login', require: 'editor' })
 ```
 
 Plain Elysia routes, such as an API, close behind a gate:

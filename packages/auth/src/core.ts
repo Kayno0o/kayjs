@@ -1,3 +1,4 @@
+import type { Guard } from 'kay'
 import type { OAuthClient } from './authorize/clients'
 import type { CaptchaOptions } from './captcha'
 import type { EmailCore, PendingCode } from './email'
@@ -140,6 +141,8 @@ export interface Core {
   admin?: ((user: User) => Promise<boolean>) | undefined
   // Whether a user meets a requirement, through the app's `authorize` when it has one, as `guard()` asks; for `requireUser({ require })`.
   authorize?: ((user: BareUser, requirement: Requirement<BareUser, string>, level: Level) => Promise<boolean>) | undefined
+  // `auth.guard()` of this `createAuth`, which the `guard()` of a module-less `auth()` asks for through the request's `auth`.
+  guard?: ((options: { redirect?: string, require?: Requirement<BareUser, string>, scope?: string | string[] | false }) => Guard) | undefined
   onSignUp?: ((user: User, profile: Profile | undefined) => void | Promise<void>) | undefined
   // The data to keep on the user, laid over what they hold; nothing keeps it as is.
   onProviderProfile?: ((user: User, profile: Profile) => unknown) | undefined

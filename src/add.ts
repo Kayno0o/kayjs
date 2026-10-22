@@ -16,6 +16,7 @@ const KEY = /\bextensions\s*:/
 const CLOSED = /^\s*\]/
 const DEFINE_CONFIG = /defineConfig\(\{[ \t]*\n?/
 const EXTENSIONS = /extensions:\s*\[/
+const AUTH_CALL = /\bauth\(/
 const NEWLINE = /\r?\n/
 const EDGE_SLASHES = /^\/|\/$/g
 // A `KEY=value` line of a .env file, with the `export ` some write before it.
@@ -113,6 +114,7 @@ async function read(path: string): Promise<string | undefined> {
 export async function detectFeatures(dir: string): Promise<Set<Feature>> {
   const at = (path: string) => existsSync(join(dir, path))
   const css = await read(join(dir, 'src/app.css'))
+  const config = await read(join(dir, 'kay.config.ts'))
   const checks: [Feature, boolean][] = [
     ['server', at('src/server.ts')],
     ['starter', at('src/components/header.kay')],
@@ -122,7 +124,8 @@ export async function detectFeatures(dir: string): Promise<Set<Feature>> {
     ['tests', at('bunfig.toml')],
     ['ci', ['.forgejo', '.github'].some(host => at(`${host}/workflows/test.yml`) || at(`${host}/workflows/pages.yml`))],
     ['docker', at('Dockerfile')],
-    ['auth', at('src/auth.ts') && at('src/routes/_guard.ts')],
+    // kayjs-auth's root guard, over an `auth()` in the config or the `src/auth.ts` of the former form.
+    ['auth', at('src/routes/_guard.ts') && (at('src/auth.ts') || AUTH_CALL.test(config ?? ''))],
     ['postgres', at('compose.dev.yaml')],
     ['ws', at('src/api/online.ts')],
   ]

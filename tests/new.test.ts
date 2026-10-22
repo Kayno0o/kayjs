@@ -184,7 +184,7 @@ async function installKay(dir: string) {
   await chmod(join(modules, '.bin', 'kay'), 0o755)
 
   // kayjs-auth, kayjs-mail (which auth types a dynamic import of) and kayjs-ui resolve `kay` from where they sit, so copies of the workspace's own go beside the project's kay: linked, they would type-check against the checkout's.
-  if (await Bun.file(join(dir, 'src/auth.ts')).exists()) {
+  if (await Bun.file(join(dir, 'src/routes/_guard.ts')).exists()) {
     const scope = join(modules, '@kaynooo')
 
     await rm(scope, { force: true })
@@ -215,8 +215,8 @@ const DOCKER_COPY = /^COPY (?!--from)(.+) \S+$/gm
 const MIGRATIONS = /migrationsDir: '([^']+)'/g
 // The package each command a script runs comes from, Bun aside.
 const SCRIPT_BINS: Record<string, string | undefined> = { 'bun': undefined, 'kay': 'kay', 'keslint': '@kaynooo/eslint', 'pg-orm': '@kaynooo/pg-orm' }
-// Declared though nothing imports them: Bun's types, and Elysia, which kay needs beside it.
-const UNIMPORTED = new Set(['@types/bun', 'elysia', '@iconify-json/tabler'])
+// Declared though nothing imports them: Bun's types, Elysia, which kay needs beside it, and pg-orm, which kayjs-auth's default SQLite store loads from the app.
+const UNIMPORTED = new Set(['@types/bun', 'elysia', '@iconify-json/tabler', '@kaynooo/pg-orm'])
 
 // What a scaffold's files name that it lacks: a relative import, preload, extended tsconfig, copied file or migrations folder, a package it imports without depending on it, a script package.json does not hold; and a dependency nothing imports.
 function unresolved(files: Record<string, string>): { paths: string[], undeclared: string[], unused: string[], scripts: string[] } {
@@ -743,12 +743,13 @@ describe('kay new', () => {
     try {
       const files = await createProject(dir, { kay: '^1.0.0', features: PRESETS.app.features })
 
-      expect(files).toEqual(expect.arrayContaining(['.env.example', 'src/auth.ts', 'src/routes/_guard.ts', 'src/api/online.ts', 'tests/online.test.ts']))
+      expect(files).toEqual(expect.arrayContaining(['.env.example', 'src/routes/_guard.ts', 'src/api/online.ts', 'tests/online.test.ts']))
       expect(files.filter(file => file === 'compose.dev.yaml' || file.startsWith('db/') || file.startsWith('migrations/') || file === 'pg-orm.config.ts' || file.startsWith('src/db/') || file === 'src/session.ts' || file === 'src/routes/login.kay')).toEqual([])
       expect(files).not.toContain('.env')
+      expect(files).not.toContain('src/auth.ts')
       expect(files).not.toContain('.env.test')
       expect(await Bun.file(join(dir, '.env.example')).text()).toStartWith('# Each one generated and kept out of the repository: ')
-      expect(await Bun.file(join(dir, '.env.example')).text()).toMatch(/\nKAY_SECRET=\nSITE_URL=\n$/)
+      expect(await Bun.file(join(dir, '.env.example')).text()).toMatch(/\nKAY_SECRET=\nSITE_URL=\nKAYJS_AUTH_DATABASE_URL=\n$/)
       expect((await Bun.file(join(dir, '.gitignore')).text()).split('\n')).toContain('data')
       expect((await Bun.file(join(dir, '.dockerignore')).text()).split('\n')).toContain('data')
 
@@ -769,7 +770,7 @@ describe('kay new', () => {
 
       await installKay(dir)
       expect(await checked(dir)).toEqual([])
-      expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('extensions: [auth({ module: \'./src/auth\' }), ui()],')
+      expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('extensions: [auth({ name: \'My App\' }), ui()],')
       expect(JSON.parse((await kay(['check', dir, '--format', 'json'])).stdout)).toEqual({ errors: 0, warnings: 0, problems: [] })
       expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
       // The server preset's own files are linted by its test.
@@ -779,7 +780,6 @@ describe('kay new', () => {
       const [report, output, code] = await Promise.all([new Response(tests.stderr).text(), new Response(tests.stdout).text(), tests.exited])
 
       expect({ code, passed: report.includes('2 pass'), ...code === 0 && report.includes('2 pass') ? {} : { report, output } }).toEqual({ code: 0, passed: true })
-      expect(await Bun.file(join(dir, 'data/auth.db')).exists()).toBe(true)
     }
     finally {
       await rm(join(dir, '..'), { recursive: true, force: true })
@@ -792,7 +792,7 @@ describe('kay new', () => {
     try {
       const files = await createProject(dir, { kay: '^1.0.0', features: [...PRESETS.app.features, 'postgres'] })
 
-      expect(files).toEqual(expect.arrayContaining(['.env', '.env.example', '.env.test', 'compose.dev.yaml', 'db/roles.sh', 'migrations/.gitkeep', 'pg-orm.config.ts', 'src/db/index.ts', 'src/db/tables.ts', 'src/auth.ts', 'src/routes/_guard.ts', 'src/api/online.ts', 'tests/online.test.ts']))
+      expect(files).toEqual(expect.arrayContaining(['.env', '.env.example', '.env.test', 'compose.dev.yaml', 'db/roles.sh', 'migrations/.gitkeep', 'pg-orm.config.ts', 'src/db/index.ts', 'src/db/tables.ts', 'src/routes/_guard.ts', 'src/api/online.ts', 'tests/online.test.ts']))
       expect((await stat(join(dir, '.env'))).mode & 0o777).toBe(0o600)
       expect(await Bun.file(join(dir, '.env')).text()).toMatch(/^DATABASE_URL=postgres:\/\/app_rw:app_rw@127\.0\.0\.1:5433\/app\nMIGRATE_DATABASE_URL=postgres:\/\/app:app@127\.0\.0\.1:5433\/app\nCOMPOSE_FILE=compose\.dev\.yaml\n$/)
 
@@ -820,7 +820,7 @@ describe('kay new', () => {
       expect(await Bun.file(join(dir, 'pg-orm.config.ts')).text()).toContain('process.env.MIGRATE_DATABASE_URL ?? process.env.DATABASE_URL')
       expect(await Bun.file(join(dir, 'src/db/tables.ts')).text()).toContain('export const tables = [...authTables]')
       expect(await Bun.file(join(dir, 'pg-orm.config.ts')).text()).toContain('import { tables } from \'./src/db/tables\'')
-      expect(await Bun.file(join(dir, 'src/auth.ts')).text()).toContain('store: pgStore(db)')
+      expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('store: async () => (await import(\'@kaynooo/kayjs-auth/pg\')).pgStore((await import(\'./src/db\')).db)')
       // On the Bun that scaffolded it, rather than whatever is latest when it builds.
       expect(await Bun.file(join(dir, 'Dockerfile')).text()).toStartWith(`FROM oven/bun:${Bun.version} AS build\n`)
       expect(await Bun.file(join(dir, '.forgejo/workflows/test.yml')).text()).toContain(`bun-version: ${Bun.version}\n`)
@@ -872,7 +872,9 @@ describe('kay new', () => {
     const pg = await createProjectFiles('postgres')
 
     for (const [scaffold, files] of [[app, project({})], [pg, project({ 'src/db/index.ts': pg['src/db/index.ts']!, 'src/db/tables.ts': pg['src/db/tables.ts']! })]] as const) {
-      const written = plan(files).files
+      const { files: written, extension } = plan(files)
+
+      expect(scaffold['kay.config.ts']).toContain(`extensions: [${extension.expression}, ui()]`)
 
       for (const [path, content] of Object.entries(written))
         expect(scaffold[path]).toBe(content)
@@ -945,7 +947,7 @@ describe('kay new', () => {
           // kayjs-auth keeps its users in a SQLite file under `data` unless Postgres does.
           const file = !variant.has('postgres')
 
-          expect({ features, store: contents['src/auth.ts']!.includes('sqlite://data/auth.db'), ignored: contents['.gitignore']!.split('\n').includes('data') }).toEqual({ features, store: file, ignored: file })
+          expect({ features, store: !contents['kay.config.ts']!.includes('pgStore'), ignored: contents['.gitignore']!.split('\n').includes('data') }).toEqual({ features, store: file, ignored: file })
 
           // The file is written by the user the image runs as, in a folder a volume keeps across deploys.
           if (variant.has('docker')) {

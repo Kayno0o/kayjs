@@ -640,7 +640,7 @@ it('refuses ui in a project without Tailwind, naming the command that adds both'
   }
 })
 
-it('adds kayjs-auth over a SQLite file of its own, with the guard and the ui extension', async () => {
+it('adds kayjs-auth as the one line auth() in the config, with the guard and the ui extension', async () => {
   const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'my-shop')
 
   try {
@@ -648,20 +648,17 @@ it('adds kayjs-auth over a SQLite file of its own, with the guard and the ui ext
 
     const result = await addFeatures(dir, ['auth'], { install: false })
 
-    expect(result.written).toEqual(['.env.example', '.gitignore', 'kay.config.ts', 'src/auth.ts', 'src/routes/_guard.ts'])
-
-    const source = await Bun.file(join(dir, 'src/auth.ts')).text()
-
-    expect(source).toContain('export const db = new Database({ url: \'sqlite://data/auth.db\', tables: [...authTables] })')
-    expect(source).toContain('name: \'My Shop\'')
-    expect(source).not.toContain('mail.')
-    expect(await Bun.file(join(dir, 'src/routes/_guard.ts')).text()).toContain('export default auth.guard()')
+    expect(result.written).toEqual(['.env.example', '.gitignore', 'kay.config.ts', 'src/routes/_guard.ts'])
+    expect(existsSync(join(dir, 'src/auth.ts'))).toBe(false)
+    expect(await Bun.file(join(dir, 'src/routes/_guard.ts')).text()).toContain('import { guard } from \'@kaynooo/kayjs-auth\'\n')
+    expect(await Bun.file(join(dir, 'src/routes/_guard.ts')).text()).toContain('export default guard()')
 
     const config = await Bun.file(join(dir, 'kay.config.ts')).text()
 
-    expect(config).toContain('auth({ module: \'./src/auth\' })')
+    expect(config).toContain('auth({ name: \'My Shop\' })')
     expect(config).toContain('ui()')
     expect(await Bun.file(join(dir, '.env.example')).text()).toMatch(/^SITE_URL=$/m)
+    expect(await Bun.file(join(dir, '.env.example')).text()).toMatch(/^KAYJS_AUTH_DATABASE_URL=$/m)
     expect(await Bun.file(join(dir, '.gitignore')).text()).toMatch(/^data$/m)
     expect(result.notes.join('\n')).toContain('kay add mail')
 
@@ -673,7 +670,7 @@ it('adds kayjs-auth over a SQLite file of its own, with the guard and the ui ext
   }
 })
 
-it('adds kayjs-auth over the project\'s pg-orm tables and its mailer', async () => {
+it('adds kayjs-auth over the project\'s pg-orm tables, the mailer being found by auth() itself', async () => {
   const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'app')
 
   try {
@@ -695,12 +692,11 @@ it('adds kayjs-auth over the project\'s pg-orm tables and its mailer', async () 
     expect(tables).toContain('export const tables = [...authTables, Member]')
     expect(tables).toContain('import { authTables } from \'@kaynooo/kayjs-auth/pg\'')
 
-    const source = await Bun.file(join(dir, 'src/auth.ts')).text()
+    const config = await Bun.file(join(dir, 'kay.config.ts')).text()
 
-    expect(source).toContain('import { db } from \'./db\'')
-    expect(source).toContain('email: { mailer: authMailer(mail.enqueue) },')
-    expect(source).toContain('import { authMailer } from \'@kaynooo/kayjs-mail\'')
-    expect(source).not.toContain('sqlite://')
+    expect(config).toContain('store: async () => (await import(\'@kaynooo/kayjs-auth/pg\')).pgStore((await import(\'./src/db\')).db)')
+    expect(existsSync(join(dir, 'src/auth.ts'))).toBe(false)
+    expect(await Bun.file(join(dir, '.env.example')).text()).not.toContain('KAYJS_AUTH_DATABASE_URL')
     expect((await addFeatures(dir, ['mail', 'auth'], { install: false })).written).toEqual([])
   }
   finally {
@@ -708,7 +704,7 @@ it('adds kayjs-auth over the project\'s pg-orm tables and its mailer', async () 
   }
 })
 
-it('keeps the bare mailer while kayjs-mail is not registered, and names a non-ASCII package whole', async () => {
+it('names a non-ASCII package whole, and says nothing of a mailer the project has', async () => {
   const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'café-du-coin')
 
   try {
@@ -719,13 +715,10 @@ it('keeps the bare mailer while kayjs-mail is not registered, and names a non-AS
 
     manifest.name = 'café-du-coin'
     await writeFile(join(dir, 'package.json'), JSON.stringify(manifest))
-    await addFeatures(dir, ['auth'], { install: false })
+    const result = await addFeatures(dir, ['auth'], { install: false })
 
-    const source = await Bun.file(join(dir, 'src/auth.ts')).text()
-
-    expect(source).toContain('email: { mailer: { send: mail.enqueue } },')
-    expect(source).not.toContain('authMailer')
-    expect(source).toContain('name: \'Café Du Coin\'')
+    expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('auth({ name: \'Café Du Coin\' })')
+    expect(result.notes.join('\n')).not.toContain('kay add mail')
   }
   finally {
     await rm(join(dir, '..'), { recursive: true, force: true })
@@ -808,7 +801,7 @@ it('adds kayjs-auth over the Postgres database postgres sets up, with no second 
     const tables = await Bun.file(join(dir, 'src/db/tables.ts')).text()
 
     expect(tables).toContain('authTables')
-    expect(await Bun.file(join(dir, 'src/auth.ts')).text()).toContain('import { db } from \'./db\'')
+    expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('pgStore((await import(\'./src/db\')).db)')
     expect((await addFeatures(dir, ['auth', 'postgres'], { install: false })).written).toEqual([])
   }
   finally {

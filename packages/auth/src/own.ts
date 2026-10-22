@@ -111,6 +111,10 @@ function appOf(name: string, given: true | PresetApp | OAuthApp): OAuthApp {
   return { provider: preset(options), clientId: id, clientSecret: secret, ...label !== undefined && { label }, ...keepTokens !== undefined && { keepTokens } }
 }
 
+function filled(value: string | undefined): string | undefined {
+  return value === '' ? undefined : value
+}
+
 function isStore(store: AuthStore | StoreUrl): store is AuthStore {
   return 'users' in store
 }
@@ -129,7 +133,8 @@ async function storeOf(store: StoreOption | undefined, root: string): Promise<Au
   if (store !== undefined && isStore(store))
     return store
 
-  const url = store?.url ?? process.env.KAYJS_AUTH_DATABASE_URL
+  // An empty value, as .env.example lists it, is not a url.
+  const url = store?.url ?? filled(process.env.KAYJS_AUTH_DATABASE_URL)
 
   // Tests start from no users each run, as a file kept between them would not.
   if (url === undefined && process.env.NODE_ENV === 'test')
@@ -197,7 +202,7 @@ export async function buildOwn(options: OwnOptions, app: ExtensionApp): Promise<
   const hooks = loadHooks ? (await loadHooks()).hooks : conventionalHooks(app.modules.hooks)
   const mailer = await emailOf(email, app)
 
-  if (store === undefined && process.env.NODE_ENV === 'production' && process.env.KAYJS_AUTH_DATABASE_URL === undefined)
+  if (store === undefined && process.env.NODE_ENV === 'production' && filled(process.env.KAYJS_AUTH_DATABASE_URL) === undefined)
     log.warn('auth() keeps its users in data/auth.db, a SQLite file: set KAYJS_AUTH_DATABASE_URL, or `store`, for a database that outlives a deploy')
 
   const made = createAuth({
