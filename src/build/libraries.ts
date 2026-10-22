@@ -243,6 +243,24 @@ export async function reachableLibraryFiles(root: string, libraries: KayLibrary[
   return { components: components.sort(), scripts: scripts.sort() }
 }
 
+// Every module the entries reach through their imports, the entries included, real paths: the project's own and its kay libraries', never another package's.
+export async function reachedFrom(root: string, libraries: KayLibrary[], entries: string[], graph: ImportGraph = new Map()): Promise<Set<string>> {
+  const project = realpathSync(root) + sep
+  const seen = new Set(entries)
+  const queue = [...entries]
+
+  for (let file = queue.pop(); file !== undefined; file = queue.pop()) {
+    for (const { path } of await followedImports(root, project, libraries, file, graph)) {
+      if (!seen.has(path)) {
+        seen.add(path)
+        queue.push(path)
+      }
+    }
+  }
+
+  return seen
+}
+
 // Whether `from` reaches one of `targets`, real paths, through its imports: the project's own modules and its kay libraries', never another package's. `edges` keeps each module's imports for the calls of one build, `project` the root's real path.
 export async function reachesAny(root: string, libraries: KayLibrary[], from: string, targets: ReadonlySet<string>, edges = new Map<string, Promise<string[]>>(), project = realpathSync(root) + sep, graph: ImportGraph = new Map()): Promise<boolean> {
   const seen = new Set([from])

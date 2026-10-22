@@ -9,7 +9,7 @@ import { mkdir, rm } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { clientDir, DEV_MAPS_DIR, outputDir } from '../build/assets'
-import { bothBundles, bundleIslands, bundleStyles, classTableOf, clearClientOutput, readClientSources, writeClasses } from '../build/client'
+import { bothBundles, bundleIslands, bundleStyles, classTableOf, clearClientOutput, islandClassTableOf, readClientSources, writeClasses } from '../build/client'
 import { CSS_FILE, forgetSources, inWalkScope, keepSources, readSource, readSourcePaths, writeAtomically } from '../build/files'
 import { fileWords, sourceWords } from '../build/libraries'
 import { classTokens, NAMING_FILE } from '../build/prune'
@@ -59,7 +59,7 @@ interface Built {
   styleUses?: StyleUses | undefined
   // Reading them once the stylesheets are built, which the next build waits for.
   read: Promise<void>
-  // The class table the islands were built with, as JSON.
+  // The class tables the islands were built with, the app-wide one and the one they ship, as JSON.
   classTable: string | undefined
   // The manifest as written: another one in its place, as a server building its own client writes, means building everything again.
   manifest: string
@@ -161,7 +161,8 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
     const files = (changed ?? []).map(file => join(realRoot, file))
     const texts = new Map(await Promise.all(files.map(async file => [file, await readText(file)] as const)))
     const classTable = await classTableOf(root, sources)
-    const classTableText = classTable && JSON.stringify(classTable)
+    const islandTable = await islandClassTableOf(root, sources, graph)
+    const classTableText = JSON.stringify([classTable, islandTable])
     // `src/ui.ts` is written into the components it restyles, none of which imports it, so no chunk lists it among its inputs.
     const islandsAgain = !previous || !sameEntries(previous.sources.islands, sources.islands) || files.some(file => previous.islandInputs.has(file) || file === join(realRoot, UI_FILE)) || previous.classTable !== classTableText
     const stylesAgain = !previous || await stylesChanged(previous, sources, texts)
@@ -182,7 +183,7 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
 
     await writeClasses(root, sources.classes)
 
-    const [scripts, styles] = await bothBundles(islandsAgain ? bundleIslands(root, sources.islands, options, classTable) : undefined, stylesAgain ? bundleStyles(root, sources, options) : undefined)
+    const [scripts, styles] = await bothBundles(islandsAgain ? bundleIslands(root, sources.islands, options, classTable, islandTable) : undefined, stylesAgain ? bundleStyles(root, sources, options) : undefined)
     const manifest: ClientManifest = { ...scripts?.manifest ?? previous!.islands, styles: styles?.styles ?? previous!.styles, ...classTable && { classTable }, ...(styles ? styles.uses : previous!.styleUses) && { styleUses: (styles ? styles.uses : previous!.styleUses)! }, problems: sources.problems, options: key }
     const text = JSON.stringify(manifest)
 

@@ -232,11 +232,15 @@ export async function buildClassTable(root: string, words: Iterable<string>): Pr
   if (design === undefined)
     return undefined
 
-  const known = parse(design, [...new Set(words)])
+  const asked = [...new Set(words)]
+  const known = parse(design, asked)
   const byContext = new Map<string, [string, Parsed][]>()
 
-  for (const [word, entry] of known) {
-    if (entry === null)
+  // `known` keeps every word parsed for this design, so only the words asked for are read.
+  for (const word of asked) {
+    const entry = known.get(word)
+
+    if (entry === null || entry === undefined)
       continue
 
     const list = byContext.get(entry.context) ?? []

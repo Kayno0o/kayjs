@@ -10,7 +10,7 @@ import type { ChunkInputs, IslandWhy } from './report'
 import type { StyleUses, UnresolvedClass } from './style-uses'
 import type { Reached } from './styles'
 import type { FileDiagnostic } from './transform'
-import { existsSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import { builtinModules } from 'node:module'
 import { basename, join, relative, resolve, sep } from 'node:path'
@@ -29,7 +29,7 @@ import { ASSET_PREFIX, clientDir, DEV_MAPS_DIR, MAPS_DIR, outputDir } from './as
 import { pruneNodes } from './class-rules'
 import { buildClassTable } from './class-table'
 import { CSS_FILE, findKayFiles, findProjectFiles, readSource, writeIfChanged } from './files'
-import { fileWords } from './libraries'
+import { fileWords, reachedFrom, reachesAny } from './libraries'
 import { packagesOf } from './licenses'
 import { throughLinks } from './links'
 import { kay } from './plugin'
@@ -132,6 +132,8 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
   return inSignalsScope(async () => bundleClient(root, options))
 }
 
+// A module that can render an island.
+const RENDERING_FILE = /\.(?:kay|[cm]?[jt]sx?)$/
 // The files besides components that write markup a page shows: scripts such as a Markdown plugin, Markdown and data.
 const MARKUP_FILE = /\.(?:[cm]?[jt]sx?|html?|mdx?|json|ya?ml|txt)$/
 const ROOT_MARGIN = /^-?\d+(?:\.\d+)?(?:px|%)(?: -?\d+(?:\.\d+)?(?:px|%)){0,3}$/
@@ -157,7 +159,7 @@ async function bundleClient(root: string, options: ClientOptions): Promise<Clien
   await writeClasses(root, sources.classes)
 
   const classTable = await classTableOf(root, sources)
-  const [scripts, styles] = await bothBundles(bundleIslands(root, sources.islands, options, classTable), bundleStyles(root, sources, options))
+  const [scripts, styles] = await bothBundles(bundleIslands(root, sources.islands, options, classTable, await islandClassTableOf(root, sources)), bundleStyles(root, sources, options))
   const manifest: ClientManifest = { ...scripts.manifest, styles: styles.styles, ...classTable && { classTable }, ...styles.uses && { styleUses: styles.uses }, ...options.hot && { problems: sources.problems } }
 
   if (options.sourcemap === 'external')
@@ -331,14 +333,43 @@ export async function classTableOf(root: string, { words }: Pick<ClientSources, 
   if (await tailwindDesign(root) === undefined)
     return undefined
 
-  const ignored = gitIgnoredNames(root)
-  const markup = (await findProjectFiles(root, MARKUP_FILE, { project: true, ownKayOnly: true })).filter(file => isSource(root, file, ignored, true))
+  return buildClassTable(root, (await markupFiles(root)).flatMap(file => fileWords(file)).concat([...words]))
+}
 
-  return buildClassTable(root, markup.flatMap(file => fileWords(file)).concat([...words]))
+async function markupFiles(root: string): Promise<string[]> {
+  const ignored = gitIgnoredNames(root)
+
+  return (await findProjectFiles(root, MARKUP_FILE, { project: true, ownKayOnly: true })).filter(file => isSource(root, file, ignored, true))
+}
+
+// The table the islands ship: the app-wide one cut to the classes a merge in the browser can meet, those written in a module an island bundles or in one that renders an island and hands it a class.
+// The server keeps the whole table; none is sent when no island has two classes to merge, nor when the app has no island or no Tailwind.
+export async function islandClassTableOf(root: string, { islands, libraries, shorthand }: Pick<ClientSources, 'islands' | 'libraries' | 'shorthand'>, graph?: ImportGraph): Promise<ClassTable | undefined> {
+  if (islands.size === 0 || await tailwindDesign(root) === undefined)
+    return undefined
+
+  const entries = new Set([...islands.values()].map(file => realpathSync(file)))
+  const bundled = await reachedFrom(root, libraries, [...entries], graph)
+  const edges = new Map<string, Promise<string[]>>()
+  const project = realpathSync(root) + sep
+  const renderers = new Set([...shorthand.keys(), ...(await markupFiles(root)).filter(file => RENDERING_FILE.test(file))])
+  const words = new Set([...bundled].flatMap(file => fileWords(file)))
+
+  await Promise.all([...renderers].map(async (file) => {
+    const real = realpathSync(file)
+
+    if (!bundled.has(real) && await reachesAny(root, libraries, real, entries, edges, project, graph)) {
+      for (const word of fileWords(file)) {
+        words.add(word)
+      }
+    }
+  }))
+
+  return buildClassTable(root, words)
 }
 
 // `inputs` holds the modules of each chunk, `maps` the source maps written.
-export async function bundleIslands(root: string, islands: Map<string, string>, options: ClientOptions, classTable?: ClassTable): Promise<{ manifest: Omit<ClientManifest, 'styles'>, inputs: ChunkInputs, maps: string[] }> {
+export async function bundleIslands(root: string, islands: Map<string, string>, options: ClientOptions, classTable?: ClassTable, islandTable?: ClassTable): Promise<{ manifest: Omit<ClientManifest, 'styles'>, inputs: ChunkInputs, maps: string[] }> {
   const navigation = options.navigation ?? true
 
   if (islands.size === 0 && !navigation)
@@ -367,7 +398,7 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
     '',
     ...publicEnv !== undefined ? [`;(globalThis as Record<symbol, unknown>)[Symbol.for('kay.publicEnv')] = kayPublicEnv`, ''] : [],
     // The merge of an island's classes reads the table the server sets for its own render.
-    ...classTable !== undefined && islands.size > 0 ? [`;(globalThis as Record<symbol, unknown>)[Symbol.for('kay.classTable')] = ${JSON.stringify(classTable)}`, ''] : [],
+    ...islandTable !== undefined && islands.size > 0 ? [`;(globalThis as Record<symbol, unknown>)[Symbol.for('kay.classTable')] = ${JSON.stringify(islandTable)}`, ''] : [],
     `const islands = {${registry === '' ? '' : `\n${registry}\n`}}`,
     'const hydrate = (root?: ParentNode) => hydrateIslands(islands, root)',
     '',

@@ -47,6 +47,17 @@ describe('a class passed to a component', () => {
     expect(html).toContain('class="box p-4 text-sm text-red-500"')
   })
 
+  it('ships the islands only the classes a merge in the browser can meet', async () => {
+    const entry = (await islandChunks()).match(/Symbol\.for\(.kay\.classTable.\)\] = (.*);$/m)?.[1] ?? ''
+
+    // `mb-2` and `mb-8` meet on a page that renders no island and reaches none: the server merges them, the browser never does.
+    expect(client.classTable?.classes['mb-8']).toBeDefined()
+    expect(entry).toContain('"p-6"')
+    expect(entry).toContain('"text-sm"')
+    expect(entry).not.toContain('"mb-8"')
+    expect(entry.length).toBeLessThan(JSON.stringify(client.classTable).length)
+  })
+
   it('hands the table to the island entry', async () => {
     const files = await readdir(client.dir, { recursive: true })
     const texts = await Promise.all(files.filter(file => file.endsWith('.js')).map(async file => Bun.file(join(client.dir, file)).text()))
