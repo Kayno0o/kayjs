@@ -56,7 +56,9 @@ export const post = cache(async (slug: string) => findPost(slug), { ttl: '5m', t
 
 To have the pages that show a value change in every open tab when you drop it, add `live: true` to the `cached` call. See [Data from the cache](/guides/live-and-realtime#data-from-the-cache).
 
-To keep a value across restarts, name a store.
+To keep values across restarts, set the app's store in `kay.config.ts`: `store: sqliteData('data/app.sqlite')`. Every `cached` call naming no store then keeps its value there. Give a value built from your code `{ store: false }`, so a deploy does not serve the old one. A value that cannot be serialized stays in memory, with a warning.
+
+To keep one value in a store of its own, name it.
 
 ```ts
 import { cached, sqliteCache } from 'kay/cache'

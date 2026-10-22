@@ -35,6 +35,7 @@ import { memoryRates } from '../server/protection'
 import { drainQueues, memoryJobs } from '../server/queue'
 import { sendFrom } from '../server/rewrite'
 import { memoryRooms } from '../server/rooms'
+import { memoryStore } from '../server/session'
 import { SITEMAP } from '../server/site-paths'
 import { signStamp, stampTime } from '../server/stamp'
 import { memoryFiles } from '../server/storage'
@@ -316,8 +317,8 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     throw new Error(`kay: this test process already serves ${serving}, and a process serves one project; test ${root} in a process of its own: \`bun test --parallel\` runs each file apart, or run its tests on their own as \`KAY_ROOT=${relative(process.cwd(), root) || '.'} bun test <its test files>\``)
 
   const loaded = await withConfig(root, options)
-  // A site setting none is served where the visits go, so pages reading siteUrl() or siteOrigin() render as in production; files go to memory, fresh for each site, rather than to the store kay.config.ts names, and so do the jobs, rate counts and presence rooms of its `store`.
-  const config = { ...loaded, site: loaded.site ?? ORIGIN, storage: options.storage ?? memoryFiles(), store: options.store === undefined && loaded.store !== undefined ? { jobs: memoryJobs(), rates: memoryRates(), rooms: memoryRooms(), vitals: memoryVitals() } : loaded.store }
+  // A site setting none is served where the visits go, so pages reading siteUrl() or siteOrigin() render as in production; files go to memory, fresh for each site, rather than to the store kay.config.ts names, and so do the sessions, jobs, rate counts, presence rooms and vitals of its `store`, its cached values staying in the process.
+  const config = { ...loaded, site: loaded.site ?? ORIGIN, storage: options.storage ?? memoryFiles(), store: options.store === undefined && loaded.store !== undefined ? { sessions: memoryStore(), jobs: memoryJobs(), rates: memoryRates(), rooms: memoryRooms(), vitals: memoryVitals() } : loaded.store }
   const project = resolveProject(root, config, { dev: config.dev === true, prebuilt: false, underKayDev: false })
   const inBrowser = options.browser !== undefined && options.browser !== false
   const wanted = inBrowser || options.islands !== false ? await islandsChecked(root, clientOptionsOf(config, PRODUCTION), inBrowser) : undefined

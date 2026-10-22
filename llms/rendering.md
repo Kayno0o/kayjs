@@ -42,7 +42,7 @@ export const post = cache(async (slug: string) => findPost(slug), { ttl: '5m', t
 
 ### Keep a cached value across restarts
 
-A store named in the options keeps the value on disk, so a restart or a deploy starts from what was kept:
+The app's `store` in kay.config.ts keeps every value on disk, so a restart or a deploy starts from what was kept (`import { sqliteData } from 'kay/server'` then `store: sqliteData('data/app.sqlite')`); a store named in the options keeps one apart:
 
 ```ts
 import { cached, sqliteCache } from 'kay/cache'
@@ -142,7 +142,7 @@ const posts = await cached('posts', '5m', listPosts)
 
 #### Stores
 
-A value that should outlive a restart, such as one a paid or rate-limited API gives, names a store:
+A value that should outlive a restart, such as one a paid or rate-limited API gives, is kept by the app's `store` or names one:
 
 ```ts
 import { cached, sqliteCache } from 'kay/cache'
@@ -151,6 +151,7 @@ const disk = sqliteCache('data/cache.sqlite')
 const reviews = await cached('reviews', 86_400, fetchReviews, { store: disk })
 ```
 
+- `store.cache` in kay.config.ts, which `sqliteData(path)` gives, is the store of every call naming none; `store: false` keeps a key in this process's memory alone, for a value built from the code itself, which a deploy should not find, or one devalue cannot carry. Under the app's store, a value devalue cannot carry stays in memory with a warning once per key, where a store the call names throws. Collections keep their loader's own `store` and never this one.
 - A key missing from memory is read from the store before `load` runs, and each load writes it back, so a restart, a deploy or `kay dev` reloading starts from what was kept; a stale one is given and refreshed as above.
 - The processes of one machine share a SQLite store.
 - Each keeps its copy in memory, and an `invalidate` in one process empties the store at once and reaches the others' copies within about half a second, through an events table each process polls once it has opened the store: a string key always, a function's keys as far as that process and the store know them.

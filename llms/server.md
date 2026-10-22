@@ -33,12 +33,12 @@ export default schedule('30s', collectMetrics)
 
 ### Keep a session
 
-`session()` from `kay/server` is an Elysia plugin adding `session` to the context, and a `store` keeps the data on the server:
+`session()` from `kay/server` is an Elysia plugin adding `session` to the context, and the app's `store` in kay.config.ts keeps the data on the server (`import { sqliteData } from 'kay/server'` then `store: sqliteData('data/app.sqlite')`):
 
 ```ts
-import { session, sqliteStore } from 'kay/server'
+import { session } from 'kay/server'
 
-export const sessions = session<{ userId: string }>({ store: sqliteStore('sessions.sqlite') })
+export const sessions = session<{ userId: string }>()
 ```
 
 Mount it from `src/plugins/session.ts` (`export default sessions`, see above), or in the server entry before the pages: `export const app = new Elysia().use(sessions).use(await pages())`.
@@ -193,12 +193,12 @@ export default defineConfig({ requireGuards: true })
 - `secret` is the app's own, `KAY_SECRET`, when left out ([The app secret](environment.md#the-app-secret)), so `session()` needs no option and the app no `SESSION_SECRET`; give one to keep the session's apart, at least 32 characters, read from the environment. The placeholder an older `kay new` wrote to `.env.example` is refused.
 - `deriveSecret(purpose)` on what `session()` returns gives a library its own key from the secret (HKDF, a list of 43-character texts in the order of the secrets), unrelated to the cookie's key: kayjs-auth uses it when `auth()` has no `secret`.
 - A list rotates secrets, commas in `KAY_SECRET` doing it for the app's own: the first seals new cookies, every one opens old ones, and a cookie an older one sealed goes out sealed with the first on its next use. A key derived from the first also signs form stamps, links to private files and the flash cookie, so a rotation refuses those already out, as a restart does without any secret.
-- Without a `store`, the data travels in the cookie, sealed with AES-GCM so it can be neither read nor altered, about 3.5 KB at most: past that the response fails with an error saying so.
+- Without a `store` of its own nor `store.sessions` in kay.config.ts (which `sqliteData` gives, read per request, so a `session()` made as its module loads uses it), the data travels in the cookie, sealed with AES-GCM so it can be neither read nor altered, about 3.5 KB at most: past that the response fails with an error saying so.
 - Such a cookie cannot be revoked: `destroy()` clears the browser's copy, but one taken before stays valid until `maxAge`, so a site that must end a session everywhere, after a password change say, uses a store.
-- In production `session()` without a store logs a warning as the server boots saying so.
-- With a store, the cookie carries only a sealed id, and `destroy()` deletes the session itself.
+- In production a `session()` without a store logs a warning on its first request saying so.
+- With a store, the cookie carries only a sealed id, and `destroy()` deletes the session itself. A cookie sealed with its data before the app had a store opens no session, so adding one signs everyone out once: a copy of such a cookie, which a sign-out could not end, is worth nothing from then on.
 - `memoryStore()` from `kay/server` keeps sessions in the process, gone on restart, the oldest going past 100,000.
-- `sqliteStore(path)` keeps them in a SQLite file shared by the processes on one machine, creating its directory, as `sqliteRates`, `sqliteCache` and `sqliteJobs` do; under `NODE_ENV=test`, which `bun test` sets, it keeps them in memory and writes no file; it opens its file on first use, so a process only loading the module naming it writes nothing; called again with the same file, it gives the store already open. A file deleted or replaced under a running server is noticed within seconds and opened afresh; a file put in its place takes its `-wal` and `-shm` along, or none, as SQLite would otherwise replay the old ones over it.
+- `sqliteStore(path)`, for a `session({ store })` kept apart from the app's store, keeps them in a SQLite file shared by the processes on one machine, creating its directory, as `sqliteRates`, `sqliteCache` and `sqliteJobs` do; under `NODE_ENV=test`, which `bun test` sets, it keeps them in memory and writes no file; it opens its file on first use, so a process only loading the module naming it writes nothing; called again with the same file, it gives the store already open. A file deleted or replaced under a running server is noticed within seconds and opened afresh; a file put in its place takes its `-wal` and `-shm` along, or none, as SQLite would otherwise replay the old ones over it.
 - Any object with `get(id)`, `set(id, data, maxAge)` and `delete(id)`, each sync or async, `maxAge` a `Duration` string such as `'2592000s'` (`durationMs` from `kay` gives its milliseconds), is a store too, such as one over Redis.
 - `deleteWhere(match)` on `memoryStore()` and `sqliteStore(path)` deletes every session whose data `match` returns true for, a person's once they asked to be erased or changed their password say, resolving with how many went; `sqliteStore` also drops expired sessions every hour.
 - Values cross as island props do, Dates, Maps, Sets and bigints included.

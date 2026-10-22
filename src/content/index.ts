@@ -101,7 +101,7 @@ export interface ContentLoader<Data = unknown> {
   get?: ((place: string, context: { preview: boolean }) => LoadedEntry | undefined | Promise<LoadedEntry | undefined>) | undefined
   // How long the entries are served before the next read refreshes them in the background, as `cached` does; without it, until `invalidate()` or a restart.
   ttl?: Duration | undefined
-  // Keeps the entries across restarts and processes, as `cached` does.
+  // Keeps the entries across restarts and processes, as `cached` does; the app's `store.cache` is not used for them, as a deploy changing the files would meet the entries of the last one.
   store?: CacheStore | undefined
   // Writes an entry a CMS saved, new or changed, once its collection accepts it: what `saveEntry` from `kay/content` hands on. `data` is typed from the collection's `schema`, which kay has checked it against, with each missing default filled in and a date as its text. `create` is true for an entry the CMS creates: throw when it exists, or another process's new entry is overwritten.
   save?: ((entry: { slug: string, locale?: string | undefined, data: Data, body?: string | undefined, create?: true }) => void | Promise<void>) | undefined
@@ -311,7 +311,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
   }
 
   const published = async (): Promise<Entries<Data>> => {
-    const raw = await cachedPublished(key, loader!.ttl === undefined ? FOREVER : `${durationSeconds(loader!.ttl, `the collection ${name}'s ttl`)}s`, async () => fetchLoaded(contentMode().dev), { store: loader!.store })
+    const raw = await cachedPublished(key, loader!.ttl === undefined ? FOREVER : `${durationSeconds(loader!.ttl, `the collection ${name}'s ttl`)}s`, async () => fetchLoaded(contentMode().dev), { store: loader!.store ?? false })
     let entries = decoded.get(raw)
 
     if (!entries)

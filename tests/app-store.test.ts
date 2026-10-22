@@ -1,9 +1,11 @@
 import type { Action, Duration } from '../src/runtime'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { Database } from 'bun:sqlite'
 import { afterEach, describe, expect, it } from 'bun:test'
+import { cached } from '../src/runtime/cache'
 import { memoryJobs, memoryRates, rateLimit } from '../src/server'
-import { setupStore } from '../src/server/app-store'
+import { appStore, setupStore } from '../src/server/app-store'
 import { defaultJobStore } from '../src/server/queue'
 import { sqliteData } from '../src/server/sqlite-data'
 import { testSite } from '../src/test'
@@ -66,6 +68,19 @@ describe('the app-wide store', () => {
     setupStore(data)
     await rateLimit('app-store-d', { max: 5, window: '1m' }).hit('ada')
     expect(existsSync(path)).toBe(true)
+  })
+
+  it('keeps the cached values naming no store in the sqliteData file, and gives sessions a store', async () => {
+    const path = join(await scratchDir('app-store'), 'app.sqlite')
+    const data = sqliteData(path)
+
+    setupStore(data)
+    expect(await cached('app-store-e', '60s', () => 'kept')).toBe('kept')
+
+    using db = new Database(path)
+
+    expect(db.query('SELECT key FROM kay_cache').all()).toEqual([{ key: 'app-store-e' }])
+    expect(appStore()?.sessions).toBe(data.sessions)
   })
 })
 

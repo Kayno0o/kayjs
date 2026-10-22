@@ -43,21 +43,25 @@ Put a value for later in a plugin's `derive` or `resolve`, not onto `ctx.locals`
 
 ## Sessions
 
-`session()` from `kay/server` is a plugin that adds `ctx.locals.session`. Give it a store. It seals its cookie with the app's secret, `KAY_SECRET`, which production sets and development derives.
+`session()` from `kay/server` is a plugin that adds `ctx.locals.session`. It seals its cookie with the app's secret, `KAY_SECRET`, which production sets and development derives.
 
 ```ts
-import { session, sqliteStore } from 'kay/server'
+import { session } from 'kay/server'
 
-export const sessions = session<{ userId: string }>({ store: sqliteStore('sessions.sqlite') })
+export const sessions = session<{ userId: string }>()
 ```
+
+The app's store keeps the data. Set it once in `kay.config.ts`: `store: sqliteData('data/app.sqlite')`, with `sqliteData` from `kay/server`. The same file then holds cached values, jobs and rate limits too.
 
 Use it before the pages: `new Elysia().use(sessions).use(await pages())`.
 
 ### Choosing a store
 
-With a store, the cookie only carries an id. `memoryStore()` is for development. `sqliteStore(path)` fits one machine. Any object with `get`, `set` and `delete` works as a store, as [Your own store](#your-own-store) shows.
+With a store, the cookie only carries an id. A session uses the app's store unless you give it one: `session({ store })`. `memoryStore()` is for development. `sqliteStore(path)` fits one machine. Any object with `get`, `set` and `delete` works as a store, as [Your own store](#your-own-store) shows.
 
-Without a store, the data travels in the cookie. It is sealed, but limited to about 3.5 KB and impossible to revoke. Signing out clears only the browser's copy. In production the server logs a warning as it boots that says so.
+Without a store, the data travels in the cookie. It is sealed, but limited to about 3.5 KB and impossible to revoke. Signing out clears only the browser's copy. In production the server logs a warning on the first request that says so.
+
+Adding a store signs everyone out once. A cookie sealed before holds its data, and a stolen copy of it could never be revoked, so kay no longer accepts it.
 
 To end every session of one person, call `deleteWhere` on `memoryStore()` or `sqliteStore()`. Use it when someone asks to be erased or changes their password.
 

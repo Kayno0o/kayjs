@@ -9,6 +9,7 @@ import { durationSeconds, wholeSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { overHttps } from './actions'
+import { appStore } from './app-store'
 import { nodeCrypto } from './builtins'
 import { requestCookies } from './cookies'
 import { onReload } from './reload'
@@ -47,7 +48,7 @@ export interface SessionOptions {
   domain?: string | undefined
   // Whether the browser sends the cookie along a request another site starts, a link followed or a form posted from there: `'lax'` by default sends it on a link's navigation and not on a post; `'strict'` on neither, so a visitor following a link from elsewhere arrives signed out; `'none'` on all, for a site embedded in another's page, and always `Secure`, which browsers ask of it.
   sameSite?: SameSite | undefined
-  // Keeps the data server-side, the cookie carrying only an id; without one the data travels sealed in the cookie, about 3.5 KB at most.
+  // Keeps the data server-side, the cookie carrying only an id: the app's `store.sessions` in kay.config.ts by default; without either the data travels sealed in the cookie, about 3.5 KB at most.
   store?: SessionStore | undefined
 }
 
@@ -126,11 +127,6 @@ export function session<Data extends object = SessionData>(options: SessionOptio
   if (secrets.some(secret => PUBLISHED_SECRETS.has(secret)))
     throw new KayError('config-invalid', `kay: the session secret is the placeholder an older \`kay new\` wrote to .env.example, which anyone can read; generate one with ${GENERATE_SECRET}`)
 
-  if (!options.store && process.env.NODE_ENV === 'production' && !warnedNoStore) {
-    warnedNoStore = true
-    kayLog('warn', `a session kept in its ${options.cookie ?? 'kay_session'} cookie alone, with no store, cannot be revoked by the session itself: signing out only clears the browser's cookie, and a copy taken before stays valid until it expires unless the app ends it elsewhere; give session() a store, such as sqliteStore('data/sessions.sqlite'), to end sessions on the server`)
-  }
-
   const keys = secrets.map(secret => nodeCrypto().createHash('sha256').update(secret).digest())
 
   useStampSecret(secrets[0]!, 'session')
@@ -142,7 +138,7 @@ export function session<Data extends object = SessionData>(options: SessionOptio
   if (options.sameSite !== undefined && !SAME_SITE.has(options.sameSite))
     throw new KayError('config-invalid', `kay: the session sameSite is ${JSON.stringify(options.sameSite)}, which is none of 'lax', 'strict' and 'none'`)
 
-  const config = { name: options.cookie ?? 'kay_session', sameSite: options.sameSite ?? 'lax', maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : wholeSeconds(options.maxAge, 'the session maxAge'), absoluteMaxAge: options.absoluteMaxAge === undefined ? DEFAULT_ABSOLUTE_MAX_AGE : wholeSeconds(options.absoluteMaxAge, 'the session absoluteMaxAge'), browserMaxAge: options.browserMaxAge === undefined ? DEFAULT_BROWSER_MAX_AGE : wholeSeconds(options.browserMaxAge, 'the session browserMaxAge'), domain, store: options.store, keys }
+  const config = { name: options.cookie ?? 'kay_session', sameSite: options.sameSite ?? 'lax', maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : wholeSeconds(options.maxAge, 'the session maxAge'), absoluteMaxAge: options.absoluteMaxAge === undefined ? DEFAULT_ABSOLUTE_MAX_AGE : wholeSeconds(options.absoluteMaxAge, 'the session absoluteMaxAge'), browserMaxAge: options.browserMaxAge === undefined ? DEFAULT_BROWSER_MAX_AGE : wholeSeconds(options.browserMaxAge, 'the session browserMaxAge'), domain, store: () => options.store ?? appStore()?.sessions, keys }
 
   const plugin = new Elysia({ name: 'kay/session', seed: config.name })
     .derive({ as: 'scoped' }, ({ request }) => ({ session: new RequestSession<Data>(request, config) }))
@@ -179,7 +175,8 @@ interface SessionConfig {
   absoluteMaxAge: number
   browserMaxAge: number
   domain?: string | undefined
-  store?: SessionStore | undefined
+  // The session's own store, else the app's `store.sessions`, read per request as a `session()` made while its module loads comes before the config.
+  store: () => SessionStore | undefined
   keys: Buffer[]
 }
 
@@ -197,10 +194,15 @@ class RequestSession<Data extends object> implements Session<Data> {
   private readonly secure: boolean
   // `__Host-` keeps the cookie to this host over https, so no other host of the site can set it; a Domain rules the prefix out.
   private readonly name: string
+  private readonly store: SessionStore | undefined
 
   constructor(private readonly request: Request, private readonly config: SessionConfig) {
     this.secure = overHttps(request)
     this.name = this.secure && config.domain === undefined && !config.name.startsWith('__') ? `__Host-${config.name}` : config.name
+    this.store = config.store()
+
+    if (!this.store)
+      warnNoStore(config.name)
   }
 
   async get<Key extends keyof Data>(key: Key): Promise<Data[Key] | undefined> {
@@ -261,8 +263,7 @@ class RequestSession<Data extends object> implements Session<Data> {
       return undefined
 
     await this.loading
-    const { store } = this.config
-    const { name } = this
+    const { name, store } = this
     const now = Math.floor(Date.now() / 1000)
     const started = this.started ?? now
     const lifetime = this.own.maxAge ?? this.config.maxAge
@@ -326,13 +327,13 @@ class RequestSession<Data extends object> implements Session<Data> {
     this.oldKey = opening.oldKey
     this.own = { ...sealed.maxAge === undefined ? {} : { maxAge: sealed.maxAge }, ...sealed.browser ? { browser: true } : {} }
 
-    if (!this.config.store) {
+    if (!this.store) {
       this.data = sealed.data ?? {}
 
       return
     }
 
-    const stored = sealed.id === undefined ? undefined : await this.config.store.get(sealed.id)
+    const stored = sealed.id === undefined ? undefined : await this.store.get(sealed.id)
 
     if (stored) {
       this.id = sealed.id
@@ -344,6 +345,15 @@ class RequestSession<Data extends object> implements Session<Data> {
   private cookie(value: string, maxAge: number | undefined): string {
     return new Bun.Cookie(this.name, value, { path: '/', ...this.config.domain === undefined ? {} : { domain: this.config.domain }, httpOnly: true, sameSite: this.config.sameSite, secure: this.secure || this.config.sameSite === 'none', ...maxAge === undefined ? {} : { maxAge } }).serialize()
   }
+}
+
+// Logs once, in production, that a session with no store cannot be ended on the server.
+function warnNoStore(cookie: string): void {
+  if (warnedNoStore || process.env.NODE_ENV !== 'production')
+    return
+
+  warnedNoStore = true
+  kayLog('warn', `a session kept in its ${cookie} cookie alone, with no store, cannot be revoked by the session itself: signing out only clears the browser's cookie, and a copy taken before stays valid until it expires unless the app ends it elsewhere; set store: sqliteData('data/app.sqlite') in kay.config.ts, or give session() a store, to end sessions on the server`)
 }
 
 // What the cookie holds, and whether a secret other than the first sealed it; sealed under its name, so no other cookie passes for it.

@@ -145,7 +145,7 @@ export interface KayConfig {
   preview?: PreviewConfig | false | undefined
   // Where `files` from `kay/server` keeps what it stores: `diskFiles('data/files')` by default, `s3Files()` for a bucket, or memory under `bun test`.
   storage?: FileStore | undefined
-  // Where queued jobs, schedule locks and rate limit counts live for every queue, schedule and limit naming no store of its own, the tabs a page's `presence()` lists and the Web Vitals `vitals()` counts: `sqliteData('data/app.sqlite')`, or `{ jobs, rates, rooms, vitals }` of your own, Redis say. Jobs stay in `data/jobs.sqlite`, the others in memory by default.
+  // Where the app keeps what outlives one process, for every feature naming no store of its own: `session()`'s data, `cached` values, queued jobs and schedule locks, rate limit counts, the tabs a page's `presence()` lists and the Web Vitals `vitals()` counts. `sqliteData('data/app.sqlite')` keeps them all in one file; `{ sessions, cache, jobs, rates, rooms, vitals }` takes stores of your own, each optional, Redis say. Without it sessions travel in their cookie, jobs stay in `data/jobs.sqlite` and the others in memory.
   store?: AppStore | undefined
   // Receives every error a load, a render, a guard or an action throws, as it is logged, and the ones islands report from the browser: the place to send them to an error tracker.
   // An error met outside any request, in a scheduled or background job or an `onStop` hook, comes with `undefined` for the request.

@@ -1,5 +1,5 @@
-import type { Action } from '../src/runtime'
-import type { SessionStore } from '../src/server'
+import type { Action, Duration } from '../src/runtime'
+import type { SessionData, SessionStore } from '../src/server'
 import { rename, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -10,6 +10,7 @@ import { Elysia } from 'elysia'
 import { durationSeconds } from '../src/runtime/duration'
 import { configuredSite, setSite } from '../src/runtime/site'
 import { memoryStore, session, sqliteStore } from '../src/server'
+import { setupStore } from '../src/server/app-store'
 import { readClient } from '../src/server/client'
 import { renderPage } from '../src/server/render'
 import { scanRoutes } from '../src/server/routes'
@@ -98,7 +99,7 @@ describe('sessions', () => {
     setSystemTime(Date.now())
   })
 
-  it('warns once at boot in production that a session without a store cannot be revoked, and not with one or outside production', () => {
+  it('warns once in production that a session without a store cannot be revoked, and not with its own, with the app\'s or outside production', async () => {
     const SINK = Symbol.for('kay.log')
     const global = globalThis as { [SINK]?: unknown }
     const sink = global[SINK]
@@ -108,16 +109,22 @@ describe('sessions', () => {
     global[SINK] = (level: string, message: string) => level === 'warn' && warnings.push(message)
 
     try {
+      const plain = async (options: Partial<Parameters<typeof session>[0]>) => counter(options).handle(new Request('http://localhost/plain'))
+
       process.env.NODE_ENV = 'development'
-      counter({})
+      await plain({})
       process.env.NODE_ENV = 'production'
-      counter({ store: memoryStore() })
+      await plain({ store: memoryStore() })
+      setupStore({ sessions: memoryStore() })
+      await plain({})
+      setupStore(undefined)
       expect(warnings).toEqual([])
-      counter({})
-      counter({})
+      await plain({})
+      await plain({})
     }
     finally {
       global[SINK] = sink
+      setupStore(undefined)
 
       if (environment === undefined)
         delete process.env.NODE_ENV
@@ -126,6 +133,53 @@ describe('sessions', () => {
     }
 
     expect(warnings).toEqual([expect.stringContaining('a session kept in its kay_session cookie alone, with no store')])
+  })
+
+  describe('in the app store', () => {
+    // A memory store telling what it was given, so a test sees where the data went.
+    function recording() {
+      const store = memoryStore()
+      const kept: SessionData[] = []
+
+      return { kept, store: { ...store, set: async (id: string, data: SessionData, maxAge: Duration) => {
+        kept.push({ ...data })
+
+        return store.set(id, data, maxAge)
+      } } }
+    }
+
+    afterEach(() => setupStore(undefined))
+
+    it('keeps a session naming no store in the app\'s store.sessions, set after the session was made', async () => {
+      const app = recording()
+      const visit = browser(counter())
+
+      setupStore({ sessions: app.store })
+      expect((await visit('/count')).text).toBe('1')
+      expect((await visit('/count')).text).toBe('2')
+      expect(app.kept).toEqual([{ count: 1 }, { count: 2 }])
+    })
+
+    it('prefers the store a session names over the app\'s', async () => {
+      const app = recording()
+      const own = recording()
+
+      setupStore({ sessions: app.store })
+      await browser(counter({ store: own.store }))('/count')
+      expect(own.kept).toEqual([{ count: 1 }])
+      expect(app.kept).toEqual([])
+    })
+
+    it('opens no session from a cookie holding its data once the app has a store, as no sign-out could end a copy of it', async () => {
+      const app = recording()
+      const visit = browser(counter())
+
+      expect((await visit('/count')).text).toBe('1')
+      setupStore({ sessions: app.store })
+      expect((await visit('/count')).text).toBe('1')
+      expect((await visit('/peek')).text).toBe('1')
+      expect(app.kept).toEqual([{ count: 1 }])
+    })
   })
 
   it('writes a whole Max-Age for a sub-second or fractional maxAge', async () => {

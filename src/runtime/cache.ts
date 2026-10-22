@@ -24,8 +24,8 @@ export interface CacheStore {
 export type Invalidation = { keys: string[], prefixes?: string[] } | { pages: string[], at?: number }
 
 export interface CacheOptions {
-  // Keeps the value across restarts, and for every process sharing the store; the value must survive devalue, as session data does.
-  store?: CacheStore | undefined
+  // Keeps the value across restarts, and for every process sharing the store; the value must survive devalue, as session data does. The app's `store.cache` in kay.config.ts by default, `false` for this process's memory alone.
+  store?: CacheStore | false | undefined
   // Every open page that read the value follows it: once an `invalidate` drops the key, or a key it was built from, the page shows what the loads give now. Needs the key read while a page renders, in its server fence or a layout's; a static export of such a page fails.
   live?: boolean | undefined
 }
@@ -47,6 +47,10 @@ type Tracker = <T>(load: () => Promise<T>) => Promise<{ result: T, reads: string
 const entries = new Map<string, Entry>()
 // Every store a call named, which `invalidate` empties too.
 const stores = new Set<CacheStore>()
+// The app's `store.cache`, for each call naming no store of its own.
+let appCache: CacheStore | undefined
+// The keys whose value the app's store could not hold, warned about once each.
+const unstorable = new Set<string>()
 // What hears the page paths another process marked stale: the server serving them.
 const pageListeners = new Set<(paths: string[]) => void>()
 // What learns of the keys a page render reads, and of the keys an invalidation drops: the server, to refresh the prerendered pages built from them.
@@ -206,7 +210,7 @@ async function cachedFor<T, const Ttl extends Duration = Duration>(key: string, 
   if (bypass)
     return load()
 
-  const { store } = options
+  const store = options.store === false ? undefined : options.store ?? appCache
   let entry = entries.get(key)
 
   if (store)
@@ -223,7 +227,7 @@ async function cachedFor<T, const Ttl extends Duration = Duration>(key: string, 
       // A tag added since the row was written is written into it, so a restart or another process keeps the link.
       if (deps.length > (kept.deps?.length ?? 0)) {
         kept.deps = deps
-        writeRow(key, kept, store)
+        writeRow(key, kept, store, options.store === undefined)
       }
 
       remember(key, kept)
@@ -237,7 +241,7 @@ async function cachedFor<T, const Ttl extends Duration = Duration>(key: string, 
     entries.set(key, pending)
     trim()
 
-    pending.loading = firstLoad(key, seconds, pending, load, store, tagKeys)
+    pending.loading = firstLoad(key, seconds, pending, load, store, tagKeys, options.store === undefined)
 
     return waited<T>(key, pending)
   }
@@ -249,7 +253,7 @@ async function cachedFor<T, const Ttl extends Duration = Duration>(key: string, 
     noteRead(dep)
 
   if (Date.now() >= entry.freshUntil && !entry.loading)
-    void refresh(key, seconds, entry, load, store, tagKeys)
+    void refresh(key, seconds, entry, load, store, tagKeys, options.store === undefined)
 
   return entry.value as T
 }
@@ -318,6 +322,14 @@ export function trackStore(store: CacheStore): void {
 
   stores.add(store)
   store.subscribe?.(heard)
+}
+
+// Called by the setup of a server with the config's `store.cache`, and again on a reload.
+export function setAppCache(store: CacheStore | undefined): void {
+  appCache = store
+
+  if (store)
+    trackStore(store)
 }
 
 // Lets go of a store that was closed, which `invalidate` then leaves be.
@@ -460,7 +472,7 @@ function heard(message: string): void {
   }
 }
 
-async function firstLoad<T>(key: string, ttl: number, pending: Entry, load: () => T | Promise<T>, store: CacheStore | undefined, tagKeys: string[]): Promise<T> {
+async function firstLoad<T>(key: string, ttl: number, pending: Entry, load: () => T | Promise<T>, store: CacheStore | undefined, tagKeys: string[], inherited: boolean): Promise<T> {
   try {
     const { result: value, reads: loaded, invalidated } = await trackedLoad(load)
     const reads = [...tagKeys, ...loaded]
@@ -471,7 +483,7 @@ async function firstLoad<T>(key: string, ttl: number, pending: Entry, load: () =
 
     // Only when nothing invalidated the key meanwhile.
     if (entries.get(key) === pending)
-      keep(key, { value, freshUntil: Date.now() + ttl * 1000, loaded: true, ...reads.length > 0 ? { deps: reads } : {} }, store)
+      keep(key, { value, freshUntil: Date.now() + ttl * 1000, loaded: true, ...reads.length > 0 ? { deps: reads } : {} }, store, inherited)
 
     return value
   }
@@ -483,7 +495,7 @@ async function firstLoad<T>(key: string, ttl: number, pending: Entry, load: () =
   }
 }
 
-async function refresh(key: string, ttl: number, entry: Entry, load: () => unknown, store: CacheStore | undefined, tagKeys: string[]): Promise<void> {
+async function refresh(key: string, ttl: number, entry: Entry, load: () => unknown, store: CacheStore | undefined, tagKeys: string[], inherited: boolean): Promise<void> {
   const loading = trackedLoad(load)
 
   entry.loading = loading
@@ -494,7 +506,7 @@ async function refresh(key: string, ttl: number, entry: Entry, load: () => unkno
 
     // Only when nothing invalidated or replaced the key meanwhile, nor a key the load read.
     if (!invalidated && entries.get(key) === entry)
-      keep(key, { value, freshUntil: Date.now() + ttl * 1000, loaded: true, ...reads.length > 0 ? { deps: reads } : {} }, store)
+      keep(key, { value, freshUntil: Date.now() + ttl * 1000, loaded: true, ...reads.length > 0 ? { deps: reads } : {} }, store, inherited)
   }
   catch (error) {
     entry.freshUntil = Date.now() + Math.min(ttl * 1000, RETRY_MS)
@@ -505,29 +517,45 @@ async function refresh(key: string, ttl: number, entry: Entry, load: () => unkno
   }
 }
 
-// A loaded value: one the store cannot hold throws before memory keeps it; a store that fails to write, locked or full, is logged and the value kept in memory, rather than fetched again by every caller.
-function keep(key: string, entry: Entry, store: CacheStore | undefined): void {
+// A loaded value: a store that fails to write, locked or full, is logged and the value kept in memory, rather than fetched again by every caller.
+function keep(key: string, entry: Entry, store: CacheStore | undefined, inherited: boolean): void {
   if (store)
-    writeRow(key, entry, store)
+    writeRow(key, entry, store, inherited)
 
   remember(key, entry)
 }
 
-function writeRow(key: string, entry: Entry, store: CacheStore): void {
-  let text: string
+function writeRow(key: string, entry: Entry, store: CacheStore, inherited: boolean): void {
+  const text = storedText(key, entry.value, inherited)
 
-  try {
-    text = stringify(entry.value)
-  }
-  catch (error) {
-    throw new Error(`kay: cached('${key}') cannot keep its value in a store: ${error instanceof Error ? error.message : String(error)}`)
-  }
+  if (text === undefined)
+    return
 
   try {
     store.set(key, entry.deps ? `${DEPS_PREFIX}${JSON.stringify(entry.deps)}\n${text}` : text, entry.freshUntil)
   }
   catch (error) {
     kayLog('error', `cached('${key}') could not write its store; keeping the value in memory`, error)
+  }
+}
+
+// The value as a store keeps it: one a store the call named cannot hold throws before memory keeps it, one the app's store cannot hold stays in memory alone, with a warning once per key.
+function storedText(key: string, value: unknown, inherited: boolean): string | undefined {
+  try {
+    return stringify(value)
+  }
+  catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+
+    if (!inherited)
+      throw new Error(`kay: cached('${key}') cannot keep its value in a store: ${reason}`)
+
+    if (!unstorable.has(key)) {
+      unstorable.add(key)
+      kayLog('warn', `cached('${key}') keeps its value in this process's memory, as the app's store.cache cannot hold it: ${reason}; give it { store: false } to say so`)
+    }
+
+    return undefined
   }
 }
 

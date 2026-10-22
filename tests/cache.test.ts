@@ -8,6 +8,7 @@ import { afterAll, afterEach, describe, expect, it, mock, setSystemTime, spyOn }
 import { Elysia } from 'elysia'
 import { onKeysInvalidated, refreshLocally } from '../src/runtime/cache'
 import { cached, invalidate, sqliteCache } from '../src/runtime/cache.server'
+import { setupStore } from '../src/server/app-store'
 import { feed } from './fixtures/production/src/news'
 import { scratchBuild } from './prerendered'
 import { scratchDir } from './scratch'
@@ -404,5 +405,49 @@ describe('cached with a store', () => {
     await expect(cached('handler', '60s', () => ({ run: () => 1 }), { store })).rejects.toThrow('kay: cached(\'handler\') cannot keep its value in a store')
     expect(store.keys()).toEqual([])
     expect(await cached('handler', '60s', () => 'plain', { store })).toBe('plain')
+  })
+
+  describe('in the app store', () => {
+    afterEach(() => setupStore(undefined))
+
+    it('keeps a value naming no store in the app\'s store.cache', async () => {
+      const store = sqliteCache(await storePath())
+
+      setupStore({ cache: store })
+      expect(await cached('app-kept', '60s', () => ({ at: new Date(0) }))).toEqual({ at: new Date(0) })
+      expect(store.keys()).toEqual(['app-kept'])
+    })
+
+    it('prefers the store a call names, or memory for store: false, over the app\'s', async () => {
+      const app = sqliteCache(await storePath())
+      const own = sqliteCache(await storePath())
+
+      setupStore({ cache: app })
+      await cached('app-own', '60s', () => 1, { store: own })
+      await cached('app-memory', '60s', () => 2, { store: false })
+      expect(own.keys()).toEqual(['app-own'])
+      expect(app.keys()).toEqual([])
+    })
+
+    it('keeps a value the app\'s store cannot hold in memory, warning once for its key', async () => {
+      const store = sqliteCache(await storePath())
+      const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+      setupStore({ cache: store })
+
+      try {
+        const handler = await cached('app-handler', '60s', (): { run: () => number } => ({ run: () => 1 }))
+
+        expect(handler.run()).toBe(1)
+        expect(await cached('app-handler', '60s', (): { run: () => number } => ({ run: () => 2 }))).toBe(handler)
+        invalidate('app-handler')
+        await cached('app-handler', '60s', () => ({ run: () => 3 }))
+        expect(store.keys()).toEqual([])
+        expect(warned.mock.calls.map(call => String(call[0]))).toEqual([expect.stringContaining('cached(\'app-handler\') keeps its value in this process\'s memory')])
+      }
+      finally {
+        warned.mockRestore()
+      }
+    })
   })
 })
