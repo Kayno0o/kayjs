@@ -1,18 +1,25 @@
 import { mkdir, rm } from 'node:fs/promises'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { expect, it } from 'bun:test'
 import { check, configCheckOptions } from '../src/check'
 import { loadConfig } from '../src/config'
 import { generate, generatedFiles } from '../src/generate'
+import { parseFields, resourceFiles, withTable } from '../src/generate-resource'
 import { createProject, PRESETS } from '../src/new'
 import { lintInProcess } from './scaffold-lint'
 import { scratchDir } from './scratch'
 
 const repo = join(import.meta.dir, '..')
+// A Postgres whose user may create databases, for the generated resource's tests: CI sets it.
+const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL
 
 async function run(dir: string, ...args: string[]) {
-  const child = Bun.spawn([process.execPath, join(repo, 'src/cli.ts'), ...args], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
+  return runWith(dir, {}, ...args)
+}
+
+async function runWith(dir: string, env: Record<string, string>, ...args: string[]) {
+  const child = Bun.spawn([process.execPath, join(repo, 'src/cli.ts'), ...args], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, ...env } })
   const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
   return { stdout, stderr, code }
@@ -205,3 +212,139 @@ it('writes files that pass kay check and their own tests', async () => {
   expect(tests.stderr + tests.stdout).toContain(' 0 fail')
   expect(tests.code).toBe(0)
 }, 120_000)
+
+const PROJECT = { tailwind: true, tests: true, ui: true, auth: true }
+
+it('writes a resource with the table, the actions, the pages and a test, drawn with kayjs-ui when it is installed', () => {
+  const ui = resourceFiles('blog-post', ['title:string', 'body:text', 'views:int', 'done:bool'], PROJECT)
+  const plain = resourceFiles('category', ['name:string', 'rank:number'], { ...PROJECT, ui: false })
+
+  expect(Object.keys(ui.files)).toEqual(['src/db/blog-post.ts', 'src/routes/blog-posts/_actions.kay', 'src/routes/blog-posts/index.kay', 'src/routes/blog-posts/[id=integer]/edit.kay', 'src/components/blog-posts-table.kay', 'src/components/new-blog-post.kay', 'tests/blog-posts.test.ts'])
+  expect(ui.table).toEqual({ name: 'BlogPost', file: './blog-post' })
+  expect(ui.files['src/db/blog-post.ts']).toContain('defineTable(\'blog_post\'')
+  expect(ui.files['src/db/blog-post.ts']).toContain('done: f.boolean().default(false),')
+  expect(ui.files['src/routes/blog-posts/index.kay']).toContain('BlogPostsTable(rows={blogPosts})')
+  expect(ui.files['src/routes/blog-posts/[id=integer]/edit.kay']).toContain('SaveForm(action={update}')
+  expect(ui.files['src/components/new-blog-post.kay']).toContain('FormDialog(')
+  expect(Object.keys(plain.files)).toEqual(['src/db/category.ts', 'src/routes/categories/_actions.kay', 'src/routes/categories/index.kay', 'src/routes/categories/[id=integer]/edit.kay', 'src/routes/categories/new.kay', 'tests/categories.test.ts'])
+  expect(plain.files['src/routes/categories/index.kay']).toContain('  table\n')
+  expect(plain.files['src/routes/categories/new.kay']).toContain('form(action={create})')
+  expect(Object.keys(resourceFiles('note', ['title:string'], { ...PROJECT, tests: false }).files)).not.toContain('tests/notes.test.ts')
+  expect(resourceFiles('note', ['count:int'], PROJECT).files['tests/notes.test.ts']).not.toContain('refuses')
+})
+
+it('refuses a resource named or fielded wrongly', () => {
+  expect(() => resourceFiles('a b', ['title:string'], PROJECT)).toThrow('is not a name for a resource')
+  expect(() => resourceFiles('action', ['title:string'], PROJECT)).toThrow('names something the generated files use')
+  expect(() => resourceFiles('table', ['title:string'], PROJECT)).toThrow('names something the generated files use')
+  expect(() => resourceFiles('post', [], PROJECT)).toThrow('at least one field')
+  expect(() => parseFields(['title'])).toThrow('is not a field')
+  expect(() => parseFields(['title:date'])).toThrow('is not a field')
+  expect(() => parseFields(['id:int'])).toThrow('cannot be a field')
+  expect(() => parseFields(['delete:string'])).toThrow('cannot be a field')
+  expect(() => parseFields(['title:string', 'title:text'])).toThrow('written twice')
+})
+
+it('adds a table to the tables of src/db/tables.ts, imported in order', () => {
+  const table = { name: 'Post', file: './post' }
+  const base = 'import { authTables } from \'@kaynooo/kayjs-auth/pg\'\n\n// Add the app\'s own tables.\nexport const tables = [...authTables]\n'
+  const once = withTable(base, table)!
+
+  expect(once).toBe('import { authTables } from \'@kaynooo/kayjs-auth/pg\'\nimport { Post } from \'./post\'\n\n// Add the app\'s own tables.\nexport const tables = [...authTables, Post]\n')
+  expect(withTable(once, { name: 'Comment', file: './comment' })).toContain('import { Comment } from \'./comment\'\nimport { Post } from \'./post\'')
+  expect(withTable(once, { name: 'Tag', file: './tag' })).toContain('import { Post } from \'./post\'\nimport { Tag } from \'./tag\'')
+  expect(withTable(once, { name: 'Tag', file: './tag' })).toContain('[...authTables, Post, Tag]')
+  expect(withTable('export const tables = [\n  A,\n]\n', table)).toBe('import { Post } from \'./post\'\n\nexport const tables = [\n  A, Post\n]\n')
+  expect(withTable('export const tables = []\n', table)).toContain('tables = [Post]')
+  expect(withTable('export const tables = [...authTables]\r\n', table)).not.toMatch(/[^\r]\n/)
+  expect(withTable('const tables = 1\n', table)).toBeUndefined()
+  expect(() => withTable(once, table)).toThrow('already mentions `Post`')
+})
+
+it('stops a resource in a project without a database, and writes nothing over what exists', async () => {
+  const dir = join(await scratchDir('generate-'), 'app')
+
+  await createProject(dir, { kay: '^1.0.0', features: PRESETS.server.features })
+  await expect(generate(dir, 'resource', 'post', { fields: ['title:string'] })).rejects.toThrow('run `kay add postgres`')
+
+  const postgres = join(await scratchDir('generate-'), 'app')
+
+  await createProject(postgres, { kay: '^1.0.0', features: [...PRESETS.app.features, 'postgres'] })
+  await expect(generate(postgres, 'resource', 'post')).rejects.toThrow('at least one field')
+
+  const dry = await generate(postgres, 'resource', 'post', { fields: ['title:string'], dryRun: true })
+
+  expect(dry.written[0]).toBe('src/db/tables.ts')
+  expect(await Bun.file(join(postgres, 'src/db/tables.ts')).text()).not.toContain('Post')
+
+  await generate(postgres, 'resource', 'post', { fields: ['title:string'] })
+  await expect(generate(postgres, 'resource', 'post', { fields: ['title:string'] })).rejects.toThrow('already mentions')
+  await rm(join(postgres, 'src/db/tables.ts'))
+  await expect(generate(postgres, 'resource', 'tag', { fields: ['label:string'] })).rejects.toThrow('has no `export const tables')
+  expect(await Bun.file(join(postgres, 'src/db/tag.ts')).exists()).toBe(false)
+})
+
+it('runs as kay generate resource, the fields before an optional folder', async () => {
+  const dir = join(await scratchDir('generate-'), 'app')
+
+  await createProject(dir, { kay: '^1.0.0', features: [...PRESETS.app.features, 'postgres'] })
+
+  const made = await run(dirname(dir), 'generate', 'resource', 'post', 'title:string', 'done:boolean', 'app', '--format', 'json', '--dry-run')
+
+  const document = JSON.parse(made.stdout) as { written: string[] }
+
+  expect(document).toMatchObject({ kind: 'resource', name: 'post', dryRun: true })
+  expect(document.written).toContain('src/routes/posts/_actions.kay')
+  expect((await run(dir, 'generate', 'page', 'x', 'app', 'extra')).code).toBe(1)
+})
+
+// What a resource writes passes kay check and the project's lint, and its test passes on a migrated database, with kayjs-ui and without.
+for (const ui of [true, false]) {
+  it(`writes a resource that passes kay check, lint and its own tests ${ui ? 'with' : 'without'} kayjs-ui`, async () => {
+    const dir = join(await scratchDir('generate-'), 'app')
+
+    await createProject(dir, { kay: '^1.0.0', features: [...PRESETS.app.features, 'postgres'] })
+
+    const manifestText = await Bun.file(join(dir, 'package.json')).text()
+
+    // The pages are drawn by the dependency on kayjs-ui, which is put back for the check as kayjs-auth's own pages need it.
+    if (!ui) {
+      const manifest = JSON.parse(manifestText) as { dependencies: Record<string, string> }
+
+      delete manifest.dependencies['@kaynooo/kayjs-ui']
+      await Bun.write(join(dir, 'package.json'), JSON.stringify(manifest, undefined, 2))
+    }
+
+    await generate(dir, 'resource', 'blog-post', { fields: ['title:string', 'body:text', 'views:int', 'rating:float', 'done:boolean'] })
+    await Bun.write(join(dir, 'package.json'), manifestText)
+
+    expect(await check(dir, configCheckOptions(await loadConfig(dir)))).toEqual([])
+
+    expect((await lintInProcess(dir, '.')).filter(result => result.messages.length > 0).map(result => ({ file: result.filePath, messages: result.messages }))).toEqual([])
+
+    if ((TEST_DATABASE_URL ?? '') === '')
+      return
+
+    const scratch = new URL(TEST_DATABASE_URL!)
+    const admin = new Bun.SQL(Object.assign(new URL(scratch), { pathname: '/postgres' }).href)
+    const name = `kay_generate_resource_${process.pid}_${ui ? 'ui' : 'plain'}`
+
+    await admin.unsafe(`DROP DATABASE IF EXISTS ${name}`)
+    await admin.unsafe(`CREATE DATABASE ${name}`)
+
+    try {
+      const migrate = Bun.spawn([join(repo, 'node_modules/.bin/pg-orm'), 'generate', 'init'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, MIGRATE_DATABASE_URL: Object.assign(new URL(scratch), { pathname: `/${name}` }).href } })
+      const [generated, errors] = await Promise.all([new Response(migrate.stdout).text(), new Response(migrate.stderr).text(), migrate.exited])
+
+      expect({ generated: generated.includes('Generated'), errors }).toEqual({ generated: true, errors: expect.not.stringContaining('rror') })
+
+      const tests = await runWith(dir, { DATABASE_URL: TEST_DATABASE_URL! }, 'test', 'tests/blog-posts.test.ts')
+
+      expect({ code: tests.code, report: tests.stderr + tests.stdout }).toEqual({ code: 0, report: expect.stringContaining(' 2 pass') })
+    }
+    finally {
+      await admin.unsafe(`DROP DATABASE IF EXISTS ${name}`)
+      await admin.close()
+    }
+  }, 120_000)
+}

@@ -2,8 +2,9 @@ import { existsSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { detectFeatures } from './add'
+import { resourceFiles, withTable } from './generate-resource'
 
-const KINDS = ['page', 'component', 'island', 'action', 'api', 'guard'] as const
+const KINDS = ['page', 'component', 'island', 'action', 'api', 'guard', 'resource'] as const
 
 type Kind = typeof KINDS[number]
 
@@ -20,6 +21,7 @@ const RESERVED = new Set(['action', 's', 'title', 'await', 'break', 'case', 'cat
 const ACTION_BODY = (name: string) => `export const ${name} = action(\n  s.Object({ title: s.String({ minLength: 1, maxLength: 200 }) }),\n  ({ title }) => title,\n)\n`
 const LINE_BREAK = /\r?\n/
 const LINE_BREAKS = /\r?\n/g
+const TABLES_FILE = 'src/db/tables.ts'
 const SERVER_FENCE = '--- server'
 const ANY_FENCE = /^---(?:\s|$)/
 const IMPORT_END = /^(?:import\s.*\sfrom\s.*|\}\s*from\s.*)$/
@@ -128,7 +130,7 @@ function guardFiles(segments: readonly string[], page: string | undefined, tests
 }
 
 // The files `kay generate <kind> <name>` writes, by path from the project root. Tailwind adds its shorthand classes to a page, and a project with tests gets a test of a page, an action or an API module, and a guard with a page below it; a component or an island has no URL of its own to be tested at.
-export function generatedFiles(kind: Kind, name: string, project: { tailwind: boolean, tests: boolean, auth: boolean, guardPage?: string | undefined }): Record<string, string> {
+export function generatedFiles(kind: Exclude<Kind, 'resource'>, name: string, project: { tailwind: boolean, tests: boolean, auth: boolean, guardPage?: string | undefined }): Record<string, string> {
   // `/` names the root guard, which every page and action sits below.
   const segments = kind === 'guard' && name === '/' ? [] : segmentsOf(kind === 'guard' ? 'page' : kind, name)
 
@@ -205,7 +207,7 @@ function rivalRoutes(page: string): string[] {
 }
 
 // Writes what `kay generate` makes into the project in `dir`, never over a file that exists: one that does stops it with nothing written.
-export async function generate(dir: string, kind: string, name: string, options: { dryRun?: boolean | undefined } = {}): Promise<{ written: string[] }> {
+export async function generate(dir: string, kind: string, name: string, options: { dryRun?: boolean | undefined, fields?: readonly string[] | undefined } = {}): Promise<{ written: string[] }> {
   if (!KINDS.includes(kind as Kind))
     throw new Error(`kay generate: ${kind} is none of ${KINDS.join(', ')}`)
 
@@ -213,8 +215,27 @@ export async function generate(dir: string, kind: string, name: string, options:
     throw new Error(`kay generate: ${dir} has no package.json: run it in a project`)
 
   const features = await detectFeatures(dir)
-  const files = generatedFiles(kind as Kind, name, { tailwind: features.has('tailwind'), tests: features.has('tests'), auth: features.has('auth'), guardPage: kind === 'guard' ? await pageBelow(dir, name) : undefined })
   const appended = new Map<string, string>()
+  let files: Record<string, string>
+
+  if (kind === 'resource') {
+    if (!features.has('postgres'))
+      throw new Error('kay generate: a resource needs a database, which this project has none of: run `kay add postgres` first')
+
+    const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies?: Record<string, string>, devDependencies?: Record<string, string> }
+    const made = resourceFiles(name, options.fields ?? [], { tailwind: features.has('tailwind'), tests: features.has('tests'), auth: features.has('auth'), ui: '@kaynooo/kayjs-ui' in { ...manifest.devDependencies, ...manifest.dependencies } })
+    const tables = existsSync(join(dir, TABLES_FILE)) ? withTable(await readFile(join(dir, TABLES_FILE), 'utf8'), made.table) : undefined
+
+    if (tables === undefined)
+      throw new Error(`kay generate: nothing was written, ${TABLES_FILE} has no \`export const tables = [...]\` to add ${made.table.name} to`)
+
+    files = made.files
+    appended.set(TABLES_FILE, tables)
+  }
+  else {
+    files = generatedFiles(kind as Exclude<Kind, 'resource'>, name, { tailwind: features.has('tailwind'), tests: features.has('tests'), auth: features.has('auth'), guardPage: kind === 'guard' ? await pageBelow(dir, name) : undefined })
+  }
+
   const actions = kind === 'action' ? Object.keys(files).find(path => path.endsWith('_actions.kay')) : undefined
 
   if (actions !== undefined && existsSync(join(dir, actions))) {
@@ -229,7 +250,7 @@ export async function generate(dir: string, kind: string, name: string, options:
   const taken = [...Object.keys(files), ...kind === 'page' ? rivalRoutes(Object.keys(files)[0]!) : []].filter(path => existsSync(join(dir, path)))
 
   if (taken.length > 0) {
-    const hint = taken.some(path => path.endsWith('_actions.kay')) ? `: it is not a server fence alone, so add the action by hand, from this shape:\n\n${ACTION_BODY(name.split('/').at(-1)!)}` : ''
+    const hint = kind === 'action' && taken.some(path => path.endsWith('_actions.kay')) ? `: it is not a server fence alone, so add the action by hand, from this shape:\n\n${ACTION_BODY(name.split('/').at(-1)!)}` : ''
 
     throw new Error(`kay generate: nothing was written, ${taken.join(', ')} already exist${taken.length === 1 ? 's' : ''}${hint}`)
   }

@@ -7,8 +7,8 @@ import { USAGES } from './usages'
 export const generateCommand: Command = {
   usage: USAGES.generate,
   options: { 'dry-run': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
-  positionals: 3,
-  run: async ({ values, positionals: [kind, name, dir = '.'] }, refuse) => {
+  positionals: Infinity,
+  run: async ({ values, positionals: [kind, name, ...rest] }, refuse) => {
     const format = formatOption('generate', values.format)
 
     if (kind === undefined || name === undefined)
@@ -17,10 +17,17 @@ export const generateCommand: Command = {
     if (format === undefined)
       return 1
 
+    // A resource takes its fields as `name:type`, then the project folder; every other kind takes the folder alone.
+    const fields = kind === 'resource' ? rest.filter(argument => argument.includes(':')) : []
+    const [dir = '.', ...extra] = kind === 'resource' ? rest.filter(argument => !argument.includes(':')) : rest
+
+    if (extra.length > 0)
+      return refuse(`unexpected argument ${extra[0]}`)
+
     const dryRun = values['dry-run'] === true
 
     try {
-      const { written } = await generate(resolve(dir), kind, name, { dryRun })
+      const { written } = await generate(resolve(dir), kind, name, { dryRun, fields })
 
       if (format === 'json') {
         printDocument({ kind, name, written, dryRun })

@@ -99,9 +99,10 @@ kay generate component card
 kay generate action team/removeTissue
 kay generate api notes
 kay generate guard admin
+kay generate resource post title:string body:text published:boolean
 ```
 
-`kay generate <page|component|island|action|api|guard> <name> [dir]` writes a starter file into the project, never over a file that exists: one that does stops it with `kay generate: nothing was written`.
+`kay generate <page|component|island|action|api|guard|resource> <name> [field:type...] [dir]` writes a starter file into the project, never over a file that exists: one that does stops it with `kay generate: nothing was written`.
 
 | Kind | Writes |
 | --- | --- |
@@ -111,8 +112,21 @@ kay generate guard admin
 | `action team/removeTissue` | the action `removeTissue` in `src/routes/team/_actions.kay`; one that exists and holds a server fence alone gets the action appended (with `import { s } from 'kay'` when it lacks it), a name it already exports, declares or imports stops the command, and one with a template or other fences is left alone and the action printed to add by hand |
 | `api notes` | `src/api/notes.ts`, served at `/api/notes` |
 | `guard admin` | `src/routes/admin/_guard.ts` (`/` for the root one), letting every request through until you write the rule, with a test visiting the shallowest page below the folder when there is one |
+| `resource post title:string body:text` | a table, its actions and its pages, see below |
 
 A project with tests gets `tests/<name>.test.ts` for a page, `tests/action-<name>.test.ts` for an action and `tests/api-<name>.test.ts` for an API module, and `tests/guard-<name>.test.ts` for a guard with a page below it; a project with `auth` gets the page and guard tests only, which expect the redirect to sign in. What it writes passes `kay check` and the lint. `--dry-run` lists the files without writing them, and `--format json` prints `{ kind, name, written, dryRun }`.
+
+### kay generate resource
+
+`kay generate resource <name> <field:type>...` writes a whole list, create, edit and delete for one table. It needs a database, so a project without `postgres` stops with `kay add postgres` named. A field is `name:type` with the type `string` (a `varchar(200)`), `text`, `int`, `float` or `boolean`, and every field is required.
+
+- The table is written to `src/db/<name>.ts` and added to `tables` in `src/db/tables.ts`. `blog-post` gives the table `blog_post`, the export `BlogPost` and the pages under `/blog-posts`.
+- `src/routes/blog-posts/_actions.kay` holds `create`, `update` and `remove`, checking their input with `s` schemas built from the fields, and sending the visitor back to the list.
+- The list is `src/routes/blog-posts/index.kay` and the edit page `src/routes/blog-posts/[id=integer]/edit.kay`, with a delete button.
+- With kayjs-ui installed the list is a `Table`, new rows are added from a `FormDialog` and the edit page is a `SaveForm`. Without it the list is a plain `table`, and a `new.kay` page holds the form.
+- A project with tests gets `tests/blog-posts.test.ts`, which creates a row, reads the list, and checks that an empty text field is refused.
+
+The table is new to the database, so run `bun run db:generate` and `bun run db:migrate` after it.
 
 ## kay add
 
