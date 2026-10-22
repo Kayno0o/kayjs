@@ -11,10 +11,7 @@ import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 export const prove = action(schemas.proof, async (input, ctx) => {
   const result = await ctx.locals.auth.reprove(proofOf(input))
 
-  if (!result.ok)
-    return ctx.fail(400, { error: result.error })
-
-  return undefined
+  return !result.ok ? ctx.fail(400, { error: result.error }) : undefined
 })
 
 export const remove = action(schemas.proof, async (input, ctx) => {
