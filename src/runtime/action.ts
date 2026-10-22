@@ -21,6 +21,9 @@ import { reload } from './stale'
 import { FAILURE_HEADER, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
 import { ACTION_PREFIX, ACTION_TYPE, decodeServerValue, decodeValue, malformed, serverWritten, unflattenValue } from './wire'
 
+// Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
+declare const KAY_BROWSER: true | undefined
+
 export type { CallResult }
 
 const ACTION = Symbol.for('kay.action')
@@ -679,7 +682,7 @@ export function formError(target: unknown, field: string): string | undefined {
 const refusedAt = new WeakMap<ActionError, string>()
 
 function pageOutcome(): Outcome | undefined {
-  return typeof document === 'undefined' ? undefined : pageData<Outcome>(`script[${OUTCOME_SCRIPT}]`, decodeServerValue, true)[0]
+  return typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined' ? undefined : pageData<Outcome>(`script[${OUTCOME_SCRIPT}]`, decodeServerValue, true)[0]
 }
 
 // An `ownSignal` made when first read, as most actions are only called: what is written before holds as its value.

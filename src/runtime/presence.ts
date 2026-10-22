@@ -2,6 +2,9 @@ import { NON_ROOT_TRAILING_SLASH, withoutBase } from './base'
 import { hold, live, wanted } from './live-value'
 import { currentServerScope } from './reactive'
 
+// Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
+declare const KAY_BROWSER: true | undefined
+
 // The id the members of a room are known by on the live connection: one keyed value, whose key is the room with the member the visitor is listed as, and whose value is the members of the room besides the visitor's own tab, as JSON.
 export const PRESENCE_LIVE_ID = 'kay:presence'
 // A key is at most this long, as any live key is.
@@ -27,7 +30,7 @@ export function readPresenceWith(read: (key: string) => string[]): void {
 
 // The path of the page under `base` without its trailing slash, which the server renders for and the browser is at.
 function pagePath(): string {
-  const path = typeof document === 'undefined' ? currentServerScope()?.path : withoutBase(location.pathname)
+  const path = typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined' ? currentServerScope()?.path : withoutBase(location.pathname)
 
   if (path === undefined)
     throw new TypeError('kay: presence() with no room is the page\'s own, which only a render or a browser knows; name a room, or call it in an island')
@@ -57,7 +60,7 @@ export function presence(room?: string, member?: unknown): Presence<unknown> {
   const members = handle
   const own = JSON.stringify(member ?? null)
 
-  if (typeof document === 'undefined')
+  if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
     members(key) // read now, so the render notes the key the page proves
   else
     holdConnection()

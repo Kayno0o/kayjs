@@ -497,7 +497,7 @@ let settling: ReturnType<typeof setTimeout> | undefined
 let renewing: ReturnType<typeof setTimeout> | undefined
 
 function pagesOf(): LivePage[] {
-  return typeof document === 'undefined' ? [] : pageData<LivePage>(LIVE_SCRIPT, decodeServerValue)
+  return typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined' ? [] : pageData<LivePage>(LIVE_SCRIPT, decodeServerValue)
 }
 
 function renderedValue(id: string, key: string): { value: unknown } | undefined {

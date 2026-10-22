@@ -2,6 +2,9 @@ import type { Signal } from './core'
 import { TRAILING_SLASH, withBase } from './base'
 import { createSignal, currentServerScope, markSignal } from './reactive'
 
+// Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
+declare const KAY_BROWSER: true | undefined
+
 // The visitor's answer to analytics: `'yes'`, `'no'`, or `''` while they have not chosen.
 export type Consent = 'yes' | 'no' | ''
 
@@ -62,11 +65,11 @@ function save(value: Consent): void {
 // A page renders with the answer in the request's `kay_analytics` cookie, the one kay's own notice writes, so the two never disagree; setting it is for the browser, since the server has no response to write to there.
 const reader = Object.assign(
   (): Consent => {
-    return typeof document === 'undefined' ? answer(currentServerScope()?.cookie(COOKIE)) : browserState().read()
+    return typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined' ? answer(currentServerScope()?.cookie(COOKIE)) : browserState().read()
   },
   {
     set: (next: Consent | ((current: Consent) => Consent)): void => {
-      if (typeof document === 'undefined')
+      if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
         throw new TypeError('kay: consent.set() answers from the browser, in an event handler or an effect; the server can only read the answer')
 
       const current = browserState()
