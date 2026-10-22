@@ -4,7 +4,7 @@ const CAMEL_BREAK = /([a-z0-9])([A-Z])/g
 const SEPARATORS = /[-_\s]+/
 // A word ending in a single `s` (`news`, `ideas`, `menus`) is a plural already, unless it is one of the singular words below or ends in `ss` (`class`).
 const PLURAL_S = /[^s]s$/
-const SINGULAR_S = new Set(['alias', 'analysis', 'atlas', 'axis', 'basis', 'bias', 'bonus', 'bus', 'campus', 'canvas', 'census', 'chaos', 'crisis', 'diagnosis', 'focus', 'gas', 'genus', 'iris', 'lens', 'nexus', 'plus', 'radius', 'status', 'syllabus', 'thesis', 'virus'])
+const SINGULAR_S = new Set(['alias', 'analysis', 'atlas', 'axis', 'basis', 'bias', 'bonus', 'apparatus', 'bus', 'cactus', 'campus', 'canvas', 'census', 'chaos', 'corpus', 'crisis', 'diagnosis', 'focus', 'gas', 'genus', 'iris', 'lens', 'nexus', 'plus', 'radius', 'status', 'syllabus', 'thesis', 'virus'])
 // Irregular words, each to its plural; a plural maps to itself.
 const IRREGULAR = new Map([['person', 'people'], ['people', 'people'], ['child', 'children'], ['children', 'children'], ['man', 'men'], ['men', 'men'], ['woman', 'women'], ['women', 'women'], ['mouse', 'mice'], ['mice', 'mice'], ['foot', 'feet'], ['feet', 'feet'], ['tooth', 'teeth'], ['teeth', 'teeth']])
 const PLURAL_ES = /(?:[sxz]|ch|sh)$/

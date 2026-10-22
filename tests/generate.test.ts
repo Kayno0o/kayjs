@@ -294,7 +294,9 @@ it('writes a resource with the table, the actions, the pages and a test, drawn w
   expect(Object.keys(resourceFiles('glass', ['title:string'], PROJECT).files)).toContain('src/routes/glasses/index.kay')
   expect(Object.keys(resourceFiles('canvas', ['title:string'], PROJECT).files)).toContain('src/routes/canvases/index.kay')
   expect(Object.keys(resourceFiles('bonus', ['title:string'], PROJECT).files)).toContain('src/routes/bonuses/index.kay')
+  expect(Object.keys(resourceFiles('cactus', ['title:string'], PROJECT).files)).toContain('src/routes/cactuses/index.kay')
   expect(Object.keys(resourceFiles('virus', ['title:string'], PROJECT).files)).toContain('src/routes/viruses/index.kay')
+  expect(Object.keys(resourceFiles('blog-goose', ['title:string'], PROJECT, 'geese').files)).toContain('src/routes/geese/index.kay')
   expect(Object.keys(resourceFiles('person', ['title:string'], PROJECT).files)).toContain('src/routes/people/index.kay')
   expect(Object.keys(resourceFiles('people', ['title:string'], PROJECT).files)).toContain('src/routes/people/index.kay')
   expect(Object.keys(resourceFiles('child', ['title:string'], PROJECT).files)).toContain('src/routes/children/index.kay')
@@ -400,6 +402,12 @@ it('runs as kay generate resource, every argument a field and the folder `--dir`
   expect((await run(dirname(dir), 'generate', 'page', 'x', 'app', '--dir', 'app', '--dry-run')).code).toBe(1)
   expect((await run(dirname(dir), 'generate', 'page', 'x', '--dir', 'app', '--dry-run')).code).toBe(0)
   expect((await run(dir, 'generate', 'resource', 'post', 'title:string', '--dry-run')).code).toBe(0)
+
+  // --plural reaches the files, and only a resource takes it.
+  const plural = JSON.parse((await run(dir, 'generate', 'resource', 'goose', 'title:string', '--plural', 'geese', '--dry-run', '--format', 'json')).stdout) as { written: string[] }
+
+  expect(plural.written).toContain('src/routes/geese/_actions.kay')
+  expect((await run(dir, 'generate', 'page', 'x', '--plural', 'xs', '--dry-run')).code).toBe(1)
 })
 
 // What a resource writes passes kay check and the project's lint, and its test passes on a migrated database, with kayjs-ui and without.
