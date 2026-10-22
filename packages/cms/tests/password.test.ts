@@ -147,6 +147,24 @@ describe('the secret and the lazily loaded guard', () => {
 })
 
 describe('signing out', () => {
+  test('signing out ends a cookie under the name from before 1.70 and deletes both names', async () => {
+    const { configure } = await import('../src/settings')
+    const { signOutOf } = await import('../src/access')
+    const { activePasswords } = await import('../src/password')
+    const guard = passwordGuard({ editor: 'pw-editor' })
+
+    configure({ guard })
+
+    const cookie = activePasswords()!.issue('editor', false).value
+    const ctx = context(cookie, LEGACY_SESSION_COOKIE)
+    const deleted: string[] = []
+
+    ctx.cookies.delete = ((options: { name: string }) => void deleted.push(options.name)) as typeof ctx.cookies.delete
+    await signOutOf(ctx)
+    expect(deleted).toEqual([SESSION_COOKIE, LEGACY_SESSION_COOKIE])
+    expect(await statusOf(context(cookie, LEGACY_SESSION_COOKIE), guard)).toBe(401)
+  })
+
   test('ends a copy of the cookie, which the guard then refuses with a 401', async () => {
     const { configure } = await import('../src/settings')
     const { signOutOf } = await import('../src/access')

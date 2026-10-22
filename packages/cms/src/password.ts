@@ -11,6 +11,11 @@ export const SESSION_COOKIE = 'kay_editor_session'
 export const LEGACY_SESSION_COOKIE = 'kcms_session'
 
 // The sign-in cookie a request holds, under its name or the one before 1.70.
+// Both names, as a browser holding the two must have each copy ended.
+export function sessionCookiesOf(cookies: { get: (name: string) => string | null }): string[] {
+  return [cookies.get(SESSION_COOKIE), cookies.get(LEGACY_SESSION_COOKIE)].filter(value => value != null)
+}
+
 export function sessionCookieOf(cookies: { get: (name: string) => string | null }): string | undefined {
   return cookies.get(SESSION_COOKIE) ?? cookies.get(LEGACY_SESSION_COOKIE) ?? undefined
 }

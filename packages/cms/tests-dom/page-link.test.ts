@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test'
 import { settle } from 'kay/test'
-import { CHECK_PATH, HINT_COOKIE, LEGACY_PAGE_LINK_ATTRIBUTE, PAGE_LINK_ATTRIBUTE, pageLink, pageLinkLoader, SIGNED_IN_COOKIE } from '../src/page-link'
+import { CHECK_PATH, HINT_COOKIE, LEGACY_PAGE_LINK_ATTRIBUTE, PAGE_LINK_ATTRIBUTE, pageLink, pageLinkLoader, pageLinkModule, SIGNED_IN_COOKIE } from '../src/page-link'
 
 const ANSWER = { label: 'Edit this page', href: '/admin/page' }
 const BUTTON = 'html > a'
@@ -159,6 +159,10 @@ test('fills a link of the app\'s own in place of its button, and keeps it hidden
   answering(403)
   await run()
   expect(document.querySelector<HTMLAnchorElement>(`[${PAGE_LINK_ATTRIBUTE}]`)!.hidden).toBeTrue()
+})
+
+test('serves a module matching both attribute names', () => {
+  expect(pageLinkModule()).toContain(JSON.stringify(`${PAGE_LINK_ATTRIBUTE},${LEGACY_PAGE_LINK_ATTRIBUTE}`))
 })
 
 test('fills a link written with the attribute from before 1.70', async () => {

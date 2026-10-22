@@ -1459,7 +1459,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     },
 
     // The `Cookie` header of a new session signed in as `userId`, as `signIn` makes it, for a test or a script to send by hand; throws for a missing or banned user.
-    // The cookie is the one kay's server names for the scheme it sees: by default the plugin signs in over `http://localhost/`, so the server's own rule applies (an https `site` in kay.config.ts makes it `__Host-session` in production); `secure: true` mints the one an https request reads, `secure: false` the plain one.
+    // The cookie is the one kay's server names for the scheme it sees: by default the plugin signs in over `http://localhost/`, so the server's own rule applies (an https `site` in kay.config.ts makes it `__Host-kay_session` in production); `secure: true` mints the one an https request reads, `secure: false` the plain one.
     async sessionCookie(userId: string, cookieOptions: { secure?: boolean } = {}): Promise<string> {
       return mintSessionCookie(userId, cookieOptions.secure)
     },
