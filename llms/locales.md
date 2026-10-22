@@ -87,7 +87,7 @@ T(key="intro" name="Ada")
 
 ### Switch language
 
-`alternate` gives the page being rendered in another locale, and a link carrying `hreflang` stays as written:
+`alternate` gives the page being rendered in another locale (for a routed collection's entry read with `get()`, its translation's own url), and a link carrying `hreflang` stays as written:
 
 ```kay
 --- server

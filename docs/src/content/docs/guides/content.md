@@ -259,7 +259,13 @@ for post of entries
   a(href={post.url}) {post.data.title}
 ```
 
-`url` is the path as `route()` writes it, so kay puts the base and the page's locale on it as on any link. A localized entry's `url` has its own slug, so `(await posts.translation(post, 'fr'))?.url` is the page of its translation. The route has one param, the slug, and `kay check` reports a route no page matches, such as one with `src/routes/blog/[slug].kay` missing. A collection with no `route` has no `url`.
+`url` is the path as `route()` writes it, so kay puts the base and the page's locale on it as on any link.
+
+A localized entry's `url` has its own slug, so `(await posts.translation(post, 'fr'))?.url` is the page of its translation, and on a page that read the entry with `get()`, `alternate('fr')` gives it too.
+
+A dotted slug such as `v1.2` is a page, not a file, so keep real files like `/blog/cover.png` out of the route's folder. A slug the route cannot write leaves its entry out, logged. The CMS reads the route before `url`.
+
+The route has one param, the slug, and `kay check` reports a route no page matches, such as one with `src/routes/blog/[slug].kay` missing, and a page listing the collection in `prerender` while another page serves the route. A collection with no `route` has no `url`.
 
 ## Feeds
 

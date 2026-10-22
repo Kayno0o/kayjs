@@ -12,6 +12,8 @@ export interface LocaleState extends Translations {
   // The moment `relativeTime` reads the page as rendered at, taken on its first call and written into the page once, so the islands' first render in the browser reads the same.
   now?: number
   nowWritten?: true
+  // The url of a routed entry the page read in each locale having it, by the url shown, which `alternate` gives for another locale instead of the same slug.
+  entryUrls?: Map<string, Record<string, string>>
 }
 
 const store = new AsyncLocalStorage<LocaleState>()

@@ -11,7 +11,6 @@ import { resolveFrom } from '../build/files'
 import { elementsIn, serverIslandOf } from '../compiler/ast'
 import { exportProblem, KayError } from '../compiler/errors'
 import { parseKay } from '../compiler/parser'
-import { analyzeServer } from '../compiler/script'
 import { isAction } from '../runtime/action'
 import { durationSeconds } from '../runtime/duration'
 import { IMAGE_ROUTE } from '../runtime/image'
@@ -24,6 +23,7 @@ import { writeDictionary } from './dictionary'
 import { exportedEndpoints } from './endpoints'
 import { localeCopies, stateFor } from './i18n'
 import { LIVE_MARK } from './live'
+import { pageFlags } from './page-flags'
 import { readsOf } from './page-reads'
 import { chainSetting, pageSetting } from './page-settings'
 import { matchedParams } from './params'
@@ -508,17 +508,4 @@ async function stopOf(route: Route, scans: Map<string, Promise<Scan>>, root: str
     return { stop: { file: route.file, line: 0, why: 'takes params, so `prerender` lists the pages to render' }, pathname: false }
 
   return keptScan(route, scans, root)
-}
-
-// What a page module says of its own prerendering, read off its source once: the text of its `prerender` and whether it says `keep: true`.
-async function pageFlags(file: string): Promise<{ prerender: string | undefined, keep: boolean }> {
-  const source = await Bun.file(file).text()
-  const settings = analyzeServer(source, parseKay(source).server)?.page?.settings
-  const text = (name: string) => {
-    const value = settings?.get(name)?.value
-
-    return value === undefined ? undefined : source.slice(value.start, value.end)
-  }
-
-  return { prerender: settings?.has('prerender') === true ? text('prerender') ?? '' : undefined, keep: text('keep') === 'true' }
 }

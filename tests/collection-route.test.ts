@@ -5,9 +5,14 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
 import { bootProblems } from '../src/check/boot'
 import { contentChecks, projectProblems } from '../src/check/project'
-import { collection, paginate } from '../src/content'
+import { collection, entries, entryPage, paginate } from '../src/content'
 import { unservedRoutes } from '../src/content/claims'
+import { registerCollections, registerEditSite } from '../src/content/edit'
 import { feedXml } from '../src/content/feed'
+import { localizedLink } from '../src/runtime/i18n'
+import { alternate } from '../src/runtime/i18n.server'
+import { runInLocale } from '../src/runtime/locale-state'
+import { linkedSettings } from '../src/server/i18n'
 import { scratchDir } from './scratch'
 
 const CLI = join(import.meta.dir, '../src/cli.ts')
@@ -128,6 +133,29 @@ describe('kay check', () => {
     }
   }, 60_000)
 
+  it('reports a page prerendering a routed collection while another page serves its route', async () => {
+    const root = await scratchDir('collection-route-prerender-')
+
+    try {
+      const prerendering = '--- server\nexport const page = { prerender: posts }\n---\nh1 Post\n'
+
+      await Bun.write(join(root, 'src/routes/blog/[slug].kay'), 'h1 Post\n')
+      await Bun.write(join(root, 'src/routes/posts/[slug].kay'), prerendering)
+
+      const routes = [{ collection: 'posts', route: '/blog/:slug' }]
+      const problems = (await bootProblems(root, {}, [], undefined, routes)).map(problem => problem.message)
+
+      expect(problems).toEqual([expect.stringContaining('this page prerenders the collection posts')])
+
+      await Bun.write(join(root, 'src/routes/blog/[slug].kay'), prerendering)
+      await rm(join(root, 'src/routes/posts'), { recursive: true, force: true })
+      expect(await bootProblems(root, {}, [], undefined, routes)).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports a route no page serves, and none when a page does', async () => {
     const root = await scratchDir('collection-route-check-')
 
@@ -143,6 +171,71 @@ describe('kay check', () => {
     finally {
       await rm(root, { recursive: true, force: true })
     }
+  })
+})
+
+describe('a collection route read beyond the entries', () => {
+  const localized = () => collection({ name: 'route-switch', load: () => [
+    { slug: 'en/hello', data: { title: 'Hello', translationKey: 'greeting' } },
+    { slug: 'fr/bonjour', data: { title: 'Bonjour', translationKey: 'greeting' } },
+    { slug: 'en/only-en', data: { title: 'Only' } },
+  ] }, { schema: t.Object({ title: t.String(), translationKey: t.Optional(t.String()) }), localized: true, route: '/blog/:slug' })
+
+  it('gives the CMS the route before the url option and the guess from prerender', async () => {
+    const posts = collection({ name: 'route-cms', load: () => [{ slug: 'hello', data: { title: 'Hello' } }] }, { schema, route: '/blog/:slug', url: () => '/other' })
+    const before = registerCollections([['posts', posts]])
+    const guessing = registerEditSite({ urls: async () => '/guessed' })
+
+    try {
+      expect((await entries('posts')).map(entry => entry.url)).toEqual(['/blog/hello'])
+      expect(await entryPage('posts', { slug: 'a b', data: { title: 'X' } })).toBe('/blog/a%20b')
+      expect(await entryPage('posts', { slug: '..', data: { title: 'X' } })).toBeUndefined()
+    }
+    finally {
+      registerCollections(before)
+      registerEditSite(guessing)
+    }
+  })
+
+  it('has alternate() give the translation\'s own url, and the same path where the locale has none', async () => {
+    const posts = localized()
+    const settings = { locales: ['en', 'fr'], defaultLocale: 'en', prefixDefault: false }
+    const state = (locale: string, path: string) => ({ locale, messages: new Map(), settings, path })
+
+    expect(await runInLocale(state('en', '/blog/hello'), async () => {
+      await posts.get('hello')
+
+      return alternate('fr')
+    })).toBe('/fr/blog/bonjour')
+
+    expect(await runInLocale(state('fr', '/blog/bonjour'), async () => {
+      await posts.get('bonjour')
+
+      return [alternate('en'), alternate('fr')]
+    })).toEqual(['/blog/hello', '/fr/blog/bonjour'])
+
+    expect(await runInLocale(state('en', '/blog/only-en'), async () => {
+      await posts.get('only-en')
+
+      return alternate('fr')
+    })).toBe('/fr/blog/only-en')
+
+    expect(runInLocale(state('en', '/blog/hello'), () => alternate('fr'))).toBe('/fr/blog/hello')
+  })
+
+  it('leaves out an entry whose slug the route refuses, keeping the others', async () => {
+    const docs = collection({ name: 'route-refused', load: () => [{ slug: 'ok', data: { title: 'Ok' } }, { slug: 'a//b', data: { title: 'Bad' } }] }, { schema, route: '/docs/*slug' })
+
+    expect((await docs.all()).map(entry => entry.slug)).toEqual(['ok'])
+  })
+
+  it('has the locale rule take a dotted slug under a route for a page, not a file', () => {
+    const base = { locales: ['en', 'fr'], defaultLocale: 'en', prefixDefault: false, pages: ['/blog/:slug', '/docs/*'] }
+    const linked = linkedSettings(base, [{ pattern: '/blog/:slug' }, { pattern: '/docs/*' }], [{ options: { route: '/blog/:slug' } }, { options: { route: '/docs/*slug' } }])
+
+    expect(linked.entryRoutes).toEqual(['/blog/:slug', '/docs/*'])
+    expect(['/blog/v1.2', '/blog/v1.2/', '/docs/a/b.c', '/blog/cover.png'].map(href => localizedLink(base, href, 'fr'))).toEqual(['/blog/v1.2', '/blog/v1.2/', '/docs/a/b.c', '/blog/cover.png'])
+    expect(['/blog/v1.2', '/blog/v1.2/', '/docs/a/b.c', '/blog/hello', '/other.png'].map(href => localizedLink(linked, href, 'fr'))).toEqual(['/fr/blog/v1.2', '/fr/blog/v1.2/', '/fr/docs/a/b.c', '/fr/blog/hello', '/other.png'])
   })
 })
 

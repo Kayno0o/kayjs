@@ -18,8 +18,8 @@ import { child, html, localLinks } from '../runtime/html'
 import { localeState } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
 import { previewing, previewState, sharedDraft } from '../runtime/preview'
-import { route } from '../runtime/route'
 import { checkPublishField, isDraft, publishTime } from './drafts'
+import { entryPath } from './entry-route'
 import { sizedImages } from './images'
 import { contentKey, contentMode, loadEntries, markdownOf, translationKey } from './load'
 import { compileMarkdown, countWords, MarkdownError } from './markdown'
@@ -235,7 +235,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
     const { readingSpeed, imageSizes } = markdownOf(options)
 
     try {
-      return decodeEntries(raw, options.schema, components, localized).map(({ entry, data }) => withUrl(toEntry<Data>(entry, data as Data, components, localized, readingSpeed, imageSizes), routePattern))
+      return withUrls(name, decodeEntries(raw, options.schema, components, localized).map(({ entry, data }) => toEntry<Data>(entry, data as Data, components, localized, readingSpeed, imageSizes)), routePattern)
     }
     catch (error) {
       throw typeof source === 'string' ? withMigrationHint(error, migrations) : error
@@ -459,7 +459,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
       return editableEntries(name, list.filter(entry => !hidden(entry) && (entry.locale === wanted || (entry.locale === fallback && shown(own?.get(translationKey(entry))) === undefined))), blockItem)
     },
     get: async (slug, locale) => {
-      const { bySlug, byLocale } = await loaded()
+      const { bySlug, byLocale, paired } = await loaded()
       const wanted = localized ? locale ?? localeState()?.locale : undefined
       const fallback = localeState()?.settings.defaultLocale
 
@@ -467,6 +467,9 @@ export function collection<Schema extends TSchema, Components extends Record<str
 
       if (found === undefined && !contentMode().dev && !previewing() && (wanted === undefined ? [bySlug.get(slug)] : [byLocale.get(wanted)?.get(slug), fallback === undefined ? undefined : byLocale.get(fallback)?.get(slug)]).some(ended))
         noteEndedEntry()
+
+      if (found !== undefined && localized)
+        noteTranslationUrls(found, paired, shown)
 
       return found && editableEntries(name, [found], blockItem)[0]
     },
@@ -591,12 +594,46 @@ function checkRoute(name: string, pattern: string): void {
     throw new KayError('config-invalid', `kay: the collection ${name}'s route ${pattern} must start with /, not end with one, and hold one param named slug, \`:slug\`, or \`*slug\` for slugs with folders`)
 }
 
-// The entry with the path of its page, when the collection has a route.
-function withUrl<Data>(entry: Entry<Data>, pattern: string | undefined): Entry<Data> {
-  if (pattern !== undefined)
-    entry.url = (route as (pattern: string, params: Record<string, string>) => string)(pattern, { slug: entry.slug })
+// The entries with the path of their page, when the collection has a route. One whose slug the route refuses is left out and reported, so it does not fail the load of the others.
+function withUrls<Data>(name: string, entries: Entry<Data>[], pattern: string | undefined): Entry<Data>[] {
+  if (pattern === undefined)
+    return entries
 
-  return entry
+  const refused: string[] = []
+
+  const kept = entries.filter((entry) => {
+    entry.url = entryPath(pattern, entry.slug)
+
+    if (entry.url === undefined)
+      refused.push(entry.file)
+
+    return entry.url !== undefined
+  })
+
+  if (refused.length > 0)
+    kayLog('warn', `${refused.length === 1 ? 'an entry' : `${refused.length} entries`} of ${name} ${refused.length === 1 ? 'has' : 'have'} a slug its route ${pattern} cannot write, and ${refused.length === 1 ? 'is' : 'are'} left out until renamed\n${refused.map(file => `  ${file}`).join('\n')}`)
+
+  return kept
+}
+
+// What a page showing a routed entry tells `alternate()`: the url of the entry in each locale that has one, by the url shown, so a switcher finds the translation's own slug.
+function noteTranslationUrls<Data>(found: Entry<Data>, paired: Map<string, Map<string, Entry<Data>>>, shown: (entry: Entry<Data> | undefined) => Entry<Data> | undefined): void {
+  const state = localeState()
+
+  if (found.url === undefined || state === undefined || state.implicit)
+    return
+
+  const key = translationKey(found)
+  const urls: Record<string, string> = {}
+
+  for (const [locale, entries] of paired) {
+    const url = shown(entries.get(key))?.url
+
+    if (url !== undefined)
+      urls[locale] = url
+  }
+
+  ;(state.entryUrls ??= new Map()).set(found.url, urls)
 }
 
 function toEntry<Data>(entry: RawEntry, data: Data, components: Record<string, Component<never>>, localized: boolean, readingSpeed: number, imageSizes: string | undefined): Entry<Data> {

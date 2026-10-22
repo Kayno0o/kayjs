@@ -29,6 +29,8 @@ export interface LocaleSettings {
   // The patterns the site's pages are served under and the paths of its localized feeds, which a link written as the default locale names them goes to in the page's locale.
   pages?: readonly string[] | undefined
   feeds?: readonly string[] | undefined
+  // The routes of the collections, `/blog/:slug`, whose entries' pages a link ends in a dotted slug for, `/blog/v1.2`, which is no file.
+  entryRoutes?: readonly string[] | undefined
 }
 
 // What a translation reads: the messages of its locale by dotted key, then the default locale's for a key it lacks.
@@ -308,7 +310,7 @@ export function leadsWithLocale(settings: LocaleSettings, href: string): boolean
 }
 
 // A link of the site written as the default locale names it, in the page's locale: `/about` on an English page is `/en/about`.
-// A link to no page, one under a locale's prefix already and a file a param would take, `/blog/cover.png`, stay as written.
+// A link to no page, one under a locale's prefix already and a file a param would take, `/blog/cover.png`, stay as written; a collection's route takes a dotted slug, `/blog/v1.2`, for its entry.
 export function localizedLink(settings: LocaleSettings, href: string, locale: string, currentHost?: string): string {
   const unchanged = settings.paths === undefined && (settings.hosts !== undefined || (locale === settings.defaultLocale && !settings.prefixDefault))
 
@@ -328,7 +330,8 @@ export function localizedLink(settings: LocaleSettings, href: string, locale: st
   if (settings.feeds?.includes(path) === true)
     return localePath({ ...settings, paths: undefined }, href, locale, currentHost)
 
-  const file = segments.at(-1)?.includes('.') === true
+  const entry = settings.entryRoutes?.some(pattern => matchSegments(segmentsOf(pattern), segments, {}) !== undefined) === true
+  const file = segments.at(-1)?.includes('.') === true && !entry
   const page = settings.pages?.some((pattern) => {
     const named = matchSegments(segmentsOf(pattern), segments, {})
 

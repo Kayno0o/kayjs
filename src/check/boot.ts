@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path'
 import { checkBudget } from '../build/budget'
 import { islandId } from '../compiler'
 import { CONFIG_FILE } from '../config'
-import { claimFeed, unservedRoutes } from '../content/claims'
+import { claimFeed, servesRoute, unservedRoutes } from '../content/claims'
 import { projectPaths } from '../project'
 import { actionUrl } from '../runtime/action'
 import { actionClash } from '../server/action-clash'
@@ -17,6 +17,7 @@ import { claimEndpoints } from '../server/endpoint-claims'
 import { PUBLIC_ENV_PATH } from '../server/env-state'
 import { faviconSource, svgFaviconProblems } from '../server/favicon'
 import { localeSettings, refuseLocaleClashes } from '../server/i18n'
+import { pageFlags } from '../server/page-flags'
 import { claimPublic, publicFiles } from '../server/public'
 import { claimRedirects, readRedirects } from '../server/redirects'
 import { refuseClashes } from '../server/route-table'
@@ -135,6 +136,14 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
 
   for (const { collection, route } of unservedRoutes(collectionRoutes, routes.map(page => page.pattern)))
     diagnostics.push({ file: projectPaths(root, options).content, line: 1, column: 1, message: `kay: the route ${route} of the collection ${collection} is served by no page; add the page that shows its entries, such as src/routes${route.replace('*slug', '[...slug]').replace(':slug', '[slug]')}.kay`, help: 'make the route the pattern of a page' })
+
+  // A page listing the entries of a routed collection in `prerender` while another page is the route's: the urls its entries give lead somewhere else.
+  for (const { collection, route } of collectionRoutes) {
+    for (const page of routes.filter(candidate => candidate.params.length > 0 && !servesRoute(route, candidate.pattern))) {
+      if ((await pageFlags(page.file)).prerender?.trim() === collection)
+        diagnostics.push({ file: page.file, line: 1, column: 1, message: `kay: this page prerenders the collection ${collection}, whose entries have the route ${route} and so link to another page`, help: `prerender the collection from the page serving ${route}, or change the route to ${page.pattern}` })
+    }
+  }
 
   diagnostics.push(...await actionClashes(root, [...new Set(routes.flatMap(route => [...route.layouts, ...route.actionModules ?? [], route.file]))]))
 

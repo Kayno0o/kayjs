@@ -23,6 +23,7 @@ interface Indexed {
 
 interface Compiled {
   pages: Indexed
+  entries: Indexed
   links: Map<string, string>
   translations: (locale: string, back: boolean) => Indexed
 }
@@ -36,6 +37,7 @@ function compiled(settings: LocaleSettings): Compiled {
 
     known = {
       pages: indexed((settings.pages ?? []).map((pattern, order) => compile(pattern, '/', order))),
+      entries: indexed((settings.entryRoutes ?? []).map((pattern, order) => compile(pattern, '/', order))),
       links: new Map(),
       translations(locale, back) {
         const key = `${locale}${back ? '<' : '>'}`
@@ -172,8 +174,11 @@ function resolvedLink(settings: LocaleSettings, href: string, locale: string, cu
   if (settings.feeds?.includes(path) === true)
     return localePath({ ...settings, paths: undefined }, href, locale, currentHost)
 
-  const file = segments.at(-1)?.includes('.') === true
-  const named = bestMatch(compiled(settings).pages, segments, normalized(segments))?.named
+  const spelled = normalized(segments)
+  const { pages, entries } = compiled(settings)
+  // A collection's route takes a dotted slug for an entry's page, not a file.
+  const file = segments.at(-1)?.includes('.') === true && bestMatch(entries, segments, spelled) === undefined
+  const named = bestMatch(pages, segments, spelled)?.named
 
   return named !== undefined && (!file || named === segments.length) ? localePath(settings, href, locale, currentHost) : href
 }

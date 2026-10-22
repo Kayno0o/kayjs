@@ -17,6 +17,7 @@ import { iconNames, iconProps } from '../runtime/icons'
 import { kayLog } from '../runtime/log'
 import { html } from '../runtime/rendered'
 import { isDraft } from './drafts'
+import { entryPath } from './entry-route'
 import { collectionFolder, contentKey, contentPlace, entryFiles, entrySlug, markdownOf, parseEntry, slugOf, sourcePath, STAMP_SETTLED_MS, translationKey, writableFolder } from './load'
 import { compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
 import { migrateData } from './migrate'
@@ -529,7 +530,11 @@ export async function entries(name: string, filter: EntryFilter = {}): Promise<S
 
 // The path of the page showing an entry: the collection's `url` called with the data as the schema decodes it, so an entry the schema refuses takes the route's page.
 async function pageUrl(collection: Collection<unknown>, entry: { slug: string, locale?: string | undefined }, decoded: { data: unknown } | undefined): Promise<string | undefined> {
-  const { url: urlOf } = collection.options
+  const { url: urlOf, route } = collection.options
+
+  // The route comes first, as it gives the entry its `url` and the feed its links.
+  if (route !== undefined)
+    return entryPath(route, entry.slug)
 
   return urlOf && decoded ? urlOf({ slug: entry.slug, locale: entry.locale, data: decoded.data }) : site?.urls(collection, entry)
 }

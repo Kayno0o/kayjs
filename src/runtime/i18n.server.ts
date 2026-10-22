@@ -58,7 +58,12 @@ export const localize = ((href: string, target?: string) => {
 export function alternate(target: Locale): string {
   const state = current('alternate()')
 
-  return state.implicit ? state.path : localePath(state.settings, state.path, target, state.host)
+  if (state.implicit)
+    return state.path
+
+  const shown = state.path.length > 1 && state.path.endsWith('/') ? state.path.slice(0, -1) : state.path
+
+  return localePath(state.settings, state.entryUrls?.get(shown)?.[target] ?? state.path, target, state.host)
 }
 
 // Every locale the site is served in, the default one first as `i18n` lists it, for a language switcher: `for code of locales()` with `alternate(code)` and `localeName(code)`.
