@@ -1,8 +1,12 @@
+import { mkdir, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
+import { messageKeys } from '../src/check/messages'
 import { componentInterface } from '../src/lsp/component-props'
 import { documentSymbols, foldingRanges } from '../src/lsp/outline'
 import { importEdits } from '../src/lsp/renames'
 import { templateContext } from '../src/lsp/template-completion'
+import { scratchDir } from './scratch'
 
 // The context at the `|` of a source.
 function at(marked: string, templateStart = 0) {
@@ -21,6 +25,14 @@ describe('template completion contexts', () => {
     expect(at('a(href={x|})')).toBeUndefined()
     expect(at('li: a(|)')).toMatchObject({ kind: 'attribute', tag: 'a' })
     expect(at('p(onClick={() => go(|)})')).toBeUndefined()
+  })
+
+  it('leaves the arguments of a call in a block or text line to TypeScript', () => {
+    for (const line of ['if isAdmin(user|', 'for x of xs.filter(y => y.|', 'const a = f(b|', 'await fetchUser(id|', 'p Hello(wor|'])
+      expect(at(line)).toBeUndefined()
+
+    expect(at('a(href="/users/{user.|}")')).toBeUndefined()
+    expect(at('// kay-allow-file unread|')).toMatchObject({ kind: 'lint' })
   })
 
   it('finds block keywords and elements at a line start, and blocks after @', () => {
@@ -74,5 +86,28 @@ describe('import edits on a rename', () => {
     expect(importEdits('/app/src/routes/index.kay', source, moves).map(edit => edit.text)).toEqual(['../ui/card.kay'])
     expect(importEdits('/app/src/routes/index.kay', source, new Map([['/app/src/routes/index.kay', '/app/src/routes/a/index.kay']])).map(edit => edit.text)).toEqual(['../../components/card.kay'])
     expect(importEdits('/app/src/routes/index.kay', source, new Map())).toEqual([])
+    expect(importEdits('/app/src/routes/index.kay', '---\nimport A from \'./x/../a.kay\'\n---\nA\n', new Map([['/app/src/other.kay', '/app/src/o.kay']]))).toEqual([])
+  })
+})
+
+describe('message keys', () => {
+  it('reads the catalog afresh after it is edited', async () => {
+    const root = await scratchDir('lsp-messages-')
+    const config = { locales: ['en'], defaultLocale: 'en' }
+
+    await mkdir(join(root, 'src/messages'), { recursive: true })
+    await writeFile(join(root, 'src/messages/en.ts'), 'export default { nav: { home: "Home" } }\n')
+    expect(await messageKeys(root, config)).toEqual(['nav.home'])
+
+    await writeFile(join(root, 'src/messages/en.ts'), 'export default { nav: { home: "Home", about: "About" } }\n')
+    expect(await messageKeys(root, config)).toEqual(['nav.home', 'nav.about'])
+  })
+})
+
+describe('outline on CRLF files', () => {
+  it('ends a selection at the end of its line', () => {
+    const [block] = documentSymbols('if n\r\n  p x\r\n')
+
+    expect(block!.selectionRange.end).toEqual({ line: 0, character: 4 })
   })
 })

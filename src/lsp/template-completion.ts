@@ -17,16 +17,18 @@ export interface TemplateContext {
   replace: Span
 }
 
-const KAY_ALLOW = /\/\/\s*kay-allow\s(?:[\w-]+[,\s]+)*([\w-]*)$/
+const KAY_ALLOW = /\/\/\s*kay-allow(?:-file)?\s(?:[\w-]+[,\s]+)*([\w-]*)$/
 const MESSAGE = /\bt\(\s*['"]([\w.-]*)$/
-const PATH = /(?:\b(?:href|action)=|\bnavigate\()\s*["'`](\/[^"'`]*)?$/
+const PATH = /(?:\b(?:href|action)=|\bnavigate\()\s*["'`](\/[^"'`{}]*)?$/
 const LINE_START = /^(\s*)(?:[\w-]+:\s+)?(@?)([\w-]*)$/
 const WORD_BEFORE = /[\w:|.-]*$/
 const PATH_AFTER = /^[^"'`\s]*/
 const SEPARATED = /[\s,]$/
 const CAPITALIZED = /^[A-Z]/
 const WORD_AFTER = /^[\w-]*/
-const TAG_BEFORE_PAREN = /([A-Z][\w-]*)(?:[.#][\w-]+)*$/i
+const TAG_BEFORE_PAREN = /([A-Z][\w-]*)(?:[.#][\w-]+)*$/di
+// What may come before an element on its line: indentation, and the `li:` of a nested element.
+const BEFORE_ELEMENT = /^\s*(?:\S+:\s+)?$/
 const ATTRIBUTE_NAME = /(?:^|[\s,])([\w:-]+)(?:[|=\s,]|$)/g
 const COMPONENT_LINE = /^\s*([A-Z][\w$]*)/
 
@@ -61,9 +63,10 @@ export function templateContext(source: string, offset: number, templateStart: n
     const inside = prefix.slice(open.index + 1)
     const word = WORD_BEFORE.exec(inside)![0]
     const before = inside.slice(0, inside.length - word.length)
-    const tag = TAG_BEFORE_PAREN.exec(prefix.slice(0, open.index))?.[1]
+    const found = TAG_BEFORE_PAREN.exec(prefix.slice(0, open.index))
+    const tag = found?.[1]
 
-    if (tag === undefined || !(before === '' || SEPARATED.test(before)))
+    if (tag === undefined || !BEFORE_ELEMENT.test(prefix.slice(0, found!.index)) || !(before === '' || SEPARATED.test(before)))
       return undefined
 
     const taken = new Set([...before.matchAll(ATTRIBUTE_NAME)].map(found => found[1]!))

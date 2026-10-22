@@ -210,7 +210,7 @@ function fenceLineStart(source: string, bodyStart: number): number {
 function endOfLine(source: string, offset: number): number {
   const end = source.indexOf('\n', offset)
 
-  return end === -1 ? source.length : end
+  return end === -1 ? source.length : end - (source[end - 1] === '\r' ? 1 : 0)
 }
 
 // A span may end after the line break of its last line, which the fold stops short of.

@@ -145,8 +145,11 @@ export async function messageProblems(root: string, config: I18nConfig, extensio
   return problems
 }
 
-// The keys `t()` can name: the default locale's, none while its catalog cannot be read.
+// The keys `t()` can name: the default locale's, none while its catalog cannot be read. The catalogs are read afresh, as an editor asks again after editing one.
 export async function messageKeys(root: string, config: I18nConfig, extensions: KayExtension[] = []): Promise<string[]> {
+  for (const path of [messagesFile(root, config, config.defaultLocale), ...extensionMessageFiles(root, extensions, config.defaultLocale)])
+    delete require.cache[path]
+
   const catalog = await localeCatalog(root, config, extensions, config.defaultLocale)
 
   return 'problem' in catalog ? [] : [...catalog.entries.keys()]

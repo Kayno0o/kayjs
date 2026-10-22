@@ -35,9 +35,9 @@ export function importEdits(file: string, source: string, moves: ReadonlyMap<str
 
     const target = resolve(dirname(file), specifier)
     const next = relative(dirname(placed), movedPath(target, moves)).split(sep).join('/')
-    const text = next.startsWith('.') ? next : `./${next}`
+    const text = next.startsWith('./') || next.startsWith('../') ? next : `./${next}`
 
-    if (text !== specifier)
+    if (text !== specifier && (placed !== file || movedPath(target, moves) !== target))
       edits.push({ start: span.start + 1, end: span.end - 1, text })
   }
 

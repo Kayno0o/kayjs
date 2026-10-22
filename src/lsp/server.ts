@@ -1337,7 +1337,7 @@ function safeFixes(document: Document): CodeAction[] {
   const edits: TextEdit[] = []
 
   for (const fix of document.diagnostics.flatMap(diagnostic => diagnostic.fixes?.find(candidate => candidate.safe) ?? [])) {
-    if (fix.edits.some(edit => taken.some(other => edit.start < other.end && other.start < edit.end)))
+    if (fix.edits.some(edit => taken.some(other => edit.start === other.start || (edit.start < other.end && other.start < edit.end))))
       continue
 
     taken.push(...fix.edits)
