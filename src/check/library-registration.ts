@@ -104,13 +104,15 @@ function rewritten(form: OldForm, call: t.CallExpression, source: string, root: 
     return path === undefined || !exportsAuth(root, path) ? undefined : `auth({ module: ${literal(path)}, pages: false })`
   }
 
+  // With neither a module nor a server, the old form mounted nothing, which `auth()` alone would now build itself.
   if (first === undefined)
-    return 'auth()'
+    return 'auth({ plugin: false })'
 
   if (first.type !== 'ObjectExpression')
     return undefined
 
   const members: string[] = []
+  let loads = false
 
   for (const property of first.properties) {
     if (property.type !== 'ObjectProperty') {
@@ -124,6 +126,10 @@ function rewritten(form: OldForm, call: t.CallExpression, source: string, root: 
     }
 
     const key = keyOf(property)
+
+    if (key === 'auth' || key === 'server')
+      loads = true
+
     const path = key === 'auth' ? importedPath(property.value) : undefined
 
     // The old form took both and `auth` won; the new takes one.
@@ -136,7 +142,7 @@ function rewritten(form: OldForm, call: t.CallExpression, source: string, root: 
     members.push(path === undefined ? text(property) : `module: ${literal(path)}`)
   }
 
-  return members.length === 0 ? 'auth()' : `auth({ ${members.join(', ')} })`
+  return `auth({ ${[...members, ...loads ? [] : ['plugin: false']].join(', ')} })`
 }
 
 // The registrations an app's `kay.config.ts` still writes the old way: `authPages({ auth: () => import('./src/auth') })` and `authExtension(...)` for kayjs-auth, `mailExtension('./src/mail')` for kayjs-mail.

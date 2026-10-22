@@ -23,7 +23,32 @@ An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never
 
 ## Setup
 
-In a kay project with a server and Tailwind, `kay add auth` installs the packages and writes all of this: `src/auth.ts` over your pg-orm `Database` (with `...authTables` added to its tables) or a SQLite file of its own, using kayjs-mail as the mailer when `src/mail.ts` exists, a root `src/routes/_guard.ts`, a session secret in `.env`, and the extensions below with kayjs-ui's `ui()`. The rest of this section is what it writes.
+One line in `kay.config.ts` is the whole setup. There is no auth file to write:
+
+```ts
+import { auth } from '@kaynooo/kayjs-auth'
+import { defineConfig } from 'kay/server'
+
+export default defineConfig({
+  extensions: [auth({ oauth: { github: true }, roles: { admin: ['editor'], editor: [] } })],
+})
+```
+
+`auth()` takes the options of `createAuth` and finds the rest:
+
+- The session is kay's `session()`, on the app secret ([The app secret](/guides/sessions-and-guards#the-app-secret)).
+- The site's public origin, which OAuth callbacks, mailed links and passkeys are built on, is the `site` of `kay.config.ts` (or `SITE_URL`).
+- The store is a SQLite file `data/auth.db` kept through pg-orm. Set `KAYJS_AUTH_DATABASE_URL` to a Postgres or SQLite url, or give `store`: `{ url }`, `pgStore(db)` over your own database, or a function returning a store.
+- Mail goes through `mail.enqueue` of `src/mail.ts` when it exports `mail` (kayjs-mail). `email: false` sends none, and an `email` of your own replaces it.
+- `oauth: { github: true }` reads `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` from the environment, and `kay env` lists them. The presets are github, discord, google, microsoft and gitlab. An object adds `label`, `scopes` or `keepTokens`, and `clientId` and `clientSecret` skip the environment.
+- Hooks such as `onSignUp` and `onDelete` are options too. Hooks that need your database go in an optional `src/auth.ts` that exports `hooks`, which kay finds by itself, or in `hooks: () => import('./src/auth')`, which `kay build --compile` can bake in.
+- The prebuilt pages are on under `prefix` (`/auth`), and `home` (`/`) is where sign-ins and sign-outs go. `pages: false` leaves them out.
+
+Every page, action and guard can now read `ctx.locals.auth`, typed. A file of yours at a page's path, such as `src/routes/auth/sign-in.kay`, replaces that page.
+
+An app that keeps session data of its own, or wires its store by hand, writes the auth object itself. `kay add auth` writes it for a project with a server and Tailwind.
+
+That is `src/auth.ts` over your pg-orm `Database` (with `...authTables` added to its tables) or a SQLite file of its own, using kayjs-mail as the mailer when `src/mail.ts` exists. It also adds a root `src/routes/_guard.ts`, a session secret in `.env`, and the extension below with kayjs-ui's `ui()`. The rest of this section is what it writes.
 
 `src/auth.ts` creates the auth object. `memoryAuthStore()` keeps users in the process, for trying it out.
 
@@ -45,7 +70,7 @@ The session takes kay's `KAY_SECRET`, and kayjs-auth takes its key from the sess
 
 With the default, the TOTP secrets and stored provider tokens are sealed with a key derived from the session secret. When you rotate it, keep the old session secrets in the list for as long as that data exists, or set `secret` separately. To move an app from `AUTH_SECRET` to the default, pass `secret: [...sessions.deriveSecret('kayjs-auth'), process.env.AUTH_SECRET!]` until nothing sealed under the old one is left.
 
-Then declare it in `kay.config.ts`. The module loads only when the server starts, so the config never loads your database.
+Then declare it in `kay.config.ts` with `module`. The module loads only when the server starts, so the config never loads your database.
 
 ```ts
 import { auth } from '@kaynooo/kayjs-auth'
@@ -56,7 +81,7 @@ export default defineConfig({
 })
 ```
 
-Every page, action and guard can now read `ctx.locals.auth`, typed. A `prefix` or `home` given to `auth()` reaches `createAuth({ pages: true })` too, so give them once. A `prefix` that differs from the one in `createAuth({ pages })` stops the server at start, and a differing `home` logs a warning naming both, `createAuth`'s winning. `pages: true` serves the prebuilt pages under `/auth`, such as `/auth/sign-in`, `/auth/register` and `/auth/account`.
+Every page, action and guard can now read `ctx.locals.auth`, typed. A `prefix` or `home` given to `auth({ module })` reaches `createAuth({ pages: true })` too, so give them once. A `prefix` that differs from the one in `createAuth({ pages })` stops the server at start, and a differing `home` logs a warning naming both, `createAuth`'s winning. `pages: true` serves the prebuilt pages under `/auth`, such as `/auth/sign-in`, `/auth/register` and `/auth/account`.
 
 A file of yours at the same path, such as `src/routes/auth/sign-in.kay`, replaces that page.
 

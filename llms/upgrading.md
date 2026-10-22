@@ -7,6 +7,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### An action's options are grouped by concern
 
 `rateLimit`, `honeypot`, `minTime` and `proofOfWork` move under `protect` in an action's third argument: `{ protect: { rateLimit: { max: 5, window: '1m' }, honeypot: 'website' }, maxSize, messages, tool }`. The flat form works until 1.74, and `deprecated-action-options` moves the keys with `kay upgrade` ([Protecting actions](action-protection.md#protecting-an-action)). kayjs-mail's `contactForm({ protection })` keeps its keys.
+### `auth()` with no module builds the plugin itself
+
+kayjs-auth's `auth()` with neither `module` nor `server` now makes the whole auth object (kay's session, a SQLite store, the mailer of `src/mail.ts`) instead of serving the pages alone. An app mounting `auth.plugin` by hand, `new Elysia().use(auth.plugin).use(await pages())`, gives `auth({ plugin: false })`; `kay check --fix` rewrites an `authPages(...)` that loaded no module to it (`deprecated-library-registration`), and no lint can recognise a bare `auth()` already in use.
 
 ### `src/plugins` holds server plugins
 

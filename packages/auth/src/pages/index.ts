@@ -3,11 +3,13 @@ import type { KayExtension } from 'kay/server'
 import type { CaptchaWidget } from '../captcha'
 import type { BareUser, Core } from '../core'
 import type { CodedLink, CodeMode } from '../email'
+import type { OwnOptions, OwnPlugin } from '../own'
 import type { CreateUserInput, CreateUserResult } from '../password'
 import type { LinkType } from '../store'
 import { resolve } from 'node:path'
 import { configError } from 'kay/library'
 import { pickLocale } from '../locale'
+import { buildOwn, ownEnv } from '../own'
 
 export interface AuthPagesOptions {
   // Where the pages are served, `/auth` by default, beside kayjs-auth's own routes: `/auth/sign-in`. `createAuth` reads it when `auth()` loads it with `module`.
@@ -239,6 +241,8 @@ export interface AuthExtensionOptions extends AuthPagesOptions {
   pages?: boolean | undefined
   // Reads the signed-in user before every page renders, so `SignedIn`, `SignedOut` and `UserMenu` show on the first bytes, even with JavaScript off. Left out, they stream in after the page, which needs JavaScript, and a page not showing the user costs no read. `false` by default: it reads the session on every page, making each one the visitor's own.
   viewer?: boolean | undefined
+  // `false` builds no plugin, for an app mounting the plugin by hand, `new Elysia().use(auth.plugin).use(await pages())`: the extension then serves the pages alone.
+  plugin?: false | undefined
 }
 
 // The `auth` an app's module exports, for `prepare` to hand it the prefix and home `auth()` was given.
@@ -250,7 +254,39 @@ function authOfExport(exported: unknown, module: string): { [PAGES_OF]?: PagesHa
 }
 
 // kayjs-auth for `extensions` in kay.config.ts, as the whole declaration: `auth({ module: './src/auth' })`, the module exporting the `auth` made with `createAuth`. Its plugin is used before the pages, so the app mounts nothing else and declares no `Register`, and `prefix` and `home` reach `createAuth({ pages: true })`; the prebuilt pages come with it unless `pages: false`.
-export function auth(options: AuthExtensionOptions = {}): AuthPages {
+export function auth<Role extends string = string, Prefix extends string = '/auth', const Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>>(options?: OwnOptions<Role, Prefix, Scope, OrgRole, UserData>): AuthPages<OwnPlugin<Role, Prefix, Scope, OrgRole, UserData>>
+export function auth(options: AuthExtensionOptions): AuthPages
+export function auth(options: object = {}): AuthPages {
+  const given = options as AuthExtensionOptions
+
+  if (given.module === undefined && given.server === undefined && given.plugin !== false)
+    return ownAuth(options)
+
+  return moduleAuth(given)
+}
+
+// `auth()` with no module: kayjs-auth builds the whole `createAuth` as the server starts, so kay.config.ts declares everything and no file of the app is needed.
+function ownAuth(options: OwnOptions): AuthPages {
+  const prefix = options.prefix ?? DEFAULT_PREFIX
+  let built: Promise<UserMaker & { plugin: AnyElysia }> | undefined
+  const build = async () => built ??= buildOwn(options)
+
+  const extension: AuthPages = {
+    name: '@kaynooo/kayjs-auth',
+    server: async () => (await build()).plugin,
+    ...options.pages !== false && { routes: { dir: `${import.meta.dir}/routes`, prefix } },
+    ...options.viewer === true && { layout: `${import.meta.dir}/../viewer-layout/_layout.kay` },
+    env: ownEnv(options),
+    devTool: DEV_TOOL,
+    commands: COMMANDS,
+    prefix,
+    home: options.home ?? '/',
+  }
+
+  return Object.assign(extension, { [LOAD_AUTH]: build })
+}
+
+function moduleAuth(options: AuthExtensionOptions): AuthPages {
   const { module, server, pages = true, viewer = false, prefix = DEFAULT_PREFIX, home } = options
 
   if (module !== undefined && server !== undefined)

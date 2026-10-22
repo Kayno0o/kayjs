@@ -47,7 +47,7 @@ export default defineConfig({
 })
 ```
 
-`auth()` also serves the prebuilt pages below; an app keeping its own gives `pages: false`. A plain Elysia server uses the plugin before the pages, `new Elysia().use(auth.plugin).use(await pages())`, and registers its types in kay's `Register`, as llms.txt shows.
+`auth()` also serves the prebuilt pages below; an app keeping its own gives `pages: false`. A plain Elysia server gives `auth({ plugin: false })` and uses the plugin before the pages, `new Elysia().use(auth.plugin).use(await pages())`, and registers its types in kay's `Register`, as llms.txt shows.
 
 ## A first page
 

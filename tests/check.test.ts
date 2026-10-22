@@ -3832,6 +3832,18 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('rewrites an authPages that mounted no plugin to auth with plugin: false, as auth() alone now builds its own', async () => {
+    const root = await scratchProject({ 'kay.config.ts': 'import { authPages } from \'@kaynooo/kayjs-auth\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [authPages({ prefix: \'/account\' })] })\n' })
+
+    try {
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('import { auth } from \'@kaynooo/kayjs-auth\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [auth({ prefix: \'/account\', plugin: false })] })\n')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('leaves an old authPages alone where its module exports no named auth', async () => {
     const source = 'import { authPages } from \'@kaynooo/kayjs-auth\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [authPages({ auth: () => import(\'./src/auth\') })] })\n'
     const root = await scratchProject({ 'kay.config.ts': source, 'src/auth.ts': 'const auth = 1\n\nexport { auth as default }\n' })

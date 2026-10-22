@@ -5,9 +5,23 @@
 
 ### Setup
 
-kayjs-auth is published as `@kaynooo/kayjs-auth` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay, Elysia, kayjs-ui (for the prebuilt pages) and, for the Postgres store, `@kaynooo/pg-orm` are peer dependencies.
+kayjs-auth is published as `@kaynooo/kayjs-auth` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay, Elysia, kayjs-ui (for the prebuilt pages) and `@kaynooo/pg-orm` (for the default store) are peer dependencies.
 
-`kay add auth` does the rest of this section for a project with `server` and `tailwind`: it installs the packages, writes `src/auth.ts` (over the project's pg-orm `Database`, to which it adds `...authTables`, or over a SQLite file of its own; kayjs-mail's `mail.enqueue` as the mailer when `src/mail.ts` exists), a root `src/routes/_guard.ts` exporting `auth.guard()`, `KAY_SECRET` and `SITE_URL` in `.env.example`, and lists `authPages(...)` and kayjs-ui's `ui()` in kay.config.ts. The sign-in, register and account pages stay open to visitors. Delete the guard for a site with public pages.
+One line in kay.config.ts is the whole setup, and the app has no auth file:
+
+```ts
+// kay.config.ts
+import { auth } from '@kaynooo/kayjs-auth'
+import { defineConfig } from 'kay/server'
+
+export default defineConfig({
+  extensions: [auth({ oauth: { github: true }, roles: { admin: ['editor'], editor: [] } })],
+})
+```
+
+`auth()` takes `createAuth`'s options (see Setup rules) and finds the rest. The session is kay's `session()` on the app secret. The site is kay's `site`. The store is a SQLite file `data/auth.db` through pg-orm, or the database at `KAYJS_AUTH_DATABASE_URL` (a Postgres or SQLite url), or `store`: `{ url }`, a `pgStore(db)` over the app's own database, or a function returning a store. The mailer is `mail.enqueue` of `src/mail.ts` when it exports `mail`; `email: false` sends no mail, and `email` of your own replaces it. `oauth: { github: true }` reads `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` (presets: github, discord, google, microsoft, gitlab), and `kay env` lists them; an object adds `label`, `scopes` or `keepTokens`, and `clientId` and `clientSecret` skip the environment. Hooks (`onSignUp`, `onDelete`, `profileFields`, `exportData`, `onAuthEvent`, `allow`, `authorize`, `locate`) are options too, or `export const hooks` in an optional `src/auth.ts`, found by convention, or `hooks: () => import('./src/auth')`, which `kay build --compile` bakes in. The pages are on under `prefix` (`/auth`), sign-ins and sign-outs going to `home` (`/`); `pages: false` leaves them out and `pages: { remember, profile }` tunes them. Session data of the app's own, or a store wired by hand, takes the longer form below.
+
+`kay add auth` writes that longer form for a project with `server` and `tailwind`: it installs the packages, writes `src/auth.ts` (over the project's pg-orm `Database`, to which it adds `...authTables`, or over a SQLite file of its own; kayjs-mail's `mail.enqueue` as the mailer when `src/mail.ts` exists), a root `src/routes/_guard.ts` exporting `auth.guard()`, `KAY_SECRET` and `SITE_URL` in `.env.example`, and lists `authPages(...)` and kayjs-ui's `ui()` in kay.config.ts. Delete the guard for a site with public pages.
 
 ```ts
 // src/auth.ts
@@ -44,12 +58,7 @@ export default defineConfig({
 
 ### Prebuilt pages
 
-kayjs-auth ships every sign-in and account page as a kay extension, styled with kayjs-ui, in English and French. `auth()` in kay.config.ts, as in Setup, serves them, and `createAuth` sends users to them:
-
-```ts
-// src/auth.ts
-export const auth = createAuth({ /* ... */ pages: true })
-```
+kayjs-auth ships every sign-in and account page as a kay extension, styled with kayjs-ui, in English and French. `auth()` serves them, and a `createAuth` module asks for them with `pages: true`.
 
 ### The signed-in user
 
@@ -87,14 +96,14 @@ const api = new Elysia({ prefix: '/api' })
 
 ### Setup rules
 
-That one line is the whole declaration. `module` is the file exporting `auth`, the `createAuth` result, as `export const auth`, relative to the project root, and the extension hands `pages()` its plugin, used before the pages: the app mounts nothing else and declares no `Register`, `kay check` typing `ctx.locals.auth` and checking links to kayjs-auth's routes off it. It loads as `pages()` builds the app, so kay.config.ts never loads the app's database, and `kay check`, the editor and `kay build` never load it. `auth()` also brings the prebuilt pages (see Prebuilt pages); an app keeping its own serves the plugin alone with `auth({ module: './src/auth', pages: false })`. `auth({ server })` takes any other plugin as a function, `server: async () => somePlugin`.
+`auth({ module })` is the longer form: `module` is the file exporting `auth`, the `createAuth` result, as `export const auth`, relative to the project root. The extension hands `pages()` its plugin, used before the pages, so the app mounts nothing else and declares no `Register`, and `kay check` types `ctx.locals.auth` and checks links to kayjs-auth's routes off it. The module loads as `pages()` builds the app, never for `kay check`, the editor or `kay build`. `pages: false` serves the plugin alone, and `auth({ server })` takes any other plugin as a function.
 
-A plain Elysia app, or one mounting the plugin by hand, uses it before the pages, `new Elysia().use(auth.plugin).use(await pages())`, and registers `locals: LocalsOf<typeof auth.plugin>` and `app: typeof auth.plugin` (or its own Elysia instance) in kay's `Register` for `kay check`. The plugin may also sit inside a plugin of the app's own, at any depth: `auth` reaches every route declared after it. The session plugin then goes on the app itself, or is left to `auth.plugin`: used first inside that plugin, it stays there, and every route outside it answers 500 with an error saying so. The plugin uses the session plugin itself, puts `auth` in every request's context (`ctx.locals.auth` in pages, actions and guards, `({ auth })` in Elysia routes), and serves the OAuth routes. `db.sync()` creates kayjs-auth's tables with the app's. What it logs, a mailer, a hook or a check that failed, goes where the app's `log` setting sends kay's messages, headed `kayjs-auth:`, as text, as JSON or to the app's function, under the request being answered.
+A plain Elysia app, or one mounting the plugin by hand, gives `auth({ plugin: false })` in kay.config.ts, uses `auth.plugin` before the pages, `new Elysia().use(auth.plugin).use(await pages())`, and registers `locals: LocalsOf<typeof auth.plugin>` and `app: typeof auth.plugin` in kay's `Register` for `kay check`. The plugin uses the session plugin itself, puts `auth` in every request's context (`ctx.locals.auth` in pages, actions and guards, `({ auth })` in Elysia routes), and serves the OAuth routes. What it logs goes where the app's `log` setting sends kay's messages, headed `kayjs-auth:`.
 
 `createAuth` options:
 
 - `sessions`: the plugin kay's `session()` returns, its data type including `AuthSessionData`: the signed-in state lives in the app's kay session, and kayjs-auth sets no cookie of its own.
-- `secret`: left out, kayjs-auth derives its own key from the session's secret, which is kay's `KAY_SECRET` unless `session()` gets one ([The app secret](../../../llms/environment.md#the-app-secret); `sessions.deriveSecret('kayjs-auth')`, HKDF, so it says nothing of the session's key and a rotated list stays rotated), and one secret serves both. Pass one (at least 32 characters, from the environment, a list rotates) to keep a second secret for kayjs-auth; a session plugin that is not kay's `session()` needs it. Each use gets its own key derived from it: encrypting TOTP secrets and provider tokens, and digesting where a sign-in came from. The first writes, every one reads. With the default, TOTP secrets and stored provider tokens are sealed under a key derived from the session secret: keep the old session secrets in its list while such data exists, or set `secret` separately. Moving an app from `AUTH_SECRET` to the default needs `secret: [...sessions.deriveSecret('kayjs-auth'), process.env.AUTH_SECRET!]` for as long as data sealed under it exists. After a rotation each user gets one `new-sign-in` mail, since the digest of where they sign in from changes with the secret.
+- `secret`: left out, kayjs-auth derives its own key from the session's secret ([The app secret](../../../llms/environment.md#the-app-secret)), so one secret serves both and keeping the old session secrets in its list keeps the TOTP secrets and provider tokens sealed under them readable. Pass one (at least 32 characters, a list rotates: the first writes, every one reads) to keep a second secret, or when the session plugin is not kay's. After a rotation each user gets one `new-sign-in` mail.
 - `store`: see Stores.
 - `site`: the site's public origin, for OAuth callbacks, mailed links and passkeys; kay's `site` (kay.config.ts, else `SITE_URL`) when left out; a plain Elysia app gives its own. With OAuth or mail configured and no origin anywhere, the server refuses to start and a request answers 500, naming `SITE_URL`; `kay dev` supplies `http://localhost:<port>`. `name`: the site's name in mails and authenticator apps, the origin's host by default. `url` and a `site` that is a name are the old forms of both, kept until 1.73 (`deprecated-site-name`).
 - `prefix`: where the OAuth routes live, `/auth` by default.
@@ -103,7 +112,7 @@ A plain Elysia app, or one mounting the plugin by hand, uses it before the pages
 
 ### Prebuilt pages rules
 
-- `auth({ module, prefix, home })` and `createAuth({ pages: { prefix, home } })` take the same `prefix` and `home`, and `createAuth({ pages: true })` reads them off `auth()`, so give them once, in `kay.config.ts`. A `prefix` in both places must match, else the server stops at start naming both; `home` in `createAuth` wins when they differ, and the server logs a warning at start naming both. `prefix` is where the pages live, `/auth` by default, and `home` where a sign-in goes when nothing asked for another page and where a sign-out goes, `/` by default. `pages: true` takes the defaults. `home` is also where the mailed links, a code, registering, a passkey and a provider land when nothing asked for another page; the pages localize it for a site with locales.
+- `prefix` and `home` are given once, to `auth()` in kay.config.ts, and reach a `createAuth({ pages: true })` module too. A `prefix` in both places must match, else the server stops at start naming both; `home` in `createAuth` wins when they differ, with a warning. `prefix` is where the pages live, `/auth` by default, and `home` where a sign-in goes when nothing asked for another page and where a sign-out goes, `/` by default. It is also where the mailed links, a code, registering, a passkey and a provider land when nothing asked for another page; the pages localize it for a site with locales.
 - `pages.remember` is `'checkbox'` (default), `'always'` or `'never'`: the sign-in and register pages show a "keep me signed in" box, or none and every sign-in remembered (`'always'`) or none (`'never'`). Unchecked is the same by password, passkey, register, magic link, code and each provider; checked is `remember.maxAge` on all of them. The provider buttons and the passkey button read the first box of the page, which a click carries, so a browser without script signs in with a provider as unchecked. A magic link carries the choice of the browser that asked for it, so opened in another browser it signs in as chosen. A page of the app's own, or a link to `/auth/<provider>` with no `remember`, gets the session plugin's `maxAge`, and the sign-out and provider routes fall back to `home` as written, unlocalized: only the prebuilt pages localize it.
 - The pages: `sign-in` (providers, password, magic link or code, passkey, remember me), `register`, `two-factor`, `reset-password`, `verify-email`, `magic-link`, `confirm-email`, and under `account`: the profile (address, username, verification), `security` (password, two-factor with its QR code and recovery codes, passkeys), `sessions`, `connections` (shown with providers), `tokens`, `clients` (the apps signed in by OAuth, with a revoke button; shown with the OAuth server) and `data` (download, asking for a recent proof first, and deletion). Each works without JavaScript but passkeys, and shows only what the config enables.
 - With `pages`, `signInPage`, `twoFactorPage`, `sessionsPage` and every `email.links` default to those pages, and `auth.guard()` without `redirect` sends an anonymous GET or HEAD to the sign-in page (a browser fetch, or a request whose `Accept` names neither `text/html` nor `*/*`, gets the 401), `?redirect=` back, in the page's language (`/fr/page` goes to `/fr/auth/sign-in?redirect=%2Ffr%2Fpage`). Without `pages`, `email.links` names a page for each kind, or `createAuth` throws.
