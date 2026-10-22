@@ -1,8 +1,9 @@
 import { existsSync } from 'node:fs'
-import { mkdir, rm, symlink } from 'node:fs/promises'
+import { mkdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { dirname, join, relative } from 'node:path'
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { kay } from '../../../src/build/plugin'
+import { uiProblems } from '../../../src/check/ui'
 import { child } from '../../../src/runtime/html'
 
 // An app of its own, as `src/ui.ts` restyles every instance of a component in the app: the library's fixture app renders the same components untouched, and its contract tests compare them. Built apart from testSite, which serves one project per test process.
@@ -214,9 +215,13 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     expect(html).toMatch(/<button[^>]* id="single"[^>]* class="kui-btn rounded-none">/)
   })
 
-  test('the browser build of an island carries the restyled classes as well', () => {
-    for (const classes of ['text-xl', 'justify-end', 'uppercase', 'py-4', 'h-12', 'tracking-wide', 'rounded-none', 'w-72', 'h-9'])
-      expect(browser).toContain(classes)
+  test('the browser build of an island puts the restyled classes after the kui class of their part', () => {
+    for (const [part, classes] of [['title', 'text-xl'], ['footer', 'justify-end'], ['headCell', 'uppercase'], ['cell', 'py-4'], ['panel', 'w-72']] as const)
+      expect(browser).toMatch(new RegExp(`look\\d+\\(__props, "${part}"\\), "${classes}"`))
+
+    expect(browser).toContain('class: "rounded-none" }')
+    expect(browser).toContain('inline: { root: "tracking-wide" }')
+    expect(browser).toMatch(/class: \[rest\.class, look\d+\(__props, "root"\), "h-12"/)
   })
 
   test('the browser build draws the parts of a reactive recipe with the restyle: Tabs, Toggle, MultiSelect, IconPicker and DateInput', () => {
@@ -233,6 +238,20 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     expect(html).toMatch(/<svg[^>]*data-part="spinner"/)
     expect(html).toMatch(/<button[^>]*data-part="step"[^>]*class="kui-icon-btn rounded-full kui-carousel-step size-12"/)
     expect(html).toMatch(/<svg[^>]*data-part="sortIcon"/)
+  })
+
+  test('kay check reports a part, a variant and a value a component of kayjs-ui does not have', async () => {
+    const project = join(ROOT, 'node_modules', '.cache', 'bad-ui')
+
+    await mkdir(join(project, 'src'), { recursive: true })
+    await writeFile(join(project, 'src/ui.ts'), 'export default { \'@kaynooo/kayjs-ui/card.kay\': { parts: { foot: \'a\' }, variants: { size: { sm: \'b\' } } }, \'@kaynooo/kayjs-ui/button.kay\': { variants: { tone: { loud: { root: \'c\' } } } } }')
+
+    expect(uiProblems(project).map(problem => problem.message)).toEqual([
+      '`@kaynooo/kayjs-ui/card.kay` has no part `foot`',
+      '`@kaynooo/kayjs-ui/card.kay` has no variant `size`',
+      'The variant `tone` of `@kaynooo/kayjs-ui/button.kay` has no value `loud`',
+    ])
+    expect(uiProblems(ROOT)).toEqual([])
   })
 
   test('a part nothing restyles keeps its kui class alone', () => {
