@@ -34,7 +34,7 @@ li(class={size})
 
 `--- module` holds code that runs once per bundle rather than per render. What it exports, such as `export const visits = signal(0)` or `export function label(n: number)`, other files import from the `.kay` file with its types: `import { label } from './counter.kay'`. It takes no props and no default export, and a `--- client` component has none.
 
-`--- style` holds CSS scoped to the component. kay adds a `data-k-` attribute to each element the template writes and ends every selector on it, so `.card { color: red }` styles this file's `.card` alone. `:global(.x)` is the way out, `@media`, `@supports`, `@layer` and `@container` bodies are scoped alike, and a component the template calls keeps its root unscoped: reach it with `class` or a part. The CSS reaches the page as an imported stylesheet does.
+`--- style` holds CSS scoped to the component. kay adds a `data-k-` attribute to each element the template writes and ends every selector on it, so `.card { color: red }` styles this file's `.card` alone. `:global(.x)` is the way out, `@media`, `@supports`, `@layer` and `@container` bodies and rules nested inside another are scoped alike, and a component the template calls keeps its root unscoped: reach it with `class` or a part. The CSS reaches the page as an imported stylesheet does.
 
 A fence ends on a `---` line, or on the line opening the next one. `--- script` spells the component script out, for when it follows another fence.
 

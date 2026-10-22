@@ -92,7 +92,7 @@ export const ERRORS = {
   'worker-build': {
     group: 'build',
     summary: 'A worker that fails to build, or starts itself again through other workers.',
-    fix: { file: 'llms/styles-and-assets.md', heading: 'Wasm and workers' },
+    fix: { file: 'llms/imported-files.md', heading: 'Wasm and workers' },
   },
   'glob-import': {
     group: 'build',

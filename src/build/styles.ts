@@ -2,12 +2,14 @@ import type { BunPlugin } from 'bun'
 import type { KayLibrary } from './libraries'
 import { readFileSync, statSync } from 'node:fs'
 import { rename } from 'node:fs/promises'
-import { dirname, join, sep } from 'node:path'
+import { dirname, join, relative, sep } from 'node:path'
 import { islandId, withoutTwin } from '../compiler'
 import { parseKay } from '../compiler/parser'
 import { rebaseUrls, scopeAttribute, scopeCss, scopeHash } from '../compiler/scoped-style'
+import { tailwindEntry } from '../format/tailwind'
 import { cacheDir, projectPaths } from '../project'
 import { ASSET_FILE, clientDir, writeAsset } from './assets'
+import { pruneCache, touchCacheFile } from './cache'
 import { collectionComponents, importedNames, rendersContent } from './collection-components'
 import { CSS_FILE, KAY_FILE, resolveFrom, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
 import { globbedFiles } from './glob'
@@ -22,6 +24,11 @@ const URL_SCHEME = /^[a-z][\w+.-]*:/i
 // `import css from './x.css' with { type: 'text' }` and its dynamic form: the file's text, read by the module, which no stylesheet build follows.
 const TEXT_IMPORT = /\bfrom\s*(['"])([^'"\n]+)\1\s*(?:with|assert)\s*\{[^}]*\btype\s*:\s*(['"])text\3[^}]*\}|\bimport\(\s*(['"])([^'"\n]+)\4\s*,\s*\{\s*with\s*:\s*\{[^}]*\btype\s*:\s*(['"])text\6[^}]*\}\s*(?:,\s*)?\}\s*\)/g
 const ANY = /.*/
+// What Tailwind resolves against the app's theme, which a stylesheet of its own reads through `@reference`.
+const THEME_USE = /@apply\b|@variant\b|@custom-variant\b|\btheme\(/
+const SCOPED_FILE = /^[\da-z]+\.css$/
+// Whether this process wrote or kept a scoped stylesheet, which a full build leaves in place when it prunes.
+let scopedTouched = false
 const CSS_TEXT = 'kay-css-text'
 const CSS_EFFECT = 'kay-css-effect'
 // Ends the path of a stylesheet imported for its effect: the bundler tells modules apart by path alone, so without it a text import of the same file would be the same, empty, module.
@@ -73,6 +80,11 @@ export async function styleSignature(path: string, source: string): Promise<stri
   return JSON.stringify([await importsOf(path, source), file !== undefined && rendersContent(file.template), file?.style && source.slice(file.style.start, file.style.end)])
 }
 
+// Drops the scoped stylesheets of components a full build no longer has, as `pruneCompileCache` does for compiled files; never after a run that wrote none.
+export async function pruneScopedStyles(cacheRoot: string): Promise<number> {
+  return scopedTouched ? pruneCache(join(cacheRoot, 'scoped'), SCOPED_FILE) : 0
+}
+
 // For the stylesheet build: components and modules shrink to their imports, so Bun follows them down to every stylesheet a page uses, and the assets they import are written for the server to serve.
 // A page's server code is left out but for its assets, the components and stylesheets it imports, and the components of the collections whose entries it renders, and nothing outside the project but stylesheets is followed: no server-only module ever reaches the bundler.
 // `loaded` collects the components and modules it shrank, which the bundler leaves out of its list of inputs once nothing but side-effect imports of them remains.
@@ -105,7 +117,14 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
   const scopedStylesheet = async (path: string, css: string) => {
     const moduleId = islandId(throughLinks(root, path), root)
     const file = join(cacheDir(root, 'scoped'), `${scopeHash(moduleId)}.css`)
-    const contents = rebaseUrls(scopeCss(css, scopeAttribute(moduleId)), dirname(path), dirname(file))
+
+    scopedTouched = true
+    touchCacheFile(file)
+
+    const scoped = rebaseUrls(scopeCss(css, scopeAttribute(moduleId)), dirname(path), dirname(file))
+    // `@apply` in a stylesheet of its own needs the app's Tailwind entry as a reference, which kay writes so the fence needs no line of it.
+    const entry = THEME_USE.test(scoped) ? await tailwindEntry(root, false) : undefined
+    const contents = entry === undefined ? scoped : `@reference ${JSON.stringify(relative(dirname(file), entry).split(sep).join('/'))};\n${scoped}`
 
     // Renamed into place, so a build reading the file while another writes it meets the old text or the new, never half of it.
     if (!(await Bun.file(file).exists()) || await Bun.file(file).text() !== contents) {

@@ -129,6 +129,20 @@ describe('a linked kay library', () => {
     expect(checked.output).toMatch(/^checked with no problems in \d+ ms\n$/)
     expect(checked.code).toBe(0)
   })
+
+  it('scopes a style fence by the id the compiled markup carries', async () => {
+    const out = join(linked, 'out-styled')
+
+    await write(library, { 'src/boxed.kay': '--- style\n.boxed { color: rebeccapurple }\n---\np.boxed Boxed\n' })
+    await write(linked, { 'src/routes/boxed.kay': '---\nimport Boxed from \'kay-lib/boxed.kay\'\n---\nBoxed\n' })
+    expect((await run('build', linked, '--static', '--outdir', out)).code).toBe(0)
+
+    const attribute = (/<p [^>]*\b(data-k-[a-z0-9]+)/).exec(await Bun.file(join(out, 'boxed/index.html')).text())?.[1]
+    const css = (await Promise.all((await readdir(join(out, '_kay'))).filter(name => name.endsWith('.css')).map(async name => Bun.file(join(out, '_kay', name)).text()))).join('\n')
+
+    expect(attribute).toBeDefined()
+    expect(css).toContain(`.boxed[${attribute}]`)
+  }, 120_000)
 })
 
 // A workspace installs its packages once, in a `node_modules` above each app.

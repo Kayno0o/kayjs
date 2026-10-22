@@ -48,7 +48,7 @@ const built = (prefix: string) => (_: PlumbingServed, files: string[]) => files.
 // In the order the tab lists them.
 const KNOWN: Known[] = [
   { method: 'GET', path: `${ASSET_PREFIX}*`, purpose: 'the browser build: islands, styles and fonts', docs: '/llms/build-and-start', when: always },
-  { method: 'GET', path: `${IMPORTED}*`, purpose: 'imported files, named after their content', docs: '/llms/styles-and-assets', when: built(IMPORTED) },
+  { method: 'GET', path: `${IMPORTED}*`, purpose: 'imported files, named after their content', docs: '/llms/imported-files', when: built(IMPORTED) },
   { method: 'GET', path: `${VARIANTS}*`, purpose: 'the image variants the build wrote', docs: '/llms/images', when: built(VARIANTS) },
   { method: 'GET', path: IMAGE_ROUTE, purpose: 'resized images, by width and crop', docs: '/llms/images', when: always },
   { method: 'GET', path: CARD_ROUTE, purpose: 'share cards, drawn on the first request', docs: '/llms/images', when: always },

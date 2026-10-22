@@ -52,6 +52,7 @@ import { routeSizes } from './route-sizes'
 import { writeSearchIndex } from './search'
 import { inSignalsScope } from './signals'
 import { exportStatic, refuseStaticConfig, removeLastExport } from './static'
+import { pruneScopedStyles } from './styles'
 import { pruneCompileCache } from './transform'
 import { loadExecutable, verifyExecutable } from './verify'
 import { warnServerClasses } from './warn-classes'
@@ -424,6 +425,7 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
 
   // Every page ran, so the compiled files of components since deleted can go.
   await pruneCompileCache(cacheDir(root))
+  await pruneScopedStyles(cacheDir(root))
 
   const configFile = join(root, CONFIG_FILE)
   // Read to point a redirect's lint at its line, only when there is one to point at.

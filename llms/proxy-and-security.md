@@ -119,7 +119,7 @@ export default defineConfig({
 ```
 
 - `csp` merges directives over kay's, one given `false` left out.
-- `'wasm-unsafe-eval'` and `worker-src 'self' blob:` join kay's directives and the app's when the islands need them, unless the app sets that directive to `false` or `'none'` (see [Wasm and workers](styles-and-assets.md#wasm-and-workers)).
+- `'wasm-unsafe-eval'` and `worker-src 'self' blob:` join kay's directives and the app's when the islands need them, unless the app sets that directive to `false` or `'none'` (see [Wasm and workers](imported-files.md#wasm-and-workers)).
 - `script-src`, and `script-src-elem` when the app sets one, keep kay's hashes whatever they list.
 - With `fonts`, a `style-src` or `style-src-elem` without `'unsafe-inline'` gets the hash of their inline `@font-face` rules, and with stylesheets a page may inline (see [Styles](styles-and-assets.md#styles)) the hash of each of them, one with `'unsafe-inline'` none, since a hash would switch it off.
 - `'script-src': false` leaves kay's inline scripts to `default-src`, which blocks them, islands and streamed blocks with them.

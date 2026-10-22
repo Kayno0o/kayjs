@@ -84,7 +84,7 @@ async function hasTailwindEntry(root: string): Promise<boolean> {
   return await tailwindEntry(root, true) !== undefined
 }
 
-async function tailwindEntry(root: string, parts: boolean): Promise<string | undefined> {
+export async function tailwindEntry(root: string, parts: boolean): Promise<string | undefined> {
   const preferred = join(root, ENTRY)
 
   if (await importsTailwind(preferred, parts))

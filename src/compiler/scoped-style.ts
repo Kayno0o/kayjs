@@ -207,7 +207,7 @@ function scopeRule(prelude: string, attribute: string): string {
   return lead + selectors.map(selector => selector === ',' ? selector : scopeSelector(selector, attribute)).join('')
 }
 
-// Ends the last compound of every selector of `css` on `[attribute]`, so its rules reach this component's elements alone. `:global(...)` is left unscoped, and the bodies of `@media`, `@supports`, `@layer` and `@container` are scoped alike.
+// Ends the last compound of every selector of `css` on `[attribute]`, so its rules reach this component's elements alone. `:global(...)` is left unscoped, and the bodies of `@media`, `@supports`, `@layer` and `@container` are scoped alike, as are the rules nested inside another, whose selector ends on the attribute too (`&` included).
 export function scopeCss(css: string, attribute: string): string {
   let out = ''
   let i = 0
@@ -227,7 +227,7 @@ export function scopeCss(css: string, attribute: string): string {
     const body = css.slice(stop + 1, end)
     const at = AT_NAME.exec(prelude.slice(LEADING.exec(prelude)![0].length))
 
-    out += at === null ? `${scopeRule(prelude, attribute)}{${body}}` : `${prelude}{${NESTING.has(at[1]!.toLowerCase()) ? scopeCss(body, attribute) : body}}`
+    out += at === null ? `${scopeRule(prelude, attribute)}{${body.includes('{') ? scopeCss(body, attribute) : body}}` : `${prelude}{${NESTING.has(at[1]!.toLowerCase()) ? scopeCss(body, attribute) : body}}`
 
     i = end + 1
   }
