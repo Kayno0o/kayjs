@@ -361,12 +361,12 @@ it('stops a resource in a project without a database, and writes nothing over wh
   expect(await Bun.file(join(postgres, 'src/db/label.ts')).exists()).toBe(false)
 })
 
-it('runs as kay generate resource, the fields before an optional folder', async () => {
+it('runs as kay generate resource, every argument a field and the folder `--dir`', async () => {
   const dir = join(await scratchDir('generate-'), 'app')
 
   await createProject(dir, { kay: '^1.0.0', features: [...PRESETS.app.features, 'postgres'] })
 
-  const made = await run(dirname(dir), 'generate', 'resource', 'post', 'title:string', 'done:boolean', 'app', '--format', 'json', '--dry-run')
+  const made = await run(dirname(dir), 'generate', 'resource', 'post', 'title:string', 'done:boolean', '--dir', 'app', '--format', 'json', '--dry-run')
 
   const document = JSON.parse(made.stdout) as { written: string[] }
 
@@ -374,12 +374,32 @@ it('runs as kay generate resource, the fields before an optional folder', async 
   expect(document.written).toContain('src/routes/posts/_actions.kay')
   expect((await run(dir, 'generate', 'page', 'x', 'app', 'extra')).code).toBe(1)
 
-  // A field without its type is named, not taken for the folder.
+  // A field without its type is named, not taken for the folder, whether or not a folder of that name exists.
   const untyped = await run(dir, 'generate', 'resource', 'post', 'title', '--dry-run')
 
   expect(untyped.code).toBe(1)
   expect(untyped.stderr).toContain('`title` is not a field')
-  expect((await run(dirname(dir), 'generate', 'resource', 'post', 'title:string', 'app', '--dry-run')).code).toBe(0)
+
+  const missing = await run(dir, 'generate', 'resource', 'post', 'title:string', 'newapp', '--dry-run')
+
+  expect(missing.code).toBe(1)
+  expect(missing.stderr).toContain('`newapp` is not a field')
+  expect(missing.stderr).toContain('--dir')
+
+  const named = await run(dir, 'generate', 'resource', 'post', 'src', '--dry-run')
+
+  expect(named.code).toBe(1)
+  expect(named.stderr).toContain('`src` is not a field')
+
+  // The folder is --dir, which a missing project reports by its path, and --dir with an argument folder is refused.
+  const absent = await run(dirname(dir), 'generate', 'resource', 'post', 'title:string', '--dir', 'newapp', '--dry-run')
+
+  expect(absent.code).toBe(1)
+  expect(absent.stderr).toContain('newapp')
+  expect(absent.stderr).toContain('no package.json')
+  expect((await run(dirname(dir), 'generate', 'page', 'x', 'app', '--dir', 'app', '--dry-run')).code).toBe(1)
+  expect((await run(dirname(dir), 'generate', 'page', 'x', '--dir', 'app', '--dry-run')).code).toBe(0)
+  expect((await run(dir, 'generate', 'resource', 'post', 'title:string', '--dry-run')).code).toBe(0)
 })
 
 // What a resource writes passes kay check and the project's lint, and its test passes on a migrated database, with kayjs-ui and without.

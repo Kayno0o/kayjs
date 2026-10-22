@@ -137,7 +137,7 @@ export function parseFields(specs: readonly string[]): Field[] {
     const type = ALIASES[kind?.toLowerCase() ?? '']
 
     if (name === undefined || type === undefined)
-      throw new Error(`kay generate: \`${spec}\` is not a field: write \`name:type\` with a type among string, text, int, float and boolean`)
+      throw new Error(`kay generate: \`${spec}\` is not a field: write \`name:type\` with a type among string, text, int, float and boolean (the project folder is \`--dir <folder>\`)`)
 
     if (TAKEN.has(name))
       throw new Error(`kay generate: \`${name}\` cannot be a field, the generated files use it: write another name`)

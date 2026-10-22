@@ -102,7 +102,7 @@ kay generate guard admin
 kay generate resource post title:string body:text published:boolean
 ```
 
-`kay generate <page|component|island|action|api|guard|resource> <name> [field:type...] [dir] [--plural <name>]` writes a starter file into the project, never over a file that exists: one that does stops it with `kay generate: nothing was written`.
+`kay generate <page|component|island|action|api|guard|resource> <name> [field:type...] [dir] [--dir <dir>] [--plural <name>]` writes a starter file into the project, never over a file that exists: one that does stops it with `kay generate: nothing was written`.
 
 | Kind | Writes |
 | --- | --- |
@@ -119,6 +119,8 @@ A project with tests gets `tests/<name>.test.ts` for a page, `tests/action-<name
 ### kay generate resource
 
 `kay generate resource <name> <field:type>...` writes a whole list, create, edit and delete for one table. It needs a database, so a project without `postgres` stops with `kay add postgres` named. A field is `name:type` with the type `string` (a `varchar(200)`), `text`, `int`, `float` or `boolean`, and every field is required.
+
+Every argument after the name is a field, so the project folder of a resource is `--dir <dir>` (the current folder by default), such as `kay generate resource post title:string --dir app`; the other kinds take it as their last argument or `--dir`.
 
 - The table is written to `src/db/<name>.ts` and added to `tables` in `src/db/tables.ts`. `blog-post` gives the table `blog_post`, the export `BlogPost` and the pages under `/blog-posts`. A name ending in a single `s`, such as `news`, `ideas` or `menus`, is already plural and kept as is, except a known singular such as `status` or `bus`, and `person` gives `people`. For any other word, `--plural` names the plural: `kay generate resource goose title:string --plural geese`.
 - `src/routes/blog-posts/_actions.kay` holds `create`, `update` and `remove`, checking their input with `s` schemas built from the fields, and sending the visitor back to the list.
