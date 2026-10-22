@@ -124,6 +124,10 @@ it('adds an action to an existing _actions.kay that holds a server fence alone',
     ['const local = 1', 'local', 'already declares or imports'],
     ['export const { a = 1, defaulted } = make()', 'defaulted', 'already exports'],
     ['const { a: inner } = make()', 'inner', 'already declares or imports'],
+    ['const { a = {}, picked } = make()', 'picked', 'already declares or imports'],
+    ['const local = 1\nexport { local as shown }', 'shown', 'already exports'],
+    ['export { renamed as other } from \'./x\'', 'other', 'already exports'],
+    ['export { default as fromDefault } from \'./x\'', 'fromDefault', 'already exports'],
   ]
 
   for (const [source, name, message] of declared) {
@@ -135,6 +139,20 @@ it('adds an action to an existing _actions.kay that holds a server fence alone',
   await Bun.write(actions, '--- server\nimport { other as renamed } from \'./x\'\nconst { a: inner } = make()\n')
   await generate(dir, 'action', 'team/other')
   await generate(dir, 'action', 'team/a')
+
+  // A name only a comment, a string, a handler's own local, an unexported alias source or a star re-export mentions is free.
+  for (const [source, name] of [
+    ['// user is taken\nexport const other = 1', 'user'],
+    ['export const other = \'const user = 1\'', 'visitor'],
+    ['export const other = () => {\n  const user = 1\n  function run() {}\n  return user\n}', 'person'],
+    ['export const other = ({ member }: { member: string }) => member', 'member'],
+    ['const local = 1\nexport { local as shown }', 'local2'],
+    ['export * from \'./x\'', 'guest'],
+  ]) {
+    await Bun.write(actions, `--- server\n${source}\n`)
+    await generate(dir, 'action', `team/${name}`)
+    expect(await Bun.file(actions).text()).toContain(`export const ${name} = action(`)
+  }
 
   // A name that only starts with a keyword is not a declaration of the keyword's.
   await Bun.write(actions, '--- server\nexport const constant = 1\nconst letter = 2\n')

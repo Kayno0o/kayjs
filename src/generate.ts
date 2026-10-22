@@ -1,6 +1,8 @@
+import type * as t from '@babel/types'
 import { existsSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
+import { parse } from '@babel/parser'
 import { detectFeatures } from './add'
 import { resourceFiles, withTable } from './generate-resource'
 
@@ -172,6 +174,74 @@ async function pageBelow(dir: string, name: string): Promise<string | undefined>
   return found[0] === undefined ? undefined : urlOf(found[0])
 }
 
+// The names a server fence declares or imports at its top level and the ones it exports, read from its parsed statements so a comment, a string or a handler's own local never counts; `undefined` when it does not parse.
+function topLevelNames(source: string): { declared: Set<string>, exported: Set<string> } | undefined {
+  let program: t.Program
+
+  try {
+    program = parse(source, { sourceType: 'module', plugins: ['typescript'] }).program
+  }
+  catch {
+    return undefined
+  }
+
+  const declared = new Set<string>()
+  const exported = new Set<string>()
+  const bind = (pattern: t.Node | null | undefined, into: Set<string>) => {
+    if (pattern?.type === 'Identifier') {
+      into.add(pattern.name)
+    }
+    else if (pattern?.type === 'AssignmentPattern') {
+      bind(pattern.left, into)
+    }
+    else if (pattern?.type === 'RestElement') {
+      bind(pattern.argument, into)
+    }
+    else if (pattern?.type === 'ObjectPattern') {
+      for (const property of pattern.properties) bind(property.type === 'RestElement' ? property.argument : property.value, into)
+    }
+    else if (pattern?.type === 'ArrayPattern') {
+      for (const element of pattern.elements) bind(element, into)
+    }
+  }
+  const declare = (statement: t.Statement | t.Declaration, exports: boolean) => {
+    const ids: t.Node[] = []
+
+    if (statement.type === 'VariableDeclaration')
+      ids.push(...statement.declarations.map(declarator => declarator.id))
+    else if (statement.type === 'FunctionDeclaration' || statement.type === 'ClassDeclaration' || statement.type === 'TSEnumDeclaration' || statement.type === 'TSModuleDeclaration')
+      ids.push(statement.id as t.Node)
+
+    for (const id of ids) {
+      bind(id, declared)
+
+      if (exports)
+        bind(id, exported)
+    }
+  }
+
+  for (const statement of program.body) {
+    if (statement.type === 'ImportDeclaration') {
+      for (const specifier of statement.specifiers) declared.add(specifier.local.name)
+    }
+    else if (statement.type === 'ExportNamedDeclaration') {
+      if (statement.declaration)
+        declare(statement.declaration, true)
+
+      for (const specifier of statement.specifiers) {
+        const name = specifier.exported
+
+        exported.add(name.type === 'Identifier' ? name.name : name.value)
+      }
+    }
+    else {
+      declare(statement, false)
+    }
+  }
+
+  return { declared, exported }
+}
+
 // The `_actions.kay` text with `name` added, when the file is a server fence alone and does not export it yet; `undefined` when it holds a template or other fences. A name it exports, declares or imports already throws.
 function appendedAction(path: string, existing: string, name: string): string | undefined {
   const eol = existing.includes('\r\n') ? '\r\n' : '\n'
@@ -180,10 +250,15 @@ function appendedAction(path: string, existing: string, name: string): string | 
   if (lines[0]?.trimEnd() !== SERVER_FENCE || lines.slice(1).some(line => ANY_FENCE.test(line)))
     return undefined
 
-  if (new RegExp(`\\bexport\\s+(?:(?:const|let|var|class)\\s+${name}\\b|(?:async\\s+)?function(?:\\s*\\*\\s*|\\s+)${name}\\b|\\{[^}]*\\b${name}\\b|(?:const|let|var)\\s*[{\\[][^}\\]]*\\b${name}\\b(?!\\s*:))`).test(existing))
+  const names = topLevelNames(lines.slice(1).join('\n'))
+
+  if (names === undefined)
+    return undefined
+
+  if (names.exported.has(name))
     throw new Error(`kay generate: nothing was written, ${path} already exports \`${name}\``)
 
-  if (new RegExp(`\\b(?:(?:const|let|var|class)\\s+|function(?:\\s*\\*\\s*|\\s+))${name}\\b|\\b(?:const|let|var)\\s*[{\\[][^}\\]]*\\b${name}\\b(?!\\s*:)|\\bimport\\b[^;'"]*\\b${name}\\b(?!\\s+as\\b)[^;'"]*\\bfrom\\b`).test(existing))
+  if (names.declared.has(name))
     throw new Error(`kay generate: nothing was written, ${path} already declares or imports \`${name}\``)
 
   if (!S_IMPORT.test(existing)) {
