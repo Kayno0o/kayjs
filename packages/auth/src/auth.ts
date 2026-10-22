@@ -1667,6 +1667,15 @@ function noSecret(): never {
   throw configError('`secret` is missing and the session plugin cannot derive one; pass a secret of at least 32 characters, or a plugin from kay\'s `session()`')
 }
 
+// What createCore builds on the site's origin, once it has one.
+interface SiteBound {
+  url: string | undefined
+  oauth: Core['oauth']
+  refreshers: Core['refreshers']
+  site: string
+  passkeys: Core['passkeys']
+}
+
 function createCore<Data extends AuthSessionData, Role extends string, Prefix extends string, Scope extends string, OrgRole extends string, UserData extends object>(options: AuthOptions<Data, Role, Prefix, Scope, OrgRole, UserData>): Core {
   const prefix = options.prefix ?? '/auth'
 
@@ -1780,9 +1789,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     organizations: options.organizations && organizationsCore(options.organizations),
     pruned: { at: 0, running: Promise.resolve() },
     audit: options.audit == null || options.audit === false ? undefined : { maxAge: auditMaxAge(options.audit), prunedAt: 0, ip: options.audit === true ? 'truncated' : options.audit.ip ?? 'truncated' },
-    url,
     rememberMaxAge: wholeSeconds(options.remember?.maxAge ?? options.rememberMaxAge ?? `${DEFAULT_REMEMBER_MAX_AGE}s`, 'remember.maxAge'),
-    oauth,
   }
 
   function refreshersFor(made: SiteBound): void {
