@@ -123,7 +123,7 @@ export interface TestPage {
   type: (text: string) => Promise<void>
   press: (key: Parameters<Bun.WebView['press']>[0], options?: Parameters<Bun.WebView['press']>[1]) => Promise<void>
   // Moves the pointer onto the middle of the element, scrolled into view, and leaves it there.
-  // `at` aims at a point of the element, scrolled into view, instead of its middle.
+  // `at` aims at a point of the element, scrolled into view, instead of its middle; a click with `at` neither waits for the element to keep still nor checks that nothing covers the point.
   hover: (selector: string, options?: PointerOptions) => Promise<void>
   // The first match's text, or null when nothing matches.
   text: (selector: string) => Promise<string | null>
