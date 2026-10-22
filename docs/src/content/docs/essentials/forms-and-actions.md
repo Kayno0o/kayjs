@@ -405,7 +405,7 @@ The values travel in the form's action URL. A visitor can change them as they co
 
 `add.pending()` is true while any call to `add` is running, so a row of buttons calling one action would all spin together.
 
-`add.track()` gives a handle for one component. Its `pending()` reads only the calls made through it. A call resolves with how it went, instead of throwing when the server refuses it.
+`add.track()` gives a handle for one component. Its `pending()` reads only the calls made through it. A call resolves with how it went, instead of throwing when the server refuses it. [`call.track()`](/guides/api-routes) gives an API route's calls the same result.
 
 To wait for writes you did not await, `await add.settled()` resolves once no call to `add` is running, and `removing.settled()` once none made through the handle is. It resolves whichever way the calls went, and never throws. A call whose action redirects stays running while the page goes away, unless a leave guard keeps the visitor on it.
 

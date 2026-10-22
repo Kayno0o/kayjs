@@ -1,5 +1,6 @@
 import type { Static, t, TSchema } from 'elysia'
 import type { ByteSize } from './byte-size'
+import type { CallResult } from './call-result'
 import type { ErrorStatus, RouteParams } from './checks'
 import type { Duration } from './duration'
 import type { RequestContext } from './index'
@@ -8,6 +9,7 @@ import type { Owner } from './reactive'
 import { ApiError } from './api-error'
 import { withBase } from './base'
 import { skew } from './build'
+import { trackCalls, whenIdle } from './call-result'
 import { durationSeconds } from './duration'
 import { escapeAttribute } from './escape'
 import { holdInvalid } from './invalid'
@@ -18,6 +20,8 @@ import { sendValue } from './send'
 import { reload } from './stale'
 import { FAILURE_HEADER, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
 import { ACTION_PREFIX, ACTION_TYPE, decodeServerValue, decodeValue, malformed, serverWritten, unflattenValue } from './wire'
+
+export type { CallResult }
 
 const ACTION = Symbol.for('kay.action')
 const DAY = 86_400
@@ -285,14 +289,9 @@ export interface CallOptions {
   signal?: AbortSignal | undefined
 }
 
-// How a tracked call went: what the handler returned, or the refusal the server answered.
-export type CallResult<Data, Failed>
-  = | { ok: true, data: Data }
-    | { ok: false, status: number, errors: Record<string, string>, data: Failed | undefined }
-
 // An action seen through the calls one island makes, so a row's button reads its own `pending()`.
 export interface TrackedCall<Input, Result> {
-  // Resolves with how the call went, any answer the server gave included; a failure that is no answer of this action, such as a network error, an abort or a redirect, still throws.
+  // Resolves with how the call went, any answer the server gave included; a failure that is no answer, such as a network error, an abort or a redirect, still throws.
   (...call: object extends Input ? [input?: Input, options?: CallOptions] : [input: Input, options?: CallOptions]): Promise<Result>
   (form: FormData, options?: CallOptions): Promise<Result>
   // Whether a call made through this handle is still in flight, read reactively.
@@ -884,60 +883,13 @@ function onStreamEnd(data: unknown, then: (status: StreamStatus) => void): boole
   return settles !== undefined
 }
 
-// A handle with a pending count of its own over `call`, whose refusals of this action it answers as results.
+// A handle over `call` whose refusals of this action it answers as results.
 function tracked(call: (input: never, options?: CallOptions) => Promise<unknown>, url: () => string): TrackedCall<never, unknown> {
-  const [inFlight, setInFlight] = ownSignal(0)
-  const idle = whenIdle()
-  const shift = (by: number) => {
-    setInFlight(untrack(inFlight) + by)
-    idle.check(untrack(inFlight))
-  }
-
-  const run = async (input: unknown, options?: CallOptions) => {
-    let streaming = false
-
-    shift(1)
-
-    try {
-      const data = await call(input as never, options)
-
-      streaming = onStreamEnd(data, () => shift(-1))
-
-      return { ok: true, data }
-    }
-    catch (error) {
-      if (!(error instanceof ActionError) || error instanceof ActionRedirectError || refusedAt.get(error) !== url())
-        throw error
-
-      return { ok: false, status: error.status, errors: error.errors, data: error.data }
-    }
-    finally {
-      if (!streaming)
-        shift(-1)
-    }
-  }
-
-  return Object.assign(run, { pending: () => inFlight() > 0, settled: async () => idle.wait(untrack(inFlight)) })
-}
-
-// What `settled()` waits on: callers resolved as the count of calls in flight reaches 0.
-function whenIdle(): { wait: (count: number) => Promise<void>, check: (count: number) => void } {
-  let waiting: (() => void)[] = []
-
-  return {
-    wait: async count => count === 0 ? undefined : new Promise<void>(resolve => void waiting.push(resolve)),
-    check: (count) => {
-      if (count !== 0 || waiting.length === 0)
-        return
-
-      const resolving = waiting
-
-      waiting = []
-
-      for (const resolve of resolving)
-        resolve()
-    },
-  }
+  return trackCalls(
+    call as (input: unknown, options?: CallOptions) => Promise<unknown>,
+    error => !(error instanceof ActionError) || error instanceof ActionRedirectError || refusedAt.get(error) !== url() ? undefined : { ok: false, status: error.status, errors: error.errors, data: error.data },
+    (data, release) => onStreamEnd(data, release),
+  )
 }
 
 async function post<Output>(url: string, input: unknown, onProgress: (sent: number) => void, signal: AbortSignal | undefined, onSent: () => void, left: () => boolean, caller: Caller): Promise<Output> {

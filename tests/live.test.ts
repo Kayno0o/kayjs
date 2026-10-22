@@ -854,6 +854,40 @@ describe('call()', () => {
     await expect(call(notes, '/')).rejects.toMatchObject({ name: 'ApiError', status: 0, message: 'Failed to fetch' })
   })
 
+  it('track() resolves a route\'s answer or refusal as the result an action\'s track() gives', async () => {
+    const save = call.track(notes, '/')
+    const edit = call.track(notes, '/:id')
+    const added = await save({ method: 'post', body: { title: 'Tracked' } })
+
+    expect(added).toEqual({ ok: true, data: expect.objectContaining({ title: 'Tracked' }) })
+
+    const missing = await edit({ method: 'patch', params: { id: 404 }, body: { title: 'x' } })
+
+    expect(missing).toEqual({ ok: false, status: 404, errors: { '': 'No such note' }, data: 'No such note' })
+
+    const invalid = await save({ method: 'post', body: { title: '' } })
+
+    expect(invalid).toMatchObject({ ok: false, status: 422, errors: { title: expect.any(String) } })
+    expect(save.pending()).toBe(false)
+    expect(edit.pending()).toBe(false)
+  })
+
+  it('track() keeps a pending count per handle and throws what is no answer', async () => {
+    const slow = call.track(notes, '/slow')
+    const other = call.track(notes, '/')
+    const running = slow()
+
+    expect(slow.pending()).toBe(true)
+    expect(other.pending()).toBe(false)
+    expect(await running).toEqual({ ok: true, data: 'late' })
+    await slow.settled()
+    expect(slow.pending()).toBe(false)
+
+    served.mockImplementationOnce((async () => Promise.reject(new TypeError('Failed to fetch'))) as unknown as typeof fetch)
+    await expect(other()).rejects.toMatchObject({ name: 'ApiError', status: 0 })
+    expect(other.pending()).toBe(false)
+  })
+
   it('gives a refusal\'s message to show, and a fallback when no answer came or the error is no ApiError', async () => {
     const shown = async (promise: Promise<unknown>) => {
       try {

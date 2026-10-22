@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - A handler of an API module names its own routes with `apiUrl(request, path)`, with no reference to the module inside its own chain ([API modules](api-routes.md)).
+- `call.track(module, path)` gives an API route's calls an action `track()`'s result, `{ ok, status, errors, data }` instead of a throw ([API from islands](api-from-islands.md)).
 - An action's third argument groups its checks under `protect: { rateLimit, honeypot, minTime, proofOfWork }`, beside `maxSize`, `messages` and `tool` ([Protecting actions](action-protection.md#protecting-an-action)).
 - `store: sqliteData(path)` also shares every `live()` value between processes and keeps it across restarts ([Live values](live-values.md)).
 - `apiPath: '/v1'` in `kay.config.ts` moves every API module, the OpenAPI document and the reference page off `/api`, and islands, the service worker, prefetching and kayjs-cms follow ([API modules](api-routes.md#api-modules)).

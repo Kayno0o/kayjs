@@ -1,5 +1,7 @@
+import type { CallResult } from './call-result'
 import { ApiError } from './api-error'
 import { withBase } from './base'
+import { trackCalls } from './call-result'
 import { effect, onCleanup, onMount, ownSignal } from './reactive'
 import { parseEvents } from './sse'
 import { decodeServerValue } from './wire'
@@ -861,6 +863,43 @@ export async function call<Module, const Path extends CallPath<Module>, const M 
     throw new ApiError(response.status, refusal(answer, response), answer)
 
   return answer as ApiAnswer<Module, Path, M>
+}
+
+// A route handle over `call` with a pending count of its own: `const save = call.track(api, '/notes')`, then `await save({ method: 'post', body })` resolves `{ ok, data }` or the route's refusal as `{ ok: false, status, errors, data }`, as an action's `track()` does, and `save.pending()` reads only its own calls. A call that got no answer (status 0) or was aborted still throws.
+export interface TrackedApi<Module, Path> {
+  <const M extends CallMethod<NodeAt<Module, Path>> = never>(...[options]: Optional<ApiCallOptions<Module, Path, M>>): Promise<CallResult<ApiAnswer<Module, Path, M>, unknown>>
+  readonly pending: () => boolean
+  readonly settled: () => Promise<void>
+}
+
+call.track = function track<Module, const Path extends CallPath<Module>>(module: Module, path: Path): TrackedApi<Module, Path> {
+  return trackCalls(
+    async (options: unknown) => (call as unknown as (module: unknown, path: string, options: unknown) => Promise<unknown>)(module, path, options),
+    error => error instanceof ApiError && error.status !== 0 ? { ok: false, status: error.status, errors: refusedFields(error), data: error.answer } : undefined,
+  ) as unknown as TrackedApi<Module, Path>
+}
+
+// The first segment of a validation path: `/title` and `title.0` name `title`.
+const FIRST_SEGMENT = /^\/?([^/.]*)/
+
+// A refusal as a message per field: the fields of an Elysia validation failure (all of them where it lists them, else the one it names), else the whole message under ''.
+function refusedFields(error: ApiError): Record<string, string> {
+  const answer = error.answer as { type?: unknown, property?: unknown, message?: unknown, errors?: unknown } | null
+  const errors: Record<string, string> = {}
+
+  if (typeof answer !== 'object' || answer === null || answer.type !== 'validation')
+    return { '': error.message }
+
+  const issues = Array.isArray(answer.errors) ? answer.errors as { path?: unknown, message?: unknown, summary?: unknown }[] : [{ path: answer.property, message: answer.message }]
+
+  for (const issue of issues) {
+    const text = [issue.message, issue.summary, answer.message].find(found => typeof found === 'string')
+    const named = typeof issue.path === 'string' ? FIRST_SEGMENT.exec(issue.path)?.[1] : undefined
+
+    errors[named === undefined || named === 'root' ? '' : named] ??= text ?? error.message
+  }
+
+  return Object.keys(errors).length === 0 ? { '': error.message } : errors
 }
 
 // A body carrying files goes as a form, its other fields as text, which Elysia reads against the route's schema; anything else goes as JSON.
