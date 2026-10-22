@@ -34,7 +34,7 @@ With Tailwind, `Button(class="px-2")` over the `px-4` a component sets renders `
 - `p-6` after `px-4` drops it, `px-4` after `p-6` keeps both, `hover:p-2` and `p-4` never meet, `!p-2` and `p-4` neither.
 - Properties come from the app's own Tailwind, so `@utility`, theme tokens and plugins count: `text-sm` and `text-lg` meet, `text-sm` and `text-red-500` do not.
 - A class Tailwind does not know (`.card`), and one built at runtime from parts (`p-${n}`), is never dropped.
-- The build writes a table of the classes that can meet another into the manifest and the islands' entry, about 200 to 1,000 bytes gzipped; an app without Tailwind has none and keeps the plain join.
+- The build writes a table of the classes that can meet another into the manifest, and the islands' entry gets it cut to the classes written in the modules an island bundles or that render one, none when no island has two to merge (a class that reaches an island only as data, such as Markdown or JSON, is merged on the server alone); an app without Tailwind has none and keeps the plain join.
 - A lone string is one source, but literal classes written together in one template (`.p-4(class="p-6")`) resolve too, in an island while compiling and on the server while rendering. The `class` of `<html>` from a layout and a page merges the same way.
 - Tailwind imported but its design system not loading (a missing import, an uninstalled plugin) logs why in `kay dev` and `kay build`, and merges nothing.
 

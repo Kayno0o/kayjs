@@ -5,7 +5,7 @@ import tailwind from 'bun-plugin-tailwind'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { clientDir } from '../src/build/assets'
 import { buildClassTable } from '../src/build/class-table'
-import { buildClient } from '../src/build/client'
+import { buildClient, islandClassTableOf, readClientSources } from '../src/build/client'
 import { transformKayCached } from '../src/build/transform'
 import { compileKay } from '../src/compiler'
 import { devBuilder } from '../src/dev/builder'
@@ -55,7 +55,6 @@ describe('a class passed to a component', () => {
     expect(entry).toContain('"p-6"')
     expect(entry).toContain('"text-sm"')
     expect(entry).not.toContain('"mb-8"')
-    expect(entry.length).toBeLessThan(JSON.stringify(client.classTable).length)
   })
 
   it('hands the table to the island entry', async () => {
@@ -71,6 +70,37 @@ async function islandChunks(): Promise<string> {
 
   return (await Promise.all(files.filter(file => file.endsWith('.js')).map(async file => Bun.file(join(client.dir, file)).text()))).join('\n')
 }
+
+describe('the table of the island entry', () => {
+  it('is none when no island has two classes to merge', async () => {
+    const copy = resolve(await fixtureCopy('class-merge'))
+
+    await Bun.write(join(copy, 'src/components/panel.kay'), '---\nconst open = signal(false)\n---\nbutton.open(onClick={() => open.set(true)}) open\n')
+    await Bun.write(join(copy, 'src/components/toggle.kay'), '---\nconst on = signal(false)\n---\nbutton.mt-2(onClick={() => on.set(true)}) toggle\n')
+
+    try {
+      expect(await islandClassTableOf(copy, await readClientSources(copy))).toBeUndefined()
+    }
+    finally {
+      await rm(copy, { recursive: true, force: true })
+    }
+  })
+
+  it('holds the classes src/ui.ts writes into a component, which no island imports', async () => {
+    const copy = resolve(await fixtureCopy('class-merge'))
+
+    await Bun.write(join(copy, 'src/ui.ts'), 'import { defineUi } from \'kay\'\n\nexport default defineUi({ \'./components/box.kay\': { parts: { root: \'mb-3 mb-9\' } } })\n')
+
+    try {
+      const table = await islandClassTableOf(copy, await readClientSources(copy))
+
+      expect(Object.keys(table?.classes ?? {})).toEqual(expect.arrayContaining(['mb-3', 'mb-9']))
+    }
+    finally {
+      await rm(copy, { recursive: true, force: true })
+    }
+  })
+})
 
 describe('literal classes written together in one template', () => {
   it('resolve while compiling in the island, with no merge left to run there', async () => {

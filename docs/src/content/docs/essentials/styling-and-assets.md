@@ -110,7 +110,7 @@ Literal classes written together in one template, `.p-4(class="p-6")`, resolve t
 
 When your app imports Tailwind but its design system does not load, `kay dev` and `kay build` log why and classes are not dropped.
 
-The build writes the table of classes that can meet another into the manifest and the islands' entry, about 200 to 1,000 bytes gzipped. An app without Tailwind keeps the plain join.
+The build writes the table of classes that can meet another into the manifest. The islands get a smaller one, with the classes written in the modules they use or that render them, and none when no island merges classes. A class an island only receives as data, such as from Markdown or JSON, is merged on the server alone. An app without Tailwind keeps the plain join.
 
 ### Style a part of a component
 

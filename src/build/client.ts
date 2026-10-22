@@ -44,6 +44,7 @@ import { styleUses } from './style-uses'
 import { styleImports, withoutStyles } from './styles'
 import { mergingSupports } from './supports'
 import { analyzeKayCached, KayCompileError, keepAnalyses } from './transform'
+import { UI_FILE } from './ui'
 
 export interface ClientOptions {
   minify?: boolean | undefined
@@ -353,7 +354,9 @@ export async function islandClassTableOf(root: string, { islands, libraries, sho
   const edges = new Map<string, Promise<string[]>>()
   const project = realpathSync(root) + sep
   const renderers = new Set([...shorthand.keys(), ...(await markupFiles(root)).filter(file => RENDERING_FILE.test(file))])
-  const words = new Set([...bundled].flatMap(file => fileWords(file)))
+  const ui = join(root, UI_FILE)
+  // `src/ui.ts` is written into the components it restyles, none of which imports it.
+  const words = new Set([...bundled, ...existsSync(ui) ? [ui] : []].flatMap(file => fileWords(file)))
 
   await Promise.all([...renderers].map(async (file) => {
     const real = realpathSync(file)
