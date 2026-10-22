@@ -46,6 +46,31 @@ const texts = (page: Page, selector: string) => page.evaluate((target: string) =
 const formSteps = (page: Page) => page.evaluate(() => [...document.querySelectorAll('[data-kcms-path="steps"] [data-kcms-row] input')].map(input => (input as HTMLInputElement).value))
 const barCount = (page: Page) => page.evaluate(() => document.querySelectorAll('.kcms-list-bar').length)
 
+// Waits until the bars have kept their boxes for a few frames, so a box read next is not one of a bar still moving to its place, which takes longer on a loaded machine. Not for a click next: the tooltip of the last button pressed shows over the new bar meanwhile.
+function barsStill(page: Page) {
+  return page.evaluate(() => new Promise<void>((resolve) => {
+    let last = ''
+    let same = 0
+    const check = () => {
+      const now = [...document.querySelectorAll('.kcms-list-bar')].map((bar) => {
+        const { left, top, width, height } = bar.getBoundingClientRect()
+
+        return `${left},${top},${width},${height}`
+      }).join('|')
+
+      same = now === last ? same + 1 : 0
+      last = now
+
+      if (same >= 3)
+        resolve()
+      else
+        requestAnimationFrame(check)
+    }
+
+    check()
+  }))
+}
+
 // The editor docks at the bottom of a short window, so the item is scrolled to the top, clear of it, and the pointer is moved onto it there (a hover would scroll it back to the middle, under the editor's edge).
 async function showBar(page: Page, selector: string, bars = 1) {
   await page.evaluate((target: string) => {
@@ -327,14 +352,8 @@ test('the bar sits inside the window\'s scrollbars and above the docked editor',
   const page = await open()
 
   await showBar(page, 'ol.steps li:first-child')
-
-  const [item, bar] = await page.evaluate(() => [document.querySelector('ol.steps li')!, document.querySelector('.kcms-list-bar')!].map((element) => {
-    const box = element.getBoundingClientRect()
-
-    return { right: box.right, bottom: box.bottom }
-  }))
-
-  expect(Math.abs(bar!.right - item!.right)).toBeLessThan(1)
+  // The bar settles on the item's right edge a frame or two after it shows, later on a loaded machine.
+  await page.waitUntil(() => Math.abs(document.querySelector('.kcms-list-bar')!.getBoundingClientRect().right - document.querySelector('ol.steps li')!.getBoundingClientRect().right) < 1)
 
   // The item lies under the editor: the bar stays above its edge.
   await page.evaluate(() => {
@@ -342,13 +361,14 @@ test('the bar sits inside the window\'s scrollbars and above the docked editor',
     const element = document.querySelector('ul.limited li')!
 
     window.scrollBy({ top: element.getBoundingClientRect().top - (panel.top + 8) })
-
+  })
+  // The pointer is moved onto the item again at each poll: the bar follows the pointer a frame after it moves, and the editor docking or the scroll settling on a loaded machine can leave the first move on something else.
+  await page.waitUntil(() => {
+    const element = document.querySelector('ul.limited li')!
     const box = element.getBoundingClientRect()
 
     element.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: box.left + 4, clientY: box.top + 4 }))
-  })
-  // The bar moves on the scroll and the pointer event, a frame or two later on a loaded machine.
-  await page.waitUntil(() => {
+
     const bars = document.querySelectorAll('.kcms-list-bar')
 
     return bars.length === 1 && bars[0]!.getBoundingClientRect().bottom <= document.querySelector('.kcms-editor-open')!.getBoundingClientRect().top + 0.5
@@ -380,6 +400,7 @@ async function showBarAt(page: Page, selector: string, top: number, bars = 1) {
     element.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: box.left + 4, clientY: box.top + box.height / 2 }))
   }, selector, top)
   await page.waitUntil((count: number) => document.querySelectorAll('.kcms-list-bar').length === count, undefined, bars)
+  await barsStill(page)
 }
 
 // Whether the element at the item's top left corner is the item or inside it, so the pointer that called the bar still reaches the page.
@@ -403,6 +424,7 @@ test('the bar sits above its item\'s top right corner, below it with no room abo
   expect(await pointerOnItem(page, 'ol.steps li:first-child')).toBe(true)
 
   await showBar(page, 'ol.steps li:first-child')
+  await barsStill(page)
 
   const [top, under] = await boxes(page, 'ol.steps li:first-child', BAR) as [Box, Box]
 
