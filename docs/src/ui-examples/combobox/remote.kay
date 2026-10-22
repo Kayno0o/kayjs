@@ -1,0 +1,13 @@
+---
+import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
+
+const people = ['Ada Lovelace', 'Alan Turing', 'Grace Hopper', 'Edsger Dijkstra', 'Barbara Liskov', 'Donald Knuth', 'Margaret Hamilton']
+
+// Stands for an action or an API call taking `{ q }`.
+async function search({ q }: { q: string }) {
+  await new Promise(resolve => setTimeout(resolve, 400))
+
+  return people.filter(person => person.toLowerCase().includes(q.toLowerCase())).map(person => ({ value: person.toLowerCase().replaceAll(' ', '-'), label: person }))
+}
+---
+Combobox(label="Person" options={search} placeholder="Search people" name="person")

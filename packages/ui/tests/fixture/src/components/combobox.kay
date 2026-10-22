@@ -1,0 +1,9 @@
+---
+import type { ComboboxOption, ComboboxOptions } from '@kaynooo/kayjs-ui'
+import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
+
+// What the test reads back: each value picked and each text created, with the options it hands over, a list or a loader.
+const { options, onChange, onCreate, minLength, create = true } = props<{ options: ComboboxOptions, create?: boolean, onChange?: (value: string, option: ComboboxOption | undefined) => void, onCreate?: (text: string) => void, minLength?: number }>()
+---
+form#form
+  Combobox#combo(label="Planet" name="planet" options={options} create={create} minLength={minLength} onChange={onChange} onCreate={onCreate})

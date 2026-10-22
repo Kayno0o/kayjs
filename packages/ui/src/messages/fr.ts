@@ -13,6 +13,13 @@ export default defineMessages({
       previousLabel: 'Diapositive précédente',
       slideLabel: 'Diapositive {n} sur {count}',
     },
+    combobox: {
+      createLabel: 'Créer « {text} »',
+      emptyLabel: 'Aucune correspondance',
+      failureLabel: 'Impossible de charger les options',
+      loadingLabel: 'Chargement…',
+      resultsLabel: { one: '{count} résultat', other: '{count} résultats' },
+    },
     commandPalette: {
       emptyLabel: 'Aucun résultat',
       label: 'Rechercher',
@@ -108,6 +115,7 @@ export default defineMessages({
     sidePanel: { closeLabel: 'Fermer' },
     siteNav: { menuLabel: 'Menu' },
     splitLayout: { backLabel: 'Retour', resizeLabel: 'Redimensionner la liste' },
+    steps: { doneLabel: 'terminée' },
     table: {
       exportLabel: 'Exporter en CSV',
       filterLabel: 'Filtrer',

@@ -15,6 +15,11 @@ const EFFECT_ADDED: Record<string, string | undefined> = {
   'contact-form': 'aria-required',
 }
 
+// What the browser takes off once it runs while the server's markup holds it, by component: the native suggestion list a combobox hands over to its own.
+const EFFECT_REMOVED: Record<string, string | undefined> = {
+  combobox: 'list',
+}
+
 // The fixture app is no part of this package's type check, so its table is imported by a path no import is resolved for.
 const { CASES } = await import(join(process.env.KAY_ROOT!, 'src', 'contract.ts')) as { CASES: Record<string, unknown> }
 const mounted: { unmount: () => void }[] = []
@@ -29,8 +34,13 @@ const DRAWN = /\bK\d+(?:-\d+)?/g
 
 // What the browser holds as properties, a box ticked or an option picked, written as the attributes the server's markup holds.
 function reflected(root: Element): string {
-  for (const input of root.querySelectorAll<HTMLInputElement>('input'))
+  for (const input of root.querySelectorAll<HTMLInputElement>('input')) {
     input.toggleAttribute('checked', input.checked)
+
+    // A combobox's text is the value the browser holds, which the server writes as the attribute.
+    if (input.getAttribute('role') === 'combobox')
+      input.setAttribute('value', input.value)
+  }
 
   for (const option of root.querySelectorAll<HTMLOptionElement>('option'))
     option.toggleAttribute('selected', option.selected)
@@ -39,7 +49,7 @@ function reflected(root: Element): string {
 }
 
 // The markup as a browser holds it: hydration markers and island wrappers gone, drawn ids numbered, attributes in a fixed order.
-function canonical(html: string, browserDrawn = '', effectAdded = ''): string {
+function canonical(html: string, browserDrawn = '', effectAdded = '', effectRemoved = ''): string {
   const holder = document.createElement('div')
 
   holder.innerHTML = html
@@ -74,6 +84,11 @@ function canonical(html: string, browserDrawn = '', effectAdded = ''): string {
   if (effectAdded) {
     for (const element of holder.querySelectorAll(`[${effectAdded}]`))
       element.removeAttribute(effectAdded)
+  }
+
+  if (effectRemoved) {
+    for (const element of holder.querySelectorAll(`[${effectRemoved}]`))
+      element.removeAttribute(effectRemoved)
   }
 
   for (const element of holder.querySelectorAll('[value=""]'))
@@ -134,7 +149,7 @@ describe('component contract', () => {
       mounted.push(browser)
 
       // The server and the browser's first render draw the same page.
-      expect(canonical(reflected(browser.root), BROWSER_DRAWN[name], EFFECT_ADDED[name])).toBe(canonical(server, BROWSER_DRAWN[name]))
+      expect(canonical(reflected(browser.root), BROWSER_DRAWN[name], EFFECT_ADDED[name])).toBe(canonical(server, BROWSER_DRAWN[name], undefined, EFFECT_REMOVED[name]))
 
       // No id repeats.
       const ids = [...browser.root.querySelectorAll('[id]')].map(element => element.id)

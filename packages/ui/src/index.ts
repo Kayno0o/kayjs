@@ -1,3 +1,4 @@
+export type { ComboboxOption, ComboboxOptions, ComboboxQuery } from './combobox'
 export type { ContributionDay } from './contribution'
 export type { IconSlot, NavLink, Settings, UiSettings } from './defaults'
 export { defaults, default as uiDefaults } from './defaults'
@@ -17,6 +18,8 @@ export type { AxisScale, AxisTick, BarListRow, ChartSeries, ScatterAxis, Scatter
 export type * from './popover'
 export type { RangeValue } from './range'
 export { rangeFrom } from './range'
+export type { StepCookies, StepDraft, StepDraftOptions, StepItem } from './steps'
+export { currentStep, stepDraft, stepHref } from './steps'
 export { toCsv } from './table'
 export type { Column, RowFilter, RowKey, RowKeyValue, SortDirection, SortState } from './table'
 export * from './toast'

@@ -1,0 +1,10 @@
+---
+import Steps from '@kaynooo/kayjs-ui/steps.kay'
+
+const steps = [
+  { key: 'account', label: 'Account' },
+  { key: 'profile', label: 'Profile' },
+  { key: 'review', label: 'Review' },
+]
+---
+Steps(steps={steps} current="profile" done={['account']} url="/ui/steps" label="Signup")

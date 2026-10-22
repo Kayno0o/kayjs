@@ -1,0 +1,22 @@
+---
+import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
+
+const planets = [
+  { value: 'mercury', label: 'Mercury' },
+  { value: 'venus', label: 'Venus' },
+  { value: 'earth', label: 'Earth' },
+  { value: 'mars', label: 'Mars' },
+  { value: 'jupiter', label: 'Jupiter' },
+]
+const planet = signal('')
+---
+.flex.flex-col.items-start.gap-2
+  Combobox(
+    label="Planet"
+    options={planets}
+    value={planet()}
+    onChange={planet.set}
+    placeholder="Type a planet"
+    create
+  )
+  p.text-kui-subtext0 Picked: {planet() || 'none'}.

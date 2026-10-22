@@ -1,0 +1,91 @@
+// The step a URL names, and the draft a multi-step form keeps between its posts.
+
+export interface StepItem<Key extends string = string> {
+  key: Key
+  label: string
+}
+
+// What `ctx.cookies` is, which is all the draft asks of it.
+export interface StepCookies {
+  get: (name: string) => string | null | undefined
+  set: (name: string, value: string, options?: { path?: string, httpOnly?: boolean, sameSite?: 'lax' | 'strict' | 'none', maxAge?: number }) => void
+  delete: (name: string, options?: { path?: string }) => void
+}
+
+const STEP_PARAM = 'step'
+
+// A cookie holds about 4 KB once encoded, so a draft past this many characters of JSON is refused rather than dropped by the browser.
+const DRAFT_LIMIT = 3000
+
+// The page at `url` with its `step` param set to `key`, every other param kept and the hash dropped.
+export function stepHref(url: string | URL, key: string, param: string = STEP_PARAM): string {
+  const next = new URL(url, 'http://kay.invalid')
+
+  next.searchParams.set(param, key)
+
+  return `${next.pathname}${next.search}`
+}
+
+// The step to show: the one `url` names when it is known and no further than the first step not in `done`, else that first step; the last once every step is done.
+export function currentStep<Key extends string>(url: string | URL, keys: readonly Key[], done: readonly string[] = [], param: string = STEP_PARAM): Key {
+  const open = keys.findIndex(key => !done.includes(key))
+  const furthest = open === -1 ? keys.length - 1 : open
+  const asked = keys.indexOf(new URL(url, 'http://kay.invalid').searchParams.get(param) as Key)
+
+  return keys[asked === -1 || asked > furthest ? furthest : asked]!
+}
+
+type Values = Record<string, unknown>
+
+export interface StepDraft {
+  // The steps whose saved values pass `check`, in the order saved.
+  done: () => string[]
+  // The values of each step done, by step.
+  values: () => Record<string, Values>
+  // The values of every step done in one object, a later step's over an earlier one's.
+  merged: () => Values
+  // Keeps `values` as the step's, replacing what it held.
+  save: (step: string, values: Values) => void
+  // Forgets the draft, once the last step has gone through.
+  clear: () => void
+}
+
+export interface StepDraftOptions {
+  // Whether the values kept for `step` still pass that step's schema: the cookie is the visitor's to edit, so a step failing it is not done.
+  check?: ((step: string, values: Values) => boolean) | undefined
+  // Seconds the draft lives; an hour by default.
+  maxAge?: number | undefined
+}
+
+// The values of a multi-step form kept in a cookie of their own between posts, read and written from `ctx.cookies` in an action.
+export function stepDraft(cookies: StepCookies, name: string, { check, maxAge = 3600 }: StepDraftOptions = {}): StepDraft {
+  const cookie = `ksteps_${name}`
+
+  function read(): Record<string, Values> {
+    try {
+      const parsed: unknown = JSON.parse(cookies.get(cookie) ?? '{}')
+
+      return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed) ? parsed as Record<string, Values> : {}
+    }
+    catch {
+      return {}
+    }
+  }
+
+  const values = () => Object.fromEntries(Object.entries(read()).filter(([step, held]) => typeof held === 'object' && held !== null && (check?.(step, held) ?? true)))
+
+  return {
+    done: () => Object.keys(values()),
+    values,
+    merged: () => Object.assign({}, ...Object.values(values())) as Values,
+    save(step, held) {
+      const text = JSON.stringify({ ...read(), [step]: held })
+
+      if (text.length > DRAFT_LIMIT)
+        throw new RangeError(`The draft of ${name} is over ${DRAFT_LIMIT} characters, too much for a cookie`)
+
+      cookies.set(cookie, text, { path: '/', httpOnly: true, sameSite: 'lax', maxAge })
+    },
+    clear: () => cookies.delete(cookie, { path: '/' }),
+  }
+}

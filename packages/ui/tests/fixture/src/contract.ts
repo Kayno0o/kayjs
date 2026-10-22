@@ -12,6 +12,7 @@ import Carousel from '@kaynooo/kayjs-ui/carousel.kay'
 import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
 import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
 import CollapsibleSection from '@kaynooo/kayjs-ui/collapsible-section.kay'
+import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
 import CommandPalette from '@kaynooo/kayjs-ui/command-palette.kay'
 import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
 import ContactForm from '@kaynooo/kayjs-ui/contact-form.kay'
@@ -54,6 +55,7 @@ import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
 import Skeleton from '@kaynooo/kayjs-ui/skeleton.kay'
 import SplitLayout from '@kaynooo/kayjs-ui/split-layout.kay'
 import Stat from '@kaynooo/kayjs-ui/stat.kay'
+import Steps from '@kaynooo/kayjs-ui/steps.kay'
 import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
 import Table from '@kaynooo/kayjs-ui/table.kay'
 import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
@@ -94,6 +96,7 @@ export const COMPONENTS = {
   'checkbox': Checkbox,
   'chip-group': ChipGroup,
   'collapsible-section': CollapsibleSection,
+  'combobox': Combobox,
   'command-palette': CommandPalette,
   'confirm-delete': ConfirmDelete,
   'contact-form': ContactForm,
@@ -136,6 +139,7 @@ export const COMPONENTS = {
   'split-layout': SplitLayout,
   'skeleton': Skeleton,
   'stat': Stat,
+  'steps': Steps,
   'tab-nav': TabNav,
   'table': Table,
   'tabs': Tabs,
@@ -166,6 +170,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'checkbox': { label: 'I agree', hint: 'v2' },
   'chip-group': { label: 'Decks', options, value: ['mars'] },
   'collapsible-section': { title: 'Older', boxed: true, children: 'Deimos' },
+  'combobox': { options: [{ value: 'Mars', label: 'Mars' }, { value: 'Earth', label: 'Earth' }], label: 'Planet', value: 'Mars', name: 'planet' },
   'command-palette': { open: false, entries: [{ label: 'Home', group: 'Go', href: '/' }, { label: 'Do', group: 'Act', onSelect: noop }] },
   'confirm-delete': { message: 'Delete this?', failure: 'Could not delete', onConfirm: noop },
   'contact-form': { action, nameLabel: 'Name', emailLabel: 'Email', messageLabel: 'Message', submitLabel: 'Send' },
@@ -208,6 +213,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'split-layout': { list: 'L', detail: 'D' },
   'skeleton': { lines: 2, label: 'Loading' },
   'stat': { value: 12, label: 'moons' },
+  'steps': { steps: [{ key: 'account', label: 'Account' }, { key: 'details', label: 'Details' }, { key: 'review', label: 'Review' }], current: 'details', url: '/signup?step=details', done: ['account'], label: 'Signup' },
   'tab-nav': { links: [{ href: '/', label: 'Home' }], current: '/', label: 'Sections' },
   'table': { columns, rows: planets, rowKey: 'name' },
   'tabs': { tabs: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], value: 'a', label: 'Tabs', panel: (value: string) => value },

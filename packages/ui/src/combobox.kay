@@ -1,0 +1,302 @@
+--- <Value extends string>
+import type { JSX } from 'kay'
+import type { ComboboxOption, ComboboxOptions } from './combobox'
+import { effect, onCleanup, signal, uid, untrack } from 'kay'
+import { enabledIndex, matchingOptions, offersCreate } from './combobox'
+import { onFormReset, startRef } from './form-reset'
+import { wording } from 'kay/words'
+
+// A remote search waits this long after the last key.
+const DEBOUNCE_MS = 200
+
+const { id, options, value = '', label, name, minLength = 1, create = false, createLabel = (text: string) => wording('ui.combobox.createLabel', 'Create "{text}"', { text }), loadingLabel = wording('ui.combobox.loadingLabel', 'Loading…'), emptyLabel = wording('ui.combobox.emptyLabel', 'No match'), failureLabel = wording('ui.combobox.failureLabel', 'Could not load the options'), disabled = false, onChange, onCreate, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'id' | 'value' | 'name' | 'class' | 'children' | 'onChange' | 'disabled' | 'role' | 'minLength'> & {
+  // The listbox's id, unique on the page; one is drawn when none is given.
+  id?: string | undefined
+  // A list, filtered as the visitor types, or a function handed `{ q }` that answers the options for it: an action, or an API call wrapped in one. Only the latest answer is shown.
+  options: ComboboxOptions<Value>
+  // The value picked; a control whose parent passes another follows it. Empty while nothing is picked.
+  value?: Value | '' | undefined
+  // Names the input for screen readers, unless a FormField labels it.
+  label?: string | undefined
+  // Submits the value picked, or the text typed while nothing is. Without JavaScript the input posts its text.
+  name?: string | undefined
+  // The characters typed before a function is asked for options.
+  minLength?: number | undefined
+  // Offers what was typed as a new option when no option bears its label. Picking it hands the text as the value, and `onCreate` the text.
+  create?: boolean | undefined
+  createLabel?: ((text: string) => string) | undefined
+  loadingLabel?: string | undefined
+  emptyLabel?: string | undefined
+  failureLabel?: string | undefined
+  disabled?: boolean | undefined
+  onChange?: ((value: Value | '', option: ComboboxOption<Value> | undefined) => void) | undefined
+  // Called with the text of a created option, once it is picked.
+  onCreate?: ((text: string) => void) | undefined
+}>()
+
+const listId = id ?? uid()
+const remote = typeof options === 'function'
+const known = () => typeof options === 'function' ? [] : options
+const startOption = () => known().find(option => option.value === value)
+
+const text = signal(startOption()?.label ?? value)
+const picked = signal<ComboboxOption<Value> | undefined>(startOption() ?? (value ? { value: value as Value, label: value } : undefined))
+const open = signal(false)
+const active = signal(-1)
+const found = signal<readonly ComboboxOption<Value>[]>([])
+const loading = signal(false)
+const failed = signal(false)
+// Set once the browser runs, so the first render is the page without JavaScript: the text posts as it is and the browser's own suggestions apply, which the listbox drawn here replaces.
+const enhanced = signal(false)
+let input: HTMLInputElement | undefined
+let request = 0
+const initial = untrack(() => ({ text: text(), picked: picked() }))
+
+effect(() => {
+  const next = value
+
+  if (next === untrack(() => picked()?.value ?? ''))
+    return
+
+  const option = untrack(() => [...known(), ...found()].find(candidate => candidate.value === next))
+  const chosen = option ?? (next ? { value: next, label: next } : undefined)
+
+  picked.set(chosen)
+  text.set(chosen?.label ?? '')
+})
+
+effect(() => {
+  enhanced.set(true)
+})
+
+// The option whose value goes in a hidden field of its own, once the browser runs: one posting its label alone is the input's text.
+const carried = () => {
+  const option = picked()
+
+  return enhanced() && option && option.value !== option.label ? option : undefined
+}
+
+const rows = () => remote ? found() : matchingOptions(known(), text())
+const offered = () => create && offersCreate(remote ? found() : known(), text())
+const count = () => rows().length + (offered() ? 1 : 0)
+const optionId = (index: number) => `${listId}-option-${index}`
+const flags = () => [...rows().map(option => option.disabled === true), ...offered() ? [false] : []]
+
+const status = () => {
+  if (!open() || (remote && text().trim().length < minLength))
+    return ''
+
+  if (loading())
+    return loadingLabel
+
+  if (failed())
+    return failureLabel
+
+  return count() === 0 ? emptyLabel : wording('ui.combobox.resultsLabel', '{count} results', { count: count() })
+}
+
+// Only the latest question lands: an answer arriving after a newer key press is dropped.
+async function load(query: string) {
+  const mine = ++request
+
+  if (typeof options !== 'function' || query.trim().length < minLength) {
+    loading.set(false)
+    found.set([])
+
+    return
+  }
+
+  loading.set(true)
+
+  try {
+    const answer = await options({ q: query })
+
+    if (mine !== request)
+      return
+
+    found.set(answer)
+    failed.set(false)
+    active.set(-1)
+  }
+  catch (error) {
+    if (mine === request) {
+      console.error('kayjs-ui: a Combobox could not load its options', error)
+      failed.set(true)
+    }
+  }
+  finally {
+    if (mine === request)
+      loading.set(false)
+  }
+}
+
+// The search waits for a pause in typing; a list filters at once.
+effect(() => {
+  const query = text()
+
+  if (!untrack(() => open()) || !remote)
+    return
+
+  const timer = setTimeout(() => void load(query), DEBOUNCE_MS)
+
+  onCleanup(() => clearTimeout(timer))
+})
+
+function type(next: string) {
+  open.set(true)
+  text.set(next)
+  active.set(-1)
+
+  if (picked()) {
+    picked.set(undefined)
+    onChange?.('', undefined)
+  }
+}
+
+function pick(index: number) {
+  const row = rows()[index]
+  const option = row ?? (index === rows().length && offered() ? { value: text().trim() as Value, label: text().trim() } : undefined)
+
+  if (!option || option.disabled)
+    return
+
+  picked.set(option)
+  text.set(option.label)
+  open.set(false)
+  active.set(-1)
+
+  if (!row)
+    onCreate?.(option.label)
+
+  onChange?.(option.value, option)
+}
+
+function move(step: 1 | -1) {
+  if (!open()) {
+    open.set(true)
+
+    if (remote)
+      void load(text())
+  }
+
+  active.set(enabledIndex(flags(), active(), step))
+}
+
+// The arrows move through the options with focus staying in the input, as the combobox pattern has it; Enter picks the active one, Escape closes the list and a second Escape clears the text.
+function keyDown(event: KeyboardEvent) {
+  if (event.altKey && event.key === 'ArrowDown') {
+    event.preventDefault()
+    open.set(true)
+
+    return
+  }
+
+  if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)
+    return
+
+  switch (event.key) {
+    case 'ArrowDown':
+      event.preventDefault()
+      move(1)
+      break
+    case 'ArrowUp':
+      event.preventDefault()
+      move(-1)
+      break
+    case 'Enter':
+      if (open() && active() !== -1) {
+        event.preventDefault()
+        pick(active())
+      }
+
+      break
+    case 'Escape':
+      if (open()) {
+        event.preventDefault()
+        open.set(false)
+        active.set(-1)
+      }
+      else if (text() !== '') {
+        const had = picked()
+
+        event.preventDefault()
+        text.set('')
+        picked.set(undefined)
+
+        if (had)
+          onChange?.('', undefined)
+      }
+
+      break
+    default:
+      break
+  }
+}
+
+function focusIn() {
+  if (remote && text().trim().length < minLength)
+    return
+
+  open.set(true)
+
+  if (remote && found().length === 0)
+    void load(text())
+}
+
+// A click on an option keeps focus in the input, so the list closes on focus leaving rather than on that press.
+function focusOut() {
+  open.set(false)
+  active.set(-1)
+}
+
+effect(() => {
+  const index = active()
+
+  if (index !== -1 && open())
+    document.getElementById(optionId(index))?.scrollIntoView({ block: 'nearest' })
+})
+
+onFormReset(() => input, () => {
+  text.set(initial.text)
+  picked.set(initial.picked)
+  open.set(false)
+  active.set(-1)
+})
+
+const ref = startRef<HTMLInputElement>(element => input = element, rest.ref)
+---
+.kui-combobox
+  input.kui-field-input(
+    {...rest}
+    ref={ref}
+    type="text"
+    role="combobox"
+    autocomplete="off"
+    name={carried() ? undefined : name}
+    value={text()}
+    disabled={disabled}
+    list={!remote && !enhanced() ? `${listId}-native` : undefined}
+    aria-label={label}
+    aria-expanded={open() ? 'true' : 'false'}
+    aria-controls={listId}
+    aria-autocomplete="list"
+    aria-activedescendant={open() && active() !== -1 ? optionId(active()) : undefined}
+    aria-busy={loading() ? 'true' : undefined}
+    onInput={event => type(event.currentTarget.value)}
+    onKeyDown={keyDown}
+    onFocusIn={focusIn}
+    onFocusOut={focusOut}
+  )
+  if name && carried() as option
+    input(type="hidden" name={name} value={option.value} disabled={disabled})
+  if !remote
+    datalist(id={`${listId}-native`})
+      for option of known() key={option.value}
+        option(value={option.label})
+  ul.kui-combobox-list(part="list" id={listId} role="listbox" aria-label={label} hidden={!open() || count() === 0})
+    for option, index of rows() key={option.value}
+      li.kui-combobox-option(part="option" id={optionId(index)} role="option" aria-selected={active() === index ? 'true' : 'false'} aria-disabled={option.disabled ? 'true' : undefined} data-selected={picked()?.value === option.value ? '' : undefined} onMouseDown={event => event.preventDefault()} onClick={() => pick(index)}) {option.label}
+    if offered()
+      li.kui-combobox-option(part="option" id={optionId(rows().length)} role="option" aria-selected={active() === rows().length ? 'true' : 'false'} data-create="" onMouseDown={event => event.preventDefault()} onClick={() => pick(rows().length)}) {createLabel(text().trim())}
+  // Read out as the list loads and settles, which otherwise changes in silence.
+  p.kui-combobox-status(part="status" role="status") {status()}

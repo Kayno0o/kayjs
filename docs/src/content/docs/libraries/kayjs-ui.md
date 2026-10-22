@@ -175,11 +175,11 @@ Actions: [Button](/ui/button), [IconButton](/ui/icon-button), [ConfirmDelete](/u
 
 Overlays: [Dialog](/ui/dialog), [FormDialog](/ui/form-dialog), [SidePanel](/ui/side-panel), [Popover](/ui/popover), [TooltipHost](/ui/tooltip-host), [Toaster](/ui/toaster), [CommandPalette](/ui/command-palette).
 
-Forms: [FormField](/ui/form-field), [SaveForm](/ui/save-form), [ContactForm](/ui/contact-form), [TextInput](/ui/text-input), [Checkbox](/ui/checkbox), [ChipGroup](/ui/chip-group), [RadioGroup](/ui/radio-group), [Select](/ui/select), [MultiSelect](/ui/multi-select), [Textarea](/ui/textarea), [RangeInput](/ui/range-input), [FileDrop](/ui/file-drop), [IconPicker](/ui/icon-picker), [MarkdownEditor](/ui/markdown-editor), [ImageCropper](/ui/image-cropper), [Rating](/ui/rating).
+Forms: [FormField](/ui/form-field), [SaveForm](/ui/save-form), [ContactForm](/ui/contact-form), [TextInput](/ui/text-input), [Checkbox](/ui/checkbox), [ChipGroup](/ui/chip-group), [RadioGroup](/ui/radio-group), [Select](/ui/select), [MultiSelect](/ui/multi-select), [Combobox](/ui/combobox), [Textarea](/ui/textarea), [RangeInput](/ui/range-input), [FileDrop](/ui/file-drop), [IconPicker](/ui/icon-picker), [MarkdownEditor](/ui/markdown-editor), [ImageCropper](/ui/image-cropper), [Rating](/ui/rating).
 
 Layout: [Card](/ui/card), [CardRow](/ui/card-row), [PageHeader](/ui/page-header), [PageSection](/ui/page-section), [CollapsibleSection](/ui/collapsible-section), [Widget](/ui/widget), [SplitLayout](/ui/split-layout), [EmptyState](/ui/empty-state), [Notice](/ui/notice), [Masonry](/ui/masonry).
 
-Navigation: [Tabs](/ui/tabs), [TabNav](/ui/tab-nav), [Breadcrumb](/ui/breadcrumb), [Segmented](/ui/segmented), [SiteNav](/ui/site-nav), [AppHeader](/ui/app-header), [Pagination](/ui/pagination), [TreeView](/ui/tree-view).
+Navigation: [Tabs](/ui/tabs), [TabNav](/ui/tab-nav), [Breadcrumb](/ui/breadcrumb), [Segmented](/ui/segmented), [SiteNav](/ui/site-nav), [AppHeader](/ui/app-header), [Pagination](/ui/pagination), [Steps](/ui/steps), [TreeView](/ui/tree-view).
 
 Data: [Table](/ui/table), [Stat](/ui/stat), [Meter](/ui/meter), [BarList](/ui/bar-list), [Badge](/ui/badge), [Avatar](/ui/avatar), [LineChart](/ui/line-chart), [ScatterChart](/ui/scatter-chart), [ContributionGraph](/ui/contribution-graph), [QrCode](/ui/qr-code), [SiteFavicon](/ui/site-favicon), [Icon](/ui/icon).
 

@@ -1,0 +1,38 @@
+---
+import type { JSX } from 'kay'
+import type { StepItem } from './steps'
+import { wording } from 'kay/words'
+import { stepHref } from './steps'
+
+const { steps, current, url, done = [], param = 'step', label, doneLabel = wording('ui.steps.doneLabel', 'completed'), ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & {
+  steps: readonly StepItem[]
+  // The key of the step on screen, which `currentStep(ctx.url, keys, done)` reads off the URL.
+  current: string
+  // The page's URL, `ctx.url`: each link to a step keeps its other params.
+  url: string | URL
+  // The keys of the steps whose values were kept; a step before the current one or in this list is a link back, any other plain text.
+  done?: readonly string[] | undefined
+  // The query param holding the step.
+  param?: string | undefined
+  // Names the navigation for screen readers.
+  label: string
+  // What a screen reader hears after a completed step's name.
+  doneLabel?: string | undefined
+}>()
+
+const at = () => steps.findIndex(step => step.key === current)
+const state = (index: number, key: string) => key === current ? 'current' : index < at() || done.includes(key) ? 'done' : 'upcoming'
+---
+nav.kui-steps({...rest} aria-label={label})
+  ol.kui-steps-list(part="list")
+    for step, index of steps key={step.key}
+      li.kui-steps-item(part="item" data-state={state(index, step.key)})
+        if state(index, step.key) === 'done'
+          a.kui-steps-link(part="link" href={stepHref(url, step.key, param)})
+            span.kui-steps-marker(part="marker" aria-hidden="true") {index + 1}
+            span.kui-steps-label(part="label") {step.label}
+            span.kui-steps-state {doneLabel}
+        else
+          span.kui-steps-link(part="link" aria-current={step.key === current ? 'step' : undefined})
+            span.kui-steps-marker(part="marker" aria-hidden="true") {index + 1}
+            span.kui-steps-label(part="label") {step.label}

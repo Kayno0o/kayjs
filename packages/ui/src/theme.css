@@ -1398,6 +1398,46 @@
     @apply my-1 border-0 border-t border-kui-surface2;
   }
 
+  /* Combobox: the listbox opens under the input without taking focus, the row the arrows stand on marked by aria-selected. */
+  .kui-combobox {
+    @apply relative inline-flex min-w-0 flex-col;
+  }
+
+  .kui-combobox-list {
+    @apply absolute inset-x-0 top-full z-20 m-0 mt-1 max-h-64 list-none overflow-y-auto border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-mantle p-1 text-sm text-kui-text;
+
+    &:where([hidden]) {
+      @apply hidden;
+    }
+  }
+
+  .kui-combobox-option {
+    @apply cursor-pointer px-2 py-1.5 hover:bg-kui-row-hover;
+
+    &:where([aria-selected='true']) {
+      @apply bg-kui-row-hover;
+      box-shadow: inset 2px 0 0 var(--color-kui-accent);
+      outline: 2px solid transparent;
+      outline-offset: -2px;
+    }
+
+    &:where([data-selected]) {
+      @apply font-medium text-kui-accent;
+    }
+
+    &:where([data-create]) {
+      @apply italic;
+    }
+
+    &:where([aria-disabled='true']) {
+      @apply cursor-not-allowed opacity-50;
+    }
+  }
+
+  .kui-combobox-status {
+    @apply sr-only;
+  }
+
   .kui-multi-select {
     @apply inline-flex min-w-0;
   }
@@ -2046,6 +2086,51 @@
     &:where([aria-current='page']) {
       @apply border-kui-accent text-kui-accent;
     }
+  }
+
+  /* Steps: a numbered row, the current step marked by aria-current and the ones behind it links. */
+  .kui-steps {
+    @apply block;
+  }
+
+  .kui-steps-list {
+    @apply m-0 flex list-none flex-wrap gap-x-6 gap-y-2 p-0;
+  }
+
+  .kui-steps-item {
+    @apply flex items-center text-sm text-kui-subtext0;
+
+    &:where([data-state='current']) {
+      @apply font-medium text-kui-text;
+    }
+  }
+
+  .kui-steps-link {
+    @apply flex items-center gap-2 rounded-md no-underline;
+
+    &:where(a) {
+      @apply text-kui-text hover:text-kui-accent;
+    }
+  }
+
+  .kui-steps-marker {
+    @apply flex size-6 shrink-0 items-center justify-center rounded-full border border-kui-overlay0 text-xs;
+
+    :where([data-state='current']) & {
+      @apply border-kui-accent bg-kui-accent text-kui-on-accent;
+    }
+
+    :where([data-state='done']) & {
+      @apply border-kui-accent text-kui-accent;
+    }
+  }
+
+  .kui-steps-label {
+    @apply min-w-0;
+  }
+
+  .kui-steps-state {
+    @apply sr-only;
   }
 
   /* In-page tabs look like TabNav's, the shown one marked by aria-selected rather than aria-current. */

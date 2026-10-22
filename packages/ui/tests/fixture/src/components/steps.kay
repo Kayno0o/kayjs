@@ -1,0 +1,7 @@
+---
+import Steps from '@kaynooo/kayjs-ui/steps.kay'
+
+const { current, done } = props<{ current: string, done: string[] }>()
+const steps = [{ key: 'account', label: 'Account' }, { key: 'details', label: 'Details' }, { key: 'review', label: 'Review' }]
+---
+Steps(steps={steps} current={current} done={done} url="/signup?plan=pro&step=details" label="Signup")
