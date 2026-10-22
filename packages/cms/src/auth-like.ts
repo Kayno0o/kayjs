@@ -11,7 +11,7 @@ interface AuthLike {
   isGranted?: (role: string, user: MemberLike) => boolean
   signInUrl?: (back?: string) => string
   signOut?: () => Promise<void>
-  requireUser?: (options: { require: string }) => Promise<unknown>
+  requireUser?: (options: { require: string, bare: true }) => Promise<unknown>
   [REQUIRES]?: unknown
 }
 
@@ -44,6 +44,6 @@ export function roleGuard(role: string): Guard {
       return ctx.deny(403)
     }
 
-    await auth.requireUser({ require: role })
+    await auth.requireUser({ require: role, bare: true })
   }
 }

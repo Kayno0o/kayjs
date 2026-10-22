@@ -158,8 +158,8 @@ describe('cms({ role })', () => {
   // kayjs-auth's `ctx.locals.auth`, admitting a user holding the role asked.
   function signedIn(roles: string[], asked: string[]): GuardContext {
     const ctx = context('POST', '/entries/posts/hello', false)
-    const requireUser = async ({ require }: { require: string }) => {
-      asked.push(require)
+    const requireUser = async ({ require, bare }: { require: string, bare?: boolean }) => {
+      asked.push(bare === true ? `${require} bare` : require)
 
       return roles.includes(require) ? { id: 'u1', roles } : ctx.deny(403)
     }
@@ -174,7 +174,7 @@ describe('cms({ role })', () => {
 
     expect(await admitted(signedIn(['editor'], asked))).toBe(true)
     expect(await admitted(signedIn(['reader'], asked))).toBe(false)
-    expect(asked).toEqual(['editor', 'editor'])
+    expect(asked).toEqual(['editor bare', 'editor bare'])
   })
 
   test('refuses every request with no kayjs-auth in its locals, or one too old to read require, logging it once', async () => {

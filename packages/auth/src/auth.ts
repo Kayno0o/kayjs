@@ -75,6 +75,14 @@ export type { AuthSessionData, BareUser, OAuthApp, Off, Profile, User } from './
 
 const STATE = Symbol('kayjs-auth.state')
 const TAKE_COOKIES = Symbol('kayjs-auth.takeCookies')
+
+interface RequireUserOptions<Scope extends string, Role extends string> {
+  redirect?: string | undefined
+  scope?: ScopeRequirement<Scope> | undefined
+  require?: AuthRequirement<Role> | undefined
+  bare?: boolean | undefined
+}
+
 // Says `requireUser()` reads `require`, so kayjs-cms's `role` refuses a request rather than trust an older kayjs-auth that ignores it.
 const REQUIRES: unique symbol = Symbol.for('kayjs-auth.requires')
 
@@ -333,8 +341,11 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
   // The signed-in user, who must be there: an anonymous visitor opening a page goes to the sign-in page and comes back, and any other request, an action's call included, is refused with a 401, as `auth.guard()` does. For a page or an action to ask for a user without a guard above it; the user is read once per request.
   // The sign-in page is the prebuilt one with `pages`, else `redirect`, else `signInPage`, else the visitor gets the 401 too. A bearer token limited to scopes is refused with a 403 unless `scope` names one it holds, and a user who does not meet `require` (a role, or any requirement `guard()` takes, with no route params) with a 403 too.
-  async requireUser(options: { redirect?: string | undefined, scope?: ScopeRequirement<Scope> | undefined, require?: AuthRequirement<Role> | undefined } = {}): Promise<User<UserData>> {
-    const user = await this.user()
+  // `bare: true` answers the `BareUser` of `bareUser()`, with no providers read: for a caller that only wants the checks, as kayjs-cms's `role` does.
+  async requireUser(options: RequireUserOptions<Scope, Role> & { bare: true }): Promise<BareUser<UserData>>
+  async requireUser(options?: RequireUserOptions<Scope, Role>): Promise<User<UserData>>
+  async requireUser(options: RequireUserOptions<Scope, Role> = {}): Promise<User<UserData> | BareUser<UserData>> {
+    const user = await this.bareUser()
     const { redirect, deny } = stoppers(this.request)
 
     if (!user) {
@@ -349,7 +360,10 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     if (options.require !== undefined && !(await this.core.authorize?.(user as BareUser, options.require, READ_METHODS.has(this.request.method) ? 'read' : 'write')))
       return deny(403)
 
-    return !scopeAllows(await this.scopes(), options.scope) ? deny(403) : user
+    if (!scopeAllows(await this.scopes(), options.scope))
+      return deny(403)
+
+    return options.bare ? user : { ...user, providers: await this.providersOf((await this.record())!) }
   }
 
   // The signed-in admin, as themselves, for an admin page to ask for: 404 while the `admin` option names no one (a `Denied`, which a plain Elysia app answers too), a visitor sent to sign in as `requireUser()` does, and 403 for anyone else, an admin acting as a user and a bearer token included.

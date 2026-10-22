@@ -218,6 +218,29 @@ describe('app data and provider ids on the user', () => {
     expect(listed).toHaveBeenCalledTimes(1)
   })
 
+  test('requireUser({ bare: true }) reads no identities, and requireUser() still answers the providers, read once', async () => {
+    providers({ 1: { id: '1', username: 'ada' } })
+    const { app, auth, browserOn, store } = setup()
+    const wrapped = new Elysia().use(app).use(auth.plugin).get('/bare', async ({ auth }) => auth.requireUser({ require: 'editor', bare: true })).get('/full', async ({ auth }) => {
+      await auth.requireUser()
+
+      return auth.requireUser({ require: 'editor' })
+    })
+    const ada = browserOn(wrapped)
+
+    await signInWith(ada, 'discord', '1')
+    await store.users.update((await me(ada)).id, { roles: ['editor'] })
+
+    const listed = spyOn(store.identities, 'listByUser')
+    const bare = await (await ada.fetch('/bare')).json() as Record<string, unknown>
+
+    expect(bare).toMatchObject({ roles: ['editor'] })
+    expect(bare).not.toHaveProperty('providers')
+    expect(listed).not.toHaveBeenCalled()
+    expect(await (await ada.fetch('/full')).json()).toMatchObject({ providers: { discord: { id: '1' } } })
+    expect(listed).toHaveBeenCalledTimes(1)
+  })
+
   test('the admin option sees the provider id of the user it judges', async () => {
     providers({ 1: { id: '1', username: 'ada' } })
     const { browser } = setup({ admin: async (user: User) => user.providers.discord?.id === '1' })
