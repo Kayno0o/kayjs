@@ -535,7 +535,6 @@ createAuth({
     owner: 'owner',
     manage: 'admin',
     defaultRoles: ['member'],
-    invitationPage: '/invitation',
     invitations: { maxAge: '7d' },
   },
 })
@@ -808,4 +807,5 @@ Topics of the kayjs-auth reference the sections above do not link:
 - [The OAuth server for MCP clients, bearer tokens and forward auth](/llms/kayjs-auth-oauth-server-and-tokens)
 - [Events, the audit log, admin and organizations](/llms/kayjs-auth-admin-and-organizations)
 - [The prebuilt admin pages](/llms/kayjs-auth-admin-pages)
+- [The prebuilt organization pages](/llms/kayjs-auth-organization-pages)
 - [Bots, breached passwords, limits, stores, testing and the dev tool](/llms/kayjs-auth-hardening-and-testing)

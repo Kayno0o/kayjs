@@ -191,7 +191,7 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   scopes?: readonly Scope[] | undefined
   // Each role and the roles it includes: `{ admin: ['editor'], editor: [] }`.
   roles?: Record<Role, NoInfer<Role>[]> | undefined
-  // Teams or workspaces users belong to, with roles of their own in each: `{ roles: { owner: ['admin'], admin: ['member'], member: [] }, owner: 'owner', invitationPage: '/invitation' }`.
+  // Teams or workspaces users belong to, with roles of their own in each: `{ roles: { owner: ['admin'], admin: ['member'], member: [] }, owner: 'owner' }`.
   organizations?: OrganizationsOptions<OrgRole, NoInfer<Role>> | undefined
   // Who may list, ban and impersonate users and grant them roles, such as `'admin'`; nobody without it.
   admin?: AuthRequirement<NoInfer<Role>> | undefined
@@ -1077,7 +1077,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return record ? removeMember(this[STATE], ref, record.id) : { ok: false, error: 'signed-out' }
   }
 
-  // Mails `email` a link to the `invitationPage`, giving `roles` (`defaultRoles` when none) once accepted: for members holding `manage` and every role it gives.
+  // Mails `email` a link to the `invitationPage`, else the prebuilt pages' invitation page, giving `roles` (`defaultRoles` when none) once accepted: for members holding `manage` and every role it gives.
   async invite(ref: string, email: string, roles?: OrgRole[]): Promise<InviteResult<OrgRole>> {
     return invite(this[STATE], ref, email, roles) as Promise<InviteResult<OrgRole>>
   }

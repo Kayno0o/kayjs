@@ -43,6 +43,10 @@ export const reject = action(schemas.id, async ({ id }, ctx) => {
 // Signs the wrong account out and comes back to this link to sign in with the right one.
 export const switchAccount = action(schemas.id, async ({ id }, ctx) => {
   const auth = ctx.locals.auth
+
+  if (!auth.features().organizations)
+    return ctx.fail(404, { error: 'not-found' })
+
   const { signInPage, pages, prefix } = auth.features()
   const signIn = localize(signInPage)
 

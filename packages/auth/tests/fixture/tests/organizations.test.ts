@@ -13,7 +13,7 @@ const browser = () => testSite({ root: ROOT })
 await browser()
 const { register } = await import(join(PAGES, 'register.kay'))
 const { password } = await import(join(PAGES, 'sign-in.kay'))
-const { create, accept: acceptMine, reject: rejectMine } = await import(join(PAGES, 'account', 'organizations', 'index.kay'))
+const { create, accept: acceptMine } = await import(join(PAGES, 'account', 'organizations', 'index.kay'))
 const { invite, leave, removeMember, remove, rename, revoke, setRoles } = await import(join(PAGES, 'account', 'organizations', '[org].kay'))
 const { accept, reject, switchAccount } = await import(join(PAGES, 'invitation.kay'))
 
@@ -158,6 +158,11 @@ describe('the organization pages', () => {
     expect((await owner.visitor.visit(from)).status).toBe(404)
     expect(await owner.visitor.call(removeMember, { userId: ada.id }, { from: `${LIST}/renamed-cycle` })).toBe('done')
     expect((await ada.visitor.visit(LIST)).find('[data-organization]')).toHaveLength(0)
+    // A member leaving goes back to the list and is no longer in it.
+    const bob = await member('renamed-cycle', owner, 'cycle-bob@example.com', ['member'])
+
+    expect((await bob.visitor.submit(leave, {}, { from: `${LIST}/renamed-cycle` })).url).toBe(LIST)
+    expect((await bob.visitor.visit(LIST)).find('[data-organization]')).toHaveLength(0)
     expect((await owner.visitor.refusal(remove, {}, { from: `${LIST}/renamed-cycle` })).data).toEqual({ error: 'form' })
     expect((await owner.visitor.submit(remove, { confirm: 'on' }, { from: `${LIST}/renamed-cycle` })).url).toBe(LIST)
     expect(await store.organizations!.findBySlug('renamed-cycle')).toBeUndefined()
@@ -316,6 +321,5 @@ describe('inviting', () => {
 
     expect(row.attributes['data-invitation']).toBe(link.searchParams.get('invitation')!)
     expect((await ada.visitor.submit(acceptMine, { id: row.attributes['data-invitation']! }, { from: list })).url).toBe(from)
-    expect(rejectMine).toBeDefined()
   })
 })

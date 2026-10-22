@@ -14,7 +14,6 @@ createAuth({
     owner: 'owner',
     manage: 'admin',
     defaultRoles: ['member'],
-    invitationPage: '/invitation',
   },
 })
 ```
