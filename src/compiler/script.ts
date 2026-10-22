@@ -129,7 +129,7 @@ export function analyzeScript(source: string, script: Span | undefined, serverNa
 
 // The `--- module` fence as module-level code: every statement is hoisted, the exports among them are the file's own.
 function analyzeModule(source: string, module: Span): ScriptAnalysis {
-  const analysis: ScriptAnalysis = { hoisted: [], imports: [], specifiers: [], body: [], broken: [], brokenModule: [], reactive: false, implicit: [], functions: [], diagnostics: [] }
+  const analysis: ScriptAnalysis = { hoisted: [], imports: [], specifiers: [], body: [], broken: [], brokenModule: [], reactive: false, implicit: [], functions: [], plain: [], diagnostics: [] }
   const split = splitFence(source, module, [], analysis)
 
   if (!split)

@@ -123,7 +123,7 @@ export const check: Command = {
 interface CheckRun {
   project: unknown
   entry: unknown
-  values: { 'deny-warnings'?: boolean, 'fix'?: boolean, 'quiet'?: boolean }
+  values: { 'deny-warnings'?: boolean, 'fix'?: boolean, 'dry-run'?: boolean, 'quiet'?: boolean }
   only: LintGroup | undefined
   since: string | undefined
   format: ProblemFormat
