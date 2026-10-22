@@ -259,7 +259,19 @@ it('writes a resource with the table, the actions, the pages and a test, drawn w
   expect(plain.files['src/routes/categories/new.kay']).toContain('form(action={create})')
   expect(Object.keys(resourceFiles('note', ['title:string'], { ...PROJECT, tests: false }).files)).not.toContain('tests/notes.test.ts')
   expect(resourceFiles('note', ['count:int'], PROJECT).files['tests/notes.test.ts']).toContain('with an invalid count')
-  expect(resourceFiles('note', ['done:boolean'], PROJECT).files['tests/notes.test.ts']).not.toContain('refuses')
+  expect(resourceFiles('note', ['done:boolean'], PROJECT).files['tests/notes.test.ts']).toContain('refuses a note with an invalid done')
+  expect(resourceFiles('note', ['title:string'], PROJECT).files['tests/notes.test.ts']).toContain('const id = String((await db.repo(Note)')
+  expect(resourceFiles('note', ['title:string'], PROJECT).files['tests/notes.test.ts']).not.toContain('\'1\'')
+  // A boolean's `true` matches anything, so a list shows the first other field, or the absence of the empty message.
+  expect(resourceFiles('note', ['done:boolean', 'title:string'], PROJECT).files['tests/notes.test.ts']).toContain('toContain(\'First\')')
+  expect(resourceFiles('note', ['done:boolean'], PROJECT).files['tests/notes.test.ts']).toContain('not.toContain(\'No notes yet.\')')
+  // A name already plural stays so, its list variable apart from its row.
+  const news = resourceFiles('news', ['title:string'], { ...PROJECT, ui: false })
+
+  expect(Object.keys(news.files)).toContain('src/routes/news/index.kay')
+  expect(news.files['src/routes/news/index.kay']).toContain('for news of newsList')
+  expect(Object.keys(resourceFiles('address', ['title:string'], PROJECT).files)).toContain('src/routes/addresses/index.kay')
+  expect(Object.keys(resourceFiles('tags', ['title:string'], PROJECT).files)).toContain('src/routes/tags/index.kay')
 })
 
 it('refuses a resource named or fielded wrongly', () => {
@@ -332,6 +344,13 @@ it('runs as kay generate resource, the fields before an optional folder', async 
   expect(document).toMatchObject({ kind: 'resource', name: 'post', dryRun: true })
   expect(document.written).toContain('src/routes/posts/_actions.kay')
   expect((await run(dir, 'generate', 'page', 'x', 'app', 'extra')).code).toBe(1)
+
+  // A field without its type is named, not taken for the folder.
+  const untyped = await run(dir, 'generate', 'resource', 'post', 'title', '--dry-run')
+
+  expect(untyped.code).toBe(1)
+  expect(untyped.stderr).toContain('`title` is not a field')
+  expect((await run(dirname(dir), 'generate', 'resource', 'post', 'title:string', 'app', '--dry-run')).code).toBe(0)
 })
 
 // What a resource writes passes kay check and the project's lint, and its test passes on a migrated database, with kayjs-ui and without.
@@ -352,6 +371,8 @@ for (const ui of [true, false]) {
     }
 
     await generate(dir, 'resource', 'blog-post', { fields: ['title:string', 'body:text', 'views:int', 'rating:float', 'done:boolean'] })
+    // A name already plural and a resource of booleans alone.
+    await generate(dir, 'resource', 'news', { fields: ['active:boolean'] })
     await Bun.write(join(dir, 'package.json'), manifestText)
 
     expect(await check(dir, configCheckOptions(await loadConfig(dir)))).toEqual([])
@@ -374,9 +395,9 @@ for (const ui of [true, false]) {
 
       expect({ generated: generated.includes('Generated'), errors }).toEqual({ generated: true, errors: expect.not.stringContaining('rror') })
 
-      const tests = await runWith(dir, { DATABASE_URL: TEST_DATABASE_URL! }, 'test', 'tests/blog-posts.test.ts')
+      const tests = await runWith(dir, { DATABASE_URL: TEST_DATABASE_URL! }, 'test', 'tests/blog-posts.test.ts', 'tests/news.test.ts')
 
-      expect({ code: tests.code, report: tests.stderr + tests.stdout }).toEqual({ code: 0, report: expect.stringContaining(' 3 pass') })
+      expect({ code: tests.code, report: tests.stderr + tests.stdout }).toEqual({ code: 0, report: expect.stringContaining(' 6 pass') })
     }
     finally {
       await admin.unsafe(`DROP DATABASE IF EXISTS ${name}`)

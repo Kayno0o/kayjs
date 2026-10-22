@@ -120,11 +120,11 @@ A project with tests gets `tests/<name>.test.ts` for a page, `tests/action-<name
 
 `kay generate resource <name> <field:type>...` writes a whole list, create, edit and delete for one table. It needs a database, so a project without `postgres` stops with `kay add postgres` named. A field is `name:type` with the type `string` (a `varchar(200)`), `text`, `int`, `float` or `boolean`, and every field is required.
 
-- The table is written to `src/db/<name>.ts` and added to `tables` in `src/db/tables.ts`. `blog-post` gives the table `blog_post`, the export `BlogPost` and the pages under `/blog-posts`.
+- The table is written to `src/db/<name>.ts` and added to `tables` in `src/db/tables.ts`. `blog-post` gives the table `blog_post`, the export `BlogPost` and the pages under `/blog-posts`. A name ending in a single `s`, such as `news`, is already plural and kept as is.
 - `src/routes/blog-posts/_actions.kay` holds `create`, `update` and `remove`, checking their input with `s` schemas built from the fields, and sending the visitor back to the list.
 - The list is `src/routes/blog-posts/index.kay` and the edit page `src/routes/blog-posts/[id=integer]/edit.kay`, with a delete button.
 - With kayjs-ui installed the list is a `Table`, new rows are added from a `FormDialog` and the edit page is a `SaveForm`. Without it the list is a plain `table`, and a `new.kay` page holds the form.
-- A project with tests gets `tests/blog-posts.test.ts`, which creates a row, reads the list, edits and deletes the row, and checks that an empty text field is refused. A `tables` list holding a comment or an index is left alone, and the command stops.
+- A project with tests gets `tests/blog-posts.test.ts`, which creates a row, reads the list, edits and deletes that row, and checks that an invalid field is refused. A `tables` list holding a comment or an index is left alone, and the command stops.
 
 The table is new to the database, so run `bun run db:generate` and `bun run db:migrate` after it.
 

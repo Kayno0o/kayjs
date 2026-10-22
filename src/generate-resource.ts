@@ -2,6 +2,8 @@ const NAME = /^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$/i
 const FIELD = /^([a-z][a-z0-9]*):([a-z]+)$/i
 const CAMEL_BREAK = /([a-z0-9])([A-Z])/g
 const SEPARATORS = /[-_\s]+/
+// A word ending in a single `s` (`news`, `tags`) is a plural already; `ss` (`class`) is not.
+const PLURAL_S = /[^s]s$/
 const PLURAL_ES = /(?:[sxz]|ch|sh)$/
 const PLURAL_IES = /[^aeiou]y$/
 const LINE_BREAK = /\r?\n/
@@ -73,6 +75,9 @@ function capitalize(word: string): string {
 }
 
 function pluralOf(word: string): string {
+  if (PLURAL_S.test(word))
+    return word
+
   if (PLURAL_ES.test(word))
     return `${word}es`
 
@@ -97,7 +102,7 @@ function namesOf(name: string): Names {
     pascal: words.map(capitalize).join(''),
     slug: words.join('-'),
     row: camel(words),
-    rows: camel(plurals),
+    rows: camel(plurals) === camel(words) ? `${camel(words)}List` : camel(plurals),
     tableFile: `${plurals.join('-')}-table`,
     tableComponent: `${plurals.map(capitalize).join('')}Table`,
     folder: plurals.join('-'),
@@ -331,9 +336,10 @@ ${controls(fields, true, undefined, 1).join('\n')}
 function testFile(names: Names, fields: readonly Field[], project: ResourceProject): string {
   const { folder, plural } = names
   const label = names.label.toLowerCase()
-  const first = fields[0]!
+  // The first field a list shows as text: a boolean's `true` could match anything.
+  const shown = fields.find(field => field.type !== 'boolean') ?? fields[0]!
   const textual = (field: Field) => field.type === 'string' || field.type === 'text'
-  // A blank field is an empty text or, for a number, a word.
+  // A blank field is an empty text or, for a number or a boolean, a word.
   const value = (field: Field, posted: boolean, blank?: Field) => {
     if (field !== blank)
       return TYPES[field.type][posted ? 'posted' : 'sample']
@@ -341,13 +347,16 @@ function testFile(names: Names, fields: readonly Field[], project: ResourceProje
     return textual(field) ? '\'\'' : '\'abc\' as never'
   }
   const object = (posted: boolean, blank?: Field, id = '') => `{ ${id}${fields.map(field => `${field.name}: ${value(field, posted, blank)}`).join(', ')} }`
-  const blank = fields.find(field => textual(field)) ?? fields.find(field => field.type !== 'boolean')
+  const blank = fields.find(field => textual(field)) ?? fields.find(field => field.type !== 'boolean') ?? fields[0]!
   const person = `{ email: 'ada@example.com', username: 'Ada' }`
   const signIn = project.auth ? `  await ${project.authModule ? `auth.signInAs(site, ${person})` : `authTest(site).signInAs(${person})`}\n` : ''
-  const imports = `${project.auth && !project.authModule ? 'import { authTest } from \'@kaynooo/kayjs-auth/test\'\n' : ''}import { expect, it } from 'bun:test'\nimport { testSite } from 'kay/test'\n${project.authModule ? 'import { auth } from \'../src/auth\'\n' : ''}import { create, remove, update } from '../src/routes/${folder}/_actions.kay'\n`
-  const refusal = blank === undefined ? '' : `\nit('refuses a ${label} with ${textual(blank) ? 'an empty' : 'an invalid'} ${blank.label.toLowerCase()}', async () => {\n${signIn}  const refused = await site.refusal(create, ${object(false, blank)})\n\n  expect(refused.status).toBe(422)\n})\n`
+  const imports = `${project.auth && !project.authModule ? 'import { authTest } from \'@kaynooo/kayjs-auth/test\'\n' : ''}import { expect, it } from 'bun:test'\nimport { testSite } from 'kay/test'\n${project.authModule ? 'import { auth } from \'../src/auth\'\n' : ''}import { db } from '../src/db'\nimport { ${names.pascal} } from '../src/db/${names.slug}'\nimport { create, remove, update } from '../src/routes/${folder}/_actions.kay'\n`
+  const refusal = `\nit('refuses a ${label} with ${textual(blank) ? 'an empty' : 'an invalid'} ${blank.label.toLowerCase()}', async () => {\n${signIn}  const refused = await site.refusal(create, ${object(false, blank)})\n\n  expect(refused.status).toBe(422)\n})\n`
 
-  return `${imports}\nconst site = await testSite()\n\nit('lists the ${plural.toLowerCase()} created', async () => {\n${signIn}  const page = await site.submit(create, ${object(true)}, { from: '/${folder}' })\n\n  expect(page.text()).toContain('${TYPES[first.type].shown}')\n})\n\nit('edits and deletes a ${label}', async () => {\n${signIn}  await site.submit(update, ${object(true, undefined, 'id: \'1\', ')}, { from: '/${folder}/1/edit' })\n\n  expect((await site.visit('/${folder}/1/edit')).status).toBe(200)\n\n  await site.submit(remove, { id: '1' }, { from: '/${folder}/1/edit' })\n\n  expect((await site.visit('/${folder}/1/edit')).status).toBe(404)\n})\n${refusal}`
+  const listed = shown.type === 'boolean' ? `expect(page.text()).not.toContain('No ${plural.toLowerCase()} yet.')` : `expect(page.text()).toContain('${TYPES[shown.type].shown}')`
+  const newest = `(await db.repo(${names.pascal}).read.findMany(q => q.orderBy('id', 'desc')))[0]!`
+
+  return `${imports}\nconst site = await testSite()\n\nit('lists the ${plural.toLowerCase()} created', async () => {\n${signIn}  const page = await site.submit(create, ${object(true)}, { from: '/${folder}' })\n\n  ${listed}\n})\n\nit('edits and deletes a ${label}', async () => {\n${signIn}  await site.submit(create, ${object(true)}, { from: '/${folder}' })\n\n  const id = String(${newest}.id)\n\n  await site.submit(update, ${object(true, undefined, 'id, ')}, { from: \`/${folder}/\${id}/edit\` })\n\n  expect((await site.visit(\`/${folder}/\${id}/edit\`)).status).toBe(200)\n\n  await site.submit(remove, { id }, { from: \`/${folder}/\${id}/edit\` })\n\n  expect((await site.visit(\`/${folder}/\${id}/edit\`)).status).toBe(404)\n})\n${refusal}`
 }
 
 // The files `kay generate resource <name> <field:type>...` writes: the pg-orm table, the actions, the list and edit pages, a new page or, with kayjs-ui, a dialog on the list, and a test of the list and of a refused create. `table` is what `src/db/tables.ts` imports and lists.

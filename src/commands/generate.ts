@@ -1,8 +1,11 @@
 import type { Command } from './command'
+import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { generate } from '../generate'
 import { count, done, formatOption, printDocument, reportFailure } from './command'
 import { USAGES } from './usages'
+
+const PATH_LIKE = /[./\\]/
 
 export const generateCommand: Command = {
   usage: USAGES.generate,
@@ -17,9 +20,9 @@ export const generateCommand: Command = {
     if (format === undefined)
       return 1
 
-    // A resource takes its fields as `name:type`, then the project folder, the last argument when it is no field; every other kind takes the folder alone.
+    // A resource takes its fields as `name:type`, then the project folder, the last argument when it is no field: one with a path separator or a dot, or an existing folder, so a field written without its type is reported as one. Every other kind takes the folder alone.
     const last = rest.at(-1)
-    const folder = kind === 'resource' && last !== undefined && !last.includes(':') ? 1 : 0
+    const folder = kind === 'resource' && last !== undefined && !last.includes(':') && (PATH_LIKE.test(last) || existsSync(resolve(last))) ? 1 : 0
     const fields = kind === 'resource' ? rest.slice(0, rest.length - folder) : []
     const [dir = '.', ...extra] = kind === 'resource' ? rest.slice(rest.length - folder) : rest
 
