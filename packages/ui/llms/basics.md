@@ -60,6 +60,7 @@ Dialog(open={editing()} title="Rename" onOpenChange={() => editing.set(false)})
   input.kui-field-input(name="name")
 ```
 
+- `size` is the width: `sm`, `md` (the default) or `lg`, and `full` fills the viewport less its margin in both directions. `bare` drops the body's inset and scroll, for content that runs to the edge, such as a pan and zoom canvas, which then fills the body (`.h-full`); the title and footer keep theirs.
 - Dialog is a modal `dialog`. It closes when its parent sets `open` to false, on Escape, or on a click outside. `onOpenChange(false)` runs however it closed. Closed by Escape or a click outside, its content is still there to read; closed by the parent, it is already gone. Its title names it for screen readers, an `h2` unless `level` says otherwise.
 - Once something has been typed inside, or while `dirty` is set (for example while a request is in flight), Escape and a click outside leave it open: only its own buttons close it. A Dialog with no footer still closes on Escape after typing, as it has no button to close it.
 - `ConfirmDelete(message="Delete this post?" failure="Could not delete" onConfirm={remove})` renders a trigger that opens a dialog asking before deleting:

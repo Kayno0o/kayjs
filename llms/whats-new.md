@@ -66,6 +66,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui: `Button(spinner={false})` keeps its label and icon while it is busy and still disables itself, where `busy={false}` also switched the disabling off ([Button](../packages/ui/llms/basics.md#icon-button-iconbutton)).
 - kayjs-ui: `Stat(variant="tile")` is a framed box with the figure above its label, and `Stat(tone)` colours the figure ([Stat](../packages/ui/llms/basics.md#stat-meter-progress-skeleton-barlist-sitefavicon-copybutton-rating)).
 - kayjs-ui: `Button(pressed)` makes a toggle button, writing `aria-pressed` and drawing an accent keyline while on, and `tone="success"` joins `accent` and `danger` ([Button](../packages/ui/llms/basics.md#icon-button-iconbutton)).
+- kayjs-ui: `Dialog(size="sm"|"md"|"lg"|"full")` sets its width, `full` its height too, and `Dialog(bare)` drops the body inset and scroll for content that fills it ([Dialog](../packages/ui/llms/basics.md#dialog-confirmdelete)).
 
 ## 1.69.0
 

@@ -2,14 +2,22 @@
 import type { JSX, Snippet } from 'kay'
 import { effect, recipe, signal } from 'kay'
 
-const look = recipe({ parts: { root: 'kui-dialog', title: 'kui-dialog-title', body: 'kui-dialog-body', footer: 'kui-dialog-footer' } })
+const look = recipe({
+  parts: { root: 'kui-dialog', title: 'kui-dialog-title', body: 'kui-dialog-body', footer: 'kui-dialog-footer' },
+  variants: { size: { sm: '', md: '', lg: '', full: '' } },
+  defaults: { size: 'md' },
+})
 
-const { open, title, level = 2, dirty = false, onOpenChange, footer, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'onClose' | 'onInput' | 'closedby' | 'closedBy'> & {
+const { open, title, level = 2, size = 'md', bare = false, dirty = false, onOpenChange, footer, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'onClose' | 'onInput' | 'closedby' | 'closedBy'> & {
   // Shows the dialog as a modal; the parent sets it back to false in `onOpenChange`.
   open: boolean
   title: string
   // The title's heading level: a modal opens over the page's own `h1`.
   level?: 2 | 3 | 4 | 5 | 6 | undefined
+  // The width: `sm`, `md` (the default), `lg`, or `full`, which takes the whole viewport width and height less the margin, for content such as a canvas that fills the dialog.
+  size?: 'sm' | 'md' | 'lg' | 'full' | undefined
+  // No inset or scroll on the body, for content that runs to the dialog's edge; the title and footer keep theirs.
+  bare?: boolean | undefined
   // Work the dialog must not drop, such as a request in flight: a click outside or Escape leaves it open. Typing inside the dialog counts on its own, though Escape still closes one with no footer.
   dirty?: boolean | undefined
   footer?: Snippet
@@ -50,7 +58,7 @@ function closed() {
 }
 ---
 // Named by its title for screen readers, which announce the dialog as it opens.
-dialog(aria-label={title} {...rest} ref={element => dialog = element} closedby={closeWatcher()} onInput={() => edited.set(true)} onClose={closed})
+dialog(aria-label={title} {...rest} data-size={size === 'md' ? undefined : size} data-bare={bare ? '' : undefined} ref={element => dialog = element} closedby={closeWatcher()} onInput={() => edited.set(true)} onClose={closed})
   if open
     if level === 2
       h2(part="title") {title}

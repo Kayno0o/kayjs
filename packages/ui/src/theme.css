@@ -747,12 +747,29 @@
     @apply m-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-[min(42rem,calc(100vw-2rem))] flex-col overflow-hidden border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-surface0 p-0;
   }
 
+  /* The width, `md` being the base above; `full` fills the viewport minus the margin on both axes, `lg` being the widest that still reads as a dialog. */
+  .kui-dialog:where([data-size='sm']) {
+    @apply max-w-[min(28rem,calc(100vw-2rem))];
+  }
+
+  .kui-dialog:where([data-size='lg']) {
+    @apply max-w-[min(72rem,calc(100vw-2rem))];
+  }
+
+  .kui-dialog:where([data-size='full']) {
+    @apply h-[calc(100dvh-2rem)] max-w-[calc(100vw-2rem)];
+  }
+
   .kui-dialog-title {
     @apply shrink-0 border-b border-kui-surface2 px-5 py-4 text-lg font-kui-heading tracking-kui-label text-kui-text uppercase;
   }
 
   .kui-dialog-body {
     @apply min-h-0 flex-1 overflow-y-auto px-5 py-4;
+  }
+
+  .kui-dialog:where([data-bare]) .kui-dialog-body {
+    @apply overflow-hidden p-0;
   }
 
   .kui-dialog-footer {

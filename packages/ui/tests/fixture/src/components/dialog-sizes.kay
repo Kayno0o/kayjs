@@ -1,0 +1,10 @@
+---
+import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
+
+// Dialogs held open, to read what each size and `bare` write on the root.
+const close = () => undefined
+---
+Dialog#plain(open title="Plain" onOpenChange={close}) Body
+Dialog#full(open title="Full" size="full" bare onOpenChange={close})
+  canvas#canvas
+Dialog#small(open title="Small" size="sm" onOpenChange={close}) Body

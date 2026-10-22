@@ -186,7 +186,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'copy-button': { text: 'x', label: 'Copy link' },
   'date-input': { 'aria-label': 'Day', 'value': '2026-10-21' },
   'date-range-input': { label: 'Stay', value: ['2026-10-21', null] },
-  'dialog': { open: false, title: 'Rename', onOpenChange: noop, children: 'Body' },
+  'dialog': { open: false, title: 'Rename', onOpenChange: noop, children: 'Body', size: 'full', bare: true },
   'empty-state': { title: 'No moons', description: 'Add one' },
   'file-drop': { 'aria-label': 'Photos', 'onFiles': noop, 'content': () => 'Drop files' },
   'form-dialog': { open: false, title: 'Rename', action, submitLabel: 'Save', failure: 'Failed', onOpenChange: noop },

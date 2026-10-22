@@ -22,6 +22,10 @@ Set `dirty` for other work the dialog must not drop, such as a request in flight
 
 <Demo name="dialog/dirty" />
 
+## Size and bare content
+
+`size` is the width: `sm`, `md` (the default) or `lg`, and `full` fills the viewport less its margin in both directions. `bare` drops the body's inset and scroll, as Card's does, for content that runs to the dialog's edge such as a pan and zoom canvas; give that content `h-full` to fill the body. The title and the footer keep their inset.
+
 ## Heading level
 
 The title is an `h2`, as the dialog opens over the page's own `h1`. `level` sets another.
