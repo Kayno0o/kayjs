@@ -59,6 +59,8 @@ Set them on `:root` or `html`, as `@theme` does: a seed set on one element does 
 
 `--kui-border-width` is the keyline of buttons, cards, rows, widgets, notices, avatars, toasts, dialogs, side panels, tooltips, tables, boxed sections, segmented controls, chips, toggles, chart plots and the other framed boxes. The dashed frame and the handles the image cropper draws around the crop keep their fixed borders, as they have to show over any photo. It is a length: `2px`, not `2px solid red`, which it ignores. The old name, `--kui-border-card`, works until 1.61.
 
+Labels, headings and table heads are uppercase unless `--kui-label-case` is `none`, and `--kui-label-font` sets their font. Two skins ship, `@kaynooo/kayjs-ui/skins/brutalist.css` and `soft.css`, imported after `theme.css`; your own `@theme` after them wins.
+
 A few tokens shape boxes rather than colour them. A brutalist skin sets `--kui-shadow-raised` (under cards, rows, widgets and toasts), `--kui-shadow-press` (under framed buttons) and `--kui-press-travel` (how far a pressed button moves down). All three draw nothing by default.
 
 ### Light or dark

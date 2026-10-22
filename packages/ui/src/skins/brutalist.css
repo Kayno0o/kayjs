@@ -1,0 +1,23 @@
+/*
+ * A hard-edged skin: black and white with a yellow accent, square boxes, 2px keylines, offset shadows that a button presses into, and the labels in monospace capitals.
+ * Import it after theme.css in the app's stylesheet: its tokens are the app's `@theme`, so an override of yours after it wins.
+ */
+@theme {
+  --color-kui-canvas: light-dark(#ffffff, #0a0a0a);
+  --color-kui-text: light-dark(#000000, #ffffff);
+  --color-kui-accent: light-dark(#0000cc, #ffd400);
+  --color-kui-success: light-dark(#006400, #7cfc9a);
+  --color-kui-warning: light-dark(#8a4b00, #ffb347);
+  --color-kui-info: light-dark(#00508a, #7cc4ff);
+  --color-kui-error: light-dark(#b00020, #ff7b8c);
+  --color-kui-field-border: light-dark(#4d4d4d, #9a9a9a);
+
+  --kui-border-width: 2px;
+  --kui-border-input: 2px;
+  --radius-kui-card: 0px;
+  --kui-label-case: uppercase;
+  --kui-label-font: var(--font-mono);
+  --kui-shadow-raised: 4px 4px 0 var(--color-kui-text);
+  --kui-shadow-press: 3px 3px 0 var(--color-kui-text);
+  --kui-press-travel: 3px;
+}

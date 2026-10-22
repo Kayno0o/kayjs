@@ -449,6 +449,30 @@ describe('theme.css', () => {
     expect(blockOf(theme, ':is(.kui-shell, .kui-btn, .kui-stat-badge)::before')).toContain('border-radius: inherit;')
   })
 
+  test('sets the case and font of labels, headings and table heads by --kui-label-case and --kui-label-font, uppercase unless a skin sets them', async () => {
+    const css = await built('@theme { --kui-label-case: none; --kui-label-font: var(--font-mono); }')
+
+    expect(theme).toContain('--kui-label-case: uppercase;')
+    expect(blockOf(css, '.kui-btn')).toContain('text-transform: var(--kui-label-case)')
+    expect(blockOf(css, '.kui-btn')).toContain('font-family: var(--kui-label-font,inherit)')
+    expect(css).toContain('--kui-label-case: none')
+    // Only the stamp badge, which has --kui-badge-case, and an avatar's initial keep their own case.
+    expect(theme.match(/@apply [^\n]* uppercase/g)).toHaveLength(2)
+  })
+
+  test('ships skins that read at 4.5:1 for text and 3:1 for lines, and compile over the theme', async () => {
+    for (const name of ['brutalist', 'soft']) {
+      const skin = await Bun.file(`${ROOT}src/skins/${name}.css`).text()
+      const tokens = withSkin(skin)
+
+      expect(failing(TEXT, 4.5, tokens), name).toEqual([])
+      expect(failing(LINES, 3, tokens), name).toEqual([])
+      expect(await built(skin), name).toContain('--kui-label-case:')
+    }
+
+    expect(await built(await Bun.file(`${ROOT}src/skins/soft.css`).text())).toContain('--kui-label-case: none')
+  })
+
   test('sizes the keyline of every framed box by --kui-border-width, a length the old --kui-border-card still sets', () => {
     for (const selector of ['.kui-card', '.kui-card-head', '.kui-card-row', '.kui-widget', '.kui-toast', '.kui-dialog', '.kui-command-palette', '.kui-popover', '.kui-side-panel', '.kui-tooltip', '.kui-table-wrap', '.kui-collapsible-section', '.kui-save-bar', '.kui-segmented', '.kui-file-drop', '.kui-pagination-step', ':where(.kui-site-nav-list:popover-open)', '.kui-line-chart-tooltip'])
       expect(blockOf(theme, selector), selector).toMatch(/border(?:-[bl])?-\(length:--kui-border-width\)/)

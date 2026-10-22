@@ -24,6 +24,7 @@
   "exports": {
     "./*.kay": "./src/*.kay",
     "./theme.css": "./src/theme.css",
+    "./skins/*.css": "./src/skins/*.css",
     "./extension": "./src/extension.ts",
     "./add": "./src/add.ts",
     "./announce": "./src/announce.ts",
