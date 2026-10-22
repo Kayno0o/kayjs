@@ -193,7 +193,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'page-section': { title: 'Moons', children: 'Phobos' },
   'pagination': { page: 2, pages: 5, url: '/posts' },
   'popover': { trigger: noop },
-  'progress': { value: 0.4, label: 'Export' },
+  'progress': { value: 40, label: 'Export' },
   'qr-code': { value: 'https://kaynooo.fr', label: 'Site' },
   'radio-group': { label: 'Planet', options, value: 'mars' },
   'range-input': { label: 'Hours', min: 0, max: 24 },

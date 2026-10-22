@@ -1,6 +1,6 @@
 ---
 import Progress from '@kaynooo/kayjs-ui/progress.kay'
 
-const done = signal(0.3)
+const done = signal(30)
 ---
 Progress(value={done()} label="Export")

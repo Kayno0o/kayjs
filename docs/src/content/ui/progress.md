@@ -4,7 +4,7 @@ description: A bar showing how far a task has got, or that one is under way with
 
 <Demo name="progress/basic" />
 
-`value` is the fraction done, from 0 to 1, and `label` names the bar for screen readers. It is a `progressbar`, where [Meter](/ui/meter) is a gauge for a level such as disk usage.
+`value` is how far the task has got out of `max`, a percentage as Meter's, and `label` names the bar for screen readers. It is a `progressbar`, where [Meter](/ui/meter) is a gauge for a level such as disk usage.
 
 ## Without a value
 
@@ -14,7 +14,7 @@ With no `value` the bar is indeterminate: a bar sliding along the track, held st
 
 ## With an upload
 
-`value` takes the 0 to 1 that an action's `progress()` reads while the browser sends a file, so it needs no conversion.
+An action's `progress()` reads from 0 to 1 while the browser sends a file, so pass `max={1}`.
 
 ```kay
 ---
@@ -29,5 +29,5 @@ async function send(event: Event) {
 ---
 input(type="file" aria-label="Photo" onChange={send})
 if upload.progress() !== undefined
-  Progress(value={upload.progress()} label="Sending the photo")
+  Progress(value={upload.progress()} max={1} label="Sending the photo")
 ```

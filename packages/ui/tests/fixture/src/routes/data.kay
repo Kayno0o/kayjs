@@ -19,7 +19,9 @@ main
   article#avatar-skeleton
     Skeleton(shape="avatar" width="4rem")
   article#progress
-    Progress(value={0.426} label="Export")
+    Progress(value={42.6} label="Export")
+  article#progress-max
+    Progress(value={0.5} max={1} label="Upload")
   article#indeterminate
     Progress(label="Loading")
   article#bars

@@ -1481,12 +1481,14 @@
     }
   }
 
-  .kui-meter {
+  .kui-meter,
+  .kui-progress {
     @apply h-2 w-full overflow-hidden bg-kui-surface0;
   }
 
-  .kui-meter-fill {
-    @apply h-full bg-kui-accent transition-[width];
+  .kui-meter-fill,
+  .kui-progress-fill {
+    @apply h-full bg-kui-accent transition-[width] motion-reduce:transition-none;
   }
 
   .kui-skeleton {
@@ -1517,17 +1519,9 @@
     @apply sr-only;
   }
 
-  .kui-progress {
-    @apply relative h-2 w-full overflow-hidden bg-kui-surface0;
-  }
-
-  .kui-progress-fill {
-    @apply h-full bg-kui-accent transition-[width] motion-reduce:transition-none;
-
-    /* Indeterminate: a bar sliding across the track, held still and half-filled under reduced motion. */
-    &:where([data-indeterminate] > *) {
-      @apply w-2/5 animate-[kui-progress-slide_1.4s_ease-in-out_infinite] motion-reduce:animate-none;
-    }
+  /* Indeterminate: a bar sliding across the track, held still and part-filled under reduced motion. */
+  :where(.kui-progress[data-indeterminate]) > .kui-progress-fill {
+    @apply w-2/5 animate-[kui-progress-slide_1.4s_ease-in-out_infinite] motion-reduce:animate-none;
   }
 
   .kui-page-header {

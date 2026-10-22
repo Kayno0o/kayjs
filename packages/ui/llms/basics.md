@@ -97,7 +97,7 @@ Popover(placement="bottom-end")
 ### Stat, Meter, Progress, Skeleton, BarList, SiteFavicon, CopyButton, Rating
 
 - `Stat(value={12} label="moons" icon="info")`: a figure read with what it counts.
-- `Progress(value label)`: a `role="progressbar"` for a task, `value` its fraction from 0 to 1 as `upload.progress()` reads, so `Progress(value={upload.progress()} label="Sending")` needs no conversion. Without `value` it is indeterminate, with no `aria-valuenow`; the slide stops under `prefers-reduced-motion`.
+- `Progress(value max label)`: a `role="progressbar"` for a task, `value` out of `max` (100 as Meter's percentage), so `Progress(value={upload.progress()} max={1} label="Sending")` takes an upload's 0 to 1. Without `value` it is indeterminate, with no `aria-valuenow`; the slide stops under `prefers-reduced-motion`.
 - `Skeleton(shape lines width height label)`: a placeholder for a pending block: `shape` is `text` (`lines` bars, the last shorter, 1 by default), `avatar` or `card`, `width` and `height` CSS lengths. The shapes are `aria-hidden`; `label` adds a visually hidden `role="status"` the pending block announces. The pulse stops under `prefers-reduced-motion`.
 - `Meter(value={usage} label="Disk" fillClass="bg-kui-warning")`: a `role="meter"` bar named by the required `label`, holding `value` between 0 and 100. `fillClass` styles the fill alone, such as a colour picked by threshold.
 - `BarList(rows={[{ key: 'fr', label: 'France', value: 120, display: '120 visits' }]})`: a bar per row, each measured against the largest value, reading `display` or else the value. `onSelect(row)` makes each row a button, from an island; `emptyLabel` is what it reads with no rows. Its rows are typed `BarListRow`, or any type extending it.

@@ -377,9 +377,11 @@ describe('data', () => {
     expect(await attributes('/data', '#meter [role="meter"]', ['aria-valuenow', 'aria-valuemin', 'aria-valuemax', 'aria-label'])).toEqual([{ 'aria-valuenow': '100', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-label': 'Disk' }])
   })
 
-  test('Progress is a named progressbar, determinate with a value from 0 to 1 and indeterminate without', async () => {
+  test('Progress is a named progressbar, determinate with a value out of max (100 by default) and indeterminate without', async () => {
     expect(await attributes('/data', '#progress [role="progressbar"]', ['aria-valuenow', 'aria-label', 'data-indeterminate'])).toEqual([{ 'aria-valuenow': '43', 'aria-label': 'Export', 'data-indeterminate': null }])
     expect((await one('/data', '#progress .kui-progress-fill')).attributes.style).toBe('width: 42.6%')
+    expect(await attributes('/data', '#progress-max [role="progressbar"]', ['aria-valuenow'])).toEqual([{ 'aria-valuenow': '50' }])
+    expect((await one('/data', '#progress-max .kui-progress-fill')).attributes.style).toBe('width: 50%')
     expect(await attributes('/data', '#indeterminate [role="progressbar"]', ['aria-valuenow', 'data-indeterminate'])).toEqual([{ 'aria-valuenow': null, 'data-indeterminate': '' }])
   })
 

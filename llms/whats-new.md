@@ -14,6 +14,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay check` reports a `readonly` property or array element assigned in a script, as plain code does, and types a generic target's `+=` and `++` ([Assigning](components.md)).
 - `kay check` reports a `readonly` property or array element holding no signal assigned in a script, as plain code does, and types a generic target's `+=` and `++` ([Assigning](components.md)).
 - kayjs-ui `Progress` is a progress bar taking an upload's `progress()`, indeterminate without a value ([Progress](../packages/ui/llms/basics.md)).
+- kayjs-ui `Progress` is a progress bar with `value` and `max`, indeterminate without a value ([Progress](../packages/ui/llms/basics.md)).
 - kayjs-ui `Skeleton` is a placeholder for a pending block, as text lines, an avatar or a card, still under reduced motion ([Skeleton](../packages/ui/llms/basics.md)).
 - kayjs-ui `Accordion` groups collapsible sections, one open at a time or several, with arrow keys between headers ([Accordion](../packages/ui/llms/tables-navigation-and-layout.md)).
 - With Tailwind, a class passed to a component, or an expression or spread merged with the shorthand, overrides an earlier one setting the same property, `Button(class="px-2")` over `px-4`, with no `twMerge` ([Override a class](styles-and-assets.md#override-a-class-a-component-sets)).
