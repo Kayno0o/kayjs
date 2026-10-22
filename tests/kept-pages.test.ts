@@ -6,6 +6,7 @@ import { outputDir } from '../src/build/assets'
 import { formatRouteTable } from '../src/build/report'
 import { compileKay } from '../src/compiler'
 import { CONTENT_EXPORTS, KAY_EXPORTS, keptScan } from '../src/server/pure-page'
+import { kayBuild } from './check-helper'
 import { scratchDir } from './scratch'
 
 type Route = Parameters<typeof keptScan>[0]
@@ -13,7 +14,6 @@ type Route = Parameters<typeof keptScan>[0]
 const keptStop = async (route: Route) => (await keptScan(route)).stop
 const readsNothing = async (route: Route) => await keptStop(route) === undefined
 
-const CLI = join(import.meta.dir, '../src/cli.ts')
 const CONFIG = 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false })\n'
 const TSCONFIG = JSON.stringify({
   compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
@@ -31,8 +31,7 @@ async function project(files: Record<string, string>): Promise<string> {
 }
 
 async function built(root: string): Promise<string[]> {
-  const child = Bun.spawn([process.execPath, CLI, 'build', root, '--no-check'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
-  const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  const { code, report: out, output: err } = await kayBuild([root, '--no-check'])
 
   if (code !== 0)
     throw new Error(`${out}${err}`)
@@ -812,8 +811,7 @@ describe('what stops a page from being kept', () => {
 
     roots.push(root)
 
-    const child = Bun.spawn([process.execPath, CLI, 'build', root, '--format', 'json'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
-    const [out] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+    const { report: out } = await kayBuild([root, '--format', 'json'])
     const document = JSON.parse(out) as { built: { routes: { route: string, kept: number, pages: number, stop?: string }[] }, problems: { code: string, message: string, line: number }[] }
     const routes = Object.fromEntries(document.built.routes.map(route => [route.route, route]))
 
@@ -833,8 +831,7 @@ describe('what stops a page from being kept', () => {
 
   // The build's report, as `kay build --format json` gives it.
   async function reported(root: string, args: string[] = []) {
-    const child = Bun.spawn([process.execPath, CLI, 'build', root, '--format', 'json', ...args], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
-    const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+    const { code, report: out, output: err } = await kayBuild([root, '--format', 'json', ...args])
 
     return { code, err, document: JSON.parse(out) as { built: { routes: { route: string, kept: number, stop?: string }[] }, problems: { code: string, message: string, line: number, severity?: string }[] } }
   }
@@ -1336,8 +1333,7 @@ describe('a page reading only what its path fixes', () => {
 
     roots.push(root)
 
-    const child = Bun.spawn([process.execPath, CLI, 'build', root, '--static', '--no-check'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
-    const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+    const { code, report: out, output: err } = await kayBuild([root, '--static', '--no-check'])
 
     expect(code, `${out}${err}`).toBe(0)
     expect(await Bun.file(join(outputDir(root), 'pages/about.html')).text()).toContain('At /about/<')
@@ -1355,8 +1351,7 @@ describe('a layout reading ctx.locals', () => {
   })
 
   const fails = async (root: string, ...flags: string[]) => {
-    const child = Bun.spawn([process.execPath, CLI, 'build', root, '--no-check', ...flags], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
-    const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+    const { code, report: out, output: err } = await kayBuild([root, '--no-check', ...flags])
 
     return { code, text: `${out}${err}` }
   }
@@ -1424,8 +1419,7 @@ describe('a layout reading ctx.locals', () => {
 
     roots.push(root)
 
-    const child = Bun.spawn([process.execPath, CLI, 'build', root, '--no-check', '--format', 'json'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
-    const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+    const { code, report: out, output: err } = await kayBuild([root, '--no-check', '--format', 'json'])
 
     expect(code, err).toBe(0)
     expect(out).toContain('reads `ctx.locals` at src/routes/(shop)/_layout.kay:2')
