@@ -70,7 +70,7 @@ To build a site, read [Build a site](llms/site.md) first. The topic files below 
 - [SEO lints](llms/seo-lints.md): the `seo` group, when it applies, which lints read the config, the heads and the built pages
 - [Errors](llms/errors.md): the codes of the errors that are no lint, and where each fix is documented
 - [Project setup and scaffolding](llms/project.md): `kay.config.ts`, tsconfig, editor setup, migrating from Astro
-- [kay new and kay add](llms/project-new-and-add.md): presets, features, adding one to a project
+- [kay new and kay add](llms/project-new-and-add.md): presets, features, adding one, `kay generate`
 - [The dev server](llms/dev-server.md): `kay dev` and its error page
 - [The dev tool](llms/dev-tool.md): its tabs and the problems it lists
 - [Building and starting](llms/build-and-start.md): `kay build`, one executable, a static export, `kay start`

@@ -2,6 +2,7 @@
 export const USAGES = {
   'new': 'new <dir> [--kay <dependency>] [--template blank|server|site|app] [--with <features>] [--without <features>] [--forge forgejo|github] [--runner <label>] [-y] [--dry-run] [--format text|json] [--quiet]',
   'add': 'add <features> [dir] [--no-install] [--dry-run] [--format text|json] [--quiet]',
+  'generate': 'generate <page|component|island|action|api|guard> <name> [dir] [--dry-run] [--format text|json] [--quiet]',
   'dev': 'dev [dir] [--entry <file>] [--port <port>] [--host[=<address>]] [--inspect[=<address>]] [--open] [--format text|json] [--quiet] [--no-types]',
   'build': 'build [dir] [--compile <executable> [--verify | --verify-load]] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [--no-cache] [--analyze] [--deny-warnings] [-p tsconfig.json] [--format text|github|json] [--quiet]',
   'start': 'start [dir] [--entry <file>] [--port <port>] [--quiet]',

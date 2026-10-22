@@ -20,6 +20,15 @@ kay new my-site --template site --with search
 kay add postgres
 ```
 
+### Generate a page, a component or an API module
+
+`kay generate` writes a starter file of the kind in its folder, and a test of it when the project has tests:
+
+```sh
+kay generate page pricing
+kay generate action team/removeTissue
+```
+
 ## Reference
 
 - `kay new <dir> [--kay <dependency>] [--template blank|server|site|app] [--with <features>] [--without <features>] [--forge forgejo|github] [--runner <label>] [-y] [--dry-run] [--format text|json] [--quiet]`:
@@ -42,6 +51,11 @@ kay add postgres
   - Every template's `tsconfig.json` adds `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride` and `noFallthroughCasesInSwitch` to `strict`, as kay does itself, so an optional field passed `undefined` must say `?: T | undefined`;
   - `server` and `app` carry a workflow checking, linting and testing the project on every push, and the `site` workflow tests it before building, which checks it, then lints it (see [Linting](checks.md#linting)).
   - Every project also has an `AGENTS.md` pointing coding agents at kay's docs for the installed version, through a `@node_modules/kay/llms.txt` line Claude Code expands at the start of a session, saying that every page title ends with `seo.name`, which `kay new` filled in from the folder name (left out by `kay migrate astro`, whose pages keep their own titles), and naming the checks its scripts run; a project without one adds it by hand.
+- `kay generate <page|component|island|action|api|guard> <name> [dir] [--dry-run] [--format text|json] [--quiet]`:
+  - Writes a starter file into the project in `dir` (the current directory by default), by `<name>`, and never over a file that exists: one that does stops it with `kay generate: nothing was written`.
+  - `page pricing` writes `src/routes/pricing.kay` (`blog/[slug]` and `(group)/about` are routes too; its `h1` takes Tailwind's shorthand classes when the project has Tailwind), `component card` and `island likes` write `src/components/card.kay` (a `label` prop) and `src/components/likes.kay` (a signal and a button), `api notes` writes `src/api/notes.ts` (`api().get('/')`), `guard admin` writes `src/routes/admin/_guard.ts` (`/` for the root one; it denies a request with no `authorization` header, for you to replace) and `action team/removeTissue` writes the action `removeTissue` into `src/routes/team/_actions.kay` (a schema and a handler). An `_actions.kay` that exists is left alone and the command prints the action to add to its server fence by hand.
+  - A project with `tests` (`bunfig.toml`) also gets `tests/<name>.test.ts` for a page (it visits the URL, a project with `auth` expecting the redirect to sign in), an action (`site.call` and `site.refusal`) and an API module (`site.api`); none for a component, an island or a guard, nor for a page with a param, and none for an action or API module in a project with `auth`, whose guard answers first.
+  - What it writes passes `kay check` and the lint. `--dry-run` lists the files and writes none, and `--format json` prints `{ kind, name, written, dryRun }`.
 - `kay add <features> [dir] [--no-install] [--dry-run] [--format text|json] [--quiet]`:
   - Applies `kay new` features, comma-separated, to the project in `dir` (the current directory by default): the files and edits `kay new --with` would have made, then `bun install`.
   - The features the project holds are read off its files. A feature missing what it needs is refused naming the command that adds them together (`kay add server,ws`); `kay add postgres` on a project without kayjs-auth plans it too, `kay add auth,postgres` writes both in one run, and `postgres` over an app whose `data/auth.db` exists stops there, as that file holds the users.

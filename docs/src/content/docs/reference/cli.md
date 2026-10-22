@@ -19,6 +19,7 @@ This needs Bun to know the registry first, see [Installation](/getting-started/i
 | `kay new <dir>` | Scaffold a project that checks, builds and runs |
 | `kay types [dir]` | Write the types the editor's ESLint reads, without checking |
 | `kay add <features> [dir]` | Add `kay new` features, or a kay library, to an existing project |
+| `kay generate <kind> <name> [dir]` | Write a starter page, component, island, action, API module or guard, with a test |
 | `kay dev [dir]` | Run the server, restarting on change, with errors shown in the browser |
 | `kay build [dir]` | Check the project and bundle the browser code for production |
 | `kay start [dir]` | Serve the last build as production does |
@@ -89,6 +90,29 @@ Every project gets an `AGENTS.md` for coding agents. It points them at kay's doc
 ```text
 kay: accents needs tailwind: add --with tailwind, or drop it with --without accents
 ```
+
+## kay generate
+
+```sh
+kay generate page pricing
+kay generate component card
+kay generate action team/removeTissue
+kay generate api notes
+kay generate guard admin
+```
+
+`kay generate <page|component|island|action|api|guard> <name> [dir]` writes a starter file into the project, never over a file that exists: one that does stops it with `kay generate: nothing was written`.
+
+| Kind | Writes |
+| --- | --- |
+| `page pricing` | `src/routes/pricing.kay`, with a title and an `h1`; `blog/[slug]` and `(group)/about` are routes too, and Tailwind's shorthand classes are on the `h1` when the project has Tailwind |
+| `component card` | `src/components/card.kay`, taking a `label` prop |
+| `island likes` | `src/components/likes.kay`, a signal and a button |
+| `action team/removeTissue` | the action `removeTissue` in `src/routes/team/_actions.kay`; one that exists is left alone and the action is printed to add by hand |
+| `api notes` | `src/api/notes.ts`, served at `/api/notes` |
+| `guard admin` | `src/routes/admin/_guard.ts` (`/` for the root one), denying a request with no `authorization` header until you write the real rule |
+
+A project with tests gets `tests/<name>.test.ts` for a page, an action and an API module; a project with `auth` gets the page test only, which expects the redirect to sign in. What it writes passes `kay check` and the lint. `--dry-run` lists the files without writing them, and `--format json` prints `{ kind, name, written, dryRun }`.
 
 ## kay add
 
@@ -628,19 +652,19 @@ Each tool runs its command in a child process, so a call costs what the command 
 
 ## Quiet and plain output
 
-`kay add`, `kay build`, `kay check`, `kay dev`, `kay fmt`, `kay migrate`, `kay new`, `kay render`, `kay routes`, `kay start`, `kay types` and `kay upgrade` take `--quiet`; every other command refuses it.
+`kay add`, `kay build`, `kay check`, `kay dev`, `kay fmt`, `kay generate`, `kay migrate`, `kay new`, `kay render`, `kay routes`, `kay start`, `kay types` and `kay upgrade` take `--quiet`; every other command refuses it.
 
 `--quiet` prints the problems and one summary line, without the size report or the files one by one. `kay types` prints nothing at all.
 
 `kay start` leaves out its warnings about a stale build, `kay render` its status line and `kay routes` the note about the routes the server adds when it starts.
 
-`--dry-run` lists what the command would write and writes nothing. `kay check --dry-run` counts the fixes `--fix` would apply, `kay fmt --dry-run` lists the files it would format and exits 0, and so do `kay new`, `kay add`, `kay migrate`, `kay i18n accept`, `kay not-found --redirect` and `kay upgrade`.
+`--dry-run` lists what the command would write and writes nothing. `kay check --dry-run` counts the fixes `--fix` would apply, `kay fmt --dry-run` lists the files it would format and exits 0, and so do `kay new`, `kay add`, `kay generate`, `kay migrate`, `kay i18n accept`, `kay not-found --redirect` and `kay upgrade`.
 
 `kay fmt` refuses `--check` and `--dry-run` together. `kay fmt --check` stays the verify-only form: it fails when a file is not formatted.
 
 `kay types`, `kay build` and `kay dev` write only generated output under `.kay` and `dist`, never a file of yours, so they take none.
 
-`kay add`, `kay new` and `kay types` also take `--format json`.
+`kay add`, `kay generate`, `kay new` and `kay types` also take `--format json`.
 
 ```sh
 kay fmt src --quiet   # formatted 3 files
@@ -650,7 +674,7 @@ Colour only goes to a terminal, and not under `NO_COLOR` or `TERM=dumb`. `FORCE_
 
 ## Output for tools
 
-`kay add`, `kay new`, `kay types`, `kay build`, `kay routes`, `kay env`, `kay doctor`, `kay i18n missing`, `kay explain`, `kay fmt`, `kay migrate`, `kay not-found` and `kay screenshot` take `--format json`, as `kay check` does. Stdout then holds one JSON document on one line, and what the app's own code prints goes to stderr. The exit code is the one the text output gives.
+`kay add`, `kay generate`, `kay new`, `kay types`, `kay build`, `kay routes`, `kay env`, `kay doctor`, `kay i18n missing`, `kay explain`, `kay fmt`, `kay migrate`, `kay not-found` and `kay screenshot` take `--format json`, as `kay check` does. Stdout then holds one JSON document on one line, and what the app's own code prints goes to stderr. The exit code is the one the text output gives.
 
 | Command | Document |
 | --- | --- |
@@ -665,6 +689,7 @@ Colour only goes to a terminal, and not under `NO_COLOR` or `TERM=dumb`. `FORCE_
 | `kay migrate astro` | `{ dryRun, written, kept, copied, notes }` |
 | `kay migrate content` | `{ rewritten, failed, dryRun }` |
 | `kay add` | `{ features, written, installed, notes, dryRun }` |
+| `kay generate` | `{ kind, name, written, dryRun }` |
 | `kay new` | `{ dir, features, files, dryRun }` |
 | `kay types` | `{ files, dir }` |
 

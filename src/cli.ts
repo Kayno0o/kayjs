@@ -10,6 +10,7 @@ import { USAGES } from './commands/usages'
 const COMMANDS: Record<keyof typeof USAGES, () => Promise<Command>> = {
   'new': async () => (await import('./commands/new')).scaffold,
   'add': async () => (await import('./commands/add')).add,
+  'generate': async () => (await import('./commands/generate')).generateCommand,
   'dev': async () => (await import('./commands/dev')).dev,
   'build': async () => (await import('./commands/build')).build,
   'start': async () => (await import('./commands/start')).start,

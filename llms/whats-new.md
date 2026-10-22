@@ -23,6 +23,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay fmt --stdin [path]` formats a source from stdin for an editor's formatter, with the Neovim, Helix and Zed setup in the docs guide Other editors ([Format the templates](check-and-tools.md#format-the-templates)).
 - A browser error's stack under `kay dev` is on `.kay` lines in `.kay/dev/errors.json` (`at` filled) and in the dev tool's Problems tab, not on chunk positions ([Errors without a browser](dev-server.md)).
 - The language server checks the edited component first as you type, then the open components importing it after a quiet spell, and no other, so many open files no longer slow each edit; a save still checks them all.
+- `kay generate page|component|island|action|api|guard <name>` writes a starter file in its folder, with a test when the project has tests ([kay generate](project-new-and-add.md)).
 
 ## 1.70.0
 
