@@ -114,6 +114,25 @@ pgDescribe('pgData live values', () => {
     second.stop?.()
   })
 
+  pgIt('starts after the newest events, not the ones whose sequence number sorts last as text', async () => {
+    const sql = await fresh()
+    const [first, second] = twoReplicas()
+
+    await first.entries()
+    // More rows than the overlap, their seq crossing 99: by text the newest 100 would end at 99.
+    await sql.unsafe(`INSERT INTO kay_live_events (origin, id, key, at) SELECT 'elsewhere', 'app:room', 'old' || n, floor(extract(epoch FROM statement_timestamp()) * 1000)::bigint FROM generate_series(1, 150) n`)
+
+    const heard = listen(second)
+
+    await second.entries()
+    await first.set('app:room', 'new', '[1]')
+    await waitFor(() => heard.length >= 1, 'the second replica to hear the new set')
+    await Bun.sleep(300)
+    expect(heard.map(([, key]) => key)).toEqual(['new'])
+    first.stop?.()
+    second.stop?.()
+  })
+
   pgIt('hands a restarted replica what is held, and a set in between is heard once', async () => {
     await fresh()
 
