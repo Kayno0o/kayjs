@@ -97,7 +97,7 @@ Popover(placement="bottom-end")
 
 ### Stat, Meter, Progress, Skeleton, BarList, SiteFavicon, CopyButton, Rating
 
-- `Stat(value={12} label="moons" icon="info")`: a figure read with what it counts.
+- `Stat(value={12} label="moons" icon="info")`: a figure read with what it counts. `variant="tile"` draws a framed box with the figure above its label, for a grid of them, and `tone` (`accent`, `success`, `warning`, `danger`, `info`) colours the figure alone, such as `tone={load > 90 ? "danger" : "neutral"}`.
 - `Progress(value max label)`: a `role="progressbar"` for a task, `value` out of `max` (100 as Meter's percentage), so `Progress(value={upload.progress()} max={1} label="Sending")` takes an upload's 0 to 1. Without `value` it is indeterminate, with no `aria-valuenow`; the slide stops under `prefers-reduced-motion`.
 - `Skeleton(shape lines width height label)`: a placeholder for a pending block: `shape` is `text` (`lines` bars, the last shorter, 1 by default), `avatar` or `card`, `width` and `height` CSS lengths. The shapes are `aria-hidden`; `label` adds a visually hidden `role="status"` the pending block announces. The pulse stops under `prefers-reduced-motion`.
 - `Meter(value={usage} label="Disk" fillClass="bg-kui-warning")`: a `role="meter"` bar named by the required `label`, holding `value` between 0 and `max` (100 by default). `fillClass` styles the fill alone, such as a colour picked by threshold.

@@ -2069,6 +2069,40 @@
     @apply text-kui-subtext0;
   }
 
+  /* A tile fills its grid cell: the figure large above its label. */
+  .kui-stat-badge:where([data-variant='tile']) {
+    @apply flex flex-col items-start gap-1 px-kui-field-x py-3;
+
+    & .kui-stat-value {
+      @apply text-2xl/none;
+    }
+
+    & .kui-stat-label {
+      @apply text-kui-micro font-kui-label tracking-kui-label uppercase;
+    }
+  }
+
+  /* The figure alone takes the tone, so the label keeps its text colour. */
+  .kui-stat-badge:where([data-tone='accent']) .kui-stat-value {
+    @apply text-kui-accent;
+  }
+
+  .kui-stat-badge:where([data-tone='success']) .kui-stat-value {
+    @apply text-kui-success;
+  }
+
+  .kui-stat-badge:where([data-tone='warning']) .kui-stat-value {
+    @apply text-kui-warning;
+  }
+
+  .kui-stat-badge:where([data-tone='danger']) .kui-stat-value {
+    @apply text-kui-error;
+  }
+
+  .kui-stat-badge:where([data-tone='info']) .kui-stat-value {
+    @apply text-kui-info;
+  }
+
   /* Below lg the links fold behind the toggle, a popover its popovertarget opens; from lg they sit in a row, the popover's frame undone and the toggle hidden. A browser without popovers shows the links as they are and hides the toggle. */
   .kui-site-nav {
     @apply flex items-center;

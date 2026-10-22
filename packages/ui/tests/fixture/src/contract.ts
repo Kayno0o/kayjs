@@ -223,7 +223,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'slider': { label: 'Delay', value: 40, min: 0, max: 100, formatValue: (value: number) => `${value} ms` },
   'split-layout': { list: 'L', detail: 'D' },
   'skeleton': { lines: 2, label: 'Loading' },
-  'stat': { value: 12, label: 'moons' },
+  'stat': { value: 12, label: 'moons', variant: 'tile', tone: 'danger' },
   'steps': { steps: [{ key: 'account', label: 'Account' }, { key: 'details', label: 'Details' }, { key: 'review', label: 'Review' }], current: 'details', url: '/signup?step=details', done: ['account'], label: 'Signup' },
   'tab-nav': { links: [{ href: '/', label: 'Home' }], current: '/', label: 'Sections' },
   'table': { columns, rows: planets, rowKey: 'name' },

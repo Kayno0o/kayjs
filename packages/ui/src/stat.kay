@@ -5,16 +5,27 @@ import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
 import Icon from './icon.kay'
 
-const look = recipe({ parts: { root: 'kui-stat-badge', value: 'kui-stat-value', label: 'kui-stat-label' } })
+const look = recipe({
+  parts: { root: 'kui-stat-badge', value: 'kui-stat-value', label: 'kui-stat-label' },
+  variants: {
+    variant: { inline: '', tile: '' },
+    tone: { neutral: '', accent: '', success: '', warning: '', danger: '', info: '' },
+  },
+  defaults: { variant: 'inline', tone: 'neutral' },
+})
 
-const { value, label, icon, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children'> & {
+const { value, label, icon, variant = 'inline', tone = 'neutral', ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children'> & {
   value: number | string
   label?: string | undefined
   icon?: IconSlot | IconProps | undefined
+  // `inline` is the pill, figure and label side by side; `tile` is a framed box with the figure above its label, to stack in a grid.
+  variant?: 'inline' | 'tile' | undefined
+  // Colours the figure, such as `danger` past a threshold; `neutral` keeps the text colour.
+  tone?: 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info' | undefined
 }>()
 ---
 // A figure and what it counts, read together: "12 moons".
-span({...rest})
+span({...rest} data-variant={variant === 'tile' ? 'tile' : undefined} data-tone={tone === 'neutral' ? undefined : tone})
   if icon
     Icon(icon={icon})
   span(part="value") {value}

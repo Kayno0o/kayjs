@@ -1,0 +1,8 @@
+---
+import Stat from '@kaynooo/kayjs-ui/stat.kay'
+
+// The inline pill, a tile, and a tile whose figure is toned.
+---
+Stat#plain(value={12} label="moons")
+Stat#tile(value={12} label="moons" variant="tile")
+Stat#toned(value="91%" label="load" variant="tile" tone="danger")

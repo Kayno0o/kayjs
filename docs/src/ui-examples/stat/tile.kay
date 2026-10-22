@@ -1,0 +1,7 @@
+---
+import Stat from '@kaynooo/kayjs-ui/stat.kay'
+---
+.grid.grid-cols-3.gap-3
+  Stat(variant="tile" value={95} label="moons")
+  Stat(variant="tile" value="12 h" label="rotation")
+  Stat(variant="tile" value="91%" label="load" tone="danger")
