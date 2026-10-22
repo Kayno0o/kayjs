@@ -240,7 +240,6 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
   // `ends` reads the clock, so this follows the date passing.
   const ended = () => endsAt() !== undefined && ends() === undefined
   // A text that does not parse keeps Save enabled, so pressing it says what to fix.
-  // A stranded new entry exists already, so saving it again would create it twice.
   const canSave = () => !saving() && stranded() === undefined && (first === undefined || drafts.changed(ref) || drafts.blocked(ref).length > 0)
 
   const lastSave = signal<SavedState>()
@@ -275,6 +274,10 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
     // Ctrl+S and a click on a disabled button's neighbour reach here with nothing to save.
     if (first && !drafts.changed(ref) && drafts.blocked(ref).length === 0)
       return true
+
+    // A stranded new entry exists already, so saving it again would create it twice.
+    if (stranded() !== undefined)
+      return false
 
     saving.set(true)
 
