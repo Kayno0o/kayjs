@@ -1,16 +1,18 @@
 import type { BunPlugin } from 'bun'
 import type { KayLibrary } from './libraries'
 import { readFileSync, statSync } from 'node:fs'
+import { rename } from 'node:fs/promises'
 import { dirname, join, sep } from 'node:path'
 import { islandId, withoutTwin } from '../compiler'
 import { parseKay } from '../compiler/parser'
-import { scopeAttribute, scopeCss } from '../compiler/scoped-style'
+import { rebaseUrls, scopeAttribute, scopeCss, scopeHash } from '../compiler/scoped-style'
 import { cacheDir, projectPaths } from '../project'
 import { ASSET_FILE, clientDir, writeAsset } from './assets'
 import { collectionComponents, importedNames, rendersContent } from './collection-components'
 import { CSS_FILE, KAY_FILE, resolveFrom, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
 import { globbedFiles } from './glob'
 import { importsOf, libraryOf } from './libraries'
+import { throughLinks } from './links'
 import { UI_FILE, uiEntryOf } from './ui'
 
 const ABSOLUTE_URL = /^\//
@@ -101,12 +103,17 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
   }
   // A `--- style` fence reaches the bundler as a stylesheet of its own, written under the cache with its selectors scoped.
   const scopedStylesheet = async (path: string, css: string) => {
-    const moduleId = islandId(path, root)
-    const file = join(cacheDir(root, 'scoped'), `${Bun.hash(moduleId).toString(36)}.css`)
-    const contents = scopeCss(css, scopeAttribute(moduleId))
+    const moduleId = islandId(throughLinks(root, path), root)
+    const file = join(cacheDir(root, 'scoped'), `${scopeHash(moduleId)}.css`)
+    const contents = rebaseUrls(scopeCss(css, scopeAttribute(moduleId)), dirname(path), dirname(file))
 
-    if (!(await Bun.file(file).exists()) || await Bun.file(file).text() !== contents)
-      await Bun.write(file, contents)
+    // Renamed into place, so a build reading the file while another writes it meets the old text or the new, never half of it.
+    if (!(await Bun.file(file).exists()) || await Bun.file(file).text() !== contents) {
+      const temporary = `${file}.${crypto.randomUUID()}.tmp`
+
+      await Bun.write(temporary, contents)
+      await rename(temporary, file)
+    }
 
     return importing(note(path, [file]))
   }

@@ -1,13 +1,21 @@
+import { relative, resolve, sep } from 'node:path'
+
 const LEADING = /^(?:\s|\/\*[\s\S]*?\*\/)*/
 const AT_NAME = /^@([\w-]+)/
 const GLOBAL = ':global('
-const PSEUDO_ELEMENT = /::|:(?:before|after|first-line|first-letter)\b/
+const LEGACY_PSEUDO_ELEMENT = /^:(?:before|after|first-line|first-letter)\b/
+const URL_REFERENCE = /url\(\s*(['"]?)([^)'"\s]+)\1\s*\)|@import\s+(['"])([^'"]+)\3/g
+const OUTSIDE_FILE = /^(?:[a-z][\w+.-]*:|\/|#)/i
 // At-rules whose body holds style rules of the same page.
-const NESTING = new Set(['media', 'supports', 'layer', 'container', 'document'])
+const NESTING = new Set(['media', 'supports', 'layer', 'container', 'document', 'scope', 'starting-style'])
 
 // The attribute a component with a `--- style` fence puts on every element its template writes, and its selectors end on.
 export function scopeAttribute(moduleId: string): string {
-  return `data-k-${Bun.hash(moduleId).toString(36).slice(0, 8)}`
+  return `data-k-${scopeHash(moduleId).slice(0, 8)}`
+}
+
+export function scopeHash(moduleId: string): string {
+  return Bun.hash(moduleId).toString(36)
 }
 
 // Where `open` at `from` closes, past strings, comments and nested brackets; the end of `css` when it never does.
@@ -109,10 +117,10 @@ function pieces(text: string, separators: string): string[] {
   return out
 }
 
-// `compound` with each `:global(...)` unwrapped, and whether anything else is left.
+// `compound` with each `:global(...)` unwrapped, and whether anything of this component's is left: the pseudo-classes and pseudo-elements after a leading `:global(...)` belong to it.
 function unwrapped(compound: string): { text: string, own: boolean } {
   let text = ''
-  let own = false
+  let ownText = ''
   let i = 0
 
   while (i < compound.length) {
@@ -124,12 +132,58 @@ function unwrapped(compound: string): { text: string, own: boolean } {
     }
     else {
       text += compound[i]
-      own = true
+      ownText += compound[i]
       i++
     }
   }
 
-  return { text, own }
+  return { text, own: ownText !== '' && !(compound.startsWith(GLOBAL) && ownText.startsWith(':')) }
+}
+
+// Where a pseudo-element starts in `compound`, outside brackets and strings, or its end.
+function pseudoElementAt(compound: string): number {
+  let depth = 0
+
+  for (let i = 0; i < compound.length; i++) {
+    const char = compound[i]!
+
+    if (char === '\\')
+      i++
+    else if (char === '"' || char === '\'')
+      i = stringEnd(compound, i)
+    else if (char === '(' || char === '[')
+      depth++
+    else if (char === ')' || char === ']')
+      depth = Math.max(depth - 1, 0)
+    else if (depth === 0 && char === ':' && (compound[i + 1] === ':' || LEGACY_PSEUDO_ELEMENT.test(compound.slice(i))))
+      return i
+  }
+
+  return compound.length
+}
+
+// `css` without its comments, which could split a selector or hide its end.
+function withoutComments(css: string): string {
+  let out = ''
+
+  for (let i = 0; i < css.length; i++) {
+    const char = css[i]!
+
+    if (char === '/' && css[i + 1] === '*') {
+      i = commentEnd(css, i)
+    }
+    else if (char === '"' || char === '\'') {
+      const end = stringEnd(css, i)
+
+      out += css.slice(i, end + 1)
+      i = end
+    }
+    else {
+      out += char
+    }
+  }
+
+  return out
 }
 
 function scopeSelector(selector: string, attribute: string): string {
@@ -140,7 +194,7 @@ function scopeSelector(selector: string, attribute: string): string {
     if (index !== target)
       return part.text
 
-    const pseudo = PSEUDO_ELEMENT.exec(part.text)?.index ?? part.text.length
+    const pseudo = pseudoElementAt(part.text)
 
     return `${part.text.slice(0, pseudo)}[${attribute}]${part.text.slice(pseudo)}`
   }).join('')
@@ -148,7 +202,7 @@ function scopeSelector(selector: string, attribute: string): string {
 
 function scopeRule(prelude: string, attribute: string): string {
   const lead = LEADING.exec(prelude)![0]
-  const selectors = pieces(prelude.slice(lead.length), ',')
+  const selectors = pieces(withoutComments(prelude.slice(lead.length)), ',')
 
   return lead + selectors.map(selector => selector === ',' ? selector : scopeSelector(selector, attribute)).join('')
 }
@@ -179,4 +233,19 @@ export function scopeCss(css: string, attribute: string): string {
   }
 
   return out
+}
+
+// `css` with the relative `url()` and `@import` it holds, written for a file in `from`, pointing at the same files from `to`.
+export function rebaseUrls(css: string, from: string, to: string): string {
+  return css.replace(URL_REFERENCE, (whole, quote: string | undefined, url: string | undefined, importQuote: string | undefined, imported: string | undefined) => {
+    const target = url ?? imported!
+
+    if (OUTSIDE_FILE.test(target) || (url === undefined && !target.startsWith('.')))
+      return whole
+
+    const moved = relative(to, resolve(from, target)).split(sep).join('/')
+    const text = moved.startsWith('.') ? moved : `./${moved}`
+
+    return url === undefined ? `@import ${importQuote}${text}${importQuote}` : `url(${quote}${text}${quote})`
+  })
 }

@@ -7,7 +7,7 @@ import { styleSignature } from '../src/build/styles'
 import { compileKay } from '../src/compiler'
 import { formatKay } from '../src/compiler/format'
 import { parseKay } from '../src/compiler/parser'
-import { scopeCss } from '../src/compiler/scoped-style'
+import { rebaseUrls, scopeCss } from '../src/compiler/scoped-style'
 import { fixtureCopy } from './scratch'
 
 const ATTR = 'data-k-x'
@@ -18,7 +18,8 @@ let root = ''
 beforeAll(async () => {
   root = resolve(await fixtureCopy('page-styles'))
   await Bun.write(join(root, 'src/routes/scoped.kay'), `---\nimport Card from '../card.kay'\n---\nh1 Scoped\nCard\n`)
-  await Bun.write(join(root, 'src/card.kay'), '--- style\n.card { color: rebeccapurple }\n:global(.outside) .card p { margin: 3px }\n---\n.card\n  p inside\n')
+  await Bun.write(join(root, 'src/card.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==', 'base64'))
+  await Bun.write(join(root, 'src/card.kay'), '--- style\n.card { background: url(./card.png); color: rebeccapurple }\n:global(.outside) .card p { margin: 3px }\n---\n.card\n  p inside\n')
 })
 
 afterAll(async () => {
@@ -49,6 +50,30 @@ describe('scopeCss', () => {
   })
 })
 
+describe('scopeCss edge cases', () => {
+  it('ignores comments inside a selector', () => {
+    expect(scopeCss('.a /* c, d */ { x: y }', ATTR)).toBe(`.a[${ATTR}]  { x: y }`)
+  })
+
+  it('finds a pseudo-element outside brackets and strings only', () => {
+    expect(scopeCss('a[href="::"]:not(:before) { x: y }', ATTR)).toBe(`a[href="::"]:not(:before)[${ATTR}] { x: y }`)
+  })
+
+  it('leaves a global element with its pseudo-classes and pseudo-elements unscoped', () => {
+    expect(scopeCss(':global(.a)::before, :global(.b):hover { x: y }', ATTR)).toBe('.a::before, .b:hover { x: y }')
+  })
+
+  it('scopes the bodies of scope and starting-style', () => {
+    expect(scopeCss('@starting-style { .a { x: y } }', ATTR)).toBe(`@starting-style { .a[${ATTR}] { x: y } }`)
+  })
+})
+
+describe('rebaseUrls', () => {
+  it('points relative references at the files they named from another folder', () => {
+    expect(rebaseUrls('a { background: url(./a.png) } b { background: url("../b.png") } @import "./c.css"; i { background: url(/p.png) url(data:x) url(https://x/y) } @import "tailwindcss";', '/app/src', '/app/.kay/cache/scoped')).toBe('a { background: url(../../../src/a.png) } b { background: url("../../../b.png") } @import "../../../src/c.css"; i { background: url(/p.png) url(data:x) url(https://x/y) } @import "tailwindcss";')
+  })
+})
+
 describe('the style fence', () => {
   it('is parsed as CSS, whose slashes and quotes close nothing', () => {
     const file = parseKay('--- style\na { background: url(/x/y.png); content: "\'" } /* it\'s */\n---\np hi\n')
@@ -73,10 +98,17 @@ describe('the style fence', () => {
     const attribute = (/data-k-[a-z0-9]+/).exec(server)![0]
 
     expect(dom).toContain(attribute)
+    expect(compileKay(source, join(root, 'src/b.kay'), { root, output: 'dom' }).tsx).not.toContain(attribute)
   })
 
   it('is kept by the formatter', () => {
     const source = '--- style\n.a { color: red }\n---\np.a hi\n'
+
+    expect(formatKay(source).code).toBe(source)
+  })
+
+  it('is kept by the formatter beside a script fence', () => {
+    const source = '--- style\n.a { color: red }\n--- script\nconst n = 1\n---\np.a {n}\n'
 
     expect(formatKay(source).code).toBe(source)
   })
@@ -93,5 +125,6 @@ describe('the style fence', () => {
     expect(css).toMatch(/\.card\[data-k-[a-z0-9]+\]/)
     expect(css).toMatch(/\.outside \.card p\[data-k-[a-z0-9]+\]/)
     expect(css).not.toContain(':global')
+    expect(css).not.toContain('url(./card.png)')
   }, 120_000)
 })

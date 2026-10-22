@@ -174,7 +174,7 @@ export function foldingRanges(source: string): FoldingRange[] {
       folds.push({ startLine, endLine, ...kind && { kind } })
   }
 
-  for (const span of [file.server, file.script, file.module]) {
+  for (const span of [file.server, file.script, file.module, file.style]) {
     if (span)
       fold(fenceLineStart(source, span.start), span.end, 'region')
   }

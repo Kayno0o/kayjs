@@ -7,6 +7,9 @@
   ],
   "patterns": [
     {
+      "include": "#style-fence"
+    },
+    {
       "include": "#fence"
     },
     {
@@ -62,8 +65,31 @@
     }
   ],
   "repository": {
+    "style-fence": {
+      "begin": "^(---)[ \\t]+(style)[ \\t]*$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.fence.kay"
+        },
+        "2": {
+          "name": "keyword.other.fence.kay"
+        }
+      },
+      "end": "^(---)[ \\t]*$|^(?=---[ \\t]*(?:[a-z]|<))",
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.fence.kay"
+        }
+      },
+      "contentName": "meta.embedded.block.css",
+      "patterns": [
+        {
+          "include": "source.css"
+        }
+      ]
+    },
     "fence": {
-      "begin": "^(---)(?:[ \\t]+(server|client|script)(?:[ \\t]+(<.*>))?|[ \\t]*(<.*>))?[ \\t]*$",
+      "begin": "^(---)(?:[ \\t]+(server|client|script|module)(?:[ \\t]+(<.*>))?|[ \\t]*(<.*>))?[ \\t]*$",
       "beginCaptures": {
         "1": {
           "name": "punctuation.definition.fence.kay"
