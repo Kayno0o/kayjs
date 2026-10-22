@@ -42,8 +42,13 @@ class Editor {
     })
   }
 
+  // What the server advertised.
+  advertised: { semanticTokensProvider?: { legend: { tokenTypes: string[], tokenModifiers: string[] } } } = {}
+
   async start() {
-    await this.connection.request('initialize', { processId: process.pid, rootUri: this.fileUri(this.root), capabilities: this.capabilities })
+    const { capabilities } = await this.connection.request<{ capabilities: Editor['advertised'] }>('initialize', { processId: process.pid, rootUri: this.fileUri(this.root), capabilities: this.capabilities })
+
+    this.advertised = capabilities
     this.connection.notify('initialized', {})
   }
 
@@ -1731,6 +1736,27 @@ describe('kay lsp lookup caches', () => {
   })
 })
 
+const TOKENS_PAGE = [
+  '--- server',
+  'const greeting = \'héllo\'',
+  'function shout(text: string) { return text.toUpperCase() }',
+  '---',
+  '---',
+  'import { open } from \'../store\'',
+  '',
+  'const { title, subtitle = \'x\' } = props<{ title: string, subtitle?: string }>()',
+  'const count = signal(0)',
+  'const doubled = memo(() => count * 2)',
+  '---',
+  'p {greeting} {title} {shout(\'a\')}',
+  'button(onClick={() => count = count + 1}) {count} {doubled} {open}',
+  'p 😀é {subtitle}',
+  'for title of [1, 2]',
+  '  li {title} {count}',
+  'p.title {obj.count}',
+  '',
+].join('\n')
+
 const LINKS_PAGE = [
   'a(href="/about") About',
   'a(href="/posts/42/") Post',
@@ -1761,6 +1787,8 @@ describe('kay lsp editor features of an app under a base', () => {
       Bun.write(join(dir, 'src/routes/links.kay'), LINKS_PAGE),
       Bun.write(join(dir, 'src/routes/broken.kay'), 'ul\n  for of [1, 2]\n    li x\na(href="/about") About\n'),
       Bun.write(join(dir, 'src/routes/empty.kay'), ''),
+      Bun.write(join(dir, 'src/store.ts'), 'import { signal } from \'kay\'\n\nexport const open = signal(false)\n'),
+      Bun.write(join(dir, 'src/routes/tokens.kay'), TOKENS_PAGE),
     ])
     editor = new Editor(dir)
     await editor.start()
@@ -1804,6 +1832,77 @@ describe('kay lsp editor features of an app under a base', () => {
 
       expect((await request<DocumentLink[]>('textDocument/documentLink', 'src/routes/broken.kay')).map(link => link.target.slice(-9))).toEqual(['about.kay'])
       expect(await request<DocumentLink[]>('textDocument/documentLink', 'src/routes/empty.kay')).toEqual([])
+    })
+  })
+
+  describe('semantic tokens', () => {
+    // Each token as the text it covers, its type and its modifiers, from the data the server encoded.
+    const decode = (text: string, data: number[]) => {
+      const { tokenTypes, tokenModifiers } = editor.advertised.semanticTokensProvider!.legend
+      const lines = text.split('\n')
+      const found: string[] = []
+      let line = 0
+      let character = 0
+
+      for (let at = 0; at < data.length; at += 5) {
+        line += data[at]!
+        character = data[at] === 0 ? character + data[at + 1]! : data[at + 1]!
+
+        const mods = tokenModifiers.filter((_, bit) => (data[at + 4]! & (1 << bit)) !== 0)
+
+        found.push(`${line}:${character} ${lines[line]!.slice(character, character + data[at + 2]!)} ${tokenTypes[data[at + 3]!]} ${mods.join(',')}`)
+      }
+
+      return found
+    }
+
+    const tokensOf = async (path: string, text: string) => decode(text, (await request<{ data: number[] }>('textDocument/semanticTokens/full', path)).data)
+
+    it('advertises its legend', () => {
+      expect(editor.advertised.semanticTokensProvider!.legend).toEqual({ tokenTypes: ['variable', 'property', 'function'], tokenModifiers: ['declaration', 'readonly', 'signal', 'prop', 'server'] })
+    })
+
+    it('tells signals, props and server values apart wherever they are declared, read or written, in a server fence, a script and the template', async () => {
+      await editor.open('src/routes/tokens.kay')
+
+      expect(await tokensOf('src/routes/tokens.kay', TOKENS_PAGE)).toEqual([
+        // The server fence: values the page and its script read.
+        '1:6 greeting variable declaration,readonly,server',
+        '2:9 shout function declaration,server',
+        // The script: an imported signal, the props with and without a default, and signals read inside a memo.
+        '5:9 open variable declaration,signal',
+        '7:8 title property declaration,prop',
+        '7:15 subtitle property declaration,prop',
+        '8:6 count variable declaration,signal',
+        '9:6 doubled variable declaration,readonly,signal',
+        '9:27 count variable signal',
+        // The template, a write included.
+        '11:3 greeting variable readonly,server',
+        '11:14 title property prop',
+        '11:22 shout function server',
+        '12:22 count variable signal',
+        '12:30 count variable signal',
+        '12:43 count variable signal',
+        '12:51 doubled variable readonly,signal',
+        '12:61 open variable signal',
+        // Columns count UTF-16 units: the emoji and the accent come first on the line.
+        '13:7 subtitle property prop',
+        // A loop item named like a prop hides it; a member named like a signal is no signal.
+        '15:14 count variable signal',
+      ])
+    })
+
+    it('follows an edit, and gives a file with a syntax error or no text no failure', async () => {
+      const edited = TOKENS_PAGE.replace('p 😀é {subtitle}', 'p {subtitle')
+
+      await editor.change('src/routes/tokens.kay', edited, 2)
+      expect(await tokensOf('src/routes/tokens.kay', edited)).toContain('8:6 count variable declaration,signal')
+
+      await editor.open('src/routes/broken.kay')
+      await editor.open('src/routes/empty.kay')
+
+      expect(await tokensOf('src/routes/broken.kay', '')).toEqual([])
+      expect((await request<{ data: number[] }>('textDocument/semanticTokens/full', 'src/routes/empty.kay')).data).toEqual([])
     })
   })
 })

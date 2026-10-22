@@ -43,6 +43,11 @@
         "configuration": "./language-configuration.json"
       }
     ],
+    "semanticTokenModifiers": [
+      { "id": "signal", "description": "A signal or a memo of a kay component" },
+      { "id": "prop", "description": "A prop of a kay component" },
+      { "id": "server", "description": "A value a kay server fence declares" }
+    ],
     "configuration": {
       "title": "Kay",
       "properties": {

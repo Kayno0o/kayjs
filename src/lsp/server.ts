@@ -40,6 +40,7 @@ import { toOffset, toPosition } from './positions'
 import { importEdits, importSpecifiers, moduleImportEdits } from './renames'
 import { routeLinks } from './route-links'
 import { Connection } from './rpc'
+import { semanticTokens, TOKEN_MODIFIERS, TOKEN_TYPES } from './semantic-tokens'
 import { templateContext, templateItems } from './template-completion'
 
 // Where a file tsgo names is for the editor: its .kay source for a shadow file, the file itself outside the shadow tree.
@@ -191,6 +192,7 @@ export class KayLanguageServer {
     client.onRequest<CodeActionParams>('textDocument/codeAction', async params => this.codeActions(params))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/documentSymbol', ({ textDocument }) => this.symbols(textDocument.uri))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/documentLink', async ({ textDocument }) => this.links(textDocument.uri))
+    client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/semanticTokens/full', ({ textDocument }) => this.tokens(textDocument.uri))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/foldingRange', ({ textDocument }) => this.folds(textDocument.uri))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/codeLens', ({ textDocument }) => this.lenses(textDocument.uri))
     client.onRequest<{ files: { oldUri: string, newUri: string }[] }>('workspace/willRenameFiles', async ({ files }) => inWalkScope(async () => this.renamedFiles(files)))
@@ -249,6 +251,7 @@ export class KayLanguageServer {
         documentFormattingProvider: true,
         documentSymbolProvider: true,
         foldingRangeProvider: true,
+        semanticTokensProvider: { legend: { tokenTypes: TOKEN_TYPES, tokenModifiers: TOKEN_MODIFIERS }, full: true },
         documentLinkProvider: {},
         codeLensProvider: {},
       },
@@ -996,6 +999,13 @@ export class KayLanguageServer {
     catch {
       return []
     }
+  }
+
+  // Signals, props and server values told apart from other names, whose tokens TypeScript does not know.
+  private tokens(uri: string): { data: number[] } {
+    const document = this.documents.get(uri)
+
+    return { data: document ? semanticTokens(document.source, importedSignals(document.file, document.source)) : [] }
   }
 
   private folds(uri: string): FoldingRange[] {
