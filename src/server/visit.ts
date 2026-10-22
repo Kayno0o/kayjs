@@ -22,8 +22,18 @@ export function markInternal(headers: Headers): Headers {
   return headers
 }
 
+const received = new WeakSet<Request>()
+
+// Reads the mark and drops it from the request, so no handler of the app reads the token; `isInternal` still tells afterwards.
+export function receiveInternal(request: Request): void {
+  if (request.headers.get(INTERNAL) === INTERNAL_TOKEN)
+    received.add(request)
+
+  request.headers.delete(INTERNAL)
+}
+
 export function isInternal(request: Request): boolean {
-  return request.headers.get(INTERNAL) === INTERNAL_TOKEN
+  return received.has(request) || request.headers.get(INTERNAL) === INTERNAL_TOKEN
 }
 
 // Sends `visit` through the app that received `request`, as if the browser had sent it: through the server's own fetch handler when there is one, else through `fallback`.

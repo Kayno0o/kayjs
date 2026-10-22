@@ -179,6 +179,16 @@ export function announceStart(app: Elysia, logger: Exclude<Logger, false>, prere
   })
 }
 
+// Writes the line of a request an early hook answered before the request log saw it, the same line under the same id; undefined when requests are not logged.
+export function requestRefusalLogger(logger: Logger): ((request: Request, status: number) => void) | undefined {
+  if (logger === false)
+    return undefined
+
+  const writeLine = writerFor(logger)
+
+  return (request, status) => writeLine({ type: 'request', time: new Date().toISOString(), level: 'info', method: request.method, path: pathOf(request.url), status, duration: 0, id: requestId(request) })
+}
+
 // Logs one line per request, `GET /blog/hello 200 12ms AZnL...`, in the format the `log` option of this `pages()` says; kay's own `/_kay/` routes, an extension's API modules served there excepted, and the health route are left out.
 // A hook, so it reaches the app's routes registered after `pages()`.
 export function logRequests(app: Elysia, logger: Exclude<Logger, false>, healthPath?: string, apiPrefixes: readonly string[] = []): void {

@@ -57,7 +57,7 @@ import { avifQuality, serveImages, webpQuality } from './image'
 import { countWrites } from './kept-pages'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { serveLive } from './live'
-import { announceStart, logRequests, pathOf, useLogger } from './log'
+import { announceStart, logRequests, pathOf, requestRefusalLogger, useLogger } from './log'
 import { mcpBodyLimit, receiveDispatched, serveMcp, serveToolCallsThrough } from './mcp'
 import { countMissing, knowRedirects } from './not-found'
 import { serveServiceWorker } from './offline'
@@ -89,6 +89,7 @@ import { markPageStale, trackPrerendered } from './stale-pages'
 import { serveFiles } from './storage'
 import { answerUncaught } from './uncaught'
 import { serveViolationReports } from './violations'
+import { receiveInternal } from './visit'
 import { agreeOnWildcards } from './wildcards'
 
 const JSON_EXTENSION = /\.json$/
@@ -382,7 +383,11 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   setRequestIdHeader(options.requestIdHeader)
   trustProxy(app, options.proxy)
-  requireProxyKey(app, checkProxy(options.proxy), { dev: mode.dev, exported, base, health: options.health === false ? undefined : options.health?.path ?? HEALTH_PATH })
+  // Before the key check reads the mark, and dropped from the request there, so no handler reads it.
+  app.onRequest(({ request }) => {
+    receiveInternal(request)
+  })
+  requireProxyKey(app, checkProxy(options.proxy), { dev: mode.dev, exported, base, health: options.health === false ? undefined : options.health?.path ?? HEALTH_PATH, logRefused: requestRefusalLogger(log) })
   refuseForeignHosts(app, site)
 
   if (security)

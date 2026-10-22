@@ -31,6 +31,12 @@ const KAY_VARIABLES: EnvVariable[] = [
   { name: 'KAY_SECRET', type: 'string', required: false, description: 'at least 32 random characters, sealing sessions and signing form stamps, links to private files, the flash cookie and preview links, each under a key of its own; commas separate a rotation list, the first sealing, and only sessions and kayjs-auth opening the others; unless `secret` in kay.config.ts sets it' },
 ]
 
+// What `proxy.key` reads: a production server with the setting refuses to boot without the key, given directly or as the file that holds it.
+const PROXY_KEY_VARIABLES: EnvVariable[] = [
+  { name: 'KAY_PROXY_KEY', type: 'string', required: 'production', secret: true, description: 'the key the proxy sends in the header `proxy.key` names, or set `KAY_PROXY_KEY_FILE` instead' },
+  { name: 'KAY_PROXY_KEY_FILE', type: 'string', required: false, description: 'the path of a file holding the proxy key, read when `KAY_PROXY_KEY` is unset' },
+]
+
 // Every variable the project's `defineEnv` schemas, its `publicEnv` and its extensions declare, with whether each is required, in production only or always, and its default. The server entry is not run: the modules under `src` that call `defineEnv` are imported without the server's environment.
 export const env: Command = {
   usage: USAGES.env,
@@ -125,6 +131,7 @@ export async function listEnv(root: string): Promise<{ variables: Listed[], unre
     ...config.publicEnv ? described(config.publicEnv, 'publicEnv in kay.config.ts') : [],
     ...(config.extensions ?? []).flatMap(extension => extension.env === undefined ? [] : described(extension.env, `the extension ${extension.name}`).filter(({ name }) => !declaredNames.has(name))),
     ...KAY_VARIABLES.map(variable => ({ ...variable, source: 'kay' })),
+    ...typeof config.proxy === 'object' && config.proxy.key !== undefined ? PROXY_KEY_VARIABLES.map(variable => ({ ...variable, source: 'kay' })) : [],
   ]
 
   return { variables, unread }

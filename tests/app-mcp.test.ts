@@ -274,6 +274,8 @@ describe('behind proxy.key', () => {
 
     expect(called.body.result).toMatchObject({ structuredContent: { created: 'Milk' } })
     expect((await keyed.fetch('/mcp', { method: 'POST', headers: { 'content-type': 'application/json', 'x-upstream-key': '' }, body: '{}' })).status).toBe(403)
+    // The marks that let it by are dropped from the request, so a handler echoing its headers cannot expose them.
+    expect((await rpc(keyed, 'tools/call', { name: 'get_notes_who' }, BEARER)).body.result).toMatchObject({ structuredContent: { tool: 'get_notes_who', leaked: [] } })
     expect((await keyed.fetch('/mcp', { method: 'POST', headers: { 'x-kay-internal': 'guess', 'x-upstream-key': '' }, body: '{}' })).status).toBe(403)
   })
 })
@@ -898,14 +900,14 @@ describe('a tool call an app can tell', () => {
   it('is told from the handler too, after the markers are dropped from the request', async () => {
     const result = await site.mcp.call('get_notes_who', {}, { headers: BEARER })
 
-    expect(result.data).toEqual({ tool: 'get_notes_who' })
-    expect((await (await site.fetch('/api/notes/who', { headers: { ...BEARER, 'x-kay-agent': 'guess', 'x-kay-agent-tool': 'x' } })).json())).toEqual({ tool: null })
+    expect(result.data).toEqual({ tool: 'get_notes_who', leaked: [] })
+    expect((await (await site.fetch('/api/notes/who', { headers: { ...BEARER, 'x-kay-agent': 'guess', 'x-kay-agent-tool': 'x', 'x-kay-internal': 'guess' } })).json())).toEqual({ tool: null, leaked: [] })
   })
 
   it('is seen through the app.handle fallback of a site without a server too', async () => {
     const result = await mounted.mcp.call('get_notes_who')
 
-    expect(result.data).toEqual({ tool: 'get_notes_who' })
+    expect(result.data).toEqual({ tool: 'get_notes_who', leaked: [] })
   })
 })
 

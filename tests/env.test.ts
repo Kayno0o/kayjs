@@ -226,6 +226,24 @@ describe('kay env', () => {
     expect(listed.unread[0]!.error).toContain('missing')
   })
 
+  it('lists KAY_PROXY_KEY and KAY_PROXY_KEY_FILE while proxy.key is set, and writes them to .env.example', async () => {
+    const root = await project({ ...files, 'kay.config.ts': 'export default { favicon: false, proxy: { key: "x-upstream-key" } }\n' })
+    const { stdout, code } = await kay(['env', '--format', 'json'], root)
+    const listed = JSON.parse(stdout) as { variables: { name: string, source: string, required: string | false, secret?: true }[] }
+    const row = (name: string) => listed.variables.find(variable => variable.name === name)
+
+    expect(code).toBe(0)
+    expect(row('KAY_PROXY_KEY')).toMatchObject({ source: 'kay', required: 'production', secret: true })
+    expect(row('KAY_PROXY_KEY_FILE')).toMatchObject({ source: 'kay', required: false })
+
+    expect((await kay(['env', '--write'], root)).stderr).toContain('KAY_PROXY_KEY, KAY_PROXY_KEY_FILE')
+
+    const text = await Bun.file(join(root, '.env.example')).text()
+
+    expect(text).toContain('required in production\nKAY_PROXY_KEY=\n')
+    expect(text).toContain('# KAY_PROXY_KEY_FILE=\n')
+  })
+
   it('prints a listing in text, and answers a bad format', async () => {
     const root = await project(files)
     const { stdout, code } = await kay(['env'], root)

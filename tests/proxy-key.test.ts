@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs'
+import type { LogEntry } from '../src/server/log'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -67,6 +68,29 @@ describe('proxy.key', () => {
 
     expect(refused.headers.get('content-type')).toContain('text/plain')
     expect(await refused.text()).not.toContain(KEY)
+  })
+
+  it('logs a refused request like any other, under the id its 403 carries, without the key header', async () => {
+    const lines: LogEntry[] = []
+    const app = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: HEADER }, log: (entry) => {
+      lines.push(entry)
+    } })
+    const refused = await app.handle(new Request('http://localhost/secret?token=1', { headers: { [HEADER]: 'wrong-guess' } }))
+    const id = refused.headers.get('x-request-id')
+
+    expect(refused.status).toBe(403)
+    // Past the after-response hooks, which log the requests the request log saw.
+    await Bun.sleep(20)
+    expect(id).toBeTruthy()
+    expect(lines).toEqual([expect.objectContaining({ type: 'request', method: 'GET', path: '/secret', status: 403, id })])
+    expect(JSON.stringify(lines)).not.toContain('wrong-guess')
+    expect(JSON.stringify(lines)).not.toContain(KEY)
+  })
+
+  it('logs nothing for a refusal while requests are not logged, and still sends the id', async () => {
+    const app = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: HEADER }, log: false })
+
+    expect((await app.handle(new Request('http://localhost/'))).headers.get('x-request-id')).toBeTruthy()
   })
 
   it('leaves the health route open, wherever the app puts it', async () => {

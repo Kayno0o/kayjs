@@ -296,7 +296,7 @@ export default defineConfig({
 })
 ```
 
-The key itself is not in the config. Kay reads it from `KAY_PROXY_KEY`, or from the file `KAY_PROXY_KEY_FILE` names, such as a container secret. A request without the header, or with another value, is refused with 403. A production server with `key` and no key to compare with does not start. Nothing is checked under `kay dev`, and `kay build --verify` uses a key of its own.
+The key itself is not in the config. Kay reads it from `KAY_PROXY_KEY`, or from the file `KAY_PROXY_KEY_FILE` names, such as a container secret. A request without the header, or with another value, is refused with 403, logged like any request with its request id. A production server with `key` and no key to compare with does not start. Nothing is checked under `kay dev`, and `kay build --verify` uses a key of its own.
 
 The health route stays open, since the container asks it without the key. `open` lists other paths that need none, such as `open: ['/api/push']`, each with what is under it.
 

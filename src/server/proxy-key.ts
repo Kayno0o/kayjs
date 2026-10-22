@@ -6,6 +6,7 @@ import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
 import { routerPath } from './base'
 import { pathOf } from './log'
+import { requestId, requestIdHeader } from './protection'
 import { sameText } from './seal'
 import { isInternal } from './visit'
 
@@ -43,7 +44,7 @@ function isOpen(path: string, open: readonly string[]): boolean {
 
 // Refuses with 403 every request that does not carry the proxy's shared key in the header `proxy.key` names, so a process or a container reaching the port directly skips nothing the proxy does.
 // Off under `kay dev`, in a static export, and outside production while no key is given; a production server with `key` and no key to compare with does not boot.
-export function requireProxyKey(app: Elysia, proxy: ProxyConfig | undefined, options: { dev: boolean, exported: boolean, base: string, health: string | undefined }): void {
+export function requireProxyKey(app: Elysia, proxy: ProxyConfig | undefined, options: { dev: boolean, exported: boolean, base: string, health: string | undefined, logRefused?: ((request: Request, status: number) => void) | undefined }): void {
   const header = proxy?.key
 
   if (header === undefined || options.dev || options.exported)
@@ -72,6 +73,9 @@ export function requireProxyKey(app: Elysia, proxy: ProxyConfig | undefined, opt
     if (given !== null && sameText(given, secret))
       return
 
-    return new Response('Forbidden\n', { status: 403, headers: { 'content-type': 'text/plain; charset=utf-8' } })
+    // This hook runs before the request id and request log hooks, which a response made here skips.
+    options.logRefused?.(request, 403)
+
+    return new Response('Forbidden\n', { status: 403, headers: { 'content-type': 'text/plain; charset=utf-8', [requestIdHeader()]: requestId(request) } })
   })
 }
