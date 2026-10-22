@@ -88,7 +88,7 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
 
     return paths
   }
-  const scan = (code: string, importer: string, loader: Bun.JavaScriptLoader) => [...importedSpecifiers(code, loader).map(path => resolveFrom(path, importer)).filter(path => path !== undefined), ...globbedFiles(code, importer, root, loader)]
+  const scan = (code: string, importer: string, loader: Bun.JavaScriptLoader) => [...importedSpecifiers(code, loader).map(path => resolveFrom(path, importer)).filter(path => path !== undefined), ...globbedFiles(code, importer, root, loader) ?? []]
   const imports = async (code: string, importer: string, loader: Bun.JavaScriptLoader) => {
     const paths = scan(code, importer, loader)
 

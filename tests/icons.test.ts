@@ -146,6 +146,14 @@ describe('icons', () => {
     expect(globbedFiles(code, importer, FIXTURE, 'ts')).toEqual([join(FIXTURE, 'src/routes/index.kay')])
   })
 
+  it('answers no files for a module that only names the glob call, so the import graph keeps it', () => {
+    const importer = join(FIXTURE, 'src/other.ts')
+
+    expect(globbedFiles('// import.meta.glob is replaced at build time\nexport const x = 1', importer, FIXTURE, 'ts')).toBeUndefined()
+    expect(globbedFiles('export const x = 1', importer, FIXTURE, 'ts')).toBeUndefined()
+    expect(globbedFiles('import.meta.glob("/nothing/*.zzz")', importer, FIXTURE, 'ts')).toEqual([])
+  })
+
   it('gives the icons a glob names to a module the server loads, as the props an import gives', async () => {
     await registerLoader(process.cwd())
     const dir = await scratchDir('icon-glob-')

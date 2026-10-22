@@ -349,9 +349,13 @@ async function importsIn(root: string, file: string, source: string, hash: numbe
   const code = kay ? fences(source) : source
   const missing: string[] = []
   let paths: string[] = []
+  let globbed = code.includes(GLOB_CALL)
 
   try {
-    paths = globbedFiles(code, file, root, kay ? 'ts' : scriptLoader(file)).map(found => realpathSync(found))
+    const found = globbedFiles(code, file, root, kay ? 'ts' : scriptLoader(file))
+
+    globbed = found !== undefined
+    paths = found?.map(path => realpathSync(path)) ?? []
   }
   catch {
     // A glob the build cannot read, which the check or the build reports as it reaches the module.
@@ -366,7 +370,7 @@ async function importsIn(root: string, file: string, source: string, hash: numbe
       missing.push(specifier)
   }
 
-  return { hash, paths, missing, globbed: code.includes(GLOB_CALL) }
+  return { hash, paths, missing, globbed }
 }
 
 function resolvedPath(specifier: string, importer: string): string | undefined {

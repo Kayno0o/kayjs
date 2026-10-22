@@ -129,9 +129,14 @@ function expandAlternatives(pattern: string): string[] {
   return group[1]!.split(',').flatMap(option => expandAlternatives(pattern.slice(0, group.index) + option + pattern.slice(group.index + group[0].length)))
 }
 
-// The files the module's `import.meta.glob` calls match, for a build that follows imports without running the module, such as the stylesheet build.
-export function globbedFiles(code: string, importer: string, root: string, loader: Bun.JavaScriptLoader): string[] {
-  return code.includes(GLOB_CALL) ? globCalls(code, importer, loader).flatMap(call => [...globFiles(call.patterns.filter(pattern => !pattern.replace(NEGATED, '').startsWith(ICONS)), importer, root).values()]) : []
+// The files the module's `import.meta.glob` calls match, for a build that follows imports without running the module, such as the stylesheet build, or undefined for a module with no such call, one that only names it.
+export function globbedFiles(code: string, importer: string, root: string, loader: Bun.JavaScriptLoader): string[] | undefined {
+  if (!code.includes(GLOB_CALL))
+    return undefined
+
+  const calls = globCalls(code, importer, loader)
+
+  return calls.length === 0 ? undefined : calls.flatMap(call => [...globFiles(call.patterns.filter(pattern => !pattern.replace(NEGATED, '').startsWith(ICONS)), importer, root).values()])
 }
 
 // The module with each `import.meta.glob` call replaced by the record of the files it matches, as Vite does: each module, or with `import` one of its exports, imported up front when `eager`, else behind a function importing it.
