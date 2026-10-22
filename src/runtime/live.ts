@@ -879,8 +879,8 @@ function track<Module, const Path extends CallPath<Module>>(module: Module, path
   ) as unknown as TrackedApi<Module, Path>
 }
 
-// `call` with `track` on it, built in its declaration so a bundle dropping `call` drops `track` too.
-export const call = Object.assign(callApi, { track })
+// `call` with `track` on it, built in its declaration and marked pure so a bundle dropping `call` drops `track` and the tracker too.
+export const call = /* @__PURE__ */ Object.assign(callApi, { track })
 
 // The first segment of a validation path: `/title` and `title.0` name `title`.
 const FIRST_SEGMENT = /^\/?([^/.]*)/
