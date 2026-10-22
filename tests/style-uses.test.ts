@@ -1,4 +1,5 @@
 import type { UnresolvedClass } from '../src/build/style-uses'
+import { mkdir, symlink } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { expandInline, styleUses } from '../src/build/style-uses'
@@ -60,6 +61,22 @@ describe('which classes a page gets from the components it renders', () => {
 
     return (entries['page.kay'] as number[]).map(index => classes[index]!).sort()
   }
+
+  it('reads the components of a page reached through a link, as the bundler names them by the real path', async () => {
+    const root = await scratchDir('style-uses-linked-')
+    const real = join(root, 'package', 'page.kay')
+    const linked = join(root, 'node_modules', 'package', 'page.kay')
+    const card = join(root, 'package', 'card.kay')
+
+    await mkdir(join(root, 'node_modules'), { recursive: true })
+    await Bun.write(real, 'Card\n')
+    await Bun.write(card, 'p.mt-1 a\n')
+    await symlink(join(root, 'package'), join(root, 'node_modules', 'package'))
+
+    const { classes, entries } = styleUses(root, [linked], [CSS], { edges: new Map([[real, [card]]]), open: new Set() }, new Map())
+
+    expect((entries[relative(root, linked)] as number[]).map(index => classes[index]!)).toEqual(['mt-1'])
+  })
 
   it('takes the literal a parent passes as a prop, whichever side writes it', async () => {
     expect(await reaching('Card(tone="btn-primary")\n', { 'card.kay': 'const { tone } = props<{ tone: string }>()\n---\np(class={tone}) a\n' })).toEqual(['btn-primary'])

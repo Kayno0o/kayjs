@@ -1,6 +1,6 @@
 import type { Judge, RuntimeClass } from './dynamic-classes'
 import type { Reached } from './styles'
-import { existsSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { dirname, relative, resolve } from 'node:path'
 import { parseKay } from '../compiler/parser'
 import { styledClassNames } from './class-rules'
@@ -291,8 +291,22 @@ export interface UnresolvedClass extends RuntimeClass {
 
 // `sheets` is the text of every stylesheet the build wrote, `shorthand` the classes each component writes as `div.flex.w-1/2`, which the words of its source cannot tell from a name with a dot.
 // `markup` lists the files that can write markup into a page without being a component it imports: scripts such as a Markdown plugin, Markdown and data files. A page rendering a collection's Markdown may show the classes of any of them, so it names theirs besides its components'.
-export function styleUses(root: string, entries: Iterable<string>, sheets: Iterable<string>, reached: Reached, shorthand: ReadonlyMap<string, Iterable<string>>, markup: readonly string[] = [], options: StyleUsesOptions = {}): StyleUses {
+export function styleUses(root: string, entries: readonly string[], sheets: Iterable<string>, reached: Reached, shorthand: ReadonlyMap<string, Iterable<string>>, markup: readonly string[] = [], options: StyleUsesOptions = {}): StyleUses {
   const styled = new Set<string>()
+
+  // The bundler follows a linked package's pages by their real path, which an entry reached through node_modules does not share, so the entry takes on the edges of its real path.
+  for (const entry of entries) {
+    const real = existsSync(entry) ? realpathSync(entry) : entry
+
+    if (real === entry)
+      continue
+
+    if (!reached.edges.has(entry) && reached.edges.has(real))
+      reached.edges.set(entry, reached.edges.get(real)!)
+
+    if (reached.open.has(real))
+      reached.open.add(entry)
+  }
 
   // Identical texts, as the stylesheets of two entries often are, are read once.
   for (const css of new Set(sheets)) {
