@@ -1,5 +1,5 @@
 import type { RenderedPage } from '../check/seo'
-import type { ElementNode, NamedAttribute, Node, Span } from '../compiler/ast'
+import type { ElementNode, NamedAttribute, Node, SlotNode, Span } from '../compiler/ast'
 import type { ClientBuild } from '../server/client'
 import type { Stop } from '../server/pure-page'
 import type { Route } from '../server/routes'
@@ -69,8 +69,8 @@ export async function routeSizes(root: string, client: ClientBuild, routes: Rout
 
   // What the files a component imports, however deep and whatever they are, lead to.
   // `given` is what the component calling `file` passes, which decides the components `file` renders only for a prop; a file reached any other way is given everything.
-  const reach = async (file: string, found: Reach, seen: Set<string>, given?: Given): Promise<void> => {
-    const key = given === undefined ? file : `${file}\n${[...given.names].sort().join(',')}`
+  const reach = async (file: string, found: Reach, seen: Set<string>, given?: Set<string>): Promise<void> => {
+    const key = given === undefined ? file : `${file}\n${[...given].sort().join(',')}`
 
     if (seen.has(key))
       return
@@ -97,8 +97,8 @@ export async function routeSizes(root: string, client: ClientBuild, routes: Rout
       }
 
       for (const use of uses) {
-        if (given === undefined || use.needs.every(name => given.names.has(name) || given.names.has(SPREAD)))
-          await reach(imported, found, seen, { names: new Set(use.names) })
+        if (given === undefined || use.needs.every(name => given.has(name) || given.has(SPREAD)))
+          await reach(imported, found, seen, new Set(use.names))
       }
     }
   }
@@ -158,10 +158,6 @@ interface Use {
   names: string[]
 }
 
-interface Given {
-  names: Set<string>
-}
-
 interface Reach {
   islands: Set<string>
   ships: boolean
@@ -204,15 +200,19 @@ function usesOf(source: string, file: string, root: string, template: Node[]): M
   const plain = new Set(entries.filter(entry => PROP_NAME.test(entry)))
   const bound = new Map<string, string>()
   const blocked = new Set<string>()
+  const uses = new Map<string, Use[]>()
+  const bindings = new Map<string, number>()
+  const mentions = new Map<string, number>()
 
   for (const [, name, specifier] of source.matchAll(DEFAULT_IMPORT)) {
     const imported = followed(resolveFrom(specifier!, file), root)
 
-    if (imported?.endsWith('.kay'))
+    if (imported?.endsWith('.kay')) {
       bound.set(name!, imported)
+      bindings.set(imported, (bindings.get(imported) ?? 0) + 1)
+    }
   }
 
-  const uses = new Map<string, Use[]>()
   const counts = new Map<string, number>()
 
   const guard = (test: Span): string[] => {
@@ -261,6 +261,19 @@ function usesOf(source: string, file: string, root: string, template: Node[]): M
       blocked.add(imported)
   }
 
+  // A dynamic, named or side-effect import of the file beside its default one loads it however the template renders.
+  for (const [, specifier] of source.matchAll(IMPORT)) {
+    const imported = followed(resolveFrom(specifier!, file), root)
+
+    if (imported !== undefined)
+      mentions.set(imported, (mentions.get(imported) ?? 0) + 1)
+  }
+
+  for (const [imported, count] of mentions) {
+    if (count !== bindings.get(imported))
+      blocked.add(imported)
+  }
+
   for (const imported of blocked)
     uses.delete(imported)
 
@@ -273,9 +286,17 @@ function usesOf(source: string, file: string, root: string, template: Node[]): M
   return uses
 }
 
-// The props a component call passes, or every one when it spreads.
+// The props a component call passes, or every one when it spreads: its attributes, `#id` and `.class`, the `@name` blocks it holds and `children` for the lines that are no block.
 function givenBy(element: ElementNode, source: string): string[] {
-  return element.attributes.map(attribute => attribute.kind === 'spread' ? SPREAD : source.slice(attribute.name.start, attribute.name.end).replace(BIND_PREFIX, ''))
+  const blocks = element.children.filter((child): child is SlotNode => child.kind === 'slot')
+
+  return [
+    ...element.id === undefined ? [] : ['id'],
+    ...element.classes.length === 0 ? [] : ['class'],
+    ...blocks.map(block => source.slice(block.name.start, block.name.end)),
+    ...blocks.length < element.children.length ? ['children'] : [],
+    ...element.attributes.map(attribute => attribute.kind === 'spread' ? SPREAD : source.slice(attribute.name.start, attribute.name.end).replace(BIND_PREFIX, '')),
+  ]
 }
 
 // Whether a component call is marked `hydrate="visible"` or `hydrate="idle"`, or by a value the build cannot read.

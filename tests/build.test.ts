@@ -2192,6 +2192,17 @@ describe('the build report', () => {
         'src/named.kay': '---\nimport B from \'./b.kay\'\n\nconst { label, shown } = props<{ label: string, shown?: boolean }>()\n---\nif shown\n  B\np {label}\n',
         'src/defaulted.kay': '---\nimport B from \'./b.kay\'\n\nconst { shown = true } = props<{ shown?: boolean }>()\n---\nif shown\n  B\n',
         'src/aliased.kay': '---\nimport B from \'./b.kay\'\n\nconst { label, ...rest } = props<{ label: string, onClick?: () => void }>()\nconst Used = B\n---\nif rest.onClick\n  B\np {label}\n',
+        'src/footed.kay': '---\nimport B from \'./b.kay\'\nimport type { Snippet } from \'kay\'\n\nconst { footer } = props<{ footer?: Snippet }>()\n---\nif footer\n  B\n',
+        'src/tagged.kay': '---\nimport B from \'./b.kay\'\n\nconst { id, ...rest } = props<{ id?: string, class?: string }>()\n---\nif id\n  B\nif rest.class\n  B\n',
+        'src/loaded.kay': '---\nimport B from \'./b.kay\'\n\nconst { shown } = props<{ shown?: boolean }>()\nconst load = () => import(\'./b.kay\')\n---\nif shown\n  B\n',
+        'src/both.kay': '---\nimport B from \'./b.kay\'\n\nconst { one, two } = props<{ one?: boolean, two?: boolean }>()\n---\nif one\n  if two\n    B\n',
+        'src/routes/footed.kay': '---\nimport A from \'../a.kay\'\nimport Footed from \'../footed.kay\'\n---\nA\nFooted\n  @footer\n    p Note\n',
+        'src/routes/bare-footed.kay': '---\nimport A from \'../a.kay\'\nimport Footed from \'../footed.kay\'\n---\nA\nFooted\n',
+        'src/routes/tagged.kay': '---\nimport A from \'../a.kay\'\nimport Tagged from \'../tagged.kay\'\n---\nA\nTagged#main\n',
+        'src/routes/classed.kay': '---\nimport A from \'../a.kay\'\nimport Tagged from \'../tagged.kay\'\n---\nA\nTagged.big\n',
+        'src/routes/loaded.kay': '---\nimport A from \'../a.kay\'\nimport Loaded from \'../loaded.kay\'\n---\nA\nLoaded\n',
+        'src/routes/one.kay': '---\nimport A from \'../a.kay\'\nimport Both from \'../both.kay\'\n---\nA\nBoth(one)\n',
+        'src/routes/two.kay': '---\nimport A from \'../a.kay\'\nimport Both from \'../both.kay\'\n---\nA\nBoth(one two)\n',
         'src/routes/link.kay': '---\nimport A from \'../a.kay\'\nimport Wrap from \'../wrap.kay\'\n---\nA\nWrap(label="Open")\n',
         'src/routes/press.kay': '---\nimport A from \'../a.kay\'\nimport Wrap from \'../wrap.kay\'\n\nconst go = () => {}\n---\nA\nWrap(label="Open" onClick={go})\n',
         'src/routes/spread.kay': '---\nimport A from \'../a.kay\'\nimport Wrap from \'../wrap.kay\'\n\nconst more = { label: \'Open\' }\n---\nA\nWrap({...more})\n',
@@ -2209,7 +2220,7 @@ describe('the build report', () => {
           { file: 'src/b.kay', size: { raw: 0, gzip: 0 }, chunks: [url('b.js')] },
         ],
       }
-      const routes = ['link', 'press', 'spread', 'named', 'shown', 'defaulted', 'aliased'].map(name => ({ pattern: `/${name}`, file: join(dir, `src/routes/${name}.kay`), params: [], layouts: [] }) as unknown as Route)
+      const routes = ['link', 'press', 'spread', 'named', 'shown', 'defaulted', 'aliased', 'footed', 'bare-footed', 'tagged', 'classed', 'loaded', 'one', 'two'].map(name => ({ pattern: `/${name}`, file: join(dir, `src/routes/${name}.kay`), params: [], layouts: [] }) as unknown as Route)
       const sizes = Object.fromEntries((await routeSizes(dir, { dir: join(dir, 'out'), styles: new Map() } as unknown as ClientBuild, routes, [], report)).map(each => [each.route, each]))
       const [entry, a, b] = await Promise.all(['entry.js', 'a.js', 'b.js'].map(async name => gzipSize(await Bun.file(join(dir, 'out', name)).bytes())))
 
@@ -2222,6 +2233,14 @@ describe('the build report', () => {
       // A default makes the prop true without the route passing it, and a component the script also names may render anywhere.
       expect(sizes['/defaulted']!.js).toBe(entry! + a! + b!)
       expect(sizes['/aliased']!.js).toBe(entry! + a! + b!)
+      // A block, an id and a class are props too, a dynamic import of the file loads it whatever the template renders, and a guard nested in another needs both props.
+      expect(sizes['/footed']!.js).toBe(entry! + a! + b!)
+      expect(sizes['/bare-footed']!.js).toBe(entry! + a!)
+      expect(sizes['/tagged']!.js).toBe(entry! + a! + b!)
+      expect(sizes['/classed']!.js).toBe(entry! + a! + b!)
+      expect(sizes['/loaded']!.js).toBe(entry! + a! + b!)
+      expect(sizes['/one']!.js).toBe(entry! + a!)
+      expect(sizes['/two']!.js).toBe(entry! + a! + b!)
     }
     finally {
       await rm(dir, { recursive: true, force: true })
