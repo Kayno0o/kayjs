@@ -302,10 +302,10 @@ function isPlainData(value: t.Node): boolean {
     return isPlainData(value.expression)
 
   if (value.type === 'ArrayExpression')
-    return value.elements.every(element => element !== null && element.type !== 'SpreadElement' && isPlainData(element))
+    return value.elements.length > 0 && value.elements.every(element => element !== null && element.type !== 'SpreadElement' && isPlainData(element))
 
   if (value.type === 'ObjectExpression')
-    return value.properties.every(property => property.type === 'ObjectProperty' && !property.computed && isPlainData(property.value))
+    return value.properties.length > 0 && value.properties.every(property => property.type === 'ObjectProperty' && !property.computed && isPlainData(property.value))
 
   if (value.type === 'TemplateLiteral')
     return value.expressions.length === 0

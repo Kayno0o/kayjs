@@ -12,6 +12,7 @@ const AWAIT_BEFORE = /await\s+$/
 export interface RenamedName {
   from: string
   to: string
+  // `outcome` is `ctx.failed(action)` or `ctx.succeeded(action)`, written `action.failed()` or `action.succeeded()`, with `from` and `to` both `failed` or `succeeded`.
   // `key` is an object key (`{ from: 1 }`; the shorthand `{ from }` only with `call`), `method` a call on any object (`.from(`).
   kind: 'key' | 'method' | 'outcome'
   // Only the key of an object literal passed straight to this function, the shorthand included, for a name too common to rename everywhere.
@@ -20,7 +21,6 @@ export interface RenamedName {
   receiver?: boolean
   // The old method answered a boolean where the new one answers `{ ok }`: `await auth.from(x)` is fixed to `(await auth.to(x)).ok`, any other use reported with no fix.
   answersOk?: boolean
-  // `outcome` is `ctx.failed(action)` or `ctx.succeeded(action)`, written `action.failed()` or `action.succeeded()`: `from` and `to` are the two names, `failed` and `succeeded`.
   // Why the old name goes, the end of the message.
   why: string
 }

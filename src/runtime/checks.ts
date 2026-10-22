@@ -267,7 +267,7 @@ type ActionProp<Component, Value> = true extends HoldsAction<Value, false> ? Com
 // The paths to the function-typed fields a value holds, in arrays as `columns[].sortValue`, so the error names which one to look at; a type seen further up ends there, and eight levels are read at most.
 type FunctionPaths<T, Seen = never, Depth extends unknown[] = [], Prefix extends string = ''> = 0 extends 1 & T
   ? never
-  : T extends Sendable | symbol
+  : T extends Sendable | symbol | Action<never, unknown>
     ? never
     : T extends ((...args: never[]) => unknown)
       ? Prefix

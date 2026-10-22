@@ -1847,6 +1847,22 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('checks an empty literal and a name a block of the template binds again, which the plain data of the script does not stand for', async () => {
+    const page = '---\nimport Grid from \'../components/grid.kay\'\nimport { fromModule } from \'../columns\'\n\nconst empty: { key: string, sortValue?: (() => number) | true }[] = []\nconst written: { key: string, sortValue?: (() => number) | true }[] = [{ key: \'name\', sortValue: true }]\nconst fine: { key: string, sortValue?: (() => number) | true }[] = [{ key: \'name\', sortValue: true }]\n---\nGrid(columns={empty})\nGrid(columns={fine})\nfor written of [fromModule]\n  Grid(columns={written})\n'
+    const root = await scratchProject({
+      'src/columns.ts': 'export const fromModule: { key: string, sortValue?: (() => number) | true }[] = [{ key: \'name\', sortValue: () => 1 }]\n',
+      'src/components/grid.kay': '--- \nimport { signal } from \'kay\'\n\nconst { columns } = props<{ columns: { key: string, sortValue?: (() => number) | true }[] }>()\nconst chosen = signal(0)\n---\nbutton(onClick={() => chosen.set(columns.length)}) {chosen()}\n',
+      'src/routes/index.kay': `--- server${page.slice(3)}`,
+    })
+
+    try {
+      expect((await check(root)).filter(d => d.code?.startsWith('TS')).map(d => d.line)).toEqual([9, 12])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports two extensions giving an editor at the config', async () => {
     const root = await scratchProject({ 'src/routes/index.kay': 'p home\n' })
 

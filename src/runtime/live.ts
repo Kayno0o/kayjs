@@ -797,9 +797,12 @@ export function resource(module: unknown, path?: string, options?: UrlInput | ((
 
 export { ApiError }
 
-// The text of a refusal a visitor can read: the message of an `ApiError` the route answered, else `fallback` for an error that came with no answer (status 0, whose message is the browser's) or is no `ApiError`.
+// The text of a refusal a visitor can read: the message of an `ApiError` the route answered, else `fallback` for an error that came with no answer (status 0, whose message is the browser's) or is no `ApiError`. An action's refusal (an `ActionError`, which carries `errors`) gives its form-wide message, else `fallback`.
 export function refusalMessage(error: unknown, fallback: string): string {
-  return error instanceof ApiError && error.status !== 0 ? (error as { errors?: Record<string, string> }).errors?.[''] ?? error.message : fallback
+  if (!(error instanceof ApiError) || error.status === 0)
+    return fallback
+
+  return 'errors' in error ? (error.errors as Record<string, string>)[''] ?? fallback : error.message
 }
 
 // The methods a node answers over HTTP, a websocket's left out.

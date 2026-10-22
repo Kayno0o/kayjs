@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { kay } from '../src/build/plugin'
 import { check } from '../src/check'
 import { flush, root, signal } from '../src/runtime'
+import { ActionError, ActionRedirectError } from '../src/runtime/action'
 import { ApiError, call, dispatch, openSocket, readEvents, refusalMessage, resource, routeUrl, socket, stream } from '../src/runtime/live'
 import { encodeValue } from '../src/runtime/wire'
 import { apiStubs, scanApi } from '../src/server/api-modules'
@@ -872,6 +873,16 @@ describe('call()', () => {
     expect(refusalMessage(new Error('boom'), 'Try again')).toBe('Try again')
     expect(refusalMessage(undefined, 'Try again')).toBe('Try again')
     expect(refusalMessage(new ApiError(503, 'HTTP 503'), 'Try again')).toBe('HTTP 503')
+  })
+
+  it('catches an ActionError as an ApiError, and shows its form-wide message or the fallback', () => {
+    const refused = new ActionError(422, 'bad', { title: 'Too short' })
+
+    expect(refused).toBeInstanceOf(ApiError)
+    expect(refused).toMatchObject({ status: 422, answer: 'bad', errors: { title: 'Too short' } })
+    expect(refusalMessage(refused, 'Try again')).toBe('Try again')
+    expect(refusalMessage(new ActionError(409, 'x', { '': 'Taken' }), 'Try again')).toBe('Taken')
+    expect(refusalMessage(new ActionRedirectError(302, '/'), 'Try again')).toBe('Try again')
   })
 
   it('aborts a call with its signal, which rejects with the signal\'s reason', async () => {

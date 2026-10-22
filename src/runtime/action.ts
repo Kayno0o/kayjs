@@ -31,7 +31,7 @@ export interface Caller {
 
 // Type only: what the handler returns on success, so a prop typed with it takes a handler that can also `ctx.fail`.
 declare const RESULT: unique symbol
-// Type only: what the handler passes to `ctx.fail`, so a page can type `ctx.failed(action)`.
+// Type only: what the handler passes to `ctx.fail`, so a page can type `action.failed()`.
 declare const FAILED: unique symbol
 // Type only: the honeypot field an action's forms render, which `kay check` then takes as one of their fields.
 declare const HONEYPOT: unique symbol
@@ -181,7 +181,7 @@ export interface ProtectionMessages {
 export interface ActionContext extends RequestContext<RouteParams> {
   // Response status, for a fetch call or the redirect after a plain form post.
   status: (code: number) => void
-  // `return ctx.fail(409, { message: 'Taken' })`: a plain form post gets its page rendered again, which reads it through `ctx.failed(action)`; a call throws an `ActionError` carrying `data`. A string is also the form's message, under `errors['']`.
+  // `return ctx.fail(409, { message: 'Taken' })`: a plain form post gets its page rendered again, which reads it through `action.failed()`; a call throws an `ActionError` carrying `data`. A string is also the form's message, under `errors['']`.
   fail: <const Data = undefined, const Status extends number = number>(status: Status & ErrorStatus<Status>, data?: Data) => Failure<Data>
 }
 
@@ -208,7 +208,7 @@ export type Final<Output> = Output extends AsyncIterable<infer Value> ? Value | 
 // Unknown for an action of any output, so any action passes where `Action<never, unknown>` is expected, and for one whose output names no `Failure`, so a handler that can `ctx.fail` passes where only its success output is typed.
 export type FailureData<Output> = unknown extends Output ? unknown : [Extract<Output, Failure<unknown>>] extends [never] ? unknown : Output extends Failure<infer Data> ? Data : never
 
-// What a page reads back through `ctx.failed(action)` after a plain form post failed.
+// What a page reads back through `action.failed()` after a plain form post failed.
 export interface FormFailure<Input, Data, Honeypot extends string = never> {
   status: number
   // What the form posted, so its fields can show it again; fields named like a password or a secret are left out.
@@ -230,7 +230,7 @@ export type InputOf<Target> = Target extends Action<infer Input, unknown> ? Inpu
 
 export type FailureOf<Target> = Target extends Action<infer Input, unknown> ? FormFailure<Input, FailuresOf<Target>, Extract<HoneypotOf<Target>, string>> : never
 
-// What a page reads back through `ctx.succeeded(action)` after a plain form post succeeded.
+// What a page reads back through `action.succeeded()` after a plain form post succeeded.
 export interface FormSuccess<Output> {
   // What the handler returned.
   data: Output
@@ -288,7 +288,7 @@ export interface Action<Input, Output, Honeypot extends string = never> {
   readonly track: () => TrackedCall<Input, CallResult<Answer<Success<Output>>, FailureData<Output>>>
   // How much of the last call carrying files the browser sent, from 0 to 1, while it uploads; undefined otherwise: `progress(value={upload.progress()})`.
   readonly progress: () => number | undefined
-  // How the form post the page renders for went, refused, as `ctx.failed` reads it; in an island, how its last call went, read reactively.
+  // How the form post the page renders for went, refused, as `failed()` reads it; in an island, how its last call went, read reactively.
   readonly failed: () => FormFailure<Input, FailureData<Output>, Honeypot> | undefined
   readonly succeeded: () => FormSuccess<Final<Success<Output>>> | undefined
   // This action for a form to post with fixed fields, as hidden inputs would carry them: `form(action={move.with({ id, to: 2 })})`. They travel in the form's action URL, so the form needs no inputs for them and posts them with or without JavaScript.

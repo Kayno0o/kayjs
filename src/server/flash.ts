@@ -45,7 +45,7 @@ export function handedOverFlash(request: Request): Flash | undefined {
   return id === null ? undefined : handedOver.get(id)
 }
 
-// The page the browser goes back to reads it through `ctx.succeeded`, unless it cannot be carried there.
+// The page the browser goes back to reads it through `succeeded()`, unless it cannot be carried there.
 export function writeSuccess(cookies: CookieMap, success: SuccessFlash, secure = false, base = ''): void {
   const refusal = setFlash(cookies, success, secure, base)
 

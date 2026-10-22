@@ -87,6 +87,7 @@ export interface Generated {
 }
 
 const CTX_REFERENCE = /\bctx\b/
+const IDENTIFIER = /[\p{ID_Start}$_][\p{ID_Continue}$]*/gu
 const IMPORT_COMMA_AFTER = /^\s*,\s*/
 const IMPORT_COMMA_BEFORE = /,\s*$/
 // The specifier of an import that did not parse, quoted and closed or not.
@@ -198,13 +199,47 @@ class ModuleShell {
     this.deferred = deferredData(this.facts, this.fence)
   }
 
+  // The plain data the scripts write out, but for a name a block of the template binds again, which then stands for something else.
+  private plainNames(): Set<string> {
+    const bound = new Set<string>()
+    const bind = (span: Span | undefined) => {
+      for (const name of span ? this.src.slice(span.start, span.end).match(IDENTIFIER) ?? [] : [])
+        bound.add(name)
+    }
+
+    visitNodes(this.file.template, (node) => {
+      if (node.kind === 'for') {
+        bind(node.item)
+        bind(node.index)
+      }
+      else if (node.kind === 'snippet') {
+        bind(node.params)
+      }
+      else if (node.kind === 'slot') {
+        bind(node.params)
+      }
+      else if (node.kind === 'const') {
+        bind(node.pattern)
+      }
+      else if (node.kind === 'await') {
+        bind(node.resolved?.alias)
+        bind(node.rejected?.alias)
+      }
+      else if (node.kind === 'try') {
+        bind(node.rejected?.alias)
+      }
+    })
+
+    return new Set([...this.script.plain, ...this.server?.plain ?? []].filter(name => !bound.has(name)))
+  }
+
   // Only the jsx and check outputs render through it.
   private get jsx(): JsxTemplate {
     return this.jsxTemplate ??= new JsxTemplate(this.b, this.src, this.facts, {
       check: this.mode === 'check',
       staticLoops: this.staticLoops,
       sendsIslandProps: this.kind === 'static' || this.kind === 'twin',
-      plain: new Set([...this.script.plain, ...this.server?.plain ?? []]),
+      plain: this.plainNames(),
     }, this.sites)
   }
 

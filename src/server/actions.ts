@@ -843,7 +843,7 @@ async function countGoneThrough(action: ServerAction<TSchema, unknown>, request:
   }
 }
 
-// A call gets the result; a plain form post goes back to the page it came from, which reads the result through `ctx.succeeded`.
+// A call gets the result; a plain form post goes back to the page it came from, which reads the result through `succeeded()`.
 function succeeded(action: ServerAction<TSchema, unknown>, request: Request, jar: CookieJar, headers: Headers, result: unknown, status: number, base = ''): Response {
   if (!isCall(request))
     writeSuccess(jar.cookies, { action: action.url, succeeded: true, data: result }, overHttps(request), base)
@@ -1009,7 +1009,7 @@ async function failed(request: Request, headers: Headers, cookies: CookieMap, fl
   return new Response(encodeOrExplain({ errors: flash.errors, data: flash.data }, `what ${flash.action} passed to ctx.fail`), { status: flash.status, headers })
 }
 
-// The page renders as for a visit, through the app, its guards and hooks included, and the failure reaches `ctx.failed` in memory, so all the visitor typed comes back whatever its length.
+// The page renders as for a visit, through the app, its guards and hooks included, and the failure reaches `failed()` in memory, so all the visitor typed comes back whatever its length.
 // It answers the post itself, with the failure's status: a reload posts again, as after any form a server answers in place, and without the page swap a `base` keeps relative links pointing where they did on the page.
 async function renderBack(app: Elysia, base: string, request: Request, headers: Headers, flash: Flash, server: Server | null): Promise<Response> {
   const from = new URL(backTo(request, base), request.url)
@@ -1020,7 +1020,7 @@ async function renderBack(app: Elysia, base: string, request: Request, headers: 
   let page: Response
   let html: string | undefined
 
-  // Read through before the failure is forgotten: an `await` block streamed after the shell may read `ctx.failed` too.
+  // Read through before the failure is forgotten: an `await` block streamed after the shell may read `failed()` too.
   try {
     page = await visitAs(request, new Request(new URL(`${path}${from.search}`, request.url), { headers: sent }), server, async visit => app.handle(visit))
 
