@@ -252,7 +252,7 @@ describe('a production server started from disk', () => {
     const compiled = await scan(root, options, false)
 
     expect(recorded.routes).toEqual(compiled.routes)
-    expect(recorded.routes.filter(([, layouts]) => layouts.some(layout => layout.includes('context-layout'))).map(([pattern]) => pattern).sort()).toEqual(['/bare', '/deep', '/fenced', '/gated', '/inline', '/inner/page'])
+    expect(recorded.routes.filter(([, layouts]) => layouts.some(layout => layout.includes('context-layout'))).map(([pattern]) => pattern).sort()).toEqual(['/bare', '/deep', '/fenced', '/gated', '/globbed', '/inline', '/inner/page'])
     expect(recorded.loaded).toBe(0)
     expect(compiled.loaded).toBeGreaterThan(0)
   }, 120_000)
