@@ -119,10 +119,26 @@ export async function follow(url: URL, swap: Swap): Promise<void> {
   await swapper.go(url, swap)
 }
 
-export function linkOf(event: Event): HTMLAnchorElement | undefined {
-  const link = (event.target as Element | null)?.closest?.('a[href]')
+// A click during a view transition lands on the root, not on the link under the pointer: the transition is skipped, which gives the page its elements back, and the link is looked for where the click was made.
+function linkUnderTransition(event: MouseEvent): HTMLAnchorElement | undefined {
+  if (event.target !== document.documentElement || !navigation.skipTransition)
+    return undefined
+
+  navigation.skipTransition()
+
+  const under = document.elementFromPoint(event.clientX, event.clientY)
+
+  return linkIn(under)
+}
+
+function linkIn(element: Element | null): HTMLAnchorElement | undefined {
+  const link = element?.closest?.('a[href]')
 
   return link instanceof HTMLAnchorElement ? link : undefined
+}
+
+export function linkOf(event: Event): HTMLAnchorElement | undefined {
+  return linkIn(event.target as Element | null)
 }
 
 // A link the swap may follow: a plain click on one of the app's pages, opening in this tab, with nothing opting it out.
@@ -143,7 +159,7 @@ function onClick(event: MouseEvent): void {
   if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
     return
 
-  const link = linkOf(event)
+  const link = linkOf(event) ?? linkUnderTransition(event)
   const url = link && followable(link)
 
   if (!url)

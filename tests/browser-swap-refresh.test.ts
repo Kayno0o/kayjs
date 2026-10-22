@@ -242,6 +242,35 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
     expect(page.errors).toEqual([])
   }, 30_000)
 
+  it('a link pressed during the view transition of another is followed', async () => {
+    await using page = await opened(true)
+
+    await page.evaluate(() => {
+      const style = document.createElement('style')
+
+      // The animation outlasts the click.
+      style.textContent = '::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation-duration: 3s !important; }'
+      document.head.append(style)
+    })
+    await page.click('a.cross')
+    await page.waitFor('h1', { text: 'Other' })
+
+    const running = await page.evaluate(() => document.getAnimations().some(animation => (animation.effect as KeyframeEffect | null)?.pseudoElement?.startsWith('::view-transition')))
+    const [x, y] = await page.evaluate(() => {
+      const box = document.querySelector('a.home')!.getBoundingClientRect()
+
+      return [box.x + box.width / 2, box.y + box.height / 2]
+    })
+
+    // A press as a pointer makes it, not the page's own click().
+    await page.view.click(x, y)
+    await page.waitFor('h1', { text: 'Home', timeout: '3s' })
+
+    expect(running).toBe(true)
+    expect(await page.path()).toBe('/')
+    expect(page.errors).toEqual([])
+  }, 30_000)
+
   it('back arrives on the page it goes to when an action refreshes during it', async () => {
     await using page = await opened(false)
 

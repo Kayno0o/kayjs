@@ -416,9 +416,19 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
   if (policy.transition && viewTransitions()) {
     const transition = (document as Document & { startViewTransition: (update: () => void) => ViewTransition }).startViewTransition(commit)
 
-    // A transition stuck, as in a tab the browser keeps from painting, is skipped, which still runs the commit.
-    if (await bounded(transition.finished, TRANSITION_TIMEOUT_MS) === LATE)
-      transition.skipTransition()
+    const skip = () => transition.skipTransition()
+
+    navigation.skipTransition = skip
+
+    try {
+      // A transition stuck, as in a tab the browser keeps from painting, is skipped, which still runs the commit.
+      if (await bounded(transition.finished, TRANSITION_TIMEOUT_MS) === LATE)
+        skip()
+    }
+    finally {
+      if (navigation.skipTransition === skip)
+        navigation.skipTransition = undefined
+    }
   }
   else {
     commit()
