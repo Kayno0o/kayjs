@@ -33,7 +33,7 @@ describe('mailTest', () => {
   })
 
   it('waits for a mail the app enqueued, running the site\'s queues', async () => {
-    const waited = mail.waitFor('team@fixture.test', { timeout: 1 })
+    const waited = mail.waitFor('team@fixture.test', { timeout: '1s' })
 
     await site.call(contact, fields)
 
@@ -41,6 +41,6 @@ describe('mailTest', () => {
   })
 
   it('names the mails the outbox holds when none came', async () => {
-    await expect(mail.waitFor('nobody@fixture.test', { timeout: 0.05 })).rejects.toThrow('no mail to nobody@fixture.test')
+    await expect(mail.waitFor('nobody@fixture.test', { timeout: '50ms' })).rejects.toThrow('no mail to nobody@fixture.test')
   })
 })
