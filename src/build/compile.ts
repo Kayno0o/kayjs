@@ -114,7 +114,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
   await Bun.write(generated, [
     `import { join } from 'node:path'`,
     `import process from 'node:process'`,
-    `import { buildingWithoutEnv, probeHealth, registerBundle } from 'kay/internal/server'`,
+    `import { buildingWithoutEnv, listenIdleApps, probeHealth, registerBundle } from 'kay/internal/server'`,
     // An embedded file, read only for `--licenses`, so the server keeps none of it in memory.
     `import notices from ${JSON.stringify(notices)} with { type: 'file' }`,
     '',
@@ -159,6 +159,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
     '})',
     '',
     `await import(${JSON.stringify(entry)})`,
+    'listenIdleApps()',
     '',
   ].join('\n'))
 

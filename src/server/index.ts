@@ -82,7 +82,7 @@ export async function pages(options: PagesOptions = {}) {
   // An entry that runs under a kay command, as the executable, or as `bun src/server.ts` itself, and never listens, is listened for; a test or a script importing it is not.
   const listened = <T extends AnyElysia>(app: T): T => {
     if (mode.underKayDev || source.embedded || process.env[START_PARENT] !== undefined || Bun.main === project.paths.entry)
-      listenWhenIdle(app)
+      listenWhenIdle(app, !source.embedded)
 
     return app
   }

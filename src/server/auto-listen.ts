@@ -4,31 +4,42 @@ import { kayLog } from '../runtime/log'
 
 // On `globalThis`, as `kay dev`'s preload reads it from its own copy of this module.
 const PENDING = Symbol.for('kay.autoListen')
-// How long an app `pages()` returned may go unused before it is left alone.
-const UNUSED_MS = 200
-// One turn of the event loop, enough for an entry to reach its `listen` after `await pages()`.
-const TURN_MS = 5
+const SERVES = Symbol.for('kay.autoListen.serves')
 
 interface WithParent {
   getParent?: () => AnyElysia | null | undefined
 }
 
-interface Idle {
-  since: number
-  // The app was seen holding the pages for a turn of the event loop, which is the entry's own code reaching its `listen`.
-  seen: boolean
+interface Holder {
+  [PENDING]?: Map<AnyElysia, number>
+  [SERVES]?: number
 }
 
-let timer: Timer | undefined
-
-function pending(): Map<AnyElysia, Idle> {
-  const holder = globalThis as { [PENDING]?: Map<AnyElysia, Idle> }
-
-  return holder[PENDING] ??= new Map()
+// The apps `pages()` returned in an entry that may not listen, with how many `Bun.serve` calls had been made when each was.
+function pending(): Map<AnyElysia, number> {
+  return (globalThis as Holder)[PENDING] ??= new Map()
 }
 
-// The app `pages()` was used in, however deep: Elysia gives a used instance its parent, which is not in its types.
-function rootOf(app: AnyElysia): AnyElysia {
+// Counts the servers started through `Bun.serve`, which Elysia's `listen` goes through too: an entry serving `app.fetch` itself has started one, so its app is not listened a second time.
+function serves(): number {
+  const holder = globalThis as Holder
+
+  if (holder[SERVES] === undefined) {
+    const serve = Bun.serve.bind(Bun)
+
+    holder[SERVES] = 0
+    Bun.serve = ((...args: Parameters<typeof Bun.serve>) => {
+      holder[SERVES] = (holder[SERVES] ?? 0) + 1
+
+      return serve(...args)
+    }) as typeof Bun.serve
+  }
+
+  return holder[SERVES]
+}
+
+// The app `pages()` was used in, however deep: Elysia gives a used instance its parent, which is not in its types and which `tests/auto-listen.test.ts` pins.
+export function rootOf(app: AnyElysia): AnyElysia {
   let root = app
 
   for (let parent = (root as unknown as WithParent).getParent?.(); parent !== undefined && parent !== null; parent = (root as unknown as WithParent).getParent?.())
@@ -48,7 +59,7 @@ function listen(app: AnyElysia): void {
   const original = app.listen
 
   app.listen({ port: Number(process.env.PORT ?? 3000), ...HOST !== undefined && { hostname: HOST } })
-  // An entry reaching its own `listen` after an `await` replaces the server kay started with the one it asks for.
+  // An entry reaching its own `listen` after it ran to its end replaces the server kay started with the one it asks for.
   app.listen = ((...args: Parameters<AnyElysia['listen']>) => {
     void app.server?.stop(true)
     app.server = null
@@ -72,47 +83,38 @@ export function forgetIdleApps(): void {
   pending().clear()
 }
 
-// Listens every app waiting at once, for `kay dev` right after a reload, whose entry ran to its end.
+// Listens every app waiting that its entry left idle, right after the entry ran to its end: one that listened, or that served through `Bun.serve`, is left alone.
 export function listenIdleApps(): void {
   const apps = pending()
+  const now = serves()
 
-  for (const plugin of apps.keys()) {
+  for (const [plugin, before] of apps) {
     apps.delete(plugin)
 
     const app = rootOf(plugin)
 
-    if (!listening(app))
-      listen(app)
+    if (!listening(app) && now === before)
+      listenSafely(app)
   }
 }
 
-// An app is listened a turn after it was seen in the entry's app, as an `await` on `pages()` returns a turn after it was made, or dropped past `UNUSED_MS` when no app ever used it.
-function settle(): void {
-  const apps = pending()
+// Notes the app `pages()` returned, to be listened on `PORT` and `HOST` by `listenIdleApps` once the entry ran to its end.
+// `afterEntry` listens it there itself, by importing the main module, which resolves when its evaluation ends: the executable has no entry module to import and calls `listenIdleApps` instead.
+export function listenWhenIdle(plugin: AnyElysia, afterEntry: boolean): void {
+  pending().set(plugin, serves())
 
-  timer = undefined
-
-  for (const [plugin, idle] of apps) {
-    const app = rootOf(plugin)
-    const used = app !== plugin
-
-    if (listening(app) || (used && idle.seen) || (!used && Date.now() - idle.since > UNUSED_MS)) {
-      apps.delete(plugin)
-
-      if (used && !listening(app))
-        listenSafely(app)
-    }
-    else if (used) {
-      idle.seen = true
-    }
-  }
-
-  if (apps.size > 0)
-    timer = setTimeout(settle, TURN_MS)
+  if (afterEntry)
+    void listenAfterEntry()
 }
 
-// Has the app `pages()` returned listened on `PORT` and `HOST` once the entry's own code had its turn, unless it listened itself.
-export function listenWhenIdle(plugin: AnyElysia): void {
-  pending().set(plugin, { since: Date.now(), seen: false })
-  timer ??= setTimeout(settle, TURN_MS)
+async function listenAfterEntry(): Promise<void> {
+  try {
+    await import(Bun.main)
+  }
+  catch {
+    // The entry failed, which it reports itself.
+    return
+  }
+
+  listenIdleApps()
 }
