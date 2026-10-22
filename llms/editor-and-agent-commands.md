@@ -33,8 +33,8 @@ claude mcp add kay -- bunx kay mcp
 ## Reference
 
 - `kay lsp --stdio`:
-  - The language server behind the editor extension in `editors/vscode`: errors, hover, completion with auto-import, signatures, definitions, references, rename, quick fixes and formatting in `.kay` files, plus an outline, folding, a `source.fixAll.kay` action applying every safe fix, and the relative imports of other `.kay` files rewritten when one is renamed or moved.
-  - Outside a `{expr}` it completes element names, block keywords and the `@` blocks of a component at a line start, attribute and event names (a component's props, read from its type) inside `(...)`, route paths after `href="`, `action="` and `navigate('`, `t('` message keys of the default locale, and lint names after `// kay-allow`.
+  - The language server behind the editor extension in `editors/vscode`: errors, hover, completion with auto-import, signatures, definitions, references, rename, quick fixes and formatting in `.kay` files, plus an outline, folding, a `source.fixAll.kay` action applying every safe fix, and the relative imports of other `.kay` files and of TypeScript modules rewritten when one is renamed or moved, a `.kay` import written without its extension included.
+  - Outside a `{expr}` it completes element names, block keywords and the `@` blocks of a component at a line start, attribute and event names (a component's props, read from its type or, for a package's component or a type imported from another file, from TypeScript) inside `(...)`, across lines, route paths after `href="`, `action="` and `navigate('`, `t('` message keys of the default locale, and lint names after `// kay-allow`.
   - An import it adds goes in the fence the name is used from, the server fence for server code and the component script otherwise, made if missing.
   - Renaming a server value renames its reads in the template, and renaming a destructured prop renames it in every parent passing it.
   - It runs the project's `kay.config.ts`, and the modules it imports, as soon as a `.kay` file is opened, as `bun` would: open only a project you trust, as with its `package.json` scripts.

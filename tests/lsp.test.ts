@@ -263,6 +263,32 @@ describe('kay lsp', () => {
     }
   })
 
+  it('completes the props of a package\'s component and of a props type declared in another file', async () => {
+    const path = 'site/src/routes/search.kay'
+    const text = await Bun.file(join(workspace, path)).text()
+    const source = '---\nimport { Badge } from \'badge-kit\'\nimport Typed from \'../components/typed.kay\'\n---\nBadge()\nTyped()\nBadge(label="a" )\n'
+    const labels = async (line: number, character: number) => (await editor.request<CompletionList>('textDocument/completion', path, line, character)).items.map(item => item.label)
+
+    await mkdir(join(workspace, 'site/node_modules/badge-kit'), { recursive: true })
+    await Bun.write(join(workspace, 'site/node_modules/badge-kit/package.json'), '{ "name": "badge-kit", "version": "1.0.0", "types": "index.d.ts" }')
+    await Bun.write(join(workspace, 'site/node_modules/badge-kit/index.d.ts'), 'export declare function Badge(props: { label: string, tone?: \'warm\' | \'cool\' }): unknown\n')
+    await Bun.write(join(workspace, 'site/src/components/typed-props.ts'), 'export interface TypedProps { heading: string, size?: number }\n')
+    await Bun.write(join(workspace, 'site/src/components/typed.kay'), '---\nimport type { TypedProps } from \'./typed-props\'\nconst { heading } = props<TypedProps>()\n---\nh2 {heading}\n')
+    await editor.open(path)
+    await editor.change(path, source, 2)
+    await editor.filesChanged(path, [{ path: 'site/src/components/typed.kay', type: 1 }, { path: 'site/src/components/typed-props.ts', type: 1 }])
+
+    try {
+      expect(await labels(4, 6)).toEqual(expect.arrayContaining(['label', 'tone']))
+      expect(await labels(5, 6)).toEqual(expect.arrayContaining(['heading', 'size']))
+      expect(await labels(6, 16)).not.toContain('label')
+      expect(await labels(6, 16)).toContain('tone')
+    }
+    finally {
+      await editor.change(path, text, 3)
+    }
+  })
+
   it('lists the outline and the folds of a file', async () => {
     const path = 'site/src/routes/index.kay'
 
@@ -308,6 +334,13 @@ describe('kay lsp', () => {
     expect(await edits('site/src/routes/index.kay', 'site/src/routes/deep/index.kay')).toMatchObject({ 'site/src/routes/index.kay': expect.arrayContaining(['../../components/card.kay']) })
     expect(await edits('site/src/components', 'site/src/parts')).toMatchObject({ 'site/src/routes/index.kay': expect.arrayContaining(['../parts/card.kay']) })
     expect(await edits('site/src/routes/about.kay', 'site/src/routes/about-us.kay')).toEqual({})
+
+    await mkdir(join(workspace, 'site/src/lib'), { recursive: true })
+    await Bun.write(join(workspace, 'site/src/lib/uses-card.ts'), 'import Card from \'../components/card.kay\'\nexport { Card }\n')
+    await Bun.write(join(workspace, 'site/src/components/bare.kay'), '---\nimport Card from \'./card\'\n---\nCard(title="a")\n')
+    expect(await edits('site/src/components/card.kay', 'site/src/ui/card.kay')).toMatchObject({ 'site/src/lib/uses-card.ts': ['../ui/card.kay'], 'site/src/components/bare.kay': ['../ui/card'] })
+    await rm(join(workspace, 'site/src/lib'), { recursive: true })
+    await rm(join(workspace, 'site/src/components/bare.kay'))
   })
 
   it('goes to definitions across .kay files', async () => {

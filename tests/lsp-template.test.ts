@@ -5,7 +5,7 @@ import { messageKeys } from '../src/check/messages'
 import { componentInterface } from '../src/lsp/component-props'
 import { islandLens } from '../src/lsp/island-lens'
 import { documentSymbols, foldingRanges } from '../src/lsp/outline'
-import { importEdits } from '../src/lsp/renames'
+import { importEdits, moduleImportEdits } from '../src/lsp/renames'
 import { templateContext } from '../src/lsp/template-completion'
 import { scratchDir } from './scratch'
 
@@ -19,6 +19,14 @@ function at(marked: string, templateStart = 0) {
 }
 
 describe('template completion contexts', () => {
+  it('does not take attribute names written inside a quoted value, and completes on the lines of a multi-line list', () => {
+    expect(at('Card(class="title big" |)')).toMatchObject({ kind: 'attribute', taken: new Set(['class']) })
+    expect(at('Card(\n  title="a"\n  |\n)')).toMatchObject({ kind: 'attribute', tag: 'Card', taken: new Set(['title']) })
+    expect(at('li: Card(\n  tit|\n)')).toMatchObject({ kind: 'attribute', tag: 'Card', replaced: 'tit' })
+    expect(at('Card(a="1")\n  |')).toMatchObject({ kind: 'line' })
+    expect(at('p Hello (see\n  |')).toMatchObject({ kind: 'line' })
+  })
+
   it('finds attribute names inside parentheses, leaving out those written', () => {
     expect(at('a(hr|)')).toMatchObject({ kind: 'attribute', tag: 'a', replaced: 'hr' })
     expect(at('Card.wide#top(title="x" |)')).toMatchObject({ kind: 'attribute', tag: 'Card', taken: new Set(['title']) })
@@ -60,8 +68,9 @@ describe('component interface', () => {
   it('reads props from the type, a named type and the destructuring, and the blocks it renders', () => {
     const named = '---\ninterface Props {\n  title: string\n  tone?: \'a\' | \'b\'\n  onPick: (id: number) => void\n}\nconst { title, extra = 1 } = props<Props>()\n---\nslot actions\nslot\n'
 
-    expect(componentInterface(named)).toEqual({ props: [{ name: 'title', optional: false }, { name: 'tone', optional: true }, { name: 'onPick', optional: false }, { name: 'extra', optional: true }], blocks: ['actions'] })
-    expect(componentInterface('p x')).toEqual({ props: [], blocks: [] })
+    expect(componentInterface(named)).toEqual({ props: [{ name: 'title', optional: false }, { name: 'tone', optional: true }, { name: 'onPick', optional: false }, { name: 'extra', optional: true }], blocks: ['actions'], typed: false })
+    expect(componentInterface('p x')).toEqual({ props: [], blocks: [], typed: false })
+    expect(componentInterface('---\nimport type { Props } from \'./props\'\nconst { a } = props<Props>()\n---\np x')).toMatchObject({ typed: true })
   })
 })
 
@@ -101,6 +110,17 @@ describe('import edits on a rename', () => {
     expect(importEdits('/app/src/routes/index.kay', source, new Map([['/app/src/routes/index.kay', '/app/src/routes/a/index.kay']])).map(edit => edit.text)).toEqual(['../../components/card.kay'])
     expect(importEdits('/app/src/routes/index.kay', source, new Map())).toEqual([])
     expect(importEdits('/app/src/routes/index.kay', '---\nimport A from \'./x/../a.kay\'\n---\nA\n', new Map([['/app/src/other.kay', '/app/src/o.kay']]))).toEqual([])
+  })
+})
+
+describe('import edits of modules and bare imports', () => {
+  it('rewrites a TypeScript module\'s imports of a moved .kay file, and a .kay import written without its extension', () => {
+    const moves = new Map([['/app/src/components/card.kay', '/app/src/ui/card.kay']])
+    const module = 'import Card from \'../components/card.kay\'\nexport { x } from \'./x\'\nconst lazy = () => import(\'../components/card.kay\')\nimport \'kay\'\n'
+
+    expect(moduleImportEdits('/app/src/lib/cards.ts', module, moves).map(edit => edit.text)).toEqual(['../ui/card.kay', '../ui/card.kay'])
+    expect(moduleImportEdits('/app/src/lib/cards.ts', module, moves).map(edit => module.slice(edit.start, edit.end))).toEqual(['../components/card.kay', '../components/card.kay'])
+    expect(importEdits('/app/src/routes/index.kay', '---\nimport Card from \'../components/card\'\n---\nCard\n', moves).map(edit => edit.text)).toEqual(['../ui/card'])
   })
 })
 

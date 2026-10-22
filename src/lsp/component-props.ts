@@ -6,6 +6,8 @@ export interface ComponentInterface {
   props: { name: string, optional: boolean }[]
   // The blocks the component renders where it writes `slot name`, which a caller fills with `@name`.
   blocks: string[]
+  // Whether the props type is named but not declared in the file, an import or a utility type, so the file alone does not say its keys.
+  typed: boolean
 }
 
 const COMMENT = /\/\/.*$/gm
@@ -17,10 +19,13 @@ export function componentInterface(source: string): ComponentInterface {
   const file = parseKay(source)
   const analysis = analyzeScript(source, file.script)
   const props = new Map<string, boolean>()
+  let typed = false
 
   if (analysis.props) {
     const type = analysis.props.type && source.slice(analysis.props.type.start, analysis.props.type.end).trim()
     const body = type === undefined ? undefined : literalOf(type, source.slice(file.script?.start ?? 0, file.script?.end ?? 0))
+
+    typed = type !== undefined && body === undefined
 
     for (const [name, optional] of body === undefined ? [] : memberKeys(body))
       props.set(name, optional)
@@ -31,7 +36,7 @@ export function componentInterface(source: string): ComponentInterface {
 
   const blocks = [...elementsIn(file.template)].flatMap(element => element.outlet ? [source.slice(element.outlet.name.start, element.outlet.name.end)] : [])
 
-  return { props: [...props].map(([name, optional]) => ({ name, optional })), blocks: [...new Set(blocks)] }
+  return { props: [...props].map(([name, optional]) => ({ name, optional })), blocks: [...new Set(blocks)], typed }
 }
 
 // The type literal a props type is written as: in place, or declared by name in the script.

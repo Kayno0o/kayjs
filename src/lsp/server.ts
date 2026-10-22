@@ -6,6 +6,7 @@ import type { Diagnostic as KayDiagnostic } from '../compiler'
 import type { Span } from '../compiler/ast'
 import type { KayConfig } from '../config'
 import type { RouteMount } from '../server/routes'
+import type { ComponentInterface } from './component-props'
 import type { CodeAction, CodeActionParams, CodeLens, CompletionItem, CompletionList, Diagnostic, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, DocumentSymbol, FileEvent, FoldingRange, Hover, InitializeParams, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, WorkspaceEdit } from './protocol'
 import type { TemplateData, Wanted } from './template-completion'
 import { existsSync } from 'node:fs'
@@ -13,7 +14,7 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { KAY_DIR } from '../build/assets'
-import { findKayFiles, inWalkScope, realPath } from '../build/files'
+import { findKayFiles, findProjectFiles, inWalkScope, realPath } from '../build/files'
 import { throughNodeModules } from '../build/libraries'
 import { importedSignals } from '../build/signals'
 import { configCheckOptions, configProblems, contentChecks, generatedChecks, generatedProblem, projectProblems, stopProbes, writeShadowTypes } from '../check'
@@ -36,7 +37,7 @@ import { componentInterface } from './component-props'
 import { islandLens } from './island-lens'
 import { documentSymbols, foldingRanges } from './outline'
 import { toOffset, toPosition } from './positions'
-import { importEdits } from './renames'
+import { importEdits, moduleImportEdits } from './renames'
 import { Connection } from './rpc'
 import { templateContext, templateItems } from './template-completion'
 
@@ -68,6 +69,8 @@ interface Project {
   // The last shadow write, which the project-wide checks read.
   types?: ShadowTypes
   configured: boolean
+  // What template completion looked up, dropped on a save and when the config is read again: the route table, the message catalog, the interface of each component read from disk and the props TypeScript gives a tag.
+  lookups: { paths?: Promise<string[]>, messages?: Promise<string[]>, interfaces: Map<string, ComponentInterface | undefined>, typedProps: Map<string, Promise<ComponentInterface['props'] | undefined>> }
 }
 
 interface Document extends ShadowFile {
@@ -115,10 +118,14 @@ const PROJECT_CHECKS_DELAY = 300
 const SAVE_EVENTS_DELAY = 25
 const QUICK_FIX = 'quickfix'
 const CAPITALIZED = /^[A-Z]/
+const MODULE_FILE = /\.(?:[cm]?[jt]s|[jt]sx)$/
 const FIX_ALL = 'source.fixAll.kay'
 const PLAIN_FORMAT = 1
 const SNIPPET_FORMAT = 2
 const PACKAGE_TYPES = join(SHADOW_DIR, 'kay-packages.d.ts')
+const OPTIONAL_MARK = /\?$/
+const KIND_FIELD = 5
+const KIND_PROPERTY = 10
 const DEFAULT_MEMBER = '.default'
 // Completions offer names from modules not imported yet, as editors do for TypeScript by default; added imports are quoted the way kay's own code is, since generated code would mislead the guess.
 // Types come from the project's own packages, so the server fetches none with npm, which would also run in a project with no npm of its own.
@@ -345,6 +352,9 @@ export class KayLanguageServer {
   private async writeAfterSave(modulesChanged: boolean) {
     const options = new Map([...this.projects].map(([root, project]) => [root, project.options]))
 
+    for (const project of this.projects.values())
+      project.lookups = { interfaces: new Map(), typedProps: new Map() }
+
     const changes = await this.writeShadows()
     // The layouts are read from disk to tell their queries, so only a pass in which one came, changed or went reads them.
     const layoutsChanged = changes.some(({ uri }) => uri.endsWith(LAYOUT_SHADOW_SUFFIX))
@@ -438,6 +448,7 @@ export class KayLanguageServer {
     project.mounts = routeMounts(project.root, project.options.extensions)
     project.locales = servedLocales(project.options.i18n)
     project.configured = true
+    project.lookups = { interfaces: new Map(), typedProps: new Map() }
   }
 
   // A project first met here compiles with the defaults until the next save reads its config.
@@ -445,7 +456,7 @@ export class KayLanguageServer {
     let project = this.projects.get(root)
 
     if (!project)
-      this.projects.set(root, project = { root, options: {}, routesDir: projectPaths(root).routes, mounts: [], locales: [], shadowTree: `${projectPaths(root).types}/`, shadowFiles: new Set(), shadowStamps: new Map(), islandOnly: new Set(), unreached: new Set(), libraries: [], probes: new Map(), configured: false })
+      this.projects.set(root, project = { root, options: {}, routesDir: projectPaths(root).routes, mounts: [], locales: [], shadowTree: `${projectPaths(root).types}/`, shadowFiles: new Set(), shadowStamps: new Map(), islandOnly: new Set(), unreached: new Set(), libraries: [], probes: new Map(), configured: false, lookups: { interfaces: new Map(), typedProps: new Map() } })
 
     return project
   }
@@ -799,45 +810,106 @@ export class KayLanguageServer {
       data.lints = Object.entries(LINTS).filter(([, lint]) => !('site' in lint)).map(([name]) => name)
     }
     else if (wanted.kind === 'path') {
-      data.paths = [...new Set((await servedPathsOf(project.root, project.options)).filter(path => path.startsWith('/')))].sort()
+      data.paths = await (project.lookups.paths ??= this.servedRoutes(project))
     }
     else if (wanted.kind === 'message') {
-      data.messages = project.options.i18n ? await messageKeys(project.root, project.options.i18n, project.options.extensions) : []
+      data.messages = await (project.lookups.messages ??= project.options.i18n ? messageKeys(project.root, project.options.i18n, project.options.extensions) : Promise.resolve([]))
     }
     else {
       data.elements = [...HTML_ELEMENTS]
-      data.components = await this.importedComponents(document)
+      data.components = await this.importedComponents(document, project, wanted.kind === 'attribute' ? wanted.tag : undefined)
     }
 
     return data
   }
 
-  // The components a file imports; a local `.kay` one is read for the props and blocks it takes.
-  private async importedComponents(document: Document): Promise<TemplateData['components']> {
+  private async servedRoutes(project: Project): Promise<string[]> {
+    const paths = await servedPathsOf(project.root, project.options)
+
+    return [...new Set(paths.filter(path => path.startsWith('/')))].sort()
+  }
+
+  // The components a file imports; a local `.kay` one is read for the props and blocks it takes, and the props of `tag` come from TypeScript when the file alone does not say them: a package's component, or a props type declared elsewhere.
+  private async importedComponents(document: Document, project: Project, tag?: string): Promise<TemplateData['components']> {
     const parsed = parseKay(document.source)
     const { imports } = analyzeScript(document.source, parsed.script, [], [], parsed.module)
     const found: TemplateData['components'] = []
 
     for (const binding of imports.filter(candidate => CAPITALIZED.test(candidate.local) && !candidate.typeOnly)) {
-      const path = binding.source.startsWith('.') && binding.source.endsWith('.kay') ? resolve(dirname(document.file), binding.source) : undefined
-      const open = path === undefined ? undefined : [...this.documents.values()].find(candidate => candidate.file === path)?.source
-      const source = open ?? (path !== undefined && existsSync(path) ? await Bun.file(path).text() : undefined)
+      const known = await this.localInterface(document, project, binding.source)
+      const typed = binding.local === tag && (known === undefined || known.typed) ? await this.typedProps(document, project, tag, binding.source) : undefined
 
-      found.push({ name: binding.local, from: binding.source, ...source === undefined ? { props: [], blocks: [] } : componentInterface(source) })
+      found.push({ name: binding.local, from: binding.source, props: typed ?? known?.props ?? [], blocks: known?.blocks ?? [] })
     }
 
     return found
   }
 
-  // Renaming or moving a `.kay` file, or a folder holding some, rewrites the relative imports of the other `.kay` files, and those of the files that move.
+  // The interface of the `.kay` file an import names, written with its extension or without: the open text, or the file as of the last save.
+  private async localInterface(document: Document, project: Project, specifier: string): Promise<ComponentInterface | undefined> {
+    if (!specifier.startsWith('.'))
+      return undefined
+
+    const path = resolve(dirname(document.file), specifier.endsWith('.kay') ? specifier : `${specifier}.kay`)
+    const open = [...this.documents.values()].find(candidate => candidate.file === path)
+
+    if (open)
+      return componentInterface(open.source)
+
+    if (!project.lookups.interfaces.has(path))
+      project.lookups.interfaces.set(path, existsSync(path) ? componentInterface(await Bun.file(path).text()) : undefined)
+
+    return project.lookups.interfaces.get(path)
+  }
+
+  // The props TypeScript gives a tag, asked of a copy of the file's shadow with the tag written once more at its end, since the cursor of a completion is not in the shadow itself.
+  private async typedProps(document: Document, project: Project, tag: string, from: string): Promise<ComponentInterface['props'] | undefined> {
+    const key = `${document.file}\0${tag}\0${from}`
+    const cached = project.lookups.typedProps.get(key)
+
+    if (cached)
+      return cached
+
+    const asked = this.askProps(document, tag)
+
+    project.lookups.typedProps.set(key, asked)
+
+    return asked
+  }
+
+  private async askProps(document: Document, tag: string): Promise<ComponentInterface['props'] | undefined> {
+    const call = `void (<${tag}  />)`
+    const text = `${document.tsx}\n${call}\n`
+    const uri = `${document.shadowUri}.props.tsx`
+    const position = toPosition(text, text.length - call.length - 1 + call.indexOf('  ') + 1)
+
+    this.server.notify('textDocument/didOpen', { textDocument: { uri, languageId: 'typescriptreact', version: 1, text } })
+
+    try {
+      const result = await this.server.request<CompletionList | CompletionItem[] | null>('textDocument/completion', { textDocument: { uri }, position })
+      const items = (Array.isArray(result) ? result : result?.items ?? []).filter(item => (item.kind === KIND_PROPERTY || item.kind === KIND_FIELD) && item.label !== 'key' && !GENERATED_NAME.test(item.label))
+
+      return items.length > 0 ? items.map(item => ({ name: item.label.replace(OPTIONAL_MARK, ''), optional: item.label.endsWith('?') })) : undefined
+    }
+    catch {
+      return undefined
+    }
+    finally {
+      this.server.notify('textDocument/didClose', { textDocument: { uri } })
+    }
+  }
+
+  // Renaming or moving a `.kay` file, or a folder holding some, rewrites the relative imports of the `.kay` files and TypeScript modules importing it, and those of the files that move.
   private async renamedFiles(files: { oldUri: string, newUri: string }[]): Promise<WorkspaceEdit | null> {
     const moves = new Map(files.filter(file => file.oldUri.startsWith('file:') && file.newUri.startsWith('file:')).map(file => [filePath(file.oldUri), filePath(file.newUri)]))
     const changes: Record<string, TextEdit[]> = {}
 
-    for (const file of await findKayFiles(this.root)) {
+    const modules = (await findProjectFiles(this.root, MODULE_FILE)).filter(file => !file.endsWith('.d.ts'))
+
+    for (const file of [...await findKayFiles(this.root), ...modules]) {
       const open = [...this.documents.values()].find(document => document.file === file)
       const source = open?.source ?? await Bun.file(file).text()
-      const edits = importEdits(file, source, moves)
+      const edits = file.endsWith('.kay') ? importEdits(file, source, moves) : moduleImportEdits(file, source, moves)
 
       if (edits.length > 0)
         changes[open?.uri ?? this.clientUri(file)] = edits.map(edit => ({ range: { start: toPosition(source, edit.start), end: toPosition(source, edit.end) }, newText: edit.text }))

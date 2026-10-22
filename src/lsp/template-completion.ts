@@ -30,6 +30,10 @@ const TAG_BEFORE_PAREN = /([A-Z][\w-]*)(?:[.#][\w-]+)*$/di
 // What may come before an element on its line: indentation, and the `li:` of a nested element.
 const BEFORE_ELEMENT = /^\s*(?:\S+:\s+)?$/
 const ATTRIBUTE_NAME = /(?:^|[\s,])([\w:-]+)(?:[|=\s,]|$)/g
+// A quoted value, whose words are not attribute names.
+const QUOTED = /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`/g
+// How many lines above the cursor an attribute list opened on may start.
+const MAX_ATTRIBUTE_LINES = 40
 const COMPONENT_LINE = /^\s*([A-Z][\w$]*)/
 
 // `templateStart` is where the template begins, past the fences: line starts and attributes mean something there only. Strings and comments are found anywhere.
@@ -57,21 +61,26 @@ export function templateContext(source: string, offset: number, templateStart: n
   if (offset < templateStart)
     return undefined
 
-  const open = openParenthesis(prefix)
+  const here = openParenthesis(prefix)
+  const open = here ?? earlierParenthesis(source, lineStart, prefix)
 
   if (open) {
-    const inside = prefix.slice(open.index + 1)
+    const inside = open.text.slice(open.index + 1)
     const word = WORD_BEFORE.exec(inside)![0]
     const before = inside.slice(0, inside.length - word.length)
-    const found = TAG_BEFORE_PAREN.exec(prefix.slice(0, open.index))
+    const found = TAG_BEFORE_PAREN.exec(open.text.slice(0, open.index))
     const tag = found?.[1]
 
-    if (tag === undefined || !BEFORE_ELEMENT.test(prefix.slice(0, found!.index)) || !(before === '' || SEPARATED.test(before)))
+    const valid = tag !== undefined && BEFORE_ELEMENT.test(open.text.slice(open.text.lastIndexOf('\n', found!.index - 1) + 1, found!.index)) && (before === '' || SEPARATED.test(before))
+
+    // A parenthesis of an earlier line that is no element's leaves the line to its own completions.
+    if (!valid && here)
       return undefined
 
-    const taken = new Set([...before.matchAll(ATTRIBUTE_NAME)].map(found => found[1]!))
+    const taken = new Set([...before.replace(QUOTED, '""').matchAll(ATTRIBUTE_NAME)].map(found => found[1]!))
 
-    return { wanted: { kind: 'attribute', tag, taken }, replace: reaching(offset - word.length) }
+    if (valid && tag !== undefined)
+      return { wanted: { kind: 'attribute', tag, taken }, replace: reaching(offset - word.length) }
   }
 
   const line = LINE_START.exec(prefix)
@@ -85,7 +94,7 @@ export function templateContext(source: string, offset: number, templateStart: n
 }
 
 // The `(` the cursor is inside, when it is among the attributes: not in a quote or in a `{...}` expression, where the value is TypeScript's or a string's.
-function openParenthesis(prefix: string): { index: number } | undefined {
+function openParenthesis(prefix: string): { index: number, text: string } | undefined {
   const parentheses: number[] = []
   let quote = ''
   let braces = 0
@@ -116,7 +125,24 @@ function openParenthesis(prefix: string): { index: number } | undefined {
 
   const last = parentheses.at(-1)
 
-  return quote === '' && braces === 0 && last !== undefined ? { index: last } : undefined
+  return quote === '' && braces === 0 && last !== undefined ? { index: last, text: prefix } : undefined
+}
+
+// The `(` of an attribute list opened on an earlier line and still open at the cursor: the nearest line above from which the text up to the cursor leaves one open on that line.
+function earlierParenthesis(source: string, lineStart: number, prefix: string): { index: number, text: string } | undefined {
+  let start = lineStart
+
+  for (let step = 0; step < MAX_ATTRIBUTE_LINES && start > 0; step++) {
+    start = source.lastIndexOf('\n', start - 2) + 1
+
+    const text = source.slice(start, lineStart) + prefix
+    const open = openParenthesis(text)
+
+    if (open && open.index < source.indexOf('\n', start) - start)
+      return open
+  }
+
+  return undefined
 }
 
 // The component a line is a child of, by indentation: the first line above it indented less.
