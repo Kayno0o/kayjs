@@ -9,5 +9,4 @@
   --tracking-kui-section: 0.04em;
   --tracking-kui-action: 0.01em;
   --kui-shadow-raised: 0 1px 3px color-mix(in srgb, var(--color-kui-text) 14%, transparent);
-  --kui-badge-case: none;
 }

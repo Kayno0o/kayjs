@@ -467,6 +467,18 @@ describe('theme.css', () => {
 
       expect(failing(TEXT, 4.5, tokens), name).toEqual([])
       expect(failing(LINES, 3, tokens), name).toEqual([])
+
+      for (const [, token] of skin.matchAll(/^\s*(--[\w-]+):/gm)) {
+        // The label font has no default: it falls back to inherit where it is read.
+        if (!token!.startsWith('--color-kui-') && token !== '--kui-label-font')
+          expect(theme, `${name} ${token}`).toContain(`${token}:`)
+      }
+
+      for (const scheme of [0, 1] as const) {
+        for (const fill of ['accent', 'accent-hi'])
+          expect(contrast(colour('on-accent', scheme, undefined, tokens), colour(fill, scheme, undefined, tokens)), `${name} ${fill}`).toBeGreaterThanOrEqual(4.5)
+      }
+
       expect(await built(skin), name).toContain('--kui-label-case:')
     }
 

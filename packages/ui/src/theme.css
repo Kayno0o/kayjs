@@ -94,10 +94,10 @@
   --color-kui-avatar-ring: var(--color-kui-surface2);
   --font-weight-kui-avatar: 600;
 
-  /* Offset shadows and a press-down, none unless a skin sets them: raised under cards, card rows, widgets and toasts, press under framed buttons, which move down by the travel and drop it while pressed. */
   /* The case of labels, headings and table heads: uppercase unless a skin sets none. --kui-label-font sets their font, the text's own unless set. */
   --kui-label-case: uppercase;
 
+  /* Offset shadows and a press-down, none unless a skin sets them: raised under cards, card rows, widgets and toasts, press under framed buttons, which move down by the travel and drop it while pressed. */
   --kui-shadow-raised: none;
   --kui-shadow-press: none;
   --kui-press-travel: 0px;

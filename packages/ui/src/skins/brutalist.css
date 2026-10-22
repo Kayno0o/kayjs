@@ -1,5 +1,5 @@
 /*
- * A hard-edged skin: black and white with a yellow accent, square boxes, 2px keylines, offset shadows that a button presses into, and the labels in monospace capitals.
+ * A hard-edged skin: black and white with a blue or yellow accent, square boxes, 2px keylines, offset shadows that a button presses into, and the labels in monospace capitals.
  * Import it after theme.css in the app's stylesheet: its tokens are the app's `@theme`, so an override of yours after it wins.
  */
 @theme {
