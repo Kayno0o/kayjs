@@ -1683,7 +1683,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     const url = given ?? configuredSite()?.origin.replace(TRAILING_SLASH, '')
 
     if (needsUrl && url === undefined)
-      throw new Error('kayjs-auth: OAuth sign-in and mailed links need the site\'s public origin to build their URLs: set `site` in kay.config.ts or SITE_URL, or `url` in createAuth')
+      throw configError('OAuth sign-in and mailed links need the site\'s public origin to build their URLs: set `site` in kay.config.ts or SITE_URL, or `url` in createAuth')
 
     const clients: Core['oauth'] = new Map()
 
