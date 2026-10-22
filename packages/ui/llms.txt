@@ -8,7 +8,7 @@ The rest by topic, each file read whole with one command:
 
 - [Setup, settings and testing](llms/setup.md): installing the theme and components, the settings that map icons, testing an app that uses it
 - [Icons, buttons, toasts, dialogs, cards, popovers and stats](llms/basics.md): Icon, Button, toast, Dialog, ConfirmDelete, Card, Badge, Notice, Avatar, Popover, TooltipHost, Stat, Meter, BarList, CopyButton, Rating
-- [Inputs, selects, editors and forms](llms/forms.md): TextInput, Textarea, Select, RangeInput, DateInput, DateRangeInput, TimeInput, MultiSelect, Combobox, FileDrop, Menu, IconPicker, MarkdownEditor
+- [Inputs, selects, editors and forms](llms/forms.md): TextInput, Textarea, Select, RangeInput, Slider, DateInput, DateRangeInput, TimeInput, MultiSelect, Combobox, FileDrop, Menu, IconPicker, MarkdownEditor
 - [Forms, FormDialog and Steps](llms/forms-and-steps.md): FormField, SaveForm, ContactForm, FormDialog and Steps, the multi-step form
 - [Tables, tabs, pagination, page layout, command palette and trees](llms/tables-navigation-and-layout.md): Table, Segmented, Tabs, TabNav, SiteNav, AppHeader, Toggle, Checkbox, Pagination, QrCode, PageHeader, SidePanel, SplitLayout, CommandPalette, TreeView
 - [Texts and languages](llms/words.md): the `ui.*` messages that word every default text, and the page's locale in charts

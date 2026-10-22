@@ -55,6 +55,7 @@ import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
 import SiteFavicon from '@kaynooo/kayjs-ui/site-favicon.kay'
 import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
 import Skeleton from '@kaynooo/kayjs-ui/skeleton.kay'
+import Slider from '@kaynooo/kayjs-ui/slider.kay'
 import SplitLayout from '@kaynooo/kayjs-ui/split-layout.kay'
 import Stat from '@kaynooo/kayjs-ui/stat.kay'
 import Steps from '@kaynooo/kayjs-ui/steps.kay'
@@ -141,6 +142,7 @@ export const COMPONENTS = {
   'side-panel': SidePanel,
   'site-favicon': SiteFavicon,
   'site-nav': SiteNav,
+  'slider': Slider,
   'split-layout': SplitLayout,
   'skeleton': Skeleton,
   'stat': Stat,
@@ -218,6 +220,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'side-panel': { open: false, title: 'Detail', onOpenChange: noop },
   'site-favicon': { name: 'kaynooo.fr' },
   'site-nav': { links: [{ href: '/', label: 'Home' }], current: '/', label: 'Main' },
+  'slider': { label: 'Delay', value: 40, min: 0, max: 100, formatValue: (value: number) => `${value} ms` },
   'split-layout': { list: 'L', detail: 'D' },
   'skeleton': { lines: 2, label: 'Loading' },
   'stat': { value: 12, label: 'moons' },

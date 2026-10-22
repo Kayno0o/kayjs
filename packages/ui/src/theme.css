@@ -1858,6 +1858,48 @@
     outline-offset: -2px;
   }
 
+  .kui-slider {
+    @apply grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1;
+  }
+
+  .kui-slider-label {
+    @apply text-kui-micro font-kui-label tracking-kui-label text-kui-subtext0 uppercase;
+  }
+
+  .kui-slider-value {
+    @apply text-xs text-kui-text tabular-nums;
+  }
+
+  /* The track and the thumb of both engines, drawn from the field and accent tokens. */
+  .kui-slider-input {
+    @apply col-span-2 h-4 w-full cursor-pointer appearance-none bg-transparent;
+
+    &::-webkit-slider-runnable-track {
+      @apply h-1 bg-kui-field-border;
+    }
+
+    &::-moz-range-track {
+      @apply h-1 bg-kui-field-border;
+    }
+
+    &::-webkit-slider-thumb {
+      @apply -mt-1.5 size-4 appearance-none rounded-kui-card border-0 bg-kui-accent;
+    }
+
+    &::-moz-range-thumb {
+      @apply size-4 rounded-kui-card border-0 bg-kui-accent;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-kui-accent);
+      outline-offset: 2px;
+    }
+
+    &:disabled {
+      @apply cursor-default opacity-50;
+    }
+  }
+
   .kui-image-cropper {
     @apply flex flex-col gap-2;
   }

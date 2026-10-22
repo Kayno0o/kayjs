@@ -1,0 +1,63 @@
+---
+import type { JSX } from 'kay'
+import { effect, signal, untrack } from 'kay'
+import { onFormReset, startRef } from './form-reset'
+
+const { value, min = 0, max = 100, step, label, showValue = true, formatValue, onInput, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'class' | 'children' | 'type' | 'value' | 'min' | 'max' | 'step' | 'onInput' | 'onChange'> & {
+  // The value to start with; a slider whose parent passes another follows it.
+  value: number
+  // The bounds, 0 and 100 by default.
+  min?: number | undefined
+  max?: number | undefined
+  step?: number | undefined
+  // Shown beside the slider and naming it for screen readers.
+  label: string
+  // Whether the value is written beside the label.
+  showValue?: boolean | undefined
+  // Words the value for the display and for screen readers, such as `value => `${value} ms``.
+  formatValue?: ((value: number) => string) | undefined
+  // Runs on every move of the thumb, with the number, and after a form reset with the value it went back to.
+  onInput?: ((value: number) => void) | undefined
+  class?: string | undefined
+}>()
+
+const shown = signal(untrack(() => value))
+let slider: HTMLInputElement | undefined
+
+effect(() => {
+  shown.set(value)
+})
+
+const words = (number: number) => formatValue ? formatValue(number) : String(number)
+const sliderRef = startRef<HTMLInputElement>((element) => {
+  slider = element
+  element.defaultValue = String(untrack(() => value))
+})
+
+function moved(event: Event) {
+  const next = Number((event.currentTarget as HTMLInputElement).value)
+
+  shown.set(next)
+  onInput?.(next)
+}
+
+// A reset puts the thumb back on its default, which the app's `onInput` then hears of.
+onFormReset(() => slider, () => {
+  if (!slider)
+    return
+
+  const next = Number(slider.value)
+
+  if (next === shown())
+    return
+
+  shown.set(next)
+  onInput?.(next)
+})
+---
+.kui-slider(class={className})
+  span.kui-slider-label {label}
+  input.kui-slider-input({...rest} ref={sliderRef} type="range" aria-label={label} aria-valuetext={formatValue ? words(shown()) : undefined} min={min} max={max} step={step} value={shown()} onInput={moved})
+  if showValue
+    // Not an `output`, which a form reset empties; the input itself speaks the value.
+    span.kui-slider-value(aria-hidden="true") {words(shown())}
