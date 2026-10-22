@@ -168,5 +168,10 @@ jobs:
         if: steps.changed.outputs.bench == 'true'
         run: bun run bench:check:apps
 
+      # Reports only: a landing's own run of this script is the gate.
+      - name: Report the eager JS sizes against their baseline
+        run: bun scripts/sizes.ts --report
+        continue-on-error: true
+
       - name: Check that kay's bench pages leave hydration markers to islands
         run: bun test ./bench -t 'leave hydration markers'

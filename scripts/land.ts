@@ -199,6 +199,8 @@ async function verify(): Promise<string> {
   await step('bun install', [BUN, 'install', '--silent', '--frozen-lockfile'])
   await step('lint', [BUN, 'run', 'lint'])
   await step('check', [BUN, 'run', 'check'])
+  // On every landing, whatever it reaches: a page growing past the tolerance stops it here with the command accepting the growth.
+  await step('eager JS sizes', [BUN, 'scripts/sizes.ts'])
 
   if (changed.some(path => path.startsWith('bench/') || path === 'bun.lock')) {
     await step('bench:check', [BUN, 'run', 'bench:check'])

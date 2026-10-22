@@ -3,21 +3,14 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { eagerJs, lazyChunks, scriptUrls } from '../scripts/eager-js'
 import { headersFile, nginxHeaders } from '../src/build/header-files'
 import { IMAGE_LINK } from '../src/server/prerender'
 import { kayBuild } from './check-helper'
-import { expectEagerJsWithin, lazyChunks } from './eager-js'
 import { fixtureCopy } from './scratch'
 
 const FIXTURE = resolve('tests/fixtures/static')
 const BASE = '/repo'
-// The gzipped JS a page with one small island loads before anything is clicked, as measured, with `EAGER_JS_SLACK` of margin added by `expectEagerJsWithin`: a change growing it pays for its bytes with a cut elsewhere in the eager runtime, or, when none is clean and it buys speed or reliability in the browser, raises this.
-// The runtime is split by who imports each name, which costs the import statements between its chunks, about 12 bytes here.
-// Keeping a pending block shown while a reload or another document replaces the page costs 19 bytes here, raised for it as it keeps a slow submit from looking dead.
-// Reading whether the visitor asks to save data, so an island with no `hydrate` waits for the viewport, costs about 105 bytes here: it runs before the first island hydrates, so it cannot wait in a chunk.
-// Marking each signal so an assignment to a property or a let holding one writes it costs 36 bytes here, raised for it as it is what lets `box.count = 1` write the signal.
-// A refresh waiting on a swap in flight, a page that never answers loaded by the browser and a stuck or interrupted view transition skipped (#1972, #1973, #1974) cost 32 bytes here (the rest of their code loads with the swap), raised for them as a stuck navigation otherwise leaves the page dead.
-const EAGER_JS_BUDGET = 8_884
 const LAZY_CHUNKS = ['fetch-island', 'forms', 'hydrate-when', 'live-cache', 'live-props', 'page-swap', 'prefetch', 'static-slots']
 const SCRIPT_URL = /<(?:script type="module" src|link rel="modulepreload" href)="([^"]+)"/g
 
@@ -245,12 +238,8 @@ describe('kay build --static', () => {
     expect(home).toContain(`<link rel="modulepreload" href="/repo/_kay/${file}">`)
   })
 
-  it('keeps the JS a page loads up front within its budget', async () => {
-    await expectEagerJsWithin(EAGER_JS_BUDGET, (await get('/')).text, async url => Bun.file(join(out, url.slice(BASE.length))).text())
-  })
-
   it('ships no error reporter and no leave question in the files loaded up front, a page with no leave guard having none to ask', async () => {
-    const eager = await expectEagerJsWithin(EAGER_JS_BUDGET, (await get('/')).text, async url => Bun.file(join(out, url.slice(BASE.length))).text())
+    const eager = [...(await eagerJs(scriptUrls((await get('/')).text), async url => Bun.file(join(out, url.slice(BASE.length))).text())).values()].map(({ code }) => code)
 
     // The default reporter only logs, so a closure logging an error and installed beside it is the page's own reporter.
     expect(eager.filter(code => (/\(\w+,\w+\)=>\{console\.error\(\w+\)\}/).test(code))).toEqual([])
@@ -259,7 +248,7 @@ describe('kay build --static', () => {
 
   it('keeps what reloads a tab opened before a deploy in the files loaded up front, and in no chunk loaded after idle', async () => {
     const read = async (url: string) => Bun.file(join(out, url.slice(BASE.length))).text()
-    const eager = await expectEagerJsWithin(EAGER_JS_BUDGET, (await get('/')).text, read)
+    const eager = [...(await eagerJs(scriptUrls((await get('/')).text), read)).values()].map(({ code }) => code)
     const chunks = await Array.fromAsync(new Bun.Glob('_kay/*.js').scan(out))
     const holding = await Promise.all(chunks.map(async chunk => (await Bun.file(join(out, chunk)).text()).includes('kay-reloaded')))
 

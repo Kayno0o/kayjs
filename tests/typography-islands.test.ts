@@ -2,11 +2,11 @@ import type { TestPage, TestSite } from '../src/test'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
+import { eagerJs } from '../scripts/eager-js'
 import { clientOptionsOf, PRODUCTION } from '../src/project'
 import { LEFT_ALONE, spaced } from '../src/runtime/french'
 import { frenchSpaces } from '../src/server/typography'
 import { browserPath, testSite } from '../src/test'
-import { eagerJs } from './eager-js'
 
 const path = browserPath()
 const messages = resolve('tests/fixtures/french-islands/src/messages')

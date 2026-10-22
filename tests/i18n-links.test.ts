@@ -5,18 +5,10 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { browserPath, testSite } from '../src/test'
-import { expectEagerJsWithin } from './eager-js'
+import { eagerJs, scriptUrls } from '../scripts/eager-js'
 import { fixtureCopy } from './scratch'
 
 const chrome = browserPath()
-// What a page of an app with locales, its one small island importing nothing of kay/i18n, loads up front, gzipped, as measured, with `EAGER_JS_SLACK` of margin on top: the links an island sets go in the page's locale from the start, the messages and formatters wait for an island using them.
-// The check for a visitor asking to save data, which islands with no `hydrate` wait on, costs about 105 to 140 bytes here, read before the first island hydrates so it cannot wait in a chunk.
-// This unminified build keeps the three dead `if (false)` of the French spacing, 16 bytes the minified build of a site not in French does not carry.
-// Marking each signal so an assignment to a property or a let holding one writes it costs about 45 bytes here.
-// The file test of a link, `FILE_EXTENSION` and `namesFile` (a collection route takes a dotted slug, an entry file stays a page), costs about 186 bytes here: an island writes links, so it cannot wait in a chunk.
-// `swappable` reading the page's API path from a meta tag (apiPath) costs about 40 bytes here (44 on CI, as gzip sizes differ by a few bytes from one host to another): navigation runs before any island.
-// A refresh waiting on a swap in flight, a page that never answers loaded by the browser and a stuck or interrupted view transition skipped (#1972, #1973, #1974) cost about 66 bytes here: navigation runs before any island.
-const EAGER_JS_BUDGET = 15_741
 
 // Apart from tests/i18n.test.ts, as one process serves one project and this one serves a copy whose island imports nothing of kay/i18n.
 describe('an island of an app with locales', () => {
@@ -46,12 +38,8 @@ describe('an island of an app with locales', () => {
     expect(page.errors).toEqual([])
   }, 60_000)
 
-  it('keeps the JS a page loads up front within its budget, kay/i18n\'s messages and formatters left to the islands using them', async () => {
-    await expectEagerJsWithin(EAGER_JS_BUDGET, await (await site.fetch('/en')).text(), async url => (await site.fetch(url)).text())
-  })
-
   it('ships the error reporter of a server page, and no leave question while no island guards the page', async () => {
-    const eager = await expectEagerJsWithin(EAGER_JS_BUDGET, await (await site.fetch('/en')).text(), async url => (await site.fetch(url)).text())
+    const eager = [...(await eagerJs(scriptUrls(await (await site.fetch('/en')).text()), async url => (await site.fetch(url)).text())).values()].map(({ code }) => code)
 
     // This build is not minified, so the call is found by name.
     expect(eager.filter(code => code.includes('setErrorReporter((error'))).toHaveLength(1)
