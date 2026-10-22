@@ -43,7 +43,7 @@ export async function removedUiClasses(root: string, options: CheckOptions): Pro
         ...positionAt(source, match.index),
         end: match.index + match[0].length,
         message: `\`.${match[1]}\` is no longer set on the \`${removed.part}\` of \`${removed.component}\` since 1.71, and its rule leaves theme.css in 1.74`,
-        help: `select \`[data-part='${removed.part}']\` inside the component, or restyle the part from src/ui.ts: \`'@kaynooo/kayjs-ui/${removed.component.replace(/[A-Z]/g, (letter, at) => `${at > 0 ? '-' : ''}${letter.toLowerCase()}`)}.kay': { parts: { ${removed.part}: '...' } }\``,
+        help: `select \`[data-part='${removed.part}']\` as a child of the component's root, or restyle the part from src/ui.ts: \`'@kaynooo/kayjs-ui/${removed.component.replace(/[A-Z]/g, (letter, at) => `${at > 0 ? '-' : ''}${letter.toLowerCase()}`)}.kay': { parts: { ${removed.part}: '...' } }\``,
         code: 'deprecated-ui-class',
         severity: level === 'warn' ? 'warning' : 'error',
       })

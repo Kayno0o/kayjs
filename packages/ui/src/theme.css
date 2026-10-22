@@ -1,6 +1,6 @@
 /*
  * The tokens and classes behind every component, for a Tailwind v4 app: import it right after tailwindcss.
- * Tokens are `@theme default`, so the app's own `@theme` overrides them wherever it sits, and components write no utility of their own, only the classes below: a rule of the app's on one of them restyles every instance, and a utility through `class` restyles one.
+ * Tokens are `@theme default`, so the app's own `@theme` overrides them wherever it sits, and components write no utility of their own except the recipes of those that hold their look (Card, Badge and Notice), only the classes below: a rule of the app's on one of them restyles every instance, and a utility through `class` restyles one.
  */
 
 /* A keyline is a length: a registered property keeps a skin's `2px solid red`, which is no length, from making every keyline invalid. */

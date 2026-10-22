@@ -3,7 +3,7 @@ title: kayjs-ui
 order: 3
 description: A set of kay components styled by one theme you restyle from your own stylesheet.
 ---
-`@kaynooo/kayjs-ui` is a set of `.kay` components that your app compiles as its own, styled by the classes of one `theme.css`. Components use only `kui-` prefixed classes, so they never meet your own.
+`@kaynooo/kayjs-ui` is a set of `.kay` components that your app compiles as its own, styled by the classes of one `theme.css`. Components use `kui-` prefixed classes, and utilities in the recipes that hold their look, so they never meet your own.
 
 ## Install
 
@@ -119,7 +119,7 @@ export default defineUi({
 
 - The components with parts: Button, Card, Dialog, Table, TextInput, Textarea, DateInput, DateRangeInput, TimeInput, Badge, Notice, Avatar, Stat, PageHeader, PageSection, EmptyState, CardRow, FormField, Checkbox, Toggle, Select, MultiSelect, RangeInput, Segmented, Rating, FileDrop, IconButton, CopyButton, Menu, Slider, Popover, HoverCard, TooltipHost, Toaster, SidePanel, CommandPalette, ConfirmDelete, FormDialog.
 - Also with parts: SaveForm, ContactForm, CollapsibleSection, Widget, Meter, BarList, ChipGroup, Tabs, TabNav, SiteNav, AppHeader, Pagination, SplitLayout, TreeView, LoadMore, VirtualList, BarChart, LineChart, ScatterChart, ContributionGraph, Carousel, Masonry, MediaGallery, ImageCropper, ZoomPane, QrCode, SiteFavicon, Icon, IconPicker, MarkdownEditor and WhenVisible.
-- A part keeps its `kui-` class and the rules of `theme.css` until its component's recipe holds the look. Card, Badge and Notice do: their root keeps `kui-card`, `kui-badge` and `kui-notice` as a name for your CSS, and their other parts carry `data-part` alone (`.kui-card [data-part='head']`).
+- A part keeps its `kui-` class and the rules of `theme.css` until its component's recipe holds the look. Card, Badge and Notice do: their root keeps `kui-card`, `kui-badge` and `kui-notice` as a name for your CSS, and their other parts carry `data-part` alone (`.kui-card > [data-part='head']`, a child selector, as `head`, `title` and `body` are names other components use too).
 - A recipe holds the look as utilities, so `src/ui.ts` or `class` replaces the one it sets, such as `p-6` for `p-kui-card`, instead of overriding a rule. `kay check` reports a stylesheet selecting a removed part class (`deprecated-ui-class`). A utility of `src/ui.ts` or of `class` wins over a theme rule on the same property.
 - A part is named after what its `kui-` class draws: Card has `root`, `head`, `title` and `body`, Dialog `root`, `title`, `body` and `footer`, Button `root` and `spinner`.
 - Table has `root` (the wrapper), `table`, `headCell`, `row`, `cell`, `cellBody`, `sortButton`, `sortIcon`, `filter`, `filterInput`, `count`, `selection`, `bulk` and `emptyCell`.

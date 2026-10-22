@@ -373,7 +373,7 @@ describe('theme.css', () => {
     const written = new Set(components.flatMap(({ path, source }) => writtenClasses(path, source)))
     const quoted = new Set([...components.map(({ source }) => source), ...scripts].flatMap(source => [...source.matchAll(QUOTED)].map(([, name]) => name)))
 
-    expect([...classes].filter(name => !written.has(name) && !quoted.has(name) && !THIRD_PARTY.test(name) && !(name in REMOVED_UI_CLASSES))).toEqual([])
+    expect([...classes].filter(name => !written.has(name) && !quoted.has(name) && !THIRD_PARTY.test(name) && !Object.hasOwn(REMOVED_UI_CLASSES, name))).toEqual([])
   })
 
   // kay leaves out the rules of the classes no file writes whole, so a class put together at runtime would lose its own.

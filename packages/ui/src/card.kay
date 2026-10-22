@@ -2,7 +2,7 @@
 import type { JSX, Snippet } from 'kay'
 import { recipe } from 'kay'
 
-// 'kui-card' is the component's name for an app's CSS and tests, and carries no rule of its own that the utilities do not.
+// 'kui-card' stays as the component's name for an app's CSS and tests; theme.css still has its old rule until 1.74.
 const look = recipe({
   parts: {
     root: 'kui-card flex flex-col rounded-kui-card border-(length:--kui-border-width) border-solid border-kui-surface2 bg-kui-surface0 [box-shadow:var(--kui-shadow-raised)]',

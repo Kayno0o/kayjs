@@ -4288,7 +4288,7 @@ describe.concurrent('kay check, unused code', () => {
 
       expect(output.match(/deprecated-ui-class/g)).toHaveLength(3)
       expect(output).toContain('.kui-card-head')
-      expect(output).toContain('select `[data-part=\'icon\']` inside the component')
+      expect(output).toContain('select `[data-part=\'icon\']` as a child of the component\'s root')
       await runCheck(root, '--fix')
       expect(await Bun.file(join(root, 'src/app.css')).text()).toBe(css)
     }
