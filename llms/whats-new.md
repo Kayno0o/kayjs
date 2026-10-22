@@ -94,22 +94,4 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-cms's editor outlines the field under the pointer and, with a toggle (on by default on a phone), every marked field, attributes and comment pairs included; it asks which field when an element holds several, names each tab stop, and has a Browse toggle that lets links and menus work with the editor open ([Screens](../packages/cms/llms/screens.md)).
 - kayjs-cms moves the uploads an older release kept per collection into its shared `cms-media` folder when the server starts, pointing the entries at the copies, and its media library pages 48 uploads at a time with a search ([kayjs-cms](../packages/cms/llms/uploads.md)).
 
-## 1.65.0
-
-- kayjs-cms keeps the last 50 saves of every entry of a SQLite or Postgres collection and its deleted entries for 30 days, by default, to list, compare and restore from an entry's History button and the list's Trash; `cms({ history: false })` turns it off ([History and the trash](../packages/cms/llms/history.md)).
-- kayjs-ui's TabNav keeps the window scrolled where it was when a tab is followed, so a bar needs no `data-keep-scroll` ([TabNav](../packages/ui/llms/tables-navigation-and-layout.md)).
-- kayjs-cms keeps every upload in one folder, named by the hash of its file so a file sent twice is stored once, and has a media library at `<prefix>/media` listing them with a preview, size and the entries using each, to rename or delete; `files.put(file, { id })` names a key ([kayjs-cms](../packages/cms/llms/uploads.md), [Files](files.md)).
-- `blocks({ hero: s.Object({ ... }), text: s.Object({ ... }) })` from `kay/content` declares a list of items of several types, stored with a `type` key and read as a union discriminated on it, and kayjs-cms adds, reorders and removes them by type and marks their fields in edit mode ([kayjs-cms](../packages/cms/llms/fields.md#blocks)).
-- `kay i18n translate` translates the texts inside `blocks()` lists, each item by its type ([kayjs-ai](../packages/ai/llms/translating.md)).
-- kayjs-ui's MarkdownEditor loads its toolbar apart, so `toolbar={false}` ships none of it, and the toolbar is one Tab stop; kayjs-cms's Preview highlights code with `markdown.highlight`, shows an entry's relative images and takes `form.previewClass` such as `prose` ([MarkdownEditor](../packages/ui/llms/forms.md#markdowneditor), [Arranging and replacing the screens](../packages/cms/llms/screens.md#arrange-a-collection)).
-- kayjs-cms edit mode types a one-line text in place on the page, as plain text, with the form following each keystroke ([kayjs-cms](../packages/cms/llms/screens.md)).
-
-## 1.64.0
-
-- kayjs-cms's entries list shows Last modified and Author columns that sort, the content list shows a collection's last edit and its `icon`, and a new entry has Cancel and Create and add another ([kayjs-cms](../packages/cms/llms/screens.md)).
-- `site.runJobs()` waits for a `queue.enqueue()` or a kayjs-mail `send`/`enqueue` an action left unawaited, with nothing declared ([Testing](testing.md)).
-- A text field replaced by a query `navigate()`, such as a live search box whose island gets the new value, keeps its caret, selection and the keys typed while the page was fetched instead of restarting at 0 ([Navigation](navigation.md)).
-- kayjs-ui's MarkdownEditor has a toolbar (bold, italic, heading, lists, link, image; `toolbar` turns it down) and, given a `preview` function, a Preview button showing the server-rendered text beside the field or in its place on a narrow one ([MarkdownEditor](../packages/ui/llms/forms.md#markdowneditor)).
-- kayjs-cms's Markdown boxes carry kayjs-ui's toolbar and a Preview rendered by the site's own Markdown pipeline, and `cms({ collections: { posts: { form: { body: { label, hint }, toolbar } } } })` words the body and cuts the toolbar down per collection ([Arranging and replacing the screens](../packages/cms/llms/screens.md#arrange-a-collection)).
-
-Releases before 1.64 are in [What's new, older releases](whats-new-archive.md).
+Releases before 1.66 are in [What's new, older releases](whats-new-archive.md).
