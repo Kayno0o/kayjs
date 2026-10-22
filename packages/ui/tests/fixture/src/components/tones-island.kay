@@ -1,0 +1,12 @@
+---
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import Card from '@kaynooo/kayjs-ui/card.kay'
+import Notice from '@kaynooo/kayjs-ui/notice.kay'
+
+const open = signal(false)
+---
+button(onClick={() => open.set(!open())}) Toggle
+if open()
+  Card#island-card(class="border-kui-error" title="Moons")
+    Badge(tone="success" label="New")
+  Notice(tone="danger" label="Failed")

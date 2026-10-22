@@ -7,18 +7,18 @@ import Icon from './icon.kay'
 
 const look = recipe({
   parts: {
-    root: 'kui-badge inline-flex items-center gap-1 border-solid border-kui-surface2 bg-kui-surface0 px-kui-badge-x py-kui-badge-y text-kui-badge tracking-kui-badge whitespace-nowrap text-kui-subtext0 [--kui-badge-tone:var(--color-kui-subtext0)] [border-width:var(--kui-border-badge)] [font-family:var(--kui-badge-font,inherit)] [text-transform:var(--kui-badge-case)] data-stamp:border-kui-stamp data-stamp:bg-kui-stamp-fill data-stamp:px-2.5 data-stamp:py-1 data-stamp:font-mono data-stamp:text-[0.625rem]/[1.4] data-stamp:font-normal data-stamp:tracking-[0.14em] data-stamp:text-kui-stamp data-stamp:uppercase data-stamp:transition-colors data-stamp:duration-150 data-stamp:[border-width:var(--kui-border-stamp)] group-hover:data-stamp:bg-kui-stamp-fill-hover data-solid:[border-color:var(--kui-badge-tone)] data-solid:[background-color:var(--kui-badge-tone)] data-solid:[color:var(--kui-badge-solid-text,var(--color-kui-on-accent))]',
+    root: 'kui-badge inline-flex items-center gap-1 border-solid bg-kui-surface0 px-kui-badge-x py-kui-badge-y text-kui-badge tracking-kui-badge whitespace-nowrap [border-color:var(--kui-badge-tone,var(--color-kui-surface2))] [border-width:var(--kui-border-badge)] [color:var(--kui-badge-tone,var(--color-kui-subtext0))] [font-family:var(--kui-badge-font,inherit)] [text-transform:var(--kui-badge-case)] data-stamp:bg-kui-stamp-fill data-stamp:px-2.5 data-stamp:py-1 data-stamp:font-mono data-stamp:text-[0.625rem]/[1.4] data-stamp:font-normal data-stamp:tracking-[0.14em] data-stamp:uppercase data-stamp:transition-colors data-stamp:duration-150 data-stamp:[border-color:var(--kui-badge-tone,var(--color-kui-stamp))] data-stamp:[border-width:var(--kui-border-stamp)] data-stamp:[color:var(--kui-badge-tone,var(--color-kui-stamp))] group-hover:data-stamp:bg-kui-stamp-fill-hover data-solid:[background-color:var(--kui-badge-tone,var(--color-kui-subtext0))] data-solid:[border-color:var(--kui-badge-tone,var(--color-kui-subtext0))] data-solid:[color:var(--kui-badge-solid-text,var(--color-kui-on-accent))]',
     icon: 'size-3',
   },
-  // A tone writes its colours again under data-stamp, so the tone beats the colours of the stamp, as it always has.
+  // A tone sets one variable that the base colours read, so no tone class has to beat a neutral colour of the base.
   variants: {
     tone: {
       neutral: '',
-      accent: '[--kui-badge-tone:var(--color-kui-accent)] border-kui-accent text-kui-accent data-stamp:border-kui-accent data-stamp:text-kui-accent',
-      success: '[--kui-badge-tone:var(--color-kui-success)] border-kui-success text-kui-success data-stamp:border-kui-success data-stamp:text-kui-success',
-      warning: '[--kui-badge-tone:var(--color-kui-warning)] border-kui-warning text-kui-warning data-stamp:border-kui-warning data-stamp:text-kui-warning',
-      danger: '[--kui-badge-tone:var(--color-kui-error)] border-kui-error text-kui-error data-stamp:border-kui-error data-stamp:text-kui-error',
-      info: '[--kui-badge-tone:var(--color-kui-info)] border-kui-info text-kui-info data-stamp:border-kui-info data-stamp:text-kui-info',
+      accent: '[--kui-badge-tone:var(--color-kui-accent)]',
+      success: '[--kui-badge-tone:var(--color-kui-success)]',
+      warning: '[--kui-badge-tone:var(--color-kui-warning)]',
+      danger: '[--kui-badge-tone:var(--color-kui-error)]',
+      info: '[--kui-badge-tone:var(--color-kui-info)]',
     },
   },
   defaults: { tone: 'neutral' },

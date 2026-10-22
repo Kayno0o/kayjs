@@ -264,8 +264,8 @@ describe('a component whose recipe holds its look', () => {
     expect(card).toContain('rounded-kui-card')
     expect(card.at(-1)).toBe('rounded-xl')
     expect(card.indexOf('rounded-kui-card')).toBeLessThan(card.indexOf('rounded-xl'))
-    expect(classesOf('id="badge"')).toEqual(expect.arrayContaining(['kui-badge', 'border-kui-success', 'bg-green-100']))
-    expect(classesOf('id="notice"')).toEqual(expect.arrayContaining(['kui-notice', 'border-kui-error', 'border-2']))
+    expect(classesOf('id="badge"')).toEqual(expect.arrayContaining(['kui-badge', '[--kui-badge-tone:var(--color-kui-success)]', 'bg-green-100']))
+    expect(classesOf('id="notice"')).toEqual(expect.arrayContaining(['kui-notice', '[--kui-notice-tone:var(--color-kui-error)]', 'border-2']))
   })
 
   test('sets no kui class on its other parts, which carry data-part to select them by', () => {

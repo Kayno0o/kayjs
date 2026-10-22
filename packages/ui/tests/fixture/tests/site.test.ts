@@ -1,7 +1,9 @@
 import type { Found } from 'kay/test'
+import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, test } from 'bun:test'
 import { testSite } from 'kay/test'
+import { resolveClasses } from '../../../../../src/runtime/class-table'
 
 // The fixture is an app installing the library, linked back to the library by the repository root's scripts/link-fixture.ts.
 const ROOT = join(import.meta.dir, '..')
@@ -220,6 +222,54 @@ describe('layout', () => {
     expect(await attributes('/layout', '#app-header .kui-site-nav-link', ['href', 'aria-current'])).toEqual([{ 'href': '/', 'aria-current': null }, { 'href': '/data', 'aria-current': 'page' }])
     expect((await find('/layout', '#app-header .kui-site-nav-link')).map(found => found.text)).toEqual(['Home', '<b>Data</b>'])
     expect(await attributes('/layout', '#app-header .kui-site-nav-link svg', ['aria-hidden'])).toEqual([{ 'aria-hidden': 'true' }])
+  })
+})
+
+// The island bundle the test site built: what an island carries of a recipe and of the class table its merge reads.
+async function islandBundle() {
+  const dist = join(ROOT, '.kay/test-client/dist')
+  const files = (await readdir(dist, { recursive: true })).filter(file => file.endsWith('.js'))
+  const text = (await Promise.all(files.map(async file => Bun.file(join(dist, file)).text()))).join('\n')
+  const table = (/Symbol\.for\("kay\.classTable"\)\] = (\{.*\});$/m).exec(text)?.[1]
+
+  return { text, table: table === undefined ? undefined : Bun.JSON5.parse(table) as Parameters<typeof resolveClasses>[1] }
+}
+
+// The root classes a recipe writes in the island bundle, or in the page for the first of an element.
+function recipeRoot(bundle: string, name: string): string {
+  return new RegExp(`root: "(${name} [^"]*)"`).exec(bundle)![1]!
+}
+
+describe('recipe colours under Tailwind', () => {
+  test('a tone and an override of the page replace the base class they set, on the server', async () => {
+    const html = (await visit('/tones')).html
+    const classes = (id: string) => (/class="([^"]*)"/).exec(new RegExp(`<[a-z]+ [^>]*id="${id}"[^>]*>`).exec(html)![0])![1]!.split(' ')
+
+    expect(classes('card')).toContain('border-kui-error')
+    expect(classes('card')).not.toContain('border-kui-surface2')
+    expect(classes('badge')).toContain('[--kui-badge-tone:var(--color-kui-success)]')
+    expect(classes('badge')).not.toContain('border-kui-success')
+    expect(classes('notice')).toContain('[--kui-notice-tone:var(--color-kui-error)]')
+    expect(classes('notice')).not.toContain('border-kui-error')
+  })
+
+  test('an island drops them the same through the class table of its bundle, and keeps both without it', async () => {
+    const { text, table } = await islandBundle()
+
+    expect(table).toBeDefined()
+
+    const card = `${recipeRoot(text, 'kui-card')} border-kui-error`
+
+    expect(resolveClasses(card, table).split(' ')).not.toContain('border-kui-surface2')
+    expect(resolveClasses(card, table).split(' ')).toContain('border-kui-error')
+    expect(resolveClasses(card, { sets: [], classes: {} }).split(' ')).toEqual(expect.arrayContaining(['border-kui-surface2', 'border-kui-error']))
+
+    // A tone sets a variable the base colours read, so nothing is left for the table to drop and the tone works without it.
+    const badge = `${recipeRoot(text, 'kui-badge')} [--kui-badge-tone:var(--color-kui-success)]`
+    const notice = `${recipeRoot(text, 'kui-notice')} [--kui-notice-ground:var(--color-kui-canvas)] [--kui-notice-tone:var(--color-kui-error)]`
+
+    for (const classes of [badge, notice])
+      expect(resolveClasses(classes, table)).toBe(classes)
   })
 })
 

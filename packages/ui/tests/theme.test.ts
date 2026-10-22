@@ -536,8 +536,8 @@ describe('theme.css', () => {
     }
 
     expect(missing).toEqual([])
-    // The tone of a stamp beats the stamp's own colour, so a tone writes it again under data-stamp.
+    // A tone sets a variable the colours of the base and of the stamp read, so it beats neither by the order of the classes.
     expect(css).toContain('--kui-badge-tone')
-    expect(css).toMatch(/\.data-stamp\\:border-kui-error\[data-stamp\]\s*\{/)
+    expect(css).toMatch(/\[data-stamp\]\s*\{[^}]*border-color: var\(--kui-badge-tone,var\(--color-kui-stamp\)\)/)
   })
 })

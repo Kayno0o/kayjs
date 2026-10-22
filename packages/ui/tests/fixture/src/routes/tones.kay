@@ -1,0 +1,11 @@
+---
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import Card from '@kaynooo/kayjs-ui/card.kay'
+import Notice from '@kaynooo/kayjs-ui/notice.kay'
+import TonesIsland from '../components/tones-island.kay'
+---
+main
+  Card#card(class="border-kui-error" title="Moons")
+    Badge#badge(tone="success" label="New")
+  Notice#notice(tone="danger" label="Failed")
+  TonesIsland
