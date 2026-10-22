@@ -85,6 +85,9 @@ interface Document extends ShadowFile {
 
 const LAYOUT_SHADOW_SUFFIX = '/_layout.kay.tsx'
 const KAY_FILE = /^file:.*\.kay$/
+// The module of an import or a re-export in a component's text, fence or template.
+const IMPORT_SOURCE = /\b(?:from|import)\s*['"]([^'"]+)['"]/g
+const EXTENSION = /\.\w+$/
 const IMPORT_DECLARATION = /^\s*import\s/
 const TRAILING_SEMICOLON = /;$/
 // A one-line named import, as generated code writes them: its names, then its quoted module.
@@ -102,6 +105,10 @@ const WATCHED = '**/*.{kay,ts,tsx,js,jsx,json,md,yaml,yml}'
 
 // How long a change waits for the next before the files are checked again, as typing makes many; the first after a quiet spell is checked at once.
 export const DIAGNOSTICS_DELAY = 150
+// How long the open files importing an edited one wait for the next edit before they are checked again, after the edited one is.
+export const DEPENDENTS_DELAY = 750
+// How many of those are checked at once, so an edit coming meanwhile waits for few.
+const DEPENDENTS_BATCH = 4
 // How long the project-wide checks wait after a save for the next, as saving every file at once makes.
 const PROJECT_CHECKS_DELAY = 300
 // How long the events of one save, the editor's save notice and its file watcher's, are waited for before the shadow tree is written once for them all; short of the diagnostics' delay.
@@ -134,9 +141,12 @@ export class KayLanguageServer {
   // The quiet spell since the last change, and whether another came during it, which publishes again once it ends.
   private diagnosticsTimer: Timer | undefined
   private diagnosticsDue = false
-  // Whether every open file is being published, and whether another publish was asked for during it, which runs once it ends.
-  private publishing = false
-  private publishAgain = false
+  // The files whose diagnostics wait to be published: those a change or a save reached, which go first, and the open files importing an edited one, which wait for a quiet spell of their own.
+  private readonly urgent = new Set<string>()
+  private readonly later = new Set<string>()
+  private dependentsTimer: Timer | undefined
+  // The run publishing them, one at a time: those asked for meanwhile join it, and see the latest text.
+  private publishing: Promise<void> | undefined
   private projectChecksTimer?: Timer
   // The run of the project-wide checks in flight, and whether a save came during it.
   private projectChecks: Promise<void> | undefined
@@ -270,7 +280,7 @@ export class KayLanguageServer {
     const document = this.compile(item.uri, item.text, item.version)
 
     this.server.notify('textDocument/didOpen', { textDocument: { uri: document.shadowUri, languageId: 'typescriptreact', version: document.version, text: document.tsx } })
-    this.scheduleDiagnostics()
+    this.scheduleDiagnostics([document.uri])
   }
 
   private change({ textDocument, contentChanges }: DidChangeTextDocumentParams) {
@@ -283,7 +293,8 @@ export class KayLanguageServer {
     const document = this.compile(textDocument.uri, text, textDocument.version)
 
     this.server.notify('textDocument/didChange', { textDocument: { uri: document.shadowUri, version: document.version }, contentChanges: [{ text: document.tsx }] })
-    this.scheduleDiagnostics()
+    this.scheduleDiagnostics([document.uri])
+    this.scheduleDependents(document)
   }
 
   private close(uri: string) {
@@ -470,9 +481,15 @@ export class KayLanguageServer {
     return { file: library ? throughNodeModules(library, file) : file, shadowOf: programShadows(project.root, programs) }
   }
 
-  private scheduleDiagnostics() {
+  // The given files, every open one when none are.
+  private scheduleDiagnostics(uris: Iterable<string> = this.documents.keys()) {
+    for (const uri of uris) {
+      this.later.delete(uri)
+      this.urgent.add(uri)
+    }
+
     if (this.diagnosticsTimer === undefined)
-      void guard(this.publishAllDiagnostics())
+      void guard(this.publishQueued())
     else
       this.diagnosticsDue = true
 
@@ -482,9 +499,37 @@ export class KayLanguageServer {
 
       if (this.diagnosticsDue) {
         this.diagnosticsDue = false
-        void guard(this.publishAllDiagnostics())
+        void guard(this.publishQueued())
       }
     }, DIAGNOSTICS_DELAY)
+  }
+
+  // An edit can break the open files importing the edited one, directly or through another, and no other.
+  // A file reaching it through a module that is not open waits for the next save, which checks them all.
+  private scheduleDependents(edited: Document) {
+    const found = new Set<string>()
+
+    const queue = [edited]
+
+    for (const target of queue) {
+      for (const document of this.documents.values()) {
+        if (document !== edited && !found.has(document.uri) && importsFile(document, target.file)) {
+          found.add(document.uri)
+          queue.push(document)
+        }
+      }
+    }
+
+    for (const uri of found) {
+      if (!this.urgent.has(uri))
+        this.later.add(uri)
+    }
+
+    if (this.later.size === 0)
+      return
+
+    clearTimeout(this.dependentsTimer)
+    this.dependentsTimer = setTimeout(() => void guard(this.publishQueued()), DEPENDENTS_DELAY)
   }
 
   // What `kay check` finds across the project, run after a save rather than on every keystroke, since it reads every collection, catalog and route.
@@ -575,32 +620,58 @@ export class KayLanguageServer {
     return found.flat()
   }
 
-  // Every open file is checked again on any change, since editing one component can break the files using it. A slow tsgo runs one publish at a time, those asked for meanwhile making one more, which sees the latest text.
+  // Every open file, checked again.
   private async publishAllDiagnostics() {
-    if (this.publishing) {
-      this.publishAgain = true
+    for (const uri of this.documents.keys())
+      this.urgent.add(uri)
 
-      return
-    }
+    await this.publishQueued()
+  }
 
-    this.publishing = true
+  // Publishes the files waiting, the urgent ones first and the rest a few at a time, one run at a time so a slow tsgo is not asked twice for a file; those asked for meanwhile join the run.
+  private async publishQueued(): Promise<void> {
+    this.publishing ??= this.publishRun()
+
+    return this.publishing
+  }
+
+  private async publishRun() {
+    // Past this the run is always stored before it ends.
+    await Promise.resolve()
+
+    let failure: { reason: unknown } | undefined
 
     try {
-      // Settled, not rejected at the first failure, so none is still running when the next publish starts.
-      const settled = await Promise.allSettled([...this.documents.values()].map(async document => this.publishDiagnostics(document)))
-      const failed = settled.find(result => result.status === 'rejected')
+      for (let batch = this.nextBatch(); batch.length > 0; batch = this.nextBatch()) {
+        // Settled, not rejected at the first failure, so none is still running when the next batch starts.
+        const settled = await Promise.allSettled(batch.map(async (uri) => {
+          const document = this.documents.get(uri)
 
-      if (failed)
-        throw failed.reason
-    }
-    finally {
-      this.publishing = false
+          if (document)
+            await this.publishDiagnostics(document)
+        }))
+        const failed = settled.find(result => result.status === 'rejected')
 
-      if (this.publishAgain) {
-        this.publishAgain = false
-        void guard(this.publishAllDiagnostics())
+        failure ??= failed?.status === 'rejected' ? { reason: failed.reason } : undefined
       }
     }
+    finally {
+      this.publishing = undefined
+    }
+
+    if (failure)
+      throw failure.reason
+  }
+
+  private nextBatch(): string[] {
+    const batch = this.urgent.size > 0 ? [...this.urgent] : [...this.later].slice(0, DEPENDENTS_BATCH)
+
+    for (const uri of batch) {
+      this.urgent.delete(uri)
+      this.later.delete(uri)
+    }
+
+    return batch
   }
 
   private async publishDiagnostics(document: Document) {
@@ -1165,6 +1236,18 @@ async function projectConfig(root: string): Promise<KayConfig> {
 // Runs until the editor closes the stream.
 export async function startServer(input: ReadableStream<Uint8Array>, write: (data: string) => void): Promise<void> {
   await new KayLanguageServer(new Connection(input, write)).listening
+}
+
+// Whether the component imports the file; a module named by an alias is taken for it when their names match.
+function importsFile(document: Document, file: string): boolean {
+  const stem = (path: string) => basename(path).replace(EXTENSION, '')
+
+  for (const [, specifier] of document.source.matchAll(IMPORT_SOURCE)) {
+    if (specifier!.startsWith('.') ? [specifier!, `${specifier}.kay`].some(path => resolve(dirname(document.file), path) === file) : stem(specifier!) === stem(file))
+      return true
+  }
+
+  return false
 }
 
 // Background work reports its failure instead of ending the process with an unhandled rejection.

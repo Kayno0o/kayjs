@@ -117,5 +117,6 @@ The rest of this release is in [What's new, older releases](whats-new-archive.md
 - [Recipes](recipes.md) build a database CRUD, a dashboard behind sign-in with roles, and a blog with tags, RSS and a sitemap, each with its test.
 - kayjs-auth names its methods `list*`, `get*`, `revoke*` and `delete*` (`listSessions()`, `getOrganization(ref)`, `revokeSession(id)`, `revokeBearerToken(id)`, `updatePasskeyName`, `rejectInvitation` and `updateLocale` answering `{ ok }`), the old names kept three minors ([Setup](../packages/auth/llms/setup.md)).
 - A browser error's stack under `kay dev` is on `.kay` lines in `.kay/dev/errors.json` (`at` filled) and in the dev tool's Problems tab, not on chunk positions ([Errors without a browser](dev-server.md)).
+- The language server checks the edited component first as you type, then the open components importing it after a quiet spell, and no other, so many open files no longer slow each edit; a save still checks them all.
 
 Releases before 1.70 are in [What's new, older releases](whats-new-archive.md).

@@ -750,6 +750,63 @@ describe('kay lsp for a client that supports diagnostic refreshes', () => {
   })
 })
 
+describe('kay lsp publishing after an edit', () => {
+  const badge = 'src/components/badge.kay'
+  const card = 'src/components/card.kay'
+  const page = 'src/routes/a.kay'
+  const other = 'src/routes/other.kay'
+  let editor: Editor
+  let dir: string
+
+  beforeAll(async () => {
+    dir = await scratchDir('lsp-dependents-')
+    await Promise.all([
+      Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
+      Bun.write(join(dir, badge), '---\nconst { label } = props<{ label: string }>()\n---\nspan {label}\n'),
+      Bun.write(join(dir, card), '---\nimport Badge from \'./badge.kay\'\n---\nBadge(label="x")\n'),
+      Bun.write(join(dir, page), '---\nimport Card from \'../components/card.kay\'\n---\nCard\n'),
+      Bun.write(join(dir, other), 'p x\n'),
+    ])
+    editor = new Editor(dir)
+    await editor.start()
+
+    for (const path of [other, page, card, badge])
+      await editor.open(path)
+
+    await settled(editor)
+  })
+
+  afterAll(async () => {
+    await editor.stop()
+    await rm(dir, { recursive: true, force: true })
+  })
+
+  const codes = (diagnostics: Diagnostic[]) => diagnostics.map(diagnostic => diagnostic.code)
+  const publishedAfter = (from: number) => editor.publishes.slice(from).map(entry => entry.uri)
+
+  it('publishes the edited file first, then the open files importing it, directly or through another, and never the others', async () => {
+    const from = editor.publishes.length
+
+    await editor.change(badge, '---\nconst { label, size } = props<{ label: string, size: number }>()\n---\nspan {label} {size}\n', 2)
+    await settled(editor)
+
+    const [first, ...rest] = publishedAfter(from)
+
+    expect(first).toBe(editor.uri(badge))
+    expect(rest.toSorted()).toEqual([card, page].map(path => editor.uri(path)).toSorted())
+    expect(codes(editor.publishes.findLast(entry => entry.uri === editor.uri(card))!.diagnostics)).not.toEqual([])
+  })
+
+  it('publishes only the file edited when no open file imports it', async () => {
+    const from = editor.publishes.length
+
+    await editor.change(other, 'p y\n', 2)
+    await settled(editor)
+
+    expect(publishedAfter(from)).toEqual([editor.uri(other)])
+  })
+})
+
 // In process, holding the debounce's timer, so the test ends each quiet spell itself and no publish has a clock to beat.
 describe('kay lsp framing', () => {
   it('reads a message that comes in many small chunks, and several in one, whole', async () => {
