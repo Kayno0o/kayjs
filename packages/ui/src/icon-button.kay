@@ -1,5 +1,5 @@
 ---
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import { recipe } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
@@ -8,7 +8,8 @@ import Icon from './icon.kay'
 const look = recipe({ parts: { root: 'kui-icon-btn' } })
 
 const { icon, label, size = 'md', variant = 'solid', tone = 'neutral', type = 'button', ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'type' | 'class' | 'children'> & {
-  icon: IconSlot | IconProps
+  // A name or drawing of the icon set, or a snippet drawing it, such as an `svg` of the app's own: `IconButton(label="Send")` then `@icon` and its markup.
+  icon: IconSlot | IconProps | Snippet
   // Names the action for screen readers and, as its tooltip, for everyone else, since the button shows nothing but the icon.
   label: string
   size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
@@ -23,4 +24,7 @@ const { icon, label, size = 'md', variant = 'solid', tone = 'neutral', type = 'b
 const framed = () => variant === 'solid'
 ---
 button(part="root" {...rest} type={type} aria-label={label} data-tooltip={label} data-size={size} data-variant={variant} data-tone={tone} class={{ 'kui-shell': framed(), 'kui-shell-danger': framed() && tone === 'danger' }})
-  Icon(icon={icon})
+  if typeof icon === 'function'
+    | {icon}
+  else
+    Icon(icon={icon as IconSlot | IconProps})

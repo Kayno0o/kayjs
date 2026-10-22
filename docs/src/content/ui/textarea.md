@@ -4,4 +4,6 @@ description: A multi-line text field that reports each keystroke and the committ
 
 <Demo name="textarea/basic" />
 
-`onInput` is called on each keystroke and `onChange` once the value is committed, on blur. Without `value`, the box starts empty and keeps what is typed, for a form posting it by its `name`. A `value` the page writes back, such as the text trimmed, lands once the box is left, never under the caret. Other attributes such as `rows` and `placeholder` pass through to the textarea.
+`onInput` is called on each keystroke and `onChange` once the value is committed, on blur. Without `value`, the box starts empty and keeps what is typed, for a form posting it by its `name`. A `value` the page writes back, such as the text trimmed, lands once the box is left, never under the caret.
+
+An empty text lands at once, as a chat clearing its draft after a send, and `writeFocused` lets any write land while the box is focused, the caret going to the end. Other attributes such as `rows` and `placeholder` pass through to the textarea.

@@ -23,6 +23,8 @@ function pickKind(next: 'post' | 'page' | '') {
 }
 // Kept as the names it reads, one per line, as a roster would.
 const roster = signal('Ada\nGrace')
+// A message being written, which a send clears while the box is focused.
+const draft = signal('')
 ---
 TextInput#name(value={name()} onInput={value => name.set(value)} onChange={onCommit} onBlur={event => onLeave?.(event.currentTarget.id)})
 p#echo {name()}
@@ -36,6 +38,10 @@ Select#kind(value={kind()} options={KINDS} emptyOption="Any" onChange={pickKind}
 TextInput#plain(name="email" aria-label="Email")
 Textarea#roster(aria-label="Roster" onBlur={event => onLeave?.(event.currentTarget.id)} value={roster()} onInput={value => roster.set(value.split('\n').map(line => line.trim()).filter(Boolean).join('\n'))})
 p#names {roster()}
+Textarea#draft(aria-label="Draft" value={draft()} onInput={draft.set})
+button#send(onClick={() => draft.set('')}) Send
+button#restore(onClick={() => draft.set('Back')}) Restore
+Textarea#live(aria-label="Live" writeFocused value={draft()} onInput={draft.set})
 form#filters(method="get" onSubmit={event => { event.preventDefault(); onFilter?.(String(new FormData(event.currentTarget).get('period'))) }})
   FormField(label="Period" compact)
     Select(name="period" value="" emptyOption="Any" submit options={[{ value: '7d', label: '7 days' }]})

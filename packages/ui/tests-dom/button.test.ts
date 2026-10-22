@@ -178,3 +178,13 @@ test('a Button used as a part of another component keeps the part name its calle
   expect(mounted.root.querySelector('#plain')?.getAttribute('data-part')).toBe('cta')
   expect(mounted.root.querySelector('#busy')?.getAttribute('data-part')).toBe('busyCta')
 })
+
+test('an IconButton draws the snippet it is handed in place of an icon of the set', async () => {
+  mounted = await mountComponent('src/components/button-part.kay', {})
+
+  const button = mounted.root.querySelector('#drawn')!
+
+  expect(button.querySelector('svg#arrow')).not.toBeNull()
+  expect(button.querySelectorAll('svg')).toHaveLength(1)
+  expect(button.getAttribute('aria-label')).toBe('Send')
+})

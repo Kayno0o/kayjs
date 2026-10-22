@@ -1,5 +1,6 @@
 ---
 import Button from '@kaynooo/kayjs-ui/button.kay'
+import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
 import { recipe } from 'kay'
 
 const look = recipe({ parts: { root: 'frame', cta: '', busyCta: '' } })
@@ -7,3 +8,7 @@ const look = recipe({ parts: { root: 'frame', cta: '', busyCta: '' } })
 div(part="root")
   Button#plain(label="Plain" part="cta")
   Button#busy(label="Busy" part="busyCta" onClick={() => undefined})
+  IconButton#drawn(label="Send" tone="accent")
+    @icon
+      svg#arrow(viewBox="0 0 24 24")
+        path(d="M12 19V5")

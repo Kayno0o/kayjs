@@ -2,8 +2,8 @@
 import type { Action, ActionStream, Failure, SanitizeOptions, Snippet } from 'kay'
 import type { CodeBlock, Message, Progress, ToolCall } from './types'
 import { ActionError, effect, onCleanup, onMount, recipe, sanitizeHtml, signal, trustHtml, untrack } from 'kay'
-import Button from '@kaynooo/kayjs-ui/button.kay'
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
+import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
 import { markdownHtml } from 'kay/markdown'
 import { wording } from 'kay/words'
 import { MARK, MARKED, withoutMarker } from './marker'
@@ -13,7 +13,7 @@ import './chat.css'
 
 // The chat's own classes are its parts, so an app restyles them from src/ui.ts or a `class` object. The table of a reply is built as a string and keeps its class.
 const look = recipe({
-  parts: { root: 'kai-chat', empty: 'kai-chat-empty', greeting: 'kai-chat-greeting', suggestions: 'kai-chat-suggestions', suggestion: 'kai-chat-suggestion', log: 'kai-chat-log', turn: 'kai-chat-turn', text: 'kai-chat-text', thinking: 'kai-chat-text kai-chat-thinking', note: 'kai-chat-note', status: 'kai-chat-status', disclosure: 'kai-chat-disclosure', form: 'kai-chat-form', field: 'kui-field-input', send: 'kai-chat-send' },
+  parts: { root: 'kai-chat', empty: 'kai-chat-empty', greeting: 'kai-chat-greeting', suggestions: 'kai-chat-suggestions', suggestion: 'kai-chat-suggestion', log: 'kai-chat-log', turn: 'kai-chat-turn', text: 'kai-chat-text', thinking: 'kai-chat-text kai-chat-thinking', note: 'kai-chat-note', status: 'kai-chat-status', disclosure: 'kai-chat-disclosure', form: 'kai-chat-form', field: 'kui-field-input', send: 'kai-chat-send', retry: 'kui-btn' },
   variants: {
     variant: { bubble: '', plain: '' },
     tone: { accent: '', neutral: '' },
@@ -457,11 +457,11 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
       | {failure()}
       |
       if !busy() && !takenBack() && history().at(-1)?.role === 'user'
-        Button(label={retryLabel} onClick={() => { void send(true) }})
+        button(part="retry" type="button" data-variant="solid" data-size="md" onClick={() => { void send(true) }}) {retryLabel}
   if disclosure !== ''
     p(part="disclosure") {disclosure}
   form(part="form" onSubmit={event => { event.preventDefault(); void send() }})
-    textarea(part="field" ref={element => { field = element }} bind:value={draft} rows="1" aria-label={label} placeholder={placeholder} onKeyDown={keyDown})
+    Textarea(part="field" writeFocused ref={element => { field = element }} value={draft()} onInput={draft.set} rows="1" aria-label={label} placeholder={placeholder} onKeyDown={keyDown})
     if busy()
       button(part="send" type="button" aria-label={stopLabel} data-tooltip={stopLabel} onClick={stop})
         slot stopIcon

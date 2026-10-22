@@ -6,21 +6,23 @@ import { startRef } from './form-reset'
 
 const look = recipe({ parts: { root: 'kui-field-input' } })
 
-const { value, onInput, onChange, onBlur, ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onChange'> & {
+const { value, onInput, onChange, onBlur, writeFocused = false, ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onChange'> & {
   // Without it, the box starts empty and keeps what is typed, for a form posting it by its `name`.
   value?: string | undefined
   onInput?: ((value: string) => void) | undefined
   // Called once the value is committed, on blur, after `onInput`.
   onChange?: ((value: string) => void) | undefined
+  // Lets any write of the parent land while the box is focused, the caret going to the end, such as a chat putting a refused message back; without it, only an empty text does.
+  writeFocused?: boolean | undefined
 }>()
 
 let box: HTMLTextAreaElement | undefined
 
-// The parent may write back its own reading of the text, such as without the blank line just typed: the box takes it once left, never while focused, which would throw the caret to the end.
+// The parent may write back its own reading of the text, such as without the blank line just typed: the box takes it once left, never while focused, which would throw the caret to the end, except an empty text, such as a chat clearing its draft after a send.
 const { heard, sync } = controlledValue({
   box: () => box,
   value: () => value,
-  writable: element => document.activeElement !== element,
+  writable: element => writeFocused || document.activeElement !== element || value === '',
   report: (element) => {
     heard(element.value)
     ;(onInput ?? onChange)?.(element.value)
