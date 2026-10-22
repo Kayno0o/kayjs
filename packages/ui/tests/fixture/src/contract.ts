@@ -186,7 +186,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'masonry': { items: [1, 2], key: (item: number) => item, tile: (item: number) => String(item) },
   'media-gallery': { items: media },
   'menu': { items: [{ label: 'Edit', onSelect: noop }], label: 'Actions', icon },
-  'meter': { value: 30, label: 'Disk' },
+  'meter': { value: 3, max: 10, label: 'Disk' },
   'multi-select': { options, label: 'Planets', value: ['mars'] },
   'notice': { children: 'Saved' },
   'page-header': { title: 'Moons', description: 'Every moon' },

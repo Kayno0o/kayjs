@@ -392,6 +392,10 @@ describe('data', () => {
     expect(await find('/data', '#avatar-skeleton [role="status"]')).toEqual([])
   })
 
+  test('Meter reads value out of a custom max', async () => {
+    expect(await attributes('/data', '#meter-max [role="meter"]', ['aria-valuenow', 'aria-valuemax'])).toEqual([{ 'aria-valuenow': '75', 'aria-valuemax': '100' }])
+  })
+
   test('BarList measures each row against the largest, reads its display, and says when it has none', async () => {
     const bars = (await one('/data', '#bars')).html
 

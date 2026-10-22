@@ -1,9 +1,11 @@
 ---
 import type { JSX } from 'kay'
 
-const { value, label, fillClass, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
-  // The percentage filled, held between 0 and 100.
+const { value, max = 100, label, fillClass, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
+  // How much is filled, held between 0 and `max`.
   value: number
+  // The value of a full meter, 100 by default so `value` reads as a percentage.
+  max?: number | undefined
   // Names the meter for screen readers.
   label: string
   // Classes for the fill alone, such as a colour picked by threshold; the track always looks like `kui-meter`.
@@ -11,7 +13,7 @@ const { value, label, fillClass, class: className, ...rest } = props<Omit<JSX.In
   class?: string | undefined
 }>()
 
-const percent = () => Math.min(100, Math.max(0, value))
+const percent = () => max > 0 ? Math.min(100, Math.max(0, value / max * 100)) : 0
 ---
 .kui-meter({...rest} role="meter" aria-valuenow={percent()} aria-valuemin={0} aria-valuemax={100} aria-label={label} class={className})
   .kui-meter-fill(class={fillClass} style={`width: ${percent()}%`})

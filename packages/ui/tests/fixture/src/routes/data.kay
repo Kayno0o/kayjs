@@ -24,6 +24,8 @@ main
     Progress(value={0.5} max={1} label="Upload")
   article#indeterminate
     Progress(label="Loading")
+  article#meter-max
+    Meter(value={3} max={4} label="Quota")
   article#bars
     BarList(rows={[{ key: 'mars', label: 'Mars', value: 2 }, { key: 'earth', label: 'Earth', value: 1, display: 'one' }, { key: 'venus', label: 'Venus', value: 0 }]})
   article#no-bars-label
