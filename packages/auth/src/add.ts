@@ -15,7 +15,7 @@ function withAuthTables(_match: string, open: string, space: string, close: stri
   if (close !== '')
     return `${open}...authTables${close}`
 
-  return space.includes('\n') ? `${open}${space}...authTables,${space}` : `${open}...authTables, `
+  return space.includes('\n') ? `${open}${space}...authTables,${space}` : `${open}${space}...authTables, `
 }
 
 // The site's name for mails and authenticator apps, from the package name.

@@ -733,7 +733,7 @@ it('keeps the bare mailer while kayjs-mail is not registered, and names a non-AS
 })
 
 it('puts the auth tables first in an empty, a single-line and a multi-line list', async () => {
-  const lists = [['[]', '[...authTables]'], ['[Member, Notice]', '[...authTables, Member, Notice]'], ['[\n  Member,\n  Notice,\n]', '[\n  ...authTables,\n  Member,\n  Notice,\n]']] as const
+  const lists = [['[]', '[...authTables]'], ['[ Member ]', '[ ...authTables, Member ]'], ['[Member, Notice]', '[...authTables, Member, Notice]'], ['[\n  Member,\n  Notice,\n]', '[\n  ...authTables,\n  Member,\n  Notice,\n]']] as const
 
   for (const [given, expected] of lists) {
     const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'app')

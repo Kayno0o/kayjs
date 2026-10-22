@@ -213,13 +213,32 @@ inBrowser('HoverCard and ZoomPane', () => {
     await page.waitUntil((() => !document.querySelector('#card')!.matches(':popover-open')) as never)
     expect(await page.evaluate((() => document.querySelector<HTMLElement>('#card + span')!.style.getPropertyValue('anchor-name')) as never)).toBe('')
 
-    // An HTML element takes the name itself and gives it back.
+    // An HTML element is anchored through the stand-in too, and keeps its own anchor-name.
     await page.click('#plain')
     await page.waitUntil((() => document.querySelector('#card')?.matches(':popover-open')) as never)
-    expect(await page.evaluate((() => document.querySelector<HTMLElement>('#plain')!.style.getPropertyValue('anchor-name')) as never)).not.toBe('')
+    expect(await page.evaluate((() => document.querySelector<HTMLElement>('#card + span')!.style.getPropertyValue('anchor-name')) as never)).not.toBe('')
     await page.evaluate((() => document.querySelector<HTMLElement>('#plain')!.blur()) as never)
     await page.waitUntil((() => !document.querySelector('#card')!.matches(':popover-open')) as never)
     expect(await page.evaluate((() => document.querySelector<HTMLElement>('#plain')!.style.getPropertyValue('anchor-name')) as never)).toBe('')
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
+  test('keeps an anchor-name of the app, and sits beside an anchor inside a transformed ancestor', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/hover-card')
+
+    await page.click('#own')
+    await page.waitUntil((() => document.querySelector('#card')?.matches(':popover-open')) as never)
+    await page.waitUntil((() => {
+      const card = document.querySelector('#card')!.getBoundingClientRect()
+      const own = document.querySelector('#own')!.getBoundingClientRect()
+
+      return Math.abs((card.left + card.right) / 2 - (own.left + own.right) / 2) < 2 && card.top >= own.bottom - 1
+    }) as never)
+    expect(await page.evaluate((() => document.querySelector<HTMLElement>('#own')!.style.getPropertyValue('anchor-name')) as never)).toBe('--own')
+    await page.evaluate((() => document.querySelector<HTMLElement>('#own')!.blur()) as never)
+    await page.waitUntil((() => !document.querySelector('#card')!.matches(':popover-open')) as never)
     expect(page.errors).toEqual([])
   }, 120_000)
 

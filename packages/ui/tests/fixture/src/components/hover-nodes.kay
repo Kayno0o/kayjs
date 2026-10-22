@@ -14,3 +14,5 @@ const plate = signal<Plate>({ scale: 1, x: 0, y: 0 })
         circle(id={`node-${node}`} cx={node * 30} cy="50" r="8" onPointerEnter={event => hovered.set(event.currentTarget)} onPointerLeave={() => hovered.set(null)})
   button#plain(onFocus={event => hovered.set(event.currentTarget)} onBlur={() => hovered.set(null)}) Plain
   HoverCard#card(anchor={hovered()} placement="bottom") Detail
+  div(style="transform: translate(40px, 30px); filter: opacity(0.9)")
+    button#own(style="anchor-name: --own" onFocus={event => hovered.set(event.currentTarget)} onBlur={() => hovered.set(null)}) Own

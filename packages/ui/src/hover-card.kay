@@ -17,7 +17,6 @@ const { id, anchor, placement = 'top', ...rest } = props<Omit<JSX.IntrinsicEleme
 const panelId = id ?? uid()
 const name = `--kui-hover-card-${panelId}`
 let panel: HTMLDivElement | undefined
-let marked: HTMLElement | undefined
 let stand: HTMLSpanElement | undefined
 let frame = 0
 // Where the stand-in was last put, so a frame with nothing moved writes nothing.
@@ -25,17 +24,24 @@ let placed = ''
 
 function unmark() {
   cancelAnimationFrame(frame)
-  marked?.style.removeProperty('anchor-name')
-  marked = undefined
   placed = ''
   stand?.style.removeProperty('anchor-name')
 }
 
-// An SVG shape is no CSS box, so the browser cannot anchor to it: a fixed, invisible box laid over it stands in, kept on it frame by frame as a pan, a zoom or a scroll moves it.
+function close() {
+  unmark()
+
+  if (panel?.isConnected && panel.matches(':popover-open'))
+    panel.hidePopover()
+
+  if (stand?.isConnected && stand.matches(':popover-open'))
+    stand.hidePopover()
+}
+
+// The browser anchors to a CSS box, which an SVG shape is not, and an element's own anchor-name may be the app's: a fixed, invisible box laid over the target stands in for every element, kept on it frame by frame as a pan, a zoom or a scroll moves it. It sits in the top layer like the card, so a transformed, filtered or contained ancestor cannot offset it.
 function follow(target: Element) {
   if (!target.isConnected) {
-    unmark()
-    panel?.hidePopover()
+    close()
 
     return
   }
@@ -51,29 +57,25 @@ function follow(target: Element) {
   frame = requestAnimationFrame(() => follow(target))
 }
 
-// The browser's anchor positioning follows the element named by `anchor-name`, so the name moves from the element the card left to the one it lands on.
 effect(() => {
   const target = anchor ?? undefined
 
   unmark()
 
-  if (!panel)
+  if (!panel || !stand)
     return
 
   if (!target) {
-    if (panel.matches(':popover-open'))
-      panel.hidePopover()
+    close()
 
     return
   }
 
-  if (target instanceof HTMLElement) {
-    target.style.setProperty('anchor-name', name)
-    marked = target
-  }
-  else {
-    follow(target)
-  }
+  // The stand-in opens first and stays open as long as the card does, as an anchor must come before the card in the top layer.
+  if (!stand.matches(':popover-open'))
+    stand.showPopover()
+
+  follow(target)
 
   if (!panel.matches(':popover-open'))
     panel.showPopover()
@@ -83,4 +85,4 @@ onCleanup(unmark)
 ---
 div(part="root" {...rest} ref={element => panel = element} id={panelId} popover="manual" data-placement={placement} style={`position-anchor: ${name}`})
   slot
-span(ref={element => stand = element} aria-hidden="true" class="kui-hover-card-stand")
+span(ref={element => stand = element} popover="manual" aria-hidden="true" class="kui-hover-card-stand")
