@@ -2,7 +2,7 @@ import { mkdir, readdir, rm, symlink } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { findKayLibraries } from '../src/build/libraries'
+import { findKayLibraries, kayLibrariesOf } from '../src/build/libraries'
 import { throughLinks } from '../src/build/links'
 import { projectPaths } from '../src/project'
 import { kayCheck } from './check-helper'
@@ -92,6 +92,27 @@ describe('the names a kay library names kay by', () => {
     await write(join(app, 'node_modules/lib-none'), { 'package.json': JSON.stringify({ name: 'lib-none', version: '1.0.0', type: 'module' }), 'src/badge.kay': 'p none\n' })
 
     expect((await findKayLibraries(app)).map(library => library.name).sort()).toEqual(['lib-alias', 'lib-current', 'lib-old'])
+  })
+})
+
+// The scan of the routes and the estimate of what they load share the libraries of a root.
+describe('the kay libraries of a root, found once', () => {
+  it('are found once for the calls that follow, and again once a manifest of the project or of a library changes', async () => {
+    const app = await newProject()
+    const first = await kayLibrariesOf(app)
+
+    expect(first.map(library => library.name)).toEqual(['kay-lib'])
+    expect(await kayLibrariesOf(app)).toBe(first)
+
+    await Bun.write(join(app, 'node_modules/kay-lib/package.json'), `${manifest('kay')}\n`)
+
+    const second = await kayLibrariesOf(app)
+
+    expect(second).not.toBe(first)
+    expect(await kayLibrariesOf(app)).toBe(second)
+
+    await Bun.write(join(app, 'package.json'), `${await Bun.file(join(app, 'package.json')).text()}\n`)
+    expect(await kayLibrariesOf(app)).not.toBe(second)
   })
 })
 

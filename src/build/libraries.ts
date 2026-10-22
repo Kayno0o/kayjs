@@ -1,5 +1,5 @@
 import type { Manifest } from './manifests'
-import { existsSync, readFileSync, realpathSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { isBuiltin } from 'node:module'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { KayError } from '../compiler/errors'
@@ -71,6 +71,45 @@ export async function findKayLibraries(root: string): Promise<KayLibrary[]> {
 
   // In the UTF-16 code unit order of their directories, so what is generated from them reads the same from one run and one machine to the next.
   return [...found.values()].sort((a, b) => a.dir < b.dir ? -1 : 1)
+}
+
+// The libraries of each project root, found once and shared by the scan of the routes and the estimate of what they load, for as long as the manifests of the project and of its libraries stay as they were.
+// Their file lists are those of the first call, which the lookups of a module's origin do not read; `findKayLibraries` lists them afresh.
+const foundLibraries = new Map<string, { stamp: string, dirs: string[], found: Promise<KayLibrary[]> }>()
+
+function manifestStamp(dirs: string[]): string {
+  return dirs.map((dir) => {
+    const stat = statSync(join(dir, 'package.json'), { throwIfNoEntry: false })
+
+    return stat === undefined ? '-' : `${stat.size}:${stat.mtimeMs}`
+  }).join(',')
+}
+
+export async function kayLibrariesOf(root: string): Promise<KayLibrary[]> {
+  const real = realpathSync(root)
+  const kept = foundLibraries.get(real)
+
+  if (kept !== undefined && kept.stamp === manifestStamp(kept.dirs))
+    return kept.found
+
+  const found = findKayLibraries(root)
+  const entry = { stamp: manifestStamp([real]), dirs: [real], found }
+
+  foundLibraries.set(real, entry)
+
+  try {
+    const libraries = await found
+
+    entry.dirs = [real, ...libraries.map(library => library.dir)]
+    entry.stamp = manifestStamp(entry.dirs)
+
+    return libraries
+  }
+  catch (error) {
+    foundLibraries.delete(real)
+
+    throw error
+  }
 }
 
 // What the app's `settings` replaces: each library's settings module, by its path under `node_modules` and its real one, and the app's module taking its place.

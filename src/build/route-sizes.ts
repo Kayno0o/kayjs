@@ -13,7 +13,7 @@ import { bindingNames, scopedBlocks } from '../compiler/template-reads'
 import { describeStop } from '../server/pure-page'
 import { ASSET_PREFIX } from './assets'
 import { resolveFrom, SCRIPT_FILE } from './files'
-import { findKayLibraries, importEdges, projectImportGraph } from './libraries'
+import { importEdges, kayLibrariesOf, projectImportGraph } from './libraries'
 import { gzipSize } from './report'
 
 // A script a page loads from the build, whatever the mount point puts before it.
@@ -74,7 +74,7 @@ export async function routeSizes(root: string, client: ClientBuild, routes: Rout
   const imports: () => Promise<Imports> = async () => opened ??= (async () => {
     const real = realpathSync(root)
 
-    return { edges: importEdges(real, await findKayLibraries(root), projectImportGraph(root)), real }
+    return { edges: importEdges(real, await kayLibrariesOf(root), projectImportGraph(root)), real }
   })()
   const bySize = new Map<string, RouteSize>()
 
@@ -186,11 +186,14 @@ async function factsOf(file: string, root: string, memo: Map<string, Promise<Sou
 
   if (facts === undefined) {
     facts = (async () => {
+      // Opened outside the read of the file: a graph that cannot be opened fails the build, rather than weighing every route as nothing.
+      const { edges, real } = await imports()
+      // A file of the project, named as the route lists it rather than by its real path, which the imports and the uses of a template are both named by.
+      const named = (path: string) => path.startsWith(real + sep) ? join(root, path.slice(real.length)) : path
+
       try {
         const source = await Bun.file(file).text()
-        const { edges, real } = await imports()
-        // A file of the project, named as the route lists it rather than by its real path.
-        const followedFiles = (await edges(realpathSync(file))).map(path => path.startsWith(real + sep) ? join(root, path.slice(real.length)) : path)
+        const followedFiles = (await edges(realpathSync(file))).map(named)
 
         if (!file.endsWith('.kay'))
           return { imports: followedFiles, uses: new Map(), posts: false, defers: false, waits: false }
@@ -198,7 +201,7 @@ async function factsOf(file: string, root: string, memo: Map<string, Promise<Sou
         const { template } = parseKay(source)
         const elements = [...elementsIn(template)]
 
-        return { imports: followedFiles, uses: usesOf(source, file, root, template), posts: elements.some(element => actionOf(element, source) !== undefined), defers: elements.some(element => serverIslandOf(element, source)?.mode === 'defer'), waits: elements.some(element => waitsToHydrate(element, source)) }
+        return { imports: followedFiles, uses: usesOf(source, file, root, template, named), posts: elements.some(element => actionOf(element, source) !== undefined), defers: elements.some(element => serverIslandOf(element, source)?.mode === 'defer'), waits: elements.some(element => waitsToHydrate(element, source)) }
       }
       catch {
         return { imports: [], uses: new Map(), posts: false, defers: false, waits: false }
@@ -212,7 +215,8 @@ async function factsOf(file: string, root: string, memo: Map<string, Promise<Sou
 
 // The components a template renders, by file, each use with the props of the file it renders for and the props it is given: an `if rest.onClick` or `if shown` around it, where `shown` has no default, renders it only for a call passing that prop.
 // A component the script also names, or one imported by a name the template does not use as a whole, may render anywhere, so it is left out and always followed.
-function usesOf(source: string, file: string, root: string, template: Node[]): Map<string, Use[]> {
+function usesOf(source: string, file: string, root: string, template: Node[], named: (path: string) => string): Map<string, Use[]> {
+  const mapped = (path: string | undefined) => path === undefined ? undefined : named(path)
   const pattern = PROPS_PATTERN.exec(source)?.[1]
   const entries = (pattern?.split(',') ?? []).map(entry => entry.trim())
   const rest = entries.find(entry => entry.startsWith('...'))?.slice(3).trim()
@@ -224,7 +228,7 @@ function usesOf(source: string, file: string, root: string, template: Node[]): M
   const mentions = new Map<string, number>()
 
   for (const [, name, specifier] of source.matchAll(DEFAULT_IMPORT)) {
-    const imported = followed(resolveFrom(specifier!, file), root)
+    const imported = followed(mapped(resolveFrom(specifier!, file)), root)
 
     if (imported?.endsWith('.kay')) {
       bound.set(name!, imported)
@@ -293,7 +297,7 @@ function usesOf(source: string, file: string, root: string, template: Node[]): M
 
   // A dynamic, named or side-effect import of the file beside its default one loads it however the template renders.
   for (const [, specifier] of source.matchAll(IMPORT)) {
-    const imported = followed(resolveFrom(specifier!, file), root)
+    const imported = followed(mapped(resolveFrom(specifier!, file)), root)
 
     if (imported !== undefined)
       mentions.set(imported, (mentions.get(imported) ?? 0) + 1)

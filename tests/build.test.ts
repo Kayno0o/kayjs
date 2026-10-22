@@ -2247,6 +2247,53 @@ describe('the build report', () => {
     }
   })
 
+  it('estimates an unprerendered route the same under a symlinked project root, leaving out the island a prop the route does not pass guards', async () => {
+    const real = await scratchDir('route-sizes-linked-')
+    const linked = `${real}-link`
+
+    try {
+      const chunk = async (name: string, size: number) => Bun.write(join(real, 'out', name), Array.from({ length: size }, (_, index) => `export const v${index} = ${index * 7919 % 1013}\n`).join(''))
+
+      await Promise.all([chunk('entry.js', 60), chunk('a.js', 40), chunk('b.js', 50)])
+      await Promise.all(Object.entries({
+        'tsconfig.json': '{}',
+        'src/a.kay': 'p A\n',
+        'src/b.kay': 'p B\n',
+        'src/named.kay': '---\nimport B from \'./b.kay\'\n\nconst { label, shown } = props<{ label: string, shown?: boolean }>()\n---\nif shown\n  B\np {label}\n',
+        'src/routes/named.kay': '---\nimport A from \'../a.kay\'\nimport Named from \'../named.kay\'\n---\nA\nNamed(label="Open")\n',
+        'src/routes/shown.kay': '---\nimport A from \'../a.kay\'\nimport Named from \'../named.kay\'\n---\nA\nNamed(label="Open" shown)\n',
+      }).map(async ([path, content]) => Bun.write(join(real, path), content)))
+      await symlink(real, linked)
+
+      const url = (name: string) => `/_kay/${name}`
+      const report: SizeReport = {
+        entry: { size: { raw: 0, gzip: 0 }, chunks: [url('entry.js')] },
+        islands: [
+          { file: 'src/a.kay', size: { raw: 0, gzip: 0 }, chunks: [url('a.js')] },
+          { file: 'src/b.kay', size: { raw: 0, gzip: 0 }, chunks: [url('b.js')] },
+        ],
+      }
+      const [entry, a, b] = await Promise.all(['entry.js', 'a.js', 'b.js'].map(async name => gzipSize(await Bun.file(join(real, 'out', name)).bytes())))
+
+      for (const root of [real, linked]) {
+        const routes = ['named', 'shown'].map(name => ({ pattern: `/${name}`, file: join(root, `src/routes/${name}.kay`), params: [], layouts: [] }) as unknown as Route)
+        const sizes = Object.fromEntries((await routeSizes(root, { dir: join(root, 'out'), styles: new Map() } as unknown as ClientBuild, routes, [], report)).map(each => [each.route, each.js]))
+
+        expect(sizes).toEqual({ '/named': entry! + a!, '/shown': entry! + a! + b! })
+      }
+    }
+    finally {
+      await rm(linked, { force: true })
+      await rm(real, { recursive: true, force: true })
+    }
+  })
+
+  it('reports an import graph it cannot open, rather than weighing every unprerendered route as nothing', async () => {
+    const route = { pattern: '/', file: '/nowhere/src/routes/index.kay', params: [], layouts: [] } as unknown as Route
+
+    await expect(routeSizes('/nowhere', { dir: '/nowhere/out', styles: new Map() } as unknown as ClientBuild, [route], [], { entry: { size: { raw: 0, gzip: 0 }, chunks: [] }, islands: [] })).rejects.toThrow('ENOENT')
+  })
+
   it('reads no guard on a name a for, an as, a snippet or a const binds as a prop the route does not pass', async () => {
     const dir = await scratchDir('route-sizes-shadowed-')
 

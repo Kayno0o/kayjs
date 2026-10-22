@@ -3,7 +3,7 @@ import type { Reach } from './reach'
 import { readFileSync, realpathSync } from 'node:fs'
 import { sep } from 'node:path'
 import { KAY_FILE } from '../build/files'
-import { findKayLibraries, followedImports, projectImportGraph } from '../build/libraries'
+import { followedImports, kayLibrariesOf, projectImportGraph } from '../build/libraries'
 import { implicitContextKeys } from './context-reads'
 import { reachOver } from './reach'
 
@@ -19,7 +19,7 @@ function realFile(file: string): string {
 // Reads the graph the island finder reads, shared with the route sizes: a literal `import()`, a glob and an alias are followed, a specifier in a comment or a string is not, and a library's components are, wherever it is installed.
 // With `collect`, what the walk meets is kept for `kay build` to record.
 export async function openReach(root: string, collect?: ContextReads): Promise<Reach> {
-  const libraries = await findKayLibraries(root)
+  const libraries = await kayLibrariesOf(root)
   const project = realFile(root) + sep
   const graph = projectImportGraph(root)
   const edges = new Map<string, string[]>()
