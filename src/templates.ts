@@ -311,7 +311,7 @@ function config({ has, settings }: Setup): string {
   const base = settings.base === undefined ? undefined : quote(settings.base)
 
   return lines(
-    has('auth') && 'import { authPages } from \'@kaynooo/kayjs-auth\'',
+    has('auth') && 'import { auth } from \'@kaynooo/kayjs-auth\'',
     has('auth') && 'import { ui } from \'@kaynooo/kayjs-ui/extension\'',
     !server && 'import process from \'node:process\'',
     has('tailwind') && 'import tailwind from \'bun-plugin-tailwind\'',
@@ -319,7 +319,7 @@ function config({ has, settings }: Setup): string {
     '',
     !server && '// Set when building, as the Pages workflow does: the path the site is published under; kay reads the host it is published on from SITE_URL.',
     'export default defineConfig({',
-    has('auth') && '  extensions: [authPages({ auth: async () => import(\'./src/auth\') }), ui()],',
+    has('auth') && '  extensions: [auth({ module: \'./src/auth\' }), ui()],',
     `  lang: ${quote(settings.lang ?? 'en')},`,
     settings.site !== undefined && `  site: ${quote(settings.site)},`,
     server ? base !== undefined && `  base: ${base},` : `  base: process.env.SITE_BASE${base === undefined ? '' : ` ?? ${base}`},`,

@@ -55,7 +55,7 @@ export const auth = createAuth({
       : [],
     example: ['KAY_SECRET', 'SITE_URL'],
     ignore: ownDatabase ? [] : ['data'],
-    extension: { import: 'import { authPages } from \'@kaynooo/kayjs-auth\'', expression: 'authPages({ auth: async () => import(\'./src/auth\') })' },
+    extension: { import: 'import { auth } from \'@kaynooo/kayjs-auth\'', expression: 'auth({ module: \'./src/auth\' })' },
     notes: [
       ownDatabase ? 'Run your migration generator (bun run db:generate) for the auth_* tables kayjs-auth added to the tables.' : 'kayjs-auth keeps its users in data/auth.db: point the Database in src/auth.ts at Postgres before production.',
       ...mailed ? [] : ['Without a mailer, password resets, magic links and verification mails cannot be sent: run `kay add mail` and pass `email: { mailer: { send: mail.enqueue } }` to createAuth.'],

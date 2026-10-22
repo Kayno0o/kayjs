@@ -659,7 +659,7 @@ it('adds kayjs-auth over a SQLite file of its own, with the guard and the ui ext
 
     const config = await Bun.file(join(dir, 'kay.config.ts')).text()
 
-    expect(config).toContain('authPages({ auth: async () => import(\'./src/auth\') })')
+    expect(config).toContain('auth({ module: \'./src/auth\' })')
     expect(config).toContain('ui()')
     expect(await Bun.file(join(dir, '.env.example')).text()).toMatch(/^SITE_URL=$/m)
     expect(await Bun.file(join(dir, '.gitignore')).text()).toMatch(/^data$/m)

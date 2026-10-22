@@ -768,7 +768,7 @@ describe('kay new', () => {
 
       await installKay(dir)
       expect(await checked(dir)).toEqual([])
-      expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('extensions: [authPages({ auth: async () => import(\'./src/auth\') }), ui()],')
+      expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('extensions: [auth({ module: \'./src/auth\' }), ui()],')
       expect(JSON.parse((await kay(['check', dir, '--format', 'json'])).stdout)).toEqual({ errors: 0, warnings: 0, problems: [] })
       expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
       // The server preset's own files are linted by its test.
