@@ -10,9 +10,16 @@ const ROOT = join(import.meta.dir, 'restyle-app')
 const LIBRARY = join(import.meta.dir, '..')
 const UI = join(LIBRARY, '../ui')
 const OUT = join(ROOT, 'node_modules', '.cache', 'out')
+const SETTINGS = { '@kaynooo/kayjs-ui': './src/ui-settings.ts' }
+const TABLER = join(UI, '../../node_modules/@iconify-json/tabler/icons.json')
+const PATH = /\sd="([^"]+)"/
 const MARKERS = /<!--[[\]]-->/g
 
 let html = ''
+let icons: Record<string, string> = {}
+
+// The drawing of a tabler icon, as the page holds it.
+const body = (name: string): string => icons[name]!
 
 async function link(name: string, target: string): Promise<void> {
   const path = join(ROOT, 'node_modules', '@kaynooo', name)
@@ -28,13 +35,14 @@ beforeAll(async () => {
   await link('kayjs-ai', LIBRARY)
   await link('kayjs-ui', UI)
 
-  const build = await Bun.build({ entrypoints: [join(ROOT, 'src/entry.ts')], outdir: OUT, target: 'bun', plugins: [kay({ root: ROOT, target: 'ssr' })] })
+  const build = await Bun.build({ entrypoints: [join(ROOT, 'src/entry.ts')], outdir: OUT, target: 'bun', plugins: [kay({ root: ROOT, target: 'ssr', settings: SETTINGS })] })
 
   if (!build.success)
     throw new AggregateError(build.logs, 'build failed')
 
   const { Page } = await import(build.outputs[0]!.path) as { Page: (props: Record<string, unknown>) => unknown }
 
+  icons = Object.fromEntries(Object.entries((await Bun.file(TABLER).json() as { icons: Record<string, { body: string }> }).icons).map(([name, { body }]) => [name, body]))
   html = child(Page({})).replace(MARKERS, '')
 }, 60_000)
 
@@ -88,5 +96,47 @@ describe('restyling the chat from src/ui.ts', () => {
   test('the field and the buttons keep the kayjs-ui classes the theme styles', () => {
     expect(html).toContain('class="kui-field-input"')
     expect(html).toContain('class="kui-icon-btn kai-chat-send size-12"')
+  })
+})
+
+describe('the chat\'s icons from kayjs-ui\'s settings.icons', () => {
+  // The chat the page gives its own @sendIcon and @stopIcon blocks, labelled apart; the markup before it holds the others.
+  const split = () => {
+    const at = html.indexOf('aria-label="Own icons"')
+
+    return { before: html.slice(0, at), own: html.slice(at, html.indexOf('kai-launcher', at)) }
+  }
+
+  test('the send button draws the app\'s send slot, not kayjs-ui\'s arrow', () => {
+    const { before } = split()
+
+    expect(before).toContain(body('rocket'))
+    expect(html).not.toContain('M12 5v14m6-8l-6-6m-6 6l6-6')
+  })
+
+  test('the launcher draws the app\'s chat, close, plus and expand slots, the collapse one showing once it is large', () => {
+    const launcher = html.slice(html.indexOf('class="kai-launcher mb-2"'))
+
+    for (const name of ['ghost', 'square-x', 'circle-plus', 'maximize', 'rocket'])
+      expect(launcher).toContain(body(name))
+  })
+
+  // The stop button shows while a reply streams and the collapse button once the panel is large, so neither is in the server markup: the island carries them.
+  test('the browser build carries the app\'s stop and collapse slots', async () => {
+    const built = await Bun.build({ entrypoints: [join(LIBRARY, 'src/chat-launcher.kay'), join(LIBRARY, 'src/chat.kay')], target: 'browser', outdir: join(OUT, 'dom'), plugins: [kay({ root: ROOT, target: 'dom', settings: SETTINGS })] })
+
+    expect(built.success, built.logs.join('\n')).toBe(true)
+
+    const code = (await Promise.all(built.outputs.map(async output => output.text()))).join('\n')
+
+    for (const name of ['hand-stop', 'minimize'])
+      expect(code).toContain(body(name).match(PATH)![1]!)
+  }, 60_000)
+
+  test('an @sendIcon block wins over the setting', () => {
+    const { own } = split()
+
+    expect(own).toContain('class="own-send"')
+    expect(own).not.toContain(body('rocket'))
   })
 })

@@ -13,6 +13,11 @@ const calls = [{ id: 'a', name: 'search', status: 'done' as const, input: {}, re
 //- Renders the chat `src/ui.ts` restyles, for the library's restyle test.
 Chat(action={reply} initial={[{ role: 'user', content: 'Hello' }, { role: 'assistant', content: 'Hi there' }]} class={{ log: 'max-h-96' }})
 Chat(action={reply} suggestions={['One']} variant="plain" tone="neutral" size="sm" class="rounded-lg")
+Chat(action={reply} label="Own icons")
+  @sendIcon
+    b.own-send own
+  @stopIcon
+    b.own-stop own
 Launcher(action={reply} variant="plain" tone="neutral" size="lg" class="mb-2")
 Calls(calls={calls} labels={{}} details={true} runningLabel="Running" doneLabel="Done" failedLabel="Failed" argumentsLabel="Arguments" resultLabel="Result")
 Panel(label="Ask" icon={() => undefined} closeIcon={() => undefined} newIcon={() => undefined} expandIcon={() => undefined} collapseIcon={() => undefined})
