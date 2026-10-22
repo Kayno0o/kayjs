@@ -10,7 +10,11 @@ function jar(initial: Record<string, string> = {}) {
   return {
     held,
     get: (name: string) => held.get(name),
-    set: (name: string, value: string) => void held.set(name, value),
+    options: [] as unknown[],
+    set(name: string, value: string, options?: unknown) {
+      held.set(name, value)
+      this.options.push(options)
+    },
     delete: (name: string) => void held.delete(name),
   }
 }
@@ -99,6 +103,38 @@ describe('stepDraft', () => {
 
   it('refuses a draft too big for a cookie', () => {
     expect(() => stepDraft(jar(), 'signup', ANY).save('account', { bio: 'x'.repeat(4000) })).toThrow(RangeError)
+  })
+})
+
+describe('stepDraft cookie flags', () => {
+  const saved = (options: Record<string, unknown>) => {
+    const cookies = jar()
+
+    stepDraft(cookies, 'signup', { ...ANY, ...options }).save('account', { email: 'a@b.fr' })
+
+    return cookies.options[0] as { secure?: boolean }
+  }
+
+  it('is secure when the request is https, directly or behind a proxy', () => {
+    expect(saved({ request: new Request('https://kaynooo.fr/signup') }).secure).toBe(true)
+    expect(saved({ request: new Request('http://app/signup', { headers: { 'x-forwarded-proto': 'https' } }) }).secure).toBe(true)
+  })
+
+  it('is not secure over plain http, and an explicit secure wins', () => {
+    expect(saved({ request: new Request('http://localhost/signup') }).secure).toBe(false)
+    expect(saved({}).secure).toBe(false)
+    expect(saved({ request: new Request('https://kaynooo.fr/signup'), secure: false }).secure).toBe(false)
+    expect(saved({ secure: true }).secure).toBe(true)
+  })
+
+  it('clears the draft a sign-out leaves behind, under the path it was saved to', () => {
+    const cookies = jar()
+    const draft = stepDraft(cookies, 'signup', { ...ANY, path: '/signup' })
+
+    draft.save('account', { email: 'a@b.fr' })
+    stepDraft(cookies, 'signup', { ...ANY, path: '/signup' }).clear()
+
+    expect(cookies.held.size).toBe(0)
   })
 })
 

@@ -8,11 +8,19 @@ export interface StepItem<Key extends string = string> {
 // What `ctx.cookies` is, which is all the draft asks of it.
 export interface StepCookies {
   get: (name: string) => string | null | undefined
-  set: (name: string, value: string, options?: { path?: string, httpOnly?: boolean, sameSite?: 'lax' | 'strict' | 'none', maxAge?: number }) => void
+  set: (name: string, value: string, options?: { path?: string, httpOnly?: boolean, sameSite?: 'lax' | 'strict' | 'none', maxAge?: number, secure?: boolean }) => void
   delete: (name: string, options?: { path?: string }) => void
 }
 
 const STEP_PARAM = 'step'
+
+// The first proxy's `X-Forwarded-Proto` saying the browser came over https.
+const FORWARDED_HTTPS = /^\s*https\s*(?:,|$)/i
+
+// Not kay's own check, which the browser build of this package cannot import: an https `site` in kay.config.ts does not stand in for a proxy that passes no header.
+function overHttps(request: Request): boolean {
+  return new URL(request.url).protocol === 'https:' || FORWARDED_HTTPS.test(request.headers.get('x-forwarded-proto') ?? '')
+}
 
 // A browser drops a cookie past about 4 KB, and the value goes out percent-encoded, so a draft past this many encoded bytes is refused rather than lost.
 const DRAFT_LIMIT = 3800
@@ -49,7 +57,7 @@ export interface StepDraft {
   merged: () => Values
   // Keeps `values` as the step's, replacing what it held.
   save: (step: string, values: Values) => void
-  // Forgets the draft, once the last step has gone through.
+  // Forgets the draft, once the last step has gone through, and on sign-out: the cookie is not tied to a session, so the next visitor of a shared browser would inherit it.
   clear: () => void
 }
 
@@ -60,10 +68,14 @@ export interface StepDraftOptions {
   maxAge?: number | undefined
   // The path the cookie is sent to; the whole site by default, so a form living under one path narrows it.
   path?: string | undefined
+  // The request being answered (`ctx.request`): the cookie is `secure` when it came over https, directly or through a proxy's `X-Forwarded-Proto`.
+  request?: Request | undefined
+  // Forces the cookie's `secure` flag on or off, over what `request` says.
+  secure?: boolean | undefined
 }
 
 // The values of a multi-step form kept in a cookie of their own between posts, read and written from `ctx.cookies` in an action.
-export function stepDraft(cookies: StepCookies, name: string, { check, maxAge = 3600, path = '/' }: StepDraftOptions): StepDraft {
+export function stepDraft(cookies: StepCookies, name: string, { check, maxAge = 3600, path = '/', request, secure = request !== undefined && overHttps(request) }: StepDraftOptions): StepDraft {
   const cookie = `ksteps_${name}`
 
   function read(): Record<string, Values> {
@@ -89,7 +101,7 @@ export function stepDraft(cookies: StepCookies, name: string, { check, maxAge = 
       if (encodeURIComponent(text).length > DRAFT_LIMIT)
         throw new RangeError(`The draft of ${name} is over ${DRAFT_LIMIT} bytes once encoded, too much for a cookie`)
 
-      cookies.set(cookie, text, { path, httpOnly: true, sameSite: 'lax', maxAge })
+      cookies.set(cookie, text, { path, httpOnly: true, sameSite: 'lax', secure, maxAge })
     },
     clear: () => cookies.delete(cookie, { path }),
   }

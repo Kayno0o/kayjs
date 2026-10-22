@@ -6,7 +6,7 @@ description: A numbered row showing where the visitor is in a multi-step form, t
 
 `Steps` is the indicator, and the step it shows lives in the URL: `?step=profile`. Each step before the current one, and each in `done`, is a link back; the others are plain text. `current` is the key of the step on screen, `url` the page's URL (`ctx.url`), whose other params every link keeps, and `param` the query param, `step` by default. Screen readers hear the current step as `aria-current="step"` and a completed one followed by `doneLabel`.
 
-Three helpers from `@kaynooo/kayjs-ui` run the flow: `currentStep(url, keys, done)` reads the step off the URL, never one ahead of the first not done; `stepHref(url, key)` builds a link to a step; `stepDraft(ctx.cookies, name, { check })` keeps the values of each step between posts.
+Three helpers from `@kaynooo/kayjs-ui` run the flow: `currentStep(url, keys, done)` reads the step off the URL, never one ahead of the first not done; `stepHref(url, key)` builds a link to a step; `stepDraft(ctx.cookies, name, { check, request: ctx.request })` keeps the values of each step between posts.
 
 ## A multi-step form
 
@@ -23,22 +23,22 @@ const profile = s.Object({ name: s.String({ minLength: 2, maxLength: 80, error: 
 const checks: Record<string, ReturnType<typeof TypeCompiler.Compile>> = { account: TypeCompiler.Compile(account), profile: TypeCompiler.Compile(profile) }
 
 // The cookie is the visitor's to edit, so a step counts as done only while its values still pass its schema.
-const draft = (cookies: Bun.CookieMap) => stepDraft(cookies, 'signup', { check: (step, values) => checks[step]?.Check(values) ?? false })
+const draft = (ctx: { cookies: Bun.CookieMap, request: Request }) => stepDraft(ctx.cookies, 'signup', { request: ctx.request, check: (step, values) => checks[step]?.Check(values) ?? false })
 
 export const saveAccount = action(account, async (input, ctx) => {
-  draft(ctx.cookies).save('account', input)
+  draft(ctx).save('account', input)
 
   return ctx.redirect(stepHref(ctx.url, 'profile'))
 })
 
 export const saveProfile = action(profile, async (input, ctx) => {
-  draft(ctx.cookies).save('profile', input)
+  draft(ctx).save('profile', input)
 
   return ctx.redirect(stepHref(ctx.url, 'review'))
 })
 
 export const finish = action(async (ctx) => {
-  const kept = draft(ctx.cookies)
+  const kept = draft(ctx)
 
   if (kept.done().length < 2)
     return ctx.redirect(stepHref(ctx.url, 'account'))
@@ -49,9 +49,9 @@ export const finish = action(async (ctx) => {
   return ctx.redirect('/welcome')
 })
 
-const done = draft(ctx.cookies).done()
+const done = draft(ctx).done()
 const current = currentStep(ctx.url, KEYS, done)
-const values = draft(ctx.cookies).merged()
+const values = draft(ctx).merged()
 ---
 Steps(steps={[{ key: 'account', label: 'Account' }, { key: 'profile', label: 'Profile' }, { key: 'review', label: 'Review' }]} current={current} done={done} url={ctx.url} label="Signup")
 
@@ -71,7 +71,8 @@ else
     button Create the account
 ```
 
-- The draft is a cookie of its own, `httpOnly`, sent with every request under `path` (the whole site by default) for an hour (`maxAge`). A browser drops a cookie past about 4 KB, so `save` throws a `RangeError` past 3,800 bytes once encoded, around 1,500 characters of text: give the schemas a `maxLength`, and send a file or a long text through its own upload. Keep no password in it.
+- The draft is a cookie of its own, `httpOnly`, `secure` when `request` came over https (or `secure` says so), sent with every request under `path` (the whole site by default) for an hour (`maxAge`). A browser drops a cookie past about 4 KB, so `save` throws a `RangeError` past 3,800 bytes once encoded, around 1,500 characters of text: give the schemas a `maxLength`, and send a file or a long text through its own upload.
+- Keep no password in it. The cookie is not tied to a session, so call `clear()` on sign-out, or the next visitor of a shared browser inherits the draft for the hour.
 - Back keeps what was typed, since the values come from the draft. A step posted again replaces its values.
 - `check` is required: `done()` lists only the steps whose values pass it, and `currentStep` sends the visitor back to the first one that does not, so a hand-edited cookie or URL skips nothing. The schemas say `additionalProperties: false`, so an edited cookie adds no key either.
 - `Steps` takes the standard parts: `list`, `item`, `link`, `marker` and `label`.
