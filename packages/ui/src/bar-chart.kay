@@ -40,7 +40,7 @@ const colors = (item: BarSeries, index: number, at: number) => item.colors?.[at]
 
 // The bar the keyboard stands at, the latest one until it moves.
 const stop = signal<number | null>(null)
-const current = () => stop() ?? Math.max(0, labels.length - 1)
+const current = () => Math.min(stop() ?? labels.length - 1, Math.max(0, labels.length - 1))
 
 const reading = (item: BarSeries, at: number) => {
   const value = item.values[at]
@@ -56,8 +56,8 @@ const summaries = memo(() => labels.map((_, at) => {
   return `${headingTexts()[at]}: ${[...series.map(item => `${item.name} ${reading(item, at)}`), ...total].join(', ')}${notes.length > 0 ? `; ${notes.join('; ')}` : ''}`
 }))
 
-// A column with no height still shows a stub where its series gives it a colour or a note, so a failed run recorded as 0 stands out as much as a long one.
-const marked = (item: BarSeries, at: number) => Boolean(item.colors?.[at] || item.notes?.[at])
+// A column with no height still shows a stub where its series gives it a note, or a colour with a reading, so a failed run recorded as 0 stands out as much as a long one.
+const marked = (item: BarSeries, at: number) => Boolean(item.notes?.[at] || (item.colors?.[at] && typeof item.values[at] === 'number'))
 
 // The arrows walk the columns, one tab stop in all, and Home and End reach either end.
 function keyDown(event: KeyboardEvent) {
