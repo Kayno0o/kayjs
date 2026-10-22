@@ -1,12 +1,12 @@
 --- <Item>
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import { memo, onCleanup, onMount } from 'kay'
 import { virtualRows } from './virtual'
 
 const { items, item, itemKey, estimate = 48, overscan = 4, label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'tabindex'> & {
   items: Item[]
   // Draws a row, from the `@item(item, index)` block.
-  item: (item: Item, index: number) => JSX.Element
+  item: Snippet<[Item, number]>
   // Tells a row from another, so the height measured for it follows it when the list shifts; the row's index without one.
   itemKey?: ((item: Item, index: number) => unknown) | undefined
   // The height assumed for a row until it is measured, in pixels: the closer to the rows' own, the less the scroll bar moves as they are.
