@@ -197,8 +197,9 @@ describe('a room\'s state over a store of either kind', () => {
 
   it('treats any thenable a store answers as async, not only a native Promise', async () => {
     const base = memoryRooms()
-    const thenable = async (text: string | undefined) => ({ then: (resolve: (value: string | undefined) => void) => resolve(text) }) as unknown as Promise<string | undefined>
-    const store = { ...base, state: async (room: string) => thenable(base.state!(room)), update: async (room: string, change: (current: string | undefined) => string) => thenable(base.update!(room, change)) as Promise<string> } as AsyncRoomStore
+    // Plain functions returning a bare thenable: an async one would flatten it into a native Promise.
+    const thenable = <T>(value: T): PromiseLike<T> => ({ then: (resolve: (value: T) => unknown) => resolve(value) }) as PromiseLike<T>
+    const store = { ...base, state: (room: string) => thenable(base.state!(room)), update: (room: string, change: (current: string | undefined) => string) => thenable(base.update!(room, change)) } as unknown as AsyncRoomStore
     const live = rooms<Message, string, State>({ ...options, store })
 
     live.join(connection(), 'hall', 'ada')

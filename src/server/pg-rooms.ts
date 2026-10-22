@@ -89,7 +89,7 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
     void logged(what, ordered(work))
   }
 
-  // Waits for the room's lock for 5 seconds at most, so a stuck update elsewhere fails this one rather than holding the store's writes, the heartbeat's included.
+  // Waits for the room's lock for 5 seconds at most, so a stuck update elsewhere fails this one rather than holding the store's writes, the heartbeat's included; a leaving member asks up to `LOCK_ATTEMPTS` times.
   const lockRoom = async (tx: SQL, room: string) => {
     await query(tx, 'SET LOCAL lock_timeout = \'5s\'')
     await query(tx, 'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`kay_room_state\n${room}`])
