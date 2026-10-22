@@ -4,8 +4,6 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
-- `part="head"` on an element or a component call lets the caller style it: the component's `class` is typed from its parts, `Card(class={{ root: 'mt-4', head: 'p-6' }})`, each entry merged onto its part and `data-part` rendered ([Style a part of a component](styles-and-assets.md#style-a-part-of-a-component)).
-- `recipe({ parts, variants, defaults })` holds a component's classes by part and variant, and its variants become typed props with nothing declared twice, `Card(tone="danger" compact)` ([Give a component variants](styles-and-assets.md#give-a-component-variants)).
 - With Tailwind, a class passed to a component, or an expression or spread merged with the shorthand, overrides an earlier one setting the same property, `Button(class="px-2")` over `px-4`, with no `twMerge` ([Override a class](styles-and-assets.md#override-a-class-a-component-sets)).
 - Every value `kay` exports needs no import in a script or a server fence, `kay check` names the entry of a name that comes from another one, and `kay/server` exports `s` beside `defineEnv` ([Imports kay adds](components.md)); a page importing `action` is kept for prerendering like one that does not.
 - A value of `kay` only a template expression reads, such as `route` in a link, needs no import, and `route`, `localPath`, `withBase`, `s`, `durationMs` and `refusalMessage` keep a component static ([Imports kay adds](components.md)).
@@ -21,18 +19,19 @@ What each release of kay and its libraries adds, newest first, each feature with
 - Every size limit is `maxSize`: `bodyLimit` in the config, an action, `api()` and a route's `detail` is renamed, the old name kept three minors ([Protecting actions](action-protection.md#body-limit)).
 - One test helper per library, called at the top of a file with the test site and clearing itself before each test: `mailTest(site)`, `aiTest()`, `cmsTest(site)` (sign in as an editor, `save`, `entry`) and `auth.test(site)` ([Testing](testing.md)).
 - `kay test` runs `bun test` isolated, with kay's preload and failures at `.kay` lines, so a project needs no `bunfig.toml` or `--isolate`; `mountComponent` loads happy-dom itself ([Testing](testing.md)).
+- `part="head"` on an element or a component call lets the caller style it: the component's `class` is typed from its parts, `Card(class={{ root: 'mt-4', head: 'p-6' }})`, each entry merged onto its part and `data-part` rendered ([Style a part of a component](styles-and-assets.md#style-a-part-of-a-component)).
+- `recipe({ parts, variants, defaults })` holds a component's classes by part and variant, and its variants become typed props with nothing declared twice, `Card(tone="danger" compact)` ([Give a component variants](styles-and-assets.md#give-a-component-variants)).
 - A prop typed `Signal<T>` or `Memo<T>` is deprecated for `Bindable<T>` with `bind:` and a plain value prop: `kay check --fix --since 1.70` rewrites the type, its reads and every tag passing it ([Components](components.md#bind-a-prop-to-the-parents-signal)).
-
-## 1.69.0
-
-- A class set from a value the build cannot read no longer warns when a script its file reaches names a class of a stylesheet the file reaches, whose rules every page reaching it keeps ([Link or inline the stylesheets](styles-and-assets.md#link-or-inline-the-stylesheets)).
 - A class set from a value the build cannot read no longer warns when a script its file reaches writes out a class of a stylesheet the file reaches, whose rules every page reaching it keeps ([Link or inline the stylesheets](styles-and-assets.md#link-or-inline-the-stylesheets)).
 - `Bindable<T>` props and `bind:open={open}` on a component: the child reads and assigns the prop as a plain name, and the assignment writes the parent's signal ([Components](components.md#bind-a-prop-to-the-parents-signal)).
 - Assigning writes a signal held in an object's property, an array element or a `let` set from a function, `box.count = 1`, as it does a `const` one, and `kay check` types it by what the target holds ([Components](components.md#signals)).
 - `Snippet` from `kay` types a prop taking markup, `Snippet<[Item, number]>` for markup the component calls with values, and `kay upgrade` rewrites `JSX.Element` props to it ([Slots](templates.md#slots), [Islands](islands.md#props-to-an-island)).
-- A second `kay build --compile` costs what the first did: a build removes the last executable, and the last `--static` folder, before it starts, so Tailwind no longer scans them ([Build and start](build-and-start.md)).
 - With Tailwind, a class passed to a component or merged with another, literal pairs and `<html>`'s included, overrides an earlier one setting the same property, `Button(class="px-2")` over `px-4`, with no `twMerge` ([Override a class](styles-and-assets.md#override-a-class-a-component-sets)).
 - `kay lint` reports a line misindented in a `.kay` fence, by any amount, and `--fix` reindents it as in a `.ts` file; the preset turns `style/indent` on under kay 1.70 ([Linting](checks.md#linting)).
+
+## 1.69.0
+
+- A second `kay build --compile` costs what the first did: a build removes the last executable, and the last `--static` folder, before it starts, so Tailwind no longer scans them ([Build and start](build-and-start.md)).
 - kayjs-cms: a `passwordGuard` the app wraps in its own guard keeps its sign-in screen ([Options](../packages/cms/llms/options.md)).
 - `kay check` reports an `async` function returning kayjs-ai's `ask()` (`async-reply`, fixed by removing `async`), and the reply has `.stream()` for one that awaits first ([Lints](lints.md)).
 - `page.text()` and `find().text` keep the text of sibling blocks apart, `Sites Traffic` rather than `SitesTraffic`, as a visitor reads it ([Testing](testing.md)).
