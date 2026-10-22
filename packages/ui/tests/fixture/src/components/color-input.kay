@@ -11,5 +11,7 @@ form#form
   ColorInput#light(label="Light" name="light" value={light()} onChange={(value: string) => onChange ? onChange(value) : light.set(value)})
   ColorInput#locked(label="Locked" name="locked" value="#112233" disabled)
   button#set(type="button" onClick={() => light.set('#00ff00')}) Set
+  button#upper(type="button" onClick={() => light.set('#ABCDEF')}) Upper
+  button#invalid(type="button" onClick={() => light.set('red')}) Invalid
   button#reset(type="reset") Reset
   p#state {light()}

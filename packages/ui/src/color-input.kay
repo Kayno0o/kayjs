@@ -12,25 +12,27 @@ const { value, label, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['in
   // Written beside the swatch and naming the input for screen readers.
   label: string
   // Runs once with the colour chosen as `#rrggbb`, when the picker commits it and after a form reset that moved it, not on each shade dragged over.
+  // The place for a slow answer, such as a colour sent to a bulb that takes seconds to confirm it.
   // A promise holds the input busy until it settles, and puts the previous colour back when it rejects (logged) or resolves to false: a refused change never shows as made.
   // Typed `unknown`, so a callback answering something else, such as `list.push`, still fits.
   onChange?: ((value: string) => unknown) | undefined
 }>()
 
-// The input only holds lowercase `#rrggbb`.
-const hex = (colour: string) => colour.toLowerCase()
+// The input only holds lowercase `#rrggbb`, and turns anything else into black.
+const HEX = /^#[\da-f]{6}$/i
+const normal = (colour: string) => HEX.test(colour) ? colour.toLowerCase() : '#000000'
 
-const shown = signal(untrack(() => hex(value)))
+const shown = signal(untrack(() => normal(value)))
 const busy = signal(false)
 let box: HTMLInputElement | undefined
 // The colour the app last accepted, which a refused change puts back.
-let settled = untrack(() => hex(value))
+let settled = untrack(() => normal(value))
 // How often the parent's `value` reached the input, so a change under way knows whether the parent answered it.
 let synced = 0
 
 // A parent echoing the colour chosen from `onChange` is not setting it, so only one other than the shown colour counts.
 effect(() => {
-  const wanted = hex(value)
+  const wanted = normal(value)
 
   if (wanted === untrack(shown))
     return
@@ -42,7 +44,7 @@ effect(() => {
 
 const boxRef = startRef<HTMLInputElement>((element) => {
   box = element
-  element.defaultValue = hex(untrack(() => value))
+  element.defaultValue = normal(untrack(() => value))
 }, rest.ref)
 
 // The swatch follows the picker while it is dragged over, without telling the app.
@@ -104,6 +106,6 @@ onFormReset(() => box, resetting.reset)
 ---
 // A native colour input drawn as a swatch, so the picker, the keyboard and the form post come with it. A click while a change is under way opens nothing.
 label(part="root")
-  input({...rest} part="input" ref={boxRef} type="color" value={shown()} aria-busy={busy() ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onInput={moved} onChange={event => chosen(event.currentTarget)})
+  input({...rest} part="input" ref={boxRef} type="color" aria-label={label} value={shown()} aria-busy={busy() ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onInput={moved} onChange={event => chosen(event.currentTarget)})
   span(part="label") {label}
-  span(part="value") {shown()}
+  span(part="value" aria-hidden="true") {shown()}

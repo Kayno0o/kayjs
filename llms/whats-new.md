@@ -13,7 +13,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui `Slider` takes `onChange(value)` once on release or key press, a promise holding it busy and `false` putting the thumb back ([Slider](../packages/ui/llms/forms.md)).
 - `unsized-image` no longer warns of an `img` whose static classes or `style` reserve its box, as `aspect-video w-full` ([Checks](checks.md)).
 - kayjs-ui `ColorInput` picks a `#rrggbb` colour on a native input drawn as a swatch, holds itself busy on a promise from `onChange` and puts the colour back when refused ([Forms](../packages/ui/llms/forms.md)).
-- kayjs-ui `ChipGroup` takes number values as `Segmented` does, and both take `disabled` for the whole group ([ChipGroup](../packages/ui/llms/tables-navigation-and-layout.md)).
+- kayjs-ui `ChipGroup` takes number values as `Segmented` does, and `Segmented`, `ChipGroup` and `RadioGroup` take `disabled` for the whole group ([ChipGroup](../packages/ui/llms/tables-navigation-and-layout.md)).
 - The on-page editor offers Publish, Unpublish and Delete for the entry beside Save, with the role's refusal as tooltip ([Editor](../packages/cms/llms/editor.md)).
 - `proxy: { key: 'x-upstream-key' }` refuses with 403 every request lacking the key the proxy shares (`KAY_PROXY_KEY` or `KAY_PROXY_KEY_FILE`), with the health route and `open` paths left out ([Proxies](proxy-and-security.md#behind-a-proxy)).
 - `rooms({ store: appStore().rooms })` is typed `StoreRooms`, whose `state` and `update` give the state or a promise of it, so `await` them with no narrowing ([Rooms](rooms.md)).

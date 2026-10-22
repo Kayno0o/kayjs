@@ -37,6 +37,47 @@ test('draws a native colour input named by its label, with the swatch value and 
   expect(root.querySelector<HTMLInputElement>('input[name="locked"]')!.disabled).toBe(true)
 })
 
+test('names the input by its label alone, not by the hex beside it', async () => {
+  const { input } = await open()
+
+  expect(input.getAttribute('aria-label')).toBe('Light')
+})
+
+test('shows an upper case or invalid parent colour as the input holds it', async () => {
+  mounted = await mountComponent('src/components/color-input.kay', {})
+
+  const root = mounted.root
+
+  click(root.querySelector('#upper'))
+  await settle()
+
+  expect([root.querySelector<HTMLInputElement>('input[name="light"]')!.value, root.querySelector('.kui-color-input-value')?.textContent]).toEqual(['#abcdef', '#abcdef'])
+
+  click(root.querySelector('#invalid'))
+  await settle()
+
+  expect([root.querySelector<HTMLInputElement>('input[name="light"]')!.value, root.querySelector('.kui-color-input-value')?.textContent]).toEqual(['#000000', '#000000'])
+})
+
+test('a refusal puts the previous colour back when the parent never changed its value', async () => {
+  const { input, commit, shown } = await open(async () => false)
+
+  await commit('#abcdef')
+
+  expect([input.value, shown()]).toEqual(['#ff8800', '#ff8800'])
+})
+
+test('a refused form reset puts the colour it came from back', async () => {
+  const { input, commit, root, shown } = await open(async value => value !== '#ff8800')
+
+  await commit('#abcdef')
+  click(root.querySelector('#reset'))
+  await settle()
+  await settle()
+
+  expect([input.value, shown()]).toEqual(['#abcdef', '#abcdef'])
+})
+
 test('posts its colour under its name in a form', async () => {
   const { root, commit } = await open()
 

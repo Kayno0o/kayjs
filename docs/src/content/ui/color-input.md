@@ -8,7 +8,7 @@ The field is a native `input type="color"`, so the browser draws its own picker 
 
 ## Reading it
 
-`onChange` runs once with the colour the picker commits, in lowercase `#rrggbb`, and after a form reset that moved it. It does not run on each shade the pointer passes over: the swatch follows those on its own. Use a [Slider](/ui/slider) for a number instead.
+`onChange` runs once with the colour the picker commits, in lowercase `#rrggbb`, and after a form reset that moved it. It does not run on each shade the pointer passes over: the swatch follows those on its own.
 
 ## Async change
 
@@ -18,4 +18,6 @@ Return a promise from `onChange` to hold the input busy until it settles, for a 
 
 ## Label
 
-`label` is required. It names the input for screen readers.
+`label` is required. It names the input for screen readers, which do not hear the hex beside it.
+
+`id`, `disabled` and the other input attributes go on the input. A `value` that is not `#rrggbb` shows as black, as the native input does.
