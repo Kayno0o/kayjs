@@ -126,6 +126,58 @@ pgDescribe('pgData', () => {
     expect(await rows(sql, 'SELECT indisvalid FROM pg_index WHERE indexrelid = to_regclass(\'kay_jobs_due\')')).toEqual([{ indisvalid: true }])
   })
 
+  pgIt('leaves alone an index another replica is still building', async () => {
+    const sql = await fresh()
+    const [holder, first, second] = replicas(3) as [SQL, SQL, SQL]
+
+    await createDataTables(sql)
+    await sql.unsafe('DROP INDEX kay_jobs_due')
+
+    const errors: unknown[] = []
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const holding = holder.begin('ISOLATION LEVEL REPEATABLE READ', async (tx) => {
+      // Its snapshot makes the build wait for it, so the index stays invalid while the second replica starts.
+      await tx.unsafe('SELECT count(*) FROM kay_jobs')
+      await held
+    })
+    const building = async (): Promise<boolean> => (await rows<{ found: boolean }>(sql, 'SELECT EXISTS (SELECT 1 FROM pg_stat_progress_create_index WHERE index_relid = to_regclass(\'kay_jobs_due\')) AS found'))[0]!.found
+    const build = (async (): Promise<void> => {
+      try {
+        await createDataTables(first)
+      }
+      catch (error) {
+        errors.push(error)
+      }
+    })()
+    const startSecond = async (): Promise<string> => {
+      await createDataTables(second)
+
+      return 'done'
+    }
+    const timeout = async (): Promise<string> => {
+      await Bun.sleep(3000)
+
+      return 'waited on the first build'
+    }
+
+    try {
+      await waitFor(building, 'the first build')
+      expect(await Promise.race([startSecond(), timeout()])).toBe('done')
+      expect(await building()).toBe(true)
+    }
+    finally {
+      release()
+      await holding
+    }
+
+    await build
+    expect(errors).toEqual([])
+    expect(await rows(sql, 'SELECT indisvalid FROM pg_index WHERE indexrelid = to_regclass(\'kay_jobs_due\')')).toEqual([{ indisvalid: true }])
+  })
+
   pgIt('creates the tables once when replicas open it at once', async () => {
     await fresh()
 

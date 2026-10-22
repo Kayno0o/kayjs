@@ -63,10 +63,10 @@ export async function relationsMissing(db: SQL, names: readonly string[]): Promi
 export async function createMissingIndexes(db: SQL, indexes: readonly PgIndex[]): Promise<void> {
   for (const index of indexes) {
     if (!await relationsMissing(db, [index.name])) {
-      // A concurrent build that failed leaves an invalid index, which is dropped to be built again.
-      const [found] = await rowsOf<{ valid: boolean }>(db.unsafe(`SELECT indisvalid AS valid FROM pg_index WHERE indexrelid = to_regclass('${index.name}')`))
+      // A concurrent build that failed leaves an invalid index, which is dropped to be built again, but one that is invalid while another session still builds it is left alone.
+      const [found] = await rowsOf<{ valid: boolean, building: boolean }>(db.unsafe(`SELECT indisvalid AS valid, EXISTS (SELECT 1 FROM pg_stat_progress_create_index WHERE index_relid = indexrelid) AS building FROM pg_index WHERE indexrelid = to_regclass('${index.name}')`))
 
-      if (found?.valid !== false)
+      if (found?.valid !== false || found.building)
         continue
 
       await db.unsafe(`DROP INDEX CONCURRENTLY IF EXISTS ${index.name}`)
