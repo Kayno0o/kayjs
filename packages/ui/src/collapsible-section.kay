@@ -1,8 +1,11 @@
 ---
+import { recipe } from 'kay'
 import type { JSX, Snippet } from 'kay'
 import Icon from './icon.kay'
 
-const { title, open = true, boxed = false, meta, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['details'], 'class' | 'title' | 'open' | 'children'> & {
+const look = recipe({ parts: { root: 'kui-collapsible-section', summary: 'kui-collapsible-section-summary', title: 'kui-collapsible-section-title', meta: 'kui-collapsible-section-meta', chevron: 'kui-collapsible-section-chevron', body: 'kui-collapsible-section-body' } })
+
+const { title, open = true, boxed = false, meta, ...rest } = props<Omit<JSX.IntrinsicElements['details'], 'class' | 'title' | 'open' | 'children'> & {
   title: string
   // Whether it starts unfolded; the reader folds and unfolds it from then on.
   open?: boolean | undefined
@@ -10,16 +13,15 @@ const { title, open = true, boxed = false, meta, class: className, ...rest } = p
   boxed?: boolean | undefined
   // Sits in the band before the chevron, for a count or a state the folded section would otherwise hide.
   meta?: Snippet
-  class?: string | undefined
 }>()
 ---
 // A native disclosure, so it folds without script and a static page can hold it.
-details.kui-collapsible-section({...rest} open={open} data-boxed={boxed || undefined} class={className})
-  summary.kui-collapsible-section-summary
-    span.kui-heading-section.kui-collapsible-section-title {title}
+details({...rest} part="root" open={open} data-boxed={boxed || undefined})
+  summary(part="summary")
+    span.kui-heading-section(part="title") {title}
     if meta
-      span.kui-collapsible-section-meta
+      span(part="meta")
         | {meta}
-    Icon(icon="chevron" class="kui-collapsible-section-chevron")
-  .kui-collapsible-section-body
+    Icon(icon="chevron" part="chevron")
+  div(part="body")
     slot

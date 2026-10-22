@@ -1,13 +1,15 @@
 ---
 import type { SearchHit } from 'kay'
 import type { PaletteAction, PaletteEntry, PaletteLink } from './palette'
-import { effect, memo, searchResults, shortcut, signal, uid } from 'kay'
+import { effect, memo, recipe, searchResults, shortcut, signal, uid } from 'kay'
 import { stepIndex } from './cycle'
 import Icon from './icon.kay'
 import { isPaletteLink, paletteHits, paletteMatches, paletteSections, splitMatches, withRecent } from './palette'
 import { wording } from 'kay/words'
 
-const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentChange, hotkey = 'k', siteSearch = false, siteSearchLabel = wording('ui.commandPalette.siteSearchLabel', 'In the pages'), siteSearchError = wording('ui.commandPalette.siteSearchError', 'The pages could not be searched'), label = wording('ui.commandPalette.label', 'Search'), placeholder = wording('ui.commandPalette.placeholder', 'Search'), emptyLabel = wording('ui.commandPalette.emptyLabel', 'No results'), recentLabel = wording('ui.commandPalette.recentLabel', 'Recent'), resultsLabel, siteSearchMore, class: className } = props<{
+const look = recipe({ parts: { root: 'kui-command-palette', search: 'kui-command-palette-search', input: 'kui-command-palette-input', list: 'kui-command-palette-list', heading: 'kui-command-palette-heading', option: 'kui-command-palette-option', text: 'kui-command-palette-text', label: 'kui-command-palette-label', snippet: 'kui-command-palette-snippet', more: 'kui-command-palette-more', group: 'kui-command-palette-group', empty: 'kui-command-palette-empty', count: 'kui-command-palette-count' } })
+
+const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentChange, hotkey = 'k', siteSearch = false, siteSearchLabel = wording('ui.commandPalette.siteSearchLabel', 'In the pages'), siteSearchError = wording('ui.commandPalette.siteSearchError', 'The pages could not be searched'), label = wording('ui.commandPalette.label', 'Search'), placeholder = wording('ui.commandPalette.placeholder', 'Search'), emptyLabel = wording('ui.commandPalette.emptyLabel', 'No results'), recentLabel = wording('ui.commandPalette.recentLabel', 'Recent'), resultsLabel, siteSearchMore } = props<{
   // Shows the palette; the hotkey opens and closes it too, and `onOpenChange` reports every change for a parent driving it.
   open?: boolean | undefined
   onOpenChange?: ((open: boolean) => void) | undefined
@@ -33,7 +35,6 @@ const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentC
   resultsLabel?: ((count: number) => string) | undefined
   // How many more times a section found holds the words searched for, past the line shown.
   siteSearchMore?: ((count: number) => string) | undefined
-  class?: string | undefined
 }>()
 
 // A row of the list, numbered the way the arrow keys walk it; a section the site search found carries the line of text it was found in, and its heading's words found marked.
@@ -182,50 +183,50 @@ function keyDown(event: KeyboardEvent) {
   document.getElementById(optionId(active()))?.click()
 }
 ---
-dialog.kui-command-palette(ref={element => dialog = element} closedby="any" aria-label={label} onClose={closed} class={className})
+dialog(part="root" ref={element => dialog = element} closedby="any" aria-label={label} onClose={closed})
   if shown()
-    .kui-command-palette-search
+    div(part="search")
       Icon(icon="search")
-      input.kui-command-palette-input(value={query()} onInput={event => { query.set(event.currentTarget.value); selected.set(0) }} onKeyDown={keyDown} role="combobox" aria-label={label} aria-expanded="true" aria-controls={`${id}-list`} aria-autocomplete="list" aria-activedescendant={rows()[active()] ? optionId(active()) : undefined} autocomplete="off" spellcheck="false" placeholder={placeholder})
-    .kui-command-palette-list(id={`${id}-list`} role="listbox" aria-label={label})
+      input(part="input" value={query()} onInput={event => { query.set(event.currentTarget.value); selected.set(0) }} onKeyDown={keyDown} role="combobox" aria-label={label} aria-expanded="true" aria-controls={`${id}-list`} aria-autocomplete="list" aria-activedescendant={rows()[active()] ? optionId(active()) : undefined} autocomplete="off" spellcheck="false" placeholder={placeholder})
+    div(part="list" id={`${id}-list`} role="listbox" aria-label={label})
       for section, sectionIndex of sections() key={sectionIndex}
         div(role="group" aria-labelledby={section.group === null ? undefined : `${id}-group-${sectionIndex}`})
           if section.group !== null
-            .kui-heading-section.kui-command-palette-heading(id={`${id}-group-${sectionIndex}`}) {section.group}
+            div.kui-heading-section(part="heading" id={`${id}-group-${sectionIndex}`}) {section.group}
           for row of section.rows key={row.index}
             if linkOf(row.entry) as link
-              a.kui-command-palette-option(href={link.href} {...link.external ? EXTERNAL : {}} id={optionId(row.index)} role="option" aria-selected={row.index === active() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected.set(row.index)} onClick={() => followed(link, row.snippet !== undefined)})
+              a(part="option" href={link.href} {...link.external ? EXTERNAL : {}} id={optionId(row.index)} role="option" aria-selected={row.index === active() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected.set(row.index)} onClick={() => followed(link, row.snippet !== undefined)})
                 if link.icon as icon
                   Icon(icon={icon})
                 if row.snippet as snippet
-                  span.kui-command-palette-text
-                    span.kui-command-palette-label
+                  span(part="text")
+                    span(part="label")
                       for part, partIndex of row.labelParts ?? [{ text: row.entry.label, hit: false }] key={partIndex}
                         if part.hit
                           mark {part.text}
                         else
                           | {part.text}
-                    span.kui-command-palette-snippet
+                    span(part="snippet")
                       for part, partIndex of snippet key={partIndex}
                         if part.hit
                           mark {part.text}
                         else
                           | {part.text}
                     if row.more as more
-                      span.kui-command-palette-more {countedMore(more)}
+                      span(part="more") {countedMore(more)}
                 else
-                  span.kui-command-palette-label {row.entry.label}
+                  span(part="label") {row.entry.label}
                 if query().trim() && row.entry.group
-                  span.kui-command-palette-group {row.entry.group}
+                  span(part="group") {row.entry.group}
             else if actionOf(row.entry) as action
-              button.kui-command-palette-option(type="button" id={optionId(row.index)} role="option" aria-selected={row.index === active() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected.set(row.index)} onClick={() => act(action)})
+              button(part="option" type="button" id={optionId(row.index)} role="option" aria-selected={row.index === active() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected.set(row.index)} onClick={() => act(action)})
                 if action.icon as icon
                   Icon(icon={icon})
-                span.kui-command-palette-label {row.entry.label}
+                span(part="label") {row.entry.label}
                 if query().trim() && row.entry.group
-                  span.kui-command-palette-group {row.entry.group}
+                  span(part="group") {row.entry.group}
       if site?.error() && query().trim()
-        p.kui-command-palette-empty {siteSearchError}
+        p(part="empty") {siteSearchError}
       else if rows().length === 0 && !site?.loading()
-        p.kui-command-palette-empty {emptyLabel}
-    p.kui-command-palette-count(role="status") {query().trim() && !site?.loading() ? counted(rows().length) : ''}
+        p(part="empty") {emptyLabel}
+    p(part="count" role="status") {query().trim() && !site?.loading() ? counted(rows().length) : ''}

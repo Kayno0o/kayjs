@@ -1,10 +1,12 @@
 ---
 import type { JSX, Snippet } from 'kay'
-import { effect } from 'kay'
+import { effect, recipe } from 'kay'
 import IconButton from './icon-button.kay'
 import { wording } from 'kay/words'
 
-const { open, title, actions, footer, onOpenChange, closeLabel = wording('ui.sidePanel.closeLabel', 'Close'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'closedby' | 'closedBy'> & {
+const look = recipe({ parts: { root: 'kui-side-panel', head: 'kui-side-panel-head', title: 'kui-side-panel-title', body: 'kui-side-panel-body', footer: 'kui-side-panel-footer' } })
+
+const { open, title, actions, footer, onOpenChange, closeLabel = wording('ui.sidePanel.closeLabel', 'Close'), ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'closedby' | 'closedBy'> & {
   // Shows the panel as a modal along the edge; the parent sets it back to false in `onOpenChange`.
   open: boolean
   title: string
@@ -12,7 +14,6 @@ const { open, title, actions, footer, onOpenChange, closeLabel = wording('ui.sid
   actions?: Snippet
   footer?: Snippet
   closeLabel?: string | undefined
-  class?: string | undefined
   // Called with `false` however the panel closes, a click outside and Escape included. Closed by either of those or its close button, its content is still there to read; closed by the parent, it is already gone.
   onOpenChange: (open: boolean) => void
 }>()
@@ -32,14 +33,14 @@ effect(() => {
 })
 ---
 // Named by its title for screen readers. Every way of closing it ends in the dialog's `close` event, the close button included, so `onOpenChange` is the one place the parent learns of it.
-dialog.kui-side-panel(aria-label={title} {...rest} ref={element => panel = element} closedby="any" onClose={() => onOpenChange(false)} class={className})
+dialog(part="root" aria-label={title} {...rest} ref={element => panel = element} closedby="any" onClose={() => onOpenChange(false)})
   if open
-    header.kui-side-panel-head
-      h2.kui-side-panel-title {title}
+    header(part="head")
+      h2(part="title") {title}
       | {actions}
       IconButton(icon="close" label={closeLabel} variant="ghost" onClick={() => panel?.close()})
-    .kui-side-panel-body
+    div(part="body")
       slot
     if footer
-      .kui-side-panel-footer
+      div(part="footer")
         | {footer}

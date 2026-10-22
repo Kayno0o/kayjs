@@ -1,16 +1,17 @@
 --- <Row extends BarListRow>
 import type { JSX } from 'kay'
 import type { BarListRow } from './plot'
-import { memo } from 'kay'
+import { memo, recipe } from 'kay'
 import { wording } from 'kay/words'
 
-const { rows, onSelect, emptyLabel, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'onSelect'> & {
+const look = recipe({ parts: { root: 'kui-bar-list', row: 'kui-bar-list-row', label: 'kui-bar-list-label', value: 'kui-bar-list-value', track: 'kui-bar-list-track', fill: 'kui-bar-list-fill' } })
+
+const { rows, onSelect, emptyLabel, ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'onSelect'> & {
   rows: Row[]
   // Makes every row a button handing back the row it was pressed on.
   onSelect?: ((row: Row) => void) | undefined
   // What the list reads with no rows.
   emptyLabel?: string | undefined
-  class?: string | undefined
 }>()
 
 const nothing = () => emptyLabel ?? wording('ui.barList.emptyLabel', 'No data yet.')
@@ -22,20 +23,20 @@ const percent = (row: Row) => largest() > 0 ? Math.max(0, row.value) / largest()
 ---
 if rows.length === 0
   // The app's id and class stay on whichever element shows.
-  p.kui-bar-list-empty(id={rest.id} class={className}) {nothing()}
+  p.kui-bar-list-empty(part="root" id={rest.id}) {nothing()}
 else
-  ul.kui-bar-list({...rest} class={className})
+  ul({...rest} part="root")
     for row of rows key={row.key}
       li
         if onSelect
-          button.kui-bar-list-row(type="button" data-interactive onClick={() => onSelect?.(row)})
-            span.kui-bar-list-label {row.label}
-            span.kui-bar-list-value {row.display ?? row.value}
-            span.kui-bar-list-track
-              span.kui-bar-list-fill(style={`width: ${percent(row)}%`})
+          button(part="row" type="button" data-interactive onClick={() => onSelect?.(row)})
+            span(part="label") {row.label}
+            span(part="value") {row.display ?? row.value}
+            span(part="track")
+              span(part="fill" style={`width: ${percent(row)}%`})
         else
-          .kui-bar-list-row
-            span.kui-bar-list-label {row.label}
-            span.kui-bar-list-value {row.display ?? row.value}
-            span.kui-bar-list-track
-              span.kui-bar-list-fill(style={`width: ${percent(row)}%`})
+          div(part="row")
+            span(part="label") {row.label}
+            span(part="value") {row.display ?? row.value}
+            span(part="track")
+              span(part="fill" style={`width: ${percent(row)}%`})

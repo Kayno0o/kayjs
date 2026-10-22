@@ -399,7 +399,7 @@ describe('data', () => {
   test('BarList measures each row against the largest, reads its display, and says when it has none', async () => {
     const bars = (await one('/data', '#bars')).html
 
-    expect([...bars.matchAll(/bar-list-value">([^<]*)<.*?width: (\d+)%/g)].map(match => [match[1], match[2]])).toEqual([['2', '100'], ['one', '50'], ['0', '0']])
+    expect([...bars.matchAll(/bar-list-value" data-part="value">([^<]*)<.*?width: (\d+)%/g)].map(match => [match[1], match[2]])).toEqual([['2', '100'], ['one', '50'], ['0', '0']])
     expect(await find('/data', '#bars button')).toEqual([])
     expect((await find('/data', '#no-bars-label p')).map(found => found.text)).toEqual(['No visits'])
     expect((await find('/data', '#no-bars-default p')).map(found => found.text)).toEqual(['No data yet.'])
@@ -662,7 +662,7 @@ describe('ContactForm', () => {
 
     const refused = await site.submit(contact, { name: 'Ada', email: 'ada@example.com', message: 'Hi', consent: false } as never, { from: '/contact-consent' })
 
-    expect(refused.html).toContain('class="kui-form-field-issue">Please tick the box to send your message.</span>')
+    expect(refused.html).toContain('class="kui-form-field-issue" data-part="issue">Please tick the box to send your message.</span>')
   })
 
   test('draws no consent box for an app\'s own consent field, which only consent: true marks', async () => {

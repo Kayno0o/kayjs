@@ -1,12 +1,14 @@
 --- <Data>
-import { signal } from 'kay'
+import { recipe, signal } from 'kay'
 import Button from './button.kay'
 import Dialog from './dialog.kay'
 import IconButton from './icon-button.kay'
 import { attempt } from './toast'
 import { wording } from 'kay/words'
 
-const { message, onConfirm, onOpen, failure, success, refused, tone = 'danger', trigger = 'icon', ask = 'dialog', label, title, confirmLabel, pendingLabel, cancelLabel = wording('ui.confirmDelete.cancelLabel', 'Cancel'), size, variant, class: className } = props<{
+const frame = recipe({ parts: { root: '', armed: 'kui-confirm-delete-armed', message: 'kui-confirm-delete-message' } })
+
+const { message, onConfirm, onOpen, failure, success, refused, tone = 'danger', trigger = 'icon', ask = 'dialog', label, title, confirmLabel, pendingLabel, cancelLabel = wording('ui.confirmDelete.cancelLabel', 'Cancel'), size, variant } = props<{
   // The dialog's question; asked inline, the armed pair's name for screen readers and the confirm button's tooltip.
   message: string
   // Deletes, or does what a neutral confirm asks. The dialog stays open, its buttons disabled, until a returned promise settles, and closes once it resolves.
@@ -38,7 +40,6 @@ const { message, onConfirm, onOpen, failure, success, refused, tone = 'danger', 
   // The icon trigger's form, as an IconButton's, which then takes the tone as its own: danger-coloured by default, neutral for `tone="neutral"`. Without it the icon stays neutral.
   variant?: 'solid' | 'ghost' | 'inline' | undefined
   // Goes on the trigger.
-  class?: string | undefined
 }>()
 
 const danger = () => tone === 'danger'
@@ -88,15 +89,15 @@ function keyDown(event: KeyboardEvent) {
 }
 ---
 if trigger === 'button'
-  Button(label={triggerLabel()} tone={look()} hidden={ask === 'inline' && open()} class={className} onClick={start})
+  Button(label={triggerLabel()} tone={look()} hidden={ask === 'inline' && open()} part="root" onClick={start})
 else if trigger === 'link'
-  button.kui-confirm-delete-link(type="button" hidden={ask === 'inline' && open()} class={className} onClick={start}) {triggerLabel()}
+  button.kui-confirm-delete-link(part="root" type="button" hidden={ask === 'inline' && open()} onClick={start}) {triggerLabel()}
 else
-  IconButton(icon={danger() ? 'delete' : 'success'} label={triggerLabel()} size={size} variant={variant} tone={variant === undefined ? undefined : tone} hidden={ask === 'inline' && open()} class={className} onClick={start})
+  IconButton(icon={danger() ? 'delete' : 'success'} label={triggerLabel()} size={size} variant={variant} tone={variant === undefined ? undefined : tone} hidden={ask === 'inline' && open()} part="root" onClick={start})
 if ask === 'inline'
   if open()
     // Armed by a click, so the focus moves onto the button that deletes.
-    span.kui-confirm-delete-armed(ref={element => { armed = element; queueMicrotask(() => element.querySelector('button')?.focus()) }} role="group" aria-label={message} onKeyDown={keyDown})
+    span(part="armed" ref={element => { armed = element; queueMicrotask(() => element.querySelector('button')?.focus()) }} role="group" aria-label={message} onKeyDown={keyDown})
       Button(label={pending() ? pendingText() : confirmText()} tone={look()} busy={pending()} disabled={pending()} data-tooltip={message} onClick={confirm})
       IconButton(icon="close" label={cancelLabel} size={size} variant="ghost" disabled={pending()} onClick={close})
 else
@@ -104,4 +105,4 @@ else
     @footer
       Button(label={cancelLabel} disabled={pending()} onClick={() => open.set(false)})
       Button(label={pending() ? pendingText() : confirmText()} tone={look()} busy={pending()} disabled={pending()} onClick={confirm})
-    p.kui-confirm-delete-message {message}
+    p(part="message") {message}

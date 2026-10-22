@@ -94,6 +94,23 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     'kui-menu-list min-w-48',
     'kui-slider-label font-medium',
     'kui-slider-value tabular-nums',
+    'kui-bar-list-row py-1',
+    'kui-bar-list-label font-medium',
+    'kui-bar-list-track h-2',
+    'kui-chip rounded-full',
+    'kui-collapsible-section-summary py-3',
+    'kui-collapsible-section-body pt-2',
+    'kui-widget-head pb-2',
+    'kui-heading-section kui-widget-title text-sm',
+    'bg-red-500 kui-meter-fill rounded-full',
+    'kui-popover shadow-xl',
+    'kui-side-panel-head px-6',
+    'kui-side-panel-title text-lg',
+    'kui-side-panel-body px-6',
+    'kui-save-bar sticky',
+    'kui-save-bar-status italic',
+    'kui-save-bar-actions gap-4',
+    'kui-command-palette rounded-2xl',
   ]
 
   test.each(restyled)('draws class="%s"', (classes) => {

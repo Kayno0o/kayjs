@@ -1,6 +1,6 @@
 ---
 import type { Duration } from 'kay'
-import { durationMs, effect, onCleanup, signal } from 'kay'
+import { durationMs, effect, onCleanup, recipe, signal } from 'kay'
 import { claim } from './claim'
 
 // An element carries its tooltip as `data-tooltip`, and where it sits as `data-tooltip-placement`, a CSS `position-area`, `top` by default.
@@ -10,6 +10,8 @@ const ANCHOR = '--kui-tooltip-anchor'
 const WHITESPACE = /\s+/
 // The id of the tooltip panel, which the element it shows for points at with `aria-describedby`.
 const PANEL_ID = 'kui-tooltip'
+
+const look = recipe({ parts: { root: 'kui-tooltip' } })
 
 const { showDelay = '80ms', hideDelay = '150ms' } = props<{
   // How long the pointer or focus rests on an element before its tooltip shows.
@@ -164,4 +166,4 @@ effect(() => {
 ---
 // Rendered in the root layout, it shows the tooltip of whichever element the pointer or a tab lands on. A second one, such as an extension's, renders nothing while the first is mounted.
 if owns()
-  .kui-tooltip(id={PANEL_ID} ref={element => panel.set(element)} popover="manual" role="tooltip") {aimed()?.text}
+  div(part="root" id={PANEL_ID} ref={element => panel.set(element)} popover="manual" role="tooltip") {aimed()?.text}

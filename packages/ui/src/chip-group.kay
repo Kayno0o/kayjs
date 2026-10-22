@@ -2,12 +2,14 @@
 import type { JSX } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
-import { effect, signal, uid, untrack } from 'kay'
+import { effect, recipe, signal, uid, untrack } from 'kay'
 import { changeAccepted } from './change'
 import { onFormReset, resetWhenIdle, startRef } from './form-reset'
 import Icon from './icon.kay'
 
-const { options, value, label, name, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+const look = recipe({ parts: { root: 'kui-chip-group', chip: 'kui-chip', input: 'kui-chip-input', label: 'kui-chip-label', icon: 'kui-chip-icon' } })
+
+const { options, value, label, name, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // `icon` sits before the label; `disabled` keeps that chip as it is.
   options: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[]
   // The options picked to start with, in any order; a group whose parent passes others follows them.
@@ -20,7 +22,6 @@ const { options, value, label, name, onChange, class: className, ...rest } = pro
   // A promise holds the group busy until it settles, and puts the previous pick back when it resolves to false, rejects or throws (logged): a refused change never shows as made.
   // Typed `unknown`, so a callback answering something else, such as `list.push`, still fits.
   onChange?: ((value: Value[]) => unknown) | undefined
-  class?: string | undefined
 }>()
 
 const group = name ?? uid()
@@ -79,11 +80,11 @@ const resetting = resetWhenIdle(busy, () => {
 onFormReset(() => root, resetting.reset)
 ---
 // Real checkboxes drawn as chips, so the group submits like any other field and Space toggles the focused chip. A click while a change is under way ticks nothing.
-.kui-chip-group({...rest} ref={ref} role="group" aria-label={label} aria-busy={busy() ? 'true' : undefined} class={className})
+div({...rest} part="root" ref={ref} role="group" aria-label={label} aria-busy={busy() ? 'true' : undefined})
   for option of options key={option.value}
-    label.kui-chip
-      input.kui-chip-input(ref={element => element.defaultChecked = untrack(() => value.includes(option.value))} type="checkbox" name={group} value={option.value} checked={picked().includes(option.value)} disabled={option.disabled} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => toggle(event.currentTarget, option.value)})
-      span.kui-chip-label
+    label(part="chip")
+      input(part="input" ref={element => element.defaultChecked = untrack(() => value.includes(option.value))} type="checkbox" name={group} value={option.value} checked={picked().includes(option.value)} disabled={option.disabled} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => toggle(event.currentTarget, option.value)})
+      span(part="label")
         if option.icon
-          Icon(icon={option.icon} class="kui-chip-icon")
+          Icon(icon={option.icon} part="icon")
         | {option.label}

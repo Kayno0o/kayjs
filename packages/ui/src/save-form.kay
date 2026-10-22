@@ -1,13 +1,15 @@
 --- <Output>
 import type { Action, Answer, FailureData, Success } from 'kay'
-import { guardLeave, onCleanup, onMount, shortcut, signal } from 'kay'
+import { guardLeave, onCleanup, onMount, recipe, shortcut, signal } from 'kay'
 import Button from './button.kay'
 import { callAction, formIssues } from './forms'
 import { holdDefaults, onFormReset } from './form-reset'
 import { toast } from './toast'
 import { wording } from 'kay/words'
 
-const { action, refused, saved, onSaved, onDiscard, dirty, onSave, status, failure = wording('ui.saveForm.failure', 'Could not save.'), dirtyLabel = wording('ui.saveForm.dirtyLabel', 'Unsaved changes.'), cleanLabel = wording('ui.saveForm.cleanLabel', 'No unsaved change.'), savingLabel = wording('ui.saveForm.savingLabel', 'Saving…'), saveLabel = wording('ui.saveForm.saveLabel', 'Save'), discardLabel = wording('ui.saveForm.discardLabel', 'Discard'), shortcut: saveKeys = 'mod+s', class: className } = props<{
+const look = recipe({ parts: { root: 'kui-save-form', grid: 'kui-form-grid', bar: 'kui-save-bar', status: 'kui-save-bar-status', actions: 'kui-save-bar-actions' } })
+
+const { action, refused, saved, onSaved, onDiscard, dirty, onSave, status, failure = wording('ui.saveForm.failure', 'Could not save.'), dirtyLabel = wording('ui.saveForm.dirtyLabel', 'Unsaved changes.'), cleanLabel = wording('ui.saveForm.cleanLabel', 'No unsaved change.'), savingLabel = wording('ui.saveForm.savingLabel', 'Saving…'), saveLabel = wording('ui.saveForm.saveLabel', 'Save'), discardLabel = wording('ui.saveForm.discardLabel', 'Discard'), shortcut: saveKeys = 'mod+s' } = props<{
   // The page's action the form calls with its fields, as FormDialog does. An editor whose state is signals gives `dirty` and `onSave` instead.
   action?: Action<never, Output> | undefined
   // Toasted when the call fails other than on a field, or when `onSave` rejects.
@@ -34,7 +36,6 @@ const { action, refused, saved, onSaved, onDiscard, dirty, onSave, status, failu
   discardLabel?: string | undefined
   // The keys that save, `mod+s` (Ctrl or Cmd with S) by default; `false` binds none. Written as kay's `shortcut` takes them.
   shortcut?: string | false | undefined
-  class?: string | undefined
 }>()
 
 const issues = signal<Record<string, string>>({})
@@ -191,13 +192,13 @@ function discard() {
 // Ctrl or Cmd with S saves unless `shortcut` says otherwise, the browser's own save dialog kept away even when there is nothing to save.
 shortcut(() => saveKeys || null, () => form?.requestSubmit(), { on: () => form })
 ---
-form.kui-save-form(class={className} ref={element => form = element} onSubmit={submit} onInput={checkSoon} onChange={checkSoon})
-  .kui-form-grid
+form(part="root" ref={element => form = element} onSubmit={submit} onInput={checkSoon} onChange={checkSoon})
+  div(part="grid")
     slot
-  .kui-save-bar
+  div(part="bar")
     // Announced as it changes, so a screen reader hears the changes pile up, the save start and the form come back clean.
-    p.kui-save-bar-status(role="status" data-dirty={isDirty() || undefined}) {status ?? (busy() ? savingLabel : isDirty() ? dirtyLabel : cleanLabel)}
-    .kui-save-bar-actions
+    p(part="status" role="status" data-dirty={isDirty() || undefined}) {status ?? (busy() ? savingLabel : isDirty() ? dirtyLabel : cleanLabel)}
+    div(part="actions")
       // `aria-disabled` rather than `disabled`, so the button pressed keeps the focus as the form turns clean.
       Button(label={discardLabel} aria-disabled={!isDirty() || busy() || undefined} onClick={discard})
       Button(label={saveLabel} type="submit" tone="accent" busy={busy()} aria-disabled={!isDirty() || busy() || undefined})
