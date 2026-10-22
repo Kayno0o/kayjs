@@ -2,14 +2,80 @@
 
 The options `cms()` takes, from `kay.config.ts`.
 
-`cms({ prefix, logo, guard, roles, member, files, uploads, pageSize, collections, rawHtml, author, onSave, history })`: `prefix` is where the screens live (`/admin`; `/` is the root, where the screens mount under a `(admin)` group, so an app root layout and guard neither wrap them nor are wrapped by theirs), `logo` an image (`/logo.svg` or an https URL) before the name in the admin's header, `pageSize` how many entries a collection's list shows on a page (50), a positive whole number, `collections` how the screens arrange a collection by name, `{ form: { fields, hide }, list: { columns, actions } }` (see [Arranging and replacing the screens](screens.md)), `guard` who may use them and the API, as `{ load }` returning the guard, which runs on the first request so `kay.config.ts` imports nothing of the app's auth or database, or the built guard itself, which does import it, `files` where a folder entry's file goes, `workingTree()` by default, which a production server refuses to boot with unless named, as the next deploy would drop its saves. `uploads` lists the types a file field takes, exact or `image/*`, PNG, JPEG, WebP, GIF, AVIF and PDF by default, the type read off the file name's extension, in any case, as kay's storage serves it; another is answered 415. The bytes must be that type too, whatever the name or the declared type says: PNG, JPEG, GIF, WebP and AVIF are read by their signatures, a PDF by its header, an SVG by its `<svg` root, and a file that is not what it is named (HTML named `x.png`, a JPEG named `x.png`, a PNG cut short of its header) is answered 415 with `cms.upload.notReal`; a type with no signature (`text/csv`, video) is taken as named, and storage serves anything but a PNG, JPEG, WebP, GIF, AVIF, video, audio, PDF or plain-text type as a sandboxed download, an SVG included, so it never runs as the site; the SVG check is only for a `<svg` root in the first 4 KB. `uploads: { types, maxSize }` also sets the most an upload may weigh, bytes or `'50mb'` as kay's `budget` takes them, 20 MB by default; the upload route reads that much whatever the app's `maxSize`, so nothing else is raised, and a `maxSize` that is zero, negative, fractional in bytes or over 128 MB less 64 KB throws as `kay.config.ts` loads, as Bun refuses a request body over 128 MB before the route sees it and buffers an upload in memory. A save whose body renders HTML that would run as the site or cover it, every tag and attribute kay's sanitizer drops (a `<script>`, an `<svg>`, a `<form>` or an input, an `on*`, `style` or `formaction` attribute), a `javascript:` URL in any URL attribute, or a tag left open or wrapped around a component, read off the HTML kay renders as a browser tokenizes it, is refused with an issue on the body, unless `rawHtml` lists its collection; the collection's own components, HTML in code and Markdown's task lists pass, and publishing keeps the stored body unchecked. `author` names who a save is committed as, and who the entry screen lists as also open in its entry (kay's `presence()`, the names of the other editors, else how many), from the guard's context, so only with a `guard`; without it the forge commits as the account behind its token and no editor's name or email reaches git, and git history cannot be erased (RGPD art. 17), so prefer a pseudonym such as `{ name: \`Editor ${user.id}\`, email: \`${user.id}@users.noreply.example.com\` }` unless the editors agreed to stay in the history for good; a real identity is written like this: `author: async ({ locals }) => { const user = await locals.auth.user(); return user && { name: user.name, email: user.email } }`.
+## Common tasks
 
-`onSave({ collection, slug, locale, verb, author, commit })` runs after each save, publish, duplicate, move, restore and deletion that went through, a throw being logged and never undoing the save ([After a save](loaders.md#after-a-save)).
+### Mount the screens elsewhere
 
-`history` is `false` to keep no revisions nor deleted entries, or `{ revisions, trash }`: the saves kept per entry, 50 by default, and how long a deleted entry is kept, `'30d'` by default, `false` for none; `collections: { name: { history: false } }` leaves one collection out ([History, the trash and the activity log](history.md)).
+`prefix` is where the screens live, `/admin` by default; `logo` puts an image before the name in the admin's header and `pageSize` sets the entries a list shows on a page.
 
-## Signing in and roles
+```ts
+cms({ prefix: '/studio', logo: '/logo.svg', pageSize: 25, guard, files })
+```
 
+### Protect the screens with a password
+
+A site with no users uses `passwordGuard`, which signs in at `<prefix>/sign-in`; a lone password signs in as `editor`.
+
+```ts
+import { cms, passwordGuard } from '@kaynooo/kayjs-cms'
+
+cms({ guard: passwordGuard(env.EDITOR_PASSWORD) })
+```
+
+### Limit what a role may do
+
+`roles` names what each role may do beyond editing (`publish`, `delete`, `upload`, `redirects`), and needs a `guard`.
+
+```ts
+cms({ guard, roles: { editor: [], publisher: ['publish'], admin: ['publish', 'delete', 'upload', 'redirects'] } })
+```
+
+### Choose who a save is committed as
+
+`author` returns the identity from the guard's context, so only with a `guard`; prefer a pseudonym unless the editors agreed to stay in git for good.
+
+```ts
+cms({
+  guard,
+  author: async ({ locals }) => {
+    const user = await locals.auth.user()
+
+    return user && { name: `Editor ${user.id}`, email: `${user.id}@users.noreply.example.com` }
+  },
+})
+```
+
+### Allow other upload types
+
+`uploads` lists the types a file field takes, or `{ types, maxSize }` to set the most an upload may weigh.
+
+```ts
+cms({ guard, files, uploads: { types: ['image/*', 'application/pdf'], maxSize: '50mb' } })
+```
+
+### Run something after a save
+
+`onSave` runs after each change that went through, see [After a save](loaders.md#after-a-save).
+
+```ts
+cms({ guard, files, onSave: async ({ collection, slug }) => { await purgeCdn(`/${collection}/${slug}`) } })
+```
+
+## Reference
+
+### The options
+
+- `cms({ prefix, logo, guard, roles, member, files, uploads, pageSize, collections, rawHtml, author, onSave, history })`: `prefix` is where the screens live (`/admin`; `/` is the root, where the screens mount under a `(admin)` group, so an app root layout and guard neither wrap them nor are wrapped by theirs), `logo` an image (`/logo.svg` or an https URL) before the name in the admin's header, `pageSize` how many entries a collection's list shows on a page (50), a positive whole number, `collections` how the screens arrange a collection by name, `{ form: { fields, hide }, list: { columns, actions } }` (see [Arranging and replacing the screens](screens.md)), `guard` who may use them and the API, as `{ load }` returning the guard, which runs on the first request so `kay.config.ts` imports nothing of the app's auth or database, or the built guard itself, which does import it, `files` where a folder entry's file goes, `workingTree()` by default, which a production server refuses to boot with unless named, as the next deploy would drop its saves.
+- `uploads` lists the types a file field takes, exact or `image/*`, PNG, JPEG, WebP, GIF, AVIF and PDF by default, the type read off the file name's extension, in any case, as kay's storage serves it; another is answered 415. The bytes must be that type too, whatever the name or the declared type says: PNG, JPEG, GIF, WebP and AVIF are read by their signatures, a PDF by its header, an SVG by its `<svg` root, and a file that is not what it is named (HTML named `x.png`, a JPEG named `x.png`, a PNG cut short of its header) is answered 415 with `cms.upload.notReal`; a type with no signature (`text/csv`, video) is taken as named, and storage serves anything but a PNG, JPEG, WebP, GIF, AVIF, video, audio, PDF or plain-text type as a sandboxed download, an SVG included, so it never runs as the site; the SVG check is only for a `<svg` root in the first 4 KB.
+- `uploads: { types, maxSize }` also sets the most an upload may weigh, bytes or `'50mb'` as kay's `budget` takes them, 20 MB by default; the upload route reads that much whatever the app's `maxSize`, so nothing else is raised, and a `maxSize` that is zero, negative, fractional in bytes or over 128 MB less 64 KB throws as `kay.config.ts` loads, as Bun refuses a request body over 128 MB before the route sees it and buffers an upload in memory.
+- A save whose body renders HTML that would run as the site or cover it, every tag and attribute kay's sanitizer drops (a `<script>`, an `<svg>`, a `<form>` or an input, an `on*`, `style` or `formaction` attribute), a `javascript:` URL in any URL attribute, or a tag left open or wrapped around a component, read off the HTML kay renders as a browser tokenizes it, is refused with an issue on the body, unless `rawHtml` lists its collection; the collection's own components, HTML in code and Markdown's task lists pass, and publishing keeps the stored body unchecked.
+- `author` names who a save is committed as, and who the entry screen lists as also open in its entry (kay's `presence()`, the names of the other editors, else how many), from the guard's context, so only with a `guard`; without it the forge commits as the account behind its token and no editor's name or email reaches git, and git history cannot be erased (RGPD art. 17), so prefer a pseudonym such as `{ name: \`Editor ${user.id}\`, email: \`${user.id}@users.noreply.example.com\` }` unless the editors agreed to stay in the history for good; a real identity is written like this: `author: async ({ locals }) => { const user = await locals.auth.user(); return user && { name: user.name, email: user.email } }`.
+- `onSave({ collection, slug, locale, verb, author, commit })` runs after each save, publish, duplicate, move, restore and deletion that went through, a throw being logged and never undoing the save ([After a save](loaders.md#after-a-save)).
+- `history` is `false` to keep no revisions nor deleted entries, or `{ revisions, trash }`: the saves kept per entry, 50 by default, and how long a deleted entry is kept, `'30d'` by default, `false` for none; `collections: { name: { history: false } }` leaves one collection out ([History, the trash and the activity log](history.md)).
+
+### Signing in and roles
+
+- The screens are closed without a `guard`: kayjs-cms has no users of its own, so a guard is kayjs-auth's, or `passwordGuard(password)` for a small site (a sign-in screen at `<prefix>/sign-in`).
 - A visitor the guard refuses with a 401 (kayjs-auth's `auth.guard()` without a sign-in page, `passwordGuard`) is redirected on a read to the sign-in, `?redirect=` set to the exact path and query asked for (through `localPath`, so a value leaving the site leads to `prefix`): kayjs-auth's `signInUrl(back)` when `ctx.locals.auth` has it, else the cms's `<prefix>/sign-in` for a `passwordGuard`. A guard that redirects itself (`auth.guard()` with `pages`) is left alone. A post is answered 401.
 - `passwordGuard(password | { role: password }, { maxAge = '14d' })` is a guard for a site with no users: `cms({ guard: passwordGuard(env.EDITOR_PASSWORD) })`, a lone password signing in as `editor`. `<prefix>/sign-in` takes the password (10 tries per 15 minutes) and sets `kcms_session`, `HttpOnly`, `SameSite=Lax`, `Secure` over https, holding `role.expires.signature`, the signature an HMAC with a key made from that role's password, so changing a password ends its sign-ins and a forged role or date fails. An empty password, an unset variable included, throws; a role is letters, digits, `_` and `-`. `passwordGuard(passwords, { secret })` mixes the app's own secret into the signing key (the key is also stretched with scrypt, so a cookie seen once does not give the password away offline), and the same password on another site then signs in nowhere else. Sign-out deletes the cookie and ends it in this process, so a copy stops working too; another process or a restart still takes a copy until it expires or a password changes. The sign-in's rate limit is per client address, so behind a proxy set kay's `proxy` option or every editor shares one bucket. A `passwordGuard` the app wraps in its own guard (`guard: ctx => extra(ctx) && pg(ctx)`) keeps its sign-in screen once the wrapper has called it. Use kayjs-auth when there are members.
 - `cmsTest(site)` from `@kaynooo/kayjs-cms/test` is the cms as one test site uses it: `await editor.signInAs(role?)`, `editor.signOut()`, `await editor.save(collection, slug, data, { body, locale, create, version })` (as the screen saves: `{ saved: true }`, or `{ issues }` for a refused entry, and a site not signed in throws) and `await editor.entry(collection, slug, { locale })` (the entry as the editor opens it, `undefined` when there is none). Saves go to the content the test site holds, never the project's. `editor = cmsTest(site)`.

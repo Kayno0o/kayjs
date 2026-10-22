@@ -2,6 +2,10 @@
 
 A `queue` runs jobs in the background, each surviving a restart; `schedule` and `background` are in [Running in production](production.md#background-jobs).
 
+## Common tasks
+
+### Run a job in the background
+
 A queue holds jobs that must not be lost: an action enqueues one and goes on, and the server runs it in the background, after a restart or a deploy if need be:
 
 ```ts
@@ -19,6 +23,16 @@ export const welcomeMails = queue(
 // src/server.ts
 new Elysia().use(welcomeMails).use(await pages()).listen(3000)
 ```
+
+### Delay a job or keep one per key
+
+`enqueue` takes a `delay`, and a `key` keeps one job waiting or running for it:
+
+```ts
+await welcomeMails.enqueue({ to: email }, { delay: '1h', key: email })
+```
+
+## Reference
 
 - An action calls `await welcomeMails.enqueue({ to: email })`, or `enqueue(payload, { delay: '1h' })` to run it later.
 - `queue(name, handler, options)` is an Elysia plugin: the server using it runs the queue's jobs from start to stop, `concurrency` at a time, 1 by default, and waits on stop for the runs in progress.

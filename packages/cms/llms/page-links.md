@@ -1,6 +1,36 @@
 # The Edit this page link and the page of an entry
 
-## Edit this page
+The link an editor's browser finds on each page to enter edit mode, and how an entry finds the page it is shown on.
+
+## Common tasks
+
+### Leave out the Edit this page link
+
+`cms({ pageLink: false })` leaves out the head script and the `kay_editor` hint; the screens and the check stay served.
+
+```ts
+cms({ guard, files, pageLink: false })
+```
+
+### Put the link where you want it
+
+Any `a[data-cms-edit-page]` written `hidden` is shown, given the address, and given the label when it has no text; the default button is then not drawn.
+
+```kay
+a(data-cms-edit-page hidden class="edit-link")
+```
+
+### Say which page an entry is shown on
+
+The collection's `url` option gives the page of its entries, used by the screens' Edit on page and by `entries()`; without it kay looks at the route whose `page.prerender` or `page.sitemap` is the collection, then at the first page without params that reads it.
+
+```ts
+collection(loader, { schema, url: entry => `/blog/${entry.slug}` })
+```
+
+## Reference
+
+### Edit this page
 
 - A browser the guard let into a screen, or answered `GET /api/cms/editor`, holds `kay_editor=1`: readable (not HttpOnly), `Path=/`, `SameSite=Lax`, `Secure` over https, 90 days, slid forward each time the guard lets the editor through. It is a hint, never a permission: every write still goes through the guard.
 - `cms()` adds one inline `script` to the head of every page (`config.head`, under 250 bytes, covered by the CSP like any head tag). It reads `document.cookie` and, only with the hint, imports `<base>/api/cms/editor/module.js` once the document is parsed. A browser without the hint loads nothing more, and the page reads no cookie on the server, so a prerendered page stays kept.
@@ -9,7 +39,7 @@
 - The app's own link: any `a[data-cms-edit-page]`, written `hidden`, is shown, given the address, and given the label when it has no text; the default button is then not drawn. `cms({ pageLink: false })` leaves out the script and the `kay_editor` hint (the module and the check stay served).
 - The hint is first set when the guard lets the editor into a screen or the check. kayjs-auth sets `kay_user` at each sign-in and clears it at sign-out, so the head script also loads the module for a browser holding that, whose check sets the hint when the guard lets the user in: an editor sees the link on the first page after signing in, with nothing declared. A refusal is remembered in the tab's `sessionStorage` against that sign-in's value, so a signed-in visitor who is no editor costs one request, not one per page. Without kayjs-auth the hint still comes from the first screen the editor opens. Under a static export the pages carry the script but no server answers it, so no link shows.
 
-## The page of an entry
+### The page of an entry
 
 - `entries()` and the screens give an entry its `url` from, in order: the collection's `url` option, the route whose `page.prerender` or `page.sitemap` is the collection, then the first page without params that reads it.
 - The last is learned by rendering each page without params once in edit mode, in every locale, through the server itself with an edit cookie only this process signs (a guarded page answers nothing and shows nothing), the shallowest path first, the first page naming each entry winning; a CMS screen rendered meanwhile asks for no page again. It happens the first time a screen needs a page the routes do not give, and is kept five minutes; a page that fails to render or takes over 5 s is logged, and tried again by the next screen.

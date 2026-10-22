@@ -2,6 +2,19 @@
 
 Every text kayjs-ui shows by default is looked up in the app's catalogs (`src/messages/<locale>.ts`) under a `ui.<component>.<prop>` key before its English, through `wording` from `kay/words`. kayjs-ui ships the French of every key, read on a page whose locale is `fr` (`fr-CA` and the like included) after the app's own catalog, with no setup: a site on `lang: 'fr'` with no `src/messages` reads French defaults. Any other locale, and a key the app words itself, reads the app's catalog, then the English below.
 
+## Common tasks
+
+### Word a text for the whole site
+
+Put the message under its `ui.<component>.<prop>` key in the locale's file:
+
+```ts
+// src/messages/fr.ts
+ui: { sidePanel: { closeLabel: 'Fermer' } }
+```
+
+## Reference
+
 - Word a text once for the whole site, in the locale's file: `ui: { sidePanel: { closeLabel: 'Fermer' }, pagination: { previousLabel: 'Précédent', nextLabel: 'Suivant' } }`. Every instance of the component reads it, an island's included.
 - The key is the component's name in camel case, then the prop that sets the text: `SidePanel`'s `closeLabel` is `ui.sidePanel.closeLabel`. A prop given to the component replaces the message and the English both.
 - A message may hold the placeholders its English shows, `{n}` or `{count}`, and a count may be written as plural forms: `rowCount: { one: '{count} ligne', other: '{count} lignes' }`.
@@ -12,8 +25,9 @@ Every text kayjs-ui shows by default is looked up in the app's catalogs (`src/me
 - Rating's `{value}` and `{max}` and RangeInput's `{label}` fill the messages of the same name.
 - ContactForm's labels read `ui.contactForm.*`, then kayjs-mail's `mail.contact.form.*` messages (English and French) before the English, and MarkdownEditor's `Uploading name…` marker, a placeholder in the text until the upload ends, stays English.
 - Texts the app's data owns, a `failure`, a `message` or a `label` it passes, are the app's to word.
+- Messages about the app's data are its own, passed as props (`failure`, `message`, `label`). The library's own words (`Close`, `Cancel`, `Loading…`...) are looked up in the app's catalogs under `ui.<component>.<prop>` keys, `ui.sidePanel.closeLabel`, before their English, and a prop given to the component replaces both. The French of every key ships with the library and is read on a French page with no setup.
 
-## The keys
+### The keys
 
 - `ui.barList.*`: `emptyLabel` (`No data yet.`)
 - `ui.carousel.*`: `dotLabel` (`Go to slide {n}`), `label` (`Carousel`), `nextLabel` (`Next slide`), `pauseLabel` (`Pause`), `playLabel` (`Play`), `previousLabel` (`Previous slide`), `slideLabel` (`Slide {n} of {count}`)

@@ -2,49 +2,9 @@
 
 > An LLM called from kay apps with no SDK and no streaming code: `ask()` over Anthropic or any OpenAI-compatible server (OpenAI, Ollama) through their HTTP APIs, a reply that streams into `await` blocks and into streaming actions as it is, and a scripted fake answering in development and tests.
 
-## Rules that are easy to get wrong
-
-- `ask()` runs on the server, where the key lives: call it in a `--- server` fence, an action, a job or an API route. An island importing it fails `kay build`, which is how the key stays out of the browser. Reach it from an island through an action.
-- The reply is a thenable async iterable, not a Promise: `await ask(...)` is the full text, `for await` gives snapshots (the text so far), and an `await` block or a plain-arrow handler returning it streams; an `async` handler returns `ask(...).stream()` (lint `async-reply`).
-- Nothing is sent until the reply is first read, so an `await ask()` an island's server render skips bills nothing. A reader leaving early, the visitor leaving the page, or `options.signal` aborts the provider request.
-- Messages are `user` and `assistant` only; the system prompt goes in `options.system`. A history a visitor posts can never carry a system prompt, and a `system` role throws.
-- Under `bun test` `ask()` always answers from `fakeAi`, whatever keys the environment holds; in development it does until `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `AI_BASE_URL` is set. Production with none of them throws.
-- `ask(messages, { tools: [addNote, bookSlot] })` lets the model call those actions, and only those: passing one is its opt-in. Each call runs as the visitor through the whole app (guards, validation, rate limits), a failure goes back to the model as an error result, and a loop of at most `maxSteps` requests (5) runs until the model answers. It needs the request being answered, so call it from a page, an action or a handler, not a job.
-- `ask(messages, { schema: s.Object({ ... }) })` answers an object instead of text: `await` is the value the schema describes, typed and checked with no cast, `for await` the object so far (strings growing, anything else once complete, every field optional in its type). Each provider is asked through its JSON-schema output (Anthropic `output_config.format`, OpenAI-compatible `response_format`, a forced tool call for a server refusing it); an answer the schema refuses, cut by `maxTokens` or refused fails with an `AiError` of kind `schema` naming `fields`. `tools`, `maxSteps`, limits and `maxInputChars` hold. `fakeAi.reply({ data })` scripts the object: [an object instead of text](llms/asking.md#an-object-instead-of-text).
-- No model id is built in: set `AI_MODEL` (required in production) or pass `{ model }`.
-- A failure is an `AiError` with a `kind`; nothing retries by itself. A rate limit carries `retryAfter` in seconds. A reply cut by `maxTokens` still resolves as text: read `await reply.finish` (`length`) to tell.
-- A chat for a site is `Chat` from `@kaynooo/kayjs-ai/chat.kay`, given the streaming action by the page (`Chat(action={reply})`), styled by kayjs-ui's `theme.css`: see the chat topic. It shows a line that the visitor talks to an AI and that messages go to a provider (`disclosure`, the `ai.chat.disclosure` message); what the provider receives is in [personal data](llms/personal-data.md). `ChatLauncher` from `@kaynooo/kayjs-ai/chat-launcher.kay` is the same chat behind a button at the bottom right of every page, put once in the root layout, loading the chat on its first open.
-- `ai({ rateLimit, budget })` in `kay.config.ts` sets asks and tokens per visitor (the user `key` names, else the one kayjs-auth names, else the address; a store sees a digest of it, never the address or id) and in total, refused with a `limited` error, 429 and `Retry-After` in an action. In production, unset, a visitor gets 20 asks per 10 minutes and 100,000 tokens a day; `rateLimit: false` / `budget: false` lifts one. Messages past `maxInputChars` (50,000) fail with `too-long` (413), a streamed tool name past 256 characters stops growing and names no tool, and `confirm` gates each tool call.
-- `kay i18n translate <locale>` (added by `ai()`) writes a locale's missing messages and localized entries as drafts, a text kept only when it keeps every `{placeholder}`, a string field of a `customField` kind left as it is; `--dry-run` lists and estimates the tokens, [translating](llms/translating.md).
-
-## Setup
-
-`kay add ai` installs the package and lists it in `kay.config.ts`; `ask` works without that, which lists the variables in `kay env`, applies `rateLimit`/`budget`/`key` and adds `kay i18n translate`; without it `ask` is unlimited.
-
-```ts
-// kay.config.ts
-import { ai } from '@kaynooo/kayjs-ai'
-
-export default defineConfig({ extensions: [ai()] })
-```
-
-```kay
---- server
-import { ask } from '@kaynooo/kayjs-ai'
-
-const answer = ask('Say hello', { system: 'Be brief' })
----
-await answer
-  p Thinking
-then text
-  p {text}
-catch
-  p The reply was cut short
-```
-
 ## Topics
 
-The rest is split by topic, each file read whole with one command:
+Each topic is one file, read whole with one command:
 
 - [Environment, ask() and its reply](llms/asking.md): the variables, picking a provider, `ask()`'s options, an object instead of text (`schema`), the reply, `await` blocks and streaming actions
 - [Chat island](llms/chat.md): `Chat(action={reply})`, its props, behaviour, markdown and the rules for passing it the action

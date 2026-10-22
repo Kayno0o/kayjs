@@ -1,6 +1,28 @@
 # Edit mode and the CMS editor
 
-## Edit mode
+## Common tasks
+
+### Enter edit mode
+
+A CMS's guarded route enters edit mode, signed apart from preview, and `exitPreview` leaves it:
+
+```ts
+enterPreview(ctx, { edit: true })
+```
+
+### Show unsaved edits on the page
+
+The editor's island calls `showDraft` with the entries it has not saved, and the page swaps them in place:
+
+```ts
+import { showDraft } from 'kay/edit'
+
+await showDraft([{ collection: 'posts', slug: 'hello', data: { title: 'Hi' } }])
+```
+
+## Reference
+
+### Edit mode
 
 - Edit mode is preview mode for a CMS editing content on the page: `enterPreview(ctx, { edit: true })` from the CMS's guarded route or `previewUrl(path, { edit: true })` enter it, signed apart so no preview link or cookie becomes one, and `exitPreview` leaves both.
 - Everything preview mode does holds, and `editing()` from `kay` is true while the server renders for such a visitor; `editRequested(request)` from `kay/server` tells the same of any request, for the CMS's own API modules and guards. `editedEntry(request, collection, slug)` from `kay/server` tells whether a page rendered in edit mode for the request's cookie read that entry, its collection named as the content config exports it, so a CMS's API serves an edit cookie, tied to no user, only those entries and not a customer or order collection. It is kept in memory per server until the cookie expires, so it is false on another server or after a restart until the page is loaded again.
@@ -12,7 +34,7 @@
 - A text read but never rendered, such as `status` in `if status === 'draft'`, marks a literal `"draft"` rendered right after it, with no field read between, as that field; a number computed equal to one just read is marked as it.
 - A collection the content config does not export is named by its folder or loader name.
 
-## The editor
+### The editor
 
 - A CMS's extension gives its editor as `editor: `${import.meta.dir}/editor.kay``, absolute or relative to the project root: an island every page renders at the end of its body in edit mode alone, kept alive across navigations and drafts (`persist`), and given `{ entries, unclickable }`, typed `EditorProps` from `kay/edit`: `entries`, each entry the page read, `{ collection, slug, locale? }`, its head and attributes included, those of the next page once the swap shows it, and `unclickable`, `{ collection, slug, locale?, path, frozen? }` for each field the page read that no marker on its body reaches (a field a marker or a marked list around it covers is left out), `frozen` for one in a frozen object, kayjs-cms naming them in the entry's form. They come in the order the page shows each one's first marked field, not the order the reads resolved in, so a draft render keeps every form in place; an entry showing no marked field, one whose field a draft emptied say, comes after the others, by name.
 - An entry read only in a deferred part of a streamed page is missing.

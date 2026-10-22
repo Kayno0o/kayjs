@@ -1,6 +1,8 @@
 # kayjs-ui: Setup, settings and testing
 
-## Setup
+## Common tasks
+
+### Setup
 
 kayjs-ui is published as `@kaynooo/kayjs-ui` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay, Tailwind v4 and `@iconify-json/tabler` are peer dependencies. It is released with kay at its version and peers on kay's minor: the app installs the one matching its kay and moves them together.
 
@@ -64,7 +66,7 @@ TooltipHost
 
 The extension puts both islands on every page, so each page loads the hydration code, as the layout above does, and since the Toaster holds state `kay build` does not keep a page prerendered under it, as with the two in your own layout.
 
-## Settings
+### Settings
 
 The icons the components draw come from slots, each named for what it means: `alert`, `back`, `chevron`, `close`, `delete`, `globe`, `info`, `menu`, `pause`, `play`, `plus`, `search`, `spinner`, `star`, `success`, `zoomFit`, `zoomIn`, `zoomOut`. The app replaces any of them through kay's library settings, spreading the defaults:
 
@@ -86,6 +88,12 @@ export default settings
 
 `kay check` checks this module against `Settings`. The server, the browser, `kay build` and `bun test` all render with it.
 
-## Testing an app's use of it
+### Testing an app's use of it
 
 A page that uses the components renders them in `testSite()` like the app's own. To test what their handlers do, `mountComponent(file, props)` from `kay/test` renders a component of the app into the DOM `kay/test/dom` registers, listed after `kay/test/preload` under `[test] preload` in bunfig.toml with `@happy-dom/global-registrator` installed; it shims the popover API happy-dom lacks, which Toaster and Popover use.
+
+## Reference
+
+- Import each component by its `.kay` path: `import Button from '@kaynooo/kayjs-ui/button.kay'`. Types, `toast`, `attempt`, `messageOf`, `editing`, `infiniteList` and the defaults come from the package itself: `import { toast } from '@kaynooo/kayjs-ui'`, and the drag and drop controllers from `@kaynooo/kayjs-ui/dnd`.
+- Components write no Tailwind utility, only the classes of `theme.css`, every one prefixed `kui-` as its tokens are, so a site's own `btn`, `card` or `--color-accent` never meets them. A rule of the app's on one of those classes restyles every instance, and `--kui-border-width` sets the keyline of every framed box; utilities passed through a component's `class` prop restyle one.
+- `toast` only shows in the browser, called from an island. The server's toast list, shared by every request, stays empty. `ui()` in kay.config.ts (`kay add ui`) mounts one `Toaster`, one `TooltipHost` and the theme on every page. An extension may render its own: while one is mounted, a second renders nothing until the first unmounts.

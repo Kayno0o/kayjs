@@ -1,5 +1,15 @@
 # Errors
 
+## Common tasks
+
+### Look up an error code
+
+An error that is no lint prints its code in brackets, and `kay explain` says where the fix is written:
+
+```sh
+kay explain template-syntax
+```
+
 ## Reference
 
 ### Errors

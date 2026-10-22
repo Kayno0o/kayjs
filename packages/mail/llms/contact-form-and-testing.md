@@ -1,6 +1,8 @@
 # kayjs-mail: The contact form, testing, development and kayjs-auth
 
-## A contact form
+## Common tasks
+
+### A contact form
 
 `contactForm(mail, options)` gives the arguments of `action` for a contact form, so a site writes no schema, error mapping or mail wrapper; spread into `action(...)`, which kay finds by name:
 
@@ -21,7 +23,7 @@ export const contact = action(...contactForm(mail, { fields: { phone: s.Optional
 - `MailNotConfiguredError` answers 503 and any other send failure 502, as a refusal the form shows through `contact.error()`; the cause is logged, by the mailer for a delivery that failed and by the form for a mail that never got to it (not configured, a view that does not render). `reach` is named in the 503, the 502 and the rate-limit refusal.
 - The refusals, subject and mail footer read the `mail.contact` messages, which the package declares in its package.json, so every kay app installing it reads them, `mail()` or not (an Elysia app not run through kay reads English), in the page's language (English and French shipped), overridden key by key in the app's `src/messages`. The mail is written in the page's language, not the recipient's. The schema's field messages (`mail.contact.errors`) and `ContactForm`'s labels (`mail.contact.form`, with `consent` and `privacy`, read when the messages exist, else English) are in the page's language too, English and French shipped. `errors: { name, email, message, consent }` replaces the field messages with a text or a `() => string`, and ContactForm's label props replace its labels.
 
-## Testing
+### Testing
 
 Under `bun test` mails go to the outbox, with no SMTP server to stub:
 
@@ -56,7 +58,7 @@ await site.submit(request, { email }, { from: '/auth/reset-password' })
 const token = outbox.token(await outbox.waitFor(email, { site }), '/auth/reset-password')
 ```
 
-## Development
+### Development
 
 Under `kay dev`, which sets `NODE_ENV=development`, each mail sent is logged with its subject and kept in the outbox, and `/_kay/mail` lists them, newest first, each with its headers, its size, its html in a sandboxed frame and its text. The list reloads as mails arrive and can be cleared, a mail's html shows at desktop or phone width (`?view=phone`), its size warns past the 102 KB of html Gmail clips at, and it downloads as the `.eml` SMTP would send. Under `kay dev` the outbox is kept in `.kay/mail-outbox.json` for the checkout (written aside and renamed, so a crash never leaves half a file), the last 500, so the mails survive a page refresh and `kay dev` restarting the server for an edit; the Mail tab's Clear button, `/_kay/mail/clear` and `outbox.clear()` empty the file too. `outbox.waitFor` under `kay dev` finds a mail kept from an earlier run as well. Only the server `kay dev` runs reads or writes it: under `bun test`, in production and in a server merely started with `NODE_ENV=development` the outbox stays in memory, so each test run starts empty. The file holds each mail in full, reset links included, and `.kay` stays out of git.
 
@@ -73,11 +75,11 @@ import type Welcome from './welcome.kay'
 export default { name: 'Ada', url: 'https://example.com/confirm' } satisfies Parameters<typeof Welcome>[0]
 ```
 
-## Other transports
+### Other transports
 
 `transport` takes any `{ send(mail) }` resolving with a `Delivery`, such as a provider's HTTP API. `smtp({ host, port, insecure, user, pass, name, timeout, maxConnections, rateLimit, dkim: { domain, selector, privateKey } })` is the SMTP one, for settings read some other way. `outbox` is a transport too, for a staging server that must never send. In production a custom `transport` still needs a sender, `from` or `SMTP_FROM`, or the boot stops naming both (an `optional` mailer throws `MailNotConfiguredError` per send); development and tests keep `kay@localhost`.
 
-## kayjs-auth
+### kayjs-auth
 
 `authMailer(send)` is kayjs-auth's `email.mailer`, rendering its verification, password reset, magic link, code, security, invitation and account-exists mails through the components above, in wording the app overrides line by line, themed by the app's mail settings, rather than kayjs-auth's own html. It needs `mail({ module })` in `kay.config.ts`'s `extensions`, which brings its wording:
 
@@ -132,6 +134,10 @@ AuthLink(mail={mail} lead={t('resetLead', { site: mail.site })})
 
 `{ send: mail.enqueue }` also fits `email.mailer` as it is, sending kayjs-auth's own html.
 
-## Dev tool
+### Dev tool
 
 - `mail()` adds a Mail tab to the dev tool under `kay dev`, with nothing to add in the app: the outbox newest first, each mail previewed in place (its html in a sandboxed frame, or its text) or opened on its page at `/_kay/mail/<id>`, kept up to date as mails are sent, with a Clear button. It reads `/_kay/mail.json`.
+
+## Reference
+
+- In development (`NODE_ENV=development`) and under `bun test` (`NODE_ENV=test`) no mail leaves the process: they go to the outbox, which `kay dev` lists at `/_kay/mail` and a test reads through `outbox`; a server started with `NODE_ENV=development` outside `kay dev` serves no such page. Only another `NODE_ENV`, production, sends over SMTP.

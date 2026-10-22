@@ -1,6 +1,27 @@
 # kayjs-auth: Events, the audit log, admin and organizations
 
-## Events and the audit log
+## Common tasks
+
+### Organizations
+
+Teams or workspaces users belong to, with roles of their own in each:
+
+```ts
+createAuth({
+  // ...
+  organizations: {
+    roles: { owner: ['admin'], admin: ['member'], member: [] },
+    owner: 'owner',
+    manage: 'admin',
+    defaultRoles: ['member'],
+    invitationPage: '/invitation',
+  },
+})
+```
+
+## Reference
+
+### Events and the audit log
 
 `onAuthEvent(info)` hears every security mail's event above, mailed or not, and these, never mailed. `info` is one object, `{ event, user, context, ...fields }`: `context` is `{ ip, userAgent, actor }`, and the fields are the event's own, as below. Switch on `info.event` and the fields are typed. A failed password sign-in is reported after the response, so a hook or an audit read right after the call may not see it yet.
 
@@ -20,7 +41,7 @@ With `audit: true`, or `{ maxAge }` as seconds or a string such as `'90d'` (a ye
 
 `describeAuditEntry(entry, { locale, wording })` words an entry for a person, its detail included (`Role editor granted`, `Signed in with discord`), in English or French as the pages are, English for another locale. `wording` takes the app's own phrase for any event, a string or a function of the detail, over kayjs-auth's; `auditWording` holds kayjs-auth's by language.
 
-## Admin
+### Admin
 
 `admin: 'admin'`, any requirement a guard takes, names who may manage users; without it, and to anyone else, to an admin acting as someone or to a bearer token, an admin's included, every method below answers `{ ok: false, error: 'forbidden' }`. The methods changing a user, `grantRole`, `revokeRole`, `banUser`, `unbanUser` and `deleteUser`, also answer `stale` unless the admin signed in or re-proved (`reprove`) in the last ten minutes, so a session left open or stolen changes no one; reading users and the audit log takes no such proof.
 
@@ -31,22 +52,7 @@ With `audit: true`, or `{ maxAge }` as seconds or a string such as `'90d'` (a ye
 - `impersonate(id)` answers `stale` unless the admin signed in or re-proved within ten minutes, as the other admin changes do, and signs the admin's browser in as the user, keeping the admin's own sign-in; `impersonator()` gives the admin, to show a banner, and `stopImpersonating()` signs them back in as themselves, or out when their own sign-in ended meanwhile. Meanwhile nothing taking a proof passes (`reprove` answers `impersonating`, and the sign-in counts as stale), no new sign-in mail goes out, and the impersonation ends once the admin is signed out everywhere, banned or no longer an admin. Another admin, oneself and a banned user cannot be impersonated. `signOut()` ends both sign-ins.
 - `listAdminAuditLog({ userId, before, limit })` gives `{ ok: true, entries }`, everyone's audit log or one user's, paged by `before` as `listAuditLog` is.
 
-## Organizations
-
-Teams or workspaces users belong to, with roles of their own in each:
-
-```ts
-createAuth({
-  // ...
-  organizations: {
-    roles: { owner: ['admin'], admin: ['member'], member: [] },
-    owner: 'owner',
-    manage: 'admin',
-    defaultRoles: ['member'],
-    invitationPage: '/invitation',
-  },
-})
-```
+### Organization rules
 
 - `roles` is a hierarchy as the site's `roles` is, typed the same way. Whoever creates an organization holds `owner`: owners alone delete it, and the last one cannot leave, be removed, lose the role or delete their account (`last-owner`); a sole owner who is also the only member deletes the organization with the account. `deletionImpact()` gives `{ deleted, blocked }`, the organization names the signed-in user's deletion would delete or be refused for, and the account page shows both before the proof. A deletion not refused (an admin's `deleteUser`, a stale guest, an unverified registration replaced) hands such an organization to its longest-standing member, who is told (`organization-handed-over`), and owners leaving, demoted or deleted at once cannot leave it ownerless: a write that would have left none is undone and answers `last-owner`. `manage`, `owner` by default, is what renaming, inviting, removing members and changing their roles take. `create`, any requirement a guard takes, limits who may create one; anyone signed in by default.
 - `createOrganization({ name, slug? })` answers `{ ok: true, membership }`, or `invalid-name` (1 to 100 characters, with no control characters, line breaks or direction marks, the name going into the invitation mail), `invalid-slug` (lowercase letters, digits and dashes, 64 at most, lowercased first), `slug-taken` or `limited` (past `organization`, 10 a day per account). A membership is `{ organization: { id, name, slug, createdAt }, roles, joinedAt }`.

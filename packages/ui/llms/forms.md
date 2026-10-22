@@ -1,6 +1,6 @@
 # kayjs-ui: Inputs, selects, editors and forms
 
-## Components
+## Common tasks
 
 ### TextInput, Textarea, Select
 
@@ -64,7 +64,7 @@
   - It shows about 12 lines and grows with its text up to 70% of the screen, where the browser sizes a field by its content (Chromium); it can be resized by hand.
   - `onInput(value)` reports the text after every change, typed or applied. A parent passing other text replaces it; passing back what it was given leaves the caret alone.
 
-## Forms
+### Forms
 
 FormField frames a control with its label, hint and messages; inside an island a `group` given a message marks each input, select and textarea in it `aria-invalid` and described by the message, so `focusInvalid` reveals its tab and focuses its first field. A `required` FormField gives its control, each field of a `group`, `aria-required="true"` unless it sets its own, as the `*` is hidden from screen readers. FormDialog calls a page's action from a dialog and shows the message of each refused field on its FormField. SaveForm does the same for an editor page, with a sticky bar of unsaved changes.
 
@@ -141,3 +141,7 @@ form.flex.flex-wrap.items-end.gap-3(method="get" role="search")
     input(name="host" value={filters.host} autocomplete="off")
   Button(type="submit" label="Filter")
 ```
+
+## Reference
+
+- FormDialog gives the action the form's `FormData`: give each control the `name` of its field in the action's schema, and numbers, booleans and lists are coerced from their text, while files and the honeypot come along.

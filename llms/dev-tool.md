@@ -2,6 +2,20 @@
 
 A page served by `kay dev` carries the dev tool, a drawer of tabs about the page; the rest of `kay dev` is in [The dev server](dev-server.md).
 
+## Common tasks
+
+### Open the dev tool
+
+The bar at the bottom left of any page under `kay dev` counts the problems; a click on it, or Alt+Shift+K, opens the drawer, and Escape closes it.
+
+### Hand the problems to an LLM
+
+The Copy button puts every listed problem on the clipboard as plain text, the page URL first.
+
+### Read what served the page
+
+The Request tab shows the route matched, the layouts, the params, the locale, the status and the server's time by phase; the Network tab lists what the page fetched.
+
 ## Reference
 
 - A problem kay recovers from in the browser, such as an island that did not match its server markup or had no client chunk, or a message no locale has, shows in the console and in the dev tool every dev page carries, a bar at the bottom left of the page counting the problems, red when one is an error and amber for a warning, whose drawer (a click on the bar, or Alt+Shift+K; Escape closes it) lists them under Problems, grouped by kind, with an error nothing caught, one kay caught in an island or an effect, or an unhandled rejection, and its stack, and each source the Content-Security-Policy blocked, a problem logged again counted rather than repeated;

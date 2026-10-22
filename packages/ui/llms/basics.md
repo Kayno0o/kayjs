@@ -1,6 +1,6 @@
 # kayjs-ui: Icons, buttons, toasts, dialogs, cards, popovers and stats
 
-## Components
+## Common tasks
 
 Each component spreads the other attributes it is given onto its root element, `id`, `aria-*` and `data-*` included. The exceptions: Toggle and Checkbox spread them on their checkbox, Popover on its panel, and CommandPalette, ConfirmDelete, FormField, FormDialog, SaveForm, Menu, Toaster, TooltipHost, LoadMore and WhenVisible take none.
 
@@ -103,3 +103,9 @@ Popover(placement="bottom-end")
 - `CopyButton(text={url} label="Copy link")`: copies `text`, with `html` alongside for apps that paste rich text, and reads `copiedLabel` for `copiedFor` (a duration with its unit, `2s` by default). The button keeps the width of the wider of `label` and `copiedLabel` (the one not showing is drawn invisibly from `data-other` on its `.kui-copy-btn-text` span), and its text and accessible name stay the visible label. It takes Button's `variant`, `tone` and `size`. A copy the browser refuses toasts `failure`.
 - `Rating(value={4.6} max={5} label="Rated 4.6 out of 5")`: stars filled to `value`'s share of `max`, part of a star included, kept between none and all. Screen readers read `label`, `4.6 out of 5` by default.
 - BarList, SiteFavicon and CopyButton are islands taking data alone, so a static page passes them their props as it would to any element.
+
+## Reference
+
+- An icon is either a slot name such as `'close'`, which the app's settings map to any icon set, or an icon imported from `~icons/<prefix>/<name>`. The default slots use Tabler, so the app installs `@iconify-json/tabler`.
+- Dialog and FormDialog follow `open`. The parent sets it, then sets it back to false in `onOpenChange(open)`, which every disclosure takes (Dialog, SidePanel, FormDialog, CommandPalette, Popover) and runs however the dialog closed. Their content renders only while they are open. A Popover the page opens through `open` is set back the same way, in `onOpenChange`.
+- One vocabulary: `variant` names a form (`solid`, `ghost`, `inline`) and `tone` a meaning (`neutral`, `accent`, `success`, `warning`, `danger`, `info`; each component takes the ones it draws), `size` is `xs`, `sm`, `md` or `lg`, and an option is `{ value, label, icon?, disabled? }`. `label` is the visible text of a component that draws it and the accessible name of one that does not (IconButton, Menu, the groups).

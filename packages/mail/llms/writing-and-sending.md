@@ -1,6 +1,8 @@
 # kayjs-mail: Setup, environment, writing and sending mails
 
-## Setup
+## Common tasks
+
+### Setup
 
 `kay add mail` does the install, writes `src/mail.ts` with a bare `mailer()` (SMTP from the environment, outbox in development and under `bun test`) and lists `mail({ module: './src/mail' })` in `kay.config.ts`; the files below add `from` and `lang`.
 
@@ -27,7 +29,7 @@ export default defineConfig({ extensions: [mail({ module: './src/mail' })] })
 - `mailer(options)` returns an Elysia plugin: the server using it, through `mail({ module })` or `.use(mail)`, runs the queue `enqueue` fills and, under `kay dev`, serves the outbox page. A script that only sends need not use it.
 - Options: `from`, the default sender, `SMTP_FROM` when left out; `fromName`, the name shown beside a bare `SMTP_FROM`; `to`, the recipient of a mail naming none, `MAIL_TO` when left out, read from the environment in development too; `lang`, the language mails are written in, which a message's own `lang` replaces: the locale their component renders `t()` in and the `<html lang>`, the site's default locale (or the request's) when neither is set; `transport`, where mails go in place of the default; `smtp: { name, timeout, maxConnections, rateLimit }`, merged over the SMTP built from the environment (`name` is the sender's domain by default, `timeout` a duration such as `'30s'`, 10 seconds by default, `maxConnections` 5), the options left out keeping the defaults, a broken one stopping the boot, and refused next to a `transport`, whose `smtp()` takes them; `queue`, kay's `QueueOptions` (`attempts`, `backoff`, `store`, `onFailed`...) plus `name`, `mail` by default, which two mailers in one app set apart; `optional`, see Environment; `logRecipients: true` logs each mail's recipients in full rather than their count and domains, and `logSubjects: true` logs each mail's subject, which the log leaves out.
 
-## Environment
+### Environment
 
 In production the mailer reads, as the server boots, through kay's `defineEnv`; `mail()` lists them for `kay env`, `SMTP_HOST` and `SMTP_FROM` as required in production, with nothing wired in the app:
 
@@ -47,7 +49,7 @@ A missing or refused variable stops the boot, naming each one. `kay build` runs 
 
 `mailer({ optional: true })` boots without `SMTP_HOST` and `SMTP_FROM` instead, for a site whose mail can wait to be set up: `mail.configured` reads `false`, and `send` and `enqueue` throw `MailNotConfiguredError`, whose `missing` names the variables, before rendering or queueing anything, so a contact form can catch it and tell the visitor to write or call instead. A mail naming no `to` while the mailer has none, in any environment, throws it naming `MAIL_TO`, alongside the others, so a contact form sends to `MAIL_TO` with nothing to check itself. An app throws it too for a setting of its own, `new MailNotConfiguredError(['SUPPORT_PHONE'])`.
 
-## Writing a mail
+### Writing a mail
 
 A mail is a `.kay` component like any other, rendered on the server with `renderToString` from `kay/server`, its `await` blocks waited for. kayjs-mail ships the pieces most mails need, each with inline styles:
 
@@ -123,7 +125,7 @@ Layout(preheader={message.slice(0, 120)})
 
 It goes out with `replyTo: { name, address: email }`, so replying reaches the visitor, and `from` stays the site's own.
 
-## Sending
+### Sending
 
 ```kay
 --- server
@@ -143,3 +145,10 @@ export const signUp = action(s.Object({ name: s.String({ maxLength: 100 }), emai
 - An address is `'Name <address>'`, a bare address, or `{ name, address }`, which needs no quoting of a name holding a comma.
 - Every mail with html goes out with a text part too: the one `text` gives, else one written from the html, links followed by their address, list items dashed, table rows one to a line and a row header written `Label: value`, what the html hides, such as the preheader, left out. `htmlToText(html)` is exported.
 - `send(message)` renders and sends now, resolving with `{ messageId, accepted, rejected, response }`. Each mail sent, from `send` or the queue, logs one line, `A mail sent to 2 recipients at example.com: 250 queued`, with how many recipients the server took, their domains and its answer, and the subject only with `logSubjects: true` (it can hold a visitor's name), so an app logs nothing of its own. These lines go where the app's `log` setting sends kay's, as text headed `kayjs-mail:`, as JSON with `from: 'kayjs-mail'` or to the app's function, under the request being answered. A mail the server takes for some recipients and refuses for others is sent all the same, and logged counting those refused: it is not retried, which would send it again to those who have it. A send that fails logs the mail and the reason before it throws. `enqueue(message, { delay })` renders now and queues it, resolving with the job's id; a failed send is retried as kay's queues retry, 5 attempts by default, each wait twice the last from 10 seconds, and a mail given up after its last attempt is logged naming it and the reason, then handed to `queue.onFailed` if given. `render(message)` gives the rendered `Mail` without sending it. `drain()` sends every queued mail due, here and now, for a script. `failed()` lists the mails given up on, with why: a mail given up is kept 7 days, not the queue's 30, and without its html, text, headers and attachments (so the link of a reset or a sign-in is not kept with it; the server's error text is not scrubbed, and a refusal may echo a URL), keeping its recipients, subject and the error; set `queue: { keepFailed, redact }` to change either, and the expired ones go on any `enqueue`, `failed()` or `remove()`, not only in a process running the queue. The error is kept as the server worded it, and `onFailed` gets the whole mail. `remove(id)`, `remove({ recipient })` or `remove(match)` deletes queued and failed mails, a person's to, cc or bcc once they asked to be erased, resolving with how many went.
+
+## Reference
+
+- Mail clients drop stylesheets: a mail's styles live in `style` attributes. The components kayjs-mail ships already do, themed through kay's library settings; Tailwind classes do nothing in a mail.
+- `from` is the site's own address, whose domain the SMTP server signs for: a visitor's address goes in `replyTo`, never in `from`, or SPF and DKIM fail and the mail lands in spam.
+- `send()` throws when the server refuses the mail or cannot be reached. An action whose point is not the mail itself uses `enqueue()`, so a mail server outage never fails the visitor's action, and the queue retries it. A transport that throws something other than an `Error` makes `send()` throw an `Error` with the thrown value as its `cause`.
+- `enqueue()` renders the mail at once and queues the result: the queue runs only in a server that uses the mailer, listed in kay.config.ts as `mail({ module })` or used as `new Elysia().use(mail)`.

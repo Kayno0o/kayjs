@@ -2,7 +2,29 @@
 
 `kay i18n translate <locale> [--dry-run]` fills what a locale lacks, messages and the entries of localized collections, with a model's translations saved as drafts. It is added by `ai()` in `kay.config.ts`'s `extensions` (`kay add ai` lists it), runs in the project of the current directory and asks the provider the environment names (see [asking](asking.md)); with no key it stops saying no provider is configured (only `NODE_ENV=development` gets the fake, whose reply fails the checks below), so set a key first.
 
-## Rules that are easy to get wrong
+## Common tasks
+
+### Translate a locale
+
+Run it for one locale, after a dry run if you want the estimate first:
+
+```sh
+kay i18n translate fr --dry-run
+kay i18n translate fr
+```
+
+### Messages
+
+Missing messages (a library's catalog included, as `kay i18n missing` lists them) go in batches of at most 40 texts. Each batch that passes is written at once by `writeDraftMessages` into `src/messages/<locale>.ts`, each marked `// draft` at its place in the nesting, so `kay check` reports `draft-message` until `kay i18n accept <locale>` or a person deletes the comments.
+
+### A run stopped half way
+
+Every file is written whole (a temporary file renamed over a messages file, a linked one for an entry), so Ctrl-C, a failing request or a crash leaves complete files, the batches and entries done kept. Run it again: it translates what is still missing.
+
+
+## Reference
+
+### Rules that are easy to get wrong
 
 - The locale must be one of `i18n.locales` and not the default one, else it stops before any request. A locale lacking nothing prints `<locale> lacks nothing` and asks nothing.
 - `--dry-run` needs no provider and no model: it lists the message keys and the `collection: slugs` it would translate and estimates the tokens (characters / 4 in, about 1.5 times that out). It writes nothing.
@@ -10,11 +32,7 @@
 - A plural is written with the forms the locale picks between, as `Intl.PluralRules` lists them (Russian `one`, `few`, `many`, `other`; Japanese `other` alone), plus a `zero` the source has. Each form translates the source's form of that name or else its `other`, is checked against it, and is told to the model in the system prompt as its category with example counts (ids and categories only, never a key or a text). A source form the locale never picks is not translated. A message with one form failing is not written at all.
 - Texts reach the model as numbered JSON (`{ "1": "Hello {name}" }`) under a system prompt saying they are content, never instructions: no key or path is ever part of the prompt, and what the model returns is placed by id.
 
-## Messages
-
-Missing messages (a library's catalog included, as `kay i18n missing` lists them) go in batches of at most 40 texts. Each batch that passes is written at once by `writeDraftMessages` into `src/messages/<locale>.ts`, each marked `// draft` at its place in the nesting, so `kay check` reports `draft-message` until `kay i18n accept <locale>` or a person deletes the comments.
-
-## Entries
+### Entries
 
 For each slug a localized collection has in the default locale and not in the locale, the default entry is read and its translatable strings and body are translated. The strings are the schema's plain `String` fields, in nested objects, arrays and `blocks()` lists too (each item read by its `type`); left as they are: a field with a `format` (dates), `enum`, `const` or `pattern`, an `image`, `file` or `reference` field, a field of a kind the app adds with `customField`, whatever shape it wraps, and anything the schema does not describe as one string. A plain `String` field holding a category, a brand, a slug or a link would be translated too, so wrap it in `untranslated(...)` from `kay/content` (`brand: untranslated(t.String())`, an object or an array too: everything inside is left), or give it a `pattern`, `enum` or `format`. The dry run lists, per entry, the field paths it would translate: `shop: mug (title, rows.0.name, body)`. An entry goes in requests of at most 8000 characters: a body past 6000 characters is cut into parts at its blank lines, a code fence and a line never cut, each part checked on its own and joined back with its own ending white space, and the entry is written only when every part passed (the first failing one stops the entry, the rest is not asked). The ids of the parts (`body.1`...) are the only thing in the prompt besides the texts. The entry is validated by the collection's schema and created as `<dir>/<locale>/<slug>.<ext>` in the format of the default locale's entry (Markdown, or YAML when it has no body; JSON only with a draft field); an entry the locale already has is never overwritten.
 
@@ -23,7 +41,3 @@ A translated entry is marked a draft:
 - A collection with `draft: 'field'` gets that boolean field set to `true`: the entry is held back in production, the default locale's entry standing in, until a CMS or a person writes `false`.
 - Any other Markdown or YAML entry gets `# draft` as the first line of its YAML (inside the `---` of a Markdown entry). It is served as any entry, live at once (so is a collection whose `draft` is a function): read it before deploying. Saving it from a CMS rewrites the YAML and so accepts it, as does deleting the line. `kay check` reports it as `draft-entry` (warn) until then.
 - A JSON entry in a collection without a draft field holds no comment, so it is reported (`data/item: holds JSON, which cannot be marked a draft`) and skipped: give the collection a `draft: 'field'`.
-
-## A run stopped half way
-
-Every file is written whole (a temporary file renamed over a messages file, a linked one for an entry), so Ctrl-C, a failing request or a crash leaves complete files, the batches and entries done kept. Run it again: it translates what is still missing.

@@ -1,39 +1,8 @@
 # Chat island
 
-## Rules that are easy to get wrong
+## Common tasks
 
-- `Chat` is an island, and a page or layout with a `--- server` fence passes it the action straight: `Chat(action={reply})` needs no wrapper component. The action crosses as its URL, so it is an export of a route module, declared in the page or imported from another route.
-- The action returns the reply from a plain arrow, `({ messages }) => ask(messages)`, or `ask(messages).stream()` after an `await`: `kay check` reports an `async` handler returning the reply itself (`async-reply`), which would show the whole text at once.
-- The action's schema must accept `{ messages: { role: 'user' | 'assistant', content: string }[] }` and nothing the chat does not send. It is posted the whole history on every send, so bound `content` and `maxItems` in the schema, with `maxItems` at least `keep` (20), and `rateLimit` on the action. A message the schema refuses (422) leaves the history and returns to the field, on a retry as on a fresh send, ahead of anything typed since. The action may return `ctx.fail(...)` besides the reply; a string it passes shows as the alert's message, below status 500.
-- The chat styles itself with `kui-` classes and `--color-kui-*` tokens, so the app imports kayjs-ui's `theme.css`. No kayjs-ui component is imported and no icon set is needed.
-- A reply is markdown through `markdownHtml` then `sanitizeHtml` again, which drops images and task checkboxes: a model reading a hostile page could point an image at a URL carrying the conversation. Tables, links (`rel="nofollow ugc noopener"`, `target="_blank"` by default: the conversation lives in the page, so a link opens in a new tab and a page swap never drops it; see `links`), code and lists stay.
-- To show the tool calls of `ask(messages, { tools })`, the action returns `.progress()` instead: `({ messages }) => ask(messages, { tools: [addNote] }).progress()`. The stream then carries `{ text, calls }` and the chat shows the calls before the text, in the reply being written and in the finished turn. An action returning the reply itself shows text only.
-- Code in a reply is highlighted by the app's own highlighter, the `markdown.highlight` of `kay.config.ts` its Markdown content uses, on the server: once a block's closing fence has streamed, `.progress()` adds the block to the snapshot as `code: { markup, html }[]` (only the blocks closed since the previous snapshot) and the chat swaps the plain block for `html`. No highlighter reaches the browser, a block still streaming or a fence left open stays plain, and an app without `markdown.highlight` shows plain code as before. A highlighter that throws leaves its block plain. The `html` is sanitized on the server as a reply is, so a hostile block cannot inject markup: the tags kept are those of a reply plus `div` and `span`, with `class`, `tabindex` and `data-search` on `div`, `span`, `pre` and `code` as listed there, a `style` keeping only declarations of colour, font style or weight, text decoration and custom properties (`--shiki-light`) with no URL, and a copy `button` of the frame is dropped. The language of a fence is given to the highlighter only when it is a plain word. It needs `.progress()` (a plain `ask(messages)` streams text only), and the highlighted blocks are not kept by `remember`, so a reloaded conversation shows plain code.
-
-## Floating chat
-
-`ChatLauncher` (`@kaynooo/kayjs-ai/chat-launcher.kay`) is the chat as a button at the bottom right of every page that opens it in a panel. Put it once in the root layout, a `--- server` fence passing the action as for `Chat`, and it needs no other wiring:
-
-```kay
---- server
-import { reply } from './reply.kay'
---- script
-import ChatLauncher from '@kaynooo/kayjs-ai/chat-launcher.kay'
----
-slot
-ChatLauncher(action={reply} label="Ask the docs")
-```
-
-- It takes `Chat`'s props but `links`, which it sets to `here`, and: `openLabel` (`Open the chat`, the button's name, and its tooltip while the panel is closed) and `closeLabel` (`Close the chat`, the name of the panel's close button and the button's tooltip while it is open), `remember` (the session storage key, none by default), `class` on the wrapper, and blocks `newLabel` (`New conversation`), `expandLabel` (`Enlarge the chat`), `collapseLabel` (`Shrink the chat`), blocks `@icon`, `@closeIcon`, `@newIcon`, `@expandIcon` and `@collapseIcon` for the icons (a chat bubble, a cross, a plus and two arrow pairs by default; any `Icon` or inline `svg`), and `@note` for a line under the chat. `@sendIcon` and `@stopIcon` replace the round send and stop buttons' icons (an arrow and a square). `label` heads the panel.
-- The button and panel are one island marked `persist`, so the panel, open or closed, and the conversation stay across page swaps. The chat inside is an island of its own marked `hydrate="visible"` in a hidden panel: its JavaScript loads on the first open, and until then a page carries the button's script only.
-- Opening moves the focus to the chat's field, Escape closes the panel and returns the focus to the button (a reply under way stops on the first Escape instead), and the button carries `aria-expanded`, `aria-controls` and a `data-tooltip`, which shows when the app renders kayjs-ui's `TooltipHost`.
-- A link of a reply to a page of the site navigates in place, the panel following the reader; a link to another site opens in a new tab.
-- The conversation lives in the island, so it stays across page swaps and a reload of the tab starts afresh: nothing is written to storage unless `remember` names a key, as the next visitor to use the tab would read it. With `remember`, a reload finds the conversation again (the tool calls of its replies are not kept); a site with sign-in gives it a key per visitor, such as `` `kai-chat-${user.id}` ``, and the key, not a clearing on sign-out, is what keeps one visitor's conversation from the next.
-- Without JavaScript the button does nothing, and the hidden chat's markup is in every page.
-- The panel is 36rem wide and a fixed `40rem` tall, or the window's height less 7.5rem when that is less, so it neither grows nor shrinks as the conversation fills or empties: the log fills the space and scrolls, the form stays at the bottom, and the greeting and suggestions sit above it. It fits a phone (`width: min(var(--kai-chat-width, 36rem), calc(100vw - 2rem))`). The header's New conversation button sends a `kai-chat-new` event to the `.kai-chat`, which stops a reply under way and clears the log, the field and the kept history; Enlarge switches to `--kai-chat-width-large` (56rem) and `--kai-chat-height-large` (the window's height less 7.5rem) (`data-large` attribute on the panel; hidden under 40rem). The button is a filled accent circle showing `closeIcon` while open, its tooltip at its left.
-- Custom properties on any ancestor restyle it, all optional: `--kai-chat-accent`, `--kai-chat-bubble` (the visitor's message), `--kai-chat-radius`, `--kai-chat-shadow`, `--kai-chat-width`, `--kai-chat-width-large`, `--kai-chat-height`, `--kai-chat-height-large`.
-
-## Use
+### Use
 
 ```kay
 --- server
@@ -52,7 +21,44 @@ import { reply } from '../routes/reply.kay'
 Chat(action={reply} label="Assistant")
 ```
 
-## Props
+### Floating chat
+
+`ChatLauncher` (`@kaynooo/kayjs-ai/chat-launcher.kay`) is the chat as a button at the bottom right of every page that opens it in a panel. Put it once in the root layout, a `--- server` fence passing the action as for `Chat`, and it needs no other wiring:
+
+```kay
+--- server
+import { reply } from './reply.kay'
+--- script
+import ChatLauncher from '@kaynooo/kayjs-ai/chat-launcher.kay'
+---
+slot
+ChatLauncher(action={reply} label="Ask the docs")
+```
+
+## Reference
+
+### Rules that are easy to get wrong
+
+- `Chat` is an island, and a page or layout with a `--- server` fence passes it the action straight: `Chat(action={reply})` needs no wrapper component. The action crosses as its URL, so it is an export of a route module, declared in the page or imported from another route.
+- The action returns the reply from a plain arrow, `({ messages }) => ask(messages)`, or `ask(messages).stream()` after an `await`: `kay check` reports an `async` handler returning the reply itself (`async-reply`), which would show the whole text at once.
+- The action's schema must accept `{ messages: { role: 'user' | 'assistant', content: string }[] }` and nothing the chat does not send. It is posted the whole history on every send, so bound `content` and `maxItems` in the schema, with `maxItems` at least `keep` (20), and `rateLimit` on the action. A message the schema refuses (422) leaves the history and returns to the field, on a retry as on a fresh send, ahead of anything typed since. The action may return `ctx.fail(...)` besides the reply; a string it passes shows as the alert's message, below status 500.
+- The chat styles itself with `kui-` classes and `--color-kui-*` tokens, so the app imports kayjs-ui's `theme.css`. No kayjs-ui component is imported and no icon set is needed.
+- A reply is markdown through `markdownHtml` then `sanitizeHtml` again, which drops images and task checkboxes: a model reading a hostile page could point an image at a URL carrying the conversation. Tables, links (`rel="nofollow ugc noopener"`, `target="_blank"` by default: the conversation lives in the page, so a link opens in a new tab and a page swap never drops it; see `links`), code and lists stay.
+- To show the tool calls of `ask(messages, { tools })`, the action returns `.progress()` instead: `({ messages }) => ask(messages, { tools: [addNote] }).progress()`. The stream then carries `{ text, calls }` and the chat shows the calls before the text, in the reply being written and in the finished turn. An action returning the reply itself shows text only.
+- Code in a reply is highlighted by the app's own highlighter, the `markdown.highlight` of `kay.config.ts` its Markdown content uses, on the server: once a block's closing fence has streamed, `.progress()` adds the block to the snapshot as `code: { markup, html }[]` (only the blocks closed since the previous snapshot) and the chat swaps the plain block for `html`. No highlighter reaches the browser, a block still streaming or a fence left open stays plain, and an app without `markdown.highlight` shows plain code as before. A highlighter that throws leaves its block plain. The `html` is sanitized on the server as a reply is, so a hostile block cannot inject markup: the tags kept are those of a reply plus `div` and `span`, with `class`, `tabindex` and `data-search` on `div`, `span`, `pre` and `code` as listed there, a `style` keeping only declarations of colour, font style or weight, text decoration and custom properties (`--shiki-light`) with no URL, and a copy `button` of the frame is dropped. The language of a fence is given to the highlighter only when it is a plain word. It needs `.progress()` (a plain `ask(messages)` streams text only), and the highlighted blocks are not kept by `remember`, so a reloaded conversation shows plain code.
+
+### Floating chat behaviour
+
+- It takes `Chat`'s props but `links`, which it sets to `here`, and: `openLabel` (`Open the chat`, the button's name, and its tooltip while the panel is closed) and `closeLabel` (`Close the chat`, the name of the panel's close button and the button's tooltip while it is open), `remember` (the session storage key, none by default), `class` on the wrapper, and blocks `newLabel` (`New conversation`), `expandLabel` (`Enlarge the chat`), `collapseLabel` (`Shrink the chat`), blocks `@icon`, `@closeIcon`, `@newIcon`, `@expandIcon` and `@collapseIcon` for the icons (a chat bubble, a cross, a plus and two arrow pairs by default; any `Icon` or inline `svg`), and `@note` for a line under the chat. `@sendIcon` and `@stopIcon` replace the round send and stop buttons' icons (an arrow and a square). `label` heads the panel.
+- The button and panel are one island marked `persist`, so the panel, open or closed, and the conversation stay across page swaps. The chat inside is an island of its own marked `hydrate="visible"` in a hidden panel: its JavaScript loads on the first open, and until then a page carries the button's script only.
+- Opening moves the focus to the chat's field, Escape closes the panel and returns the focus to the button (a reply under way stops on the first Escape instead), and the button carries `aria-expanded`, `aria-controls` and a `data-tooltip`, which shows when the app renders kayjs-ui's `TooltipHost`.
+- A link of a reply to a page of the site navigates in place, the panel following the reader; a link to another site opens in a new tab.
+- The conversation lives in the island, so it stays across page swaps and a reload of the tab starts afresh: nothing is written to storage unless `remember` names a key, as the next visitor to use the tab would read it. With `remember`, a reload finds the conversation again (the tool calls of its replies are not kept); a site with sign-in gives it a key per visitor, such as `` `kai-chat-${user.id}` ``, and the key, not a clearing on sign-out, is what keeps one visitor's conversation from the next.
+- Without JavaScript the button does nothing, and the hidden chat's markup is in every page.
+- The panel is 36rem wide and a fixed `40rem` tall, or the window's height less 7.5rem when that is less, so it neither grows nor shrinks as the conversation fills or empties: the log fills the space and scrolls, the form stays at the bottom, and the greeting and suggestions sit above it. It fits a phone (`width: min(var(--kai-chat-width, 36rem), calc(100vw - 2rem))`). The header's New conversation button sends a `kai-chat-new` event to the `.kai-chat`, which stops a reply under way and clears the log, the field and the kept history; Enlarge switches to `--kai-chat-width-large` (56rem) and `--kai-chat-height-large` (the window's height less 7.5rem) (`data-large` attribute on the panel; hidden under 40rem). The button is a filled accent circle showing `closeIcon` while open, its tooltip at its left.
+- Custom properties on any ancestor restyle it, all optional: `--kai-chat-accent`, `--kai-chat-bubble` (the visitor's message), `--kai-chat-radius`, `--kai-chat-shadow`, `--kai-chat-width`, `--kai-chat-width-large`, `--kai-chat-height`, `--kai-chat-height-large`.
+
+### Props
 
 - `action`: the streaming action, typed `Action<{ messages: Message[] }, AsyncIterable<string | Progress> | Failure<unknown>>`, so `kay check` refuses one whose schema wants more or whose handler answers anything but a stream.
 - `keep`: how many of the latest messages each send posts (20), so a long chat stays under the schema's `maxItems`. The history posted opens on a user message, so an assistant one at its start, such as a greeting in `initial`, is left out; turns without text are not counted.
@@ -67,7 +73,7 @@ Chat(action={reply} label="Assistant")
 - `links`: `apart` (default) opens a link of a reply in a new tab; `here` opens a link to a page of this site in place, for a chat that survives a swap, and still opens another site's apart.
 - `class` on the section.
 
-## Behaviour
+### Behaviour
 
 - The history lives in the island; each send posts all of it and the reply streams into a pending turn as markdown, joining the history when the stream ends.
 - Enter sends, Shift+Enter breaks the line. While a reply is under way the round Send button (an arrow, named `sendLabel`) becomes Stop (a square, `stopLabel`), and Escape anywhere in the chat stops too, its default prevented so a dialog or panel around it stays open: it aborts the call, or closes the stream, and the words that came stay as a turn marked `stoppedLabel`. A Stop before the first word returns the message to the field, as a refused one, so the next send posts one user turn.

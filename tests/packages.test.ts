@@ -252,13 +252,10 @@ describe('the naming conventions', () => {
 
 // Topic files open with the tasks and keep the facts under Reference, for kay and for each library alike.
 describe('the llms topic files', () => {
-  // #1693 lists the kay topic files still to gain both sections.
-  const knownKay = new Set(['analytics', 'content-edit', 'dev-tool', 'editor-and-agent-commands', 'errors', 'project-new-and-add', 'queues', 'routing-endpoints-and-base', 'testing-setup'].map(topic => `llms/${topic}.md`))
   // The release logs are written by `just patch` and `just minor`, not as a topic.
+  const INDEX_BYTES = 6000
   const logs = /^llms\/(?:whats-new|upgrading)(?:-archive)?\.md$/
   const topics = async () => [...await Array.fromAsync(new Glob('llms/*.md').scan()), ...await Array.fromAsync(new Glob('packages/*/llms/*.md').scan())].sort().filter(file => !logs.test(file))
-  // Every library topic file as of #1693, to gain both sections.
-  const knownLibraries = new Set('ai/asking ai/chat ai/limits ai/personal-data ai/testing-and-errors ai/tools ai/translating auth/admin-and-organizations auth/hardening-and-testing auth/oauth-passkeys-two-factor auth/oauth-server-and-tokens auth/passwords-and-mails auth/setup cms/fields cms/history cms/loaders cms/options cms/page-links cms/rename cms/screens cms/uploads cms/words mail/contact-form-and-testing mail/writing-and-sending ui/basics ui/charts-drag-and-media ui/forms ui/setup ui/tables-navigation-and-layout ui/words'.split(' ').map(topic => topic.replace('/', '/llms/')).map(path => `packages/${path}.md`))
 
   it('open with Common tasks and hold a Reference section', async () => {
     const lacking: string[] = []
@@ -266,10 +263,9 @@ describe('the llms topic files', () => {
     for (const file of await topics()) {
       const text = await Bun.file(file).text()
       const opens = (/^## Common tasks$/m).test(text) && (/^## Reference$/m).test(text) && text.indexOf('## Common tasks') < text.indexOf('## Reference')
-      const known = knownKay.has(file) || knownLibraries.has(file)
 
-      if (opens === known)
-        lacking.push(opens ? `${file}: has both sections, remove it from the list of #1693` : file)
+      if (!opens)
+        lacking.push(file)
     }
 
     expect(lacking).toEqual([])
@@ -277,7 +273,6 @@ describe('the llms topic files', () => {
 
   // A library's llms.txt is a title, a one-line quote and a list of links, like kay's own.
   it('keep each library\'s llms.txt an index without a rules dump', async () => {
-    const ceilings: Record<string, number> = { ai: 6334, auth: 3419, cms: 24772, mail: 2067, ui: 5201 }
     const found: string[] = []
 
     for (const library of folders) {
@@ -285,12 +280,11 @@ describe('the llms topic files', () => {
       const bytes = new TextEncoder().encode(text).length
       const dump = (/^## Rules that are easy to get wrong$/m).test(text)
 
-      // #1693 turns these into indexes; until then they may not grow.
-      if (bytes > ceilings[library]!)
-        found.push(`${library}: ${bytes} bytes, over the ${ceilings[library]} it had when #1693 was filed`)
+      if (dump)
+        found.push(`${library}: a rules dump, move the rules into the Reference of a topic file`)
 
-      if (!dump && library in ceilings)
-        found.push(`${library}: no rules dump any more, remove it from the list of #1693`)
+      if (bytes > INDEX_BYTES)
+        found.push(`${library}: ${bytes} bytes, over the ${INDEX_BYTES} an index may take`)
     }
 
     expect(found).toEqual([])

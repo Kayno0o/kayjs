@@ -2,15 +2,45 @@
 
 Every text kayjs-cms shows is looked up in the app's catalogs (`src/messages/<locale>.ts`) under a `cms.<area>.<name>` key before its English, through `wording` from `kay/words`, in the screens and in the editor alike. kayjs-cms ships the French of every key, read on a page whose locale is `fr` (`fr-CA` and the like included) after the app's own catalog, with no setup: a site on `lang: 'fr'` reads French screens and a French editor, markdown editor help and placeholder included (kayjs-ui ships those `ui.*` keys in French). Any other locale, and a key the app words itself, reads the app's catalog, then the English below.
 
+## Common tasks
+
+### Word a text once for the whole site
+
+The `cms` block of the locale's file words a text for the screens, read server-side, and for the editor and the forms, which read it in the browser, where the page sends the keys of the locale it is in.
+
+```ts
+// src/messages/fr.ts
+export default {
+  cms: { editor: { title: 'Modifier cette page', stop: 'Arrêter de modifier' }, admin: { content: 'Contenu' } },
+}
+```
+
+### Add a language
+
+A site words the `cms` block in its own `src/messages/<locale>.ts`, whatever the keys it gives, the rest reading the English.
+
+```ts
+// src/messages/de.ts
+export default { cms: { editor: { title: 'Diese Seite bearbeiten' } } }
+```
+
+### Write a count with plural forms
+
+A message may hold the placeholders its English shows, `{title}`, `{n}` or `{count}`, and a count may be written as plural forms.
+
+```ts
+cms: { admin: { entryCount: { one: '{count} entrée', other: '{count} entrées' } } }
+```
+
+## Reference
+
 - The French lives in `src/messages/fr.ts` of the package, declared by `"kay": { "messages": "./src/messages" }` in its package.json; an app overrides any key in its own `src/messages/fr.ts`, which lays over it key by key.
-- Another language: a site words the `cms` block in its own `src/messages/<locale>.ts`, whatever the keys it gives, the rest reading the English. A language for every site is a `src/messages/<locale>.ts` added to the package with every key: `tests/words.test.ts` holds each file there to the keys, with the placeholders of the English, so a new `cms.*` key without its text fails it.
-- Word a text once for the whole site, in the locale's file: `cms: { editor: { title: 'Modifier cette page', stop: 'Arrêter de modifier' }, admin: { content: 'Contenu' } }`. The screens read it server-side, the editor and the forms read it in the browser, where the page sends the keys of the locale it is in.
-- A message may hold the placeholders its English shows, `{title}`, `{n}` or `{count}`, and a count may be written as plural forms: `admin: { entryCount: { one: '{count} entrée', other: '{count} entrées' } }`.
+- A language for every site is a `src/messages/<locale>.ts` added to the package with every key: `tests/words.test.ts` holds each file there to the keys, with the placeholders of the English, so a new `cms.*` key without its text fails it.
 - A value is text: the catalog's HTML is escaped, never rendered.
 - `kay check` leaves `cms.*` keys out of its comparison between locales, so a French block needs no English twin; a key a locale lacks reads the English.
 - A name a collection or its schema gives, a field's label, a collection's name or a title, is the app's data and stays as written.
 
-## The keys
+### The keys
 
 - `cms.activity.*`: `add` (`Created`), `back` (`Back to the content`), `delete` (`Deleted`), `duplicate` (`Duplicated`), `empty` (`Nothing yet`), `emptyHint` (`What editors save, publish, delete, restore or rename from now on is listed here.`), `publish` (`Published`), `rename` (`Renamed from {from}`), `restore` (`Restored`), `title` (`Activity`), `unpublish` (`Unpublished`), `update` (`Saved`)
 - `cms.admin.*`: `brand` (`Content admin`, also the end of every title), `clearSearch` (`Clear search`), `collectionUnreadable` (`This collection cannot be read`), `content` (`Content`), `crumbs` (`Breadcrumb`, the label of an entry screen's path), `draftCount` (`{count} drafts`, `1 draft` for one), `entryCount` (`{count} entries`, `1 entry` for one), `lastEdited` (`Last edited {date}`), `lastEditedBy` (`Last edited {date} by {author}`), `media` (`Media`, the library's link and title), `navigation` (`Content admin`, the nav's label), `newEntry` (`New entry`), `newEntryIn` (`New entry in {collection}`), `newEntryTitle` (`New entry - {collection}`), `noCollections` (`No collections`), `noCollectionsHint` (`This site declares no content collection in its content config.`), `resultCount` (`{count} results`, `1 result` for one), `scheduledCount` (`{count} scheduled`, `1 scheduled` for one), `search` (`Search`), `searchLabel` (`Search entries`), `signedInAs` (`Signed in as {name}`), `signOut` (`Sign out`), `skip` (`Skip to the content`), `statusAll` (`All`), `statusDraft` (`Drafts`), `statusLabel` (`Filter by status`), `statusPublished` (`Published`), `statusScheduled` (`Scheduled`), `unreadable` (`Cannot be read`), `uploads` (`Unused uploads`), `viewSite` (`View the site`)

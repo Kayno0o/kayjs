@@ -2,6 +2,34 @@
 
 `kay lsp` serves an editor, `kay screenshot` photographs a page of `kay dev`, and `kay mcp` gives an agent kay's tools. The other commands are in [Check, inspect and tool commands](check-and-tools.md).
 
+## Common tasks
+
+### Serve an editor
+
+`kay lsp --stdio` is the server behind the editor extension in `editors/vscode`:
+
+```sh
+kay lsp --stdio
+```
+
+### Photograph a page of the dev server
+
+With `kay dev` running, `kay screenshot` shoots a path at two widths and writes the files under `.kay/screenshots`:
+
+```sh
+kay screenshot /posts --scheme dark
+```
+
+### Give an agent kay's tools
+
+`kay mcp` serves the project to an agent over stdio; register it once:
+
+```sh
+claude mcp add kay -- bunx kay mcp
+```
+
+## Reference
+
 - `kay lsp --stdio`:
   - The language server behind the editor extension in `editors/vscode`: errors, hover, completion with auto-import, signatures, definitions, references, rename, quick fixes and formatting in `.kay` files.
   - An import it adds goes in the fence the name is used from, the server fence for server code and the component script otherwise, made if missing.

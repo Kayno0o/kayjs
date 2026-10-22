@@ -1,6 +1,6 @@
 # kayjs-ui: Charts, drag and drop, galleries and image tools
 
-## Components
+## Common tasks
 
 ### LineChart, ScatterChart, ContributionGraph
 
@@ -78,3 +78,9 @@ ul
   - The box takes the focus to scroll by keyboard (arrows, Page Up and Down, Home, End). Find-in-page sees the drawn rows alone, and a focused control in a row that scrolls out of the window loses its focus, so give a long list a filter. A row's height is its border box: space it with padding or a gap, not a margin. The server draws the first screenful only.
 - `ZoomPane(label="Floor plan")` around a picture: pinch, Ctrl with the wheel, a double click, + and -, and the zoom buttons take it in, and once in the wheel alone zooms too, while fitted it scrolls the page; Ctrl with + or 0 stays the browser's zoom. A drag or the arrows move it, and 0 or the fit button fits it again. A press that does not wander stays a click, so marks standing on the picture remain clickable; `--kui-zoom-scale` lets one keep its own size with `calc(1 / var(--kui-zoom-scale))`. `tools` draws the buttons, on by default; `most` caps the zoom, 8 times fitted.
 - `ImageCropper(src={photo} ratio={16 / 9} onCrop={crop.set})` with an optional `@footer(reset)` block: a crop of a fixed `ratio` over the image, centred once it loads, moved by a drag or the arrows and resized by its corners or Shift with the arrows, Alt taking bigger steps. `onLoad({ width, height })` reports the image's natural size once it has decoded. `onCrop({ x, y, w, h })` reports it in the image's natural pixels, ready for a canvas draw; `grid` adds a rule-of-thirds overlay and `minSize` the smallest side.
+
+## Reference
+
+## Reference
+
+- ContributionGraph's month names and the day and month a LineChart draws on its axis follow the page's locale; `en` keeps `5 Jan`.

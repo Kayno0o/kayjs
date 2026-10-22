@@ -2,6 +2,26 @@
 
 `kay new` scaffolds a project from presets and features, and `kay add` adds a feature to one that exists. The rest of the commands are in [Project setup and scaffolding](project.md).
 
+## Common tasks
+
+### Scaffold a project
+
+`kay new` takes a directory, a preset and the features to add or drop:
+
+```sh
+kay new my-site --template site --with search
+```
+
+### Add a feature to a project
+
+`kay add` writes what a feature needs into a project that exists, and `kay add auth,ui` adds the libraries' features:
+
+```sh
+kay add postgres
+```
+
+## Reference
+
 - `kay new <dir> [--kay <dependency>] [--template blank|server|site|app] [--with <features>] [--without <features>] [--forge forgejo|github] [--runner <label>] [-y] [--quiet]`:
   - Scaffold a project in an empty directory.
   - A project is a set of features: `server` (an Elysia server; off, a static site), `starter` (a header, a skip link, a `_404.kay`, a home page greeting from the server with a counter island), `tailwind` (Tailwind through `bun-plugin-tailwind` over the Catppuccin Mocha palette, with `.vscode/settings.json` pointing Tailwind IntelliSense at the shorthand and `class="..."`; off, the markup carries no classes), `accents` (an accent picker in the header, kept in a cookie, which needs `starter` and `tailwind`), `eslint`, `tests`, `ci` (the workflow below, Forgejo's or GitHub's), `docker` (the container below; a static site's brings a `_404.kay` when `starter` is off, for its nginx 404), `auth` (the app's sessions, sign-in and members in SQLite, which needs `server`), `postgres` (the members in Postgres instead, with its compose stack and roles, which needs `auth`) and `ws` (the app's API module and websocket island, shown on the home page, which needs `server`).

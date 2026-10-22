@@ -2,17 +2,6 @@
 
 > Auth for kay apps, built on kay's `session()`: OAuth sign-in with any provider, passwords, mailed links (email verification, password reset, magic links, email change), TOTP two-factor with recovery codes, bearer tokens for devices and API clients, security mails, a proof-of-work CAPTCHA or a third party's, a breached-password check, a fail-closed gate for routes, and prebuilt sign-in and account pages. It works in kay pages, actions and guards, and in a plain Elysia app. Its data lives in a store: in memory for tests, in Postgres or SQLite through pg-orm, or in any object keeping the store contract.
 
-## Rules that are easy to get wrong
-
-- The signed-in state lives in the app's kay session. kayjs-auth sets no cookie of its own: the app's session data type includes `AuthSessionData`.
-- `auth.user()` is a method returning a promise, resolved once per request: `const user = await ctx.locals.auth.user()`. Where there must be a user, `await ctx.locals.auth.requireUser()` gives it, or sends the visitor to sign in and back, or refuses with a 401 (see The signed-in user).
-- A method that can fail answers `{ ok: true, ... }` or `{ ok: false, error }`, and field errors come as `errors` holding codes such as `'too-short'` or `'taken'`, never messages: the page words them in its own language.
-- A mailed link opens an app page that shows a button, or the new password's form, posting the token to an action. The page never spends the token on load: mail scanners open links.
-- A sign-in may stop at the second factor. `signInWithPassword`, `signInWithMagicLink`, `resetPassword` and the OAuth callback then answer the `twoFactorPage` as where to go, and the user is signed in once `verifyTwoFactor` gets the code. Redirect to the `redirect` they answer, never to a path of your own.
-- An action that redirects writes `return ctx.redirect(...)`, with the `return`, so `kay check` types `ctx.failed(action)` right.
-- A guest (`signInAsGuest`) costs nothing to mint, so kayjs-auth does not name it to other libraries: kayjs-ai's limits keep counting a guest by address, a signed-in user by id.
-- A link to an OAuth route changes the session on GET: give it `data-no-prefetch`, so a hover starts nothing.
-
 ## Topics
 
 The rest is split by topic, each file read whole with one command:
