@@ -152,7 +152,7 @@ function mask(source: string): string {
         continue
       }
 
-      if (char === '/' && (previous === '' || '(,=:[!&|?{;+-*%<>~^'.includes(previous) || REGEX_AFTER_WORD.test(tail))) {
+      if (char === '/' && (previous === '' || '(,=:[!&|?{;+-*%<>~^'.includes(previous) || REGEX_AFTER_WORD.test(tail.trimEnd()))) {
         const end = regexEnd(source, at)
 
         if (end !== -1) {

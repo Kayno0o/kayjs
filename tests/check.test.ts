@@ -3364,6 +3364,7 @@ describe.concurrent('kay check, unused code', () => {
         'const quote = /"|\'|`/g',
         'const nested = `a ${`b ${1}`} c`',
         'const division = (4 / 2) / 1',
+        'export const test = (s: string) => { return /\'|`/.test(s) }',
         'export const a = api({ bodyLimit: "1mb" })',
         'export const b = `${infiniteList(rows, { size: 5 })}`',
         'export const c = infiniteList<() => X>(rows, { size: 6 })',
