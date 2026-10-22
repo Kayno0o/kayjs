@@ -1,5 +1,5 @@
 import type { SocketOf } from '../src/runtime/live'
-import type { Rooms } from '../src/server/rooms'
+import type { AsyncRoomStore, Rooms, RoomStore } from '../src/server/rooms'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -183,6 +183,27 @@ describe('a room\'s state in memory', () => {
     }
 
     void typed
+  })
+})
+
+describe('a room\'s state over a store of either kind', () => {
+  it('takes the app store\'s rooms, typed as either kind, and answers as the store does', async () => {
+    const store: RoomStore | AsyncRoomStore | undefined = memoryRooms()
+    const live = rooms<Message, string, State>({ ...options, store })
+
+    live.join(connection(), 'hall', 'ada')
+    expect(await live.update('hall', state => ({ ...state, round: 1 }))).toEqual({ round: 1, scores: {} })
+  })
+
+  it('treats any thenable a store answers as async, not only a native Promise', async () => {
+    const base = memoryRooms()
+    const thenable = async (text: string | undefined) => ({ then: (resolve: (value: string | undefined) => void) => resolve(text) }) as unknown as Promise<string | undefined>
+    const store = { ...base, state: async (room: string) => thenable(base.state!(room)), update: async (room: string, change: (current: string | undefined) => string) => thenable(base.update!(room, change)) as Promise<string> } as AsyncRoomStore
+    const live = rooms<Message, string, State>({ ...options, store })
+
+    live.join(connection(), 'hall', 'ada')
+    expect(await live.update('hall', state => ({ ...state, round: 2 }))).toEqual({ round: 2, scores: {} })
+    expect(await live.state('hall')).toEqual({ round: 2, scores: {} })
   })
 })
 

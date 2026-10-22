@@ -26,17 +26,19 @@ interface Own {
 
 type Listener = Parameters<AsyncRoomStore['subscribe']>[0]
 
-// Runs a write once the ones before it did, its failure logged: the writes of a store go to Postgres in the order they were made.
-async function chained(prior: Promise<void>, what: string, work: () => Promise<unknown>): Promise<void> {
-  await prior
-
+// Awaits work nobody else holds, its failure logged.
+async function logged(what: string, work: Promise<unknown>): Promise<void> {
   try {
-    await work()
+    await work
   }
   catch (error) {
     kayLog('error', `${what} failed`, error)
   }
 }
+
+// How many times a change asks for a room's lock, a stuck update elsewhere letting go meanwhile; Postgres' lock_not_available.
+const LOCK_ATTEMPTS = 3
+const LOCK_NOT_AVAILABLE = '55P03'
 
 // Presence rooms in Postgres: a message published in one replica reaches the members connected to the others within `poll`, `'250ms'` by default; a bare number throws.
 // A replica reads the members of the rooms it holds a connection in or asked `members` about, so one it asks about for the first time lists the others' members from its next poll. A replica that stops without leaving has its members dropped once it has not been heard from for 10 seconds.
@@ -61,11 +63,7 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
   let pruned = 0
   let closed = false
 
-  const enqueue = (what: string, work: (db: SQL) => Promise<unknown>) => {
-    tail = chained(tail, what, async () => work(await pg.db()))
-  }
-
-  // Like `enqueue`, but gives the work's result, or its error, to the caller: a state is read and changed after the members written before it.
+  // Runs work once the ones queued before it did, in the order they were made, and gives its result, or its error, to the caller: a state is read and changed after the members written before it.
   const ordered = async <T>(work: (db: SQL) => Promise<T>): Promise<T> => {
     const prior = tail
     const run = (async () => {
@@ -84,6 +82,11 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
     })()
 
     return run
+  }
+
+  // Like `ordered` for a write nobody awaits, its failure logged.
+  const enqueue = (what: string, work: (db: SQL) => Promise<unknown>) => {
+    void logged(what, ordered(work))
   }
 
   // Waits for the room's lock for 5 seconds at most, so a stuck update elsewhere fails this one rather than holding the store's writes, the heartbeat's included.
@@ -259,11 +262,21 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
       sync()
       enqueue('removing a member from the rooms store', async (db) => {
         await query(db, 'DELETE FROM kay_room_members WHERE room = $1 AND connection = $2', [room, connection])
-        // Under the room's lock, so an update storing a state for the member that just left finishes first.
-        await db.begin(async (tx) => {
-          await lockRoom(tx, room)
-          await query(tx, 'DELETE FROM kay_room_state WHERE room = $1 AND NOT EXISTS (SELECT 1 FROM kay_room_members WHERE room = $1)', [room])
-        })
+        // Under the room's lock, so an update storing a state for the member that just left finishes first; a lock not given in time is asked for again rather than left to the next prune.
+        for (let attempt = 1; ; attempt++) {
+          try {
+            await db.begin(async (tx) => {
+              await lockRoom(tx, room)
+              await query(tx, 'DELETE FROM kay_room_state WHERE room = $1 AND NOT EXISTS (SELECT 1 FROM kay_room_members WHERE room = $1)', [room])
+            })
+
+            return
+          }
+          catch (error) {
+            if (attempt >= LOCK_ATTEMPTS || (error as { errno?: string }).errno !== LOCK_NOT_AVAILABLE)
+              throw error
+          }
+        }
       })
     },
     async state(room) {

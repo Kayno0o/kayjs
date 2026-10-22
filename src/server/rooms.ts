@@ -109,6 +109,7 @@ const KEPT = 30_000
 // Rooms of websocket connections, typed by what they send: join one in `open`, leave in `close`, and publish to it from anywhere.
 export function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options?: RoomsOptions<Message, State>] : [options: RoomsOptions<Message, State> & { state: () => State }]): Rooms<Message, Member, State>
 export function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options: RoomsOptions<Message, State, AsyncRoomStore> & { store: AsyncRoomStore }] : [options: RoomsOptions<Message, State, AsyncRoomStore> & { store: AsyncRoomStore, state: () => State }]): AsyncRooms<Message, Member, State>
+export function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options?: RoomsOptions<Message, State, RoomStore | AsyncRoomStore>] : [options: RoomsOptions<Message, State, RoomStore | AsyncRoomStore> & { state: () => State }]): Rooms<Message, Member, State> | AsyncRooms<Message, Member, State>
 export function rooms<Message, Member, State>(...[options = {}]: [options?: RoomsOptions<Message, State, RoomStore | AsyncRoomStore>]): RoomsBase<Message, Member> & { state: (room: string) => State | Promise<State>, update: (room: string, change: (state: State) => State) => State | Promise<State> } {
   const store: RoomStore | AsyncRoomStore = options.store ?? memoryRooms()
 
@@ -234,7 +235,11 @@ export function rooms<Message, Member, State>(...[options = {}]: [options?: Room
 
 // What `next` makes of a value, at once for a value and once it resolved for a promise, so a sync store stays sync.
 function after<T, R>(value: T | Promise<T>, next: (value: T) => R): R | Promise<R> {
-  return value instanceof Promise ? (async () => next(await value))() : next(value)
+  return isThenable(value) ? (async () => next(await value))() : next(value)
+}
+
+function isThenable<T>(value: T | Promise<T>): value is Promise<T> {
+  return typeof value === 'object' && value !== null && typeof Reflect.get(value, 'then') === 'function'
 }
 
 // Awaits a promise nobody else holds, its error logged.

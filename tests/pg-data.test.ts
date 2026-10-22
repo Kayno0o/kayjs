@@ -392,6 +392,33 @@ pgDescribe('pgRooms', () => {
     store.close()
   })
 
+  pgIt('drops a state itself when the last member leaves while another replica holds the room\'s lock past the timeout', async () => {
+    const sql = await fresh()
+    const [handle, other] = handles(2)
+    const store = pgRooms(handle!, { poll: '20ms' })
+    const live = rooms<string, undefined, { count: number }>({ store, state: () => ({ count: 0 }) })
+    const ada = { raw: { sendText: () => undefined } }
+
+    live.join(ada, 'lobby')
+    await live.update('lobby', () => ({ count: 3 }))
+
+    // Held for longer than the 5 s the leaving one waits for the lock.
+    const holder = (async () => {
+      const db = await other!.db()
+
+      await db.begin(async (tx) => {
+        await tx.unsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', ['kay_room_state\nlobby'])
+        await Bun.sleep(5_500)
+      })
+    })()
+
+    await Bun.sleep(300)
+    live.leave(ada)
+    await holder
+    await waitFor(async () => (await rows(sql, 'SELECT 1 FROM kay_room_state')).length === 0, 'the state to go', 8000)
+    store.close()
+  }, 20_000)
+
   pgIt('sends an async coalesce snapshot, and no snapshot to a joiner that left while the state was read', async () => {
     await fresh()
 
