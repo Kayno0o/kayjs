@@ -8,6 +8,8 @@ import process from 'node:process'
 import { throughLinks } from '../build/links'
 import { KayError } from '../compiler/errors'
 import { entryPath } from '../content/entry-route'
+import { contentKey } from '../content/load'
+import { onKeysInvalidated } from '../runtime/cache'
 import { FILE_EXTENSION, flattenMessages, localePath, matchLinksWith, pathSegment, splitLocale, translatedPath } from '../runtime/i18n'
 import { localeState } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
@@ -15,7 +17,7 @@ import { acceptedLocales, LOCALE_TAG, matchLocale } from './accept-language'
 import { routerPath } from './base'
 import { importModule } from './bundle'
 import { requestCookies } from './cookies'
-import { compiledLinks } from './links'
+import { compiledLinks, forgetLinks } from './links'
 import { requestUrl } from './request-url'
 import { projectSource } from './source'
 import { INVALID_PARAMS } from './words'
@@ -182,7 +184,7 @@ export function routedSettings(settings: LocaleSettings, routes: Pick<Route, 'pa
 
 const CATCH_ALL = /\*[^/]+/
 
-// The paths of the entries of routed collections whose slug ends in an extension, which the locale rule would take for files; read once at startup, so an entry added later needs a restart.
+// The paths of the entries of routed collections whose slug ends in an extension, which the locale rule would take for files; `followEntryFiles` reads them again when a collection is invalidated.
 export async function entryFilePaths(collections: { options: { route?: string | undefined }, all: () => Promise<{ slug: string }[]> }[]): Promise<string[]> {
   const paths = await Promise.all(collections.map(async ({ options, all }) => {
     const { route } = options
@@ -198,13 +200,54 @@ export async function entryFilePaths(collections: { options: { route?: string | 
       })
     }
     catch (error) {
-      kayLog('warn', `the entries of ${route} could not be read at startup, so a link to one whose slug ends in a file extension stays a file`, error)
+      kayLog('warn', `the entries of ${route} could not be read, so a link to one whose slug ends in a file extension stays a file`, error)
 
       return []
     }
   }))
 
   return paths.flat()
+}
+
+// Settings are read-only once a page has written them, but for `followEntryFiles`, which forgets the written form.
+const settingsJsons = new WeakMap<LocaleSettings, string>()
+
+type EntryCollection = Parameters<typeof entryFilePaths>[0][number]
+
+// Keeps `settings.entryFiles` to what the routed collections hold now: an entry saved, loaded or published later is linked in its locale without a restart.
+// The settings object stays the same, as the server holds it, with the memos of its links and its serialized form reset; the listener goes once the settings are let go of.
+export function followEntryFiles(settings: LocaleSettings, collections: (EntryCollection & { name: string })[]): void {
+  const routed = collections.filter(({ options }) => options.route !== undefined)
+
+  if (routed.length === 0)
+    return
+
+  const keys = new Set(routed.map(({ name }) => contentKey(name)))
+  const weak = new WeakRef(settings)
+  let latest = 0
+
+  // Only the newest read is kept, as two invalidations in a row can finish out of order.
+  const refresh = async (target: LocaleSettings, turn: number) => {
+    const entryFiles = await entryFilePaths(routed)
+
+    if (turn !== latest)
+      return
+
+    target.entryFiles = entryFiles.length > 0 ? entryFiles : undefined
+    forgetLinks(target)
+    settingsJsons.delete(target)
+  }
+
+  const stop = onKeysInvalidated((_, dropped) => {
+    const target = weak.deref()
+
+    if (target === undefined)
+      stop()
+    else if ([...keys].some(key => dropped(key)))
+      void refresh(target, ++latest)
+
+    return []
+  })
 }
 
 // The settings told of the patterns the site's pages are served under and of its localized feeds, which a link written as the default locale names them goes to in the page's locale.
@@ -455,9 +498,6 @@ export function messagesScript(keys: Set<string>, first: boolean, pinned = false
 
   return `<script type="application/json" data-kay-i18n>{${parts.join(',')}}</script>`
 }
-
-// Settings are read-only once a page has written them.
-const settingsJsons = new WeakMap<LocaleSettings, string>()
 
 // The settings go to every page with islands unchanged, so they are written once.
 function settingsJson(settings: LocaleSettings): string {

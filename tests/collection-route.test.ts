@@ -14,7 +14,7 @@ import { localizedLink, matchLinksWith } from '../src/runtime/i18n'
 import { alternate } from '../src/runtime/i18n.server'
 import { runInLocale } from '../src/runtime/locale-state'
 import { entryUrls } from '../src/server/entry-urls'
-import { entryFilePaths, linkedSettings } from '../src/server/i18n'
+import { entryFilePaths, followEntryFiles, linkedSettings } from '../src/server/i18n'
 import { compiledLinks } from '../src/server/links'
 import { scratchDir } from './scratch'
 
@@ -261,6 +261,29 @@ describe('a collection route read beyond the entries', () => {
     finally {
       matchLinksWith(compiledLinks)
     }
+  })
+
+  it('keeps the entry files of the locale rule to what a collection holds after an invalidate()', async () => {
+    let rows = [{ slug: 'first', data: { title: 'A' } }]
+    const docs = collection({ name: 'route-files-later', load: () => rows }, { schema, route: '/later/*slug' })
+    const base = { locales: ['en', 'fr'], defaultLocale: 'en', prefixDefault: false, pages: ['/later/*'] }
+    const linked = linkedSettings(base, [{ pattern: '/later/*' }], [docs])
+
+    await docs.all()
+    followEntryFiles(linked, [docs])
+    expect(compiledLinks.link(linked, '/later/x.html', 'fr', undefined)).toBe('/later/x.html')
+
+    rows = [...rows, { slug: 'x.html', data: { title: 'B' } }]
+    docs.invalidate()
+    await Bun.sleep(50)
+    expect(linked.entryFiles).toEqual(['/later/x.html'])
+    expect(compiledLinks.link(linked, '/later/x.html', 'fr', undefined)).toBe('/fr/later/x.html')
+
+    rows = rows.slice(0, 1)
+    docs.invalidate()
+    await Bun.sleep(50)
+    expect(linked.entryFiles).toBeUndefined()
+    expect(compiledLinks.link(linked, '/later/x.html', 'fr', undefined)).toBe('/later/x.html')
   })
 
   it('leaves out an entry whose slug the route refuses, keeping the others', async () => {

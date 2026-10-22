@@ -21,7 +21,7 @@ import { basePath } from './base'
 import { checkCardConfig, drawLogo, setupCards } from './card'
 import { chooseInlineStyles } from './client'
 import { appServesManifest } from './favicon'
-import { entryFilePaths, implicitI18n, linkedSettings, loadI18n, routedSettings, serveLocales } from './i18n'
+import { entryFilePaths, followEntryFiles, implicitI18n, linkedSettings, loadI18n, routedSettings, serveLocales } from './i18n'
 import { applyImageConfig } from './image'
 import { loadMatchers } from './params'
 import { setupPreview } from './preview'
@@ -165,6 +165,11 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
 
   const collections = await loadingCollections
 
+  // The entries whose slug ends in a file extension are read beside the client build, for the locale rule of the links.
+  const readingEntryFiles = i18n ? entryFilePaths(collections) : undefined
+
+  void Promise.allSettled([readingEntryFiles])
+
   const claimed = refuse?.({ routes, files, endpoints, collections, i18n: i18n?.settings, site, base }) as Claimed
 
   // Started once every refusal that needs no build is behind, those of the config (images, markdown, i18n, matchers, base, preview, the cards) and of the scanned project, the server's own among them; only what needs the built client or the routes' guards (the font faces of a Fontsource family, API modules, extension routes) still follows it.
@@ -195,9 +200,10 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
 
   // A localized site's links are told of its pages and localized feeds, for the server and the static export alike.
   if (i18n) {
-    const entryFiles = await entryFilePaths(collections)
+    const entryFiles = await readingEntryFiles!
 
     i18n.settings = { ...linkedSettings(i18n.settings, routes, collections), ...entryFiles.length > 0 && { entryFiles } }
+    followEntryFiles(i18n.settings, collections)
   }
 
   return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions: { ...renderOptionsOf(config, mode, { head, maxDensity, fontCss, islandPreloads: mode.dev ? undefined : islandOnlyChunks(client), editor: source.editor(root, config) }), redirectSpelling }, cards, files, endpoints, appManifest: ownManifest, extensions, api, claimed }

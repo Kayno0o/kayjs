@@ -210,6 +210,11 @@ function repath(settings: LocaleSettings, href: string, locale: string, back: bo
   return `/${filled.join('/')}${slash && filled.length > 0 ? '/' : ''}${end === -1 ? '' : href.slice(end)}`
 }
 
+// Forgets what was split and resolved for a settings object whose patterns or entry files changed.
+export function forgetLinks(settings: LocaleSettings): void {
+  compiledSettings.delete(settings)
+}
+
 // The runtime matches a link against the patterns as they come, which a page of islands does a few times; the server resolves every link of every page, so it keeps each site's patterns split once.
 export const compiledLinks: LinkMatcher = {
   link(settings, href, locale, currentHost) {
