@@ -235,6 +235,20 @@ describe('kay check on parts', () => {
     expect(diagnostics(call('spinner root'))).toEqual([expect.stringContaining('`root` is the first name')])
   })
 
+  it('refuses a part handed in a page or a layout, which has no class to take it from', () => {
+    const call = '---\nimport Busy from \'./busy.kay\'\n---\nBusy(part="root spinner")\n'
+
+    expect(diagnostics(call, { page: true })).toEqual([expect.stringContaining('has no parts to hand on')])
+    expect(diagnostics(call.replace('root spinner', 'spinner'), { page: true })).toEqual([])
+  })
+
+  it('checks each handed part against the called component and types it from there', () => {
+    const code = compileKay('---\nimport Busy from \'./busy.kay\'\n---\nBusy(part="root spinner")\n', 'src/part.kay', { check: true }).tsx
+
+    expect(code).toContain('{...KayHandsPart(Busy)("spinner")}')
+    expect(code).toContain('"spinner"?: KayHandedPart<typeof Busy, "spinner">')
+  })
+
   it('refuses several parts on an element, which only a component call hands on', () => {
     expect(diagnostics('---\n---\ndiv(part="root spinner")\n')).toEqual([expect.stringContaining('Only a component call names several parts')])
   })

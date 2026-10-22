@@ -147,7 +147,7 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
   ]
 
   return [
-    'import type { Action, ApiRoutesOf, BoundProp, BoundValue, CheckedHref, CheckedHtml, ExtensionServersOf, FieldName, FunctionProp, HandedSignal, IslandProp, PlainIslandProp, LocalsOf, PublicEnvOf, PublicFieldsOfModule, ServerOfModule, Signal, Truthy, Unmatched, UnresolvedParameter } from \'kay\'',
+    'import type { Action, ApiRoutesOf, BoundProp, BoundValue, CheckedHref, CheckedHtml, ExtensionServersOf, FieldName, FunctionProp, HandedSignal, HandsPart, IslandProp, PlainIslandProp, LocalsOf, PublicEnvOf, PublicFieldsOfModule, ServerOfModule, Signal, Truthy, Unmatched, UnresolvedParameter } from \'kay\'',
     ...content === undefined ? [] : ['import type { FeedPathsOf } from \'kay/content\''],
     ...(i18n?.messages.length ?? 0) > 1 ? ['import type { MergeMessages } from \'kay/i18n\''] : [],
     '',
@@ -164,6 +164,7 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
     '  function KayProp<Component>(component: Component): <Value>(value: Value & IslandProp<Component, Value>) => Value',
     '  function KayPlainProp<Component>(component: Component): <Value>(value: Value & PlainIslandProp<Component, Value>) => Value',
     '  function KayFunctionProp<Component>(component: Component): (attribute: FunctionProp<Component>) => Record<never, never>',
+    '  function KayHandsPart<Component>(component: Component): <Name extends string>(name: Name & HandsPart<Component, Name>) => Record<never, never>',
     '  function KayBound<Component>(component: Component): <Key extends string, Value>(key: Key & BoundProp<Component, Key>, value: Value, write: (value: BoundValue<Component, Key>) => unknown) => Value',
     '  function KayRow<Item>(each: readonly Item[] | null | undefined | false): Item',
     '  function KayTruthy<Value>(value: Value): Truthy<Value>',

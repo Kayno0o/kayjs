@@ -441,7 +441,7 @@ class ModuleShell {
       b.add(`const ${helperName('ui')} = ${helperName('uiRecipe')}(${JSON.stringify(this.options.ui)}${facts.recipe === undefined ? '' : `, ${facts.recipe}`})\n`)
 
     if (this.partsType().helper)
-      b.add('import type { PartClass as KayPartOf } from \'kay\'\n')
+      b.add('import type { HandedPart as KayHandedPart, PartClass as KayPartOf } from \'kay\'\n')
 
     if (this.partsType().recipe)
       b.add('import type { RecipeProps as KayRecipeProps } from \'kay\'\n')
@@ -487,16 +487,27 @@ class ModuleShell {
 
     const imported = new Set(this.script.imports.map(binding => binding.local))
     let helper = false
+    const importedCall = (component: string) => imported.has(component.slice(0, component.includes('.') ? component.indexOf('.') : undefined))
     const entries = [...parts.names].toSorted(([a], [b]) => Number(b === 'root') - Number(a === 'root')).map(([name, components]) => {
-      const types = new Set(components.map((component) => {
-        if (component === undefined || !imported.has(component.slice(0, component.includes('.') ? component.indexOf('.') : undefined)))
-          return 'string'
+      const types = new Set([
+        ...components.map((component) => {
+          if (component === undefined || !importedCall(component))
+            return 'string'
 
-        // A server page never types its props from its parts.
-        helper ||= this.server === undefined
+          // A server page never types its props from its parts.
+          helper ||= this.server === undefined
 
-        return `KayPartOf<typeof ${component}>`
-      }))
+          return `KayPartOf<typeof ${component}>`
+        }),
+        ...(parts.handed.get(name) ?? []).map((component) => {
+          if (!importedCall(component))
+            return 'string'
+
+          helper ||= this.server === undefined
+
+          return `KayHandedPart<typeof ${component}, ${JSON.stringify(name)}>`
+        }),
+      ])
 
       return `${JSON.stringify(name)}?: ${[...types].join(' | ')}`
     })

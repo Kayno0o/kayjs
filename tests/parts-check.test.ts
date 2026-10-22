@@ -14,15 +14,17 @@ const COMPONENTS = {
   'src/card.kay': 'section.card\n  header(part="head") a\n  div(part="body")\n    slot\n',
   'src/plain.kay': '---\nconst { class: className } = props<{ class?: string }>()\n---\ndiv(class={className}) a\n',
   'src/pair.kay': 'header(part="top") a\nfooter(part="bottom") b\n',
+  'src/busy.kay': 'button(part="root")\n  span(part="spinner") a\n',
+  'src/hands.kay': '---\nimport Busy from \'./busy.kay\'\n---\nBusy(part="root spinner")\n',
   'src/panel.kay': '---\nimport Card from \'./card.kay\'\n---\nsection.panel\n  Card(part="card") body\n',
 }
 const IMPORTS = '---\nimport Card from \'../card.kay\'\nimport Pair from \'../pair.kay\'\nimport Panel from \'../panel.kay\'\nimport Plain from \'../plain.kay\'\nconst rest = { id: \'x\' }\n---\n'
 
-async function problems(page: string): Promise<string[]> {
+async function problems(page: string, route = 'src/routes/index.kay'): Promise<string[]> {
   const root = await scratchDir('parts-check-')
 
   try {
-    await Promise.all(Object.entries({ 'tsconfig.json': tsconfig, ...COMPONENTS, 'src/routes/index.kay': page }).map(async ([path, content]) => Bun.write(join(root, path), content)))
+    await Promise.all(Object.entries({ 'tsconfig.json': tsconfig, ...COMPONENTS, [route]: page }).map(async ([path, content]) => Bun.write(join(root, path), content)))
 
     return (await check(root)).map(diagnostic => diagnostic.message.slice(0, diagnostic.message.includes('\n') ? diagnostic.message.indexOf('\n') : undefined)).filter(message => !message.includes('is declared but'))
   }
@@ -30,6 +32,22 @@ async function problems(page: string): Promise<string[]> {
     await rm(root, { recursive: true, force: true })
   }
 }
+
+const HANDS = '---\nimport Busy from \'./busy.kay\'\nimport Plain from \'./plain.kay\'\n---\n'
+const CALLER = 'src/caller.kay'
+
+describe('kay check on a part handed to a called component', () => {
+  it('reports a handed part the called component does not name, at the call', async () => {
+    expect(await problems(`${HANDS}Busy(part="root spiner")\n`, CALLER)).toEqual([expect.stringContaining('spiner')])
+    expect(await problems(`${HANDS}Plain(part="root head")\n`, CALLER)).toEqual([expect.stringContaining('head')])
+  })
+
+  it('types the handed part as the called component types it', async () => {
+    expect(await problems(`${HANDS}Busy(part="root spinner")\n`, CALLER)).toEqual([])
+    expect(await problems('---\nimport Hands from \'../hands.kay\'\n---\nHands(class={{ root: \'a\', spinner: \'b\' }})\n')).toEqual([])
+    expect(await problems('---\nimport Hands from \'../hands.kay\'\n---\nHands(class={{ spinner: 5 }})\n')).toEqual([expect.stringContaining('not assignable')])
+  })
+})
 
 describe('kay check on a component with parts', () => {
   it('passes a string for the root, an object of parts, and a nested object for a part that is a component', async () => {

@@ -315,6 +315,12 @@ type PropsOf<Tag> = Tag extends keyof JSX.IntrinsicElements ? JSX.IntrinsicEleme
 // The `class` a part that is a call of this component takes, as the component types it: a string for its root, or an object of its own parts.
 export type PartClass<Component> = Component extends (props: infer Props) => unknown ? 'class' extends keyof Props ? Props['class' & keyof Props] : never : never
 
+// The type of the part `Name` of a component, which a call of it receives from the part of the same name this component hands on: its own parts object entry for it.
+export type HandedPart<Component, Name extends string> = PartClass<Component> extends infer Class ? Class extends object ? Name extends keyof Class ? Class[Name] : never : never : never
+
+// What `part="root spinner"` checks of the called component: it names a part `Name`, or the call is refused.
+export type HandsPart<Component, Name extends string> = 0 extends 1 & Component ? unknown : [HandedPart<Component, Name>] extends [never] ? { kayError: `The called component has no part ${Name}` } : unknown
+
 // An object of classes by part name, `{ head: 'p-6' }`, told from a `{ name: condition }` object by its string values.
 type PartsObject<Item> = 0 extends 1 & Item ? never : Item extends readonly unknown[] ? never : Item extends object ? [Extract<Item[keyof Item], string>] extends [never] ? never : Item : never
 

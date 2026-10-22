@@ -1,7 +1,7 @@
 import type { Attribute, AwaitBranch, AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfBranch, IfNode, MatchNode, NamedAttribute, Node, SlotNode, SnippetNode, Span, TemplateFacts, TextNode, TryNode } from './ast'
 import type { CodeBuilder } from './mapping'
 import type { Sites } from './rewrite'
-import { actionOf, bindsOwnProp, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isSlot, keyedByPosition, partAttribute, serverIslandOf } from './ast'
+import { actionOf, bindsOwnProp, FIELD_ATTRIBUTE, FIELD_ELEMENTS, handedParts, isSlot, keyedByPosition, partAttribute, serverIslandOf } from './ast'
 import { isFunctionAt, sentParts } from './expression'
 import { slotValue } from './items'
 import { DYNAMIC_TAG } from './mapping'
@@ -632,8 +632,15 @@ export class JsxTemplate {
         continue
 
       // Not a prop of the element or the component: it names a part, whose class the component's own `class` type takes.
-      if (attribute === part)
+      if (attribute === part) {
+        // The called component must have each part handed to it.
+        if (this.options.check) {
+          for (const handed of handedParts(element, this.src, this.facts.parts))
+            b.add(' {...KayHandsPart(').addSource(element.tag).add(')(').wrap(attribute.name, () => b.add(JSON.stringify(handed))).add(')}')
+        }
+
         continue
+      }
 
       if (attribute === serverIsland?.attribute)
         continue

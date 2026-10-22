@@ -488,6 +488,8 @@ class Validator {
       this.error(attribute.name, 'A part is named once on a call', { help: 'delete the repeated name' })
     else if (names.slice(1).includes('root'))
       this.error(attribute.name, '`root` is the first name of a call that hands parts on, or is not handed', { help: 'write `part="root spinner"`, the root first' })
+    else if (this.options.pageFile === true)
+      this.error(attribute.name, 'A page or a layout has no parts to hand on', { note: 'only a component takes `class` entries per part, which a call hands on to the component it calls', help: 'move the call into a component, or name one part' })
   }
 
   private attribute(element: ElementNode, attribute: NamedAttribute, name: string): void {

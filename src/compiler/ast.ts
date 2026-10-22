@@ -611,6 +611,8 @@ const IDENTIFIER = /^[A-Z_$][\w$]*$/i
 export interface PartFacts {
   // Each part, with the component it is a call of when it is one: its class is then that component's own.
   names: Map<string, (string | undefined)[]>
+  // Each part this component hands on to the components it calls, with the calls: the type of that part is the called component's own for it.
+  handed: Map<string, string[]>
   // Where the string form of `class` goes: the part marked `root`, else the template's single top element, else nowhere.
   root: 'marked' | 'implicit' | 'none'
   implicit?: ElementNode | undefined
@@ -690,7 +692,7 @@ function addRecipe(facts: TemplateFacts, file: KayFile, recipe: string): void {
   facts.recipe = recipe
 
   if (!facts.parts) {
-    facts.parts = { names: new Map(), root: 'none', merges: true }
+    facts.parts = { names: new Map(), handed: new Map(), root: 'none', merges: true }
     markRoot(facts.parts, file.template)
 
     if (facts.parts.root !== 'none')
@@ -717,13 +719,24 @@ function factsOf(file: KayFile): TemplateFacts {
         facts.helpers.add('componentClass')
 
       for (const [index, part] of partNames(node, file.source).entries()) {
-        facts.parts ??= { names: new Map(), root: 'none', merges: true }
-        // A part handed on is not the called component's: its entry is a string or that component's own parts.
-        const tag = node.component && index === 0 ? node.name : undefined
+        facts.parts ??= { names: new Map(), handed: new Map(), root: 'none', merges: true }
         const tags = facts.parts.names.get(part) ?? []
 
-        if (!tags.includes(tag))
-          facts.parts.names.set(part, [...tags, tag])
+        // A part handed on is not the called component's own: its entry is whatever that component's part takes.
+        if (index > 0 && node.component) {
+          const calls = facts.parts.handed.get(part) ?? []
+
+          if (!calls.includes(node.name))
+            facts.parts.handed.set(part, [...calls, node.name])
+
+          facts.parts.names.set(part, tags)
+        }
+        else {
+          const tag = node.component ? node.name : undefined
+
+          if (!tags.includes(tag))
+            facts.parts.names.set(part, [...tags, tag])
+        }
 
         facts.helpers.add('partClass')
 
