@@ -37,7 +37,7 @@ function readText(file: string): string | undefined {
 
 // Bun cannot start a build while a plugin of another waits, so a worker is bundled by a process of its own, which prints its file's name.
 if (import.meta.main) {
-  const bundle = JSON.parse(process.argv[2]!) as WorkerBundle
+  const bundle = JSON.parse(await Bun.stdin.text()) as WorkerBundle
   const out = await Bun.build({
     entrypoints: [bundle.entry],
     outdir: bundle.outdir,

@@ -134,7 +134,8 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
           return kept.result.name
 
         const started = Date.now()
-        const child = Bun.spawn([process.execPath, WORKER_BUNDLE, JSON.stringify(bundle)], { cwd: root, env: { ...process.env, [RENDER_OUTPUT]: basename(dirname(dist)) }, stdout: 'pipe', stderr: 'pipe' })
+        // The bundle goes on stdin, as the class table it carries outgrows what one argument may hold; the command names the entry alone, which the process list shows.
+        const child = Bun.spawn([process.execPath, WORKER_BUNDLE, path], { cwd: root, env: { ...process.env, [RENDER_OUTPUT]: basename(dirname(dist)) }, stdin: new Blob([key]), stdout: 'pipe', stderr: 'pipe' })
         const [name, problems, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
         if (code !== 0)
