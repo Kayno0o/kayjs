@@ -94,6 +94,24 @@ describe('the shared event poller', () => {
     expect(busy).toBe(0)
   })
 
+  pgIt('leaves alone a statement a timer started from a run that succeeded', async () => {
+    const { sql } = await postgres()
+    let later: Promise<unknown> = Promise.resolve()
+
+    await timeLimited(async () => {
+      later = new Promise((resolve) => {
+        setTimeout(() => {
+          void (async () => {
+            resolve(await sql`SELECT 7 AS seven`)
+          })()
+        }, 50)
+      })
+    }, 1000, 'the read')
+    await Bun.sleep(100)
+
+    expect(((await later) as { seven: number }[])[0]?.seven).toBe(7)
+  })
+
   it('does not run a task again before its last run ended', async () => {
     const counter = counted({ db: async () => ({}) as SQL })
     let started = 0

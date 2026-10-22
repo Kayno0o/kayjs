@@ -20,17 +20,20 @@ export async function timeLimited<Result>(work: () => Promise<Result>, ms: numbe
 
   try {
     return await Promise.race([startedStatements.run(run, work), new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`${what} took more than ${ms / 1000} seconds`)), ms)
+      timer = setTimeout(() => {
+        // Only a run given up on is over: the context of one that succeeded lives on in the timers and listeners it made, whose statements are theirs to run.
+        run.over = true
+
+        for (const statement of run.statements)
+          statement.cancel()
+
+        reject(new Error(`${what} took more than ${ms / 1000} seconds`))
+      }, ms)
       timer.unref()
     })])
   }
   finally {
     clearTimeout(timer)
-
-    run.over = true
-
-    for (const statement of run.statements)
-      statement.cancel()
   }
 }
 
