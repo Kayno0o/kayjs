@@ -5,7 +5,7 @@ import process from 'node:process'
 import { SQL } from 'bun'
 import { afterAll, afterEach, describe, expect, it } from 'bun:test'
 import { setLiveStore } from '../src/runtime/live-value'
-import { pages } from '../src/server'
+import { pages, pgData } from '../src/server'
 import { setupStore } from '../src/server/app-store'
 import { pgDescribe, pgIt, url } from './job-stores'
 import { scratchDir } from './scratch'
@@ -20,8 +20,17 @@ const CONFIG = 'import { defineConfig, pgData } from \'kay/server\'\n\nexport de
 const UNREACHABLE = 'postgres://test:test@127.0.0.1:1/none'
 const roots: string[] = []
 let databases = 0
+const URL_KEY = 'PG_LIVE_SETUP_URL'
+const before = process.env[URL_KEY]
+
+process.env[URL_KEY] = UNREACHABLE
 
 afterAll(async () => {
+  if (before === undefined)
+    delete process.env[URL_KEY]
+  else
+    process.env[URL_KEY] = before
+
   await Promise.all(roots.map(async root => rm(root, { recursive: true, force: true })))
 })
 
@@ -31,7 +40,6 @@ afterEach(() => {
 })
 
 // The config of an in-process start reads it too, and the store the test gives wins.
-process.env.PG_LIVE_SETUP_URL = UNREACHABLE
 
 async function project(): Promise<string> {
   const root = await scratchDir('pg-live-setup-')
@@ -78,6 +86,12 @@ describe('a build or a check with a pgData store', () => {
     expect(code, text).toBe(0)
   }, 60_000)
 
+  it('builds without connecting when the database is unreachable', async () => {
+    const { code, text } = await kay(await project(), UNREACHABLE, 'build', '--no-check')
+
+    expect(code, text).toBe(0)
+  }, 60_000)
+
   pgIt('creates no kay table in a static build', async () => {
     await withDatabase(async (database, tables) => {
       const { code, text } = await kay(await project(), database, 'build', '--static', '--no-check')
@@ -89,16 +103,18 @@ describe('a build or a check with a pgData store', () => {
 
   pgIt('creates no kay table in kay check', async () => {
     await withDatabase(async (database, tables) => {
-      const { text } = await kay(await project(), database, 'check')
+      const { code, text } = await kay(await project(), database, 'check')
 
+      expect(code, text).toBe(0)
       expect(text).not.toContain('ECONNREFUSED')
       expect(await tables()).toEqual([])
     })
   }, 60_000)
 
   it('checks without connecting when the database is unreachable', async () => {
-    const { text } = await kay(await project(), UNREACHABLE, 'check')
+    const { code, text } = await kay(await project(), UNREACHABLE, 'check')
 
+    expect(code, text).toBe(0)
     expect(text).not.toContain('ECONNREFUSED')
   }, 60_000)
 })
@@ -150,7 +166,7 @@ pgDescribe('a server starting against Postgres', () => {
     await withDatabase(async (database, tables) => {
       const root = await project()
 
-      await pages({ root, routes: join(root, 'src/routes'), prebuilt: false, security: false, store: (await import('../src/server')).pgData(database) })
+      await pages({ root, routes: join(root, 'src/routes'), prebuilt: false, security: false, store: pgData(database) })
       expect(await tables()).toContain('kay_live')
     })
   }, 60_000)
