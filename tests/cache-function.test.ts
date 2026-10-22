@@ -25,8 +25,8 @@ describe('cache', () => {
   it('gives two caches their own keys', async () => {
     let a = 0
     let b = 0
-    const first = cache(() => ++a, { ttl: 60 })
-    const second = cache(() => ++b, { ttl: 60 })
+    const first = cache(() => ++a, { ttl: '1m' })
+    const second = cache(() => ++b, { ttl: '1m' })
 
     await first()
     await second()
@@ -42,7 +42,7 @@ describe('cache', () => {
       loads.push(slug)
 
       return slug
-    }, { ttl: 60 })
+    }, { ttl: '1m' })
 
     await post('a')
     await post('b')
@@ -61,8 +61,8 @@ describe('cache', () => {
     const group = cacheTag()
     let tagged = 0
     let other = 0
-    const one = cache(() => ++tagged, { ttl: 60, tags: [group] })
-    const two = cache(() => ++other, { ttl: 60 })
+    const one = cache(() => ++tagged, { ttl: '1m', tags: [group] })
+    const two = cache(() => ++other, { ttl: '1m' })
 
     await one()
     await two()
@@ -73,7 +73,7 @@ describe('cache', () => {
 
   it('lets a render that read a cache function or its tag be refreshed by either invalidation', async () => {
     const group = cacheTag()
-    const posts = cache(() => 1, { ttl: 60, tags: [group] })
+    const posts = cache(() => 1, { ttl: '1m', tags: [group] })
     const { reads } = await readsOf(async () => posts())
 
     expect(reads).toHaveLength(2)
@@ -96,7 +96,7 @@ describe('cache', () => {
     const rows = new Map<string, { text: string, freshUntil: number }>()
     const store: CacheStore = { get: key => rows.get(key), set: (key, text, freshUntil) => void rows.set(key, { text, freshUntil }), delete: key => void rows.delete(key), keys: () => [...rows.keys()] }
     const group = cacheTag()
-    const posts = cache(() => 'kept', { ttl: 60, store, tags: [group] })
+    const posts = cache(() => 'kept', { ttl: '1m', store, tags: [group] })
 
     await posts()
     expect(rows.size).toBe(1)
@@ -110,7 +110,7 @@ describe('cache', () => {
       seen.push(value)
 
       return seen.length
-    }, { ttl: 60 })
+    }, { ttl: '1m' })
 
     await echo(undefined)
     await echo(null)
@@ -128,7 +128,7 @@ describe('cache', () => {
       await Bun.sleep(5)
 
       return seen
-    }, { ttl: 60, tags: [group] })
+    }, { ttl: '1m', tags: [group] })
 
     const first = posts()
 
@@ -141,7 +141,7 @@ describe('cache', () => {
   it('tells the other processes of a bare invalidate when this one holds no value', () => {
     const sent: string[] = []
     const store: CacheStore = { get: () => undefined, set: () => undefined, delete: () => undefined, keys: () => [], publish: message => void sent.push(message), subscribe: () => undefined }
-    const posts = cache(() => 1, { ttl: 60, store })
+    const posts = cache(() => 1, { ttl: '1m', store })
 
     trackStore(store)
     posts.invalidate()
@@ -156,7 +156,7 @@ describe('cache', () => {
       hear = listener
     } }
     let loads = 0
-    const post = cache((slug: string) => `${slug}${++loads}`, { ttl: 60, store })
+    const post = cache((slug: string) => `${slug}${++loads}`, { ttl: '1m', store })
 
     // The sender holds no value, as another process would not.
     trackStore(store)
@@ -179,7 +179,7 @@ describe('cache', () => {
     const group = (cacheTag as unknown as (id: string) => CacheTag)('rewrite-group')
     const named = cache as unknown as (load: () => string, options: CacheFunctionOptions, id: string) => CachedFunction<[], string>
 
-    await named(() => 'kept', { ttl: 60, store }, 'rewrite')()
+    await named(() => 'kept', { ttl: '1m', store }, 'rewrite')()
     expect(rows.get('cache:rewrite')?.text.startsWith('#deps ')).toBe(false)
 
     // A restart: memory is empty, the row stays, and the module now names a tag.
@@ -187,14 +187,14 @@ describe('cache', () => {
 
     invalidateLocally('cache:rewrite')
     rows.set('cache:rewrite', row)
-    expect(await named(() => 'other', { ttl: 60, store, tags: [group] }, 'rewrite')()).toBe('kept')
+    expect(await named(() => 'other', { ttl: '1m', store, tags: [group] }, 'rewrite')()).toBe('kept')
     expect(rows.get('cache:rewrite')?.text.startsWith('#deps ')).toBe(true)
     group.invalidate()
     expect(rows.has('cache:rewrite')).toBe(false)
   })
 
   it('says an argument devalue cannot write is the cause', async () => {
-    const post = cache((_value: unknown) => 1, { ttl: 60 })
+    const post = cache((_value: unknown) => 1, { ttl: '1m' })
 
     await expect(post(() => 1)).rejects.toThrow('arguments devalue can write')
   })
@@ -205,7 +205,7 @@ describe('cache', () => {
     try {
       const dir = join(root, 'a (b)')
 
-      await Bun.write(join(dir, 'app.ts'), `import { cache } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/cache'))}\n\nconst keys: string[] = []\nconst store = { get: () => undefined, set: (key: string) => void keys.push(key), delete: () => undefined, keys: () => [] }\nconst posts = cache(() => 1, { ttl: 60, store })\n\nawait posts()\nconsole.log(keys[0])\n`)
+      await Bun.write(join(dir, 'app.ts'), `import { cache } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/cache'))}\n\nconst keys: string[] = []\nconst store = { get: () => undefined, set: (key: string) => void keys.push(key), delete: () => undefined, keys: () => [] }\nconst posts = cache(() => 1, { ttl: '1m', store })\n\nawait posts()\nconsole.log(keys[0])\n`)
 
       const run = Bun.spawn([process.execPath, join(dir, 'app.ts')], { stdout: 'pipe', stderr: 'pipe' })
 
@@ -222,7 +222,7 @@ describe('cache', () => {
     const root = await scratchDir('cache-bundle-')
 
     try {
-      await Bun.write(join(root, 'app.ts'), `import { cache } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/cache'))}\n\nlet loads = 0\nconst make = (value: number) => cache(() => value + ++loads * 0, { ttl: 60 })\nconst first = make(1)\nconst second = make(2)\nconst third = cache(() => 3, { ttl: 60 })\n\nconsole.log(JSON.stringify([await first(), await third()]))\n`)
+      await Bun.write(join(root, 'app.ts'), `import { cache } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/cache'))}\n\nlet loads = 0\nconst make = (value: number) => cache(() => value + ++loads * 0, { ttl: '1m' })\nconst first = make(1)\nconst second = make(2)\nconst third = cache(() => 3, { ttl: '1m' })\n\nconsole.log(JSON.stringify([await first(), await third()]))\n`)
 
       const built = await Bun.build({ entrypoints: [join(root, 'app.ts')], outdir: join(root, 'out'), target: 'bun' })
 
@@ -239,6 +239,6 @@ describe('cache', () => {
   })
 
   it('refuses a tag it did not make', () => {
-    expect(() => cache(() => 1, { ttl: 60, tags: [{ invalidate: () => undefined } as CacheTag] })).toThrow('cacheTag()')
+    expect(() => cache(() => 1, { ttl: '1m', tags: [{ invalidate: () => undefined } as CacheTag] })).toThrow('cacheTag()')
   })
 })
