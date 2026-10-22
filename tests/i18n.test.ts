@@ -250,6 +250,22 @@ describe('locale prefixes', () => {
   })
 })
 
+describe('html lang set by a page', () => {
+  it('is ignored under i18n, where the locale decides', async () => {
+    const copy = await fixtureCopy('i18n')
+
+    try {
+      await Bun.write(join(copy, 'src/routes/own-lang.kay'), 'head\n  html(lang="ar")\np x\n')
+      const site = new Elysia().use(await pages({ routes: `${copy}/src/routes`, prebuilt: false, security: false, i18n: { ...i18n, messages: `${copy}/src/messages` } }))
+
+      expect((await get('/own-lang', site)).html).toContain('<html lang="fr">')
+    }
+    finally {
+      await rm(copy, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('the default locale prefixed', () => {
   const prefixedSite = once(async () => new Elysia().use(await pages({ routes, prebuilt: false, security: false, i18n: { ...i18n, prefixDefault: true } })))
 

@@ -403,13 +403,14 @@ export function invalidKeys(): string[] {
 }
 
 // The messages a page's islands use, with what the browser needs to build links in its locale; nothing outside a request served in one.
-export function messagesScript(keys: Set<string>, first: boolean): string {
+export function messagesScript(keys: Set<string>, first: boolean, pinned = false): string {
   const state = localeState()
 
   const now = state?.now !== undefined && !state.nowWritten ? state.now : undefined
 
+  // A page of its own `html lang` pins the locale, which the browser would otherwise read from `<html>`.
   // Without `i18n`, the browser builds links as they are written: a page sends its locale only for the messages its islands read.
-  if (!state || (keys.size === 0 && (!first || state.implicit) && now === undefined))
+  if (!state || (keys.size === 0 && (!first || state.implicit) && now === undefined && !pinned))
     return ''
 
   if (now !== undefined)

@@ -130,7 +130,7 @@ h1 {todo.title}
 - `class` is the exception: its tokens add up across the layouts and the page, each once.
 - `html.dark` in a layout and `html.wide` in its page give `class="dark wide"`, and a page cannot take off a layout's class.
 - No event handler is attached to `html`.
-- `lang` is kay's from `lang` in kay.config.ts or the locale, and `html(lang="fr")` in a page or layout sets that page's own on a site without `i18n`, `dir` following it; with `i18n` the locale decides and the tag is ignored. `dir` is kay's alone. A link to a page of another `lang` loads it in full, and messages and dates keep the site's language.
+- `lang` is kay's from `lang` in kay.config.ts or the locale, and `html(lang="fr")` in a page or layout sets that page's own on a site without `i18n`, `dir` following it; with `i18n` the locale decides and the tag is ignored. `dir` is kay's alone. A link to a page of another `lang` loads it in full, and messages, dates and typography keep the site's language, a value that is not a non-empty string being ignored.
 - An island's `head` holds a `title` only, any other tag being the page's to set, and `title(raw)` skips `seo.titleTemplate` there too.
 - While an island's title reads empty, the page shows `seo.name` as the server does.
 - Two islands on a page both setting a title: the one last in the page shows, as the server renders it, hydrated or not and whichever hydrated last; a change in the others leaves it. An island rendered in the browser alone is not counted.

@@ -2,5 +2,5 @@
 
 // The meta holding the attributes the layouts and the page set on `<html>`, as JSON by name, which the page swap compares with the next page's.
 export const ROOT_ATTRIBUTES = 'kay-html'
-// What kay sets on `<html>` from the page's locale, which an `html` tag does not.
-export const LOCALE_ATTRIBUTES = new Set(['lang', 'dir'])
+// What kay sets on `<html>` from the page's language, which an `html` tag does not.
+export const LOCALE_ATTRIBUTES = new Set(['dir'])

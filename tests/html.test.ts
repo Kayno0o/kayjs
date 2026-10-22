@@ -143,6 +143,18 @@ describe('head', () => {
     expect(rendered).toEqual({ prelude: '', styles: '<link rel="stylesheet" href="/a.css">', html: '<meta name="description" content="page"><title>Page &amp; co</title>', root: '', charset: false, viewport: false })
   })
 
+  it('takes the page\'s html lang over its layout\'s, ignoring a value that is no text', () => {
+    const lang = (...groups: unknown[]) => collectHead(() => {
+      for (const value of groups)
+        head([{ tag: 'html', props: { lang: value } }])
+    }).head.lang
+
+    expect(lang('fr', 'ar')).toBe('ar')
+    expect(lang('fr', undefined)).toBe('fr')
+    expect(lang('fr', '')).toBe('fr')
+    expect(lang(false)).toBeUndefined()
+  })
+
   it('hands the browser the template and the site title an island\'s title goes on setting, and nothing when no island sets it', () => {
     const options = { defaults: [{ tag: 'title', props: { children: 'Site' } }], titleTemplate: '%s | Site' }
     const island = collectHead(() => head([{ tag: 'title', props: { island: true, children: 'Room' } }]), options).head

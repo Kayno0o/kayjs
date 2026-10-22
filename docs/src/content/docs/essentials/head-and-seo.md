@@ -53,7 +53,7 @@ head
 slot
 ```
 
-kay sets `lang` and `dir` itself, from `lang` in kay.config.ts or the page's locale. On a site without `i18n`, one page of another language says so with `html(lang="fr")` in its `head`, and `dir` follows. With `i18n` the locale decides and the tag is ignored. Messages and dates keep the site's language, and a link to a page of another `lang` loads it in full.
+kay sets `lang` and `dir` itself, from `lang` in kay.config.ts or the page's locale. On a site without `i18n`, one page of another language says so with `html(lang="fr")` in its `head`, and `dir` follows. With `i18n` the locale decides and the tag is ignored. Messages, dates and typography keep the site's language, and a link to a page of another `lang` loads it in full.
 
 When a link swaps the page in, a theme your script changed, such as a dark mode toggle, stays. It takes the place of the next page's own `theme-color`.
 
