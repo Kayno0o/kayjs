@@ -14,7 +14,7 @@ The control goes inside as the child. `label` names it, `hint` explains it below
 
 ## Messages
 
-`issue` shows a message of the page's own, such as `ctx.failed(rename)?.errors.title` after a plain form post. Inside a FormDialog, the message the action refused that field with shows here by itself.
+`issue` shows a message of the page's own, such as `rename.failed()?.errors.title` after a plain form post. Inside a FormDialog, the message the action refused that field with shows here by itself.
 
 <Demo name="form-field/issue" />
 

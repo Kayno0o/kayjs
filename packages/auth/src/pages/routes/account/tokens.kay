@@ -32,8 +32,8 @@ const auth = ctx.locals.auth
 const user = await auth.requireUser()
 const features = auth.features()
 const tokens = await auth.listTokens()
-const created = ctx.succeeded(create)?.data
-const refused = ctx.failed(create)?.data?.error
+const created = create.succeeded()?.data
+const refused = create.failed()?.data?.error
 const date = (value: Date) => formatDate(value, { dateStyle: 'medium' })
 ---
 PageSection(title={t('auth.account.tokens.title')})

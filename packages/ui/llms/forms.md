@@ -122,7 +122,7 @@ SaveForm is the form of an editor page: `SaveForm(action={rename} failure="Could
 
 FormField also works outside a dialog, in a plain form posting to an action:
 
-- `issue` shows a message of the page's own, such as `ctx.failed(rename)?.errors.title`.
+- `issue` shows a message of the page's own, such as `rename.failed()?.errors.title`.
 - `hint` explains the control, under it. `action` sits at the end of the label's line. `required` marks the label with a `*` hidden from screen readers, which read the control's own `required`.
 - The label holds only the label's text and the control, so the hint, the messages and the action stay out of the control's accessible name.
 - Inside an island, as in a FormDialog, the control's `aria-describedby` gains the hint and, while one shows, the messages, beside the ids it had, and the control is `aria-invalid` while a message shows. A FormDialog refusing a field focuses the first one marked so. On a static page, kay marks the fields of a refused plain post `aria-invalid` itself.

@@ -6,7 +6,7 @@ const { label, name, issue, hint, required = false, group = false, compact = fal
   label: string
   // The field the control posts as: inside a FormDialog, the message its call was refused with for that field shows here.
   name?: string | undefined
-  // A message of the page's own, such as `ctx.failed(add)?.errors.title` after a plain form post.
+  // A message of the page's own, such as `add.failed()?.errors.title` after a plain form post.
   issue?: string | undefined
   // What the control takes or what it does, under it and above any message.
   hint?: string | undefined

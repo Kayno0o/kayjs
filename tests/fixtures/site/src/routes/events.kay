@@ -19,8 +19,8 @@ export const schedule = action(t.Object({ title: t.String({ maxLength: 10_000, m
 
 export const leak = action(t.Object({}), () => ({ format: new Intl.NumberFormat() }))
 
-const scheduled = ctx.succeeded(schedule)
-const failure = ctx.failed(schedule)
+const scheduled = schedule.succeeded()
+const failure = schedule.failed()
 --- script
 import List from '../components/list.kay'
 import Picker from '../components/picker.kay'

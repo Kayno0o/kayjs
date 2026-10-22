@@ -39,7 +39,7 @@ const auth = ctx.locals.auth
 const features = auth.features()
 const pending = await auth.twoFactorPending()
 const redirect = localPath(ctx.url.searchParams.get('redirect'), localize(features.pages?.home ?? '/'))
-const error = ctx.failed(verify)?.data?.error
+const error = verify.failed()?.data?.error
 ---
 head
   title {t('auth.twoFactor.title')}

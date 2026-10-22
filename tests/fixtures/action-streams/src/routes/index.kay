@@ -138,7 +138,7 @@ export const refuses = action(t.Object({ full: t.Boolean() }), async ({ full }, 
   })()
 })
 
-const done = ctx.succeeded(count)
+const done = count.succeeded()
 --- script
 import Counter from '../components/counter.kay'
 ---

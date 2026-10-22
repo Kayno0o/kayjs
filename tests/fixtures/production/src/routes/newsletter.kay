@@ -6,8 +6,8 @@ export const page = { prerender: true }
 
 export const join = action(t.Object({ email: t.String({ maxLength: 200, format: 'email', error: 'Not an email' }) }), ({ email }) => email.split('@')[0])
 
-const failure = ctx.failed(join)
-const joined = ctx.succeeded(join)
+const failure = join.failed()
+const joined = join.succeeded()
 ---
 form(action={join})
   input(name="email" aria-label="Email" value={failure?.values.email})

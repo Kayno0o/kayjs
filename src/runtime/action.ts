@@ -5,6 +5,7 @@ import type { Duration } from './duration'
 import type { RequestContext } from './index'
 import type { EventReader, StreamStatus } from './live'
 import type { Owner } from './reactive'
+import { ApiError } from './api-error'
 import { withBase } from './base'
 import { skew } from './build'
 import { durationSeconds } from './duration'
@@ -313,12 +314,12 @@ export interface ServerAction<Schema extends TSchema, Output, Honeypot extends s
   readonly protection?: ActionProtection<string>
 }
 
-export class ActionError<Data = unknown> extends Error {
+export class ActionError<Data = unknown> extends ApiError {
   override name = 'ActionError'
 
   // `errors` holds a message per field the schema refused, `data` what the handler passed to `ctx.fail`, undefined when the call was refused before it ran.
-  constructor(readonly status: number, readonly body: string, readonly errors: Record<string, string> = {}, readonly data?: Data, message = `Action failed with ${status}: ${body}`) {
-    super(message)
+  constructor(status: number, readonly body: string, readonly errors: Record<string, string> = {}, readonly data?: Data, message = `Action failed with ${status}: ${body}`) {
+    super(status, message, body)
   }
 }
 

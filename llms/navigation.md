@@ -107,7 +107,7 @@ const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Ticket
 
 ### Forms posting in place
 
-- A form posting to an action posts without a reload, then shows the page the post leads to, as the browser would: `ctx.failed` and `ctx.succeeded` read as after a full post.
+- A form posting to an action posts without a reload, then shows the page the post leads to, as the browser would: `failed()` and `succeeded()` of an action read as after a full post.
 - A post going back to the same page, or refused and rendering it again, keeps the scroll position and the focused field.
 - A refused post moves focus to the form's first field marked `aria-invalid`, which a screen reader reads with the message describing it (see [Actions](actions.md)).
 - With no field marked, the message describing the form itself is announced and the control that posted it, such as a submit button, is focused again.

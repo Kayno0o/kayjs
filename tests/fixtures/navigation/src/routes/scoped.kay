@@ -13,8 +13,8 @@ export const contact = action(t.Object({ message: t.String({ maxLength: 200 }), 
   return message.length
 })
 
-const failure = ctx.failed(contact)?.data
-const sent = ctx.succeeded(contact)
+const failure = contact.failed()?.data
+const sent = contact.succeeded()
 ---
 head
   title Scoped

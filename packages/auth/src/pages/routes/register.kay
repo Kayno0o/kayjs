@@ -40,10 +40,10 @@ if (user && !user.guest)
 
 const { askRemember, providerLinks } = rememberOf(features, redirect, provider => t('auth.signIn.provider', { provider }), features.providers)
 const captcha = await captchaFor(auth, features.captcha, 'register')
-const refused = ctx.failed(register)?.data
+const refused = register.failed()?.data
 const fields = refused && 'fields' in refused ? refused.fields : {}
-const error = refusal(ctx.failed(register), features.captcha)
-const verify = ctx.succeeded(register) !== undefined
+const error = refusal(register.failed(), features.captcha)
+const verify = register.succeeded() !== undefined
 ---
 head
   title {t('auth.register.title')}

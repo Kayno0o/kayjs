@@ -5,8 +5,8 @@ import { action } from 'kay'
 // Each post costs the browser a challenge, solved in a worker.
 export const pay = action(t.Object({ title: t.String({ maxLength: 200 }) }), ({ title }, ctx) => title === 'refused' ? ctx.fail(409, 'Refused') : title, { proofOfWork: 5000 })
 
-const success = ctx.succeeded(pay)
-const failure = ctx.failed(pay)
+const success = pay.succeeded()
+const failure = pay.failed()
 --- script
 import Payer from '../components/payer.kay'
 ---

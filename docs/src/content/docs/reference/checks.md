@@ -108,6 +108,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `deprecated-library-registration` | warn | deprecated | `authPages`, `authExtension` or `mailExtension` in `kay.config.ts`, from the registration 1.70 replaced |
 | `deprecated-body-limit` | warn | deprecated | `bodyLimit` in the config, an action, `api()` or a route's `detail`, now `maxSize` |
 | `deprecated-page-size` | warn | deprecated | `size` in the options of kayjs-ui's `infiniteList()`, now `pageSize` |
+| `deprecated-ctx-outcome` | warn | deprecated | `ctx.failed(action)` and `ctx.succeeded(action)`, now `action.failed()` and `action.succeeded()` |
 | `deprecated-auth-method` | warn | deprecated | A kayjs-auth method called on `auth` by its old name, such as `sessions()` for `listSessions()` |
 | `deprecated-signal-prop` | warn | deprecated | A required prop typed `Signal<T>` or `Memo<T>`, from 1.70: use `Bindable<T>` with `bind:`, or a plain value prop |
 | `deprecated-option-name` | warn | deprecated | An option of a library function under its old name, such as `forgejo({ url })`, now `baseUrl`, `mailer({ lang })`, now `locale`, or a lifetime now `maxAge`: `rememberMaxAge`, `email.expires`, `invitationMaxAge`, `files.url`'s `expires` |

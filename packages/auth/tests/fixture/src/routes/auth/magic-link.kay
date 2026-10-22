@@ -13,7 +13,7 @@ export const spend = action(t.Object({ token: t.String() }), async ({ token }, c
 })
 
 const token = ctx.query.token ?? ''
-const failure = ctx.failed(spend)
+const failure = spend.failed()
 ---
 form#spend(action={spend})
   input(type="hidden" name="token" value={token})

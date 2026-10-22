@@ -6,9 +6,9 @@ import { action } from 'kay'
 export const ask = action(t.Object({ message: t.String({ maxLength: 200 }) }), ({ message }) => message.length, { minTime: '3s' })
 export const quick = action(t.Object({ message: t.String({ maxLength: 200 }) }), ({ message }) => message.length, { minTime: { after: '3s', maxAge: '1h', pretend: true } })
 
-const failure = ctx.failed(ask)
-const asked = ctx.succeeded(ask)
-const sent = ctx.succeeded(quick)
+const failure = ask.failed()
+const asked = ask.succeeded()
+const sent = quick.succeeded()
 ---
 form(action={ask})
   input(name="message" aria-label="Message")

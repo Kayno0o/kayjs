@@ -19,8 +19,8 @@ export const confirm = action(schemas.token, async ({ token }, ctx) => {
   return ctx.redirect(localize(result.redirect))
 })
 
-const token = ctx.url.searchParams.get('token') ?? ctx.failed(confirm)?.values.token
-const error = ctx.failed(confirm)?.data?.error
+const token = ctx.url.searchParams.get('token') ?? confirm.failed()?.values.token
+const error = confirm.failed()?.data?.error
 ---
 head
   title {t('auth.confirmEmail.title')}

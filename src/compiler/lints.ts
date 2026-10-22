@@ -579,6 +579,15 @@ export const LINTS = {
     wrong: 'infiniteList(first, { size: 20, load })',
     right: 'infiniteList(first, { pageSize: 20, load })',
   },
+  'deprecated-ctx-outcome': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.70',
+    site: true,
+    summary: '`ctx.failed(action)` and `ctx.succeeded(action)`, now `action.failed()` and `action.succeeded()`, which read the same outcome in a page, a component and an island; the old form works three minors. The fix rewrites the call.',
+    wrong: 'const failure = ctx.failed(add)',
+    right: 'const failure = add.failed()',
+  },
   'deprecated-auth-method': {
     level: 'warn',
     group: 'deprecated',

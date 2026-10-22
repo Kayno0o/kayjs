@@ -17,7 +17,7 @@ export const upload = action(t.Object({
 })
 
 const last = uploads.at(-1)
-const failure = ctx.failed(upload)
+const failure = upload.failed()
 ---
 form(action={upload})
   input(name="note" aria-label="Note" value={failure?.values.note})

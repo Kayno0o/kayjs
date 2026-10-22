@@ -25,7 +25,7 @@ export const profile = action(t.Object({ age: t.Number(), admin: t.Boolean(), ta
 export const limited = action(t.Object({}), async () => 'ok', { rateLimit: { max: 1, window: 60 } })
 
 const name = await (ctx.locals.session as Session<{ name: string }>).get('name')
-const failure = ctx.failed(signIn)
+const failure = signIn.failed()
 const greeting = ctx.locals.greeting as string
 ---
 p {greeting}, {name === undefined ? 'signed out' : `signed in as ${name}`}

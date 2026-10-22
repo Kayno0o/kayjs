@@ -7,10 +7,10 @@ export const solve = action(t.Object({ message: t.String({ maxLength: 200 }) }),
 export const gated = action(t.Object({ message: t.String({ maxLength: 200 }) }), ({ message }) => message.length, { proofOfWork: 500, minTime: '1s' })
 export const faked = action(t.Object({ message: t.String({ maxLength: 200 }) }), ({ message }) => message.length, { proofOfWork: { difficulty: 500, maxAge: '1h', pretend: true }, messages: { proofOfWork: reason => `${reason}!` } })
 
-const failure = ctx.failed(solve) ?? ctx.failed(gated) ?? ctx.failed(faked)
-const solved = ctx.succeeded(solve)
-const passed = ctx.succeeded(gated)
-const sent = ctx.succeeded(faked)
+const failure = solve.failed() ?? gated.failed() ?? faked.failed()
+const solved = solve.succeeded()
+const passed = gated.succeeded()
+const sent = faked.succeeded()
 ---
 form(action={solve})
   input(name="message" aria-label="Message")

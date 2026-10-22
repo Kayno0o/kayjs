@@ -6,7 +6,7 @@ import { stamp } from '../renders'
 export const send = action(t.Object({ stamp: t.String({ pattern: '^stamp-' }) }), async () => 'sent')
 
 const current = stamp()
-const failure = ctx.failed(send)
+const failure = send.failed()
 --- script
 import Contact from '../components/contact.kay'
 import Hero from '../components/hero.kay'

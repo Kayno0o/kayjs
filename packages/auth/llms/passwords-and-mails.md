@@ -19,7 +19,7 @@ export const signIn = action(s.Object({ identifier: s.String({ maxLength: 254 })
   return ctx.redirect(result.redirect)
 })
 
-const failure = ctx.failed(signIn)
+const failure = signIn.failed()
 ---
 form(action={signIn})
   input(name="identifier" autocomplete="username")
@@ -58,7 +58,7 @@ export const spend = action(s.Object({ token: s.String() }), async ({ token }, c
   return ctx.redirect(result.redirect)
 })
 
-const failure = ctx.failed(spend)
+const failure = spend.failed()
 ---
 form(action={spend})
   input(type="hidden" name="token" value={ctx.query.token ?? ''})
@@ -72,7 +72,7 @@ if failure
 ### Passwords rules
 
 - A method that can fail answers `{ ok: true, ... }` or `{ ok: false, error }`, and field errors come as `errors` holding codes such as `'too-short'` or `'taken'`, never messages: the page words them in its own language.
-- An action that redirects writes `return ctx.redirect(...)`, with the `return`, so `kay check` types `ctx.failed(action)` right.
+- An action that redirects writes `return ctx.redirect(...)`, with the `return`, so `kay check` types `action.failed()` right.
 - `register({ email, password, username?, locale? })` answers `{ ok: true, user, signedIn: true }` once signed in, `{ ok: true, signedIn: false }` when the app requires verified addresses (`requireVerified`, on by default with a mailer), or `errors` by field (`email`: `'invalid'`, or `'taken'` with `requireVerified: false` or no mailer; `password`: `'too-short'` or `'too-long'`; `username`: `'length'`, `'characters'`, `'mixed-scripts'` or `'taken'`), or `error: 'limited'`, `'captcha'` or `'closed'`. `'mixed-scripts'` (and `'invalid'` for an address before its `@`) catches a name mixing Latin, Cyrillic and Greek letters only: a name written wholly in Cyrillic that looks Latin passes, so show names next to something they cannot fake, such as an avatar. It signs the user in unless the app requires verified addresses, and mails a verification link when the app sends mail.
 - Every way of signing in takes one trailing options object, `{ redirect, remember, captcha }`, with the ones it uses: `register(input, { redirect, remember, captcha })`, `signInWithPassword(input, { redirect, remember, captcha })`, `requestMagicLink(email, { redirect, remember, captcha })`, `requestPasswordReset(email, { redirect, captcha })` and `signInWithPasskey(response, { redirect, remember })`. A `redirect` that is not a path of the site leads home. Registering or resetting with one keeps the page through the mailed link: the mail verifying the address, a resend included, and the reset lead on to it, the verification through the sign-in page when the browser is not signed in.
 - `signInWithPassword({ identifier, password }, { redirect?, remember?, captcha? })` takes an email, or a username when it holds no `@`. A wrong password and an unknown account answer alike, `'invalid'`, in the same time: a hash is checked either way, and the failed sign-in's event (`onAuthEvent`, the audit log) and the lockout notice are reported after the response, so a slow hook never tells a held address. `'unverified'` comes once the password is right, under `email.requireVerified`, the default with a mailer: the page then offers `sendVerification()`, which this browser may call from then on. `'limited'` past the attempts allowed: six tries from one client at one account in 15 minutes stop that client until the window ends, and 60 from all clients stop the account for everyone (see Limits), so a stranger's wrong passwords never keep the holder out from another address. The tries count against the account, its email and every spelling of its name alike, and each is counted before its password is checked, so parallel guesses do not slip past; a right password clears both counts.

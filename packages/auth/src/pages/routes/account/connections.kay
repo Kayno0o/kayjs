@@ -27,7 +27,7 @@ const auth = ctx.locals.auth
 const user = await auth.requireUser()
 const features = auth.features()
 const linked = new Set(await auth.listIdentities())
-const refused = ctx.failed(connect)?.data ?? ctx.failed(disconnect)?.data
+const refused = connect.failed()?.data ?? disconnect.failed()?.data
 ---
 PageSection(title={t('auth.account.connections.title')})
   .flex.flex-col.gap-2

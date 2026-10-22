@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- An action reads its outcome as `add.failed()` and `add.succeeded()`, and `ActionError` extends `ApiError` ([Reading the outcome](actions.md#reading-the-outcome)).
 - A static page hands an island a declared `Column<Row>[]` written out as literals, and `kay check` names the function field of a prop it refuses, `columns[].sortValue` ([Props to an island](islands.md#props-to-an-island)).
 - With Tailwind, a class passed to a component, or an expression or spread merged with the shorthand, overrides an earlier one setting the same property, `Button(class="px-2")` over `px-4`, with no `twMerge` ([Override a class](styles-and-assets.md#override-a-class-a-component-sets)).
 - Every value `kay` exports needs no import in a script or a server fence, `kay check` names the entry of a name that comes from another one, and `kay/server` exports `s` beside `defineEnv` ([Imports kay adds](components.md)); a page importing `action` is kept for prerendering like one that does not.

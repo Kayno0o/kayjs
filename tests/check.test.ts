@@ -1588,7 +1588,7 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
-  it('types what ctx.failed and ctx.succeeded read back from an action that ends without returning, as after ctx.redirect, and the form-wide and honeypot errors', async () => {
+  it('types what failed() and succeeded() read back from an action that ends without returning, as after ctx.redirect, and the form-wide and honeypot errors', async () => {
     const page = [
       '--- server',
       'import { t } from \'elysia\'',
@@ -1606,9 +1606,9 @@ describe.concurrent('kay check, edge cases', () => {
       '    return 1',
       '})',
       '',
-      'const failure = ctx.failed(signIn)',
-      'const saved: 1 | undefined = ctx.succeeded(save)?.data',
-      'const wrong: number | undefined = ctx.failed(save)?.data',
+      'const failure = signIn.failed()',
+      'const saved: 1 | undefined = save.succeeded()?.data',
+      'const wrong: number | undefined = save.failed()?.data',
       'const formWide: string | undefined = failure?.errors[\'\']',
       'const caught: string | undefined = failure?.errors.website',
       '---',
@@ -3196,6 +3196,21 @@ describe.concurrent('kay check, unused code', () => {
         '}',
         '',
       ].join('\n'))
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('reports action.failed() and action.succeeded() as the action reading its own outcome, and --fix rewrites them, leaving other calls', async () => {
+    const root = await scratchProject({
+      'src/a.ts': 'const failure = ctx.failed(add)\nconst sent = ctx.succeeded( note ) !== undefined\nconst nested = ctx.failed(forms.add)?.data\nconst mine = other.failed(add)\nconst text = \'add.failed()\' // add.succeeded()\nconst called = ctx.failed(pick())\n',
+    })
+
+    try {
+      expect((await runCheck(root)).output.match(/deprecated-ctx-outcome/g)).toHaveLength(3)
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/a.ts')).text()).toBe('const failure = add.failed()\nconst sent = note.succeeded() !== undefined\nconst nested = forms.add.failed()?.data\nconst mine = other.failed(add)\nconst text = \'add.failed()\' // add.succeeded()\nconst called = ctx.failed(pick())\n')
     }
     finally {
       await rm(root, { recursive: true, force: true })

@@ -3,7 +3,7 @@ import { action } from 'kay'
 
 export const save = action(() => 'saved')
 
-const done = ctx.succeeded(save)
+const done = save.succeeded()
 ---
 h1 Cookies
 form(action={save})

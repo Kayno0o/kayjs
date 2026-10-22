@@ -13,13 +13,14 @@ export interface RenamedName {
   from: string
   to: string
   // `key` is an object key (`{ from: 1 }`; the shorthand `{ from }` only with `call`), `method` a call on any object (`.from(`).
-  kind: 'key' | 'method'
+  kind: 'key' | 'method' | 'outcome'
   // Only the key of an object literal passed straight to this function, the shorthand included, for a name too common to rename everywhere.
   call?: string
   // Only a method called on an `auth` (`auth.from()`, `ctx.locals.auth.from()`), for a name other objects share.
   receiver?: boolean
   // The old method answered a boolean where the new one answers `{ ok }`: `await auth.from(x)` is fixed to `(await auth.to(x)).ok`, any other use reported with no fix.
   answersOk?: boolean
+  // `outcome` is `ctx.failed(action)` or `ctx.succeeded(action)`, written `action.failed()` or `action.succeeded()`: `from` and `to` are the two names, `failed` and `succeeded`.
   // Why the old name goes, the end of the message.
   why: string
 }
@@ -127,6 +128,11 @@ function skipString(source: string, at: number): number {
   return end + 1
 }
 
+// `ctx.failed(add)`, the action a plain name or a path of them.
+function outcomePattern(name: string): RegExp {
+  return new RegExp(`(?<![\\w$.])ctx\\s*\\.\\s*${name}\\(\\s*[\\p{ID_Start}$_][\\p{ID_Continue}$]*(?:\\s*\\.\\s*[\\p{ID_Start}$_][\\p{ID_Continue}$]*)*\\s*\\)`, 'gu')
+}
+
 function methodPattern(name: string): RegExp {
   return new RegExp(`(?<=\\.)${name}(?=\\s*\\()`, 'g')
 }
@@ -174,6 +180,9 @@ function closing(source: string, open: number): number {
 
 interface Place {
   start: number
+  // What the report underlines and names when it is not `from`.
+  old?: string
+  now?: string
   edits: { start: number, end: number, text: string }[] | undefined
 }
 
@@ -184,6 +193,15 @@ const AFTER_CALL = /^\s*(?:\?\.|[.[(])/
 function placesOf(source: string, scan: string, rename: RenamedName): Place[] {
   const { from, to, kind, call, receiver, answersOk } = rename
   const key = (start: number): Place => ({ start, edits: [{ start, end: start + from.length, text: scan.slice(start + from.length).trimStart().startsWith(':') ? to : `${to}: ${from}` }] })
+
+  if (kind === 'outcome') {
+    return [...scan.matchAll(outcomePattern(from))].map((match) => {
+      const action = source.slice(match.index + match[0].indexOf('(') + 1, match.index + match[0].lastIndexOf(')')).trim()
+      const now = `${action}.${to}()`
+
+      return { start: match.index, old: source.slice(match.index, match.index + match[0].length), now, edits: [{ start: match.index, end: match.index + match[0].length, text: now }] }
+    })
+  }
 
   if (call !== undefined)
     return callKeys(scan, call, from).map(key)
@@ -245,7 +263,7 @@ async function renamedNames(root: string, options: CheckOptions, groups: RenameG
         if (!source.includes(from))
           continue
 
-        for (const { start, edits } of placesOf(source, scan, rename)) {
+        for (const { start, edits, old, now } of placesOf(source, scan, rename)) {
           const level = levelAt(lint, start)
 
           if (level === 'allow' || seen.has(`${lint}:${start}`))
@@ -256,12 +274,12 @@ async function renamedNames(root: string, options: CheckOptions, groups: RenameG
           found.push({
             file,
             ...positionAt(source, start),
-            end: start + from.length,
-            message: `\`${from}\` is \`${to}\` now: ${why}; the old name keeps working for three minors`,
-            help: edits === undefined ? `write \`${to}\` and read \`.ok\` of its answer` : `write \`${to}\``,
+            end: start + (old?.length ?? from.length),
+            message: `\`${old ?? from}\` is \`${now ?? to}\` now: ${why}; the old name keeps working for three minors`,
+            help: edits === undefined ? `write \`${to}\` and read \`.ok\` of its answer` : `write \`${now ?? to}\``,
             code: lint,
             severity: level === 'warn' ? 'warning' : 'error',
-            ...edits && { fixes: [{ title: `Rename ${from} to ${to}`, edits, safe: true }] },
+            ...edits && { fixes: [{ title: `Rename ${old ?? from} to ${now ?? to}`, edits, safe: true }] },
           })
         }
       }
@@ -282,6 +300,13 @@ const BODY_LIMIT: RenamedName[] = [
 // A list paged by number takes `pageSize`; `limit` and `offset` stay for a window onto a list.
 const PAGE_SIZE: RenamedName[] = [
   { from: 'size', to: 'pageSize', kind: 'key', call: 'infiniteList', why: 'a list paged by number takes `pageSize`' },
+]
+
+// A form's outcome is read from the action, in an island or a page alike.
+const OUTCOME_WHY = 'an action reads its own outcome, `add.failed()` and `add.succeeded()`, in a page, a component and an island alike'
+const OUTCOMES: RenamedName[] = [
+  { from: 'failed', to: 'failed', kind: 'outcome', why: OUTCOME_WHY },
+  { from: 'succeeded', to: 'succeeded', kind: 'outcome', why: OUTCOME_WHY },
 ]
 
 // kayjs-auth's methods: `list*` for a collection, `get*` for one, `revoke*` for a credential and `delete*` for a record.
@@ -311,5 +336,6 @@ export async function renameChecks(root: string, options: CheckOptions): Promise
     { lint: 'deprecated-body-limit', renames: BODY_LIMIT },
     { lint: 'deprecated-page-size', renames: PAGE_SIZE },
     { lint: 'deprecated-auth-method', renames: AUTH_METHODS },
+    { lint: 'deprecated-ctx-outcome', renames: OUTCOMES },
   ])
 }

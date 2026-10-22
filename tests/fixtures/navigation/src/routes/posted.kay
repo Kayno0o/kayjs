@@ -9,10 +9,10 @@ export const upload = action(t.Object({ file: t.File() }), async ({ file }) => f
 export const count = action(t.Object({}), () => ++store.posts)
 
 // A refusal this page cannot render, which the server's error page answers.
-if (ctx.failed(crash))
+if (crash.failed())
   throw new Error('This page cannot show the refusal')
 
-const sent = ctx.succeeded(upload)
+const sent = upload.succeeded()
 ---
 head
   title Posted

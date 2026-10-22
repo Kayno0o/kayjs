@@ -73,15 +73,15 @@ export const removePasskey = action(schemas.removePasskey, async (input, ctx) =>
 const auth = ctx.locals.auth
 const user = await auth.requireUser()
 const features = auth.features()
-const passwordSaved = ctx.succeeded(changePassword) !== undefined
-const passwordRefused = ctx.failed(changePassword)?.data
-const setupUri = ctx.succeeded(setUp)?.data ?? ctx.failed(enable)?.values.uri
+const passwordSaved = changePassword.succeeded() !== undefined
+const passwordRefused = changePassword.failed()?.data
+const setupUri = setUp.succeeded()?.data ?? enable.failed()?.values.uri
 const setupKey = setupUri && new URL(setupUri).searchParams.get('secret')
-const twoFactorError = ctx.failed(setUp)?.data?.error ?? ctx.failed(enable)?.data?.error ?? ctx.failed(regenerate)?.data?.error ?? ctx.failed(disable)?.data?.error
-const recoveryCodes = ctx.succeeded(enable)?.data ?? ctx.succeeded(regenerate)?.data
+const twoFactorError = setUp.failed()?.data?.error ?? enable.failed()?.data?.error ?? regenerate.failed()?.data?.error ?? disable.failed()?.data?.error
+const recoveryCodes = enable.succeeded()?.data ?? regenerate.succeeded()?.data
 const codesLeft = user.twoFactor ? await auth.recoveryCodesLeft() : 0
 const passkeys = features.passkeys ? await auth.listPasskeys() : []
-const removeRefused = ctx.failed(removePasskey)?.data
+const removeRefused = removePasskey.failed()?.data
 const passkeyErrors = Object.fromEntries((['proof', 'stale', 'limited', 'impersonating', 'expired', 'invalid', 'signed-out'] as const).map(code => [code, failure(code)]))
 ---
 PageSection(title={t('auth.account.password.title')})

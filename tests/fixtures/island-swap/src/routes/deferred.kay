@@ -6,7 +6,7 @@ export const stay = action(t.Object({}), (_, ctx) => ctx.redirect(ctx.url.pathna
 export const refuse = action(t.Object({}), (_, ctx) => ctx.fail(409, 'Refused'))
 export const over = action(t.Object({}), (_, ctx) => ctx.redirect('/deferred-two'))
 
-const refused = ctx.failed(refuse)
+const refused = refuse.failed()
 const label = ctx.url.searchParams.get('label') ?? 'one'
 --- script
 import Remote from '../components/remote.kay'

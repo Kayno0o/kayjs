@@ -276,7 +276,7 @@ ul
 ### Forms
 
 - A page's server fence exports an action, a schema and a handler; `form(action={comment})` posts to it without JavaScript.
-- A refused post renders the page again, the fields holding what was sent and `ctx.failed(comment)` telling why.
+- A refused post renders the page again, the fields holding what was sent and `comment.failed()` telling why.
 - Each field names itself with `field`, which writes its `name` and the constraints the schema gives it, so the browser checks them without JavaScript.
 - An `error` line shows the message a refused post gave that field, the field described by it for screen readers.
 - A bare `error` shows the form's own:

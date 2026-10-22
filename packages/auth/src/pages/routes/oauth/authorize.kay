@@ -18,7 +18,7 @@ export const decide = action(schemas.oauthConsent, async ({ decision, ...fields 
 })
 
 const auth = ctx.locals.auth
-const refused = ctx.failed(decide)?.data?.error
+const refused = decide.failed()?.data?.error
 const request: Parameters<typeof auth.oauthAuthorize>[0] = {}
 
 for (const field of FIELDS) {

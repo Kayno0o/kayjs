@@ -65,7 +65,7 @@ form(action={subscribe})
 
 ### Show what a post returned
 
-The handler's result comes back on the next render of the page, once, through `ctx.succeeded`:
+The handler's result comes back on the next render of the page, once, through `createToken.succeeded()`:
 
 ```kay
 --- server
@@ -73,7 +73,7 @@ import { s } from 'kay'
 
 export const createToken = action(s.Object({ label: s.String({ maxLength: 80 }) }), async () => crypto.randomUUID())
 
-const done = ctx.succeeded(createToken)
+const done = createToken.succeeded()
 ---
 if done
   p Your token: {done.data}
@@ -203,7 +203,7 @@ form(action={add})
 ### Refused posts
 
 - A post the schema refuses, or whose handler returns `ctx.fail(status, data)`, is answered with the page it came from, rendered with the failure's status, rather than with a redirect.
-- There `ctx.failed(add)` returns `{ status, values, errors, data }`, typed from the action, or `undefined`.
+- There `add.failed()` returns `{ status, values, errors, data }`, typed from the action, or `undefined`.
 - `values` is what the form posted (fields named like a password left out).
 - `errors` is a message per refused field, the schema's `error` option when set.
 - `data` is what `ctx.fail` received.
@@ -250,16 +250,16 @@ form(action={add})
 
 ### Reading the outcome
 
-- `add.failed()`, `add.succeeded()` and `add.error('title')` read the same as `ctx.failed(add)` and `ctx.succeeded(add)`, from any template, layout, component or island, and from the server fence.
+- `add.failed()`, `add.succeeded()` and `add.error('title')` read the outcome from any template, layout, component or island, and from the server fence; `ctx.failed(add)` and `ctx.succeeded(add)` are the same, kept three minors (`deprecated-ctx-outcome`, which `kay upgrade` fixes).
 - `error()` without a field is the form-wide message, `errors['']`.
 - The field name is typed from the schema.
 - An island reads them in the browser too, as its server render did, but for `values`, which stay on the server, so no field the server cannot tell is a secret reaches the page's source: the fields hold what was sent.
 - Once the page shown called the action, they read how its last call went instead, reactively, a call clearing them as it starts: an island calling `add({ title })` catches the `ActionError` and `add.error('title')` shows the message, the field marked invalid.
-- A post that succeeds goes back to the page with what the handler returned: `ctx.succeeded(add)` returns `{ data }`, typed from the action, or `undefined`, on that one render only.
+- A post that succeeds goes back to the page with what the handler returned: `add.succeeded()` returns `{ data }`, typed from the action, or `undefined`, on that one render only.
 - `data` travels in a cookie, sealed (AES-GCM under a key derived from [the app secret](environment.md#the-app-secret), else a key of the process, which a restart changes), so a secret shown once, such as a new API token, can be neither read nor altered in it.
-- Data too big for it, over about 3.5 KB sealed, is left out with a warning, and `ctx.succeeded` returns `undefined`, as it does for a cookie that does not open, forged or sealed before a restart.
+- Data too big for it, over about 3.5 KB sealed, is left out with a warning, and `succeeded()` returns `undefined`, as it does for a cookie that does not open, forged or sealed before a restart.
 - A prerendered page reads both too: the request carrying that cookie renders it afresh, see [Prerendering](prerendering.md#prerendering).
-- The cookie carrying `ctx.succeeded` back is `HttpOnly`, `SameSite=Lax`, and `Secure` when the request came over https, `X-Forwarded-Proto` included, as is every request in production when `site` is https.
+- The cookie carrying `succeeded()` back is `HttpOnly`, `SameSite=Lax`, and `Secure` when the request came over https, `X-Forwarded-Proto` included, as is every request in production when `site` is https.
 
 ### Files
 

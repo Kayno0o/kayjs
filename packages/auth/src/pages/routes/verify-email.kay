@@ -36,13 +36,13 @@ export const resend = action(async (ctx) => {
 })
 
 const auth = ctx.locals.auth
-const token = ctx.url.searchParams.get('token') ?? ctx.failed(verify)?.values.token
+const token = ctx.url.searchParams.get('token') ?? verify.failed()?.values.token
 const user = await auth.user()
 const pending = await auth.emailCodePending()
-const refused = ctx.failed(verify)?.data?.error
-const codeError = ctx.failed(code)?.data?.error
-const resendError = ctx.failed(resend)?.data?.error
-const resent = ctx.succeeded(resend) !== undefined
+const refused = verify.failed()?.data?.error
+const codeError = code.failed()?.data?.error
+const resendError = resend.failed()?.data?.error
+const resent = resend.succeeded() !== undefined
 ---
 head
   title {t('auth.verify.title')}

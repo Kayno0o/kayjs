@@ -1,3 +1,4 @@
+import { ApiError } from './api-error'
 import { withBase } from './base'
 import { effect, onCleanup, onMount, ownSignal } from './reactive'
 import { parseEvents } from './sse'
@@ -794,19 +795,11 @@ export function resource(module: unknown, path?: string, options?: UrlInput | ((
   return { value, status, error, refresh: () => asked === undefined || gone ? undefined : void load(asked) }
 }
 
-// What `call()` throws when a route refused or no answer came, aborting aside.
-export class ApiError extends Error {
-  override name = 'ApiError'
-
-  // `status` is the one the route answered with, 0 when no answer came; `answer` what it answered, read as JSON or as text.
-  constructor(readonly status: number, message: string, readonly answer?: unknown) {
-    super(message)
-  }
-}
+export { ApiError }
 
 // The text of a refusal a visitor can read: the message of an `ApiError` the route answered, else `fallback` for an error that came with no answer (status 0, whose message is the browser's) or is no `ApiError`.
 export function refusalMessage(error: unknown, fallback: string): string {
-  return error instanceof ApiError && error.status !== 0 ? error.message : fallback
+  return error instanceof ApiError && error.status !== 0 ? (error as { errors?: Record<string, string> }).errors?.[''] ?? error.message : fallback
 }
 
 // The methods a node answers over HTTP, a websocket's left out.

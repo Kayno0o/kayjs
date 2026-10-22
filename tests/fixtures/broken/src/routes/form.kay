@@ -4,7 +4,7 @@ import { action } from 'kay'
 
 export const rename = action(t.Object({ title: t.String({ maxLength: 200 }) }), async ({ title }) => title)
 
-const failure = ctx.failed(rename)
+const failure = rename.failed()
 ---
 form(action={rename})
   input(name="titel" aria-label="Title")

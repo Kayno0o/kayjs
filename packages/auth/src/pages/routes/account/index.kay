@@ -44,15 +44,15 @@ export const saveProfile = action(schemas.profile, async (input, ctx) => {
 const auth = ctx.locals.auth
 const user = await auth.requireUser()
 const features = auth.features()
-const resent = ctx.succeeded(resend) !== undefined
-const resendError = ctx.failed(resend)?.data?.error
-const emailSent = ctx.succeeded(changeEmail)?.data
-const emailRefused = ctx.failed(changeEmail)?.data
-const usernameSaved = ctx.succeeded(changeUsername) !== undefined
-const usernameRefused = ctx.failed(changeUsername)?.data
+const resent = resend.succeeded() !== undefined
+const resendError = resend.failed()?.data?.error
+const emailSent = changeEmail.succeeded()?.data
+const emailRefused = changeEmail.failed()?.data
+const usernameSaved = changeUsername.succeeded() !== undefined
+const usernameRefused = changeUsername.failed()?.data
 const profile = await auth.profile(ctx.locale)
-const profileSaved = ctx.succeeded(saveProfile) !== undefined
-const profileRefused = ctx.failed(saveProfile)?.data
+const profileSaved = saveProfile.succeeded() !== undefined
+const profileRefused = saveProfile.failed()?.data
 const profileProblems = profileRefused && 'errors' in profileRefused ? profileRefused.errors : {}
 const problemOf = (name: string) => Object.hasOwn(profileProblems, name) ? profileProblems[name] : undefined
 ---

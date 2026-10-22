@@ -55,7 +55,7 @@ See [Rate limits](rate-limits.md#limit-attempts-in-a-guard-or-an-api-route).
 - It is hidden by a `style` attribute, which a `csp` dropping `style-src 'unsafe-inline'` would leave visible.
 - A page writing the field itself as well renders it twice, which still posts empty.
 - A form inside an island renders it itself, as its markup is claimed node by node when it hydrates: `div(style="position:absolute;left:-9999px" aria-hidden="true" inert)` around `input(name="website" tabindex="-1" autocomplete="off" data-1p-ignore data-lpignore="true" data-bwignore)`, and `kay check` takes it as one of the form's fields.
-- `honeypot: { field: 'website', pretend: true }` answers a bot filling it in as if its post went through instead, a call with no result and a plain form post going back to its page with `ctx.succeeded(add)` holding `data: undefined`, so the bot learns nothing to adjust.
+- `honeypot: { field: 'website', pretend: true }` answers a bot filling it in as if its post went through instead, a call with no result and a plain form post going back to its page with `add.succeeded()` holding `data: undefined`, so the bot learns nothing to adjust.
 
 #### Minimum time
 

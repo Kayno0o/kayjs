@@ -59,10 +59,10 @@ if (user && !user.guest)
 const [captchaSignIn, captchaMagic] = await Promise.all([captchaFor(auth, features.captcha, 'sign-in'), captchaFor(auth, features.captcha, 'magic-link')])
 const pending = await auth.emailCodePending()
 const oauthError = oauthFailure(ctx.url.searchParams.get('error'))
-const signInError = refusal(ctx.failed(password), features.captcha)
-const mailError = refusal(ctx.failed(magicLink), features.captcha)
-const codeError = ctx.failed(emailCode)?.data?.error
-const mailedTo = ctx.succeeded(magicLink)?.data
+const signInError = refusal(password.failed(), features.captcha)
+const mailError = refusal(magicLink.failed(), features.captcha)
+const codeError = emailCode.failed()?.data?.error
+const mailedTo = magicLink.succeeded()?.data
 const { askRemember, providerLinks } = rememberOf(features, redirect, provider => t('auth.signIn.provider', { provider }), features.providers)
 const codes = features.codes?.['magic-link'] ?? 'link'
 ---

@@ -127,7 +127,7 @@ p {column()}
 - Once it went through, the refresh brings what the server kept, which a `linked` signal then takes.
 - `{ signal }` aborts a call: it rejects with the signal's reason, what `optimistic` showed goes back, and the action records no outcome.
 - A call aborted once sent may still have run, so the page refreshes as after one that went through, unless `refresh: false`.
-- The call is typed, `ctx.fail` results excluded, and throws `ActionError` from `kay` with `status`, `errors` and `data` when it fails.
+- The call is typed, `ctx.fail` results excluded, and throws `ActionError` from `kay` with `status`, `errors` and `data` when it fails; it extends `ApiError`, so one `instanceof ApiError` catches a refused action and a refused `call()`.
 - `const save = add.track()` is a handle for one component, row or button: `save.pending()` reads, reactively, only the calls made through it, where `add.pending()` reads every call of the page.
 - `await save(input, options)` takes what `add` does and resolves with `{ ok: true, data }` or, for any non-2xx answer of the server, `{ ok: false, status, errors, data }`, `errors` per field and `data` typed as `add.refused` types it, so no `try` or `ActionError` check is needed; a failure with no answer, a network error, an abort or a redirect, still throws, `pending()` clearing either way; an action with no input is called `save()`.
 - `add.refused(error)` tells a refusal of a call to `add` from any other error, a redirect's included, and types its `data` as the handler passes it to `ctx.fail`, with no cast: `if (add.refused(error)) shown = error.data?.message`.
@@ -148,4 +148,4 @@ p {column()}
 - `rateLimit` with `count: 'succeeded'` counts a stream once its first value is there, and a drained post once its iterable ended.
 - A `pretend` bot protection answering an island's `FormData` call resolves `undefined`, not an `ActionStream`, as the handler never ran.
 - `on()` added right after the call resolves gets every value, `last()` only the latest: a reply yields the text so far rather than the piece added, so `last()` is all an island reads.
-- A plain form post, a page swap's post and an MCP tool call read the iterable to its end and get its last value, as from a handler returning it: `ctx.succeeded(reply)?.data`.
+- A plain form post, a page swap's post and an MCP tool call read the iterable to its end and get its last value, as from a handler returning it: `reply.succeeded()?.data`.

@@ -19,8 +19,8 @@ export const spend = action(schemas.token, async ({ token }, ctx) => {
   return ctx.redirect(localize(result.redirect))
 })
 
-const token = ctx.url.searchParams.get('token') ?? ctx.failed(spend)?.values.token
-const error = ctx.failed(spend)?.data?.error
+const token = ctx.url.searchParams.get('token') ?? spend.failed()?.values.token
+const error = spend.failed()?.data?.error
 ---
 head
   title {t('auth.magic.title')}

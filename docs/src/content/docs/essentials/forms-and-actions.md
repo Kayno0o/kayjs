@@ -381,7 +381,7 @@ An effect running again closes the stream it started. One started under no owner
 
 A bot caught by a `pretend` protection gets `undefined` back, not a stream, since the handler never ran.
 
-A form posted without JavaScript waits for the end and gets the last value, through `ctx.succeeded(reply)`. In a test, `site.call(reply, input)` gives every value.
+A form posted without JavaScript waits for the end and gets the last value, through `reply.succeeded()`. In a test, `site.call(reply, input)` gives every value.
 
 ## Fixed fields
 
@@ -433,7 +433,7 @@ Any answer other than success gives `{ ok: false, status, errors, data }`. `erro
 
 A success gives `{ ok: true, data }`. A failure with no answer from the server, such as a lost connection, still throws.
 
-In a server fence, `ctx.failed(add)` and `ctx.succeeded(add)` read the same outcome as `add.failed()` and `add.succeeded()` in a template. Each gives `undefined` when there is none.
+`add.failed()` and `add.succeeded()` read the outcome in a server fence, a template, a component and an island alike. Each gives `undefined` when there is none. They replace `ctx.failed(add)` and `ctx.succeeded(add)`, which work three minors and which `kay upgrade` rewrites.
 
 ## File uploads
 
