@@ -1,11 +1,11 @@
 import type { RenderedPage } from '../check/seo'
-import type { ElementNode, NamedAttribute } from '../compiler/ast'
+import type { ElementNode, NamedAttribute, Node, Span } from '../compiler/ast'
 import type { ClientBuild } from '../server/client'
 import type { Stop } from '../server/pure-page'
 import type { Route } from '../server/routes'
 import type { RouteSize, SizeReport } from './report'
 import { join, relative } from 'node:path'
-import { actionOf, elementsIn, serverIslandOf } from '../compiler/ast'
+import { actionOf, childBlocks, elementsIn, serverIslandOf } from '../compiler/ast'
 import { parseKay } from '../compiler/parser'
 import { describeStop } from '../server/pure-page'
 import { ASSET_PREFIX } from './assets'
@@ -19,6 +19,13 @@ const ISLAND_SLOT = /<slot data-component="([^"]+)"/g
 const PATH_SEPARATOR = /[/\\]/
 // Every specifier a module names, static or dynamic, `from 'x'`, `import 'x'` or `import('x')`; one in a comment or a string only adds a file the estimate may overcount.
 const IMPORT = /\b(?:from|import)\s*(?:\(\s*)?['"]([^'"]+)['"]/g
+const DEFAULT_IMPORT = /\bimport\s+([A-Za-z_$][\w$]*)\s*(?:,\s*\{[^}]*\}\s*)?from\s*['"]([^'"]+)['"]/g
+const PROPS_PATTERN = /\bconst\s*\{([^}]*)\}\s*=\s*props\b/
+const PROP_NAME = /^[A-Z_$][\w$]*$/i
+const GUARD = /^(?:([A-Z_$][\w$]*)\.)?([A-Z_$][\w$]*)$/i
+// Stands in a call's props for a spread, which may pass any.
+const SPREAD = '*'
+const BIND_PREFIX = /^bind:/
 
 // What each route loads, gzip: the stylesheets of its layouts and page, and the scripts its prerendered pages link, the heaviest page of them.
 // A route none of whose pages was prerendered has no page to read, so its scripts are the entry and every island its components can reach, through helpers, dynamic imports and aliases too, which is at most what a request loads.
@@ -61,11 +68,14 @@ export async function routeSizes(root: string, client: ClientBuild, routes: Rout
   const bySize = new Map<string, RouteSize>()
 
   // What the files a component imports, however deep and whatever they are, lead to.
-  const reach = async (file: string, found: Reach, seen: Set<string>): Promise<void> => {
-    if (seen.has(file))
+  // `given` is what the component calling `file` passes, which decides the components `file` renders only for a prop; a file reached any other way is given everything.
+  const reach = async (file: string, found: Reach, seen: Set<string>, given?: Given): Promise<void> => {
+    const key = given === undefined ? file : `${file}\n${[...given.names].sort().join(',')}`
+
+    if (seen.has(key))
       return
 
-    seen.add(file)
+    seen.add(key)
 
     const name = relative(root, file).replaceAll('\\', '/')
 
@@ -77,8 +87,20 @@ export async function routeSizes(root: string, client: ClientBuild, routes: Rout
     found.ships ||= (facts.posts && client.navigation === true) || facts.defers
     found.waits ||= facts.waits || facts.defers
 
-    for (const imported of facts.imports)
-      await reach(imported, found, seen)
+    for (const imported of facts.imports) {
+      const uses = facts.uses.get(imported)
+
+      if (uses === undefined) {
+        await reach(imported, found, seen)
+
+        continue
+      }
+
+      for (const use of uses) {
+        if (given === undefined || use.needs.every(name => given.names.has(name) || given.names.has(SPREAD)))
+          await reach(imported, found, seen, { names: new Set(use.names) })
+      }
+    }
   }
 
   for (const route of routes) {
@@ -121,12 +143,23 @@ export async function routeSizes(root: string, client: ClientBuild, routes: Rout
 // What a source file says without running it: the files it imports, and whether its template makes a page load the entry.
 interface SourceFacts {
   imports: string[]
+  // For a component imported by default and used only as a template element, each use: the props of this file it renders for, and what it is given.
+  uses: Map<string, Use[]>
   // A form posting to an action, which the entry sends without a reload.
   posts: boolean
   // A server island the entry fetches once the page has loaded.
   defers: boolean
   // An island marked to hydrate when visible or idle, or by a value the build cannot read.
   waits: boolean
+}
+
+interface Use {
+  needs: string[]
+  names: string[]
+}
+
+interface Given {
+  names: Set<string>
 }
 
 interface Reach {
@@ -145,20 +178,104 @@ async function factsOf(file: string, root: string, memo: Map<string, Promise<Sou
         const imports = [...source.matchAll(IMPORT)].flatMap(([, specifier]) => followed(resolveFrom(specifier!, file), root) ?? [])
 
         if (!file.endsWith('.kay'))
-          return { imports, posts: false, defers: false, waits: false }
+          return { imports, uses: new Map(), posts: false, defers: false, waits: false }
 
-        const elements = [...elementsIn(parseKay(source).template)]
+        const { template } = parseKay(source)
+        const elements = [...elementsIn(template)]
 
-        return { imports, posts: elements.some(element => actionOf(element, source) !== undefined), defers: elements.some(element => serverIslandOf(element, source)?.mode === 'defer'), waits: elements.some(element => waitsToHydrate(element, source)) }
+        return { imports, uses: usesOf(source, file, root, template), posts: elements.some(element => actionOf(element, source) !== undefined), defers: elements.some(element => serverIslandOf(element, source)?.mode === 'defer'), waits: elements.some(element => waitsToHydrate(element, source)) }
       }
       catch {
-        return { imports: [], posts: false, defers: false, waits: false }
+        return { imports: [], uses: new Map(), posts: false, defers: false, waits: false }
       }
     })()
     memo.set(file, facts)
   }
 
   return facts
+}
+
+// The components a template renders, by file, each use with the props of the file it renders for and the props it is given: an `if rest.onClick` or `if shown` around it, where `shown` has no default, renders it only for a call passing that prop.
+// A component the script also names, or one imported by a name the template does not use as a whole, may render anywhere, so it is left out and always followed.
+function usesOf(source: string, file: string, root: string, template: Node[]): Map<string, Use[]> {
+  const pattern = PROPS_PATTERN.exec(source)?.[1]
+  const entries = (pattern?.split(',') ?? []).map(entry => entry.trim())
+  const rest = entries.find(entry => entry.startsWith('...'))?.slice(3).trim()
+  const plain = new Set(entries.filter(entry => PROP_NAME.test(entry)))
+  const bound = new Map<string, string>()
+  const blocked = new Set<string>()
+
+  for (const [, name, specifier] of source.matchAll(DEFAULT_IMPORT)) {
+    const imported = followed(resolveFrom(specifier!, file), root)
+
+    if (imported?.endsWith('.kay'))
+      bound.set(name!, imported)
+  }
+
+  const uses = new Map<string, Use[]>()
+  const counts = new Map<string, number>()
+
+  const guard = (test: Span): string[] => {
+    const match = GUARD.exec(source.slice(test.start, test.end).trim())
+
+    if (match === null)
+      return []
+
+    const [, owner, name] = match
+
+    const props = owner === undefined ? plain.has(name!) : owner === rest
+
+    return props ? [name!] : []
+  }
+
+  const visit = (nodes: readonly Node[], needs: string[]) => {
+    for (const node of nodes) {
+      if (node.kind === 'if') {
+        for (const [index, branch] of node.branches.entries()) {
+          visit(branch.children, index === 0 ? [...needs, ...guard(branch.test)] : needs)
+        }
+
+        if (node.fallback !== undefined)
+          visit(node.fallback.children, needs)
+
+        continue
+      }
+
+      const imported = node.kind === 'element' && node.component ? bound.get(node.name) : undefined
+
+      if (node.kind === 'element' && imported !== undefined) {
+        counts.set(node.name, (counts.get(node.name) ?? 0) + 1)
+        uses.set(imported, [...uses.get(imported) ?? [], { needs, names: givenBy(node, source) }])
+      }
+
+      for (const block of childBlocks(node))
+        visit(block, needs)
+    }
+  }
+
+  visit(template, [])
+
+  // The name's import and each element are its only mentions.
+  for (const [name, imported] of bound) {
+    if ((source.match(new RegExp(`(?<![\\w$.])${name.replaceAll('$', '\\$')}(?![\\w$])`, 'g'))?.length ?? 0) !== 1 + (counts.get(name) ?? 0))
+      blocked.add(imported)
+  }
+
+  for (const imported of blocked)
+    uses.delete(imported)
+
+  // An import with no element at all is not rendered by this file.
+  for (const imported of new Set(bound.values())) {
+    if (!blocked.has(imported) && !uses.has(imported))
+      uses.set(imported, [])
+  }
+
+  return uses
+}
+
+// The props a component call passes, or every one when it spreads.
+function givenBy(element: ElementNode, source: string): string[] {
+  return element.attributes.map(attribute => attribute.kind === 'spread' ? SPREAD : source.slice(attribute.name.start, attribute.name.end).replace(BIND_PREFIX, ''))
 }
 
 // Whether a component call is marked `hydrate="visible"` or `hydrate="idle"`, or by a value the build cannot read.
