@@ -82,9 +82,11 @@ if (process.env.FIXTURE_ADMIN) {
   await store.users.update(admin.id, { roles: ['admin'] })
 
   const list = await site.visit(`${PAGES_AT}/admin`)
+  const auditPage = await site.visit(`${PAGES_AT}/admin/audit`)
   const detail = await site.visit(`${PAGES_AT}/admin/users/${acted.id}`)
   const refused = await other.visit(`${PAGES_AT}/admin`)
   const home = await site.submit(impersonate, {}, { from: detail })
+  const acting = await site.visit(`${PAGES_AT}/admin`)
   const banner = await site.visit(`${PAGES_AT}/account`)
 
   const stopped = await site.fetch(banner.find('[data-impersonating] form')[0]!.attributes.action!, { method: 'POST', body: new URLSearchParams({ redirect: banner.find('[data-impersonating] input[name="redirect"]')[0]!.attributes.value! }) })
@@ -95,6 +97,8 @@ if (process.env.FIXTURE_ADMIN) {
     tabs: list.find('.kui-tab-nav a').map(link => link.attributes.href),
     search: list.find('form[role="search"]')[0]?.attributes.action,
     refused: refused.status,
+    acting: { status: acting.status, banner: acting.find('[data-impersonating]').length, tabs: acting.find('.kui-tab-nav a').length },
+    audit: auditPage.find('.kui-empty-state-title').map(title => title.text),
     home: home.url,
     banner: banner.find('[data-impersonating] form').map(form => form.attributes.action),
     back: banner.find('[data-impersonating] input[name="redirect"]').map(input => input.attributes.value),

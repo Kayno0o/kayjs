@@ -95,8 +95,10 @@ export interface AuthFeatures {
   prefix: string
   // Whether MCP clients sign in to this app through its own OAuth server, which the account page then lists the approved ones of.
   oauthServer: boolean
-  // The roles an admin may give, when the `admin` option names who manages users; null without it. The prebuilt admin pages answer 404 while it is null.
-  admin: { roles: string[] } | null
+  // Whether the `admin` option names who manages users. The prebuilt admin pages answer 404 without it.
+  admin: boolean
+  // Whether the `audit` option keeps the audit log.
+  audit: boolean
   // Where a sign-in that failed goes, and where a guard sends an anonymous visitor once the prebuilt pages are on.
   signInPage: string
   // The prebuilt pages' prefix and home; null without them.
@@ -136,7 +138,8 @@ export function featuresOf(core: Core): AuthFeatures {
     prefix: core.prefix,
     oauthServer: core.oauthServer !== undefined,
     signInPage: core.signInPage,
-    admin: core.admin ? { roles: [...core.roles ?? []] } : null,
+    admin: core.admin !== undefined,
+    audit: core.audit !== undefined,
     rules: { password: { min: core.rules.password.min, max: core.rules.password.max }, username: { ...core.rules.username } },
     pages: core.pages ? { prefix: core.pages.prefix, home: core.pages.home, remember: core.pages.remember } : null,
   }

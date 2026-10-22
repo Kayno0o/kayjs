@@ -89,6 +89,7 @@ export default defineMessages({
     },
     admin: {
       title: 'Administration',
+      acting: 'Revenez à votre compte pour utiliser l’administration.',
       nav: { label: 'Administration', users: 'Utilisateurs', audit: 'Journal d’audit' },
       users: {
         search: 'Rechercher',
@@ -111,7 +112,7 @@ export default defineMessages({
         ban: 'Suspendre le compte',
         banReason: 'Motif',
         banUntil: 'Jusqu’au',
-        banUntilHint: 'Laissez vide pour une suspension sans fin.',
+        banUntilHint: 'La suspension prend fin à la fin de ce jour, en UTC. Laissez vide pour une suspension sans fin.',
         banned: 'Suspendu depuis le {date}.',
         bannedUntil: 'Suspendu jusqu’au {date}.',
         unban: 'Lever la suspension',
@@ -122,7 +123,7 @@ export default defineMessages({
         activity: 'Activité récente',
         signInAgain: 'Se reconnecter',
       },
-      audit: { title: 'Journal d’audit', none: 'Aucune entrée.', older: 'Plus anciennes' },
+      audit: { title: 'Journal d’audit', off: 'Le journal d’audit est désactivé : donnez l’option audit pour en garder un.', none: 'Aucune entrée.', older: 'Plus anciennes' },
     },
     impersonation: { banner: 'Vous agissez comme {user}.', stop: 'Revenir à mon compte' },
     account: {

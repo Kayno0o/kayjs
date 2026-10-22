@@ -891,8 +891,14 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return listUsers(this[STATE], query)
   }
 
-  async getUser(userId: string): Promise<{ ok: true, user: ManagedUser } | { ok: false, error: AdminFailure }> {
+  // One user; `admin` tells whether they meet the `admin` option, whom an admin can neither ban, impersonate nor delete.
+  async getUser(userId: string): Promise<{ ok: true, user: ManagedUser, admin: boolean } | { ok: false, error: AdminFailure }> {
     return getUser(this[STATE], userId)
+  }
+
+  // The roles an admin may give, those `roles` declares; none without it.
+  adminRoles(): string[] {
+    return [...this.core.roles ?? []]
   }
 
   // Gives a user a role the app declares, effective on their next request.
@@ -1413,8 +1419,11 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
       return redirect(safeRedirect(text((body as Record<string, unknown> | undefined)?.redirect), homeOf(core)), 303)
     })
-    // The impersonation banner's button: a form posting here signs the admin back in as themselves, then goes to `redirect`, a path of the site, else the pages' home. A post only, as sign-out is.
-    .post(`${core.prefix}/stop-impersonating` as `${Prefix}/stop-impersonating`, async ({ auth, body, redirect }) => {
+    // The impersonation banner's button: a form posting here signs the admin back in as themselves, then goes to `redirect`, a path of the site, else the pages' home. A post only, as sign-out is, and a cross-site one is refused with a 403.
+    .post(`${core.prefix}/stop-impersonating` as `${Prefix}/stop-impersonating`, async ({ auth, body, redirect, request }) => {
+      if (auth[STATE].crossSite())
+        return crossSiteResponse(request, 'request', core.url)
+
       await auth.stopImpersonating()
 
       return redirect(safeRedirect(text((body as Record<string, unknown> | undefined)?.redirect), homeOf(core)), 303)

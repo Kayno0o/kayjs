@@ -129,13 +129,13 @@ export async function listUsers(state: RequestState, query: { search?: string | 
   return { ok: true, users: found.users.map(managedUser), total: found.total }
 }
 
-export async function getUser(state: RequestState, userId: string): Promise<{ ok: true, user: ManagedUser } | { ok: false, error: AdminFailure }> {
+export async function getUser(state: RequestState, userId: string): Promise<{ ok: true, user: ManagedUser, admin: boolean } | { ok: false, error: AdminFailure }> {
   if (!(await actingAdmin(state)))
     return { ok: false, error: 'forbidden' }
 
   const record = await state.core.store.users.get(userId)
 
-  return record ? { ok: true, user: managedUser(record) } : { ok: false, error: 'not-found' }
+  return record ? { ok: true, user: managedUser(record), admin: await isAdmin(state, record) } : { ok: false, error: 'not-found' }
 }
 
 // Takes effect on the user's next request, roles being read with the user each time.

@@ -105,6 +105,7 @@ test('the admin pages and the impersonation banner link under the base and the p
     tabs: ['/app/members/admin', '/app/members/admin/audit'],
     search: '/app/members/admin',
     refused: 403,
+    acting: { status: 403, banner: 1, tabs: 0 },
     home: '/app/dashboard',
     banner: ['/app/auth/stop-impersonating'],
     stopped: [303, '/app/members/admin'],
@@ -112,4 +113,10 @@ test('the admin pages and the impersonation banner link under the base and the p
   })
   expect((seen.list as string[])).toHaveLength(1)
   expect((seen.list as string[])[0]).toStartWith('/app/members/admin/users/')
+}, 60_000)
+
+test('with the audit log off, the admin pages keep the users tab alone and the audit page says it is off', async () => {
+  const seen = await variant({ FIXTURE_ADMIN: '1', FIXTURE_NO_AUDIT: '1' })
+
+  expect(seen).toMatchObject({ tabs: ['/auth/admin'], audit: ['The audit log is off: set the audit option to keep one.'] })
 }, 60_000)

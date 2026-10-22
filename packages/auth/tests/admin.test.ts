@@ -100,7 +100,8 @@ describe('admin', () => {
     expect(await admin.browser.call('unbanUser', ada.id)).toEqual({ ok: false, error: 'stale' })
     expect(await admin.browser.call('deleteUser', ada.id)).toEqual({ ok: false, error: 'stale' })
     expect(await admin.browser.call('impersonate', ada.id)).toEqual({ ok: false, error: 'stale' })
-    expect(await admin.browser.call('getUser', ada.id)).toMatchObject({ ok: true })
+    expect(await admin.browser.call('getUser', ada.id)).toMatchObject({ ok: true, admin: false })
+    expect(await admin.browser.call('getUser', admin.id)).toMatchObject({ ok: true, admin: true })
 
     expect(await admin.browser.call('reprove', { password: PASSWORD })).toEqual({ ok: true })
     expect(await admin.browser.call('banUser', ada.id)).toMatchObject({ ok: true })
@@ -421,6 +422,12 @@ describe('requireAdmin and the stop-impersonating route, which the admin pages s
     const stop = async (redirect: string) => admin.browser.fetch('/auth/stop-impersonating', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ redirect }) })
 
     await admin.browser.callOk('impersonate', ada.id)
+    expect(await admin.browser.call('impersonator')).toMatchObject({ id: admin.id })
+
+    // A page of another site posting here changes nothing.
+    const cross = await admin.browser.fetch('/auth/stop-impersonating', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'sec-fetch-site': 'cross-site' }, body: new URLSearchParams({ redirect: '/' }) })
+
+    expect(cross.status).toBe(403)
     expect(await admin.browser.call('impersonator')).toMatchObject({ id: admin.id })
 
     const back = await stop('https://evil.example/')

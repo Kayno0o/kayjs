@@ -59,6 +59,7 @@ export const auth = createAuth({
   },
   roles: { admin: ['editor'], editor: [] },
   admin: 'admin',
-  audit: true,
+  // A run of tests/variants.ts sets FIXTURE_NO_AUDIT to see the admin pages without the audit log.
+  audit: !process.env.FIXTURE_NO_AUDIT,
   organizations: { roles: { owner: ['admin'], admin: ['member'], member: [] }, owner: 'owner', manage: 'admin' },
 })

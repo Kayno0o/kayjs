@@ -38,6 +38,6 @@ PageSection(title={wording('auth.admin.audit.title', 'Audit log')})
         span {describeAuditEntry(entry, { locale })}
         span.text-kui-muted {dateTime(entry.at)}
     else
-      EmptyState(title={wording('auth.admin.audit.none', 'No entry.')})
+      EmptyState(title={features.audit ? wording('auth.admin.audit.none', 'No entry.') : wording('auth.admin.audit.off', 'The audit log is off: set the audit option to keep one.')})
   if older
     a(href={older} rel="next") {wording('auth.admin.audit.older', 'Older entries')}

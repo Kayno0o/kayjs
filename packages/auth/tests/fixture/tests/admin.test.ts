@@ -143,7 +143,9 @@ describe('the admin pages', () => {
 
     expect(acted.url).toBe('/')
     expect(text(await root.visitor.visit('/auth/account'), '[data-impersonating] span')).toBe('You are acting as act-ada@example.com.')
-    expect((await root.visitor.visit('/auth/admin')).status).toBe(403)
+    const refused = await root.visitor.visit('/auth/admin')
+
+    expect([refused.status, refused.find('[data-impersonating]').length, refused.find('.kui-tab-nav').length]).toEqual([403, 1, 0])
 
     const back = await root.visitor.fetch('/auth/stop-impersonating', { method: 'POST', body: new URLSearchParams({ redirect: '/auth/admin' }) })
 
@@ -153,6 +155,20 @@ describe('the admin pages', () => {
     expect(await store.users.get(ada.id)).toBeDefined()
     expect(await root.visitor.submit(remove, { confirm: 'on' }, { from })).toMatchObject({ url: '/auth/admin' })
     expect(await store.users.get(ada.id)).toBeUndefined()
+  })
+
+  test('another admin\'s page offers no ban, impersonation or deletion, which would all answer admin, and a member\'s page keeps them', async () => {
+    const root = await member('root-forms@example.com', ['admin'])
+    const other = await member('forms-other@example.com', ['admin'])
+    const ada = await member('forms-ada@example.com')
+    const forms = async (id: string) => {
+      const page = await root.visitor.visit(`/auth/admin/users/${id}`)
+
+      return [page.find('input[name="reason"]').length, page.find('input[name="confirm"]').length, page.find('select[name="role"] option').map(option => option.text)]
+    }
+
+    expect(await forms(other.id)).toEqual([0, 0, ['editor']])
+    expect(await forms(ada.id)).toEqual([1, 1, ['admin', 'editor']])
   })
 
   test('the audit log page opens for an admin only, and a cursor that is no date shows an empty page', async () => {

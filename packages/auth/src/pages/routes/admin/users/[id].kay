@@ -93,7 +93,7 @@ const user = found.user
 const me = await auth.user()
 const own = me?.id === user.id
 const base = localize(`${features.pages?.prefix ?? features.prefix}/admin`)
-const declared = features.admin?.roles ?? []
+const declared = auth.adminRoles()
 const grantable = declared.filter(role => !user.roles.includes(role))
 const log = await auth.listAdminAuditLog({ userId: user.id, limit: 20 })
 const entries = log.ok ? log.entries : []
@@ -139,7 +139,8 @@ PageSection(title={wording('auth.admin.user.roles', 'Roles')})
             for role of grantable key={role}
               option(value={role}) {role}
         Button(type="submit" label={wording('auth.admin.user.grant', 'Give the role')})
-if !own
+// An admin is neither banned, acted as nor deleted from here: the methods refuse it.
+if !own && !found.admin
   PageSection(title={wording('auth.admin.user.ban', 'Suspend the account')})
     if user.ban
       p {user.ban.until ? wording('auth.admin.user.bannedUntil', 'Suspended until {date}.', { date: date(user.ban.until) }) : wording('auth.admin.user.banned', 'Suspended since {date}.', { date: date(user.ban.at) })}
@@ -151,7 +152,7 @@ if !own
       form.flex.flex-col.gap-3(action={ban})
         FormField(label={wording('auth.admin.user.banReason', 'Reason')})
           input(name="reason" maxlength="500")
-        FormField(label={wording('auth.admin.user.banUntil', 'Until')} hint={wording('auth.admin.user.banUntilHint', 'Leave empty to suspend for good.')})
+        FormField(label={wording('auth.admin.user.banUntil', 'Until')} hint={wording('auth.admin.user.banUntilHint', 'The suspension ends at the close of that day, UTC. Leave empty to suspend for good.')})
           input(type="date" name="until")
         Button(type="submit" tone="danger" label={wording('auth.admin.user.ban', 'Suspend the account')})
   PageSection(title={wording('auth.admin.user.impersonate', 'Act as this user')})

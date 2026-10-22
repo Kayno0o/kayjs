@@ -502,7 +502,7 @@ if (found.ok) {
 }
 ```
 
-- `listUsers({ search, offset, limit })` gives the users newest first, with `total`. `getUser(id)` gives one.
+- `listUsers({ search, offset, limit })` gives the users newest first, with `total`. `getUser(id)` gives one, with `admin` telling whether they meet the `admin` option. `adminRoles()` lists the roles an admin may give.
 - `grantRole(id, role)` and `revokeRole(id, role)` take a role your `roles` option declares. If two admins revoke each other's role at the same moment, at least one stays an admin, and a revoke that would have left none is undone and answers `last-admin`. Two admins deleting their own accounts at the same moment are held to the same rule, which needs an `admin` option that reads the user's roles.
 - `banUser(id, { reason, until })` bars the user from signing in and signs them out everywhere. `until` leaves it for good when left out. `unbanUser(id)` lifts it. An admin cannot ban themselves or another admin.
 - `deleteUser(id)` deletes the user as `deleteAccount` does. An organization the user solely owns with other members passes to its longest-standing member, who is told by mail and by an `organization-handed-over` event, so an abandoned account can always be removed.
@@ -516,10 +516,12 @@ Changing a user needs a sign-in or `reprove()` under ten minutes old. Otherwise 
 With `admin` set, the prebuilt pages also serve an admin area under their prefix, `/auth/admin` by default. It needs nothing more.
 
 - `/auth/admin` lists the users, 25 a page, with a search over part of an email or a username, or a whole id.
-- `/auth/admin/users/<id>` shows one user. There you give or take back a role, suspend the account with a reason and an optional last day, lift a suspension, act as the user, or delete the account. With `audit` on, their latest audit entries show too.
-- `/auth/admin/audit` reads everyone's audit log.
+- `/auth/admin/users/<id>` shows one user. There you give or take back a role, suspend the account with a reason and an optional last day (it ends at the close of that day, UTC), lift a suspension, act as the user, or delete the account. Another admin's page offers none of the last three, as they refuse an admin. With `audit` on, their latest audit entries show too.
+- `/auth/admin/audit` reads everyone's audit log; its tab shows with `audit` on.
 
-A visitor is sent to sign in, anyone else gets a 403, and a site with no `admin` option gets a 404. While an admin acts as a user, every prebuilt page shows a banner with a button back to their own account. With `viewer: true`, the banner shows on every page of your app; elsewhere, put `ImpersonationBanner` from `@kaynooo/kayjs-auth/components/impersonation-banner.kay` in your layout. `auth.requireAdmin()` gives your own admin pages the same check.
+A visitor is sent to sign in, anyone else gets a 403, and a site with no `admin` option gets a 404.
+
+While an admin acts as a user, the admin pages answer 403 with the banner and the way back, and every prebuilt page shows a banner with a button back to their own account. With `viewer: true`, the banner shows on every page of your app; elsewhere, put `ImpersonationBanner` from `@kaynooo/kayjs-auth/components/impersonation-banner.kay` in your layout. `auth.requireAdmin()` gives your own admin pages the same check.
 
 ## Organizations
 

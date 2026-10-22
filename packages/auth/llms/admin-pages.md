@@ -12,9 +12,9 @@ extensions: [auth({ admin: 'admin', roles: { admin: ['editor'], editor: [] }, au
 ```
 
 - `/auth/admin`: the users, newest first, 25 a page, with a search over part of an email or a username or a whole id (`?q=`, `?page=`).
-- `/auth/admin/users/<id>`: one user, with their roles (give one of the declared `roles`, so declare them to grant from the page; take one back), a ban with a reason and an optional last day, the lift of a ban, `Act as this user`, and the deletion behind a ticked box. With `audit` on, their last 20 audit entries show too.
-- `/auth/admin/audit`: everyone's audit log, 50 entries a page, an `Older entries` link paging by the last entry.
-- Each page is as open as the method behind it: a visitor is sent to sign in, anyone else (a member, an admin already acting as a user, a bearer token) gets a 403, and a site naming no `admin` gets a 404. The actions answer the same through the methods, so a post that skips the page changes nothing.
+- `/auth/admin/users/<id>`: one user, with their roles (give one of the declared `roles`, so declare them to grant from the page; take one back), a ban with a reason and an optional last day (the close of that day, UTC), the lift of a ban, `Act as this user`, and the deletion behind a ticked box; the last three are left out for another admin, whom they refuse. With `audit` on, their last 20 audit entries show too.
+- `/auth/admin/audit`: everyone's audit log (its tab shows with `audit` on, the page says it is off otherwise), 50 entries a page, an `Older entries` link paging by the last entry.
+- Each page is as open as the method behind it: a visitor is sent to sign in, anyone else (a member, an admin already acting as a user, who still sees the banner and the way back, a bearer token) gets a 403, and a site naming no `admin` gets a 404. The actions answer the same through the methods, so a post that skips the page changes nothing.
 - A change asks for a sign-in under ten minutes old, as the methods do: the page says so with a `Sign in again` button that comes back to the user.
 - The pages follow the prefix, the base path and the locale of the other prebuilt pages (`/fr/auth/admin`), and `pages: false` leaves them out with the rest.
 
@@ -25,6 +25,6 @@ extensions: [auth({ admin: 'admin', roles: { admin: ['editor'], editor: [] }, au
 ## Reference
 
 - `auth.requireAdmin()` is the guard of the pages for your own admin page: the signed-in admin as themselves, else the refusal above.
-- `features().admin` is `{ roles }` while an admin is named, else null.
+- `features().admin` is whether an admin is named and `features().audit` whether the audit log is kept; the roles an admin may give are `auth.adminRoles()`, server-side.
 - The words are `auth.admin.*` and `auth.impersonation.*` in the app's catalogs; English and French ship.
 - Organization pages (members, roles, invitations) are not prebuilt yet: the methods in [admin and organizations](admin-and-organizations.md) have no screen.

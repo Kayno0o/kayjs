@@ -1,20 +1,29 @@
 --- server
 import { localize } from 'kay/i18n'
 import { wording } from 'kay/words'
+import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
+import ImpersonationBanner from '../../../components/impersonation-banner.kay'
 import UserMenu from '../../../components/user-menu.kay'
 import { loadViewer } from '../../../viewer'
 
+const features = ctx.locals.auth.features()
+// An admin acting as a user is refused with a 403 too, but sees the way back rather than a bare error.
+const acting = features.admin ? await ctx.locals.auth.impersonator() : null
+
 // Only the admin as themselves passes: a visitor is sent to sign in, anyone else gets a 403, and a site naming no admin a 404.
-await ctx.locals.auth.requireAdmin()
+if (acting)
+  ctx.status(403)
+else
+  await ctx.locals.auth.requireAdmin()
+
 await loadViewer(ctx.request)
 
-const features = ctx.locals.auth.features()
 const current = ctx.url.pathname
 const base = localize(`${features.pages?.prefix ?? features.prefix}/admin`)
 const links = [
   { href: base, label: wording('auth.admin.nav.users', 'Users') },
-  { href: `${base}/audit`, label: wording('auth.admin.nav.audit', 'Audit log') },
+  ...features.audit ? [{ href: `${base}/audit`, label: wording('auth.admin.nav.audit', 'Audit log') }] : [],
 ]
 const here = links.find(link => link.href.replace(/\/$/, '') === current.replace(/\/$/, ''))
 const title = `${here?.label ?? wording('auth.admin.nav.users', 'Users')} - ${wording('auth.admin.title', 'Administration')}`
@@ -25,5 +34,9 @@ head
   .flex.flex-wrap.items-center.justify-between.gap-4
     h1.kui-heading-section {wording('auth.admin.title', 'Administration')}
     UserMenu
-  TabNav(links={links} current={current} label={wording('auth.admin.nav.label', 'Administration')})
-  slot
+  if acting
+    ImpersonationBanner
+    Notice(tone="warning") {wording('auth.admin.acting', 'Go back to your account to use the administration.')}
+  else
+    TabNav(links={links} current={current} label={wording('auth.admin.nav.label', 'Administration')})
+    slot
