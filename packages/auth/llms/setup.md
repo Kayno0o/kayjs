@@ -43,6 +43,7 @@ export default defineConfig({
 ```
 
 
+
 ### Prebuilt pages
 
 kayjs-auth ships every sign-in and account page as a kay extension, styled with kayjs-ui, in English and French. `auth()` in kay.config.ts, as in Setup, serves them, and `createAuth` sends users to them:
@@ -129,7 +130,7 @@ A plain Elysia app, or one mounting the plugin by hand, uses it before the pages
 - `signIn({ id })` signs a user in directly, without their second factor, for a way of signing in the app proves itself. kayjs-auth's own flows all go through the second factor.
 - A deleted user, one signed out everywhere since, or a session ended or unseen past its lifetime, reads as `null`, and the stale entry leaves the session.
 - A websocket route on an app using the plugin reads its user as `await ws.data.auth.user()`, off the cookie or token its upgrade carried. `auth.socketUser(ws)` does the same for a handler typed for any socket, `null` for an anonymous one or one opened without the plugin. A socket's user is read again once 30 seconds have passed since the last read, so a sign-out, "sign out everywhere", a revoked token or a ban reaches an open socket within 30 seconds of its next read: `ws.data.auth.user()` then answers `null`, and `socketUser` also closes the socket it had answered a user for, with code 1008. A handler reads the user on each message it acts on, not once on `open`.
-- A browser's cross-site POST or websocket upgrade reads the session as signed out on a plain Elysia app too, which has no Origin check of kay's, and a session write from it (a sign-in, a sign-out) answers a 403: `Origin` (or `Sec-Fetch-Site`) must name the request's host, the host of `url` or kay's `site`, so an app behind a proxy that does not pass `Host` on sets `url`. `socketUser` answers `null` and closes such a socket with 1008, and `ws.data.auth.user()` reads `null`. A request with neither header (a script, a webhook), a safe method, an `Authorization: Bearer` token, the OAuth `form_post` callback, and what an `api({ cors })` module of kay admits are left alone.
+- A browser's cross-site POST or websocket upgrade reads the session as signed out on a plain Elysia app too, which has no Origin check of kay's, and a session write from it (a sign-in, a sign-out) answers a 403: `Origin` (or `Sec-Fetch-Site`) must name the request's host, the host of `site`, so an app behind a proxy that does not pass `Host` on sets `site`. `socketUser` answers `null` and closes such a socket with 1008, and `ws.data.auth.user()` reads `null`. A request with neither header (a script, a webhook), a safe method, an `Authorization: Bearer` token, the OAuth `form_post` callback, and what an `api({ cors })` module of kay admits are left alone.
 
 ### Sessions
 

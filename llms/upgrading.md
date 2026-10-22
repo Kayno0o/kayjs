@@ -24,7 +24,7 @@ kayjs-ai's `ai({ limit })` is `ai({ rateLimit })`, its `ai({ visitor })` and `as
 
 ### `site` is the origin and `name` the display name
 
-kayjs-auth's `createAuth({ url, site: 'Example' })` is `createAuth({ site: 'https://example.com', name: 'Example' })`, and the origin defaults to the `site` of kay.config.ts (or `SITE_URL`), so `url` can usually go. The old forms work for three minors (the `deprecated-site-name` lint, and `kay upgrade` renames them); `site` is told a name from an origin by not being a URL. A custom auth mail template or view reads `mail.name` and `data.name` for the name: `mail.site` and `data.site` keep working until 1.73, and the contact mail view's `origin` prop is `site` the same way. The messages keep their `{site}` placeholder.
+kayjs-auth's `createAuth({ url, site: 'Example' })` is `createAuth({ site: 'https://example.com', name: 'Example' })`, and the origin defaults to the `site` of kay.config.ts (or `SITE_URL`), so `url` can usually go. The old forms work for three minors (the `deprecated-site-name` lint, and `kay upgrade` renames them); `site` is told a name from an origin by not being a URL. A custom auth mail template or view reads `mail.name` and `data.name` for the name: `mail.site` and `data.site` keep working until 1.73, and the contact mail view's `origin` prop is `site` the same way; no lint finds these, as they are fields of templates and views `kay check` cannot tell from other code. The messages keep their `{site}` placeholder.
 
 ### Runtime error classes end in `Error` and carry a `code`
 

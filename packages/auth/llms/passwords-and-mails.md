@@ -37,7 +37,7 @@ The `email` option names the mailer and the page each kind of link opens:
 email: {
   mailer: { send: mail.enqueue },
   links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' },
-  templates: { 'magic-link': ({ site, url }) => ({ subject: `Your ${site} link`, text: url!, html: `<a href="${url}">Sign in</a>` }) },
+  templates: { 'magic-link': ({ name, url }) => ({ subject: `Your ${name} link`, text: url!, html: `<a href="${url}">Sign in</a>` }) },
 }
 ```
 
