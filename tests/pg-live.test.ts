@@ -27,7 +27,9 @@ async function waitFor(check: () => boolean | Promise<boolean>, what: string, ms
 async function fresh() {
   const { sql } = await postgres()
 
-  await sql.unsafe(`DROP TABLE IF EXISTS ${dataTables.join(', ')}`)
+  // One table per statement, as one DROP of them all holds locks on the first while it waits for the next, which a poller still reading two of them deadlocks with.
+  for (const table of dataTables)
+    await sql.unsafe(`DROP TABLE IF EXISTS ${table}`)
 
   return sql
 }

@@ -31,6 +31,11 @@ export async function createDataTables(source: PgJobsSource): Promise<void> {
 
   try {
     await createJobTables(db)
+
+    // Tables already there are not locked again: a CREATE INDEX IF NOT EXISTS takes a share lock on its table, which would wait on, and deadlock with, a replica writing several tables.
+    if (!await tablesMissing(db, OWN_TABLES))
+      return
+
     await db.begin(async (tx) => {
       await tx`SELECT pg_advisory_xact_lock(hashtext(${MIGRATION_LOCK}))`
       await tx`CREATE TABLE IF NOT EXISTS kay_sessions (id text PRIMARY KEY, data text NOT NULL, expires bigint NOT NULL)`
@@ -59,14 +64,18 @@ export async function createDataTables(source: PgJobsSource): Promise<void> {
   }
 }
 
+async function tablesMissing(db: SQL, names: readonly string[]): Promise<boolean> {
+  const [found] = await rowsOf<{ missing: boolean }>(db.unsafe(`SELECT ${names.map(name => `to_regclass('${name}') IS NULL`).join(' OR ')} AS missing`))
+
+  return found?.missing === true
+}
+
 // One connection and one table check for every store of a `pgData`.
 export function pgHandle(db: SQL): PgHandle {
   let ready: Promise<SQL> | undefined
 
   const create = async (): Promise<SQL> => {
-    const [found] = await rowsOf<{ missing: boolean }>(db.unsafe(`SELECT ${OWN_TABLES.map(name => `to_regclass('${name}') IS NULL`).join(' OR ')} AS missing`))
-
-    if (found?.missing !== true)
+    if (!await tablesMissing(db, OWN_TABLES))
       return db
 
     try {

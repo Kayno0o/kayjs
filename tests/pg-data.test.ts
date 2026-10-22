@@ -33,7 +33,9 @@ async function rows<Row = unknown>(sql: SQL, text: string): Promise<Row[]> {
 async function fresh(): Promise<SQL> {
   const { sql } = await postgres()
 
-  await sql.unsafe(`DROP TABLE IF EXISTS ${dataTables.join(', ')}`)
+  // One table per statement, as one DROP of them all holds locks on the first while it waits for the next, which a poller still reading two of them deadlocks with.
+  for (const table of dataTables)
+    await sql.unsafe(`DROP TABLE IF EXISTS ${table}`)
 
   return sql
 }

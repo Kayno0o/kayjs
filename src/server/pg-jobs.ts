@@ -55,6 +55,12 @@ export async function createJobTables(source: PgJobsSource): Promise<void> {
   const db = connectionOf(source)
 
   try {
+    const [found] = await rowsOf<{ missing: boolean }>(db`SELECT (to_regclass('kay_jobs') IS NULL OR to_regclass('kay_locks') IS NULL OR to_regclass('kay_jobs_due') IS NULL OR to_regclass('kay_jobs_key') IS NULL) AS missing`)
+
+    // Tables already there are not locked again, as a CREATE INDEX IF NOT EXISTS would wait on a replica writing them.
+    if (found?.missing !== true)
+      return
+
     await db.begin(async (tx) => {
       await tx`SELECT pg_advisory_xact_lock(hashtext(${MIGRATION_LOCK}))`
       await tx`CREATE TABLE IF NOT EXISTS kay_jobs (id text PRIMARY KEY, queue text NOT NULL, payload text NOT NULL, attempts integer NOT NULL, run_at bigint NOT NULL, held_until bigint, failed boolean NOT NULL DEFAULT false, error text, job_key text, progress text)`

@@ -572,18 +572,21 @@ describe('kay migrate --format json', () => {
     expect(report.notes.map(note => note.file)).toEqual(['package.json', 'src/pages/api/ping.ts'])
   })
 
-  it('writes into --outdir, or --out as before, and refuses two different ones', async () => {
-    const root = await project({ 'package.json': '{ "dependencies": { "astro": "^5.0.0" } }', 'src/pages/index.astro': '<h1>Home</h1>\n' })
-
-    for (const flag of ['--outdir', '--out']) {
+  // One kay process per case, as three of them in one case outlast the timeout of a loaded run.
+  for (const flag of ['--outdir', '--out']) {
+    it(`writes into ${flag}`, async () => {
+      const root = await project({ 'package.json': '{ "dependencies": { "astro": "^5.0.0" } }', 'src/pages/index.astro': '<h1>Home</h1>\n' })
       const out = join(root, `out${flag}`)
       const { stdout, stderr, code } = await kay(['migrate', 'astro', '.', flag, out, '--format', 'json'], root)
 
       expect(code, stderr).toBe(0)
       expect(document<{ written: string[] }>(stdout).written).toContain(relative(root, join(out, 'src/routes/index.kay')))
       expect(await Bun.file(join(out, 'src/routes/index.kay')).exists()).toBe(true)
-    }
+    })
+  }
 
+  it('refuses --outdir and --out together when they differ', async () => {
+    const root = await project({ 'package.json': '{ "dependencies": { "astro": "^5.0.0" } }', 'src/pages/index.astro': '<h1>Home</h1>\n' })
     const refused = await kay(['migrate', 'astro', '.', '--outdir', 'a', '--out', 'b', '--format', 'json'], root)
 
     expect(refused.code).toBe(1)
