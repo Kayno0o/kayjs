@@ -366,3 +366,35 @@ it('reloads a module that imports package.json when only its version changed, an
     await rm(root, { recursive: true, force: true })
   }
 }, 90_000)
+
+async function answers(port: number): Promise<boolean> {
+  try {
+    return (await fetch(`http://localhost:${port}/`)).ok
+  }
+  catch {
+    return false
+  }
+}
+
+it('stops the whole run, server included, on SIGHUP as on SIGINT', async () => {
+  const root = await project('dev-hangup-', { 'src/server.ts': 'import { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nexport const app = new Elysia().use(await pages()).listen(Number(process.env.PORT))\n', 'src/routes/index.kay': 'h1 Home\n', 'kay.config.ts': 'export default {}\n' })
+  const port = await freePort()
+  const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'dev', '--port', String(port)], { cwd: root, stdout: 'ignore', stderr: 'ignore' })
+
+  try {
+    let up = false
+
+    for (const limit = Date.now() + 30_000; !up && Date.now() < limit; await Bun.sleep(100))
+      up = await answers(port)
+
+    expect(up).toBe(true)
+    child.kill('SIGHUP')
+    await Promise.race([child.exited, Bun.sleep(20_000)])
+    expect(child.exitCode).toBe(0)
+    expect(await answers(port)).toBe(false)
+  }
+  finally {
+    child.kill('SIGKILL')
+    await rm(root, { recursive: true, force: true })
+  }
+}, 60_000)
