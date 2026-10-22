@@ -61,7 +61,14 @@ Set them on `:root` or `html`, as `@theme` does: a seed set on one element does 
 
 `--kui-border-width` is the keyline of buttons, cards, rows, widgets, notices, avatars, toasts, dialogs, side panels, tooltips, tables, boxed sections, segmented controls, chips, toggles, chart plots and the other framed boxes. The dashed frame and the handles the image cropper draws around the crop keep their fixed borders, as they have to show over any photo. It is a length: `2px`, not `2px solid red`, which it ignores. The old name, `--kui-border-card`, works until 1.61.
 
-Labels, headings and table heads are uppercase unless `--kui-label-case` is `none`, and `--kui-label-font` sets their font. Two skins ship, `@kaynooo/kayjs-ui/skins/brutalist.css` (which sets the three shadow tokens below) and `soft.css`, imported after `theme.css`; your own `@theme` after them wins.
+Labels, headings and table heads are uppercase unless `--kui-label-case` is `none`, and `--kui-label-font` sets their font. Three skins ship, `@kaynooo/kayjs-ui/skins/brutalist.css` (which sets the three shadow tokens below), `soft.css` and `space.css`, imported after `theme.css`; an app importing none keeps the default theme, and your own `@theme` after one wins.
+
+The space skin is dark only: a near-black canvas, a starlight accent, red kept for errors, and no lines around boxes, where the fill tells them apart. Buttons become hairline keys that light in the accent on hover, checkboxes are drawn, selects are themed, and the `starfield` class paints tiled dots behind a page or a section. It uses Space Grotesk, which you serve with `fonts: [{ fontsource: '@fontsource-variable/space-grotesk' }]` in `kay.config.ts`.
+
+```css
+@import '@kaynooo/kayjs-ui/theme.css';
+@import '@kaynooo/kayjs-ui/skins/space.css';
+```
 
 `--radius-kui-sm`, `--radius-kui-md` and `--radius-kui-full` round what sits inside a framed box (badges and toggle thumbs, chips and toggle tracks, avatars), square except `full`. `--font-kui-mono` is the monospace of the markdown editor, code and stamps, `--font-kui-body` sets the font of labels and text fields when an app wants one, and `--kui-density` (`1`) multiplies the card, inline and section gaps and the field insets.
 

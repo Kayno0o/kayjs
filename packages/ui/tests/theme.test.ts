@@ -509,7 +509,7 @@ describe('theme.css', () => {
   })
 
   test('ships skins that read at 4.5:1 for text and 3:1 for lines, and compile over the theme', async () => {
-    for (const name of ['brutalist', 'soft']) {
+    for (const name of ['brutalist', 'soft', 'space']) {
       const skin = await Bun.file(`${ROOT}src/skins/${name}.css`).text()
       const tokens = withSkin(skin)
 
@@ -517,8 +517,8 @@ describe('theme.css', () => {
       expect(failing(LINES, 3, tokens), name).toEqual([])
 
       for (const [, token] of skin.matchAll(/^\s*(--[\w-]+):/gm)) {
-        // The label font has no default: it falls back to inherit where it is read.
-        if (!token!.startsWith('--color-kui-') && token !== '--kui-label-font')
+        // The label font has no default: it falls back to inherit where it is read. --font-sans is Tailwind's own.
+        if (!token!.startsWith('--color-kui-') && token !== '--kui-label-font' && token !== '--font-sans')
           expect(theme, `${name} ${token}`).toContain(`${token}:`)
       }
 
@@ -533,6 +533,25 @@ describe('theme.css', () => {
     expect(await built(await Bun.file(`${ROOT}src/skins/soft.css`).text())).toContain('--kui-label-case: none')
     expect(await built(await Bun.file(`${ROOT}src/skins/soft.css`).text())).toContain('--radius-kui-md: 0.375rem')
     expect(await built(await Bun.file(`${ROOT}src/skins/brutalist.css`).text())).toContain('--kui-label-font: var(--font-kui-mono)')
+  })
+
+  test('ships the space skin as one scheme with a starfield utility, keys, drawn checkboxes and themed selects, each overridable after it', async () => {
+    const skin = await Bun.file(`${ROOT}src/skins/space.css`).text()
+    const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
+    const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${theme}\n${skin}\n@theme { --color-kui-accent: red; }\n@tailwind utilities;`, { base: ROOT, loadStylesheet: async (_, base) => ({ path: tailwind, base, content: await Bun.file(tailwind).text() }) })
+    const css = compiler.build(['starfield'])
+
+    expect(css).toMatch(/\.starfield \{[^}]*background-size: 97px 97px, 131px 131px, 173px 173px, 211px 211px/)
+    expect(css).toMatch(/data-theme=.light.\][^{]*\{\s*color-scheme: dark/)
+    expect(skin).toContain('--font-sans: \'Space Grotesk\'')
+    expect(css).toContain('--color-kui-accent: red')
+    expect(css).not.toContain('--color-kui-accent: #bcd4ff')
+    expect(css).toContain('appearance: base-select')
+    expect(css).toContain('linear-gradient(45deg')
+    expect(css).toContain('clip-path: polygon(14% 44%')
+    expect(css).toMatch(/--kui-border-width: 0px/)
+    // The skin sets one colour scheme, so it never asks for light.
+    expect(skin).not.toContain('light-dark(')
   })
 
   test('sizes the keyline of every framed box by --kui-border-width, a length the old --kui-border-card still sets', () => {

@@ -1,0 +1,152 @@
+/*
+ * A dark-only space skin: a near-black canvas, a starlight accent, Space Grotesk, few borders (fill tells the boxes apart), buttons as hairline keys that light in the accent, drawn checkboxes and themed selects, and a `starfield` background utility.
+ * Import it after theme.css in the app's stylesheet: its tokens are the app's `@theme`, so an override of yours after it wins. It names the family `Space Grotesk`, which the app serves with `fonts: [{ fontsource: '@fontsource-variable/space-grotesk' }]` in kay.config.ts.
+ */
+@theme {
+  --font-sans: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+
+  --color-kui-canvas: #07080d;
+  --color-kui-text: #dfe4f0;
+  --color-kui-accent: #bcd4ff;
+  --color-kui-success: #7fd8a6;
+  --color-kui-warning: #e6c07b;
+  --color-kui-info: #7cc4e8;
+  --color-kui-error: #ff6b6b;
+  --color-kui-field-border: #5c657a;
+  --color-kui-surface0: color-mix(in oklab, var(--color-kui-canvas), var(--color-kui-text) 4.5%);
+  --color-kui-surface1: color-mix(in oklab, var(--color-kui-canvas), var(--color-kui-text) 8%);
+  --color-kui-surface2: color-mix(in srgb, var(--color-kui-text) 7%, transparent);
+  --color-kui-overlay0: color-mix(in srgb, var(--color-kui-text) 16%, transparent);
+
+  --kui-border-width: 0px;
+  --kui-border-notice: 1px;
+  --kui-border-avatar: 1px;
+  --kui-label-case: none;
+  --tracking-kui-label: 0.02em;
+  --tracking-kui-section: 0.06em;
+  --tracking-kui-action: 0.02em;
+}
+
+/* One scheme, whatever the visitor's system or a data-theme asks for. */
+:root,
+[data-theme='light'],
+[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+/* Dots tiled at prime sizes, so the four layers never line up into a grid. */
+@utility starfield {
+  background-image:
+    radial-gradient(1px 1px at 23px 41px, rgb(255 255 255 / 0.55), transparent),
+    radial-gradient(1px 1px at 71px 17px, rgb(188 212 255 / 0.4), transparent),
+    radial-gradient(1.5px 1.5px at 109px 83px, rgb(255 255 255 / 0.65), transparent),
+    radial-gradient(1px 1px at 151px 127px, rgb(255 255 255 / 0.3), transparent);
+  background-size: 97px 97px, 131px 131px, 173px 173px, 211px 211px;
+}
+
+@layer components {
+  /* The framed boxes have no line, so the controls that need one draw it again. */
+  :is(.kui-btn, .kui-segmented, .kui-pagination-step, .kui-toggle-track, .kui-chip, .kui-file-drop) {
+    --kui-border-width: 1px;
+  }
+
+  /* Overlays lose their line to a shadow that lifts them off the page. */
+  :is(.kui-dialog, .kui-command-palette, .kui-popover, .kui-hover-card, .kui-toast, .kui-tooltip) {
+    box-shadow: 0 1rem 3rem -0.75rem rgb(0 0 0 / 0.8);
+  }
+
+  /* A key: a hairline on the canvas, lit in the accent while hovered. The tones, the ghost and inline forms and a pressed toggle keep their own. */
+  .kui-btn:where(:not(.kui-btn-accent, .kui-btn-success, .kui-btn-danger, [data-variant='ghost'], [data-variant='inline'], [aria-pressed='true'])) {
+    --kui-shell-line: var(--color-kui-overlay0);
+    --kui-shell-fill: transparent;
+  }
+
+  .kui-btn:where(:not(.kui-btn-accent, .kui-btn-success, .kui-btn-danger, [data-variant='ghost'], [data-variant='inline'], [aria-pressed='true'])):hover {
+    --kui-shell-line: var(--color-kui-accent);
+    --kui-shell-fill: transparent;
+    color: var(--color-kui-accent);
+  }
+
+  /* A themed select: its own chevron drawn as two gradients, and where the browser can style the select itself, its list too. */
+  :is(select.kui-field-input, .kui-form-field select) {
+    appearance: none;
+    padding-right: 1.75rem;
+    background-image: linear-gradient(45deg, transparent 50%, var(--color-kui-subtext0) 50%), linear-gradient(135deg, var(--color-kui-subtext0) 50%, transparent 50%);
+    background-position: calc(100% - 1rem) 55%, calc(100% - 0.7rem) 55%;
+    background-size: 0.3rem 0.3rem, 0.3rem 0.3rem;
+    background-repeat: no-repeat;
+  }
+
+  @supports (appearance: base-select) {
+    :is(select.kui-field-input, .kui-form-field select) {
+      appearance: base-select;
+      padding-right: var(--spacing-kui-field-x);
+      background-image: none;
+
+      &::picker(select) {
+        appearance: base-select;
+        margin-top: 0.25rem;
+        padding: 0.25rem;
+        border: 1px solid var(--color-kui-overlay0);
+        border-radius: var(--radius-kui-card);
+        background: var(--color-kui-mantle);
+        color: var(--color-kui-text);
+        box-shadow: 0 1rem 3rem -0.75rem rgb(0 0 0 / 0.8);
+      }
+
+      &::picker-icon {
+        color: var(--color-kui-subtext0);
+      }
+
+      & option {
+        padding: 0.25rem var(--spacing-kui-field-x);
+        border-radius: var(--radius-kui-card);
+
+        &:hover,
+        &:focus-visible {
+          background: var(--color-kui-surface1);
+        }
+
+        &:checked {
+          color: var(--color-kui-accent);
+        }
+      }
+    }
+  }
+
+  /* A drawn checkbox: a square in the field's line that fills with the accent and shows a tick once checked. */
+  .kui-checkbox-input {
+    display: inline-grid;
+    place-content: center;
+    appearance: none;
+    border: 1px solid var(--color-kui-field-border);
+    border-radius: var(--radius-kui-card);
+    background: var(--color-kui-surface0);
+    transition: background-color 150ms, border-color 150ms;
+
+    &::before {
+      content: '';
+      width: 0.625rem;
+      height: 0.625rem;
+      background: var(--color-kui-on-accent);
+      clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0, 43% 62%);
+      transform: scale(0);
+      transition: transform 120ms;
+    }
+
+    &:checked,
+    &:indeterminate {
+      border-color: var(--color-kui-accent);
+      background: var(--color-kui-accent);
+    }
+
+    &:checked::before {
+      transform: scale(1);
+    }
+
+    &:indeterminate::before {
+      clip-path: polygon(0 40%, 100% 40%, 100% 60%, 0 60%);
+      transform: scale(1);
+    }
+  }
+}
