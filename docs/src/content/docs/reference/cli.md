@@ -110,9 +110,9 @@ kay generate guard admin
 | `island likes` | `src/components/likes.kay`, a signal and a button |
 | `action team/removeTissue` | the action `removeTissue` in `src/routes/team/_actions.kay`; one that exists is left alone and the action is printed to add by hand |
 | `api notes` | `src/api/notes.ts`, served at `/api/notes` |
-| `guard admin` | `src/routes/admin/_guard.ts` (`/` for the root one), denying a request with no `authorization` header until you write the real rule |
+| `guard admin` | `src/routes/admin/_guard.ts` (`/` for the root one), letting every request through until you write the rule |
 
-A project with tests gets `tests/<name>.test.ts` for a page, an action and an API module; a project with `auth` gets the page test only, which expects the redirect to sign in. What it writes passes `kay check` and the lint. `--dry-run` lists the files without writing them, and `--format json` prints `{ kind, name, written, dryRun }`.
+A project with tests gets `tests/<name>.test.ts` for a page, `tests/action-<name>.test.ts` for an action and `tests/api-<name>.test.ts` for an API module; a project with `auth` gets the page test only, which expects the redirect to sign in. What it writes passes `kay check` and the lint. `--dry-run` lists the files without writing them, and `--format json` prints `{ kind, name, written, dryRun }`.
 
 ## kay add
 

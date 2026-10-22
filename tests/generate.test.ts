@@ -6,6 +6,7 @@ import { check, configCheckOptions } from '../src/check'
 import { loadConfig } from '../src/config'
 import { generate, generatedFiles } from '../src/generate'
 import { createProject, PRESETS } from '../src/new'
+import { lintInProcess } from './scaffold-lint'
 import { scratchDir } from './scratch'
 
 const repo = join(import.meta.dir, '..')
@@ -52,6 +53,9 @@ it('writes into a project, refusing a file that exists and honouring --dry-run',
   await expect(generate(dir, 'widget', 'x')).rejects.toThrow('widget is none of page')
   await expect(generate(join(dir, 'src'), 'page', 'x')).rejects.toThrow('no package.json')
   await generate(dir, 'action', 'save')
+  await expect(generate(dir, 'action', 'action')).rejects.toThrow('that are no reserved word')
+  await expect(generate(dir, 'page', 'save')).resolves.toEqual({ written: ['src/routes/save.kay', 'tests/save.test.ts'] })
+  await expect(generate(dir, 'page', 'pricing/index')).rejects.toThrow('src/routes/pricing.kay already exists')
   await expect(generate(dir, 'action', 'send')).rejects.toThrow('add the action to its server fence by hand')
 })
 
@@ -87,6 +91,8 @@ it('writes files that pass kay check and their own tests', async () => {
   await Bun.write(join(dir, 'src/routes/team/index.kay'), 'head\n  title Team\nh1 Team\n')
 
   expect(await check(dir, configCheckOptions(await loadConfig(dir)))).toEqual([])
+
+  expect((await lintInProcess(dir, '.')).filter(result => result.messages.length > 0).map(result => ({ file: result.filePath, messages: result.messages }))).toEqual([])
 
   const tests = await run(dir, 'test')
 

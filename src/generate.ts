@@ -3,19 +3,19 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { detectFeatures } from './add'
 
-export const KINDS = ['page', 'component', 'island', 'action', 'api', 'guard'] as const
+const KINDS = ['page', 'component', 'island', 'action', 'api', 'guard'] as const
 
-export type Kind = typeof KINDS[number]
-
-export interface GenerateResult {
-  written: string[]
-}
+type Kind = typeof KINDS[number]
 
 // A route segment: a name, a `[param]` or `[...rest]`, or a `(group)`; a component or module name is a plain one.
 const PLAIN = /^[a-z0-9][\w-]*$/i
 const ROUTE_SEGMENT = /^(?:[a-z0-9][\w-]*|\[(?:\.\.\.)?[a-z]\w*\]|\([a-z][\w-]*\))$/i
 const ACTION_NAME = /^[a-z][a-z0-9]*$/i
 const WORD_BREAK = /[-_]+/g
+// Words an action cannot be exported as, or that its own file already names: the `action` and `s` it calls, `title` its handler reads.
+const RESERVED = new Set(['action', 's', 'title', 'await', 'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger', 'default', 'delete', 'do', 'else', 'enum', 'export', 'extends', 'false', 'finally', 'for', 'function', 'if', 'import', 'in', 'instanceof', 'let', 'new', 'null', 'return', 'static', 'super', 'switch', 'this', 'throw', 'true', 'try', 'typeof', 'var', 'void', 'while', 'with', 'yield'])
+// The `_actions.kay` fence an action is added to, for the hint printed when the file exists.
+const ACTION_BODY = (name: string) => `export const ${name} = action(\n  s.Object({ title: s.String({ minLength: 1, maxLength: 200 }) }),\n  ({ title }) => title,\n)\n`
 const DYNAMIC = /[[(]/
 const LEADING_DIGIT = /^\d/
 const DASH_LETTER = /-(\w)/g
@@ -71,19 +71,19 @@ function pageFiles(segments: readonly string[], tailwind: boolean, tests: boolea
 function actionFiles(segments: readonly string[], tests: boolean, auth: boolean): Record<string, string> {
   const name = segments.at(-1)!
 
-  if (!ACTION_NAME.test(name))
-    throw new Error(`kay generate: \`${name}\` is not a name for an action: write letters and digits, such as \`removeTissue\``)
+  if (!ACTION_NAME.test(name) || RESERVED.has(name))
+    throw new Error(`kay generate: \`${name}\` is not a name for an action: write letters and digits that are no reserved word, such as \`removeTissue\``)
 
   const folder = segments.slice(0, -1).join('/')
   const file = `src/routes/${folder === '' ? '' : `${folder}/`}_actions.kay`
   const files: Record<string, string> = {
-    [file]: `--- server\nimport { s } from 'kay'\n\nexport const ${name} = action(\n  s.Object({ title: s.String({ minLength: 1, maxLength: 200 }) }),\n  async ({ title }) => title,\n)\n`,
+    [file]: `--- server\nimport { s } from 'kay'\n\n${ACTION_BODY(name)}`,
   }
 
   if (tests && !auth) {
     const imported = `../${file.slice(0, -'.kay'.length)}.kay`
 
-    files[`tests/${slugOf(segments.join('/'))}.test.ts`] = `${TEST_HEAD}import { ${name} } from '${imported}'\n\nconst site = await testSite()\n\nit('answers a valid ${name}', async () => {\n  expect(await site.call(${name}, { title: 'First' })).toBe('First')\n})\n\nit('refuses an empty title', async () => {\n  const refused = await site.refusal(${name}, { title: '' })\n\n  expect(refused.status).toBe(422)\n})\n`
+    files[`tests/action-${slugOf(segments.join('/'))}.test.ts`] = `${TEST_HEAD}import { ${name} } from '${imported}'\n\nconst site = await testSite()\n\nit('answers a valid ${name}', async () => {\n  expect(await site.call(${name}, { title: 'First' })).toBe('First')\n})\n\nit('refuses an empty title', async () => {\n  const refused = await site.refusal(${name}, { title: '' })\n\n  expect(refused.status).toBe(422)\n})\n`
   }
 
   return files
@@ -106,7 +106,7 @@ function apiFiles(segments: readonly string[], tests: boolean, auth: boolean): R
 
 function guardFiles(segments: readonly string[]): Record<string, string> {
   return {
-    [`src/routes/${segments.map(segment => `${segment}/`).join('')}_guard.ts`]: 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (request.headers.get(\'authorization\') === null)\n    return deny(401, \'Sign in first\')\n})\n',
+    [`src/routes/${segments.map(segment => `${segment}/`).join('')}_guard.ts`]: 'import { guard } from \'kay\'\n\n// Runs before every page and action in this folder and below: redirect or deny here, such as `return deny(403, "Admins only")`.\nexport default guard(() => undefined)\n',
   }
 }
 
@@ -131,8 +131,15 @@ export function generatedFiles(kind: Kind, name: string, project: { tailwind: bo
   }
 }
 
+// The other file that serves the same URL as a page file: `pricing.kay` and `pricing/index.kay` both serve /pricing, which `kay check` refuses.
+function rivalRoutes(page: string): string[] {
+  const base = page.slice(0, -'.kay'.length)
+
+  return base.endsWith('/index') ? [`${base.slice(0, -'/index'.length)}.kay`] : [`${base}/index.kay`]
+}
+
 // Writes what `kay generate` makes into the project in `dir`, never over a file that exists: one that does stops it with nothing written.
-export async function generate(dir: string, kind: string, name: string, options: { dryRun?: boolean | undefined } = {}): Promise<GenerateResult> {
+export async function generate(dir: string, kind: string, name: string, options: { dryRun?: boolean | undefined } = {}): Promise<{ written: string[] }> {
   if (!KINDS.includes(kind as Kind))
     throw new Error(`kay generate: ${kind} is none of ${KINDS.join(', ')}`)
 
@@ -141,18 +148,18 @@ export async function generate(dir: string, kind: string, name: string, options:
 
   const features = await detectFeatures(dir)
   const files = generatedFiles(kind as Kind, name, { tailwind: features.has('tailwind'), tests: features.has('tests'), auth: features.has('auth') })
-  const taken = Object.keys(files).filter(path => existsSync(join(dir, path)))
+  const taken = [...Object.keys(files), ...kind === 'page' ? rivalRoutes(Object.keys(files)[0]!) : []].filter(path => existsSync(join(dir, path)))
 
   if (taken.length > 0) {
-    const first = taken[0]!
+    const hint = taken.some(path => path.endsWith('_actions.kay')) ? `: add the action to its server fence by hand, from this shape:\n\n${ACTION_BODY(name.split('/').at(-1)!)}` : ''
 
-    throw new Error(`kay generate: nothing was written, ${taken.join(', ')} already exist${taken.length === 1 ? 's' : ''}${first.endsWith('_actions.kay') ? `: add the action to its server fence by hand, from this shape:\n\n${files[first]!.replace('--- server\nimport { s } from \'kay\'\n\n', '')}` : ''}`)
+    throw new Error(`kay generate: nothing was written, ${taken.join(', ')} already exist${taken.length === 1 ? 's' : ''}${hint}`)
   }
 
   if (options.dryRun !== true) {
     for (const [path, text] of Object.entries(files)) {
       await mkdir(dirname(join(dir, path)), { recursive: true })
-      await writeFile(join(dir, path), text)
+      await writeFile(join(dir, path), text, { flag: 'wx' })
     }
   }
 
