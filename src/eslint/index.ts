@@ -118,7 +118,7 @@ function runTypes(kay: string, root: string): { ok: boolean, why: string } {
 
     why = `kay types ${child.error ? `did not run (${child.error.message})` : `exited with status ${child.status}, signal ${child.signal}`}: ${(child.stderr ?? '').trim().slice(-500)}`
 
-    if (child.status !== null && !child.signal)
+    if (child.status !== null || child.error)
       break
   }
 
