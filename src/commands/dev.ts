@@ -14,7 +14,7 @@ const PORT_FIRST = /^\d+(?:\/|$)/
 // Restarts the server on every change until interrupted.
 export const dev: Command = {
   usage: USAGES.dev,
-  options: { entry: { type: 'string' }, port: { type: 'string' }, host: { type: 'string' }, inspect: { type: 'string' }, open: { type: 'boolean' }, format: { type: 'string' }, quiet: { type: 'boolean' } },
+  options: { 'entry': { type: 'string' }, 'port': { type: 'string' }, 'host': { type: 'string' }, 'inspect': { type: 'string' }, 'open': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' }, 'no-types': { type: 'boolean' } },
   positionals: 1,
   // A bare `--inspect` or `--host` takes the default address, as Bun's does, rather than the next argument.
   normalize: args => args.map(arg => arg === '--inspect' || arg === '--host' ? `${arg}=` : arg),
@@ -67,7 +67,7 @@ export const dev: Command = {
 
       try {
         try {
-          stop = await startDev(root, { entry, port: typeof port === 'string' ? Number(port) : undefined, host, inspect: debuggerAt, open: open === true, format, keys, onQuit: interrupted, log: events?.write, quiet: values.quiet === true, refuseConfig: true })
+          stop = await startDev(root, { entry, port: typeof port === 'string' ? Number(port) : undefined, host, inspect: debuggerAt, open: open === true, format, keys, onQuit: interrupted, log: events?.write, quiet: values.quiet === true, types: values['no-types'] === true ? false : undefined, refuseConfig: true })
         }
         catch (error) {
           // The process that found the config does not load printed why.

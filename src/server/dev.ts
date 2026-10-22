@@ -2,6 +2,7 @@ import type { ClientOptions } from '../build/client'
 import type { KayCompileError } from '../build/transform'
 import type { KayExtension } from '../config'
 import type { BuildFailure } from '../dev/builder'
+import type { TypeProblem } from '../dev/refuse'
 import type { HotSwap } from '../runtime/client'
 import type { LocaleSettings } from '../runtime/i18n'
 import type { ClientBuild } from './client'
@@ -24,6 +25,7 @@ import { isCrossSite } from './actions'
 import { routerPath } from './base'
 import { nodeNet } from './builtins'
 import { BUILD_FAILURE, clientOptionsKey, fromManifest, readManifest } from './client'
+import { recordTypeErrors } from './dev-errors'
 import { redirectedBy } from './dev-notes'
 import { editorCommand } from './editor'
 import { localeCopies } from './i18n'
@@ -78,6 +80,9 @@ const streams = new Set<ReadableStreamDefaultController<string>>()
 // What `kay dev` said of the last restart or stylesheet swap, for the pages connecting after it.
 let lastBuilt: string | undefined
 let followingBuilds = false
+// The type errors `kay dev` last found, as `kay check` prints them: the pages carry them in a block of their own and hear a change as an event.
+let typeTexts: string[] = []
+let lastTypes: string | undefined
 // Once its server went away, a page connects again every 10 ms for about a restart's length, then less and less often, down to four times a second for about ten seconds more, then down to once every five seconds, so a server that stays down (or a proxy answering 502 for it) is not polled hard.
 // A hidden tab waits until it is shown, then connects at once.
 const FAST_RETRY_MS = 10
@@ -96,7 +101,7 @@ const LOAD_RETRY_MS = 100
 // The id is a meta beside the script, so the script reads the same on every server: a page swap keeps it rather than running a copy that connects again, and a policy allows it by one hash.
 // The reloads the script notes for the dev tool to tell its fetches by: a fetch's timing name drops the `#fragment`, and only the last few can still be matched.
 const RELOAD_NOTES = 20
-const LIVE_RELOAD_SCRIPT = `<script>(()=>{let b=document.querySelector('meta[name=kay-boot]')?.content,v,s,n=0,q=Promise.resolve();const load=async(k=0)=>{try{const a=window.$kayReloads??=[];a.push([location.href.split('#')[0],performance.now()]);if(a.length>${RELOAD_NOTES})a.shift();const r=await fetch(location.href,{cache:'no-store',headers:{'accept':'text/html','x-kay-live-reload':'1'}});return r.ok&&!r.redirected?new DOMParser().parseFromString(await r.text(),'text/html'):null}catch{return k===${LOAD_RETRIES}?null:(await new Promise(r=>setTimeout(r,${LOAD_RETRY_MS})),load(k+1))}},css=async(d,i)=>{const o=[...document.querySelectorAll('link[rel=stylesheet]')],u=new Set(o.map(l=>l.getAttribute('href')));await Promise.all([...d.querySelectorAll('link[rel=stylesheet]')].map(l=>new Promise(r=>{const k=document.createElement('link'),h=l.getAttribute('href');k.rel='stylesheet';k.dataset.kayDev='';k.href=u.has(h)?h+(h.includes('?')?'&':'?')+'kay-dev='+i:h;k.onload=k.onerror=r;document.head.append(k)})));for(const l of o)l.remove()},on=x=>{x.onerror=()=>{x.close();const go=()=>on(new EventSource(${JSON.stringify(DEV_EVENTS)}));if(document.hidden)return document.addEventListener('visibilitychange',()=>{n=0;go()},{once:true});setTimeout(go,n++<${FAST_RETRIES}?${FAST_RETRY_MS}:Math.min(${MAX_RETRY_MS},${FAST_RETRY_MS}*2**(n-${FAST_RETRIES}),${SLOW_RETRY_MS}*2**Math.max(0,n-${FAST_RETRIES}-${SLOW_RETRIES})))};x.addEventListener('built',e=>{dispatchEvent(new CustomEvent('kay-dev-built',{detail:e.data}))});x.addEventListener('styles',e=>q=q.then(async()=>{try{const d=await load();if(!d)return location.reload();if(s)s=d;await css(d,e.data)}catch{location.reload()}}));x.addEventListener('boot',e=>(n=0,q=q.then(async()=>{let p=false;const d=e.data,s0=d.indexOf(' '),t=d.indexOf(' ',s0+1),i=d.slice(0,s0),c=t<0?d.slice(s0+1):d.slice(s0+1,t),h=t<0?null:JSON.parse(d.slice(t+1));if(i===b){v??=c;if(!window.$kayRefresh)s??=await load();return}if(c!==v){let ok=false;try{ok=!!h&&String(h.from)===v&&!!window.$kayHot&&await window.$kayHot(h)}catch{}if(!ok){if(c===i)return location.reload();if(window.$kayRefresh){try{await window.$kayRefresh()}catch{return location.reload()}}else p=true}v=c}b=i;try{const d=await load();if(!d)return location.reload();if(p){const m=await import(${JSON.stringify(DEV_PATCH)});if(!s||!m.patch(s,d))return location.reload();s=d}await css(d,i)}catch{location.reload()}})))};on(new EventSource(${JSON.stringify(DEV_EVENTS)}))})()</script>`
+const LIVE_RELOAD_SCRIPT = `<script>(()=>{let b=document.querySelector('meta[name=kay-boot]')?.content,v,s,n=0,q=Promise.resolve();const load=async(k=0)=>{try{const a=window.$kayReloads??=[];a.push([location.href.split('#')[0],performance.now()]);if(a.length>${RELOAD_NOTES})a.shift();const r=await fetch(location.href,{cache:'no-store',headers:{'accept':'text/html','x-kay-live-reload':'1'}});return r.ok&&!r.redirected?new DOMParser().parseFromString(await r.text(),'text/html'):null}catch{return k===${LOAD_RETRIES}?null:(await new Promise(r=>setTimeout(r,${LOAD_RETRY_MS})),load(k+1))}},css=async(d,i)=>{const o=[...document.querySelectorAll('link[rel=stylesheet]')],u=new Set(o.map(l=>l.getAttribute('href')));await Promise.all([...d.querySelectorAll('link[rel=stylesheet]')].map(l=>new Promise(r=>{const k=document.createElement('link'),h=l.getAttribute('href');k.rel='stylesheet';k.dataset.kayDev='';k.href=u.has(h)?h+(h.includes('?')?'&':'?')+'kay-dev='+i:h;k.onload=k.onerror=r;document.head.append(k)})));for(const l of o)l.remove()},on=x=>{x.onerror=()=>{x.close();const go=()=>on(new EventSource(${JSON.stringify(DEV_EVENTS)}));if(document.hidden)return document.addEventListener('visibilitychange',()=>{n=0;go()},{once:true});setTimeout(go,n++<${FAST_RETRIES}?${FAST_RETRY_MS}:Math.min(${MAX_RETRY_MS},${FAST_RETRY_MS}*2**(n-${FAST_RETRIES}),${SLOW_RETRY_MS}*2**Math.max(0,n-${FAST_RETRIES}-${SLOW_RETRIES})))};x.addEventListener('built',e=>{dispatchEvent(new CustomEvent('kay-dev-built',{detail:e.data}))});x.addEventListener('types',e=>{dispatchEvent(new CustomEvent('kay-dev-types',{detail:e.data}))});x.addEventListener('styles',e=>q=q.then(async()=>{try{const d=await load();if(!d)return location.reload();if(s)s=d;await css(d,e.data)}catch{location.reload()}}));x.addEventListener('boot',e=>(n=0,q=q.then(async()=>{let p=false;const d=e.data,s0=d.indexOf(' '),t=d.indexOf(' ',s0+1),i=d.slice(0,s0),c=t<0?d.slice(s0+1):d.slice(s0+1,t),h=t<0?null:JSON.parse(d.slice(t+1));if(i===b){v??=c;if(!window.$kayRefresh)s??=await load();return}if(c!==v){let ok=false;try{ok=!!h&&String(h.from)===v&&!!window.$kayHot&&await window.$kayHot(h)}catch{}if(!ok){if(c===i)return location.reload();if(window.$kayRefresh){try{await window.$kayRefresh()}catch{return location.reload()}}else p=true}v=c}b=i;try{const d=await load();if(!d)return location.reload();if(p){const m=await import(${JSON.stringify(DEV_PATCH)});if(!s||!m.patch(s,d))return location.reload();s=d}await css(d,i)}catch{location.reload()}})))};on(new EventSource(${JSON.stringify(DEV_EVENTS)}))})()</script>`
 
 export function liveReload(): string {
   return `<meta name="kay-boot" content="${bootId}">${LIVE_RELOAD_SCRIPT}`
@@ -340,6 +345,9 @@ export function devEvents(failed = false, hot?: HotSwap): Response {
 
       if (lastBuilt !== undefined)
         controller.enqueue(lastBuilt)
+
+      if (lastTypes !== undefined)
+        controller.enqueue(lastTypes)
     },
     cancel() {
       streams.delete(own!)
@@ -467,6 +475,17 @@ export function followBuilds(): void {
 
   followingBuilds = true
   process.on('message', (message: unknown) => {
+    if (typeof message === 'object' && message !== null && 'typeErrors' in message) {
+      const problems = message.typeErrors as TypeProblem[]
+
+      typeTexts = problems.map(problem => problem.report)
+      lastTypes = `event: types\ndata: ${JSON.stringify(typeTexts)}\n\n`
+      recordTypeErrors(problems)
+      broadcast(lastTypes)
+
+      return
+    }
+
     if (typeof message !== 'object' || message === null || !('built' in message))
       return
 
@@ -745,6 +764,11 @@ export function devRoutes(root: string, pages: ServedRoute[], endpoints: Endpoin
 }
 
 // The data block the dev tool reads: a script of another type never runs, so the policy has nothing to allow.
-export function problemsBlock(problems: string[] | undefined): string {
-  return problems && problems.length > 0 ? `<script type="application/json" id="kay-check-problems">${JSON.stringify(problems).replaceAll('<', '\\u003c')}</script>` : ''
+export function problemsBlock(problems: string[] | undefined, id = 'kay-check-problems'): string {
+  return problems && problems.length > 0 ? `<script type="application/json" id="${id}">${JSON.stringify(problems).replaceAll('<', '\\u003c')}</script>` : ''
+}
+
+// The type errors `kay dev` found, in a block of their own so the check's problems and these change apart.
+export function typeProblemsBlock(): string {
+  return problemsBlock(typeTexts, 'kay-type-problems')
 }

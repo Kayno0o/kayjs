@@ -116,6 +116,25 @@ describe('the dev tool', () => {
     expect(shadow().querySelector('[role=status]')?.textContent).toBe('3 problems')
   })
 
+  it('lists the type errors kay dev found beside what kay check found, and follows the check ending without a reload', async () => {
+    const mistyped = 'error[TS2322]: Type \'string\' is not assignable to type \'number\'.\n --> src/routes/index.kay:2:7'
+
+    document.head.innerHTML = problemsBlock(['warning[missing-title]: a page needs a title']) + problemsBlock([mistyped], 'kay-type-problems')
+    tool = startDevTool()
+    await Bun.sleep(0)
+
+    expect(problems()).toEqual([['warn', 'warning[missing-title]: a page needs a title'], ['error', mistyped]])
+
+    // The check ends with the error fixed and another found.
+    const other = 'error[TS2345]: Argument of type \'number\' is not assignable to parameter of type \'string\'.\n --> src/routes/other.kay:4:3'
+
+    window.dispatchEvent(new CustomEvent('kay-dev-types', { detail: JSON.stringify([other]) }))
+    expect(problems()).toEqual([['warn', 'warning[missing-title]: a page needs a title'], ['error', other]])
+
+    window.dispatchEvent(new CustomEvent('kay-dev-types', { detail: '[]' }))
+    expect(problems()).toEqual([['warn', 'warning[missing-title]: a page needs a title']])
+  })
+
   it('copies every listed problem as plain text with the page URL, dismissed ones left out, and says whether it worked', async () => {
     const copied: string[] = []
     const copy = () => shadow().querySelector<HTMLButtonElement>('.actions button[title^="Copy"]')!

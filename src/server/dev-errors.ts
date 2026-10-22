@@ -1,5 +1,6 @@
 import type { Elysia } from 'elysia'
 import type { FileDiagnostic } from '../build/transform'
+import type { TypeProblem } from '../dev/refuse'
 import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import process from 'node:process'
@@ -13,8 +14,8 @@ import { firstOwnFrame } from './overlay'
 
 // One error a `kay dev` server met, as `.kay/dev/errors.json` lists it for a reader without a browser, such as a coding agent.
 export interface DevError {
-  // `compile` and `boot` stopped the server from starting; `request` is a request that threw, `browser` an error an island met on a page.
-  kind: 'compile' | 'boot' | 'request' | 'browser'
+  // `compile` and `boot` stopped the server from starting; `request` is a request that threw, `browser` an error an island met on a page, `type` a type error the check beside `kay dev` found.
+  kind: 'compile' | 'boot' | 'request' | 'browser' | 'type'
   time: string
   message: string
   // The request that threw, or the page a browser error was met on.
@@ -22,7 +23,7 @@ export interface DevError {
   // The island's component a browser error was met in, when the browser knows it.
   island?: string
   // Each compile error's position, from the project's root.
-  problems?: { file: string, line: number, column: number, code?: string, message: string }[]
+  problems?: { file: string, line: number, column: number, code?: string | undefined, message: string }[]
   // The compile errors as `kay check` prints them, or the stack mapped to `.kay` lines.
   report: string
   // Where the project's own code threw, from its root, and the lines leading to it.
@@ -72,6 +73,33 @@ export function recordRequestError(error: unknown, request: Request): void {
 
   failed.add(request)
   neverThrowing(() => requestErrorOf(error, request))
+}
+
+// The type errors the check beside `kay dev` found now, which replace those of the check before: one entry each, at its `.kay` line. `kay dev` says them itself, so nothing is sent back.
+export function recordTypeErrors(problems: TypeProblem[]): void {
+  if (tracked === undefined)
+    return
+
+  neverThrowing(() => {
+    const errors = tracked!.errors
+
+    for (const [key, error] of errors) {
+      if (error.kind === 'type')
+        errors.delete(key)
+    }
+
+    const time = new Date().toISOString()
+
+    // Past the cap the first errors stay, as they are the ones to fix first.
+    for (const { report, ...problem } of problems.slice(0, MAX_ERRORS))
+      errors.set(typeKey(problem), { kind: 'type', time, message: problem.message, problems: [problem], report })
+
+    save()
+  })
+}
+
+function typeKey({ file, line, column, code }: Pick<TypeProblem, 'file' | 'line' | 'column' | 'code'>): string {
+  return `type ${file}:${line}:${column} ${code ?? ''}`
 }
 
 // Listing an error never costs the server its answer, nor the app its `onError`: a browser's report may hold a stack no path reads from.
@@ -196,7 +224,8 @@ function readErrors(file: string): [string, DevError][] {
   try {
     const { errors } = JSON.parse(readFileSync(file, 'utf8')) as { errors: DevError[] }
 
-    return errors.map(error => [keyOf(error), error])
+    // A type error is the check's to list again: `kay dev` tells each new server the ones it holds, so a previous run's do not outlive its fix.
+    return errors.filter(error => error.kind !== 'type').map(error => [keyOf(error), error])
   }
   catch {
     return []
@@ -206,6 +235,9 @@ function readErrors(file: string): [string, DevError][] {
 function keyOf(error: DevError): string {
   if (error.kind === 'request')
     return `request ${error.request!.method} ${error.request!.path}`
+
+  if (error.kind === 'type')
+    return typeKey(error.problems![0]!)
 
   return error.kind === 'browser' ? `browser ${error.request!.path}` : BOOT
 }

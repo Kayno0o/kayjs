@@ -8,6 +8,9 @@ const HOST = 'kay-dev'
 const STATE_KEY = 'kay-dev'
 const LAYOUT_KEY = 'kay-dev-layout'
 const CHECK_PROBLEMS = 'kay-check-problems'
+// The type errors `kay dev` found, in a block of their own that the `types` event it sends rewrites.
+const TYPE_PROBLEMS = 'kay-type-problems'
+const TYPES_EVENT = 'kay-dev-types'
 const REQUEST = 'kay-dev-request'
 const ROUTES_URL = '/_kay/dev/routes'
 const HEAD_URL = '/_kay/dev/head'
@@ -1406,7 +1409,7 @@ function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => 
 
   // What `kay check` finds now, as the page carries it: a swap brings the block of the code the server runs.
   const readChecks = () => {
-    const texts = new Set(JSON.parse(doc.getElementById(CHECK_PROBLEMS)?.textContent ?? '[]') as string[])
+    const texts = new Set([CHECK_PROBLEMS, TYPE_PROBLEMS].flatMap(id => JSON.parse(doc.getElementById(id)?.textContent ?? '[]') as string[]))
 
     for (const [text, { kind }] of shown) {
       if (kind === 'check' && !texts.has(text))
@@ -1420,6 +1423,16 @@ function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => 
   }
 
   readChecks()
+
+  // The type check beside the server ended: its block is rewritten, so a page swapped in later reads the same, and the tab shows it without a reload.
+  const typed = (event: Event) => {
+    const block = doc.getElementById(TYPE_PROBLEMS) ?? doc.head.appendChild(Object.assign(doc.createElement('script'), { id: TYPE_PROBLEMS, type: 'application/json' }))
+
+    block.textContent = String((event as CustomEvent<string>).detail)
+    readChecks()
+  }
+
+  win.addEventListener(TYPES_EVENT, typed)
 
   // What was logged before this loaded, then each problem as it is logged, a microtask later so a failure here never breaks the call that logged.
   const early = Array.isArray(win.$kayProblems) ? win.$kayProblems as DevProblem[] : []
@@ -1459,6 +1472,7 @@ function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => 
   return {
     stop: () => {
       swaps.disconnect()
+      win.removeEventListener(TYPES_EVENT, typed)
       // Problems logged from now on wait for the next tool.
       win.$kayProblems = [] as DevProblem[]
     },

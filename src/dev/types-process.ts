@@ -1,15 +1,16 @@
 import type { Subprocess } from 'bun'
+import type { TypeProblem } from './refuse'
 import { realpathSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import { CONFIG_FILE } from '../config'
-import { ANSWER, ENTRY, MODULES, WRITE } from './refuse'
+import { ANSWER, ENTRY, MODULES, PROBLEMS, WRITE } from './refuse'
 
 const TYPES = join(import.meta.dir, 'types.ts')
 // How long the process writing the types waits for the next edit before it exits, so a project left alone holds no memory for it.
 const IDLE_MS = 10_000
 
-// The process writing the shadow tree of `kay dev`, kept between writes so an edit costs a write rather than a boot and the config's imports read again.
+// The process writing the shadow tree of `kay dev`, or the one checking the project beside it (the `check` line), kept between writes so an edit costs a write rather than a boot and the config's imports read again.
 export class TypesProcess {
   private child: Subprocess<'pipe', 'pipe', 'inherit'> | undefined
   private lines: AsyncIterator<string> | undefined
@@ -19,6 +20,8 @@ export class TypesProcess {
   private turn: Promise<unknown> = Promise.resolve()
   // The server entry the config named at the last write, when no `--entry` did.
   configuredEntry: string | undefined
+  // The type errors the last `check` answered with, none before one did.
+  problems: TypeProblem[] = []
   // The project modules the running process loaded, as its last answer reported them.
   private modules: Set<string> | undefined
   // `env` is the environment the process starts with, which leaves out what the `.env` files hold so it reads them itself on every start.
@@ -103,6 +106,9 @@ export class TypesProcess {
 
         if (line.value.startsWith(MODULES))
           this.modules = new Set(JSON.parse(line.value.slice(MODULES.length)) as string[])
+
+        if (line.value.startsWith(PROBLEMS))
+          this.problems = JSON.parse(line.value.slice(PROBLEMS.length)) as TypeProblem[]
 
         if (line.value.startsWith(ENTRY))
           this.configuredEntry = line.value.slice(ENTRY.length)

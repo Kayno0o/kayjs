@@ -3,6 +3,7 @@ import type { Readable } from 'node:stream'
 import type { KayConfig } from '../config'
 import type { BuildOutcome } from './builder'
 import type { ClientBuilder } from './client'
+import type { TypeProblem } from './refuse'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { networkInterfaces } from 'node:os'
@@ -16,7 +17,7 @@ import { startClientBuilder } from './client'
 import { readConfigRecord, writeConfigRecord } from './config-record'
 import { mentionsPackage } from './fingerprint'
 import { inspectorProxy } from './inspector'
-import { CONFIG_REFUSED, LOAD, REFUSE } from './refuse'
+import { CHECK, CHECK_SKIPPED, CONFIG_REFUSED, LOAD, REFUSE } from './refuse'
 import { environmentWithoutDotenv, PAGES_ENTRY, stylesOnly, watchProject } from './sources'
 import { TypesProcess } from './types-process'
 
@@ -46,6 +47,8 @@ export interface DevOptions {
   onQuit?: (() => void) | undefined
   // Stops the start with `ConfigRefusedError` when kay.config.ts does not load, as the process writing the first types finds out, rather than going on with the defaults as it does after an edit.
   refuseConfig?: boolean | undefined
+  // Type-checks the project beside the server after each change and shows the errors, `true` by default; `false` is `--no-types`. A `config` given leaves it off, as the check loads kay.config.ts in a process of its own, and so does a project with no tsconfig.json.
+  types?: boolean | undefined
 }
 
 // kay.config.ts does not load; the process that found out has printed why.
@@ -64,6 +67,11 @@ const MAX_RELOADS = 200
 const TYPES_GRACE_MS = 2000
 // How long the first tree waits for the first server to listen before it is written anyway, as for a server that never does.
 const FIRST_TREE_WAIT_MS = 3000
+// How long the type check waits for the last change before it starts, so a burst of saves is checked once.
+const CHECK_DEBOUNCE_MS = 300
+// The type errors the terminal lists before it counts the rest.
+const MAX_TYPE_LINES = 10
+const LINE_BREAK = /\r?\n/
 
 // The root files Bun reads as a process starts.
 const STARTUP_FILE = /^(?:\.env.*|package\.json|bunfig\.toml|tsconfig\.json)$/
@@ -154,6 +162,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     return files.some(file => join(root, file).startsWith(publicDir))
   }
   let configRefused = false
+  // Set once the type check is defined, below the helpers it says its errors with.
+  let typesWritten: (() => void) | undefined
   const writeTypes = async () => {
     // Any write of the tree is the first one, so none is left waiting for a server.
     writeFirstTree = undefined
@@ -174,6 +184,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
         }
       }
 
+      typesWritten?.()
       typesWriting = undefined
     })()
 
@@ -248,6 +259,77 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     repeatable = { key, count, rows: Math.max(1, Math.ceil(shown.replace(ANSI_STYLE, '').length / (process.stdout.columns || 80))) }
   }
   const stamp = () => dim(new Date().toLocaleTimeString('en-GB'))
+  // The errors the last check ended with, and them as JSON (`undefined` before the first check) to tell a changed set from the same one.
+  let typeProblems: TypeProblem[] = []
+  let typeKey: string | undefined
+  // A check that ended with another set of type errors than the one before is told to the server and said in the terminal.
+  const publishTypeErrors = (problems: TypeProblem[]) => {
+    const key = JSON.stringify(problems)
+
+    if (key === typeKey)
+      return
+
+    typeKey = key
+    typeProblems = problems
+
+    if (child !== undefined)
+      tell(child, { typeErrors: problems })
+
+    if (problems.length === 0) {
+      if (options.quiet !== true)
+        say('types', { errors: [] }, `${stamp()} types: no errors`)
+
+      return
+    }
+
+    const lines = problems.slice(0, MAX_TYPE_LINES).map(({ file, line, column, code, message }) => `  ${file}:${line}:${column}${code === undefined ? '' : ` ${code}`} ${message.split(LINE_BREAK)[0]}`)
+    const more = problems.length - lines.length
+
+    say('types', { errors: problems.map(({ report: _report, ...problem }) => problem) }, [`${stamp()} types: ${problems.length} type error${problems.length === 1 ? '' : 's'}`, ...lines, ...more > 0 ? [`  and ${more} more`] : []].join('\n'))
+  }
+  // The type check runs in a process of its own beside the server, once the tree it types is written: a reload never waits for it, and its errors reach the open pages, errors.json and the terminal when it ends.
+  const typeChecking = options.types !== false && options.config === undefined && existsSync(join(root, 'tsconfig.json'))
+  const checkProcess = new TypesProcess(root, options.entry, env)
+  let checkFresh = true
+  let checkTimer: Timer | undefined
+  let checking: Promise<void> | undefined
+  let checkAgain = false
+  const scheduleCheck = () => {
+    if (!typeChecking || stopping || configRefused)
+      return
+
+    clearTimeout(checkTimer)
+    checkTimer = setTimeout(() => {
+      checkAgain = true
+      checking ??= (async () => {
+        try {
+          while (checkAgain) {
+            checkAgain = false
+            await typesWriting
+
+            const fresh = checkFresh
+
+            checkFresh = false
+
+            const code = await checkProcess.write(fresh, '', CHECK)
+
+            if (stopping)
+              break
+
+            // A change came meanwhile, whose check follows and says what holds.
+            if (!checkAgain && code !== CHECK_SKIPPED)
+              publishTypeErrors(checkProcess.problems)
+          }
+        }
+        finally {
+          checking = undefined
+        }
+      })()
+    }, CHECK_DEBOUNCE_MS)
+    checkTimer.unref()
+  }
+
+  typesWritten = scheduleCheck
   // A restart or a reload is over, its report the terminal's and the open pages'; `reloaded` says the running process took the change in, where a restart is a new one.
   const restarted = (server: Subprocess, url: string | undefined, reloaded = false) => {
     const ms = Math.round(performance.now() - restartedAt)
@@ -416,8 +498,13 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     if ('followsStyles' in message)
       follower = server
 
-    if (server === child && 'listening' in message)
+    if (server === child && 'listening' in message) {
       listening = true
+
+      // A new process starts without the errors the last check found.
+      if (typeProblems.length > 0)
+        tell(server, { typeErrors: typeProblems })
+    }
 
     if (server === child && 'reloaded' in message)
       reloadAnswer?.('reloaded')
@@ -578,6 +665,10 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
     // The entry is the config's, which the types read: the new process starts on the one known, and another process follows once the types tell the config now names another.
     const configEdited = files.includes(CONFIG_FILE)
+
+    if (configEdited || files.some(file => !file.endsWith('.kay') && (!CODE_FILE.test(file) || checkProcess.loaded(file))))
+      checkFresh = true
+
     let entryWrite: Promise<void> | undefined
 
     if (configEdited) {
@@ -813,6 +904,9 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
       }
     }
 
+    clearTimeout(checkTimer)
+    checkAgain = false
+    checkProcess.close()
     typesProcess.close()
     await Promise.all([child?.exited, waiting?.exited, builder?.stop()])
     await inspector?.stop()

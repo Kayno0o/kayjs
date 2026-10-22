@@ -40,7 +40,7 @@ import { importModule, onForgetModules } from './bundle'
 import { INLINE_LIMIT, islandChunks } from './client'
 import { preferredEncoding, STYLE_TAG, wholeResponse } from './compress'
 import { cookieJar, requestCookies } from './cookies'
-import { A11Y_SCRIPT, DEV_BOOT, devToolScripts, errorPageScripts, liveReload, problemsBlock, STYLES_SCRIPT } from './dev'
+import { A11Y_SCRIPT, DEV_BOOT, devToolScripts, errorPageScripts, liveReload, problemsBlock, STYLES_SCRIPT, typeProblemsBlock } from './dev'
 import { noteRedirect } from './dev-notes'
 import { dictionaryAsked } from './dictionary'
 import { entryHeadOf } from './entry-head'
@@ -1058,7 +1058,7 @@ function kayMetas(options: RenderOptions, hasIslands: boolean): string {
 }
 
 function devScripts(client: ClientBuild, files: string[], late: boolean): string {
-  return problemsBlock(client.problems) + liveReload() + DEV_BOOT + devToolScripts() + A11Y_SCRIPT + (late ? '' : pageClassesBlock(client, files) + STYLES_SCRIPT)
+  return problemsBlock(client.problems) + typeProblemsBlock() + liveReload() + DEV_BOOT + devToolScripts() + A11Y_SCRIPT + (late ? '' : pageClassesBlock(client, files) + STYLES_SCRIPT)
 }
 
 // The classes the page's own files name, which production writes the rules of, for the dev page to check what it sets against.

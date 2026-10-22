@@ -210,7 +210,7 @@ function tools(root: string): Tool[] {
     {
       name: 'dev_errors',
       title: 'Read the dev server\'s errors',
-      description: 'Reads the errors a running `kay dev` met, from `.kay/dev/errors.json`: why the server failed to boot, requests that threw and errors islands met in the browser, each with its message, report and where the project\'s own code threw. An error leaves the list once the file compiles or the request answers again. Answers an empty list when `kay dev` has met none or has not run.',
+      description: 'Reads the errors a running `kay dev` met, from `.kay/dev/errors.json`: why the server failed to boot, type errors the check beside it found, requests that threw and errors islands met in the browser, each with its message, report and where the project\'s own code threw. An error leaves the list once the file compiles or the request answers again. Answers an empty list when `kay dev` has met none or has not run.',
       inputSchema: { type: 'object', properties: {}, additionalProperties: false },
       annotations: READ_ONLY,
       run: async () => {

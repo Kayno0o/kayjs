@@ -145,9 +145,14 @@ Open pages refresh by themselves, an edited island is swapped in place, and a pr
 | `--inspect[=<address>]` | Opens Bun's debugger in the server, at `ws://localhost:6499/kay` by default, the same address after every restart |
 | `--open` | Opens the address in the browser once the server is ready |
 | `--quiet` | Leaves out the line per restart and stylesheet swap |
+| `--no-types` | Does not type-check the project beside the server |
 | `--format text\|json` | `json` prints each line as one JSON object on stdout, with an `event` field |
 
 The server starts as soon as the config is read. The editor types in `.kay/types` are written once it listens, or after three seconds if it does not, so the first page does not wait for them.
+
+`kay dev` type-checks the project as [`kay check`](#kay-check) does, in a process of its own beside the server, so a reload never waits for it.
+
+It runs after the first start and after each change that can alter a type, a moment after the last save. The errors show at their `.kay` line in the dev tool's Problems tab, which updates without a reload, in [`.kay/dev/errors.json`](#errors-without-a-browser) as `type` errors, and in the terminal, which also says when they are fixed. A project with no `tsconfig.json` is not checked, and `--no-types` turns the check off.
 
 The terminal shows the address once, then one line per change, with how long it took.
 
@@ -200,6 +205,7 @@ Under `--format json`, each line is one JSON object on stdout with an `event` an
 | `debugger` | `url`, under `--inspect` |
 | `no-browser` | `command`, when `--open` found no browser |
 | `builder-exit` | The process building the client exited, and each change starts it again |
+| `types` | `errors`: the type errors the check found, each with `file`, `line`, `column`, `code` and `message`, empty once there are none |
 | `error` | An error from [`.kay/dev/errors.json`](#errors-without-a-browser), with its fields |
 
 `--quiet` leaves out the `restart` and `styles` events as it leaves out their lines.
@@ -237,6 +243,7 @@ While it runs, `kay dev` also writes its address to `.kay/dev/server-<pid>.json`
 | `boot` | The server failed to start |
 | `request` | A request threw |
 | `browser` | An island met an error, under its page's path |
+| `type` | A type error the check beside `kay dev` found, one entry each at its `.kay` line, replaced whenever the check ends |
 
 A request's errors stay across restarts, the latest 50 kept. A server not run by `kay dev` writes none.
 
