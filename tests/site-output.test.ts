@@ -179,6 +179,7 @@ describe('sitemap lastmod', () => {
     expect(xml).toContain('<url><loc>https://x.example/about</loc></url>')
   })
 
+  // Eleven copies, each built and served: a CI worker under load took over 20 s.
   it('lists a URL with none for a null, and for a value that is no date, which is reported', async () => {
     // A page module is imported once per path, so each value gets a copy of its own.
     const xml = async (lastmod: string) => {
@@ -194,7 +195,7 @@ describe('sitemap lastmod', () => {
 
     for (const hostile of ['\'2026-02-31\'', '\'2026-13-01\'', '\'2026-00-10\'', '\'2026-5-6\'', '\'2026-05-06T10:00:00\'', 'true', '\'soon\'', '{}', 'Number.NaN'])
       expect(await xml(hostile)).toContain('<url><loc>https://x.example/posts/a</loc></url>')
-  })
+  }, 60_000)
 
   it('keeps it with the trailing slash, the base and every locale\'s copy', async () => {
     const xml = await sitemap({ trailingSlash: 'always', base: '/docs', i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: `${ROOT}/src/messages` } })
