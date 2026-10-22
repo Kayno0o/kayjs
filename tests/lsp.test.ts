@@ -1,5 +1,5 @@
 import type { CheckDiagnostic } from '../src/check'
-import type { CodeAction, CompletionItem, CompletionList, Diagnostic, DocumentHighlight, Hover, Location, LocationLink, Range, TextEdit, WorkspaceEdit } from '../src/lsp/protocol'
+import type { CodeAction, CompletionItem, CompletionList, Diagnostic, DocumentHighlight, DocumentSymbol, FoldingRange, Hover, Location, LocationLink, Range, TextEdit, WorkspaceEdit } from '../src/lsp/protocol'
 import { cp, mkdir, mkdtemp, readdir, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -239,6 +239,75 @@ describe('kay lsp', () => {
     finally {
       await editor.change(path, text, 3)
     }
+  })
+
+  it('completes where TypeScript sees no code: props, attributes, blocks, lint names and routes', async () => {
+    const path = 'site/src/routes/search.kay'
+    const text = await Bun.file(join(workspace, path)).text()
+    const source = '---\nimport Card from \'../components/card.kay\'\n---\nCard()\nform(action="")\n  \na(href="/")\n// kay-allow \n'
+    const labels = async (line: number, character: number) => (await editor.request<CompletionList>('textDocument/completion', path, line, character)).items.map(item => item.label)
+
+    await editor.open(path)
+    await editor.change(path, source, 2)
+
+    try {
+      expect(await labels(3, 5)).toEqual(['title'])
+      expect(await labels(4, 5)).toEqual(expect.arrayContaining(['action', 'method', 'onSubmit']))
+      expect(await labels(4, 5)).not.toContain('href')
+      expect(await labels(5, 2)).toEqual(expect.arrayContaining(['if', 'for', 'await', 'Card', 'div']))
+      expect(await labels(6, 9)).toContain('/todos/:id')
+      expect(await labels(7, 13)).toEqual(expect.arrayContaining(['unread-name']))
+    }
+    finally {
+      await editor.change(path, text, 3)
+    }
+  })
+
+  it('lists the outline and the folds of a file', async () => {
+    const path = 'site/src/routes/index.kay'
+
+    await editor.open(path)
+
+    const symbols = await editor.connection.request<DocumentSymbol[]>('textDocument/documentSymbol', { textDocument: { uri: editor.uri(path) } })
+
+    expect(symbols.map(symbol => symbol.name)).toEqual(['server', 'script', 'Card', 'Counter'])
+    expect(symbols[0]!.children!.map(symbol => [symbol.name, symbol.detail])).toEqual(expect.arrayContaining([['add', 'action'], ['open', undefined]]))
+
+    const folds = await editor.connection.request<FoldingRange[]>('textDocument/foldingRange', { textDocument: { uri: editor.uri(path) } })
+
+    expect(folds).toEqual(expect.arrayContaining([expect.objectContaining({ startLine: 0, kind: 'region' })]))
+  })
+
+  it('fixes every safe problem of a file at once', async () => {
+    const path = 'site/src/routes/search.kay'
+    const text = await Bun.file(join(workspace, path)).text()
+    const source = 'button(onclick={() => 1}) a\nbutton(onmouseenter={() => 2}) b\n'
+
+    await editor.open(path)
+    await editor.change(path, source, 2)
+
+    try {
+      const actions = await editor.connection.request<CodeAction[]>('textDocument/codeAction', { textDocument: { uri: editor.uri(path) }, range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } }, context: { diagnostics: [], only: ['source.fixAll'] } })
+
+      expect(actions.map(action => [action.kind, applyEdits(source, action.edit!.changes![editor.uri(path)]!)])).toEqual([['source.fixAll.kay', source.replace('onclick', 'onClick').replace('onmouseenter', 'onMouseEnter')]])
+    }
+    finally {
+      await editor.change(path, text, 3)
+    }
+  })
+
+  it('updates the imports of a .kay file renamed or moved, and those of the files that move', async () => {
+    const edits = async (oldPath: string, newPath: string) => {
+      const changes = (await editor.connection.request<WorkspaceEdit | null>('workspace/willRenameFiles', { files: [{ oldUri: editor.uri(oldPath), newUri: editor.uri(newPath) }] }))?.changes ?? {}
+
+      return Object.fromEntries(Object.entries(changes).map(([uri, list]) => [uri.slice(editor.uri('').length + 1), list.map(edit => edit.newText)]))
+    }
+
+    expect(await edits('site/src/components/card.kay', 'site/src/components/panel.kay')).toMatchObject({ 'site/src/routes/index.kay': ['../components/panel.kay'] })
+    expect(await edits('site/src/components/card.kay', 'site/src/ui/card.kay')).toMatchObject({ 'site/src/routes/index.kay': ['../ui/card.kay'] })
+    expect(await edits('site/src/routes/index.kay', 'site/src/routes/deep/index.kay')).toMatchObject({ 'site/src/routes/index.kay': expect.arrayContaining(['../../components/card.kay']) })
+    expect(await edits('site/src/components', 'site/src/parts')).toMatchObject({ 'site/src/routes/index.kay': expect.arrayContaining(['../parts/card.kay']) })
+    expect(await edits('site/src/routes/about.kay', 'site/src/routes/about-us.kay')).toEqual({})
   })
 
   it('goes to definitions across .kay files', async () => {

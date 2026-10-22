@@ -6,9 +6,10 @@ import type { Diagnostic as KayDiagnostic } from '../compiler'
 import type { Span } from '../compiler/ast'
 import type { KayConfig } from '../config'
 import type { RouteMount } from '../server/routes'
-import type { CodeAction, CodeActionParams, CompletionItem, CompletionList, Diagnostic, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, FileEvent, Hover, InitializeParams, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, WorkspaceEdit } from './protocol'
+import type { CodeAction, CodeActionParams, CompletionItem, CompletionList, Diagnostic, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, DocumentSymbol, FileEvent, FoldingRange, Hover, InitializeParams, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, WorkspaceEdit } from './protocol'
+import type { TemplateData, Wanted } from './template-completion'
 import { existsSync } from 'node:fs'
-import { basename, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { KAY_DIR } from '../build/assets'
@@ -17,12 +18,12 @@ import { throughNodeModules } from '../build/libraries'
 import { importedSignals } from '../build/signals'
 import { configCheckOptions, configProblems, contentChecks, generatedChecks, generatedProblem, projectProblems, stopProbes, writeShadowTypes } from '../check'
 import { diagnoseShadow, reportsTypeErrors, servedByTheApp, servedLocales } from '../check/diagnose'
+import { messageKeys } from '../check/messages'
 import { compileShadow, generatedSpan, layoutQueries, shadowSource, sourceSpan } from '../check/shadow'
-import { programShadows } from '../check/shadow-types'
+import { programShadows, servedPathsOf } from '../check/shadow-types'
 import { elementsIn } from '../compiler/ast'
 import { formatKay } from '../compiler/format'
-import { lintLevels } from '../compiler/lints'
-import { offsetAt, positionAt } from '../compiler/mapping'
+import { HTML_ELEMENTS, lintLevels, LINTS } from '../compiler/lints'
 import { GENERATED_NAME } from '../compiler/names'
 import { nativeExe } from '../compiler/native-typescript'
 import { parseKay } from '../compiler/parser'
@@ -31,7 +32,12 @@ import { CONFIG_FILE, loadConfig } from '../config'
 import { tailwindSorter } from '../format/tailwind'
 import { projectPaths, projectRootOf, SHADOW_DIR } from '../project'
 import { routeMounts } from '../server/routes'
+import { componentInterface } from './component-props'
+import { documentSymbols, foldingRanges } from './outline'
+import { toOffset, toPosition } from './positions'
+import { importEdits } from './renames'
 import { Connection } from './rpc'
+import { templateContext, templateItems } from './template-completion'
 
 // Where a file tsgo names is for the editor: its .kay source for a shadow file, the file itself outside the shadow tree.
 interface Target {
@@ -100,6 +106,10 @@ const PROJECT_CHECKS_DELAY = 300
 // How long the events of one save, the editor's save notice and its file watcher's, are waited for before the shadow tree is written once for them all; short of the diagnostics' delay.
 const SAVE_EVENTS_DELAY = 25
 const QUICK_FIX = 'quickfix'
+const CAPITALIZED = /^[A-Z]/
+const FIX_ALL = 'source.fixAll.kay'
+const PLAIN_FORMAT = 1
+const SNIPPET_FORMAT = 2
 const PACKAGE_TYPES = join(SHADOW_DIR, 'kay-packages.d.ts')
 const DEFAULT_MEMBER = '.default'
 // Completions offer names from modules not imported yet, as editors do for TypeScript by default; added imports are quoted the way kay's own code is, since generated code would mislead the guess.
@@ -156,6 +166,9 @@ export class KayLanguageServer {
     client.onRequest<TextDocumentPositionParams & { newName: string }>('textDocument/rename', async params => this.rename(params))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/formatting', async ({ textDocument }) => this.format(textDocument.uri))
     client.onRequest<CodeActionParams>('textDocument/codeAction', async params => this.codeActions(params))
+    client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/documentSymbol', ({ textDocument }) => this.symbols(textDocument.uri))
+    client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/foldingRange', ({ textDocument }) => this.folds(textDocument.uri))
+    client.onRequest<{ files: { oldUri: string, newUri: string }[] }>('workspace/willRenameFiles', async ({ files }) => this.renamedFiles(files))
     client.onRequest('shutdown', async () => this.server.request('shutdown'))
     client.onNotification('exit', () => this.exit())
   }
@@ -201,15 +214,18 @@ export class KayLanguageServer {
       capabilities: {
         textDocumentSync: { openClose: true, change: FULL_SYNC, save: { includeText: false } },
         hoverProvider: true,
-        completionProvider: { triggerCharacters: result.capabilities.completionProvider?.triggerCharacters ?? ['.'], resolveProvider: true },
+        completionProvider: { triggerCharacters: ['@', ...result.capabilities.completionProvider?.triggerCharacters ?? ['.']], resolveProvider: true },
         definitionProvider: true,
         referencesProvider: true,
         documentHighlightProvider: true,
         signatureHelpProvider: result.capabilities.signatureHelpProvider ?? { triggerCharacters: ['(', ','] },
         renameProvider: { prepareProvider: true },
-        codeActionProvider: { codeActionKinds: [QUICK_FIX] },
+        codeActionProvider: { codeActionKinds: [QUICK_FIX, FIX_ALL] },
         documentFormattingProvider: true,
+        documentSymbolProvider: true,
+        foldingRangeProvider: true,
       },
+      workspace: { fileOperations: { willRename: { filters: [{ pattern: { glob: '**/*.kay' } }, { pattern: { glob: '**', matches: 'folder' } }] } } },
       serverInfo: { name: 'kay' },
     }
   }
@@ -652,6 +668,11 @@ export class KayLanguageServer {
   }
 
   private async completion(params: TextDocumentPositionParams & { context?: unknown }): Promise<CompletionList | null> {
+    const own = await this.templateCompletion(params)
+
+    if (own)
+      return own
+
     const target = this.toShadow(params)
 
     if (!target)
@@ -673,6 +694,90 @@ export class KayLanguageServer {
     }
   }
 
+  // Kay's own completions, where TypeScript sees no code: element, attribute and block names, route paths, message keys and lint names.
+  private async templateCompletion({ textDocument, position }: TextDocumentPositionParams): Promise<CompletionList | undefined> {
+    const document = this.documents.get(textDocument.uri)
+
+    if (!document)
+      return undefined
+
+    const context = templateContext(document.source, toOffset(document.source, position), parseKay(document.source).templateStart)
+
+    if (!context)
+      return undefined
+
+    const range = { start: toPosition(document.source, context.replace.start), end: toPosition(document.source, context.replace.end) }
+    const items = templateItems(context.wanted, await this.templateData(document, context.wanted), (label, text, snippet) => ({ textEdit: { range, newText: text }, filterText: label, insertTextFormat: snippet ? SNIPPET_FORMAT : PLAIN_FORMAT }))
+
+    return items.length > 0 ? { isIncomplete: false, items } : undefined
+  }
+
+  private async templateData(document: Document, wanted: Wanted): Promise<TemplateData> {
+    const project = this.projectAt(projectRootOf(document.file, this.root))
+    const data: TemplateData = { lints: [], paths: [], messages: [], components: [], elements: [] }
+
+    if (wanted.kind === 'lint') {
+      data.lints = Object.entries(LINTS).filter(([, lint]) => !('site' in lint)).map(([name]) => name)
+    }
+    else if (wanted.kind === 'path') {
+      data.paths = [...new Set((await servedPathsOf(project.root, project.options)).filter(path => path.startsWith('/')))].sort()
+    }
+    else if (wanted.kind === 'message') {
+      data.messages = project.options.i18n ? await messageKeys(project.root, project.options.i18n, project.options.extensions) : []
+    }
+    else {
+      data.elements = [...HTML_ELEMENTS]
+      data.components = await this.importedComponents(document)
+    }
+
+    return data
+  }
+
+  // The components a file imports; a local `.kay` one is read for the props and blocks it takes.
+  private async importedComponents(document: Document): Promise<TemplateData['components']> {
+    const { imports } = analyzeScript(document.source, parseKay(document.source).script)
+    const found: TemplateData['components'] = []
+
+    for (const binding of imports.filter(candidate => CAPITALIZED.test(candidate.local) && !candidate.typeOnly)) {
+      const path = binding.source.startsWith('.') && binding.source.endsWith('.kay') ? resolve(dirname(document.file), binding.source) : undefined
+      const open = path === undefined ? undefined : [...this.documents.values()].find(candidate => candidate.file === path)?.source
+      const source = open ?? (path !== undefined && existsSync(path) ? await Bun.file(path).text() : undefined)
+
+      found.push({ name: binding.local, from: binding.source, ...source === undefined ? { props: [], blocks: [] } : componentInterface(source) })
+    }
+
+    return found
+  }
+
+  // Renaming or moving a `.kay` file, or a folder holding some, rewrites the relative imports of the other `.kay` files, and those of the files that move.
+  private async renamedFiles(files: { oldUri: string, newUri: string }[]): Promise<WorkspaceEdit | null> {
+    const moves = new Map(files.filter(file => file.oldUri.startsWith('file:') && file.newUri.startsWith('file:')).map(file => [filePath(file.oldUri), filePath(file.newUri)]))
+    const changes: Record<string, TextEdit[]> = {}
+
+    for (const file of await findKayFiles(this.root)) {
+      const open = [...this.documents.values()].find(document => document.file === file)
+      const source = open?.source ?? await Bun.file(file).text()
+      const edits = importEdits(file, source, moves)
+
+      if (edits.length > 0)
+        changes[open?.uri ?? this.clientUri(file)] = edits.map(edit => ({ range: { start: toPosition(source, edit.start), end: toPosition(source, edit.end) }, newText: edit.text }))
+    }
+
+    return Object.keys(changes).length > 0 ? { changes } : null
+  }
+
+  private symbols(uri: string): DocumentSymbol[] {
+    const document = this.documents.get(uri)
+
+    return document ? documentSymbols(document.source) : []
+  }
+
+  private folds(uri: string): FoldingRange[] {
+    const document = this.documents.get(uri)
+
+    return document ? foldingRanges(document.source) : []
+  }
+
   // Items carry the document they were listed for, since the editor may resolve one after another file asked for completions.
   private async resolveCompletion(item: CompletionItem): Promise<CompletionItem> {
     const { uri, offset, data } = item.data as { uri: string, offset: number, data: unknown }
@@ -685,11 +790,19 @@ export class KayLanguageServer {
   // Quick fixes whose every edit lands in what the user wrote, an added import moved into its fence: kay's own, then TypeScript's.
   private async codeActions(params: CodeActionParams): Promise<CodeAction[] | null> {
     const document = this.documents.get(params.textDocument.uri)
-    const wanted = params.context.only?.includes(QUICK_FIX) ?? true
+    const only = params.context.only
 
-    if (!document || !wanted)
+    if (!document)
       return null
 
+    const fixAll = only === undefined || only.some(kind => FIX_ALL.startsWith(kind)) ? safeFixes(document) : []
+    const fixes = (only?.includes(QUICK_FIX) ?? true) ? await this.quickFixes(document, params) : null
+    const actions = [...fixAll, ...fixes ?? []]
+
+    return actions.length > 0 || fixes ? actions : null
+  }
+
+  private async quickFixes(document: Document, params: CodeActionParams): Promise<CodeAction[] | null> {
     const own = kayFixes(document, toOffset(document.source, params.range.start), toOffset(document.source, params.range.end))
     const range = toShadowRange(document, params.range)
 
@@ -1218,6 +1331,22 @@ function zeroRange(): Range {
   return { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } }
 }
 
+// Every safe fix of the file at once, the first of each problem and none whose edits overlap another's: what `kay check --fix` would write, offered to run on save.
+function safeFixes(document: Document): CodeAction[] {
+  const taken: Span[] = []
+  const edits: TextEdit[] = []
+
+  for (const fix of document.diagnostics.flatMap(diagnostic => diagnostic.fixes?.find(candidate => candidate.safe) ?? [])) {
+    if (fix.edits.some(edit => taken.some(other => edit.start < other.end && other.start < edit.end)))
+      continue
+
+    taken.push(...fix.edits)
+    edits.push(...fix.edits.map(edit => ({ range: { start: toPosition(document.source, edit.start), end: toPosition(document.source, edit.end) }, newText: edit.text })))
+  }
+
+  return edits.length > 0 ? [{ title: 'Fix all safe problems in this file', kind: FIX_ALL, edit: { changes: { [document.uri]: edits } } }] : []
+}
+
 // The fixes kay's own diagnostics carry, for those touching the range the editor asks about; two reads in one statement offer its fixes once.
 function kayFixes(document: Document, start: number, end: number): CodeAction[] {
   const fixes = document.diagnostics.filter(diagnostic => diagnostic.start <= end && diagnostic.end >= start).flatMap(diagnostic => diagnostic.fixes ?? [])
@@ -1227,15 +1356,4 @@ function kayFixes(document: Document, start: number, end: number): CodeAction[] 
     kind: QUICK_FIX,
     edit: { changes: { [document.uri]: fix.edits.map(change => ({ range: { start: toPosition(document.source, change.start), end: toPosition(document.source, change.end) }, newText: change.text })) } },
   }))
-}
-
-// LSP positions are 0-based, the mapping helpers 1-based; both count UTF-16 code units like JS strings.
-function toOffset(text: string, position: Position): number {
-  return Math.min(offsetAt(text, { line: position.line + 1, column: position.character + 1 }), text.length)
-}
-
-function toPosition(text: string, offset: number): Position {
-  const { line, column } = positionAt(text, offset)
-
-  return { line: line - 1, character: column - 1 }
 }

@@ -145,6 +145,13 @@ export async function messageProblems(root: string, config: I18nConfig, extensio
   return problems
 }
 
+// The keys `t()` can name: the default locale's, none while its catalog cannot be read.
+export async function messageKeys(root: string, config: I18nConfig, extensions: KayExtension[] = []): Promise<string[]> {
+  const catalog = await localeCatalog(root, config, extensions, config.defaultLocale)
+
+  return 'problem' in catalog ? [] : [...catalog.entries.keys()]
+}
+
 // The keys each locale but the default lacks, with the default locale's message for each; a locale with no catalog at all lacks every key, and a default locale without one fails, as nothing says what the others lack.
 export async function missingMessages(root: string, config: I18nConfig, extensions: KayExtension[] = []): Promise<Map<string, Map<string, Message>>> {
   const reference = await localeCatalog(root, config, extensions, config.defaultLocale)

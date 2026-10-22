@@ -125,3 +125,18 @@ export interface InitializeParams {
   initializationOptions?: { routes?: string } | undefined
   [key: string]: unknown
 }
+
+export interface DocumentSymbol {
+  name: string
+  detail?: string | undefined
+  kind: number
+  range: Range
+  selectionRange: Range
+  children?: DocumentSymbol[] | undefined
+}
+
+export interface FoldingRange {
+  startLine: number
+  endLine: number
+  kind?: 'comment' | 'imports' | 'region' | undefined
+}

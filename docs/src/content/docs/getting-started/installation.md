@@ -52,7 +52,7 @@ bun run start   # kay start: the production server, after a build (server preset
 
 ## Editor
 
-The `.kay` extension for VS Code highlights `.kay` files and runs `kay lsp`. You get errors, hover, completion with auto-import, go-to-definition, references, rename, quick fixes and formatting.
+The `.kay` extension for VS Code highlights `.kay` files and runs `kay lsp`. You get errors, hover, completion with auto-import, go-to-definition, references, rename, quick fixes, formatting, an outline, folding, and imports updated when you rename or move a `.kay` file. Completion also offers element, attribute, prop and block names, route paths in `href`, `action` and `navigate()`, `t()` message keys and lint names after `// kay-allow`.
 
 It is not on the Marketplace. Build it from `editors/vscode` in a checkout of the [kay repository](https://github.com/Kayno0o/kayjs), then install the file it writes.
 
