@@ -28,6 +28,8 @@ export default api()
 
 To serve the API somewhere else, set `apiPath: '/v1'` in `kay.config.ts`: every module, the OpenAPI document and the reference page move under it, and islands, the service worker, link prefetching and the libraries follow. `apiUrl(module, path)` from `kay` gives where a route is served when code needs the URL rather than a call; a page using it renders per request, as the module is mounted only by a running server.
 
+A handler names the route of its own module with `apiUrl(request, path)`, as a reference to the module inside its own chain would leave its type circular.
+
 A route at the path of a page, a public file, an endpoint or a redirect stops the server at boot. A single file a static export should write, such as `llms.txt`, is an [endpoint file](/essentials/routing#endpoint-files) in `src/routes/` instead.
 
 ## Errors

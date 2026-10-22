@@ -132,6 +132,8 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
         // A span from the guards to the response, which the handler's own spans do not nest under: the handler runs in Elysia's call, not in one kay makes.
         .onBeforeHandle(({ request, route: mounted }) => {
           owners.set(request, instance)
+          // What `apiUrl(request, path)` in a handler reads to name the route of the module it runs in.
+          Object.defineProperty(request, API_MOUNT, { value: module.mount, configurable: true })
           // `/api/echo` rather than the `/api/echo/` a module's `/` route is mounted at.
           const route = mounted.length > 1 ? mounted.replace(TRAILING_SLASH, '') : mounted
           const span = startSpan(`${request.method} ${route}`, { kind: SERVER_SPAN, attributes: { 'http.request.method': request.method, 'http.route': route, 'url.path': requestUrl(request).pathname, 'kay.request.id': requestId(request) } })

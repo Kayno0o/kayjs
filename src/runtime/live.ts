@@ -480,6 +480,7 @@ export function routeUrl(module: unknown, path: string, options: UrlInput = {}):
 }
 
 // Where a route of a module under `src/api` is served, its params filled in and its query appended, under the site's `base` in the browser: the path follows `apiPath`, so code naming a route never writes `/api/...`. On the server the module must be mounted, which a prerender never does.
+// A handler passes its `request` for the module it runs in, which it cannot name inside its own chain.
 export function apiUrl(module: unknown, path = '/', options: UrlInput = {}): string {
   return withBase(routeUrl(module, path, options))
 }

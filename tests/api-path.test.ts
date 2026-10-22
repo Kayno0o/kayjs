@@ -1,7 +1,9 @@
+import { rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { apiPathOf, apiStubs, openApiPaths, scanApi } from '../src/server/api-modules'
 import { testSite } from '../src/test'
+import { scratchDir } from './scratch'
 
 const KEY = { 'x-key': 'open' }
 const moved = await testSite({ routes: 'tests/fixtures/openapi/src/routes', api: 'tests/fixtures/openapi/src/api', apiPath: '/v1', openapi: { reference: true }, mcp: true, base: '/shop' })
@@ -74,5 +76,33 @@ describe('apiPath', () => {
     expect(modules.every(module => module.mount.startsWith('/v1'))).toBe(true)
     expect(openApiPaths(undefined, '/v1')).toEqual({ document: '/v1/openapi.json', reference: '/v1/reference' })
     expect(openApiPaths({ path: '/spec.json' }, '/v1').document).toBe('/spec.json')
+  })
+})
+
+describe('apiUrl in a handler', () => {
+  it('names the route of the module the handler runs in from its request, under apiPath', async () => {
+    const root = await scratchDir('api-own-url-')
+
+    try {
+      await Bun.write(join(root, 'api/where.ts'), 'import { apiUrl } from \'kay\'\nimport { api } from \'kay/server\'\n\nexport default api({ guards: false }).get(\'/\', ({ request }) => ({ here: apiUrl(request, \'/\'), item: apiUrl(request, \'/items/:id\', { params: { id: 7 }, query: { q: \'a b\' } }) }))\n')
+
+      const site = await testSite({ routes: 'tests/fixtures/openapi/src/routes', api: join(root, 'api'), apiPath: '/v1', base: '/shop' })
+
+      try {
+        expect(await (await site.fetch('/v1/where')).json()).toEqual({ here: '/v1/where', item: '/v1/where/items/7?q=a+b' })
+      }
+      finally {
+        await site.close()
+      }
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses a request no module of src/api received', async () => {
+    const { apiUrl } = await import('../src/runtime/live')
+
+    expect(() => apiUrl(new Request('http://localhost/'), '/')).toThrow('under src/api')
   })
 })
