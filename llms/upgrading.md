@@ -11,6 +11,7 @@ Every `src/plugins/<name>.ts` (not `_*`, `*.test.ts`, `*.d.ts`) is now used as a
 ### A page action's `ctx.params` has the types of the route
 
 Under `[id=integer]`, `ctx.params.id` is a `number`, so a cast such as `ctx.params.id as string` is now a type error: drop the cast.
+
 ### `bind:` next to a spread is an error
 
 `input(bind:value={v} {...rest})` bound nothing and said nothing; `kay check` now reports it. Bind a child element, or write the value and the handler.
