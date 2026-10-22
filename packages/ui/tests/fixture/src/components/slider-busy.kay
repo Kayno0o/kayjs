@@ -1,0 +1,19 @@
+---
+import Slider from '@kaynooo/kayjs-ui/slider.kay'
+
+// A Slider whose change stays busy until the test releases it, counting the calls of onChange and onInput to see a drag while busy move nothing.
+let release: () => void = () => undefined
+
+function hold() {
+  const page = window as unknown as { changes: number }
+  page.changes = (page.changes ?? 0) + 1
+
+  return new Promise<boolean>((resolve) => {
+    release = () => resolve(true)
+  })
+}
+---
+form
+  Slider#level(label="Level" min={0} max={100} step={10} value={50} onChange={hold})
+  button#next(type="button") Next
+  button#release(type="button" onClick={() => release()}) Release

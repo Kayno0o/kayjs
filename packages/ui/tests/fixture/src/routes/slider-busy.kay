@@ -1,0 +1,5 @@
+---
+import SliderBusy from '../components/slider-busy.kay'
+---
+main
+  SliderBusy

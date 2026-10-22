@@ -1158,3 +1158,67 @@ inBrowser('a non-modal SidePanel and the space skin on a served page', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 })
+
+inBrowser('a busy Slider', () => {
+  // Starts a change with a key and leaves it pending, then returns what the slider holds.
+  const state = (page: { evaluate: <R>(run: () => R) => Promise<R> }) => page.evaluate(() => ({
+    value: document.querySelector<HTMLInputElement>('#level')!.value,
+    changes: (window as unknown as { changes?: number }).changes ?? 0,
+    busy: document.querySelector('#level')!.getAttribute('aria-busy'),
+  }))
+  const middle = (page: { evaluate: <R>(run: () => R) => Promise<R> }) => page.evaluate(() => {
+    const box = document.querySelector('#level')!.getBoundingClientRect()
+
+    return { left: box.left, right: box.right, y: box.top + box.height / 2 }
+  })
+
+  test('keeps its value and its onChange count against a mouse drag, a touch drag and the stepping keys, and lets Tab move focus', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/slider-busy')
+
+    await page.evaluate(() => document.querySelector<HTMLInputElement>('#level')!.focus())
+    await page.press('ArrowRight')
+    await page.waitUntil(() => document.querySelector('#level')!.getAttribute('aria-busy') === 'true')
+    expect(await state(page)).toEqual({ value: '60', changes: 1, busy: 'true' })
+
+    const box = await middle(page)
+    const mouse = (type: string, x: number) => page.cdp('Input.dispatchMouseEvent', { type, x, y: box.y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 })
+
+    await mouse('mouseMoved', box.left + 5)
+    await mouse('mousePressed', box.left + 5)
+    await mouse('mouseMoved', box.left + 20)
+    await mouse('mouseMoved', box.right - 5)
+    await mouse('mouseReleased', box.right - 5)
+    expect(await state(page)).toEqual({ value: '60', changes: 1, busy: 'true' })
+
+    const touch = (type: string, x: number) => page.cdp('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y: box.y }] })
+
+    await page.cdp('Emulation.setTouchEmulationEnabled', { enabled: true })
+    await touch('touchStart', box.left + 5)
+    await touch('touchMove', box.left + 20)
+    await touch('touchMove', box.right - 5)
+    await touch('touchEnd', box.right - 5)
+    expect(await state(page)).toEqual({ value: '60', changes: 1, busy: 'true' })
+
+    for (const key of ['ArrowLeft', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'])
+      await page.press(key as never)
+
+    expect(await state(page)).toEqual({ value: '60', changes: 1, busy: 'true' })
+
+    // Tab is not a step: focus leaves the slider.
+    await page.press('Tab')
+    expect(await page.evaluate(() => document.activeElement?.id)).toBe('next')
+
+    await page.click('#release')
+    await page.waitUntil(() => document.querySelector('#level')!.getAttribute('aria-busy') === null)
+    expect(await state(page)).toEqual({ value: '60', changes: 1, busy: null })
+
+    // Once idle the same touch drag moves it, so the busy drag above was a real one.
+    await touch('touchStart', box.left + 5)
+    await touch('touchMove', box.right - 5)
+    await touch('touchEnd', box.right - 5)
+    await page.waitUntil(() => document.querySelector<HTMLInputElement>('#level')!.value === '100')
+    expect(page.errors).toEqual([])
+  }, 120_000)
+})
