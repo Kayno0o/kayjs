@@ -117,6 +117,26 @@ describe('markdownHtml in an island', () => {
     expect(element.innerHTML).toBe('<h1>Title</h1>')
   })
 
+  it('keeps the outer island\'s held markup when an island nested in it ends first', async () => {
+    const { markdownHtml } = await shell('nested')
+    const container = document.createElement('div')
+    const inner = document.createElement('div')
+
+    container.innerHTML = '<div><h1>Title</h1></div>'
+    inner.innerHTML = '<div></div>'
+
+    const element = container.firstElementChild!
+
+    root(() => hydrate(() => {
+      const html = markdownHtml('# Title')
+
+      hydrate(() => undefined, inner)
+      property(element, 'innerHTML', html)
+    }, container))
+    flush()
+    expect(element.innerHTML).toBe('<h1>Title</h1>')
+  })
+
   it('draws the markup of an unrelated element when a markdownHtml was evaluated but never written', async () => {
     const { markdownHtml } = await shell('unwritten')
     const container = document.createElement('div')
