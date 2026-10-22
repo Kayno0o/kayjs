@@ -9,7 +9,7 @@ const PATH_LIKE = /[./\\]/
 
 export const generateCommand: Command = {
   usage: USAGES.generate,
-  options: { 'dry-run': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
+  options: { 'dry-run': { type: 'boolean' }, 'format': { type: 'string' }, 'plural': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: Infinity,
   run: async ({ values, positionals: [kind, name, ...rest] }, refuse) => {
     const format = formatOption('generate', values.format)
@@ -29,10 +29,13 @@ export const generateCommand: Command = {
     if (extra.length > 0)
       return refuse(`unexpected argument ${extra[0]}`)
 
+    if (values.plural !== undefined && kind !== 'resource')
+      return refuse('--plural is for a resource')
+
     const dryRun = values['dry-run'] === true
 
     try {
-      const { written } = await generate(resolve(dir), kind, name, { dryRun, fields })
+      const { written } = await generate(resolve(dir), kind, name, { dryRun, fields, plural: typeof values.plural === 'string' ? values.plural : undefined })
 
       if (format === 'json') {
         printDocument({ kind, name, written, dryRun })

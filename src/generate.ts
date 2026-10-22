@@ -296,7 +296,7 @@ async function exportsAuth(dir: string): Promise<boolean> {
 }
 
 // Writes what `kay generate` makes into the project in `dir`, never over a file that exists: one that does stops it with nothing written.
-export async function generate(dir: string, kind: string, name: string, options: { dryRun?: boolean | undefined, fields?: readonly string[] | undefined } = {}): Promise<{ written: string[] }> {
+export async function generate(dir: string, kind: string, name: string, options: { dryRun?: boolean | undefined, fields?: readonly string[] | undefined, plural?: string | undefined } = {}): Promise<{ written: string[] }> {
   if (!KINDS.includes(kind as Kind))
     throw new Error(`kay generate: ${kind} is none of ${KINDS.join(', ')}`)
 
@@ -312,7 +312,7 @@ export async function generate(dir: string, kind: string, name: string, options:
       throw new Error('kay generate: a resource needs a database, which this project has none of: run `kay add postgres` first')
 
     const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies?: Record<string, string>, devDependencies?: Record<string, string> }
-    const made = resourceFiles(name, options.fields ?? [], { tailwind: features.has('tailwind'), tests: features.has('tests'), auth: features.has('auth'), authModule: await exportsAuth(dir), ui: '@kaynooo/kayjs-ui' in { ...manifest.devDependencies, ...manifest.dependencies } })
+    const made = resourceFiles(name, options.fields ?? [], { tailwind: features.has('tailwind'), tests: features.has('tests'), auth: features.has('auth'), authModule: await exportsAuth(dir), ui: '@kaynooo/kayjs-ui' in { ...manifest.devDependencies, ...manifest.dependencies } }, options.plural)
     const tables = existsSync(join(dir, TABLES_FILE)) ? withTable(await readFile(join(dir, TABLES_FILE), 'utf8'), made.table) : undefined
 
     if (tables === undefined)

@@ -2,8 +2,11 @@ const NAME = /^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$/i
 const FIELD = /^([a-z][a-z0-9]*):([a-z]+)$/i
 const CAMEL_BREAK = /([a-z0-9])([A-Z])/g
 const SEPARATORS = /[-_\s]+/
-// A word ending in a single `s` (`news`, `tags`) is a plural already; `ss` (`class`) and `us`, `is`, `as` (`status`, `analysis`, `gas`) are not.
-const PLURAL_S = /[^aisu]s$/
+// A word ending in a single `s` (`news`, `ideas`, `menus`) is a plural already, unless it is one of the singular words below or ends in `ss` (`class`).
+const PLURAL_S = /[^s]s$/
+const SINGULAR_S = new Set(['alias', 'analysis', 'atlas', 'axis', 'basis', 'bias', 'bonus', 'bus', 'campus', 'canvas', 'census', 'chaos', 'crisis', 'diagnosis', 'focus', 'gas', 'genus', 'iris', 'lens', 'nexus', 'plus', 'radius', 'status', 'syllabus', 'thesis', 'virus'])
+// Irregular words, each to its plural; a plural maps to itself.
+const IRREGULAR = new Map([['person', 'people'], ['people', 'people'], ['child', 'children'], ['children', 'children'], ['man', 'men'], ['men', 'men'], ['woman', 'women'], ['women', 'women'], ['mouse', 'mice'], ['mice', 'mice'], ['foot', 'feet'], ['feet', 'feet'], ['tooth', 'teeth'], ['teeth', 'teeth']])
 const PLURAL_ES = /(?:[sxz]|ch|sh)$/
 const PLURAL_IES = /[^aeiou]y$/
 const LINE_BREAK = /\r?\n/
@@ -75,7 +78,12 @@ function capitalize(word: string): string {
 }
 
 function pluralOf(word: string): string {
-  if (PLURAL_S.test(word))
+  const irregular = IRREGULAR.get(word)
+
+  if (irregular !== undefined)
+    return irregular
+
+  if (PLURAL_S.test(word) && !SINGULAR_S.has(word))
     return word
 
   if (PLURAL_ES.test(word))
@@ -88,12 +96,15 @@ function wordsOf(name: string): string[] {
   return name.replace(CAMEL_BREAK, '$1 $2').split(SEPARATORS).map(word => word.toLowerCase())
 }
 
-function namesOf(name: string): Names {
+function namesOf(name: string, pluralName?: string): Names {
+  if (pluralName !== undefined && !NAME.test(pluralName))
+    throw new Error(`kay generate: \`${pluralName}\` is not a plural for a resource: write letters and digits, separated by \`-\` or \`_\`, such as \`ideas\` or \`blog-posts\``)
+
   if (!NAME.test(name))
     throw new Error(`kay generate: \`${name}\` is not a name for a resource: write letters and digits, separated by \`-\` or \`_\`, such as \`post\` or \`blog-post\``)
 
   const words = wordsOf(name)
-  const plurals = [...words.slice(0, -1), pluralOf(words.at(-1)!)]
+  const plurals = pluralName === undefined ? [...words.slice(0, -1), pluralOf(words.at(-1)!)] : wordsOf(pluralName)
   const camel = (list: string[]) => list.map((word, index) => index === 0 ? word : capitalize(word)).join('')
   const names: Names = {
     label: capitalize(words.join(' ')),
@@ -360,8 +371,8 @@ function testFile(names: Names, fields: readonly Field[], project: ResourceProje
 }
 
 // The files `kay generate resource <name> <field:type>...` writes: the pg-orm table, the actions, the list and edit pages, a new page or, with kayjs-ui, a dialog on the list, and a test of the list and of a refused create. `table` is what `src/db/tables.ts` imports and lists.
-export function resourceFiles(name: string, specs: readonly string[], project: ResourceProject): { files: Record<string, string>, table: { name: string, file: string } } {
-  const names = namesOf(name)
+export function resourceFiles(name: string, specs: readonly string[], project: ResourceProject, pluralName?: string): { files: Record<string, string>, table: { name: string, file: string } } {
+  const names = namesOf(name, pluralName)
   const fields = parseFields(specs)
   const routes = `src/routes/${names.folder}`
   const files: Record<string, string> = {
