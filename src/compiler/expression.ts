@@ -26,7 +26,8 @@ function isFunctionExpression(code: string): boolean {
   }
 }
 
-// The globals whose members are functions, `Math.max` or `console.log`, bar their constants, `Math.PI` or `Number.MAX_VALUE`, which are written in capitals.
+// The globals whose members are functions, `Math.max` or `console.log`, bar their constants, `Math.PI` or `Number.NaN`, which start with a capital.
+const LOWERCASE = /^[a-z]/
 const FUNCTION_NAMESPACES = new Set(['Math', 'console', 'JSON', 'Object', 'Array', 'Number', 'String', 'Boolean', 'Date', 'Promise', 'Reflect', 'Intl', 'BigInt'])
 
 // Whether a node reads a function off a global, `Math.max` as a value; `shadowed` says whether the script declares the global's name itself.
@@ -34,7 +35,7 @@ export function isGlobalFunctionMember(node: t.Node, shadowed: (name: string) =>
   if ((node.type !== 'MemberExpression' && node.type !== 'OptionalMemberExpression') || node.computed || node.object.type !== 'Identifier' || node.property.type !== 'Identifier')
     return false
 
-  return FUNCTION_NAMESPACES.has(node.object.name) && !shadowed(node.object.name) && node.property.name !== node.property.name.toUpperCase()
+  return FUNCTION_NAMESPACES.has(node.object.name) && !shadowed(node.object.name) && LOWERCASE.test(node.property.name)
 }
 
 // Values no island prop check needs to see.
