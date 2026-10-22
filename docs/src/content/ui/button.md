@@ -25,6 +25,8 @@ Pass `busy` yourself to decide instead: it has the last word, and it only shows 
 
 <Demo name="button/busy" />
 
+A button that draws its own progress, such as an overlay in its slot, passes `spinner={false}`: the icon and label stay, and the button is still busy and disabled until its promise settles. Passing `busy={false}` instead would switch the automatic disabling off with it.
+
 ## As a link
 
 Given an `href`, the button renders an `a` that looks like one, for an action that goes to another page.

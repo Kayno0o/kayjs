@@ -225,14 +225,16 @@
     @apply cursor-progress;
     pointer-events: none;
 
-    & .kui-icon {
-      display: none;
-    }
+    &:where(:not([data-spinner='off'])) {
+      & .kui-icon {
+        display: none;
+      }
 
-    &::after {
-      content: '';
-      order: -1;
-      @apply size-4 shrink-0 animate-spin motion-reduce:animate-none rounded-full border-2 border-current border-t-transparent;
+      &::after {
+        content: '';
+        order: -1;
+        @apply size-4 shrink-0 animate-spin motion-reduce:animate-none rounded-full border-2 border-current border-t-transparent;
+      }
     }
   }
 

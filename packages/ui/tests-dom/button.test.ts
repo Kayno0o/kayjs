@@ -128,3 +128,32 @@ test('a submit Button whose onClick answers a promise still submits its form, bu
 
   expect([submits, save.settles.length]).toEqual([[1], 1])
 })
+
+test('spinner={false} keeps the label and icon while the button is still busy and disabled until its promise settles', async () => {
+  const save = later()
+
+  mounted = await mountComponent('src/components/buttons.kay', { onSave: save.run, onSubmit: () => undefined })
+
+  const root = mounted.root
+  const quiet = root.querySelector<HTMLButtonElement>('#quiet')!
+
+  click(quiet)
+  await settle()
+  click(quiet)
+  await settle()
+
+  expect([state(root, 'quiet'), quiet.querySelector('.kui-spinner'), quiet.textContent.trim(), quiet.getAttribute('data-spinner'), save.settles.length]).toEqual([['true', true], null, 'Quiet', 'off', 1])
+
+  save.settles[0]!()
+  await settle()
+
+  expect(state(root, 'quiet')).toEqual([null, false])
+})
+
+test('spinner={false} on a static submit button marks it for the stylesheet, which then draws no spinner of its own', async () => {
+  mounted = await mountComponent('src/components/buttons.kay', { onSave: () => undefined, onSubmit: () => undefined })
+
+  const root = mounted.root
+
+  expect([root.querySelector('#quietSubmit')!.getAttribute('data-spinner'), root.querySelector('#send')!.getAttribute('data-spinner')]).toEqual(['off', null])
+})

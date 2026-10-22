@@ -12,6 +12,7 @@ Each component spreads the other attributes it is given onto its root element, `
   - Its label stays on one line; a row of buttons wraps whole buttons, as the dialog and panel footers do.
   - A promise returned by `onClick` holds that button alone busy (spinner in place of the icon, `aria-busy`) and disabled until it settles; a rejection is logged. A `type="submit"` button is busy (spinner, `aria-busy`, clicks ignored) the same way, but not disabled, while its `onClick` or its form's `onSubmit` returns a promise.
   - An explicit `busy` shows a spinner and sets `aria-busy` and has the last word; it does not disable the button.
+  - `spinner={false}` keeps the icon and label while the button is busy, and the button still disables itself until its promise settles: for a button that draws its own progress, such as an overlay in its slot.
   - `expanded` sets `aria-expanded`, for a button that opens a panel.
   - `type` defaults to `button`, so a button inside a form never submits it by accident: pass `type="submit"` to submit. Children render after `label`.
   - `href` makes it a link looking like a button, `a.kui-btn`, taking a link's attributes such as `target` in place of `type`, `expanded` and `disabled`. A site path in `href` is not checked against the pages the way a literal `a(href)` is.

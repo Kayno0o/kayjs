@@ -63,6 +63,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui's Card, Button, Table, kayjs-ai's Chat and more restyle from `src/ui.ts` ([Setup](../packages/ui/llms/setup.md)).
 - kayjs-ui: `Slider` is a single-value range input with a label, a shown value worded by `formatValue` and a `name` that posts in a plain form, drawn from the theme tokens ([Slider](../packages/ui/llms/forms.md#rangeinput-slider-multiselect-combobox-filedrop-menu-iconpicker)).
 - kayjs-ui: `Segmented(orientation="vertical")` stacks its options in a column ([Segmented](../packages/ui/llms/tables-navigation-and-layout.md#segmented-chipgroup-tabnav-breadcrumb-sitenav-appheader-tabs-toggle-checkbox)).
+- kayjs-ui: `Button(spinner={false})` keeps its label and icon while it is busy and still disables itself, where `busy={false}` also switched the disabling off ([Button](../packages/ui/llms/basics.md#icon-button-iconbutton)).
 
 ## 1.69.0
 

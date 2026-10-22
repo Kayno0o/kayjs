@@ -14,6 +14,8 @@ export interface Look {
   // Spins in place of the icon while what the press started is under way.
   // Left out, a button with an `onClick` is busy and disabled by itself while the promise it returned is pending, and a submit button is busy while its form's `onSubmit` returns one; given, `busy` has the last word.
   busy?: boolean | undefined
+  // Whether `busy` shows the spinner; `false` keeps the icon and label while the button still holds itself busy and, with an `onClick`, disabled.
+  spinner?: boolean | undefined
   label?: string | undefined
 }
 

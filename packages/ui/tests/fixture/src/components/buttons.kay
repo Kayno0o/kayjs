@@ -6,8 +6,10 @@ const { onSave, onSubmit, busy } = props<{ onSave: () => unknown, onSubmit: (eve
 ---
 Button#save(label="Save" onClick={onSave})
 Button#other(label="Other" onClick={() => undefined})
+Button#quiet(label="Quiet" spinner={false} onClick={onSave})
 Button#forced(label="Forced" busy={busy} onClick={onSave})
 form#form(onSubmit={event => { event.preventDefault(); return onSubmit(event) }})
   Button#send(label="Send" type="submit")
+  Button#quietSubmit(label="Quiet send" type="submit" spinner={false})
   Button#plain(label="Plain" type="button")
   Button#sendAsync(label="Send async" type="submit" onClick={onSave})
