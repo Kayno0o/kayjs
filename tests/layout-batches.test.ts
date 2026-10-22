@@ -98,8 +98,6 @@ describe('transitions of a list', () => {
     const computed = globalThis.getComputedStyle
 
     try {
-      setItems(range(30))
-      await settle()
       tokens.add = function (...names: string[]) {
         events.push('w')
         add.apply(this, names)
@@ -113,7 +111,12 @@ describe('transitions of a list', () => {
 
         return computed(element)
       }
-      await twoFrames()
+      setItems(range(30))
+
+      // The patches stand before the rows enter, and the wait is for the reads themselves: a loaded run can run both frames before a timer asked after them.
+      for (let wait = 0; wait < 100 && !events.includes('r'); wait++)
+        await twoFrames()
+
       expect(events.filter(event => event === 'r')).toHaveLength(30)
       expect(events.join('')).toMatch(/^w+r+$/)
       await finished()
