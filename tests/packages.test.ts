@@ -1,6 +1,6 @@
 import { Glob } from 'bun'
 import { describe, expect, it } from 'bun:test'
-import { archiveOldest, indexArchive, MAX_PAGE_BYTES, oversizedPages, releasePages, stampUnreleased, trimArchive } from '../scripts/whats-new'
+import { archiveOldest, capNewest, indexArchive, MAX_PAGE_BYTES, NEWEST_CAP, oversizedPages, releasePages, stampUnreleased, trimArchive } from '../scripts/whats-new'
 
 interface Manifest {
   name: string
@@ -107,6 +107,34 @@ describe('what\'s new', () => {
     expect(pages.get('llms/upgrading-archive.md')).toContain('## 1.69.0\n\n- b')
     expect(oversizedPages(pages)).toEqual([])
     expect(oversizedPages(new Map([['llms/upgrading.md', 'x'.repeat(MAX_PAGE_BYTES + 1)], ['llms.txt', 'x'.repeat(MAX_PAGE_BYTES + 1)], ['llms/a.md', 'x'.repeat(MAX_PAGE_BYTES)]]))).toEqual(['llms/upgrading.md'])
+  })
+
+  it('cuts a long newest release at a bullet into the archive, leaving room for the next release\'s lines, and loses none of it', () => {
+    const [a, b, c] = ['a', 'b', 'c'].map(letter => letter.repeat(60))
+    const page = `# New\n\nIntro.\n\n## 1.70.0\n\n- ${a}\n- ${b}\n  more\n- ${c}\n\nReleases before 1.70 are in [Old](old.md).\n`
+    const archive = '# Old\n\nWhat each release before 1.70 added.\n\n## 1.69.0\n\n- z\n'
+    const capped = capNewest(page, archive, 200)
+
+    expect(capped.page).toBe(`# New\n\nIntro.\n\n## 1.70.0\n\n- ${a}\n- ${b}\n  more\n\nThe rest of this release is in [Old](old.md).\n\nReleases before 1.70 are in [Old](old.md).\n`)
+    expect(capped.archive).toBe(`# Old\n\nWhat each release before 1.70 added.\n\n## 1.70.0 (continued)\n\n- ${c}\n\n## 1.69.0\n\n- z\n`)
+    expect(capNewest(page, archive, 1000)).toEqual({ page, archive })
+    // A first bullet that alone outgrows the cap has nowhere to be cut.
+    expect(capNewest(page, archive, 5)).toEqual({ page, archive })
+  })
+
+  it('keeps What\'s new far enough under the hard limit for a batch of Unreleased lines whatever the newest release weighs', () => {
+    const bullets = (count: number) => Array.from({ length: count }, (_, index) => `- ${index} ${'x'.repeat(300)}\n`).join('')
+    const files: Record<string, string> = {
+      'llms.txt': '- [Old](llms/whats-new-archive.md): before 1.69\n- [Up](llms/upgrading-archive.md): before 1.69\n',
+      'llms/whats-new.md': `# W\n\n## Unreleased\n\n${bullets(60)}\n## 1.69.0\n\n${bullets(30)}\nReleases before 1.69 are in [Old](whats-new-archive.md).\n`,
+      'llms/whats-new-archive.md': '# WA\n\nWhat each release before 1.69 added.\n\n## 1.68.0\n\n- z\n',
+      'llms/upgrading.md': '# U\n',
+      'llms/upgrading-archive.md': '# UA\n\nWhat each release before 1.69 added.\n',
+    }
+    const page = releasePages(path => files[path]!, '1.70.0').get('llms/whats-new.md')!
+
+    expect(Buffer.byteLength(page)).toBeLessThan(NEWEST_CAP + 1000)
+    expect(MAX_PAGE_BYTES - Buffer.byteLength(page)).toBeGreaterThan(10_000)
   })
 
   it('moves the index\'s line for an archive to the release it now starts before, and leaves the other lines alone', () => {

@@ -4,6 +4,10 @@ export const WHATS_NEW = ['llms/whats-new.md']
 export const INDEX = 'llms.txt'
 // Each long page with the archive its oldest releases move to, so an agent still reads either with one command.
 export const ARCHIVES = [['llms/whats-new.md', 'llms/whats-new-archive.md'], ['llms/upgrading.md', 'llms/upgrading-archive.md']] as const
+// What's new keeps well under the limit above, so the lines of the next release, added under `## Unreleased`, always have room: about 25,000 minus this and the newest release's cap.
+export const WHATS_NEW_LIMIT = 14_000
+// The size the newest release of What's new is kept to: the lines past it move to the top of the archive as "continued", so a long release never leaves the next `## Unreleased` without room.
+export const NEWEST_CAP = 10_000
 // The size a page is kept under by moving its oldest releases away, below the 25,000 bytes tests/llms.test.ts allows.
 export const PAGE_LIMIT = 20_000
 // The size tests/llms.test.ts allows a page under llms/: the newest release stays on its page however large, so the limit above is a target and this one a wall.
@@ -16,6 +20,7 @@ const BEFORE = /before \d+\.\d+(?:\.\d+)?/
 const NOTE = /\n\n(Releases before [^\n]*)\n$/
 const PATCH_ZERO = /\.0$/
 const VERSION_HEADING = /^## (\d+\.\d+(?:\.\d+)?)/
+const NOTE_LINK = /\[[^\]]*\]\([^)]*\)/
 
 const UNRELEASED = /^## Unreleased$/m
 // The last line of an archive whose oldest releases were dropped.
@@ -54,6 +59,37 @@ export function archiveOldest(page: string, archive: string, limit = PAGE_LIMIT)
   return {
     page: `${[intro, ...releases].join('').trimEnd()}\n\n${boundary(note)}\n`,
     archive: `${boundary(archiveIntro!)}${moved.map(section => `${section.trimEnd()}\n\n`).join('')}${archived.join('')}`,
+  }
+}
+
+// Cuts the newest release of a page to `cap` bytes at a bullet, moving its remaining lines under `## <version> (continued)` at the top of the archive and ending the kept ones on a link to it, so the page keeps room for the next release's lines and nothing is lost. A release already under `cap` is left as it is.
+export function capNewest(page: string, archive: string, cap = NEWEST_CAP): { page: string, archive: string } {
+  const [intro, ...sections] = page.split(SECTION)
+  const index = sections.findIndex(section => VERSION_HEADING.test(section))
+  const note = sections.at(-1)?.match(NOTE)?.[1]
+  const link = NOTE_LINK.exec(note ?? '')?.[0]
+  // The page's last line belongs to the last section's text, so it is set aside and put back after it.
+  const section = index === sections.length - 1 && note !== undefined ? sections[index]?.replace(`\n${note}\n`, '') : sections[index]
+
+  if (section === undefined || link === undefined || Buffer.byteLength(section) <= cap)
+    return { page, archive }
+
+  const pointer = `The rest of this release is in ${link}.\n`
+  const heading = section.slice(0, section.indexOf('\n'))
+  const starts = [...section.matchAll(/^- /gm)].map(match => match.index)
+  const cut = starts.findLast(start => Buffer.byteLength(`${section.slice(0, start).trimEnd()}\n\n${pointer}`) <= cap)
+
+  // A release whose first bullet alone outgrows the cap has nowhere to be cut.
+  if (cut === undefined || cut === starts[0])
+    return { page, archive }
+
+  const [archiveIntro, ...archived] = archive.split(SECTION)
+  const kept = `${section.slice(0, cut).trimEnd()}\n\n${pointer}${index === sections.length - 1 ? `\n${note}\n` : '\n'}`
+  const rest = `${heading} (continued)\n\n${section.slice(cut).trimEnd()}\n\n`
+
+  return {
+    page: [intro, ...sections.map((value, position) => position === index ? kept : value)].join(''),
+    archive: `${archiveIntro!}${rest}${archived.join('')}`,
   }
 }
 
@@ -99,11 +135,13 @@ export function releasePages(read: (path: string) => string, version: string): M
     pages.set(path, stampUnreleased(read(path), version))
 
   for (const [page, archive] of ARCHIVES) {
-    const moved = archiveOldest(pages.get(page) ?? read(page), read(archive))
+    const limit = WHATS_NEW.includes(page) ? WHATS_NEW_LIMIT : PAGE_LIMIT
+    const moved = archiveOldest(pages.get(page) ?? read(page), read(archive), limit)
+    const capped = WHATS_NEW.includes(page) ? capNewest(moved.page, moved.archive) : moved
 
-    pages.set(page, moved.page)
-    pages.set(archive, trimArchive(moved.archive))
-    index = indexArchive(index, archive, moved.archive)
+    pages.set(page, capped.page)
+    pages.set(archive, trimArchive(capped.archive))
+    index = indexArchive(index, archive, trimArchive(capped.archive))
   }
 
   pages.set(INDEX, index)
