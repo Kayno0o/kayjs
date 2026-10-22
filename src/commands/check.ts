@@ -92,6 +92,8 @@ export const check: Command = {
       let config: KayConfig | undefined
       let failed = false
       const inProcess = async () => {
+        failed = false
+
         const code = await checkOnce(root, async () => {
           try {
             return config ??= await loadConfig(root)
