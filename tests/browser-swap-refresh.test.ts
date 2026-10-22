@@ -2,13 +2,14 @@ import type { TestPage, TestSite } from '../src/test'
 import process from 'node:process'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
+import { PAGE_TIMEOUT_MS, TRANSITION_TIMEOUT_MS } from '../src/runtime/page-swap'
 import { browserPath, testSite } from '../src/test'
 
 const chrome = browserPath()
 const NAVIGATE = 'x-kay-navigate'
 const TRANSITION = '@view-transition { navigation: auto; } ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation-duration: 500ms; }'
 
-interface Hold { test: (url: URL, request: Request) => boolean, gate: Promise<void> }
+interface Hold { test: (url: URL, request: Request) => boolean, gate: Promise<void>, release: () => void }
 
 // CI installs Chromium for these: there, a missing browser fails rather than skipping.
 describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refresh landing during a swap', () => {
@@ -20,7 +21,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
   function hold(test: Hold['test']): () => void {
     const { promise, resolve } = Promise.withResolvers<void>()
 
-    holds.push({ test, gate: promise })
+    holds.push({ test, gate: promise, release: resolve })
 
     return resolve
   }
@@ -59,8 +60,9 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
   }, 120_000)
 
   afterEach(() => {
-    for (const { gate } of holds)
-      void gate
+    // A request a test left held is answered, so no connection stays open.
+    for (const { release } of holds)
+      release()
 
     holds.length = 0
     seen.length = 0
@@ -180,6 +182,63 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
 
     expect(await page.path()).toBe('/?view=b')
     expect(await page.text('p.view')).toBe('b')
+    expect(page.errors).toEqual([])
+  }, 30_000)
+
+  // Makes the page's wait for a page or a transition last a moment, as a timer of exactly that length fires at once.
+  async function shorten(page: TestPage, ...bounds: number[]): Promise<void> {
+    await page.evaluate((lengths) => {
+      const original = window.setTimeout.bind(window)
+
+      window.setTimeout = ((handler: TimerHandler, delay?: number, ...rest: unknown[]) => original(handler, delay !== undefined && lengths.includes(delay) ? 100 : delay, ...rest)) as typeof window.setTimeout
+    }, bounds)
+  }
+
+  it('a link whose page never answers is loaded by the browser', async () => {
+    await using page = await opened(false)
+
+    await page.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
+    })
+    await shorten(page, PAGE_TIMEOUT_MS)
+    // The browser's own load waits behind the held fetch in its HTTP cache, so the server answers once the swap gave up: a swap still waiting would then show the page itself.
+    const release = hold(isPage('/other'))
+
+    await page.click('a.cross')
+    await Bun.sleep(1000)
+    release()
+    await page.waitFor('h1', { text: 'Other' })
+
+    expect(await page.path()).toBe('/other')
+    expect(await page.evaluate(() => (window as { kayAlive?: boolean }).kayAlive === true)).toBe(false)
+    expect(page.errors).toEqual([])
+  }, 30_000)
+
+  it('a view transition that never finishes is skipped and the swap still commits', async () => {
+    await using page = await opened(true)
+
+    await shorten(page, TRANSITION_TIMEOUT_MS)
+    await page.evaluate(() => {
+      const start = document.startViewTransition.bind(document)
+      const counted = window as { kaySkipped?: number }
+
+      counted.kaySkipped = 0
+      document.startViewTransition = ((update: () => void) => {
+        const real = start(update)
+
+        return {
+          finished: new Promise<void>(() => undefined),
+          skipTransition: () => {
+            counted.kaySkipped!++
+            real.skipTransition()
+          },
+        }
+      }) as unknown as typeof document.startViewTransition
+    })
+    await page.click('a.query')
+    await page.waitUntil(() => document.querySelector('p.view')?.textContent === 'b' && !document.documentElement.hasAttribute('aria-busy'), { timeout: '5s' })
+
+    expect(await page.evaluate(() => (window as { kaySkipped?: number }).kaySkipped)).toBe(1)
     expect(page.errors).toEqual([])
   }, 30_000)
 

@@ -50,6 +50,11 @@ const OPAQUE_TAGS = new Set(['slot', 'script', 'template'])
 const PREFETCH_TTL_MS = 30_000
 const STYLESHEET_TIMEOUT_MS = 3000
 
+// A page not answered after this long is loaded by the browser, which shows its own progress or error; a view transition not finished after this long is skipped.
+export const PAGE_TIMEOUT_MS = 10_000
+export const TRANSITION_TIMEOUT_MS = 3000
+const LATE = Symbol('late')
+
 export const HTML = /^text\/html\b/
 const SPACES = /\s+/
 // A CR, alone or before a LF, which the HTML parser reads as a LF.
@@ -162,6 +167,20 @@ async function pageFor(url: URL, signal: AbortSignal): Promise<FetchedPage> {
   return fetchPage(url, signal)
 }
 
+// The work's result, or `LATE` once `ms` passed first.
+async function bounded<T>(work: Promise<T>, ms: number): Promise<T | typeof LATE> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+
+  try {
+    return await Promise.race([work, new Promise<typeof LATE>((resolve) => {
+      timer = setTimeout(resolve, ms, LATE)
+    })])
+  }
+  finally {
+    clearTimeout(timer)
+  }
+}
+
 // The intent's policy, with history replaced as the swap asks, and the top for a traversal to an entry that saved no position.
 function policyOf(swap: Swap): Policy {
   const policy = { ...POLICIES[swap.intent] }
@@ -256,10 +275,18 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
     let page: FetchedPage
 
     try {
-      page = await pageFor(url, controller.signal)
+      const fetched = await bounded(pageFor(url, controller.signal), PAGE_TIMEOUT_MS)
+
+      if (fetched === LATE) {
+        controller.abort()
+
+        throw new Error('kay: the page did not answer in time')
+      }
+
+      page = fetched
     }
     catch {
-      // A fetch a newer navigation cancelled leaves nothing to load.
+      // A fetch a newer navigation cancelled leaves nothing to load, one that never answered is loaded by the browser.
       if (isCurrent())
         leave(url)
 
@@ -386,10 +413,16 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
     document.dispatchEvent(new CustomEvent('kay:navigate', { detail: { url: target.href } }))
   }
 
-  if (policy.transition && viewTransitions())
-    await (document as Document & { startViewTransition: (update: () => void) => { finished: Promise<void> } }).startViewTransition(commit).finished
-  else
+  if (policy.transition && viewTransitions()) {
+    const transition = (document as Document & { startViewTransition: (update: () => void) => ViewTransition }).startViewTransition(commit)
+
+    // A transition stuck, as in a tab the browser keeps from painting, is skipped, which still runs the commit.
+    if (await bounded(transition.finished, TRANSITION_TIMEOUT_MS) === LATE)
+      transition.skipTransition()
+  }
+  else {
     commit()
+  }
 }
 
 // The entry a swap adds or replaces, holding where the page it leaves was scrolled to.

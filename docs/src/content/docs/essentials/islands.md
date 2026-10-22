@@ -271,6 +271,8 @@ button(onClick={() => navigate('/todos')}) Todos
 
 `navigate('/todos', { scroll: 'keep' })` goes to the page without scrolling to the top, and `{ transition: false }` swaps it without a view transition. A link does the same with `data-keep-scroll` and `data-no-transition`, which an element around several links can carry. The nearest `data-keep-scroll` to the link decides, so `data-keep-scroll="false"` on one link inside a keeping element scrolls to the top.
 
+A page the server has not answered after 10 seconds is loaded by the browser instead, which shows its own progress or error. A view transition that has not finished after 3 seconds is skipped and the page is shown.
+
 Each swap fires a `kay:navigate` event on `document`, with the page's address in `event.detail.url`, for a plain script to set itself up again. A full load fires none.
 
 A link with `data-reload` loads its page fully. So does every link to a page setting `reload: true` in its `page`.
