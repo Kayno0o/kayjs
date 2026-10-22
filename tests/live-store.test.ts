@@ -184,6 +184,18 @@ process.exit(0)`)
     setLiveStore(undefined)
   })
 
+  it('keeps every row the store held at the start, however many', () => {
+    const rows: [string, string, string][] = Array.from({ length: 10_500 }, (_, row) => ['test:many', String(row), '[3]'])
+
+    setLiveStore({ entries: () => rows, set: () => undefined, delete: () => undefined, subscribe: () => undefined })
+
+    const many = (live as unknown as (initial: (key: string) => number, id: string, name: string) => (key: string) => number)(() => 0, 'test:many', 'many')
+
+    expect(many('0')).toBe(3)
+    expect(many('10499')).toBe(3)
+    setLiveStore(undefined)
+  })
+
   it('writes to the store from a second copy of the module', async () => {
     const path = await storePath()
     const store = sqliteLive(path)

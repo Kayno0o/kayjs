@@ -92,7 +92,7 @@ export function sqliteLive(path: string): LiveStore {
         try {
           const live = open(false)
 
-          // A read that fails part way is tried again from the last event heard in full.
+          // `seen` moves only once every event is read, so a read failing part way starts again from the old one.
           let last = seen
 
           for (const event of live?.eventsAfter.all(seen, PROCESS) ?? []) {

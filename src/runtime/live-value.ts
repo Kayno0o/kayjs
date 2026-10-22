@@ -132,7 +132,10 @@ interface ServerState {
   subscribed: WeakSet<LiveStore>
   // What the store holds for a value no module declared yet, by id then key: taken when its declaration runs.
   undeclared: Map<string, Map<string, string>>
+  // The rows of `undeclared` that count toward the cap: the ones heard after the start. What the store held at the start is bounded by the store and never dropped.
   undeclaredRows: number
+  // The ids with rows read at the start.
+  startup: Set<string>
   checkWrite: ((label: string, value: unknown) => void) | undefined
 }
 
@@ -143,7 +146,7 @@ const UNDECLARED_ROWS = 10_000
 function state(): ServerState {
   const holder = globalThis as Record<symbol, ServerState | undefined>
 
-  return holder[STATE] ??= { store: undefined, subscribed: new WeakSet(), undeclared: new Map(), undeclaredRows: 0, checkWrite: undefined }
+  return holder[STATE] ??= { store: undefined, subscribed: new WeakSet(), undeclared: new Map(), undeclaredRows: 0, startup: new Set(), checkWrite: undefined }
 }
 
 // Installed by the server: refuses a value a browser could not be sent where it is set.
@@ -180,12 +183,17 @@ function shared(slot: ServerSlot): boolean {
 }
 
 // Keeps what the store holds for an id no module declared yet, or forgets it for a deleted key.
-function keepUndeclared(id: string, key: string, text: string | undefined): void {
+function keepUndeclared(id: string, key: string, text: string | undefined, atStart: boolean): void {
   const kept = state()
   let held = kept.undeclared.get(id)
 
+  if (atStart)
+    kept.startup.add(id)
+
+  const counted = !kept.startup.has(id)
+
   if (text === undefined) {
-    if (held?.delete(key))
+    if (held?.delete(key) && counted)
       kept.undeclaredRows--
 
     return
@@ -194,16 +202,20 @@ function keepUndeclared(id: string, key: string, text: string | undefined): void
   if (held === undefined)
     kept.undeclared.set(id, held = new Map<string, string>())
 
-  if (!held.has(key))
+  if (!held.has(key) && counted)
     kept.undeclaredRows++
 
   held.set(key, text)
 
   while (kept.undeclaredRows > UNDECLARED_ROWS) {
-    const [oldest, rows] = kept.undeclared.entries().next().value!
+    const dropped = [...kept.undeclared].find(([other]) => !kept.startup.has(other))
 
-    kept.undeclared.delete(oldest)
-    kept.undeclaredRows -= rows.size
+    if (dropped === undefined)
+      break
+
+    kayLog('warn', `the live value ${dropped[0]} was set by another process and no module here declares it: its ${dropped[1].size} stored rows are dropped`)
+    kept.undeclared.delete(dropped[0])
+    kept.undeclaredRows -= dropped[1].size
   }
 }
 
@@ -227,7 +239,7 @@ export function setLiveStore(store: LiveStore | undefined): void {
     return
 
   for (const [id, key, text] of store.entries())
-    hear(id, key, text)
+    hear(id, key, text, true)
 
   if (kept.subscribed.has(store))
     return
@@ -252,11 +264,11 @@ function decoded(text: string, id: string): { value: unknown } | undefined {
 }
 
 // A value the store holds, set here without telling the store: the watchers of a slot see it as any change.
-function hear(id: string, key: string, text: string | undefined): void {
+function hear(id: string, key: string, text: string | undefined, atStart = false): void {
   const slot = slots().get(id)
 
   if (slot === undefined) {
-    keepUndeclared(id, key, text)
+    keepUndeclared(id, key, text, atStart)
 
     return
   }
@@ -304,7 +316,9 @@ function serverLive(id: string, initial: unknown, name: string | undefined): Han
 
     if (held !== undefined) {
       kept.undeclared.delete(id)
-      kept.undeclaredRows -= held.size
+
+      if (!kept.startup.delete(id))
+        kept.undeclaredRows -= held.size
     }
   }
 
