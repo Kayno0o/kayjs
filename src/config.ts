@@ -23,8 +23,8 @@ import type { Prefetch } from './server/speculation'
 import type { FileStore } from './server/storage'
 import type { Tracer } from './server/trace'
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { existsSync, readdirSync, realpathSync, statSync } from 'node:fs'
-import { isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { existsSync, lstatSync, readdirSync, realpathSync, statSync } from 'node:fs'
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { libraryMessageExtensions } from './build/manifests'
 import { KayError } from './compiler/errors'
@@ -501,12 +501,40 @@ export async function extensionServers(extensions: KayExtension[] | undefined, r
   }))
 }
 
-// The file of `path` under `root` that an extension names in `appFiles`, refusing one outside the root.
-function appFileOf(root: string, extension: string, name: string, path: string): string {
-  const file = resolve(root, path)
+function isUnder(root: string, file: string): boolean {
   const inside = relative(root, file)
 
-  if (inside === '' || inside === '..' || inside.startsWith(`..${sep}`) || isAbsolute(inside))
+  return inside !== '' && inside !== '..' && !inside.startsWith(`..${sep}`) && !isAbsolute(inside)
+}
+
+// The real path of a file or, for one not written yet, of its nearest folder that exists with the rest of the name after it; undefined for a link that leads nowhere.
+function realPathOf(file: string): string | undefined {
+  try {
+    return realpathSync(file)
+  }
+  catch {
+    if (lstatSync(file, { throwIfNoEntry: false }) !== undefined)
+      return undefined
+
+    const parent = dirname(file)
+
+    if (parent === file)
+      return file
+
+    const real = realPathOf(parent)
+
+    return real === undefined ? undefined : join(real, basename(file))
+  }
+}
+
+// The file of `path` under `root` that an extension names in `appFiles`, refusing one outside the root, a link out of it included.
+// An executable holds copies of the files, so no link is followed there.
+function appFileOf(root: string, extension: string, name: string, path: string): string {
+  const file = resolve(root, path)
+  const real = bundled() === undefined ? realPathOf(file) : file
+  const realRoot = bundled() === undefined ? realPathOf(root) : root
+
+  if (!isUnder(root, file) || real === undefined || realRoot === undefined || !isUnder(realRoot, real))
     throw new KayError('config-invalid', `kay: the extension ${extension} names its file ${name} as ${path}, which is not under the project root`)
 
   return file

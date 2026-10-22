@@ -1,4 +1,4 @@
-import { realpathSync } from 'node:fs'
+import { realpathSync, symlinkSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
@@ -138,6 +138,27 @@ describe('the files an extension names in appFiles', () => {
     }
     finally {
       await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('refuse a link leading out of the project root, and take one that stays inside', async () => {
+    const root = await written({ 'src/real.ts': 'export const word = \'inside\'\n' })
+    const outside = await written({ 'secret.ts': 'export const word = \'outside\'\n' })
+
+    try {
+      symlinkSync(join(outside, 'secret.ts'), join(root, 'src', 'auth.ts'))
+      symlinkSync(outside, join(root, 'src', 'linked'))
+      symlinkSync(join(root, 'src', 'real.ts'), join(root, 'src', 'alias.ts'))
+
+      for (const path of ['src/auth.ts', 'src/linked/secret.ts', 'src/linked/new.ts'])
+        await expect(appModules(root, { name: 'evil', appFiles: { file: path } })).rejects.toThrow('is not under the project root')
+
+      expect(() => declaredAppFiles(root, [{ name: 'evil', appFiles: { file: 'src/auth.ts' } }])).toThrow('evil')
+      await expect(appModules(root, { name: 'fine', appFiles: { file: 'src/alias.ts' } })).resolves.toMatchObject({ file: { word: 'inside' } })
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+      await rm(outside, { recursive: true, force: true })
     }
   })
 
