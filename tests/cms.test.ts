@@ -869,6 +869,31 @@ describe('the collections a CMS edits', () => {
     expect(result).toEqual({ issues: [{ collection, slug, path: '', message: `holds a ${kind.slice(2)} as its data, not an object of fields` }] })
   })
 
+  // A project whose root is not the cwd, as a monorepo's: `entries()` gives the repository-relative path, which is the `repoPath` of the file, and the file's `path` stays relative to the project root.
+  it('spells one entry\'s file the same through entries(), entryFile() and entrySource() from a root that is not the cwd', async () => {
+    const before = contentPlace()
+    const [entry] = await entries('articles', { slug: 'hello', locale: 'fr' })
+
+    setContentPlace(resolve(FIXTURE), before.base)
+
+    try {
+      const file = await entryFile('articles', 'hello', { locale: 'fr' })
+      const source = await entrySource('articles', 'hello', { title: 'Salut' }, { locale: 'fr' })
+
+      if (!('file' in file) || !('file' in source))
+        throw new Error('no file')
+
+      expect(file.file.path).toBe('src/content/articles/fr/hello.md')
+      expect(source.file.path).toBe(file.file.path)
+      expect(source.file.repoPath).toBe(file.file.repoPath)
+      expect(entry!.path).toBe(file.file.repoPath)
+      expect((await entries('articles', { slug: 'hello', locale: 'fr' }))[0]!.path).toBe(file.file.repoPath)
+    }
+    finally {
+      setContentPlace(before.root, before.base)
+    }
+  })
+
   it('gives the file a folder entry is read from, for the CMS to delete', async () => {
     const hello = 'tests/fixtures/cms/src/content/articles/fr/hello.md'
     const contact = 'tests/fixtures/cms/src/content/pages/contact.yaml'
