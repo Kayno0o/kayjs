@@ -12,6 +12,14 @@ The options `cms()` takes, from `kay.config.ts`.
 cms({ prefix: '/studio', pageSize: 25, guard, files })
 ```
 
+### Let in a kayjs-auth role
+
+`role` lets in the signed-in users kayjs-auth's `requireUser({ require: role })` admits, the app's `authorize` deciding as in `auth.guard()`; it stands for `guard`, so not both. A request with no kayjs-auth is refused and logged.
+
+```ts
+cms({ role: 'editor' })
+```
+
 ### Protect the screens with a password
 
 A site with no users uses `passwordGuard`, which signs in at `<prefix>/sign-in`; a lone password signs in as `editor`.
@@ -24,7 +32,7 @@ cms({ guard: passwordGuard(env.EDITOR_PASSWORD) })
 
 ### Limit what a role may do
 
-`roles` names what each role may do beyond editing (`publish`, `delete`, `upload`, `redirects`), and needs a `guard`.
+`roles` names what each role may do beyond editing (`publish`, `delete`, `upload`, `redirects`), and needs a `guard` or a `role`.
 
 ```ts
 cms({ guard, roles: { editor: [], publisher: ['publish'], admin: ['publish', 'delete', 'upload', 'redirects'] } })
@@ -65,7 +73,7 @@ cms({ guard, files, onSave: async ({ collection, slug }) => { await purgeCdn(`/$
 
 ### The options
 
-- `cms({ prefix, logo, guard, roles, member, files, uploads, pageSize, collections, rawHtml, author, onSave, history })`: `prefix` is where the screens live (`/admin`; `/` is the root, where the screens mount under a `(admin)` group, so an app root layout and guard neither wrap them nor are wrapped by theirs), `logo` is deprecated until 1.73 for the `logo` of the cms settings module (`settings: { '@kaynooo/kayjs-cms': './src/cms-settings.ts' }`, default-exporting `{ ...defaults, logo: { src, alt, width?, height? } }`, `defaults` and `Settings` from `@kaynooo/kayjs-cms`), an image (`/logo.svg` or an https URL) before the name in the admin's header, the settings winning over `cms({ logo: string })` (no `alt`), `pageSize` how many entries a collection's list shows on a page (50), a positive whole number, `collections` how the screens arrange a collection by name, `{ form: { fields, hide }, list: { columns, actions } }` (see [Arranging and replacing the screens](screens.md)), `guard` who may use them and the API, as `{ load }` returning the guard, which runs on the first request so `kay.config.ts` imports nothing of the app's auth or database, or the built guard itself, which does import it, `files` where a folder entry's file goes, `workingTree()` by default, which a production server refuses to boot with unless named, as the next deploy would drop its saves.
+- `cms({ prefix, logo, role, guard, roles, member, files, uploads, pageSize, collections, rawHtml, author, onSave, history })`: `prefix` is where the screens live (`/admin`; `/` is the root, where the screens mount under a `(admin)` group, so an app root layout and guard neither wrap them nor are wrapped by theirs), `logo` is deprecated until 1.73 for the `logo` of the cms settings module (`settings: { '@kaynooo/kayjs-cms': './src/cms-settings.ts' }`, default-exporting `{ ...defaults, logo: { src, alt, width?, height? } }`, `defaults` and `Settings` from `@kaynooo/kayjs-cms`), an image (`/logo.svg` or an https URL) before the name in the admin's header, the settings winning over `cms({ logo: string })` (no `alt`), `pageSize` how many entries a collection's list shows on a page (50), a positive whole number, `collections` how the screens arrange a collection by name, `{ form: { fields, hide }, list: { columns, actions } }` (see [Arranging and replacing the screens](screens.md)), `role` the kayjs-auth role an editor needs, through `requireUser({ require })`, `guard` who may use them and the API instead, as `{ load }` returning the guard, which runs on the first request so `kay.config.ts` imports nothing of the app's auth or database, or the built guard itself, which does import it, `files` where a folder entry's file goes, `workingTree()` by default; a production server without it commits through `forgejo()` built from `CMS_BASE_URL`, `CMS_REPO`, `CMS_TOKEN` and the optional `CMS_BRANCH` (listed for `kay env`), and with none of them set refuses to boot, as the next deploy would drop its saves.
 - `uploads` lists the types a file field takes, exact or `image/*`, PNG, JPEG, WebP, GIF, AVIF and PDF by default, the type read off the file name's extension, in any case, as kay's storage serves it; another is answered 415. The bytes must be that type too, whatever the name or the declared type says: PNG, JPEG, GIF, WebP and AVIF are read by their signatures, a PDF by its header, an SVG by its `<svg` root, and a file that is not what it is named (HTML named `x.png`, a JPEG named `x.png`, a PNG cut short of its header) is answered 415 with `cms.upload.notReal`; a type with no signature (`text/csv`, video) is taken as named, and storage serves anything but a PNG, JPEG, WebP, GIF, AVIF, video, audio, PDF or plain-text type as a sandboxed download, an SVG included, so it never runs as the site; the SVG check is only for a `<svg` root in the first 4 KB.
 - `uploads: { types, maxSize }` also sets the most an upload may weigh, bytes or `'50mb'` as kay's `budget` takes them, 20 MB by default; the upload route reads that much whatever the app's `maxSize`, so nothing else is raised, and a `maxSize` that is zero, negative, fractional in bytes or over 128 MB less 64 KB throws as `kay.config.ts` loads, as Bun refuses a request body over 128 MB before the route sees it and buffers an upload in memory.
 - A save whose body renders HTML that would run as the site or cover it, every tag and attribute kay's sanitizer drops (a `<script>`, an `<svg>`, a `<form>` or an input, an `on*`, `style` or `formaction` attribute), a `javascript:` URL in any URL attribute, or a tag left open or wrapped around a component, read off the HTML kay renders as a browser tokenizes it, is refused with an issue on the body, unless `rawHtml` lists its collection; the collection's own components, HTML in code and Markdown's task lists pass, and publishing keeps the stored body unchecked.

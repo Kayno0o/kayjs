@@ -134,7 +134,7 @@ It is read for `user()` and `requireUser()` and for the hooks (`onSignUp`, `prof
 
 `pgStore` adds the `data` column when you run `db.sync()`, and older rows read as `{}`. A store of your own keeps `UserRecord.data` as JSON.
 
-With no prebuilt pages, `requireUser({ redirect: '/login' })` names your sign-in page. A bearer token limited to scopes is refused with a 403 unless `requireUser({ scope })` names one it holds.
+With no prebuilt pages, `requireUser({ redirect: '/login' })` names your sign-in page. A bearer token limited to scopes is refused with a 403 unless `requireUser({ scope })` names one it holds. `requireUser({ require: 'editor' })` refuses with a 403 a user who does not meet it, through your `authorize` as `guard()` does.
 
 The prebuilt pages that open from a mailed link, to reset a password, verify an address, sign in by link or confirm a new address, send `Referrer-Policy: same-origin`. The token in the address never reaches another site through a link or an image on the page. An address with a comma, an angle bracket or a double quote in it is refused as an email.
 

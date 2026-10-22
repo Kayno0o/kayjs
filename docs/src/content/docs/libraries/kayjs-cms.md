@@ -24,16 +24,16 @@ An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never
 In a kay project, `kay add cms` installs the packages and adds the extension below with its defaults. Otherwise, put `cms()` in `kay.config.ts`'s `extensions`.
 
 ```ts
-import { cms, forgejo } from '@kaynooo/kayjs-cms'
+import { auth } from '@kaynooo/kayjs-auth'
+import { cms } from '@kaynooo/kayjs-cms'
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  extensions: [cms({
-    // Who may use the screens and save; edit mode alone only reads. Loaded on the first request, so this file imports nothing of the app's auth or database.
-    guard: { load: async () => (await import('./src/auth')).auth.guard({ require: 'editor' }) },
-    // Left out, a file entry is written in the working tree, for `kay dev`: a production server refuses to boot so.
-    files: process.env.FORGEJO_TOKEN ? forgejo({ baseUrl: 'https://git.example.com', repo: 'me/site', token: process.env.FORGEJO_TOKEN }) : undefined,
-  })],
+  extensions: [
+    auth({ module: './src/auth' }),
+    // Who may use the screens and save: the kayjs-auth users with this role. Edit mode alone only reads.
+    cms({ role: 'editor' }),
+  ],
   // Edit mode is kay's preview mode; its cookie is signed with a key derived from KAY_SECRET.
   preview: {},
 })
@@ -41,7 +41,11 @@ export default defineConfig({
 
 The screens live at `/admin`. Set `prefix` to move them, to `/` if the site is only the screens. At `/` the screens keep their own chrome and guard even when your app has a root layout or guard: they mount in a `(admin)` group, which adds nothing to a URL. They stay closed without a `guard`. They fit a phone, so a client can edit from one: the entry lists stack as cards and the controls stay big enough to tap.
 
-`guard` also takes the built guard itself, `auth.guard({ require: 'editor' })`. Then `kay.config.ts` imports `./src/auth`, and with it the app's database, for every `kay build` and `kay check`.
+`role` asks kayjs-auth, as `requireUser({ require: 'editor' })` does. Your app's `authorize` policy decides, as it does for `auth.guard()`. Without kayjs-auth, every request is refused and the server logs why.
+
+`guard` is the other way to say who gets in, and you give one or the other. It takes a guard loaded on the first request, `{ load: async () => (await import('./src/auth')).auth.guard({ require: 'editor' }) }`, so `kay.config.ts` imports nothing of the app's auth or database. It also takes the built guard itself. Then `kay.config.ts` imports `./src/auth`, and with it the app's database, for every `kay build` and `kay check`.
+
+Without `files`, saves go to the working tree, which suits `kay dev`. A production server without it commits them to Forgejo, through `forgejo()` built from `CMS_BASE_URL`, `CMS_REPO`, `CMS_TOKEN` and the optional `CMS_BRANCH`. `kay env` lists them. With none of them set, the server refuses to boot, as the next deploy would drop its saves.
 
 ## Signing in and roles
 
@@ -169,7 +173,7 @@ When the dev tool is docked to the right or the bottom, the editor sits beside i
 
 An edit cookie or link is tied to no user, so it reads only the entries the pages it showed in edit mode read, never a customer or order collection the page does not render. A signed-in editor the guard admits reads any entry. The list of those entries lives in the server's memory, so after a restart, or on another replica, load the page again.
 
-Once there is a guard, every save needs it, edit mode included. Without one, saving from an edit link works under `kay dev` only: any other server refuses every save, publish, delete and upload from an edit cookie or link, and warns at boot to set `cms({ guard })`. With a guard, `author` names who a save is committed as, such as the signed-in user.
+Once there is a guard, every save needs it, edit mode included. Without one, saving from an edit link works under `kay dev` only: any other server refuses every save, publish, delete and upload from an edit cookie or link, and warns at boot to set `cms({ role })` or `cms({ guard })`. With a guard, `author` names who a save is committed as, such as the signed-in user.
 
 Without `author`, the forge commits as the account behind its token, so no editor's name or email reaches git. Give `author` the real name and email only when the editors agree to appear in the history: a commit cannot be erased from it later, so a request to delete someone's data (RGPD art. 17) cannot reach their name there. A pseudonym keeps the history useful and the editor private:
 
@@ -533,7 +537,7 @@ To wire the whole thing:
 
 1. Run `kay add cms` and set `preview: {}` in `kay.config.ts`, with `KAY_SECRET` set in production.
 2. Declare each editable collection over a loader, as above.
-3. Add `cms({ guard })` to `extensions`, with the guard of who may edit. A loader needs no `files` saver, which is for folder entries.
+3. Add `cms({ role })` to `extensions`, with the kayjs-auth role of who may edit, or `cms({ guard })` with a guard of your own. A loader needs no `files` saver, which is for folder entries.
 4. Keep the database where a deploy leaves it: a volume for the SQLite file, your `DATABASE_URL` for Postgres.
 5. Read the collections in your pages as usual. Add `live: true` to the collection so open pages follow a save.
 

@@ -471,6 +471,26 @@ describe('guard', () => {
     expect(await run(auth.guard({ require: 'admin' }), guardContext({ locals }))).toBe('deny 403')
   })
 
+  test('requireUser({ require }) lets through a user meeting it and refuses one who does not with a 403, as guard() does', async () => {
+    const { auth, browser } = await seeded()
+    const ada = browser()
+
+    await ada.fetch('/sign-in/u1', POST)
+    const ask = async (require: 'editor' | 'admin') => {
+      const { auth: signedIn } = (await contextOf(auth.plugin, `kay_session=${ada.cookies.get('kay_session')}`)) as { auth: Auth }
+
+      try {
+        return (await signedIn.requireUser({ require })).id
+      }
+      catch (outcome) {
+        return (outcome as { status?: number }).status
+      }
+    }
+
+    expect(await ask('editor')).toBe('u1')
+    expect(await ask('admin')).toBe(403)
+  })
+
   test('lets a scoped bearer token through only with one of the scopes asked', async () => {
     const { auth, browser } = testApp({ scopes: ['posts:read', 'posts:write'] })
     const ada = browser()

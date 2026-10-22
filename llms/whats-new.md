@@ -33,6 +33,14 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay generate page|component|island|action|api|guard <name>` writes a starter file, with a test when the project has tests ([kay generate](project-new-and-add.md)).
 - `store: sqliteData(path)` in kay.config.ts also keeps the data of every `session()` and `cached` naming no store of their own ([Keep a session](server.md#keep-a-session), [Stores](rendering.md#stores)).
 - kayjs-auth has `SignedIn`, `SignedOut` and `UserMenu` components that show the signed-in user and their roles from any template with no server fence, and `auth({ viewer: true })` loads the user before the page renders ([Templates](../packages/auth/llms/signed-in-components.md)).
+- `apiPath: '/v1'` in `kay.config.ts` moves every API module, the OpenAPI document and the reference page off `/api`, islands, the service worker, prefetching and kayjs-cms follow it, and `apiUrl(module, path)` gives a route's URL ([API modules](api-routes.md#api-modules)).
+- Each `src/plugins/<name>.ts` default-exporting an Elysia plugin is used before the pages, in the order of the file names, and types `ctx.locals`, so sessions, jobs and derives need no `src/server.ts` ([Mount a server plugin](server.md#mount-a-server-plugin)).
+- `collection(..., { route: '/blog/:slug' })` gives each entry a typed `url`, a feed item with no `path` links it, and `kay check` reports a route no page serves ([Give each entry its page's path](content.md#give-each-entry-its-pages-path)).
+- A collection `route` is read by the CMS, by `alternate()` on a page that read the entry (its translation's own url), by the locale rule for a dotted slug such as `v1.2`, and by `kay check` against the page prerendering it ([Give each entry its page's path](content.md#give-each-entry-its-pages-path)).
+- `cache(load, { ttl, tags })` and `cacheTag()` from `kay/cache` give a cached function whose key comes from its module and name, with `.invalidate()` on it and tags to drop a group, so no string key can be mistyped ([Cache a function with no key to type](rendering.md#cache-a-function-with-no-key-to-type)).
+- `import.meta.glob('~icons/game-icons/{war-pick,axe-swing}', { eager: true, import: 'default' })` bundles just the icons it names, for an icon known by name at runtime ([Icons](images.md#icons)).
+- An action declared in a page types `ctx.params` from that page's route, a matcher's value as it gives it ([Actions](actions.md#declaring-an-action)); a guard's and a layout's stay `unknown`.
+- `cms({ role: 'editor' })` guards with kayjs-auth, and a production cms with no `files` commits to the Forgejo `CMS_*` names ([Options of cms()](../packages/cms/llms/options.md)).
 
 ## 1.70.0
 

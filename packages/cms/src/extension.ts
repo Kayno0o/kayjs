@@ -1,7 +1,10 @@
 import type { KayExtension } from 'kay/server'
+import type { FileSaver } from './files'
 import type { CmsOptions } from './settings'
+import { s } from 'kay'
 import { configError, serverRoot, underKayDev } from 'kay/library'
-import { api } from 'kay/server'
+import { api, defineEnv } from 'kay/server'
+import { forgejo } from './files'
 import { collectionInfo, collections } from './kay/content'
 import { hintProblems, missingKindLines } from './kinds'
 import { bodylessLayout, layoutProblems, whenProblems } from './layout'
@@ -30,6 +33,31 @@ async function setupWarnings(): Promise<string[]> {
   return [...hintProblems(listed), ...missingKindLines(await serverRoot(), listed), ...layoutProblems(listed, settings().layouts), ...whenProblems(listed)]
 }
 
+// What a production server with no `cms({ files })` commits through, listed for `kay env`.
+const CMS_ENV = s.Object({
+  CMS_BASE_URL: s.Optional(s.String({ description: 'the Forgejo a production cms commits edits to, such as https://git.example.com, when cms({ files }) is not set' })),
+  CMS_REPO: s.Optional(s.String({ description: 'the repository the cms commits to, as owner/name' })),
+  CMS_TOKEN: s.Optional(s.String({ description: 'a Forgejo token allowed to write that repository\'s contents' })),
+  CMS_BRANCH: s.Optional(s.String({ description: 'the branch the cms commits to, the repository\'s default when unset' })),
+})
+
+const NO_SAVER = 'a production server saves no edit to the working tree, which the next deploy replaces: set CMS_BASE_URL, CMS_REPO and CMS_TOKEN for a Forgejo, or cms({ files: forgejo(...) }), or cms({ files: workingTree() }) where the files outlive a deploy'
+
+// The Forgejo the environment names, for a production server given no `files`; with none of it set, or part of it, the boot stops naming what is missing.
+function savedFromEnv(): FileSaver {
+  const { CMS_BASE_URL: baseUrl, CMS_REPO: repo, CMS_TOKEN: token, CMS_BRANCH: branch } = defineEnv(CMS_ENV)
+
+  if (baseUrl === undefined && repo === undefined && token === undefined)
+    throw configError(NO_SAVER)
+
+  const missing = Object.entries({ CMS_BASE_URL: baseUrl, CMS_REPO: repo, CMS_TOKEN: token }).filter(([, value]) => value === undefined).map(([name]) => name)
+
+  if (baseUrl === undefined || repo === undefined || token === undefined)
+    throw configError(`the cms commits to the Forgejo the environment names, which lacks ${missing.join(' and ')}`)
+
+  return forgejo({ baseUrl, repo, token, branch })
+}
+
 const UNCHECKED = 'the collections could not be checked for field kinds with no component or a layout naming a field they lack, or a `when` waiting for none'
 
 // The one line an app adds to kay.config.ts. `editor` is the island kay renders at the end of every page in edit mode only.
@@ -44,6 +72,7 @@ export function cms(options: CmsOptions = {}): KayExtension {
     // An editor's browser, marked once the guard let it into the screens, finds an "Edit this page" link on the pages it reads; any other browser loads nothing more than this line.
     ...options.pageLink !== false && { config: { head: [{ tag: 'script', props: { children: pageLinkLoader() } }] } },
     devTool: { module: `${import.meta.dir}/devTool.ts` },
+    env: CMS_ENV,
     // What the server logs or stops at as it listens, for `kay check` and the editor to show without one.
     check: async () => {
       // A collection loader that fails is a warning, as the boot logs it, not an error of the check; it hides a bodyless-layout error that was to be found beside it.
@@ -59,10 +88,10 @@ export function cms(options: CmsOptions = {}): KayExtension {
     // Run as the server boots, never by `kay build` or `kay check`.
     server: () => {
       if (options.files === undefined && process.env.NODE_ENV === 'production')
-        throw configError('a production server saves no edit to the working tree, which the next deploy replaces: set cms({ files: forgejo(...) }), or cms({ files: workingTree() }) where the files outlive a deploy')
+        settings().files = savedFromEnv()
 
-      if (options.guard === undefined && !underKayDev())
-        log.warn('no cms({ guard }): outside `kay dev` an edit link or cookie reads only the entries of the pages it opens and saves, publishes, deletes and uploads nothing, and the admin screens stay closed; set cms({ guard }) to let editors write')
+      if (options.guard === undefined && options.role === undefined && !underKayDev())
+        log.warn('no cms({ guard }): outside `kay dev` an edit link or cookie reads only the entries of the pages it opens and saves, publishes, deletes and uploads nothing, and the admin screens stay closed; set cms({ role }) or cms({ guard }) to let editors write')
 
       const plugin = api()
 

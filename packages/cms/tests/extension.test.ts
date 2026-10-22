@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { cms } from '../src/extension'
 import { workingTree } from '../src/files'
+import { settings } from '../src/settings'
 
 const environment = process.env.NODE_ENV
 const devCode = process.env.KAY_DEV_CODE
@@ -68,6 +69,60 @@ describe('cms()', () => {
     expect(typeof dev === 'function' && dev()).toBeTruthy()
   })
 
+  describe('a production server with no files', () => {
+    const variables = { CMS_BASE_URL: 'https://git.example.com', CMS_REPO: 'team/site', CMS_TOKEN: 'secret', CMS_BRANCH: 'content' }
+
+    afterEach(() => {
+      for (const name of Object.keys(variables))
+        delete process.env[name]
+    })
+
+    function boot(): void {
+      process.env.NODE_ENV = 'production'
+
+      const { server } = cms({ guard: () => undefined })
+
+      if (typeof server === 'function')
+        void server()
+    }
+
+    test('commits through the Forgejo CMS_BASE_URL, CMS_REPO, CMS_TOKEN and CMS_BRANCH name, and lists them for kay env', async () => {
+      Object.assign(process.env, variables)
+
+      const posted: { path: string, token: string | null, body: { branch?: string } }[] = []
+      const forge = Bun.serve({ port: 0, fetch: async (request) => {
+        if (request.method !== 'POST')
+          return new Response(null, { status: 404 })
+
+        posted.push({ path: new URL(request.url).pathname, token: request.headers.get('authorization'), body: await request.json() as { branch?: string } })
+
+        return Response.json({ commit: { sha: 'abc' } })
+      } })
+
+      try {
+        process.env.CMS_BASE_URL = `http://localhost:${forge.port}`
+        boot()
+        await settings().files.save({ repoPath: 'src/content/posts/a.md', absolute: '/nowhere/a.md', text: 'hi', message: 'add a' })
+
+        expect(posted).toEqual([{ path: '/api/v1/repos/team/site/contents', token: 'token secret', body: expect.objectContaining({ branch: 'content' }) }])
+        expect(Object.keys(cms().env?.properties ?? {})).toEqual(Object.keys(variables))
+      }
+      finally {
+        await forge.stop()
+      }
+    })
+
+    test('stops the boot naming the variables when part of them is set', () => {
+      process.env.CMS_BASE_URL = variables.CMS_BASE_URL
+
+      expect(boot).toThrow('lacks CMS_REPO and CMS_TOKEN')
+    })
+
+    test('stops the boot naming the variables when none is set', () => {
+      expect(boot).toThrow('set CMS_BASE_URL, CMS_REPO and CMS_TOKEN')
+    })
+  })
+
   test('warns a server outside kay dev without a guard, naming cms({ guard }), and no other', () => {
     const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
     const boot = (underDev: boolean, options: Parameters<typeof cms>[0]): string[] => {
@@ -89,6 +144,7 @@ describe('cms()', () => {
     try {
       expect(boot(false, {})).toEqual([expect.stringContaining('no cms({ guard })')])
       expect(boot(false, { guard: () => undefined })).toEqual([])
+      expect(boot(false, { role: 'editor' })).toEqual([])
       expect(boot(true, {})).toEqual([])
     }
     finally {

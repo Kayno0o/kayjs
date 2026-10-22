@@ -4,6 +4,7 @@ import type { Commit, FileSaver, Identity } from './files'
 import type { GivenLayout } from './kay/contract'
 import type { Action } from './roles'
 import { asConfigError, byteSize, configError, lazily, optionMs } from 'kay/library'
+import { roleGuard } from './auth-like'
 import { workingTree } from './files'
 import { checkLayouts } from './layout'
 import { PAGE_SIZE } from './listing'
@@ -42,7 +43,9 @@ export interface CmsOptions {
   logo?: string | undefined
   // Who may use the screens and the API, such as kayjs-auth's `auth.guard({ require: 'editor' })`, or `{ load }` returning it, which runs on the first request rather than as kay.config.ts loads. With one, every save needs it, edit mode included; without one, only an edit-mode request gets through.
   guard?: Guard | LazyGuard | undefined
-  // Where a folder entry's file goes: `forgejo(...)` on a deployed site, the working tree by default, for `kay dev`.
+  // The kayjs-auth role an editor needs, `cms({ role: 'editor' })` standing for a guard of `requireUser({ require: 'editor' })`, the app's `authorize` deciding as in `auth.guard()`. Not given with `guard`.
+  role?: string | undefined
+  // Where a folder entry's file goes: `forgejo(...)` on a deployed site, the working tree by default, for `kay dev`. Left out, a production server builds `forgejo()` from `CMS_BASE_URL`, `CMS_REPO`, `CMS_TOKEN` and `CMS_BRANCH`.
   files?: FileSaver | undefined
   // The types an upload may have, exact or as `image/*`: PNG, JPEG, WebP, GIF, AVIF and PDF by default; `{ types, maxSize }` also sets the most an upload may weigh, in bytes or as `'50mb'`, 20 MB by default, 127.9 MB at most (Bun refuses a request body over 128 MB). The upload route takes that size whatever the app's own `maxSize` is.
   uploads?: string[] | UploadOptions | undefined
@@ -115,7 +118,7 @@ const LOGO = /^(?:\/(?![/\\])\S*|https:\/\/\S+)$/
 
 let current: CmsSettings | undefined
 
-export function configure({ prefix = '/admin', logo, guard, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, member, onSave, collections, pageLink, roles, history }: CmsOptions): CmsSettings {
+export function configure({ prefix = '/admin', logo, guard: own, role, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, member, onSave, collections, pageLink, roles, history }: CmsOptions): CmsSettings {
   if (!Number.isInteger(pageSize) || pageSize < 1)
     throw configError('`cms({ pageSize })`', pageSize, 'a positive whole number of entries')
 
@@ -123,6 +126,13 @@ export function configure({ prefix = '/admin', logo, guard, files = workingTree(
 
   const { types = DEFAULT_UPLOADS, maxSize } = Array.isArray(uploads) ? { types: uploads, maxSize: undefined } : uploads ?? {}
 
+  if (own !== undefined && role !== undefined)
+    throw configError('`cms({ role })` stands for a guard, so it is not given with `cms({ guard })`: keep one')
+
+  if (role !== undefined && (typeof role !== 'string' || role === ''))
+    throw configError('`cms({ role })`', role, 'the name of a kayjs-auth role, such as \'editor\'')
+
+  const guard = own ?? (role === undefined ? undefined : roleGuard(role))
   const tracked = trackPasswords(guard)
 
   current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', logo: given, guard: tracked === undefined ? undefined : lazily(tracked), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, member, onSave, pageLink: pageLink !== false, roles: asConfigError(() => checkRoles(roles, guard !== undefined)), layouts: asConfigError(() => checkLayouts(collections)), history: checkHistory(history) }

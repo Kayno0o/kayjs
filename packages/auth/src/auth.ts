@@ -323,8 +323,8 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // The signed-in user, who must be there: an anonymous visitor opening a page goes to the sign-in page and comes back, and any other request, an action's call included, is refused with a 401, as `auth.guard()` does. For a page or an action to ask for a user without a guard above it; the user is read once per request.
-  // The sign-in page is the prebuilt one with `pages`, else `redirect`, else `signInPage`, else the visitor gets the 401 too. A bearer token limited to scopes is refused with a 403 unless `scope` names one it holds.
-  async requireUser(options: { redirect?: string | undefined, scope?: ScopeRequirement<Scope> | undefined } = {}): Promise<User<UserData>> {
+  // The sign-in page is the prebuilt one with `pages`, else `redirect`, else `signInPage`, else the visitor gets the 401 too. A bearer token limited to scopes is refused with a 403 unless `scope` names one it holds, and a user who does not meet `require` (a role, or any requirement `guard()` takes, with no route params) with a 403 too.
+  async requireUser(options: { redirect?: string | undefined, scope?: ScopeRequirement<Scope> | undefined, require?: AuthRequirement<Role> | undefined } = {}): Promise<User<UserData>> {
     const user = await this.user()
     const { redirect, deny } = stoppers(this.request)
 
@@ -336,6 +336,9 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
       return deny(401, 'Sign in to continue')
     }
+
+    if (options.require !== undefined && !(await this.core.authorize?.(user as BareUser, options.require, READ_METHODS.has(this.request.method) ? 'read' : 'write')))
+      return deny(403)
 
     return !scopeAllows(await this.scopes(), options.scope) ? deny(403) : user
   }
@@ -1432,6 +1435,8 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
   const authorize = options.authorize ?? (async (user, requirement, _level, ctx) => user !== null && evaluate(user, requirement, ctx))
   const signedIn: Predicate<BareUser> = user => user !== null
   const admin = options.admin
+
+  core.authorize = async (user, requirement, level) => authorize(user, requirement as AuthRequirement<Role>, level, {})
 
   if (admin !== undefined)
     core.admin = async user => authorize(user, admin, 'write', {})

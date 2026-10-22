@@ -4,26 +4,11 @@ import type { Action } from './roles'
 import { localPath } from 'kay'
 import { READ_METHODS } from 'kay/library'
 import { wording } from 'kay/words'
+import { authOf } from './auth-like'
 import { activePasswords, LEGACY_SESSION_COOKIE, SESSION_COOKIE, sessionCookiesOf, signedInBy } from './password'
 import { screenPath } from './paths'
 import { ACTIONS } from './roles'
 import { settings } from './settings'
-
-// The part of kayjs-auth's `ctx.locals.auth` the cms reads: found by its shape, so the cms works without it installed.
-interface AuthLike {
-  bareUser?: () => Promise<MemberLike | null>
-  user?: () => Promise<MemberLike | null>
-  isGranted?: (role: string, user: MemberLike) => boolean
-  signInUrl?: (back?: string) => string
-  signOut?: () => Promise<void>
-}
-
-interface MemberLike {
-  id?: unknown
-  email?: unknown
-  username?: unknown
-  roles?: unknown
-}
 
 export interface Member {
   // What the admin calls the person: a username, else an email, else the role a password opened.
@@ -40,12 +25,6 @@ export function refusalStatus(error: unknown): number | undefined {
   const { status } = error as { status?: unknown }
 
   return typeof status === 'number' ? status : undefined
-}
-
-function authOf(ctx: GuardContext): AuthLike | undefined {
-  const auth = (ctx.locals as { auth?: unknown } | undefined)?.auth
-
-  return typeof auth === 'object' && auth !== null && (typeof (auth as AuthLike).bareUser === 'function' || typeof (auth as AuthLike).user === 'function') ? auth : undefined
 }
 
 const REPEATED_SLASHES = /\/{2,}/g

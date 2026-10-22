@@ -1,5 +1,5 @@
 import type { GuardContext } from 'kay'
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
 import * as server from 'kay/server'
 import { authors } from '../src/authors'
 import { configure, settings } from '../src/settings'
@@ -151,6 +151,54 @@ describe('the API guard', () => {
 
     expect(await admitted(ctx)).toBe(true)
     expect(authors.get(ctx.request)).toBeUndefined()
+  })
+})
+
+describe('cms({ role })', () => {
+  // kayjs-auth's `ctx.locals.auth`, admitting a user holding the role asked.
+  function signedIn(roles: string[], asked: string[]): GuardContext {
+    const ctx = context('POST', '/entries/posts/hello', false)
+    const requireUser = async ({ require }: { require: string }) => {
+      asked.push(require)
+
+      return roles.includes(require) ? { id: 'u1', roles } : ctx.deny(403)
+    }
+
+    return Object.assign(ctx, { locals: { auth: { user: async () => ({ id: 'u1', roles }), requireUser } } })
+  }
+
+  test('lets in whom kayjs-auth\'s requireUser({ require: role }) admits, and refuses the others', async () => {
+    configure({ role: 'editor' })
+
+    const asked: string[] = []
+
+    expect(await admitted(signedIn(['editor'], asked))).toBe(true)
+    expect(await admitted(signedIn(['reader'], asked))).toBe(false)
+    expect(asked).toEqual(['editor', 'editor'])
+  })
+
+  test('refuses every request with no kayjs-auth in its locals, logging it once', async () => {
+    configure({ role: 'editor' })
+
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      expect(await admitted(context('POST', '/entries/posts/hello', false))).toBe(false)
+      expect(await admitted(context('POST', '/entries/posts/hello', false))).toBe(false)
+      expect(logged.mock.calls.map(call => String(call[0]))).toEqual([expect.stringContaining('cms({ role: \'editor\' }) found no kayjs-auth')])
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
+
+  test('is a config error beside a guard, or empty', () => {
+    expect(() => configure({ role: 'editor', guard: () => undefined })).toThrow('is not given with `cms({ guard })`')
+    expect(() => configure({ role: '' })).toThrow('`cms({ role })`')
+  })
+
+  test('counts as the guard cms({ roles }) needs', () => {
+    expect(() => configure({ role: 'editor', roles: { editor: ['publish'] } })).not.toThrow()
   })
 })
 

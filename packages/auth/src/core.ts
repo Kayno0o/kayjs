@@ -15,6 +15,7 @@ import type { PasskeyChallenge, Relying } from './passkeys'
 import type { ResolvedRules } from './rules'
 import type { AuthStore, IdentityRecord, UserRecord } from './store'
 import type { Challenge } from './twoFactor'
+import type { Level, Requirement } from './types'
 import type { UserDataRules } from './userData'
 import { localPath } from 'kay'
 
@@ -137,6 +138,8 @@ export interface Core {
   roles?: Set<string> | undefined
   // Whether a user meets the `admin` option; nobody does without it.
   admin?: ((user: User) => Promise<boolean>) | undefined
+  // Whether a user meets a requirement, through the app's `authorize` when it has one, as `guard()` asks; for `requireUser({ require })`.
+  authorize?: ((user: BareUser, requirement: Requirement<BareUser, string>, level: Level) => Promise<boolean>) | undefined
   onSignUp?: ((user: User, profile: Profile | undefined) => void | Promise<void>) | undefined
   // The data to keep on the user, laid over what they hold; nothing keeps it as is.
   onProviderProfile?: ((user: User, profile: Profile) => unknown) | undefined
