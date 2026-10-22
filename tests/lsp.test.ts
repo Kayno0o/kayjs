@@ -1662,3 +1662,51 @@ describe('kay lsp project checks after a save', () => {
     }
   }, 180_000)
 })
+
+describe('kay lsp lookup caches', () => {
+  interface Lookups { paths?: Promise<string[]>, typedProps: Map<string, Promise<unknown>> }
+  interface Internals {
+    remembered: (lookups: Lookups, key: 'paths', ask: () => Promise<string[]>) => Promise<string[]>
+    typedProps: (document: unknown, project: unknown, tag: string, from: string) => Promise<unknown>
+    askProps: (document: unknown, tag: string) => Promise<unknown>
+  }
+
+  const make = () => {
+    const stream = new TransformStream<Uint8Array>()
+
+    return new KayLanguageServer(new Connection(stream.readable, () => undefined)) as unknown as Internals
+  }
+
+  it('drops only its own failed entry, not one a save put in its place', async () => {
+    const server = make()
+    const lookups: Lookups = { typedProps: new Map() }
+    const failing = server.remembered(lookups, 'paths', async () => Promise.reject(new Error('probe failed')))
+    const fresh = Promise.resolve(['/fresh'])
+
+    lookups.paths = fresh
+
+    await expect(failing).rejects.toThrow('probe failed')
+    expect(lookups.paths).toBe(fresh)
+
+    const solo: Lookups = { typedProps: new Map() }
+    const alone = server.remembered(solo, 'paths', async () => Promise.reject(new Error('again')))
+
+    await expect(alone).rejects.toThrow('again')
+    expect(solo.paths).toBeUndefined()
+  })
+
+  it('asks the props of a tag again only when the probe failed, not when it found none', async () => {
+    const server = make()
+    const lookups: Lookups = { typedProps: new Map() }
+    const project = { lookups }
+    const document = { file: '/app/src/page.kay' }
+    const asked = spyOn(server, 'askProps').mockResolvedValueOnce([]).mockResolvedValueOnce(undefined).mockResolvedValueOnce([{ name: 'label', optional: false }])
+
+    expect(await server.typedProps(document, project, 'Plain', './plain')).toEqual([])
+    expect(await server.typedProps(document, project, 'Plain', './plain')).toEqual([])
+    expect(asked).toHaveBeenCalledTimes(1)
+    expect(await server.typedProps(document, project, 'Failing', './failing')).toBeUndefined()
+    expect(await server.typedProps(document, project, 'Failing', './failing')).toEqual([{ name: 'label', optional: false }])
+    expect(asked).toHaveBeenCalledTimes(3)
+  })
+})

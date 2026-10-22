@@ -827,7 +827,7 @@ export class KayLanguageServer {
     return data
   }
 
-  // A lookup kept until the next save, forgotten when it fails so the next completion asks again.
+  // A lookup kept until the next save, forgotten when it fails so the next completion asks again; only its own failed promise is dropped, not a newer one a save put there.
   private async remembered(lookups: Project['lookups'], key: 'paths' | 'messages', ask: () => Promise<string[]>): Promise<string[]> {
     const kept = lookups[key] ?? ask()
 
@@ -837,7 +837,8 @@ export class KayLanguageServer {
       return await kept
     }
     catch (error) {
-      delete lookups[key]
+      if (lookups[key] === kept)
+        delete lookups[key]
 
       throw error
     }
@@ -859,7 +860,7 @@ export class KayLanguageServer {
       const known = await this.localInterface(document, project, binding.source)
       const typed = binding.local === tag && (known === undefined || known.typed) ? await this.typedProps(document, project, tag, binding.source) : undefined
 
-      found.push({ name: binding.local, from: binding.source, props: typed ?? known?.props ?? [], blocks: known?.blocks ?? [] })
+      found.push({ name: binding.local, from: binding.source, props: typed !== undefined && typed.length > 0 ? typed : known?.props ?? [], blocks: known?.blocks ?? [] })
     }
 
     return found
@@ -899,8 +900,8 @@ export class KayLanguageServer {
 
     const props = await asked
 
-    // A failed probe is asked again.
-    if (props === undefined)
+    // A failed probe is asked again, unless a newer one took its key.
+    if (props === undefined && typedProps.get(key) === asked)
       typedProps.delete(key)
 
     return props
@@ -918,7 +919,7 @@ export class KayLanguageServer {
       const result = await this.server.request<CompletionList | CompletionItem[] | null>('textDocument/completion', { textDocument: { uri }, position })
       const items = (Array.isArray(result) ? result : result?.items ?? []).filter(item => (item.kind === KIND_PROPERTY || item.kind === KIND_FIELD) && item.label !== 'key' && !GENERATED_NAME.test(item.label))
 
-      return items.length > 0 ? items.map(item => ({ name: item.label.replace(OPTIONAL_MARK, ''), optional: item.label.endsWith('?') })) : undefined
+      return items.map(item => ({ name: item.label.replace(OPTIONAL_MARK, ''), optional: item.label.endsWith('?') }))
     }
     catch {
       return undefined
