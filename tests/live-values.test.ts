@@ -25,7 +25,7 @@ const SECRET = idOf('secret')
 // `swappable` reading the page's API path from a meta tag (apiPath) costs about 12 bytes of it, 4 more on CI than here as gzip sizes differ by a few bytes from one host to another.
 // The `style:prop` pairs `setStyle` merges, a dialog bound to a signal closing itself, and a details or dialog told once hydrated of the toggle made before it cost 66 bytes of it.
 // Measured again at 12,866 bytes once these sat on the import graph the builds of a process share (#1140), a run of the whole suite reading a few bytes more.
-// A refresh waiting on a swap in flight, a page that never answers loaded by the browser and a stuck or interrupted view transition skipped (#1972, #1973, #1974) cost about 69 bytes of it.
+// A refresh waiting on a swap in flight, a page that never answers loaded by the browser and a stuck or interrupted view transition skipped (#1972, #1973, #1974) cost about 48 bytes of it.
 const LIVE_EAGER_JS_BUDGET = 12_916
 
 // The live values of the fixture, imported once a site is up: its plugin gives them their ids.
