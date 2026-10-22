@@ -4,10 +4,6 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
-- kayjs-ui: DateInput, DateRangeInput and TimeInput ([Forms](../packages/ui/llms/forms.md)).
-- kayjs-ui's Card, Button, Table and more restyle from `src/ui.ts` ([Setup](../packages/ui/llms/setup.md)).
-- kayjs-ui adds Combobox, loaded as you type, and Steps for multi-step forms ([Forms](../packages/ui/llms/forms.md)).
-- kayjs-ui's Card, Button, Table, kayjs-ai's Chat and more restyle from `src/ui.ts` ([Setup](../packages/ui/llms/setup.md)).
 - With Tailwind, a class passed to a component, or an expression or spread merged with the shorthand, overrides an earlier one setting the same property, `Button(class="px-2")` over `px-4`, with no `twMerge` ([Override a class](styles-and-assets.md#override-a-class-a-component-sets)).
 - Every value `kay` exports needs no import in a script or a server fence, `kay check` names the entry of a name that comes from another one, and `kay/server` exports `s` beside `defineEnv` ([Imports kay adds](components.md)); a page importing `action` is kept for prerendering like one that does not.
 - A value of `kay` only a template expression reads, such as `route` in a link, needs no import, and `route`, `localPath`, `withBase`, `s`, `durationMs` and `refusalMessage` keep a component static ([Imports kay adds](components.md)).
@@ -61,6 +57,10 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui `Skeleton` is a placeholder for a pending block, as text lines, an avatar or a card, still under reduced motion ([Skeleton](../packages/ui/llms/basics.md)).
 - kayjs-ui `Accordion` groups collapsible sections, one open at a time or several, with arrow keys between headers ([Accordion](../packages/ui/llms/tables-navigation-and-layout.md)).
 - `site` is the origin everywhere: kayjs-auth's `createAuth({ site, name })` takes kay's own `site` by default and `url` goes ([kayjs-auth](../packages/auth/llms/setup.md)); `kay upgrade` renames the old form.
+- kayjs-ui: DateInput, DateRangeInput and TimeInput ([Forms](../packages/ui/llms/forms.md)).
+- kayjs-ui's Card, Button, Table and more restyle from `src/ui.ts` ([Setup](../packages/ui/llms/setup.md)).
+- kayjs-ui adds Combobox, loaded as you type, and Steps for multi-step forms ([Forms](../packages/ui/llms/forms.md)).
+- kayjs-ui's Card, Button, Table, kayjs-ai's Chat and more restyle from `src/ui.ts` ([Setup](../packages/ui/llms/setup.md)).
 
 ## 1.69.0
 
