@@ -222,10 +222,24 @@ export function servedPaths(routes: Route[]): Set<string> {
   return new Set(routes.flatMap(route => patternShapes(route.pattern)))
 }
 
-// The app's pages, then each mounted library's that no page of the app serves the path of.
-// The scan filling in the reads it works out, for the build to record.
+// The scans filling in the reads they work out, for the build to record.
 const collecting = new WeakMap<LayoutsRead, ContextReads>()
 
+// Every template reading `ctx` that a scan of the routes and of the fallback pages meets, answered by the compiler, for `kay build` to record.
+export async function contextReadsOf(routesDir: string, mounts: RouteMount[]): Promise<Map<string, boolean>> {
+  const reads: ContextReads = { files: new Map(), recorded: false }
+
+  await scanRoutes(routesDir, mounts, reads)
+
+  const read: LayoutsRead = new Map()
+
+  collecting.set(read, reads)
+  specialPagesOf(routeTrees(routesDir, mounts), '', read)
+
+  return reads.files
+}
+
+// The app's pages, then each mounted library's that no page of the app serves the path of.
 // `reads` is what `kay build` recorded of the templates reading `ctx`, which a server started from disk takes in place of the compiler; given with `recorded` unset, the scan fills it in for the build to write.
 export async function scanRoutes(routesDir: string, mounts: RouteMount[] = [], reads?: ContextReads): Promise<Route[]> {
   await loadContextReader(mounts, reads)
@@ -547,11 +561,12 @@ function readsContext(file: string, read: LayoutsRead): boolean {
   let found = memo.get(file)
 
   if (found === undefined) {
-    found = recordedReads.get(file)
+    // A scan collecting answers from the templates, whatever a record read earlier says.
+    found = collecting.has(read) ? undefined : recordedReads.get(file)
 
     if (found === undefined) {
       if (contextReader === undefined)
-        throw new KayError('route-invalid', `kay: the build recorded nothing of ${file}, which a route reaches; run kay build again`)
+        throw new KayError('route-invalid', `kay: ${file} is reached by a route and neither the build's record nor a scan with the compiler covers it; run kay build again`)
 
       try {
         found = contextReader(readFileSync(file, 'utf8'))

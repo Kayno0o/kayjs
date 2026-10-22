@@ -27,7 +27,7 @@ import { writeCards } from '../server/card'
 import { ENTRY_RECORD, EXECUTABLE_RECORD, PRERENDERED_DIR } from '../server/client'
 import { compressFiles } from '../server/compress'
 import { remoteLimits } from '../server/config-limits'
-import { writeContextRecord } from '../server/context-record'
+import { CONTEXT_RECORD, writeContextRecord } from '../server/context-record'
 import { writeDictionaryCopies } from '../server/dictionary'
 import { FAVICON_DIR, faviconSource } from '../server/favicon'
 import { fontFiles } from '../server/fonts'
@@ -36,7 +36,7 @@ import { setImageColors } from '../server/image-color'
 import { assetFiles, hookPrerendered } from '../server/page-hook'
 import { prerenderPages } from '../server/prerender'
 import { remoteImages, remotePatterns } from '../server/remote'
-import { routeMounts, scanRoutes, slashedPath } from '../server/routes'
+import { contextReadsOf, routeMounts, slashedPath } from '../server/routes'
 import { linkStoredFiles } from '../server/storage'
 import { budgetLints, checkBudget, footprintLints } from './budget'
 import { cacheCounts, resetCacheCounts } from './cache'
@@ -161,6 +161,9 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
     await setAside(output, previous)
   else
     await rm(previous, { recursive: true, force: true })
+
+  // The build's own prerender scans the routes, which must not take the record of the last build.
+  await rm(join(output, CONTEXT_RECORD), { force: true })
 
   let step: string | undefined
   const report: Report = (progress) => {
@@ -330,10 +333,7 @@ async function recordContextReads({ root, config, paths }: Project): Promise<voi
   if (!mounts.some(mount => mount.reaching === 'context'))
     return
 
-  const reads = { files: new Map<string, boolean>(), recorded: false }
-
-  await scanRoutes(paths.routes, mounts, reads)
-  await writeContextRecord(paths.output, root, reads)
+  await writeContextRecord(paths.output, root, await contextReadsOf(paths.routes, mounts))
 }
 
 // What the browser build bundles, the fonts the pages declare and the icon sets they inline.

@@ -267,6 +267,31 @@ describe('a production server started from disk', () => {
     expect(await get(options, '/gated')).toMatchObject({ status: 200, html: expect.stringContaining('<p id="who">Ada</p>') })
   }, 120_000)
 
+  it('writes the same record when built again over the last, with no check', async () => {
+    const { root, options } = await project([EXTENSION])
+    const record = resolve(root, '.kay/client/context-reads.json')
+
+    await build(options)
+
+    const first = await Bun.file(record).text()
+
+    await build(options)
+    expect(await Bun.file(record).text()).toBe(first)
+  }, 120_000)
+
+  it('refuses a record missing a file a route reaches, asking for a new build', async () => {
+    const { root, options } = await project([EXTENSION])
+
+    await build(options)
+
+    const record = resolve(root, '.kay/client/context-reads.json')
+    const answers = await Bun.file(record).json() as Record<string, boolean>
+
+    delete answers['lib/gate.kay']
+    await Bun.write(record, JSON.stringify(answers))
+    await expect(run(`const options = ${options}\nconst { pages } = await import(${JSON.stringify(resolve('src/server'))})\nawait pages(options)\n`, true)).rejects.toThrow()
+  }, 120_000)
+
   it('writes no record without a context', async () => {
     const { root, options } = await project([{ name: 'none' }])
 

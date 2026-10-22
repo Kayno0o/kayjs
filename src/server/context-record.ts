@@ -1,5 +1,6 @@
 import { realpathSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
+import { kayLog } from '../runtime/log'
 
 // Whether each file the reach walk met reads `ctx`, as `kay build` records them so a server started from disk never loads the compiler to find them again.
 export interface ContextReads {
@@ -20,10 +21,10 @@ function real(path: string): string {
 }
 
 // Written as paths from the root, which a build moved to another directory keeps.
-export async function writeContextRecord(output: string, root: string, reads: ContextReads): Promise<void> {
+export async function writeContextRecord(output: string, root: string, files: Map<string, boolean>): Promise<void> {
   const base = real(root)
 
-  await Bun.write(join(output, CONTEXT_RECORD), JSON.stringify(Object.fromEntries([...reads.files].map(([file, found]) => [relative(base, file), found] as const).sort(([a], [b]) => a.localeCompare(b)))))
+  await Bun.write(join(output, CONTEXT_RECORD), JSON.stringify(Object.fromEntries([...files].map(([file, found]) => [relative(base, file), found] as const).sort(([a], [b]) => a.localeCompare(b)))))
 }
 
 // Undefined for a build that wrote none, which a scan then answers from the templates.
@@ -40,6 +41,8 @@ export async function readContextRecord(output: string, root: string): Promise<C
     return { files: new Map(Object.entries(paths).map(([path, found]) => [resolve(base, path), found] as const)), recorded: true }
   }
   catch {
+    kayLog('warn', `${CONTEXT_RECORD} in ${output} is unreadable, so the templates are read instead; run kay build again`)
+
     return undefined
   }
 }
