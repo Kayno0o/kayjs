@@ -31,6 +31,7 @@ kay's own libraries are released with kay, and each ships its `llms.txt` and `ll
 To build a site, read [Build a site](llms/site.md) first. The topic files below cover what it leaves out. Each opens with its common tasks, one sentence and one example apiece; the exact rules follow under Reference, one per bullet.
 
 - [Build a site](llms/site.md): config, layout, a Markdown collection, the 404 page, islands, a form
+- [Recipes](llms/recipes.md): a database CRUD, a dashboard behind sign-in, a blog with tags and RSS
 - [Components](llms/components.md): fences, props, signals, memos, effects, generic components, `import.meta.glob`
 - [Component libraries and extensions](llms/component-libraries.md): shipping components in a package, the pages, tabs and commands a library adds, naming conventions
 - [Template lines](llms/templates.md): elements, attributes, events, bindings, `if`/`for`/`await`/`try`, slots, snippets

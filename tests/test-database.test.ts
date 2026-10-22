@@ -92,8 +92,8 @@ export const Member = defineTable('member', f => ({
 
 export const db = new Database({ url: process.env.DATABASE_URL, tables: [Member] })
 `)
-    await Bun.write(join(dir, 'pg-orm.config.ts'), "import { defineConfig } from '@kaynooo/pg-orm'\nimport { db } from './src/db'\n\nexport default defineConfig({ db })\n")
-    await Bun.write(join(dir, 'tests', 'seed.ts'), "import { Member } from '../src/db'\n\nexport default async function seed(db) {\n  await db.repo(Member).write.insertOne({ name: 'Ada' })\n}\n")
+    await Bun.write(join(dir, 'pg-orm.config.ts'), 'import { defineConfig } from \'@kaynooo/pg-orm\'\nimport { db } from \'./src/db\'\n\nexport default defineConfig({ db })\n')
+    await Bun.write(join(dir, 'tests', 'seed.ts'), 'import { Member } from \'../src/db\'\n\nexport default async function seed(db) {\n  await db.repo(Member).write.insertOne({ name: \'Ada\' })\n}\n')
     await Bun.write(join(dir, 'tests', 'one.test.ts'), `import { expect, it } from 'bun:test'
 import { Member, db } from '../src/db'
 
@@ -111,7 +111,6 @@ it('queries the copy', async () => {
     expect(code).toBe(0)
     expect(report).not.toContain('URL sqlite://data/test.db')
   }, 60_000)
-
 
   it('gives each file a copy of the migrated, seeded database, and drops it after, from the config alone', async () => {
     const dir = await project(true)
