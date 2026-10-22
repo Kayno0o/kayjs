@@ -182,7 +182,7 @@ export default defineUi({
     parts: { root: 'rounded-xl', head: 'p-6' },
   },
   Badge: {
-    variants: { tone: { danger: { root: 'bg-red-100' } } },
+    variants: { tone: { danger: { root: 'bg-red-100' }, brand: { root: 'bg-brand' } } },
   },
   Panel: { parts: 'shadow-lg' },
 })
@@ -192,7 +192,8 @@ export default defineUi({
 - The file is read as it is written at build time and merged into the component's output: the per-page CSS cut sees the final classes, and the parts of an entry without variants are written into the component as static classes, so an island carries nothing for them. It holds string literals and object literals only; a variant reads the component's props and the defaults of its recipe.
 - A name matches the app's components under `src/` and kayjs-ui's. For a name two components bear, or a component of another package, key the specifier `src/ui.ts` would import it with: `'@kaynooo/kayjs-ui/card.kay'` or `'./components/card.kay'`. `kay check` reports a name no component bears and a name two bear, naming their specifiers.
 - `defineUi` is typed from the components `kay check` writes to `.kay/types/kay-ui.d.ts`: your editor completes each key, and a part, a variant or a value the component lacks fails `bun run check`.
-- The component must have parts or a recipe, and a variant must be one its recipe declares, so a component with no recipe takes `parts` alone. `kay check` reports an unknown component, part, variant or value, a page, a layout or a server-fenced file, two keys naming one component, a class that is not a plain string and a file with no default export. The dev server rebuilds when `src/ui.ts` changes.
+- A variant or value the component's recipe lacks is added to it, with the classes the entry gives: `Badge(tone="brand")` above is valid, and your editor completes `brand` and `bun run check` accepts it, with nothing declared elsewhere. The recipe's `defaults` stay.
+- The component must have parts or a recipe. `kay check` reports an unknown component or part, a value a template passes that neither the recipe nor `src/ui.ts` declares, a page, a layout or a server-fenced file, two keys naming one component, a class that is not a plain string and a file with no default export. The dev server rebuilds when `src/ui.ts` changes.
 
 ## Public files
 

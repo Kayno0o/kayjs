@@ -125,9 +125,11 @@ import { defineUi } from 'kay'
 
 export default defineUi({
   Card: { parts: { root: 'rounded-xl', head: 'p-6' } },
-  Button: { variants: { tone: { danger: { root: 'bg-red-600' } } } },
+  Button: { variants: { tone: { danger: { root: 'bg-red-600' }, brand: { root: 'bg-brand' } } } },
 })
 ```
+
+A variant or value the component lacks is added: `Button(tone="brand")` types and renders.
 
 - The components with parts: Button, Card, Dialog, Table, TextInput, Textarea, DateInput, DateRangeInput, TimeInput, Badge, Notice, Avatar, Stat, PageHeader, PageSection, EmptyState, CardRow, FormField, Checkbox, Toggle, Select, MultiSelect, RangeInput, Segmented, Rating, FileDrop, IconButton, CopyButton, Menu, Slider, ColorInput, Popover, HoverCard, TooltipHost, Toaster, SidePanel, CommandPalette, ConfirmDelete, FormDialog.
 - Also with parts: SaveForm, ContactForm, CollapsibleSection, Widget, Meter, BarList, ChipGroup, Tabs, TabNav, SiteNav, AppHeader, Pagination, SplitLayout, TreeView, LoadMore, VirtualList, BarChart, LineChart, ScatterChart, ContributionGraph, Carousel, Masonry, MediaGallery, ImageCropper, ZoomPane, QrCode, SiteFavicon, Icon, IconPicker, MarkdownEditor and WhenVisible.
@@ -137,7 +139,7 @@ export default defineUi({
 - A part is named after what its `kui-` class draws: Card has `root`, `head`, `title` and `body`, Dialog `root`, `title`, `body` and `footer`, Button `root` and `spinner`.
 - Table has `root` (the wrapper), `table`, `headCell`, `row`, `cell`, `cellBody`, `sortButton`, `sortIcon`, `filter`, `filterInput`, `count`, `selection`, `bulk` and `emptyCell`.
 - DateInput has `root`, `input`, `trigger`, `panel`, `head`, `title`, `step`, `grid`, `weekday`, `day` and `today`, DateRangeInput `root` and `separator`, TimeInput `root`.
-- The variants are the props that already exist: `tone` (Button, Badge, Notice, CopyButton), `variant` and `size` (Button). `kay check` reports a part or variant that does not exist.
+- The variants are the props that already exist, and `src/ui.ts` can add more: `tone` (Button, Badge, Notice, CopyButton), `variant` and `size` (Button). `kay check` reports a part that does not exist.
 - A Button with an `onClick` hands its root and spinner classes to its busy button, so `button.kay` reaches both.
 - FormField has `root`, `label`, `head`, `text`, `required`, `action`, `hint`, `issues` and `issue`; Checkbox `root`, `input`, `label` and `hint`; Toggle `root`, `input`, `track` and `label`; Select `root`; Slider `root`, `label`, `input` and `value`; ColorInput `root`, `input`, `label` and `value`.
 - RangeInput has `root`, `box`, `separator` and `unit`; Segmented `root`, `option`, `input`, `label` and `icon`; Rating `root`, `stars` and `fill`; FileDrop `root` and `input`; IconButton and BareIconButton `root`; CopyButton `root`, `text` and `live`, with `tone` as its variant.

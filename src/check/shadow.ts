@@ -8,6 +8,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { KAY_FILE, TS_FILE } from '../build/files'
 import { importedSignals } from '../build/signals'
+import { uiEntryOf } from '../build/ui'
 import { compileKay } from '../compiler'
 import { expressionSpans } from '../compiler/ast'
 import { parseKay } from '../compiler/parser'
@@ -113,7 +114,7 @@ export function compileShadow(root: string, file: string, source: string, { rout
     return relative(shadowDir, target)
   }
   const queries = layoutQueries(file, source, routesDir, mounts)
-  const { tsx, map, bodyLines, moduleLines, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), outerQueries: moved ? layoutQueries(file, source, routesDir, mounts, { dir: shadowDir, of: shadowOf }) : queries, check: true, page: route !== undefined, typesOnly, insideIsland, relocateImport, lints, importedSignals: signals })
+  const { tsx, map, bodyLines, moduleLines, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), outerQueries: moved ? layoutQueries(file, source, routesDir, mounts, { dir: shadowDir, of: shadowOf }) : queries, check: true, page: route !== undefined, typesOnly, insideIsland, relocateImport, lints, importedSignals: signals, ui: uiEntryOf(root, file) })
   // Reported as the server reports it, rather than as a type error in the shadow file.
   const unknown = Object.values(route?.matchers ?? {}).filter(matcher => matcherSource(routesDir, matcher) === undefined)
 

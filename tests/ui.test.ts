@@ -277,7 +277,7 @@ describe('kay check on src/ui.ts', () => {
     ])
   })
 
-  it('reports an unknown part, variant and value, listing the known ones', async () => {
+  it('reports an unknown part, listing the known ones, and takes a variant or value the recipe lacks', async () => {
     await Bun.write(join(scratch, 'src/ui.ts'), 'export default { \'./card.kay\': { parts: { foot: \'a\' }, variants: { size: { sm: \'b\' }, tone: { loud: { head: \'c\', tail: \'d\' } } } } }')
 
     const problems = uiProblems(scratch)
@@ -285,11 +285,8 @@ describe('kay check on src/ui.ts', () => {
     expect(problems.map(problem => problem.message)).toEqual([
       '`./card.kay` has no part `foot`',
       '`./card.kay` has no part `tail`',
-      '`./card.kay` has no variant `size`',
-      'The variant `tone` of `./card.kay` has no value `loud`',
     ])
     expect(problems[0]!.help).toContain('`head`')
-    expect(problems[2]!.help).toContain('`tone`')
   })
 
   it('reports two keys naming one component, and a page, a layout or a server-fenced file', async () => {
@@ -367,5 +364,77 @@ describe('a component keyed by its name', () => {
     await Bun.write(join(scratch, 'src/latecomer.kay'), 'section.card\n  header(part="head") a\n')
     expect(uiProblems(scratch)).toEqual([])
     expect(uiEntryOf(scratch, join(scratch, 'src/latecomer.kay'))).toEqual({ parts: 'p-2' })
+  })
+})
+
+describe('a variant or value src/ui.ts adds', () => {
+  const ADDED = `export default {
+  './card.kay': { variants: { tone: { brand: { head: 'bg-brand', root: 'ring' } }, size: { big: { head: 'text-xl' } } } },
+  './plain.kay': { variants: { tone: { loud: 'font-black' } } },
+}`
+
+  it('renders its classes on the server when passed, and leaves the recipe\'s default alone', async () => {
+    await Bun.write(join(scratch, 'src/ui.ts'), ADDED)
+
+    const server = await bundle('bun', 'out-added')
+
+    expect(html(server.Card!, { title: 't', tone: 'brand', size: 'big' })).toContain('<section class="card p-4 ring"><header class="p-2 bg-brand text-xl" data-part="head">t</header>')
+    expect(html(server.Card!, { title: 't' })).toContain('<section class="card p-4"><header class="p-2" data-part="head">t</header>')
+    expect(html(server.Card!, { title: 't', tone: 'danger' })).toContain('text-red-700')
+    expect(html(server.Plain!, { tone: 'loud' })).toContain('<section class="card font-black">')
+    expect(html(server.Plain!, {})).toContain('<section class="card">')
+  })
+
+  it('renders them in an island, and does not hand the variant to the element', async () => {
+    GlobalRegistrator.register()
+
+    try {
+      const client = await bundle('browser', 'out-added-client')
+      const root = document.createElement('div')
+
+      document.body.append(root)
+
+      const stop = client.render(() => client.Card!({ title: 't', tone: 'brand' }), root)
+
+      expect(root.querySelector('section')?.getAttribute('class')).toBe('card p-4 ring')
+      expect(root.querySelector('header')?.getAttribute('class')).toBe('p-2 bg-brand')
+      stop()
+    }
+    finally {
+      await GlobalRegistrator.unregister()
+    }
+  })
+
+  it('is checked for the parts it names, and for nothing else', async () => {
+    await Bun.write(join(scratch, 'src/ui.ts'), ADDED.replace('big: { head', 'big: { foot'))
+
+    expect(uiProblems(scratch).map(problem => problem.message)).toEqual(['`./card.kay` has no part `foot`'])
+  })
+})
+
+describe('the src/ui.ts examples of the docs', () => {
+  const FILES = ['llms/styles-and-assets.md', 'packages/ui/llms/setup.md', 'docs/src/content/docs/essentials/styling-and-assets.md', 'docs/src/content/docs/libraries/kayjs-ui.md']
+  const BLOCK = /```ts\n([^`]*defineUi\([^`]*)```/g
+
+  it('pass kay check against kayjs-ui and an app with a Panel component', async () => {
+    const project = await scratchDir('ui-docs-')
+
+    try {
+      await Bun.write(join(project, 'src/components/panel.kay'), 'section\n  div(part="body") a\n')
+
+      for (const file of FILES) {
+        const blocks = [...(await Bun.file(join(import.meta.dir, '..', file)).text()).matchAll(BLOCK)].map(match => match[1]!)
+
+        expect(blocks.length).toBeGreaterThan(0)
+
+        for (const block of blocks) {
+          await Bun.write(join(project, 'src/ui.ts'), block)
+          expect({ file, problems: uiProblems(project).map(problem => problem.message) }).toEqual({ file, problems: [] })
+        }
+      }
+    }
+    finally {
+      await rm(project, { recursive: true, force: true })
+    }
   })
 })

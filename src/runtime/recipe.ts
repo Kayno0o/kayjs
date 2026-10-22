@@ -14,8 +14,15 @@ type NumberOf<Name> = Name extends `${infer Number extends number}` ? Number : n
 
 type VariantValues<Variants extends VariantTable> = { [Name in keyof Variants]?: VariantValue<Variants[Name]> | undefined }
 
-// The variant props a recipe adds to a component's props, inferred from the recipe so the component declares them once.
-export type RecipeProps<Recipe> = Recipe extends (values?: infer Values, part?: string) => string ? NonNullable<Values> : never
+type RecipeValues<Recipe> = [Recipe] extends [never] ? Record<never, never> : Recipe extends (values?: infer Values, part?: string) => string ? NonNullable<Values> : Record<never, never>
+
+// The variant props a recipe adds to a component's props, inferred from the recipe so the component declares them once; `Added` holds the values `src/ui.ts` adds, by variant, which join the recipe's or open a variant of their own.
+export type RecipeProps<Recipe, Added extends Record<string, string> = Record<never, never>> = [keyof Added] extends [never]
+  ? RecipeValues<Recipe>
+  : Omit<RecipeValues<Recipe>, keyof Added> & { [Name in keyof Added]?: (Name extends keyof RecipeValues<Recipe> ? RecipeValues<Recipe>[Name] : never) | VariantValue<Record<Added[Name], unknown>> | undefined }
+
+// A component's props without the variants `src/ui.ts` widens, whose type the recipe and `src/ui.ts` give.
+export type ReplacedProps<Props, Names extends string> = Props extends unknown ? Omit<Props, Names> : never
 
 export interface Recipe<Variants extends VariantTable> {
   // The classes of a part, `root` unless named: its base, then the variant of each value given, in the order the variants are declared.

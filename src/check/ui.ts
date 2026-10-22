@@ -73,24 +73,6 @@ function componentProblems(ui: UiSource, component: UiComponent, report: (span: 
     if (!found.parts.has(part.name))
       report(part.span, `\`${component.specifier}\` has no part \`${part.name}\``, `its parts are ${listed(found.parts)}`)
   }
-
-  if (found.variants === undefined)
-    return
-
-  for (const variant of component.variants) {
-    const values = Object.hasOwn(found.variants, variant.name) ? found.variants[variant.name]! : undefined
-
-    if (values === undefined) {
-      report(variant.span, `\`${component.specifier}\` has no variant \`${variant.name}\``, Object.keys(found.variants).length === 0 ? 'a variant restyles one the component\'s `recipe()` declares, and it declares none' : `its variants are ${listed(Object.keys(found.variants))}`)
-
-      continue
-    }
-
-    for (const value of variant.values) {
-      if (!values.includes(value.name))
-        report(value.span, `The variant \`${variant.name}\` of \`${component.specifier}\` has no value \`${value.name}\``, `its values are ${listed(values)}`)
-    }
-  }
 }
 
 // What `src/ui.ts` sets that the components it names do not have: an unknown component, part, variant or value, and a file the compiler cannot read as written.
