@@ -182,6 +182,7 @@ async function installKay(dir: string) {
   await Promise.all((await readdir(join(repo, 'node_modules/.bin'))).filter(name => name !== 'kay').map(async name => symlink(join(repo, 'node_modules/.bin', name), join(modules, '.bin', name))))
   await Bun.write(join(modules, '.bin', 'kay'), `#!/bin/sh\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(join(repo, 'src/cli.ts'))} "$@"\n`)
   await chmod(join(modules, '.bin', 'kay'), 0o755)
+
   // kayjs-auth and kayjs-ui resolve `kay` from where they sit, so copies of the workspace's own go beside the project's kay: linked, they would type-check against the checkout's.
   if (await Bun.file(join(dir, 'src/auth.ts')).exists()) {
     const scope = join(modules, '@kaynooo')

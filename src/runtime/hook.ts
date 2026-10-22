@@ -1,5 +1,6 @@
 // The text between a function's parentheses, or its lone arrow parameter: its first character is all that is read.
 const PARAMETERS = /^(?:async\s+)?(?:function[^(]*|[\w$]+\s*)?\(\s*(.?)/
+const IDENTIFIER_START = /^[\w$]+/
 const NATIVE = '[native code]'
 
 type Shape = 'event' | 'positional' | { keys: string[] }
@@ -40,7 +41,7 @@ function patternKeys(source: string): string[] | undefined {
 
   keys.push(piece)
 
-  const named = keys.map(key => key.trim()).filter(key => key !== '' && !key.startsWith('...')).map(key => (/^[\w$]+/).exec(key)?.[0])
+  const named = keys.map(key => key.trim()).filter(key => key !== '' && !key.startsWith('...')).map(key => IDENTIFIER_START.exec(key)?.[0])
 
   return named.every(key => key !== undefined) ? named : undefined
 }

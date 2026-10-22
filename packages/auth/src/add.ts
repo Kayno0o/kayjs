@@ -1,4 +1,3 @@
-
 interface Project {
   name: string
   exists: (path: string) => boolean

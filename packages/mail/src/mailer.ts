@@ -6,7 +6,7 @@ import type { Address, Delivery, Envelope, Mail, Message, Transport } from './ty
 import process from 'node:process'
 import { Elysia } from 'elysia'
 import { s } from 'kay'
-import { configError, callHook, escapeHtml as escape, inFlightWork, underKayDev } from 'kay/library'
+import { callHook, configError, escapeHtml as escape, inFlightWork, underKayDev } from 'kay/library'
 import { defineEnv, queue, renderLocale, renderToString } from 'kay/server'
 import parseAddresses from 'nodemailer/lib/addressparser'
 import { attempt, deliveryAddress, messageOf } from './delivery'

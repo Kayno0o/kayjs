@@ -3406,30 +3406,30 @@ describe.concurrent('kay check, unused code', () => {
   })
 
   it('reports the dropped identity-key in a kay-allow comment and in lints, and --fix removes the name only', async () => {
-  const root = await scratchProject({
-    'kay.config.ts': 'export default {\n  lints: { \'identity-key\': \'allow\', \'missing-alt\': \'warn\' },\n}\n',
-    'src/components/list.kay': '---\nconst posts = signal([{ slug: \'a\' }])\nconst empty = signal([{ slug: \'b\' }])\n---\nul\n  // kay-allow identity-key\n  for post of posts()\n    li {post.slug}\n  // kay-allow missing-alt, identity-key\n  for row of empty()\n    li {row.slug}\nbutton(onClick={() => { posts.set([]); empty.set([]) }}) Clear\n',
+    const root = await scratchProject({
+      'kay.config.ts': 'export default {\n  lints: { \'identity-key\': \'allow\', \'missing-alt\': \'warn\' },\n}\n',
+      'src/components/list.kay': '---\nconst posts = signal([{ slug: \'a\' }])\nconst empty = signal([{ slug: \'b\' }])\n---\nul\n  // kay-allow identity-key\n  for post of posts()\n    li {post.slug}\n  // kay-allow missing-alt, identity-key\n  for row of empty()\n    li {row.slug}\nbutton(onClick={() => { posts.set([]); empty.set([]) }}) Clear\n',
+    })
+
+    try {
+      const { output } = await runCheck(root)
+
+      expect(output.match(/deprecated-identity-key/g)).toHaveLength(3)
+      expect(output).not.toContain('unknown-lint')
+      expect(output).not.toContain('no lint or group')
+      await Bun.write(join(root, 'kay.config.ts'), 'export default {\n  lints: { \'identity-key\': \'allow\', },\n}\n')
+      expect((await runCheck(root, '--fix')).output).not.toContain('deprecated-identity-key')
+      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('export default {\n  lints: {  },\n}\n')
+      await Bun.write(join(root, 'kay.config.ts'), 'export default {\n  lints: { \'identity-key\': \'allow\', \'missing-alt\': \'warn\' },\n}\n')
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/components/list.kay')).text()).toBe('---\nconst posts = signal([{ slug: \'a\' }])\nconst empty = signal([{ slug: \'b\' }])\n---\nul\n  for post of posts()\n    li {post.slug}\n  // kay-allow missing-alt\n  for row of empty()\n    li {row.slug}\nbutton(onClick={() => { posts.set([]); empty.set([]) }}) Clear\n')
+      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('export default {\n  lints: { \'missing-alt\': \'warn\' },\n}\n')
+      expect((await runCheck(root)).output).not.toContain('deprecated-identity-key')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
-
-  try {
-    const { output } = await runCheck(root)
-
-    expect(output.match(/deprecated-identity-key/g)).toHaveLength(3)
-    expect(output).not.toContain('unknown-lint')
-    expect(output).not.toContain('no lint or group')
-    await Bun.write(join(root, 'kay.config.ts'), 'export default {\n  lints: { \'identity-key\': \'allow\', },\n}\n')
-    expect((await runCheck(root, '--fix')).output).not.toContain('deprecated-identity-key')
-    expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('export default {\n  lints: {  },\n}\n')
-    await Bun.write(join(root, 'kay.config.ts'), 'export default {\n  lints: { \'identity-key\': \'allow\', \'missing-alt\': \'warn\' },\n}\n')
-    await runCheck(root, '--fix')
-    expect(await Bun.file(join(root, 'src/components/list.kay')).text()).toBe('---\nconst posts = signal([{ slug: \'a\' }])\nconst empty = signal([{ slug: \'b\' }])\n---\nul\n  for post of posts()\n    li {post.slug}\n  // kay-allow missing-alt\n  for row of empty()\n    li {row.slug}\nbutton(onClick={() => { posts.set([]); empty.set([]) }}) Clear\n')
-    expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('export default {\n  lints: { \'missing-alt\': \'warn\' },\n}\n')
-    expect((await runCheck(root)).output).not.toContain('deprecated-identity-key')
-  }
-  finally {
-    await rm(root, { recursive: true, force: true })
-  }
-})
 
   it('reports the rate limit options under their old names and --fix renames them, leaving a call that gives both and an object held elsewhere', async () => {
     const config = 'import { ai, ask } from \'@kaynooo/kayjs-ai\'\nimport * as auths from \'@kaynooo/kayjs-auth\'\nimport { createAuth } from \'@kaynooo/kayjs-auth\'\nimport { mailer, smtp } from \'@kaynooo/kayjs-mail\'\n\nconst limit = { max: 1, window: \'1m\' }\nconst held = { limit }\n\nexport const extensions = [ai({ limit, visitor: request => request.headers.get(\'x-user\') ?? undefined })]\nexport const both = ai({ limit, rateLimit: limit })\nexport const unread = ai(held)\nexport const auth = createAuth({ limits: { signIn: { max: 3, window: \'1h\' } } })\nexport const asked = ask(\'hi\', { visitor: \'job\' })\nexport const spaced = auths.createAuth({ "limits": {} })\nexport const sent = smtp({ host: \'mail.test\', rateLimit: 5 })\nexport const nested = mailer({ smtp: { rateLimit: 2 } })\nexport const done = smtp({ host: \'mail.test\', rateLimit: { max: 5, window: \'1s\' } })\nexport const other = ai({ budget: { tokens: 1, window: \'1d\' } })\n'
