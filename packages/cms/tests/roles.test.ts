@@ -19,6 +19,11 @@ void mock.module('../src/store', () => ({
   entryScreen: async ({ slug }: { slug: string }) => ({ entry: slug === 'hello' || slug === 'café' ? { data: saved } : undefined }),
 }))
 
+const { default: devApi } = await import('../src/api/dev')
+
+// The guard names the cms's routes below the mount of its own modules, which a mounted site sets.
+Object.assign(devApi, { [Symbol.for('kay.api')]: '/api/cms/dev' })
+
 const { default: apiGuard } = await import('../src/api/_guard')
 
 interface Asks { method?: string, path: string, body?: unknown, cookie?: string, user?: { roles: string[], email?: string } | null, headers?: Record<string, string> }

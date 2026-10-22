@@ -93,17 +93,17 @@ const REGEX_SYNTAX = /[.*+?^${}()|[\]\\]/g
 export async function projectApi(root: string, config: Pick<KayConfig, 'api' | 'extensions' | 'apiPath'>): Promise<ApiModule[]> {
   const [app, ...mounts] = apiTrees(root, config)
 
-  return scanApi(app!.dir, mounts, app!.apiPath)
+  return scanApi(app!.dir, mounts, apiPathOf(config.apiPath))
 }
 
 // The app's API directory at the root of the API tree, then each extension's under its prefix.
 export function apiTrees(root: string, config: Pick<KayConfig, 'api' | 'extensions' | 'apiPath'>): RouteMount[] {
   const apiPath = apiPathOf(config.apiPath)
 
-  return [{ dir: projectPaths(root, config).api, prefix: '', apiPath }, ...apiMounts(root, config.extensions)].map(tree => ({ ...tree, apiPath }))
+  return [{ dir: projectPaths(root, config).api, prefix: '' }, ...apiMounts(root, config.extensions)].map(tree => ({ ...tree, apiPath }))
 }
 
-// Every module under `apiDir`, mounted at `/api` plus its path there, then each mounted library's under its prefix that no module before it is served at.
+// Every module under `apiDir`, mounted at `apiPath` (`/api` by default) plus its path there, then each mounted library's under its prefix that no module before it is served at.
 export async function scanApi(apiDir: string, mounts: RouteMount[] = [], apiPath = API_PREFIX): Promise<ApiModule[]> {
   const trees = [{ dir: apiDir, prefix: '' }, ...mounts]
   const modules: ApiModule[] = []

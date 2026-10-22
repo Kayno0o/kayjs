@@ -13,6 +13,11 @@ void mock.module('kay/server', () => ({
   editedEntry: (request: Request, collection: string, slug: string) => (request.headers.get('x-edit') ?? '').split(',').includes(`${collection}/${slug}`),
 }))
 
+const { default: devApi } = await import('../src/api/dev')
+
+// The guard names the cms's routes below the mount of its own modules, which a mounted site sets.
+Object.assign(devApi, { [Symbol.for('kay.api')]: '/api/cms/dev' })
+
 const { default: apiGuard } = await import('../src/api/_guard')
 const { default: screenGuard } = await import('../src/routes/_guard')
 const ada = { name: 'Ada', email: 'ada@example.com' }
@@ -96,6 +101,16 @@ describe('the API guard', () => {
       expect(await admitted(context('GET', '/entries/posts/hello/', 'posts/hello'))).toBe(false)
       expect(await admitted(context('GET', '/entries/orders/42', 'posts/hello,orders/42'))).toBe(true)
     }
+  })
+
+  test('reads a collection or a slug named like a route as the entry it is', async () => {
+    configure({})
+
+    for (const path of ['/entries/cms/dev', '/entries/cms/icons', '/entries/x/dev', '/entries/files/rules', '/entries/editor/module.js'])
+      expect(await admitted(context('GET', path, 'posts/hello'))).toBe(false)
+
+    expect(await admitted(context('GET', '/dev', false))).toBe(true)
+    expect(await admitted(context('GET', '/entries/cms/dev', 'cms/dev'))).toBe(true)
   })
 
   test('lets a signed-in editor read any collection through the app\'s guard', async () => {

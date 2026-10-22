@@ -26,7 +26,7 @@ export default api()
 
 `api()` is an Elysia instance whose handlers read the app's `locals`, so `({ user })` is typed. A `_guard.ts` in `src/api/` protects its routes the way it protects pages. A handler runs in the locale of the page that called it, by its `Referer` or the browser's `Accept-Language`, so `t()` and `wording()` answer in it. A websocket's `open` and `message` callbacks run outside it.
 
-To serve the API somewhere else, set `apiPath: '/v1'` in `kay.config.ts`: every module, the OpenAPI document and the reference page move under it, and islands, the service worker, link prefetching and the libraries follow. `apiUrl(module, path)` from `kay` gives where a route is served when code needs the URL rather than a call.
+To serve the API somewhere else, set `apiPath: '/v1'` in `kay.config.ts`: every module, the OpenAPI document and the reference page move under it, and islands, the service worker, link prefetching and the libraries follow. `apiUrl(module, path)` from `kay` gives where a route is served when code needs the URL rather than a call; a page using it renders per request, as the module is mounted only by a running server.
 
 A route at the path of a page, a public file, an endpoint or a redirect stops the server at boot. A single file a static export should write, such as `llms.txt`, is an [endpoint file](/essentials/routing#endpoint-files) in `src/routes/` instead.
 

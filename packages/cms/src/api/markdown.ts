@@ -15,7 +15,7 @@ const KEPT = { tags: ['img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'], attri
 
 // A Markdown text rendered by the site's own parser, for the editor's Preview: its structure, with a component shown as its content, code highlighted by the site's highlighter, and an image written as a path in the entry's folder shown from there. The HTML is sanitized, as it is shown inside the screens, which a `<script>` in a text must not run in; a link opens in a new tab so a click never leaves a draft.
 // The module as mounted, which the handler below reads to name its own image route: a reference to the module inside its own initializer would leave its type circular.
-const self: { module?: unknown } = {}
+const self: { module?: unknown } = {} // kaynooo/kayjs#1840
 
 const markdown = api()
   .onError(({ error, status }) => error instanceof UnknownCollectionError ? status(404, error.message) : undefined)

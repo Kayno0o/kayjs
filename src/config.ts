@@ -443,11 +443,15 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
 export const PLUGINS_DIR = 'src/plugins'
 const PLUGIN_FILE = /^[^_.][^.]*\.ts$/
 
-// The app's `src/plugins/*.ts` as extensions carrying a server module, then the config's extensions: every server plugin `pages()` mounts, in the order it mounts them.
-export function serverExtensions(root: string, extensions: KayExtension[] | undefined): KayExtension[] {
+// The file names of the app's server plugins, in the order they are used.
+export function pluginFiles(root: string): string[] {
   const dir = join(root, PLUGINS_DIR)
-  const files = existsSync(dir) ? readdirSync(dir).filter(name => PLUGIN_FILE.test(name)).sort() : []
 
+  return existsSync(dir) ? readdirSync(dir).filter(name => PLUGIN_FILE.test(name)).sort() : []
+}
+
+// The app's `src/plugins/*.ts` as extensions carrying a server module, then the config's extensions: every server plugin `pages()` mounts, in the order it mounts them. An executable gives the `files` it was built with, as it holds no such directory.
+export function serverExtensions(root: string, extensions: KayExtension[] | undefined, files = pluginFiles(root)): KayExtension[] {
   return [...files.map(name => ({ name: `${PLUGINS_DIR}/${name}`, serverModule: { path: `./${PLUGINS_DIR}/${name}` } })), ...extensions ?? []]
 }
 

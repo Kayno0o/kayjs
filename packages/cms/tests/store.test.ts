@@ -727,7 +727,7 @@ describe('a new entry saved by a role that may not publish, through the entries 
     const path = `/${collection}/new`
     const request = new Request(`http://site.test${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ data: { title: 'New' }, create: true }) })
 
-    expect(await leavesPublication(request, `/api/cms/entries${path}`)).toBe(true)
+    expect(await leavesPublication(request, `/entries${path}`)).toBe(true)
     expect(await (await entriesApi.handle(request)).json()).toMatchObject({ saved: true })
     expect(frontmatter(saved[0]!)).toEqual({ title: 'New', publishAt: held })
   })

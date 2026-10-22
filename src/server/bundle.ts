@@ -10,8 +10,10 @@ export interface Bundle {
   routes: Route[]
   // The routes directory's own special pages, answering URLs no page serves.
   fallback: SpecialPages
-  // The modules under the API directory, mounted under `/api`.
+  // The modules under the API directory, mounted under `/api` or the config's `apiPath`.
   api?: ApiModule[]
+  // The file names under `src/plugins`, whose plugins `pages()` uses before the pages.
+  plugins?: string[]
   // The endpoint files under the routes directory, `llms.txt.ts` and the like.
   endpoints?: Endpoint[]
   modules: Record<string, unknown>

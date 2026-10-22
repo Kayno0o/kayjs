@@ -49,6 +49,13 @@ describe('service worker', () => {
     expect(headers.get('cache-control')).toBe('no-cache')
   })
 
+  it('asks the network for the API where apiPath mounts it', async () => {
+    const app = await pages({ routes: ROUTES, prebuilt: false, site: 'https://x.example', base: '/repo', apiPath: '/v1', offline: { pages: ['/'] } })
+    const { settings } = await worker(app)
+
+    expect(settings!.network).toEqual(['/repo/_kay/', '/repo/v1/'])
+  })
+
   it('stays off with offline: false from a JS config', async () => {
     const app = await pages({ routes: ROUTES, prebuilt: false, site: 'https://x.example', offline: false })
     const page = await app.handle(new Request('http://localhost/about'))

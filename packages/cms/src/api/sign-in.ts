@@ -5,7 +5,7 @@ import { settings } from '../settings'
 
 const TRAILING_SLASH = /\/$/
 // The module as mounted, which the handler reads to find the base the request came in under: a reference to the module inside its own initializer would leave its type circular.
-const self: { module?: unknown } = {}
+const self: { module?: unknown } = {} // kaynooo/kayjs#1840
 
 // Where an editor whose sign-in ended goes to sign in again, from the editor's own tab: the sign-in screen, leading back to `redirect`. No guard runs, as the editor has none to show.
 const signIn = api({ guards: false })

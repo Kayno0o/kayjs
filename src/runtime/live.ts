@@ -443,7 +443,7 @@ export function routeUrl(module: unknown, path: string, options: UrlInput = {}):
   const mount = (module as { [API_MOUNT]?: string } | undefined)?.[API_MOUNT]
 
   if (mount === undefined)
-    throw new TypeError('kay: socket(), stream(), resource() and call() take the default export of a module under src/api')
+    throw new TypeError('kay: socket(), stream(), resource(), call() and apiUrl() take the default export of a module under src/api')
 
   const segments = path.split('/').map((segment) => {
     if (segment === '*')
@@ -479,7 +479,7 @@ export function routeUrl(module: unknown, path: string, options: UrlInput = {}):
   return `${mount}${joined === '/' ? '' : joined}${search}`
 }
 
-// Where a route of a module under `src/api` is served, its params filled in and its query appended, under the site's `base` in the browser: the path follows `apiPath`, so code naming a route never writes `/api/...`.
+// Where a route of a module under `src/api` is served, its params filled in and its query appended, under the site's `base` in the browser: the path follows `apiPath`, so code naming a route never writes `/api/...`. On the server the module must be mounted, which a prerender never does.
 export function apiUrl(module: unknown, path = '/', options: UrlInput = {}): string {
   return withBase(routeUrl(module, path, options))
 }

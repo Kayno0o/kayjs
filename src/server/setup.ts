@@ -177,7 +177,7 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
   void Promise.allSettled([loadingClient])
 
   // Imported while the client builds; the content config is already imported, so an extension or API module may read the collections at import time.
-  const extensions = prerendering ? Promise.resolve([]) : extensionServers(serverExtensions(root, config.extensions), root)
+  const extensions = prerendering ? Promise.resolve([]) : extensionServers(serverExtensions(root, config.extensions, source.plugins(root)), root)
   const api = prerendering ? Promise.resolve([]) : source.api(root, config)
 
   void Promise.allSettled([extensions, api])

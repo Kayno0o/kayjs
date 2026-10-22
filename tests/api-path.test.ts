@@ -32,6 +32,15 @@ describe('apiPath', () => {
     expect(page).not.toContain('/shop/api/')
   })
 
+  it('hashes the prefetch rules the page carries into its content security policy', async () => {
+    const response = await moved.fetch('/')
+    const script = (/<script type="speculationrules">(.*?)<\/script>/).exec(await response.text())?.[1]
+    const hash = `'sha256-${new Bun.CryptoHasher('sha256').update(script ?? '').digest('base64')}'`
+
+    expect(script).toContain('/shop/v1/*')
+    expect(response.headers.get('content-security-policy')).toContain(hash)
+  })
+
   it('keeps /api and sets no meta when left out', async () => {
     const plain = await testSite({ routes: 'tests/fixtures/openapi/src/routes', api: 'tests/fixtures/openapi/src/api' })
 

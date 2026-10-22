@@ -1,6 +1,6 @@
 import type { GuardContext } from 'kay'
 import type { Action } from '../roles'
-import { guard } from 'kay'
+import { apiUrl, guard } from 'kay'
 import { READ_METHODS, underKayDev } from 'kay/library'
 import { editedEntry, editRequested } from 'kay/server'
 import { wording } from 'kay/words'
@@ -8,31 +8,50 @@ import { forbidden, may, memberOf, routePath } from '../access'
 import { authors } from '../authors'
 import { leavesPublication, restrain } from '../publishing'
 import { settings } from '../settings'
+import devApi from './dev'
+
+// Where the cms's modules are mounted; the default `/api/cms` for an app that replaced the dev module with its own, which then is not mounted.
+function mountRoot(): string {
+  try {
+    return apiUrl(devApi, '/').slice(0, -'/dev'.length)
+  }
+  catch {
+    return '/api/cms'
+  }
+}
+
+// The path below the cms's own mount (`/entries/posts/hello`), whatever `base` and `apiPath` put before it, so a collection or slug named like a route never reads as one.
+function ownPath(path: string): string {
+  const root = mountRoot()
+  const at = path.indexOf(`${root}/`)
+
+  return at < 0 ? path : path.slice(at + root.length)
+}
 
 // Leaving edit mode writes nothing, so an edit link alone may do it; `/entries/preview/exit` is a save to a collection named preview.
-const LEAVING = /\/cms\/preview\/exit$/
+const LEAVING = /^\/preview\/exit$/
 
 // What the editor reads: an entry of a collection, and the rules for an upload.
-const ENTRY = /\/cms\/entries\/([^/]+)\/([^/]+)$/
-const UPLOAD_RULES = /\/cms\/files\/rules$/
-const ICON_PAGE = /\/cms\/icons$/
+const ENTRY = /^\/entries\/([^/]+)\/([^/]+)$/
+const UPLOAD_RULES = /^\/files\/rules$/
+const ICON_PAGE = /^\/icons$/
 // The preview's images, read from the folder of the entry being edited.
-const PREVIEW_IMAGE = /\/cms\/markdown\/image$/
+const PREVIEW_IMAGE = /^\/markdown\/image$/
 // The module an editor's browser loads on each page, which holds nothing private.
-const PAGE_LINK_MODULE = /\/cms\/editor\/module\.js$/
+const PAGE_LINK_MODULE = /^\/editor\/module\.js$/
 // What the dev tool's tab reads, which answers under `kay dev` alone and holds the edit mode's state and the tab's texts.
-const DEV_STATE = /\/cms\/dev$/
-const EDITOR_CAN = /\/cms\/editor\/can$/
+const DEV_STATE = /^\/dev$/
+const EDITOR_CAN = /^\/editor\/can$/
 
 // What a role may be limited from, by the route: publishing, deleting, uploading and the redirects, which a rename makes.
 // Sharing a draft shows what is not published, so it is a publisher's.
-const PUBLISH = /\/cms\/entries\/[^/]+\/[^/]+\/(?:publish|unpublish|share)$/
-const ENTRY_RENAME = /\/cms\/entries\/[^/]+\/[^/]+\/rename$/
-const REDIRECTS = /\/cms\/redirects(?:\/|$)/
-const UPLOAD = /\/cms\/files\/[^/]+$/
-const MEDIA_RENAME = /\/cms\/files\/media\/rename$/
-const RESTORE = /\/cms\/(?:history\/[^/]+\/[^/]+|trash\/[^/]+\/[^/]+)\/restore$/
-const UNUSED_UPLOADS = /\/cms\/files\/unused\/delete$/
+const PUBLISH = /^\/entries\/[^/]+\/[^/]+\/(?:publish|unpublish|share)$/
+const ENTRY_RENAME = /^\/entries\/[^/]+\/[^/]+\/rename$/
+const REDIRECTS = /^\/redirects(?:\/|$)/
+const UPLOAD = /^\/files\/[^/]+$/
+const MEDIA_RENAME = /^\/files\/media\/rename$/
+const RESTORE = /^\/(?:history\/[^/]+\/[^/]+|trash\/[^/]+\/[^/]+)\/restore$/
+const UNUSED_UPLOADS = /^\/files\/unused\/delete$/
 
 // Which action of `cms({ roles })` a request needs, from its method and path as the router reads them.
 function actionOf(method: string, path: string): Action | undefined {
@@ -50,10 +69,12 @@ function actionOf(method: string, path: string): Action | undefined {
 
 // Whether the edit cookie may read this request: only an entry the pages rendered in edit mode read, since it is tied to no user and a preview link goes to people the app has not signed in.
 function mayRead(ctx: GuardContext): boolean {
-  if (UPLOAD_RULES.test(ctx.url.pathname) || ICON_PAGE.test(ctx.url.pathname) || (PREVIEW_IMAGE.test(ctx.url.pathname) && underKayDev()))
+  const path = ownPath(ctx.url.pathname)
+
+  if (UPLOAD_RULES.test(path) || ICON_PAGE.test(path) || (PREVIEW_IMAGE.test(path) && underKayDev()))
     return true
 
-  const [, collection, slug] = ENTRY.exec(ctx.url.pathname) ?? []
+  const [, collection, slug] = ENTRY.exec(path) ?? []
 
   if (collection === undefined || slug === undefined)
     return false
@@ -78,13 +99,13 @@ export default guard(async (ctx) => {
   const { guard: admits, author } = settings()
   const { method } = ctx.request
 
-  if (method === 'GET' && (PAGE_LINK_MODULE.test(ctx.url.pathname) || DEV_STATE.test(ctx.url.pathname)))
+  if (method === 'GET' && (PAGE_LINK_MODULE.test(ownPath(ctx.url.pathname)) || DEV_STATE.test(ownPath(ctx.url.pathname))))
     return
 
   const editing = editRequested(ctx.request)
 
   if (editing) {
-    if (method === 'POST' && LEAVING.test(ctx.url.pathname))
+    if (method === 'POST' && LEAVING.test(ownPath(ctx.url.pathname)))
       return
 
     if (READ_METHODS.has(method) ? mayRead(ctx) : !admits && underKayDev())
@@ -98,10 +119,10 @@ export default guard(async (ctx) => {
 
   if (settings().roles !== undefined) {
     // Read now so the route that tells what the person may do has it; every other route reads it only when it needs it.
-    if (method === 'GET' && EDITOR_CAN.test(ctx.url.pathname))
+    if (method === 'GET' && EDITOR_CAN.test(ownPath(ctx.url.pathname)))
       await memberOf(ctx)
 
-    const path = routePath(ctx.url)
+    const path = ownPath(routePath(ctx.url))
     const needed = actionOf(method, path)
 
     // Restoring undoes an edit or a delete, which any editor may; what it restores never publishes or withdraws for a role that may not.

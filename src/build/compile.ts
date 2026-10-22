@@ -5,7 +5,7 @@ import { existsSync, realpathSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import { buildFailure, KayError, raisedMark } from '../compiler/errors'
-import { CONFIG_FILE, extensionServerModules, serverExtensions } from '../config'
+import { CONFIG_FILE, extensionServerModules, pluginFiles, serverExtensions } from '../config'
 import { PAGES_ENTRY } from '../dev/sources'
 import { projectApi } from '../server/api-modules'
 import { AVIF_WORKER_SOURCE } from '../server/avif'
@@ -100,9 +100,10 @@ export async function compileServer(project: Project, options: CompileOptions): 
   const messageFiles = [...Object.values(extensionMessages).flat(), ...locales.map(locale => messagesFile(root, config.i18n ?? {}, locale)).filter(file => existsSync(file))]
   // The API modules too, with their guards, which `pages()` mounts from the list rather than the directory.
   const api = await projectApi(root, config)
+  const plugins = pluginFiles(root)
   const endpoints = await scanEndpoints(routesDir, mounts)
   const editor = extensionEditor(root, config.extensions)
-  const modules = [...new Set([...routeModules(routes, fallback), ...editor === undefined ? [] : [editor], ...extensionServerModules(root, serverExtensions(root, config.extensions)), ...existsSync(contentConfig) ? [contentConfig] : [], ...matcherFiles, ...messageFiles, ...[...api, ...endpoints].flatMap(module => [module.file, ...module.guards.map(guard => guard.file)])])]
+  const modules = [...new Set([...routeModules(routes, fallback), ...editor === undefined ? [] : [editor], ...extensionServerModules(root, serverExtensions(root, config.extensions, plugins)), ...existsSync(contentConfig) ? [contentConfig] : [], ...matcherFiles, ...messageFiles, ...[...api, ...endpoints].flatMap(module => [module.file, ...module.guards.map(guard => guard.file)])])]
   const configFile = join(root, CONFIG_FILE)
   const generated = join(paths.compile, 'entry.ts')
   const embedded = (dir: string) => `join(import.meta.dir, ${JSON.stringify(basename(dir))})`
@@ -148,6 +149,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
     `  fallback: ${JSON.stringify(fallback)},`,
     `  api: ${JSON.stringify(api)},`,
     `  endpoints: ${JSON.stringify(endpoints)},`,
+    `  plugins: ${JSON.stringify(plugins)},`,
     `  extensionMessages: ${JSON.stringify(extensionMessages)},`,
     ...editor === undefined ? [] : [`  editor: ${JSON.stringify(editor)},`],
     `  modules: { ${modules.map((file, index) => `${JSON.stringify(file)}: module${index}`).join(', ')} },`,

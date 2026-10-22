@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.70.0
 
+### `src/plugins` holds server plugins
+
+Every `src/plugins/<name>.ts` (not `_*`, `*.test.ts`, `*.d.ts`) is now used as a server plugin before the pages, and the server stops with a message naming the file when its default export is not an Elysia plugin. An app keeping other code there (a Bun build plugin, a helper) moves it elsewhere or renames it to start with `_`. No `kay check` lint can recognise it, as any file there may be meant either way.
+
 ### `part` names a part of a component
 
 A static `part="x"` on an element or a component call now renders `data-part="x"` and takes the `class` entry of that name, and `part` with an expression or a value of several words (`part="label icon"`, the HTML attribute for `::part()`) is a `kay check` error. Write the HTML attribute on a custom element through a spread, `{...{ part: 'label' }}`; no lint recognises the old form, as it is a valid HTML attribute.

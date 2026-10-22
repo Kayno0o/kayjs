@@ -61,7 +61,7 @@ export interface HistoryState {
   at?: number
 }
 
-const SKIPPED_PATHS = /^\/(?:_kay|api)(?:\/|$)/
+const KAY_PATHS = /^\/_kay(?:\/|$)/
 const ACTION_PATH = /^\/_kay\/action\//
 const HASH = /#.*/
 const SCROLL_SAVE_MS = 150
@@ -202,7 +202,10 @@ export function swappable(url: URL): boolean {
   if (mount !== '/' && url.pathname !== mount.slice(0, -1) && !url.pathname.startsWith(mount))
     return false
 
-  return !SKIPPED_PATHS.test(withoutBase(url.pathname))
+  const path = withoutBase(url.pathname)
+  const api = document.querySelector<HTMLMetaElement>('meta[name="kay-api"]')?.content ?? '/api'
+
+  return !KAY_PATHS.test(path) && path !== api && !path.startsWith(`${api}/`)
 }
 
 // Where a form posts when the swap posts it: one of the app's actions, in this tab, with nothing opting it out.

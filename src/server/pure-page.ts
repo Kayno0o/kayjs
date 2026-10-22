@@ -53,7 +53,6 @@ export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   navigate: 'free',
   refresh: 'free',
   refusalMessage: 'free',
-  apiUrl: 'free',
   ActionError: 'free',
   ActionRedirect: 'free',
   ActionRedirectError: 'free',
@@ -66,6 +65,8 @@ export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   guard: 'request',
   action: 'free',
   call: 'request',
+  // Names a route of a module the running server mounted, which a prerender never loads.
+  apiUrl: 'request',
   dispatch: 'request',
   resource: 'request',
   socket: 'request',

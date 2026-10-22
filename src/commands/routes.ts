@@ -198,6 +198,7 @@ function kayRoutes(root: string, config: KayConfig): Listed[] {
   const enabled = config.openapi === false ? undefined : config.openapi
   const openapi = enabled === true ? {} : enabled
   const mcpAt = mcpPath(config.mcp)
+  const documented = openApiPaths(openapi, apiPathOf(config.apiPath))
 
   return [
     ...config.health === false ? [] : [kay(config.health?.path ?? HEALTH_PATH, 'health check')],
@@ -211,7 +212,7 @@ function kayRoutes(root: string, config: KayConfig): Listed[] {
     ...typeof config.security === 'object' && config.security.reports === true ? [kay(CSP_REPORTS, 'CSP violation reports', 'POST')] : [],
     ...config.preview !== undefined && config.preview !== false ? [kay(PREVIEW_ROUTE, 'preview mode')] : [],
     ...mcpAt === undefined ? [] : [kay(mcpAt, 'MCP endpoint', 'POST'), kay(RESOURCE_METADATA, 'MCP sign-in metadata'), kay(`${RESOURCE_METADATA}${mcpAt}`, 'MCP sign-in metadata')],
-    ...openapi !== undefined && openapi.dev !== true ? [kay(openApiPaths(openapi, apiPathOf(config.apiPath)).document, 'OpenAPI document'), ...openapi.reference === true ? [kay(openApiPaths(openapi, apiPathOf(config.apiPath)).reference, 'API reference')] : []] : [],
+    ...openapi !== undefined && openapi.dev !== true ? [kay(documented.document, 'OpenAPI document'), ...openapi.reference === true ? [kay(documented.reference, 'API reference')] : []] : [],
     ...config.site === undefined ? [] : [kay(SITEMAP, 'sitemap, unless the app serves it'), kay(ROBOTS, 'robots.txt, unless the app serves it')],
     ...favicon ? FAVICON_PATHS.filter(path => (path !== SVG_ICON || favicon.svg !== undefined) && (!MASKABLE_ICON.test(path) || favicon.maskable !== undefined)).map(path => kay(path, 'favicon, unless the app serves it')) : [],
     ...favicon ? localeManifests({ name: config.seo?.name, description: config.seo?.description }, config.i18n).map(({ path }) => kay(path, 'favicon, unless the app serves it')) : [],
