@@ -5,6 +5,7 @@ import { cached } from '../src/runtime/cache'
 import { rateLimit, rooms } from '../src/server'
 import { appStore, setupStore } from '../src/server/app-store'
 import { createDataTables, dataTables, pgData, pgHandle } from '../src/server/pg-data'
+import { indexStatement } from '../src/server/pg-jobs'
 import { pgRooms } from '../src/server/pg-rooms'
 import { pgRates, pgSessions, pgVitals } from '../src/server/pg-stores'
 import { cleanUpAfterFile, pgDescribe, pgIt, postgres, replicas } from './job-stores'
@@ -126,7 +127,7 @@ pgDescribe('pgData', () => {
     expect(await rows(sql, 'SELECT indisvalid FROM pg_index WHERE indexrelid = to_regclass(\'kay_jobs_due\')')).toEqual([{ indisvalid: true }])
   })
 
-  pgIt('leaves alone an index another replica is still building', async () => {
+  pgIt('leaves alone an index another session is still building', async () => {
     const sql = await fresh()
     const [holder, first, second] = replicas(3) as [SQL, SQL, SQL]
 
@@ -146,14 +147,19 @@ pgDescribe('pgData', () => {
     const building = async (): Promise<boolean> => (await rows<{ found: boolean }>(sql, 'SELECT EXISTS (SELECT 1 FROM pg_stat_progress_create_index WHERE index_relid = to_regclass(\'kay_jobs_due\')) AS found'))[0]!.found
     const build = (async (): Promise<void> => {
       try {
-        await createDataTables(first)
+        await first.unsafe(indexStatement({ name: 'kay_jobs_due', on: 'kay_jobs (queue, failed, run_at)' }, true))
       }
       catch (error) {
         errors.push(error)
       }
     })()
     const startSecond = async (): Promise<string> => {
-      await createDataTables(second)
+      try {
+        await createDataTables(second)
+      }
+      catch (error) {
+        errors.push(error)
+      }
 
       return 'done'
     }
@@ -176,6 +182,17 @@ pgDescribe('pgData', () => {
     await build
     expect(errors).toEqual([])
     expect(await rows(sql, 'SELECT indisvalid FROM pg_index WHERE indexrelid = to_regclass(\'kay_jobs_due\')')).toEqual([{ indisvalid: true }])
+  })
+
+  pgIt('creates a missing index once when replicas start at once, neither failing', async () => {
+    const sql = await fresh()
+    const [first, second] = replicas(2) as [SQL, SQL]
+
+    await createDataTables(sql)
+    await sql.unsafe('DROP INDEX kay_jobs_due')
+    await sql.unsafe('DROP INDEX kay_jobs_key')
+    await Promise.all([createDataTables(first), createDataTables(second)])
+    expect(await rows(sql, 'SELECT indisvalid FROM pg_index WHERE indexrelid IN (to_regclass(\'kay_jobs_due\'), to_regclass(\'kay_jobs_key\'))')).toEqual([{ indisvalid: true }, { indisvalid: true }])
   })
 
   pgIt('creates the tables once when replicas open it at once', async () => {

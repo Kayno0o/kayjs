@@ -20,6 +20,7 @@ export type PgJobsSource = SQL | { sql: SQL } | string
 
 // What replicas starting together take turns on while one creates the tables.
 const MIGRATION_LOCK = 'kay_jobs'
+const INDEX_LOCK = 'kay_indexes'
 const LOST_KEY_TRIES = 3
 const INSUFFICIENT_PRIVILEGE = '42501'
 const DUPLICATE_RELATION = '42P07'
@@ -60,26 +61,49 @@ export async function relationsMissing(db: SQL, names: readonly string[]): Promi
 }
 
 // Creates the indexes missing on tables that exist, each on its own and concurrently: a plain CREATE INDEX locks its table against writes, and inside a transaction with others it would deadlock with a replica writing several tables.
+// One replica at a time: two concurrent builds of one index deadlock each other, so a replica that finds another one at it leaves the indexes to it.
 export async function createMissingIndexes(db: SQL, indexes: readonly PgIndex[]): Promise<void> {
-  for (const index of indexes) {
-    if (!await relationsMissing(db, [index.name])) {
-      // A concurrent build that failed leaves an invalid index, which is dropped to be built again, but one that is invalid while another session still builds it is left alone.
-      const [found] = await rowsOf<{ valid: boolean, building: boolean }>(db.unsafe(`SELECT indisvalid AS valid, EXISTS (SELECT 1 FROM pg_stat_progress_create_index WHERE index_relid = indexrelid) AS building FROM pg_index WHERE indexrelid = to_regclass('${index.name}')`))
+  const session = await db.reserve()
 
-      if (found?.valid !== false || found.building)
-        continue
+  try {
+    const [lock] = await rowsOf<{ taken: boolean }>(session`SELECT pg_try_advisory_lock(hashtext(${INDEX_LOCK})) AS taken`)
 
-      await db.unsafe(`DROP INDEX CONCURRENTLY IF EXISTS ${index.name}`)
-    }
+    if (lock?.taken !== true)
+      return
 
     try {
-      await db.unsafe(indexStatement(index, true))
+      for (const index of indexes) {
+        if (!await relationsMissing(db, [index.name])) {
+          // A concurrent build that failed leaves an invalid index, which is dropped to be built again, but one that is invalid while another session still builds it is left alone: its session holds a ShareUpdateExclusiveLock on the table, which pg_locks shows to every role, unlike the progress views, so an autovacuum running meanwhile only delays the repair to the next start. Whether it is building is read before whether it is valid, so a build finishing in between reads as valid.
+          const [building] = await rowsOf<{ building: boolean }>(db.unsafe(`SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'relation' AND mode = 'ShareUpdateExclusiveLock' AND relation = (SELECT indrelid FROM pg_index WHERE indexrelid = to_regclass('${index.name}')) AND database = (SELECT oid FROM pg_database WHERE datname = current_database())) AS building`))
+
+          if (building?.building === true)
+            continue
+
+          const [found] = await rowsOf<{ valid: boolean }>(db.unsafe(`SELECT indisvalid AS valid FROM pg_index WHERE indexrelid = to_regclass('${index.name}')`))
+
+          if (found?.valid !== false)
+            continue
+
+          await db.unsafe(`DROP INDEX CONCURRENTLY IF EXISTS ${index.name}`)
+        }
+
+        try {
+          await db.unsafe(indexStatement(index, true))
+        }
+        catch (error) {
+          // A replica creating the same index at the same moment won it.
+          if ((error as { errno?: string }).errno !== DUPLICATE_RELATION)
+            throw error
+        }
+      }
     }
-    catch (error) {
-      // A replica creating the same index at the same moment won it.
-      if ((error as { errno?: string }).errno !== DUPLICATE_RELATION)
-        throw error
+    finally {
+      await session`SELECT pg_advisory_unlock(hashtext(${INDEX_LOCK}))`
     }
+  }
+  finally {
+    session.release()
   }
 }
 
