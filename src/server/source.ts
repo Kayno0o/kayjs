@@ -29,7 +29,7 @@ export interface ProjectSource {
   // Lets the `.kay` modules it imports compile as they load.
   prepare: (root: string, settings?: Record<string, string>) => Promise<void>
   has: (file: string) => boolean
-  routes: (routesDir: string, mounts: RouteMount[]) => Promise<Route[]>
+  routes: (routesDir: string, mounts: RouteMount[], root: string) => Promise<Route[]>
   fallback: (routesDir: string, mounts: RouteMount[]) => SpecialPages
   api: (root: string, config: Pick<KayConfig, 'api' | 'extensions'>) => Promise<ApiModule[]>
   endpoints: (routesDir: string, mounts: RouteMount[]) => Promise<Endpoint[]>
@@ -79,7 +79,7 @@ const DISK: ProjectSource = {
   // Imported as it is asked for, as it needs Bun, which eslint's bundle of the shadow types runs without.
   prepare: async (root, settings) => (await import('./loader')).registerLoader(root, settings),
   has: file => existsSync(file),
-  routes: async (routesDir, mounts) => scanRoutes(routesDir, mounts),
+  routes: async (routesDir, mounts, root) => scanRoutes(routesDir, mounts, root),
   fallback: (routesDir, mounts) => specialPagesOf(routeTrees(routesDir, mounts), ''),
   // Imported as it is asked for, as the API modules' actions read the locales, which read this.
   api: async (root, config) => (await import('./api-modules')).projectApi(root, config),

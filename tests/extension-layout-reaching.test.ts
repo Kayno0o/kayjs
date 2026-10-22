@@ -73,3 +73,23 @@ test('an executable names the layout and reaching files of a bundled library wit
   expect(() => routeMounts(root, [{ name: 'lib', layout }])).toThrow('not an existing _layout.kay')
   expect(routeMounts(root, [{ name: 'lib', layout }], false)).toHaveLength(1)
 })
+
+test('an import.meta.glob pattern of a library script expands against the project root, negated patterns included', async () => {
+  const root = await project()
+  const files: Record<string, string> = {
+    'lib/package.json': '{ "name": "lib-with-glob" }\n',
+    'lib/other.kay': 'p other\n',
+    'lib/parts.ts': 'export const parts = import.meta.glob([\'/src/parts/*.kay\', \'!/src/parts/draft.kay\'], { eager: true })\n',
+    'src/parts/ready.kay': '---\nimport Widget from \'../../lib/widget.kay\'\n---\nWidget\n',
+    'src/parts/draft.kay': '---\nimport Other from \'../../lib/other.kay\'\n---\nOther\n',
+    'src/routes/globbed.kay': '---\nimport { parts } from \'../../lib/parts.ts\'\n---\np {Object.keys(parts).length}\n',
+  }
+
+  for (const [path, text] of Object.entries(files))
+    await Bun.write(join(root, path), text)
+
+  const wrapping = async (target: string) => (await scanRoutes(join(root, 'src/routes'), routeMounts(root, [{ name: 'lib', layout: { file: 'lib/_layout.kay', reaching: [target] } }]), root)).filter(route => route.layouts.length > 0).map(route => route.pattern)
+
+  expect(await wrapping('lib/widget.kay')).toContain('/globbed')
+  expect(await wrapping('lib/other.kay')).not.toContain('/globbed')
+})

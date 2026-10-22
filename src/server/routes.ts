@@ -221,13 +221,20 @@ export function servedPaths(routes: Route[]): Set<string> {
   return new Set(routes.flatMap(route => patternShapes(route.pattern)))
 }
 
-// The app's pages, then each mounted library's that no page of the app serves the path of.
-export async function scanRoutes(routesDir: string, mounts: RouteMount[] = []): Promise<Route[]> {
+// The project root of a scan, which the walk expands `import.meta.glob` patterns against.
+const globRoots = new WeakMap<LayoutsRead, string>()
+
+// The app's pages, then each mounted library's that no page of the app serves the path of. The `root` is the project's, which an `import.meta.glob` pattern of a file the walk reaches expands against as the build does.
+export async function scanRoutes(routesDir: string, mounts: RouteMount[] = [], root?: string): Promise<Route[]> {
   await loadContextReader(mounts)
 
   const trees = routeTrees(routesDir, mounts)
   const routes: Route[] = []
   const read: LayoutsRead = new Map()
+
+  if (root !== undefined)
+    globRoots.set(read, root)
+
   const served = new Set<string>()
   const access = new Map<string, LayoutAccess<GuardFile>>()
   const accessOf = (layout: string) => {
@@ -440,7 +447,7 @@ function importsOf(file: string, read: LayoutsRead): string[] {
     }
 
     try {
-      for (const path of source.includes(GLOB_CALL) ? globbedFiles(KAY_FILE.test(file) ? fences(source) : source, file, packageRoot(dirname(file)), KAY_FILE.test(file) ? 'ts' : scriptLoader(file)) ?? [] : []) {
+      for (const path of source.includes(GLOB_CALL) ? globbedFiles(KAY_FILE.test(file) ? fences(source) : source, file, globRoots.get(read) ?? packageRoot(dirname(file)), KAY_FILE.test(file) ? 'ts' : scriptLoader(file)) ?? [] : []) {
         const real = realFile(path)
 
         if (followed(real))

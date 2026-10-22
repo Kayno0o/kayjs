@@ -34,7 +34,7 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
   const diagnostics: CheckDiagnostic[] = []
   const config = join(root, CONFIG_FILE)
   const { routes: routesDir, public: publicDir } = projectPaths(root, options)
-  const [routes, files] = scanned ? [scanned.routes, scanned.found] : await Promise.all([scanRoutes(routesDir, routeMounts(root, options.extensions)), publicFiles(publicDir)])
+  const [routes, files] = scanned ? [scanned.routes, scanned.found] : await Promise.all([scanRoutes(routesDir, routeMounts(root, options.extensions), root), publicFiles(publicDir)])
 
   const refused = (file: string, run: () => void) => {
     try {
