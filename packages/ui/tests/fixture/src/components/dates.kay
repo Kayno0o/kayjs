@@ -1,6 +1,7 @@
 ---
 import DateInput from '@kaynooo/kayjs-ui/date-input.kay'
 import DateRangeInput from '@kaynooo/kayjs-ui/date-range-input.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 import TimeInput from '@kaynooo/kayjs-ui/time-input.kay'
 import type { DateRange } from '@kaynooo/kayjs-ui'
 
@@ -12,4 +13,7 @@ form
   DateInput#plain(aria-label="Plain" name="plain")
   DateRangeInput#range(label="Stay" fromName="from" toName="to" firstDay={firstDay} onChange={onRange})
   TimeInput#time(aria-label="Start" name="start" value="09:30" onChange={onTime})
+  FormField(label="Held")
+    DateInput#held(name="held" value="2026-10-21")
+  DateInput#locked(aria-label="Locked" value="2026-10-21" readonly)
   button#reset(type="reset") Reset

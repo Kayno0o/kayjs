@@ -95,7 +95,7 @@ function go(iso: string) {
 
 // Written into the field as if typed, so a controlled parent, a form and the app's `onChange` all hear it.
 function pick(iso: string) {
-  if (!box || !withinBounds(iso, min, max))
+  if (!box || box.readOnly || box.disabled || !withinBounds(iso, min, max))
     return
 
   box.value = iso
@@ -141,15 +141,18 @@ const canStepOn = () => !isDate(max) || addMonths(cursor(), 1).slice(0, 7) <= ma
 div(ref={element => root = element})
   TextInput({...rest} part="input" type="date" ref={ref} min={min} max={max} value={value} onInput={heard} onChange={heard})
   if ready()
-    Popover(part="panel" open={opened()} role="dialog" aria-label={openLabel} onOpenChange={toggled} onKeyDown={keyDown} onFocusOut={focusLeft})
+    // The panel's click is cancelled so a FormField's label, which holds it in the DOM, does not move focus to the field and close the calendar.
+    Popover(part="panel" open={opened()} role="dialog" aria-label={openLabel} onOpenChange={toggled} onKeyDown={keyDown} onFocusOut={focusLeft} onClick={event => event.preventDefault()})
       @trigger(attributes)
-        button({...attributes} part="trigger" type="button" aria-label={openLabel} disabled={rest.disabled})
+        button({...attributes} part="trigger" type="button" aria-label={openLabel} disabled={rest.disabled || rest.readonly})
           Icon(icon="calendar")
       div(part="head")
-        button(part="step" type="button" aria-label={previousLabel} disabled={!canStepBack()} onClick={() => go(addMonths(cursor(), -1))}) ‹
+        button(part="step" type="button" data-direction="previous" aria-label={previousLabel} disabled={!canStepBack()} onClick={() => go(addMonths(cursor(), -1))})
+          Icon(icon="chevron")
         // Read out as the month changes, which is otherwise silent.
         div(part="title" aria-live="polite") {monthTitle(cursor(), pageLocale())}
-        button(part="step" type="button" aria-label={nextLabel} disabled={!canStepOn()} onClick={() => go(addMonths(cursor(), 1))}) ›
+        button(part="step" type="button" data-direction="next" aria-label={nextLabel} disabled={!canStepOn()} onClick={() => go(addMonths(cursor(), 1))})
+          Icon(icon="chevron")
       table(part="grid" role="grid" aria-label={monthTitle(cursor(), pageLocale())})
         thead
           tr

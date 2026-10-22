@@ -1667,12 +1667,25 @@
   }
 
   .kui-date-input-step {
-    @apply size-7 cursor-pointer rounded-kui-card text-lg leading-none text-kui-subtext0 hover:bg-kui-row-hover hover:text-kui-text disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent;
+    @apply inline-flex size-7 cursor-pointer items-center justify-center rounded-kui-card text-kui-subtext0 hover:bg-kui-row-hover hover:text-kui-text disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent;
 
     &:focus-visible {
       outline: 2px solid var(--color-kui-accent);
       outline-offset: 2px;
     }
+  }
+
+  /* The browser's own picker button gives way to the calendar's once it is drawn. */
+  .kui-date-input:has(.kui-date-input-trigger) .kui-date-input-box::-webkit-calendar-picker-indicator {
+    @apply hidden;
+  }
+
+  .kui-date-input-step:where([data-direction='previous']) .kui-icon {
+    @apply rotate-90 rtl:-rotate-90;
+  }
+
+  .kui-date-input-step:where([data-direction='next']) .kui-icon {
+    @apply -rotate-90 rtl:rotate-90;
   }
 
   .kui-date-input-grid {

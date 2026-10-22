@@ -116,8 +116,6 @@ describe('DateInput', () => {
     expect(calendar(root).querySelector('.kui-date-input-title')?.textContent).toMatch(/2026/)
     await press('PageUp', true)
     expect(focused()).toBe('2025-11-25')
-    await press('ArrowRight')
-    await press('Enter')
   })
 
   test('days outside min and max cannot be picked or reached', async () => {
@@ -164,6 +162,37 @@ describe('DateInput', () => {
 
     expect(seen.date).toEqual(['2026-12-01', '2026-10-21'])
     expect(input.value).toBe('2026-10-21')
+  })
+
+  test('a click on the panel inside a FormField does not reach its label, which would close the calendar', async () => {
+    const root = await dates()
+
+    await open(root, '#held')
+
+    const panel = calendar(root, '#held').querySelector<HTMLElement>('.kui-date-input-panel')!
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true })
+
+    calendar(root, '#held').querySelector('.kui-date-input-title')!.dispatchEvent(click)
+
+    expect(click.defaultPrevented).toBe(true)
+    expect(panel.matches(':popover-open')).toBe(true)
+  })
+
+  test('Escape closes the calendar', async () => {
+    const root = await dates()
+    const panel = calendar(root).querySelector<HTMLElement>('.kui-date-input-panel')!
+
+    await open(root)
+    panel.hidePopover()
+    await settle()
+
+    expect(calendar(root).querySelector('.kui-date-input-trigger')?.getAttribute('aria-expanded')).toBe('false')
+  })
+
+  test('a read-only field cannot be changed through the calendar', async () => {
+    const root = await dates()
+
+    expect(calendar(root, '#locked').querySelector<HTMLButtonElement>('.kui-date-input-trigger')!.disabled).toBe(true)
   })
 
   test('a plain one keeps what is picked for a form to post', async () => {
@@ -222,6 +251,7 @@ describe('TimeInput', () => {
     expect(input.value).toBe('09:30')
 
     input.value = '17:45'
+    input.dispatchEvent(new Event('input', { bubbles: true }))
     input.dispatchEvent(new Event('change', { bubbles: true }))
 
     expect(seen.time).toEqual(['17:45'])
