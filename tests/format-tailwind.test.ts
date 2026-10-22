@@ -2,7 +2,7 @@ import { mkdtemp, rm, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
-import { formatFiles, formatKay } from '../src/format'
+import { formatFiles, formatKay, formatSource } from '../src/format'
 import { installed, tailwindSorter } from '../src/format/tailwind'
 import { scratchDir } from './scratch'
 
@@ -129,5 +129,47 @@ describe('Tailwind\'s order', () => {
     expect(installed('tailwindcss', root)).toBe(false)
     expect(await tailwindSorter(root)).toBeUndefined()
     expect(installed('tailwindcss', await project({}))).toBe(true)
+  })
+})
+
+describe('kay fmt --stdin', () => {
+  const CLI = join(import.meta.dir, '../src/cli.ts')
+
+  async function run(args: string[], stdin: string, cwd?: string): Promise<{ out: string, err: string, status: number }> {
+    const child = Bun.spawn(['bun', CLI, 'fmt', ...args], { cwd: cwd ?? process.cwd(), stdin: new Blob([stdin]), stdout: 'pipe', stderr: 'pipe' })
+    const [out, err, status] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+    return { out, err, status }
+  }
+
+  it('formats a source for the project of the path it is given, a file that does not exist yet too, and leaves every file alone', async () => {
+    const root = await project({ 'src/app.css': '@import \'tailwindcss\';\n' })
+    const unsorted = 'div.p-4.flex x\n'
+    const file = join(root, 'src/routes/new.kay')
+
+    expect((await formatSource(unsorted, file)).code).toBe('div.flex.p-4 x\n')
+    expect(await run(['--stdin', file], unsorted)).toEqual({ out: 'div.flex.p-4 x\n', err: '', status: 0 })
+    // Without a path, the project is the working directory's.
+    expect((await run(['--stdin'], unsorted, root)).out).toBe('div.flex.p-4 x\n')
+    expect(await Bun.file(file).exists()).toBe(false)
+  })
+
+  it('prints a formatted source as it is, and fails with nothing on stdout when it does not compile', async () => {
+    expect(await run(['--stdin', 'a.kay'], 'p hi\n')).toEqual({ out: 'p hi\n', err: '', status: 0 })
+
+    const broken = await run(['--stdin', 'a.kay'], 'else\n  p no\n')
+
+    expect(broken.out).toBe('')
+    expect(broken.err).toContain('`else` must directly follow')
+    expect(broken.status).toBe(1)
+  })
+
+  it('refuses --check, --from-html, --format json and several paths', async () => {
+    for (const args of [['--check'], ['--from-html'], ['--format', 'json'], ['a.kay', 'b.kay']]) {
+      const { out, status } = await run(['--stdin', ...args], 'p hi\n')
+
+      expect(out).not.toContain('p hi')
+      expect(status).toBe(1)
+    }
   })
 })

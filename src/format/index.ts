@@ -24,6 +24,11 @@ async function statIfExists(path: string) {
   }
 }
 
+// Formats a source an editor holds, as the file at `file` would be: the nearest project of that path, which need not exist, decides the Tailwind order of the classes.
+export async function formatSource(source: string, file: string): Promise<ReturnType<typeof formatKay>> {
+  return formatKay(source, { sortClasses: await tailwindSorter(projectRootOf(resolve(file))) })
+}
+
 // Formats the .kay files at `paths`, each a .kay file or a directory searched recursively; throws before writing anything when one is neither.
 export async function formatFiles(paths: string[], options: { write: boolean }): Promise<FormatFilesResult> {
   const files = (await Promise.all(paths.map(async (path) => {

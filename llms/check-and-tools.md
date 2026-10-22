@@ -132,6 +132,7 @@ kay fmt --check
   - Write `.kay/types`, which the language server, `kay lint` and the editor's ESLint read, without checking anything; the editor's ESLint runs it through `bun` the first time it meets a component whose types are missing.
 - `kay lsp`, `kay screenshot` and `kay mcp` are in [Language server, screenshot and MCP commands](editor-and-agent-commands.md).
 
+- `kay fmt --stdin [path]` reads a source on stdin and prints it formatted on stdout, for an editor's formatter (conform.nvim, Helix, Zed): `path` names the file it is for, which may not exist and decides the Tailwind order; a source that does not compile prints its problems on stderr, nothing on stdout, and exits 1; `--check`, `--from-html`, `--format json` and several paths are refused.
 - `kay fmt` refuses a path that is missing or is neither a directory nor a `.kay` file.
 - The TextMate grammar the extension highlights `.kay` files with ships as `kay/kay.tmLanguage.json`, for a highlighter such as Shiki: register it as `{ ...grammar, name: 'kay', embeddedLangs: ['typescript'] }`.
 

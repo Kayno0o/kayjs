@@ -33,7 +33,7 @@ This needs Bun to know the registry first, see [Installation](/getting-started/i
 | `kay i18n missing [locale] [dir]` | List what each locale lacks against the default one |
 | `kay i18n accept <locale> [dir]` | Accept a locale's draft messages |
 | `kay explain [lint\|error\|group]` | List the lints and the errors, or a group's, or explain one |
-| `kay fmt [paths]` | Format `.kay` files, or with `--from-html` turn HTML into a template |
+| `kay fmt [paths]` | Format `.kay` files, or with `--stdin` a source on stdin, or with `--from-html` turn HTML into a template |
 | `kay lint [args]` | Run ESLint with the types it reads for `.kay` files |
 | `kay test [args]` | Run `bun test` with each file isolated and kay's preload loaded |
 | `kay migrate astro [dir]` | Translate an Astro project into a kay one |
@@ -562,6 +562,8 @@ kay lint --fix --cache       # ESLint, with the types it reads written first
 In an app whose stylesheet imports Tailwind, `kay fmt` also puts the shorthand's classes in Tailwind's order, the one the Tailwind rules of `@kaynooo/eslint` use, and keeps a class Tailwind does not know where it stands, first. When it moves the classes into a `class` attribute, the words already in that attribute are sorted with them as one list. The editor's format does the same.
 
 To know Tailwind's order, `kay fmt` loads the app's `tailwindcss` and runs the plugin and config modules the stylesheet names, as the build does. It fetches nothing: before `bun install`, or with a package missing, the classes stay as written. The editor picks up an edit to any stylesheet the entry imports on its next format. A line that is long for its other attributes, not its classes, is left as written.
+
+`kay fmt --stdin [path]` reads a source on stdin and prints it formatted, for an editor's formatter: see [Other editors](/guides/other-editors). `path` names the file it is for, and a source that does not compile prints its problems on stderr and nothing on stdout.
 
 `kay fmt --from-html` reads a file, or stdin, and prints the HTML as a template, with what it could not carry over listed on stderr. [Migrating from HTML](/migrating/from-html) shows what it writes.
 

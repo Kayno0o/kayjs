@@ -15,7 +15,7 @@ export const USAGES = {
   'doctor': 'doctor [dir] [--port <port>] [--format text|json]',
   'explain': 'explain [lint|error|group] [--format text|json]',
   'types': 'types [dir] [--format text|json] [--quiet]',
-  'fmt': 'fmt [paths...] [--check | --dry-run] [--format text|json] [--quiet] | fmt --from-html [file] [--format text|json]',
+  'fmt': 'fmt [paths...] [--check | --dry-run] [--format text|json] [--quiet] | fmt --stdin [path] | fmt --from-html [file] [--format text|json]',
   'lint': 'lint [keslint arguments]...',
   'test': 'test [bun test arguments]...',
   'i18n missing': 'i18n missing [locale] [dir] [--format text|json]',

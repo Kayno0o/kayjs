@@ -70,7 +70,7 @@ The command palette has Kay: Restart the language server, Run kay check (in a te
 
 A project made with Tailwind also gets Tailwind CSS IntelliSense settings in `.vscode/settings.json`: it reads `.kay` files as HTML and finds the classes of the `.class` shorthand and of `class="..."`, so completion and hover work in both. The extension matches by pattern, so a line of a script fence such as `console.log(` can show Tailwind hovers too.
 
-Any editor that speaks the Language Server Protocol, such as Neovim, Helix or Zed, can run the same server. Start `bunx kay lsp --stdio` in the project root for `.kay` files.
+Any editor that speaks the Language Server Protocol, such as Neovim, Helix or Zed, can run the same server. Start `bunx kay lsp --stdio` in the project root for `.kay` files. [Other editors](/guides/other-editors) has the setup for each, and `kay fmt --stdin` for their formatters.
 
 The server runs the project's `kay.config.ts` when a `.kay` file opens, so open only a project you trust.
 
