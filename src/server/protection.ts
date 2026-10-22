@@ -617,8 +617,8 @@ export function checkProxy(setting: ProxyConfig | number | boolean | undefined):
   if (key !== undefined && !HEADER_NAME.test(key))
     throw new KayError('config-invalid', 'kay: proxy.key names the header the proxy sends its shared key in, such as x-upstream-key')
 
-  if (open !== undefined && (key === undefined || open.some(path => !path.startsWith('/'))))
-    throw new KayError('config-invalid', 'kay: proxy.open lists paths starting with / that need no key, and goes with proxy.key')
+  if (open !== undefined && (key === undefined || open.some(path => !path.startsWith('/') || path === '/')))
+    throw new KayError('config-invalid', 'kay: proxy.open lists paths below / that need no key, such as /api/push, and goes with proxy.key')
 
   if (hops !== undefined && (!Number.isInteger(hops) || hops < 1))
     throw new KayError('config-invalid', `kay: proxy.hops is the number of proxies in front, a whole number from 1; got ${hops}`)

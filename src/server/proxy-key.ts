@@ -3,8 +3,11 @@ import type { ProxyConfig } from '../config'
 import { readFileSync } from 'node:fs'
 import process from 'node:process'
 import { KayError } from '../compiler/errors'
+import { kayLog } from '../runtime/log'
 import { routerPath } from './base'
+import { pathOf } from './log'
 import { sameText } from './seal'
+import { isInternal } from './visit'
 
 const KEY_VARIABLE = 'KAY_PROXY_KEY'
 const KEY_FILE_VARIABLE = 'KAY_PROXY_KEY_FILE'
@@ -49,8 +52,11 @@ export function requireProxyKey(app: Elysia, proxy: ProxyConfig | undefined, opt
   const secret = proxyKeyValue()
 
   if (secret === undefined) {
-    if (process.env.NODE_ENV !== 'production')
+    if (process.env.NODE_ENV !== 'production') {
+      kayLog('warn', `proxy.key is set but ${KEY_VARIABLE} and ${KEY_FILE_VARIABLE} are not, so requests are not checked for the ${header} header; a production server would not boot`)
+
       return
+    }
 
     throw new KayError('config-invalid', `kay: proxy.key names the header ${header}, which carries a key read from ${KEY_VARIABLE} or from the file ${KEY_FILE_VARIABLE} names, and neither gives a non-empty one`)
   }
@@ -58,7 +64,7 @@ export function requireProxyKey(app: Elysia, proxy: ProxyConfig | undefined, opt
   const open = [...(proxy?.open ?? []).map(entry => entry.length > 1 && entry.endsWith('/') ? entry.slice(0, -1) : entry), ...options.health === undefined ? [] : [options.health]]
 
   app.onRequest(({ request }) => {
-    if (isOpen(routerPath(new URL(request.url).pathname, options.base), open))
+    if (isInternal(request) || isOpen(routerPath(pathOf(request.url), options.base), open))
       return
 
     const given = request.headers.get(header)

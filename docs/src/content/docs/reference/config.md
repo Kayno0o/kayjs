@@ -96,7 +96,7 @@ Every option is optional. The tables give each option's default. The full refere
 | Option | Effect |
 | --- | --- |
 | `security` | The CSP and security headers every response carries, or `false` for none. See [Security](/guides/security) |
-| `proxy` | How many proxies sit in front (`true` for one, a number for more, `false` for none), or `{ header }` naming the header they set. `trusted` lists the public ranges they reach the server from. See [Trust a proxy](/guides/security#trust-a-proxy) |
+| `proxy` | How many proxies sit in front (`true` for one, a number for more, `false` for none), or `{ header }` naming the header they set. `trusted` lists the public ranges they reach the server from. `key` names a header carrying a key shared with the proxy, and a request without it gets 403; `open` lists paths left out. See [Trust a proxy](/guides/security#trust-a-proxy) |
 | `compress` | Compresses responses rendered per request. On in production; `false` when a proxy or CDN does it |
 | `secret` | The app's one secret, at least 32 random characters: it seals `session()`, signs form stamps, links to private files and the flash cookie, and keys `preview`. `KAY_SECRET` when left out. A list, or commas in `KAY_SECRET`, rotates it: the first seals and signs and every one opens sessions and kayjs-auth's data, while stamps, private-file links, the flash cookie and preview links use the first alone. See [The app secret](/guides/sessions-and-guards#the-app-secret) |
 | `health` | The route a load balancer polls, `/_kay/health` by default. `{ path, check, timeout }` renames it and fails it with 503 when `check` returns false, throws or takes longer than `timeout` (5 seconds by default). `false` serves none |

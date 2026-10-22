@@ -12,9 +12,25 @@ export function servedThrough(request: Request, handle: Handle): void {
   handlers.set(request, handle)
 }
 
+// Marks a request kay sends through its own app, one value per process, so no client can send it: `proxy.key` lets such a request by, as it never came by the proxy.
+const INTERNAL = 'x-kay-internal'
+const INTERNAL_TOKEN = crypto.randomUUID()
+
+export function markInternal(headers: Headers): Headers {
+  headers.set(INTERNAL, INTERNAL_TOKEN)
+
+  return headers
+}
+
+export function isInternal(request: Request): boolean {
+  return request.headers.get(INTERNAL) === INTERNAL_TOKEN
+}
+
 // Sends `visit` through the app that received `request`, as if the browser had sent it: through the server's own fetch handler when there is one, else through `fallback`.
 export async function visitAs(request: Request, visit: Request, server: Server | null | undefined, fallback: Handle): Promise<Response> {
   const handle = handlers.get(request)
+
+  markInternal(visit.headers)
 
   if (handle)
     return handle(visit)

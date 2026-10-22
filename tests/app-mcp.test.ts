@@ -31,10 +31,17 @@ const uncovered = await testSite({ routes, api, mcp: true, islands: false, requi
 // A site with tool actions and no API module has no guard to add, so requireGuards leaves its list open, while its OpenAPI document stays refused.
 const noApi = await testSite({ routes, api: 'tests/fixtures/mcp/src/none', mcp: true, openapi: true, islands: false, requireGuards: true })
 const documentOnly = await testSite({ routes, api: guardedApi, openapi: true, islands: false })
+// Behind a proxy sharing a key: the site's own requests, such as a tool call dispatched through the app, carry none.
+const PROXY_KEY = 'k'.repeat(40)
+
+process.env.KAY_PROXY_KEY = PROXY_KEY
+const keyed = await testSite({ routes, api, mcp: true, islands: false, locals, proxy: { key: 'x-upstream-key' }, headers: { 'x-upstream-key': PROXY_KEY } })
+
+delete process.env.KAY_PROXY_KEY
 const localized = await testSite({ routes, api, mcp: true, islands: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' } })
 
 afterAll(async () => {
-  await Promise.all([site.close(), off.close(), mounted.close(), localized.close(), openapi.close(), guarded.close(), guardedMounted.close(), strict.close(), uncovered.close(), noApi.close(), documentOnly.close(), limited.close(), names.close()])
+  await Promise.all([site.close(), keyed.close(), off.close(), mounted.close(), localized.close(), openapi.close(), guarded.close(), guardedMounted.close(), strict.close(), uncovered.close(), noApi.close(), documentOnly.close(), limited.close(), names.close()])
 })
 
 async function post(target: typeof site, body: unknown, headers: Record<string, string> = {}) {
@@ -258,6 +265,16 @@ describe('the tools', () => {
     expect((await mounted.mcp.tools()).length).toBe((await site.mcp.tools()).length)
     expect((await mounted.mcp.call('get_notes_id', { id: 'a' })).data).toEqual({ id: 'a', fields: null, tags: [] })
     expect((await mounted.mcp.call('add_note', { title: 'Milk' })).data).toEqual({ id: 1, title: 'Milk', at: '1970-01-01T00:00:00.000Z' })
+  })
+})
+
+describe('behind proxy.key', () => {
+  it('answers a tool call that the app dispatches to itself, and refuses a request without the key', async () => {
+    const called = await rpc(keyed, 'tools/call', { name: 'create_note', arguments: { title: 'Milk' } })
+
+    expect(called.body.result).toMatchObject({ structuredContent: { created: 'Milk' } })
+    expect((await keyed.fetch('/mcp', { method: 'POST', headers: { 'content-type': 'application/json', 'x-upstream-key': '' }, body: '{}' })).status).toBe(403)
+    expect((await keyed.fetch('/mcp', { method: 'POST', headers: { 'x-kay-internal': 'guess', 'x-upstream-key': '' }, body: '{}' })).status).toBe(403)
   })
 })
 

@@ -111,6 +111,18 @@ describe('kay build --format json', () => {
     expect(await Bun.file(join(outputDir(root), 'executable')).exists()).toBe(true)
   }, 60_000)
 
+  it('verifies an executable whose proxy.key is only on the deploy host', async () => {
+    const root = await project({ 'kay.config.ts': 'export default { favicon: false, proxy: { key: \'x-upstream-key\' } }\n', 'src/routes/index.kay': 'p Home\n' })
+    const env = { ...process.env }
+
+    delete env.KAY_PROXY_KEY
+    delete env.KAY_PROXY_KEY_FILE
+
+    const built = await kayWith(['build', root, '--no-check', '--compile', join(root, 'server'), '--verify'], env)
+
+    expect(built.code, built.stderr).toBe(0)
+  }, 60_000)
+
   it('bakes the module an extension names its server plugin by into the executable', async () => {
     const config = 'export default { favicon: false, extensions: [{ name: \'own\', serverModule: { path: \'./src/own\', export: \'own\' } }] }\n'
     const own = 'import { Elysia } from \'elysia\'\n\nexport const own = new Elysia().get(\'/own/ping\', () => \'pong\')\n'

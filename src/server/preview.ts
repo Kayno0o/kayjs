@@ -21,7 +21,7 @@ import { requestCookies } from './cookies'
 import { requestUrl } from './request-url'
 import { MIN_SECRET_LENGTH, sameText } from './seal'
 import { appSecrets, noAppSecret, useStampSecret } from './stamp'
-import { visitAs } from './visit'
+import { markInternal, visitAs } from './visit'
 
 // Where a preview link enters preview mode, or `?exit` leaves it.
 export const PREVIEW_ROUTE = '/_kay/preview'
@@ -286,7 +286,7 @@ export async function entriesReadAt(handle: (request: Request) => Promise<Respon
   try {
     const headers = new Headers({ [PROBE_HEADER]: id, cookie: `${PREVIEW_COOKIE}=${[until, EDIT, sign(settings, cookieText(until, true))].join('.')}` })
 
-    const response = await withinTimeout(timeout, async signal => probing.run(true, async () => handle(new Request(url, { headers, signal }))))
+    const response = await withinTimeout(timeout, async signal => probing.run(true, async () => handle(new Request(url, { headers: markInternal(headers), signal }))))
 
     await response.body?.cancel()
 

@@ -130,6 +130,7 @@ describe('proxy.key', () => {
   it('refuses a setting that names no header, or open without a key', async () => {
     await expect(served({}, { proxy: { key: 'bad header' } })).rejects.toThrow('proxy.key')
     await expect(served({}, { proxy: { hops: 1, open: ['/x'] } })).rejects.toThrow('proxy.open')
+    await expect(served({ KAY_PROXY_KEY: KEY }, { proxy: { key: HEADER, open: ['/'] } })).rejects.toThrow('proxy.open')
     await expect(served({ KAY_PROXY_KEY: KEY }, { proxy: { key: HEADER, open: ['x'] } })).rejects.toThrow('proxy.open')
     await expect(served({ KAY_PROXY_KEY: KEY }, { proxy: { key: HEADER, hops: 1, header: 'x-real-ip' } })).rejects.toThrow('kay: proxy')
   })

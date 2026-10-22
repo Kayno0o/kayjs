@@ -45,7 +45,9 @@ export async function verifyExecutable(executable: string, root: string, health:
   const started = performance.now()
   const port = String(await freePort())
   // HOST is pinned to loopback, where the readiness check and `--health` ask, whatever the build's shell or the project's .env exports.
-  const env = { ...process.env, NODE_ENV: 'production', PORT: port, HOST: '127.0.0.1' }
+  // The key of `proxy.key` lives on the deploy host, so a throwaway one stands in where the build has none: the health route it asks is open.
+  const keyed = process.env.KAY_PROXY_KEY === undefined && process.env.KAY_PROXY_KEY_FILE === undefined
+  const env = { ...process.env, ...keyed ? { KAY_PROXY_KEY: crypto.randomUUID() } : {}, NODE_ENV: 'production', PORT: port, HOST: '127.0.0.1' }
   const server = Bun.spawn([executable], { cwd: root, env, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', detached: true })
   const printed = capture(server)
   const running = () => server.exitCode === null && server.signalCode === null

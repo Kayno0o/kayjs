@@ -93,7 +93,7 @@ export default defineConfig({
 
 - A directory inside the project holding a `kay.config.ts` of its own, such as an example app or a documentation site, is another project: its components are never the outer one's islands, and it checks and builds from its own root.
 
-- `proxy: false` is none, `proxy: true` is one proxy in front, `proxy: 2` two, `{ header }` a header the proxy sets ([Production](proxy-and-security.md#behind-a-proxy)).
+- `proxy: false` is none, `proxy: true` is one proxy in front, `proxy: 2` two, `{ header }` a header the proxy sets, `{ key: 'x-upstream-key', open }` refuses requests without the shared key ([Production](proxy-and-security.md#behind-a-proxy)).
 - `extensions` lists what libraries add to the app, one value each, such as `extensions: [auth()]`: pages laid over `src/routes` and API modules over `src/api` under a prefix, message catalogs under `src/messages`, an app file at the same path or an app key winning, config laid under the app's, such as Bun plugins or head tags (see [Extensions](component-libraries.md#extensions)), and a hook rewriting each prerendered page (see [Page hooks](prerendering.md#page-hooks)).
 
 - `minify` is on for `kay build` unless set to `false`, and off for `kay dev` and a server bundling at boot unless set to `true`.
