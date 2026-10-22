@@ -1,5 +1,6 @@
 --- server
-import { formatDate, t } from 'kay/i18n'
+import { formatDate } from 'kay/i18n'
+import { wording } from 'kay/words'
 import Message from '../../components/message.kay'
 import Proof from '../../components/proof.kay'
 import { failure, proofOf, schemas, scopeLabel } from '../../forms'
@@ -36,47 +37,47 @@ const created = create.succeeded()?.data
 const refused = create.failed()?.data?.error
 const date = (value: Date) => formatDate(value, { dateStyle: 'medium' })
 ---
-PageSection(title={t('auth.account.tokens.title')})
+PageSection(title={wording('auth.account.tokens.title', 'Access tokens')})
   .flex.flex-col.gap-2
-    p {t('auth.account.tokens.intro')}
+    p {wording('auth.account.tokens.intro', 'Tokens let scripts and other apps use your account through the API.')}
     if created
-      Message(tone="success" text={t('auth.account.tokens.created')})
+      Message(tone="success" text={wording('auth.account.tokens.created', 'Copy this token now: it will not be shown again.')})
       code#kayjs-auth-token.break-all {created}
-      CopyButton(text={created} label={t('auth.account.tokens.copy')})
+      CopyButton(text={created} label={wording('auth.account.tokens.copy', 'Copy the token')})
     for token of tokens key={token.id}
       CardRow(data-token={token.id})
         @right
           form(action={revoke})
             input(type="hidden" name="id" value={token.id})
-            Button(type="submit" tone="danger" label={t('auth.account.tokens.revoke')} aria-label={`${t('auth.account.tokens.revoke')}: ${token.label}`})
+            Button(type="submit" tone="danger" label={wording('auth.account.tokens.revoke', 'Revoke')} aria-label={`${wording('auth.account.tokens.revoke', 'Revoke')}: ${token.label}`})
         .flex.flex-col
           span.flex.flex-wrap.items-center.gap-2
             strong {token.label}
             if token.expired
-              Badge(label={t('auth.account.tokens.expired')} tone="warning")
-          span.text-kui-muted {token.scopes ? token.scopes.map(scopeLabel).join(', ') : t('auth.account.tokens.allScopes')}
+              Badge(label={wording('auth.account.tokens.expired', 'Expired')} tone="warning")
+          span.text-kui-muted {token.scopes ? token.scopes.map(scopeLabel).join(', ') : wording('auth.account.tokens.allScopes', 'Everything')}
           span.text-kui-muted
-            | {token.lastUsedAt ? t('auth.account.tokens.lastUsed', { date: date(token.lastUsedAt) }) : t('auth.account.tokens.neverUsed')}
+            | {token.lastUsedAt ? wording('auth.account.tokens.lastUsed', 'Last used {date}', { date: date(token.lastUsedAt) }) : wording('auth.account.tokens.neverUsed', 'Never used')}
             if token.expiresAt && !token.expired
-              | · {t('auth.account.tokens.expires', { date: date(token.expiresAt) })}
+              | · {wording('auth.account.tokens.expires', 'Expires {date}', { date: date(token.expiresAt) })}
     else
-      EmptyState(title={t('auth.account.tokens.none')})
-PageSection(title={t('auth.account.tokens.create')})
+      EmptyState(title={wording('auth.account.tokens.none', 'No token yet.')})
+PageSection(title={wording('auth.account.tokens.create', 'Create a token')})
   form.flex.flex-col.gap-3(action={create})
-    FormField(label={t('auth.account.tokens.label')} required)
+    FormField(label={wording('auth.account.tokens.label', 'Name')} required)
       input(name="label" maxlength="100" required)
     if features.scopes.length > 0
-      FormField(label={t('auth.account.tokens.scopes')} group)
+      FormField(label={wording('auth.account.tokens.scopes', 'Allowed to')} group)
         for scope of features.scopes key={scope}
           label.flex.items-center.gap-2
             input(type="checkbox" name="scopes" value={scope})
             | {scopeLabel(scope)}
-    FormField(label={t('auth.account.tokens.expiresIn')})
+    FormField(label={wording('auth.account.tokens.expiresIn', 'Expires')})
       select(name="days")
-        option(value="0") {t('auth.account.tokens.never')}
+        option(value="0") {wording('auth.account.tokens.never', 'Never')}
         for days of EXPIRIES key={days}
-          option(value={String(days)} selected={days === 90}) {t('auth.account.tokens.days', { count: days })}
+          option(value={String(days)} selected={days === 90}) {wording('auth.account.tokens.days', days === 1 ? 'In {count} day' : 'In {count} days', { count: days })}
     Proof(user={user})
     if refused
       Message(text={failure(refused)})
-    Button(type="submit" tone="accent" label={t('auth.account.tokens.create')})
+    Button(type="submit" tone="accent" label={wording('auth.account.tokens.create', 'Create a token')})

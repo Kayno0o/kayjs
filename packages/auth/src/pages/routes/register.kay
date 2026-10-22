@@ -1,6 +1,7 @@
 --- server
 import { localPath } from 'kay'
-import { localize, t } from 'kay/i18n'
+import { localize } from 'kay/i18n'
+import { wording } from 'kay/words'
 import Captcha from '../components/captcha.kay'
 import Message from '../components/message.kay'
 import Panel from '../components/panel.kay'
@@ -38,7 +39,7 @@ const user = await auth.user()
 if (user && !user.guest)
   ctx.redirect(redirect)
 
-const { askRemember, providerLinks } = rememberOf(features, redirect, provider => t('auth.signIn.provider', { provider }), features.providers)
+const { askRemember, providerLinks } = rememberOf(features, redirect, provider => wording('auth.signIn.provider', 'Continue with {provider}', { provider }), features.providers)
 const captcha = await captchaFor(auth, features.captcha, 'register')
 const refused = register.failed()?.data
 const fields = refused && 'fields' in refused ? refused.fields : {}
@@ -46,10 +47,10 @@ const error = refusal(register.failed(), features.captcha)
 const verify = register.succeeded() !== undefined
 ---
 head
-  title {t('auth.register.title')}
-Panel(title={t('auth.register.title')})
+  title {wording('auth.register.title', 'Create an account')}
+Panel(title={wording('auth.register.title', 'Create an account')})
   if verify
-    Message(tone="success" text={t('auth.register.checkMail')})
+    Message(tone="success" text={wording('auth.register.checkMail', 'Check your mail to continue.')})
   else
     if features.providers.length > 0
       .flex.flex-col.gap-2
@@ -57,18 +58,18 @@ Panel(title={t('auth.register.title')})
       Separator
     form.flex.flex-col.gap-3(action={register})
       input(type="hidden" name="redirect" value={redirect})
-      FormField(label={t('auth.email')} issue={fields.email && issue('email', fields.email)} required)
+      FormField(label={wording('auth.email', 'Email')} issue={fields.email && issue('email', fields.email)} required)
         input(name="email" type="email" autocomplete="email" required)
-      FormField(label={t('auth.password')} hint={t('auth.passwordHint', { min: features.rules.password.min })} issue={fields.password && issue('password', fields.password, features.rules)} required)
+      FormField(label={wording('auth.password', 'Password')} hint={wording('auth.passwordHint', 'At least {min} characters', { min: features.rules.password.min })} issue={fields.password && issue('password', fields.password, features.rules)} required)
         input(name="password" type="password" autocomplete="new-password" minlength={features.rules.password.min} required)
       if askRemember
         label.flex.items-center.gap-2
           input(name="remember" type="checkbox")
-          span {t('auth.remember')}
+          span {wording('auth.remember', 'Keep me signed in')}
       if features.captcha && captcha.shown
         Captcha(widget={features.captcha} challenge={captcha.challenge} action="register")
       if error
         Message(text={error})
-      Button(type="submit" tone="accent" label={t('auth.register.submit')})
+      Button(type="submit" tone="accent" label={wording('auth.register.submit', 'Create the account')})
   p.text-center
-    | {t('auth.register.haveAccount')} #[a(href={localize(`${prefix}/sign-in?redirect=${encodeURIComponent(redirect)}`)}) {t('auth.register.signIn')}]
+    | {wording('auth.register.haveAccount', 'Already have an account?')} #[a(href={localize(`${prefix}/sign-in?redirect=${encodeURIComponent(redirect)}`)}) {wording('auth.register.signIn', 'Sign in')}]

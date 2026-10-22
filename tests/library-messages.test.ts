@@ -87,6 +87,14 @@ describe('a library\'s message catalog, declared in its package.json', () => {
     expect(lookup(translations.get('en')!, 'lib.cancel')).toBeUndefined()
   })
 
+  test('lets the default locale have no file of its own while the library ships a catalog, its English being inline in wording()', async () => {
+    const root = await project('export default { i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\' } }\n')
+    const { translations } = await loadI18n(root, { locales: ['en', 'fr'], defaultLocale: 'en' }, (await loadConfig(root)).extensions)
+
+    expect(lookup(translations.get('fr')!, 'lib.cancel')).toBe('Annuler')
+    expect(lookup(translations.get('en')!, 'lib.cancel')).toBeUndefined()
+  })
+
   test('is dropped when the options of withConfig give their own extensions, which replace the config\'s', async () => {
     const { extensions } = await withConfig(sites.french!, { extensions: [{ name: 'other' }] })
 

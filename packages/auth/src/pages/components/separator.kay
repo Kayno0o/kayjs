@@ -1,4 +1,4 @@
 ---
-import { t } from 'kay/i18n'
+import { wording } from 'kay/words'
 ---
-p.text-center.text-kui-muted {t('auth.or')}
+p.text-center.text-kui-muted {wording('auth.or', 'or')}

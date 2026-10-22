@@ -1,5 +1,6 @@
 --- server
-import { localize, t } from 'kay/i18n'
+import { localize } from 'kay/i18n'
+import { wording } from 'kay/words'
 import Message from '../components/message.kay'
 import Panel from '../components/panel.kay'
 import { failure, schemas } from '../forms'
@@ -45,37 +46,37 @@ const resendError = resend.failed()?.data?.error
 const resent = resend.succeeded() !== undefined
 ---
 head
-  title {t('auth.verify.title')}
-Panel(title={t('auth.verify.title')})
+  title {wording('auth.verify.title', 'Verify your address')}
+Panel(title={wording('auth.verify.title', 'Verify your address')})
   if token
     form.flex.flex-col.gap-3(action={verify})
       input(type="hidden" name="token" value={token})
       if refused === 'confirm'
-        p {t('auth.verify.confirm')}
-        FormField(label={t('auth.password')} required)
+        p {wording('auth.verify.confirm', 'This link was opened in another browser: type your password to confirm it is you.')}
+        FormField(label={wording('auth.password', 'Password')} required)
           input(name="password" type="password" autocomplete="current-password" required)
       else
-        p {t('auth.verify.intro')}
+        p {wording('auth.verify.intro', 'Press the button to verify your address.')}
         if refused
           Message(text={failure(refused)})
-      Button(type="submit" tone="accent" label={t('auth.verify.submit')})
+      Button(type="submit" tone="accent" label={wording('auth.verify.submit', 'Verify my address')})
   else if pending?.type === 'verify'
     form.flex.flex-col.gap-3(action={code})
-      p {t('auth.verify.codeIntro', { email: pending.email })}
-      FormField(label={t('auth.code')} required)
+      p {wording('auth.verify.codeIntro', 'Type the code mailed to {email}.', { email: pending.email })}
+      FormField(label={wording('auth.code', 'Code')} required)
         input(name="code" inputmode="numeric" autocomplete="one-time-code" required)
       if codeError
         Message(text={failure(codeError)})
-      Button(type="submit" tone="accent" label={t('auth.verify.submit')})
+      Button(type="submit" tone="accent" label={wording('auth.verify.submit', 'Verify my address')})
   else if user?.email && !user.emailVerified
     form.flex.flex-col.gap-3(action={resend})
-      p {t('auth.verify.unverified', { email: user.email })}
+      p {wording('auth.verify.unverified', 'Your address {email} is not verified yet.', { email: user.email })}
       if resent
-        Message(tone="success" text={t('auth.verify.resent')})
+        Message(tone="success" text={wording('auth.verify.resent', 'A new link is on its way.')})
       if resendError
         Message(text={failure(resendError)})
-      Button(type="submit" label={t('auth.verify.resend')})
+      Button(type="submit" label={wording('auth.verify.resend', 'Mail me a new link')})
   else if user?.emailVerified
-    Message(tone="success" text={t('auth.verify.done')})
+    Message(tone="success" text={wording('auth.verify.done', 'Your address is verified.')})
   else
     Message(text={failure('link')})

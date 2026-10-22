@@ -301,14 +301,9 @@ describe('the llms topic files', () => {
 
   // One lookup and one registration (llms/component-libraries.md, Texts): `wording` from `kay/words`, a shipped `fr.ts` and no `en.ts`, declared by `kay.messages` in package.json.
   it('word every text through wording, with a French catalog registered in package.json', async () => {
-    // Libraries still on `t()` and an `en.ts`, until #1777 moves them.
-    const waiting = new Set(['auth', 'mail'])
     const found: string[] = []
 
     for (const library of folders) {
-      if (waiting.has(library))
-        continue
-
       const manifest = await Bun.file(`packages/${library}/package.json`).json() as { kay?: { messages?: string } }
       const sources = await Array.fromAsync(new Glob('src/**/*.{kay,ts}').scan({ cwd: `packages/${library}` }))
       const files = await Promise.all(sources.map(async path => ({ path, text: await Bun.file(`packages/${library}/${path}`).text() })))

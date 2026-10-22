@@ -1,11 +1,13 @@
 import { mailer, outbox } from '@kaynooo/kayjs-mail'
 import { beforeEach, describe, expect, test } from 'bun:test'
 import { AUTH_LINK_KINDS, AUTH_NOTICE_KINDS } from '../../mail/src/auth'
-import en from '../../mail/src/messages/en'
+import { ENGLISH } from '../../mail/src/auth-english'
 import fr from '../../mail/src/messages/fr'
 import { builtInTemplates } from '../src/mail'
 import { testApp } from './helpers/app'
 
+// The English is inline in kayjs-mail's `wording` calls, held by this table.
+const en = { mail: { auth: { ...ENGLISH, link: 'link' } } }
 const PLACEHOLDER = /\{(\w+)\}/g
 
 const LINKS = { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' }

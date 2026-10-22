@@ -136,7 +136,6 @@ describe('auth({ module }) registers the app\'s auth module', () => {
     const extension = auth({ module: './src/auth' })
 
     expect(extension).toMatchObject({ name: '@kaynooo/kayjs-auth', serverModule: { path: './src/auth', export: 'auth' }, prefix: '/auth', home: '/', routes: { prefix: '/auth' } })
-    expect(extension.messages).toBeDefined()
     expect(extension.devTool).toEqual(authPages().devTool)
     expect(extension.commands).toEqual(authPages().commands)
   })
@@ -145,7 +144,6 @@ describe('auth({ module }) registers the app\'s auth module', () => {
     const extension = auth({ module: './src/auth', pages: false })
 
     expect(extension.routes).toBeUndefined()
-    expect(extension.messages).toBeUndefined()
     expect(extension.serverModule?.export).toBe('auth')
   })
 

@@ -1,0 +1,70 @@
+// The English of every code the pages word, which `failure`, `issue` and `oauthFailure` read through `wording` as `auth.errors.<code>`, `auth.oauth.<code>` and `auth.fields.<field>.<problem>`. A code a flow answers with no entry here is a type error.
+export const ERRORS = {
+  'form': 'Check the fields and try again.',
+  'credentials': 'Wrong email, username or password.',
+  'limited': 'Too many attempts. Wait a while, then try again.',
+  'captcha': 'Complete the check that you are not a robot.',
+  'captchaAgain': 'The check in your browser did not go through: send the form again.',
+  'captchaScript': 'This form runs a check in your browser, which needs JavaScript: turn it on, then send it again.',
+  'early': 'Wait a moment, then send it again.',
+  'unverified': 'Verify your address first: open the link mailed to you.',
+  'banned': 'This account is suspended.',
+  'closed': 'This site does not take new accounts.',
+  'unavailable': 'Mail is not set up on this site.',
+  'link': 'This link is invalid or was already used.',
+  'code': 'Wrong code.',
+  'expired': 'This took too long: start again.',
+  'signed-out': 'Sign in first.',
+  'verified': 'Your address is already verified.',
+  'proof': 'Wrong password or code.',
+  'stale': 'For your safety, sign in again before doing this.',
+  'impersonating': 'Not while acting as another user.',
+  'enabled': 'Two-step verification is already on.',
+  'not-set-up': 'Set up two-step verification first.',
+  'disabled': 'Two-step verification is off.',
+  'not-linked': 'This account is not connected.',
+  'last-way-in': 'This is your only way to sign in: add another first.',
+  'self': 'You cannot do this to your own account.',
+  'last-admin': 'You are the only admin: make someone else an admin first.',
+  'last-owner': 'You are the only owner of an organization with other members: make another member an owner first.',
+  'not-found': 'Not found.',
+  'label': 'Give the token a name.',
+  'scope': 'Choose what the token is allowed to do.',
+  'expiry': 'Choose when the token expires.',
+  'invalid': 'That did not work.',
+  'none': 'No passkey to use.',
+} as const
+
+export const OAUTH_ERRORS = {
+  'oauth': 'The sign-in with that provider failed. Try again.',
+  'cancelled': 'The sign-in was cancelled.',
+  'refused': 'This account may not sign in here.',
+  'taken': 'Another account already uses that address: sign in to it, then connect this provider.',
+  'unavailable': 'Signing in with that provider is not available.',
+  'signed-out': 'Sign in first.',
+  'banned': 'This account is suspended.',
+} as const
+
+export const FIELD_ERRORS = {
+  email: {
+    invalid: 'Type a valid address.',
+    taken: 'An account already uses this address.',
+    unchanged: 'This is your current address.',
+  },
+  password: {
+    'too-short': 'Use at least {min} characters.',
+    'too-long': 'Use at most {max} characters.',
+    'breached': 'This password appeared in a data breach: choose another.',
+  },
+  username: {
+    'length': 'Use {min} to {max} characters.',
+    'characters': 'Use letters, digits, spaces, dots, dashes and underscores.',
+    'mixed-scripts': 'Use one alphabet only.',
+    'taken': 'This username is taken.',
+    'unchanged': 'This is your current username.',
+  },
+  profile: {
+    'required': 'Fill this in.',
+    'too-long': 'Use at most {max} characters.',
+  },
+} as const

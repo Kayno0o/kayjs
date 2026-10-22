@@ -298,7 +298,7 @@ export interface MailExtensionOptions {
   server?: (() => Promise<Mailer>) | undefined
 }
 
-// Lists the mailer in `kay.config.ts`'s `extensions`, so `pages()` uses it and the server needs no `.use(mail)`, and brings the `mail.auth` messages `authMailer` writes in and the `mail.contact` ones of `contactForm`.
+// Lists the mailer in `kay.config.ts`'s `extensions`, so `pages()` uses it and the server needs no `.use(mail)`; its `mail.auth` and `mail.contact` messages come with the package (`kay.messages`).
 // It is loaded only as `pages()` builds the app: a `.kay` mail the module imports while the config loads would come before kay compiles any.
 export function mail(options: MailExtensionOptions): KayExtension<Mailer> {
   const { module, server } = options
@@ -309,13 +309,11 @@ export function mail(options: MailExtensionOptions): KayExtension<Mailer> {
   if (module !== undefined && server !== undefined)
     throw new Error('kayjs-mail: mail() takes the path of the module or a `server`, not both')
 
-  const messages = `${import.meta.dir}/messages`
-
   const devTool = { module: `${import.meta.dir}/devTool.ts` }
 
   const env = smtpEnv({ listed: true })
 
-  return module === undefined ? { name: '@kaynooo/kayjs-mail', server: server!, messages, devTool, env } : { name: '@kaynooo/kayjs-mail', serverModule: { path: module, export: 'mail' }, messages, devTool, env }
+  return module === undefined ? { name: '@kaynooo/kayjs-mail', server: server!, devTool, env } : { name: '@kaynooo/kayjs-mail', serverModule: { path: module, export: 'mail' }, devTool, env }
 }
 
 /** @deprecated Use `mail({ module })`, which `kay check --fix` rewrites it to. */

@@ -3,18 +3,16 @@ import type { Auth } from '../auth'
 import type { CaptchaAction } from '../captcha'
 import type { Proof } from '../twoFactor'
 import type { AuthFeatures, ProfileProblem } from './index'
-import type en from './messages/en'
 import { t } from 'elysia'
-import { t as message } from 'kay/i18n'
 import { wording } from 'kay/words'
 import { passkeyAssertion, passkeyAttestation } from '../payloads'
 import { PROFILE_MAX_LENGTH } from '../rules'
+import { ERRORS, FIELD_ERRORS, OAUTH_ERRORS } from './english'
 
-// The codes the pages word, as the English catalog, which every other language mirrors, holds them: a code a flow answers with no message is a type error here.
-type Catalog = typeof en['auth']
-export type FailureCode = keyof Catalog['errors']
-export type OAuthFailureCode = keyof Catalog['oauth']
-type Fields = Catalog['fields']
+// The codes the pages word, as the English table holds them: a code a flow answers with no message is a type error here.
+export type FailureCode = keyof typeof ERRORS
+export type OAuthFailureCode = keyof typeof OAUTH_ERRORS
+type Fields = typeof FIELD_ERRORS
 type Problem<Field extends keyof Fields> = keyof Fields[Field]
 
 // A scope as the page shows it: the label the app words under `auth.scopes.<scope>` in its catalogs, else the scope itself.
@@ -123,7 +121,7 @@ export function proofOf(input: { password?: string | undefined, code?: string | 
 
 // What a page shows for a failure code, in the request's language.
 export function failure(error: FailureCode): string {
-  return message(`auth.errors.${error}`)
+  return wording(`auth.errors.${error}`, ERRORS[error])
 }
 
 function captchaFailure(captcha: AuthFeatures['captcha'], error: string): FailureCode {
@@ -157,20 +155,20 @@ export function refusal(failed: { errors: Partial<Record<string, string>>, data?
 // What a page shows under a field refused for `problem`, with the limits the app's rules hold it to. A password problem the app's own `check` returned that has no message of the page's shows as it is.
 export function issue(...[field, problem, rules]: [field: 'email', problem: Problem<'email'>, rules?: undefined] | [field: 'password', problem: Problem<'password'> | (string & {}), rules: AuthFeatures['rules']] | [field: 'username', problem: Problem<'username'>, rules: AuthFeatures['rules']]): string {
   switch (field) {
-    case 'email': return message(`auth.fields.email.${problem}`)
-    case 'password': return PASSWORD_PROBLEMS.has(problem) ? message(`auth.fields.password.${problem as Problem<'password'>}`, { min: rules.password.min, max: rules.password.max }) : problem
-    case 'username': return message(`auth.fields.username.${problem}`, { min: rules.username.min, max: rules.username.max })
+    case 'email': return wording(`auth.fields.email.${problem}`, FIELD_ERRORS.email[problem])
+    case 'password': return PASSWORD_PROBLEMS.has(problem) ? wording(`auth.fields.password.${problem as Problem<'password'>}`, FIELD_ERRORS.password[problem as Problem<'password'>], { min: rules.password.min, max: rules.password.max }) : problem
+    case 'username': return wording(`auth.fields.username.${problem}`, FIELD_ERRORS.username[problem], { min: rules.username.min, max: rules.username.max })
   }
 }
 
 // What a page shows under a profile field the app asked for, `max` being the field's own limit when it set one.
 export function profileIssue(problem: ProfileProblem, max?: number): string {
-  return typeof problem === 'object' ? problem.message : message(`auth.fields.profile.${problem}`, { max: max ?? PROFILE_MAX_LENGTH })
+  return typeof problem === 'object' ? problem.message : wording(`auth.fields.profile.${problem}`, FIELD_ERRORS.profile[problem], { max: max ?? PROFILE_MAX_LENGTH })
 }
 
 // The message for the `?error=` a failed provider sign-in comes back with; undefined for none, or one kayjs-auth never sends.
 export function oauthFailure(error: string | null): string | undefined {
-  return error !== null && isOAuthFailure(error) ? message(`auth.oauth.${error}`) : undefined
+  return error !== null && isOAuthFailure(error) ? wording(`auth.oauth.${error}`, OAUTH_ERRORS[error]) : undefined
 }
 
 function isOAuthFailure(error: string): error is OAuthFailureCode {

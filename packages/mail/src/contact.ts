@@ -3,7 +3,6 @@ import type { ActionContext, ActionProtection, Failure, JSX } from 'kay'
 import type { Mailer } from './mailer'
 import type { Address, MailField } from './types'
 import { s } from 'kay'
-import { t } from 'kay/i18n'
 import { configError } from 'kay/library'
 import { siteOrigin } from 'kay/seo'
 import { wording } from 'kay/words'
@@ -102,7 +101,7 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
     const { email } = input
 
     if ((message.match(LINK)?.length ?? 0) > maxLinks)
-      return ctx.fail(422, t('mail.contact.tooManyLinks', { max: maxLinks }))
+      return ctx.fail(422, wording('mail.contact.tooManyLinks', 'No more than {max} links per message.', { max: maxLinks }))
 
     const given: MailField[] = [{ label: labelOf('name', labels), value: name }, { label: labelOf('email', labels), value: email, href: `mailto:${email}` }]
 
@@ -113,7 +112,7 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
       given.push({ label: labelOf(key, labels), value: text })
     }
 
-    const subject = options.subject?.(input) ?? t('mail.contact.subject', { name })
+    const subject = options.subject?.(input) ?? wording('mail.contact.subject', 'Message from {name}', { name })
     const origin = siteOrigin()
 
     try {
@@ -131,13 +130,13 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
       if (error instanceof MailNotConfiguredError) {
         log.error(error.message, error)
 
-        return ctx.fail(503, reach === undefined ? t('mail.contact.notConfigured') : t('mail.contact.notConfiguredReach', words))
+        return ctx.fail(503, reach === undefined ? wording('mail.contact.notConfigured', 'The form cannot send messages yet.') : wording('mail.contact.notConfiguredReach', 'The form cannot send messages yet: write to {reach}.', words))
       }
 
       if (!wasLogged(error))
         log.error('the contact mail could not be sent', error)
 
-      return ctx.fail(502, reach === undefined ? t('mail.contact.sendFailed') : t('mail.contact.sendFailedReach', words))
+      return ctx.fail(502, reach === undefined ? wording('mail.contact.sendFailed', 'Your message could not be sent. Please try again later.') : wording('mail.contact.sendFailedReach', 'Your message could not be sent. Please try again later, or write to {reach}.', words))
     }
 
     return undefined
@@ -149,8 +148,8 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
     ...options.protection,
     honeypot: { field: honeypot, pretend: true },
     messages: {
-      rateLimit: () => reach === undefined ? t('mail.contact.rateLimit') : t('mail.contact.rateLimitReach', words),
-      minTime: reason => t(reason === 'early' ? 'mail.contact.early' : 'mail.contact.expired'),
+      rateLimit: () => reach === undefined ? wording('mail.contact.rateLimit', 'Too many messages sent from here in a short time: try again in a few minutes.') : wording('mail.contact.rateLimitReach', 'Too many messages sent from here in a short time: try again in a few minutes, or write to {reach}.', words),
+      minTime: reason => reason === 'early' ? wording('mail.contact.early', 'One moment: read your message again, then send it.') : wording('mail.contact.expired', 'This page has expired: reload it, then send your message again.'),
     },
   }
 

@@ -1,5 +1,6 @@
 --- server
-import { localize, t } from 'kay/i18n'
+import { localize } from 'kay/i18n'
+import { wording } from 'kay/words'
 import Message from '../components/message.kay'
 import Panel from '../components/panel.kay'
 import { failure, schemas } from '../forms'
@@ -23,14 +24,14 @@ const token = ctx.url.searchParams.get('token') ?? spend.failed()?.values.token
 const error = spend.failed()?.data?.error
 ---
 head
-  title {t('auth.magic.title')}
-Panel(title={t('auth.magic.title')})
+  title {wording('auth.magic.title', 'Sign in')}
+Panel(title={wording('auth.magic.title', 'Sign in')})
   if token
     form.flex.flex-col.gap-3(action={spend})
       input(type="hidden" name="token" value={token})
-      p {t('auth.magic.intro')}
+      p {wording('auth.magic.intro', 'Press the button to finish signing in.')}
       if error
         Message(text={failure(error)})
-      Button(type="submit" tone="accent" label={t('auth.magic.submit')})
+      Button(type="submit" tone="accent" label={wording('auth.magic.submit', 'Sign in')})
   else
     Message(text={failure('link')})

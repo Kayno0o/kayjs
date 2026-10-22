@@ -1,5 +1,6 @@
 --- server
-import { localize, t } from 'kay/i18n'
+import { localize } from 'kay/i18n'
+import { wording } from 'kay/words'
 import Message from '../components/message.kay'
 import Panel from '../components/panel.kay'
 import { failure, schemas } from '../forms'
@@ -23,14 +24,14 @@ const token = ctx.url.searchParams.get('token') ?? confirm.failed()?.values.toke
 const error = confirm.failed()?.data?.error
 ---
 head
-  title {t('auth.confirmEmail.title')}
-Panel(title={t('auth.confirmEmail.title')})
+  title {wording('auth.confirmEmail.title', 'Confirm your new address')}
+Panel(title={wording('auth.confirmEmail.title', 'Confirm your new address')})
   if token
     form.flex.flex-col.gap-3(action={confirm})
       input(type="hidden" name="token" value={token})
-      p {t('auth.confirmEmail.intro')}
+      p {wording('auth.confirmEmail.intro', 'Press the button to move your account to this address.')}
       if error
         Message(text={failure(error)})
-      Button(type="submit" tone="accent" label={t('auth.confirmEmail.submit')})
+      Button(type="submit" tone="accent" label={wording('auth.confirmEmail.submit', 'Confirm the address')})
   else
     Message(text={failure('link')})

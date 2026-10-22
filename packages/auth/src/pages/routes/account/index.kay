@@ -1,5 +1,5 @@
 --- server
-import { t } from 'kay/i18n'
+import { wording } from 'kay/words'
 import Message from '../../components/message.kay'
 import Proof from '../../components/proof.kay'
 import { failure, issue, profileIssue, proofOf, schemas } from '../../forms'
@@ -56,32 +56,32 @@ const profileRefused = saveProfile.failed()?.data
 const profileProblems = profileRefused && 'errors' in profileRefused ? profileRefused.errors : {}
 const problemOf = (name: string) => Object.hasOwn(profileProblems, name) ? profileProblems[name] : undefined
 ---
-PageSection(title={t('auth.account.profile.title')})
+PageSection(title={wording('auth.account.profile.title', 'Profile')})
   .flex.flex-col.gap-3
     .flex.flex-wrap.items-center.gap-2
       if user.email
         span#kayjs-auth-email {user.email}
         if user.emailVerified
-          Badge(label={t('auth.account.profile.verified')} tone="success")
+          Badge(label={wording('auth.account.profile.verified', 'Verified')} tone="success")
         else
-          Badge(label={t('auth.account.profile.unverified')} tone="warning")
+          Badge(label={wording('auth.account.profile.unverified', 'Not verified')} tone="warning")
       else
-        span {t('auth.account.profile.noEmail')}
+        span {wording('auth.account.profile.noEmail', 'No address yet')}
     if user.email && !user.emailVerified && features.email
       form(action={resend})
         if resent
-          Message(tone="success" text={t('auth.account.profile.resent')})
+          Message(tone="success" text={wording('auth.account.profile.resent', 'A verification link is on its way.')})
         if resendError
           Message(text={failure(resendError)})
-        Button(type="submit" label={t('auth.account.profile.resend')})
+        Button(type="submit" label={wording('auth.account.profile.resend', 'Mail me a verification link')})
     form.flex.flex-col.gap-3(action={changeUsername})
-      FormField(label={t('auth.account.profile.username')} issue={usernameRefused && 'username' in usernameRefused ? issue('username', usernameRefused.username, features.rules) : undefined})
+      FormField(label={wording('auth.account.profile.username', 'Username')} issue={usernameRefused && 'username' in usernameRefused ? issue('username', usernameRefused.username, features.rules) : undefined})
         input(name="username" value={user.username ?? ''} autocomplete="username" required)
       if usernameSaved
-        Message(tone="success" text={t('auth.account.profile.usernameSaved')})
+        Message(tone="success" text={wording('auth.account.profile.usernameSaved', 'Your username is saved.')})
       if usernameRefused && 'error' in usernameRefused
         Message(text={failure(usernameRefused.error)})
-      Button(type="submit" label={t('auth.account.profile.saveUsername')})
+      Button(type="submit" label={wording('auth.account.profile.saveUsername', 'Save the username')})
     if profile
       form.flex.flex-col.gap-3(action={saveProfile})
         for field of profile key={field.name}
@@ -91,18 +91,18 @@ PageSection(title={t('auth.account.profile.title')})
             else
               input(name={field.name} type={field.type ?? 'text'} value={field.value} autocomplete={field.autocomplete} maxlength={field.maxLength} required={field.required})
         if profileSaved
-          Message(tone="success" text={t('auth.account.profile.profileSaved')})
+          Message(tone="success" text={wording('auth.account.profile.profileSaved', 'Your profile is saved.')})
         if profileRefused && 'error' in profileRefused
           Message(text={failure(profileRefused.error)})
-        Button(type="submit" label={t('auth.account.profile.saveProfile')})
+        Button(type="submit" label={wording('auth.account.profile.saveProfile', 'Save the profile')})
 if features.email
-  PageSection(title={t('auth.account.profile.changeEmail')})
+  PageSection(title={wording('auth.account.profile.changeEmail', 'Change your address')})
     form.flex.flex-col.gap-3(action={changeEmail})
-      FormField(label={t('auth.account.profile.newEmail')} issue={emailRefused && 'email' in emailRefused ? issue('email', emailRefused.email) : undefined} required)
+      FormField(label={wording('auth.account.profile.newEmail', 'New address')} issue={emailRefused && 'email' in emailRefused ? issue('email', emailRefused.email) : undefined} required)
         input(name="email" type="email" autocomplete="email" required)
       Proof(user={user} secondFactor)
       if emailSent
-        Message(tone="success" text={t('auth.account.profile.changeSent', { email: emailSent })})
+        Message(tone="success" text={wording('auth.account.profile.changeSent', 'Open the link mailed to {email} to confirm it.', { email: emailSent })})
       if emailRefused && 'error' in emailRefused
         Message(text={failure(emailRefused.error)})
-      Button(type="submit" label={t('auth.account.profile.sendChange')})
+      Button(type="submit" label={wording('auth.account.profile.sendChange', 'Mail a confirmation link')})

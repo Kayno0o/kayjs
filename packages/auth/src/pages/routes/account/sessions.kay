@@ -1,5 +1,6 @@
 --- server
-import { formatRelativeTime, localize, t } from 'kay/i18n'
+import { formatRelativeTime, localize } from 'kay/i18n'
+import { wording } from 'kay/words'
 import { schemas } from '../../forms'
 import Badge from '@kaynooo/kayjs-ui/badge.kay'
 import Button from '@kaynooo/kayjs-ui/button.kay'
@@ -23,27 +24,27 @@ export const endOthers = action(async (ctx) => {
 })
 
 const sessions = await ctx.locals.auth.listSessions()
-const describe = (session: (typeof sessions)[number]) => [session.device.browser, session.device.os].filter(Boolean).join(', ') || t('auth.account.sessions.unknown')
+const describe = (session: (typeof sessions)[number]) => [session.device.browser, session.device.os].filter(Boolean).join(', ') || wording('auth.account.sessions.unknown', 'Unknown device')
 ---
-PageSection(title={t('auth.account.sessions.title')})
+PageSection(title={wording('auth.account.sessions.title', 'Where you are signed in')})
   @actions
     if sessions.length > 1
       form(action={endOthers})
-        Button(type="submit" label={t('auth.account.sessions.endOthers')})
+        Button(type="submit" label={wording('auth.account.sessions.endOthers', 'Sign out everywhere else')})
   .flex.flex-col.gap-2
     for session of sessions key={session.id}
       CardRow(data-session={session.id})
         @right
           form(action={end})
             input(type="hidden" name="id" value={session.id})
-            Button(type="submit" label={t('auth.account.sessions.end')} aria-label={`${t('auth.account.sessions.end')}: ${describe(session)}`})
+            Button(type="submit" label={wording('auth.account.sessions.end', 'Sign out')} aria-label={`${wording('auth.account.sessions.end', 'Sign out')}: ${describe(session)}`})
         .flex.flex-col
           span.flex.flex-wrap.items-center.gap-2
             strong {describe(session)}
             if session.device.mobile
-              span.text-kui-muted {t('auth.account.sessions.mobile')}
+              span.text-kui-muted {wording('auth.account.sessions.mobile', 'mobile')}
             if session.current
-              Badge(label={t('auth.account.sessions.current')} tone="accent")
+              Badge(label={wording('auth.account.sessions.current', 'This device')} tone="accent")
           span.text-kui-muted
             | {[session.place, session.ip].filter(Boolean).join(' · ')}
-          span.text-kui-muted {t('auth.account.sessions.lastSeen', { date: formatRelativeTime(session.lastSeenAt) })}
+          span.text-kui-muted {wording('auth.account.sessions.lastSeen', 'Last seen {date}', { date: formatRelativeTime(session.lastSeenAt) })}

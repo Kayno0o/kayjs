@@ -1,6 +1,7 @@
 --- server
 import { localPath } from 'kay'
-import { localize, t } from 'kay/i18n'
+import { localize } from 'kay/i18n'
+import { wording } from 'kay/words'
 import Message from '../components/message.kay'
 import Panel from '../components/panel.kay'
 import PasskeyTwoFactor from '../components/passkey-two-factor.kay'
@@ -42,18 +43,18 @@ const redirect = localPath(ctx.url.searchParams.get('redirect'), localize(featur
 const error = verify.failed()?.data?.error
 ---
 head
-  title {t('auth.twoFactor.title')}
-Panel(title={t('auth.twoFactor.title')})
+  title {wording('auth.twoFactor.title', 'Two-step verification')}
+Panel(title={wording('auth.twoFactor.title', 'Two-step verification')})
   if pending
     form.flex.flex-col.gap-3(action={verify})
-      p {t('auth.twoFactor.intro')}
-      FormField(label={t('auth.code')} required)
+      p {wording('auth.twoFactor.intro', 'Type the code your authenticator app shows, or one of your recovery codes.')}
+      FormField(label={wording('auth.code', 'Code')} required)
         input(name="code" autocomplete="one-time-code" autocapitalize="off" spellcheck="false" required)
       if error
         Message(text={failure(error)})
-      Button(type="submit" tone="accent" label={t('auth.twoFactor.submit')})
+      Button(type="submit" tone="accent" label={wording('auth.twoFactor.submit', 'Verify')})
     if features.passkeys
-      PasskeyTwoFactor(label={t('auth.twoFactor.passkey')} failed={failure('invalid')})
+      PasskeyTwoFactor(label={wording('auth.twoFactor.passkey', 'Use a passkey instead')} failed={failure('invalid')})
   else
-    p {t('auth.twoFactor.nothing')}
-    a(href={localize(`${features.signInPage}?redirect=${encodeURIComponent(redirect)}`)}) {t('auth.signIn.title')}
+    p {wording('auth.twoFactor.nothing', 'No sign-in is waiting for a code.')}
+    a(href={localize(`${features.signInPage}?redirect=${encodeURIComponent(redirect)}`)}) {wording('auth.signIn.title', 'Sign in')}

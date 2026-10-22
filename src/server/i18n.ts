@@ -208,8 +208,8 @@ export async function loadI18n(root: string, config: I18nConfig, extensions?: Ka
 
     const catalogs = [...libraryCatalogs(root, extensions, locale), ...fileExists(file) ? [file] : []]
 
-    // An extension's catalog stands in for an app with no text of its own in that locale.
-    if (catalogs.length === 0)
+    // An extension's catalog stands in for an app with no text of its own in that locale, and the default locale needs none while a library ships a catalog in another, its English being inline in `wording()`.
+    if (catalogs.length === 0 && !(locale === settings.defaultLocale && settings.locales.some(other => libraryCatalogs(root, extensions, other).length > 0)))
       throw new KayError('locales-invalid', `kay: i18n lists ${locale}, so its messages go in ${relative(process.cwd(), file)}: export default defineMessages({ ... })`)
 
     flat.set(locale, await mergedCatalogs(catalogs))

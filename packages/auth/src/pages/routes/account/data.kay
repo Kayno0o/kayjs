@@ -1,5 +1,6 @@
 --- server
-import { localize, t } from 'kay/i18n'
+import { localize } from 'kay/i18n'
+import { wording } from 'kay/words'
 import Message from '../../components/message.kay'
 import Proof from '../../components/proof.kay'
 import { failure, proofOf, schemas } from '../../forms'
@@ -47,39 +48,39 @@ const stale = !proved && !user.hasPassword && !user.twoFactor
 if impersonated
   p {failure('impersonating')}
 else
-  PageSection(title={t('auth.account.data.export')})
+  PageSection(title={wording('auth.account.data.export', 'Download your data')})
     .flex.flex-col.items-start.gap-3
-      p {t('auth.account.data.exportIntro')}
+      p {wording('auth.account.data.exportIntro', 'Everything we keep about your account, as a JSON file.')}
       if proved
-        Button(href={`${features.prefix}/export`} label={t('auth.account.data.export')} download data-no-prefetch)
+        Button(href={`${features.prefix}/export`} label={wording('auth.account.data.export', 'Download your data')} download data-no-prefetch)
       else if stale
         form.flex.flex-col.items-start.gap-3(action={signInAgain})
-          p {t('auth.proof.stale')}
-          Button(type="submit" label={t('auth.proof.signInAgain')})
+          p {wording('auth.proof.stale', 'For your safety, sign in again before doing this.')}
+          Button(type="submit" label={wording('auth.proof.signInAgain', 'Sign in again')})
       else
         form.flex.flex-col.gap-3(action={prove})
           Proof(user={user})
           if notProved
             Message(text={failure(notProved)})
-          Button(type="submit" label={t('auth.account.data.confirmExport')})
-  PageSection(title={t('auth.account.data.delete')})
+          Button(type="submit" label={wording('auth.account.data.confirmExport', 'Confirm to download my data')})
+  PageSection(title={wording('auth.account.data.delete', 'Delete your account')})
     if stale
       form.flex.flex-col.items-start.gap-3(action={signInAgain})
-        p {t('auth.account.data.deleteIntro')}
+        p {wording('auth.account.data.deleteIntro', 'Your account and everything tied to it are deleted for good. This cannot be undone.')}
         if impact.deleted.length > 0
-          p {t('auth.account.data.deleteOrganizations', { names: impact.deleted.join(', ') })}
+          p {wording('auth.account.data.deleteOrganizations', 'These organizations are deleted with it, as you are their only member: {names}.', { names: impact.deleted.join(', ') })}
         if impact.blocked.length > 0
-          p {t('auth.account.data.deleteBlocked', { names: impact.blocked.join(', ') })}
-        p {t('auth.proof.stale')}
-        Button(type="submit" label={t('auth.proof.signInAgain')})
+          p {wording('auth.account.data.deleteBlocked', 'You are the only owner of {names}: make another member an owner first.', { names: impact.blocked.join(', ') })}
+        p {wording('auth.proof.stale', 'For your safety, sign in again before doing this.')}
+        Button(type="submit" label={wording('auth.proof.signInAgain', 'Sign in again')})
     else
       form.flex.flex-col.gap-3(action={remove})
-        p {t('auth.account.data.deleteIntro')}
+        p {wording('auth.account.data.deleteIntro', 'Your account and everything tied to it are deleted for good. This cannot be undone.')}
         if impact.deleted.length > 0
-          p {t('auth.account.data.deleteOrganizations', { names: impact.deleted.join(', ') })}
+          p {wording('auth.account.data.deleteOrganizations', 'These organizations are deleted with it, as you are their only member: {names}.', { names: impact.deleted.join(', ') })}
         if impact.blocked.length > 0
-          p {t('auth.account.data.deleteBlocked', { names: impact.blocked.join(', ') })}
+          p {wording('auth.account.data.deleteBlocked', 'You are the only owner of {names}: make another member an owner first.', { names: impact.blocked.join(', ') })}
         Proof(user={user})
         if refused
           Message(text={failure(refused)})
-        Button(type="submit" tone="danger" label={t('auth.account.data.confirmDelete')})
+        Button(type="submit" tone="danger" label={wording('auth.account.data.confirmDelete', 'Delete my account')})

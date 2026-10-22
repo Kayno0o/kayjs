@@ -1,5 +1,6 @@
 --- server
-import { localize, t } from 'kay/i18n'
+import { localize } from 'kay/i18n'
+import { wording } from 'kay/words'
 import Message from '../../components/message.kay'
 import Proof from '../../components/proof.kay'
 import { failure, oauthFailure, proofOf, schemas } from '../../forms'
@@ -29,27 +30,27 @@ const features = auth.features()
 const linked = new Set(await auth.listIdentities())
 const refused = connect.failed()?.data ?? disconnect.failed()?.data
 ---
-PageSection(title={t('auth.account.connections.title')})
+PageSection(title={wording('auth.account.connections.title', 'Connected accounts')})
   .flex.flex-col.gap-2
-    p {t('auth.account.connections.intro')}
+    p {wording('auth.account.connections.intro', 'Sign in with these accounts as well as your own.')}
     for provider of features.providers key={provider.name}
       CardRow(data-provider={provider.name})
         .flex.flex-col.gap-2
           span.flex.items-center.gap-2
             strong {provider.label}
             if linked.has(provider.name)
-              Badge(label={t('auth.account.connections.connected')} tone="success")
+              Badge(label={wording('auth.account.connections.connected', 'Connected')} tone="success")
           if refused?.provider === provider.name
             Message(text={oauthFailure(refused.error) ?? failure(refused.error)})
           if linked.has(provider.name)
             form.flex.flex-wrap.items-end.gap-2(action={disconnect})
               input(type="hidden" name="provider" value={provider.name})
               Proof(user={user})
-              Button(type="submit" tone="danger" label={t('auth.account.connections.disconnect')})
+              Button(type="submit" tone="danger" label={wording('auth.account.connections.disconnect', 'Disconnect')})
           else
             form.flex.flex-wrap.items-end.gap-2(action={connect})
               input(type="hidden" name="provider" value={provider.name})
               Proof(user={user} secondFactor)
-              Button(type="submit" label={t('auth.account.connections.connect')})
+              Button(type="submit" label={wording('auth.account.connections.connect', 'Connect')})
     else
-      p {t('auth.account.connections.none')}
+      p {wording('auth.account.connections.none', 'No provider is set up.')}

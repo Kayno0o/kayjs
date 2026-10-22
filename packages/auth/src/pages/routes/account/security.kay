@@ -1,5 +1,6 @@
 --- server
-import { formatDate, t } from 'kay/i18n'
+import { formatDate } from 'kay/i18n'
+import { wording } from 'kay/words'
 import Message from '../../components/message.kay'
 import PasskeyAdd from '../../components/passkey-add.kay'
 import Proof from '../../components/proof.kay'
@@ -84,69 +85,69 @@ const passkeys = features.passkeys ? await auth.listPasskeys() : []
 const removeRefused = removePasskey.failed()?.data
 const passkeyErrors = Object.fromEntries((['proof', 'stale', 'limited', 'impersonating', 'expired', 'invalid', 'signed-out'] as const).map(code => [code, failure(code)]))
 ---
-PageSection(title={t('auth.account.password.title')})
+PageSection(title={wording('auth.account.password.title', 'Password')})
   form.flex.flex-col.gap-3(action={changePassword})
     if !user.hasPassword
-      p {t('auth.account.password.none')}
+      p {wording('auth.account.password.none', 'You sign in without a password. Set one to sign in with your address too.')}
     Proof(user={user})
-    FormField(label={t('auth.newPassword')} hint={t('auth.passwordHint', { min: features.rules.password.min })} issue={passwordRefused && 'password' in passwordRefused ? issue('password', passwordRefused.password, features.rules) : undefined} required)
+    FormField(label={wording('auth.newPassword', 'New password')} hint={wording('auth.passwordHint', 'At least {min} characters', { min: features.rules.password.min })} issue={passwordRefused && 'password' in passwordRefused ? issue('password', passwordRefused.password, features.rules) : undefined} required)
       input(name="newPassword" type="password" autocomplete="new-password" minlength={features.rules.password.min} required)
     if passwordSaved
-      Message(tone="success" text={t('auth.account.password.changed')})
+      Message(tone="success" text={wording('auth.account.password.changed', 'Your password is saved. Your other sessions were signed out.')})
     if passwordRefused && 'error' in passwordRefused
       Message(text={failure(passwordRefused.error)})
-    Button(type="submit" label={user.hasPassword ? t('auth.account.password.change') : t('auth.account.password.set')})
-PageSection(title={t('auth.account.twoFactor.title')})
+    Button(type="submit" label={user.hasPassword ? wording('auth.account.password.change', 'Change the password') : wording('auth.account.password.set', 'Set a password')})
+PageSection(title={wording('auth.account.twoFactor.title', 'Two-step verification')})
   @actions
-    Badge(label={user.twoFactor ? t('auth.account.twoFactor.on') : t('auth.account.twoFactor.off')} tone={user.twoFactor ? 'success' : 'neutral'})
+    Badge(label={user.twoFactor ? wording('auth.account.twoFactor.on', 'On') : wording('auth.account.twoFactor.off', 'Off')} tone={user.twoFactor ? 'success' : 'neutral'})
   .flex.flex-col.gap-3
     if recoveryCodes
       RecoveryCodes(codes={recoveryCodes})
     if twoFactorError
       Message(text={failure(twoFactorError)})
     if user.twoFactor
-      p#kayjs-auth-codes-left {t('auth.account.twoFactor.codesLeft', { count: codesLeft })}
+      p#kayjs-auth-codes-left {wording('auth.account.twoFactor.codesLeft', codesLeft === 0 ? 'No recovery code left' : codesLeft === 1 ? '{count} recovery code left' : '{count} recovery codes left', { count: codesLeft })}
       form.flex.flex-col.gap-3(action={regenerate})
         Proof(user={user} secondFactor)
-        Button(type="submit" label={t('auth.account.twoFactor.regenerate')})
+        Button(type="submit" label={wording('auth.account.twoFactor.regenerate', 'Make new recovery codes')})
       form.flex.flex-col.gap-3(action={disable})
         Proof(user={user} secondFactor)
-        Button(type="submit" tone="danger" label={t('auth.account.twoFactor.disable')})
+        Button(type="submit" tone="danger" label={wording('auth.account.twoFactor.disable', 'Turn off')})
     else if setupUri
-      p {t('auth.account.twoFactor.scan')}
-      QrCode(value={setupUri} label={t('auth.account.twoFactor.qr')} size={192})
+      p {wording('auth.account.twoFactor.scan', 'Scan this code with your authenticator app, or type the key, then type the code it shows.')}
+      QrCode(value={setupUri} label={wording('auth.account.twoFactor.qr', 'QR code for your authenticator app')} size={192})
       if setupKey
         p
-          | {t('auth.account.twoFactor.key')}: #[code#kayjs-auth-key {setupKey}]
+          | {wording('auth.account.twoFactor.key', 'Key')}: #[code#kayjs-auth-key {setupKey}]
       form.flex.flex-col.gap-3(action={enable})
         input(type="hidden" name="uri" value={setupUri})
-        FormField(label={t('auth.code')} required)
+        FormField(label={wording('auth.code', 'Code')} required)
           input(name="code" inputmode="numeric" autocomplete="one-time-code" required)
-        Button(type="submit" tone="accent" label={t('auth.account.twoFactor.enable')})
+        Button(type="submit" tone="accent" label={wording('auth.account.twoFactor.enable', 'Turn on')})
     else
       form.flex.flex-col.gap-3(action={setUp})
-        p {t('auth.account.twoFactor.intro')}
+        p {wording('auth.account.twoFactor.intro', 'Ask for a code from an authenticator app at each sign-in.')}
         Proof(user={user})
-        Button(type="submit" tone="accent" label={t('auth.account.twoFactor.setUp')})
+        Button(type="submit" tone="accent" label={wording('auth.account.twoFactor.setUp', 'Set up two-step verification')})
 if features.passkeys
-  PageSection(title={t('auth.account.passkeys.title')})
+  PageSection(title={wording('auth.account.passkeys.title', 'Passkeys')})
     .flex.flex-col.gap-3
-      p {t('auth.account.passkeys.intro')}
+      p {wording('auth.account.passkeys.intro', 'Sign in with your fingerprint, face or device PIN instead of a password.')}
       for passkey of passkeys key={passkey.id}
         CardRow
           form.flex.flex-wrap.items-end.gap-2(action={renamePasskey})
             input(type="hidden" name="id" value={passkey.id})
-            FormField(label={t('auth.account.passkeys.name')})
+            FormField(label={wording('auth.account.passkeys.name', 'Name')})
               input(name="name" value={passkey.name} required)
-            Button(type="submit" label={t('auth.account.passkeys.rename')} aria-label={`${t('auth.account.passkeys.rename')}: ${passkey.name}`})
+            Button(type="submit" label={wording('auth.account.passkeys.rename', 'Rename')} aria-label={`${wording('auth.account.passkeys.rename', 'Rename')}: ${passkey.name}`})
           p.text-kui-muted
-            | {t('auth.account.passkeys.created', { date: formatDate(passkey.createdAt, { dateStyle: 'medium' }) })}
+            | {wording('auth.account.passkeys.created', 'Added {date}', { date: formatDate(passkey.createdAt, { dateStyle: 'medium' }) })}
           form.flex.flex-wrap.items-end.gap-2(action={removePasskey})
             input(type="hidden" name="id" value={passkey.id})
             Proof(user={user})
             if removeRefused?.id === passkey.id
               Message(text={failure(removeRefused.error)})
-            Button(type="submit" tone="danger" label={t('auth.account.passkeys.remove')} aria-label={`${t('auth.account.passkeys.remove')}: ${passkey.name}`})
+            Button(type="submit" tone="danger" label={wording('auth.account.passkeys.remove', 'Remove')} aria-label={`${wording('auth.account.passkeys.remove', 'Remove')}: ${passkey.name}`})
       else
-        EmptyState(title={t('auth.account.passkeys.none')})
-      PasskeyAdd(user={{ hasPassword: user.hasPassword, twoFactor: user.twoFactor }} label={t('auth.account.passkeys.add')} nameLabel={t('auth.account.passkeys.name')} passwordLabel={t('auth.proof.password')} codeLabel={t('auth.proof.code')} unsupported={t('auth.account.passkeys.unsupported')} failed={t('auth.account.passkeys.failed')} errors={passkeyErrors})
+        EmptyState(title={wording('auth.account.passkeys.none', 'No passkey yet.')})
+      PasskeyAdd(user={{ hasPassword: user.hasPassword, twoFactor: user.twoFactor }} label={wording('auth.account.passkeys.add', 'Add a passkey')} nameLabel={wording('auth.account.passkeys.name', 'Name')} passwordLabel={wording('auth.proof.password', 'Current password')} codeLabel={wording('auth.proof.code', 'Code from your authenticator app')} unsupported={wording('auth.account.passkeys.unsupported', 'This browser cannot make passkeys.')} failed={wording('auth.account.passkeys.failed', 'The passkey was not added.')} errors={passkeyErrors})

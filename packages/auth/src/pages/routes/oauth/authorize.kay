@@ -1,5 +1,5 @@
 --- server
-import { t } from 'kay/i18n'
+import { wording } from 'kay/words'
 import Message from '../../components/message.kay'
 import Panel from '../../components/panel.kay'
 import { schemas, scopeLabel } from '../../forms'
@@ -42,30 +42,34 @@ if (outcome?.kind === 'redirect')
   ctx.redirect(outcome.url)
 
 const problem = refused ?? (outcome?.kind === 'error' ? outcome.error : undefined)
-const words = { 'client': 'client', 'redirect_uri': 'redirectUri', 'signed-out': 'signedOut' } as const
+const words = {
+  'client': ['client', 'This app is not known to this site, so nothing was shared with it.'],
+  'redirect_uri': ['redirectUri', 'This app asked to come back to an address it did not register, so nothing was shared with it.'],
+  'signed-out': ['signedOut', 'You are signed out: start again from the app.'],
+} as const
 ---
 head
-  title {t('auth.consent.title')}
+  title {wording('auth.consent.title', 'Allow access')}
   meta(name="robots" content="noindex")
-Panel(title={t('auth.consent.title')})
+Panel(title={wording('auth.consent.title', 'Allow access')})
   if problem
-    Message(text={t(`auth.consent.${words[problem]}`)})
+    Message(text={wording(`auth.consent.${words[problem][0]}`, words[problem][1])})
   else if outcome?.kind === 'consent'
-    p {t('auth.consent.intro', { client: outcome.client.name })}
+    p {wording('auth.consent.intro', '{client} wants to use your account.', { client: outcome.client.name })}
     if outcome.client.host
-      p.text-kui-muted {t('auth.consent.from', { host: outcome.client.host })}
-    p.text-kui-muted {t('auth.consent.returnsTo', { host: outcome.redirectHost })}
-    p {t('auth.consent.scopes')}
+      p.text-kui-muted {wording('auth.consent.from', 'This app lives at {host}. Only continue if you started this sign-in.', { host: outcome.client.host })}
+    p.text-kui-muted {wording('auth.consent.returnsTo', 'After you decide, you go back to {host}.', { host: outcome.redirectHost })}
+    p {wording('auth.consent.scopes', 'It will be allowed to')}
     ul.list-disc.pl-5
       if outcome.scopes === null
-        li {t('auth.consent.everything')}
+        li {wording('auth.consent.everything', 'Do everything you can do')}
       else if outcome.scopes.length === 0
-        li {t('auth.consent.noScopes')}
+        li {wording('auth.consent.noScopes', 'Identify you, with no access to the features that need a permission')}
       else
         for scope of outcome.scopes key={scope}
           li {scopeLabel(scope)}
     form.flex.flex-wrap.gap-3(action={decide})
       for field of Object.entries(outcome.fields) key={field[0]}
         input(type="hidden" name={field[0]} value={field[1]})
-      Button(type="submit" name="decision" value="allow" tone="accent" label={t('auth.consent.allow')})
-      Button(type="submit" name="decision" value="deny" label={t('auth.consent.deny')})
+      Button(type="submit" name="decision" value="allow" tone="accent" label={wording('auth.consent.allow', 'Allow')})
+      Button(type="submit" name="decision" value="deny" label={wording('auth.consent.deny', 'Deny')})

@@ -1,6 +1,7 @@
 --- server
 import { localPath } from 'kay'
-import { localize, t } from 'kay/i18n'
+import { localize } from 'kay/i18n'
+import { wording } from 'kay/words'
 import Captcha from '../components/captcha.kay'
 import Message from '../components/message.kay'
 import Panel from '../components/panel.kay'
@@ -63,12 +64,12 @@ const signInError = refusal(password.failed(), features.captcha)
 const mailError = refusal(magicLink.failed(), features.captcha)
 const codeError = emailCode.failed()?.data?.error
 const mailedTo = magicLink.succeeded()?.data
-const { askRemember, providerLinks } = rememberOf(features, redirect, provider => t('auth.signIn.provider', { provider }), features.providers)
+const { askRemember, providerLinks } = rememberOf(features, redirect, provider => wording('auth.signIn.provider', 'Continue with {provider}', { provider }), features.providers)
 const codes = features.codes?.['magic-link'] ?? 'link'
 ---
 head
-  title {t('auth.signIn.title')}
-Panel(title={t('auth.signIn.title')})
+  title {wording('auth.signIn.title', 'Sign in')}
+Panel(title={wording('auth.signIn.title', 'Sign in')})
   if oauthError
     Message(text={oauthError})
   if features.providers.length > 0
@@ -77,48 +78,48 @@ Panel(title={t('auth.signIn.title')})
     Separator
   if pending?.type === 'sign-in'
     form.flex.flex-col.gap-3(action={emailCode})
-      p {t('auth.signIn.codeSent', { email: pending.email })}
-      FormField(label={t('auth.code')} required)
+      p {wording('auth.signIn.codeSent', 'Type the code mailed to {email}.', { email: pending.email })}
+      FormField(label={wording('auth.code', 'Code')} required)
         input(name="code" inputmode="numeric" autocomplete="one-time-code" required)
       if codeError
         Message(text={failure(codeError)})
-      Button(type="submit" tone="accent" label={t('auth.signIn.codeSubmit')})
+      Button(type="submit" tone="accent" label={wording('auth.signIn.codeSubmit', 'Sign in')})
   form.flex.flex-col.gap-3(action={password})
     input(type="hidden" name="redirect" value={redirect})
-    FormField(label={t('auth.signIn.identifier')} required)
+    FormField(label={wording('auth.signIn.identifier', 'Email or username')} required)
       input(name="identifier" autocomplete="username webauthn" required)
-    FormField(label={t('auth.password')} required)
+    FormField(label={wording('auth.password', 'Password')} required)
       input(name="password" type="password" autocomplete="current-password" required)
     if askRemember
       label.flex.items-center.gap-2
         input(name="remember" type="checkbox")
-        span {t('auth.remember')}
+        span {wording('auth.remember', 'Keep me signed in')}
     if features.captcha && captchaSignIn.shown
       Captcha(widget={features.captcha} challenge={captchaSignIn.challenge} action="sign-in")
     if signInError
       Message(text={signInError})
-    Button(type="submit" tone="accent" label={t('auth.signIn.submit')})
+    Button(type="submit" tone="accent" label={wording('auth.signIn.submit', 'Sign in')})
     if features.email
-      a(href={localize(`${prefix}/reset-password?redirect=${encodeURIComponent(redirect)}`)}) {t('auth.signIn.forgot')}
+      a(href={localize(`${prefix}/reset-password?redirect=${encodeURIComponent(redirect)}`)}) {wording('auth.signIn.forgot', 'Forgot your password?')}
   if features.passkeys
-    PasskeySignIn(redirect={redirect} label={t('auth.signIn.passkey')} failed={failure('invalid')})
+    PasskeySignIn(redirect={redirect} label={wording('auth.signIn.passkey', 'Sign in with a passkey')} failed={failure('invalid')})
   if features.email
     Separator
     if mailedTo && codes === 'link'
-      Message(tone="success" text={t('auth.signIn.sent')})
+      Message(tone="success" text={wording('auth.signIn.sent', 'If an account has this address, a mail is on its way.')})
     form.flex.flex-col.gap-3(action={magicLink})
       input(type="hidden" name="redirect" value={redirect})
-      FormField(label={t('auth.email')} required)
+      FormField(label={wording('auth.email', 'Email')} required)
         input(name="email" type="email" autocomplete="email" required)
       if askRemember
         label.flex.items-center.gap-2
           input(name="remember" type="checkbox")
-          span {t('auth.remember')}
+          span {wording('auth.remember', 'Keep me signed in')}
       if features.captcha && captchaMagic.shown
         Captcha(widget={features.captcha} challenge={captchaMagic.challenge} action="magic-link")
       if mailError
         Message(text={mailError})
-      Button(type="submit" label={codes === 'link' ? t('auth.signIn.magic') : t('auth.signIn.magicCode')})
+      Button(type="submit" label={codes === 'link' ? wording('auth.signIn.magic', 'Mail me a sign-in link') : wording('auth.signIn.magicCode', 'Mail me a sign-in code')})
   if features.signUp
     p.text-center
-      | {t('auth.signIn.noAccount')} #[a(href={localize(`${prefix}/register?redirect=${encodeURIComponent(redirect)}`)}) {t('auth.signIn.register')}]
+      | {wording('auth.signIn.noAccount', 'No account yet?')} #[a(href={localize(`${prefix}/register?redirect=${encodeURIComponent(redirect)}`)}) {wording('auth.signIn.register', 'Create one')}]

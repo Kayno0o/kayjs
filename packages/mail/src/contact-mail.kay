@@ -1,6 +1,6 @@
 ---
 import type { ContactMailProps } from './contact'
-import { t } from 'kay/i18n'
+import { wording } from 'kay/words'
 import Button from './button.kay'
 import Fields from './fields.kay'
 import Heading from './heading.kay'
@@ -12,8 +12,8 @@ const { subject, name, email, fields, message, site } = props<ContactMailProps>(
 ---
 Layout(preheader={message.slice(0, 120)})
   @footer
-    | {t('mail.contact.footer', { name, origin: site })}
+    | {wording('mail.contact.footer', 'Sent from the contact form of {origin}. Replying to this mail writes to {name}.', { name, origin: site })}
   Heading {subject}
-  Fields(fields={fields} empty={t('mail.contact.empty')})
+  Fields(fields={fields} empty={wording('mail.contact.empty', 'not given')})
   Quote(text={message})
-  Button(href={`mailto:${email}?subject=${encodeURIComponent(`Re: ${subject}`)}`}) {t('mail.contact.reply', { name })}
+  Button(href={`mailto:${email}?subject=${encodeURIComponent(`Re: ${subject}`)}`}) {wording('mail.contact.reply', 'Reply to {name}', { name })}
