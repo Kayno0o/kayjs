@@ -7,7 +7,7 @@ Select(
   value={kind()}
   options={[]}
   onChange={kind.set}
-  loading
+  busy
   loadingLabel="Loading kinds…"
   aria-label="Kind"
 )

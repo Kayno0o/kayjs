@@ -16,7 +16,7 @@ Select(value={kind()} options={KINDS} onChange={kind.set} emptyOption="Any kind"
 
 ## Loading options
 
-When the options come from a request, set `loading` to show a disabled row in their place, and `loadingLabel` to word it. The chosen `value` stays selected once the options arrive.
+When the options come from a request, set `busy` to show a disabled row in their place, and `loadingLabel` to word it. The chosen `value` stays selected once the options arrive.
 
 <Demo name="select/loading" />
 
