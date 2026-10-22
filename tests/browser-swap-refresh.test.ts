@@ -40,6 +40,16 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
     throw new Error(`timed out waiting for ${what}`)
   }
 
+  // Releases the held action and waits for its answer to reach the page. The refresh it starts loads a chunk before it asks for the page, which nothing shows from outside, hence the short wait.
+  async function answered(page: TestPage, release: () => void): Promise<void> {
+    release()
+    await page.waitUntil(() => (window as { kayActions?: number }).kayActions! >= 1, { timeout: '5s' })
+    await Bun.sleep(150)
+  }
+
+  // The page cannot be polled once it gave up and a full load is pending, and nothing shows from outside that it did: its shortened wait is waited out with a margin.
+  const gaveUp = async (after: number) => Bun.sleep(after + 300)
+
   const requested = (match: (url: string) => boolean) => () => seen.some(match)
 
   beforeAll(async () => {
@@ -74,6 +84,20 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
     const page = await site.open('/')
 
     await page.waitFor('button.act')
+    await page.evaluate(() => {
+      const original = window.fetch.bind(window)
+      const marked = window as { kayActions?: number }
+
+      marked.kayActions = 0
+      window.fetch = async (...args) => {
+        const response = await original(...args)
+
+        if (String(args[0] instanceof Request ? args[0].url : args[0]).includes('/_kay/action'))
+          marked.kayActions!++
+
+        return response
+      }
+    })
 
     if (transition) {
       await page.evaluate((css) => {
@@ -131,8 +155,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
           }
 
           // The action answers while the page is still on its way, and its refresh starts.
-          releaseAction()
-          await Bun.sleep(400)
+          await answered(page, releaseAction)
           releasePage()
           await page.waitUntil((selector, text) => document.querySelector(selector)?.textContent === text && !document.documentElement.hasAttribute('aria-busy'), { timeout: '5s' }, ...link.shows)
 
@@ -158,8 +181,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
     await until(requested(url => url.startsWith('GET /slow.css')), 'the stylesheet to be asked for')
     await page.click('button.act')
     await until(requested(url => url.startsWith('POST /_kay/action')), 'the action to be sent')
-    releaseAction()
-    await Bun.sleep(400)
+    await answered(page, releaseAction)
     releaseSheet()
     await page.waitFor('h1', { text: 'Styled' })
     await page.waitUntil(() => !document.documentElement.hasAttribute('aria-busy'), { timeout: '5s' })
@@ -190,6 +212,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
     await page.evaluate((lengths, to) => {
       const original = window.setTimeout.bind(window)
 
+      // A timer of exactly one of these lengths fires after `to` instead.
       window.setTimeout = ((handler: TimerHandler, delay?: number, ...rest: unknown[]) => original(handler, delay !== undefined && lengths.includes(delay) ? to : delay, ...rest)) as typeof window.setTimeout
     }, bounds, to)
   }
@@ -205,7 +228,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
     const release = hold(isPage('/other'))
 
     await page.click('a.cross')
-    await Bun.sleep(1000)
+    await gaveUp(100)
     release()
     await page.waitFor('h1', { text: 'Other' })
 
@@ -218,7 +241,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
     await using page = await opened(false)
 
     // Long enough for the action's refresh to start waiting before the swap gives up.
-    await shorten(page, [PAGE_TIMEOUT_MS, 1500])
+    await shorten(page, [PAGE_TIMEOUT_MS], 800)
 
     const releaseAction = hold(isAction)
     const releasePage = hold(isPage('/?view=b'))
@@ -228,10 +251,11 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
     await page.click('a.query')
     await until(requested(url => url === 'GET /?view=b nav'), 'the page to be asked for')
     seen.length = 0
-    releaseAction()
-    await Bun.sleep(2500)
+    await answered(page, releaseAction)
+    await gaveUp(800)
+    // The refresh, had it not given way, has asked for its page by now.
+    await page.evaluate(() => 0)
     releasePage()
-    await Bun.sleep(500)
     await page.waitFor('p.view', { text: 'b' })
 
     expect(seen).not.toContain('GET / nav')
@@ -302,6 +326,32 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
 
     await page.click('a.cross')
     await page.waitFor('h1', { text: 'Other' })
+    await page.click('a.home')
+    await page.waitFor('h1', { text: 'Home' })
+
+    const releaseAction = hold(isAction)
+    const releasePage = hold(isPage('/other'))
+
+    await page.click('button.act')
+    await until(requested(url => url.startsWith('POST /_kay/action')), 'the action to be sent')
+    await page.evaluate(() => {
+      history.back()
+    })
+    await until(requested(url => url === 'GET /other nav'), 'the page to be asked for')
+    await answered(page, releaseAction)
+    releasePage()
+    await page.waitFor('h1', { text: 'Other' })
+    await page.waitUntil(() => !document.documentElement.hasAttribute('aria-busy'), { timeout: '5s' })
+
+    expect(await page.path()).toBe('/other')
+    expect(page.errors).toEqual([])
+  }, 30_000)
+
+  it('forward arrives on the page it goes to when an action refreshes during it', async () => {
+    await using page = await opened(false)
+
+    await page.click('a.cross')
+    await page.waitFor('h1', { text: 'Other' })
     await page.evaluate(() => {
       history.back()
     })
@@ -316,8 +366,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
       history.forward()
     })
     await until(requested(url => url === 'GET /other nav'), 'the page to be asked for')
-    releaseAction()
-    await Bun.sleep(400)
+    await answered(page, releaseAction)
     releasePage()
     await page.waitFor('h1', { text: 'Other' })
 
