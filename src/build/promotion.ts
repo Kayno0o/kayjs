@@ -1,10 +1,9 @@
 import type { KayExtension } from '../config'
 import type { ImportGraph, KayLibrary } from './libraries'
 import { existsSync, realpathSync } from 'node:fs'
-import { sep } from 'node:path'
 import { extensionEditor, routeMounts } from '../server/routes'
 import { findKayFiles } from './files'
-import { findKayLibraries, reachableLibraryFiles, reachesAny } from './libraries'
+import { findKayLibraries, importEdges, reachableLibraryFiles, reachingAny } from './libraries'
 
 export type BrowserRole = 'island' | 'promotable' | undefined
 
@@ -36,8 +35,8 @@ export async function buildFiles(root: string, extensions: KayExtension[] | unde
 // Whether the build promotes each file to an island: a static component that passes a function, whose imports reach an island of the project, of a library it mounts or of one it reaches.
 export async function promotedFiles(root: string, libraries: KayLibrary[], files: string[], roles: BrowserRole[], graph: ImportGraph = new Map()): Promise<boolean[]> {
   const islandFiles = new Set(files.filter((_, index) => roles[index] === 'island').map(file => realpathSync(file)))
-  const edges = new Map<string, Promise<string[]>>()
-  const project = realpathSync(root) + sep
+  const promotable = files.filter((_, index) => roles[index] === 'promotable').map(file => realpathSync(file))
+  const reaching = islandFiles.size > 0 ? await reachingAny(promotable, islandFiles, importEdges(root, libraries, graph)) : new Set<string>()
 
-  return Promise.all(files.map(async (file, index) => roles[index] === 'promotable' && islandFiles.size > 0 && await reachesAny(root, libraries, realpathSync(file), islandFiles, edges, project, graph)))
+  return files.map((file, index) => roles[index] === 'promotable' && reaching.has(realpathSync(file)))
 }

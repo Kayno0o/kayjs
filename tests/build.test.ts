@@ -17,7 +17,7 @@ import { ASSET_FILE, clientDir, MAPS_DIR, outputDir, writeAsset } from '../src/b
 import { writeCacheEntry } from '../src/build/cache'
 import { buildClient, islandManifest, keepMaps, readClientSources } from '../src/build/client'
 import { forgetSources, keepSources, readSource, realPath, writeAtomically, writeIfChanged } from '../src/build/files'
-import { fileWords, reachesAny } from '../src/build/libraries'
+import { fileWords, importEdges, reachingAny } from '../src/build/libraries'
 import { BUNDLED_LICENCES, codecWarnings, thirdPartyNotices, unknownCodecVersions } from '../src/build/licenses'
 import { kay } from '../src/build/plugin'
 import { formatBuildReport, formatRemoved, formatRouteTable, formatSizeReport, gzipSize, shorten, writeStoredReport } from '../src/build/report'
@@ -1705,14 +1705,14 @@ describe('what a build keeps in memory', () => {
 
     try {
       await Bun.write(from, 'import \'./b\'\nimport \'node:fs\'\n')
-      expect(await reachesAny(dir, [], from, new Set([target]), undefined, undefined, graph)).toBe(false)
+      expect((await reachingAny([from], new Set([target]), importEdges(dir, [], graph))).has(from)).toBe(false)
       expect(graph.get(from)).toMatchObject({ paths: [], missing: ['./b'] })
 
       await Bun.write(target, '')
-      expect(await reachesAny(dir, [], from, new Set([target]), undefined, undefined, graph)).toBe(true)
+      expect((await reachingAny([from], new Set([target]), importEdges(dir, [], graph))).has(from)).toBe(true)
 
       await Bun.write(from, 'import \'node:fs\'\n')
-      expect(await reachesAny(dir, [], from, new Set([target]), undefined, undefined, graph)).toBe(false)
+      expect((await reachingAny([from], new Set([target]), importEdges(dir, [], graph))).has(from)).toBe(false)
       expect(graph.get(from)).toMatchObject({ paths: [], missing: [] })
     }
     finally {
@@ -1729,19 +1729,19 @@ describe('what a build keeps in memory', () => {
       await Bun.write(a, 'import \'./b\'\n')
       await Bun.write(b, 'import \'./c\'\n')
       await Bun.write(c, '')
-      expect(await reachesAny(dir, [], a, new Set([c]), undefined, undefined, graph)).toBe(true)
+      expect((await reachingAny([a], new Set([c]), importEdges(dir, [], graph))).has(a)).toBe(true)
 
       // As an install drops a library's component its importer still names.
       await rm(c)
-      expect(await reachesAny(dir, [], a, new Set([c]), undefined, undefined, graph)).toBe(false)
+      expect((await reachingAny([a], new Set([c]), importEdges(dir, [], graph))).has(a)).toBe(false)
       expect(graph.get(b)).toMatchObject({ paths: [], missing: ['./c'] })
 
       await rename(b, renamed)
-      expect(await reachesAny(dir, [], a, new Set([renamed]), undefined, undefined, graph)).toBe(false)
+      expect((await reachingAny([a], new Set([renamed]), importEdges(dir, [], graph))).has(a)).toBe(false)
       expect(graph.get(a)).toMatchObject({ paths: [], missing: ['./b'] })
 
       await Bun.write(a, 'import \'./e\'\n')
-      expect(await reachesAny(dir, [], a, new Set([renamed]), undefined, undefined, graph)).toBe(true)
+      expect((await reachingAny([a], new Set([renamed]), importEdges(dir, [], graph))).has(a)).toBe(true)
     }
     finally {
       await rm(dir, { recursive: true, force: true })

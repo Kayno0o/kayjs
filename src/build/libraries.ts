@@ -243,49 +243,80 @@ export async function reachableLibraryFiles(root: string, libraries: KayLibrary[
   return { components: components.sort(), scripts: scripts.sort() }
 }
 
-// Every module the entries reach through their imports, the entries included, real paths: the project's own and its kay libraries', never another package's.
-export async function reachedFrom(root: string, libraries: KayLibrary[], entries: string[], graph: ImportGraph = new Map()): Promise<Set<string>> {
-  const project = realpathSync(root) + sep
-  const seen = new Set(entries)
-  const queue = [...entries]
+// The modules a module imports that a build follows, real paths, each read once for the calls sharing it.
+export type ImportEdges = (file: string) => Promise<string[]>
 
-  for (let file = queue.pop(); file !== undefined; file = queue.pop()) {
-    for (const { path } of await followedImports(root, project, libraries, file, graph)) {
-      if (!seen.has(path)) {
-        seen.add(path)
-        queue.push(path)
-      }
+export function importEdges(root: string, libraries: KayLibrary[], graph?: ImportGraph): ImportEdges {
+  const project = realpathSync(root) + sep
+  const read = new Map<string, Promise<string[]>>()
+
+  return async (file) => {
+    let paths = read.get(file)
+
+    if (paths === undefined) {
+      paths = (async () => (await followedImports(root, project, libraries, file, graph)).map(({ path }) => path))()
+      read.set(file, paths)
     }
+
+    return paths
   }
+}
+
+// Every module the entries reach through their imports, the entries included, real paths: the project's own and its kay libraries', never another package's.
+export async function reachedFrom(entries: string[], edges: ImportEdges): Promise<Set<string>> {
+  const seen = new Set(entries)
+  const visit = async (file: string): Promise<void> => {
+    await Promise.all((await edges(file)).map(async (path) => {
+      if (seen.has(path))
+        return
+
+      seen.add(path)
+      await visit(path)
+    }))
+  }
+
+  await Promise.all(entries.map(visit))
 
   return seen
 }
 
-// Whether `from` reaches one of `targets`, real paths, through its imports: the project's own modules and its kay libraries', never another package's. `edges` keeps each module's imports for the calls of one build, `project` the root's real path.
-export async function reachesAny(root: string, libraries: KayLibrary[], from: string, targets: ReadonlySet<string>, edges = new Map<string, Promise<string[]>>(), project = realpathSync(root) + sep, graph: ImportGraph = new Map()): Promise<boolean> {
-  const seen = new Set([from])
-  const queue = [from]
+// The `from` modules, real paths, that reach one of `targets` through their imports: the project's own modules and its kay libraries', never another package's.
+// Each module reached is read once, then one walk back from the targets finds who leads to them.
+export async function reachingAny(from: string[], targets: ReadonlySet<string>, edges: ImportEdges): Promise<Set<string>> {
+  const importedBy = new Map<string, string[]>()
+  const seen = new Set(from)
+  const visit = async (file: string): Promise<void> => {
+    await Promise.all((await edges(file)).map(async (path) => {
+      const importers = importedBy.get(path)
+
+      if (importers)
+        importers.push(file)
+      else
+        importedBy.set(path, [file])
+
+      if (seen.has(path))
+        return
+
+      seen.add(path)
+      await visit(path)
+    }))
+  }
+
+  await Promise.all(from.map(visit))
+
+  const reaching = new Set<string>()
+  const queue = [...targets]
 
   for (let file = queue.pop(); file !== undefined; file = queue.pop()) {
-    let next = edges.get(file)
-
-    if (next === undefined) {
-      next = (async () => (await followedImports(root, project, libraries, file, graph)).map(({ path }) => path))()
-      edges.set(file, next)
-    }
-
-    for (const path of await next) {
-      if (targets.has(path))
-        return true
-
-      if (!seen.has(path)) {
-        seen.add(path)
-        queue.push(path)
+    for (const importer of importedBy.get(file) ?? []) {
+      if (!reaching.has(importer)) {
+        reaching.add(importer)
+        queue.push(importer)
       }
     }
   }
 
-  return false
+  return new Set(from.filter(file => reaching.has(file)))
 }
 
 // The modules `file` imports, its `import.meta.glob` matches included, that a build follows, by real path as Bun resolves them: `project`'s own, the root's real path, and its kay libraries', `library` naming which; never another package's.

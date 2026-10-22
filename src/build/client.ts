@@ -31,6 +31,7 @@ import { buildClassTable } from './class-table'
 import { CSS_FILE, findKayFiles, findProjectFiles, readSource, writeIfChanged } from './files'
 import { hoistLayerOrder } from './layer-order'
 import { fileWords, reachedFrom, reachesAny } from './libraries'
+import { fileWords, importEdges, reachedFrom, reachingAny } from './libraries'
 import { packagesOf } from './licenses'
 import { throughLinks } from './links'
 import { kay } from './plugin'
@@ -333,43 +334,55 @@ export async function writeClasses(root: string, classes: Set<string>): Promise<
 
 // The table of Tailwind classes a later one overrides, from every word of the components and of the other files an app writes markup in; none when the app has no Tailwind.
 // Only an app with Tailwind reads them, and only its sources: a test or a hidden file read here would be one more input a test edit makes `kay dev` build again for.
-export async function classTableOf(root: string, { words }: Pick<ClientSources, 'words'>): Promise<ClassTable | undefined> {
+export async function classTableOf(root: string, sources: Pick<ClientSources, 'words'>): Promise<ClassTable | undefined> {
   if (await tailwindDesign(root) === undefined)
     return undefined
 
-  return buildClassTable(root, (await markupFiles(root)).flatMap(file => fileWords(file)).concat([...words]))
+  return buildClassTable(root, (await markupFiles(root, sources)).flatMap(file => fileWords(file)).concat([...sources.words]))
 }
 
-async function markupFiles(root: string): Promise<string[]> {
-  const ignored = gitIgnoredNames(root)
+// Both tables of a build read the same files, found once for the sources they are given.
+const markupOf = new WeakMap<object, Promise<string[]>>()
 
-  return (await findProjectFiles(root, MARKUP_FILE, { project: true, ownKayOnly: true })).filter(file => isSource(root, file, ignored, true))
+async function markupFiles(root: string, sources: object): Promise<string[]> {
+  let found = markupOf.get(sources)
+
+  if (found === undefined) {
+    found = (async () => {
+      const ignored = gitIgnoredNames(root)
+
+      return (await findProjectFiles(root, MARKUP_FILE, { project: true, ownKayOnly: true })).filter(file => isSource(root, file, ignored, true))
+    })()
+    markupOf.set(sources, found)
+  }
+
+  return found
 }
 
 // The table the islands ship: the app-wide one cut to the classes a merge in the browser can meet, those written in a module an island bundles or in one that renders an island and hands it a class.
 // The server keeps the whole table; none is sent when no island has two classes to merge, nor when the app has no island or no Tailwind.
-export async function islandClassTableOf(root: string, { islands, libraries, shorthand }: Pick<ClientSources, 'islands' | 'libraries' | 'shorthand'>, graph?: ImportGraph): Promise<ClassTable | undefined> {
+export async function islandClassTableOf(root: string, sources: Pick<ClientSources, 'islands' | 'libraries' | 'shorthand'>, graph?: ImportGraph): Promise<ClassTable | undefined> {
+  const { islands, libraries, shorthand } = sources
+
   if (islands.size === 0 || await tailwindDesign(root) === undefined)
     return undefined
 
   const entries = new Set([...islands.values()].map(file => realpathSync(file)))
-  const bundled = await reachedFrom(root, libraries, [...entries], graph)
-  const edges = new Map<string, Promise<string[]>>()
-  const project = realpathSync(root) + sep
-  const renderers = new Set([...shorthand.keys(), ...(await markupFiles(root)).filter(file => RENDERING_FILE.test(file))])
+  const edges = importEdges(root, libraries, graph)
+  const bundled = await reachedFrom([...entries], edges)
+  const renderers = new Set([...shorthand.keys(), ...(await markupFiles(root, sources)).filter(file => RENDERING_FILE.test(file))])
+  const outside = [...renderers].filter(file => !bundled.has(realpathSync(file)))
   const ui = join(root, UI_FILE)
   // `src/ui.ts` is written into the components it restyles, none of which imports it.
   const words = new Set([...bundled, ...existsSync(ui) ? [ui] : []].flatMap(file => fileWords(file)))
+  const reaching = await reachingAny(outside.map(file => realpathSync(file)), entries, edges)
 
-  await Promise.all([...renderers].map(async (file) => {
-    const real = realpathSync(file)
-
-    if (!bundled.has(real) && await reachesAny(root, libraries, real, entries, edges, project, graph)) {
-      for (const word of fileWords(file)) {
+  for (const file of outside) {
+    if (reaching.has(realpathSync(file))) {
+      for (const word of fileWords(file))
         words.add(word)
-      }
     }
-  }))
+  }
 
   return buildClassTable(root, words)
 }
