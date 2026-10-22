@@ -2,7 +2,7 @@ import type { AuthSessionData } from '../../../src/auth'
 import type { Mail } from '../../../src/mail'
 import { session } from 'kay/server'
 import { createAuth } from '../../../src/auth'
-import { memoryStore } from '../../../src/memoryStore'
+import { memoryAuthStore } from '../../../src/memoryStore'
 import { discordProvider } from '../../../src/oauth/providers'
 
 const DIGIT = /\d/
@@ -11,7 +11,7 @@ const SECRET = 'a-fixture-secret-that-is-long-enough-for-kay'
 // Every mail the site sends, read by the test.
 export const mails: Mail[] = []
 
-export const store = memoryStore()
+export const store = memoryAuthStore()
 
 // What the app keeps beside each user, by id.
 export const profiles = new Map<string, Record<string, string>>()

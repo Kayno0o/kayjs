@@ -22,7 +22,7 @@ kay, Elysia and kayjs-ui (for the prebuilt pages) are peers, and `@kaynooo/pg-or
 ```ts
 // src/auth.ts
 import type { AuthSessionData } from '@kaynooo/kayjs-auth'
-import { createAuth, memoryStore } from '@kaynooo/kayjs-auth'
+import { createAuth, memoryAuthStore } from '@kaynooo/kayjs-auth'
 import { session } from 'kay/server'
 
 export const auth = createAuth({
@@ -30,7 +30,7 @@ export const auth = createAuth({
   // The session takes kay's KAY_SECRET, and kayjs-auth its key from the session's secret; pass `secret` (32+ characters) to keep a separate one.
   // OAuth callbacks and mailed links are built on kay's `site` (kay.config.ts or SITE_URL); `url` gives another.
   // In the process, for trying it out; `pgStore(db)` from '@kaynooo/kayjs-auth/pg' keeps it in Postgres, or in SQLite on a pg-orm `Database` opened at a `sqlite://` URL, whose `tables` list `...authTables` and are migrated with the app's own.
-  store: memoryStore(),
+  store: memoryAuthStore(),
   signInPage: '/login',
 })
 ```

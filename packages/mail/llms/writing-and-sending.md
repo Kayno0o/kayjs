@@ -76,20 +76,20 @@ Layout(preheader="Your account is ready")
 - `Divider` is a line across the card.
 - `Image(src alt width height)` takes its width in pixels, which Outlook sizes it by; other clients scale it down to a narrow screen. `width` and `height` are optional. It leaves off the `loading` and `decoding` kay gives a page's images, which mail clients ignore.
 - `Row` lays `Column`s side by side, stacking them on a screen too narrow for them: `Column` takes half the card's width, or `share`, the fraction it takes, `Column(share={1 / 3})`.
-- `Fields(fields)` lays out a form's answers as label and value pairs, `fields` a list of `{ label, value?, href? }` (the `Field` type): a long value wraps, its line breaks kept, `href` links it, a `mailto:` or `tel:` say, and a value blank or left out shows `empty`, `-` by default. The text part writes each as `Label: value`, one to a line.
+- `Fields(fields)` lays out a form's answers as label and value pairs, `fields` a list of `{ label, value?, href? }` (the `MailField` type): a long value wraps, its line breaks kept, `href` links it, a `mailto:` or `tel:` say, and a value blank or left out shows `empty`, `-` by default. The text part writes each as `Label: value`, one to a line.
 - `Quote(text)` sets a block of text a visitor wrote apart, its line breaks kept in the html and the text part alike.
-- Their colours, fonts, radius and width come from the library's settings, which the app replaces in `kay.config.ts` as with any kay library: `settings: { '@kaynooo/kayjs-mail': './src/mail-settings.ts' }`, a module default-exporting `{ ...defaults, accent: '#0047ff' }`, `defaults` and the `Settings` type imported from `@kaynooo/kayjs-mail`.
+- Their colours, fonts, radius and width come from the library's settings, which the app replaces in `kay.config.ts` as with any kay library: `settings: { '@kaynooo/kayjs-mail': './src/mail-settings.ts' }`, a module default-exporting `{ ...mailDefaults, accent: '#0047ff' }`, `mailDefaults` and the `MailSettings` type imported from `@kaynooo/kayjs-mail`.
 - Mail clients read no CSS custom properties, so rather than typing the site's palette again, the settings take it from the site's stylesheet: `cssColours(css, name)` takes the stylesheet's text, imported with `with { type: 'text' }`, which works in a server built with `kay build --compile` too, and gives a function turning a custom property into its colour, its first declaration in the stylesheet, `var()`s and their fallbacks followed, as hex, from which the dark colours derive as from any other. A property missing, no colour or seen through stops the boot naming it and the stylesheet, `name`, else `the stylesheet`. `cssColours(new URL('./styles/global.css', import.meta.url))` reads the file instead, as the server boots, which a compiled server, carrying no source file, cannot.
 
 ```ts
 // src/mail-settings.ts
-import type { Settings } from '@kaynooo/kayjs-mail'
-import { cssColours, defaults } from '@kaynooo/kayjs-mail'
+import type { MailSettings } from '@kaynooo/kayjs-mail'
+import { cssColours, mailDefaults } from '@kaynooo/kayjs-mail'
 import stylesheet from './styles/global.css' with { type: 'text' }
 
 const colour = cssColours(stylesheet, 'styles/global.css')
 
-export default { ...defaults, text: colour('--color-ink'), surface: colour('--color-paper'), accent: colour('--color-wine') } satisfies Settings
+export default { ...mailDefaults, text: colour('--color-ink'), surface: colour('--color-paper'), accent: colour('--color-wine') } satisfies MailSettings
 ```
 - In a client's dark mode, Apple Mail and Outlook.com among them, `Layout` and the components switch to dark colours: `settings.dark` gives any of `text`, `muted`, `background`, `surface`, `border`, `accent` and `onAccent`, and each left out is derived from its light colour, lightness turned over and the accent lightened until it reads on the card; only hex colours are derived, another is kept as it is. `darkPalette(settings)` gives the colours a mail would switch to. The rules sit in a `<style>` the document moves into its head, beside `color-scheme` metas saying `light dark`; a mail without them declares `light` alone, so no client inverts part of it. The Gmail apps apply their own dark mode whatever the mail says.
 - A component's markup is wrapped in a whole html document, with the charset, the viewport and the subject as its title; markup that already starts with `<html>` or a doctype is kept as it is.

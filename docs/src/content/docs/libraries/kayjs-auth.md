@@ -25,16 +25,16 @@ An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never
 
 In a kay project with a server and Tailwind, `kay add auth` installs the packages and writes all of this: `src/auth.ts` over your pg-orm `Database` (with `...authTables` added to its tables) or a SQLite file of its own, using kayjs-mail as the mailer when `src/mail.ts` exists, a root `src/routes/_guard.ts`, a session secret in `.env`, and the extensions below with kayjs-ui's `ui()`. The rest of this section is what it writes.
 
-`src/auth.ts` creates the auth object. `memoryStore()` keeps users in the process, for trying it out.
+`src/auth.ts` creates the auth object. `memoryAuthStore()` keeps users in the process, for trying it out.
 
 ```ts
 import type { AuthSessionData } from '@kaynooo/kayjs-auth'
-import { createAuth, memoryStore } from '@kaynooo/kayjs-auth'
+import { createAuth, memoryAuthStore } from '@kaynooo/kayjs-auth'
 import { session, sqliteStore } from 'kay/server'
 
 export const auth = createAuth({
   sessions: session<AuthSessionData>({ store: sqliteStore('data/sessions.sqlite') }),
-  store: memoryStore(),
+  store: memoryAuthStore(),
   pages: true,
 })
 ```
@@ -609,7 +609,7 @@ For Traefik, use `forwardAuth` with the address `http://auth:3000/auth/forward?r
 
 ## Letting an AI agent sign in
 
-An agent such as Claude Code or MCP Inspector can sign in to your app through [`/mcp`](/guides/api-routes#letting-an-agent-call-the-app-over-mcp) with no code on your side. With `auth()` and a store that keeps OAuth data (`memoryStore` and `pgStore` do), your app is its own OAuth authorization server.
+An agent such as Claude Code or MCP Inspector can sign in to your app through [`/mcp`](/guides/api-routes#letting-an-agent-call-the-app-over-mcp) with no code on your side. With `auth()` and a store that keeps OAuth data (`memoryAuthStore` and `pgStore` do), your app is its own OAuth authorization server.
 
 The agent is pointed at `/mcp`, gets a 401, and reads where to sign in. It sends the user to a consent page of your app, which names the agent and lists what it asks for. Once the user allows it, the agent gets a token.
 
@@ -668,7 +668,7 @@ Behind a proxy, kay reads the client address through `proxy` in `kay.config.ts`.
 
 ## Stores
 
-`memoryStore()` is for tests and trying things out. `pgStore(db)` keeps users in Postgres, or in a SQLite file when the `Database` opens a `sqlite://` URL.
+`memoryAuthStore()` is for tests and trying things out. `pgStore(db)` keeps users in Postgres, or in a SQLite file when the `Database` opens a `sqlite://` URL.
 
 Any object with the `AuthStore` methods is a store. Each method is sync or async.
 
@@ -705,7 +705,7 @@ const cookie = await auth.sessionCookie(user.id)
 const response = await app.handle(new Request('http://localhost/account', { headers: { cookie } }))
 ```
 
-Each `testSite` keeps its own cookies. `memoryStore()` keeps each test's users apart. A mailer that pushes into an array gives the test the links it would have mailed.
+Each `testSite` keeps its own cookies. `memoryAuthStore()` keeps each test's users apart. A mailer that pushes into an array gives the test the links it would have mailed.
 
 ## In the dev tool
 

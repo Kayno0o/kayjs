@@ -45,7 +45,10 @@ export interface TextContent {
   view?: never | undefined
 }
 
-export type Message<P extends object = object> = Envelope & (ViewContent<P> | HtmlContent | TextContent)
+export type MailMessage<P extends object = object> = Envelope & (ViewContent<P> | HtmlContent | TextContent)
+
+/** @deprecated Renamed `MailMessage` in 1.70, as kayjs-ai has a `Message` of its own; the old name goes in 1.73. */
+export type Message<P extends object = object> = MailMessage<P>
 
 // A mail once rendered: what a transport sends, the queue keeps and the outbox shows.
 export interface Mail {
@@ -76,8 +79,11 @@ export interface Transport {
 }
 
 // One line of a `Fields`: a label, its value, blank or left out for one not given, and where the value links to, a `mailto:` or `tel:` say.
-export interface Field {
+export interface MailField {
   label: string
   value?: string | undefined
   href?: string | undefined
 }
+
+/** @deprecated Renamed `MailField` in 1.70, as kayjs-cms has a `Field` of its own; the old name goes in 1.73. */
+export type Field = MailField

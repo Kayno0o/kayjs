@@ -1,6 +1,6 @@
 import { describe, expect, setSystemTime, test } from 'bun:test'
 import { session } from 'kay/server'
-import { memoryStore } from '../src/memoryStore'
+import { memoryAuthStore } from '../src/memoryStore'
 import { SECRET, testApp, userRecord } from './helpers/app'
 import { mailbox } from './helpers/mail'
 
@@ -93,7 +93,7 @@ describe('a sign-in follows the session plugin\'s lifetimes', () => {
 
   test('the pruning keeps what the plugin lets live', async () => {
     const limits: unknown[] = []
-    const store = { ...memoryStore(), prune: async (given: unknown) => void limits.push(given) }
+    const store = { ...memoryAuthStore(), prune: async (given: unknown) => void limits.push(given) }
     const app = await setup({ maxAge: '7d', absoluteMaxAge: '20d', browserMaxAge: '1h' }, { store, remember: { maxAge: '15d' } })
 
     await app.browser().json('/me')

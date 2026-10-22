@@ -77,16 +77,16 @@ export default defineConfig({ settings: { '@kaynooo/kayjs-ui': './src/ui-setting
 
 ```ts
 // src/ui-settings.ts
-import type { Settings } from '@kaynooo/kayjs-ui'
-import { defaults } from '@kaynooo/kayjs-ui'
+import type { UiSettings } from '@kaynooo/kayjs-ui'
+import { uiDefaults } from '@kaynooo/kayjs-ui'
 import close from '~icons/tabler/x'
 
-const settings: Settings = { ...defaults, icons: { ...defaults.icons, close } }
+const settings: UiSettings = { ...uiDefaults, icons: { ...uiDefaults.icons, close } }
 
 export default settings
 ```
 
-`kay check` checks this module against `Settings`. The server, the browser, `kay build` and `bun test` all render with it.
+`kay check` checks this module against `UiSettings`. The server, the browser, `kay build` and `bun test` all render with it.
 
 ### Testing an app's use of it
 

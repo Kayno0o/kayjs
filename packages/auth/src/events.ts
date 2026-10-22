@@ -243,7 +243,7 @@ function validDate(value: unknown): Date | null {
 
 function audit(core: Core): NonNullable<Core['store']['audit']> {
   if (!core.store.audit)
-    throw configError('the `audit` option needs a store keeping an audit log, as memoryStore and pgStore do')
+    throw configError('the `audit` option needs a store keeping an audit log, as memoryAuthStore and pgStore do')
 
   return core.store.audit
 }

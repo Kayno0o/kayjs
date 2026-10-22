@@ -1,11 +1,11 @@
 ---
-import type { Field } from '@kaynooo/kayjs-mail'
+import type { MailField } from '@kaynooo/kayjs-mail'
 import Fields from '@kaynooo/kayjs-mail/fields.kay'
 import Heading from '@kaynooo/kayjs-mail/heading.kay'
 import Layout from '@kaynooo/kayjs-mail/layout.kay'
 import Quote from '@kaynooo/kayjs-mail/quote.kay'
 
-const { fields, message } = props<{ fields: Field[], message: string }>()
+const { fields, message } = props<{ fields: MailField[], message: string }>()
 ---
 Layout
   Heading A message from the site

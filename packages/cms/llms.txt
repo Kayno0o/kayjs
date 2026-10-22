@@ -11,7 +11,7 @@
 - [Arranging and replacing the screens](llms/screens.md): `cms({ collections })` for a form's field order, rows and hidden fields and a list's columns and row actions; an app's page at a screen's path; `createEntryForm` and the entry parts to build an entry screen
 - [Uploads and image fields](llms/uploads.md): what a file or image field does, the upload route and its limits, the picker, alt text and sizes kept beside an image, and the unused-uploads screen
 - [History, the trash and the activity log](llms/history.md): the last 50 saves of a loaded entry and its deleted entries for 30 days, restorable, and who did what, kept by default; `cms({ history })` and a loader's `sibling`
-- [Loaders and a live CMS](llms/loaders.md): `sqliteLoader` and `postgresLoader`, seeding, all-or-nothing saves of several entries, the steps to wire editors saving on a running site, how other processes and outside edits are followed (`watch`), and `onSave`
+- [Loaders and a live CMS](llms/loaders.md): `sqliteLoader` and `pgLoader`, seeding, all-or-nothing saves of several entries, the steps to wire editors saving on a running site, how other processes and outside edits are followed (`watch`), and `onSave`
 - [Edit this page link](llms/page-links.md): the link an editor's browser finds on each page, `pageLink: false`, a link of your own, and how an entry finds its page
 - [Field kinds and entering a field](llms/fields.md): `fieldInput` (placeholder, unit, rows, labels, lines, when), what the schema sets, `customField`, `blocks`, ready-made kinds (`colorField`, `moneyField`, `tagsField`, `linkField`, `geoField`, `iconField`)
 - [Form fields and drafts](llms/api.md): `fieldsOf`, `fieldOf`, `humanize`, `emptyValue`, markers, `createDrafts` and the path helpers

@@ -1,7 +1,7 @@
 import type { AuthStore } from '../src/store'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { session as sessionPlugin } from 'kay/server'
-import { memoryStore } from '../src/memoryStore'
+import { memoryAuthStore } from '../src/memoryStore'
 import { totpCode, totpStep, verifyTotp } from '../src/totp'
 import { SECRET, testApp, userRecord } from './helpers/app'
 import { mailbox } from './helpers/mail'
@@ -15,7 +15,7 @@ afterEach(() => {
 })
 
 // A store that writes every call down as `group.method`, with the arguments, and answers as the store it wraps.
-function recorded(store: AuthStore = memoryStore()) {
+function recorded(store: AuthStore = memoryAuthStore()) {
   const calls: { name: string, args: unknown[] }[] = []
   const wrapped = Object.fromEntries(Object.entries(store).map(([group, value]) => {
     // The OAuth server's members nest a level deeper than this wraps, and no test here counts them.
@@ -63,7 +63,7 @@ describe('pruning what expired', () => {
   })
 
   test('a store that cannot prune is left alone', async () => {
-    const store = memoryStore()
+    const store = memoryAuthStore()
 
     delete store.prune
 
@@ -74,7 +74,7 @@ describe('pruning what expired', () => {
 
   test('a failing prune does not fail the request, and is not retried within the hour', async () => {
     let tries = 0
-    const failing: AuthStore = { ...memoryStore(), prune: () => {
+    const failing: AuthStore = { ...memoryAuthStore(), prune: () => {
       tries++
 
       throw new Error('database down')
@@ -87,7 +87,7 @@ describe('pruning what expired', () => {
   })
 
   test('expired links, sessions and attempt windows go, and live ones stay', async () => {
-    const store = memoryStore()
+    const store = memoryAuthStore()
     const now = Date.now()
 
     await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
@@ -117,7 +117,7 @@ describe('pruning what expired', () => {
 describe('an authenticated request', () => {
   test('reads the user and their session together', async () => {
     const order: string[] = []
-    const base = memoryStore()
+    const base = memoryAuthStore()
     const slow = async <T>(name: string, read: () => T): Promise<T> => {
       order.push(`${name}:start`)
       await Bun.sleep(20)
@@ -196,7 +196,7 @@ describe('lists', () => {
   })
 
   test('a store without getMany still lists', async () => {
-    const base = memoryStore()
+    const base = memoryAuthStore()
 
     delete base.users.getMany
     delete base.organizations!.getMany
@@ -230,7 +230,7 @@ describe('revoking in bulk', () => {
   })
 
   test('a store without deleteForUser still revokes every token', async () => {
-    const store = memoryStore()
+    const store = memoryAuthStore()
 
     delete store.bearerTokens.deleteForUser
 
@@ -358,7 +358,7 @@ describe('attempt keys', () => {
   })
 
   test('sessions ended by raising the version are pruned, and the live ones stay', async () => {
-    const store = memoryStore()
+    const store = memoryAuthStore()
     const now = Date.now()
 
     await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))

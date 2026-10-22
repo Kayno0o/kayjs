@@ -2,7 +2,7 @@ import type { EnqueueOptions, FailedJob, KayExtension, QueueOptions } from 'kay/
 import type { Relayed } from './outbox'
 import type { Relay } from './preview'
 import type { SmtpOverrides } from './smtp'
-import type { Address, Delivery, Envelope, Mail, Message, Transport } from './types'
+import type { Address, Delivery, Envelope, Mail, MailMessage, Transport } from './types'
 import process from 'node:process'
 import { Elysia } from 'elysia'
 import { s } from 'kay'
@@ -17,7 +17,7 @@ import { checkKey, checkOptions, greetingOf, rateFromText, smtp } from './smtp'
 import { htmlToText } from './text'
 
 // The development pages' routes, which read `./preview` on the first request to one: a plugin that registers its routes at once, so it mounts as any other, with handlers that hand the request to the pages once they are loaded. Each is registered by its method and path, as the pages do, since a catch-all would lose to the page fallback's `GET /*`.
-function mountPreview(plugin: Elysia, render: (message: Message) => Promise<Mail>, relay: Relay): void {
+function mountPreview(plugin: Elysia, render: (message: MailMessage) => Promise<Mail>, relay: Relay): void {
   let pages: Promise<(request: Request) => Promise<Response>> | undefined
 
   const load = async () => {
@@ -97,10 +97,10 @@ export type Mailer = Elysia & {
   // False for an `optional` mailer lacking its settings, whose sends throw `MailNotConfiguredError`.
   configured: boolean
   // Renders the message and sends it now, throwing when the server refuses it or cannot be reached.
-  send: <P extends object>(message: Message<P>) => Promise<Delivery>
+  send: <P extends object>(message: MailMessage<P>) => Promise<Delivery>
   // Renders the message now and leaves it to the queue to send, retrying a failure: the server using the mailer runs it.
-  enqueue: <P extends object>(message: Message<P>, options?: EnqueueOptions) => Promise<string>
-  render: <P extends object>(message: Message<P>) => Promise<Mail>
+  enqueue: <P extends object>(message: MailMessage<P>, options?: EnqueueOptions) => Promise<string>
+  render: <P extends object>(message: MailMessage<P>) => Promise<Mail>
   // Sends every queued mail whose time has come, here and now, as a script or a test does without the server running the queue.
   drain: () => Promise<number>
   // The queued mails given up after their last attempt, each with why it failed, kept 7 days unless `queue.keepFailed` says otherwise, with the recipients and subject but not the body.
@@ -189,7 +189,7 @@ function asDocument(html: string, subject: string, lang: string): string {
 }
 
 // RFC 8058's one-click unsubscribe, which Gmail and Yahoo require of bulk senders.
-function unsubscribeHeaders(unsubscribe: NonNullable<Message['unsubscribe']>, subject: string): Record<string, string> {
+function unsubscribeHeaders(unsubscribe: NonNullable<MailMessage['unsubscribe']>, subject: string): Record<string, string> {
   const { url, address } = typeof unsubscribe === 'string' ? { url: unsubscribe, address: undefined } : unsubscribe
   const parsed = URL.parse(url)
 
@@ -367,7 +367,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
       throw new MailNotConfiguredError(missing)
   }
 
-  const render = async <P extends object>(message: Message<P>): Promise<Mail> => {
+  const render = async <P extends object>(message: MailMessage<P>): Promise<Mail> => {
     const to = recipients(message)
 
     if (to === undefined)
@@ -510,7 +510,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     mountPreview(plugin, render, realDelivery)
 
   const sending = Object.assign(plugin, {
-    send: async <P extends object>(message: Message<P>) => inFlightWork(async () => {
+    send: async <P extends object>(message: MailMessage<P>) => inFlightWork(async () => {
       ready(message)
 
       const mail = await render(message)
@@ -530,7 +530,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
         throw thrown
       }
     }),
-    enqueue: async <P extends object>(message: Message<P>, enqueueOptions?: EnqueueOptions) => inFlightWork(async () => {
+    enqueue: async <P extends object>(message: MailMessage<P>, enqueueOptions?: EnqueueOptions) => inFlightWork(async () => {
       ready(message)
 
       return jobs.enqueue(await render(message), enqueueOptions)

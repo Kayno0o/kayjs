@@ -1,6 +1,6 @@
 import { Database } from '@kaynooo/pg-orm'
 import { afterAll, expect, test } from 'bun:test'
-import { memoryStore } from '../src/memoryStore'
+import { memoryAuthStore } from '../src/memoryStore'
 import { authTables, pgStore } from '../src/pg'
 import { signInAsContract } from './helpers/signInAsContract'
 import { storeContract } from './helpers/storeContract'
@@ -11,7 +11,7 @@ afterAll(async () => {
   await Promise.all(opened.map(async db => db.close()))
 })
 
-storeContract('memoryStore', async () => memoryStore())
+storeContract('memoryAuthStore', async () => memoryAuthStore())
 
 storeContract('pgStore on SQLite', async () => {
   const db = new Database({ url: 'sqlite://:memory:', tables: [...authTables] })
@@ -22,7 +22,7 @@ storeContract('pgStore on SQLite', async () => {
   return pgStore(db)
 })
 
-signInAsContract('memoryStore', async () => memoryStore())
+signInAsContract('memoryAuthStore', async () => memoryAuthStore())
 
 signInAsContract('pgStore on SQLite', async () => {
   const db = new Database({ url: 'sqlite://:memory:', tables: [...authTables] })
@@ -33,8 +33,8 @@ signInAsContract('pgStore on SQLite', async () => {
   return pgStore(db)
 })
 
-test('memoryStore lists audit entries of one millisecond newest added first', async () => {
-  const store = memoryStore()
+test('memoryAuthStore lists audit entries of one millisecond newest added first', async () => {
+  const store = memoryAuthStore()
   const at = new Date('2026-01-01T00:00:00Z')
 
   for (const id of ['a1', 'a2', 'a3'])

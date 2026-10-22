@@ -61,7 +61,7 @@ What is refreshed before the hook runs, with nothing to call:
 ### The loaders
 
 - `sqliteLoader({ name, database, seed?, table?, ttl?, watch? })`: `database` is a file path (created with its folder, in WAL mode) or a `bun:sqlite` `Database` the app opened.
-- `postgresLoader({ name, sql, seed?, table?, ttl?, watch? })` from `@kaynooo/kayjs-cms/postgres`: `sql` is a connection URL or a Bun `SQL`. A pg-orm app passes its own connection, `sql: db.sql`, and lists the loader's table in `ignoreTables` (`db.sync({ ignoreTables: ['kay_content'] })` and `pg-orm.config.ts`), as pg-orm would otherwise see it as a table to drop. A URL opens one pool shared by every loader using it.
+- `pgLoader({ name, sql, seed?, table?, ttl?, watch? })` from `@kaynooo/kayjs-cms/pg`: `sql` is a connection URL or a Bun `SQL`. A pg-orm app passes its own connection, `sql: db.sql`, and lists the loader's table in `ignoreTables` (`db.sync({ ignoreTables: ['kay_content'] })` and `pg-orm.config.ts`), as pg-orm would otherwise see it as a table to drop. A URL opens one pool shared by every loader using it.
 - Both give the loader's `load`, `count`, `get`, `save`, `saveMany` and `remove`, so the screens, the on-page editor, Publish, Delete and a reorder work with nothing else declared.
 - Every collection of the app can share the table (`kay_content` by default, `table` names another, a plain identifier): its rows are keyed by the loader's `name`.
 - The table is created on the first read or save, and a failed start is tried again by the next call. Postgres processes starting together take an advisory lock, so one creates the table and seeds.

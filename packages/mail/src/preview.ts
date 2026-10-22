@@ -1,6 +1,6 @@
 import type { AuthKind } from './auth'
 import type { Relayed, SentMail } from './outbox'
-import type { Address, Attachment, Delivery, Mail, Message, ViewContent } from './types'
+import type { Address, Attachment, Delivery, Mail, MailMessage, ViewContent } from './types'
 import { join } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
@@ -199,11 +199,11 @@ async function mailFiles(): Promise<string[]> {
 const previewOf = (file: string): string => file.replace(KAY_EXTENSION, '.preview.ts')
 
 // A mail rendered as the mailer renders it, with the props its `<name>.preview.ts` default-exports, else a kayjs-auth sample for the app's view of a kind, else none, and where they came from.
-async function sample(file: string, render: (message: Message) => Promise<Mail>): Promise<{ mail: Mail, props: string }> {
+async function sample(file: string, render: (message: MailMessage) => Promise<Mail>): Promise<{ mail: Mail, props: string }> {
   const kind = AUTH_SAMPLES.get(file)
 
   if (kind !== undefined)
-    return { mail: await render(await authMessage(authSample(kind), authMailerOptions() ?? {}, undefined) as Message), props: 'a sample of kayjs-auth\'s, through authMailer' }
+    return { mail: await render(await authMessage(authSample(kind), authMailerOptions() ?? {}, undefined) as MailMessage), props: 'a sample of kayjs-auth\'s, through authMailer' }
 
   const preview = join(process.cwd(), MAILS_DIR, previewOf(file))
   const { default: view } = await import(join(process.cwd(), MAILS_DIR, file)) as { default: ViewContent<object>['view'] }
@@ -230,7 +230,7 @@ function samplesPage(files: string[]): Response {
   return page('Mail samples', `${back}<h1>Mail samples</h1><p>Each mail under ${MAILS_DIR}, rendered with the props its <code>&lt;name&gt;.preview.ts</code> default-exports.</p><ul>${rows.join('')}</ul>`, 200, live)
 }
 
-async function samplePage(file: string, phone: boolean, render: (message: Message) => Promise<Mail>, relay: Relay, outcome?: Outcome, status = 200): Promise<Response> {
+async function samplePage(file: string, phone: boolean, render: (message: MailMessage) => Promise<Mail>, relay: Relay, outcome?: Outcome, status = 200): Promise<Response> {
   const live = `<script>${RESTART_RELOAD}</script>`
   const self = `${SAMPLES_PATH}?mail=${encodeURIComponent(file)}`
   const back = `<div class="bar"><a href="${SAMPLES_PATH}">Mail samples</a></div>`
@@ -324,7 +324,7 @@ async function deliveryState(relay: Relay): Promise<Response> {
 const sentTo = (to: string | undefined): Outcome | undefined => to === undefined ? undefined : { to }
 
 // The development server's view of the outbox, every mail sent since it started, newest first, each with its headers, html and text, and of the app's mails rendered with sample props, through `render`.
-export function preview(render: (message: Message) => Promise<Mail>, relay: Relay) {
+export function preview(render: (message: MailMessage) => Promise<Mail>, relay: Relay) {
   return new Elysia({ name: 'kayjs-mail-preview' })
     .get(PREVIEW_PATH, ({ query }) => listPage('clear' in query))
     .get(SAMPLES_PATH, async ({ query }) => {

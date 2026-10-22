@@ -1,7 +1,7 @@
 import type { AuthStore } from '../src/store'
 import { Database } from '@kaynooo/pg-orm'
 import { afterAll, beforeEach, describe, expect, test } from 'bun:test'
-import { memoryStore } from '../src/memoryStore'
+import { memoryAuthStore } from '../src/memoryStore'
 import { authTables, pgStore } from '../src/pg'
 import { testApp, userRecord } from './helpers/app'
 
@@ -24,7 +24,7 @@ if (reachable)
 opened.push(postgres)
 
 const backends: [string, () => Promise<AuthStore>][] = [
-  ['memoryStore', async () => memoryStore()],
+  ['memoryAuthStore', async () => memoryAuthStore()],
   ['pgStore on SQLite', async () => {
     const db = new Database({ url: 'sqlite://:memory:', tables: [...authTables] })
 
@@ -270,7 +270,7 @@ describe('an undo meeting a store outage', () => {
   const down = new Error('store down')
 
   test('a failed put-back of the last way in is not answered as last-way-in', async () => {
-    const race = overlapping(memoryStore(), 2)
+    const race = overlapping(memoryAuthStore(), 2)
     const store: AuthStore = { ...race.store, identities: { ...race.store.identities, create: async (...args: Parameters<typeof race.store.identities.create>) => {
       if (outage)
         throw down
@@ -299,7 +299,7 @@ describe('an undo meeting a store outage', () => {
   })
 
   test('a failed put-back of the last owner is not answered as last-owner', async () => {
-    const race = overlapping(memoryStore(), 2)
+    const race = overlapping(memoryAuthStore(), 2)
     const members = race.store.members!
     const store: AuthStore = { ...race.store, members: { ...members, add: async (...args: Parameters<typeof members.add>) => {
       if (outage)

@@ -6,7 +6,7 @@ import { session } from 'kay/server'
 import { cookieJar } from 'kay/test'
 import { setSite } from '../../../src/runtime/site'
 import { Auth, createAuth } from '../src/auth'
-import { memoryStore } from '../src/memoryStore'
+import { memoryAuthStore } from '../src/memoryStore'
 import { browser, SECRET, testApp, userRecord } from './helpers/app'
 
 const POST = { method: 'POST' }
@@ -197,7 +197,7 @@ describe('createAuth', () => {
   })
 
   test('reaches the app\'s routes from inside a plugin of the app\'s own, however deep', async () => {
-    const store = memoryStore()
+    const store = memoryAuthStore()
 
     await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
     const auth = createAuth({ sessions: session<AuthSessionData>({ secret: SECRET }), secret: SECRET, store })
@@ -219,7 +219,7 @@ describe('createAuth', () => {
 
   test('says where the session plugin goes when a plugin of the app\'s own keeps it to itself', async () => {
     const sessions = session<AuthSessionData>({ secret: SECRET })
-    const auth = createAuth({ sessions, secret: SECRET, store: memoryStore() })
+    const auth = createAuth({ sessions, secret: SECRET, store: memoryAuthStore() })
     const app = new Elysia().use(new Elysia().use(sessions).use(auth.plugin)).get('/me', async ({ auth }) => (await auth.user()) ?? 'anonymous')
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
     const response = await app.handle(new Request('http://localhost/me'))
@@ -290,7 +290,7 @@ describe('createAuth', () => {
   })
 
   test('a secret shorter than 32 characters is refused', () => {
-    expect(() => createAuth({ sessions: session<AuthSessionData>({ secret: SECRET }), secret: 'short', store: memoryStore() })).toThrow('at least 32 characters')
+    expect(() => createAuth({ sessions: session<AuthSessionData>({ secret: SECRET }), secret: 'short', store: memoryAuthStore() })).toThrow('at least 32 characters')
   })
 
   test('reading auth without the plugin says how to add it', async () => {

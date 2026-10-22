@@ -1,7 +1,7 @@
 import type { Static, TSchema } from 'elysia'
 import type { ActionContext, ActionProtection, Failure, JSX } from 'kay'
 import type { Mailer } from './mailer'
-import type { Address, Field } from './types'
+import type { Address, MailField } from './types'
 import { s } from 'kay'
 import { t } from 'kay/i18n'
 import { configError } from 'kay/library'
@@ -16,7 +16,7 @@ export interface ContactMailProps {
   name: string
   email: string
   message: string
-  fields: Field[]
+  fields: MailField[]
   origin: string
 }
 
@@ -102,7 +102,7 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
     if ((message.match(LINK)?.length ?? 0) > maxLinks)
       return ctx.fail(422, t('mail.contact.tooManyLinks', { max: maxLinks }))
 
-    const given: Field[] = [{ label: labelOf('name', labels), value: name }, { label: labelOf('email', labels), value: email, href: `mailto:${email}` }]
+    const given: MailField[] = [{ label: labelOf('name', labels), value: name }, { label: labelOf('email', labels), value: email, href: `mailto:${email}` }]
 
     for (const key of Object.keys(fields)) {
       const value = (input as Record<string, unknown>)[key]

@@ -58,7 +58,7 @@ const loader = {
 
 ### Which collections
 
-- The history is written through the collection's own loader, into hidden collections of its store: `sqliteLoader` and `postgresLoader` keep them in the same table as the entries (under names no collection can have), so no table, setting or migration is added.
+- The history is written through the collection's own loader, into hidden collections of its store: `sqliteLoader` and `pgLoader` keep them in the same table as the entries (under names no collection can have), so no table, setting or migration is added.
 - A loader of your own gets history by giving `sibling(kind)`, which returns a loader for a hidden collection of that kind (`'history'`, `'trash'`, `'activity'`: a loader answering the others for a kind it does not know would mix the activity into its trash) in the same store. Without it the collection keeps none, and its screens show no History button. Give the hidden loader a `get(place)` too, or each read of a revision loads the whole hidden collection.
 - A folder collection keeps none: its files are in git, and the forge or the repository has their history.
 - Every read and write is a `get` and a `save` of one row per entry; each revision is its own row beside an index row, so a save reads the index and the newest revision, then writes the new revision and the index, and a revision beyond the cap is removed.

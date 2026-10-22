@@ -7,7 +7,7 @@ import { afterAll, describe, expect, test } from 'bun:test'
 import { s } from 'kay'
 import { collection } from 'kay/content'
 import { scratchDir } from 'kay/test'
-import { postgresLoader } from '../src/loaders/postgres'
+import { pgLoader } from '../src/loaders/pg'
 import { sqliteLoader } from '../src/loaders/sqlite'
 
 const seed: SeedEntry[] = [
@@ -133,10 +133,10 @@ describe('sqliteLoader files', () => {
 
 const postgresTest = test.skipIf(skipPostgres)
 
-contract('postgresLoader', (options) => {
+contract('pgLoader', (options) => {
   shared ??= new SQL(Object.assign(new URL(url), { pathname: `/${database}` }).href, { max: 4 })
 
-  return postgresLoader({ ...options, sql: shared })
+  return pgLoader({ ...options, sql: shared })
 }, postgresTest)
 
 if (admin !== undefined) {
@@ -239,21 +239,21 @@ describe('a loader watching its database', () => {
   postgresTest('postgres follows a save and a hand edit made through another connection, and not its own', async () => {
     shared ??= new SQL(Object.assign(new URL(url), { pathname: `/${database}` }).href, { max: 4 })
 
-    const posts = collection(postgresLoader({ name: 'watched-pg', sql: shared, table: 'watched', watch: '40ms', seed: [{ slug: 'a', data: { title: 'A' } }] }), { schema })
+    const posts = collection(pgLoader({ name: 'watched-pg', sql: shared, table: 'watched', watch: '40ms', seed: [{ slug: 'a', data: { title: 'A' } }] }), { schema })
 
     expect((await posts.all()).map(post => post.data.title)).toEqual(['A'])
 
     const other = new SQL(Object.assign(new URL(url), { pathname: `/${database}` }).href, { max: 1 })
 
     try {
-      await postgresLoader({ name: 'watched-pg', sql: other, table: 'watched' }).save!({ slug: 'b', data: { title: 'B' } })
+      await pgLoader({ name: 'watched-pg', sql: other, table: 'watched' }).save!({ slug: 'b', data: { title: 'B' } })
       expect(await titlesBecome(posts, ['A', 'B'])).toEqual(['A', 'B'])
       await other.unsafe(`UPDATE watched SET data = '{"title":"Edited"}' WHERE collection = 'watched-pg' AND place = 'a'`)
       expect(await titlesBecome(posts, ['B', 'Edited'])).toEqual(['B', 'Edited'])
       await other.unsafe(`DELETE FROM watched WHERE collection = 'watched-pg' AND place = 'b'`)
       expect(await titlesBecome(posts, ['Edited'])).toEqual(['Edited'])
 
-      const own = postgresLoader({ name: 'watched-pg-own', sql: shared, table: 'watched', watch: '40ms' })
+      const own = pgLoader({ name: 'watched-pg-own', sql: shared, table: 'watched', watch: '40ms' })
 
       expect(await readsDuring(own, async () => own.save!({ slug: 'x', data: { title: 'X' } }))).toBe(1)
     }

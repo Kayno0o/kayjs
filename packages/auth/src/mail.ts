@@ -17,7 +17,7 @@ export interface MailContent {
 }
 
 // A mail for the app's mailer to send: `subject`, `text` and `html` are filled from the templates, and `kind`, `site`, `detail` and `url` let an app with its own templating ignore them.
-export interface Mail extends MailContent {
+export interface AuthMailMessage extends MailContent {
   to: string
   kind: MailKind
   // The site's name, as the templates write it.
@@ -35,10 +35,16 @@ export interface Mail extends MailContent {
   expires?: { link?: number, code?: number } | undefined
 }
 
-export interface Mailer {
+export interface AuthMailer {
   // Awaited, its result ignored, so a queue's enqueue fits as it is.
-  send: (mail: Mail) => unknown
+  send: (mail: AuthMailMessage) => unknown
 }
+
+/** @deprecated Renamed `AuthMailMessage` in 1.70, as kayjs-mail has a `Mail` of its own; the old name goes in 1.73. */
+export type Mail = AuthMailMessage
+
+/** @deprecated Renamed `AuthMailer` in 1.70, as kayjs-mail has a `Mailer` of its own; the old name goes in 1.73. */
+export type Mailer = AuthMailer
 
 // What a template is given: the site's name, the address written to, the link and the code when the mail carries them, and the provider or token an event is about, or the organization an invitation is to.
 export interface MailData {

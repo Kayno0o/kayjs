@@ -1,5 +1,5 @@
-import type { Logo, Settings } from '@kaynooo/kayjs-mail'
-import { cssColours, defaults } from '@kaynooo/kayjs-mail'
+import type { Logo, MailSettings } from '@kaynooo/kayjs-mail'
+import { cssColours, mailDefaults } from '@kaynooo/kayjs-mail'
 import site from './styles/site.css' with { type: 'text' }
 
 const colour = cssColours(site, 'styles/site.css')
@@ -8,9 +8,9 @@ const colour = cssColours(site, 'styles/site.css')
 export const branding: { logo?: Logo | undefined } = {}
 
 export default {
-  ...defaults,
+  ...mailDefaults,
   accent: colour('--color-brand'),
   get logo() {
     return branding.logo
   },
-} satisfies Settings
+} satisfies MailSettings

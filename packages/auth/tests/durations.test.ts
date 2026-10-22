@@ -1,6 +1,6 @@
 import type { Duration } from 'kay'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
-import { memoryStore } from '../src/memoryStore'
+import { memoryAuthStore } from '../src/memoryStore'
 import { testApp } from './helpers/app'
 
 const PASSWORD = 'correct horse battery'
@@ -34,7 +34,7 @@ describe('time options take a Duration', () => {
 
   test('a sub-second guests.maxAge is read as whole seconds, rounded up', async () => {
     const cutoffs: Date[] = []
-    const base = memoryStore()
+    const base = memoryAuthStore()
     const store = { ...base, users: { ...base.users, staleGuests: async (createdBefore: Date, limit: number) => {
       cutoffs.push(createdBefore)
 
@@ -52,7 +52,7 @@ describe('time options take a Duration', () => {
 
   test('a sub-second audit.maxAge is read as whole seconds, rounded up', async () => {
     const cutoffs: Date[] = []
-    const base = memoryStore()
+    const base = memoryAuthStore()
     const store = { ...base, audit: { ...base.audit!, prune: async (before: Date) => {
       cutoffs.push(before)
       await base.audit!.prune(before)
@@ -82,7 +82,7 @@ describe('time options take a Duration', () => {
 
   test('a limit window takes a string, handed to the store in seconds, and a bad one names its limit', async () => {
     const windows: Duration[] = []
-    const base = memoryStore()
+    const base = memoryAuthStore()
     const store = { ...base, attempts: { ...base.attempts, hit: async (key: string, window: Duration) => {
       windows.push(window)
 
@@ -97,7 +97,7 @@ describe('time options take a Duration', () => {
 
   test('limits, the old name of rateLimit, still counts, and rateLimit wins where both name a limit', async () => {
     const windows: Duration[] = []
-    const base = memoryStore()
+    const base = memoryAuthStore()
     const store = { ...base, attempts: { ...base.attempts, hit: async (key: string, window: Duration) => {
       windows.push(window)
 

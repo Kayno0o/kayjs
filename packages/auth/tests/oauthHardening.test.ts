@@ -3,7 +3,7 @@ import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { documentUrl, fetchPublicDocument, plainName, privateAddress } from '../src/authorize/clients'
 import { validRedirectUri, validRedirectUris } from '../src/authorize/uris'
 import { digest } from '../src/keys'
-import { memoryStore } from '../src/memoryStore'
+import { memoryAuthStore } from '../src/memoryStore'
 import { authPages } from '../src/pages'
 import { testApp } from './helpers/app'
 
@@ -660,7 +660,7 @@ describe('clients nobody approved', () => {
   })
 
   test('the memory store is the one tested', () => {
-    expect(memoryStore().oauth).toBeDefined()
+    expect(memoryAuthStore().oauth).toBeDefined()
   })
 })
 

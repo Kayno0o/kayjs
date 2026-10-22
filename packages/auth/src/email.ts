@@ -1,6 +1,6 @@
 import type { Duration } from 'kay'
 import type { Core } from './core'
-import type { MailData, Mailer, Templates } from './mail'
+import type { AuthMailer, MailData, Templates } from './mail'
 import type { EmailProblem, PasswordProblem } from './rules'
 import type { RequestState } from './state'
 import type { CodeType, LinkType, TokenType, UserRecord } from './store'
@@ -67,7 +67,7 @@ const LINK_OF: Record<CodeType, CodedLink> = { 'sign-in-code': 'magic-link', 've
 export type CodeMode = 'link' | 'code' | 'both'
 
 export interface EmailOptions {
-  mailer: Mailer
+  mailer: AuthMailer
   // The app's page each link opens, the token in `?token=`, the prebuilt one by default with `pages`. Each shows a button, or the new password's form, posting the token to an action, so a mail scanner opening the link spends nothing.
   links?: Partial<Record<LinkType, string>> | undefined
   // Over kayjs-auth's own templates in every language.

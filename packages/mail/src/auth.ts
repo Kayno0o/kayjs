@@ -1,5 +1,5 @@
 import type { JSX } from 'kay'
-import type { Message } from './types'
+import type { MailMessage } from './types'
 import { renderToString } from 'kay/server'
 import { decode } from './text'
 
@@ -50,7 +50,7 @@ export interface AuthMailerOptions {
 }
 
 // A mailer's `send`, `enqueue` or `render`.
-type Send<R> = <P extends object>(message: Message<P>) => R | Promise<R>
+type Send<R> = <P extends object>(message: MailMessage<P>) => R | Promise<R>
 
 // Set once an app hands kayjs-auth a mailer of this, so the samples page lists kayjs-auth's mails, through the app's own views.
 let authOptions: AuthMailerOptions | undefined
@@ -67,7 +67,7 @@ export function authMailer<R>(send: Send<R>, options: AuthMailerOptions = {}): {
 }
 
 // The message `authMailer` sends for a mail, rendered in `locale`, the site's default locale when undefined. A kind it does not know goes as kayjs-auth wrote it.
-export async function authMessage(mail: AuthMail, options: AuthMailerOptions, locale: string | undefined): Promise<Message<{ mail: AuthMail }>> {
+export async function authMessage(mail: AuthMail, options: AuthMailerOptions, locale: string | undefined): Promise<MailMessage<{ mail: AuthMail }>> {
   if (!isLinkKind(mail.kind) && !isNoticeKind(mail.kind))
     return { to: mail.to, subject: mail.subject, locale, html: mail.html, text: mail.text }
 

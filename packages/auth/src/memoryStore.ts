@@ -6,7 +6,7 @@ const SWEEP_EVERY = 1000
 const UNUSED_CLIENT_MS = 24 * 60 * 60 * 1000
 
 // Everything in this process's memory, gone on restart: for tests, and for trying kayjs-auth before a database is wired.
-export function memoryStore(): AuthStore {
+export function memoryAuthStore(): AuthStore {
   const users = new Map<string, UserRecord>()
   const identities = new Map<string, IdentityRecord>()
   const tokens = new Map<string, TokenRecord>()
@@ -594,3 +594,6 @@ function oldestFirst<T extends { createdAt: Date }>(records: T[]): T[] {
 function clone<T extends object>(value: T | undefined): T | undefined {
   return value && { ...value }
 }
+
+/** @deprecated Renamed `memoryAuthStore` in 1.70, as kay's `memoryStore` is the session one; the old name goes in 1.73. */
+export const memoryStore = memoryAuthStore

@@ -1,5 +1,5 @@
 import type { JSX } from 'kay'
-import type { Palette, Settings } from './defaults'
+import type { MailSettings, Palette } from './defaults'
 import { html } from 'kay/html'
 
 type Triple = [number, number, number]
@@ -104,7 +104,7 @@ function readableOn(colour: string, ground: string): string {
 }
 
 // The colours a mail switches to in a client's dark mode: `settings.dark`'s, and for each it leaves out one derived from the light colour.
-export function darkPalette(settings: Settings): Palette {
+export function darkPalette(settings: MailSettings): Palette {
   const given = settings.dark ?? {}
   const surface = given.surface ?? inverted(settings.surface)
   const accent = given.accent ?? readableOn(inverted(settings.accent), surface)
@@ -134,10 +134,10 @@ const RULES: [className: string, declarations: (palette: Palette) => string[]][]
 ]
 
 // Built once per settings object, as every mail of an app carries the same.
-const styles = new WeakMap<Settings, JSX.Element>()
+const styles = new WeakMap<MailSettings, JSX.Element>()
 
 // Dark colours for clients honouring `prefers-color-scheme`, such as Apple Mail, and for Outlook.com, which marks the elements it recolours with `data-ogsc` and `data-ogsb`. The mail's document moves it into its head.
-export function darkStyle(settings: Settings): JSX.Element {
+export function darkStyle(settings: MailSettings): JSX.Element {
   let style = styles.get(settings)
 
   if (style === undefined) {
@@ -148,7 +148,7 @@ export function darkStyle(settings: Settings): JSX.Element {
   return style
 }
 
-function darkStyleOf(settings: Settings): JSX.Element {
+function darkStyleOf(settings: MailSettings): JSX.Element {
   const palette = darkPalette(settings)
   const rules = (selector: (className: string) => string) => RULES.map(([className, declarations]) => `${selector(className)}{${declarations(palette).map(declaration => `${declaration}!important`).join(';')}}`).join('')
 

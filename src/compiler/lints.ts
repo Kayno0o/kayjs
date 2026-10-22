@@ -557,7 +557,7 @@ export const LINTS = {
     group: 'deprecated',
     since: '1.70',
     site: true,
-    summary: 'An import of an export kay or a library renamed in 1.70 so its error class ends in `Error`: `HydrationMismatch` of `kay/dom` is `HydrationMismatchError`, `SaveConflict` of kayjs-cms `SaveConflictError`, `MailNotConfigured` of kayjs-mail `MailNotConfiguredError`. The old name stays an alias three minors. The fix renames the import and its uses in the file. Found in the project\'s `.kay` files and scripts.',
+    summary: 'An import of an export kay or a library renamed in 1.70 so its error class ends in `Error`: `HydrationMismatch` of `kay/dom` is `HydrationMismatchError`, `SaveConflict` of kayjs-cms `SaveConflictError`, `MailNotConfigured` of kayjs-mail `MailNotConfiguredError`, and the exports that clashed across libraries: kayjs-auth\'s `memoryStore`, `Mailer` and `Mail` (`memoryAuthStore`, `AuthMailer`, `AuthMailMessage`), kayjs-mail\'s `Settings`, `defaults`, `Field` and `Message` (`MailSettings`, `mailDefaults`, `MailField`, `MailMessage`), kayjs-ui\'s `Settings` and `defaults` (`UiSettings`, `uiDefaults`) and kayjs-cms\'s `postgresLoader` of `/postgres` (`pgLoader` of `/pg`). The old name stays an alias three minors. The fix renames the import and its uses in the file, and moves the cms entry. Found in the project\'s `.kay` files and scripts.',
     wrong: 'import { MailNotConfigured } from \'@kaynooo/kayjs-mail\'\n\nif (error instanceof MailNotConfigured) retry()',
     right: 'import { MailNotConfiguredError } from \'@kaynooo/kayjs-mail\'\n\nif (error instanceof MailNotConfiguredError) retry()',
   },

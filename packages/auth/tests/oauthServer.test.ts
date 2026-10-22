@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { Elysia } from 'elysia'
-import { memoryStore } from '../src/memoryStore'
+import { memoryAuthStore } from '../src/memoryStore'
 import { authPages } from '../src/pages'
 import { browser as browserOf, testApp } from './helpers/app'
 
@@ -15,7 +15,7 @@ afterEach(() => {
   setSystemTime()
 })
 
-function server(options: { documents?: Record<string, unknown>, scopes?: ('posts:read' | 'posts:write')[], defaultScopes?: ('posts:read' | 'posts:write')[], store?: ReturnType<typeof memoryStore> } = {}) {
+function server(options: { documents?: Record<string, unknown>, scopes?: ('posts:read' | 'posts:write')[], defaultScopes?: ('posts:read' | 'posts:write')[], store?: ReturnType<typeof memoryAuthStore> } = {}) {
   const fetched: string[] = []
   const app = testApp({
     url: 'http://localhost',
@@ -186,7 +186,7 @@ describe('the authorization request', () => {
   })
 
   test('an approval held with every scope, from an app declaring none, asks again once the app declares some', async () => {
-    const store = memoryStore()
+    const store = memoryAuthStore()
     const before = server({ scopes: [], store })
     const { client_id } = await register(before)
     const ada = await signedIn(before)

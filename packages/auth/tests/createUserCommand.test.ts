@@ -6,12 +6,12 @@ import { configuredSite, setSite } from 'kay/library'
 import { session } from 'kay/server'
 import { createAuth } from '../src/auth'
 import { createUserCommand, readFromTerminal, typedSecret } from '../src/createUserCommand'
-import { memoryStore } from '../src/memoryStore'
+import { memoryAuthStore } from '../src/memoryStore'
 import { authExtension, auth as authFrom, authPages } from '../src/pages'
 import { SECRET } from './helpers/app'
 
 const FIXTURE = `${import.meta.dir}/fixture`
-const store = memoryStore()
+const store = memoryAuthStore()
 const auth = createAuth({ sessions: session({ secret: SECRET }), secret: SECRET, store, roles: { admin: [] } })
 const CONFIG: KayConfig = { extensions: [authPages({ auth: async () => ({ auth }) })] }
 const PASSWORD = 'a long enough password'
@@ -283,7 +283,7 @@ describe('the command in production', () => {
     setSite(undefined)
 
     try {
-      const config: KayConfig = { site: 'https://auth.example.test', extensions: [authPages({ auth: async () => ({ auth: createAuth({ sessions: session({ secret: SECRET }), secret: SECRET, store: memoryStore(), forwardAuth: 'example.test' }) }) })] }
+      const config: KayConfig = { site: 'https://auth.example.test', extensions: [authPages({ auth: async () => ({ auth: createAuth({ sessions: session({ secret: SECRET }), secret: SECRET, store: memoryAuthStore(), forwardAuth: 'example.test' }) }) })] }
 
       expect(await run(['prod@example.com'], PASSWORD, config)).toMatchObject({ code: 0 })
     }

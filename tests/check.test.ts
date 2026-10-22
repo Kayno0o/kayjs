@@ -3464,6 +3464,30 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports the 1.70 renames that keep a name from clashing across libraries, and --fix moves a cms postgres import to pg', async () => {
+    const root = await scratchProject({
+      'kay.config.ts': 'export default {}\n',
+      'src/cms.ts': 'import type { PostgresLoaderOptions } from \'@kaynooo/kayjs-cms/postgres\'\nimport { postgresLoader, SeedEntry } from \'@kaynooo/kayjs-cms/postgres\'\n\nexport const load = (options: PostgresLoaderOptions) => postgresLoader(options)\nexport type Seed = SeedEntry\n',
+      'src/auth.ts': 'import type { Mail } from \'@kaynooo/kayjs-auth\'\nimport { createAuth, memoryStore } from \'@kaynooo/kayjs-auth\'\n\nexport const auth = createAuth({ store: memoryStore() })\nexport const mails: Mail[] = []\n',
+      'src/mail.ts': 'import type { Field, Settings } from \'@kaynooo/kayjs-mail\'\nimport { defaults } from \'@kaynooo/kayjs-mail\'\n\nexport const settings: Settings = { ...defaults }\nexport const fields: Field[] = []\n',
+      'src/ui.ts': 'import type { Settings } from \'@kaynooo/kayjs-ui\'\nimport { defaults } from \'@kaynooo/kayjs-ui\'\n\nexport const settings: Settings = { ...defaults }\n',
+    })
+
+    try {
+      const { output } = await runCheck(root)
+
+      expect(output.match(/deprecated-renamed-export/g)).toHaveLength(9)
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/cms.ts')).text()).toBe('import type { PgLoaderOptions } from \'@kaynooo/kayjs-cms/pg\'\nimport { pgLoader, SeedEntry } from \'@kaynooo/kayjs-cms/pg\'\n\nexport const load = (options: PgLoaderOptions) => pgLoader(options)\nexport type Seed = SeedEntry\n')
+      expect(await Bun.file(join(root, 'src/auth.ts')).text()).toBe('import type { AuthMailMessage } from \'@kaynooo/kayjs-auth\'\nimport { createAuth, memoryAuthStore } from \'@kaynooo/kayjs-auth\'\n\nexport const auth = createAuth({ store: memoryAuthStore() })\nexport const mails: AuthMailMessage[] = []\n')
+      expect(await Bun.file(join(root, 'src/mail.ts')).text()).toBe('import type { MailField, MailSettings } from \'@kaynooo/kayjs-mail\'\nimport { mailDefaults } from \'@kaynooo/kayjs-mail\'\n\nexport const settings: MailSettings = { ...mailDefaults }\nexport const fields: MailField[] = []\n')
+      expect(await Bun.file(join(root, 'src/ui.ts')).text()).toBe('import type { UiSettings } from \'@kaynooo/kayjs-ui\'\nimport { uiDefaults } from \'@kaynooo/kayjs-ui\'\n\nexport const settings: UiSettings = { ...uiDefaults }\n')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports the dropped identity-key in a kay-allow comment and in lints, and --fix removes the name only', async () => {
     const root = await scratchProject({
       'kay.config.ts': 'export default {\n  lints: { \'identity-key\': \'allow\', \'missing-alt\': \'warn\' },\n}\n',

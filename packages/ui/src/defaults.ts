@@ -32,13 +32,19 @@ export interface NavLink {
 export type AddedSlot = 'pause'
 
 // What an app may replace through `settings` in its kay.config.ts, spreading these defaults to change a few.
-export interface Settings {
+export interface UiSettings {
   // An icon of any set kay imports, `~icons/<prefix>/<name>`, standing in for each slot.
   icons: Record<Exclude<IconSlot, AddedSlot>, IconProps> & Partial<Record<AddedSlot, IconProps>>
 }
 
-const defaults: Settings = {
+const uiDefaults: UiSettings = {
   icons: { alert, back, chevron, close, delete: remove, globe, info, menu, pause, play, plus, search, spinner, star, success, zoomFit, zoomIn, zoomOut },
 }
 
-export default defaults
+export default uiDefaults
+
+/** @deprecated Renamed `UiSettings` in 1.70, as kayjs-mail has a `Settings` of its own; the old name goes in 1.73. */
+export type Settings = UiSettings
+
+/** @deprecated Renamed `uiDefaults` in 1.70, as kayjs-mail has a `defaults` of its own; the old name goes in 1.73. */
+export const defaults = uiDefaults

@@ -18,7 +18,7 @@ export interface Palette {
 }
 
 // What an app may replace through `settings` in its kay.config.ts, spreading these defaults to change a few. Mail clients drop stylesheets, so every value lands in a `style` attribute.
-export interface Settings extends Palette {
+export interface MailSettings extends Palette {
   font: string
   // A `Code`'s.
   mono: string
@@ -31,7 +31,7 @@ export interface Settings extends Palette {
   logo?: Logo | undefined
 }
 
-const defaults: Settings = {
+const mailDefaults: MailSettings = {
   font: 'system-ui, -apple-system, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif',
   mono: 'ui-monospace, \'SF Mono\', Menlo, Consolas, \'Courier New\', monospace',
   text: '#1a1a1a',
@@ -45,4 +45,10 @@ const defaults: Settings = {
   width: 560,
 }
 
-export default defaults
+export default mailDefaults
+
+/** @deprecated Renamed `MailSettings` in 1.70, as kayjs-ui has a `Settings` of its own; the old name goes in 1.73. */
+export type Settings = MailSettings
+
+/** @deprecated Renamed `mailDefaults` in 1.70, as kayjs-ui has a `defaults` of its own; the old name goes in 1.73. */
+export const defaults = mailDefaults

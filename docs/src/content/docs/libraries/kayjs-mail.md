@@ -92,7 +92,7 @@ Layout(preheader="Your account is ready")
   Button(href={url}) Confirm my address
 ```
 
-`Layout` shows its `@header` above the card, a logo say. To put the same logo on every mail, the built-in auth and contact ones included, set `logo` in the settings instead: `{ ...defaults, logo: { src: 'https://example.com/logo.png', alt: 'Example', width: 120 } }`, with an optional `height` and `href`, and a `width` in pixels, which Outlook sizes the image by.
+`Layout` shows its `@header` above the card, a logo say. To put the same logo on every mail, the built-in auth and contact ones included, set `logo` in the settings instead: `{ ...mailDefaults, logo: { src: 'https://example.com/logo.png', alt: 'Example', width: 120 } }`, with an optional `height` and `href`, and a `width` in pixels, which Outlook sizes the image by.
 
 A `@header` replaces it for one mail, and an empty one shows nothing. The text part writes the logo's `alt`.
 
@@ -101,12 +101,12 @@ It also ships `Code`, `Divider`, `Fields`, `Image`, `Link`, `Quote`, and `Row` w
 Mail clients read no CSS custom properties, so the settings need real colours. To take them from the site's stylesheet instead of typing them again, use `cssColours`. It gives a function that turns a custom property into its colour, as hex, following any `var()`.
 
 ```ts
-import { cssColours, defaults } from '@kaynooo/kayjs-mail'
+import { cssColours, mailDefaults } from '@kaynooo/kayjs-mail'
 import stylesheet from './styles/global.css' with { type: 'text' }
 
 const colour = cssColours(stylesheet, 'styles/global.css')
 
-export default { ...defaults, text: colour('--color-ink'), accent: colour('--color-wine') }
+export default { ...mailDefaults, text: colour('--color-ink'), accent: colour('--color-wine') }
 ```
 
 Import the stylesheet's text as above, which also works in an executable. A URL, `new URL('./styles/global.css', import.meta.url)`, reads the file as the server boots, and an executable has no such file. A property that is missing, or that is no opaque colour, stops the boot and names it.
@@ -119,10 +119,10 @@ Set `dark` in the settings to choose any of them. A colour you leave out is stil
 
 ```ts
 // src/mail-settings.ts
-import type { Settings } from '@kaynooo/kayjs-mail'
-import { defaults } from '@kaynooo/kayjs-mail'
+import type { MailSettings } from '@kaynooo/kayjs-mail'
+import { mailDefaults } from '@kaynooo/kayjs-mail'
 
-export default { ...defaults, accent: '#0047ff', dark: { background: '#101014', accent: '#7aa2ff' } } satisfies Settings
+export default { ...mailDefaults, accent: '#0047ff', dark: { background: '#101014', accent: '#7aa2ff' } } satisfies MailSettings
 ```
 
 `dark` takes `text`, `muted`, `background`, `surface`, `border`, `accent` and `onAccent`. Only hex colours are derived. `darkPalette(settings)` gives the colours a mail would switch to. The Gmail apps apply their own dark mode whatever the mail says.

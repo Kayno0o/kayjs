@@ -4,7 +4,7 @@ import { afterAll, afterEach, describe, expect, test } from 'bun:test'
 import { s } from 'kay'
 import { collection, contentKey } from 'kay/content'
 import { onKeysInvalidated, refreshLocally, trackStore, untrackStore } from '../../../src/runtime/cache'
-import { postgresLoader } from '../src/loaders/postgres'
+import { pgLoader } from '../src/loaders/pg'
 import { watcher } from '../src/loaders/shared'
 
 const schema = s.Object({ title: s.String() })
@@ -190,7 +190,7 @@ describe('the postgres loader\'s watch', () => {
     await admin.unsafe(`CREATE DATABASE ${database}`)
     sql = new SQL(Object.assign(new URL(url), { pathname: `/${database}` }).href, { max: 2 })
 
-    const loader = postgresLoader({ name: 'frozen', sql, table: 'frozen', watch: '40ms', seed: [{ slug: 'a', data: { title: 'A' } }] })
+    const loader = pgLoader({ name: 'frozen', sql, table: 'frozen', watch: '40ms', seed: [{ slug: 'a', data: { title: 'A' } }] })
     let reads = 0
     const posts = collection({ ...loader, load: async (context) => {
       reads++

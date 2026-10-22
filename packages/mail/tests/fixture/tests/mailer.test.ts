@@ -1,6 +1,6 @@
 import type { Mail, Transport } from '@kaynooo/kayjs-mail'
 import process from 'node:process'
-import { darkPalette, defaults, mailer, MailNotConfiguredError, outbox } from '@kaynooo/kayjs-mail'
+import { darkPalette, mailDefaults, mailer, MailNotConfiguredError, outbox } from '@kaynooo/kayjs-mail'
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { setSite } from 'kay/library'
@@ -62,8 +62,8 @@ describe('rendering', () => {
   })
 
   it('takes the dark colours an app gives, deriving only the others', () => {
-    expect(darkPalette(defaults)).toEqual({ text: '#d5d5d5', muted: '#a3a3a3', background: '#21211c', surface: '#141414', border: '#303028', accent: '#d5d5d5', onAccent: '#141414' })
-    expect(darkPalette({ ...defaults, accent: 'rebeccapurple', dark: { surface: '#202020' } })).toMatchObject({ surface: '#202020', accent: 'rebeccapurple', onAccent: '#ffffff' })
+    expect(darkPalette(mailDefaults)).toEqual({ text: '#d5d5d5', muted: '#a3a3a3', background: '#21211c', surface: '#141414', border: '#303028', accent: '#d5d5d5', onAccent: '#141414' })
+    expect(darkPalette({ ...mailDefaults, accent: 'rebeccapurple', dark: { surface: '#202020' } })).toMatchObject({ surface: '#202020', accent: 'rebeccapurple', onAccent: '#ffffff' })
   })
 
   it('follows the preheader with invisible filler, so the inbox preview stops there, and leaves it out of the text', async () => {

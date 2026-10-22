@@ -5,7 +5,7 @@ import { Elysia } from 'elysia'
 import { session } from 'kay/server'
 import { createAuth } from '../src/auth'
 import { log } from '../src/log'
-import { memoryStore } from '../src/memoryStore'
+import { memoryAuthStore } from '../src/memoryStore'
 import { discordProvider, githubProvider } from '../src/oauth/providers'
 import { auth, authExtension, authPages } from '../src/pages'
 import { scopeLabel } from '../src/pages/forms'
@@ -52,7 +52,7 @@ describe('authPages and createAuth share the prefix and home', () => {
     return (await (await app.handle(new Request('http://localhost/features'))).json() as { pages: unknown }).pages
   }
 
-  const make = (pages: Record<string, unknown> | boolean | undefined) => createAuth({ sessions: session({ secret: SECRET }), secret: SECRET, store: memoryStore(), proxy: { hops: 1 }, captcha: false, ...pages === undefined ? {} : { pages } })
+  const make = (pages: Record<string, unknown> | boolean | undefined) => createAuth({ sessions: session({ secret: SECRET }), secret: SECRET, store: memoryAuthStore(), proxy: { hops: 1 }, captcha: false, ...pages === undefined ? {} : { pages } })
 
   test('the prefix and home given to authPages alone reach createAuth, which asks for the pages with `pages: true`', async () => {
     expect(await loaded({ prefix: '/account', home: '/dashboard' }, make, true)).toMatchObject({ prefix: '/account', home: '/dashboard' })
@@ -119,7 +119,7 @@ describe('authPages and createAuth share the prefix and home', () => {
 
 describe('auth({ module }) registers the app\'s auth module', () => {
   const SECRET = 'a-test-secret-that-is-long-enough-for-kayjs-auth'
-  const make = (pages?: Record<string, unknown> | boolean) => createAuth({ sessions: session({ secret: SECRET }), secret: SECRET, store: memoryStore(), proxy: { hops: 1 }, captcha: false, ...pages === undefined ? {} : { pages } })
+  const make = (pages?: Record<string, unknown> | boolean) => createAuth({ sessions: session({ secret: SECRET }), secret: SECRET, store: memoryAuthStore(), proxy: { hops: 1 }, captcha: false, ...pages === undefined ? {} : { pages } })
 
   // What `features().pages` says once `prepare` handed the module's `auth` the extension's prefix and home, as kay does before it takes the plugin.
   async function adopted(options: Parameters<typeof auth>[0], pages: Record<string, unknown> | boolean | undefined) {

@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, spyOn, test } from '
 import { s } from 'kay'
 import { collection } from 'kay/content'
 import { registerCollections } from '../../../src/content/edit'
-import { postgresLoader } from '../src/loaders/postgres'
+import { pgLoader } from '../src/loaders/pg'
 import { restoreRevision, restoreTrashed } from '../src/restore'
 import { revisionsOf } from '../src/revisions'
 import { configure } from '../src/settings'
@@ -29,7 +29,7 @@ if (admin !== undefined) {
 
 function notes(): void {
   shared ??= new SQL(Object.assign(new URL(url), { pathname: `/${database}` }).href, { max: 4 })
-  restore = registerCollections([['notes', collection(postgresLoader({ name: 'notes', sql: shared, table: `notes_${++count}` }), { schema })]])
+  restore = registerCollections([['notes', collection(pgLoader({ name: 'notes', sql: shared, table: `notes_${++count}` }), { schema })]])
 }
 
 beforeEach(() => {
@@ -47,7 +47,7 @@ afterAll(async () => {
   await admin?.close()
 })
 
-describe('history on postgresLoader', () => {
+describe('history on pgLoader', () => {
   postgresTest('keeps the last saves and restores one as a new save', async () => {
     notes()
     configure({ history: { revisions: 3 } })

@@ -243,6 +243,15 @@ describe('the naming conventions', () => {
     }
   })
 
+  it('keep the old name of an export renamed to stop clashing across libraries as a @deprecated alias', async () => {
+    for (const [file, old, renamed] of [['packages/auth/src/memoryStore.ts', 'memoryStore', 'memoryAuthStore'], ['packages/auth/src/mail.ts', 'Mail', 'AuthMailMessage'], ['packages/auth/src/mail.ts', 'Mailer', 'AuthMailer'], ['packages/mail/src/defaults.ts', 'Settings', 'MailSettings'], ['packages/mail/src/defaults.ts', 'defaults', 'mailDefaults'], ['packages/mail/src/types.ts', 'Field', 'MailField'], ['packages/mail/src/types.ts', 'Message', 'MailMessage'], ['packages/ui/src/defaults.ts', 'Settings', 'UiSettings'], ['packages/ui/src/defaults.ts', 'defaults', 'uiDefaults'], ['packages/cms/src/loaders/postgres.ts', 'postgresLoader', 'pgLoader'], ['packages/cms/src/loaders/postgres.ts', 'PostgresLoaderOptions', 'PgLoaderOptions']] as const) {
+      const text = await Bun.file(file).text()
+
+      expect(text).toContain(`/** @deprecated Renamed \`${renamed}\` in 1.70`)
+      expect(text).toMatch(new RegExp(`export (?:const|type) ${old}(?:<[^>]*>)? = ${renamed}`))
+    }
+  })
+
   it('give the error class a library exports a code, as kay\'s KayError carries one', () => {
     const find = (_: string, __: string, text: string): string[] => [...text.matchAll(/export (?:abstract )?class (\w+) extends \w*Error \{\n([\s\S]*?)\n\}/g)].filter(([, , body]) => !(/\bcode\b/).test(body!)).map(([, name]) => name!)
 

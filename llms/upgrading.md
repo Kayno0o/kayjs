@@ -26,6 +26,10 @@ kayjs-ai's `ai({ limit })` is `ai({ rateLimit })`, its `ai({ visitor })` and `as
 
 kay's `HydrationMismatch` of `kay/dom`, `ActionRedirect` from `kay`, `CspViolation` from `kay/server` and `RedirectRefused` of `kay/library` are `HydrationMismatchError`, `ActionRedirectError`, `CspViolationError` and `RedirectRefusedError` (their `name` changes with them), kayjs-cms's `SaveConflict` is `SaveConflictError` and kayjs-mail's `MailNotConfigured` is `MailNotConfiguredError`; the old names stay as aliases three minors, and `kay upgrade` renames the imports and their uses (the `deprecated-renamed-export` lint). Every error class a library exports has a `code` (`'save-conflict'`, `'mail-not-configured'`, `'oauth-exchange'`, `'forge-refused'`), and `AiError` has `code` beside `kind`, the same value.
 
+### Exports that clashed across libraries are renamed, and the postgres entry is `pg`
+
+kayjs-cms's `@kaynooo/kayjs-cms/postgres` is `@kaynooo/kayjs-cms/pg` with `pgLoader` and `PgLoaderOptions`, kayjs-auth's `memoryStore` is `memoryAuthStore` (kay's is the session one) and its `Mailer` and `Mail` are `AuthMailer` and `AuthMailMessage`, kayjs-mail's `Settings`, `defaults`, `Field` and `Message` are `MailSettings`, `mailDefaults`, `MailField` and `MailMessage`, and kayjs-ui's `Settings` and `defaults` are `UiSettings` and `uiDefaults`. The old names and entry stay three minors, and `kay upgrade` renames the imports and their uses (the `deprecated-renamed-export` lint).
+
 ### Boot config errors of the libraries are `KayError`s
 
 A setting kayjs-cms, kayjs-mail, kayjs-auth or kayjs-ai refuses at boot, or a bad argument to `ask()`, throws a `KayError` with code `config-invalid`, worded `kay: <option> is <value>; it takes <what>`, where it threw a plain `Error` or `TypeError` reading `kayjs-cms: ...`. A test matching the old text or `toThrow(TypeError)` changes; no check can recognise it.
