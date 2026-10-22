@@ -10,6 +10,8 @@ import { collection, entries, entryPage, paginate } from '../src/content'
 import { unservedRoutes } from '../src/content/claims'
 import { registerCollections, registerEditSite } from '../src/content/edit'
 import { feedXml } from '../src/content/feed'
+import { contentKey } from '../src/content/load'
+import { invalidateLocally } from '../src/runtime/cache'
 import { localizedLink, matchLinksWith } from '../src/runtime/i18n'
 import { alternate } from '../src/runtime/i18n.server'
 import { runInLocale } from '../src/runtime/locale-state'
@@ -32,6 +34,14 @@ const FILES: Record<string, string> = {
   'src/content/notes/en/a.md': '---\ntitle: first\ndate: 2026-01-01\n---\nbody\n',
   'src/content/notes/fr/a.md': '---\ntitle: premier\ndate: 2026-01-01\n---\ncorps\n',
   'src/routes/notes/[slug].kay': '--- server\nimport { notes } from \'../../content.config\'\n\nexport const page = { prerender: notes }\n\nconst note = await notes.get(ctx.params.slug) ?? ctx.notFound()\n---\nh1 {note.data.title}\na.self(href={note.url}) self\n',
+}
+
+// The entry files change once the read an invalidation started ends.
+async function settled(settings: { entryFiles?: readonly string[] | undefined }): Promise<void> {
+  const before = settings.entryFiles
+
+  for (let waited = 0; settings.entryFiles === before && waited < 2000; waited += 10)
+    await Bun.sleep(10)
 }
 
 const schema = t.Object({ title: t.String() })
@@ -275,15 +285,31 @@ describe('a collection route read beyond the entries', () => {
 
     rows = [...rows, { slug: 'x.html', data: { title: 'B' } }]
     docs.invalidate()
-    await Bun.sleep(50)
+    await settled(linked)
     expect(linked.entryFiles).toEqual(['/later/x.html'])
     expect(compiledLinks.link(linked, '/later/x.html', 'fr', undefined)).toBe('/fr/later/x.html')
 
     rows = rows.slice(0, 1)
     docs.invalidate()
-    await Bun.sleep(50)
+    await settled(linked)
     expect(linked.entryFiles).toBeUndefined()
     expect(compiledLinks.link(linked, '/later/x.html', 'fr', undefined)).toBe('/later/x.html')
+
+    rows = [...rows, { slug: 'y.txt', data: { title: 'C' } }]
+    invalidateLocally(contentKey('route-files-later'))
+    await settled(linked)
+    expect(linked.entryFiles).toEqual(['/later/y.txt'])
+
+    // A read that fails leaves the list as it was.
+    const down = collection({ name: 'route-files-down', load: () => {
+      throw new Error('down')
+    } }, { schema, route: '/down/*slug' })
+    const kept = { ...base, entryFiles: ['/down/a.html'] }
+
+    followEntryFiles(kept, [down])
+    down.invalidate()
+    await Bun.sleep(50)
+    expect(kept.entryFiles).toEqual(['/down/a.html'])
   })
 
   it('leaves out an entry whose slug the route refuses, keeping the others', async () => {

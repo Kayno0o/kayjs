@@ -185,7 +185,7 @@ export function routedSettings(settings: LocaleSettings, routes: Pick<Route, 'pa
 const CATCH_ALL = /\*[^/]+/
 
 // The paths of the entries of routed collections whose slug ends in an extension, which the locale rule would take for files; `followEntryFiles` reads them again when a collection is invalidated.
-export async function entryFilePaths(collections: { options: { route?: string | undefined }, all: () => Promise<{ slug: string }[]> }[]): Promise<string[]> {
+export async function entryFilePaths(collections: { options: { route?: string | undefined }, all: () => Promise<{ slug: string }[]> }[], failed?: () => void): Promise<string[]> {
   const paths = await Promise.all(collections.map(async ({ options, all }) => {
     const { route } = options
 
@@ -202,6 +202,8 @@ export async function entryFilePaths(collections: { options: { route?: string | 
     catch (error) {
       kayLog('warn', `the entries of ${route} could not be read, so a link to one whose slug ends in a file extension stays a file`, error)
 
+      failed?.()
+
       return []
     }
   }))
@@ -209,7 +211,7 @@ export async function entryFilePaths(collections: { options: { route?: string | 
   return paths.flat()
 }
 
-// Settings are read-only once a page has written them, but for `followEntryFiles`, which forgets the written form.
+// The written form of a settings object, forgotten by `followEntryFiles` when it changes the entry files.
 const settingsJsons = new WeakMap<LocaleSettings, string>()
 
 type EntryCollection = Parameters<typeof entryFilePaths>[0][number]
@@ -222,15 +224,16 @@ export function followEntryFiles(settings: LocaleSettings, collections: (EntryCo
   if (routed.length === 0)
     return
 
-  const keys = new Set(routed.map(({ name }) => contentKey(name)))
   const weak = new WeakRef(settings)
   let latest = 0
 
   // Only the newest read is kept, as two invalidations in a row can finish out of order.
   const refresh = async (target: LocaleSettings, turn: number) => {
-    const entryFiles = await entryFilePaths(routed)
+    let unread = false
+    const entryFiles = await entryFilePaths(routed, () => (unread = true))
 
-    if (turn !== latest)
+    // A read that failed keeps the list it has, rather than dropping every entry file for a loader that is down for a moment.
+    if (turn !== latest || unread)
       return
 
     target.entryFiles = entryFiles.length > 0 ? entryFiles : undefined
@@ -238,12 +241,12 @@ export function followEntryFiles(settings: LocaleSettings, collections: (EntryCo
     settingsJsons.delete(target)
   }
 
-  const stop = onKeysInvalidated((_, dropped) => {
+  const stop = onKeysInvalidated((matches) => {
     const target = weak.deref()
 
     if (target === undefined)
       stop()
-    else if ([...keys].some(key => dropped(key)))
+    else if (routed.some(({ name }) => matches(contentKey(name))))
       void refresh(target, ++latest)
 
     return []

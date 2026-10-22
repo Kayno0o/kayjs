@@ -73,7 +73,7 @@ export const posts = collection('content/posts', {
 ```
 
 - `a(href={post.url}) ...` links it; `url` is the path as `route()` writes it, so kay puts the base and the page's locale on it as on any link.
-- A localized entry's `url` has its own slug, so `(await posts.translation(post, 'fr'))?.url` is the page of its translation, on a page that read the entry with `get()`, `alternate('fr')` gives it too. A dotted slug, `v1.2`, is a page for the locale rule, not a file; so is an entry's `release.html` (read at startup); links ending in `.png` are files. A slug the route cannot write (`..`) leaves its entry out, logged. The CMS reads the route before `url`.
+- A localized entry's `url` has its own slug, so `(await posts.translation(post, 'fr'))?.url` is the page of its translation, on a page that read the entry with `get()`, `alternate('fr')` gives it too. A dotted slug, `v1.2`, is a page, not a file; so is an entry's `release.html` (re-read on `invalidate()`); links ending in `.png` are files. A slug the route cannot write (`..`) leaves its entry out, logged. The CMS reads the route before `url`.
 - A feed item with no `path` links the entry's `url`, absolute on the site, in the locale's feed under its prefix, as `trailingSlash` writes a page's address.
 - The route has one param, the slug: `:slug`, or `*slug` for slugs with folders, and `collection()` refuses any other.
 - `kay check` reports a route no page's pattern matches (`src/routes/blog/[slug].kay`, whatever its param is named); a page listing the entries in `prerender: posts` while another page serves the route is reported too.

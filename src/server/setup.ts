@@ -168,8 +168,6 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
   // The entries whose slug ends in a file extension are read beside the client build, for the locale rule of the links.
   const readingEntryFiles = i18n ? entryFilePaths(collections) : undefined
 
-  void Promise.allSettled([readingEntryFiles])
-
   const claimed = refuse?.({ routes, files, endpoints, collections, i18n: i18n?.settings, site, base }) as Claimed
 
   // Started once every refusal that needs no build is behind, those of the config (images, markdown, i18n, matchers, base, preview, the cards) and of the scanned project, the server's own among them; only what needs the built client or the routes' guards (the font faces of a Fontsource family, API modules, extension routes) still follows it.
@@ -200,7 +198,7 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
 
   // A localized site's links are told of its pages and localized feeds, for the server and the static export alike.
   if (i18n) {
-    const entryFiles = await readingEntryFiles!
+    const entryFiles = (await readingEntryFiles) ?? []
 
     i18n.settings = { ...linkedSettings(i18n.settings, routes, collections), ...entryFiles.length > 0 && { entryFiles } }
     followEntryFiles(i18n.settings, collections)
