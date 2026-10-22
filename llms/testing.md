@@ -153,7 +153,7 @@ A test never writes into the project's `src/content`: a folder collection moves 
 
 ### Test a component's handlers
 
-`mountComponent(file, props)` renders one component built for the browser into `document`, and `settle()` lets effects land before the DOM is read. The first `mountComponent` of a file registers happy-dom's DOM, `@happy-dom/global-registrator` installed as a dev dependency (20.14.6, or 21.0.3 and later); a file that mounts nothing never loads it. Registering replaces `setTimeout` and makes `document` exist, so a file stubbing timers or rendering pages before its first mount imports `kay/test/dom` instead, last among its imports as the lint preset sorts a side-effect import, which runs before any test body.
+`mountComponent(file, props)` renders one component built for the browser into `document`, and `settle()` lets effects land before the DOM is read. The first `mountComponent` of a file registers happy-dom's DOM, `@happy-dom/global-registrator` installed as a dev dependency (20.14.6, or 21.0.3 and later); a file that mounts nothing never loads it. Registering replaces `setTimeout` and makes `document` exist, so a file stubbing timers or rendering pages before its first mount imports `kay/test/dom` instead, last among its imports as the lint preset sorts a side-effect import, which runs before any test body; an earlier import capturing `setTimeout` at load needs it first.
 
 ```ts
 import { expect, it } from 'bun:test'
@@ -174,7 +174,7 @@ it('opens its panel on a click', async () => {
 
 ### Test site
 
-`kay/test` serves the project's pages and actions inside the test process, with no server and no browser; its islands are built for the browser as a check, never loaded, and a `.kay` file that does not compile fails only the visit of a page importing it, with its own error, not every site (a `browser` site needs the build and fails whole):
+`kay/test` serves the project's pages and actions inside the test process, with no server and no browser; its islands are built for the browser as a check, never loaded, and a `.kay` file that does not compile makes only the visit of a page importing it answer 500 and log the error naming the file, not every site, and a file no page imports goes unreported (a `browser` site needs the build and fails whole):
 
 ```ts
 import { expect, it } from 'bun:test'

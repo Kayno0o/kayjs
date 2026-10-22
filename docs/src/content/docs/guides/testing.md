@@ -273,7 +273,7 @@ The value is not checked against the schema, so a string given to a number field
 
 Every `testSite()` call builds the islands for the browser. It throws that build's error when one fails, such as an island importing a module that reaches `bun:sqlite` or the database. Pages still render without scripts, and no browser is needed.
 
-A `.kay` file that does not compile is the exception: it fails only the visit of a page importing it, with the error naming the file, so the tests of other pages stay green. A site opened with `browser` needs the whole build and throws it.
+A `.kay` file that does not compile is the exception: only the visit of a page importing it answers 500 and logs the error naming the file, so the tests of other pages stay green; a file no page imports goes unreported. A site opened with `browser` needs the whole build and throws it.
 
 The build goes to `.kay/test-client`, so what `kay build` wrote stays as it was. It runs once per process while the files under `src`, your routes and your API are unchanged.
 

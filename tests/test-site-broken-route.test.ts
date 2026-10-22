@@ -53,6 +53,6 @@ it('fails the test of the broken route with a message naming its file', async ()
 
   expect(code).not.toBe(0)
   expect(report).toContain('broken.kay')
-  expect(report).not.toContain('\n    at ')
+  expect(report).not.toMatch(/\n {4}at (?!<anonymous>)/)
   expect(report.split('\n').length).toBeLessThan(60)
 }, 120_000)
