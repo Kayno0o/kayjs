@@ -96,9 +96,9 @@ describe('time options take a Duration', () => {
   })
 
   test('limits, the old name of rateLimit, still counts, and rateLimit wins where both name a limit', async () => {
-    const windows: number[] = []
+    const windows: Duration[] = []
     const base = memoryStore()
-    const store = { ...base, attempts: { ...base.attempts, hit: async (key: string, window: number) => {
+    const store = { ...base, attempts: { ...base.attempts, hit: async (key: string, window: Duration) => {
       windows.push(window)
 
       return base.attempts.hit(key, window)
@@ -106,8 +106,8 @@ describe('time options take a Duration', () => {
     const { browser } = testApp({ store, limits: { register: { max: 1, window: '2h' }, signIn: { max: 1, window: '1h' } }, rateLimit: { register: { max: 1, window: '3h' } } })
 
     await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
-    expect(windows).toContain(3 * 60 * 60)
-    expect(windows).not.toContain(2 * 60 * 60)
+    expect(windows).toContain('10800s')
+    expect(windows).not.toContain('7200s')
     expect(() => testApp({ limits: { signIn: { max: 1, window: '-5m' } } })).toThrow('kay: limits.signIn.window is \'-5m\'')
   })
 
