@@ -11,9 +11,9 @@
 - Shared values are exported from a `--- module` fence.
 - A page has no props: its data comes from its `--- server` fence.
 - `window`, `document`, `localStorage` and the other globals only a browser has are read in `effect` or `onMount`, or in a component whose script fence is `--- client`; reading one while rendering throws on the server.
-- Every duration is a string with its unit, `'250ms'`, `'30s'`, `'5m'`, `'1.5h'`, `'30d'` or `'2w'` (type `Duration` from `kay`) in every option, store call and test helper; a bare number is a type error `kay check` fixes (`deprecated-bare-duration`), and a session store's `set` gets its `maxAge` as a `Duration` string (`durationMs` gives its milliseconds).
+- Every duration is a string with its unit, `'250ms'`, `'30s'`, `'5m'`, `'1.5h'`, `'30d'` or `'2w'` (type `Duration` from `kay`) everywhere; a bare number is a type error `kay check` fixes (`deprecated-bare-duration`), `durationMs` gives one's milliseconds, and a session store's `set` takes its `maxAge` as one.
 - Indentation is spaces only, consistent within a block. Text after a tag needs one space: `p Hello`, never `p:Hello`.
-- Under `kay dev`, `.kay/dev/errors.json` lists the errors the server met (compile errors, type errors, requests that threw, islands' browser errors) at their `.kay` lines: read it rather than opening the browser.
+- Under `kay dev`, `.kay/dev/errors.json` lists the errors the server met (compile and type errors, requests that threw, islands' browser errors) at their `.kay` lines: read it rather than opening the browser.
 - Pug features that do not exist: `- code` lines, `#{}` and `!{}` interpolation, `+mixins`, `include`, `extends`, `block`, filters, `&attributes`, `case`, `each`, `while`, `unless`, `doctype`; a line starting with one is reported, with what kay writes instead.
 
 ## Libraries
@@ -76,6 +76,7 @@ To build a site, read [Build a site](llms/site.md) first. The topic files below 
 - [Checks and lints](llms/checks.md): what `kay check` verifies, ESLint on `.kay` files
 - [Lints and warnings](llms/lints.md): every lint at its default level, allowing one, its fix
 - [SEO lints](llms/seo-lints.md): the `seo` group and what each lint reads
+- [Deprecated lints](llms/deprecated-lints.md): old forms and their fixes
 - [Errors](llms/errors.md): the codes of the errors that are no lint, and where each fix is documented
 - [Project setup and scaffolding](llms/project.md): `kay.config.ts`, tsconfig, editor setup, migrating from Astro
 - [kay new and kay add](llms/project-new-and-add.md): presets, features, adding one, `kay generate`

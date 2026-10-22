@@ -1,0 +1,33 @@
+# Deprecated lints
+
+## Common tasks
+
+- Move an app off every old form at once: `kay upgrade`, or `kay check --fix --since 1.70` for one minor alone; see [Apply the quick fixes](lints.md#apply-the-quick-fixes).
+
+## Reference
+
+### Deprecated lints
+
+The lints of the `deprecated` group, each the old form a minor replaced, reported for three minors with a safe fix unless its row says otherwise.
+
+| Lint | Default | Group | Reports |
+| --- | --- | --- | --- |
+| `deprecated-library-registration` | warn | deprecated | `authPages`, `authExtension` or `mailExtension` in `kay.config.ts`, since 1.70: libraries register with `auth({ module })` and `mail({ module })`. `kay upgrade` rewrites the calls and the import where the module is a literal path. Found in `kay.config.ts`. |
+| `deprecated-body-limit` | warn | deprecated | `bodyLimit` in `kay.config.ts`, an action's options, `api()` or a route's `detail`, since 1.70: it is `maxSize` now, like every size limit. `kay upgrade` renames it. |
+| `deprecated-ui-prop` | warn | deprecated | `loading` of kayjs-ui's `Select`, since 1.70: it is `busy` now. `kay upgrade` renames it. |
+| `deprecated-page-size` | warn | deprecated | `size` in the options of kayjs-ui's `infiniteList()`, since 1.70: it is `pageSize` now. `kay upgrade` renames it. |
+| `deprecated-ctx-outcome` | warn | deprecated | `ctx.failed(action)` and `ctx.succeeded(action)`, since 1.70: they are `action.failed()` and `action.succeeded()`. `kay upgrade` rewrites them. |
+| `deprecated-auth-method` | warn | deprecated | A kayjs-auth method called on `auth` by its old name since 1.70 (`sessions()` is `listSessions()`, `organization()` is `getOrganization()`, `removePasskey()` is `revokePasskey()`, `endSession()` is `revokeSession()`, `revokeToken()` is `revokeBearerToken()`, `setLocale()` is `updateLocale()`). `kay upgrade` renames the call. |
+| `deprecated-signal-prop` | warn | deprecated | A required prop typed `Signal<T>` or `Memo<T>`, since 1.70: a prop is always a value, a child writing its parent's state types it `Bindable<T>` and the parent passes `bind:open={open}`, a `Memo<T>` prop becomes `T` passed `value={memo()}`. `--fix` rewrites the type, the component's reads and every tag passing it in the project, and is not offered, with the reason, for a tag that spreads props or passes an expression that is no name or property path, or a prop the component uses other than by calling it. An optional prop is not reported. |
+| `deprecated-option-name` | warn | deprecated | An option of a library function under its old name, since 1.70: kayjs-cms's `forgejo({ url })` is `baseUrl`, kayjs-mail's `mailer({ lang })` is `locale`, and kayjs-auth's `rememberMaxAge`, `email.expires` and `invitationMaxAge`, like `files.url(key, { expires })`, are `maxAge` forms (`remember: { maxAge }`, `invitations: { maxAge }`). The fix renames the key, unless the new name is given beside it. Found in TypeScript files and `.kay` fences. |
+| `deprecated-cms-edit-page` | warn | deprecated | `data-cms-edit-page` on a kayjs-cms link is `data-kcms-edit-page` since 1.70. `kay upgrade` renames it. |
+| `deprecated-bare-duration` | warn | deprecated | A bare number where a `Duration` goes, since 1.70: `cached(key, 300, load)`, `maxAge: 3600`, `page.click(sel, { timeout: 5000 })`; `Infinity` in a toast. `kay check --fix` writes a literal with the unit it stood for (`'300s'`, `'5000ms'` for a test helper or a toast), and leaves an expression to its type error; a `hit` on a receiver not named for a rate store or an attempts store gets its fix unsafe, as its unit is a guess. The runtime reads the old number until 1.73. |
+| `deprecated-identity-key` | warn | deprecated | A `// kay-allow identity-key` comment or an `identity-key` entry in `lints`, since 1.69: the lint is gone, as a `for` over objects with no `id` needs no key. `kay upgrade` removes it. Found in `.kay` files and `kay.config.ts`. |
+| `deprecated-rate-limit` | warn | deprecated | kayjs-ai's `limit` and `visitor` in `ai({ ... })`, `visitor` in `ask(messages, { ... })`, kayjs-auth's `limits` in `createAuth({ ... })` and a bare number in kayjs-mail's `smtp({ rateLimit })`, since 1.70: they are `rateLimit` and `key`, and `{ max, window }`. The fix renames the key or writes the number as `{ max: 5, window: '1s' }`, unless the new name is given beside it. Found in TypeScript files and `.kay` fences. |
+| `deprecated-site-name` | warn | deprecated | kayjs-auth's `createAuth({ url, site: 'Name' })`, since 1.70: `site` is the origin, as in kay.config.ts, and `name` the display name. The fix renames `url` to `site` and a `site` that is a string literal and no URL to `name`, unless the new name is given beside it. Found in TypeScript files and `.kay` fences. |
+| `deprecated-renamed-export` | warn | deprecated | An import of an export kay or a library renamed in 1.70. A runtime error class now ends in `Error` (such as `HydrationMismatch` of `kay/dom` and `SaveConflict` of kayjs-cms). An export that clashed with another library's is namespaced (`memoryStore`, `Mailer` and `Mail` of kayjs-auth, `Settings`, `defaults`, `Field` and `Message` of kayjs-mail, `Settings` and `defaults` of kayjs-ui), and kayjs-cms's `postgresLoader` of `/postgres` is `pgLoader` of `/pg`. The old name stays an alias three minors; `kay upgrade` renames the import and its uses, in `.kay` files and scripts. |
+| `deprecated-mount-component` | warn | deprecated | `mountComponent('src/components/toggle.kay', props)` of `kay/test`, since 1.70: pass the imported component, `mountComponent(Toggle, props)`. |
+| `deprecated-markup-prop` | warn | deprecated | A props type of a `.kay` script writing a markup prop as `JSX.Element` or a function returning it, since 1.70: it is a `Snippet` from `kay`. `kay upgrade` rewrites the type and the import. |
+| `deprecated-hook-shape` | warn | deprecated | An `on*` hook with positional arguments, since 1.70: `onSignUp`, `onDelete`, `onError` and a queue's `onFailed` take one event object, and `onExport`, `onProviderProfile` are `exportData`, `profileFields`. Read until 1.73. `kay upgrade` destructures the parameters. Found in `.ts` files importing kayjs-auth, `kay/server` or kayjs-mail, and `kay.config.ts`. |
+| `deprecated-action-options` | warn | deprecated | An action's third argument setting `rateLimit`, `honeypot`, `minTime` or `proofOfWork` outside `protect`, since 1.71. Read until 1.74. `kay upgrade` moves them into `protect: { ... }`. Found in `action(...)` calls with an object literal, in `.ts` files and `.kay` fences. |
+| `deprecated-ui-class` | warn | deprecated | A `.css` file selecting a part class kayjs-ui stopped setting in 1.71, such as `.kui-card-head`. No fix. |
