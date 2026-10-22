@@ -129,7 +129,7 @@ async function measureHere(page: Page): Promise<Size> {
   }
 }
 
-// The bench app builds once for both its pages.
+// The bench app builds again for each of its two pages, about a second each.
 async function measureAll(): Promise<Record<Page, Size>> {
   const sizes = {} as Record<Page, Size>
 
