@@ -1,7 +1,7 @@
 import process from 'node:process'
 import { $, Glob } from 'bun'
 import { brokenLinks } from './links'
-import { ARCHIVES, INDEX, releasePages, WHATS_NEW } from './whats-new'
+import { ARCHIVES, INDEX, MAX_PAGE_BYTES, oversizedPages, releasePages, WHATS_NEW } from './whats-new'
 
 // `bun scripts/version.ts patch|minor|major`: kay and every library under packages/ move to one version, committed as `v<version>` and tagged, as `bun pm version` does for one package.
 const LEVELS = ['major', 'minor', 'patch'] as const
@@ -43,6 +43,11 @@ const dangling = await brokenLinks(pages)
 
 if (dangling.length > 0)
   throw new Error(`the release leaves ${dangling.length} broken link${dangling.length === 1 ? '' : 's'}, which tests/docs.test.ts would fail on:\n${dangling.join('\n')}`)
+
+const oversized = oversizedPages(pages)
+
+if (oversized.length > 0)
+  throw new Error(`the release leaves ${oversized.join(', ')} over ${MAX_PAGE_BYTES} bytes, which tests/llms.test.ts would fail on: split the release's section into a new file first`)
 
 const start = (await $`git rev-parse HEAD`.text()).trim()
 const tag = `v${version}`

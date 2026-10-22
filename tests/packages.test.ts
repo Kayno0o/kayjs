@@ -1,6 +1,6 @@
 import { Glob } from 'bun'
 import { describe, expect, it } from 'bun:test'
-import { archiveOldest, indexArchive, stampUnreleased, trimArchive } from '../scripts/whats-new'
+import { archiveOldest, indexArchive, MAX_PAGE_BYTES, oversizedPages, releasePages, stampUnreleased, trimArchive } from '../scripts/whats-new'
 
 interface Manifest {
   name: string
@@ -94,6 +94,19 @@ describe('what\'s new', () => {
     expect(moved.archive).toBe('# Old\n\nWhat each release before 1.51.2 added.\n\n## 1.51.1\n\n- bb\n\n## 1.51.0\n\n- aaaaaaaaaa\n\n## 1.50.0\n\n- z\n')
     // The patch boundary reads back: a second run moves nothing.
     expect(archiveOldest(moved.page, moved.archive, 10)).toEqual(moved)
+  })
+
+  it('lets a release whose own section outgrows the page limit through, moving every older one away, and names a page still over the hard limit', () => {
+    const big = '- ' + 'x'.repeat(21_000)
+    const page = `# New\n\nIntro.\n\n## 1.70.0\n\n${big}\n\n## 1.69.0\n\n- b\n\nReleases before 1.69 are in [Old](old.md).\n`
+    const archive = '# Old\n\nWhat each release before 1.69 added.\n\n## 1.68.0\n\n- z\n'
+    const files: Record<string, string> = { 'llms.txt': '- [Old](old.md): before 1.69\n', 'llms/whats-new.md': '# W\n', 'llms/whats-new-archive.md': '# WA\n', 'llms/upgrading.md': page, 'llms/upgrading-archive.md': archive }
+    const pages = releasePages(path => files[path]!, '1.70.0')
+
+    expect(pages.get('llms/upgrading.md')).toBe(`# New\n\nIntro.\n\n## 1.70.0\n\n${big}\n\nReleases before 1.70 are in [Old](old.md).\n`)
+    expect(pages.get('llms/upgrading-archive.md')).toContain('## 1.69.0\n\n- b')
+    expect(oversizedPages(pages)).toEqual([])
+    expect(oversizedPages(new Map([['llms/upgrading.md', 'x'.repeat(MAX_PAGE_BYTES + 1)], ['llms.txt', 'x'.repeat(MAX_PAGE_BYTES + 1)], ['llms/a.md', 'x'.repeat(MAX_PAGE_BYTES)]]))).toEqual(['llms/upgrading.md'])
   })
 
   it('moves the index\'s line for an archive to the release it now starts before, and leaves the other lines alone', () => {

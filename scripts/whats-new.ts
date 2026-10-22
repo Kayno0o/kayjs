@@ -6,6 +6,8 @@ export const INDEX = 'llms.txt'
 export const ARCHIVES = [['llms/whats-new.md', 'llms/whats-new-archive.md'], ['llms/upgrading.md', 'llms/upgrading-archive.md']] as const
 // The size a page is kept under by moving its oldest releases away, below the 25,000 bytes tests/llms.test.ts allows.
 export const PAGE_LIMIT = 20_000
+// The size tests/llms.test.ts allows a page under llms/: the newest release stays on its page however large, so the limit above is a target and this one a wall.
+export const MAX_PAGE_BYTES = 25_000
 // The size an archive is kept under by dropping its oldest releases: it only changes at a release, so it needs no room for the next one.
 const ARCHIVE_LIMIT = 24_000
 
@@ -81,6 +83,11 @@ export function indexArchive(index: string, path: string, archive: string): stri
   const boundary = BEFORE.exec(archive.split(SECTION)[0]!)?.[0]
 
   return boundary === undefined ? index : index.split('\n').map(line => line.includes(`(${path})`) ? line.replace(BEFORE, boundary) : line).join('\n')
+}
+
+// The pages under llms/ a release leaves over the 25,000 bytes tests/llms.test.ts allows, which only a single release larger than the room left can cause.
+export function oversizedPages(pages: Map<string, string>): string[] {
+  return [...pages].filter(([path, text]) => path.startsWith('llms/') && Buffer.byteLength(text) > MAX_PAGE_BYTES).map(([path]) => path)
 }
 
 // The text of every page a release rewrites, by path: the unreleased section named after `version`, then the oldest releases moved to each archive, each archive trimmed and the index's line for it moved to the release it now starts before. Pure, so a release can check the result before it writes any of it.
