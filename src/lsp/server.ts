@@ -192,7 +192,7 @@ export class KayLanguageServer {
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/documentLink', ({ textDocument }) => this.links(textDocument.uri))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/foldingRange', ({ textDocument }) => this.folds(textDocument.uri))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/codeLens', ({ textDocument }) => this.lenses(textDocument.uri))
-    client.onRequest<{ files: { oldUri: string, newUri: string }[] }>('workspace/willRenameFiles', async ({ files }) => this.renamedFiles(files))
+    client.onRequest<{ files: { oldUri: string, newUri: string }[] }>('workspace/willRenameFiles', async ({ files }) => inWalkScope(async () => this.renamedFiles(files)))
     client.onRequest('shutdown', async () => this.server.request('shutdown'))
     client.onNotification('exit', () => this.exit())
   }

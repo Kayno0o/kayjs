@@ -1,10 +1,9 @@
 import type { Span } from '../compiler/ast'
 import { dirname, relative, resolve, sep } from 'node:path'
 import { parseKay } from '../compiler/parser'
-import { analyzeScript, analyzeServer } from '../compiler/script'
 
-// The relative specifier after `from`, `import` or `import(`, in the second group.
-const MODULE_SPECIFIER = /(?:\bfrom\s*|\bimport\s*(?:\(\s*)?)(['"])(\.[^'"\n]*)\1/g
+// What stands right before the quote of a specifier.
+const IMPORT_BEFORE = /(?:\bfrom|\bimport|\bimport\s*\(|\brequire\s*\()\s*$/
 
 export interface ImportEdit extends Span {
   text: string
@@ -24,8 +23,6 @@ export function movedPath(path: string, moves: ReadonlyMap<string, string>): str
 }
 
 const KAY_EXTENSION = /\.kay$/
-// The quoted module of an `import`, `export ... from` or dynamic `import()` in a TypeScript module, which the TypeScript scanner gives without positions.
-const MODULE_SPECIFIER = /(?:\bfrom\s*|\bimport\s*(?:\(\s*)?)(["'])([^"'\n]+)\1/g
 
 // Where a relative import ends up once `moves` happen: a `.kay` file imported without its extension moves with it, and keeps being written without.
 function movedSpecifier(file: string, specifier: string, moves: ReadonlyMap<string, string>): string {
@@ -40,12 +37,78 @@ function movedSpecifier(file: string, specifier: string, moves: ReadonlyMap<stri
   return KAY_EXTENSION.test(bare) ? bare.replace(KAY_EXTENSION, '') : target
 }
 
-function editsFor(file: string, source: string, spans: Span[], moves: ReadonlyMap<string, string>): ImportEdit[] {
+// The relative specifiers of the imports, re-exports, dynamic imports and `require` calls in the fences of a `.kay` file, between their quotes.
+export function importSpecifiers(source: string): Span[] {
+  const parsed = parseKay(source)
+
+  return [parsed.script, parsed.server, parsed.module].flatMap(fence => fence ? specifierSpans(source.slice(fence.start, fence.end), fence.start) : [])
+}
+
+// The same for a TypeScript or JavaScript module, whose imports of a moved `.kay` file need the new path.
+export function moduleImportEdits(file: string, source: string, moves: ReadonlyMap<string, string>): ImportEdit[] {
+  return retargeted(file, specifierSpans(source, 0), source, moves)
+}
+
+// Walks `code` past comments and template literals, and takes a string for a specifier when `from`, `import`, `import(` or `require(` stands right before it, so a string or a comment that only looks like an import is left alone.
+function specifierSpans(code: string, offset: number): Span[] {
+  const spans: Span[] = []
+  let i = 0
+
+  while (i < code.length) {
+    const char = code[i]!
+
+    if (char === '/' && code[i + 1] === '/') {
+      const end = code.indexOf('\n', i)
+
+      i = end === -1 ? code.length : end
+    }
+    else if (char === '/' && code[i + 1] === '*') {
+      const end = code.indexOf('*/', i + 2)
+
+      i = end === -1 ? code.length : end + 2
+    }
+    else if (char === '`') {
+      i = quotedEnd(code, i) + 1
+    }
+    else if (char === '"' || char === '\'') {
+      const end = quotedEnd(code, i)
+      const specifier = code.slice(i + 1, end)
+
+      if (specifier.startsWith('.') && IMPORT_BEFORE.test(code.slice(Math.max(i - 24, 0), i)))
+        spans.push({ start: offset + i + 1, end: offset + end })
+
+      i = end + 1
+    }
+    else {
+      i++
+    }
+  }
+
+  return spans
+}
+
+function quotedEnd(code: string, from: number): number {
+  for (let i = from + 1; i < code.length; i++) {
+    if (code[i] === '\\')
+      i++
+    else if (code[i] === code[from])
+      return i
+  }
+
+  return code.length
+}
+
+// The relative imports of a file that point somewhere else once `moves` happen, whether the imported file moved or the importing one did. `file` is where the source is now.
+export function importEdits(file: string, source: string, moves: ReadonlyMap<string, string>): ImportEdit[] {
+  return retargeted(file, importSpecifiers(source), source, moves)
+}
+
+function retargeted(file: string, spans: Span[], source: string, moves: ReadonlyMap<string, string>): ImportEdit[] {
   const placed = movedPath(file, moves)
   const edits: ImportEdit[] = []
 
   for (const span of spans) {
-    const specifier = source.slice(span.start + 1, span.end - 1)
+    const specifier = source.slice(span.start, span.end)
 
     if (!specifier.startsWith('.'))
       continue
@@ -56,29 +119,8 @@ function editsFor(file: string, source: string, spans: Span[], moves: ReadonlyMa
     const text = next.startsWith('./') || next.startsWith('../') ? next : `./${next}`
 
     if (text !== specifier && (placed !== file || moved !== target))
-      edits.push({ start: span.start + 1, end: span.end - 1, text })
+      edits.push({ ...span, text })
   }
 
   return edits
-}
-
-// The relative imports of a file that point somewhere else once `moves` happen, whether the imported file moved or the importing one did. `file` is where the source is now.
-export function importEdits(file: string, source: string, moves: ReadonlyMap<string, string>): ImportEdit[] {
-  return editsFor(file, source, quotedSpecifiers(source), moves)
-}
-
-function quotedSpecifiers(source: string): Span[] {
-  const parsed = parseKay(source)
-
-  return [...analyzeScript(source, parsed.script, [], [], parsed.module).specifiers, ...analyzeServer(source, parsed.server)?.specifiers ?? []]
-}
-
-// The text between the quotes of every import and re-export in the fences of a `.kay` file.
-export function importSpecifiers(source: string): Span[] {
-  return quotedSpecifiers(source).map(span => ({ start: span.start + 1, end: span.end - 1 }))
-}
-
-// The same for a TypeScript or JavaScript module, whose imports of a moved `.kay` file need the new path.
-export function moduleImportEdits(file: string, source: string, moves: ReadonlyMap<string, string>): ImportEdit[] {
-  return editsFor(file, source, [...source.matchAll(MODULE_SPECIFIER)].map(found => ({ start: found.index + found[0].length - found[2]!.length - 2, end: found.index + found[0].length })), moves)
 }
