@@ -14,8 +14,6 @@ const CONFIG = `import { Elysia } from 'elysia'
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  // The base moves the pages, not the files.
-  base: '/docs',
   extensions: [{
     name: 'probe',
     appFiles: { hooks: 'src/probe.ts', mail: 'src/probe-mail.ts' },

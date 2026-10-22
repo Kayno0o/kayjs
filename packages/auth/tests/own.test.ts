@@ -126,6 +126,16 @@ describe('found by convention', () => {
     expect(auth({}).appFiles).toEqual({ hooks: 'src/auth.ts', mail: 'src/mail.ts' })
   })
 
+  test('are built once while the files of the app stay as they were, and again once one is added', async () => {
+    const extension = auth({ captcha: false, store: memoryAuthStore(), email: false })
+    const first = await boot(extension)
+
+    expect(await boot(extension)).toBe(first)
+    mkdirSync(join(root, 'src'))
+    writeFileSync(join(root, 'src/auth.ts'), 'export const hooks = {}\n')
+    expect(await boot(extension)).not.toBe(first)
+  })
+
   test('are read under the project root the server is given, not the working directory', async () => {
     const elsewhere = mkdtempSync(join(tmpdir(), 'kayjs-auth-cwd-'))
 

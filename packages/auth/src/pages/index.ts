@@ -1,5 +1,5 @@
 import type { AnyElysia } from 'elysia'
-import type { KayExtension } from 'kay/server'
+import type { ExtensionApp, KayExtension } from 'kay/server'
 import type { CaptchaWidget } from '../captcha'
 import type { BareUser, Core } from '../core'
 import type { CodedLink, CodeMode } from '../email'
@@ -282,21 +282,20 @@ export function auth(options: object = {}): AuthPages {
 // `auth()` with no module: kayjs-auth builds the whole `createAuth` as the server starts, so kay.config.ts declares everything and no file of the app is needed.
 function ownAuth(options: OwnOptions): AuthPages {
   const prefix = options.prefix ?? DEFAULT_PREFIX
-  // One build per boot of the server: a reload under `kay dev` hands a new `modules`, so the hooks and the mailer are read again.
-  const booted = new WeakMap<object, Promise<UserMaker & { plugin: AnyElysia }>>()
-  let loaded: Promise<UserMaker> | undefined
+  // Built again only when the hooks or the mail module are not the ones it was built from, so a reload under `kay dev` that left them alone keeps the store it opened.
+  let current: { root: string, hooks: unknown, mail: unknown, built: Promise<UserMaker & { plugin: AnyElysia }> } | undefined
+
+  const build = async (app: ExtensionApp) => {
+    if (current?.root !== app.root || current.hooks !== app.modules.hooks || current.mail !== app.modules.mail)
+      current = { root: app.root, hooks: app.modules.hooks, mail: app.modules.mail, built: buildOwn(options, app) }
+
+    return current.built
+  }
 
   const extension: AuthPages = {
     name: '@kaynooo/kayjs-auth',
     appFiles: APP_FILES,
-    server: async (app) => {
-      let built = booted.get(app.modules)
-
-      if (built === undefined)
-        booted.set(app.modules, built = buildOwn(options, app))
-
-      return (await built).plugin
-    },
+    server: async app => (await build(app)).plugin,
     ...options.pages !== false && { routes: { dir: `${import.meta.dir}/routes`, prefix } },
     ...viewerLayout(options.viewer),
     env: ownEnv(options),
@@ -306,7 +305,7 @@ function ownAuth(options: OwnOptions): AuthPages {
     home: options.home ?? '/',
   }
 
-  return Object.assign(extension, { [LOAD_AUTH]: async (root: string) => loaded ??= buildOwn(options, { root, modules: await appModules(root, extension) }) as Promise<UserMaker> })
+  return Object.assign(extension, { [LOAD_AUTH]: async (root: string) => await build({ root, modules: await appModules(root, extension) }) as UserMaker })
 }
 
 function moduleAuth(options: AuthExtensionOptions): AuthPages {
