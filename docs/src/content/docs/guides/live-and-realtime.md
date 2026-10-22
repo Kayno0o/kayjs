@@ -61,7 +61,7 @@ A live value is the same for everyone who can render the page. There is no value
 
 Whatever a page reads while it renders goes into its HTML. Read only what everyone who sees the page may see.
 
-Values live in the memory of one process. Several processes do not share them, and there is no pub/sub adapter yet.
+By default values live in the memory of one process, so a restart loses them and replicas show different values. Set `store: sqliteData('data/app.sqlite')` in `kay.config.ts` and every process sharing the file shows the same values: a `set` in one reaches the tabs connected to another within about half a second, and a process that starts reads what the file holds. A `set` with a function reads the value this process has, so two processes updating at once can lose one change.
 
 A page with a server fence, a layout and the special pages render once and are not islands, so reading a live value in their template is an error. Read it in a component they render. Their server fence may read and write it.
 

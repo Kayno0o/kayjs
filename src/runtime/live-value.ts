@@ -2,9 +2,10 @@ import type { Setter } from './index'
 import type { PlainValue, ServerScope } from './reactive'
 import { withBase } from './base'
 import { readEvents } from './live'
+import { kayLog } from './log'
 import { pageData } from './page-data'
 import { currentServerScope, isHydrating, onCleanup, ownSignal, tracking, untrack, whenHydrated } from './reactive'
-import { decodeServerValue } from './wire'
+import { decodeServerValue, encodeValue } from './wire'
 
 // Defined by the browser build, which never runs the server's half: tested where it is read, so the bundler drops it.
 declare const KAY_BROWSER: true | undefined
@@ -29,6 +30,18 @@ export interface LiveByKey<K extends LiveKey, T> {
 
 // What both halves return for either shape; `live()` types the two apart for the app.
 type Handle = Live<unknown> & LiveByKey<LiveKey, unknown>
+
+// Where live values are kept beyond one process, `store.live` of kay.config.ts: `sqliteLive(path)` for the processes of a machine. A value is its text, as `encodeValue` writes it.
+export interface LiveStore {
+  // Every value held, read when the server starts.
+  entries: () => [id: string, key: string, text: string][]
+  // Keeps a value and tells the other processes sharing the store, which hear it through `subscribe`.
+  set: (id: string, key: string, text: string) => void
+  // Drops a key and tells the other processes.
+  delete: (id: string, key: string) => void
+  // Calls `listener` with the text now held for a key another process set, or undefined once it deleted it; never for this process's own.
+  subscribe: (listener: (id: string, key: string, text: string | undefined) => void) => void
+}
 
 // The page's script of live values: the value of each as the server rendered it, with the signature that proves the page read those keys.
 export interface LivePage {
@@ -139,6 +152,74 @@ export function noteLives(handles: readonly unknown[]): void {
   }
 }
 
+// The ids kay keeps for itself (cached values followed by pages, presence) are not the app's values and stay in memory.
+const OWN_ID = /^kay:/
+
+let liveStore: LiveStore | undefined
+// What the store holds for a value no module declared yet, by id then key: taken when its declaration runs.
+const undeclared = new Map<string, Map<string, string>>()
+
+// Called by the setup of a server with the config's `store.live`: reads what it holds, then follows what the other processes set.
+export function setLiveStore(store: LiveStore | undefined): void {
+  if (store === liveStore)
+    return
+
+  liveStore = store
+
+  if (store === undefined)
+    return
+
+  for (const [id, key, text] of store.entries())
+    hear(id, key, text)
+
+  store.subscribe(hear)
+}
+
+function decoded(text: string, id: string): { value: unknown } | undefined {
+  try {
+    return { value: decodeServerValue(text) }
+  }
+  catch (error) {
+    kayLog('error', `the live value ${id} held in the store could not be read; it is left out`, error)
+
+    return undefined
+  }
+}
+
+// A value the store holds, set here without telling the store: the watchers of a slot see it as any change.
+function hear(id: string, key: string, text: string | undefined): void {
+  const slot = slots().get(id)
+
+  if (slot === undefined) {
+    let held = undeclared.get(id)
+
+    if (held === undefined && text !== undefined)
+      undeclared.set(id, held = new Map<string, string>())
+
+    if (text === undefined)
+      held?.delete(key)
+    else
+      held?.set(key, text)
+
+    return
+  }
+
+  if (text === undefined) {
+    if (slot.values.delete(key))
+      notify(slot, key)
+
+    return
+  }
+
+  const read = decoded(text, id)
+
+  if (read === undefined || (slot.values.has(key) && encodeValue(slot.values.get(key)) === text))
+    return
+
+  slot.values.set(key, read.value)
+  notify(slot, key)
+}
+
 function serverLive(id: string, initial: unknown, name: string | undefined): Handle {
   const keyed = typeof initial === 'function'
   const known = slots().get(id)
@@ -152,6 +233,17 @@ function serverLive(id: string, initial: unknown, name: string | undefined): Han
   }
 
   slots().set(id, slot)
+
+  if (!known) {
+    for (const [key, text] of undeclared.get(id) ?? []) {
+      const read = decoded(text, id)
+
+      if (read !== undefined)
+        slot.values.set(key, read.value)
+    }
+
+    undeclared.delete(id)
+  }
 
   const read = (key: string): unknown => {
     const value = slotValue(slot, key)
@@ -169,6 +261,11 @@ function serverLive(id: string, initial: unknown, name: string | undefined): Han
       return
 
     checkWrite?.(slot.name === undefined ? slot.id : `${slot.name} (${slot.id})`, value)
+
+    // The store first, so a refusal leaves the value as it was.
+    if (!OWN_ID.test(slot.id))
+      liveStore?.set(slot.id, key, encodeValue(value))
+
     slot.values.set(key, value)
     notify(slot, key)
   }
@@ -181,6 +278,9 @@ function serverLive(id: string, initial: unknown, name: string | undefined): Han
     ? {
       set: (key: LiveKey, next: unknown) => write(keyText(key), next),
       delete: (key: LiveKey) => {
+        if (!OWN_ID.test(slot.id))
+          liveStore?.delete(slot.id, keyText(key))
+
         slot.values.delete(keyText(key))
         notify(slot, keyText(key))
       },
