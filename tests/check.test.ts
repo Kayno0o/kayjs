@@ -3885,6 +3885,10 @@ describe.concurrent('kay check, unused code', () => {
       await runCheck(root, '--fix')
       expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe(kept)
 
+      // A call named auth that is not the import, and a spread that may carry the module, are not the bare call.
+      await Bun.write(join(root, 'kay.config.ts'), 'import { auth } from \'@kaynooo/kayjs-auth\'\nimport { defineConfig } from \'kay/server\'\n\nconst shadowed = (auth: () => unknown) => auth()\nconst options = {}\n\nexport default defineConfig({ extensions: [auth({ module: \'./src/auth\' }), auth({ ...options })], shadowed })\n')
+      expect((await runCheck(root)).output).not.toContain('deprecated-library-registration')
+
       await rm(join(root, 'src/auth.ts'))
       await Bun.write(join(root, 'kay.config.ts'), 'import { auth } from \'@kaynooo/kayjs-auth\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [auth()] })\n')
       expect((await runCheck(root)).output).not.toContain('deprecated-library-registration')

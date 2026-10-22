@@ -1,3 +1,4 @@
+import type { Binding } from '@babel/traverse'
 import type * as t from '@babel/types'
 import type { CheckDiagnostic, CheckOptions } from '.'
 import { readFileSync } from 'node:fs'
@@ -5,8 +6,9 @@ import { join, resolve } from 'node:path'
 import { parse } from '@babel/parser'
 import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
+import { loadTraverse } from '../compiler/rewrite'
 import { CONFIG_FILE } from '../config'
-import { walk } from './ast'
+import { importedName, walk } from './ast'
 
 interface Edit {
   start: number
@@ -252,17 +254,24 @@ export function oldRegistrations(root: string, options: CheckOptions): CheckDiag
   return [...diagnostics, ...bare]
 }
 
+// Whether a binding is the `auth` kayjs-auth exports, not a variable or parameter of the same name in a closer scope.
+function isAuthImport(binding: Binding | undefined): boolean {
+  const specifier = binding?.path.node
+
+  return binding?.kind === 'module' && specifier?.type === 'ImportSpecifier' && specifier.importKind !== 'type' && importedName(specifier) === 'auth' && (binding.path.parent as t.ImportDeclaration).importKind !== 'type' && (binding.path.parent as t.ImportDeclaration).source.value === '@kaynooo/kayjs-auth'
+}
+
 // A bare `auth()` or `auth({ ...options })` beside an app module that exports its own `auth`: it used to serve the pages alone for a plugin mounted by hand, and now builds a second auth of its own. `plugin: false` keeps the old meaning.
 function bareAuthCalls(ast: t.File, source: string, file: string, root: string, severity: CheckDiagnostic['severity']): CheckDiagnostic[] {
-  const imported = ast.program.body.some(statement => statement.type === 'ImportDeclaration' && statement.importKind !== 'type' && statement.source.value === '@kaynooo/kayjs-auth' && statement.specifiers.some(specifier => specifier.type === 'ImportSpecifier' && specifier.local.name === 'auth' && (specifier.imported.type === 'Identifier' ? specifier.imported.name : specifier.imported.value) === 'auth'))
-
-  if (!imported || !exportsAuth(root, './src/auth'))
+  if (!exportsAuth(root, './src/auth'))
     return []
 
   const diagnostics: CheckDiagnostic[] = []
 
-  walk(ast, (node) => {
-    if (node.type !== 'CallExpression' || node.callee.type !== 'Identifier' || node.callee.name !== 'auth' || node.arguments.length > 1)
+  loadTraverse()(ast, { CallExpression(path) {
+    const node = path.node
+
+    if (node.callee.type !== 'Identifier' || node.arguments.length > 1 || !isAuthImport(path.scope.getBinding(node.callee.name)))
       return
 
     const [options] = node.arguments
@@ -291,7 +300,7 @@ function bareAuthCalls(ast: t.File, source: string, file: string, root: string, 
       severity,
       fixes: [{ title: 'Use auth({ plugin: false })', edits: [edit], safe: true }],
     })
-  })
+  } })
 
   return diagnostics
 }
