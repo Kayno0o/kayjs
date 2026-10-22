@@ -120,7 +120,7 @@ export default defineUi({
 - Table has `root` (the wrapper), `table`, `headCell`, `row`, `cell`, `cellBody`, `sortButton`, `sortIcon`, `filter`, `filterInput`, `count`, `selection`, `bulk` and `emptyCell`.
 - DateInput has `root`, `input`, `trigger`, `panel`, `head`, `title`, `step`, `grid`, `weekday`, `day` and `today`, DateRangeInput `root` and `separator`, TimeInput `root`.
 - The variants are the props that already exist: `tone` (Button, Badge, Notice, CopyButton), `variant` and `size` (Button). `kay check` reports a part or variant that does not exist.
-- A Button with an `onClick` hands its root classes to its busy button, so `button.kay` reaches it, but its `spinner` part is set through the `@kaynooo/kayjs-ui/internal/busy-button.kay` key, `class={{ spinner: ... }}` included.
+- A Button with an `onClick` hands its root and spinner classes to its busy button, so `button.kay` reaches both.
 - FormField has `root`, `label`, `head`, `text`, `required`, `action`, `hint`, `issues` and `issue`; Checkbox `root`, `input`, `label` and `hint`; Toggle `root`, `input`, `track` and `label`; Select `root`; Slider `root`, `label`, `input` and `value`.
 - RangeInput has `root`, `box`, `separator` and `unit`; Segmented `root`, `option`, `input`, `label` and `icon`; Rating `root`, `stars` and `fill`; FileDrop `root` and `input`; IconButton and BareIconButton `root`; CopyButton `root`, `text` and `live`, with `tone` as its variant.
 - MultiSelect has `root`, `panel`, `trigger`, `summary`, `chevron`, `search`, `bar`, `action`, `options`, `option`, `checkbox`, `icon`, `label` and `empty`.

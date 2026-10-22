@@ -5,8 +5,8 @@ import { buttonOf, linkOf } from '../button-props'
 import { isPromiseLike } from '../change'
 import Icon from '../icon.kay'
 
-// Button hands its root classes down as `class`, so its recipe and `src/ui.ts` reach this root as well; the spinner is this component's own part.
-const look = recipe({ parts: { spinner: 'kui-spinner' } })
+// Button hands its root and spinner classes down as `class` (`part="root spinner"`), so its recipe and `src/ui.ts` reach this root and its spinner as well.
+const look = recipe({ parts: { spinner: '' } })
 
 const { variant = 'solid', tone, size = 'md', icon, busy, spinner = true, label, onClick, ...rest } = props<ButtonProps>()
 

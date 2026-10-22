@@ -193,9 +193,9 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     expect(html).toMatch(/<button[^>]* id="busy"[^>]* class="kui-btn tracking-wide">/)
   })
 
-  test('a busy button and a busy link draw the spinner part restyled, a button with an onClick its own spinner part', () => {
-    expect(html.match(/class="kui-icon kui-spinner size-5"/g)).toHaveLength(2)
-    expect(html.match(/class="kui-icon kui-spinner"/g)).toHaveLength(1)
+  test('a busy button, a busy link and a busy button with an onClick draw the spinner part restyled', () => {
+    expect(html.match(/class="kui-icon kui-spinner size-5"/g)).toHaveLength(3)
+    expect(html.match(/class="kui-icon kui-spinner"/g)).toBeNull()
   })
 
   test('an IconButton and the trigger of a Menu take the restyle, a Menu class string going to the trigger', () => {
