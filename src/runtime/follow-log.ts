@@ -1,5 +1,8 @@
 import { onCleanup, onMount } from './reactive'
 
+// Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
+declare const KAY_BROWSER: true | undefined
+
 export interface FollowLogOptions {
   // How far from the bottom, in pixels, the view still counts as being at it; 32 by default.
   threshold?: number | undefined
@@ -33,7 +36,7 @@ function firstBelow(items: ArrayLike<Element>, top: number): Element | undefined
 
 // Keeps a scrolling container at its bottom while the reader is there and the first item showing in place while the reader is above it, whatever changes inside: an item appended, one prepended, a line growing as it streams. The container is the element that scrolls, or a function returning it once the island mounted, as `() => list` for a `ref`'s variable. It starts at its bottom, and does nothing on the server.
 export function followLog(container: Element | (() => Element | null | undefined), options: FollowLogOptions = {}): void {
-  if (typeof document === 'undefined')
+  if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
     return
 
   onMount(() => {

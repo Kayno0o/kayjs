@@ -2,6 +2,9 @@ import type { LeaveGuard } from './navigation'
 import { leaveGuards, navigation } from './navigation'
 import { effect, onCleanup } from './reactive'
 
+// Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
+declare const KAY_BROWSER: true | undefined
+
 export interface LeaveGuardOptions {
   // Asked before the page is left for `to`, an app's own dialog resolving once answered; `window.confirm` by default.
   confirm?: ((to: URL) => boolean | Promise<boolean>) | undefined
@@ -14,7 +17,7 @@ const dirtyGuards = new Set<LeaveGuard>()
 
 // Asks before the page is left while `dirty` holds, for as long as the island lives: a link of the app, `navigate()` and going back or forward ask the guard, a reload, closing the tab or another site's link get the browser's own prompt.
 export function guardLeave(dirty: () => boolean, options: LeaveGuardOptions = {}): void {
-  if (typeof document === 'undefined')
+  if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
     return
 
   const guard: LeaveGuard = { dirty, confirm: options.confirm ?? askLeave }

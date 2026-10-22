@@ -1,6 +1,9 @@
 import { ARRIVAL_PARAM } from './arrival'
 import { withBase } from './base'
 
+// Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
+declare const KAY_BROWSER: true | undefined
+
 // What `kay build` writes with `search` on: the manifest naming the index of the build and each language's, served revalidated, and the index under a directory named by its hash, served for good.
 export const SEARCH_MANIFEST = '/_kay/search.json'
 export const SEARCH_DIR = '/_kay/search/'
@@ -98,7 +101,7 @@ export function searchShard(word: string, letters = MIN_WORD): string {
 export async function searchSite(query: string, options: SearchOptions = {}): Promise<SearchHit[]> {
   const terms = [...new Set(searchWords(query))].filter(term => term.length >= MIN_WORD)
 
-  if (terms.length === 0 || typeof document === 'undefined')
+  if (terms.length === 0 || (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined'))
     return []
 
   const manifest = await load<SearchManifest>(SEARCH_MANIFEST)

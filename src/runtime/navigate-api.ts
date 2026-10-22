@@ -3,6 +3,9 @@ import { withBase } from './base'
 import { follow } from './navigate'
 import { leave, loadAgain, mayLeave, navigation, prefetched, swappable } from './navigation'
 
+// Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
+declare const KAY_BROWSER: true | undefined
+
 export interface NavigateOptions {
   // Replaces the current history entry instead of adding one.
   replace?: boolean | undefined
@@ -22,7 +25,7 @@ export async function navigate(to: { query: QueryChanges }, options?: NavigateOp
 // Last, so a path no page serves is reported against it.
 export async function navigate<const Href extends string>(href: Href & CheckedHref<Href>, options?: NavigateOptions): Promise<boolean>
 export async function navigate(to: string | { query: QueryChanges }, options: NavigateOptions = {}): Promise<boolean> {
-  if (typeof document === 'undefined')
+  if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
     return true
 
   navigation.flush?.()
@@ -61,7 +64,7 @@ export async function navigate(to: string | { query: QueryChanges }, options: Na
 
 // Runs the page's loads again and shows what they return, keeping scroll, focus and every island whose props did not change.
 export async function refresh(): Promise<void> {
-  if (typeof document === 'undefined')
+  if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
     return
 
   if (!navigation.hooks) {

@@ -1,11 +1,14 @@
 import { flush } from './reactive'
 
+// Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
+declare const KAY_BROWSER: true | undefined
+
 // What may keep a field out of sight until found: a closed `details`, or `hidden` given a value, `until-found` among them, which `untilFound` in reveal.ts tells exactly. It errs toward loading the reveal, `hidden="hidden"` included, as happy-dom rejects the `i` flag `[hidden="until-found" i]` needs.
 const MAY_HIDE = 'details:not([open]),[hidden]:not([hidden=""])'
 
 // Focuses the first field marked `aria-invalid="true"` under `root` that takes focus, once the effects pending from a write have run, so a field a refusal just rendered or revealed is there; whether one took it.
 export async function focusInvalid(root?: ParentNode): Promise<boolean> {
-  if (typeof document === 'undefined')
+  if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
     return false
 
   flush()

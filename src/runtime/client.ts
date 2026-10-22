@@ -30,6 +30,9 @@ let following = false
 
 // Defined by `kay build --static`, whose host has no server to take the reports. Tested where it is read, not through a constant, so the bundler drops the code sending them.
 declare const KAY_STATIC_EXPORT: true | undefined
+
+// Defined by the browser build, which always has a window.
+declare const KAY_BROWSER: true | undefined
 // Set in development: renders an island noting its signals, for an edited version of it to take their values back.
 let rendering: (<T>(element: HTMLElement, run: () => T, values?: unknown[]) => T) | undefined
 const signalsOf = new WeakMap<HTMLElement, () => unknown[]>()
@@ -58,7 +61,7 @@ if (typeof KAY_STATIC_EXPORT === 'undefined') {
     void reportLazily(error, island)
   })
 
-  if (typeof window !== 'undefined') {
+  if (typeof KAY_BROWSER !== 'undefined' || typeof window !== 'undefined') {
     // An error with no error object is another origin's script, whose details the browser hides: nothing to report.
     window.addEventListener('error', (event) => {
       if (event.error !== undefined && event.error !== null)

@@ -83,3 +83,16 @@ describe('the browser bundle', () => {
     expect(await browser.outputs[0]!.text()).not.toContain(server)
   })
 })
+
+// Some server branches hold no string of their own to look for, so the browser build is compared with the same build whose `KAY_BROWSER` is undefined: it is smaller by the branch.
+describe('the browser bundle, branches with no string of their own', () => {
+  const build = async (name: string, browser: boolean): Promise<string> => {
+    const result = await Bun.build({ entrypoints: [join(import.meta.dir, `../src/runtime/${name}.ts`)], target: 'browser', minify: true, define: { 'KAY_BROWSER': browser ? 'true' : 'undefined', 'KAY_STATIC_EXPORT': 'undefined', 'KAY_FRENCH': 'undefined', 'process.env.NODE_ENV': '"production"' } })
+
+    return result.outputs[0]!.text()
+  }
+
+  it.each(['action', 'live-value', 'client', 'leave', 'shortcut', 'follow-log', 'focus', 'navigate-api', 'edit', 'search', 'dom'])('drops the server test of %s', async (name) => {
+    expect((await build(name, true)).length).toBeLessThan((await build(name, false)).length)
+  })
+})

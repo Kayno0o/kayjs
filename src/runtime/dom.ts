@@ -14,6 +14,9 @@ import { freshPrefix, withIds } from './uid'
 import { safeUrl } from './url'
 import { attributeName, attributeValue, classText, eachChild, elementName, handlerName, merge, spreadAttributes, styleText } from './values'
 
+// Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
+declare const KAY_BROWSER: true | undefined
+
 declare const KAY_FRENCH: true | undefined
 
 export { holdSubmits, listenSubmit } from './form-hold'
@@ -531,7 +534,7 @@ function units(value: unknown): Unit[] {
 
 // Where the focused element sits among the nodes of `list`: the index of its top node, then of each child down to it.
 function focusedIn(list: Unit[]): { element: Element, path: number[] } | undefined {
-  const element = typeof document === 'undefined' ? null : document.activeElement
+  const element = typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined' ? null : document.activeElement
 
   if (!element || element === document.body)
     return undefined

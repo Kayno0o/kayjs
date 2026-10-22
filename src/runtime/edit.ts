@@ -3,6 +3,9 @@ import { withBase, withoutBase } from './base'
 import { navigation } from './navigation'
 import { DRAFT_ROUTE, NAVIGATE_HEADER } from './swap'
 
+// Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
+declare const KAY_BROWSER: true | undefined
+
 // An entry as a CMS's editor has it before saving, by the name the content config exports its collection under: its data, and its Markdown body when it changed.
 export interface DraftEntry {
   collection: string
@@ -38,7 +41,7 @@ let latest: AbortController | undefined
 // Shows the page with `entries` in place of the saved ones, keeping scroll, focus and every island whose props did not change; an entry failing its schema is left out, showing its saved text, and resolves where it fails.
 // A newer call cancels this one, which then resolves `{}` and shows nothing, as does going to another page before it shows.
 export async function showDraft(entries: DraftEntry[]): Promise<{ issues?: DraftIssue[] }> {
-  if (typeof document === 'undefined')
+  if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
     return {}
 
   latest?.abort()

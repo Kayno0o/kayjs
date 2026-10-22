@@ -981,7 +981,7 @@ export async function readActionResponse<Output>(response: Response, action: str
   const target = response.headers.get(REDIRECT_HEADER)
 
   if (target !== null) {
-    if (typeof window === 'undefined')
+    if (typeof KAY_BROWSER === 'undefined' && typeof window === 'undefined')
       throw new ActionRedirectError(response.status, target)
 
     // Only a page goes there: a `javascript:` target would run in this one.

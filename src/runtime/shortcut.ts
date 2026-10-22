@@ -1,5 +1,8 @@
 import { effect, onCleanup, onMount } from './reactive'
 
+// Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
+declare const KAY_BROWSER: true | undefined
+
 export interface ShortcutOptions {
   // The element the shortcut works inside, or a function returning it once the island mounted, as `() => form` for a `ref`'s variable; the whole page when the option is left out, and nothing when it is there but holds no element. An element-scoped shortcut also sets `aria-keyshortcuts` on it.
   on?: Element | (() => Element | null | undefined) | undefined
@@ -101,7 +104,7 @@ export function shortcut(keys: string | (() => string | null | undefined), handl
   if (typeof keys === 'string')
     parse(keys, false)
 
-  if (typeof document === 'undefined')
+  if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
     return
 
   const apple = isApple()
