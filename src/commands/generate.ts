@@ -17,9 +17,11 @@ export const generateCommand: Command = {
     if (format === undefined)
       return 1
 
-    // A resource takes its fields as `name:type`, then the project folder; every other kind takes the folder alone.
-    const fields = kind === 'resource' ? rest.filter(argument => argument.includes(':')) : []
-    const [dir = '.', ...extra] = kind === 'resource' ? rest.filter(argument => !argument.includes(':')) : rest
+    // A resource takes its fields as `name:type`, then the project folder, the last argument when it is no field; every other kind takes the folder alone.
+    const last = rest.at(-1)
+    const folder = kind === 'resource' && last !== undefined && !last.includes(':') ? 1 : 0
+    const fields = kind === 'resource' ? rest.slice(0, rest.length - folder) : []
+    const [dir = '.', ...extra] = kind === 'resource' ? rest.slice(rest.length - folder) : rest
 
     if (extra.length > 0)
       return refuse(`unexpected argument ${extra[0]}`)

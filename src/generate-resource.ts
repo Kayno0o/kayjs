@@ -27,11 +27,14 @@ interface TypeDescription {
   shown: string
 }
 
+// The range of a 4-byte column, which a bare integer schema would let a post exceed.
+const INT4 = '{ minimum: -2147483648, maximum: 2147483647 }'
+
 const TYPES: Record<FieldType, TypeDescription> = {
   string: { column: 'f.varchar(200)', schema: 's.String({ minLength: 1, maxLength: 200 })', sample: '\'First\'', posted: '\'First\'', shown: 'First' },
   text: { column: 'f.text()', schema: 's.String({ minLength: 1, maxLength: 10_000 })', sample: '\'Some text\'', posted: '\'Some text\'', shown: 'Some text' },
-  int: { column: 'f.integer()', schema: 's.Integer()', sample: '3', posted: '\'3\'', shown: '3' },
-  float: { column: 'f.doublePrecision()', schema: 's.Number()', sample: '1.5', posted: '\'1.5\'', shown: '1.5' },
+  int: { column: 'f.integer()', schema: `s.Integer(${INT4})`, sample: '42', posted: '\'42\'', shown: '42' },
+  float: { column: 'f.doublePrecision()', schema: 's.Number()', sample: '4.25', posted: '\'4.25\'', shown: '4.25' },
   boolean: { column: 'f.boolean().default(false)', schema: 's.Boolean()', sample: 'true', posted: '\'on\'', shown: 'true' },
 }
 
@@ -155,13 +158,13 @@ export const create = action(s.Object(fields), async (input, ctx) => {
   return ctx.redirect('${list}')
 })
 
-export const update = action(s.Object({ id: s.Integer(), ...fields }), async ({ id, ...values }, ctx) => {
+export const update = action(s.Object({ id: s.Integer(${INT4}), ...fields }), async ({ id, ...values }, ctx) => {
   await db.repo(${names.pascal}).write.updateOne(values, { id })
 
   return ctx.redirect('${list}')
 })
 
-export const remove = action(s.Object({ id: s.Integer() }), async ({ id }, ctx) => {
+export const remove = action(s.Object({ id: s.Integer(${INT4}) }), async ({ id }, ctx) => {
   await db.repo(${names.pascal}).write.deleteOne({ id })
 
   return ctx.redirect('${list}')
@@ -327,13 +330,21 @@ function testFile(names: Names, fields: readonly Field[], project: ResourceProje
   const { folder, plural } = names
   const label = names.label.toLowerCase()
   const first = fields[0]!
-  const object = (posted: boolean, blank?: string) => `{ ${fields.map(field => `${field.name}: ${field.name === blank ? '\'\'' : TYPES[field.type][posted ? 'posted' : 'sample']}`).join(', ')} }`
-  const blank = fields.find(field => field.type === 'string' || field.type === 'text')
-  const signIn = project.auth ? '  await auth.signInAs(site, { email: \'ada@example.com\', username: \'Ada\' })\n' : ''
-  const imports = `import { expect, it } from 'bun:test'\nimport { testSite } from 'kay/test'\n${project.auth ? 'import { auth } from \'../src/auth\'\n' : ''}import { create } from '../src/routes/${folder}/_actions.kay'\n`
-  const refusal = blank === undefined ? '' : `\nit('refuses a ${label} with an empty ${blank.label.toLowerCase()}', async () => {\n${signIn}  const refused = await site.refusal(create, ${object(false, blank.name)})\n\n  expect(refused.status).toBe(422)\n})\n`
+  const textual = (field: Field) => field.type === 'string' || field.type === 'text'
+  // A blank field is an empty text or, for a number, a word.
+  const value = (field: Field, posted: boolean, blank?: Field) => {
+    if (field !== blank)
+      return TYPES[field.type][posted ? 'posted' : 'sample']
 
-  return `${imports}\nconst site = await testSite()\n\nit('lists the ${plural.toLowerCase()} created', async () => {\n${signIn}  const page = await site.submit(create, ${object(true)}, { from: '/${folder}' })\n\n  expect(page.text()).toContain('${TYPES[first.type].shown}')\n})\n${refusal}`
+    return textual(field) ? '\'\'' : '\'abc\' as never'
+  }
+  const object = (posted: boolean, blank?: Field, id = '') => `{ ${id}${fields.map(field => `${field.name}: ${value(field, posted, blank)}`).join(', ')} }`
+  const blank = fields.find(field => textual(field)) ?? fields.find(field => field.type !== 'boolean')
+  const signIn = project.auth ? '  await auth.signInAs(site, { email: \'ada@example.com\', username: \'Ada\' })\n' : ''
+  const imports = `import { expect, it } from 'bun:test'\nimport { testSite } from 'kay/test'\n${project.auth ? 'import { auth } from \'../src/auth\'\n' : ''}import { create, remove, update } from '../src/routes/${folder}/_actions.kay'\n`
+  const refusal = blank === undefined ? '' : `\nit('refuses a ${label} with ${textual(blank) ? 'an empty' : 'an invalid'} ${blank.label.toLowerCase()}', async () => {\n${signIn}  const refused = await site.refusal(create, ${object(false, blank)})\n\n  expect(refused.status).toBe(422)\n})\n`
+
+  return `${imports}\nconst site = await testSite()\n\nit('lists the ${plural.toLowerCase()} created', async () => {\n${signIn}  const page = await site.submit(create, ${object(true)}, { from: '/${folder}' })\n\n  expect(page.text()).toContain('${TYPES[first.type].shown}')\n})\n\nit('edits and deletes a ${label}', async () => {\n${signIn}  await site.submit(update, ${object(true, undefined, 'id: \'1\', ')}, { from: '/${folder}/1/edit' })\n\n  expect((await site.visit('/${folder}/1/edit')).status).toBe(200)\n\n  await site.submit(remove, { id: '1' }, { from: '/${folder}/1/edit' })\n\n  expect((await site.visit('/${folder}/1/edit')).status).toBe(404)\n})\n${refusal}`
 }
 
 // The files `kay generate resource <name> <field:type>...` writes: the pg-orm table, the actions, the list and edit pages, a new page or, with kayjs-ui, a dialog on the list, and a test of the list and of a refused create. `table` is what `src/db/tables.ts` imports and lists.
@@ -365,6 +376,8 @@ export function resourceFiles(name: string, specs: readonly string[], project: R
 const TABLES = /(export const tables = \[)([^\]]*)\]/
 const RELATIVE_IMPORT = /^import\s.*from\s+'(\.\/[^']*)'/
 const ANY_IMPORT = /^(?:import\s.*\sfrom\s.*|\}\s*from\s.*)$/
+const COMPLEX_LIST = /\[|\/\/|\/\*/
+const REST_OF_LINE = /^[;\t ]*(?:\r?\n|$)/
 const TRAILING_COMMA = /,\s*$/
 const TRAILING_SPACE = /\s*$/
 
@@ -376,7 +389,8 @@ function relativeImport(line: string): string | undefined {
 export function withTable(text: string, table: { name: string, file: string }): string | undefined {
   const match = TABLES.exec(text)
 
-  if (match === null)
+  // A list holding a comment or an index is left to be edited by hand, as is a line going on after the closing bracket.
+  if (match === null || COMPLEX_LIST.test(match[2]!) || !REST_OF_LINE.test(text.slice(match.index + match[0].length)))
     return undefined
 
   if (new RegExp(`\\b${table.name}\\b`).test(text))

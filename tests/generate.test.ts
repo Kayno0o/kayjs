@@ -230,7 +230,8 @@ it('writes a resource with the table, the actions, the pages and a test, drawn w
   expect(plain.files['src/routes/categories/index.kay']).toContain('  table\n')
   expect(plain.files['src/routes/categories/new.kay']).toContain('form(action={create})')
   expect(Object.keys(resourceFiles('note', ['title:string'], { ...PROJECT, tests: false }).files)).not.toContain('tests/notes.test.ts')
-  expect(resourceFiles('note', ['count:int'], PROJECT).files['tests/notes.test.ts']).not.toContain('refuses')
+  expect(resourceFiles('note', ['count:int'], PROJECT).files['tests/notes.test.ts']).toContain('with an invalid count')
+  expect(resourceFiles('note', ['done:boolean'], PROJECT).files['tests/notes.test.ts']).not.toContain('refuses')
 })
 
 it('refuses a resource named or fielded wrongly', () => {
@@ -258,6 +259,11 @@ it('adds a table to the tables of src/db/tables.ts, imported in order', () => {
   expect(withTable('export const tables = []\n', table)).toContain('tables = [Post]')
   expect(withTable('export const tables = [...authTables]\r\n', table)).not.toMatch(/[^\r]\n/)
   expect(withTable('const tables = 1\n', table)).toBeUndefined()
+  // A list it could not extend as written is left to be edited by hand.
+  expect(withTable('export const tables = [\n  A, // main\n]\n', table)).toBeUndefined()
+  expect(withTable('export const tables = [...authTables, ...more[0]]\n', table)).toBeUndefined()
+  expect(withTable('export const tables = [A /* ] */]\n', table)).toBeUndefined()
+  expect(withTable('export const tables = [A].concat(more)\n', table)).toBeUndefined()
   expect(() => withTable(once, table)).toThrow('already mentions `Post`')
 })
 
@@ -279,9 +285,11 @@ it('stops a resource in a project without a database, and writes nothing over wh
 
   await generate(postgres, 'resource', 'post', { fields: ['title:string'] })
   await expect(generate(postgres, 'resource', 'post', { fields: ['title:string'] })).rejects.toThrow('already mentions')
+  await Bun.write(join(postgres, 'src/routes/tags.kay'), 'h1 Tags\n')
+  await expect(generate(postgres, 'resource', 'tag', { fields: ['label:string'] })).rejects.toThrow('src/routes/tags.kay already exists')
   await rm(join(postgres, 'src/db/tables.ts'))
-  await expect(generate(postgres, 'resource', 'tag', { fields: ['label:string'] })).rejects.toThrow('has no `export const tables')
-  expect(await Bun.file(join(postgres, 'src/db/tag.ts')).exists()).toBe(false)
+  await expect(generate(postgres, 'resource', 'label', { fields: ['label:string'] })).rejects.toThrow('has no `export const tables')
+  expect(await Bun.file(join(postgres, 'src/db/label.ts')).exists()).toBe(false)
 })
 
 it('runs as kay generate resource, the fields before an optional folder', async () => {
@@ -340,7 +348,7 @@ for (const ui of [true, false]) {
 
       const tests = await runWith(dir, { DATABASE_URL: TEST_DATABASE_URL! }, 'test', 'tests/blog-posts.test.ts')
 
-      expect({ code: tests.code, report: tests.stderr + tests.stdout }).toEqual({ code: 0, report: expect.stringContaining(' 2 pass') })
+      expect({ code: tests.code, report: tests.stderr + tests.stdout }).toEqual({ code: 0, report: expect.stringContaining(' 3 pass') })
     }
     finally {
       await admin.unsafe(`DROP DATABASE IF EXISTS ${name}`)

@@ -124,7 +124,7 @@ A project with tests gets `tests/<name>.test.ts` for a page, `tests/action-<name
 - `src/routes/blog-posts/_actions.kay` holds `create`, `update` and `remove`, checking their input with `s` schemas built from the fields, and sending the visitor back to the list.
 - The list is `src/routes/blog-posts/index.kay` and the edit page `src/routes/blog-posts/[id=integer]/edit.kay`, with a delete button.
 - With kayjs-ui installed the list is a `Table`, new rows are added from a `FormDialog` and the edit page is a `SaveForm`. Without it the list is a plain `table`, and a `new.kay` page holds the form.
-- A project with tests gets `tests/blog-posts.test.ts`, which creates a row, reads the list, and checks that an empty text field is refused.
+- A project with tests gets `tests/blog-posts.test.ts`, which creates a row, reads the list, edits and deletes the row, and checks that an empty text field is refused. A `tables` list holding a comment or an index is left alone, and the command stops.
 
 The table is new to the database, so run `bun run db:generate` and `bun run db:migrate` after it.
 

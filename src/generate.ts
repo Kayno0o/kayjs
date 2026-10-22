@@ -247,7 +247,7 @@ export async function generate(dir: string, kind: string, name: string, options:
     }
   }
 
-  const taken = [...Object.keys(files), ...kind === 'page' ? rivalRoutes(Object.keys(files)[0]!) : []].filter(path => existsSync(join(dir, path)))
+  const taken = [...Object.keys(files), ...kind === 'page' || kind === 'resource' ? rivalRoutes(kind === 'page' ? Object.keys(files)[0]! : Object.keys(files).find(path => path.endsWith('/index.kay'))!) : []].filter(path => existsSync(join(dir, path)))
 
   if (taken.length > 0) {
     const hint = kind === 'action' && taken.some(path => path.endsWith('_actions.kay')) ? `: it is not a server fence alone, so add the action by hand, from this shape:\n\n${ACTION_BODY(name.split('/').at(-1)!)}` : ''
