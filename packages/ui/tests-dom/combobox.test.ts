@@ -394,14 +394,32 @@ test('a list keeps showing the value as its text when no label is given', async 
   expect(input.value).toBe('venus')
 })
 
-test('a group FormField and a bare label leave the input without the label text reference', async () => {
-  for (const wrap of ['group', 'label']) {
-    const { input } = await combobox(PLANETS, undefined, true, { wrap })
+test('a FormField names the input by its label, a group FormField and a bare label do not', async () => {
+  for (const [extra, named] of [[{ field: true }, true], [{ wrap: 'group' }, false], [{ wrap: 'label' }, false]] as const) {
+    const { root, input } = await combobox(PLANETS, undefined, true, extra)
 
     await settle()
 
-    expect(input.hasAttribute('aria-labelledby')).toBe(false)
+    expect(root.textContent).toContain('Planet')
+    expect(input.hasAttribute('aria-labelledby')).toBe(named)
 
     mounted?.unmount()
   }
+})
+
+test('ArrowDown on a remote value without a label opens the list and loads it', async () => {
+  const asked: string[] = []
+  const { root, input, rows } = await combobox(async ({ q }: { q: string }) => {
+    asked.push(q)
+
+    return [{ value: 'c-42', label: 'Ada' }, { value: 'c-43', label: 'Grace' }]
+  }, 0, false, { value: 'c-42' })
+
+  input.focus()
+
+  const event = key(input, 'ArrowDown')
+
+  await settle()
+
+  expect([event.defaultPrevented, asked, input.getAttribute('aria-expanded'), rows(), root.querySelector('[role="status"]')?.textContent]).toEqual([true, [''], 'true', ['Ada', 'Grace'], '2 results'])
 })
