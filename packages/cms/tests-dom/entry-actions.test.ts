@@ -30,7 +30,7 @@ function server(answer: object = { saved: true, version: 'v2' }, hold = false) {
   })
   const fetched = spyOn(globalThis, 'fetch').mockImplementation((async (_url: string | URL | Request, init?: RequestInit) => {
     // The version another save left, which a conflict reads.
-    if (init?.method !== 'POST')
+    if (init?.method === undefined || init.method === 'GET')
       return Response.json({ collection: POSTS, entry: stored({ title: 'Theirs' }, { version: 'v9' }) })
 
     if (hold)
@@ -239,6 +239,29 @@ test('Ctrl+S in a field saves and leaves the caret in it once the save ends', as
   expect(fetched).toHaveBeenCalledTimes(1)
   expect(root.querySelector('fieldset')!.disabled).toBe(false)
   expect(document.activeElement).toBe(title(root))
+})
+
+test('Delete with edits not saved, when leaving is declined, locks the form and leaves a notice linking the collection screen', async () => {
+  server()
+  spyOn(window.location, 'assign').mockImplementation(() => undefined)
+
+  const ask = spyOn(globalThis, 'confirm').mockImplementation(() => false)
+
+  ;(window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL('http://localhost/admin/collections/posts/hello')
+
+  const root = await open()
+
+  await type(root, 'Hello again')
+  button(root, 'Delete')!.click()
+  await settle()
+  document.querySelector<HTMLButtonElement>('dialog[open] .kui-btn-danger')!.click()
+  await pause()
+  await pause()
+  expect(ask).toHaveBeenCalled()
+  expect(root.querySelector('.kcms-entry-failure')!.textContent).toContain('This entry is deleted.')
+  expect(root.querySelector('.kcms-entry-failure a')!.getAttribute('href')).toBe('/admin/collections/posts')
+  expect(root.querySelector('fieldset')).toBeNull()
+  expect(buttons(root)).toEqual([])
 })
 
 test('a role that may not publish or delete sees those buttons disabled, with the reason as their tooltip', async () => {

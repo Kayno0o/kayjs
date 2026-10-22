@@ -61,6 +61,8 @@ export interface EntryForm extends FormScope {
   // Where the new entry's slug lands among the slugs the collection holds, once they are read; undefined before, and for an entry that is saved or single. Given `typed`, where that slug lands among those of the saved entry's locale: what the Rename dialog checks.
   slugReport: (typed?: string) => SlugReport | undefined
   saving: Signal<boolean>
+  // The collection's screen once the entry is deleted but the leave to it was declined over edits not saved, which leaves the form dead; the default screen then shows a notice linking it.
+  stranded: Signal<string | undefined>
   // Whether the entry has edits not saved yet.
   dirty: () => boolean
   // Whether Save has something to do: edits to save, or a new entry to create, and no save on its way.
@@ -142,6 +144,7 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
   // kay files each entry of a localized collection under one of the site's locales.
   const newLocale = signal(locale ?? collection.locales?.[0] ?? '')
   const saving = signal(false)
+  const stranded = signal<string>()
   // A folder entry's slug is cleaned as it is typed; a loaded collection's is the loader's to judge, so it stays as typed.
   const cleans = collection.kind === 'folder'
   const suggestsSlug = signal(!first && !copy && !collection.single && cleans)
@@ -337,6 +340,7 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
     slugReport,
     slugNeedsTyping,
     saving,
+    stranded,
     dirty: () => drafts.changed(ref) || drafts.blocked(ref).length > 0,
     canSave,
     savedAt: () => lastSave(),
@@ -357,8 +361,13 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
     referrers: () => referrers(),
     askReferrers,
     async remove() {
-      if (await deleteSaved(ref, drafts.version(ref)))
-        await navigate(collectionPath(prefix, collection.name), { replace: true })
+      if (!await deleteSaved(ref, drafts.version(ref)))
+        return
+
+      const screen = collectionPath(prefix, collection.name)
+
+      if (!await navigate(screen, { replace: true }))
+        stranded.set(screen)
     },
     async rename(next, onRefused) {
       const renamed = await renameSaved(ref, next, drafts.version(ref), onRefused)

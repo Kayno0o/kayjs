@@ -1,4 +1,5 @@
 ---
+import { wording } from 'kay/words'
 import type { Denials } from '../access'
 import type { ScreenCollection, StoredEntry } from '../kay/contract'
 import type { EntryPresence as Editors } from '../presence'
@@ -22,14 +23,20 @@ const form = createEntryForm({ prefix, collection, entry, locale, copy, denied, 
 ---
 form.kcms-entry-editor(novalidate aria-busy={form.saving()} onSubmit={event => { event.preventDefault(); void form.save() }})
   EntryHeader(prefix={prefix} collection={collection} title={form.name} subtitle={form.subtitle})
-    EntryActions(form={form} denied={denied})
+    if !form.stranded()
+      EntryActions(form={form} denied={denied})
   if presence
     EntryPresence(room={presence.room} member={presence.member})
   if translations && entry
     EntryLocales(prefix={prefix} entry={form.entry} translations={translations} compared={translations.compare?.locale})
-  // Locked while a save is on its way, so what is typed meanwhile is not left out of it.
-  fieldset.kcms-entry-fields(disabled={form.saving()})
-    EntryIdentity(form={form})
-    EntryFields(form={form})
+  if form.stranded() as screen
+    .kcms-entry-failure(role="alert")
+      p {wording('cms.entry.deleted', 'This entry is deleted.')}
+      a(href={screen}) {wording('cms.entry.deletedLeave', 'Go to the collection')}
+  else
+    // Locked while a save is on its way, so what is typed meanwhile is not left out of it.
+    fieldset.kcms-entry-fields(disabled={form.saving()})
+      EntryIdentity(form={form})
+      EntryFields(form={form})
   if translations?.compare as other
     EntryCompare(collection={collection} other={other})
