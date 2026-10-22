@@ -10,7 +10,7 @@ export interface MenuAction {
   danger?: boolean
   disabled?: boolean
   // Runs once the menu has closed, so a dialog it opens takes focus from the page rather than from a vanished menu.
-  onSelect: () => void
+  onSelect: () => unknown
 }
 
 // An action, or a rule between groups of them.

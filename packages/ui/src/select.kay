@@ -87,7 +87,7 @@ function left(event: FocusEvent & { currentTarget: HTMLSelectElement }) {
 const ref = startRef<HTMLSelectElement>(element => box = element, rest.ref)
 ---
 // Each option says whether it is selected, so the right one stays chosen when the options arrive after the value.
-select({...rest} aria-busy={busy || loading ? 'true' : undefined} ref={ref} onChange={event => picked(event.currentTarget)} onKeyDown={submit ? pressed : onKeyDown} onPointerDown={submit ? grabbed : onPointerDown} onBlur={submit ? left : onBlur})
+select(aria-busy={busy || loading ? 'true' : undefined} {...rest} ref={ref} onChange={event => picked(event.currentTarget)} onKeyDown={submit ? pressed : onKeyDown} onPointerDown={submit ? grabbed : onPointerDown} onBlur={submit ? left : onBlur})
   if emptyOption !== undefined && emptyOption !== false
     option(value="") {typeof emptyOption === 'string' ? emptyOption : ''}
   if busy || loading

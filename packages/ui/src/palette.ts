@@ -19,7 +19,7 @@ export interface PaletteLink extends PaletteBase {
 
 // Something to do, run once the palette has closed.
 export interface PaletteAction extends PaletteBase {
-  onSelect: () => void
+  onSelect: () => unknown
 }
 
 export type PaletteEntry = PaletteLink | PaletteAction

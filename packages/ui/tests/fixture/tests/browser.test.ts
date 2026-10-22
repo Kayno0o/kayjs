@@ -219,7 +219,19 @@ inBrowser('HoverCard and ZoomPane', () => {
     expect(await page.evaluate((() => document.querySelector<HTMLElement>('#card + span')!.style.getPropertyValue('anchor-name')) as never)).not.toBe('')
     await page.evaluate((() => document.querySelector<HTMLElement>('#plain')!.blur()) as never)
     await page.waitUntil((() => !document.querySelector('#card')!.matches(':popover-open')) as never)
-    expect(await page.evaluate((() => document.querySelector<HTMLElement>('#plain')!.style.getPropertyValue('anchor-name')) as never)).toBe('')
+    expect(await page.evaluate((() => document.querySelector<HTMLElement>('#card + span')!.style.getPropertyValue('anchor-name')) as never)).toBe('')
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
+  test('closes without an error when its anchor leaves the page', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/hover-card')
+
+    await page.click('#own')
+    await page.waitUntil((() => document.querySelector('#card')?.matches(':popover-open')) as never)
+    await page.evaluate((() => document.querySelector('#own')!.remove()) as never)
+    await page.waitUntil((() => !document.querySelector('#card')!.matches(':popover-open')) as never)
     expect(page.errors).toEqual([])
   }, 120_000)
 

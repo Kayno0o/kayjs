@@ -210,6 +210,12 @@ describe('layout', () => {
     expect((await find('/layout', '#app-header-bare header .kui-app-header-brand, #app-header-bare header .kui-app-header-end'))).toEqual([])
   })
 
+  test('SiteNav takes the URL as current, and Select marks itself busy by busy or by its old loading', async () => {
+    expect(await attributes('/layout', '#url-links .kui-site-nav-link', ['aria-current'])).toEqual([{ 'aria-current': null }, { 'aria-current': 'page' }])
+    expect(await attributes('/layout', '#busy-select select', ['id', 'aria-busy'])).toEqual([{ 'id': 'busy-new', 'aria-busy': 'false' }, { 'id': 'busy-new-plain', 'aria-busy': 'true' }, { 'id': 'busy-old', 'aria-busy': 'true' }, { 'id': 'idle', 'aria-busy': null }])
+    expect((await find('/layout', '#busy-select option[disabled]')).length).toBe(3)
+  })
+
   test('AppHeader marks the current link and draws a link\'s icon beside its escaped label', async () => {
     expect(await attributes('/layout', '#app-header .kui-site-nav-link', ['href', 'aria-current'])).toEqual([{ 'href': '/', 'aria-current': null }, { 'href': '/data', 'aria-current': 'page' }])
     expect((await find('/layout', '#app-header .kui-site-nav-link')).map(found => found.text)).toEqual(['Home', '<b>Data</b>'])

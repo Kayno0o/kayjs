@@ -3453,7 +3453,7 @@ describe.concurrent('kay check, unused code', () => {
     })
 
     try {
-      expect((await runCheck(root)).output.match(/deprecated-ctx-outcome/g)).toHaveLength(3)
+      expect((await runCheck(root)).output.match(/deprecated-ctx-outcome/g)).toHaveLength(4)
       await runCheck(root, '--fix')
       expect(await Bun.file(join(root, 'src/a.ts')).text()).toBe('const failure = add.failed()\nconst sent = note.succeeded() !== undefined\nconst nested = forms.add.failed()?.data\nconst mine = other.failed(add)\nconst text = \'add.failed()\' // add.succeeded()\nconst called = ctx.failed(pick())\n')
     }
@@ -3898,15 +3898,18 @@ describe.concurrent('kay check, unused code', () => {
       'Select(value="a" options={[]} loading={loading})',
       'Select(value="a" options={[]} {loading})',
       'Select(value="a" options={[]} loading={true} busy={false})',
+      'Select(value="a" options={[]} loading)',
+      '// kay-allow deprecated-ui-prop',
+      'Select(value="a" options={[]} loading)',
       'Other(loading={loading})',
       '',
     ].join('\n')
     const root = await scratchProject({ 'src/routes/index.kay': page, 'src/routes/other.kay': '---\nconst { loading } = props<{ loading: boolean }>()\n---\np {loading}\n' })
 
     try {
-      expect((await runCheck(root)).output.match(/deprecated-ui-prop/g)).toHaveLength(3)
+      expect((await runCheck(root)).output.match(/deprecated-ui-prop/g)).toHaveLength(4)
       await runCheck(root, '--fix')
-      expect(await Bun.file(join(root, 'src/routes/index.kay')).text()).toBe(page.replace('options={[]} loading={loading})', 'options={[]} busy={loading})').replace('options={[]} {loading})', 'options={[]} busy={loading})'))
+      expect(await Bun.file(join(root, 'src/routes/index.kay')).text()).toBe(page.replace('options={[]} loading={loading})', 'options={[]} busy={loading})').replace('options={[]} {loading})', 'options={[]} busy={loading})').replace('options={[]} loading)\n// kay-allow', 'options={[]} busy)\n// kay-allow'))
     }
     finally {
       await rm(root, { recursive: true, force: true })

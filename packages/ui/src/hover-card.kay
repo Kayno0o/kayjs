@@ -38,6 +38,7 @@ function close() {
     stand.hidePopover()
 }
 
+// Every anchor is followed by a frame loop while the card is open: the stand-in trails a native scroll by a frame, and an anchor that is `display: none` has no box to follow.
 // The browser anchors to a CSS box, which an SVG shape is not, and an element's own anchor-name may be the app's: a fixed, invisible box laid over the target stands in for every element, kept on it frame by frame as a pan, a zoom or a scroll moves it. It sits in the top layer like the card, so a transformed, filtered or contained ancestor cannot offset it.
 function follow(target: Element) {
   if (!target.isConnected) {
@@ -62,7 +63,7 @@ effect(() => {
 
   unmark()
 
-  if (!panel || !stand)
+  if (!panel?.isConnected || !stand?.isConnected)
     return
 
   if (!target) {
@@ -74,6 +75,12 @@ effect(() => {
   // The stand-in opens first and stays open as long as the card does, as an anchor must come before the card in the top layer.
   if (!stand.matches(':popover-open'))
     stand.showPopover()
+
+  if (!target.isConnected) {
+    close()
+
+    return
+  }
 
   follow(target)
 

@@ -1,7 +1,8 @@
 import type { CheckDiagnostic, CheckOptions } from '.'
+import type { Attribute } from '../compiler/ast'
 import { findProjectFiles } from '../build/files'
 import { elementsIn } from '../compiler/ast'
-import { lintLevel } from '../compiler/lints'
+import { lintLevel, lintLevels } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
 import { parseKay } from '../compiler/parser'
 import { analyzeScript, analyzeServer } from '../compiler/script'
@@ -30,6 +31,7 @@ export async function renamedUiProps(root: string, options: CheckOptions): Promi
       continue
 
     const parsed = parseKay(source)
+    const levelAt = lintLevels(source, options.lints)
     const tags = new Map<string, (typeof RENAMES)[number]>()
 
     for (const binding of [...analyzeScript(source, parsed.script).imports, ...analyzeServer(source, parsed.server)?.imports ?? []]) {
@@ -45,10 +47,12 @@ export async function renamedUiProps(root: string, options: CheckOptions): Promi
       if (!rename)
         continue
 
-      const named = (name: string) => element.attributes.filter(attribute => attribute.kind !== 'spread' && source.slice(attribute.name.start, attribute.name.end) === name)
+      const named = (name: string) => element.attributes.filter((attribute): attribute is Exclude<Attribute, { kind: 'spread' }> => attribute.kind !== 'spread' && source.slice(attribute.name.start, attribute.name.end) === name)
 
       for (const attribute of named(rename.from)) {
-        if (attribute.kind === 'spread')
+        const here = levelAt('deprecated-ui-prop', attribute.name.start)
+
+        if (here === 'allow')
           continue
 
         const taken = named(rename.to).length > 0
@@ -61,7 +65,7 @@ export async function renamedUiProps(root: string, options: CheckOptions): Promi
           message: `\`${rename.from}\` of \`${element.name}\` is \`${rename.to}\` since 1.70, as ${rename.because}`,
           help: `write \`${rename.to}\` for \`${rename.from}\``,
           code: 'deprecated-ui-prop',
-          severity: level === 'warn' ? 'warning' : 'error',
+          severity: here === 'warn' ? 'warning' : 'error',
           ...!taken && { fixes: [{ title: `Use ${rename.to}`, edits: [{ start: text.start, end: text.end, text: text.text }], safe: true }] },
         })
       }

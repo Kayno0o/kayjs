@@ -5,6 +5,7 @@ import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
 import CollapsibleSection from '@kaynooo/kayjs-ui/collapsible-section.kay'
 import PageHeader from '@kaynooo/kayjs-ui/page-header.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import Select from '@kaynooo/kayjs-ui/select.kay'
 import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
 import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
 import Widget from '@kaynooo/kayjs-ui/widget.kay'
@@ -59,5 +60,13 @@ main
         a(href="/") Moons
       @end
         a(href="/form") Sign in
+  article#url-nav
+    SiteNav(id="url-links" links={[{ href: '/', label: 'Home' }, { href: '/data', label: 'Data' }]} current={new URL('https://example.com/data/?view=1')} label="By URL")
+  article#busy-select
+    Select#busy-new(value="a" options={[{ value: 'a', label: 'A' }]} busy aria-busy="false")
+    Select#busy-new-plain(value="a" options={[{ value: 'a', label: 'A' }]} busy)
+    // kay-allow deprecated-ui-prop
+    Select#busy-old(value="a" options={[{ value: 'a', label: 'A' }]} loading)
+    Select#idle(value="a" options={[{ value: 'a', label: 'A' }]})
   article#app-header-bare
     AppHeader(links={[{ href: '/', label: 'Home' }]} current="/" label="Bare" sticky={false})

@@ -17,7 +17,7 @@ export interface BoardMove {
 
 export interface BoardOptions {
   // Applies a move, by a drop or an arrow key. The board takes no other move until a returned promise settles, and a rejection goes unhandled, so wrap the call in `attempt`.
-  onMove: (move: BoardMove) => void | Promise<void>
+  onMove: (move: BoardMove) => unknown
 }
 
 // Where a dragged item would land, and the insertion bar marking it, in viewport coordinates for a `position: fixed` element.
