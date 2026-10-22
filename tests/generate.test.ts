@@ -110,6 +110,24 @@ it('adds an action to an existing _actions.kay that holds a server fence alone',
   expect(await Bun.file(actions).text()).not.toMatch(/[^\r]\n/)
   await expect(generate(dir, 'action', 'team/team')).rejects.toThrow('already exports `team`')
 
+  const declared: [source: string, name: string, message: string][] = [
+    ['export const { picked } = make()', 'picked', 'already exports'],
+    ['import { s } from \'kay\'\nimport helper from \'./helper\'', 'helper', 'already declares or imports'],
+    ['import {\n  other as renamed,\n  more,\n} from \'./x\'', 'renamed', 'already declares or imports'],
+    ['const local = 1', 'local', 'already declares or imports'],
+    ['const { a: inner } = make()', 'inner', 'already declares or imports'],
+  ]
+
+  for (const [source, name, message] of declared) {
+    await Bun.write(actions, `--- server\n${source}\n`)
+    await expect(generate(dir, 'action', `team/${name}`)).rejects.toThrow(message)
+    expect(await Bun.file(actions).text()).toBe(`--- server\n${source}\n`)
+  }
+
+  await Bun.write(actions, '--- server\nimport { other as renamed } from \'./x\'\nconst { a: inner } = make()\n')
+  await generate(dir, 'action', 'team/other')
+  await generate(dir, 'action', 'team/a')
+
   await Bun.write(actions, '--- server\nimport { s } from \'kay\'\n\nexport const sent = action(s.Object({}), () => 1)\n---\nbutton Go\n')
   await expect(generate(dir, 'action', 'team/fourth')).rejects.toThrow('add the action by hand')
   expect(await Bun.file(actions).text()).toContain('button Go')
@@ -125,6 +143,13 @@ it('writes a guard test visiting a page below the folder when there is one', asy
 
   expect((await generate(dir, 'guard', 'admin')).written).toEqual(['src/routes/admin/_guard.ts', 'tests/guard-admin.test.ts'])
   expect(await Bun.file(join(dir, 'tests/guard-admin.test.ts')).text()).toContain('site.visit(\'/admin/users\')')
+
+  // A `(group)` folder is part of the glob's syntax; a `[param]` one has no page to visit.
+  await Bun.write(join(dir, 'src/routes/(staff)/desk.kay'), 'h1 Desk\n')
+  await Bun.write(join(dir, 'src/routes/[org]/home.kay'), 'h1 Home\n')
+  expect((await generate(dir, 'guard', '(staff)')).written).toEqual(['src/routes/(staff)/_guard.ts', 'tests/guard-staff.test.ts'])
+  expect(await Bun.file(join(dir, 'tests/guard-staff.test.ts')).text()).toContain('site.visit(\'/desk\')')
+  expect((await generate(dir, 'guard', '[org]')).written).toEqual(['src/routes/[org]/_guard.ts'])
   await rm(join(dir, 'src/routes'), { recursive: true })
   expect((await generate(dir, 'guard', 'norouts')).written).toEqual(['src/routes/norouts/_guard.ts'])
   expect((await generate(dir, 'guard', 'empty')).written).toEqual(['src/routes/empty/_guard.ts'])

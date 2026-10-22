@@ -10,6 +10,8 @@ type Kind = typeof KINDS[number]
 // A route segment: a name, a `[param]` or `[...rest]`, or a `(group)`; a component or module name is a plain one.
 const PLAIN = /^[a-z0-9][\w-]*$/i
 const ROUTE_SEGMENT = /^(?:[a-z0-9][\w-]*|\[(?:\.\.\.)?[a-z]\w*\]|\([a-z][\w-]*\))$/i
+// `[` and `]` are glob syntax, a `(group)` is not.
+const GLOB_META = /[[\]]/g
 const ACTION_NAME = /^[a-z][a-z0-9]*$/i
 const WORD_BREAK = /[-_]+/g
 // Words an action cannot be exported as, or that its own file already names: the `action` and `s` it calls, `title` its handler reads.
@@ -156,7 +158,7 @@ async function pageBelow(dir: string, name: string): Promise<string | undefined>
   if (!existsSync(root) || !folder.every(segment => ROUTE_SEGMENT.test(segment)))
     return undefined
 
-  for await (const file of new Bun.Glob(`${folder.map(segment => `${segment}/`).join('')}**/*.kay`).scan({ cwd: root })) {
+  for await (const file of new Bun.Glob(`${folder.map(segment => `${segment.replaceAll(GLOB_META, '\\$&')}/`).join('')}**/*.kay`).scan({ cwd: root })) {
     const segments = file.slice(0, -'.kay'.length).split('/')
 
     if (!segments.some(segment => segment.startsWith('_')) && urlOf(segments) !== undefined)
@@ -168,7 +170,7 @@ async function pageBelow(dir: string, name: string): Promise<string | undefined>
   return found[0] === undefined ? undefined : urlOf(found[0])
 }
 
-// The `_actions.kay` text with `name` added, when the file is a server fence alone and does not export it yet; `undefined` when it holds a template or other fences. A name it exports already throws.
+// The `_actions.kay` text with `name` added, when the file is a server fence alone and does not export it yet; `undefined` when it holds a template or other fences. A name it exports, declares or imports already throws.
 function appendedAction(path: string, existing: string, name: string): string | undefined {
   const eol = existing.includes('\r\n') ? '\r\n' : '\n'
   const lines = existing.split(LINE_BREAK)
@@ -176,8 +178,11 @@ function appendedAction(path: string, existing: string, name: string): string | 
   if (lines[0]?.trimEnd() !== SERVER_FENCE || lines.slice(1).some(line => ANY_FENCE.test(line)))
     return undefined
 
-  if (new RegExp(`\\bexport\\s+(?:(?:const|let|var|class)\\s+${name}\\b|(?:async\\s+)?function(?:\\s*\\*\\s*|\\s+)${name}\\b|\\{[^}]*\\b${name}\\b)`).test(existing))
+  if (new RegExp(`\\bexport\\s+(?:(?:const|let|var|class)\\s+${name}\\b|(?:async\\s+)?function(?:\\s*\\*\\s*|\\s+)${name}\\b|\\{[^}]*\\b${name}\\b|(?:const|let|var)\\s*[{\\[][^=]*\\b${name}\\b(?!\\s*:))`).test(existing))
     throw new Error(`kay generate: nothing was written, ${path} already exports \`${name}\``)
+
+  if (new RegExp(`\\b(?:const|let|var|class|function)\\s*\\*?\\s*${name}\\b|\\b(?:const|let|var)\\s*[{\\[][^=]*\\b${name}\\b(?!\\s*:)|\\bimport\\b[^;'"]*\\b${name}\\b(?!\\s+as\\b)[^;'"]*\\bfrom\\b`).test(existing))
+    throw new Error(`kay generate: nothing was written, ${path} already declares or imports \`${name}\``)
 
   if (!S_IMPORT.test(existing)) {
     const after = lines.findLastIndex(line => IMPORT_END.test(line))
