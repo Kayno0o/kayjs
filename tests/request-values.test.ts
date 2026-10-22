@@ -1,6 +1,6 @@
-import { existsSync } from 'node:fs'
-import { rm } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs'
+import { cp, mkdir, rm, symlink } from 'node:fs/promises'
+import { basename, dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { outputDir } from '../src/build/assets'
@@ -194,16 +194,38 @@ describe('a template reading ctx', () => {
   })
 })
 
+interface Recorded {
+  anchor?: string
+  files: Record<string, { file: string, loader: string, hash: string, map?: string }>
+  covered: unknown
+  icons: unknown
+  replaced: unknown
+}
+
 describe('a production server started from disk', () => {
   // A process of its own, as the test process compiled `.kay` files already and Babel fills `require.cache` once loaded.
-  async function run(script: string, failing = false): Promise<string> {
+  async function spawned(script: string): Promise<{ output: string, errors: string, code: number }> {
     const child = Bun.spawn([process.execPath, '-e', script], { stdout: 'pipe', stderr: 'pipe' })
     const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
+    return { output: output.trim(), errors, code }
+  }
+
+  async function run(script: string, failing = false): Promise<string> {
+    const { output, errors, code } = await spawned(script)
+
     expect({ code, errors: failing ? '' : errors }).toEqual({ code: 0, errors: '' })
 
-    return output.trim()
+    return output
   }
+
+  const WASM = join(import.meta.dir, 'fixtures/workers/src/add.wasm')
+  const recorded = (root: string) => join(outputDir(root), 'server-modules.json')
+  const serverDir = (root: string) => join(outputDir(root), 'server')
+  const recordOf = async (root: string) => await Bun.file(recorded(root)).json() as Recorded
+
+  // The result of `body` after `pages()` ran in a process of its own, with the compiler's files it loaded.
+  const afterPages = (options: string, body: string) => `const options = ${options}\nconst { pages } = await import(${JSON.stringify(resolve('src/server'))})\nconst app = await pages(options)\n${body}\nconsole.log(JSON.stringify({ result, loaded: Object.keys(require.cache).filter(key => key.includes('@babel/parser')).length }))\n`
 
   // Where the build writes it, apart for each worker of a parallel run.
   const recordFile = (root: string) => join(outputDir(root), 'context-reads.json')
@@ -216,7 +238,7 @@ describe('a production server started from disk', () => {
   }
 
   async function build(options: string): Promise<void> {
-    await run(`import { buildProject } from ${JSON.stringify(resolve('src/build/pipeline'))}\nconst options = ${options}\nconst built = await buildProject(options.root, { extensions: options.extensions, security: false, inlineStyles: false, site: options.site, base: options.base, i18n: options.i18n }, { check: false })\nif (built.failed) throw built.failed.error\n`)
+    await run(`import { buildProject } from ${JSON.stringify(resolve('src/build/pipeline'))}\nconst options = ${options}\nconst built = await buildProject(options.root, { extensions: options.extensions, security: false, inlineStyles: false, site: options.site, base: options.base, i18n: options.i18n, settings: options.settings }, { check: false })\nif (built.failed) throw built.failed.error\n`)
   }
 
   // The status and body of a page of the server, as a proxy stripping the base forwards it, started from the build in `options`.
@@ -416,6 +438,211 @@ describe('a production server started from disk', () => {
 
     expect(answers[0]!.html).toContain('<p id="edited">Edited</p>')
     expect(answers[1]!.html).toContain('id="inside"')
+  }, 120_000)
+
+  it('records a wasm file imported by its path, and serves it from the record without the compiler', async () => {
+    const { root, options } = await project([EXTENSION])
+
+    await Bun.write(resolve(root, 'lib/add.wasm'), Bun.file(WASM))
+    await Bun.write(resolve(root, 'lib/other.wasm'), Bun.file(WASM))
+    await Bun.write(resolve(root, 'src/routes/wasm.kay'), '--- server\nimport path from \'../../lib/add.wasm\' with { type: \'file\' }\nimport url from \'../../lib/other.wasm\'\n---\np#path {path}\np#url {url}\np#who {ctx.user?.name}\n')
+    await build(options)
+    expect(Object.keys((await recordOf(root)).files)).toEqual(expect.arrayContaining(['lib/add.wasm', 'lib/other.wasm']))
+
+    const { answers, loaded } = await boot(options, ['/wasm'])
+
+    expect(answers[0]!.html).toContain(`<p id="path">${realpathSync(resolve(root, 'lib/add.wasm'))}</p>`)
+    expect(answers[0]!.html).toMatch(/<p id="url">[^<]*other[^<]*\.wasm<\/p>/)
+    expect(loaded).toBe(0)
+  }, 120_000)
+
+  it('resolves the wasm file a module outside the record imports by its path, the resolver being asked after the loader registered', async () => {
+    const { root, options } = await project([EXTENSION])
+
+    await Bun.write(resolve(root, 'lib/add.wasm'), Bun.file(WASM))
+    await Bun.write(resolve(root, 'lib/late.ts'), 'import path from \'./add.wasm\' with { type: \'file\' }\n\nexport default path\n')
+    await build(options)
+    expect(Object.keys((await recordOf(root)).files)).not.toContain('lib/add.wasm')
+
+    const out = JSON.parse(await run(afterPages(options, `const result = (await import(${JSON.stringify(resolve(root, 'lib/late.ts'))})).default`))) as { result: string }
+
+    expect(out.result).toBe(realpathSync(resolve(root, 'lib/add.wasm')))
+  }, 120_000)
+
+  it('boots from a root whose path holds a dollar sign and regular expression characters', async () => {
+    const { root, options } = await project([EXTENSION])
+    const odd = resolve(await scratchDir('request-values-$1 (a)+'))
+
+    await Bun.spawn(['cp', '-a', `${root}/.`, odd]).exited
+    await build(options.replaceAll(root, odd))
+
+    const { answers, loaded } = await boot(options.replaceAll(root, odd), ['/gated'])
+
+    expect(answers[0]!.html).toContain('<p id="who">Ada</p>')
+    expect(loaded).toBe(0)
+  }, 120_000)
+
+  it('checks the source of a script handed back as it is, so an edit since the build is compiled', async () => {
+    const { root, options } = await project([EXTENSION])
+
+    await Bun.write(resolve(root, 'src/shared/info.ts'), 'export const info = \'plain\'\n')
+    await Bun.write(resolve(root, 'src/routes/info.kay'), '--- server\nimport { info } from \'../shared/info\'\n---\np#info {info}\np#who {ctx.user?.name}\n')
+    await build(options)
+    expect(Object.keys((await recordOf(root)).covered as object)).toContain('src/shared/info.ts')
+    expect((await boot(options, ['/info'])).loaded).toBe(0)
+    await Bun.write(resolve(root, 'src/shared/info.ts'), 'const parts = import.meta.glob(\'../parts/*.kay\')\n\nexport const info = String(Object.keys(parts).length)\n')
+
+    const { answers } = await boot(options, ['/info'])
+
+    expect(answers[0]!.html).toContain('<p id="info">1</p>')
+  }, 120_000)
+
+  it('boots from a build moved with a module above the root, the record holding its path from the directory above', async () => {
+    const { root, options } = await project([EXTENSION])
+    const outside = join(dirname(resolve(root)), `outside-${Bun.hash(root).toString(36)}`)
+
+    await mkdir(outside, { recursive: true })
+    await Bun.write(join(outside, 'add.wasm'), Bun.file(WASM))
+    await Bun.write(resolve(root, 'src/routes/up.kay'), `--- server\nimport path from '../../../${basename(outside)}/add.wasm' with { type: 'file' }\n---\np#path {path}\np#who {ctx.user?.name}\n`)
+    await build(options)
+    expect((await recordOf(root)).anchor).toBe('..')
+
+    const parent = resolve(await scratchDir('request-values-parent-'))
+    const moved = join(parent, basename(resolve(root)))
+
+    await cp(resolve(root), moved, { recursive: true })
+    await cp(outside, join(parent, basename(outside)), { recursive: true })
+
+    const { answers, loaded } = await boot(options.replaceAll(resolve(root), moved), ['/up'])
+
+    expect(answers[0]!.html).toContain(`<p id="path">${realpathSync(join(parent, basename(outside), 'add.wasm'))}</p>`)
+    expect(loaded).toBe(0)
+  }, 120_000)
+
+  it('boots from a build made through a link to the root', async () => {
+    const { root, options } = await project([EXTENSION])
+    const link = `${resolve(root)}-link`
+
+    await symlink(resolve(root), link)
+    await Bun.write(resolve(root, 'lib/add.wasm'), Bun.file(WASM))
+    await Bun.write(resolve(root, 'src/routes/wasm.kay'), '--- server\nimport path from \'../../lib/add.wasm\' with { type: \'file\' }\n---\np#path {path}\np#who {ctx.user?.name}\n')
+    await build(options.replaceAll(resolve(root), link))
+
+    const { answers, loaded } = await boot(options.replaceAll(resolve(root), link), ['/wasm'])
+
+    expect(answers[0]!.html).toContain('<p id="path">')
+    expect(loaded).toBe(0)
+  }, 120_000)
+
+  it('keeps the maps of the recorded components in files of their own, read when a stack needs them', async () => {
+    const { root, options } = await project([EXTENSION])
+
+    await build(options)
+
+    const gate = (await recordOf(root)).files['lib/gate.kay']!
+
+    expect(gate.map).toBeDefined()
+    expect(readFileSync(join(serverDir(root), gate.file), 'utf8')).not.toContain('registerEmbeddedMap')
+    expect(readdirSync(serverDir(root))).toContain(gate.map!)
+  }, 120_000)
+
+  it('warns about an unreadable record and loads the modules through the loader', async () => {
+    const { root, options } = await project([EXTENSION])
+
+    await build(options)
+    await Bun.write(recorded(root), '{')
+
+    const { output, errors } = await spawned(afterPages(options, 'const response = await app.handle(new Request(\'http://localhost/gated\', { headers: { \'x-user\': \'Ada\', \'x-roles\': \'admin\' } }))\nconst result = response.status'))
+
+    expect(errors).toContain('server-modules.json')
+    expect(errors).toContain('is unreadable')
+    expect(JSON.parse(output)).toMatchObject({ result: 200 })
+  }, 120_000)
+
+  for (const [label, change] of [
+    ['an icon file outside the build', (record: Recorded) => { record.icons = { '~icons/tabler/home': '../../../etc/passwd' } }],
+    ['an icon that is not a string', (record: Recorded) => { record.icons = { '~icons/tabler/home': 1 } }],
+    ['a loader that is not one', (record: Recorded) => { for (const found of Object.values(record.files)) found.loader = 'exec' }],
+    ['a map outside the build', (record: Recorded) => { for (const found of Object.values(record.files)) found.map = '/etc/passwd' }],
+    ['a covered list', (record: Recorded) => { record.covered = ['src/a.ts'] }],
+    ['a covered hash that is not a string', (record: Recorded) => { record.covered = { 'src/a.ts': 1 } }],
+    ['a replaced list of numbers', (record: Recorded) => { record.replaced = [1] }],
+    ['an anchor that climbs elsewhere', (record: Recorded) => { record.anchor = '../../etc' }],
+  ] as const) {
+    it(`refuses a record with ${label}`, async () => {
+      const { root, options } = await project([EXTENSION])
+
+      await build(options)
+
+      const record = await recordOf(root)
+
+      change(record)
+      await Bun.write(recorded(root), JSON.stringify(record))
+
+      const { answers, loaded } = await boot(options, ['/gated'], undefined, true)
+
+      expect(answers[0]!.status).toBe(200)
+      expect(loaded).toBeGreaterThan(0)
+    }, 120_000)
+  }
+
+  it('serves icons from the record', async () => {
+    const { root, options } = await project([EXTENSION])
+
+    await Bun.write(resolve(root, 'package.json'), JSON.stringify({ name: 'app', private: true, devDependencies: { '@iconify-json/tabler': '*' } }))
+    await Bun.write(resolve(root, 'src/routes/icon.kay'), '---\nimport home from \'~icons/tabler/home\'\n---\nsvg#icon({...home})\np#who {ctx.user?.name}\n')
+    await build(options)
+    expect(Object.keys((await recordOf(root)).icons as object)).toEqual(['~icons/tabler/home'])
+
+    const { answers, loaded } = await boot(options, ['/icon'])
+
+    expect(answers[0]!.html).toContain('<svg id="icon"')
+    expect(loaded).toBe(0)
+  }, 120_000)
+
+  it('serves a library with the settings the app replaces from the record', async () => {
+    const { root, options: plain } = await project([EXTENSION])
+    const options = JSON.stringify({ ...JSON.parse(plain), settings: { 'kay-lib': './src/ui-settings.ts' } })
+    const library = resolve(root, 'node_modules/kay-lib')
+
+    await Bun.write(resolve(root, 'package.json'), JSON.stringify({ name: 'app', private: true, dependencies: { 'kay-lib': '*' } }))
+    await Bun.write(resolve(root, 'src/ui-settings.ts'), 'export default { label: \'app\' }\n')
+    await Bun.write(join(library, 'package.json'), JSON.stringify({ name: 'kay-lib', version: '1.0.0', type: 'module', peerDependencies: { kay: '*' }, exports: { './*.kay': './src/*.kay' }, kay: { settings: './src/settings' } }))
+    await Bun.write(join(library, 'src/settings.ts'), 'export default { label: \'default\' }\n')
+    await Bun.write(join(library, 'src/badge.kay'), '---\nimport settings from \'./settings\'\n---\nspan#badge {settings.label}\n')
+    await Bun.write(resolve(root, 'src/routes/badge.kay'), '---\nimport Badge from \'kay-lib/badge.kay\'\n---\nBadge\np#who {ctx.user?.name}\n')
+    await build(options)
+    expect((await recordOf(root)).replaced).toEqual(['node_modules/kay-lib/src/settings.ts'])
+
+    const { answers, loaded } = await boot(options, ['/badge'])
+
+    expect(answers[0]!.html).toContain('<span id="badge">app</span>')
+    expect(loaded).toBe(0)
+  }, 120_000)
+
+  it('loads the content config of a prebuilt server from the record', async () => {
+    const { root, options } = await project([EXTENSION])
+
+    await Bun.write(resolve(root, 'src/content.config.ts'), 'import { s } from \'kay\'\nimport { collection } from \'kay/content\'\nimport \'../lib/gate.kay\'\n\nexport const notes = collection(\'content/notes\', { schema: s.Object({ title: s.String() }) })\n')
+    await Bun.write(resolve(root, 'src/content/notes/a.md'), '---\ntitle: First\n---\nbody\n')
+    await Bun.write(resolve(root, 'src/routes/notes.kay'), '--- server\nimport { notes } from \'../content.config\'\n\nconst all = await notes.all()\n---\np#count {all.length}\np#who {ctx.user?.name}\n')
+    await build(options)
+    expect(Object.keys((await recordOf(root)).files)).toContain('lib/gate.kay')
+
+    const { answers, loaded } = await boot(options, ['/notes'])
+
+    expect(answers[0]!.html).toContain('<p id="count">1</p>')
+    expect(loaded).toBe(0)
+  }, 120_000)
+
+  it('registers one loader for a project asked for twice at once', async () => {
+    const { root, options } = await project([EXTENSION])
+
+    await build(options)
+
+    const script = `const { registerPrebuiltLoader } = await import(${JSON.stringify(resolve('src/server/prebuilt-loader'))})\nconst answers = await Promise.all([registerPrebuiltLoader(${JSON.stringify(resolve(root))}, ${JSON.stringify(outputDir(root))}), registerPrebuiltLoader(${JSON.stringify(resolve(root))}, ${JSON.stringify(outputDir(root))})])\nconst gate = await import(${JSON.stringify(resolve(root, 'lib/gate.kay'))})\nconsole.log(JSON.stringify({ answers, gate: typeof gate.default, loaded: Object.keys(require.cache).filter(key => key.includes('@babel/parser')).length }))\n`
+
+    expect(JSON.parse(await run(script))).toEqual({ answers: [true, true], gate: 'function', loaded: 0 })
   }, 120_000)
 
   it('writes no record without a context', async () => {

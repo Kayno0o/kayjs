@@ -318,7 +318,7 @@ The build runs `kay check` first and keeps the last build when the check or the 
 | `--format text\|github\|json` | `github` annotates problems on the diff, `json` prints the whole build as one document, see [Output for tools](#output-for-tools) |
 | `--quiet` | Leaves out the size report |
 
-The build also records the `.kay` modules the server loads, compiled, in `.kay/client/server-modules.json` and `.kay/client/server/`. A server started from disk imports them in place of compiling them as they load, so it boots without the compiler; a module edited since the build, or one the record lacks, is compiled when it loads, and a build importing a `.wasm` file by its path writes no record.
+The build also records the `.kay` modules the server loads, compiled, in `.kay/client/server-modules.json` and `.kay/client/server/`. A server started from disk imports them in place of compiling them as they load, so it boots without the compiler; a module edited since the build, or one the record lacks, is compiled when it loads, and a build moved to another directory, a library or a component above the root included, records its modules by their path from the root.
 
 The build prints what a page with islands loads, then a table per route with its sizes. [What a page weighs](/guides/performance#what-a-page-weighs) explains the report and `budget` limits it.
 

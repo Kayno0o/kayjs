@@ -69,11 +69,31 @@ export async function embeddedMap(file: string): Promise<string | undefined> {
 
 // Called by the modules of an executable, `name` being the path its stack frames show for the file; the map is read and decoded when a stack first needs it.
 export function registerEmbeddedMap(name: string, blob: string): void {
-  registerSourceMap(name, () => {
-    const { source, tsx, map } = JSON.parse(new TextDecoder().decode(Bun.zstdDecompressSync(Buffer.from(blob, 'base64')))) as { source: string, tsx: string, map: ReturnType<KayMap['toJSON']> }
+  registerSourceMap(name, () => decodeEmbeddedMap(blob))
+}
 
-    return { source, tsx, map: KayMap.fromJSON(map) }
-  })
+// Registers a map kept in a file of its own, which is read only when a stack first needs it, so it costs the server no memory until then.
+export function registerEmbeddedMapFile(name: string, read: () => string): void {
+  registerSourceMap(name, () => decodeEmbeddedMap(read()))
+}
+
+function decodeEmbeddedMap(blob: string): Compiled {
+  const { source, tsx, map } = JSON.parse(new TextDecoder().decode(Bun.zstdDecompressSync(Buffer.from(blob, 'base64')))) as { source: string, tsx: string, map: ReturnType<KayMap['toJSON']> }
+
+  return { source, tsx, map: KayMap.fromJSON(map) }
+}
+
+// What a module carrying its map ends with, which a server recording its modules cuts off to keep the map in a file.
+export function embeddedMapTail(name: string, blob: string): string {
+  return `\nimport { registerEmbeddedMap } from 'kay/internal/server'\nregisterEmbeddedMap(${JSON.stringify(name)}, ${JSON.stringify(blob)})\n`
+}
+
+const EMBEDDED_MAP_TAIL = /\nimport \{ registerEmbeddedMap \} from 'kay\/internal\/server'\nregisterEmbeddedMap\("(?:[^"\\]|\\.)*", ("(?:[^"\\]|\\.)*")\)\n$/
+
+export function splitEmbeddedMap(contents: string): { code: string, blob?: string } {
+  const found = EMBEDDED_MAP_TAIL.exec(contents)
+
+  return found === null ? { code: contents } : { code: contents.slice(0, found.index), blob: JSON.parse(found[1]!) as string }
 }
 
 // The text with every character but its line breaks blanked: offsets, lines and columns stay the same.

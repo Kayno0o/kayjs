@@ -19,6 +19,7 @@ import { expandGlobs } from './glob'
 import { iconModule, iconNames, installedIconSets } from './icons'
 import { settingsReplacements } from './libraries'
 import { liveIds } from './live-ids'
+import { embeddedMapTail } from './sourcemap'
 import { embeddedMapCached, transformKayCached } from './transform'
 
 export interface KayPluginOptions {
@@ -231,7 +232,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
         const noted = options.componentFiles === true && !twin ? `${anchored}\nimport KayNotedComponent from ${JSON.stringify(file)}\n;(globalThis as any)[Symbol.for('kay.component-files')] ??= new WeakMap()\n;(globalThis as any)[Symbol.for('kay.component-files')].set(KayNotedComponent, ${JSON.stringify(file)})\n` : anchored
         const map = options.embedMaps === true ? await embeddedMapCached(source, file, code, options.cacheDir) : undefined
 
-        return { contents: map === undefined ? noted : `${noted}\nimport { registerEmbeddedMap } from 'kay/internal/server'\nregisterEmbeddedMap(${JSON.stringify(twin ? `${TWIN_NAMESPACE}:${file}` : options.mapName?.(file) ?? relative(process.cwd(), file))}, ${JSON.stringify(map)})\n`, loader: 'ts' as const }
+        return { contents: map === undefined ? noted : `${noted}${embeddedMapTail(twin ? `${TWIN_NAMESPACE}:${file}` : options.mapName?.(file) ?? relative(process.cwd(), file), map)}`, loader: 'ts' as const }
       }
 
       build.onLoad({ filter: KAY_FILE }, async ({ path }) => load(path))

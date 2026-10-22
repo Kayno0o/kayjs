@@ -1,16 +1,17 @@
 import type { OnLoadArgs, OnLoadResult, PluginBuilder } from 'bun'
 import type { CapturedLoad } from '../build/captured-loads'
 import { readFileSync, realpathSync } from 'node:fs'
-import { join, relative, resolve, sep } from 'node:path'
+import { join, resolve, sep } from 'node:path'
 import { plugin } from 'bun'
 import { ASSET_FILE } from '../build/assets'
 import { KAY_FILE, scriptLoader } from '../build/files'
+import { registerEmbeddedMapFile } from '../build/sourcemap'
 import { projectPaths } from '../project'
-import { readServerRecord, ROOT_TOKEN, SERVER_DIR } from './server-record'
+import { readServerRecord, recordName, ROOT_TOKEN, SERVER_DIR, UP_TOKEN } from './server-record'
 
 const REGEX_SYNTAX = /[$()*+.?[\\\]^{|}]/g
 const registered = new Map<string, Promise<boolean>>()
-const ROOT_TOKEN_ALL = new RegExp(ROOT_TOKEN, 'g')
+const TOKENS = new RegExp(`${ROOT_TOKEN}|${UP_TOKEN}`, 'g')
 
 // The runtime wants an answer from every load, so a script the loader leaves as it is is read.
 async function asIs(path: string): Promise<OnLoadResult> {
@@ -39,7 +40,9 @@ async function register(root: string, output: string): Promise<boolean> {
   if (record === undefined)
     return false
 
-  const covered = new Set(record.covered)
+  const anchor = resolve(base, record.anchor ?? '.')
+  // What the tokens of a recorded module stand for, as the build moved.
+  const placed = (text: string) => text.replace(TOKENS, token => token === ROOT_TOKEN ? base : anchor)
   const replaced = record.replaced.map(file => join(base, file))
   const prefix = base.endsWith(sep) ? base : base + sep
   const scripts = new RegExp(`^${prefix.replace(REGEX_SYNTAX, '\\$&')}(?!(?:.*/)?node_modules/).*\\.(?:m?ts|tsx)$`)
@@ -58,16 +61,26 @@ async function register(root: string, output: string): Promise<boolean> {
   }
 
   const answer = async (args: OnLoadArgs): Promise<OnLoadResult> => {
-    const name = relative(base, args.path).split(sep).join('/')
+    const name = recordName(base, args.path)
     const found = Object.hasOwn(record.files, name) ? record.files[name] : undefined
 
-    if (found === undefined)
-      return covered.has(name) ? asIs(args.path) : compiled(args)
+    const unchanged = async (hash: string | undefined) => hash !== undefined && Bun.hash(await Bun.file(args.path).bytes()).toString(36) === hash
+    const kept = Object.hasOwn(record.covered, name) ? record.covered[name] : undefined
 
-    if (Bun.hash(await Bun.file(args.path).bytes()).toString(36) !== found.hash)
+    if (found === undefined)
+      return await unchanged(kept) ? asIs(args.path) : compiled(args)
+
+    if (!await unchanged(found.hash))
       return compiled(args)
 
-    return { contents: (await Bun.file(join(output, SERVER_DIR, found.file)).text()).replace(ROOT_TOKEN_ALL, () => base), loader: found.loader }
+    // Read when a stack first needs it, and named by the path the module has now.
+    if (found.map !== undefined) {
+      const map = join(output, SERVER_DIR, found.map)
+
+      registerEmbeddedMapFile(args.path, () => readFileSync(map, 'utf8'))
+    }
+
+    return { contents: placed(await Bun.file(join(output, SERVER_DIR, found.file)).text()), loader: found.loader }
   }
 
   plugin({
@@ -83,7 +96,7 @@ async function register(root: string, output: string): Promise<boolean> {
       build.onLoad({ filter: scripts }, answer)
 
       for (const [name, file] of Object.entries(record.icons))
-        build.module(name, () => ({ contents: readFileSync(join(output, SERVER_DIR, file), 'utf8'), loader: 'js' }))
+        build.module(name, () => ({ contents: placed(readFileSync(join(output, SERVER_DIR, file), 'utf8')), loader: 'js' }))
     },
   })
 
