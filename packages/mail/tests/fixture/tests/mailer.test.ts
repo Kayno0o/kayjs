@@ -561,18 +561,18 @@ describe('configuration', () => {
     }
   })
 
-  it('reads SMTP_RATE_LIMIT as a count and a window at boot, a bare count being a count a second, and stops on a window that is none or a zero count', () => {
-    Object.assign(process.env, { NODE_ENV: 'production', SMTP_HOST: 'smtp.example.com', SMTP_FROM: 'site@example.com' })
+  it('reads MAIL_RATE_LIMIT as a count and a window at boot, a bare count being a count a second, and stops on a window that is none or a zero count', () => {
+    Object.assign(process.env, { NODE_ENV: 'production', MAIL_URL: 'smtp://smtp.example.com:465', MAIL_FROM: 'site@example.com' })
 
     for (const valid of ['5', '5/1s', '10/2m']) {
-      process.env.SMTP_RATE_LIMIT = valid
+      process.env.MAIL_RATE_LIMIT = valid
       expect(() => mailer({ queue: { name: `rate-${valid}` } })).not.toThrow()
     }
 
     for (const bad of ['5/soon', '0/1s', '0', '5/0s']) {
-      process.env.SMTP_RATE_LIMIT = bad
-      expect(() => mailer({ queue: { name: `rate-bad-${bad}` } })).toThrow('SMTP_RATE_LIMIT')
-      expect(() => mailer({ optional: true, queue: { name: `rate-bad-optional-${bad}` } })).toThrow('SMTP_RATE_LIMIT')
+      process.env.MAIL_RATE_LIMIT = bad
+      expect(() => mailer({ queue: { name: `rate-bad-${bad}` } })).toThrow('MAIL_RATE_LIMIT')
+      expect(() => mailer({ optional: true, queue: { name: `rate-bad-optional-${bad}` } })).toThrow('MAIL_RATE_LIMIT')
     }
   })
 
