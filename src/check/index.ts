@@ -14,7 +14,7 @@ import type { ShadowFile } from './shadow'
 import type { ExtensionProgram } from './shadow-types'
 import { join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
-import { inWalkScope } from '../build/files'
+import { inWalkScope, readText } from '../build/files'
 import { formatReport } from '../compiler/frame'
 import { lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
@@ -128,10 +128,10 @@ async function runCheck(root: string, options: CheckOptions, probes?: ProbeMemor
   // The props entries give their components are typed with the rest, so the collections are read before the type check; their probe does not wait for the shadow tree, which leaves the file it writes alone.
   // The tsconfig includes the shadow tree, so its files are listed once the tree is written.
   const contentFile = join(projectPaths(root).types, CONTENT_CHECK)
-  const props = await textOf(contentFile)
+  const props = await readText(contentFile)
   const reading = contentChecks(root, options, probes)
   const shadowing = shadowedConfig(root, tsconfig, options)
-  // Where the last run left the props check, tsgo types the project while the collections are read, and again only when they changed it, which is rare.
+  // Where the last run left the props check, tsgo types the project while the collections are read, and again once they have changed it, which costs a second run after the first ends.
   const speculative = props === undefined ? undefined : (async () => typecheck(root, tsconfig, (await shadowing)[1]))()
   // Everything but the feeds waits for nothing the probe reads.
   const problemsRun = (async () => projectProblems(root, options, reading, probes, (await shadowing)[0].served))()
@@ -157,7 +157,7 @@ async function runCheck(root: string, options: CheckOptions, probes?: ProbeMemor
     if (speculative === undefined)
       return typecheck(root, tsconfig, shown)
 
-    if (await textOf(contentFile) === props)
+    if (await readText(contentFile) === props)
       return speculative
 
     // Typed against the props check the collections replaced, so it ends before the second run uses the same state.
@@ -231,15 +231,6 @@ async function runCheck(root: string, options: CheckOptions, probes?: ProbeMemor
     diagnostics.push({ file: config, line: 1, column: 1, message: `bun check exited with code ${code} and no diagnostics` })
 
   return diagnostics
-}
-
-async function textOf(file: string): Promise<string | undefined> {
-  try {
-    return await Bun.file(file).text()
-  }
-  catch {
-    return undefined
-  }
 }
 
 async function shadowedConfig(root: string, tsconfig: string, options: CheckOptions) {

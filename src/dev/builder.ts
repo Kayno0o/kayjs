@@ -10,7 +10,7 @@ import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { clientDir, DEV_MAPS_DIR, outputDir } from '../build/assets'
 import { bothBundles, bundleIslands, bundleStyles, classTableOf, clearClientOutput, islandClassTableOf, readClientSources, writeClasses } from '../build/client'
-import { CSS_FILE, forgetSources, inWalkScope, keepSources, readSource, readSourcePaths, writeAtomically } from '../build/files'
+import { CSS_FILE, forgetSources, inWalkScope, keepSources, readSource, readSourcePaths, readText, writeAtomically } from '../build/files'
 import { fileWords, sourceWords } from '../build/libraries'
 import { classTokens, NAMING_FILE } from '../build/prune'
 import { inSignalsScope } from '../build/signals'
@@ -362,15 +362,6 @@ async function signatureOf(file: string, text: string, signed: Map<string, { has
 function readSourceText(file: string): string | undefined {
   try {
     return readSource(file).text
-  }
-  catch {
-    return undefined
-  }
-}
-
-async function readText(file: string): Promise<string | undefined> {
-  try {
-    return await Bun.file(file).text()
   }
   catch {
     return undefined

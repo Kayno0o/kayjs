@@ -273,6 +273,16 @@ async function readable(dir: string, below: boolean): Promise<Dirent[]> {
 }
 
 // Leaves an unchanged file alone, so watchers and editors reading it see no change, and moves a changed one into place whole, so a build reading it beside another process writing it never reads half of it.
+// The text of a file, or undefined when it cannot be read.
+export async function readText(file: string): Promise<string | undefined> {
+  try {
+    return await Bun.file(file).text()
+  }
+  catch {
+    return undefined
+  }
+}
+
 export async function writeIfChanged(path: string, content: string) {
   const file = Bun.file(path)
 
