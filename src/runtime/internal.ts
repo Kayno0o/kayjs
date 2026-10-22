@@ -1,5 +1,5 @@
 import type { Signal } from './core'
-import { createSignal, isSignal, unrecorded, untrack } from './reactive'
+import { createSignal, getOwner, isSignal, renderEffect, runWithOwner, unrecorded, untrack } from './reactive'
 
 // The compiler's output contract, not API: what generated code imports, free to change with any release.
 export { actionStub, formAction, formChecked, formDescribed, formError, formInvalid, formMarked, formProtection, formValue, isAction, registerActions, reviveActions } from './action'
@@ -103,13 +103,14 @@ export function updateBack<Current, Next>(current: Current, update: (current: Wr
 export function bindable<Props extends object>(props: Props, keys: readonly string[]): Props {
   const names = new Set<PropertyKey>(keys)
   const local = new Map<PropertyKey, Local>()
+  const home = getOwner()
   const held = (key: PropertyKey) => {
     let kept = local.get(key)
 
     if (!kept) {
       const [version, bump] = unrecorded(() => createSignal(0))
 
-      kept = { version, bump, override: undefined }
+      kept = { version, bump, count: 0, watching: false, override: undefined }
       local.set(key, kept)
     }
 
@@ -139,7 +140,20 @@ export function bindable<Props extends object>(props: Props, keys: readonly stri
       const kept = held(key)
 
       kept.override = { value, from: untrack(() => Reflect.get(target, key)) }
-      kept.bump(kept.version() + 1)
+      kept.bump(++kept.count)
+
+      // Watches the parent's value from the first write on, so the override ends when the value moves even if nothing reads the prop before it moves back.
+      if (!kept.watching) {
+        kept.watching = true
+        runWithOwner(home, () => renderEffect(() => {
+          const parent = Reflect.get(target, key)
+
+          if (kept.override && !Object.is(parent, kept.override.from)) {
+            kept.override = undefined
+            kept.bump(++kept.count)
+          }
+        }))
+      }
 
       return true
     },
@@ -150,5 +164,7 @@ export function bindable<Props extends object>(props: Props, keys: readonly stri
 interface Local {
   version: () => number
   bump: (next: number) => void
+  count: number
+  watching: boolean
   override: { value: unknown, from: unknown } | undefined
 }

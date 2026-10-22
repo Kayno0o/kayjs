@@ -96,6 +96,34 @@ describe('the props of a component with a Bindable prop', () => {
     expect(seen).toEqual([false, true, true, false])
   })
 
+  it('does not subscribe an effect that writes the prop', () => {
+    const props = bindable({ open: false }, ['open'])
+    let runs = 0
+
+    root(() => renderEffect(() => {
+      runs++
+      props.open = true
+    }))
+    props.open = false
+    flush()
+    expect(runs).toBe(1)
+  })
+
+  it('drops a stale override when the parent moves away and back before any read', () => {
+    const flag = signal(false)
+    const parent: { open: boolean } = Object.defineProperty({ open: false }, 'open', { get: () => flag() })
+    const props = bindable(parent, ['open'])
+
+    root(() => {
+      props.open = true
+    })
+    flag.set(true)
+    flush()
+    flag.set(false)
+    flush()
+    expect(props.open).toBe(false)
+  })
+
   it('leaves the other props to the target', () => {
     const props = bindable<{ title: string, open?: boolean }>({ title: 'a' }, ['open'])
 
