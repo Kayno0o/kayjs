@@ -142,14 +142,36 @@ export function componentClass(list: readonly unknown[]): string | undefined {
 
 // The class of a call that hands a part's entry on, which is the parts object of a component with parts of its own, or a string: the rest of the call's classes join that component's root.
 export function partsClass(list: readonly unknown[]): unknown {
-  const parts = list.find(isParts)
+  const found = list.filter(isParts)
 
-  if (parts === undefined)
+  if (found.length === 0)
     return componentClass(list)
 
-  const rest = list.filter(item => item !== parts)
+  const parts = found.length === 1 ? found[0]! : mergeParts(found)
+  const rest = list.filter(item => !isParts(item))
 
   return rest.length === 0 ? parts : taggedParts({ ...parts, root: [...rest, parts.root] })
+}
+
+// A part of this component handed to the called one under its name, `{ spinner: ... }`, which joins the entries the call hands it: its value is what the part's classes and the caller's entry make.
+export function partHanded(part: string, list: readonly unknown[]): unknown {
+  return taggedParts({ [part]: partsClass(list) })
+}
+
+// Several objects of parts as one, a part two of them give joined in order: the later one overrides, unless it is a part of a part, which the later one replaces.
+function mergeParts(found: readonly Parts[]): Parts {
+  const merged: Record<string, unknown> = {}
+
+  for (const parts of found) {
+    for (const [name, entry] of Object.entries(parts)) {
+      const earlier = merged[name]
+      const joins = (value: unknown) => typeof value === 'string' || Array.isArray(value)
+
+      merged[name] = joins(earlier) && joins(entry) ? [earlier, entry] : entry ?? earlier
+    }
+  }
+
+  return taggedParts(merged)
 }
 
 const PARTS = Symbol.for('kay.parts')

@@ -455,8 +455,10 @@ class Validator {
   }
 
   private attribute(element: ElementNode, attribute: NamedAttribute, name: string): void {
-    if (name === 'part' && (attribute.kind !== 'static' || !PART_NAME.test(attribute.text)))
+    if (name === 'part' && (attribute.kind !== 'static' || !attribute.text.trim().split(WHITESPACE).every(part => PART_NAME.test(part))))
       this.error(attribute.name, '`part` names a part with a string: `part="head"`', { note: 'the `class` type of the component is built from the names at compile time', help: 'write a name of letters, digits and dashes' })
+    else if (name === 'part' && attribute.kind === 'static' && !element.component && attribute.text.trim().split(WHITESPACE).length > 1)
+      this.error(attribute.name, 'Only a component call names several parts: `part="root spinner"`', { note: 'the first is the part the call is, the others are parts of this component whose entries it hands on to the called one', help: 'name one part on an element' })
 
     if (name === 'transition' || name.startsWith(TRANSITION_PART)) {
       if (element.component)

@@ -456,7 +456,7 @@ export function isChildrenSlot(node: Node): boolean {
   return isSlot(node) && (node as ElementNode).outlet === undefined
 }
 
-export type TemplateHelper = 'For' | 'componentClass' | 'partClass' | 'partsClass'
+export type TemplateHelper = 'For' | 'componentClass' | 'partClass' | 'partHanded' | 'partsClass'
 
 // Whether an entry of `src/ui.ts` has variants, which read the component's props: without them its parts are static classes, written into the template as they are.
 export function uiHasVariants(entry: UiEntry): boolean {
@@ -621,10 +621,22 @@ export function partAttribute(element: ElementNode, source: string): Extract<Nam
   return element.attributes.find((attribute): attribute is Extract<NamedAttribute, { kind: 'static' }> => attribute.kind === 'static' && source.slice(attribute.name.start, attribute.name.end) === 'part')
 }
 
-export function partName(element: ElementNode, source: string): string | undefined {
-  const text = partAttribute(element, source)?.text
+const PART_SEPARATOR = /\s+/
 
-  return text === undefined || text === '' ? undefined : text
+// The names a `part` attribute holds: the first is the part the element is, the others on a component call are parts of this component whose entries it hands on to the called one.
+export function partNames(element: ElementNode, source: string): string[] {
+  const text = partAttribute(element, source)?.text.trim()
+
+  return text === undefined || text === '' ? [] : text.split(PART_SEPARATOR)
+}
+
+export function partName(element: ElementNode, source: string): string | undefined {
+  return partNames(element, source)[0]
+}
+
+// The parts a component call hands on beside its own: `BusyButton(part="root spinner")` hands the called button this component's `spinner` entry as well as its `root` one.
+export function handedParts(element: ElementNode, source: string, parts: PartFacts | undefined): string[] {
+  return parts?.merges && element.component ? partNames(element, source).slice(1) : []
 }
 
 // The parts an element answers for in a component: the one it names, and `root` when it is the single top element.
@@ -695,11 +707,10 @@ function factsOf(file: KayFile): TemplateFacts {
       if (mergesComponentClass(node, file.source))
         facts.helpers.add('componentClass')
 
-      const part = partName(node, file.source)
-
-      if (part !== undefined) {
+      for (const [index, part] of partNames(node, file.source).entries()) {
         facts.parts ??= { names: new Map(), root: 'none', merges: true }
-        const tag = node.component ? node.name : undefined
+        // A part handed on is not the called component's: its entry is a string or that component's own parts.
+        const tag = node.component && index === 0 ? node.name : undefined
         const tags = facts.parts.names.get(part) ?? []
 
         if (!tags.includes(tag))
@@ -709,6 +720,9 @@ function factsOf(file: KayFile): TemplateFacts {
 
         if (node.component)
           facts.helpers.add('partsClass')
+
+        if (index > 0)
+          facts.helpers.add('partHanded')
       }
     }
     else if (node.kind === 'snippet') {

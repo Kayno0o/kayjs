@@ -4,7 +4,7 @@ import type { CodeBuilder } from './mapping'
 import { resolveClasses } from '../runtime/class-table'
 import { PART_END, PART_START } from '../runtime/markers'
 import { URL_ATTRIBUTES } from '../runtime/url-attributes'
-import { actionOf, bindsOwnProp, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, partAttribute, partsOf, sectionOf, uiHasVariants, uiPartClasses } from './ast'
+import { actionOf, bindsOwnProp, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, handedParts, partAttribute, partNames, partsOf, sectionOf, uiHasVariants, uiPartClasses } from './ast'
 import { decodeEntities, isFunctionAt } from './expression'
 import { PROPS } from './names'
 
@@ -177,7 +177,7 @@ export abstract class TemplateWriter {
       const attributeName = this.source(attribute.name)
 
       if (attribute === partAttr) {
-        plan.attributes.push({ kind: 'text', name: 'data-part', text: decodeEntities(attribute.text), bare: false })
+        plan.attributes.push({ kind: 'text', name: 'data-part', text: decodeEntities(partNames(element, this.src)[0] ?? ''), bare: false })
 
         continue
       }
@@ -436,7 +436,7 @@ export abstract class TemplateWriter {
         continue
 
       if (attribute === partAttr) {
-        entry('data-part', () => b.add(JSON.stringify(decodeEntities(attribute.text))), false)
+        entry('data-part', () => b.add(JSON.stringify(decodeEntities(partNames(element, this.src)[0] ?? ''))), false)
 
         continue
       }
@@ -541,9 +541,10 @@ export abstract class TemplateWriter {
     const { b } = this
     const shorthand = element.classes.length > 0 ? this.shorthand(element) : undefined
     const parts = partsOf(element, this.src, this.facts.parts)
+    const handed = handedParts(element, this.src, this.facts.parts)
 
     // A shorthand beside a static `class` is a merge too: the browser resolves it here, the server while rendering.
-    if (!spreads && classAttribute?.kind !== 'expression' && parts.length === 0 && (classAttribute === undefined || shorthand === undefined || !this.mergesAtRuntime)) {
+    if (!spreads && classAttribute?.kind !== 'expression' && parts.length === 0 && handed.length === 0 && (classAttribute === undefined || shorthand === undefined || !this.mergesAtRuntime)) {
       b.add(JSON.stringify(this.staticClass(element, classAttribute)))
 
       return
@@ -564,6 +565,22 @@ export abstract class TemplateWriter {
         items.push({ emit: () => b.add('(').addSource(attribute.expression).add(')') })
     }
 
+    // The parts handed on come before the call's own, so the entry the caller gives the called component's root is the last word.
+    for (const part of handed) {
+      items.push({
+        emit: () => {
+          b.add(`${helperName('partHanded')}(${JSON.stringify(part)}, [`)
+
+          for (const emit of this.recipeItem(part)) {
+            emit()
+            b.add(', ')
+          }
+
+          b.add(`${helperName('partClass')}(${PROPS}, ${JSON.stringify(part)})])`)
+        },
+      })
+    }
+
     for (const part of parts)
       items.push(...this.recipeItem(part).map(emit => ({ emit })), { emit: () => b.add(`${helperName('partClass')}(${PROPS}, ${JSON.stringify(part)})`) })
 
@@ -580,7 +597,7 @@ export abstract class TemplateWriter {
         return merged
       }, [])
 
-    b.add(element.component ? `${helperName(parts.length > 0 ? 'partsClass' : 'componentClass')}([` : '[')
+    b.add(element.component ? `${helperName(parts.length > 0 || handed.length > 0 ? 'partsClass' : 'componentClass')}([` : '[')
     for (const [index, item] of written.entries()) {
       if (index > 0)
         b.add(', ')

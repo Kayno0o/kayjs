@@ -20,6 +20,8 @@ const files: Record<string, string> = {
   'rows.kay': '---\nconst { rows, open } = props<{ rows: string[], open: boolean }>()\n---\nul.rows\n  if open\n    li.p-2(part="open") open\n  for row of rows\n    li.p-2(part="item") {row}\n  li.p-2(part="slotted")\n    slot\n',
   'spread.kay': '---\nconst { title, ...rest } = props<{ title: string, [key: string]: unknown }>()\n---\narticle.box({...rest} part="root") {title}\n',
   'panel.kay': '---\nimport Card from \'./card.kay\'\n---\nsection.panel\n  Card(part="card" title="t") body\n',
+  'busy.kay': '---\n---\nbutton.btn(part="root")\n  span.spin(part="spinner") wait\n',
+  'hands.kay': '---\nimport Busy from \'./busy.kay\'\n---\nBusy(part="root spinner")\n',
   'plain.kay': '---\nconst { class: className } = props<{ class?: string }>()\n---\ndiv.base(class={className}) plain\n',
   'rooted.kay': 'header.p-2(part="top") a\nfooter.p-2(part="root") b\n',
   'wrapper.kay': '---\nimport Card from \'./card.kay\'\n---\nCard(title="w" part="root" class="from-wrapper") inside\n',
@@ -28,7 +30,7 @@ const files: Record<string, string> = {
   '_layout.kay': 'main.p-2(part="page") page\n',
   'client.kay': '--- client\nlet count = 0\n---\nsection.card\n  header(part="head") {count}\n',
   'node_modules/uilib/card.kay': '---\nconst { title } = props<{ title: string }>()\n---\nsection.card.p-4\n  header.p-2(part="head") {title}\n',
-  'calls.kay': '---\nimport Card from \'./card.kay\'\nimport Rows from \'./rows.kay\'\nimport Spread from \'./spread.kay\'\nimport Panel from \'./panel.kay\'\nimport Plain from \'./plain.kay\'\nimport Rooted from \'./rooted.kay\'\nimport Wrapper from \'./wrapper.kay\'\nimport Library from \'uilib/card.kay\'\nconst built = [\'p-\', \'8\'].join(\'\')\n---\nCard(title="string" class="mt-4") a\nCard(title="parts" class={{ root: \'mt-6\', head: \'p-6\', body: built }}) b\nCard(title="plain")\nRows(rows={[\'x\', \'y\']} open class={{ item: \'p-8\', open: \'text-lg\' }})\nRows(rows={[]} open={false} class="gap-2")\nSpread(title="s" class={{ root: \'p-9\' }} id="s")\nPanel(class={{ card: { head: \'p-9\', root: \'m-1\' }, root: \'m-2\' }})\nPlain(class="given")\nRooted(class={{ top: \'t\', root: \'r\' }})\nWrapper(class="outer")\nLibrary(title="lib" class={{ head: \'p-6\' }})\n',
+  'calls.kay': '---\nimport Card from \'./card.kay\'\nimport Rows from \'./rows.kay\'\nimport Spread from \'./spread.kay\'\nimport Panel from \'./panel.kay\'\nimport Plain from \'./plain.kay\'\nimport Rooted from \'./rooted.kay\'\nimport Wrapper from \'./wrapper.kay\'\nimport Hands from \'./hands.kay\'\nimport Library from \'uilib/card.kay\'\nconst built = [\'p-\', \'8\'].join(\'\')\n---\nCard(title="string" class="mt-4") a\nCard(title="parts" class={{ root: \'mt-6\', head: \'p-6\', body: built }}) b\nCard(title="plain")\nRows(rows={[\'x\', \'y\']} open class={{ item: \'p-8\', open: \'text-lg\' }})\nRows(rows={[]} open={false} class="gap-2")\nSpread(title="s" class={{ root: \'p-9\' }} id="s")\nPanel(class={{ card: { head: \'p-9\', root: \'m-1\' }, root: \'m-2\' }})\nPlain(class="given")\nRooted(class={{ top: \'t\', root: \'r\' }})\nWrapper(class="outer")\nHands(class={{ root: \'p-6\', spinner: \'size-5\' }})\nHands(class={{ root: { spinner: \'size-7\' }, spinner: \'size-5\' }})\nHands(class="p-8")\nLibrary(title="lib" class={{ head: \'p-6\' }})\n',
 }
 
 beforeAll(async () => {
@@ -88,6 +90,14 @@ describe('a component with parts, on the server', () => {
     const html = await render('calls.kay')
 
     expect(html).toContain('<section class="panel m-2"><section class="card p-4 m-1"><header class="p-9" data-part="head">t</header><div data-part="body">body</div></section></section>')
+  })
+
+  it('hands the called component the entries of the parts a call names beside its own, the caller\'s own entry last', async () => {
+    const html = await render('calls.kay')
+
+    expect(html).toContain('<button class="btn p-6" data-part="root"><span class="spin size-5" data-part="spinner">wait</span></button>')
+    expect(html).toContain('<button class="btn" data-part="root"><span class="spin size-5 size-7" data-part="spinner">wait</span></button>')
+    expect(html).toContain('<button class="btn p-8" data-part="root"><span class="spin" data-part="spinner">wait</span></button>')
   })
 
   it('leaves a component without parts alone, class prop and all', async () => {
@@ -192,6 +202,10 @@ describe('a component with parts, as an island', () => {
 })
 
 describe('kay check on parts', () => {
+  it('refuses several parts on an element, which only a component call hands on', () => {
+    expect(diagnostics('---\n---\ndiv(part="root spinner")\n')).toEqual([expect.stringContaining('Only a component call names several parts')])
+  })
+
   it('reports a part named by an expression', () => {
     expect(diagnostics('---\nconst name = \'head\'\n---\nsection\n  div(part={name}) a\n')).toContain('`part` names a part with a string: `part="head"`')
   })
