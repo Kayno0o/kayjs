@@ -58,6 +58,7 @@ process.exit(0)
     const spent = Number((await new Response(child.stdout).text()).trim())
 
     await child.exited
-    expect(spent).toBeGreaterThan(WAIT_MS / 3)
+    // A loaded host gives the spinning child only part of a core, so a tenth of the wait still tells a spin from an idle wait, which costs a few ms.
+    expect(spent).toBeGreaterThan(WAIT_MS / 10)
   }, 30_000)
 })
