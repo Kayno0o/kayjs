@@ -9,23 +9,37 @@ import { authors } from '../authors'
 import { leavesPublication, restrain } from '../publishing'
 import { settings } from '../settings'
 import devApi from './dev'
+import iconsApi from './icons'
+import previewApi from './preview'
 
-// Where the cms's modules are mounted; the default `/api/cms` for an app that replaced the dev module with its own, which then is not mounted.
-function mountRoot(): string {
-  try {
-    return apiUrl(devApi, '/').slice(0, -'/dev'.length)
+// The modules whose mount tells where the cms is served, the lightest ones: an app can replace any of them with its own, which is then not mounted, so the first one that is mounted gives the root.
+const ANCHORS: [module: unknown, name: string][] = [[devApi, 'dev'], [previewApi, 'preview'], [iconsApi, 'icons']]
+
+// Where the cms's modules are mounted (`/api/cms`, `/v1/cms` under an `apiPath`, behind the `base`), or undefined when none of its anchor modules is mounted.
+function mountRoot(): string | undefined {
+  for (const [module, name] of ANCHORS) {
+    try {
+      return apiUrl(module, '/').slice(0, -(name.length + 1))
+    }
+    catch {
+      // not mounted, try the next
+    }
   }
-  catch {
-    return '/api/cms'
-  }
+
+  return undefined
 }
 
 // The path below the cms's own mount (`/entries/posts/hello`), whatever `base` and `apiPath` put before it, so a collection or slug named like a route never reads as one.
+// Empty when the mount is unknown or not in the path, which no route pattern matches.
 function ownPath(path: string): string {
   const root = mountRoot()
+
+  if (root === undefined)
+    return ''
+
   const at = path.indexOf(`${root}/`)
 
-  return at < 0 ? path : path.slice(at + root.length)
+  return at < 0 ? '' : path.slice(at + root.length)
 }
 
 // Leaving edit mode writes nothing, so an edit link alone may do it; `/entries/preview/exit` is a save to a collection named preview.
@@ -123,6 +137,11 @@ export default guard(async (ctx) => {
       await memberOf(ctx)
 
     const path = ownPath(routePath(ctx.url))
+
+    // A request the guard cannot place below the cms's mount would skip every role check, so it is refused.
+    if (path === '')
+      return ctx.deny(403, wording('cms.guard.unplaced', 'The cms could not place this request among its routes'))
+
     const needed = actionOf(method, path)
 
     // Restoring undoes an edit or a delete, which any editor may; what it restores never publishes or withdraws for a role that may not.

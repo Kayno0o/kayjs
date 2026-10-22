@@ -237,6 +237,7 @@ export default defineMessages({
       notEditing: 'Pas en mode édition',
       notOnPage: 'Cette entrée n\'est sur aucune des pages ouvertes en mode édition',
       signedOut: 'Connectez-vous pour continuer',
+      unplaced: 'Le cms ne peut pas situer cette requête parmi ses routes',
     },
     history: {
       add: 'Créée',
