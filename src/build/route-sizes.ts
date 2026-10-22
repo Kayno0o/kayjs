@@ -5,8 +5,9 @@ import type { Stop } from '../server/pure-page'
 import type { Route } from '../server/routes'
 import type { RouteSize, SizeReport } from './report'
 import { join, relative } from 'node:path'
-import { actionOf, childBlocks, elementsIn, serverIslandOf } from '../compiler/ast'
+import { actionOf, elementsIn, serverIslandOf } from '../compiler/ast'
 import { parseKay } from '../compiler/parser'
+import { bindingNames, scopedBlocks } from '../compiler/template-reads'
 import { describeStop } from '../server/pure-page'
 import { ASSET_PREFIX } from './assets'
 import { resolveFrom, SCRIPT_FILE } from './files'
@@ -215,7 +216,7 @@ function usesOf(source: string, file: string, root: string, template: Node[]): M
 
   const counts = new Map<string, number>()
 
-  const guard = (test: Span): string[] => {
+  const guard = (test: Span, scope: ReadonlySet<string>): string[] => {
     const match = GUARD.exec(source.slice(test.start, test.end).trim())
 
     if (match === null)
@@ -223,20 +224,31 @@ function usesOf(source: string, file: string, root: string, template: Node[]): M
 
     const [, owner, name] = match
 
-    const props = owner === undefined ? plain.has(name!) : owner === rest
+    // A `for`, `as`, snippet or `const` name hides the prop of the same name where it is in scope.
+    const props = owner === undefined ? plain.has(name!) && !scope.has(name!) : owner === rest && !scope.has(owner)
 
     return props ? [name!] : []
   }
 
-  const visit = (nodes: readonly Node[], needs: string[]) => {
+  const namesOf = (spans: readonly Span[]) => spans.flatMap(span => bindingNames(source.slice(span.start, span.end)))
+
+  const visit = (nodes: readonly Node[], needs: string[], outer: ReadonlySet<string>) => {
+    const scope = new Set(outer)
+
     for (const node of nodes) {
+      if (node.kind === 'const') {
+        for (const name of namesOf([node.pattern]))
+          scope.add(name)
+
+        continue
+      }
+
       if (node.kind === 'if') {
-        for (const [index, branch] of node.branches.entries()) {
-          visit(branch.children, index === 0 ? [...needs, ...guard(branch.test)] : needs)
-        }
+        for (const [index, branch] of node.branches.entries())
+          visit(branch.children, index === 0 ? [...needs, ...guard(branch.test, scope)] : needs, new Set([...scope, ...namesOf(branch.alias ? [branch.alias] : [])]))
 
         if (node.fallback !== undefined)
-          visit(node.fallback.children, needs)
+          visit(node.fallback.children, needs, scope)
 
         continue
       }
@@ -248,12 +260,12 @@ function usesOf(source: string, file: string, root: string, template: Node[]): M
         uses.set(imported, [...uses.get(imported) ?? [], { needs, names: givenBy(node, source) }])
       }
 
-      for (const block of childBlocks(node))
-        visit(block, needs)
+      for (const [block, binders] of scopedBlocks(node))
+        visit(block, needs, new Set([...scope, ...namesOf(binders)]))
     }
   }
 
-  visit(template, [])
+  visit(template, [], new Set())
 
   // The name's import and each element are its only mentions.
   for (const [name, imported] of bound) {

@@ -71,7 +71,7 @@ function parameters(code: string): Set<string> | undefined {
 }
 
 // The names a pattern or a parameter list (`{ a: b }, [c], ...d` or `x: typeof y`) binds: a key or a type it holds binds none. Every word of it when it does not parse.
-function bindingNames(pattern: string): string[] {
+export function bindingNames(pattern: string): string[] {
   const names: string[] = []
   let expression: t.Expression
 
@@ -162,7 +162,7 @@ function readsOf(file: KayFile): string[] {
 }
 
 // The child blocks of a node with the spans naming what each sees besides its parent's names: a loop's item and index, a snippet's or slot's parameters, a branch's alias.
-function scopedBlocks(node: Node): [Node[], Span[]][] {
+export function scopedBlocks(node: Node): [Node[], Span[]][] {
   switch (node.kind) {
     case 'for':
       return [[node.children, node.index ? [node.item, node.index] : [node.item]], [node.fallback ?? [], []]]

@@ -2247,6 +2247,54 @@ describe('the build report', () => {
     }
   })
 
+  it('reads no guard on a name a for, an as, a snippet or a const binds as a prop the route does not pass', async () => {
+    const dir = await scratchDir('route-sizes-shadowed-')
+
+    try {
+      const chunk = async (name: string, size: number) => Bun.write(join(dir, 'out', name), Array.from({ length: size }, (_, index) => `export const v${index} = ${index * 7919 % 1013}\n`).join(''))
+
+      await Promise.all([chunk('entry.js', 60), chunk('a.js', 40), chunk('b.js', 50)])
+      await Promise.all(Object.entries({
+        'tsconfig.json': '{}',
+        'src/a.kay': 'p A\n',
+        'src/b.kay': 'p B\n',
+        'src/looped.kay': '---\nimport B from \'./b.kay\'\n\nconst { shown } = props<{ shown?: boolean }>()\nconst items = [true]\nconst nested = [[true]]\nconst pick = () => true\n---\nfor shown of items\n  if shown\n    B\n',
+        'src/aliased.kay': '---\nimport B from \'./b.kay\'\n\nconst { shown } = props<{ shown?: boolean }>()\nconst items = [true]\nconst nested = [[true]]\nconst pick = () => true\n---\nif pick() as shown\n  if shown\n    B\n',
+        'src/snippet.kay': '---\nimport B from \'./b.kay\'\n\nconst { shown } = props<{ shown?: boolean }>()\nconst items = [true]\nconst nested = [[true]]\nconst pick = () => true\n---\nsnippet inner(shown: boolean)\n  if shown\n    B\n{inner(true)}\n',
+        'src/nested.kay': '---\nimport B from \'./b.kay\'\n\nconst { shown } = props<{ shown?: boolean }>()\nconst items = [true]\nconst nested = [[true]]\nconst pick = () => true\n---\nfor row of nested\n  for shown of row\n    if shown\n      B\n',
+        'src/declared.kay': '---\nimport B from \'./b.kay\'\n\nconst { shown } = props<{ shown?: boolean }>()\nconst items = [true]\nconst nested = [[true]]\nconst pick = () => true\n---\nconst shown = true\nif shown\n  B\n',
+        'src/real.kay': '---\nimport B from \'./b.kay\'\n\nconst { shown } = props<{ shown?: boolean }>()\nconst items = [true]\nconst nested = [[true]]\nconst pick = () => true\n---\nfor shown of items\n  p {shown}\nif shown\n  B\n',
+        'src/routes/looped.kay': '---\nimport A from \'../a.kay\'\nimport W from \'../looped.kay\'\n---\nA\nW\n',
+        'src/routes/aliased.kay': '---\nimport A from \'../a.kay\'\nimport W from \'../aliased.kay\'\n---\nA\nW\n',
+        'src/routes/snippet.kay': '---\nimport A from \'../a.kay\'\nimport W from \'../snippet.kay\'\n---\nA\nW\n',
+        'src/routes/nested.kay': '---\nimport A from \'../a.kay\'\nimport W from \'../nested.kay\'\n---\nA\nW\n',
+        'src/routes/declared.kay': '---\nimport A from \'../a.kay\'\nimport W from \'../declared.kay\'\n---\nA\nW\n',
+        'src/routes/real.kay': '---\nimport A from \'../a.kay\'\nimport W from \'../real.kay\'\n---\nA\nW\n',
+      }).map(async ([path, content]) => Bun.write(join(dir, path), content)))
+
+      const url = (name: string) => `/_kay/${name}`
+      const report: SizeReport = {
+        entry: { size: { raw: 0, gzip: 0 }, chunks: [url('entry.js')] },
+        islands: [
+          { file: 'src/a.kay', size: { raw: 0, gzip: 0 }, chunks: [url('a.js')] },
+          { file: 'src/b.kay', size: { raw: 0, gzip: 0 }, chunks: [url('b.js')] },
+        ],
+      }
+      const routes = ['looped', 'aliased', 'snippet', 'nested', 'declared', 'real'].map(name => ({ pattern: `/${name}`, file: join(dir, `src/routes/${name}.kay`), params: [], layouts: [] }) as unknown as Route)
+      const sizes = Object.fromEntries((await routeSizes(dir, { dir: join(dir, 'out'), styles: new Map() } as unknown as ClientBuild, routes, [], report)).map(each => [each.route, each]))
+      const [entry, a, b] = await Promise.all(['entry.js', 'a.js', 'b.js'].map(async name => gzipSize(await Bun.file(join(dir, 'out', name)).bytes())))
+
+      // A name bound where the guard stands is that value, not the prop the call leaves out, so the island may render; the prop itself, beside a loop that bound the name elsewhere, still leaves it out.
+      for (const name of ['looped', 'aliased', 'snippet', 'nested', 'declared'])
+        expect(sizes[`/${name}`]!.js).toBe(entry! + a! + b!)
+
+      expect(sizes['/real']!.js).toBe(entry! + a!)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('lists what the last build had and this one does not', () => {
     const previous: StoredReport = { version: 1, exported: false, entry: 2048, islands: { 'src/a.kay': 1024, 'src/b.kay': 512 }, routes: { '/': { js: 1024, css: 0 }, '/old': { js: 512, css: 512 } } }
     const now = summary([route('/', 1024)])
