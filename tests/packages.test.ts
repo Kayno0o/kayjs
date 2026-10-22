@@ -422,11 +422,11 @@ describe('package scripts', () => {
   it('reach the running Bun through $npm_execpath, never a bare bun', async () => {
     const found: string[] = []
 
-    for (const path of await Array.fromAsync(new Glob('{package.json,{packages,editors,examples,bench/apps}/*/package.json}').scan())) {
+    for (const path of await Array.fromAsync(new Glob('{package.json,docs/package.json,{packages,editors,examples,bench/apps}/*/package.json}').scan())) {
       const { scripts = {} } = await Bun.file(path).json() as { scripts?: Record<string, string> }
 
       for (const [name, command] of Object.entries(scripts)) {
-        if ((/(?:^|[\s&|;(])bun\s/).test(command))
+        if ((/(?:^|[^\w$./-])bun(?:\s|$)/).test(command))
           found.push(`${path}: ${name}: ${command}`)
       }
     }
