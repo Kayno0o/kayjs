@@ -76,7 +76,7 @@ interface Run {
 }
 
 // `kay <name> <args>` run in this process: its exit code, what it printed on stderr (`output`) and on stdout (`report`), as the CLI's child process gave them.
-async function kayRun(command: Command, name: 'check' | 'build', args: string[]): Promise<Run> {
+async function kayRun(command: Command, name: 'check' | 'build' | 'env', args: string[]): Promise<Run> {
   install()
 
   const capture: Capture = { stdout: [], stderr: [] }
