@@ -28,13 +28,19 @@ export interface UiComponent {
   variants: { name: string, span: Span, values: { name: string, span: Span }[] }[]
 }
 
+interface NameIndex {
+  at: number
+  app: Map<string, string[]>
+  matches: Map<string, string[]>
+}
+
 export interface UiSource {
   file: string
   source: string
   components: UiComponent[]
   problems: UiProblem[]
-  // The components each name stood for when first found, which stay until `src/ui.ts` is read again.
-  named?: Map<string, string[]> | undefined
+  // The app's components by name and what each name stood for, as of `at`.
+  index?: NameIndex | undefined
 }
 
 const OBJECT_WRAPPERS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'ParenthesizedExpression'])
@@ -231,7 +237,7 @@ function appComponents(dir: string, found: Map<string, string[]>): void {
     if (entry.isDirectory() && entry.name !== 'node_modules' && !entry.name.startsWith('.')) {
       appComponents(join(dir, entry.name), found)
     }
-    else if (entry.isFile() && KAY_EXTENSION.test(entry.name)) {
+    else if (KAY_EXTENSION.test(entry.name) && (entry.isFile() || (entry.isSymbolicLink() && statSync(join(dir, entry.name), { throwIfNoEntry: false })?.isFile() === true))) {
       const name = componentName(entry.name)
 
       found.set(name, [...found.get(name) ?? [], join(dir, entry.name)])
@@ -257,18 +263,35 @@ function realOf(file: string): string {
   }
 }
 
-// The files a bare name stands for: the app's components of that name and kayjs-ui's, a page or a layout left out when another component bears the name. None is a name no component bears yet, looked for again next time.
-export function componentsNamed(ui: UiSource, name: string): string[] {
-  const kept = ui.named?.get(name)
+// How long a build trusts what it found of the app's components before looking at `src/` again: a component written or removed meanwhile is met by the next build pass, and `kay check` always looks again.
+const INDEX_LIFETIME = 1000
 
-  if (kept !== undefined)
-    return kept
+// Drops what was found of the components, for `kay check`, which looks at `src/` afresh.
+export function forgetNames(ui: UiSource): void {
+  ui.index = undefined
+}
+
+function nameIndex(ui: UiSource): NameIndex {
+  if (ui.index !== undefined && Date.now() - ui.index.at < INDEX_LIFETIME)
+    return ui.index
 
   const app = new Map<string, string[]>()
 
   appComponents(dirname(ui.file), app)
+  ui.index = { at: Date.now(), app, matches: new Map() }
 
-  const found = (app.get(name) ?? []).map(realOf)
+  return ui.index
+}
+
+// The files a bare name stands for: the app's components of that name and kayjs-ui's, a page or a layout left out when another component bears the name. None is a name no component bears.
+export function componentsNamed(ui: UiSource, name: string): string[] {
+  const index = nameIndex(ui)
+  const kept = index.matches.get(name)
+
+  if (kept !== undefined)
+    return kept
+
+  const found = (index.app.get(name) ?? []).map(realOf)
 
   try {
     const library = realpathSync(Bun.resolveSync(`${UI_LIBRARY}/${name.replace(WORD_BOUNDARY, '-').toLowerCase()}.kay`, dirname(ui.file)))
@@ -281,8 +304,7 @@ export function componentsNamed(ui: UiSource, name: string): string[] {
   const components = found.filter(file => !isPage(file))
   const matches = components.length > 0 ? components : found
 
-  if (matches.length > 0)
-    (ui.named ??= new Map()).set(name, matches)
+  index.matches.set(name, matches)
 
   return matches
 }
@@ -341,7 +363,7 @@ function readUi(file: string): UiSource | undefined {
   const components: UiComponent[] = []
 
   if (config === undefined) {
-    problems.push({ start: 0, end: 0, message: 'src/ui.ts has no default export', help: 'write `export default defineUi({ \'@scope/lib/card.kay\': { parts: { head: \'p-6\' } } })`' })
+    problems.push({ start: 0, end: 0, message: 'src/ui.ts has no default export', help: 'write `export default defineUi({ Card: { parts: { head: \'p-6\' } } })`' })
   }
   else {
     eachProperty(config, 'The default export', problems, (specifier, value, property) => {

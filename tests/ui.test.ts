@@ -351,6 +351,15 @@ describe('a component keyed by its name', () => {
     expect(problem!.help).toContain('`@kaynooo/kayjs-ui/card.kay`')
   })
 
+  it('sees a second component bearing a name once it is written', async () => {
+    await write('export default { InnerBox: { parts: { head: \'p-2\' } } }')
+    expect(uiProblems(scratch)).toEqual([])
+    await Bun.write(join(scratch, 'src/other/inner-box.kay'), 'section\n  header(part="head") a\n')
+    expect(uiProblems(scratch).map(problem => problem.message)).toEqual(['`InnerBox` names 2 components'])
+    await rm(join(scratch, 'src/other'), { recursive: true })
+    expect(uiProblems(scratch)).toEqual([])
+  })
+
   it('reports a name no component bears, and finds a component written after the file', async () => {
     await write('export default { Latecomer: { parts: \'p-2\' } }')
     expect(uiProblems(scratch).map(problem => problem.message)).toEqual(['`Latecomer` names no component'])

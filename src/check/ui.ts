@@ -1,9 +1,9 @@
 import type { CheckDiagnostic } from '.'
 import type { UiComponent, UiSource } from '../build/ui'
 import type { Diagnostic, Span } from '../compiler/ast'
-import { readFileSync } from 'node:fs'
+import { readFileSync, realpathSync } from 'node:fs'
 import { basename, dirname, relative, sep } from 'node:path'
-import { componentFile, componentMatches, isComponentName, KAY_EXTENSION, uiOf } from '../build/ui'
+import { componentFile, componentMatches, forgetNames, isComponentName, KAY_EXTENSION, uiOf } from '../build/ui'
 import { ROUTE_FILES } from '../compiler'
 import { templateFacts } from '../compiler/ast'
 import { parseKay } from '../compiler/parser'
@@ -30,7 +30,7 @@ export function offered(file: string): { parts: Set<string>, variants: Record<st
 
 // The specifier `src/ui.ts` writes a component by: a path from it for the app's own, the package's for a library's.
 function specifierOf(ui: UiSource, file: string): string {
-  const from = dirname(ui.file)
+  const from = realpathSync(dirname(ui.file))
 
   return file.startsWith(from + sep) ? `./${relative(from, file).split(sep).join('/')}` : `@kaynooo/kayjs-ui/${basename(file)}`
 }
@@ -99,6 +99,8 @@ export function uiProblems(root: string): CheckDiagnostic[] {
 
   if (ui === undefined)
     return []
+
+  forgetNames(ui)
 
   const found: Diagnostic[] = [...ui.problems]
   const report = (span: Span, message: string, help?: string) => found.push({ ...span, message, help })

@@ -20,6 +20,8 @@ section
   header(part="head") {title}
 `
 const PANEL = 'section\n  div(part="body") a\n'
+// A recipe with several top elements and no part marked, which has no part to restyle.
+const LOOSE = `---\nimport { recipe } from 'kay'\n\nconst loose = recipe({ variants: { tone: { a: '', b: '' } } })\n---\np a\np b\n`
 // A name kayjs-ui's Badge bears too.
 const BADGE = 'span(part="root") a\n'
 
@@ -32,6 +34,7 @@ async function problems(ui: string): Promise<string[]> {
       Bun.write(join(root, 'src/components/tile.kay'), TILE),
       Bun.write(join(root, 'src/panel.kay'), PANEL),
       Bun.write(join(root, 'src/badge.kay'), BADGE),
+      Bun.write(join(root, 'src/loose.kay'), LOOSE),
       Bun.write(join(root, 'package.json'), JSON.stringify({ name: 'app', dependencies: { '@kaynooo/kayjs-ui': '*', 'kay': '*' } })),
       Bun.write(join(root, 'src/ui.ts'), ui),
     ])
@@ -49,6 +52,7 @@ describe('defineUi keys', () => {
 
 export default defineUi({
   Tile: { parts: { head: 'p-6' }, variants: { tone: { danger: { head: 'bg-red-100' } }, compact: { true: 'p-0' } } },
+  Loose: { variants: { tone: { a: 'p-1' } } },
   './panel.kay': { parts: { body: 'p-4' } },
   Button: { parts: { root: 'rounded-xl' } },
 })

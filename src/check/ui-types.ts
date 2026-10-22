@@ -1,7 +1,7 @@
 import type { KayLibrary } from '../build/libraries'
 import { realpathSync } from 'node:fs'
 import { dirname, relative, sep } from 'node:path'
-import { componentsNamed, uiOf } from '../build/ui'
+import { componentsNamed, forgetNames, uiOf } from '../build/ui'
 import { componentName } from '../compiler'
 import { offered } from './ui'
 
@@ -10,10 +10,10 @@ interface Shape {
   variants: Record<string, string[]>
 }
 
-const union = (names: string[]) => names.map(name => JSON.stringify(name)).join(' | ')
+const union = (names: string[]) => names.length === 0 ? 'never' : names.map(name => JSON.stringify(name)).join(' | ')
 
 function typeOf(shape: Shape): string {
-  const variants = Object.entries(shape.variants).map(([name, values]) => `${JSON.stringify(name)}: ${values.length === 0 ? 'never' : union(values)}`)
+  const variants = Object.entries(shape.variants).map(([name, values]) => `${JSON.stringify(name)}: ${union(values)}`)
 
   return `{ parts: ${union(shape.parts)}, variants: { ${variants.join(', ')} } }`
 }
@@ -34,7 +34,9 @@ export function uiTypes(root: string, libraries: KayLibrary[], own: string[]): s
   if (ui === undefined)
     return 'export {}\n'
 
-  const from = dirname(ui.file)
+  forgetNames(ui)
+
+  const from = realOf(dirname(ui.file))
   const shapes = new Map<string, Shape>()
   const specifiers = new Map<string, string>()
 
@@ -54,9 +56,9 @@ export function uiTypes(root: string, libraries: KayLibrary[], own: string[]): s
     return shapes.get(real)
   }
 
-  for (const file of own) {
+  for (const file of own.map(realOf)) {
     if (file.startsWith(from + sep) && shapeOf(file) !== undefined)
-      specifiers.set(`./${relative(from, file).split(sep).join('/')}`, realOf(file))
+      specifiers.set(`./${relative(from, file).split(sep).join('/')}`, file)
   }
 
   for (const library of libraries) {
