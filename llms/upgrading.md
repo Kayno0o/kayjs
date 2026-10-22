@@ -2,6 +2,12 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.72.0
+
+### kay needs Bun 1.4.4
+
+kay and its libraries require Bun 1.4.4 or later (`bun upgrade`, or `bun update bun` where the project has the npm `bun` package), and the CLI and `pages()` refuse an older one. Bun 1.4.4 reads a glob differently: `*(1).txt`, `+(a)`, `@(a|b)` and `!(g)` are extglobs, and `{1..3}` is a range. A pattern of an `import.meta.glob` call or of `publicCache` that wrote one of these as literal text escapes it (`*[(]1).txt`); `(group)` folders are unchanged. Bun 1.4.4 also renders a slash tag in Markdown, such as `<div/onclick=x>`, as escaped text, as CommonMark reads it, where 1.4.3 passed it through as HTML.
+
 ## 1.71.0
 
 ### kayjs-ui parts are selected by data-part
@@ -39,10 +45,6 @@ With `store` set in kay.config.ts, a `session()` naming no store keeps its data 
 `input(bind:value={v} {...rest})` bound nothing and said nothing; `kay check` now reports it. Bind a child element, or write the value and the handler.
 
 Releases before 1.71 are in [Upgrading, older releases](upgrading-archive.md).
-### kay needs Bun 1.4.4
-
-kay and its libraries require Bun 1.4.4 or later (`bun upgrade`, or `bun update bun` where the project has the npm `bun` package), and the CLI and `pages()` refuse an older one. Bun 1.4.4 reads a glob differently: `*(1).txt`, `+(a)`, `@(a|b)` and `!(g)` are extglobs, and `{1..3}` is a range. A pattern of an `import.meta.glob` call or of `publicCache` that wrote one of these as literal text escapes it (`*[(]1).txt`); `(group)` folders are unchanged.
-
 ## 1.70.0
 
 ### `part` names a part of a component
