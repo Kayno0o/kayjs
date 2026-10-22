@@ -5,7 +5,7 @@ import { findProjectFiles } from '../build/files'
 import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
 import { parseKay } from '../compiler/parser'
-import { walk } from './ast'
+import { importedName, walk } from './ast'
 import { keyOf } from './retired-lint'
 
 const SOURCE_FILE = /(?:(?<!\.d)\.tsx?|\.kay)$/
@@ -42,8 +42,14 @@ export async function actionOptions(root: string, options: CheckOptions): Promis
         continue
       }
 
+      // A fence has `action` without importing it; a `.ts` file has it from `kay` under whatever name it imports it.
+      const action = file.endsWith('.kay') ? 'action' : importedAction(ast)
+
+      if (action === undefined)
+        continue
+
       walk(ast, (node) => {
-        if (node.type !== 'CallExpression' || node.callee.type !== 'Identifier' || node.callee.name !== 'action' || node.arguments.length < 2)
+        if (node.type !== 'CallExpression' || node.callee.type !== 'Identifier' || node.callee.name !== action || node.arguments.length < 2)
           return
 
         const argument = node.arguments.at(-1)
@@ -89,4 +95,19 @@ function regrouped(source: string, base: number, properties: t.ObjectExpression[
   const kept = properties.filter(property => property === flat[0] || !flat.includes(property as t.ObjectProperty))
 
   return kept.map(property => property === flat[0] ? protect : text(property)).join(separator)
+}
+
+// The local name `action` is imported under from `kay`, if it is.
+function importedAction(ast: t.File): string | undefined {
+  for (const statement of ast.program.body) {
+    if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type' || statement.source.value !== 'kay')
+      continue
+
+    for (const specifier of statement.specifiers) {
+      if (specifier.type === 'ImportSpecifier' && specifier.importKind !== 'type' && importedName(specifier) === 'action')
+        return specifier.local.name
+    }
+  }
+
+  return undefined
 }

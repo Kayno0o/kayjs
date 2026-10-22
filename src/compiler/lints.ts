@@ -313,8 +313,8 @@ export const LINTS = {
     group: 'security',
     site: true,
     summary: 'With `mcp`, an action that sets `tool` and a `honeypot`, `minTime` or `proofOfWork`, with no `_guard.ts` covering it: an agent calls it without the form those protections ask of a person, so anonymous callers can spam it. A guard, or a `rateLimit` with `tool` alone, keeps it in hand.',
-    wrong: '// kay.config.ts sets mcp: true\nexport const subscribe = action(s.Object({ email: s.String() }), save, { tool: true, honeypot: \'website\' })',
-    right: '// src/routes/_guard.ts covers it, or the action keeps tool and drops the honeypot\nexport const subscribe = action(s.Object({ email: s.String() }), save, { tool: true, rateLimit: { max: 5, window: \'1m\' } })',
+    wrong: '// kay.config.ts sets mcp: true\nexport const subscribe = action(s.Object({ email: s.String() }), save, { tool: true, protect: { honeypot: \'website\' } })',
+    right: '// src/routes/_guard.ts covers it, or the action keeps tool and drops the honeypot\nexport const subscribe = action(s.Object({ email: s.String() }), save, { tool: true, protect: { rateLimit: { max: 5, window: \'1m\' } } })',
   },
   'secret-prop': {
     level: 'warn',

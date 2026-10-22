@@ -415,7 +415,17 @@ export function resolveProtection(options: ActionProtection<string> | undefined)
 
   const { protect, ...rest } = options
 
-  return protect === undefined ? rest : { ...rest, ...Object.fromEntries(Object.entries(protect).filter(([, value]) => value !== undefined)) }
+  if (protect == null)
+    return rest
+
+  const grouped: ResolvedProtection = { ...rest }
+
+  for (const [key, value] of Object.entries(protect)) {
+    if (value !== undefined)
+      (grouped as Record<string, unknown>)[key] = value
+  }
+
+  return grouped
 }
 
 function declare(schema: TSchema, handler: (input: unknown, ctx: ActionContext) => unknown, options: ActionProtection<string> | undefined): ServerAction<TSchema, unknown> {

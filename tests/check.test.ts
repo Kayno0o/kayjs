@@ -3725,7 +3725,8 @@ describe.concurrent('kay check, unused code', () => {
   it('reports the checks of an action set outside protect and --fix groups them, leaving a protect, a spread or a comment unfixed', async () => {
     const root = await scratchProject({
       'src/routes/index.kay': '--- server\nexport const a = action(s.Object({ m: s.String() }), send, { rateLimit: { max: 5, window: \'1m\' }, honeypot: \'website\', minTime: \'3s\', messages: { honeypot: \'No\' } })\nexport const b = action(send, { tool: true, proofOfWork: true })\nexport const c = action(send, { protect: { minTime: \'3s\' }, honeypot: \'x\' })\nexport const d = action(send, { ...shared, rateLimit: { max: 1, window: \'1m\' } })\nexport const e = action(send, {\n  rateLimit: { max: 5, window: \'1m\' }, // five a minute\n  tool: true,\n})\nexport const f = action(send, { protect: { rateLimit: { max: 5, window: \'1m\' } }, maxSize: \'1mb\' })\nexport const g = other(send, { honeypot: \'x\' })\n---\np\n',
-      'src/actions.ts': 'export const h = action(send, {\n  rateLimit: { max: 5, window: \'1m\' },\n  tool: true,\n  proofOfWork: 1000,\n})\n',
+      'src/local.ts': 'function action(a: unknown, b: unknown, c: unknown) { return [a, b, c] }\nexport const x = action(1, 2, { minTime: \'3s\' })\n',
+      'src/actions.ts': 'import { action } from \'kay\'\n\nexport const h = action(send, {\n  rateLimit: { max: 5, window: \'1m\' },\n  tool: true,\n  proofOfWork: 1000,\n})\n',
     })
 
     try {
@@ -3733,7 +3734,7 @@ describe.concurrent('kay check, unused code', () => {
 
       expect(output.match(/deprecated-action-options/g)).toHaveLength(6)
       await runCheck(root, '--fix')
-      expect(await Bun.file(join(root, 'src/actions.ts')).text()).toBe('export const h = action(send, {\n  protect: { rateLimit: { max: 5, window: \'1m\' }, proofOfWork: 1000 },\n  tool: true,\n})\n')
+      expect(await Bun.file(join(root, 'src/actions.ts')).text()).toBe('import { action } from \'kay\'\n\nexport const h = action(send, {\n  protect: { rateLimit: { max: 5, window: \'1m\' }, proofOfWork: 1000 },\n  tool: true,\n})\n')
 
       const page = await Bun.file(join(root, 'src/routes/index.kay')).text()
 
@@ -3742,6 +3743,7 @@ describe.concurrent('kay check, unused code', () => {
       expect(page).toContain('export const c = action(send, { protect: { minTime: \'3s\' }, honeypot: \'x\' })')
       expect(page).toContain('export const d = action(send, { ...shared, rateLimit: { max: 1, window: \'1m\' } })')
       expect(page).toContain('  rateLimit: { max: 5, window: \'1m\' }, // five a minute\n  tool: true,')
+      expect(await Bun.file(join(root, 'src/local.ts')).text()).toContain('{ minTime: \'3s\' }')
       expect(page).toContain('export const g = other(send, { honeypot: \'x\' })')
     }
     finally {

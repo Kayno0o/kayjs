@@ -128,12 +128,12 @@ A site that needs a feature `Permissions-Policy` refuses, such as geolocation fo
 
 ## Rate limits
 
-A rate limit answers 429 once a client has posted too often. Set it on an action in the third argument.
+A rate limit answers 429 once a client has posted too often. Set it under `protect` in an action's third argument.
 
 ```kay
 --- server
 export const contact = action(schema, send, {
-  rateLimit: { max: 5, window: '1m' },
+  protect: { rateLimit: { max: 5, window: '1m' } },
 })
 ---
 ```
@@ -216,7 +216,7 @@ Honeypots, a minimum time and proof of work protect a form from bots too. `minTi
 
 ## Proof of work checked in your own code
 
-`proofOfWork: true` on an action checks the work for you. For a form your code checks itself, such as a sign-up handled in an API route, `workChallenge` and `verifyWork` from `kay/server` do the same, bound to a name you pick.
+`protect: { proofOfWork: true }` on an action checks the work for you. For a form your code checks itself, such as a sign-up handled in an API route, `workChallenge` and `verifyWork` from `kay/server` do the same, bound to a name you pick.
 
 ```kay
 ---

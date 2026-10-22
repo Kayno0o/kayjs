@@ -6,7 +6,7 @@ How many times a client may do something in a window, on actions, in guards and 
 
 ### Limit an action
 
-`rateLimit` in an action's third argument answers 429 past `max` posts every `window`, before the handler; the rest of the action's protection is in [Protecting actions](action-protection.md):
+`protect.rateLimit` in an action's third argument answers 429 past `max` posts every `window`, before the handler; the rest of the action's protection is in [Protecting actions](action-protection.md):
 
 ```kay
 --- server
@@ -15,7 +15,7 @@ import { s } from 'kay'
 export const subscribe = action(
   s.Object({ email: s.String({ format: 'email' }) }),
   async ({ email }) => email.length,
-  { rateLimit: { max: 5, window: '1m' } },
+  { protect: { rateLimit: { max: 5, window: '1m' } } },
 )
 ---
 form(action={subscribe})

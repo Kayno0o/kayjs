@@ -730,7 +730,8 @@ describe('kay check', () => {
 
     await Bun.write(join(dir, 'src/routes/spread.kay'), page('{ tool: true, ...shared }'))
     await Bun.write(join(dir, 'src/routes/opaque.kay'), page('shared').replace('spread', 'opaque'))
-    expect((await reported(dir, true)).filter(([file]) => file !== 'src/routes/index.kay')).toEqual([['src/routes/spread.kay', 'spread']])
+    await Bun.write(join(dir, 'src/routes/flat.kay'), page('{ tool: true, honeypot: \'website\' }').replace('spread', 'flat'))
+    expect((await reported(dir, true)).filter(([file]) => file !== 'src/routes/index.kay')).toEqual([['src/routes/flat.kay', 'flat'], ['src/routes/spread.kay', 'spread']])
   })
 
   it('reports each route where it is written, not at the start of its chain', async () => {
