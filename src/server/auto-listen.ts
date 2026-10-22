@@ -120,6 +120,9 @@ export function listenIdleApps(): void {
     if (!listening(app) && !serving(started.slice(before), app, plugin))
       listenSafely(app)
   }
+
+  // Each server holds its `fetch`, which holds the app of one run of the entry: kept across `kay dev` reloads they would pile up.
+  started.length = 0
 }
 
 // Whether the main module is already being waited on to its end.
