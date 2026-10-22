@@ -17,7 +17,7 @@ export default defineConfig({
   extensions: [{
     name: 'probe',
     appFiles: { hooks: 'src/probe.ts', mail: 'src/probe-mail.ts' },
-    server: ({ root, modules }) => new Elysia().get('/probe', () => JSON.stringify({ hooks: modules.hooks?.word ?? null, mail: modules.mail?.word ?? null, root })),
+    server: ({ root, modules, extensions }) => new Elysia().get('/probe', () => JSON.stringify({ hooks: modules.hooks?.word ?? null, mail: modules.mail?.word ?? null, root, extensions })),
   }],
 })
 `
@@ -96,7 +96,7 @@ describe('the files an extension names in appFiles', () => {
       await extensionServers([extension], root)
       await extensionServers([extension], root)
       expect(seen).toHaveLength(2)
-      expect(seen[0]).toMatchObject({ root, modules: { hooks: { word: 'one' } } })
+      expect(seen[0]).toMatchObject({ root, modules: { hooks: { word: 'one' } }, extensions: ['probe'] })
       expect(seen[0]).not.toBe(seen[1])
     }
     finally {
@@ -129,8 +129,8 @@ describe('the files an extension names in appFiles', () => {
       const without = await run([process.execPath, 'serve.ts'], absent, { KAY_ROOT: absent })
 
       expect(withFiles.stderr).not.toContain('error')
-      expect(probed(withFiles.stdout)).toEqual({ hooks: 'hooked', mail: 'mailed', root: present })
-      expect(probed(without.stdout)).toEqual({ hooks: null, mail: null, root: absent })
+      expect(probed(withFiles.stdout)).toEqual({ hooks: 'hooked', mail: 'mailed', root: present, extensions: ['probe'] })
+      expect(probed(without.stdout)).toEqual({ hooks: null, mail: null, root: absent, extensions: ['probe'] })
     }
     finally {
       await Promise.all([rm(present, { recursive: true, force: true }), rm(absent, { recursive: true, force: true })])
@@ -157,11 +157,82 @@ describe('the files an extension names in appFiles', () => {
 
       expect(withFile.code).toBe(0)
       // The data the extension keeps lives where the executable runs, not where it was built.
-      expect(probed(withFile.stdout)).toEqual({ hooks: 'hooked', mail: null, root: realpathSync(elsewhere) })
-      expect(probed(without.stdout)).toEqual({ hooks: null, mail: null, root: realpathSync(elsewhere) })
+      expect(probed(withFile.stdout)).toEqual({ hooks: 'hooked', mail: null, root: realpathSync(elsewhere), extensions: ['probe'] })
+      expect(probed(without.stdout)).toEqual({ hooks: null, mail: null, root: realpathSync(elsewhere), extensions: ['probe'] })
     }
     finally {
       await Promise.all([present, absent, elsewhere].map(async dir => rm(dir, { recursive: true, force: true })))
     }
   }, 180_000)
+})
+
+// An app listing auth() beside mail(), with a probe route registering a user and answering the mails kayjs-mail kept.
+function AUTH_CONFIG(withMail: boolean) {
+  return `import { auth } from '@kaynooo/kayjs-auth'
+import { mail, outbox } from '@kaynooo/kayjs-mail'
+import { Elysia } from 'elysia'
+import { defineConfig } from 'kay/server'
+import { mail as mailer } from './src/mail'
+
+export default defineConfig({
+  site: 'http://localhost',
+  extensions: [
+    auth({ viewer: false, captcha: false }),
+    ${withMail ? 'mail({ module: \'./src/mail\' }),' : ''}
+    { name: 'probe', server: () => new Elysia().post('/probe', async (ctx) => {
+      await (ctx as unknown as { auth: { register: (input: unknown) => Promise<unknown> } }).auth.register({ email: 'ada@example.com', password: 'correct horse battery' })
+      for (let wait = 0; wait < 100 && outbox.mails.length === 0; wait++) {
+        await mailer.drain()
+        await Bun.sleep(50)
+      }
+
+      return JSON.stringify(outbox.mails.map(sent => ({ subject: sent.subject, styled: sent.html?.includes('<table') ?? false })))
+    }) },
+  ],
+})
+`
+}
+
+const AUTH_SERVE = `import { pages } from 'kay/server'
+
+const app = await pages({ prebuilt: true })
+const answer = await (await app.handle(new Request('http://localhost/probe', { method: 'POST', headers: { origin: 'http://localhost' } }))).text()
+
+console.log(JSON.stringify({ probe: answer }))
+process.exit(0)
+`
+
+describe('auth() beside mail()', () => {
+  it('sends the auth mails in kayjs-mail\'s wording from an executable, which has no kay.config.ts beside it, as kay dev does', async () => {
+    const files = (withMail: boolean) => app({
+      'package.json': JSON.stringify({ name: 'app', dependencies: { '@iconify-json/tabler': '*' } }),
+      'kay.config.ts': AUTH_CONFIG(withMail),
+      'serve.ts': AUTH_SERVE,
+      'src/mail.ts': 'import { mailer, outbox } from \'@kaynooo/kayjs-mail\'\n\nexport const mail = mailer({ from: \'site@localhost\', transport: outbox })\n',
+    })
+
+    const [listed, unlisted, elsewhere] = await Promise.all([written(files(true)), written(files(false)), scratchDir('app-files-elsewhere-')])
+
+    try {
+      const answers: unknown[] = []
+
+      for (const root of [listed, unlisted]) {
+        const built = await run([process.execPath, CLI, 'build', '--no-check', '--compile', 'server', '--entry', 'serve.ts'], root)
+
+        expect(built.stderr).not.toContain('error')
+        expect(built.code).toBe(0)
+
+        const ran = await run([join(root, 'server')], elsewhere, { KAY_SECRET: 'a-secret-long-enough-for-a-kay-session-cookie' })
+
+        expect(ran.code).toBe(0)
+        answers.push(JSON.parse((JSON.parse(ran.stdout) as { probe: string }).probe))
+      }
+
+      // Themed html comes from kayjs-mail's views, which an executable finds by the extension listed and not by reading kay.config.ts; with no mail() listed the bare mailer sends kayjs-auth's own.
+      expect(answers).toEqual([[{ subject: 'Confirm your email for localhost', styled: true }], [{ subject: 'Confirm your email for localhost', styled: false }]])
+    }
+    finally {
+      await Promise.all([listed, unlisted, elsewhere].map(async dir => rm(dir, { recursive: true, force: true })))
+    }
+  }, 240_000)
 })

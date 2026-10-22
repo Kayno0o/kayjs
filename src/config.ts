@@ -404,10 +404,12 @@ export interface ExtensionProblem {
   help?: string | undefined
 }
 
-// What kay hands an extension's `server` function: the root its own files (a database file, a cache) live under, and the modules of the files it named in `appFiles`.
+// What kay hands an extension's `server` function: the root its own files (a database file, a cache) live under, the modules of the files it named in `appFiles`, and the names of the extensions the config lists.
 export interface ExtensionApp {
   // The project root, or the folder an executable runs in.
   root: string
+  // The `name` of every extension the config lists, the app's `src/plugins` files included, for an extension to tell which libraries the app registered, in an executable too.
+  extensions: string[]
   modules: Record<string, Record<string, unknown> | undefined>
 }
 
@@ -475,13 +477,15 @@ export function serverExtensions(root: string, extensions: KayExtension[] | unde
 
 // The server plugins the extensions carry, in their order, those given as a function built now.
 export async function extensionServers(extensions: KayExtension[] | undefined, root: string): Promise<{ name: string, server: AnyElysia }[]> {
+  const names = (extensions ?? []).map(extension => extension.name)
+
   return Promise.all((extensions ?? []).flatMap((extension) => {
     const { name, server, serverModule } = extension
 
     if (serverModule !== undefined)
       return [(async () => ({ name, server: await serverFromModule(name, serverModule, root) }))()]
 
-    return server === undefined ? [] : [(async () => ({ name, server: typeof server === 'function' ? await server({ root: bundled() ? process.cwd() : root, modules: await appModules(root, extension) }) : server }))()]
+    return server === undefined ? [] : [(async () => ({ name, server: typeof server === 'function' ? await server({ root: bundled() ? process.cwd() : root, modules: await appModules(root, extension), extensions: names }) : server }))()]
   }))
 }
 

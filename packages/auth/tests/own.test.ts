@@ -36,14 +36,14 @@ afterEach(() => {
 type Options = OwnOptions<string, string>
 
 // What kay's `pages()` hands the server function: the root, and the app files the extension named.
-async function boot(extension: KayExtension, at = root): Promise<AnyElysia> {
-  return (extension.server as (app: unknown) => Promise<AnyElysia>)({ root: at, modules: await appModules(at, extension) })
+async function boot(extension: KayExtension, at = root, extensions: string[] = []): Promise<AnyElysia> {
+  return (extension.server as (app: unknown) => Promise<AnyElysia>)({ root: at, modules: await appModules(at, extension), extensions })
 }
 
 // The app an `auth()` with no module serves, the way kay's `pages()` mounts its server.
-async function served(options: Options) {
+async function served(options: Options, extensions: string[] = []) {
   const extension = auth({ captcha: false, store: memoryAuthStore(), ...options })
-  const plugin = await boot(extension)
+  const plugin = await boot(extension, root, extensions)
 
   const app = new Elysia()
     .use(plugin)
@@ -92,9 +92,9 @@ describe('auth() with no module', () => {
 
   test('the app\'s auth reaches the commands, built once', async () => {
     const extension = auth({ store: memoryAuthStore() })
-    const load = (extension as unknown as Record<symbol, (root: string) => Promise<unknown>>)[LOAD_AUTH]!
+    const load = (extension as unknown as Record<symbol, (root: string, extensions: string[]) => Promise<unknown>>)[LOAD_AUTH]!
 
-    expect(await load(root)).toBe(await load(root))
+    expect(await load(root, [])).toBe(await load(root, []))
   })
 })
 

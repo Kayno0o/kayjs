@@ -293,11 +293,11 @@ export function auth(options: object = {}): AuthPages {
 function ownAuth(options: OwnOptions): AuthPages {
   const prefix = options.prefix ?? DEFAULT_PREFIX
   // Built again only when the hooks or the mail module are not the ones it was built from, so a reload under `kay dev` that left them alone keeps the store it opened.
-  let current: { root: string, hooks: unknown, mail: unknown, built: Promise<UserMaker & { plugin: AnyElysia }> } | undefined
+  let current: { root: string, hooks: unknown, mail: unknown, extensions: string, built: Promise<UserMaker & { plugin: AnyElysia }> } | undefined
 
   const build = async (app: ExtensionApp) => {
-    if (current?.root !== app.root || current.hooks !== app.modules.hooks || current.mail !== app.modules.mail)
-      current = { root: app.root, hooks: app.modules.hooks, mail: app.modules.mail, built: buildOwn(options, app) }
+    if (current?.root !== app.root || current.hooks !== app.modules.hooks || current.mail !== app.modules.mail || current.extensions !== app.extensions.join())
+      current = { root: app.root, hooks: app.modules.hooks, mail: app.modules.mail, extensions: app.extensions.join(), built: buildOwn(options, app) }
 
     return current.built
   }
@@ -315,7 +315,7 @@ function ownAuth(options: OwnOptions): AuthPages {
     home: options.home ?? '/',
   }
 
-  return Object.assign(extension, { [LOAD_AUTH]: async (root: string) => await build({ root, modules: await appModules(root, extension) }) as UserMaker })
+  return Object.assign(extension, { [LOAD_AUTH]: async (root: string, extensions: string[]) => await build({ root, modules: await appModules(root, extension), extensions }) as UserMaker })
 }
 
 function moduleAuth(options: AuthExtensionOptions): AuthPages {

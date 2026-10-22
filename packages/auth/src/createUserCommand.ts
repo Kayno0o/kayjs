@@ -145,7 +145,7 @@ export function createUserCommand(ask: () => Promise<string | undefined>): KayCo
       if (!isEmail && values.username !== undefined)
         return refuse('auth create-user was given two usernames: the one to sign in with, and --username')
 
-      const loader = (config.extensions ?? []).map(extension => (extension as { [LOAD_AUTH]?: (root: string) => Promise<UserMaker> })[LOAD_AUTH]).find(load => load !== undefined)
+      const loader = (config.extensions ?? []).map(extension => (extension as { [LOAD_AUTH]?: (root: string, extensions: string[]) => Promise<UserMaker> })[LOAD_AUTH]).find(load => load !== undefined)
 
       if (loader === undefined) {
         console.error('kay auth create-user: kay.config.ts lists no auth() to find the app\'s auth through')
@@ -173,7 +173,7 @@ export function createUserCommand(ask: () => Promise<string | undefined>): KayCo
 
       try {
         // The app's auth loads, and the login is checked, before a password is asked twice for a user that cannot be made.
-        const auth = await loader(root)
+        const auth = await loader(root, (config.extensions ?? []).map(extension => extension.name))
         const problems = await auth[CHECK_USER]({ ...email !== undefined && { email }, ...username !== undefined && { username }, ...roles && { roles } })
 
         if (Object.keys(problems).length > 0) {

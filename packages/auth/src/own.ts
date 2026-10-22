@@ -7,7 +7,6 @@ import type { ProviderOptions } from './oauth/providers'
 import type { AuthPagesConfig, AuthPagesOptions, UserMaker } from './pages'
 import type { AuthStore } from './store'
 import type { OwnTest } from './test'
-import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { s } from 'kay'
@@ -71,7 +70,8 @@ export interface OwnOptions<Role extends string = string, Prefix extends string 
 
 export type OwnPlugin<Role extends string, Prefix extends string, Scope extends string, OrgRole extends string, UserData extends object> = ReturnType<typeof CreateAuth<AuthSessionData, Role, Prefix, Scope, OrgRole, UserData>>['plugin']
 
-const MAIL_REGISTERED = /\bmail(?:Extension)?\(/
+// The name kayjs-mail's `mail()` extension lists itself by.
+const MAIL_EXTENSION = '@kaynooo/kayjs-mail'
 // A relative SQLite path: `sqlite://data/auth.db`, not `sqlite:///srv/auth.db` or `sqlite://:memory:`.
 const SQLITE_FILE = /^sqlite:(?:\/\/)?(?![/:])([^?]+)$/
 
@@ -183,7 +183,7 @@ async function emailOf(email: OwnOptions['email'], app: ExtensionApp): Promise<E
     return undefined
 
   // kayjs-mail registered in kay.config.ts brings its wording, views and theme to the mails, as `kay add auth` writes it.
-  if (!MAIL_REGISTERED.test(existsSync(resolve(app.root, 'kay.config.ts')) ? readFileSync(resolve(app.root, 'kay.config.ts'), 'utf8') : ''))
+  if (!app.extensions.includes(MAIL_EXTENSION))
     return { mailer: { send: send as never } }
 
   try {

@@ -49,7 +49,7 @@ describe('cms()', () => {
 
     expect(() => {
       if (typeof server === 'function')
-        void server({ root: process.cwd(), modules: {} })
+        void server({ root: process.cwd(), modules: {}, extensions: [] })
     }).toThrow('kay: a production server saves no edit to the working tree, which the next deploy replaces: set CMS_BASE_URL, CMS_REPO and CMS_TOKEN')
   })
 
@@ -59,14 +59,14 @@ describe('cms()', () => {
     const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
     const told = cms({ files: workingTree() }).server
 
-    expect(typeof told === 'function' && told({ root: process.cwd(), modules: {} })).toBeTruthy()
+    expect(typeof told === 'function' && told({ root: process.cwd(), modules: {}, extensions: [] })).toBeTruthy()
     warned.mockRestore()
 
     process.env.NODE_ENV = 'development'
 
     const dev = cms().server
 
-    expect(typeof dev === 'function' && dev({ root: process.cwd(), modules: {} })).toBeTruthy()
+    expect(typeof dev === 'function' && dev({ root: process.cwd(), modules: {}, extensions: [] })).toBeTruthy()
   })
 
   describe('a production server with no files', () => {
@@ -83,7 +83,7 @@ describe('cms()', () => {
       const { server } = cms({ guard: () => undefined })
 
       if (typeof server === 'function')
-        void server({ root: process.cwd(), modules: {} })
+        void server({ root: process.cwd(), modules: {}, extensions: [] })
     }
 
     test('commits through the Forgejo CMS_BASE_URL, CMS_REPO, CMS_TOKEN and CMS_BRANCH name, and lists them for kay env', async () => {
@@ -132,7 +132,7 @@ describe('cms()', () => {
       const { server } = cms({ files: workingTree(), ...options })
 
       if (typeof server === 'function')
-        void server({ root: process.cwd(), modules: {} })
+        void server({ root: process.cwd(), modules: {}, extensions: [] })
 
       return warned.mock.calls.map(call => String(call[0]))
     }
@@ -161,7 +161,7 @@ describe('cms() missing field kinds', () => {
     const config = await import('./fixture/src/content.config') as Record<string, unknown>
     const before = registerCollections(Object.entries(config) as Parameters<typeof registerCollections>[0])
     const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
-    const app = (typeof server === 'function' ? await server({ root: process.cwd(), modules: {} }) : server)!
+    const app = (typeof server === 'function' ? await server({ root: process.cwd(), modules: {}, extensions: [] }) : server)!
 
     try {
       // The working directory is the package's, not the project: the root is the one the content config settled.
