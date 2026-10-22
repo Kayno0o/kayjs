@@ -642,7 +642,7 @@ Save is disabled until something changed, and Ctrl or Cmd+S saves from anywhere 
 
 Publish, Unpublish, Publish now and Clear schedule each change one field and save it. With unsaved edits they refuse and ask you to save or cancel them first, so they never save half-typed text. If the save is refused, the form goes back to how it was. Delete names the entry, warns that the page of one that has a page stops answering, and lists the entries that name it in a reference field.
 
-If Delete leaves the screen and you decline the question about edits not saved, the form is replaced by a notice with a link to the collection.
+If you decline the question about edits not saved when Delete takes you to the collection, the form is replaced by a notice with a link to the collection.
 
 After a save the site shows only once it has rebuilt, the line by the buttons says `Not live yet` until the public page serves the change, then `Live now`.
 

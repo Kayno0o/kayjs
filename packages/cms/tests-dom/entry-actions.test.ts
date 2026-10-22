@@ -242,7 +242,8 @@ test('Ctrl+S in a field saves and leaves the caret in it once the save ends', as
 })
 
 test('Delete with edits not saved, when leaving is declined, locks the form and leaves a notice linking the collection screen', async () => {
-  server()
+  const { fetched } = server()
+
   spyOn(window.location, 'assign').mockImplementation(() => undefined)
 
   const ask = spyOn(globalThis, 'confirm').mockImplementation(() => false)
@@ -257,11 +258,18 @@ test('Delete with edits not saved, when leaving is declined, locks the form and 
   document.querySelector<HTMLButtonElement>('dialog[open] .kui-btn-danger')!.click()
   await pause()
   await pause()
-  expect(ask).toHaveBeenCalled()
+  expect(ask).toHaveBeenCalledTimes(1)
   expect(root.querySelector('.kcms-entry-failure')!.textContent).toContain('This entry is deleted.')
   expect(root.querySelector('.kcms-entry-failure a')!.getAttribute('href')).toBe('/admin/collections/posts')
   expect(root.querySelector('fieldset')).toBeNull()
   expect(buttons(root)).toEqual([])
+
+  const sent = fetched.mock.calls.length
+
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true }))
+  await pause()
+  expect(fetched.mock.calls.filter(call => (call[1])?.method === 'DELETE')).toHaveLength(1)
+  expect(fetched.mock.calls.length).toBe(sent)
 })
 
 test('a role that may not publish or delete sees those buttons disabled, with the reason as their tooltip', async () => {

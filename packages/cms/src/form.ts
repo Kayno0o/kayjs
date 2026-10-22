@@ -366,8 +366,11 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
 
       const screen = collectionPath(prefix, collection.name)
 
-      if (!await navigate(screen, { replace: true }))
+      // Declined over the entry's own edits: they are of an entry that is gone, so they no longer hold the leave nor feed a save.
+      if (!await navigate(screen, { replace: true })) {
+        drafts.reset(ref)
         stranded.set(screen)
+      }
     },
     async rename(next, onRefused) {
       const renamed = await renameSaved(ref, next, drafts.version(ref), onRefused)
