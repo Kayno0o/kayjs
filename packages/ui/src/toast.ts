@@ -151,16 +151,14 @@ export function messageOf(error: unknown, fallback: string): string {
 }
 
 function refusalOf<Data>(error: unknown, refused: ((data: Data) => string | undefined) | undefined): string | undefined {
-  if (error instanceof ApiError)
-    return refusalOfApi(error, refused)
+  if (error instanceof ActionError) {
+    // A schema refusal carries no handler data for `refused` to read.
+    const said = error.data === undefined ? undefined : readRefused(refused, error.data as Data)
 
-  if (!(error instanceof ActionError))
-    return undefined
+    return [said, error.errors['']].find(message => message !== undefined && message !== '')
+  }
 
-  // A schema refusal carries no handler data for `refused` to read.
-  const said = error.data === undefined ? undefined : readRefused(refused, error.data as Data)
-
-  return [said, error.errors['']].find(message => message !== undefined && message !== '')
+  return error instanceof ApiError ? refusalOfApi(error, refused) : undefined
 }
 
 // A route's refusal: `refused` reads its answer, else the words the route gave, which a server fault, an answer that never came or a bare status keep to `failure`.
