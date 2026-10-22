@@ -19,7 +19,7 @@ describe('the release\'s link check', () => {
     const islands = await read('llms/islands.md')
     const broken = async (target: string) => brokenLinks(new Map([['llms/islands.md', islands.replace('# ', `[Library](${target})\n\n# `)]]))
 
-    expect(await broken('../packages/ui/llms/forms.md#components')).toEqual([])
+    expect(await broken('../packages/ui/llms/forms.md#common-tasks')).toEqual([])
     expect(await broken('../packages/cms/llms.txt')).toEqual([])
     expect(await broken('../packages/ui/llms/forms.md#nope')).toEqual(['llms/islands.md: /llms/kayjs-ui-forms#nope'])
     expect(await broken('../packages/ui/llms/nope.md')).toEqual(['llms/islands.md: /llms/kayjs-ui-nope'])
