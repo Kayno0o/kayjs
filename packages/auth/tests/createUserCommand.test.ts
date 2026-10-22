@@ -238,6 +238,8 @@ describe('reading a secret on a terminal', () => {
       await seen('Password: ')
       child.kill('SIGTERM')
       expect(await child.exited).toBe(143)
+      // The child's last line can reach the terminal after its exit does.
+      await Promise.race([seen('exit raw=false'), hangs(5000)])
       expect(output()).toContain('exit raw=false')
     }
     finally {
