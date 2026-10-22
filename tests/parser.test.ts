@@ -166,6 +166,15 @@ describe('fence', () => {
 })
 
 describe('elements', () => {
+  it('reads bind:open on a component as an expression attribute', () => {
+    const file = parse('Toggle(bind:open={open} bind:count={a.b})\n')
+    const toggle = element(file.template[0])
+
+    expect(file.diagnostics).toEqual([])
+    expect(toggle.component).toBe(true)
+    expect(toggle.attributes.map(attribute => attribute.kind === 'expression' ? [text(file, attribute.name), text(file, attribute.expression)] : undefined)).toEqual([['bind:open', 'open'], ['bind:count', 'a.b']])
+  })
+
   it('reads shorthand classes and id, with div implied', () => {
     const file = parse('.card#main.wide\nsection.a.b')
 

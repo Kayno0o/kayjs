@@ -156,8 +156,9 @@ export abstract class TemplateWriter {
     const parts = partsOf(element, this.src, this.facts.parts)
     const partAttr = partAttribute(element, this.src)
 
-    if (parts.length > 0)
+    if (parts.length > 0) {
       plan.classes = { text: this.staticClass(element, classAttribute?.kind === 'expression' ? undefined : classAttribute).trim(), expression: classAttribute?.kind === 'expression' ? classAttribute.expression : undefined, parts }
+    }
     else if (element.classes.length > 0) {
       if (classAttribute?.kind === 'expression')
         plan.classes = { text: this.shorthand(element), expression: classAttribute.expression }
@@ -394,7 +395,7 @@ export abstract class TemplateWriter {
 
     // `bind:open={open}` hands a component the value and the way to write it back: a getter and a setter, the setter reaching the signal, or the `Bindable` prop of this component the name stands for.
     const boundEntry = (attribute: Extract<NamedAttribute, { kind: 'expression' }>, name: string) => {
-      const passedOn = bindsOwnProp(this.facts, this.source(attribute.expression))
+      const passedOn = bindsOwnProp(this.facts, attribute, this.source(attribute.expression))
       const target = () => b.add('(').addSource(attribute.expression).add(')')
       const read = () => passedOn === undefined ? target().add('()') : target()
 

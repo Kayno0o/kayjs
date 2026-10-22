@@ -1,0 +1,9 @@
+---
+import { type Bindable } from 'kay'
+import ByName from './by-name.kay'
+
+const { label, ...rest } = props<{ label: string, open: Bindable<boolean> }>()
+---
+span.label {label}
+div.wrap
+  ByName({...rest})

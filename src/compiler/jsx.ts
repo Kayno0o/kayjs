@@ -948,7 +948,7 @@ export class JsxTemplate {
   // `bind:open={open}` on a component passes the prop the signal's value and, to the types, the way to write it back, which only a prop typed `Bindable` takes; the name of a `Bindable` prop of this component stands for itself.
   private emitComponentBind(element: ElementNode, attribute: Extract<Attribute, { kind: 'expression' }>, prop: string) {
     const { b } = this
-    const passedOn = bindsOwnProp(this.facts, this.text(attribute.expression))
+    const passedOn = bindsOwnProp(this.facts, attribute, this.text(attribute.expression))
 
     b.wrap(attribute.name, () => b.add(prop))
     b.add('={KayBound(').addSource(element.tag).add(')(').wrap(attribute.name, () => b.add(JSON.stringify(prop))).add(', (').addSource(attribute.expression).add(passedOn === undefined ? ')()' : ')')

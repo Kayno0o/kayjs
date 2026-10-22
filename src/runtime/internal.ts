@@ -121,7 +121,7 @@ export function bindable<Props extends object>(props: Props, keys: readonly stri
     return kept
   }
 
-  return new Proxy(props, {
+  const proxy: Props = new Proxy(props, {
     get(target, key, receiver) {
       const parent = Reflect.get(target, key, receiver)
 
@@ -161,7 +161,18 @@ export function bindable<Props extends object>(props: Props, keys: readonly stri
 
       return true
     },
+    // `omit` and `merge` copy descriptors, so `...rest` and a props spread hand on the prop as this component reads and writes it, not the parent's original.
+    getOwnPropertyDescriptor(target, key) {
+      const descriptor = Reflect.getOwnPropertyDescriptor(target, key)
+
+      if (!descriptor || !names.has(key) || descriptor.configurable === false)
+        return descriptor
+
+      return { configurable: true, enumerable: descriptor.enumerable ?? true, get: () => Reflect.get(proxy, key), set: (value: unknown) => void Reflect.set(proxy, key, value) }
+    },
   })
+
+  return proxy
 }
 
 // What a child wrote to a prop, with the value the parent held then, and the version readers track for the writes.

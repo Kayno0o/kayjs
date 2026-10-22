@@ -1,0 +1,6 @@
+---
+import { type Bindable } from 'kay'
+
+const { open } = props<{ open: Bindable<boolean> }>()
+---
+button.name(onClick={() => open = !open}) {open ? 'on' : 'off'}

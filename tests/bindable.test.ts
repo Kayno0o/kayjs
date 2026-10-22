@@ -3,6 +3,7 @@ import { compileKay } from '../src/compiler'
 import { signal } from '../src/runtime/core'
 import { bindable } from '../src/runtime/internal'
 import { flush, renderEffect, root } from '../src/runtime/reactive'
+import { merge, omit } from '../src/runtime/values'
 
 const PARENT = '---\nimport { signal } from \'kay\'\nimport Toggle from \'./Toggle.kay\'\nconst open = signal(false)\n---\nToggle(bind:open={open})\n'
 const CHILD = '---\nimport { type Bindable } from \'kay\'\nconst { open } = props<{ open: Bindable<boolean> }>()\n---\nbutton(onClick={() => open = !open}) go\n'
@@ -48,8 +49,27 @@ describe('bind: on a component', () => {
 
     expect(dom).toContain('__props = KayBindable(__props, ["open"])')
     expect(dom).toContain('__props.open = !__props.open')
-    expect(compile(CHILD, 'html').tsx).toContain('KayBindable')
+    expect(compile(CHILD, 'html').tsx).not.toContain('KayBindable')
     expect(compile(CHILD.replace('Bindable<boolean>', 'boolean').replace('import { type Bindable } from \'kay\'\n', ''), 'dom').tsx).not.toContain('KayBindable')
+  })
+
+  it('takes the name of a loop variable, a snippet parameter or a const for the value it is, not for the prop', () => {
+    const child = (template: string) => `---\nimport { type Bindable, signal } from 'kay'\nimport Toggle from './Toggle.kay'\nconst { open } = props<{ open: Bindable<boolean> }>()\nconst flags = [signal(false)]\n---\n${template}`
+
+    for (const template of ['for open of flags\n  Toggle(bind:open={open})\n', 'snippet row(open: Signal<boolean>)\n  Toggle(bind:open={open})\nrow(flags[0]!)\n', 'const open = flags[0]!\nToggle(bind:open={open})\n']) {
+      const dom = compile(child(template), 'dom').tsx
+
+      expect(dom).toContain('.set(kayValue)')
+      expect(dom).not.toContain('__props["open"] = kayValue')
+    }
+
+    expect(compile(child('Toggle(bind:open={open})\nfor open of flags\n  Toggle(bind:open={open})\n'), 'dom').tsx).toMatch(/__props\["open"\] = kayValue[\s\S]*\.set\(kayValue\)/)
+  })
+
+  it('refuses a bind on a member of the rest props, a value, and says to spread them', () => {
+    const rest = '---\nimport { type Bindable } from \'kay\'\nimport Toggle from \'./Toggle.kay\'\nconst { label, ...rest } = props<{ label: string, open: Bindable<boolean> }>()\n---\nToggle(bind:open={rest.open})\n'
+
+    expect(compile(rest, 'dom').diagnostics.map(d => d.message)).toEqual([expect.stringContaining('is a value')])
   })
 
   it('types the bind in check mode against the Bindable prop', () => {
@@ -122,6 +142,29 @@ describe('the props of a component with a Bindable prop', () => {
     flag.set(false)
     flush()
     expect(props.open).toBe(false)
+  })
+
+  it('hands the prop on as this component holds it through the rest props and a spread', () => {
+    const open = signal(false)
+    const bound = bindable({ label: 'a', get open() {
+      return open()
+    }, set open(value: boolean) {
+      open.set(value)
+    } }, ['open'])
+    const plain = bindable({ label: 'a', open: false }, ['open'])
+
+    plain.open = true
+
+    for (const props of [omit(plain, 'label'), merge(plain)]) {
+      expect(props.open).toBe(true)
+      props.open = false
+      expect(plain.open).toBe(false)
+      plain.open = true
+    }
+
+    expect(omit(bound, 'label').label).toBeUndefined()
+    omit(bound, 'label').open = true
+    expect(open()).toBe(true)
   })
 
   it('leaves the other props to the target', () => {

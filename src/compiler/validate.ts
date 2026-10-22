@@ -153,6 +153,8 @@ class Validator {
   private foreign = false
   // The names bound to an imported PNG, JPEG, WebP, GIF or AVIF, whose size kay writes on the `img` showing them.
   private sizedImports = new Set<string>()
+  // The name of the props the script left out of its destructuring: a plain object, whose members are values.
+  private restName: string | undefined
 
   constructor(private readonly file: KayFile, private readonly options: ValidateOptions) {
     this.src = file.source
@@ -160,6 +162,7 @@ class Validator {
   }
 
   run(script: ScriptAnalysis, server: ServerAnalysis | undefined): Diagnostic[] {
+    this.restName = script.props?.rest && this.text(script.props.rest)
     this.sizedImports = new Set([...script.imports, ...(server?.imports ?? [])].filter(binding => binding.imported === 'default' && !binding.typeOnly && RESIZABLE.test(binding.source)).map(binding => binding.local))
 
     if (server && this.options.includeServer !== false) {
@@ -499,9 +502,14 @@ class Validator {
 
   // `bind:open={open}` on a component hands it the signal `open` or a `Bindable` prop of the component, named whole or as a member of one.
   private componentBind(attribute: Extract<NamedAttribute, { kind: 'expression' }>, name: string): void {
+    const expression = this.text(attribute.expression)
+    const [root, ...members] = expression.split('.')
+
     if (name === 'bind:')
       this.error(attribute.name, '`bind:` names the prop it binds', { help: '`bind:open={open}`' })
-    else if (!BOUND_NAME.test(this.text(attribute.expression)))
+    else if (this.restName !== undefined && members.length > 0 && root!.trim() === this.restName)
+      this.error(attribute.expression, `\`${expression.trim()}\` is a value, so \`${name}\` has nothing to write`, { help: `spread \`...${this.restName}\` to hand the prop on, or name the prop` })
+    else if (!BOUND_NAME.test(expression))
       this.error(attribute.expression, `\`${name}\` needs a signal or a \`Bindable\` prop`, { help: 'name the signal, or the prop of this component, that it writes' })
   }
 

@@ -1,10 +1,11 @@
 import type * as t from '@babel/types'
-import type { KayFile, Node, Span } from './ast'
+import type { Attribute, KayFile, Node, Span } from './ast'
 import { parseExpression } from '@babel/parser'
-import { nodeExpressions, visitNodes } from './ast'
+import { childBlocks, nodeExpressions, visitNodes } from './ast'
 import { codeOf, KAY_NAME } from './script'
 
 const WORD = /[\w$]+/g
+const FIRST_NAME = /^\s*([\w$]+)/
 
 // The spans of a node that declare names for its children, which its expressions do not read.
 function binders(node: Node): Span[] {
@@ -118,4 +119,65 @@ function readsOf(file: KayFile): string[] {
   })
 
   return [...read].filter(name => !bound.has(name))
+}
+
+// The child blocks of a node with the spans naming what each sees besides its parent's names: a loop's item and index, a snippet's or slot's parameters, a branch's alias.
+function scopedBlocks(node: Node): [Node[], Span[]][] {
+  switch (node.kind) {
+    case 'for':
+      return [[node.children, node.index ? [node.item, node.index] : [node.item]], [node.fallback ?? [], []]]
+    case 'snippet':
+      return [[node.children, [node.params]]]
+    case 'slot':
+      return [[node.children, node.params ? [node.params] : []]]
+    case 'if':
+      return [...node.branches.map((branch): [Node[], Span[]] => [branch.children, branch.alias ? [branch.alias] : []]), [node.fallback?.children ?? [], []]]
+    case 'await':
+      return [[node.pending, []], [node.resolved?.children ?? [], node.resolved?.alias ? [node.resolved.alias] : []], [node.rejected?.children ?? [], node.rejected?.alias ? [node.rejected.alias] : []]]
+    case 'try':
+      return [[node.children, []], [node.rejected?.children ?? [], node.rejected?.alias ? [node.rejected.alias] : []]]
+    case 'const':
+    case 'element':
+    case 'error':
+    case 'match':
+    case 'pending':
+    case 'text':
+      break
+  }
+
+  return childBlocks(node).map((block): [Node[], Span[]] => [block, []])
+}
+
+// The `bind:` attributes of a component whose expression starts with a name the template declares where it stands, a loop variable, a snippet parameter or a `const`: it is that value, not the prop of the same name.
+export function shadowedBinds(file: KayFile): WeakSet<Attribute> {
+  const shadowed = new WeakSet<Attribute>()
+  const text = (span: Span) => file.source.slice(span.start, span.end)
+  const names = (spans: Span[]) => spans.flatMap(span => text(span).match(WORD) ?? [])
+
+  const walk = (nodes: readonly Node[], scope: ReadonlySet<string>): void => {
+    const here = new Set(scope)
+
+    for (const node of nodes) {
+      if (node.kind === 'const') {
+        for (const name of names([node.pattern]))
+          here.add(name)
+
+        continue
+      }
+
+      if (node.kind === 'element' && node.component) {
+        for (const attribute of node.attributes) {
+          if (attribute.kind === 'expression' && text(attribute.name).startsWith('bind:') && here.has(FIRST_NAME.exec(text(attribute.expression))?.[1] ?? ''))
+            shadowed.add(attribute)
+        }
+      }
+
+      for (const [block, spans] of scopedBlocks(node))
+        walk(block, new Set([...here, ...names(spans)]))
+    }
+  }
+
+  walk(file.template, new Set())
+
+  return shadowed
 }

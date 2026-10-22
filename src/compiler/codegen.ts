@@ -19,6 +19,7 @@ import { helperName } from './markup'
 import { defaultName, LOAD, PROPS, VALUES } from './names'
 import { PAGE, PAGE_SETTINGS } from './page-settings'
 import { reactiveValue } from './script'
+import { shadowedBinds } from './template-reads'
 import { headTagProblem, sharedImports } from './validate'
 
 const WRITE_NAMES: Record<keyof typeof WRITE_HELPERS, KayHelper> = { to: 'writeTo', update: 'updateTo', back: 'writeBack', updateBack: 'updateBack' }
@@ -188,7 +189,7 @@ class ModuleShell {
     this.mode = outputMode(options)
     this.kind = islandKind(options)
     this.fence = options.includeServer === false ? undefined : server
-    const facts = { ...templateFacts(file, script.recipe), bindables: bindableNames(file.source, script.props) }
+    const facts = { ...templateFacts(file, script.recipe), bindables: bindableNames(file.source, script.props), shadowedBinds: shadowedBinds(file) }
 
     const owned = options.pageFile === true && facts.parts ? { ...facts, parts: { ...facts.parts, merges: false } } : facts
 
@@ -278,7 +279,7 @@ class ModuleShell {
     if (this.deferred.size > 0)
       kayHelpers.push('autoDefer')
 
-    if (runs && script.props && script.props.bindable.length > 0)
+    if (mode === 'dom' && script.props && script.props.bindable.length > 0)
       kayHelpers.push('bindable')
 
     for (const write of this.options.writes ?? [])
@@ -699,7 +700,8 @@ class ModuleShell {
 
     b.add('\n')
 
-    if (this.runs && props.bindable.length > 0)
+    // Only the browser writes a prop, so the server keeps the props as they are.
+    if (this.mode === 'dom' && props.bindable.length > 0)
       b.add(`${PROPS} = ${helperName('bindable')}(${PROPS}, ${JSON.stringify(props.bindable)});\n`)
 
     if (props.name)
