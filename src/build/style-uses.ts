@@ -106,9 +106,9 @@ function dataText(file: string): string {
   if (!file.endsWith('.kay'))
     return text
 
-  const { script, server } = parseKay(text)
+  const { script, server, module } = parseKay(text)
 
-  return [script, server].map(span => span === undefined ? '' : text.slice(span.start, span.end)).join('\n')
+  return [script, server, module].map(span => span === undefined ? '' : text.slice(span.start, span.end)).join('\n')
 }
 
 // The words of a source, and the fragments of names built at runtime among them: `btn-` from `btn-${kind}` or `:flex` from `${screen}:flex`.

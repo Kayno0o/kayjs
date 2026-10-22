@@ -778,7 +778,14 @@ export class KayLanguageServer {
   private lenses(uri: string): CodeLens[] {
     const document = this.documents.get(uri)
 
-    return document ? islandLens(document.source, filePath(uri)) : []
+    if (!document)
+      return []
+
+    const path = filePath(uri)
+    const project = this.projectAt(projectRootOf(path, this.root))
+    const route = path.startsWith(`${project.routesDir}${sep}`)
+
+    return islandLens(document.source, path, { route, insideIsland: project.islandOnly.has(path), signals: importedSignals(path, document.source) })
   }
 
   private folds(uri: string): FoldingRange[] {

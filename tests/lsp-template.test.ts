@@ -68,7 +68,10 @@ describe('component interface', () => {
 describe('the island lens', () => {
   const title = (source: string) => islandLens(source, 'src/components/part.kay')[0]!.command.title
 
-  it('says whether a component is an island and why, or static', () => {
+  it('says whether a component is an island and why, or static, and nothing on a page', () => {
+    expect(islandLens('p a\n', 'src/routes/_layout.kay')).toEqual([])
+    expect(islandLens('p a\n', 'src/routes/index.kay', { route: true, insideIsland: false })).toEqual([])
+    expect(islandLens('p a\n', 'src/components/part.kay', { route: false, insideIsland: true })[0]!.command.title).toBe('Part of an island: only islands render it')
     expect(title('button(onClick={() => 1}) a\n')).toBe('Island: `onClick`, line 1')
     expect(title('p a\n')).toBe('Static: ships no JavaScript')
     expect(title('---\nimport Picker from \'./picker.kay\'\nfunction shout() {}\n---\nPicker(format={shout})\n')).toContain('Static unless it passes an island what only an island sends: `format` passed to Picker')

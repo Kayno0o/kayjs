@@ -181,8 +181,14 @@ function moduleStateAt(file: string, source: string, unchanged: Unchanged | unde
   if (!MAYBE_STATE.test(source))
     return undefined
 
-  const fence = parseKay(source).server
+  const { server: fence, module } = parseKay(source)
   const server = analyzeServer(source, fence)
+
+  // A `--- module` fence is all module level, so what it holds is state as in a module of its own.
+  const inModule = module === undefined ? undefined : stateAt(source.slice(module.start, module.end), SETTING_NAMES, unchanged)
+
+  if (module !== undefined && inModule !== undefined)
+    return module.start + inModule
 
   if (fence === undefined || server === undefined)
     return undefined

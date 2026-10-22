@@ -82,3 +82,11 @@ describe('kay check on a module fence', () => {
     }
   })
 })
+
+describe('what reads the fences of a file', () => {
+  it('follows a module fence\'s imports and data, and judges its state', async () => {
+    const { fences } = await import('../src/build/libraries')
+
+    expect(fences('--- module\nimport \'./a.css\'\nexport const kinds = { primary: \'btn-primary\' }\n--- script\nconst x = 1\n---\np\n')).toContain('btn-primary')
+  })
+})
