@@ -11,7 +11,7 @@ it('signs a site in through the auth() built with no module', async () => {
 
   expect(() => authTest(site).signOut()).toThrow('found no `auth()`')
 
-  await buildOwn({}, { root: process.cwd(), modules: {} })
+  await buildOwn({}, { root: process.cwd(), extensions: [], modules: {} })
 
   const user = await authTest(site).signInAs({ email: 'ada@example.com', username: 'Ada' })
 
