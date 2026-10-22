@@ -183,6 +183,13 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     'kui-pagination-gap opacity-50',
     'kui-site-favicon-img rounded-sm',
     'kui-load-more py-6',
+    'kui-combobox gap-2',
+    'kui-field-input h-11',
+    'kui-combobox-option py-2',
+    'kui-combobox-status text-xs',
+    'kui-steps-list gap-4',
+    'kui-steps-marker size-8',
+    'kui-steps-state sr-only',
   ]
 
   test.each(restyled)('draws class="%s"', (classes) => {

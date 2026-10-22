@@ -73,5 +73,7 @@ export default defineUi({
   '@kaynooo/kayjs-ui/tooltip-host.kay': { parts: 'text-xs' },
   '@kaynooo/kayjs-ui/form-dialog.kay': { parts: { footer: 'pt-4', actions: 'gap-3', form: 'gap-5' } },
   '@kaynooo/kayjs-ui/contact-form.kay': { parts: { root: 'gap-7', consent: 'text-sm' } },
+  '@kaynooo/kayjs-ui/combobox.kay': { parts: { root: 'gap-2', input: 'h-11', option: 'py-2', status: 'text-xs' } },
+  '@kaynooo/kayjs-ui/steps.kay': { parts: { list: 'gap-4', marker: 'size-8', state: 'sr-only' } },
   '@kaynooo/kayjs-ui/when-visible.kay': { parts: 'min-h-4' },
 })

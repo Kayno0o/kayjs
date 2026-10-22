@@ -1,10 +1,12 @@
 --- <Value extends string>
 import type { JSX } from 'kay'
 import type { ComboboxOption, ComboboxOptions } from './combobox'
-import { effect, onCleanup, signal, uid, untrack } from 'kay'
+import { effect, onCleanup, recipe, signal, uid, untrack } from 'kay'
 import { enabledIndex, exactOption, matchingOptions, offersCreate } from './combobox'
 import { onFormReset, startRef } from './form-reset'
 import { wording } from 'kay/words'
+
+const look = recipe({ parts: { root: 'kui-combobox', input: 'kui-field-input', list: 'kui-combobox-list', option: 'kui-combobox-option', status: 'kui-combobox-status' } })
 
 // A remote search waits this long after the last key.
 const DEBOUNCE_MS = 200
@@ -317,8 +319,9 @@ onFormReset(() => input, () => {
 
 const ref = startRef<HTMLInputElement>(element => input = element, rest.ref)
 ---
-.kui-combobox
-  input.kui-field-input(
+div(part="root")
+  input(
+    part="input"
     {...rest}
     ref={ref}
     type="text"
@@ -345,10 +348,10 @@ const ref = startRef<HTMLInputElement>(element => input = element, rest.ref)
       for option of known() key={option.value}
         option(value={option.label})
   // Pressing the list, its scrollbar included, keeps focus in the input.
-  ul.kui-combobox-list(part="list" id={listId} role="listbox" aria-label={label} aria-busy={waiting() ? 'true' : undefined} hidden={!shown()} onMouseDown={event => event.preventDefault()})
+  ul(part="list" id={listId} role="listbox" aria-label={label} aria-busy={waiting() ? 'true' : undefined} hidden={!shown()} onMouseDown={event => event.preventDefault()})
     for option, index of rows() key={option.value}
-      li.kui-combobox-option(part="option" id={optionId(index)} role="option" aria-selected={active() === index ? 'true' : 'false'} aria-disabled={option.disabled ? 'true' : undefined} data-selected={picked()?.value === option.value ? '' : undefined} onClick={() => pick(index)}) {option.label}
+      li(part="option" id={optionId(index)} role="option" aria-selected={active() === index ? 'true' : 'false'} aria-disabled={option.disabled ? 'true' : undefined} data-selected={picked()?.value === option.value ? '' : undefined} onClick={() => pick(index)}) {option.label}
     if offered()
-      li.kui-combobox-option(part="option" id={optionId(rows().length)} role="option" aria-selected={active() === rows().length ? 'true' : 'false'} data-create="" onClick={() => pick(rows().length)}) {createLabel(text().trim())}
+      li(part="option" id={optionId(rows().length)} role="option" aria-selected={active() === rows().length ? 'true' : 'false'} data-create="" onClick={() => pick(rows().length)}) {createLabel(text().trim())}
   // Read out as the list loads and settles, which otherwise changes in silence.
-  p.kui-combobox-status(part="status" role="status") {status()}
+  p(part="status" role="status") {status()}

@@ -67,7 +67,7 @@
   - `valueLabel` is the text of `value` for a remote list that has not returned it: the input shows it and no load is made on focus, and without it a remote `value` leaves the input empty (a fixed list shows the value). Inside a FormField the label's text alone names the input.
   - `create` offers the typed text as a last row (`createLabel(text)`) unless an option bears it; picking it hands the text as the value and to `onCreate(text)`.
   - `name` submits the value picked, else the text typed; a label typed whole counts as a pick, and the Enter adopting it does not submit the form. Without JavaScript it is a text field posting its text, a list offered as the browser's own suggestions. A form reset puts back the text and pick.
-  - The combobox pattern: the input stays focused, ArrowDown and ArrowUp open and move through the rows (disabled ones skipped, wrapping), Alt+ArrowDown opens, Enter picks, Escape closes (an open list with no rows too) then clears; a status line reads the count, `loadingLabel`, `emptyLabel` and `failureLabel`. Parts: `list`, `option`, `status`.
+  - The combobox pattern: the input stays focused, ArrowDown and ArrowUp open and move through the rows (disabled ones skipped, wrapping), Alt+ArrowDown opens, Enter picks, Escape closes (an open list with no rows too) then clears; a status line reads the count, `loadingLabel`, `emptyLabel` and `failureLabel`. Parts: `root`, `input`, `list`, `option`, `status`.
 
 ### RadioGroup
 
