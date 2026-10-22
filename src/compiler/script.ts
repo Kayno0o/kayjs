@@ -136,6 +136,11 @@ function analyzeModule(source: string, module: Span): ScriptAnalysis {
   if (!split)
     return analysis
 
+  for (const binding of analysis.imports) {
+    if (!binding.typeOnly && !binding.source.startsWith('~icons/'))
+      scope.functions.add(binding.local)
+  }
+
   analysis.reactive = analysis.implicit.some(name => !STATIC_EXPORTS.has(name)) || analysis.imports.some(importsReactiveValue)
 
   for (const { statement, span } of split.statements) {
@@ -185,6 +190,11 @@ function analyzeComponentScript(source: string, script: Span | undefined, server
     return analysis
 
   const { ast, shift } = split
+
+  for (const binding of analysis.imports) {
+    if (!binding.typeOnly && !binding.source.startsWith('~icons/'))
+      scope.functions.add(binding.local)
+  }
 
   analysis.reactive = analysis.implicit.some(name => !STATIC_EXPORTS.has(name)) || analysis.imports.some(importsReactiveValue)
 
@@ -325,7 +335,7 @@ function splitFence(source: string, fence: Span, names: string[], analysis: Fenc
 }
 
 // What a body declaration may hold a function or an instance of a class by: writing one, awaiting one, or a call returning one.
-const FUNCTION_VALUES = new Set(['ArrowFunctionExpression', 'FunctionExpression', 'ClassExpression', 'AwaitExpression'])
+const FUNCTION_VALUES = new Set(['ArrowFunctionExpression', 'FunctionExpression', 'ClassExpression', 'AwaitExpression', 'OptionalCallExpression', 'AssignmentExpression', 'SequenceExpression', 'TaggedTemplateExpression'])
 
 // The names the script declared so far that hold a function, and the functions among them whose returns are plain data.
 interface FunctionScope {
@@ -409,6 +419,29 @@ function returned(body: t.Node): t.Expression[] | undefined {
   return body.type === 'VariableDeclaration' || body.type === 'ExpressionStatement' || body.type === 'EmptyStatement' || body.type === 'FunctionDeclaration' ? [] : undefined
 }
 
+// The locals a function body declares that hold a function, over the statements `returned` follows.
+function declareLocals(body: t.Node, scope: FunctionScope) {
+  if (body.type === 'BlockStatement') {
+    for (const statement of body.body)
+      declareLocals(statement, scope)
+  }
+  else if (body.type === 'IfStatement') {
+    declareLocals(body.consequent, scope)
+
+    if (body.alternate)
+      declareLocals(body.alternate, scope)
+  }
+  else if (body.type === 'FunctionDeclaration' && body.id) {
+    scope.functions.add(body.id.name)
+  }
+  else if (body.type === 'VariableDeclaration') {
+    for (const declaration of body.declarations) {
+      if (declaration.id.type === 'Identifier' && declaration.init && holdsFunction(declaration.init, scope))
+        scope.functions.add(declaration.id.name)
+    }
+  }
+}
+
 type FunctionNode = t.ArrowFunctionExpression | t.FunctionExpression | t.FunctionDeclaration
 
 // A function of the script whose returns are plain data: its parameters may be anything, so returning one is not.
@@ -419,6 +452,8 @@ function functionReturnsData(fn: FunctionNode, scope: FunctionScope): boolean {
     return false
 
   const inner: FunctionScope = { ...scope, functions: new Set([...scope.functions, ...fn.params.map(param => (param as t.Identifier).name)]) }
+
+  declareLocals(fn.body, inner)
 
   return !values.some(value => holdsFunction(value, inner))
 }
@@ -432,8 +467,11 @@ function callbackReturnsData(callback: t.Node, scope: FunctionScope): boolean {
     return false
 
   const values = callback.body.type === 'BlockStatement' ? returned(callback.body) : [callback.body]
+  const inner: FunctionScope = { ...scope, functions: new Set(scope.functions) }
 
-  return !callback.async && !callback.generator && values !== undefined && !values.some(value => holdsFunction(value, scope))
+  declareLocals(callback.body, inner)
+
+  return !callback.async && !callback.generator && values !== undefined && !values.some(value => holdsFunction(value, inner))
 }
 
 // What the list methods and statics return when it is given data, `filter`, `sort` and `toSorted` only testing or ordering the items they are called on.
@@ -487,7 +525,7 @@ function holdsFunction(value: t.Node, scope: FunctionScope): boolean {
   if (value.type === 'Identifier')
     return scope.functions.has(value.name)
 
-  if (value.type === 'MemberExpression')
+  if (value.type === 'MemberExpression' || value.type === 'OptionalMemberExpression')
     return holdsFunction(value.object, scope)
 
   if (value.type === 'ConditionalExpression')

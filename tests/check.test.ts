@@ -627,7 +627,7 @@ describe.concurrent('kay check, edge cases', () => {
   it('reports a component passing an island what a call may return as a function, and none passing data built by a call, an icon import or a predicate callback', async () => {
     const data: Record<string, [script: string, call: string]> = {
       mapped: ['const links = [\'a\', \'b\'].map(name => ({ href: `/${name}`, label: name }))', 'Child(format={links})'],
-      local: ['const panel = (color: string) => { const svg = `<svg fill="${color}"/>`; return `data:${svg}` }\nconst slides = [{ src: panel(\'red\') }]', 'Child(format={slides})'],
+      panel: ['const panel = (color: string) => { const svg = `<svg fill="${color}"/>`; return `data:${svg}` }\nconst slides = [{ src: panel(\'red\') }]', 'Child(format={slides})'],
       icon: ['import Brand from \'~icons/tabler/brand-github\'', 'Child(format={Brand})'],
       found: ['const { rows, current } = props<{ rows: { id: number }[], current: number }>()', 'Child(format={rows.find(row => row.id === current)})'],
       from: ['const items = Array.from({ length: 3 }, (_, index) => ({ id: index }))', 'Child(format={items})'],
@@ -641,6 +641,9 @@ describe.concurrent('kay check, edge cases', () => {
       passthrough: ['function handler() {}\nconst id = (value: unknown) => value\nconst same = id(handler)', 'Child(format={same})'],
       selected: ['function handler() {}\nconst pick = (flag: boolean) => flag ? handler : 1\nconst chosen = pick(true)', 'Child(format={chosen})'],
       concat: ['const joined = [1].concat(() => 1)', 'Child(format={joined})'],
+      imported: ['import { handlers } from \'../handlers\'\nconst shown = handlers.filter(Boolean).slice(0, 2)', 'Child(format={shown})'],
+      local: ['const make = () => { const run = () => 1; return run }\nconst made = make()', 'Child(format={made})'],
+      optional: ['const { getHandler } = props<{ getHandler?: () => void }>()\nconst got = getHandler?.()', 'Child(format={got})'],
       model: ['const money = Money.from(5)', 'Child(format={money})'],
       tested: ['function handler() {}\nconst { rows } = props<{ rows: unknown[] }>()', 'Child(format={[handler].find(one => one === rows[0])})'],
     }
@@ -650,6 +653,7 @@ describe.concurrent('kay check, edge cases', () => {
     const root = await scratchProject({
       'src/routes/index.kay': `---\n${names.map(name => `import ${name[0]!.toUpperCase()}${name.slice(1)} from '../components/${name}.kay'`).join('\n')}\n---\n${names.map(name => `${name[0]!.toUpperCase()}${name.slice(1)}`).join('\n')}\n`,
       ...Object.fromEntries(names.map(name => [`src/components/${name}.kay`, component(all[name]!)])),
+      'src/handlers.ts': 'export const handlers = [() => 1]\n',
       'src/components/island.kay': '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\nconst { format } = props<{ format: unknown }>()\n---\nbutton(onClick={() => count++}) {count()} {String(format)}\n',
     })
 
