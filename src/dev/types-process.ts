@@ -82,9 +82,22 @@ export class TypesProcess {
 
   private kill() {
     clearTimeout(this.idle)
-    this.child?.kill()
+    this.killGroup(this.child)
     this.child = undefined
     this.modules = undefined
+  }
+
+  // The process leads a group of its own, so the checker it spawned (tsgo) ends with it rather than running on as an orphan.
+  private killGroup(child: Subprocess | undefined) {
+    if (child === undefined)
+      return
+
+    try {
+      process.kill(-child.pid, 'SIGTERM')
+    }
+    catch {
+      child.kill()
+    }
   }
 
   // The exit code the process answered, or undefined once it went before it did.
@@ -128,7 +141,7 @@ export class TypesProcess {
   }
 
   private spawn(refuse: string) {
-    const child = Bun.spawn([process.execPath, TYPES, this.root, this.entry ?? '', refuse], { cwd: this.root, env: { ...this.env, NODE_ENV: 'development' }, stdin: 'pipe', stdout: 'pipe', stderr: 'inherit' })
+    const child = Bun.spawn([process.execPath, TYPES, this.root, this.entry ?? '', refuse], { cwd: this.root, env: { ...this.env, NODE_ENV: 'development' }, stdin: 'pipe', stdout: 'pipe', stderr: 'inherit', detached: true })
 
     this.child = child
     this.lines = lines(child.stdout)

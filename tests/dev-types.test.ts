@@ -90,6 +90,25 @@ describe('the type check beside kay dev', () => {
     }
   }, 120_000)
 
+  it('lists none of the type errors a previous run left once the config fails to load for the type check and the first check is skipped', async () => {
+    const root = await project({ 'kay.config.ts': '// The server loads it, the process typing the project does not.\nif (process.argv[1]?.endsWith(\'types.ts\'))\n  throw new Error(\'no config\')\n\nexport default {}\n', 'src/routes/index.kay': 'p Fixed\n' })
+    const file = join(root, KAY_DIR, `dev${testWorker()}`, DEV_ERRORS_FILE)
+    const stale = { kind: 'type', time: new Date().toISOString(), message: 'old', problems: [{ file: 'src/routes/index.kay', line: 1, column: 1, code: 'TS2322', message: 'old' }], report: 'old' }
+
+    await Bun.write(file, JSON.stringify({ errors: [stale] }))
+
+    const stop = await dev(root, { format: 'json', port: 0, log: () => {} })
+
+    try {
+      await until(() => listedTypeErrors(root).length === 0)
+      await Bun.sleep(1500)
+      expect(listedTypeErrors(root)).toEqual([])
+    }
+    finally {
+      await stop()
+    }
+  }, 60_000)
+
   it('checks nothing with --no-types, and in a project without a tsconfig', async () => {
     const off = await project({ 'src/routes/index.kay': '---\nconst count: number = \'one\'\n---\np {count}\n' })
     const bare = await scratchDir('dev-types-')

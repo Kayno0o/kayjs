@@ -269,6 +269,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   // The errors the last check ended with, and them as JSON (`undefined` before the first check) to tell a changed set from the same one.
   let typeProblems: TypeProblem[] = []
   let typeKey: string | undefined
+  // Whether the server is told the type errors on listening: once a check ended, or skipped, so it never waits on one that will not come.
+  let typeSettled = false
   // A check that ended with another set of type errors than the one before is told to the server and said in the terminal.
   const publishTypeErrors = (problems: TypeProblem[]) => {
     const key = JSON.stringify(problems)
@@ -277,6 +279,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
       return
 
     typeKey = key
+    typeSettled = true
     typeProblems = problems
 
     if (child !== undefined)
@@ -325,8 +328,18 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
               break
 
             // A change came meanwhile, whose check follows and says what holds.
-            if (!checkStale && !checkAgain && code !== CHECK_SKIPPED)
-              publishTypeErrors(checkProcess.problems)
+            if (!checkStale && !checkAgain) {
+              if (code !== CHECK_SKIPPED) {
+                publishTypeErrors(checkProcess.problems)
+              }
+              // A first check skipped leaves nothing to show: the errors a previous run listed are stale.
+              else if (!typeSettled) {
+                typeSettled = true
+
+                if (child !== undefined)
+                  tell(child, { typeErrors: [] })
+              }
+            }
           }
         }
         catch (error) {
@@ -513,7 +526,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
       listening = true
 
       // A new process starts without the errors the last check found; with no check running it clears those a previous run left in `errors.json`.
-      if (!typeChecking || typeKey !== undefined)
+      if (!typeChecking || typeSettled || configRefused)
         tell(server, { typeErrors: typeProblems.slice(0, MAX_SENT_ERRORS) })
     }
 
