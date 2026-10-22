@@ -21,7 +21,7 @@ export function scopeLabel(scope: string): string {
 }
 
 // Stands for a `minTime` refusal's reason, which kay words before the request's locale is known: `refusal` puts it in the page's language.
-const MIN_TIME = 'kayjs-auth-min-time:'
+const MIN_TIME = 'kauth-min-time:'
 const PASSWORD_PROBLEMS: ReadonlySet<string> = new Set<Problem<'password'>>(['too-short', 'too-long', 'breached'])
 const OAUTH_FAILURES: ReadonlySet<string> = new Set<OAuthFailureCode>(['oauth', 'cancelled', 'refused', 'taken', 'unavailable', 'signed-out', 'banned'])
 

@@ -18,6 +18,10 @@ With Tailwind, classes merged from the shorthand, `class`, a spread and a compon
 
 `cms({ guard: { load } })` is unchanged: a guard is the app's own call, so it stays a function the config bundles. The lint leaves a call alone whose module has no `export const auth`.
 
+### The session cookie is `kay_session`
+
+The default cookie of `session()` is `kay_session` (`__Host-kay_session` over https), and the old `session` is not read, so everyone signs in once more. Code reading the cookie by hand, a test jar or `--cookie session=` changes the name; `session({ cookie: 'session' })` keeps the old one. kayjs-cms's password sign-in cookie is `kay_editor_session`, the old `kcms_session` still read. In kayjs-auth's pages `.kayjs-auth-*` classes and ids are `.kauth-*`, and the `data-cms-edit-page` attribute of a link of your own is `data-kcms-edit-page` (the old one still works).
+
 ### Rate limits are `rateLimit` and `key`
 
 kayjs-ai's `ai({ limit })` is `ai({ rateLimit })`, its `ai({ visitor })` and `ask(messages, { visitor })` are `key`, and kayjs-auth's `createAuth({ limits })` is `rateLimit`, as kay's actions and API routes already name theirs. The old names still work for three minors (the `deprecated-rate-limit` lint), and `kay upgrade` renames them. kayjs-mail's `smtp({ rateLimit: 5 })` and `mailer({ smtp: { rateLimit: 5 } })` are `{ max: 5, window: '1s' }`, and `SMTP_RATE_LIMIT` reads `5/1s` (a bare `5` still means 5 a second). A `limit`, `limits` or number held in a variable is not found: change the option where it is passed.

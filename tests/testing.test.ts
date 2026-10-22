@@ -61,10 +61,10 @@ describe('kay/test', () => {
     expect((await signed.submit(signIn, { name: '' })).html).toContain('<p class="error">Who are you?</p>')
     // `locals` adds to what the plugins derived, after them.
     expect((await signed.submit(signIn, { name: 'Ada' })).html).toContain('<p>Hello, signed in as Ada</p>')
-    expect(signed.cookies.has('session')).toBe(true)
+    expect(signed.cookies.has('kay_session')).toBe(true)
     expect((await signed.visit('/')).html).toContain('<p>Hello, signed in as Ada</p>')
     expect((await signed.submit(signOut, {})).html).toContain('<p>Hello, signed out</p>')
-    expect(signed.cookies.has('session')).toBe(false)
+    expect(signed.cookies.has('kay_session')).toBe(false)
   })
 
   it('calls an action declared without a schema with no input at all', async () => {

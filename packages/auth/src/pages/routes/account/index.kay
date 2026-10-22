@@ -60,7 +60,7 @@ PageSection(title={wording('auth.account.profile.title', 'Profile')})
   .flex.flex-col.gap-3
     .flex.flex-wrap.items-center.gap-2
       if user.email
-        span#kayjs-auth-email {user.email}
+        span#kauth-email {user.email}
         if user.emailVerified
           Badge(label={wording('auth.account.profile.verified', 'Verified')} tone="success")
         else

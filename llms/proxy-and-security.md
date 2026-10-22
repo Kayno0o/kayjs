@@ -71,7 +71,7 @@ export default defineConfig({
 - A server a CDN reaches directly from its public addresses lists them: `proxy: { header: 'cf-connecting-ip', trusted: ['173.245.48.0/20', '2400:cb00::/32', ...] }` with every range Cloudflare publishes, each entry an IPv4 or IPv6 range or a single address; nginx or a tunnel such as cloudflared in front does as well.
 - A request from a public address outside them that carries the header warns once, as such a CDN setup misses its `trusted`, and counts by its own address.
 - A setting holding both, or neither, stops the server.
-- The proxy passes `X-Forwarded-Proto` on every location, websockets included (nginx: `proxy_set_header X-Forwarded-Proto $scheme`), as kay's cookies are `Secure` and the session's named `__Host-session` over https: a request that says `http` reads no session.
+- The proxy passes `X-Forwarded-Proto` on every location, websockets included (nginx: `proxy_set_header X-Forwarded-Proto $scheme`), as kay's cookies are `Secure` and the session's named `__Host-kay_session` over https: a request that says `http` reads no session.
 - A request without the header counts as https in production when `site` is https; with no `site`, production warns once that cookies go out without `Secure`.
 - A post goes back to its page as a path and never reads a forwarded header for it, so the swap works behind a proxy that ends TLS with nothing declared for it.
 - Without `proxy`, the address the request came from is the client.

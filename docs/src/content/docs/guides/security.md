@@ -284,7 +284,7 @@ export default defineConfig({
 
 Each entry is an IPv4 or IPv6 range or a single address. Cloudflare publishes the full list.
 
-Pass `X-Forwarded-Proto` from the proxy on every location, websockets included. kay's cookies are `Secure`, and the session is named `__Host-session` over https, so a request that says `http` reads no session.
+Pass `X-Forwarded-Proto` from the proxy on every location, websockets included. kay's cookies are `Secure`, and the session is named `__Host-kay_session` over https, so a request that says `http` reads no session.
 
 <ReadMore href="/llms/proxy-and-security#behind-a-proxy">How `hops` reads `X-Forwarded-For`, the warnings kay logs and `clientAddress` in a plain Elysia app.</ReadMore>
 

@@ -100,7 +100,7 @@ describe('the prebuilt pages', () => {
 
     const account = await ada.submit(register, { email: 'ada@example.com', password: PASSWORD, redirect: '/auth/account' }, { from: await ada.visit('/auth/register?redirect=%2Fauth%2Faccount') })
 
-    expect(text(account, '#kayjs-auth-email')).toBe('ada@example.com')
+    expect(text(account, '#kauth-email')).toBe('ada@example.com')
 
     expect(text(account, 'title')).toBe('Profile - Your account')
 
@@ -227,17 +227,17 @@ describe('the prebuilt pages', () => {
   test('two-factor is set up from the security page, and a password sign-in then goes through the code page', async () => {
     const ada = await signedUp('totp@example.com')
     const scan = await ada.submit(setUp, { password: PASSWORD }, { from: '/auth/account/security' })
-    const secret = text(scan, '#kayjs-auth-key')!
+    const secret = text(scan, '#kauth-key')!
     const uri = scan.find('input[name="uri"]')[0]!.attributes.value!
 
     expect(scan.find('img.kui-qr-code')).toHaveLength(1)
 
     // A wrong code shows the same QR code again.
-    expect(text(await ada.submit(enable, { code: '000000', uri }, { from: '/auth/account/security' }), '#kayjs-auth-key')).toBe(secret)
+    expect(text(await ada.submit(enable, { code: '000000', uri }, { from: '/auth/account/security' }), '#kauth-key')).toBe(secret)
 
     const enabled = await ada.submit(enable, { code: await totpCode(secret, totpStep()), uri }, { from: '/auth/account/security' })
 
-    const recoveryCodes = enabled.find('#kayjs-auth-recovery-codes li').map(code => code.text)
+    const recoveryCodes = enabled.find('#kauth-recovery-codes li').map(code => code.text)
 
     expect(recoveryCodes).toHaveLength(10)
     await signOut(ada)
@@ -249,7 +249,7 @@ describe('the prebuilt pages', () => {
 
     const account = await visitor.submit(verify, { code: await totpCode(secret, totpStep() + 1) }, { from: '/auth/two-factor' })
 
-    expect(text(account, '#kayjs-auth-email')).toBe('totp@example.com')
+    expect(text(account, '#kauth-email')).toBe('totp@example.com')
     // Moving the address, and with it the reset links, asks for the code rather than the password.
     expect(account.find('input[name="code"]')).toHaveLength(1)
     expect(account.find('input[name="password"]')).toHaveLength(0)
@@ -276,7 +276,7 @@ describe('the prebuilt pages', () => {
 
     const account = await visitor.submit(spend, { token: link.searchParams.get('token')! }, { from: link.pathname + link.search })
 
-    expect(text(account, '#kayjs-auth-email')).toBe('magic@example.com')
+    expect(text(account, '#kauth-email')).toBe('magic@example.com')
   })
 
   test('a forgotten password is reset through the mailed link', async () => {
@@ -327,7 +327,7 @@ describe('the prebuilt pages', () => {
 
     expect(change.pathname).toBe('/auth/confirm-email')
     await ada.submit(confirm, { token: change.searchParams.get('token')! }, { from: change.pathname + change.search })
-    expect(text(await ada.visit('/auth/account'), '#kayjs-auth-email')).toBe('moved@example.com')
+    expect(text(await ada.visit('/auth/account'), '#kauth-email')).toBe('moved@example.com')
   })
 
   test('the sessions page lists each device and signs out the others', async () => {
@@ -354,13 +354,13 @@ describe('the prebuilt pages', () => {
     const ada = await signedUp('tokens@example.com')
     const created = await ada.submit(create, { label: 'CI', days: '30', password: PASSWORD }, { from: '/auth/account/tokens' })
 
-    expect(text(created, '#kayjs-auth-token')).toBeString()
+    expect(text(created, '#kauth-token')).toBeString()
 
     const [token] = (await ada.visit('/auth/account/tokens')).find('[data-token]')
 
     expect((await ada.visit('/auth/account/tokens')).find('[data-token] button').map(button => button.attributes['aria-label'])).toEqual(['Revoke: CI'])
 
-    expect((await ada.visit('/auth/account/tokens')).find('#kayjs-auth-token')).toHaveLength(0)
+    expect((await ada.visit('/auth/account/tokens')).find('#kauth-token')).toHaveLength(0)
     await ada.submit(revoke, { id: token!.attributes['data-token']! }, { from: '/auth/account/tokens' })
     expect((await ada.visit('/auth/account/tokens')).find('[data-token]')).toHaveLength(0)
 
@@ -551,7 +551,7 @@ describe('the prebuilt pages', () => {
     const account = await visitor.visit(`/auth/discord/callback?code=abc&state=${location.searchParams.get('state')}`)
 
     expect(account).toMatchObject({ url: '/auth/account', status: 200 })
-    expect(text(account, '#kayjs-auth-email')).toBe('discord@example.com')
+    expect(text(account, '#kauth-email')).toBe('discord@example.com')
   })
 })
 

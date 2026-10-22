@@ -284,7 +284,7 @@ import { app } from './app'
 const jar = cookieJar()
 
 await jar.send(app.handle, new Request('http://localhost/sign-in', { method: 'POST' }))
-expect(jar.cookies.has('session')).toBe(true)
+expect(jar.cookies.has('kay_session')).toBe(true)
 ```
 
 

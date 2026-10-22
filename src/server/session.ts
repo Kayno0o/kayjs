@@ -35,7 +35,7 @@ const SAME_SITE = new Set<unknown>(['lax', 'strict', 'none'])
 export interface SessionOptions {
   // At least 32 characters, from the environment. A list rotates them: the first seals new cookies, every one opens old ones. The app's own secret (`secret` in kay.config.ts or `KAY_SECRET`, one derived in development) when left out.
   secret?: string | string[] | undefined
-  // Defaults to `session`; over https and without `domain`, the cookie goes out as `__Host-session`.
+  // Defaults to `kay_session`; over https and without `domain`, the cookie goes out as `__Host-kay_session`.
   cookie?: string | undefined
   // How long a session lasts without being used, seconds or a string such as '30d', 30 days by default; one used past half of it is extended.
   maxAge?: Duration | undefined
@@ -128,7 +128,7 @@ export function session<Data extends object = SessionData>(options: SessionOptio
 
   if (!options.store && process.env.NODE_ENV === 'production' && !warnedNoStore) {
     warnedNoStore = true
-    kayLog('warn', `a session kept in its ${options.cookie ?? 'session'} cookie alone, with no store, cannot be revoked by the session itself: signing out only clears the browser's cookie, and a copy taken before stays valid until it expires unless the app ends it elsewhere; give session() a store, such as sqliteStore('data/sessions.sqlite'), to end sessions on the server`)
+    kayLog('warn', `a session kept in its ${options.cookie ?? 'kay_session'} cookie alone, with no store, cannot be revoked by the session itself: signing out only clears the browser's cookie, and a copy taken before stays valid until it expires unless the app ends it elsewhere; give session() a store, such as sqliteStore('data/sessions.sqlite'), to end sessions on the server`)
   }
 
   const keys = secrets.map(secret => nodeCrypto().createHash('sha256').update(secret).digest())
@@ -142,7 +142,7 @@ export function session<Data extends object = SessionData>(options: SessionOptio
   if (options.sameSite !== undefined && !SAME_SITE.has(options.sameSite))
     throw new KayError('config-invalid', `kay: the session sameSite is ${JSON.stringify(options.sameSite)}, which is none of 'lax', 'strict' and 'none'`)
 
-  const config = { name: options.cookie ?? 'session', sameSite: options.sameSite ?? 'lax', maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : wholeSeconds(options.maxAge, 'the session maxAge'), absoluteMaxAge: options.absoluteMaxAge === undefined ? DEFAULT_ABSOLUTE_MAX_AGE : wholeSeconds(options.absoluteMaxAge, 'the session absoluteMaxAge'), browserMaxAge: options.browserMaxAge === undefined ? DEFAULT_BROWSER_MAX_AGE : wholeSeconds(options.browserMaxAge, 'the session browserMaxAge'), domain, store: options.store, keys }
+  const config = { name: options.cookie ?? 'kay_session', sameSite: options.sameSite ?? 'lax', maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : wholeSeconds(options.maxAge, 'the session maxAge'), absoluteMaxAge: options.absoluteMaxAge === undefined ? DEFAULT_ABSOLUTE_MAX_AGE : wholeSeconds(options.absoluteMaxAge, 'the session absoluteMaxAge'), browserMaxAge: options.browserMaxAge === undefined ? DEFAULT_BROWSER_MAX_AGE : wholeSeconds(options.browserMaxAge, 'the session browserMaxAge'), domain, store: options.store, keys }
 
   const plugin = new Elysia({ name: 'kay/session', seed: config.name })
     .derive({ as: 'scoped' }, ({ request }) => ({ session: new RequestSession<Data>(request, config) }))

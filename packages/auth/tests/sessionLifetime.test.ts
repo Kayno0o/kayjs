@@ -22,7 +22,7 @@ async function signedIn(app: Awaited<ReturnType<typeof setup>>, remember?: boole
   const response = await ada.fetch('/call/signIn', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify([{ id: 'u1' }, remember === undefined ? {} : { remember }]) })
   const stored = (await app.store.sessions.listByUser('u1')).at(-1)
 
-  return { ada, cookie: response.headers.getSetCookie().find(line => line.startsWith('session='))!, stored: stored! }
+  return { ada, cookie: response.headers.getSetCookie().find(line => line.startsWith('kay_session='))!, stored: stored! }
 }
 
 describe('a sign-in follows the session plugin\'s lifetimes', () => {

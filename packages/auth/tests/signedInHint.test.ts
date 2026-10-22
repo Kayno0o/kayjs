@@ -80,7 +80,7 @@ describe('the cookie marking a browser as signed in', () => {
       const response = await app.app.handle(new Request(`http://site.test/sign-in/${ada.id}`, { method: 'POST' }))
       const lines = response.headers.getSetCookie()
       const hint = lines.find(line => line.startsWith('kay_user='))!
-      const session = lines.find(line => line.includes('session='))!
+      const session = lines.find(line => line.includes('kay_session='))!
 
       expect(session).toContain('Secure')
       expect(hint).toContain('Secure')

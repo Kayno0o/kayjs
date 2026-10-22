@@ -40,7 +40,7 @@ type Browser = ReturnType<Awaited<ReturnType<typeof setup>>['browser']>
 async function cookieOf(browser: Browser, method: string, ...args: unknown[]): Promise<string | undefined> {
   const response = await browser.fetch(`/call/${method}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(args) })
 
-  return response.headers.getSetCookie().find(line => line.startsWith('session='))
+  return response.headers.getSetCookie().find(line => line.startsWith('kay_session='))
 }
 
 // What `auth[method](...args)` answers, arguments the typed `call` refuses included.

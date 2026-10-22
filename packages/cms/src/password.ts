@@ -6,7 +6,14 @@ import { configError, durationSeconds } from 'kay/library'
 import { wording } from 'kay/words'
 
 // The cookie holding a password sign-in: `<role>.<expires>.<signature>`, signed with a key made from that role's password.
-export const SESSION_COOKIE = 'kcms_session'
+export const SESSION_COOKIE = 'kay_editor_session'
+// The name before 1.70, still read so no editor is signed out by the rename; it is never set again.
+export const LEGACY_SESSION_COOKIE = 'kcms_session'
+
+// The sign-in cookie a request holds, under its name or the one before 1.70.
+export function sessionCookieOf(cookies: { get: (name: string) => string | null }): string | undefined {
+  return cookies.get(SESSION_COOKIE) ?? cookies.get(LEGACY_SESSION_COOKIE) ?? undefined
+}
 
 const DEFAULT_ROLE = 'editor'
 const DEFAULT_MAX_AGE = '14d'
@@ -179,7 +186,7 @@ export function passwordGuard(passwords: string | Record<string, string>, { maxA
     // A guard the app wrapped is no key of `passwordsOf`, but it runs this one, which says so for the cms guard that called it.
     ranFor.set(ctx.request, known)
 
-    const role = known.read(ctx.cookies.get(SESSION_COOKIE))
+    const role = known.read(sessionCookieOf(ctx.cookies))
 
     if (role === undefined)
       return ctx.deny(401, wording('cms.guard.signedOut', 'Sign in to continue'))

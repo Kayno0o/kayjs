@@ -42,7 +42,7 @@ PageSection(title={wording('auth.account.tokens.title', 'Access tokens')})
     p {wording('auth.account.tokens.intro', 'Tokens let scripts and other apps use your account through the API.')}
     if created
       Message(tone="success" text={wording('auth.account.tokens.created', 'Copy this token now: it will not be shown again.')})
-      code#kayjs-auth-token.break-all {created}
+      code#kauth-token.break-all {created}
       CopyButton(text={created} label={wording('auth.account.tokens.copy', 'Copy the token')})
     for token of tokens key={token.id}
       CardRow(data-token={token.id})

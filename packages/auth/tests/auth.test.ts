@@ -87,7 +87,7 @@ describe('createAuth', () => {
     const who = async () => (await site.send(app.handle, new Request('http://localhost/me'))).text()
 
     await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', username: 'ada', passwordHash: 'hash' }))
-    site.cookies.set('session', (await auth.sessionCookie('u1')).split('=').slice(1).join('='))
+    site.cookies.set('kay_session', (await auth.sessionCookie('u1')).split('=').slice(1).join('='))
     expect(await who()).toContain('"u1"')
     auth.signOut(site)
     expect(await who()).toBe('anonymous')
@@ -123,7 +123,7 @@ describe('createAuth', () => {
       const { auth, read } = await seed({ url: 'https://example.com' })
       const cookie = await auth.sessionCookie('u1')
 
-      expect(cookie).toStartWith('session=')
+      expect(cookie).toStartWith('kay_session=')
       expect(await read(cookie)).toContain('u1')
       expect(await read(cookie, proto)).toBe('anonymous')
     })
@@ -132,13 +132,13 @@ describe('createAuth', () => {
       const { auth, read } = await seed()
       const https = await auth.sessionCookie('u1', { secure: true })
 
-      expect(https).toStartWith('__Host-session=')
+      expect(https).toStartWith('__Host-kay_session=')
       expect(await read(https, proto)).toContain('u1')
       expect(await read(https)).toBe('anonymous')
-      expect(await auth.sessionCookie('u1', { secure: false })).toStartWith('session=')
+      expect(await auth.sessionCookie('u1', { secure: false })).toStartWith('kay_session=')
     })
 
-    test('in production with an https site and no header, follows the server and mints __Host-session', async () => {
+    test('in production with an https site and no header, follows the server and mints __Host-kay_session', async () => {
       const { auth, read } = await seed()
 
       process.env.NODE_ENV = 'production'
@@ -146,19 +146,19 @@ describe('createAuth', () => {
 
       const cookie = await auth.sessionCookie('u1')
 
-      expect(cookie).toStartWith('__Host-session=')
+      expect(cookie).toStartWith('__Host-kay_session=')
       expect(await read(cookie)).toContain('u1')
-      expect(await auth.sessionCookie('u1', { secure: false })).toStartWith('session=')
+      expect(await auth.sessionCookie('u1', { secure: false })).toStartWith('kay_session=')
     })
 
-    test('in production with an https auth url but no site, mints what the server reads: session', async () => {
+    test('in production with an https auth url but no site, mints what the server reads: kay_session', async () => {
       const { auth, read } = await seed({ url: 'https://example.com' })
 
       process.env.NODE_ENV = 'production'
 
       const cookie = await auth.sessionCookie('u1')
 
-      expect(cookie).toStartWith('session=')
+      expect(cookie).toStartWith('kay_session=')
       expect(await read(cookie)).toContain('u1')
     })
 
@@ -166,7 +166,7 @@ describe('createAuth', () => {
       const { auth, read } = await seed()
 
       process.env.NODE_ENV = 'production'
-      expect(await auth.sessionCookie('u1')).toStartWith('session=')
+      expect(await auth.sessionCookie('u1')).toStartWith('kay_session=')
       expect(await read(await auth.sessionCookie('u1', { secure: true }), proto)).toContain('u1')
     })
 
@@ -233,11 +233,11 @@ describe('createAuth', () => {
     const ada = browser()
 
     await ada.fetch('/me')
-    const before = ada.cookies.get('session')
+    const before = ada.cookies.get('kay_session')
 
     await ada.fetch('/sign-in/u1', POST)
 
-    expect(ada.cookies.get('session')).not.toBe(before)
+    expect(ada.cookies.get('kay_session')).not.toBe(before)
   })
 
   test('signing out ends the session', async () => {
@@ -256,7 +256,7 @@ describe('createAuth', () => {
     const thief = browser()
 
     await ada.fetch('/sign-in/u1', POST)
-    thief.cookies.set('session', ada.cookies.get('session')!)
+    thief.cookies.set('kay_session', ada.cookies.get('kay_session')!)
     expect(await thief.json('/me')).toMatchObject({ id: 'u1' })
 
     await ada.fetch('/sign-out-everywhere', POST)
@@ -271,7 +271,7 @@ describe('createAuth', () => {
     const thief = browser()
 
     await ada.fetch('/sign-in/u1', POST)
-    thief.cookies.set('session', ada.cookies.get('session')!)
+    thief.cookies.set('kay_session', ada.cookies.get('kay_session')!)
 
     await ada.fetch('/sign-out-everywhere?keep=1', POST)
 
@@ -464,7 +464,7 @@ describe('guard', () => {
     const ada = browser()
 
     await ada.fetch('/sign-in/u1', POST)
-    const locals = await contextOf(auth.plugin, `session=${ada.cookies.get('session')}`)
+    const locals = await contextOf(auth.plugin, `kay_session=${ada.cookies.get('kay_session')}`)
 
     expect(await run(auth.guard(), guardContext({ locals }))).toBe('passed')
     expect(await run(auth.guard({ require: 'editor' }), guardContext({ locals }))).toBe('passed')
@@ -478,7 +478,7 @@ describe('guard', () => {
     await ada.call('register', { email: 'ada@example.com', password: 'correct horse battery' })
     const { token } = await ada.callOk('createToken', { password: 'correct horse battery' }, 'Phone', { scopes: ['posts:read'] })
     const locals = await contextOf(auth.plugin, '', { authorization: `Bearer ${token}` })
-    const session = await contextOf(auth.plugin, `session=${ada.cookies.get('session')}`)
+    const session = await contextOf(auth.plugin, `kay_session=${ada.cookies.get('kay_session')}`)
 
     expect(await run(auth.guard({ scope: ['posts:read', 'posts:write'] }), guardContext({ locals }))).toBe('passed')
     expect(await run(auth.guard({ scope: 'posts:write' }), guardContext({ locals }))).toBe('deny 403')

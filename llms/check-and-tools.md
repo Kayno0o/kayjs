@@ -26,7 +26,7 @@ kay routes
 
 ```sh
 kay render /about
-kay render /account --cookie session=…
+kay render /account --cookie kay_session=…
 ```
 
 ### Screenshot a page
@@ -36,7 +36,7 @@ kay render /account --cookie session=…
 ```sh
 kay screenshot /admin/posts
 kay screenshot /admin/posts --width 375 --scheme dark --full-page
-kay screenshot /account --cookie session=abc123
+kay screenshot /account --cookie kay_session=abc123
 ```
 
 ### Give an agent kay's tools

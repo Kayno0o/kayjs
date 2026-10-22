@@ -301,7 +301,7 @@ Ctrl-C, `SIGTERM` and `SIGHUP` reach the server once, and `kay start` waits for 
 
 ```sh
 kay render /about                     # the page's HTML on stdout
-kay render /account --cookie session=…
+kay render /account --cookie kay_session=…
 kay render /_kay/action/src/routes/index.kay/add --body 'title=Milk' -i
 ```
 
@@ -328,7 +328,7 @@ A redirect prints `kay render: 302 Found, to /login` on stderr and exits 0. A st
 kay screenshot /admin/posts            # 375 and 1280 px wide
 kay screenshot /admin/posts --width 375 --scheme dark
 kay screenshot /admin/posts --full-page
-kay screenshot /account --cookie session=abc123
+kay screenshot /account --cookie kay_session=abc123
 ```
 
 `kay screenshot` opens a page of the project's running `kay dev` in a headless Chrome or Chromium and writes a PNG under `.kay/screenshots/`. It shows what the HTML does not: a control off screen at phone width, a table that stacks badly, the dark scheme. Chrome comes from `BUN_CHROME_PATH`, else the first one on the `PATH`.

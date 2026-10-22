@@ -16,7 +16,7 @@ async function setup() {
 async function cookieOf(browser: ReturnType<ReturnType<typeof testApp>['browser']>, method: string, ...args: unknown[]): Promise<string> {
   const response = await browser.fetch(`/call/${method}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(args) })
 
-  return response.headers.getSetCookie().find(line => line.startsWith('session='))!
+  return response.headers.getSetCookie().find(line => line.startsWith('kay_session='))!
 }
 
 function later(seconds: number) {

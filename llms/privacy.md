@@ -92,7 +92,7 @@ export async function archive(scan: File) {
 
 ### Cookies
 
-- `session` (`__Host-session` over https): the session's sealed data or id, set once the app writes to a session; necessary, `maxAge` unused, `'30d'` by default, never past `absoluteMaxAge`, `'90d'`.
+- `kay_session` (`__Host-kay_session` over https): the session's sealed data or id, set once the app writes to a session; necessary, `maxAge` unused, `'30d'` by default, never past `absoluteMaxAge`, `'90d'`.
 - `kay_flash`: the message an action's redirect shows on the next page, read once; necessary, 60 seconds.
 - `kay_locale`: the locale a visitor picked, on a site with locales; necessary, a year. Named `kay-locale` before 1.52, which is still read.
 - Under a `base`, `kay_flash` and `kay_locale` are set for that path alone, as `kay_preview` is.

@@ -19,7 +19,7 @@ import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
 const SECRET = 'a test secret that is long enough to seal'
-const COOKIE_VALUE = /^session=([^;]*)/
+const COOKIE_VALUE = /^kay_session=([^;]*)/
 // Held in variables so tsc leaves them to Bun: the fixture registers locals of its own.
 const ACCOUNT = './fixtures/production/src/routes/account.kay'
 const SESSIONS = './fixtures/production/src/sessions'
@@ -36,10 +36,10 @@ function browser(app: { handle: (request: Request) => Promise<Response> }) {
 
   return async (path: string, init: RequestInit = {}) => {
     const response = await app.handle(new Request(`http://localhost${path}`, { ...init, headers: { cookie, ...init.headers as Record<string, string> } }))
-    const set = response.headers.getSetCookie().find(header => header.startsWith('session='))
+    const set = response.headers.getSetCookie().find(header => header.startsWith('kay_session='))
 
     if (set !== undefined)
-      cookie = Number((/Max-Age=(\d+)/i).exec(set)?.[1]) === 0 ? '' : `session=${COOKIE_VALUE.exec(set)![1]}`
+      cookie = Number((/Max-Age=(\d+)/i).exec(set)?.[1]) === 0 ? '' : `kay_session=${COOKIE_VALUE.exec(set)![1]}`
 
     return { response, text: await response.text(), set, cookie: () => cookie }
   }
@@ -125,7 +125,7 @@ describe('sessions', () => {
         process.env.NODE_ENV = environment
     }
 
-    expect(warnings).toEqual([expect.stringContaining('a session kept in its session cookie alone, with no store')])
+    expect(warnings).toEqual([expect.stringContaining('a session kept in its kay_session cookie alone, with no store')])
   })
 
   it('writes a whole Max-Age for a sub-second or fractional maxAge', async () => {
@@ -139,7 +139,7 @@ describe('sessions', () => {
       const first = await visit('/count')
 
       expect(first.text).toBe('1')
-      expect(first.set).toMatch(/^session=[\w-]+; Path=\/; Max-Age=2592000; HttpOnly; SameSite=Lax$/i)
+      expect(first.set).toMatch(/^kay_session=[\w-]+; Path=\/; Max-Age=2592000; HttpOnly; SameSite=Lax$/i)
       expect((await visit('/count')).text).toBe('2')
 
       const peek = await visit('/peek')
@@ -184,7 +184,7 @@ describe('sessions', () => {
     const forged = await counter().handle(new Request('http://localhost/peek', { headers: { cookie: `${sealed.slice(0, -2)}${sealed.at(-2) === 'A' ? 'B' : 'A'}${sealed.at(-1)}` } }))
 
     expect(await forged.text()).toBe('none')
-    expect(forged.headers.getSetCookie()[0]).toMatch(/^session=; .*Max-Age=0/i)
+    expect(forged.headers.getSetCookie()[0]).toMatch(/^kay_session=; .*Max-Age=0/i)
   })
 
   it('opens cookies sealed with an older secret in the list, sealing new ones with the first', async () => {
@@ -200,7 +200,7 @@ describe('sessions', () => {
 
     // Only read, the session still goes out sealed with the new secret.
     const resealed = (await rotated.handle(new Request('http://localhost/peek', { headers: { cookie } }))).headers.getSetCookie()[0]!
-    const fresh = `session=${COOKIE_VALUE.exec(resealed)![1]}`
+    const fresh = `kay_session=${COOKIE_VALUE.exec(resealed)![1]}`
 
     expect(await (await counter({ secret: `new ${SECRET}` }).handle(new Request('http://localhost/peek', { headers: { cookie: fresh } }))).text()).toBe('2')
   })
@@ -222,7 +222,7 @@ describe('sessions', () => {
     expect((await visit('/out')).set).toMatch(/; Domain=example\.com;.*Max-Age=0/i)
     expect((await browser(counter())('/count')).set).not.toMatch(/Domain=/i)
 
-    const forged = await counter({ domain: 'example.com' }).handle(new Request('http://localhost/peek', { headers: { cookie: 'session=forged' } }))
+    const forged = await counter({ domain: 'example.com' }).handle(new Request('http://localhost/peek', { headers: { cookie: 'kay_session=forged' } }))
 
     expect(forged.headers.getSetCookie()[0]).toMatch(/; Domain=example\.com;.*Max-Age=0/i)
   })
@@ -290,15 +290,15 @@ describe('sessions', () => {
     const app = counter()
     const https = { 'x-forwarded-proto': 'https' }
     const set = (await app.handle(new Request('http://localhost/count', { headers: https }))).headers.getSetCookie()[0]!
-    const value = (/^__Host-session=([^;]*)/).exec(set)![1]
+    const value = (/^__Host-kay_session=([^;]*)/).exec(set)![1]
 
-    expect(set).toMatch(/^__Host-session=[\w-]+; Path=\/; Max-Age=2592000; Secure; HttpOnly; SameSite=Lax$/i)
-    expect(await (await app.handle(new Request('http://localhost/peek', { headers: { ...https, cookie: `__Host-session=${value}` } }))).text()).toBe('1')
+    expect(set).toMatch(/^__Host-kay_session=[\w-]+; Path=\/; Max-Age=2592000; Secure; HttpOnly; SameSite=Lax$/i)
+    expect(await (await app.handle(new Request('http://localhost/peek', { headers: { ...https, cookie: `__Host-kay_session=${value}` } }))).text()).toBe('1')
     // A cookie another host of the site could have set, under the name without the prefix, is no session.
-    expect(await (await app.handle(new Request('http://localhost/peek', { headers: { ...https, cookie: `session=${value}` } }))).text()).toBe('none')
+    expect(await (await app.handle(new Request('http://localhost/peek', { headers: { ...https, cookie: `kay_session=${value}` } }))).text()).toBe('none')
     expect((await counter({ cookie: 'admin' }).handle(new Request('http://localhost/count', { headers: https }))).headers.getSetCookie()[0]).toMatch(/^__Host-admin=/)
     // A Domain rules __Host- out.
-    expect((await counter({ domain: 'example.com' }).handle(new Request('http://localhost/count', { headers: https }))).headers.getSetCookie()[0]).toMatch(/^session=.*; Domain=example\.com; .*Secure/i)
+    expect((await counter({ domain: 'example.com' }).handle(new Request('http://localhost/count', { headers: https }))).headers.getSetCookie()[0]).toMatch(/^kay_session=.*; Domain=example\.com; .*Secure/i)
   })
 
   it('sends the cookie SameSite=Lax unless told another, Strict or None', async () => {
@@ -307,10 +307,10 @@ describe('sessions', () => {
 
     expect(await cookie({})).toMatch(/; SameSite=Lax$/i)
     expect(await cookie({ sameSite: 'strict' })).toMatch(/; HttpOnly; SameSite=Strict$/i)
-    expect(await cookie({ sameSite: 'strict' }, https)).toMatch(/^__Host-session=.*; Secure; HttpOnly; SameSite=Strict$/i)
-    expect(await cookie({ sameSite: 'none' }, https)).toMatch(/^__Host-session=.*; Secure; HttpOnly; SameSite=None$/i)
+    expect(await cookie({ sameSite: 'strict' }, https)).toMatch(/^__Host-kay_session=.*; Secure; HttpOnly; SameSite=Strict$/i)
+    expect(await cookie({ sameSite: 'none' }, https)).toMatch(/^__Host-kay_session=.*; Secure; HttpOnly; SameSite=None$/i)
     // Browsers drop a SameSite=None cookie that is not Secure, so it never goes out without it, over plain http included.
-    expect(await cookie({ sameSite: 'none' })).toMatch(/^session=.*; Secure; HttpOnly; SameSite=None$/i)
+    expect(await cookie({ sameSite: 'none' })).toMatch(/^kay_session=.*; Secure; HttpOnly; SameSite=None$/i)
     expect(await cookie({ sameSite: 'none', domain: 'example.com' })).toMatch(/Domain=example\.com; .*Secure.*SameSite=None$/i)
   })
 
@@ -331,9 +331,9 @@ describe('sessions', () => {
     try {
       const set = await count({})
 
-      expect(set).toMatch(/^__Host-session=.*; Secure/i)
-      expect(await count({ 'x-forwarded-proto': 'http' })).toMatch(/^session=(?!.*Secure)/i)
-      expect(await count({ 'x-forwarded-proto': 'https' })).toMatch(/^__Host-session=.*; Secure/i)
+      expect(set).toMatch(/^__Host-kay_session=.*; Secure/i)
+      expect(await count({ 'x-forwarded-proto': 'http' })).toMatch(/^kay_session=(?!.*Secure)/i)
+      expect(await count({ 'x-forwarded-proto': 'https' })).toMatch(/^__Host-kay_session=.*; Secure/i)
 
       // A websocket upgrade a proxy passes on without the header reads the session as the pages do.
       const cookie = (/^[^;]*/).exec(set)![0]
@@ -346,7 +346,7 @@ describe('sessions', () => {
       setSite(before?.origin, before?.slashed ? 'always' : undefined)
     }
 
-    expect(await count({})).toMatch(/^session=(?!.*Secure)/i)
+    expect(await count({})).toMatch(/^kay_session=(?!.*Secure)/i)
   })
 
   it('in production with no site, warns once that cookies lose Secure when a request does not say its scheme, not for a server tried locally', async () => {
@@ -360,11 +360,11 @@ describe('sessions', () => {
     process.env.NODE_ENV = 'production'
 
     try {
-      expect(await count('http://localhost/count')).toMatch(/^session=(?!.*Secure)/i)
-      expect(await count('http://example.com/count', { 'x-forwarded-proto': 'https' })).toMatch(/^__Host-session=.*; Secure/i)
+      expect(await count('http://localhost/count')).toMatch(/^kay_session=(?!.*Secure)/i)
+      expect(await count('http://example.com/count', { 'x-forwarded-proto': 'https' })).toMatch(/^__Host-kay_session=.*; Secure/i)
       expect(warn).not.toHaveBeenCalled()
-      expect(await count('http://example.com/count')).toMatch(/^session=(?!.*Secure)/i)
-      expect(await count('http://example.com/count')).toMatch(/^session=(?!.*Secure)/i)
+      expect(await count('http://example.com/count')).toMatch(/^kay_session=(?!.*Secure)/i)
+      expect(await count('http://example.com/count')).toMatch(/^kay_session=(?!.*Secure)/i)
       expect(warn).toHaveBeenCalledTimes(1)
       expect(String(warn.mock.calls[0]![0])).toContain('X-Forwarded-Proto')
     }
@@ -378,7 +378,7 @@ describe('sessions', () => {
   it('reads a cookie from before kay counted a session\'s start, counting it from when it was written', async () => {
     const key = new Bun.CryptoHasher('sha256').update(SECRET).digest()
     const now = Math.floor(Date.now() / 1000)
-    const legacy = (issued: number) => `session=${sealWith(key, stringify({ data: { count: 1 }, issued }), 'session')}`
+    const legacy = (issued: number) => `kay_session=${sealWith(key, stringify({ data: { count: 1 }, issued }), 'kay_session')}`
     const app = counter({ maxAge: '200s', absoluteMaxAge: '150s' })
     const peek = async (cookie: string) => (await app.handle(new Request('http://localhost/peek', { headers: { cookie } }))).text()
 

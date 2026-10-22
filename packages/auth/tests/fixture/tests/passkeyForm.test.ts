@@ -47,13 +47,13 @@ test('the passkey form labels its proof field with the authenticator code once t
 
   await page.fill('form[action$="/setUp"] input[name="password"]', PASSWORD)
   await page.click('form[action$="/setUp"] button')
-  await page.waitFor('#kayjs-auth-key')
+  await page.waitFor('#kauth-key')
 
-  const secret = (await page.text('#kayjs-auth-key'))!
+  const secret = (await page.text('#kauth-key'))!
 
   await page.fill('form[action$="/enable"] input[name="code"]', await totpCode(secret, totpStep()))
   await page.click('form[action$="/enable"] button')
-  await page.waitFor('#kayjs-auth-recovery-codes')
+  await page.waitFor('#kauth-recovery-codes')
   await page.goto('/auth/account/security')
   await page.waitFor('input[name="code"][autocomplete="one-time-code"]')
 

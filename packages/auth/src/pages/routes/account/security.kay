@@ -106,7 +106,7 @@ PageSection(title={wording('auth.account.twoFactor.title', 'Two-step verificatio
     if twoFactorError
       Message(text={failure(twoFactorError)})
     if user.twoFactor
-      p#kayjs-auth-codes-left {wording('auth.account.twoFactor.codesLeft', codesLeft === 0 ? 'No recovery code left' : codesLeft === 1 ? '{count} recovery code left' : '{count} recovery codes left', { count: codesLeft })}
+      p#kauth-codes-left {wording('auth.account.twoFactor.codesLeft', codesLeft === 0 ? 'No recovery code left' : codesLeft === 1 ? '{count} recovery code left' : '{count} recovery codes left', { count: codesLeft })}
       form.flex.flex-col.gap-3(action={regenerate})
         Proof(user={user} secondFactor)
         Button(type="submit" label={wording('auth.account.twoFactor.regenerate', 'Make new recovery codes')})
@@ -118,7 +118,7 @@ PageSection(title={wording('auth.account.twoFactor.title', 'Two-step verificatio
       QrCode(value={setupUri} label={wording('auth.account.twoFactor.qr', 'QR code for your authenticator app')} size={192})
       if setupKey
         p
-          | {wording('auth.account.twoFactor.key', 'Key')}: #[code#kayjs-auth-key {setupKey}]
+          | {wording('auth.account.twoFactor.key', 'Key')}: #[code#kauth-key {setupKey}]
       form.flex.flex-col.gap-3(action={enable})
         input(type="hidden" name="uri" value={setupUri})
         FormField(label={wording('auth.code', 'Code')} required)

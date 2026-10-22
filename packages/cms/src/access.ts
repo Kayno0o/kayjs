@@ -4,7 +4,7 @@ import type { Action } from './roles'
 import { localPath } from 'kay'
 import { READ_METHODS } from 'kay/library'
 import { wording } from 'kay/words'
-import { activePasswords, SESSION_COOKIE, signedInBy } from './password'
+import { activePasswords, LEGACY_SESSION_COOKIE, SESSION_COOKIE, sessionCookieOf, signedInBy } from './password'
 import { screenPath } from './paths'
 import { ACTIONS } from './roles'
 import { settings } from './settings'
@@ -177,8 +177,9 @@ export function sendToSignIn(ctx: GuardContext, error: unknown): void {
 
 // Ends the sign-in: a password guard's cookie, else kayjs-auth's session.
 export async function signOutOf(ctx: GuardContext): Promise<void> {
-  activePasswords()?.revoke(ctx.cookies.get(SESSION_COOKIE))
+  activePasswords()?.revoke(sessionCookieOf(ctx.cookies))
   ctx.cookies.delete({ name: SESSION_COOKIE, path: '/' })
+  ctx.cookies.delete({ name: LEGACY_SESSION_COOKIE, path: '/' })
   await authOf(ctx)?.signOut?.()
 }
 

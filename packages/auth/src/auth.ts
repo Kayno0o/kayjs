@@ -1406,7 +1406,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     core.organizations.create = async user => authorize(user, create, 'write', {})
 
   const dropSession = (cookies: Bun.CookieMap) => {
-    for (const name of new Set(['session', '__Host-session', ...signedInCookies.get(cookies) ?? []]))
+    for (const name of new Set(['kay_session', '__Host-kay_session', ...signedInCookies.get(cookies) ?? []]))
       cookies.delete(name)
 
     signedInCookies.delete(cookies)

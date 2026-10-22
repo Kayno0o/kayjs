@@ -165,10 +165,7 @@ describe('the naming conventions', () => {
   const others = folders.join('|')
 
   it('prefix a library\'s classes and ids with k<library>-, never kayjs-<library>-', () => {
-    expect(drift((_, __, text) => text.match(new RegExp(`(?<![\\w@/.-])kayjs-(?:${others})-[\\w-]*`, 'g')) ?? [], [
-      { library: 'auth', match: /^kayjs-auth-/, issue: '#1691' },
-      { library: 'mail', match: /^kayjs-mail-/, issue: '#1691' },
-    ])).toEqual([])
+    expect(drift((_, __, text) => text.match(new RegExp(`(?<![\\w@/.-])kayjs-(?:${others})-[\\w-]*`, 'g')) ?? [], [])).toEqual([])
   })
 
   it('define a library\'s stylesheet classes under its own k<library>- prefix', () => {
@@ -193,7 +190,7 @@ describe('the naming conventions', () => {
       ...(text.match(new RegExp(`data-k(?:${others})-[\\w-]*`, 'g')) ?? []).filter(attribute => !attribute.startsWith(`data-k${library}-`)),
     ]
 
-    expect(drift(find, [{ library: 'cms', match: /^data-cms-edit-page$/, issue: '#1691' }])).toEqual([])
+    expect(drift(find, [{ library: 'cms', match: /^data-cms-edit-page$/, issue: '#1691, the name before 1.70 kept three minors' }])).toEqual([])
   })
 
   it('mount a library\'s internal routes under /_kay/<library>, outside /api', () => {
@@ -209,7 +206,7 @@ describe('the naming conventions', () => {
     ]
 
     expect(drift(find, [
-      { library: 'cms', match: /^.kcms_session.$/, issue: '#1691' },
+      { library: 'cms', match: /^.kcms_session.$/, issue: '#1691, the name before 1.70 kept three minors' },
       { library: 'auth', match: /^auth_/, issue: '#1691' },
     ])).toEqual([])
   })

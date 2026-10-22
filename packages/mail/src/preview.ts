@@ -325,7 +325,7 @@ const sentTo = (to: string | undefined): Outcome | undefined => to === undefined
 
 // The development server's view of the outbox, every mail sent since it started, newest first, each with its headers, html and text, and of the app's mails rendered with sample props, through `render`.
 export function preview(render: (message: MailMessage) => Promise<Mail>, relay: Relay) {
-  return new Elysia({ name: 'kayjs-mail-preview' })
+  return new Elysia({ name: 'kmail-preview' })
     .get(PREVIEW_PATH, ({ query }) => listPage('clear' in query))
     .get(SAMPLES_PATH, async ({ query }) => {
       const files = await mailFiles()

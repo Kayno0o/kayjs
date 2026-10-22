@@ -7,7 +7,7 @@ const { codes } = props<{ codes: string[] }>()
 .flex.flex-col.gap-2
   strong {wording('auth.account.twoFactor.recoveryCodes', 'Recovery codes')}
   p {wording('auth.account.twoFactor.recoveryIntro', 'Keep these somewhere safe: each one signs you in once if you lose your authenticator. They are shown only now.')}
-  ul#kayjs-auth-recovery-codes.grid.grid-cols-2.gap-1.font-mono
+  ul#kauth-recovery-codes.grid.grid-cols-2.gap-1.font-mono
     for code of codes key={code}
       li {code}
   CopyButton(text={codes.join('\n')} label={wording('auth.account.twoFactor.copy', 'Copy the codes')})

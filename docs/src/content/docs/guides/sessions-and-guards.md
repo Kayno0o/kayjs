@@ -28,14 +28,14 @@ import { pages } from 'kay/server'
 const auth = new Elysia({ name: 'auth' })
   .derive({ as: 'scoped' }, async ({ cookie }) => ({
     user: await findSession(
-      cookie['__Host-session']?.value ?? cookie.session?.value,
+      cookie['__Host-kay_session']?.value ?? cookie.kay_session?.value,
     ),
   }))
 
 export const app = new Elysia().use(auth).use(await pages()).listen(3000)
 ```
 
-This example reads the cookie by hand, so it looks for `__Host-session`, the name over https, and for `session` over plain http. `session()` picks the right name for you.
+This example reads the cookie by hand, so it looks for `__Host-kay_session`, the name over https, and for `kay_session` over plain http. `session()` picks the right name for you.
 
 A page then reads `ctx.locals.user`, typed. `kay check` and the editor read `export const app` without running it.
 
@@ -129,9 +129,9 @@ Form stamps, links to private files and the flash cookie are signed with a key f
 
 ### The cookie
 
-The cookie is `HttpOnly` and `SameSite=Lax`. Over https it is `Secure` and named `__Host-session`, so no other host of the site can set it. Code reading it by hand looks for that name.
+The cookie is `HttpOnly` and `SameSite=Lax`. Over https it is `Secure` and named `__Host-kay_session`, so no other host of the site can set it. Code reading it by hand looks for that name.
 
-`cookie` changes the name from `session`.
+`cookie` changes the name from `kay_session`.
 
 `sameSite` changes what the browser does with it on a request another site starts. `'lax'`, the default, sends it on a link followed from elsewhere and not on a post.
 

@@ -44,5 +44,5 @@ else if supported()
       input(name="name" bind:value={name})
     Proof(user={user} secondFactor passwordLabel={passwordLabel} codeLabel={codeLabel})
     if error()
-      p.kayjs-auth-error.text-kui-error(role="alert") {error()}
+      p.kauth-error.text-kui-error(role="alert") {error()}
     Button(type="submit" label={label} busy={passkeyOptions.pending() || addPasskey.pending()})

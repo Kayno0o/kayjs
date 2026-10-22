@@ -31,4 +31,4 @@ async function signIn() {
 if supported()
   Button(label={label} onClick={signIn} busy={passkey.pending()})
   if error()
-    p.kayjs-auth-error.text-kui-error(role="alert") {error()}
+    p.kauth-error.text-kui-error(role="alert") {error()}

@@ -12,7 +12,7 @@ This page lists what each feature keeps, for a site's privacy notice and for the
 
 | Cookie | Set by | Kept |
 | --- | --- | --- |
-| `session`, `__Host-session` over https | a session the app writes to | 30 days unused, 90 at most, by default |
+| `kay_session`, `__Host-kay_session` over https | a session the app writes to | 30 days unused, 90 at most, by default |
 | `kay_flash` | an action redirecting with a flash message | 60 seconds |
 | `kay_locale` | a visitor picking a locale | a year |
 | `kay_analytics` | the consent notice or information line of `analytics()` | 180 days, or the `maxAge` you set |

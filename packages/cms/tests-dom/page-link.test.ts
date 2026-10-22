@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test'
 import { settle } from 'kay/test'
-import { CHECK_PATH, HINT_COOKIE, PAGE_LINK_ATTRIBUTE, pageLink, pageLinkLoader, SIGNED_IN_COOKIE } from '../src/page-link'
+import { CHECK_PATH, HINT_COOKIE, LEGACY_PAGE_LINK_ATTRIBUTE, PAGE_LINK_ATTRIBUTE, pageLink, pageLinkLoader, SIGNED_IN_COOKIE } from '../src/page-link'
 
 const ANSWER = { label: 'Edit this page', href: '/admin/page' }
 const BUTTON = 'html > a'
@@ -35,7 +35,7 @@ document.addEventListener = ((type: string, listener: EventListener, options?: b
 }) as typeof document.addEventListener
 
 async function run(): Promise<void> {
-  pageLink(HINT_COOKIE, PAGE_LINK_ATTRIBUTE, CHECK_PATH, SIGNED_IN_COOKIE)
+  pageLink(HINT_COOKIE, `${PAGE_LINK_ATTRIBUTE},${LEGACY_PAGE_LINK_ATTRIBUTE}`, CHECK_PATH, SIGNED_IN_COOKIE)
   await settle()
 }
 
@@ -159,6 +159,15 @@ test('fills a link of the app\'s own in place of its button, and keeps it hidden
   answering(403)
   await run()
   expect(document.querySelector<HTMLAnchorElement>(`[${PAGE_LINK_ATTRIBUTE}]`)!.hidden).toBeTrue()
+})
+
+test('fills a link written with the attribute from before 1.70', async () => {
+  document.body.innerHTML = `<a ${LEGACY_PAGE_LINK_ATTRIBUTE} hidden></a>`
+  answering(200)
+  await run()
+  expect(document.querySelector(BUTTON)).toBeNull()
+  expect(document.querySelector<HTMLAnchorElement>(`[${LEGACY_PAGE_LINK_ATTRIBUTE}]`)!.hidden).toBeFalse()
+  mock.restore()
 })
 
 test('moves the link to the page a swap lands on', async () => {

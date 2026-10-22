@@ -153,9 +153,9 @@ How kay and its libraries name the same idea, written before the renames land: a
 - A runtime error class ends in `Error`, extends `Error`, and carries `code` (`AiError.kind` is also its `code`; an HTTP `status` stays beside it). A renamed export keeps its old name as an alias for three minors.
 
 **Prefixes**
-- Routes a library mounts for itself are `/_kay/<library>`, never under the app's `/api` (#1691).
+- Routes a library mounts for itself are `/_kay/<library>`, never under the app's `/api`; kayjs-cms's `/api/cms/*` and kayjs-auth's `auth_*` tables are the drift left (#1691).
 - CSS classes and ids are `k<library>-` (`kui-`, `kcms-`, `kai-`, `kauth-`, `kmail-`), kay's own `kay-`; a data attribute that names an element or marker is `data-k<library>-`, kay's `data-kay-`. A bare `data-tone` or `data-size` is the state of the component's own element (#1691).
-- Cookies are `kay_<name>` and tables `kay_<plural name>`, the default session cookie included (#1691).
+- Cookies are `kay_<name>` and tables `kay_<plural name>`; the default session cookie is `kay_session` with the old name not read, and a library cookie renamed is still read under its old name for three minors (kayjs-cms's `kay_editor_session`).
 - An export name two libraries share is prefixed with its library (`authMemoryStore`), and a Postgres entry or helper is spelled `pg`, not `postgres` (#1692).
 
 **Texts**

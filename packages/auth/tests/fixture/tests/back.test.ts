@@ -128,7 +128,7 @@ for (const { name, options, base, slash, tag } of mounts) {
       const email = `second-${tag}@example.com`
       const { visitor } = await registered(email)
       const scan = await visitor.submit(form('setUp'), { password: PASSWORD }, { from: `/auth/account/security${slash}` })
-      const secret = text(scan, '#kayjs-auth-key')!
+      const secret = text(scan, '#kauth-key')!
       const uri = scan.find('input[name="uri"]')[0]!.attributes.value!
 
       await visitor.submit(form('enable'), { code: await totpCode(secret, totpStep()), uri }, { from: `/auth/account/security${slash}` })
