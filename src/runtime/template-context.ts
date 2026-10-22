@@ -38,7 +38,7 @@ function valuesNow(key: string | symbol): Record<string, unknown> {
   const values = current()
 
   if (values === undefined)
-    throw new Error(`kay: ctx.${String(key)} is read in a render that loaded no request values, which only a page rendered per request does; a page reads \`ctx\` in its template or in a component it imports, never in a module; the walk finding the page follows imports and import.meta.glob of the app, so a component reached through a package script is imported in the page`)
+    throw new Error(`kay: ctx.${String(key)} is read in a render that loaded no request values, which only a page rendered per request does; a page reads \`ctx\` in its template or in a component it imports, never in a module; a component reached only through a script in node_modules is not found, so import it in the page`)
 
   return values
 }

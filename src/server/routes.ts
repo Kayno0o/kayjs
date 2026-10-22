@@ -2,7 +2,7 @@ import type { KayExtension } from '../config'
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { findKayFiles, findProjectFiles, KAY_FILE, scriptLoader, TS_FILE } from '../build/files'
-import { globbedFiles } from '../build/glob'
+import { GLOB_CALL, globbedFiles } from '../build/glob'
 import { fences, packageRoot } from '../build/libraries'
 import { throughLinks } from '../build/links'
 import { KayError } from '../compiler/errors'
@@ -440,7 +440,7 @@ function importsOf(file: string, read: LayoutsRead): string[] {
     }
 
     try {
-      for (const path of globbedFiles(KAY_FILE.test(file) ? fences(source) : source, file, packageRoot(dirname(file)), KAY_FILE.test(file) ? 'ts' : scriptLoader(file)) ?? []) {
+      for (const path of source.includes(GLOB_CALL) ? globbedFiles(KAY_FILE.test(file) ? fences(source) : source, file, packageRoot(dirname(file)), KAY_FILE.test(file) ? 'ts' : scriptLoader(file)) ?? [] : []) {
         const real = realFile(path)
 
         if (followed(real))
