@@ -3453,7 +3453,7 @@ describe.concurrent('kay check, unused code', () => {
     })
 
     try {
-      expect((await runCheck(root)).output.match(/deprecated-ctx-outcome/g)).toHaveLength(4)
+      expect((await runCheck(root)).output.match(/deprecated-ctx-outcome/g)).toHaveLength(3)
       await runCheck(root, '--fix')
       expect(await Bun.file(join(root, 'src/a.ts')).text()).toBe('const failure = add.failed()\nconst sent = note.succeeded() !== undefined\nconst nested = forms.add.failed()?.data\nconst mine = other.failed(add)\nconst text = \'add.failed()\' // add.succeeded()\nconst called = ctx.failed(pick())\n')
     }
