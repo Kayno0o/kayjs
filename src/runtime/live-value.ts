@@ -156,6 +156,12 @@ export function noteLives(handles: readonly unknown[]): void {
 const OWN_ID = /^kay:/
 
 let liveStore: LiveStore | undefined
+
+function shared(slot: ServerSlot): boolean {
+  return liveStore !== undefined && !OWN_ID.test(slot.id)
+}
+
+const subscribed = new WeakSet<LiveStore>()
 // What the store holds for a value no module declared yet, by id then key: taken when its declaration runs.
 const undeclared = new Map<string, Map<string, string>>()
 
@@ -172,7 +178,15 @@ export function setLiveStore(store: LiveStore | undefined): void {
   for (const [id, key, text] of store.entries())
     hear(id, key, text)
 
-  store.subscribe(hear)
+  if (subscribed.has(store))
+    return
+
+  subscribed.add(store)
+  // A store replaced or removed since still delivers, which is ignored.
+  store.subscribe((id, key, text) => {
+    if (liveStore === store)
+      hear(id, key, text)
+  })
 }
 
 function decoded(text: string, id: string): { value: unknown } | undefined {
@@ -263,8 +277,8 @@ function serverLive(id: string, initial: unknown, name: string | undefined): Han
     checkWrite?.(slot.name === undefined ? slot.id : `${slot.name} (${slot.id})`, value)
 
     // The store first, so a refusal leaves the value as it was.
-    if (!OWN_ID.test(slot.id))
-      liveStore?.set(slot.id, key, encodeValue(value))
+    if (shared(slot))
+      liveStore!.set(slot.id, key, encodeValue(value))
 
     slot.values.set(key, value)
     notify(slot, key)
@@ -278,8 +292,11 @@ function serverLive(id: string, initial: unknown, name: string | undefined): Han
     ? {
       set: (key: LiveKey, next: unknown) => write(keyText(key), next),
       delete: (key: LiveKey) => {
-        if (!OWN_ID.test(slot.id))
-          liveStore?.delete(slot.id, keyText(key))
+        if (!slot.values.has(keyText(key)))
+          return
+
+        if (shared(slot))
+          liveStore!.delete(slot.id, keyText(key))
 
         slot.values.delete(keyText(key))
         notify(slot, keyText(key))

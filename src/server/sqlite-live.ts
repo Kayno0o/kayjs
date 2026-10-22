@@ -16,6 +16,8 @@ function openLive(path: string) {
   db.run('CREATE TABLE IF NOT EXISTS kay_live (id TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (id, key))')
   db.run('CREATE TABLE IF NOT EXISTS kay_live_events (seq INTEGER PRIMARY KEY AUTOINCREMENT, origin TEXT NOT NULL, id TEXT NOT NULL, key TEXT NOT NULL, at INTEGER NOT NULL)')
 
+  db.run('CREATE INDEX IF NOT EXISTS kay_live_events_at ON kay_live_events (at)')
+
   const insertEvent = db.query('INSERT INTO kay_live_events (origin, id, key, at) VALUES (?, ?, ?, ?)')
   const pruneEvents = db.query('DELETE FROM kay_live_events WHERE at < ?')
   const upsert = db.query('INSERT INTO kay_live (id, key, value) VALUES (?, ?, ?) ON CONFLICT (id, key) DO UPDATE SET value = excluded.value')
@@ -43,6 +45,8 @@ function openLive(path: string) {
 export function sqliteLive(path: string): LiveStore {
   let opened: ReturnType<typeof openLive> | undefined
   let closed = false
+  // The last event before the rows were read, so a set between the two is heard.
+  let before: number | undefined
   const polls: ReturnType<typeof setInterval>[] = []
   const open = (create: boolean) => {
     if (closed)
@@ -64,12 +68,18 @@ export function sqliteLive(path: string): LiveStore {
   })
 
   return {
-    entries: () => open(false)?.all.all().map(row => [row.id, row.key, row.value]) ?? [],
+    entries() {
+      const live = open(false)
+
+      before = live?.lastEvent.get()?.seq ?? 0
+
+      return live?.all.all().map(row => [row.id, row.key, row.value]) ?? []
+    },
     set: (id, key, text) => open(true)!.set(id, key, text),
     delete: (id, key) => open(false)?.remove(id, key),
     subscribe(listener) {
       // What was set before this process opened a file that exists is in what it read from the store already.
-      let seen = open(false)?.lastEvent.get()?.seq ?? 0
+      let seen = before ?? open(false)?.lastEvent.get()?.seq ?? 0
 
       const poll = setInterval(() => {
         try {

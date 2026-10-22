@@ -2,6 +2,7 @@ import type { Action } from '../src/runtime'
 import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { expect, it } from 'bun:test'
+import { appStore } from '../src/server/app-store'
 import { testSite } from '../src/test'
 import { fixtureCopy } from './scratch'
 
@@ -17,6 +18,7 @@ it('replaces a store the config names with memory, creating no file', async () =
   try {
     expect(await site.call(actions.perUser, {}, { headers: { 'x-user': 'ada-memory' } })).toBe('ok')
     expect(existsSync(path)).toBe(false)
+    expect(appStore()?.live).toBeUndefined()
   }
   finally {
     await site.close()

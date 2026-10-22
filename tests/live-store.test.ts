@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { live, liveSlot, setLiveStore, watchSlot } from '../src/runtime/live-value'
+import { setupStore } from '../src/server/app-store'
 import { sqliteLive } from '../src/server/sqlite-live'
 
 // The build gives a declaration its id and name; a test passes them itself.
@@ -99,5 +100,37 @@ process.exit(0)`)
 
     expect(late()).toBe(7)
     setLiveStore(undefined)
+  })
+
+  it('reads and writes the store the app setup names, and none after it is removed', async () => {
+    const path = await storePath()
+    const store = sqliteLive(path)
+    const wired = declare(0, 'test:wired', 'wired')
+
+    setupStore({ live: store })
+    wired.set(9)
+    expect(store.entries()).toEqual([['test:wired', '', '[9]']])
+    setupStore(undefined)
+    wired.set(10)
+    expect(store.entries()).toEqual([['test:wired', '', '[9]']])
+  })
+
+  it('tells the watchers of another process a key was deleted, and a value never declared there stays held', async () => {
+    const path = await storePath()
+    const setter = spawnProcess(path, 'room.set(\'z\', { id: \'z\', users: 3, since: new Date(0) })\nconsole.log(\'set\')\nawait Bun.sleep(1500)\nroom.delete(\'z\')\nroom.delete(\'never\')')
+
+    const reader = setter.stdout.getReader()
+
+    await reader.read()
+
+    const watcher = spawnProcess(path, `const seen = [room('z').users]
+watchSlot(liveSlot('test:room'), 'z', () => seen.push(room('z').users))
+for (let wait = 0; wait < 300 && seen.length < 2; wait++)
+  await Bun.sleep(10)
+console.log(JSON.stringify(seen))
+process.exit(0)`)
+
+    expect(JSON.parse(await output(watcher))).toEqual([3, 0])
+    await setter.exited
   })
 })
