@@ -27,6 +27,8 @@ export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   root: 'free',
   untrack: 'free',
   selection: 'free',
+  recipe: 'free',
+  defineUi: 'free',
   every: 'free',
   watch: 'free',
   debounced: 'free',
