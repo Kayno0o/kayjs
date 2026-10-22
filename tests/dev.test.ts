@@ -280,7 +280,11 @@ describe.concurrent('kay dev', () => {
       expect(children).toHaveLength(1)
       expect(await Bun.file(join(root, '.kay/types/src/routes/index.kay.tsx')).exists()).toBe(true)
       expect(readShadowSettings(root).lints).toEqual({ 'unread-name': 'allow' })
-      expect(await Bun.file(join(root, '.kay/types/kay-env.d.ts')).text()).toContain('FeedPathsOf<typeof import("../../site-content")>')
+      const env = await Bun.file(join(root, '.kay/types/kay-env.d.ts')).text()
+
+      expect(env).toContain('FeedPathsOf<typeof import("../../site-content")>')
+      // A fresh checkout is typed by the first write, with no kay check run before.
+      expect(env).toContain('patterns: "/"')
 
       await Bun.write(join(root, 'src/routes/about.kay'), 'p About\n')
       await until(() => children.length === 2, 15_000)

@@ -241,7 +241,7 @@ form(action={add})
 
 ### Params of the posting page
 
-- `ctx.params` holds the params of the page the action was posted from, matched against the route of the page exporting it, as its guards read them.
+- `ctx.params` holds the params of the page the action was posted from, matched against the route of the page exporting it, as its guards read them. In an action declared in a page, `kay check` types it from that page's route, a matcher's value as it gives it and an optional param `| undefined`, so `ctx.params.id` is a `number` under `[id=integer]` and a misspelled one is an error; a layout's or an `_actions.kay` action, and a guard, cover several routes and read `unknown`.
 - A layout's action gets the ones every page it wraps names.
 - The page is the one a refused post's form names in `kay_back`, else the one kay's script names in an `x-kay-page` header on a call or a form the page swap posts, else the post's `Referer`.
 - An action whose route has params, posted from no page of that route, is refused with 400: before any guard or the handler runs when guards cover its file, so a guard reading them is never skipped, else once the handler first reads `ctx.params`, so an action reading none, such as a save a page of another route calls, runs from any page.

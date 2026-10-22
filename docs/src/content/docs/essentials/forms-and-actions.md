@@ -243,12 +243,12 @@ An action reads the params of the page it was posted from in `ctx.params`. This 
 import { projects } from '../../../db'
 
 export const remove = action(s.Object({ id: s.String({ maxLength: 36 }) }), async ({ id }, ctx) => {
-  await projects.remove({ org: String(ctx.params.org), id })
+  await projects.remove({ org: ctx.params.org, id })
 })
 ---
 ```
 
-The guards checked the visitor against `ctx.params`, not against the input, which the visitor chooses. Scope what the handler touches by `ctx.params`.
+`kay check` types `ctx.params` of an action from the page declaring it, as the page reads them, a `[id=integer]` giving a `number`. The guards checked the visitor against `ctx.params`, not against the input, which the visitor chooses. Scope what the handler touches by `ctx.params`.
 
 ## Calling an action from an island
 

@@ -371,6 +371,8 @@ export interface ServerAnalysis {
   exportNames: string[]
   // The exports declared as `action(...)` calls, the ones `kay check` compares URLs of.
   actionNames: string[]
+  // The `action` of each of those calls, which `kay check` types `ctx.params` through for a page.
+  actionCallees: Span[]
   // The actions among them that set `tool`, with whether they also set `honeypot`, `minTime` or `proofOfWork`.
   toolActions: { name: string, botProtected: boolean }[]
   page?: PageSettings | undefined
@@ -396,7 +398,7 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
   if (!server)
     return undefined
 
-  const analysis: ServerAnalysis = { hoisted: [], imports: [], specifiers: [], exports: [], exportNames: [], actionNames: [], toolActions: [], body: [], broken: [], brokenModule: [], implicit: [], data: [], plain: [], separate: [], diagnostics: [] }
+  const analysis: ServerAnalysis = { hoisted: [], imports: [], specifiers: [], exports: [], exportNames: [], actionNames: [], actionCallees: [], toolActions: [], body: [], broken: [], brokenModule: [], implicit: [], data: [], plain: [], separate: [], diagnostics: [] }
   const split = splitFence(source, server, [], analysis)
 
   if (!split)
@@ -423,6 +425,7 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
         for (const declarator of statement.declaration.declarations) {
           if (declarator.id.type === 'Identifier' && declarator.init?.type === 'CallExpression' && declarator.init.callee.type === 'Identifier' && declarator.init.callee.name === 'action') {
             analysis.actionNames.push(declarator.id.name)
+            analysis.actionCallees.push(shift(declarator.init.callee))
 
             const tool = toolOptions(declarator.init.arguments)
 

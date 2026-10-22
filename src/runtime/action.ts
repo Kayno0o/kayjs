@@ -178,7 +178,7 @@ export interface ProtectionMessages {
 
 // The context every request has, `params` those of the page the action was posted from, matched against the action's own route as its guards read them: scope what it touches by them, since the input is the visitor's to choose, and a layout's action gets those every page it wraps names.
 // Its `url` is that page's, as its guards read it, its `locale` that page's too, and `redirect` answers 303 unless given.
-export interface ActionContext extends RequestContext<RouteParams> {
+export interface ActionContext<Params extends Readonly<Record<string, unknown>> = RouteParams> extends RequestContext<Params> {
   // Response status, for a fetch call or the redirect after a plain form post.
   status: (code: number) => void
   // `return ctx.fail(409, { message: 'Taken' })`: a plain form post gets its page rendered again, which reads it through `action.failed()`; a call throws an `ActionError` carrying `data`. A string is also the form's message, under `errors['']`.
@@ -361,6 +361,12 @@ type EmptySchema = ReturnType<typeof t.Object<Record<never, never>>>
 
 // Built per declaration, so an island bundle that never declares an action drops it.
 const emptySchema = () => ({ [Symbol.for('TypeBox.Kind')]: 'Object', type: 'object', properties: {} }) as unknown as EmptySchema
+
+// `action` as `kay check` reads it in a page's server fence, whose `ctx.params` are those of the page's route: not something to write.
+export interface ActionFor<Params extends Readonly<Record<string, unknown>>> {
+  <Output, const Honeypot extends string = never>(handler: (ctx: ActionContext<Params>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot>): NoInputAction<Settled<Output>, Honeypot>
+  <Schema extends TSchema, Output, const Honeypot extends string = never>(schema: Schema, handler: (input: Static<Schema>, ctx: ActionContext<Params>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot>): ServerAction<Schema, Settled<Output>, Honeypot>
+}
 
 // Declares a server action in a page's `--- server` fence: Elysia validates the input against `schema` before `handler` runs.
 // Without a schema the action takes no input, as with an empty object schema, and its handler gets the context alone.

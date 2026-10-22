@@ -2568,6 +2568,43 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
     finally { await rm(root, { recursive: true, force: true }) }
   })
 
+  it('types ctx.params in an action from the page declaring it, and leaves a layout\'s and a shared file\'s untyped', async () => {
+    const page = [
+      '--- server',
+      'import { action, s } from \'kay\'',
+      '',
+      'export const remove = action(async (ctx) => {',
+      '  const id: number = ctx.params.id',
+      '  const org: string = ctx.params.org',
+      '  const slug: string | undefined = ctx.params.slug',
+      '  const typo = ctx.params.nope',
+      '',
+      '  return { id, org, slug, typo }',
+      '})',
+      'export const rename = action(s.Object({ name: s.String({ maxLength: 20 }) }), async ({ name }, ctx) => ({ name, id: ctx.params.id satisfies number }))',
+      'export const mixed = action(async ({ params }) => params.id.toFixed(0), { minTime: 0 })',
+      '---',
+      'p hi',
+      '',
+    ].join('\n')
+    const root = await scratchProject({
+      'src/routes/[org]/items/[id=integer]/[[slug]].kay': page,
+      'src/routes/[org]/_layout.kay': '--- server\nimport { action } from \'kay\'\n\nexport const own = action(async (ctx) => ctx.params.anything)\n---\nslot\n',
+      'src/routes/_actions.kay': '--- server\nimport { action } from \'kay\'\n\nexport const shared = action(async (ctx) => ctx.params.anything)\n',
+      'src/routes/plain.kay': '--- server\nexport const hello = action(async (ctx) => ctx.params.nothing)\n---\np hi\n',
+    })
+
+    try {
+      const diagnostics = await check(root)
+
+      expect(diagnostics.map(d => [d.file.slice(root.length + 1), d.line, d.code])).toEqual([
+        ['src/routes/[org]/items/[id=integer]/[[slug]].kay', 8, 'TS2339'],
+        ['src/routes/plain.kay', 2, 'TS2339'],
+      ])
+    }
+    finally { await rm(root, { recursive: true, force: true }) }
+  })
+
   it('types links to endpoint files and what their GET returns, and reports one a public file serves too', async () => {
     const root = await scratchProject({
       'src/routes/index.kay': 'a(href="/llms.txt") llms\na(href="/feeds/first.json") feed\na(href="/feeds/first.xml") none\n',
