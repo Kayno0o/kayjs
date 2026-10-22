@@ -33,7 +33,7 @@ my-app/
 import { Elysia } from 'elysia'
 import { pages } from 'kay/server'
 
-export const app = new Elysia().use(await pages()).listen(3000)
+export const app = new Elysia().use(await pages())
 ```
 
 Exporting `app` lets `kay check` check links against your own routes and type `ctx.locals`.

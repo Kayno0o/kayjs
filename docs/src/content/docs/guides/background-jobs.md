@@ -15,7 +15,7 @@ Three tools run work outside a request, each for its own kind of job.
 
 ## Scheduled jobs
 
-`schedule(cron, job)` from `kay/server` is an Elysia plugin. The server runs the job from `.listen()` until it stops.
+`schedule(cron, job)` from `kay/server` is an Elysia plugin. The server runs the job from the server listening until it stops.
 
 ```ts
 import { Elysia } from 'elysia'
@@ -26,7 +26,6 @@ new Elysia()
   .use(schedule('30 2 * * MON', sendWeeklyReport, { tz: 'Europe/Paris' }))
   .use(schedule('30s', collectMetrics))
   .use(await pages())
-  .listen(3000)
 ```
 
 Pass several jobs in one call, as a list for one schedule or a table of schedules. `boot: true` also runs them once as the server starts. Servers starting within the same minute usually run it once, and a restart later runs it again.

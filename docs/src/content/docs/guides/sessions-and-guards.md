@@ -32,7 +32,7 @@ const auth = new Elysia({ name: 'auth' })
     ),
   }))
 
-export const app = new Elysia().use(auth).use(await pages()).listen(3000)
+export const app = new Elysia().use(auth).use(await pages())
 ```
 
 This example reads the cookie by hand, so it looks for `__Host-kay_session`, the name over https, and for `kay_session` over plain http. `session()` picks the right name for you.

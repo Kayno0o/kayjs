@@ -11,8 +11,10 @@ path: src/server.ts
 import { Elysia } from 'elysia'
 import { pages } from 'kay/server'
 
-export const app = new Elysia().use(await pages()).listen(3000)
+export const app = new Elysia().use(await pages())
 ```
+
+The entry never calls `listen`: `kay dev`, `kay start` and the executable listen it on `PORT` (3000 by default) and `HOST`, and one that calls `listen` itself keeps its own port and address.
 
 Exporting `app` lets `kay check` check links against your own routes and type `ctx.locals`, from what the app's Elysia plugins add. `kay dev` and `kay build --compile` run this entry by default, and `--entry` names another.
 

@@ -37,7 +37,6 @@ import { pages } from 'kay/server'
 export const app = new Elysia()
   .get('/feed.xml', () => '<feed/>')
   .use(await pages())
-  .listen(3000)
 ```
 
 ### Move an Astro project over
@@ -69,9 +68,9 @@ import { pages } from 'kay/server'
 export const app = new Elysia()
   .get('/feed.xml', feed)
   .use(await pages())
-  .listen(3000)
 ```
 
+- The entry never calls `listen`: it is listened on `PORT` and `HOST` by `kay dev`, `kay start` and the executable, and one calling `listen` itself keeps its own call ([Build and start](build-and-start.md)).
 - Plugins (sessions, jobs, a derive) go in `src/plugins/<name>.ts` instead, each default-exporting the plugin, so a project with only those needs no server entry ([Mount a server plugin](server.md#mount-a-server-plugin)).
 - Exporting `app` lets links and redirects point at the app's own GET routes, such as `/feed.xml`, which `kay check` otherwise reports as served by no page, and types `ctx.locals` (see [Locals](server.md#locals)).
 - An entry other than `src/server.ts` is named once, as `entry: 'src/main.ts'` in `kay.config.ts`, which `kay dev`, `start`, `render`, `check`, `build` and `build --compile` all read; `--entry` on a command wins over it, `kay build --entry` also pointing its check step at that entry.

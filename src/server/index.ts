@@ -1,3 +1,4 @@
+import type { AnyElysia } from 'elysia'
 import type { PagesOptions } from './app'
 import process from 'node:process'
 import { bunProblem } from '../bun'
@@ -5,8 +6,10 @@ import { KayError } from '../compiler/errors'
 import { resolveProject } from '../project'
 import { kayLog } from '../runtime/log'
 import { servePages } from './app'
+import { listenWhenIdle } from './auto-listen'
 import { bootFailure } from './dev'
 import { recordBootFailure, trackDevErrors } from './dev-errors'
+import { START_PARENT } from './parent'
 import { projectSource } from './source'
 
 export type { ExtensionProblem, KayConfig, KayExtension } from '../config'
@@ -76,17 +79,25 @@ export async function pages(options: PagesOptions = {}) {
   const project = await withBootFailure(async () => resolveProject(root, { ...await source.config(root, options), dev: mode.dev, prebuilt: mode.prebuilt }, mode))
   const loadClient = async () => source.client(project)
 
+  // An entry that runs under a kay command, as the executable, or as `bun src/server.ts` itself, and never listens, is listened for; a test or a script importing it is not.
+  const listened = <T extends AnyElysia>(app: T): T => {
+    if (mode.underKayDev || source.embedded || process.env[START_PARENT] !== undefined || Bun.main === project.paths.entry)
+      listenWhenIdle(app)
+
+    return app
+  }
+
   if (!mode.dev)
-    return servePages(project, loadClient)
+    return listened(await servePages(project, loadClient))
 
   try {
-    return await servePages(project, loadClient)
+    return listened(await servePages(project, loadClient))
   }
   catch (error) {
     kayLog('error', 'the server could not start', error)
     recordBootFailure(error)
 
-    return bootFailure(error, root)
+    return listened(bootFailure(error, root))
   }
 }
 

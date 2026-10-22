@@ -5,6 +5,7 @@ import { loadTraverse } from '../compiler/rewrite'
 import { CONFIG_FILE, loadConfig } from '../config'
 import { reloadableFolders } from '../content/edit'
 import { projectPaths } from '../project'
+import { forgetIdleApps, listenIdleApps } from '../server/auto-listen'
 import { forgetModules } from '../server/bundle'
 import { announceReload, stopRunning } from '../server/dev'
 import { registerEarlyLoader } from '../server/loader'
@@ -394,8 +395,10 @@ async function reloaded({ code, startedAt, changed, files }: ReloadRequest): Pro
 
     run++
     calls = 0
+    forgetIdleApps()
     mismatch = undefined
     await import(Bun.main)
+    listenIdleApps()
   }
   catch (error) {
     // The entry threw, which a new process would have too.

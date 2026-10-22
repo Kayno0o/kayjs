@@ -206,7 +206,7 @@ const auth = new Elysia({ name: 'auth' })
     user: await findUser(cookie.session?.value),
   }))
 
-export const app = new Elysia().use(auth).use(await pages()).listen(3000)
+export const app = new Elysia().use(auth).use(await pages())
 ```
 
 ```ts

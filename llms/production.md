@@ -96,7 +96,6 @@ new Elysia()
   .use(schedule('30 2 * * MON', sendWeeklyReport, { tz: 'Europe/Paris' }))
   .use(schedule('30s', collectMetrics))
   .use(await pages())
-  .listen(3000)
 ```
 
 ### Run a job that must not be lost
@@ -116,7 +115,7 @@ export const welcomeMails = queue(
 
 ```ts
 // src/server.ts
-new Elysia().use(welcomeMails).use(await pages()).listen(3000)
+new Elysia().use(welcomeMails).use(await pages())
 ```
 
 Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(payload, { delay: '1h' })` to run it later., and more in [Queues](queues.md).
@@ -127,7 +126,7 @@ Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(paylo
 
 - A server started with a NODE_ENV that is none of `development`, `production` and `test`, such as `staging`, warns once as it boots: only `production` turns on the request log, compression, the prebuilt browser bundle and the https fallback to the site's origin, so any other name runs without them; set `NODE_ENV=production` on every deployed environment and tell them apart with another variable.
 - A server started with no NODE_ENV warns as it boots, as it then bundles its browser code at boot and Elysia answers a refused API request with the schema it failed: set NODE_ENV=production where the app is deployed.
-- With NODE_ENV=production, a server's first line, once `.listen()` started it, says where it listens and what runs: `kay: listening on http://localhost:3000, kay 1.30.0 in production, 12 pages prerendered`.
+- With NODE_ENV=production, a server's first line, once it listens, says where it listens and what runs: `kay: listening on http://localhost:3000, kay 1.30.0 in production, 12 pages prerendered`.
 - Then every request kay or the app's routes registered after `.use(await pages())` answer is logged to stdout as one line: `GET /blog/hello 200 12ms AZnLe0vUe9qD0uXq9vLwZw`, the method, the path without its query string, which may carry tokens, the status, the milliseconds until the response was made, a streamed one's headers, and the request's id.
 - kay's own `/_kay/` routes, assets included, and the health route, wherever `health.path` puts it, are left out.
 - `true` in kay.config.ts's `log` logs them outside production too, `false` never.
@@ -162,7 +161,7 @@ Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(paylo
 - `health: { path: '/up', check: async () => await db.ping() }` in kay.config.ts moves it and adds a check: one returning `false`, throwing, or taking over 5 s answers 503, the error logged.
 - `health: false` leaves the route out.
 - An executable `kay build --compile` made checks a server it started, rather than starting one, when run as `./server --health`: it exits with 0 when the health route on `PORT`, 3000 by default, at `HOST` when it names an address and on loopback otherwise, answers 200, else 1, for a container image with no curl: `HEALTHCHECK CMD ["./server", "--health"]`.
-- On SIGTERM, SIGINT or SIGHUP, a server started with `.listen()` stops taking connections, lets open requests and streams finish, then runs the app's `onStop` hooks and exits with 0.
+- On SIGTERM, SIGINT or SIGHUP, a server that listens stops taking connections, lets open requests and streams finish, then runs the app's `onStop` hooks and exits with 0.
 - New connections are refused from the signal on, so a load balancer stops sending any; a client on a connection kept alive gets 503 from the health route meanwhile.
 - Requests still open after `shutdownTimeout`, 10 seconds by default, are closed and the process exits with 1.
 - `kay dev` restarts at once instead.
@@ -182,7 +181,7 @@ Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(paylo
 
 ### Background jobs
 
-- `schedule(cron, job)` and `background(work)` from `kay/server` are Elysia plugins, so a job runs in the server's process, from `.listen()` to the server stopping, once across the processes sharing the job store in production, else once per process:
+- `schedule(cron, job)` and `background(work)` from `kay/server` are Elysia plugins, so a job runs in the server's process, from the server listening to its stopping, once across the processes sharing the job store in production, else once per process:
 
 ```ts
 import { Elysia } from 'elysia'
@@ -197,7 +196,6 @@ new Elysia()
       await handleNextEmail(signal)
   }))
   .use(await pages())
-  .listen(3000)
 ```
 
 - `schedule` takes five cron fields, `minute hour day-of-month month day-of-week`, or a nickname such as `@daily`, read in the system's time zone unless `tz` names one.

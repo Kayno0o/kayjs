@@ -115,11 +115,11 @@ describe('HOST', () => {
     expect(await answersOn(join(repo, 'src/dev/pages.ts'), cwd, '::1', ['[::1]', '127.0.0.1'], ['[::1]'])).toEqual(['[::1]'])
   }, 30_000)
 
-  it('the full starter reads HOST as an optional variable and listens on it', async () => {
+  it('the full starter entry leaves listening on PORT and HOST to kay', async () => {
     const cwd = join(await scratchDir('host-'), 'app')
 
     await createProject(cwd, { kay: '^1.0.0', features: PRESETS.app.features })
-    expect(await Bun.file(join(cwd, 'src/server.ts')).text()).toContain('...process.env.HOST !== undefined && { hostname: process.env.HOST }')
+    expect(await Bun.file(join(cwd, 'src/server.ts')).text()).not.toContain('listen')
   })
 
   it('probes the health route where HOST says the server listens', async () => {

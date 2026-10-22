@@ -15,8 +15,10 @@ const auth = new Elysia({ name: 'auth' })
     user: await findSession(cookie.session?.value),
   }))
 
-export const app = new Elysia().use(auth).use(await pages()).listen(3000)
+export const app = new Elysia().use(auth).use(await pages())
 ```
+
+The entry never calls `listen`: `kay dev`, `kay start` and the executable listen it on `PORT` and `HOST` ([Build and start](build-and-start.md)), and one that calls `listen` itself keeps its own call.
 
 ### Mount a server plugin
 

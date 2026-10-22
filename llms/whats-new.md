@@ -5,6 +5,13 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - `apiPath: '/v1'` in `kay.config.ts` moves every API module, the OpenAPI document and the reference page off `/api`, islands, the service worker, prefetching and kayjs-cms follow it, and `apiUrl(module, path)` gives a route's URL ([API modules](api-routes.md#api-modules)).
+- A server entry no longer calls `listen`: `kay dev`, `kay start` and the executable listen it on `PORT` and `HOST`, and one that calls `listen` keeps its own ([Build and start](build-and-start.md)).
+- A component call can hand several parts on, `Busy(part="root spinner")`, so a Button with an `onClick` takes the `spinner` part of `button.kay` in `src/ui.ts` ([Styling](../llms/styles-and-assets.md)).
+- kayjs-ui `Accordion`, `Skeleton`, `Progress`, `Breadcrumb`, `RadioGroup` and the MarkdownEditor preview take parts, so `src/ui.ts` restyles each piece and a `class` object reaches it ([Setup](../packages/ui/llms/setup.md)).
+- kayjs-ui's `IconButton` takes a snippet for its `icon`, `BareIconButton` draws a button around your own `svg`, and `Textarea` takes `writeFocused` ([Forms](../packages/ui/llms/forms.md)).
+- kayjs-ui has a `BarChart`: vertical bars over a time or category axis in plain HTML, a bar coloured and annotated from its own status, stacked series ([BarChart](../packages/ui/llms/charts-drag-and-media.md)).
+- A `.kay` file that does not compile fails only the `testSite()` visit of the pages importing it, with the error naming the file, so the tests of other pages stay green ([Test site](testing.md#test-site)).
+- `apiPath: '/v1'` in `kay.config.ts` moves every API module, the OpenAPI document and the reference page off `/api`, and `apiUrl(module, path)` gives a route's URL ([API modules](api-routes.md#api-modules)).
 - Each `src/plugins/<name>.ts` default-exporting an Elysia plugin is used before the pages, in the order of the file names, and types `ctx.locals`, so sessions, jobs and derives need no `src/server.ts` ([Mount a server plugin](server.md#mount-a-server-plugin)).
 - `collection(..., { route: '/blog/:slug' })` gives each entry a typed `url`, a feed item with no `path` links it, and `kay check` reports a route no page serves ([Give each entry its page's path](content.md#give-each-entry-its-pages-path)).
 - A collection `route` is read by the CMS, by `alternate()` on a page that read the entry (its translation's own url), by the locale rule for a dotted slug such as `v1.2`, and by `kay check` against the page prerendering it ([Give each entry its page's path](content.md#give-each-entry-its-pages-path)).
