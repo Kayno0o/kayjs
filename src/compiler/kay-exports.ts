@@ -38,6 +38,7 @@ export const KAY_VALUES: readonly string[] = [
   'previewing',
   'publicEnv',
   'queryParam',
+  'recipe',
   'refresh',
   'refusalMessage',
   'resource',
