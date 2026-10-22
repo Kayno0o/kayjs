@@ -1,9 +1,14 @@
 ---
 import type { ComboboxOption, ComboboxOptions } from '@kaynooo/kayjs-ui'
 import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 
-// What the test reads back: each value picked and each text created, with the options it hands over, a list or a loader.
-const { options, onChange, onCreate, minLength, create = true } = props<{ options: ComboboxOptions, create?: boolean, onChange?: (value: string, option: ComboboxOption | undefined) => void, onCreate?: (text: string) => void, minLength?: number }>()
+// What the test reads back: each value picked and each text created, with the options it hands over, a list or a loader. `field` puts it in a FormField, which then names it, and `value` with `valueLabel` start it on a pick.
+const { options, onChange, onCreate, minLength, create = true, field = false, value = '', valueLabel } = props<{ options: ComboboxOptions, create?: boolean, field?: boolean, value?: string, valueLabel?: string, onChange?: (value: string, option: ComboboxOption | undefined) => void, onCreate?: (text: string) => void, minLength?: number }>()
 ---
 form#form
-  Combobox#combo(label="Planet" name="planet" options={options} create={create} minLength={minLength} onChange={onChange} onCreate={onCreate})
+  if field
+    FormField(label="Planet")
+      Combobox#combo(name="planet" options={options} create={create} minLength={minLength} value={value} valueLabel={valueLabel} onChange={onChange} onCreate={onCreate})
+  else
+    Combobox#combo(label="Planet" name="planet" options={options} create={create} minLength={minLength} value={value} valueLabel={valueLabel} onChange={onChange} onCreate={onCreate})

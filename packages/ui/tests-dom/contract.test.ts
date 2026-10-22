@@ -91,6 +91,12 @@ function canonical(html: string, browserDrawn = '', effectAdded = '', effectRemo
       element.removeAttribute(effectRemoved)
   }
 
+  // Once the browser runs a combobox posts the value picked from a hidden field, where the server's input posts its text: both are the one name on the input.
+  for (const hidden of holder.querySelectorAll('.kui-combobox > input[type="hidden"]')) {
+    hidden.parentElement?.querySelector('[role="combobox"]')?.setAttribute('name', hidden.getAttribute('name') ?? '')
+    hidden.remove()
+  }
+
   for (const element of holder.querySelectorAll('[value=""]'))
     element.removeAttribute('value')
 

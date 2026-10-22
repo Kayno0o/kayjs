@@ -170,7 +170,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'checkbox': { label: 'I agree', hint: 'v2' },
   'chip-group': { label: 'Decks', options, value: ['mars'] },
   'collapsible-section': { title: 'Older', boxed: true, children: 'Deimos' },
-  'combobox': { options: [{ value: 'Mars', label: 'Mars' }, { value: 'Earth', label: 'Earth' }], label: 'Planet', value: 'Mars', name: 'planet' },
+  'combobox': { options: [{ value: 'mars', label: 'Mars' }, { value: 'earth', label: 'Earth' }], label: 'Planet', value: 'mars', name: 'planet' },
   'command-palette': { open: false, entries: [{ label: 'Home', group: 'Go', href: '/' }, { label: 'Do', group: 'Act', onSelect: noop }] },
   'confirm-delete': { message: 'Delete this?', failure: 'Could not delete', onConfirm: noop },
   'contact-form': { action, nameLabel: 'Name', emailLabel: 'Email', messageLabel: 'Message', submitLabel: 'Send' },

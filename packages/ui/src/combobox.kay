@@ -9,13 +9,15 @@ import { wording } from 'kay/words'
 // A remote search waits this long after the last key.
 const DEBOUNCE_MS = 200
 
-const { id, options, value = '', label, name, minLength = 1, create = false, createLabel = (text: string) => wording('ui.combobox.createLabel', 'Create "{text}"', { text }), loadingLabel = wording('ui.combobox.loadingLabel', 'Loading…'), emptyLabel = wording('ui.combobox.emptyLabel', 'No match'), failureLabel = wording('ui.combobox.failureLabel', 'Could not load the options'), disabled = false, onChange, onCreate, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'id' | 'value' | 'name' | 'class' | 'children' | 'onChange' | 'disabled' | 'role' | 'minLength'> & {
+const { id, options, value = '', valueLabel, label, name, minLength = 1, create = false, createLabel = (text: string) => wording('ui.combobox.createLabel', 'Create "{text}"', { text }), loadingLabel = wording('ui.combobox.loadingLabel', 'Loading…'), emptyLabel = wording('ui.combobox.emptyLabel', 'No match'), failureLabel = wording('ui.combobox.failureLabel', 'Could not load the options'), disabled = false, onChange, onCreate, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'id' | 'value' | 'name' | 'class' | 'children' | 'onChange' | 'disabled' | 'role' | 'minLength'> & {
   // The listbox's id, unique on the page; one is drawn when none is given.
   id?: string | undefined
   // A list, filtered as the visitor types, or a function handed `{ q }` that answers the options for it: an action, or an API call wrapped in one. Only the latest answer is shown.
   options: ComboboxOptions<Value>
   // The value picked; a control whose parent passes another follows it. Empty while nothing is picked.
   value?: Value | '' | undefined
+  // The text of `value`, for a remote list that has not returned it: the input shows it, and no load is made for it.
+  valueLabel?: string | undefined
   // Names the input for screen readers, unless a FormField labels it.
   label?: string | undefined
   // Submits the value picked, or the text typed while nothing is. Without JavaScript the input posts its text.
@@ -39,8 +41,10 @@ const remote = typeof options === 'function'
 const known = () => typeof options === 'function' ? [] : options
 const startOption = () => known().find(option => option.value === value)
 
-const text = signal(startOption()?.label ?? value)
-const picked = signal<ComboboxOption<Value> | undefined>(startOption() ?? (value ? { value: value as Value, label: value } : undefined))
+const startLabel = () => startOption()?.label ?? valueLabel ?? value
+
+const text = signal(startLabel())
+const picked = signal<ComboboxOption<Value> | undefined>(startOption() ?? (value ? { value: value as Value, label: startLabel() } : undefined))
 const open = signal(false)
 const active = signal(-1)
 const found = signal<readonly ComboboxOption<Value>[]>([])
@@ -60,7 +64,7 @@ effect(() => {
     return
 
   const option = untrack(() => [...known(), ...found()].find(candidate => candidate.value === next))
-  const chosen = option ?? (next ? { value: next, label: next } : undefined)
+  const chosen = option ?? (next ? { value: next, label: valueLabel ?? next } : undefined)
 
   picked.set(chosen)
   text.set(chosen?.label ?? '')
@@ -68,6 +72,20 @@ effect(() => {
 
 effect(() => {
   enhanced.set(true)
+})
+
+// A FormField wraps the control in its label, so the status line and the rows would join the input's name: it is named by the label's own text instead.
+effect(() => {
+  if (!enhanced() || label !== undefined || rest['aria-labelledby'] !== undefined)
+    return
+
+  const text = input?.closest('label')?.querySelector('.kui-label-text')
+
+  if (!text)
+    return
+
+  text.id ||= uid()
+  input?.setAttribute('aria-labelledby', text.id)
 })
 
 // The option whose value goes in a hidden field of its own, once the browser runs: one posting its label alone is the input's text.
@@ -233,12 +251,13 @@ function keyDown(event: KeyboardEvent) {
         pick(active())
       }
       else if (adopt()) {
+        event.preventDefault()
         open.set(false)
       }
 
       break
     case 'Escape':
-      if (shown()) {
+      if (open()) {
         event.preventDefault()
         open.set(false)
         active.set(-1)
@@ -266,7 +285,7 @@ function focusIn() {
 
   open.set(true)
 
-  if (remote && found().length === 0)
+  if (remote && found().length === 0 && !picked())
     void load(text())
 }
 

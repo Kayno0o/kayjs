@@ -15,8 +15,8 @@ afterEach(() => {
 
 const PLANETS = [{ value: 'mars', label: 'Mars' }, { value: 'moon', label: 'Moon', disabled: true }, { value: 'earth', label: 'Earth' }]
 
-async function combobox(options: unknown = PLANETS, minLength?: number, create = true) {
-  mounted = await mountComponent('src/components/combobox.kay', { options, minLength, create, onChange: (value: string) => changes.push(value), onCreate: (text: string) => created.push(text) })
+async function combobox(options: unknown = PLANETS, minLength?: number, create = true, extra: Record<string, unknown> = {}) {
+  mounted = await mountComponent('src/components/combobox.kay', { options, minLength, create, ...extra, onChange: (value: string) => changes.push(value), onCreate: (text: string) => created.push(text) })
 
   const { root } = mounted
   const input = root.querySelector<HTMLInputElement>('input[role="combobox"]')!
@@ -280,4 +280,71 @@ test('drops the rows of an older text at once and offers no new option before th
   await settle()
 
   expect(rows()).toEqual([])
+})
+
+test('Enter on a label typed whole adopts it without submitting, the post then carrying the value', async () => {
+  const { root, input } = await combobox()
+  const form = root.querySelector('form')!
+  let submitted = 0
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault()
+    submitted++
+  })
+
+  type(input, 'earth')
+  await settle()
+
+  expect(key(input, 'Enter').defaultPrevented).toBe(true)
+  await settle()
+
+  expect([...new FormData(form)]).toEqual([['planet', 'earth']])
+
+  expect(key(input, 'Enter').defaultPrevented).toBe(false)
+  expect(submitted).toBe(0)
+})
+
+test('Escape closes an open list that has no rows, so it does not reappear when rows arrive', async () => {
+  let answer: (rows: unknown[]) => void = () => undefined
+  const { input, rows } = await combobox(async () => new Promise<unknown[]>(resolve => answer = resolve))
+
+  type(input, 'par')
+  await Bun.sleep(260)
+
+  expect(key(input, 'Escape').defaultPrevented).toBe(true)
+  expect(input.value).toBe('par')
+
+  answer([{ value: 'paris', label: 'Paris' }])
+  await settle()
+
+  expect([input.getAttribute('aria-expanded'), rows()]).toEqual(['false', ['Paris', 'Create "par"']])
+})
+
+test('shows the label given for a remote value, and asks the loader for nothing on focus', async () => {
+  const asked: string[] = []
+  const { root, input } = await combobox(async ({ q }: { q: string }) => {
+    asked.push(q)
+
+    return []
+  }, undefined, true, { value: 'c-42', valueLabel: 'Ada Lovelace' })
+
+  expect(input.value).toBe('Ada Lovelace')
+  expect(root.querySelector<HTMLInputElement>('input[type="hidden"]')?.value).toBe('c-42')
+
+  input.focus()
+  await Bun.sleep(260)
+
+  expect(asked).toEqual([])
+})
+
+test('keeps its status line and its rows out of the name a FormField gives the input', async () => {
+  const { root, input } = await combobox(PLANETS, undefined, true, { field: true })
+
+  type(input, 'ar')
+  await settle()
+
+  const named = input.getAttribute('aria-labelledby')!.split(' ').map(id => root.querySelector(`[id="${id}"]`)?.textContent).join(' ')
+
+  expect(named.trim()).toBe('Planet')
+  expect(root.querySelector('[role="status"]')?.textContent).toBe('3 results')
 })
