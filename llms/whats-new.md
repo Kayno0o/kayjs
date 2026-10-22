@@ -9,6 +9,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui's `ConfirmDelete` takes `disabled`, which disables its trigger and confirm button while the caller is busy and keeps an open dialog open ([Dialogs](../packages/ui/llms/basics.md)).
 - kayjs-ui `SidePanel(modal={false})` shows a detail beside a live view, the page under it staying interactive, and `closeHref` makes its close button a link for a panel the URL drives ([Page layout](../packages/ui/llms/page-layout-palette-and-trees.md)).
 - kayjs-ui gains radius steps (`--radius-kui-sm`, `-md`, `-full`), font tokens (`--font-kui-mono`, `--font-kui-body`) and `--kui-density`, which scales the spacing tokens ([Setup](../packages/ui/llms/setup.md)).
+- kayjs-ui `Slider` takes `onChange(value)` once on release or key press, a promise holding it busy and `false` putting the thumb back ([Slider](../packages/ui/llms/forms.md)).
 - The on-page editor offers Publish, Unpublish and Delete for the entry beside Save, with the role's refusal as tooltip ([Editor](../packages/cms/llms/editor.md)).
 - `proxy: { key: 'x-upstream-key' }` refuses with 403 every request lacking the key the proxy shares (`KAY_PROXY_KEY` or `KAY_PROXY_KEY_FILE`), with the health route and `open` paths left out ([Proxies](proxy-and-security.md#behind-a-proxy)).
 - `rooms({ store: appStore().rooms })` is typed `StoreRooms`, whose `state` and `update` give the state or a promise of it, so `await` them with no narrowing ([Rooms](rooms.md)).

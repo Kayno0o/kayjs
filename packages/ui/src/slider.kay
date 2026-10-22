@@ -1,11 +1,12 @@
 ---
 import type { JSX } from 'kay'
 import { effect, recipe, signal, untrack } from 'kay'
-import { onFormReset, startRef } from './form-reset'
+import { changeAccepted } from './change'
+import { onFormReset, resetWhenIdle, startRef } from './form-reset'
 
 const look = recipe({ parts: { root: 'kui-slider', label: 'kui-slider-label', input: 'kui-slider-input', value: 'kui-slider-value' } })
 
-const { value, min = 0, max = 100, step, label, showValue = true, formatValue, onInput, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'class' | 'children' | 'type' | 'value' | 'min' | 'max' | 'step' | 'onInput' | 'onChange'> & {
+const { value, min = 0, max = 100, step, label, showValue = true, formatValue, onInput, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'class' | 'children' | 'type' | 'value' | 'min' | 'max' | 'step' | 'onInput' | 'onChange'> & {
   // The value to start with; a slider whose parent passes another follows it.
   value: number
   // The bounds, 0 and 100 by default.
@@ -20,13 +21,27 @@ const { value, min = 0, max = 100, step, label, showValue = true, formatValue, o
   formatValue?: ((value: number) => string) | undefined
   // Runs on every move of the thumb, with the number, and after a form reset with the value it went back to.
   onInput?: ((value: number) => unknown) | undefined
+  // Runs once with the value let go of: when the pointer is released, on each key press (arrows, Home, End, PageUp, PageDown), and after a form reset that moved the thumb.
+  // A promise holds the slider busy until it settles, and puts the thumb back where it was when it rejects (logged) or resolves to false: a refused change never shows as made.
+  onChange?: ((value: number) => unknown) | undefined
 }>()
 
 const shown = signal(untrack(() => value))
+const busy = signal(false)
 let slider: HTMLInputElement | undefined
+// The value the app last accepted, which a refused change puts back.
+let settled = untrack(() => value)
+// How often the parent's `value` reached the slider, so a change under way knows whether the parent answered it.
+let synced = 0
 
+// A parent echoing the dragged value from `onInput` is not setting it, so only a value other than the shown one counts.
 effect(() => {
+  if (value === untrack(shown))
+    return
+
   shown.set(value)
+  settled = value
+  synced++
 })
 
 const words = (number: number) => formatValue ? formatValue(number) : String(number)
@@ -42,8 +57,29 @@ function moved(event: Event) {
   onInput?.(next)
 }
 
-// A reset puts the thumb back on its default, which the app's `onInput` then hears of.
-onFormReset(() => slider, () => {
+async function released(input: HTMLInputElement) {
+  const next = Number(input.value)
+  const before = settled
+  const syncedBefore = synced
+
+  shown.set(next)
+
+  // Put back unless the parent set `value` meanwhile, which has the last word.
+  const accepted = await changeAccepted('Slider', () => onChange?.(next), busy.set)
+
+  if (accepted) {
+    settled = next
+  }
+  else if (synced === syncedBefore) {
+    shown.set(before)
+    input.value = String(before)
+  }
+
+  resetting.idle()
+}
+
+// A reset puts the thumb back on its default, which the app's `onInput` and `onChange` then hear of; one meeting a change under way waits for it.
+const resetting = resetWhenIdle(busy, () => {
   if (!slider)
     return
 
@@ -54,11 +90,20 @@ onFormReset(() => slider, () => {
 
   shown.set(next)
   onInput?.(next)
+  void released(slider)
 })
+
+onFormReset(() => slider, resetting.reset)
+
+// A busy slider takes no new gesture, as a Toggle takes no click.
+function held(event: Event) {
+  if (busy())
+    event.preventDefault()
+}
 ---
 div(part="root")
   span(part="label") {label}
-  input({...rest} part="input" ref={sliderRef} type="range" aria-label={label} aria-valuetext={formatValue ? words(shown()) : undefined} min={min} max={max} step={step} value={shown()} onInput={moved})
+  input({...rest} part="input" ref={sliderRef} type="range" aria-label={label} aria-valuetext={formatValue ? words(shown()) : undefined} min={min} max={max} step={step} value={shown()} aria-busy={busy() ? 'true' : undefined} onInput={moved} onChange={event => released(event.currentTarget)} onMouseDown={held} onTouchStart={held} onKeyDown={held})
   if showValue
     // Not an `output`, which a form reset empties; the input itself speaks the value.
     span(part="value" aria-hidden="true") {words(shown())}
