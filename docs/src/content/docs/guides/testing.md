@@ -186,7 +186,7 @@ Install `@happy-dom/global-registrator` as a dev dependency. The first `mountCom
 
 `fetch`, `Request`, `Response`, `Headers`, `Blob`, `File`, `URL`, `URLSearchParams`, `AbortController`, `AbortSignal` and `WebSocket` stay Bun's, and `FormData` stays Bun's class while reading a form element as in a browser, so a test serving with `Bun.serve` still works beside it.
 
-A test that reads `document` before its first mount imports `kay/test/dom`, which registers the DOM at once. Put the import last, where the kay lint preset sorts a side-effect import: every import runs before a test body, so the order changes nothing there.
+A test that reads `document` before its first mount imports `kay/test/dom`, which registers the DOM at once. Put the import last, where the kay lint preset sorts a side-effect import: every import runs before a test body, so the order changes nothing there. An earlier import that captures `setTimeout` as it loads is the exception, and needs it first.
 
 ```ts
 import { expect, it } from 'bun:test'
