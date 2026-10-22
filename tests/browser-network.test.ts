@@ -282,6 +282,38 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the networ
     expect(await call(page, '/api/hello')).toContain('server')
   })
 
+  it('loads other pages while one goes offline and online, none of them aborted', async () => {
+    const other = await browse(`${origin}/`)
+    const toggling = { on: true }
+    const toggle = (async () => {
+      while (toggling.on) {
+        await other.offline()
+        await other.online()
+      }
+    })()
+    const failures: string[] = []
+
+    try {
+      for (let n = 0; n < 15; n++) {
+        try {
+          const loaded = await browse(`${origin}/`)
+
+          loaded.close()
+        }
+        catch (error) {
+          failures.push(error instanceof Error ? error.message : String(error))
+        }
+      }
+    }
+    finally {
+      toggling.on = false
+      await toggle
+      other.close()
+    }
+
+    expect(failures).toEqual([])
+  }, 60_000)
+
   it('runs a script before the scripts of every document it loads from then on', async () => {
     expect(await page.evaluate(() => (window as { seenAtParse?: string }).seenAtParse)).toBe('none')
 

@@ -388,7 +388,7 @@ await page.route('/', async (request) => {
 
 It cannot read an event stream, whose body never ends, so a route that fetches should not match one. A handler that throws is reported in `page.errors` and its request fails.
 
-`page.offline()` cuts the page off the network, so every request fails and `navigator.onLine` is false, and `page.online()` brings it back. `page.initScript(fn, ...args)` runs a function in every document the page loads from then on, before the document's own scripts, to set up a stub or a flag the page reads as it starts.
+`page.offline()` cuts the page off the network, so every request fails and `navigator.onLine` is false, and `page.online()` brings it back, for that page alone: other pages in the browser load as usual. `page.initScript(fn, ...args)` runs a function in every document the page loads from then on, before the document's own scripts, to set up a stub or a flag the page reads as it starts.
 
 ```ts
 await page.offline()

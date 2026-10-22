@@ -183,8 +183,8 @@ const VIEWPORTS = {
 // How long one try of a click waits for its element to be actionable before the page scrolls it into place again, and what Bun's message for running out of it ends with.
 const CLICK_WAIT_MS = 1000
 const ACTIONABLE = /to be actionable$/
-// What a navigation says when the page navigated on its own meanwhile, as a dev server's live reload does.
-const NAVIGATED = /navigated or closed/
+// What a navigation says when the page navigated on its own meanwhile, as a dev server's live reload does, or when the host's network changed under it (an address or an interface coming or going), which DevTools' offline emulation does not cause.
+const NAVIGATED = /navigated or closed|ERR_NETWORK_CHANGED/
 // How long a click or a hover waits for a loading page to finish before it scrolls: a page that never finishes, as with a stalled image, is acted on after it.
 const LOAD_WAIT_MS = 1000
 // How a click scrolls the element into the view in turn, for one covered where another alignment puts it, such as under a fixed bar.
@@ -611,7 +611,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 
       origin = target.origin
 
-      // Navigated again once when the page navigated on its own meanwhile.
+      // Navigated again once when the page navigated on its own meanwhile or the host's network changed.
       const navigate = async () => {
         try {
           await live(async () => view.navigate(target.href))
