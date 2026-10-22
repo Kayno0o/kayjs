@@ -106,7 +106,16 @@ describe('barRatios', () => {
   test('sets each bar against the highest reading, and a stacked bar against the highest total', () => {
     expect(barRatios([[2, 4], [1, null]], false, 2)).toEqual({ heights: [[0.5, 1], [0.25, 0]], top: 4 })
     expect(barRatios([[2, 4], [1, null]], true, 2)).toEqual({ heights: [[2 / 4, 4 / 4], [1 / 4, 0]], top: 4 })
-    expect(barRatios([[1, 1], [2, 1]], true, 2).top).toBe(3)
+    expect(barRatios([[1, 1], [2, 1]], true, 2).top).toBe(4)
+  })
+
+  test('rounds the top up to 1, 2, 4, 6, 8 or 10 times a power of ten, so the middle tick is round', () => {
+    const top = (value: number) => barRatios([[value]], false, 1).top
+
+    expect([1, 2, 3, 5, 7, 9, 31, 99, 100, 101, 1234].map(top)).toEqual([1, 2, 4, 6, 8, 10, 40, 100, 100, 200, 2000])
+    expect([0.03, 0.7, 0.15].map(top)).toEqual([0.04, 0.8, 0.2])
+    expect(barRatios([[31]], false, 1).heights).toEqual([[31 / 40]])
+    expect(valueTicks(40).map(tick => tick.ratio * 40)).toEqual([0, 20, 40])
   })
 
   test('draws no bar for a gap, a zero or a negative reading', () => {

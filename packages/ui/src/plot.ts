@@ -119,7 +119,15 @@ export interface BarSeries extends ChartSeries {
   notes?: (string | null | undefined)[]
 }
 
-// The height of each of `count` bars as a share of the plot (0 to 1), a stacked series laid on the ones before it, and the top value the plot spans. Only positive, finite readings draw a bar.
+// The smallest 1, 2, 4, 6, 8 or 10 times a power of ten that holds `value`, so the middle tick of a plot spanning it is a round number too.
+function niceTop(value: number): number {
+  const scale = 10 ** Math.floor(Math.log10(value))
+  const step = [1, 2, 4, 6, 8, 10].find(candidate => value / scale <= candidate + 1e-9) ?? 10
+
+  return Number((step * scale).toPrecision(12))
+}
+
+// The height of each of `count` bars as a share of the plot (0 to 1), a stacked series laid on the ones before it, and the top value the plot spans, the highest reading rounded up to a round number. Only positive, finite readings draw a bar.
 export function barRatios(values: readonly (readonly (number | null)[])[], stacked: boolean, count: number): { heights: number[][], top: number } {
   const positive = (row: readonly (number | null)[], at: number) => {
     const value = row[at]
@@ -136,6 +144,9 @@ export function barRatios(values: readonly (readonly (number | null)[])[], stack
 
     top = Math.max(top, own)
   }
+
+  if (top > 0)
+    top = niceTop(top)
 
   return { heights: values.map(row => Array.from({ length: count }, (_, at) => top > 0 ? positive(row, at) / top : 0)), top }
 }
