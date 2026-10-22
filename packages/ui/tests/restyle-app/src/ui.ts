@@ -63,4 +63,5 @@ export default defineUi({
   '@kaynooo/kayjs-ui/site-favicon.kay': { parts: { root: 'size-6', img: 'rounded-sm' } },
   '@kaynooo/kayjs-ui/icon-picker.kay': { parts: { grid: 'gap-3', option: 'rounded-xl', bar: 'pt-2' } },
   '@kaynooo/kayjs-ui/markdown-editor.kay': { parts: { grid: 'gap-6', bar: 'px-4' } },
+  '@kaynooo/kayjs-ui/bar-chart.kay': { parts: { plot: 'h-64', column: 'px-px', bar: 'rounded-t-md', axisLabel: 'font-mono', legendItem: 'gap-2' } },
 })

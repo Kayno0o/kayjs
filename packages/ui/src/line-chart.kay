@@ -5,10 +5,9 @@ import type { ChartSeries } from './plot'
 import { effect, memo, onCleanup, onMount, recipe, signal, uid } from 'kay'
 import type { LabelContext } from './chart-axis'
 import { chartData, headings, indexAt, labelTimes, positionOf, stackValues, totalAt, xAxisOptions } from './chart-axis'
-import { dashSample, SERIES_DASHES, steppedPoint } from './plot'
+import { dashSample, PALETTE, SERIES_DASHES, steppedPoint } from './plot'
 import { wording } from 'kay/words'
 
-const PALETTE = ['var(--kui-chart-1)', 'var(--kui-chart-2)', 'var(--kui-chart-3)', 'var(--kui-chart-4)', 'var(--kui-chart-5)', 'var(--kui-chart-6)']
 
 // Which attribute of each drawn part takes its series' colour.
 const PAINT: Record<string, string> = { line: 'stroke', point: 'stroke', area: 'fill' }

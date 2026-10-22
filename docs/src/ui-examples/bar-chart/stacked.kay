@@ -1,0 +1,7 @@
+---
+import BarChart from '@kaynooo/kayjs-ui/bar-chart.kay'
+
+const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+---
+.max-w-xl
+  BarChart(label="Jobs" labels={days} xLabels stacked series={[{ name: 'Succeeded', values: [8, 6, 9, 7, 10] }, { name: 'Failed', values: [1, 3, 0, 2, 1], color: 'var(--color-kui-error)' }]})

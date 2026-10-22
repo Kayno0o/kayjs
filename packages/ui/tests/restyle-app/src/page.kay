@@ -2,6 +2,7 @@
 import AppHeader from '@kaynooo/kayjs-ui/app-header.kay'
 import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
 import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import BarChart from '@kaynooo/kayjs-ui/bar-chart.kay'
 import BarList from '@kaynooo/kayjs-ui/bar-list.kay'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import Card from '@kaynooo/kayjs-ui/card.kay'
@@ -168,3 +169,4 @@ QrCode#qr(value="https://kay.dev")
 SiteFavicon#favicon(name="Kay")
 IconPicker#icon-picker(search={async () => []})
 MarkdownEditor#markdown
+BarChart#bars(label="Runs" labels={['a', 'b']} xLabels legend series={[{ name: 'S', values: [1, 2] }, { name: 'T', values: [2, 1] }]})

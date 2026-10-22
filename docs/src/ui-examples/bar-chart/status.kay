@@ -1,0 +1,13 @@
+---
+import BarChart from '@kaynooo/kayjs-ui/bar-chart.kay'
+
+const runs = ['02:00', '03:00', '04:00', '05:00', '06:00']
+const series = [{
+  name: 'Minutes',
+  values: [4, 5, 0, 31, 4],
+  colors: ['var(--color-kui-success)', 'var(--color-kui-success)', null, 'var(--color-kui-error)', 'var(--color-kui-success)'],
+  notes: [null, null, 'Missed', 'Timed out', null],
+}]
+---
+.max-w-xl
+  BarChart(label="Backup runs" labels={runs} xLabels series={series})

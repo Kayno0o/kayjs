@@ -3,7 +3,7 @@ import { monthStarts } from '../src/contribution'
 import { stepIndex } from '../src/cycle'
 import { isPlayable } from '../src/media'
 import { pickedShown, selectionSummary, toggledValue } from '../src/multi-select'
-import { axisExtent, axisPercent, dashSample, dotSize, steppedPoint } from '../src/plot'
+import { axisExtent, axisPercent, barRatios, dashSample, dotSize, labelSlots, steppedPoint, valueTicks } from '../src/plot'
 import { rangeFrom } from '../src/range'
 
 const OPTIONS = [{ value: 'rpg', label: 'RPG' }, { value: 'fps', label: 'Shooter' }, { value: 'sim', label: 'Simulation' }]
@@ -99,5 +99,28 @@ describe('media', () => {
     expect(isPlayable({ ...item, kind: 'video', src: 'a.m3u8' })).toBe(true)
     expect(isPlayable({ ...item, kind: 'video' })).toBe(false)
     expect(isPlayable({ ...item, kind: 'image', src: 'a.jpg' })).toBe(false)
+  })
+})
+
+describe('barRatios', () => {
+  test('sets each bar against the highest reading, and a stacked bar against the highest total', () => {
+    expect(barRatios([[2, 4], [1, null]], false)).toEqual({ heights: [[0.5, 1], [0.25, 0]], top: 4 })
+    expect(barRatios([[2, 4], [1, null]], true)).toEqual({ heights: [[2 / 4, 4 / 4], [1 / 4, 0]], top: 4 })
+    expect(barRatios([[1, 1], [2, 1]], true).top).toBe(3)
+  })
+
+  test('draws no bar for a gap, a zero or a negative reading', () => {
+    expect(barRatios([[null, 0, -3]], false)).toEqual({ heights: [[0, 0, 0]], top: 0 })
+    expect(valueTicks(0)).toEqual([{ ratio: 0 }])
+    expect(valueTicks(5).map(tick => tick.ratio)).toEqual([0, 0.5, 1])
+  })
+})
+
+describe('labelSlots', () => {
+  test('labels up to five bars, evenly and both ends included', () => {
+    expect([...labelSlots(0)]).toEqual([])
+    expect([...labelSlots(1)]).toEqual([0])
+    expect([...labelSlots(3)]).toEqual([0, 1, 2])
+    expect([...labelSlots(9)]).toEqual([0, 2, 4, 6, 8])
   })
 })

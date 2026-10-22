@@ -1851,6 +1851,68 @@
     @apply text-xs text-kui-subtext0;
   }
 
+  /* The plot leaves its left margin for the value labels, which hang outside it as ScatterChart's do. */
+  .kui-bar-chart {
+    @apply m-0 flex flex-col gap-2;
+  }
+
+  .kui-bar-chart-plot {
+    @apply relative ml-10 border-solid border-(length:--kui-border-width) border-kui-surface2 border-t-transparent border-r-transparent border-l-transparent;
+    height: var(--kui-bar-chart-height, 12rem);
+  }
+
+  .kui-bar-chart-grid {
+    @apply absolute inset-x-0 h-px bg-kui-surface2;
+  }
+
+  .kui-bar-chart-tick {
+    @apply absolute right-full mr-2 -translate-y-1/2 text-kui-2xs whitespace-nowrap text-kui-overlay1 tabular-nums;
+  }
+
+  .kui-bar-chart-columns {
+    @apply absolute inset-0 flex gap-1;
+  }
+
+  .kui-bar-chart-column {
+    @apply flex min-w-0 flex-1 items-end gap-px outline-none hover:bg-kui-surface0 focus-visible:outline-2 focus-visible:outline-kui-text;
+
+    &:where([data-stacked]) {
+      @apply flex-col-reverse items-stretch justify-start gap-0;
+    }
+  }
+
+  .kui-bar-chart-bar {
+    @apply min-h-px min-w-px flex-1 rounded-t-sm;
+  }
+
+  .kui-bar-chart-column:where([data-stacked]) .kui-bar-chart-bar {
+    @apply flex-none rounded-none;
+  }
+
+  .kui-bar-chart-axis {
+    @apply ml-10 flex gap-1;
+  }
+
+  .kui-bar-chart-axis-label {
+    @apply flex min-w-0 flex-1 justify-center text-kui-2xs whitespace-nowrap text-kui-overlay1;
+  }
+
+  .kui-bar-chart-legend {
+    @apply m-0 flex list-none flex-wrap gap-4 p-0 pl-1;
+  }
+
+  .kui-bar-chart-legend-item {
+    @apply flex items-center gap-1.5 text-xs text-kui-subtext0;
+  }
+
+  .kui-bar-chart-key {
+    @apply size-2 shrink-0;
+  }
+
+  .kui-bar-chart-empty {
+    @apply text-xs text-kui-subtext0;
+  }
+
   .kui-segmented {
     @apply inline-flex border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-surface0;
   }

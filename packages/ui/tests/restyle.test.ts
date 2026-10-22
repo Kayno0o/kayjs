@@ -150,6 +150,11 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     'kui-icon-grid-bar pt-2',
     'kui-markdown-grid gap-6',
     'kui-markdown-bar px-4',
+    'kui-bar-chart-plot h-64',
+    'kui-bar-chart-column px-px',
+    'kui-bar-chart-bar rounded-t-md',
+    'kui-bar-chart-axis-label font-mono',
+    'kui-bar-chart-legend-item gap-2',
   ]
 
   test.each(restyled)('draws class="%s"', (classes) => {

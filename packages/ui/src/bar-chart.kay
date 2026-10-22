@@ -1,0 +1,76 @@
+---
+import type { JSX } from 'kay'
+import type { BarSeries } from './plot'
+import { memo, recipe } from 'kay'
+import { barRatios, labelSlots, PALETTE, valueTicks } from './plot'
+import { wording } from 'kay/words'
+
+const look = recipe({ parts: { root: 'kui-bar-chart', plot: 'kui-bar-chart-plot', grid: 'kui-bar-chart-grid', tick: 'kui-bar-chart-tick', columns: 'kui-bar-chart-columns', column: 'kui-bar-chart-column', bar: 'kui-bar-chart-bar', axis: 'kui-bar-chart-axis', axisLabel: 'kui-bar-chart-axis-label', legend: 'kui-bar-chart-legend', legendItem: 'kui-bar-chart-legend-item', key: 'kui-bar-chart-key' } })
+
+const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel = (label: string) => label, xLabels = false, stacked = false, totalLabel = wording('ui.barChart.total', 'Total'), legend, emptyLabel, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children'> & {
+  labels: string[]
+  series: BarSeries[]
+  // Formats the y-axis labels, the tooltips and the readings screen readers hear.
+  formatValue?: ((value: number) => string) | undefined
+  // Formats a label for the x-axis, the tooltips and what screen readers hear.
+  formatLabel?: ((label: string, index: number) => string) | undefined
+  // Draws up to five x-axis labels.
+  xLabels?: boolean | undefined
+  // Piles the series of a label on one bar instead of setting them side by side, and adds a total to its tooltip.
+  stacked?: boolean | undefined
+  // Names the total a stacked chart adds to its tooltips and announcements.
+  totalLabel?: string | undefined
+  // Names each series under the chart; shown by default once there is more than one.
+  legend?: boolean | undefined
+  // What the chart reads with no labels.
+  emptyLabel?: string | undefined
+  // Names the chart for screen readers.
+  label: string
+}>()
+
+const ratios = memo(() => barRatios(series.map(item => item.values), stacked))
+const ticks = memo(() => valueTicks(ratios().top))
+const slots = memo(() => xLabels ? labelSlots(labels.length) : new Set<number>())
+const colors = (item: BarSeries, index: number, at: number) => item.colors?.[at] ?? item.color ?? PALETTE[index % PALETTE.length]!
+
+const reading = (item: BarSeries, at: number) => {
+  const value = item.values[at]
+
+  return typeof value === 'number' ? formatValue(value) : '-'
+}
+
+// What a bar column reads on hover and focus, and to screen readers: the label, each series' reading and the notes the series carry for it.
+const summary = (at: number) => {
+  const total = stacked ? [`${totalLabel} ${formatValue(series.reduce((sum, item) => sum + (item.values[at] ?? 0), 0))}`] : []
+  const notes = series.map(item => item.notes?.[at]).filter(Boolean)
+
+  return `${formatLabel(labels[at]!, at)}: ${[...series.map(item => `${item.name} ${reading(item, at)}`), ...total].join(', ')}${notes.length > 0 ? `; ${notes.join('; ')}` : ''}`
+}
+
+const nothing = () => emptyLabel ?? wording('ui.barChart.emptyLabel', 'No data yet.')
+---
+if labels.length === 0
+  // The app's id and class stay on whichever element shows.
+  p.kui-bar-chart-empty(part="root" id={rest.id}) {nothing()}
+else
+  figure(part="root" {...rest} aria-label={label})
+    div(part="plot")
+      for tick of ticks() key={tick.ratio}
+        span(part="grid" style={`bottom: ${tick.ratio * 100}%`})
+          span(part="tick") {formatValue(tick.ratio * ratios().top)}
+      div(part="columns")
+        for name, at of labels key={at}
+          span(part="column" role="img" tabindex="0" aria-label={summary(at)} data-tooltip={summary(at)} data-stacked={stacked ? '' : undefined})
+            for item, index of series key={item.name}
+              if ratios().heights[index]![at]
+                span(part="bar" data-series={index} style={`height: ${ratios().heights[index]![at]! * 100}%; background-color: ${colors(item, index, at)}`})
+    if xLabels
+      div(part="axis")
+        for name, at of labels key={at}
+          span(part="axisLabel") {slots().has(at) ? formatLabel(name, at) : ''}
+    if legend ?? series.length > 1
+      ul(part="legend")
+        for item, index of series key={item.name}
+          li(part="legendItem")
+            span(part="key" style={`background-color: ${colors(item, index, -1)}`})
+            | {item.name}

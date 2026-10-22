@@ -1,4 +1,5 @@
 ---
+import BarChart from '@kaynooo/kayjs-ui/bar-chart.kay'
 import ContributionGraph from '@kaynooo/kayjs-ui/contribution-graph.kay'
 import LineChart from '@kaynooo/kayjs-ui/line-chart.kay'
 import ScatterChart from '@kaynooo/kayjs-ui/scatter-chart.kay'
@@ -14,3 +15,9 @@ main
     ScatterChart(label="Games" points={[]} emptyLabel="No titles")
   article#graph
     ContributionGraph(days={days} color="var(--color-kui-accent)" today="2026-09-02" months)
+  article#bars
+    BarChart(label="Backups" labels={['Mon', 'Tue', 'Wed']} xLabels series={[{ name: 'Minutes', values: [4, 0, 8], colors: ['green', null, 'red'], notes: [null, null, 'Timed out'] }]})
+  article#stacked-bars
+    BarChart(label="Jobs" labels={['Mon', 'Tue']} stacked legend series={[{ name: 'Ok', values: [3, 1] }, { name: 'Failed', values: [1, 2], color: 'red' }]})
+  article#no-bars
+    BarChart(label="Backups" labels={[]} series={[]} emptyLabel="No runs")

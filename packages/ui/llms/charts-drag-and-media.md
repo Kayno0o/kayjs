@@ -2,7 +2,7 @@
 
 ## Common tasks
 
-### LineChart, ScatterChart, ContributionGraph
+### LineChart, BarChart, ScatterChart, ContributionGraph
 
 - `LineChart(label="Visits" labels={days} series={[{ name: 'Visits', values: visits }]} xLabels)`, drawn by chartist, a peer the app installs to use it: `bun add chartist`. No other component reaches it.
   - A series has a `name`, one value per label, `null` for a gap in the line (a stacked chart counts it as 0 and draws no gap), and an optional CSS `color`; without one it takes the next `--color-kui-chart-1` to `-6` token. Every line after the first is dashed in its own pattern, which the legend samples, so the series stay apart without their colours.
@@ -12,6 +12,10 @@
   - The plot is a `role="slider"`, one stop in the tab order on the latest point: the arrows walk the points, Home and End reach either end, and each step shows the tooltip and announces the label and every reading. Chords such as Alt with an arrow stay the browser's, and new `labels`, such as after zooming in on a span, drop the point the keyboard stood on.
   - `onRange(from, to)` lets a drag across the plot pick a span, from an island: a band follows the drag, and on release it hands over the indices of the span's first and last points, such as to zoom in on them; a press in place picks nothing. From the keyboard, Shift with the arrows, Home or End stretches the span, Enter hands it over and Escape drops it; `rangeHint` is what screen readers are told about these keys.
   - The server renders its frame, the slider, the table of values, the hint and the legend; the drawing happens once the island mounts. The table holds one row per label, so a series of thousands of points renders as many rows.
+- `BarChart(label="Backups" labels={runs} xLabels series={[{ name: 'Minutes', values: minutes, colors, notes }]})`, plain HTML, no peer.
+  - A series has a `name`, one value per label and an optional CSS `color`, else the next `--color-kui-chart-1` to `-6` token. `colors` gives one colour per label, winning over the series' own, such as an up run green and a failed one red, and `notes` adds one message per label to that bar's tooltip and announcement. Only positive readings draw a bar; a `null`, a zero or a negative one leaves its column empty.
+  - `stacked` piles the series of a label on one bar, scaled to the highest total, and adds a `Total` (`totalLabel`) to its tooltip. `xLabels` draws up to five labels, `legend` names the series (by default once there is more than one), `formatValue` and `formatLabel(label, index)` format the axis and the tooltips, `emptyLabel` is what it reads with no labels.
+  - Each column is a tab stop with `role="img"`, reading its label, every series' value and its notes as its tooltip and its name.
 - `ScatterChart(label="Games" points={games} x={{ label: 'Hours', scale: 'log', ticks }} y={{ label: 'Score', domain: [0, 100] }} quadrant={{ x: 20, y: 80 }} corners={{ topRight: 'Long and loved' }})`:
   - A point has a `key`, a `label`, `x` and `y`, a `weight` its dot's area follows, and a `tooltip`, the label by default.
   - An axis spans its `domain`, or else the points' own extent, along a `linear` or `log` `scale`, with `ticks` of `{ value, label }` and a `label`. `quadrant` draws guides through a point, and `corners` names the four regions they split.

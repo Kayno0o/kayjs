@@ -3,6 +3,7 @@ import { defineMessages } from 'kay/i18n'
 // The French of every `ui.*` key the components look up, which a site on a French page gets with no setup and overrides key by key in its own `src/messages/fr.ts`.
 export default defineMessages({
   ui: {
+    barChart: { emptyLabel: 'Aucune donnée pour le moment.', total: 'Total' },
     barList: { emptyLabel: 'Aucune donnée pour le moment.' },
     carousel: {
       dotLabel: 'Aller à la diapositive {n}',

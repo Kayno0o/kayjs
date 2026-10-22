@@ -29,6 +29,7 @@ ui: { sidePanel: { closeLabel: 'Fermer' } }
 
 ### The keys
 
+- `ui.barChart.*`: `emptyLabel` (`No data yet.`), `total` (`Total`)
 - `ui.barList.*`: `emptyLabel` (`No data yet.`)
 - `ui.carousel.*`: `dotLabel` (`Go to slide {n}`), `label` (`Carousel`), `nextLabel` (`Next slide`), `pauseLabel` (`Pause`), `playLabel` (`Play`), `previousLabel` (`Previous slide`), `slideLabel` (`Slide {n} of {count}`)
 - `ui.combobox.*`: `createLabel` (`Create "{text}"`), `emptyLabel` (`No match`), `failureLabel` (`Could not load the options`), `loadingLabel` (`Loading…`), `resultsLabel` (`{count} results`, `1 result` for one)

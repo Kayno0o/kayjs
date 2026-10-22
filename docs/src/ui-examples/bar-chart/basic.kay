@@ -1,0 +1,7 @@
+---
+import BarChart from '@kaynooo/kayjs-ui/bar-chart.kay'
+
+const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+---
+.max-w-xl
+  BarChart(label="Visits" labels={days} xLabels series={[{ name: 'Visits', values: [12, 18, 9, 22, 30, 14, 8] }]})

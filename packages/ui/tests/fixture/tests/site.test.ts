@@ -521,6 +521,20 @@ describe('charts', () => {
     expect(await page('no-scatter-label')).toBe('<p class="kui-scatter-chart-empty kui-scatter-chart" data-part="root">No titles</p>')
   })
 
+  test('BarChart draws a bar per positive reading, coloured by its own colour, and reads each column with its notes', async () => {
+    const bars = await page('bars')
+    const stacked = await page('stacked-bars')
+
+    expect([...bars.matchAll(/aria-label="([^"]+)" data-tooltip="[^"]+"/g)].map(match => match[1])).toEqual(['Mon: Minutes 4', 'Tue: Minutes 0', 'Wed: Minutes 8; Timed out'])
+    expect([...bars.matchAll(/style="height: ([\d.]+)%; background-color: (\w+)"/g)].map(match => match.slice(1))).toEqual([['50', 'green'], ['100', 'red']])
+    expect([...bars.matchAll(/data-part="axisLabel">([^<]*)</g)].map(match => match[1])).toEqual(['Mon', 'Tue', 'Wed'])
+    expect(bars).not.toContain('kui-bar-chart-legend')
+    expect([...stacked.matchAll(/aria-label="([^"]+)" data-tooltip/g)].map(match => match[1])).toEqual(['Mon: Ok 3, Failed 1, Total 4', 'Tue: Ok 1, Failed 2, Total 3'])
+    expect(stacked).toContain('data-stacked=""')
+    expect(stacked).toContain('<li class="kui-bar-chart-legend-item" data-part="legendItem"><span class="kui-bar-chart-key" data-part="key" style="background-color: red"></span>Failed</li>')
+    expect(await page('no-bars')).toBe('<p class="kui-bar-chart-empty kui-bar-chart" data-part="root">No runs</p>')
+  })
+
   test('ContributionGraph shades each day by how full it was, says so in its name, marks today, and names the months over their weeks', async () => {
     const graph = await page('graph')
     const cells = [...graph.matchAll(/<span class="kui-contribution-cell" data-part="cell" role="img" aria-label="([^"]+)"[^>]*?( data-today)? style="([^"]+)"/g)].map(match => [match[1], Boolean(match[2]), match[3]])

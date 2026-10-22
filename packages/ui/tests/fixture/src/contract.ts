@@ -3,6 +3,7 @@ import Accordion from '@kaynooo/kayjs-ui/accordion.kay'
 import AppHeader from '@kaynooo/kayjs-ui/app-header.kay'
 import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
 import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import BarChart from '@kaynooo/kayjs-ui/bar-chart.kay'
 import BarList from '@kaynooo/kayjs-ui/bar-list.kay'
 import Breadcrumb from '@kaynooo/kayjs-ui/breadcrumb.kay'
 import Button from '@kaynooo/kayjs-ui/button.kay'
@@ -91,6 +92,7 @@ export const COMPONENTS = {
   'app-header': AppHeader,
   'avatar': Avatar,
   'badge': Badge,
+  'bar-chart': BarChart,
   'bar-list': BarList,
   'breadcrumb': Breadcrumb,
   'button': Button,
@@ -169,6 +171,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'app-header': { links: [{ href: '/', label: 'Home', icon }, { href: '/data', label: 'Data' }], current: '/data', label: 'Main', brand: 'Moons', end: 'Ada' },
   'avatar': { name: 'Grace', label: 'Grace' },
   'badge': { label: 'Draft', icon },
+  'bar-chart': { labels: ['a', 'b'], series: [{ name: 'Runs', values: [1, 2] }], label: 'Runs' },
   'bar-list': { rows, onSelect: noop },
   'breadcrumb': { label: 'Trail', items: [{ label: 'Home', href: '/' }, { label: 'Moons' }] },
   'button': { label: 'Save', icon },
