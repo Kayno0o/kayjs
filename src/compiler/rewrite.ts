@@ -912,6 +912,9 @@ class RewriteFinder {
     const { map } = this.input
     const { start, last, rightFrom } = this.writeSpans(node)
     const name = target.name
+    // A declared type is handed to the helper, since a plain assignment is typed by it, not by the type the name was narrowed to where it is written.
+    const annotation = declarator.id.type === 'Identifier' && declarator.id.typeAnnotation?.type === 'TSTypeAnnotation' ? declarator.id.typeAnnotation.typeAnnotation : undefined
+    const typed = annotation ? `<${this.input.code.slice(annotation.start!, annotation.end!)}>` : ''
 
     const from = map.isExact(target.start!) ? map.toSource(target.start!) : undefined
 
@@ -929,10 +932,10 @@ class RewriteFinder {
 
       if (node.prefix) {
         rewrites.set(start, { replace: '', end: from })
-        rewrites.set(end, { replace: ` = ${WRITE_HELPERS.updateBack}(${name}, ${update})`, end: last + 1 })
+        rewrites.set(end, { replace: ` = ${WRITE_HELPERS.updateBack}${typed}(${name}, ${update})`, end: last + 1 })
       }
       else {
-        rewrites.set(end, { replace: ` = ${WRITE_HELPERS.updateBack}(${name}, ${update})`, end: last + 1 })
+        rewrites.set(end, { replace: ` = ${WRITE_HELPERS.updateBack}${typed}(${name}, ${update})`, end: last + 1 })
       }
 
       writes.add('updateBack')
@@ -946,14 +949,14 @@ class RewriteFinder {
     const operator = node.operator.slice(0, -1)
 
     if (operator === '') {
-      this.open(rightFrom, `${WRITE_HELPERS.back}(${name}, `)
+      this.open(rightFrom, `${WRITE_HELPERS.back}${typed}(${name}, `)
       this.insert(last + 1, ')')
       writes.add('back')
 
       return
     }
 
-    rewrites.set(end, { replace: ` = ${WRITE_HELPERS.updateBack}(${name}, (${CURRENT}) => ${CURRENT} ${operator} (`, end: rightFrom })
+    rewrites.set(end, { replace: ` = ${WRITE_HELPERS.updateBack}${typed}(${name}, (${CURRENT}) => ${CURRENT} ${operator} (`, end: rightFrom })
     this.insert(last + 1, '))')
     writes.add('updateBack')
   }

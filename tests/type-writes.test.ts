@@ -129,6 +129,15 @@ describe('assignments left as written', () => {
     expect(code).toContain('n = await load()')
   })
 
+  it('hand a let its declared type, since a plain assignment is typed by it and not by where the name was narrowed', () => {
+    const code = compiled('---\nlet element: Element | null = document.body\nlet count: number = Number(\'1\')\nfunction f() {\n  for (let walk: Element | null = element; walk && walk !== document.body; walk = walk.parentElement) element = walk\n  element = null\n  element ??= document.body\n}\n---\nbutton(onClick={f}) go\n', 'dom')
+
+    expect(code).toContain('walk = KayWriteBack<Element | null>(walk, walk.parentElement)')
+    expect(code).toContain('element = KayWriteBack<Element | null>(element, walk)')
+    expect(code).toContain('element = KayUpdateBack<Element | null>(element, (KayCurrent) => KayCurrent ?? (document.body))')
+    expect(code).not.toContain('KayWriteBack<number>')
+  })
+
   it('leave a field of this, and a postfix a function returns, as written', () => {
     const code = compiled('---\nimport { makeBox } from \'./box\'\nlet n = makeBox().n\nclass Child {\n  private hits = 0\n  bump() {\n    this.hits++\n    this.hits += 1\n  }\n}\nconst next = () => n++\nfunction f() {\n  for (let i = 0; i < 2; i++) n++\n}\n---\nbutton(onClick={f}) go\n', 'dom')
 

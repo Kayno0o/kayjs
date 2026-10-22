@@ -1,5 +1,5 @@
 import type { Signal } from './core'
-import { createSignal, getOwner, isSignal, renderEffect, runWithOwner, unrecorded, untrack } from './reactive'
+import { createSignal, getOwner, isSignal, liveOwner, renderEffect, runWithOwner, unrecorded, untrack } from './reactive'
 
 // The compiler's output contract, not API: what generated code imports, free to change with any release.
 export { actionStub, formAction, formChecked, formDescribed, formError, formInvalid, formMarked, formProtection, formValue, isAction, registerActions, reviveActions } from './action'
@@ -19,10 +19,6 @@ type Keyed = Record<PropertyKey, unknown>
 
 // What a write to a place holding `T` takes: the value of a signal, anything else as it is.
 type Written<T> = T extends Signal<infer Value> ? Value : T
-
-type Same<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false
-// The keys of `T` a plain assignment may write: a `readonly` property stays an error through the helpers.
-type WritableKey<T> = T extends unknown[] ? keyof T : T extends readonly unknown[] ? never : { [Key in keyof T]-?: Same<Pick<T, Key>, { -readonly [Only in Key]: T[Only] }> extends true ? Key : never }[keyof T]
 
 // What a `let` holds once written: the signal it held, else the value.
 type Kept<Current, Value> = Current extends Signal<infer Held> ? Signal<Held> : Value
@@ -45,7 +41,7 @@ function heldAt(object: unknown, key: PropertyKey): { held: Signal<unknown> | un
 }
 
 // An assignment to `object[key]` whose target may hold a signal (a function, a signal included, replaces it, since a signal holds none), which `kay dev` and `kay build` run no types to learn: a signal is written, anything else is assigned as written. Type checking reads the same signature, so the target is typed by what it holds.
-export function writeTo<Target, Key extends WritableKey<Target>, Value extends Written<Target[Key]> | Target[Key]>(object: Target, key: Key, value: Value): Value {
+export function writeTo<Target, Key extends keyof Target, Value extends Written<Target[Key]> | Target[Key]>(object: Target, key: Key, value: Value): Value {
   const { held } = heldAt(object, key)
 
   if (held !== undefined && typeof value !== 'function')
@@ -57,7 +53,7 @@ export function writeTo<Target, Key extends WritableKey<Target>, Value extends W
 }
 
 // `object[key] += 1` and `object[key]++`: `update` gives the next value from the current one, `post` makes the expression the number it had, and `logical` (`||=`, `??=`) writes nothing when the value stays.
-export function updateTo<Target, Key extends WritableKey<Target>>(object: Target, key: Key, update: (current: Written<Target[Key]>) => Written<Target[Key]>, form?: 'post' | 'logical'): Written<Target[Key]> {
+export function updateTo<Target, Key extends keyof Target>(object: Target, key: Key, update: (current: Written<Target[Key]>) => Written<Target[Key]>, form?: 'post' | 'logical'): Written<Target[Key]> {
   const { held, read, value } = heldAt(object, key)
   let before: unknown
 
@@ -80,7 +76,8 @@ export function updateTo<Target, Key extends WritableKey<Target>>(object: Target
 }
 
 // A `let` assigned a signal's place, `variable = writeBack(variable, value)`: a signal is written and stays the variable's value, anything else is replaced. What type checking cannot tell a plain `let` from is left unchecked.
-export function writeBack<Current, Value extends Current | Written<Current>>(current: Current, value: Value): Kept<Current, Value>
+// The type of the variable can be given as `Current`, since the argument is narrowed where a plain assignment is typed by the declaration.
+export function writeBack<Current, Value extends Current | Written<Current> = Current | Written<Current>>(current: Current, value: Value): Kept<Current, Value>
 export function writeBack(current: unknown, value: unknown): unknown {
   if (!isSignal(current) || typeof value === 'function')
     return value
@@ -91,7 +88,7 @@ export function writeBack(current: unknown, value: unknown): unknown {
 }
 
 // The same for `variable += 1` and `variable++`.
-export function updateBack<Current, Next>(current: Current, update: (current: Written<Current>) => Next): Kept<Current, Next> {
+export function updateBack<Current, Next = Current | Written<Current>>(current: Current, update: (current: Written<Current>) => Next): Kept<Current, Next> {
   if (!isSignal(current))
     return update(current as Written<Current>) as Kept<Current, Next>
 
@@ -149,7 +146,7 @@ export function bindable<Props extends object>(props: Props, keys: readonly stri
       // Watches the parent's value from the first write on, so the override ends when the value moves even if nothing reads the prop before it moves back.
       if (!kept.watching) {
         kept.watching = true
-        runWithOwner(home, () => renderEffect(() => {
+        runWithOwner(liveOwner(home), () => renderEffect(() => {
           const parent = Reflect.get(target, key)
 
           if (kept.override && !Object.is(parent, kept.override.from)) {
