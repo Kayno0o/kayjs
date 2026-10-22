@@ -4529,6 +4529,10 @@ describe.concurrent('kay check, unused code', () => {
       await Bun.write(join(root, 'kay.config.ts'), `${config}// changed\n`)
       expect(await watch.report()).toMatchObject({ errors: 0 })
       expect(await loads()).toBe(3)
+      // The config it read is stale now, so a later .kay edit is a check of its own too.
+      await Bun.write(join(root, 'src/a.kay'), 'img(src="/a.png" width="1" height="1")\n')
+      expect(await watch.report()).toMatchObject({ errors: 1 })
+      expect(await loads()).toBe(4)
     }
     finally {
       await watch.stop()

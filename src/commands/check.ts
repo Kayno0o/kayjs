@@ -90,8 +90,24 @@ export const check: Command = {
 
       // The text report goes to stderr; the other formats are left whole for what reads them.
       let config: KayConfig | undefined
+      let failed = false
+      const inProcess = async () => {
+        const code = await checkOnce(root, async () => {
+          try {
+            return config ??= await loadConfig(root)
+          }
+          catch (error) {
+            failed = true
 
-      await watchChecks(root, [CLI, 'check', ...positionals, ...flags, '--format', format], format, async () => checkOnce(root, async () => config ??= await loadConfig(root), { project, entry, values, only, since, format, scope }))
+            throw error
+          }
+        }, { project, entry, values, only, since, format, scope })
+
+        // A config that does not load is read again by the next check, a process of its own.
+        return failed ? 2 : code
+      }
+
+      await watchChecks(root, [CLI, 'check', ...positionals, ...flags, '--format', format], format, inProcess)
 
       return 0
     }
@@ -135,6 +151,7 @@ async function checkOnce(root: string, config: () => Promise<KayConfig>, { proje
 // Checks now and again on every change to the project, its tests included, a change during a check bringing one more; until interrupted.
 // Each check is a `kay check` of its own, so an edit to kay.config.ts or a module it imports is read again, which a process's import cache would not, and a check that throws or exits leaves the watch going.
 // Once one of them has reported, a change to `.kay` files alone is checked in the watch's own process with the config it first read, which spares the spawn and the config's load.
+// A change to anything else after that read ends it: the process's caches would serve the config, the modules it imports and the installed libraries as they were, so every later check is a process of its own.
 async function watchChecks(root: string, args: string[], format: ProblemFormat, inProcess: () => Promise<number>): Promise<never> {
   const clear = format === 'text' && takesControlCodes(process.stderr)
   let changed = false
@@ -146,11 +163,13 @@ async function watchChecks(root: string, args: string[], format: ProblemFormat, 
   let beyondKay = true
   let reported = false
   let inside = false
+  let retired = false
+  let read = false
   const checks = async () => {
     do {
       changed = false
 
-      const here = reported && !beyondKay
+      const here = reported && !beyondKay && !retired
 
       beyondKay = false
 
@@ -159,15 +178,8 @@ async function watchChecks(root: string, args: string[], format: ProblemFormat, 
 
       if (here) {
         inside = true
-
-        try {
-          await inProcess()
-        }
-        catch {
-          // A check that throws is reported by itself; the next one is a process of its own.
-          reported = false
-        }
-
+        read = true
+        reported = await inProcess() <= 1
         inside = false
 
         if (stopping)
@@ -177,9 +189,14 @@ async function watchChecks(root: string, args: string[], format: ProblemFormat, 
       }
 
       // A process group of its own, so an interrupt stops what it runs too, such as the type checker.
-      child = Bun.spawn([process.execPath, ...args], { stdio: ['ignore', 'inherit', 'inherit'], detached: true })
+      const spawned = Bun.spawn([process.execPath, ...args], { stdio: ['ignore', 'inherit', 'inherit'], detached: true })
 
-      const code = await child.exited
+      child = spawned
+
+      const code = await spawned.exited
+
+      // The child is gone, which a second interrupt during a check in this process must not signal.
+      child = undefined
 
       // Stopped by the watch, which exits starting no other.
       if (stopping)
@@ -189,7 +206,7 @@ async function watchChecks(root: string, args: string[], format: ProblemFormat, 
 
       // A config or a module it imports calling `process.exit()`, or a crash, leaves no report of its own.
       if (code > 1)
-        printFailure('check', child.signalCode !== null ? `the check died of ${child.signalCode} before reporting` : `the check stopped with exit code ${code} before reporting`, format, null)
+        printFailure('check', spawned.signalCode !== null ? `the check died of ${spawned.signalCode} before reporting` : `the check stopped with exit code ${code} before reporting`, format, null)
     } while (changed)
 
     child = undefined
@@ -241,8 +258,10 @@ async function watchChecks(root: string, args: string[], format: ProblemFormat, 
   watchProject(root, (file) => {
     changed = true
 
-    if (!file.endsWith('.kay'))
+    if (!file.endsWith('.kay')) {
       beyondKay = true
+      retired ||= read
+    }
 
     clearTimeout(timer)
     timer = setTimeout(() => {

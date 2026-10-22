@@ -81,6 +81,10 @@ describe('holding', () => {
     expect(holding(['/repo', '/other'], ['/repo/docs'])).toEqual(['/repo'])
     expect(holding(['/repo', '/repo/docs'], ['/repo/docs'])).toEqual(['/repo'])
   })
+
+  it('leaves the servers above the nearest one alone', () => {
+    expect(holding(['/repo', '/repo/docs'], ['/repo/docs/deep'])).toEqual(['/repo/docs'])
+  })
 })
 
 describe('commands', () => {

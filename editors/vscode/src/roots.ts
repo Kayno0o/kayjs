@@ -68,7 +68,9 @@ export function owns(root: string, file: string, roots: string[]): boolean {
   return rootOf(file, roots.includes(root) ? roots : [...roots, root]) === root
 }
 
-// The servers whose documents a change of served roots moves: those holding a root that started or stopped, whose open files another server now owns or gives back.
+// The servers whose documents a change of served roots moves: the nearest running one above each root that started or stopped, whose open files another server now owns or gives back.
 export function holding(roots: string[], changed: string[]): string[] {
-  return roots.filter(root => changed.some(other => other !== root && inside(root, other)))
+  const above = (root: string, other: string) => other !== root && inside(root, other)
+
+  return roots.filter(root => changed.some(other => above(root, other) && !roots.some(between => above(between, other) && above(root, between))))
 }
