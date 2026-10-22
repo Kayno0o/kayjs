@@ -16,7 +16,7 @@ test('the page shown is told from its address under the site\'s base, a trailing
   happyDOM.setURL('http://localhost/docs/posts/h%C3%A9llo/')
   expect(isShown('/posts/héllo')).toBe(true)
   expect(isShown('/docs/posts/héllo')).toBe(false)
-  happyDOM.setURL('http://localhost/docs')
+  happyDOM.setURL('http://localhost/docs?x=1')
   expect(isShown('/')).toBe(true)
   happyDOM.setURL('http://localhost/documents/posts/hello')
   expect(isShown('/posts/hello')).toBe(false)

@@ -29,10 +29,10 @@ afterEach(async () => {
   happyDOM.setURL('http://localhost/')
 })
 
-interface Options { hold?: boolean, collection?: object, draft?: boolean, denied?: Record<string, string>, save?: Response, locale?: string, referrers?: Record<string, string[]>, url?: string }
+interface Options { canFailsOnce?: boolean, hold?: boolean, collection?: object, draft?: boolean, denied?: Record<string, string>, save?: Response, locale?: string, referrers?: Record<string, string[]>, url?: string }
 
 // The entries API holding one entry, answering the role's limits and recording every write.
-function server({ hold = false, collection = POSTS, draft = true, denied = {}, save, locale, referrers = {}, url = '/posts/hello' }: Options = {}) {
+function server({ canFailsOnce = false, hold = false, collection = POSTS, draft = true, denied = {}, save, locale, referrers = {}, url = '/posts/hello' }: Options = {}) {
   const held = new Promise<void>((resolve) => {
     releaseSave = resolve
   })
@@ -47,8 +47,12 @@ function server({ hold = false, collection = POSTS, draft = true, denied = {}, s
 
     asked.push(path)
 
-    if (path.includes('/can'))
+    if (path.includes('/can')) {
+      if (canFailsOnce && asked.filter(each => each.includes('/can')).length === 1)
+        return Response.json({ error: 'down' }, { status: 500 })
+
       return Response.json({ denied, prefix: '/admin' })
+    }
 
     if (path.includes('/referrers'))
       return Response.json(referrers)
@@ -289,6 +293,21 @@ test('Delete from the entry\'s own page leads to the collection\'s screen, not t
   expect(root.querySelector<HTMLFieldSetElement>('fieldset')!.disabled).toBe(true)
   expect(([...root.querySelectorAll('.kcms-entry-actions button')].find(each => each.textContent?.trim() === 'Save') as HTMLButtonElement).disabled).toBe(true)
   expect((button(root, 'Publish') as HTMLButtonElement).disabled).toBe(true)
+})
+
+test('Delete from the entry\'s own page reads the screens\' address again when the role check never answered it', async () => {
+  const writes = server({ canFailsOnce: true })
+  const leftFor = leaving()
+
+  happyDOM.setURL('http://localhost/posts/hello')
+
+  const root = await open()
+
+  button(root, 'Delete')!.click()
+  await settle()
+  confirmation('Delete').click()
+  expect(await leftFor()).toBe('/admin/collections/posts')
+  expect(writes.map(write => write.method)).toEqual(['DELETE'])
 })
 
 test('Delete from the entry\'s own page counts a trailing slash and escaped characters as the same page', async () => {

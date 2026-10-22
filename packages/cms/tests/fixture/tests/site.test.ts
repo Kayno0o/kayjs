@@ -1291,6 +1291,11 @@ test('every page carries one line looking for the editor hint, and the screens s
   expect((await site.fetch('/admin', { headers: { 'x-deny': '1' } })).headers.get('set-cookie')).toBeNull()
 })
 
+test('the editor\'s /can answers the prefix of the screens, which the page editor leads to after deleting the entry its page shows, under /_kay/cms and the old /api/cms alike', async () => {
+  for (const path of ['/_kay/cms/editor/can', '/api/cms/editor/can'])
+    expect(await (await site.fetch(path)).json()).toEqual({ denied: {}, prefix: '/admin' })
+})
+
 test('the check answers an editor the guard admits with the link\'s words in the page\'s language, refreshing the hint, and a signed-out browser with a refusal', async () => {
   const signedIn = await site.fetch('/_kay/cms/editor')
 

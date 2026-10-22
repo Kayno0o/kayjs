@@ -4,7 +4,7 @@ import type { EntryRef } from '../kay/contract'
 import type { SavedState } from './live'
 import type { FieldPath } from '../markers'
 import Button from '@kaynooo/kayjs-ui/button.kay'
-import { navigate, refresh, resource, untrack } from 'kay'
+import { call, navigate, refresh, resource, untrack } from 'kay'
 import { wording } from 'kay/words'
 import editorApi from '../api/editor'
 import entriesApi from '../api/entries'
@@ -44,12 +44,14 @@ const subtitle = memo(() => isSingle() ? entry.locale : entry.locale === undefin
 // The page editor asks no author, so its editors are counted, and named ones are told of them.
 const room = entryRoom(entry.collection, entry, { name: '' })
 const saving = signal(false)
+// Set once the entry is deleted, which locks its form until the page has moved on.
+const removed = signal(false)
 let created = false
 const lastSave = signal<SavedState>()
 const onSaved = savedHandler(() => source.value()?.entry.url, saved => lastSave.set(saved), rebuildFinished)
 onCleanup(onSaved.stop)
 // A click on the page types in the entry's text fields there while this form stands.
-onCleanup(registerInline(entryKey(entry), { collection: () => source.value()?.collection, busy: () => saving() }))
+onCleanup(registerInline(entryKey(entry), { collection: () => source.value()?.collection, busy: () => saving() || removed() }))
 // What the signed-in person's role may not do, which locks the fields it covers once the server has said.
 const can = resource(editorApi, '/can')
 // One scope for as long as the answer stands, so the fields render in the one the notices ask which fields are shown.
@@ -144,15 +146,14 @@ async function askReferrers(): Promise<void> {
   referrers.set(found[entry.slug] ?? [])
 }
 
-// Set once the entry is deleted, which locks its form until the page has moved on.
-const removed = signal(false)
-
 // The page the entry rendered is gone with it. When it was the entry's own page, there is nothing to read again: the editor leads to the collection's screen, replacing that page in the history. Any other page is read again.
 async function remove(): Promise<void> {
   if (saving())
     return
 
   const url = source.value()?.entry.url
+  // Known before the delete, so a screens' address that cannot be read stops it rather than leaving a page that no longer exists.
+  const screen = url !== undefined && isShown(url) ? collectionPath(can.value()?.prefix ?? (await call(editorApi, '/can')).prefix, entry.collection) : undefined
 
   if (!await deleteSaved(entry, drafts.version(entry) ?? source.value()?.entry.version))
     return
@@ -160,10 +161,10 @@ async function remove(): Promise<void> {
   drafts.reset(entry)
   removed.set(true)
 
-  if (url !== undefined && isShown(url))
-    await navigate(collectionPath(can.value()?.prefix ?? '/', entry.collection), { replace: true })
-  else
+  if (screen === undefined)
     await refresh()
+  else
+    await navigate(screen, { replace: true })
 }
 
 saveShortcut(save)
