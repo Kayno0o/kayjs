@@ -81,6 +81,26 @@ describe('TooltipHost', () => {
     expect(button.hasAttribute('aria-describedby')).toBe(false)
   })
 
+  test('shows a data-hint under the pointer only, never as the focus lands on its element', async () => {
+    const root = await popovers()
+    const figure = root.querySelector<HTMLElement>('#figure')!
+    const tooltip = root.querySelector<HTMLElement>('.kui-tooltip')!
+
+    root.querySelector<HTMLElement>('#focusable')!.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+    await clock.elapse(100)
+    await clock.settle()
+
+    expect(tooltip.matches(':popover-open')).toBe(false)
+
+    figure.dispatchEvent(new Event('pointerover', { bubbles: true }))
+    await clock.elapse(100)
+    await clock.settle()
+
+    expect(tooltip.textContent).toBe('Damage per second')
+    expect(tooltip.matches(':popover-open')).toBe(true)
+    expect(figure.getAttribute('aria-describedby')).toBe('kui-tooltip')
+  })
+
   test('adds its id to an element\'s own aria-describedby while it shows, and leaves the rest as it was', async () => {
     const root = await popovers()
     const button = root.querySelector<HTMLElement>('#delete')!

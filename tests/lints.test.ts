@@ -628,6 +628,7 @@ describe('a11y lints', () => {
 
   it('does not take an aria-label on a role-less element as a way to reach a tooltip, nor reports an expression tabindex or the element\'s own text', () => {
     expect(a11y('span(aria-label="x" data-tooltip="y") a\nbutton(aria-label="x" data-tooltip="y") b\nspan(role="img" aria-label="x" data-tooltip="y") c\nspan(aria-describedby={d} data-tooltip="y") d\n')).toEqual(['unreachable-tooltip data-tooltip'])
+    expect(a11y('span(data-hint="Per second") 12\nbutton(data-hint="Tip") b\n')).toEqual([])
     expect(a11y('span(data-tooltip={a} tabindex={a ? \'0\' : undefined}) a\nspan(data-tooltip={a} tabindex="-1") b\n')).toEqual(['unreachable-tooltip data-tooltip'])
     expect(a11y('span(data-tooltip={v}) {v}\nspan(data-tooltip={v}) {w}\nspan(data-tooltip="Same") Same\nspan(data-tooltip={v}) Is {v}\n')).toEqual(['unreachable-tooltip data-tooltip', 'unreachable-tooltip data-tooltip'])
   })

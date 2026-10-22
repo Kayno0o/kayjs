@@ -75,6 +75,8 @@ slot
 
 `ui()` renders one `Toaster` and one `TooltipHost` after every page's layouts. Alt and T moves focus to the toasts on screen, and Escape dismisses the focused one. A layout that renders its own, as below, keeps working: only the first one mounted shows toasts and tooltips.
 
+For a hover explanation of read-only text, such as a stat, write `data-hint="Damage per second"` instead of `data-tooltip`: the host shows it under the pointer only, and `kay check` does not report it as an `unreachable-tooltip`. A hint only adds to what the element already says, as the keyboard and screen readers never reach it.
+
 ```kay
 ---
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'

@@ -3,8 +3,8 @@ import type { Duration } from 'kay'
 import { durationMs, effect, onCleanup, recipe, signal } from 'kay'
 import { claim } from './claim'
 
-// An element carries its tooltip as `data-tooltip`, and where it sits as `data-tooltip-placement`, a CSS `position-area`, `top` by default.
-const CARRIER = '[data-tooltip]'
+// An element carries its tooltip as `data-tooltip`, and where it sits as `data-tooltip-placement`, a CSS `position-area`, `top` by default. `data-hint` is a tooltip for the pointer alone, for text the keyboard has no stop on.
+const CARRIER = '[data-tooltip], [data-hint]'
 // The anchor name theme.css's `.kui-tooltip` positions against.
 const ANCHOR = '--kui-tooltip-anchor'
 const WHITESPACE = /\s+/
@@ -45,7 +45,7 @@ function onto(next: HTMLElement | null) {
   at = next
   clearTimeout(timer)
 
-  const text = next?.dataset.tooltip
+  const text = next?.dataset.tooltip ?? next?.dataset.hint
 
   if (!next || !text) {
     timer = setTimeout(() => aimed.set(null), durationMs(hideDelay))
@@ -59,8 +59,8 @@ function onto(next: HTMLElement | null) {
 function focused(event: FocusEvent) {
   const next = found(event)
 
-  // A press has just closed the tooltip on purpose, so only a focus the browser rings, a tab, opens one.
-  if (!next || next.matches(':focus-visible'))
+  // A press has just closed the tooltip on purpose, so only a focus the browser rings, a tab, opens one, and a hint never opens by focus.
+  if (!next || (next.matches(':focus-visible') && next.dataset.tooltip !== undefined))
     onto(next)
 }
 

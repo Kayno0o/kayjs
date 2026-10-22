@@ -406,7 +406,7 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
       const generic = isUnnameable(element)
       const base = 'a tooltip shows as the pointer or the focus lands on its element, and the keyboard never lands on this one'
       const note = generic && has(element, 'aria-label') ? `${base}, and a screen reader ignores an \`aria-label\` on a role-less element` : base
-      const help = `put it on a \`button\` or a link, give the element \`tabindex="0"\`, or say the same in ${generic ? '' : '`aria-label` or '}visible text`
+      const help = `put it on a \`button\` or a link, give the element \`tabindex="0"\`, say the same in ${generic ? '' : '`aria-label` or '}visible text, or write \`data-hint\` for text only the pointer adds, which kayjs-ui's \`TooltipHost\` shows`
 
       lint(attribute(element, 'data-tooltip')!.name, 'unreachable-tooltip', `This \`${element.name}\`'s tooltip shows only under the pointer`, { note, help })
     }

@@ -15,4 +15,6 @@ Popover(id="menu" open={open()} placement="top-end" onOpenChange={shown => { ope
     IconButton#trigger({...attributes} icon="chevron" label="Menu")
   p#inside Inside
 IconButton#delete(icon="delete" label="Delete" data-tooltip-placement="bottom")
+span#figure(data-hint="Damage per second") 12
+button#focusable(data-hint="Only under the pointer") Focus
 TooltipHost(showDelay={showDelay} hideDelay={hideDelay})
