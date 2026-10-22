@@ -126,6 +126,14 @@ const STOPPED = /Fetch domain is not enabled/i
 const GLOBAL_STICKY = /[gy]/g
 const KEBAB = /-([a-z])/g
 
+// A request to a closed port fails as refused online and as disconnected offline, with no response to record.
+const PROBE_URL = 'http://127.0.0.1:1/kay-network-probe'
+const DISCONNECTED = 'net::ERR_INTERNET_DISCONNECTED'
+const PROBE_FAILURES = new Set([DISCONNECTED, 'net::ERR_CONNECTION_REFUSED'])
+const PROBE_ATTEMPTS = 40
+const PROBE_WAIT_MS = 25
+const PROBE_TIMEOUT_MS = 1000
+
 const TIMED_OUT = Symbol('timed out')
 
 // What a handler waiting on the server's answer fails with once its route is removed, which is no failure of the test.
@@ -271,6 +279,13 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
   event<{ requestId: string }>('Network.loadingFinished', ended)
   event<{ requestId: string }>('Network.loadingFailed', ended)
 
+  const probes = new Set<(requestId: string, errorText: string) => void>()
+
+  event<{ requestId: string, errorText: string }>('Network.loadingFailed', ({ requestId, errorText }) => {
+    for (const probed of probes)
+      probed(requestId, errorText)
+  })
+
   // A call of the view while the page is open: the page closing on a paused request is not the test's failure.
   const send = async (method: string, params?: Record<string, unknown>) => {
     if (closed)
@@ -282,6 +297,25 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
     catch (error) {
       if (!closed)
         throw error
+    }
+  }
+
+  // How a request the page makes right now fails, or undefined when it did not fail within a second (a page that blocks it, or one that cannot run a script).
+  const probe = async (): Promise<string | undefined> => {
+    const { promise, resolve } = Promise.withResolvers<string>()
+    const probed = (requestId: string, errorText: string) => inflight.get(requestId)?.url === PROBE_URL && resolve(errorText)
+
+    probes.add(probed)
+
+    try {
+      await send('Runtime.evaluate', { expression: `fetch(${JSON.stringify(PROBE_URL)}, { mode: "no-cors", cache: "no-store" }).catch(() => {})` })
+
+      const failure = await within(promise, PROBE_TIMEOUT_MS)
+
+      return failure === TIMED_OUT ? undefined : failure
+    }
+    finally {
+      probes.delete(probed)
     }
   }
 
@@ -571,8 +605,16 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
     },
     offline: async (offline) => {
       await send('Network.emulateNetworkConditions', { offline, ...NO_THROTTLE })
-      // The command is answered before the network service applies the condition, so a request sent at once could still see the old one; a call that service must answer too, sent after it, holds the reply until it has.
-      await send('Network.getCookies')
+
+      // The command is answered before the network service applies the condition, so a request sent at once could still see the old one: probe until a request sees the new one.
+      for (let attempt = 0; attempt < PROBE_ATTEMPTS; attempt++) {
+        const failure = await probe()
+
+        if (failure === undefined || !PROBE_FAILURES.has(failure) || (failure === DISCONNECTED) === offline)
+          return
+
+        await Bun.sleep(PROBE_WAIT_MS)
+      }
     },
     waitForResponse: async (match, options = {}) => {
       const test = matches(match)
