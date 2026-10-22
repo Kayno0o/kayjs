@@ -58,16 +58,21 @@ export function sqliteLive(path: string): LiveStore {
     return opened
   }
 
-  onReload(() => {
-    closed = true
-
+  const stop = () => {
     for (const poll of polls)
       clearInterval(poll)
 
+    polls.length = 0
+  }
+
+  onReload(() => {
+    closed = true
+    stop()
     opened?.db.close()
   })
 
   return {
+    stop,
     entries() {
       const live = open(false)
 
@@ -82,16 +87,34 @@ export function sqliteLive(path: string): LiveStore {
       let seen = before ?? open(false)?.lastEvent.get()?.seq ?? 0
 
       const poll = setInterval(() => {
+        const heard: [id: string, key: string, text: string | undefined][] = []
+
         try {
           const live = open(false)
 
+          // A read that fails part way is tried again from the last event heard in full.
+          let last = seen
+
           for (const event of live?.eventsAfter.all(seen, PROCESS) ?? []) {
-            seen = event.seq
-            listener(event.id, event.key, live!.select.get(event.id, event.key)?.value)
+            heard.push([event.id, event.key, live!.select.get(event.id, event.key)?.value])
+            last = event.seq
           }
+
+          seen = last
         }
         catch (error) {
           kayLog('error', 'reading the live values the other processes set failed; trying again', error)
+
+          return
+        }
+
+        for (const [id, key, text] of heard) {
+          try {
+            listener(id, key, text)
+          }
+          catch (error) {
+            kayLog('error', `a watcher of the live value ${id} threw`, error)
+          }
         }
       }, POLL_MS)
 

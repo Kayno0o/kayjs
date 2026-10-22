@@ -133,4 +133,67 @@ process.exit(0)`)
     expect(JSON.parse(await output(watcher))).toEqual([3, 0])
     await setter.exited
   })
+
+  it('goes on to the next event when a watcher throws, and tells the store it replaced to stop', async () => {
+    const path = await storePath()
+    const store = sqliteLive(path)
+    const calls: string[] = []
+    let stopped = 0
+
+    setLiveStore(store)
+
+    const thrown = declare(0, 'test:thrown', 'thrown')
+    const other = declare(0, 'test:other', 'other')
+
+    watchSlot(liveSlot('test:thrown')!, '', () => {
+      calls.push('thrown')
+
+      throw new Error('a watcher failing')
+    })
+    watchSlot(liveSlot('test:other')!, '', () => calls.push('other'))
+
+    await output(spawnProcess(path, 'live(0, \'test:thrown\', \'thrown\').set(1)\nlive(0, \'test:other\', \'other\').set(2)'))
+
+    for (let wait = 0; wait < 300 && calls.length < 2; wait++)
+      await Bun.sleep(10)
+
+    expect(calls).toEqual(['thrown', 'other'])
+    expect([thrown(), other()]).toEqual([1, 2])
+    setLiveStore({ entries: () => [], set: () => undefined, delete: () => undefined, subscribe: () => undefined, stop: () => {
+      stopped++
+    } })
+    setLiveStore(undefined)
+    expect(stopped).toBe(1)
+  })
+
+  it('keeps a bounded number of rows for values nobody declared', () => {
+    let hear: ((id: string, key: string, text: string | undefined) => void) | undefined
+
+    setLiveStore({ entries: () => [], set: () => undefined, delete: () => undefined, subscribe: (listener) => {
+      hear = listener
+    } })
+    hear!('test:evicted', '', '[1]')
+
+    for (let row = 0; row < 10_000; row++)
+      hear!('test:bulk', String(row), '[0]')
+
+    hear!('test:recent', '', '[2]')
+
+    expect(declare(0, 'test:evicted', 'evicted')()).toBe(0)
+    expect(declare(0, 'test:recent', 'recent')()).toBe(2)
+    setLiveStore(undefined)
+  })
+
+  it('writes to the store from a second copy of the module', async () => {
+    const path = await storePath()
+    const store = sqliteLive(path)
+    const tag = 'second'
+    const copy = await import(`../src/runtime/live-value.ts?${tag}`) as { live: typeof declare }
+
+    setLiveStore(store)
+    expect(copy.live).not.toBe(live as unknown)
+    copy.live(0, 'test:copy', 'copy').set(4)
+    expect(store.entries()).toEqual([['test:copy', '', '[4]']])
+    setLiveStore(undefined)
+  })
 })

@@ -41,6 +41,8 @@ export interface LiveStore {
   delete: (id: string, key: string) => void
   // Calls `listener` with the text now held for a key another process set, or undefined once it deleted it; never for this process's own.
   subscribe: (listener: (id: string, key: string, text: string | undefined) => void) => void
+  // Stops following the other processes, as when another store replaces this one; a later `subscribe` follows again.
+  stop?: () => void
 }
 
 // The page's script of live values: the value of each as the server rendered it, with the signature that proves the page read those keys.
@@ -124,11 +126,29 @@ export function watchSlot(slot: ServerSlot, key: string, listener: () => void): 
   }
 }
 
-let checkWrite: ((label: string, value: unknown) => void) | undefined
+// What the server keeps beside the slots, shared as they are: a second copy of this module sets and hears through the same store.
+interface ServerState {
+  store: LiveStore | undefined
+  subscribed: WeakSet<LiveStore>
+  // What the store holds for a value no module declared yet, by id then key: taken when its declaration runs.
+  undeclared: Map<string, Map<string, string>>
+  undeclaredRows: number
+  checkWrite: ((label: string, value: unknown) => void) | undefined
+}
+
+const STATE = Symbol.for('kay.live.state')
+// The most rows kept for values no module declared: the oldest id goes beyond it, as a value nobody declares is not one this process shows.
+const UNDECLARED_ROWS = 10_000
+
+function state(): ServerState {
+  const holder = globalThis as Record<symbol, ServerState | undefined>
+
+  return holder[STATE] ??= { store: undefined, subscribed: new WeakSet(), undeclared: new Map(), undeclaredRows: 0, checkWrite: undefined }
+}
 
 // Installed by the server: refuses a value a browser could not be sent where it is set.
 export function checkLiveWrites(check: (label: string, value: unknown) => void): void {
-  checkWrite = check
+  state().checkWrite = check
 }
 
 function keyText(key: LiveKey): string {
@@ -155,22 +175,53 @@ export function noteLives(handles: readonly unknown[]): void {
 // The ids kay keeps for itself (cached values followed by pages, presence) are not the app's values and stay in memory.
 const OWN_ID = /^kay:/
 
-let liveStore: LiveStore | undefined
-
 function shared(slot: ServerSlot): boolean {
-  return liveStore !== undefined && !OWN_ID.test(slot.id)
+  return state().store !== undefined && !OWN_ID.test(slot.id)
 }
 
-const subscribed = new WeakSet<LiveStore>()
-// What the store holds for a value no module declared yet, by id then key: taken when its declaration runs.
-const undeclared = new Map<string, Map<string, string>>()
+// Keeps what the store holds for an id no module declared yet, or forgets it for a deleted key.
+function keepUndeclared(id: string, key: string, text: string | undefined): void {
+  const kept = state()
+  let held = kept.undeclared.get(id)
+
+  if (text === undefined) {
+    if (held?.delete(key))
+      kept.undeclaredRows--
+
+    return
+  }
+
+  if (held === undefined)
+    kept.undeclared.set(id, held = new Map<string, string>())
+
+  if (!held.has(key))
+    kept.undeclaredRows++
+
+  held.set(key, text)
+
+  while (kept.undeclaredRows > UNDECLARED_ROWS) {
+    const [oldest, rows] = kept.undeclared.entries().next().value!
+
+    kept.undeclared.delete(oldest)
+    kept.undeclaredRows -= rows.size
+  }
+}
 
 // Called by the setup of a server with the config's `store.live`: reads what it holds, then follows what the other processes set.
 export function setLiveStore(store: LiveStore | undefined): void {
-  if (store === liveStore)
+  const kept = state()
+
+  if (store === kept.store)
     return
 
-  liveStore = store
+  const replaced = kept.store
+
+  kept.store = store
+
+  if (replaced !== undefined) {
+    replaced.stop?.()
+    kept.subscribed.delete(replaced)
+  }
 
   if (store === undefined)
     return
@@ -178,13 +229,13 @@ export function setLiveStore(store: LiveStore | undefined): void {
   for (const [id, key, text] of store.entries())
     hear(id, key, text)
 
-  if (subscribed.has(store))
+  if (kept.subscribed.has(store))
     return
 
-  subscribed.add(store)
+  kept.subscribed.add(store)
   // A store replaced or removed since still delivers, which is ignored.
   store.subscribe((id, key, text) => {
-    if (liveStore === store)
+    if (kept.store === store)
       hear(id, key, text)
   })
 }
@@ -205,15 +256,7 @@ function hear(id: string, key: string, text: string | undefined): void {
   const slot = slots().get(id)
 
   if (slot === undefined) {
-    let held = undeclared.get(id)
-
-    if (held === undefined && text !== undefined)
-      undeclared.set(id, held = new Map<string, string>())
-
-    if (text === undefined)
-      held?.delete(key)
-    else
-      held?.set(key, text)
+    keepUndeclared(id, key, text)
 
     return
   }
@@ -249,14 +292,20 @@ function serverLive(id: string, initial: unknown, name: string | undefined): Han
   slots().set(id, slot)
 
   if (!known) {
-    for (const [key, text] of undeclared.get(id) ?? []) {
+    const kept = state()
+    const held = kept.undeclared.get(id)
+
+    for (const [key, text] of held ?? []) {
       const read = decoded(text, id)
 
       if (read !== undefined)
         slot.values.set(key, read.value)
     }
 
-    undeclared.delete(id)
+    if (held !== undefined) {
+      kept.undeclared.delete(id)
+      kept.undeclaredRows -= held.size
+    }
   }
 
   const read = (key: string): unknown => {
@@ -271,14 +320,15 @@ function serverLive(id: string, initial: unknown, name: string | undefined): Han
     const current = slotValue(slot, key)
     const value = typeof next === 'function' ? (next as (current: unknown) => unknown)(current) : next
 
+    // This process's copy can be up to half a second behind the store, so a value equal to it is skipped even when another process has set a newer one since.
     if (Object.is(value, current))
       return
 
-    checkWrite?.(slot.name === undefined ? slot.id : `${slot.name} (${slot.id})`, value)
+    state().checkWrite?.(slot.name === undefined ? slot.id : `${slot.name} (${slot.id})`, value)
 
     // The store first, so a refusal leaves the value as it was.
     if (shared(slot))
-      liveStore!.set(slot.id, key, encodeValue(value))
+      state().store!.set(slot.id, key, encodeValue(value))
 
     slot.values.set(key, value)
     notify(slot, key)
@@ -296,7 +346,7 @@ function serverLive(id: string, initial: unknown, name: string | undefined): Han
           return
 
         if (shared(slot))
-          liveStore!.delete(slot.id, keyText(key))
+          state().store!.delete(slot.id, keyText(key))
 
         slot.values.delete(keyText(key))
         notify(slot, keyText(key))
