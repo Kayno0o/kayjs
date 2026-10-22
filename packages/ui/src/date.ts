@@ -124,18 +124,31 @@ export function weekdays(locale: string, firstDay: number): { short: string, lon
   })
 }
 
+const formatters = new Map<string, Intl.DateTimeFormat>()
+
+// A formatter is slow to build and a calendar asks for the same few dozens of times, so each locale and options pair builds one; a locale the runtime rejects is drawn in English.
+function formatter(locale: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const key = `${locale}|${JSON.stringify(options)}`
+  let found = formatters.get(key)
+
+  if (!found) {
+    try {
+      found = new Intl.DateTimeFormat(locale, { ...options, timeZone: 'UTC' })
+    }
+    catch {
+      found = new Intl.DateTimeFormat('en', { ...options, timeZone: 'UTC' })
+    }
+
+    formatters.set(key, found)
+  }
+
+  return found
+}
+
 function format(iso: string, locale: string, options: Intl.DateTimeFormatOptions): string {
   const date = utc(iso)
 
-  if (!date)
-    return iso
-
-  try {
-    return date.toLocaleDateString(locale, { ...options, timeZone: 'UTC' })
-  }
-  catch {
-    return date.toLocaleDateString('en', { ...options, timeZone: 'UTC' })
-  }
+  return date ? formatter(locale, options).format(date) : iso
 }
 
 // Today on the viewer's own calendar.

@@ -153,15 +153,17 @@ div(ref={element => root = element})
         div(part="title" aria-live="polite") {monthTitle(cursor(), pageLocale())}
         button(part="step" type="button" data-direction="next" aria-label={nextLabel} disabled={!canStepOn()} onClick={() => go(addMonths(cursor(), 1))})
           Icon(icon="chevron")
-      table(part="grid" role="grid" aria-label={monthTitle(cursor(), pageLocale())})
-        thead
-          tr
-            for name of names() key={name.long}
-              th(part="weekday" scope="col" abbr={name.long}) {name.short}
-        tbody
-          for week of weeks() key={week[0]}
+      // The days are built while the panel is open, as a range input holds two calendars that are mostly shut.
+      if opened()
+        table(part="grid" role="grid" aria-label={monthTitle(cursor(), pageLocale())})
+          thead
             tr
-              for day of week key={day}
-                td(role="gridcell" aria-selected={current() === day ? 'true' : 'false'})
-                  button(part="day" type="button" tabindex={day === cursor() ? 0 : -1} data-day={day} data-cursor={day === cursor() ? '' : undefined} data-today={day === now() ? '' : undefined} data-selected={current() === day ? '' : undefined} data-outside={sameMonth(day, cursor()) ? undefined : ''} aria-label={dayName(day, pageLocale())} aria-current={day === now() ? 'date' : undefined} disabled={!withinBounds(day, min, max)} onClick={() => pick(day)}) {Number(day.slice(8))}
+              for name of names() key={name.long}
+                th(part="weekday" scope="col" abbr={name.long}) {name.short}
+          tbody
+            for week of weeks() key={week[0]}
+              tr
+                for day of week key={day}
+                  td(role="gridcell" aria-selected={current() === day ? 'true' : 'false'})
+                    button(part="day" type="button" tabindex={day === cursor() ? 0 : -1} data-day={day} data-cursor={day === cursor() ? '' : undefined} data-today={day === now() ? '' : undefined} data-selected={current() === day ? '' : undefined} data-outside={sameMonth(day, cursor()) ? undefined : ''} aria-label={dayName(day, pageLocale())} aria-current={day === now() ? 'date' : undefined} disabled={!withinBounds(day, min, max)} onClick={() => pick(day)}) {Number(day.slice(8))}
       button(part="today" type="button" disabled={!withinBounds(now(), min, max)} onClick={() => pick(now())}) {todayLabel}

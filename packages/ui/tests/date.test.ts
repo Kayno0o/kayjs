@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { addDays, addMonths, clampDate, dateRangeFrom, firstDayOf, isDate, monthWeeks, weekdays, weekEdge } from '../src/date'
+import { addDays, addMonths, clampDate, dateRangeFrom, dayName, firstDayOf, isDate, monthTitle, monthWeeks, weekdays, weekEdge } from '../src/date'
 
 describe('dates', () => {
   test('reads only real calendar dates', () => {
@@ -55,6 +55,15 @@ describe('dates', () => {
     expect(firstDayOf('fr-FR')).toBe(1)
     expect(firstDayOf('en-US')).toBe(0)
     expect(firstDayOf('not a locale')).toBe(1)
+  })
+
+  test('names a month and a day in the locale, a locale the runtime rejects drawn in English, and a bad date as written', () => {
+    expect(monthTitle('2026-10-21', 'en')).toBe('October 2026')
+    expect(monthTitle('2026-10-21', 'fr')).toBe('octobre 2026')
+    expect(monthTitle('2026-10-21', 'fr')).toBe('octobre 2026')
+    expect(dayName('2026-10-21', 'en')).toBe('Wednesday, October 21, 2026')
+    expect(monthTitle('2026-10-21', 'not a locale')).toBe('October 2026')
+    expect(monthTitle('nope', 'en')).toBe('nope')
   })
 
   test('reads a posted pair in order, an empty or invalid box being open', () => {

@@ -178,7 +178,7 @@ describe('DateInput', () => {
     expect(panel.matches(':popover-open')).toBe(true)
   })
 
-  test('Escape closes the calendar', async () => {
+  test('closing the panel, as the browser does on Escape, turns the trigger back to collapsed', async () => {
     const root = await dates()
     const panel = calendar(root).querySelector<HTMLElement>('.kui-date-input-panel')!
 
@@ -187,6 +187,38 @@ describe('DateInput', () => {
     await settle()
 
     expect(calendar(root).querySelector('.kui-date-input-trigger')?.getAttribute('aria-expanded')).toBe('false')
+  })
+
+  test('Tab out of the panel closes it, a focus loss with no target keeps it open', async () => {
+    const root = await dates()
+    const panel = calendar(root).querySelector<HTMLElement>('.kui-date-input-panel')!
+    const leave = (relatedTarget: Element | null) => day(root, '2026-10-21').dispatchEvent(new FocusEvent('focusout', { relatedTarget, bubbles: true }))
+
+    await open(root)
+    leave(null)
+    await settle()
+
+    expect(panel.matches(':popover-open')).toBe(true)
+
+    leave(day(root, '2026-10-22'))
+    await settle()
+
+    expect(panel.matches(':popover-open')).toBe(true)
+
+    leave(root.querySelector('#date'))
+    await settle()
+
+    expect(panel.matches(':popover-open')).toBe(false)
+  })
+
+  test('draws no days while the calendar is shut, a month of them once it opens', async () => {
+    const root = await dates()
+
+    expect(calendar(root).querySelectorAll('[data-day]')).toHaveLength(0)
+
+    await open(root)
+
+    expect(calendar(root).querySelectorAll('[data-day]').length).toBeGreaterThanOrEqual(28)
   })
 
   test('a read-only field cannot be changed through the calendar', async () => {
