@@ -761,19 +761,22 @@ export const auth = createAuth({
 // kayjs-auth's tables in a Postgres of the app's own, which a migration creates: the owner changes the schema, the app connects as app_rw.
 function postgresFiles(): Record<string, string> {
   return {
-    'src/db/index.ts': `import process from 'node:process'
-import { authTables } from '@kaynooo/kayjs-auth/pg'
-import { Database } from '@kaynooo/pg-orm'
+    'src/db/tables.ts': `import { authTables } from '@kaynooo/kayjs-auth/pg'
 
 // Add the app's own tables beside kayjs-auth's; a change goes to the database as a migration: \`bun run db:generate\`, then \`bun run db:migrate\`.
+// pg-orm.config.ts reads them from here, not from ./index: importing \`db\` there would build it on DATABASE_URL before \`kay/test/preload\` points it at the file's copy.
 export const tables = [...authTables]
+`,
+    'src/db/index.ts': `import process from 'node:process'
+import { Database } from '@kaynooo/pg-orm'
+import { tables } from './tables'
 
 // Connects on the first query; in a test, to the copy \`kay/test/preload\` made for the file.
 export const db = new Database({ url: process.env.DATABASE_URL!, tables })
 `,
     'pg-orm.config.ts': `import process from 'node:process'
 import { Database, defineConfig } from '@kaynooo/pg-orm'
-import { tables } from './src/db'
+import { tables } from './src/db/tables'
 
 // For the \`pg-orm\` command: \`bun run db:generate\` writes a migration from what the tables declare, \`bun run db:migrate\` applies the pending ones.
 export default defineConfig({

@@ -792,7 +792,7 @@ describe('kay new', () => {
     try {
       const files = await createProject(dir, { kay: '^1.0.0', features: [...PRESETS.app.features, 'postgres'] })
 
-      expect(files).toEqual(expect.arrayContaining(['.env', '.env.example', '.env.test', 'compose.dev.yaml', 'db/roles.sh', 'migrations/.gitkeep', 'pg-orm.config.ts', 'src/db/index.ts', 'src/auth.ts', 'src/routes/_guard.ts', 'src/api/online.ts', 'tests/online.test.ts']))
+      expect(files).toEqual(expect.arrayContaining(['.env', '.env.example', '.env.test', 'compose.dev.yaml', 'db/roles.sh', 'migrations/.gitkeep', 'pg-orm.config.ts', 'src/db/index.ts', 'src/db/tables.ts', 'src/auth.ts', 'src/routes/_guard.ts', 'src/api/online.ts', 'tests/online.test.ts']))
       expect((await stat(join(dir, '.env'))).mode & 0o777).toBe(0o600)
       expect(await Bun.file(join(dir, '.env')).text()).toMatch(/^DATABASE_URL=postgres:\/\/app_rw:app_rw@127\.0\.0\.1:5433\/app\nMIGRATE_DATABASE_URL=postgres:\/\/app:app@127\.0\.0\.1:5433\/app\nCOMPOSE_FILE=compose\.dev\.yaml\n$/)
 
@@ -818,7 +818,8 @@ describe('kay new', () => {
       expect(await Bun.file(join(dir, 'compose.dev.yaml')).text()).toContain('./db/roles.sh:/docker-entrypoint-initdb.d/roles.sh:ro')
       expect(await Bun.file(join(dir, 'db/roles.sh')).text()).toContain('ALTER DEFAULT PRIVILEGES FOR ROLE')
       expect(await Bun.file(join(dir, 'pg-orm.config.ts')).text()).toContain('process.env.MIGRATE_DATABASE_URL ?? process.env.DATABASE_URL')
-      expect(await Bun.file(join(dir, 'src/db/index.ts')).text()).toContain('export const tables = [...authTables]')
+      expect(await Bun.file(join(dir, 'src/db/tables.ts')).text()).toContain('export const tables = [...authTables]')
+      expect(await Bun.file(join(dir, 'pg-orm.config.ts')).text()).toContain('import { tables } from \'./src/db/tables\'')
       expect(await Bun.file(join(dir, 'src/auth.ts')).text()).toContain('store: pgStore(db)')
       // On the Bun that scaffolded it, rather than whatever is latest when it builds.
       expect(await Bun.file(join(dir, 'Dockerfile')).text()).toStartWith(`FROM oven/bun:${Bun.version} AS build\n`)
@@ -870,14 +871,14 @@ describe('kay new', () => {
     const app = await createProjectFiles('app')
     const pg = await createProjectFiles('postgres')
 
-    for (const [scaffold, files] of [[app, project({})], [pg, project({ 'src/db/index.ts': pg['src/db/index.ts']! })]] as const) {
+    for (const [scaffold, files] of [[app, project({})], [pg, project({ 'src/db/index.ts': pg['src/db/index.ts']!, 'src/db/tables.ts': pg['src/db/tables.ts']! })]] as const) {
       const written = plan(files).files
 
       for (const [path, content] of Object.entries(written))
         expect(scaffold[path]).toBe(content)
     }
 
-    expect(pg['src/db/index.ts']).toContain('...authTables')
+    expect(pg['src/db/tables.ts']).toContain('...authTables')
   })
 
   it('scaffolds a blank project of one bare page, which checks and builds as a static site', async () => {

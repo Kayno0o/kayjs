@@ -733,7 +733,7 @@ it('adds kayjs-auth over the Postgres database postgres sets up, with no second 
     expect(existsSync(join(dir, 'src/routes/login.kay'))).toBe(false)
     expect(existsSync(join(dir, 'src/session.ts'))).toBe(false)
 
-    const tables = await Bun.file(join(dir, 'src/db/index.ts')).text()
+    const tables = await Bun.file(join(dir, 'src/db/tables.ts')).text()
 
     expect(tables).toContain('authTables')
     expect(await Bun.file(join(dir, 'src/auth.ts')).text()).toContain('import { db } from \'./db\'')

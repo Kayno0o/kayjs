@@ -19,6 +19,8 @@ function siteName(name: string): string {
 // What `kay add auth` writes: src/auth.ts over the project's database or a SQLite file of its own, the extension with the prebuilt pages, a guard on the whole site and the session secret.
 export default function auth(project: Project) {
   const ownDatabase = project.exists('src/db/index.ts') && project.depends('@kaynooo/pg-orm') && project.read('src/db/index.ts')?.includes('export const db') === true
+  // A project kay new scaffolded keeps the tables apart from `db`, so pg-orm.config.ts reads them without building `db`.
+  const tablesFile = project.read('src/db/tables.ts')?.includes('export const tables') === true ? 'src/db/tables.ts' : 'src/db/index.ts'
   const mailed = project.exists('src/mail.ts') && project.read('src/mail.ts')?.includes('export const mail') === true
   const imports = [
     'import type { AuthSessionData } from \'@kaynooo/kayjs-auth\'',
@@ -50,7 +52,7 @@ export const auth = createAuth({
       'src/routes/_guard.ts': 'import { auth } from \'../auth\'\n\n// Every page below needs a signed-in visitor; the sign-in and register pages stay open. Delete this file for a public site, or move it into the folder to protect.\nexport default auth.guard()\n',
     },
     edits: ownDatabase
-      ? [{ file: 'src/db/index.ts', find: TABLES, replace: '$1...authTables, ', done: '...authTables', import: 'import { authTables } from \'@kaynooo/kayjs-auth/pg\'' }]
+      ? [{ file: tablesFile, find: TABLES, replace: '$1...authTables, ', done: '...authTables', import: 'import { authTables } from \'@kaynooo/kayjs-auth/pg\'' }]
       : [],
     example: ['KAY_SECRET', 'SITE_URL'],
     ignore: ownDatabase ? [] : ['data'],
