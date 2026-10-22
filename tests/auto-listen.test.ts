@@ -21,7 +21,7 @@ import { pages } from 'kay/server'
 export const app = new Elysia().get('/mine', () => 'mine').use(await pages())
 
 await Bun.sleep(100)
-app.listen({ port: Number(process.env.PORT) + 1, hostname: '127.0.0.1' })
+app.listen({ port: Number(process.env.PORT) + Number(process.env.LATE_SHIFT ?? 0), hostname: '127.0.0.1' })
 `
 
 function freePort(): number {
@@ -84,8 +84,8 @@ describe('an entry that does not listen', () => {
     await Promise.all([idle, late].map(async dir => Bun.$`rm -rf ${dir}`.quiet()))
   })
 
-  async function started(dir: string, port: number, host?: string): Promise<Subprocess> {
-    return Bun.spawn([process.execPath, cli, 'start', dir], { stdin: 'ignore', stdout: 'ignore', stderr: 'ignore', env: { ...process.env, PORT: String(port), ...host === undefined ? {} : { HOST: host } } })
+  async function started(dir: string, port: number, host?: string, shift = 0): Promise<Subprocess> {
+    return Bun.spawn([process.execPath, cli, 'start', dir], { stdin: 'ignore', stdout: 'ignore', stderr: 'ignore', env: { ...process.env, LATE_SHIFT: String(shift), PORT: String(port), ...host === undefined ? {} : { HOST: host } } })
   }
 
   it('is listened on PORT by kay start, its own routes beside the pages', async () => {
@@ -113,9 +113,23 @@ describe('an entry that does not listen', () => {
     }
   }, 60_000)
 
-  it('keeps the listen call it makes itself, even after an await', async () => {
+  it('takes the same port back for a listen the entry makes itself after an await', async () => {
     const port = freePort()
     const child = await started(late, port)
+
+    try {
+      expect(await until(async () => body(`http://127.0.0.1:${port}/mine`))).toBe('mine')
+      await Bun.sleep(300)
+      expect(child.exitCode).toBeNull()
+    }
+    finally {
+      child.kill()
+    }
+  }, 60_000)
+
+  it('keeps the port the entry asks for itself, even after an await', async () => {
+    const port = freePort()
+    const child = await started(late, port, undefined, 1)
 
     try {
       expect(await until(async () => body(`http://127.0.0.1:${port + 1}/mine`))).toBe('mine')
