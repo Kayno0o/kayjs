@@ -7,6 +7,7 @@ import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { throughLinks } from '../build/links'
 import { KayError } from '../compiler/errors'
+import { entryPath } from '../content/entry-route'
 import { flattenMessages, localePath, matchLinksWith, pathSegment, splitLocale, translatedPath } from '../runtime/i18n'
 import { localeState } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
@@ -180,6 +181,26 @@ export function routedSettings(settings: LocaleSettings, routes: Pick<Route, 'pa
 }
 
 const CATCH_ALL = /\*[^/]+/
+const FILE_SLUG = /\.[a-z0-9]+$/i
+
+// The paths of the entries of routed collections whose slug ends in an extension, which the locale rule would take for files; an entry that cannot be read is left out, its collection failing where it is read.
+export async function entryFilePaths(collections: { options: { route?: string | undefined }, all: () => Promise<{ slug: string }[]> }[]): Promise<string[]> {
+  const paths = await Promise.all(collections.map(async ({ options, all }) => {
+    const { route } = options
+
+    if (route === undefined)
+      return []
+
+    try {
+      return (await all()).flatMap(({ slug }) => FILE_SLUG.test(slug) ? [entryPath(route, slug)] : []).filter((path): path is string => path !== undefined)
+    }
+    catch {
+      return []
+    }
+  }))
+
+  return paths.flat()
+}
 
 // The settings told of the patterns the site's pages are served under and of its localized feeds, which a link written as the default locale names them goes to in the page's locale.
 // A localized collection's feed is served once per locale, as a page is; any other's once for all of them.

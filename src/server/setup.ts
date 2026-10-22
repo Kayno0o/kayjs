@@ -21,7 +21,7 @@ import { basePath } from './base'
 import { checkCardConfig, drawLogo, setupCards } from './card'
 import { chooseInlineStyles } from './client'
 import { appServesManifest } from './favicon'
-import { implicitI18n, linkedSettings, loadI18n, routedSettings, serveLocales } from './i18n'
+import { entryFilePaths, implicitI18n, linkedSettings, loadI18n, routedSettings, serveLocales } from './i18n'
 import { applyImageConfig } from './image'
 import { loadMatchers } from './params'
 import { setupPreview } from './preview'
@@ -194,8 +194,11 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
   const { head, scripts, styles, cards, fontCss } = await headAndCards()
 
   // A localized site's links are told of its pages and localized feeds, for the server and the static export alike.
-  if (i18n)
-    i18n.settings = linkedSettings(i18n.settings, routes, collections)
+  if (i18n) {
+    const entryFiles = await entryFilePaths(collections)
+
+    i18n.settings = { ...linkedSettings(i18n.settings, routes, collections), ...entryFiles.length > 0 && { entryFiles } }
+  }
 
   return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions: { ...renderOptionsOf(config, mode, { head, maxDensity, fontCss, islandPreloads: mode.dev ? undefined : islandOnlyChunks(client), editor: source.editor(root, config) }), redirectSpelling }, cards, files, endpoints, appManifest: ownManifest, extensions, api, claimed }
 }

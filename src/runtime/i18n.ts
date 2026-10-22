@@ -31,6 +31,8 @@ export interface LocaleSettings {
   feeds?: readonly string[] | undefined
   // The routes of the collections, `/blog/:slug`, whose entries' pages a link ends in a dotted slug for, `/blog/v1.2`, which is no file.
   entryRoutes?: readonly string[] | undefined
+  // The paths of entries whose slug ends in a file extension, `/blog/release.html`, which are pages all the same.
+  entryFiles?: readonly string[] | undefined
 }
 
 // What a translation reads: the messages of its locale by dotted key, then the default locale's for a key it lacks.
@@ -311,13 +313,18 @@ export function leadsWithLocale(settings: LocaleSettings, href: string): boolean
 
 const FILE_EXTENSION = /\.(?:png|jpe?g|gif|webp|avif|svg|ico|pdf|xml|json|txt|css|m?js|map|zip|gz|woff2?|ttf|otf|mp[34]|webm|csv|html?)$/i
 
-// Whether a link's last segment names a file: it has a dot and ends in a file's extension, or no collection route takes the path for an entry's slug, `/blog/v1.2`.
-export function namesFile(last: string | undefined, takenByRoute: () => boolean): boolean {
-  return last?.includes('.') === true && (FILE_EXTENSION.test(last) || !takenByRoute())
+// Whether a link's last segment names a file: it has a dot, and either ends in a file's extension and is no entry's path, `/blog/release.html`, or no collection route takes the path for an entry's slug, `/blog/v1.2`.
+export function namesFile(settings: LocaleSettings, segments: string[], takenByRoute: () => boolean): boolean {
+  const last = segments.at(-1)
+
+  if (last?.includes('.') !== true)
+    return false
+
+  return FILE_EXTENSION.test(last) ? settings.entryFiles?.includes(`/${segments.join('/')}`) !== true : !takenByRoute()
 }
 
 // A link of the site written as the default locale names it, in the page's locale: `/about` on an English page is `/en/about`.
-// A link to no page, one under a locale's prefix already and a file a param would take, `/blog/cover.png`, stay as written; a collection's route takes a dotted slug, `/blog/v1.2`, for its entry unless it ends in a file's extension.
+// A link to no page, one under a locale's prefix already and a file a param would take, `/blog/cover.png`, stay as written; a collection's route takes a dotted slug, `/blog/v1.2`, for its entry unless it ends in a file's extension and no entry has that slug.
 export function localizedLink(settings: LocaleSettings, href: string, locale: string, currentHost?: string): string {
   const unchanged = settings.paths === undefined && (settings.hosts !== undefined || (locale === settings.defaultLocale && !settings.prefixDefault))
 
@@ -337,7 +344,7 @@ export function localizedLink(settings: LocaleSettings, href: string, locale: st
   if (settings.feeds?.includes(path) === true)
     return localePath({ ...settings, paths: undefined }, href, locale, currentHost)
 
-  const file = namesFile(segments.at(-1), () => settings.entryRoutes?.some(pattern => matchSegments(segmentsOf(pattern), segments, {}) !== undefined) === true)
+  const file = namesFile(settings, segments, () => settings.entryRoutes?.some(pattern => matchSegments(segmentsOf(pattern), segments, {}) !== undefined) === true)
   const page = settings.pages?.some((pattern) => {
     const named = matchSegments(segmentsOf(pattern), segments, {})
 

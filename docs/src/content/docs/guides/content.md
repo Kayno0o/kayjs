@@ -263,7 +263,7 @@ for post of entries
 
 A localized entry's `url` has its own slug, so `(await posts.translation(post, 'fr'))?.url` is the page of its translation, and on a page that read the entry with `get()`, `alternate('fr')` gives it too.
 
-A dotted slug such as `v1.2` is a page, not a file; a link ending in a file's extension, such as `/blog/cover.png`, stays a file. A slug the route cannot write leaves its entry out, logged. The CMS reads the route before `url`.
+A dotted slug such as `v1.2` is a page, not a file; a link ending in a file's extension, such as `/blog/cover.png`, stays a file unless an entry has that slug, as `release.html` in a localized site. A slug the route cannot write leaves its entry out, logged. The CMS reads the route before `url`.
 
 The route has one param, the slug, and `kay check` reports a route no page matches, such as one with `src/routes/blog/[slug].kay` missing, and a page listing the collection in `prerender` while another page serves the route. A collection with no `route` has no `url`.
 

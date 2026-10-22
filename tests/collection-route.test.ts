@@ -14,7 +14,7 @@ import { localizedLink, matchLinksWith } from '../src/runtime/i18n'
 import { alternate } from '../src/runtime/i18n.server'
 import { runInLocale } from '../src/runtime/locale-state'
 import { entryUrls } from '../src/server/entry-urls'
-import { linkedSettings } from '../src/server/i18n'
+import { entryFilePaths, linkedSettings } from '../src/server/i18n'
 import { compiledLinks } from '../src/server/links'
 import { scratchDir } from './scratch'
 
@@ -240,6 +240,27 @@ describe('a collection route read beyond the entries', () => {
     })).toBe('/fr/blog/only-en')
 
     expect(runInLocale(state('en', '/blog/hello'), () => alternate('fr'))).toBe('/fr/blog/hello')
+  })
+
+  it('has the locale rule take a slug ending in a file extension for a page when an entry has it', async () => {
+    const docs = collection({ name: 'route-files', load: () => [{ slug: 'release.html', data: { title: 'A' } }, { slug: 'a/notes.txt', data: { title: 'B' } }, { slug: 'plain', data: { title: 'C' } }] }, { schema, route: '/blog/*slug' })
+    const entryFiles = await entryFilePaths([docs, collection({ name: 'unrouted', load: () => [{ slug: 'x.html', data: { title: 'D' } }] }, { schema })])
+    const base = { locales: ['en', 'fr'], defaultLocale: 'en', prefixDefault: false, pages: ['/blog/*'] }
+    const linked = { ...linkedSettings(base, [{ pattern: '/blog/*' }], [docs]), entryFiles }
+    const hrefs = ['/blog/release.html', '/blog/release.html/', '/blog/a/notes.txt', '/blog/cover.png', '/blog/other.html']
+    const expected = ['/fr/blog/release.html', '/fr/blog/release.html/', '/fr/blog/a/notes.txt', '/blog/cover.png', '/blog/other.html']
+
+    expect(entryFiles.toSorted()).toEqual(['/blog/a/notes.txt', '/blog/release.html'])
+    expect(hrefs.map(href => localizedLink(linked, href, 'fr'))).toEqual(expected)
+
+    matchLinksWith(undefined)
+
+    try {
+      expect(hrefs.map(href => localizedLink(linked, href, 'fr'))).toEqual(expected)
+    }
+    finally {
+      matchLinksWith(compiledLinks)
+    }
   })
 
   it('leaves out an entry whose slug the route refuses, keeping the others', async () => {

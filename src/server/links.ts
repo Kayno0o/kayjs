@@ -176,7 +176,7 @@ function resolvedLink(settings: LocaleSettings, href: string, locale: string, cu
 
   const spelled = normalized(segments)
   const { pages, entries } = compiled(settings)
-  const file = namesFile(segments.at(-1), () => bestMatch(entries, segments, spelled) !== undefined)
+  const file = namesFile(settings, segments, () => bestMatch(entries, segments, spelled) !== undefined)
   const named = bestMatch(pages, segments, spelled)?.named
 
   return named !== undefined && (!file || named === segments.length) ? localePath(settings, href, locale, currentHost) : href
