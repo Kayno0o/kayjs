@@ -66,6 +66,39 @@ describe('bind: on a component', () => {
     expect(compile(child('Toggle(bind:open={open})\nfor open of flags\n  Toggle(bind:open={open})\n'), 'dom').tsx).toMatch(/__props\["open"\] = kayValue[\s\S]*\.set\(kayValue\)/)
   })
 
+  it('takes only the binding names of a pattern or a parameter list for a value, not a type or a key', () => {
+    const child = (template: string) => `---\nimport { type Bindable, signal } from 'kay'\nimport Toggle from './Toggle.kay'\nimport Wrap from './Wrap.kay'\nconst { open } = props<{ open: Bindable<boolean> }>()\nconst flags = [signal(false)]\nconst box = { open: signal(false), other: signal(false) }\nconst load = async () => flags[0]!\n---\n${template}`
+    const value = [
+      'if flags[0] as open\n  Toggle(bind:open={open})\n',
+      'await load()\n  p wait\nthen open\n  Toggle(bind:open={open})\n',
+      'Wrap\n  @row(open)\n    Toggle(bind:open={open})\n',
+      'Wrap\n  @row({ shown: open })\n    Toggle(bind:open={open})\n',
+      'snippet row({ shown: [open] }: { shown: Signal<boolean>[] })\n  Toggle(bind:open={open})\nrow(box)\n',
+      'const { other: open } = box\nToggle(bind:open={open})\n',
+      'const [first, ...open] = flags\nToggle(bind:open={open})\n',
+    ]
+
+    const prop = [
+      'snippet row(x: typeof open)\n  Toggle(bind:open={open})\nrow(true)\n',
+      'snippet row({ open: other }: { open: boolean })\n  Toggle(bind:open={open})\nrow(box)\n',
+      'const { open: other } = box\nToggle(bind:open={open})\n',
+      'Wrap\n  @row({ open: other })\n    Toggle(bind:open={open})\n',
+    ]
+
+    for (const template of value) {
+      const dom = compile(child(template), 'dom').tsx
+
+      expect(dom).toContain('.set(kayValue)')
+      expect(dom).not.toContain('__props["open"] = kayValue')
+      expect(compile(child(template)).tsx).not.toContain('__props["open"] = kayValue')
+    }
+
+    for (const template of prop) {
+      expect(compile(child(template), 'dom').tsx).toContain('__props["open"] = kayValue')
+      expect(compile(child(template)).tsx).toContain('__props["open"] = kayValue')
+    }
+  })
+
   it('refuses a bind on a member of the rest props, a value, and says to spread them', () => {
     const rest = '---\nimport { type Bindable } from \'kay\'\nimport Toggle from \'./Toggle.kay\'\nconst { label, ...rest } = props<{ label: string, open: Bindable<boolean> }>()\n---\nToggle(bind:open={rest.open})\n'
 

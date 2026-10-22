@@ -70,6 +70,46 @@ function parameters(code: string): Set<string> | undefined {
   return names
 }
 
+// The names a pattern or a parameter list (`{ a: b }, [c], ...d` or `x: typeof y`) binds: a key or a type it holds binds none. Every word of it when it does not parse.
+function bindingNames(pattern: string): string[] {
+  const names: string[] = []
+  let expression: t.Expression
+
+  try {
+    expression = parseExpression(`(${pattern}\n) => 0`, { plugins: ['typescript'] })
+  }
+  catch {
+    return pattern.match(WORD) ?? []
+  }
+
+  const walk = (node: t.Node | null | undefined): void => {
+    if (node?.type === 'Identifier') {
+      names.push(node.name)
+    }
+    else if (node?.type === 'ObjectPattern') {
+      for (const property of node.properties)
+        walk(property.type === 'RestElement' ? property : property.value)
+    }
+    else if (node?.type === 'ArrayPattern') {
+      for (const element of node.elements)
+        walk(element)
+    }
+    else if (node?.type === 'AssignmentPattern') {
+      walk(node.left)
+    }
+    else if (node?.type === 'RestElement') {
+      walk(node.argument)
+    }
+  }
+
+  if (expression.type === 'ArrowFunctionExpression') {
+    for (const param of expression.params)
+      walk(param)
+  }
+
+  return names
+}
+
 const reads = new WeakMap<KayFile, string[]>()
 
 // The values of `kay` the template's expressions read, bar the names the template binds itself and the ones a function in an expression takes as parameters: the script declares the rest or leaves them to the compiler to import. A binder or a parameter hides its name file-wide, not only where it is in scope, so a file mixing both uses of one name imports it from the script.
@@ -152,7 +192,7 @@ function scopedBlocks(node: Node): [Node[], Span[]][] {
 export function shadowedBinds(file: KayFile): WeakSet<Attribute> {
   const shadowed = new WeakSet<Attribute>()
   const text = (span: Span) => file.source.slice(span.start, span.end)
-  const names = (spans: Span[]) => spans.flatMap(span => text(span).match(WORD) ?? [])
+  const names = (spans: Span[]) => spans.flatMap(span => bindingNames(text(span)))
 
   const walk = (nodes: readonly Node[], scope: ReadonlySet<string>): void => {
     const here = new Set(scope)
