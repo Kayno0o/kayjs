@@ -22,7 +22,10 @@ const BENIGN_CALLEES = new Set(['Symbol', 'Symbol.for', 'String.raw', 'Map', 'Se
 const KNOWN: Record<string, [name: string, calls: string[], why: string][]> = {
   'await.server.ts': [['early', ['??=', 'installEarlyRejections'], 'the listener only matters to a page that awaits, which keeps the module']],
   'cache.server.ts': [['PROCESS', ['crypto.randomUUID'], 'an id for this process, read by the module\'s own functions']],
-  'consent.ts': [['consent', ['Object.assign'], 'adds the setters to the reader it exports']],
+  'consent.ts': [
+    ['reader', ['Object.assign'], 'adds the setters to the reader the module exports'],
+    ['consent', ['markSignal'], 'adds the reader to the set of signals, which matters only once the export is read'],
+  ],
   'markdown.client.ts': [['marked', ['Marked'], 'builds the renderer the module\'s functions use']],
   'page-swap.ts': [['served', ['servedRoot'], 'reads the page\'s own markup into a map the module\'s functions use']],
   'work.ts': [
