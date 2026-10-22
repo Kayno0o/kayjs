@@ -66,6 +66,40 @@ describe('markdownHtml in an island', () => {
     expect(element.innerHTML).toBe('<p>new</p>')
   })
 
+  it('keeps the server\'s markup when another prop is written before the markdown\'s innerHTML', async () => {
+    const { markdownHtml } = await shell('other-prop')
+    const container = document.createElement('div')
+
+    container.innerHTML = '<div><h1>Title</h1></div>'
+
+    const element = container.firstElementChild!
+
+    root(() => hydrate(() => renderEffect(() => {
+      const html = markdownHtml('# Title')
+
+      property(element, 'title', 'a')
+      property(element, 'innerHTML', html)
+    }), container))
+    flush()
+    expect(element.innerHTML).toBe('<h1>Title</h1>')
+  })
+
+  it('draws the markup of an unrelated element when a markdownHtml was evaluated but never written', async () => {
+    const { markdownHtml } = await shell('unwritten')
+    const container = document.createElement('div')
+
+    container.innerHTML = '<div><h1>Old</h1></div>'
+
+    const element = container.firstElementChild!
+
+    root(() => hydrate(() => {
+      markdownHtml('# a')
+      renderEffect(() => property(element, 'innerHTML', '<p>new</p>'))
+    }, container))
+    flush()
+    expect(element.innerHTML).toBe('<p>new</p>')
+  })
+
   it('draws the text as written in a client-only component of a hydrating island, which has no server markup', async () => {
     const { markdownHtml } = await shell('fresh')
     const container = document.createElement('div')

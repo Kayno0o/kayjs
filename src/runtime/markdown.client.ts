@@ -37,11 +37,13 @@ export function markdownHtml(markdown: string): SafeHtml {
   if (!requested)
     void load()
 
+  const standIn = asWritten(markdown)
+
   // The server wrote this Markdown formatted: an island claiming it keeps that until the renderer arrives.
   if (isHydrating())
-    holdServerMarkup()
+    holdServerMarkup(standIn)
 
-  return asWritten(markdown)
+  return standIn
 }
 
 // Resolves once the renderer has loaded, or failed to: `await markdownReady()` before a `markdownHtml` call outside a template or effect, such as a click handler, so it returns the formatted HTML.
