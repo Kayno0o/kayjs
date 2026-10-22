@@ -51,7 +51,8 @@
     --kui-border-width: 1px;
   }
 
-  :is(.kui-segmented, .kui-pagination-step, .kui-chip-label, .kui-file-drop) {
+  /* A checked chip and a file drop being dragged over keep the accent line the theme gives them. */
+  :is(.kui-segmented, .kui-pagination-step, .kui-chip-input:not(:checked) + .kui-chip-label, .kui-file-drop:not([data-dragging])) {
     border-color: var(--color-kui-field-border);
   }
 
