@@ -41,7 +41,9 @@ const remote = typeof options === 'function'
 const known = () => typeof options === 'function' ? [] : options
 const startOption = () => known().find(option => option.value === value)
 
-const startLabel = () => startOption()?.label ?? valueLabel ?? value
+// A remote value has no label to show until the visitor searches, so its raw id stays out of the input; a list shows the value for want of a label.
+const fallbackLabel = (next: string) => valueLabel ?? (remote ? '' : next)
+const startLabel = () => startOption()?.label ?? fallbackLabel(value)
 
 const text = signal(startLabel())
 const picked = signal<ComboboxOption<Value> | undefined>(startOption() ?? (value ? { value: value as Value, label: startLabel() } : undefined))
@@ -64,7 +66,7 @@ effect(() => {
     return
 
   const option = untrack(() => [...known(), ...found()].find(candidate => candidate.value === next))
-  const chosen = option ?? (next ? { value: next, label: valueLabel ?? next } : undefined)
+  const chosen = option ?? (next ? { value: next, label: fallbackLabel(next) } : undefined)
 
   picked.set(chosen)
   text.set(chosen?.label ?? '')
@@ -258,11 +260,14 @@ function keyDown(event: KeyboardEvent) {
       break
     case 'Escape':
       if (open()) {
-        event.preventDefault()
+        // An open list with no row to hold the press leaves it to an enclosing dialog.
+        if (shown())
+          event.preventDefault()
+
         open.set(false)
         active.set(-1)
       }
-      else if (text() !== '') {
+      else if (text() !== '' || picked()) {
         const had = picked()
 
         event.preventDefault()
@@ -280,12 +285,12 @@ function keyDown(event: KeyboardEvent) {
 }
 
 function focusIn() {
-  if (remote && text().trim().length < minLength)
+  if (remote && (picked() || text().trim().length < minLength))
     return
 
   open.set(true)
 
-  if (remote && found().length === 0 && !picked())
+  if (remote && found().length === 0)
     void load(text())
 }
 

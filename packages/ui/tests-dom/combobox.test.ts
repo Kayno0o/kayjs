@@ -304,14 +304,15 @@ test('Enter on a label typed whole adopts it without submitting, the post then c
   expect(submitted).toBe(0)
 })
 
-test('Escape closes an open list that has no rows, so it does not reappear when rows arrive', async () => {
+test('Escape closes an open list that has no rows without taking the press from the page, so it does not reappear when rows arrive', async () => {
   let answer: (rows: unknown[]) => void = () => undefined
   const { input, rows } = await combobox(async () => new Promise<unknown[]>(resolve => answer = resolve))
 
   type(input, 'par')
   await Bun.sleep(260)
 
-  expect(key(input, 'Escape').defaultPrevented).toBe(true)
+  expect(key(input, 'Escape').defaultPrevented).toBe(false)
+  expect(input.getAttribute('aria-expanded')).toBe('false')
   expect(input.value).toBe('par')
 
   answer([{ value: 'paris', label: 'Paris' }])
@@ -347,4 +348,60 @@ test('keeps its status line and its rows out of the name a FormField gives the i
 
   expect(named.trim()).toBe('Planet')
   expect(root.querySelector('[role="status"]')?.textContent).toBe('3 results')
+})
+
+test('Escape on an open list with no row closes it and leaves the press to an enclosing dialog', async () => {
+  const { input } = await combobox(PLANETS, undefined, false)
+
+  type(input, 'zzz')
+  await settle()
+
+  const first = key(input, 'Escape')
+
+  expect(first.defaultPrevented).toBe(false)
+  expect(input.value).toBe('zzz')
+
+  await settle()
+
+  expect(input.getAttribute('aria-expanded')).toBe('false')
+  expect(key(input, 'Escape').defaultPrevented).toBe(true)
+})
+
+test('shows no raw id for a remote value without a label, posts it, and leaves the list shut on focus', async () => {
+  const asked: string[] = []
+  const { root, input } = await combobox(async ({ q }: { q: string }) => {
+    asked.push(q)
+
+    return [{ value: 'c-42', label: 'Ada' }]
+  }, 0, true, { value: 'c-42' })
+
+  expect(input.value).toBe('')
+  expect(root.querySelector<HTMLInputElement>('input[type="hidden"]')?.value).toBe('c-42')
+
+  input.focus()
+  await Bun.sleep(260)
+
+  expect(asked).toEqual([])
+  expect([input.getAttribute('aria-expanded'), root.querySelector('[role="status"]')?.textContent]).toEqual(['false', ''])
+
+  expect(key(input, 'Escape').defaultPrevented).toBe(true)
+  expect(changes).toEqual([''])
+})
+
+test('a list keeps showing the value as its text when no label is given', async () => {
+  const { input } = await combobox([{ value: 'mars', label: 'Mars' }], undefined, true, { value: 'venus' })
+
+  expect(input.value).toBe('venus')
+})
+
+test('a group FormField and a bare label leave the input without the label text reference', async () => {
+  for (const wrap of ['group', 'label']) {
+    const { input } = await combobox(PLANETS, undefined, true, { wrap })
+
+    await settle()
+
+    expect(input.hasAttribute('aria-labelledby')).toBe(false)
+
+    mounted?.unmount()
+  }
 })

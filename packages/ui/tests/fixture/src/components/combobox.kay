@@ -3,11 +3,17 @@ import type { ComboboxOption, ComboboxOptions } from '@kaynooo/kayjs-ui'
 import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 
-// What the test reads back: each value picked and each text created, with the options it hands over, a list or a loader. `field` puts it in a FormField, which then names it, and `value` with `valueLabel` start it on a pick.
-const { options, onChange, onCreate, minLength, create = true, field = false, value = '', valueLabel } = props<{ options: ComboboxOptions, create?: boolean, field?: boolean, value?: string, valueLabel?: string, onChange?: (value: string, option: ComboboxOption | undefined) => void, onCreate?: (text: string) => void, minLength?: number }>()
+// What the test reads back: each value picked and each text created, with the options it hands over, a list or a loader. `field` puts it in a FormField, which then names it, `wrap` in a group FormField (`group`) or a bare label (`label`), and `value` with `valueLabel` start it on a pick.
+const { options, onChange, onCreate, minLength, create = true, field = false, wrap = '', value = '', valueLabel } = props<{ options: ComboboxOptions, create?: boolean, field?: boolean, wrap?: string, value?: string, valueLabel?: string, onChange?: (value: string, option: ComboboxOption | undefined) => void, onCreate?: (text: string) => void, minLength?: number }>()
 ---
 form#form
-  if field
+  if wrap === 'group'
+    FormField(label="Planet" group)
+      Combobox#combo(name="planet" options={options} create={create} minLength={minLength} value={value} valueLabel={valueLabel} onChange={onChange} onCreate={onCreate})
+  else if wrap === 'label'
+    label Planet
+      Combobox#combo(name="planet" options={options} create={create} minLength={minLength} value={value} valueLabel={valueLabel} onChange={onChange} onCreate={onCreate})
+  else if field
     FormField(label="Planet")
       Combobox#combo(name="planet" options={options} create={create} minLength={minLength} value={value} valueLabel={valueLabel} onChange={onChange} onCreate={onCreate})
   else

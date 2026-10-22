@@ -18,7 +18,7 @@ Give `options` a function instead of a list. It is called with `{ q }` a moment 
 Combobox(label="Customer" options={searchCustomers} value={customer()} valueLabel={customerName} onChange={customer.set} name="customer")
 ```
 
-A `value` no list holds yet, such as the saved id of a customer, shows that id as the input's text. Give `valueLabel` the text to show instead, and the loader is not asked for it when the input takes focus.
+A `value` a remote list holds no label for yet, such as the saved id of a customer, leaves the input empty while the value is still posted. Give `valueLabel` the text to show, and the loader is not asked for it when the input takes focus. A fixed list shows the value itself.
 
 ## Forms
 
