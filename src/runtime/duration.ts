@@ -60,6 +60,6 @@ export function optionMs(value: Duration, what: string): number {
 }
 
 // The milliseconds of an option that took a number of them before 1.70, which still reads so until 1.73 though its type no longer allows it.
-export function legacyMs(value: Duration | number, what: string, owner = 'kay'): number {
-  return typeof value === 'number' ? value : optionMs(value, what, owner)
+export function legacyMs(value: Duration | number, what: string): number {
+  return typeof value === 'number' ? value : optionMs(value, what)
 }

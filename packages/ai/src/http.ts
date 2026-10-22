@@ -77,7 +77,7 @@ export async function refusal(name: string, response: Response, secret?: string)
 export async function* postEvents(name: string, url: string, headers: Record<string, string>, body: unknown, timeouts: Timeouts, signal: AbortSignal, secret?: string): AsyncGenerator<ServerEvent> {
   let response: Response
   const connecting = new AbortController()
-  const connect = optionMs(timeouts.connect, 'the connect timeout', 'kayjs-ai')
+  const connect = optionMs(timeouts.connect, 'the connect timeout')
   const timer = setTimeout(() => connecting.abort(), connect)
 
   try {
@@ -107,7 +107,7 @@ export async function* postEvents(name: string, url: string, headers: Record<str
   if (response.body === null)
     throw new AiError('protocol', `${name} answered with no body`)
 
-  yield* eventsOf(name, response.body, optionMs(timeouts.idle, 'the idle timeout', 'kayjs-ai'), signal)
+  yield* eventsOf(name, response.body, optionMs(timeouts.idle, 'the idle timeout'), signal)
 }
 
 // The events of a body one by one; the body is cancelled as the generator ends, so a reply stopped early stops the provider.

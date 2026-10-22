@@ -28,7 +28,7 @@ export interface TokenRefresherDeps<K, S> {
 /** Wraps a token `exchange` with per-subject caching + in-flight dedup; non-expiring credentials pass through. Feeds `GrantStore.hasCredential` (non-null = live). */
 export function createTokenRefresher<K, S>(deps: TokenRefresherDeps<K, S>) {
   // `marginMs`, the number of milliseconds before 1.70, still reads until 1.73.
-  const margin = deps.margin === undefined ? (deps as { marginMs?: number }).marginMs ?? 5 * MINUTE_MS : optionMs(deps.margin, 'margin', 'kayjs-auth')
+  const margin = deps.margin === undefined ? (deps as { marginMs?: number }).marginMs ?? 5 * MINUTE_MS : optionMs(deps.margin, 'margin')
   const cache = new Map<K, { accessToken: string, expiresAt: number }>()
   const inFlight = new Map<K, Promise<string | null>>()
 

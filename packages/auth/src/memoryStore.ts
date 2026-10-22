@@ -495,7 +495,7 @@ export function memoryStore(): AuthStore {
       hit(key, window) {
         const now = Date.now()
         const entry = attempts.get(key)
-        const next = entry && entry.resetAt > now ? { ...entry, count: entry.count + 1 } : { count: 1, resetAt: now + optionMs(window, 'an attempts window', 'kayjs-auth') }
+        const next = entry && entry.resetAt > now ? { ...entry, count: entry.count + 1 } : { count: 1, resetAt: now + optionMs(window, 'an attempts window') }
 
         // Swept every so many hits, so memory follows the clients that keep trying.
         if (++hits % SWEEP_EVERY === 0) {
@@ -551,7 +551,7 @@ export function memoryStore(): AuthStore {
       }
 
       for (const [key, session] of sessions) {
-        if (session.lastSeenAt.getTime() < at - optionMs(sessionMaxAge, 'sessionMaxAge', 'kayjs-auth') || session.createdAt.getTime() < at - optionMs(sessionAbsoluteMaxAge, 'sessionAbsoluteMaxAge', 'kayjs-auth') || session.version < (users.get(session.userId)?.sessionVersion ?? 0))
+        if (session.lastSeenAt.getTime() < at - optionMs(sessionMaxAge, 'sessionMaxAge') || session.createdAt.getTime() < at - optionMs(sessionAbsoluteMaxAge, 'sessionAbsoluteMaxAge') || session.version < (users.get(session.userId)?.sessionVersion ?? 0))
           sessions.delete(key)
       }
     },
