@@ -875,7 +875,7 @@ export interface TrackedApi<Module, Path> {
 call.track = function track<Module, const Path extends CallPath<Module>>(module: Module, path: Path): TrackedApi<Module, Path> {
   return trackCalls(
     async (options: unknown) => (call as unknown as (module: unknown, path: string, options: unknown) => Promise<unknown>)(module, path, options),
-    error => error instanceof ApiError && error.status !== 0 ? { ok: false, status: error.status, errors: refusedFields(error), data: error.answer } : undefined,
+    error => error instanceof ApiError && error.status >= 400 ? { ok: false, status: error.status, errors: refusedFields(error), data: error.answer } : undefined,
   ) as unknown as TrackedApi<Module, Path>
 }
 

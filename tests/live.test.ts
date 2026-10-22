@@ -888,6 +888,33 @@ describe('call()', () => {
     expect(other.pending()).toBe(false)
   })
 
+  it('track() maps a validation failure to its fields and any other refusal under the form-wide key, and throws on a broken success', async () => {
+    const answering = (status: number, body: unknown, type = 'application/json') => served.mockImplementationOnce((async () => new Response(typeof body === 'string' ? body : JSON.stringify(body), { status, headers: { 'content-type': type } })) as unknown as typeof fetch)
+    const save = call.track(notes, '/')
+
+    answering(422, { type: 'validation', property: '/title', message: 'Too short' })
+    expect(await save({ method: 'post', body: { title: 'x' } })).toMatchObject({ ok: false, status: 422, errors: { title: 'Too short' }, data: { type: 'validation' } })
+
+    answering(422, { type: 'validation', errors: [{ path: '/a/b', message: 'One' }, { path: 'tags.0', summary: 'Two' }, { path: '/a/c', message: 'Ignored' }, { path: 'root', message: 'Whole' }] })
+    expect((await save({ method: 'post', body: { title: 'x' } }) as { errors: unknown }).errors).toEqual({ 'a': 'One', 'tags': 'Two', '': 'Whole' })
+
+    answering(422, { type: 'validation', on: 'body', message: 'Invalid body' })
+    expect((await save({ method: 'post', body: { title: 'x' } }) as { errors: unknown }).errors).toEqual({ '': 'Invalid body' })
+
+    answering(409, { reason: 'taken' })
+    expect(await save({ method: 'post', body: { title: 'x' } })).toMatchObject({ ok: false, status: 409, data: { reason: 'taken' } })
+
+    answering(200, '{broken', 'application/json')
+    await expect(save()).rejects.toBeInstanceOf(ApiError)
+    expect(save.pending()).toBe(false)
+
+    const controller = new AbortController()
+
+    controller.abort(new Error('stop'))
+    served.mockImplementationOnce((async () => Promise.reject(controller.signal.reason)) as unknown as typeof fetch)
+    await expect(save({ signal: controller.signal })).rejects.toThrow('stop')
+  })
+
   it('gives a refusal\'s message to show, and a fallback when no answer came or the error is no ApiError', async () => {
     const shown = async (promise: Promise<unknown>) => {
       try {
