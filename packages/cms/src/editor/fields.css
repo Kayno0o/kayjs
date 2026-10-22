@@ -332,7 +332,8 @@
   gap: 0.5rem;
 }
 
-.kcms-adorned > .kui-field-input {
+.kcms-adorned > .kui-field-input,
+.kcms-adorned > .kui-date-input {
   flex: 1 1 auto;
   min-width: 0;
 }

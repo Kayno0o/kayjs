@@ -16,4 +16,7 @@ export default defineUi({
   '@kaynooo/kayjs-ui/page-section.kay': { parts: { head: 'mb-4' } },
   '@kaynooo/kayjs-ui/empty-state.kay': { parts: { description: 'italic' } },
   '@kaynooo/kayjs-ui/card-row.kay': { parts: { body: 'px-4' } },
+  '@kaynooo/kayjs-ui/date-input.kay': { parts: { root: 'gap-2', input: 'w-44', trigger: 'p-2', panel: 'w-72', day: 'h-9' } },
+  '@kaynooo/kayjs-ui/date-range-input.kay': { parts: { separator: 'mx-1' } },
+  '@kaynooo/kayjs-ui/time-input.kay': { parts: 'w-32' },
 })

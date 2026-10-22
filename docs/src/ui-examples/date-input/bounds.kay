@@ -1,0 +1,15 @@
+---
+import DateInput from '@kaynooo/kayjs-ui/date-input.kay'
+
+const day = signal('')
+---
+.flex.flex-col.items-start.gap-2
+  DateInput(
+    aria-label="Booking day"
+    min="2026-10-05"
+    max="2026-11-20"
+    firstDay={1}
+    value={day()}
+    onChange={day.set}
+  )
+  p.text-kui-subtext0 {day() ? `Booked for ${day()}.` : 'Pick a day between 5 October and 20 November.'}

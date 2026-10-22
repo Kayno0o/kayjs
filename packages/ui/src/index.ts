@@ -1,5 +1,7 @@
 export type { ComboboxOption, ComboboxOptions, ComboboxQuery } from './combobox'
 export type { ContributionDay } from './contribution'
+export type { DateRange } from './date'
+export { dateRangeFrom } from './date'
 export type { IconSlot, NavLink, Settings, UiSettings } from './defaults'
 export { defaults, default as uiDefaults } from './defaults'
 export type { Editing } from './editing'

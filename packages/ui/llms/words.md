@@ -22,7 +22,7 @@ ui: { sidePanel: { closeLabel: 'Fermer' } }
 - `kay check` leaves `ui.*` keys out of its comparison between locales, so a French block needs no English twin; a key a locale lacks reads the English.
 - CommandPalette's `recentLabel` names the heading the recently followed links sit under.
 - ContributionGraph's month names and the day and month a LineChart draws on its axis follow the page's locale; `en` keeps `5 Jan`.
-- Rating's `{value}` and `{max}` and RangeInput's `{label}` fill the messages of the same name.
+- Rating's `{value}` and `{max}` and RangeInput's and DateRangeInput's `{label}` fill the messages of the same name.
 - ContactForm's labels read `ui.contactForm.*`, then kayjs-mail's `mail.contact.form.*` messages (English and French) before the English, and MarkdownEditor's `Uploading name…` marker, a placeholder in the text until the upload ends, stays English.
 - Texts the app's data owns, a `failure`, a `message` or a `label` it passes, are the app's to word.
 - Messages about the app's data are its own, passed as props (`failure`, `message`, `label`). The library's own words (`Close`, `Cancel`, `Loading…`...) are looked up in the app's catalogs under `ui.<component>.<prop>` keys, `ui.sidePanel.closeLabel`, before their English, and a prop given to the component replaces both. The French of every key ships with the library and is read on a French page with no setup.
@@ -37,6 +37,8 @@ ui: { sidePanel: { closeLabel: 'Fermer' } }
 - `ui.contactForm.*`: `consentLabel` (`I agree that my details are used to answer my message.`), `emailLabel` (`Email`), `messageLabel` (`Message`), `nameLabel` (`Name`), `privacyLabel` (`Privacy policy`), `sentLabel` (`Thank you, your message has been sent.`), `submitLabel` (`Send`)
 - `ui.contributionGraph.*`: `label` (`Contributions`)
 - `ui.copyButton.*`: `copiedLabel` (`Copied!`), `failure` (`Could not copy to the clipboard`)
+- `ui.dateInput.*`: `nextLabel` (`Next month`), `openLabel` (`Choose a date`), `previousLabel` (`Previous month`), `todayLabel` (`Today`)
+- `ui.dateRangeInput.*`: `fromLabel` (`{label} from`), `toLabel` (`{label} to`)
 - `ui.dnd.*`: `handleItemLabel` (`Reorder {item}`), `handleLabel` (`Reorder`), `moved` (`Moved to {position} of {count}`)
 - `ui.formDialog.*`: `cancelLabel` (`Cancel`), `savingLabel` (`Saving…`)
 - `ui.iconPicker.*`: `clearLabel` (`Clear icon selection`), `emptyLabel` (`No icons found.`), `errorLabel` (`The icons could not be loaded.`), `gridLabel` (`Icons`), `moreLabel` (`Show more`), `placeholder` (`Search icons…`), `searchLabel` (`Search icons`), `searchingLabel` (`Searching…`)

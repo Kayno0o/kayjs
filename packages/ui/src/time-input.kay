@@ -1,0 +1,15 @@
+---
+import type { JSX } from 'kay'
+import { recipe } from 'kay'
+import TextInput from './text-input.kay'
+
+const look = recipe({ parts: { root: 'kui-time-input' } })
+
+const { value, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'value' | 'type' | 'class' | 'children' | 'onInput' | 'onChange'> & {
+  // The time as `HH:MM`, or `HH:MM:SS` with a `step` under a minute, and `''` for none. Without it, the box starts empty and keeps what is typed, for a form posting it by its `name`.
+  value?: string | undefined
+  // Called with the new time, or `''` once emptied, as soon as the box holds a whole time.
+  onChange?: ((value: string) => void) | undefined
+}>()
+---
+TextInput({...rest} part="root" type="time" value={value} onInput={onChange} onChange={onChange})

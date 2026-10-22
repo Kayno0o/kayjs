@@ -1637,6 +1637,90 @@
     @apply text-xs text-kui-subtext0;
   }
 
+  .kui-date-input {
+    @apply inline-flex min-w-0 items-center gap-1;
+  }
+
+  .kui-date-input-box {
+    @apply min-w-0 flex-1 tabular-nums;
+  }
+
+  .kui-date-input-trigger {
+    @apply inline-flex shrink-0 cursor-pointer items-center justify-center rounded-kui-card p-1 text-kui-subtext0 hover:text-kui-text disabled:cursor-default disabled:opacity-40;
+
+    &:focus-visible {
+      outline: 2px solid var(--color-kui-accent);
+      outline-offset: 2px;
+    }
+  }
+
+  .kui-date-input-panel {
+    @apply w-64 p-2;
+  }
+
+  .kui-date-input-head {
+    @apply mb-1 flex items-center justify-between gap-2;
+  }
+
+  .kui-date-input-title {
+    @apply text-sm font-medium capitalize;
+  }
+
+  .kui-date-input-step {
+    @apply size-7 cursor-pointer rounded-kui-card text-lg leading-none text-kui-subtext0 hover:bg-kui-row-hover hover:text-kui-text disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent;
+
+    &:focus-visible {
+      outline: 2px solid var(--color-kui-accent);
+      outline-offset: 2px;
+    }
+  }
+
+  .kui-date-input-grid {
+    @apply w-full table-fixed border-collapse text-center text-sm;
+  }
+
+  .kui-date-input-weekday {
+    @apply py-1 text-kui-2xs font-normal text-kui-subtext0 uppercase;
+  }
+
+  .kui-date-input-day {
+    @apply h-8 w-full cursor-pointer rounded-kui-card tabular-nums hover:bg-kui-row-hover disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent;
+
+    &:where([data-outside]) {
+      @apply text-kui-subtext0;
+    }
+
+    &:where([data-today]) {
+      @apply font-semibold text-kui-accent;
+    }
+
+    &:where([data-selected]) {
+      @apply bg-kui-accent text-kui-on-accent hover:bg-kui-accent;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-kui-accent);
+      outline-offset: 2px;
+    }
+  }
+
+  .kui-date-input-today {
+    @apply mt-1 w-full cursor-pointer rounded-kui-card py-1 text-center text-kui-2xs tracking-kui-label text-kui-subtext0 uppercase hover:text-kui-text disabled:cursor-default disabled:opacity-40;
+
+    &:focus-visible {
+      outline: 2px solid var(--color-kui-accent);
+      outline-offset: 2px;
+    }
+  }
+
+  .kui-date-range-input {
+    @apply inline-flex items-center gap-1.5;
+  }
+
+  .kui-date-range-input-separator {
+    @apply text-xs text-kui-subtext0;
+  }
+
   .kui-scatter-chart {
     @apply m-0 grid grid-cols-[auto_minmax(0,1fr)] grid-rows-[minmax(0,1fr)_auto] gap-2;
   }

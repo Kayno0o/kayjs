@@ -1,0 +1,164 @@
+---
+import type { JSX } from 'kay'
+import { effect, memo, onMount, recipe, signal, untrack } from 'kay'
+import { addDays, addMonths, clampDate, dayName, firstDayOf, isDate, monthTitle, monthWeeks, sameMonth, today, weekdays, weekEdge, withinBounds } from './date'
+import { startRef } from './form-reset'
+import Icon from './icon.kay'
+import Popover from './popover.kay'
+import TextInput from './text-input.kay'
+import { pageLocale, wording } from 'kay/words'
+
+const look = recipe({
+  parts: {
+    root: 'kui-date-input',
+    input: 'kui-date-input-box',
+    trigger: 'kui-date-input-trigger',
+    panel: 'kui-date-input-panel',
+    head: 'kui-date-input-head',
+    title: 'kui-date-input-title',
+    step: 'kui-date-input-step',
+    grid: 'kui-date-input-grid',
+    weekday: 'kui-date-input-weekday',
+    day: 'kui-date-input-day',
+    today: 'kui-date-input-today',
+  },
+})
+
+const { value, min, max, firstDay, openLabel = wording('ui.dateInput.openLabel', 'Choose a date'), previousLabel = wording('ui.dateInput.previousLabel', 'Previous month'), nextLabel = wording('ui.dateInput.nextLabel', 'Next month'), todayLabel = wording('ui.dateInput.todayLabel', 'Today'), onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'value' | 'type' | 'class' | 'children' | 'min' | 'max' | 'onInput' | 'onChange'> & {
+  // The date as `YYYY-MM-DD`, or `''` for none. Without it, the box starts empty and keeps what is picked, for a form posting it by its `name`.
+  value?: string | undefined
+  // The earliest and latest date allowed, as `YYYY-MM-DD`; the calendar greys out the days outside them.
+  min?: string | undefined
+  max?: string | undefined
+  // The first day of the calendar's weeks, 0 for Sunday to 6 for Saturday; the page's locale decides by default.
+  firstDay?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | undefined
+  // The calendar button's name, and its buttons for the previous and next month and for today.
+  openLabel?: string | undefined
+  previousLabel?: string | undefined
+  nextLabel?: string | undefined
+  todayLabel?: string | undefined
+  // Called with the new date, or `''` once emptied, however it was set: typed, picked in the calendar or reset by a form.
+  onChange?: ((value: string) => void) | undefined
+}>()
+
+// The calendar is drawn once the island runs, so the server renders the plain date field alone and a form posts it without JavaScript.
+const ready = signal(false)
+const opened = signal(false)
+const current = signal(untrack(() => value ?? ''))
+const cursor = signal(today())
+const now = signal(today())
+let box: HTMLInputElement | undefined
+let root: HTMLElement | undefined
+
+onMount(() => ready.set(true))
+
+const first = () => firstDay ?? firstDayOf(pageLocale())
+const weeks = memo(() => monthWeeks(cursor(), first()))
+const names = memo(() => weekdays(pageLocale(), first()))
+
+const ref = startRef<HTMLInputElement>(element => box = element, rest.ref)
+
+function heard(next: string) {
+  if (next === current())
+    return
+
+  current.set(next)
+  onChange?.(next)
+}
+
+// A parent handing another date moves the box through TextInput, which then reports it back as the same date.
+effect(() => {
+  if (value !== undefined)
+    current.set(value)
+})
+
+function toggled(open: boolean) {
+  opened.set(open)
+
+  if (!open)
+    return
+
+  now.set(today())
+  cursor.set(clampDate(isDate(current()) ? current() : today(), min, max))
+  focusCursor()
+}
+
+// Focus lands once the day's button is in the page, which a move to another month draws first.
+function focusCursor() {
+  queueMicrotask(() => root?.querySelector<HTMLElement>('[data-cursor]')?.focus())
+}
+
+function go(iso: string) {
+  cursor.set(clampDate(iso, min, max))
+  focusCursor()
+}
+
+// Written into the field as if typed, so a controlled parent, a form and the app's `onChange` all hear it.
+function pick(iso: string) {
+  if (!box || !withinBounds(iso, min, max))
+    return
+
+  box.value = iso
+  box.dispatchEvent(new Event('input', { bubbles: true }))
+  box.dispatchEvent(new Event('change', { bubbles: true }))
+  opened.set(false)
+}
+
+const MOVES: Partial<Record<string, (iso: string, shift: boolean) => string>> = {
+  ArrowLeft: iso => addDays(iso, -1),
+  ArrowRight: iso => addDays(iso, 1),
+  ArrowUp: iso => addDays(iso, -7),
+  ArrowDown: iso => addDays(iso, 7),
+  Home: iso => weekEdge(iso, first(), false),
+  End: iso => weekEdge(iso, first(), true),
+  PageUp: (iso, shift) => addMonths(iso, shift ? -12 : -1),
+  PageDown: (iso, shift) => addMonths(iso, shift ? 12 : 1),
+}
+
+// The arrows move by day and week, Home and End to the week's ends, PageUp and PageDown by month, with Shift by year; Enter and Space press the day's button.
+function keyDown(event: KeyboardEvent) {
+  const move = MOVES[event.key]
+
+  if (!move || !(event.target as Element).closest('[data-day]'))
+    return
+
+  event.preventDefault()
+  go(move(cursor(), event.shiftKey))
+}
+
+// Tab past the last control closes the panel rather than leaving it open over the page; focus going nowhere, as on a click on the panel's padding, keeps it.
+function focusLeft(event: FocusEvent) {
+  const panel = event.currentTarget as HTMLElement
+  const next = event.relatedTarget as Node | null
+
+  if (next && !panel.contains(next) && panel.matches(':popover-open'))
+    panel.hidePopover()
+}
+
+const canStepBack = () => !isDate(min) || addMonths(cursor(), -1).slice(0, 7) >= min.slice(0, 7)
+const canStepOn = () => !isDate(max) || addMonths(cursor(), 1).slice(0, 7) <= max.slice(0, 7)
+---
+div(ref={element => root = element})
+  TextInput({...rest} part="input" type="date" ref={ref} min={min} max={max} value={value} onInput={heard} onChange={heard})
+  if ready()
+    Popover(part="panel" open={opened()} role="dialog" aria-label={openLabel} onOpenChange={toggled} onKeyDown={keyDown} onFocusOut={focusLeft})
+      @trigger(attributes)
+        button({...attributes} part="trigger" type="button" aria-label={openLabel} disabled={rest.disabled})
+          Icon(icon="calendar")
+      div(part="head")
+        button(part="step" type="button" aria-label={previousLabel} disabled={!canStepBack()} onClick={() => go(addMonths(cursor(), -1))}) ‹
+        // Read out as the month changes, which is otherwise silent.
+        div(part="title" aria-live="polite") {monthTitle(cursor(), pageLocale())}
+        button(part="step" type="button" aria-label={nextLabel} disabled={!canStepOn()} onClick={() => go(addMonths(cursor(), 1))}) ›
+      table(part="grid" role="grid" aria-label={monthTitle(cursor(), pageLocale())})
+        thead
+          tr
+            for name of names() key={name.long}
+              th(part="weekday" scope="col" abbr={name.long}) {name.short}
+        tbody
+          for week of weeks() key={week[0]}
+            tr
+              for day of week key={day}
+                td(role="gridcell" aria-selected={current() === day ? 'true' : 'false'})
+                  button(part="day" type="button" tabindex={day === cursor() ? 0 : -1} data-day={day} data-cursor={day === cursor() ? '' : undefined} data-today={day === now() ? '' : undefined} data-selected={current() === day ? '' : undefined} data-outside={sameMonth(day, cursor()) ? undefined : ''} aria-label={dayName(day, pageLocale())} aria-current={day === now() ? 'date' : undefined} disabled={!withinBounds(day, min, max)} onClick={() => pick(day)}) {Number(day.slice(8))}
+      button(part="today" type="button" disabled={!withinBounds(now(), min, max)} onClick={() => pick(now())}) {todayLabel}

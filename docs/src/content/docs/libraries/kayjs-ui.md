@@ -102,7 +102,7 @@ Button(label="Save" tone="accent" onClick={save})
 
 ## Restyle a component
 
-Button, Card, Dialog, Table, TextInput, Textarea, Badge, Notice, Avatar, Stat, PageHeader, PageSection, EmptyState and CardRow have parts, and take their `class` as a string for the root or an object of parts, `Card(class={{ head: 'p-6' }})`. `src/ui.ts` restyles every instance of one, keyed by its import path ([Restyle a component from src/ui.ts](/essentials/styling-and-assets/#restyle-a-component-from-srcuits)):
+Button, Card, Dialog, Table, TextInput, Textarea, DateInput, DateRangeInput, TimeInput, Badge, Notice, Avatar, Stat, PageHeader, PageSection, EmptyState and CardRow have parts, and take their `class` as a string for the root or an object of parts, `Card(class={{ head: 'p-6' }})`. `src/ui.ts` restyles every instance of one, keyed by its import path ([Restyle a component from src/ui.ts](/essentials/styling-and-assets/#restyle-a-component-from-srcuits)):
 
 ```ts
 import { defineUi } from 'kay'
@@ -116,6 +116,7 @@ export default defineUi({
 - Each part keeps its `kui-` class, so a rule of yours on `.kui-card-head` keeps working beside the utilities. A utility of `src/ui.ts` or of `class` wins over a theme rule on the same property.
 - A part is named after what its `kui-` class draws: Card has `root`, `head`, `title` and `body`, Dialog `root`, `title`, `body` and `footer`, Button `root` and `spinner`.
 - Table has `root` (the wrapper), `table`, `headCell`, `row`, `cell`, `cellBody`, `sortButton`, `sortIcon`, `filter`, `filterInput`, `count`, `selection`, `bulk` and `emptyCell`.
+- DateInput has `root`, `input`, `trigger`, `panel`, `head`, `title`, `step`, `grid`, `weekday`, `day` and `today`, DateRangeInput `root` and `separator`, TimeInput `root`.
 - The variants are the props that already exist: `tone` (Button, Badge, Notice), `variant` and `size` (Button). `kay check` reports a part or variant that does not exist.
 - A Button with an `onClick` hands its root classes to its busy button, so `button.kay` reaches it, but its `spinner` part is set through the `@kaynooo/kayjs-ui/internal/busy-button.kay` key, `class={{ spinner: ... }}` included.
 - The other components have no parts yet and still restyle through their `kui-` classes.
@@ -176,6 +177,8 @@ Actions: [Button](/ui/button), [IconButton](/ui/icon-button), [ConfirmDelete](/u
 Overlays: [Dialog](/ui/dialog), [FormDialog](/ui/form-dialog), [SidePanel](/ui/side-panel), [Popover](/ui/popover), [TooltipHost](/ui/tooltip-host), [Toaster](/ui/toaster), [CommandPalette](/ui/command-palette).
 
 Forms: [FormField](/ui/form-field), [SaveForm](/ui/save-form), [ContactForm](/ui/contact-form), [TextInput](/ui/text-input), [Checkbox](/ui/checkbox), [ChipGroup](/ui/chip-group), [RadioGroup](/ui/radio-group), [Select](/ui/select), [MultiSelect](/ui/multi-select), [Combobox](/ui/combobox), [Textarea](/ui/textarea), [RangeInput](/ui/range-input), [FileDrop](/ui/file-drop), [IconPicker](/ui/icon-picker), [MarkdownEditor](/ui/markdown-editor), [ImageCropper](/ui/image-cropper), [Rating](/ui/rating).
+
+Dates and times: [DateInput](/ui/date-input), [DateRangeInput](/ui/date-range-input), [TimeInput](/ui/time-input).
 
 Layout: [Card](/ui/card), [CardRow](/ui/card-row), [PageHeader](/ui/page-header), [PageSection](/ui/page-section), [CollapsibleSection](/ui/collapsible-section), [Widget](/ui/widget), [SplitLayout](/ui/split-layout), [EmptyState](/ui/empty-state), [Notice](/ui/notice), [Masonry](/ui/masonry).
 

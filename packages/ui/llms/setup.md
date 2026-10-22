@@ -68,7 +68,7 @@ The extension puts both islands on every page, so each page loads the hydration 
 
 ### Settings
 
-The icons the components draw come from slots, each named for what it means: `alert`, `back`, `chevron`, `close`, `delete`, `globe`, `info`, `menu`, `pause`, `play`, `plus`, `search`, `spinner`, `star`, `success`, `zoomFit`, `zoomIn`, `zoomOut`. The app replaces any of them through kay's library settings, spreading the defaults:
+The icons the components draw come from slots, each named for what it means: `alert`, `back`, `calendar`, `chevron`, `close`, `delete`, `globe`, `info`, `menu`, `pause`, `play`, `plus`, `search`, `spinner`, `star`, `success`, `zoomFit`, `zoomIn`, `zoomOut`. The app replaces any of them through kay's library settings, spreading the defaults:
 
 ```ts
 // kay.config.ts
@@ -90,7 +90,7 @@ export default settings
 
 ### Restyle a component
 
-Button, Card, Dialog, Table, TextInput, Textarea, Badge, Notice, Avatar, Stat, PageHeader, PageSection, EmptyState and CardRow have parts, and take their `class` as a string for the root or an object of parts, `Card(class={{ head: 'p-6' }})`. `src/ui.ts` restyles every instance of one, keyed by its import path ([Restyle a component from src/ui.ts](../../../llms/styles-and-assets.md#restyle-a-component-from-srcuits)):
+Button, Card, Dialog, Table, TextInput, Textarea, DateInput, DateRangeInput, TimeInput, Badge, Notice, Avatar, Stat, PageHeader, PageSection, EmptyState and CardRow have parts, and take their `class` as a string for the root or an object of parts, `Card(class={{ head: 'p-6' }})`. `src/ui.ts` restyles every instance of one, keyed by its import path ([Restyle a component from src/ui.ts](../../../llms/styles-and-assets.md#restyle-a-component-from-srcuits)):
 
 ```ts
 import { defineUi } from 'kay'
@@ -102,7 +102,7 @@ export default defineUi({
 ```
 
 - Each part keeps its `kui-` class, so a rule of yours on `.kui-card-head` keeps working beside the utilities. A utility of `src/ui.ts` or of `class` wins over a theme rule on the same property.
-- A part is named after what its `kui-` class draws: Card has `root`, `head`, `title` and `body`; Dialog `root`, `title`, `body` and `footer`; Table `root` (the wrapper), `table`, `headCell`, `row`, `cell`, `cellBody`, `sortButton`, `sortIcon`, `filter`, `filterInput`, `count`, `selection`, `bulk` and `emptyCell`; Button `root` and `spinner`. The variants are the props that already exist: `tone` (Button, Badge, Notice), `variant` and `size` (Button). `kay check` reports a part or variant that does not exist.
+- A part is named after what its `kui-` class draws: Card has `root`, `head`, `title` and `body`; Dialog `root`, `title`, `body` and `footer`; Table `root` (the wrapper), `table`, `headCell`, `row`, `cell`, `cellBody`, `sortButton`, `sortIcon`, `filter`, `filterInput`, `count`, `selection`, `bulk` and `emptyCell`; Button `root` and `spinner`; DateInput `root`, `input`, `trigger`, `panel`, `head`, `title`, `step`, `grid`, `weekday`, `day` and `today`, DateRangeInput `root` and `separator`. The variants are the props that already exist: `tone` (Button, Badge, Notice), `variant` and `size` (Button). `kay check` reports a part or variant that does not exist.
 - A Button with an `onClick` hands its root classes to its busy button, so `button.kay` reaches it, but its `spinner` part is set through the `@kaynooo/kayjs-ui/internal/busy-button.kay` key, `class={{ spinner: ... }}` included.
 - The other components have no parts yet and still restyle through their `kui-` classes.
 

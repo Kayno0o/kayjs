@@ -10,6 +10,12 @@ const BROWSER_DRAWN: Record<string, string | undefined> = {
   'markdown-editor': '.kui-markdown-bar',
 }
 
+// What the browser adds once the island runs, the server holding the plain date field alone: the calendar's button and panel.
+const BROWSER_ADDED: Record<string, string | undefined> = {
+  'date-input': '.kui-date-input-trigger, .kui-date-input-panel',
+  'date-range-input': '.kui-date-input-trigger, .kui-date-input-panel',
+}
+
 // What an effect adds to the browser's render while the server's holds none, by component.
 const EFFECT_ADDED: Record<string, string | undefined> = {
   'contact-form': 'aria-required',
@@ -49,7 +55,7 @@ function reflected(root: Element): string {
 }
 
 // The markup as a browser holds it: hydration markers and island wrappers gone, drawn ids numbered, attributes in a fixed order.
-function canonical(html: string, browserDrawn = '', effectAdded = '', effectRemoved = ''): string {
+function canonical(html: string, browserDrawn = '', effectAdded = '', effectRemoved = '', browserAdded = ''): string {
   const holder = document.createElement('div')
 
   holder.innerHTML = html
@@ -70,6 +76,11 @@ function canonical(html: string, browserDrawn = '', effectAdded = '', effectRemo
   if (browserDrawn) {
     for (const element of holder.querySelectorAll(browserDrawn))
       element.replaceChildren()
+  }
+
+  if (browserAdded) {
+    for (const element of holder.querySelectorAll(browserAdded))
+      element.remove()
   }
 
   // The server render here reads the library's own icons and the browser build the fixture's settings, which replace the close icon, so an icon's drawing is left out of both.
@@ -155,7 +166,7 @@ describe('component contract', () => {
       mounted.push(browser)
 
       // The server and the browser's first render draw the same page.
-      expect(canonical(reflected(browser.root), BROWSER_DRAWN[name], EFFECT_ADDED[name])).toBe(canonical(server, BROWSER_DRAWN[name], undefined, EFFECT_REMOVED[name]))
+      expect(canonical(reflected(browser.root), BROWSER_DRAWN[name], EFFECT_ADDED[name], undefined, BROWSER_ADDED[name])).toBe(canonical(server, BROWSER_DRAWN[name], undefined, EFFECT_REMOVED[name]))
 
       // No id repeats.
       const ids = [...browser.root.querySelectorAll('[id]')].map(element => element.id)

@@ -449,6 +449,18 @@ describe('inputs', () => {
   })
 })
 
+describe('date and time inputs', () => {
+  test('are native fields posting ISO values with no JavaScript, the calendar left to the island', async () => {
+    const form = (await element('/inputs', 'dates')).replaceAll(/<!--[^>]*-->/g, '')
+
+    expect(form).toContain('name="day" data-part="input" min="2026-10-01" type="date" value="2026-10-21"')
+    expect(form).toContain('name="from" aria-label="Stay from" data-part="input" type="date" value="2026-10-02"')
+    expect(form).toContain('name="to" aria-label="Stay to" data-part="input" type="date"')
+    expect(form).toContain('name="start" data-part="root" type="time" value="09:30"')
+    expect(form).not.toContain('popover')
+  })
+})
+
 describe('drawn ids', () => {
   test('Segmented groups given no name each draw one of their own, shared by their radios', async () => {
     const groups = (await element('/controls', 'unnamed')).split('class="kui-segmented"').slice(1).map(group => [...new Set([...group.matchAll(/type="radio" name="([^"]+)"/g)].map(match => match[1]))])

@@ -18,6 +18,8 @@ import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
 import ContactForm from '@kaynooo/kayjs-ui/contact-form.kay'
 import ContributionGraph from '@kaynooo/kayjs-ui/contribution-graph.kay'
 import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
+import DateInput from '@kaynooo/kayjs-ui/date-input.kay'
+import DateRangeInput from '@kaynooo/kayjs-ui/date-range-input.kay'
 import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
@@ -61,6 +63,7 @@ import Table from '@kaynooo/kayjs-ui/table.kay'
 import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
+import TimeInput from '@kaynooo/kayjs-ui/time-input.kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
 import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
@@ -102,6 +105,8 @@ export const COMPONENTS = {
   'contact-form': ContactForm,
   'contribution-graph': ContributionGraph,
   'copy-button': CopyButton,
+  'date-input': DateInput,
+  'date-range-input': DateRangeInput,
   'dialog': Dialog,
   'empty-state': EmptyState,
   'file-drop': FileDrop,
@@ -148,6 +153,7 @@ export const COMPONENTS = {
   'toaster': Toaster,
   'toggle': Toggle,
   'tooltip-host': TooltipHost,
+  'time-input': TimeInput,
   'tree-view': TreeView,
   'virtual-list': VirtualList,
   'when-visible': WhenVisible,
@@ -176,6 +182,8 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'contact-form': { action, nameLabel: 'Name', emailLabel: 'Email', messageLabel: 'Message', submitLabel: 'Send' },
   'contribution-graph': { days, color: 'green', today: '2026-09-05' },
   'copy-button': { text: 'x', label: 'Copy link' },
+  'date-input': { 'aria-label': 'Day', 'value': '2026-10-21' },
+  'date-range-input': { label: 'Stay', value: ['2026-10-21', null] },
   'dialog': { open: false, title: 'Rename', onOpenChange: noop, children: 'Body' },
   'empty-state': { title: 'No moons', description: 'Add one' },
   'file-drop': { 'aria-label': 'Photos', 'onFiles': noop, 'content': () => 'Drop files' },
@@ -222,6 +230,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'toaster': {},
   'toggle': { label: 'Digest' },
   'tooltip-host': {},
+  'time-input': { 'aria-label': 'Start', 'value': '09:30' },
   'tree-view': { nodes: tree, label: 'Planets', selected: 'phobos' },
   'virtual-list': { items: [1, 2, 3], item: (row: number) => String(row), label: 'Numbers' },
   'when-visible': { onVisible: noop },

@@ -4,6 +4,8 @@ import Badge from '@kaynooo/kayjs-ui/badge.kay'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import Card from '@kaynooo/kayjs-ui/card.kay'
 import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
+import DateInput from '@kaynooo/kayjs-ui/date-input.kay'
+import DateRangeInput from '@kaynooo/kayjs-ui/date-range-input.kay'
 import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
@@ -13,6 +15,7 @@ import Stat from '@kaynooo/kayjs-ui/stat.kay'
 import Table from '@kaynooo/kayjs-ui/table.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
+import TimeInput from '@kaynooo/kayjs-ui/time-input.kay'
 
 const planets = [{ id: 1, name: 'Mars' }]
 ---
@@ -40,3 +43,6 @@ PageHeader#header(title="Planets")
 PageSection#section(title="Inner")
 EmptyState#empty(title="Nothing" description="Add one.")
 CardRow#row(left="L") Middle
+DateInput#date(aria-label="Day" name="day")
+DateRangeInput#dates(label="Stay")
+TimeInput#time(aria-label="Start" name="start")

@@ -48,6 +48,8 @@ export default defineMessages({
     },
     contributionGraph: { label: 'Contributions' },
     copyButton: { copiedLabel: 'Copié !', failure: 'Impossible de copier dans le presse-papiers' },
+    dateInput: { nextLabel: 'Mois suivant', openLabel: 'Choisir une date', previousLabel: 'Mois précédent', todayLabel: 'Aujourd’hui' },
+    dateRangeInput: { fromLabel: '{label} du', toLabel: '{label} au' },
     dnd: { handleItemLabel: 'Déplacer {item}', handleLabel: 'Déplacer', moved: 'Déplacé en position {position} sur {count}' },
     formDialog: { cancelLabel: 'Annuler', savingLabel: 'Enregistrement…' },
     iconPicker: {

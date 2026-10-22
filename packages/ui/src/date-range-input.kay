@@ -1,0 +1,50 @@
+---
+import type { JSX } from 'kay'
+import type { DateRange } from './date'
+import { effect, recipe, signal, untrack } from 'kay'
+import DateInput from './date-input.kay'
+import { dateRangeFrom } from './date'
+import { wording } from 'kay/words'
+
+const look = recipe({ parts: { root: 'kui-date-range-input', separator: 'kui-date-range-input-separator' } })
+
+const { value = [null, null], min, max, firstDay, label, fromLabel, toLabel, fromName, toName, disabled, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+  // The dates to start with as `YYYY-MM-DD`, each open when null; a pair whose parent passes another follows it.
+  value?: DateRange | undefined
+  // The earliest and latest date allowed, as `YYYY-MM-DD`.
+  min?: string | undefined
+  max?: string | undefined
+  // The first day of the calendars' weeks, 0 for Sunday to 6 for Saturday; the page's locale decides by default.
+  firstDay?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | undefined
+  // Names the pair for screen readers, each box adding "from" or "to".
+  label: string
+  // Each box's whole name in place of the label and "from" or "to", for another language.
+  fromLabel?: string | undefined
+  toLabel?: string | undefined
+  // Post each date under its own name, for a range inside a form; `dateRangeFrom(from, to)` reads them back on the server.
+  fromName?: string | undefined
+  toName?: string | undefined
+  disabled?: boolean | undefined
+  // Runs once a date is set, with the pair in order, and only when the range changed.
+  onChange?: ((value: DateRange) => void) | undefined
+}>()
+
+const pair = signal<DateRange>(untrack(() => value))
+
+effect(() => pair.set(value))
+
+// A reversed pair is put back in order, in both boxes too.
+function commit(from: string, to: string) {
+  const next = dateRangeFrom(from, to)
+
+  if (next[0] === pair()[0] && next[1] === pair()[1])
+    return
+
+  pair.set(next)
+  onChange?.(next)
+}
+---
+div({...rest} role="group" aria-label={label})
+  DateInput(name={fromName} min={min} max={max} firstDay={firstDay} disabled={disabled} aria-label={fromLabel ?? wording('ui.dateRangeInput.fromLabel', '{label} from', { label })} value={pair()[0] ?? ''} onChange={next => commit(next, pair()[1] ?? '')})
+  span(part="separator" aria-hidden="true") -
+  DateInput(name={toName} min={min} max={max} firstDay={firstDay} disabled={disabled} aria-label={toLabel ?? wording('ui.dateRangeInput.toLabel', '{label} to', { label })} value={pair()[1] ?? ''} onChange={next => commit(pair()[0] ?? '', next)})

@@ -4,6 +4,7 @@ import type { Drafts } from '../drafts'
 import type { Field } from '../fields'
 import type { CustomFieldProps, EntryRef } from '../kay/contract'
 import Button from '@kaynooo/kayjs-ui/button.kay'
+import DateInput from '@kaynooo/kayjs-ui/date-input.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
 import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
@@ -496,7 +497,7 @@ function leaveJson(): void {
     when 'date'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()} group)
         .kcms-adorned
-          TextInput(type="date" aria-label={current.label} required={starred()} value={text().slice(0, 10)} onInput={next => set(next === '' ? cleared : next)})
+          DateInput(aria-label={current.label} required={starred()} value={text().slice(0, 10)} onChange={next => set(next === '' ? cleared : next)})
           Button(label={wording('cms.field.today', 'Today')} variant="inline" onClick={() => set(today())})
           if text() !== '' && !starred()
             Button(label={wording('cms.field.clear', 'Clear')} variant="inline" onClick={() => set(cleared)})

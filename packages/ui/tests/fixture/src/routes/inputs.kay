@@ -1,10 +1,17 @@
 ---
+import DateInput from '@kaynooo/kayjs-ui/date-input.kay'
+import DateRangeInput from '@kaynooo/kayjs-ui/date-range-input.kay'
 import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
 import RangeInput from '@kaynooo/kayjs-ui/range-input.kay'
+import TimeInput from '@kaynooo/kayjs-ui/time-input.kay'
 ---
 main
   form#form
     RangeInput#range(label="Hours" min={0} max={24} unit="h" value={[2, null]})
     MultiSelect(id="planets" label="Planets" name="planet" value={['mars']} options={[{ value: 'mars', label: 'Mars' }, { value: 'venus', label: 'Venus' }]})
+  form#dates
+    DateInput(aria-label="Day" name="day" value="2026-10-21" min="2026-10-01")
+    DateRangeInput(label="Stay" fromName="from" toName="to" value={['2026-10-02', null]})
+    TimeInput(aria-label="Start" name="start" value="09:30")
   article#unnamed
     MultiSelect(label="Moons" options={[{ value: 'phobos', label: 'Phobos' }]})

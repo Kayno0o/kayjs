@@ -69,6 +69,10 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     'kui-page-section-head mb-4',
     'kui-empty-state-description italic',
     'kui-card-row-body px-4',
+    'kui-date-input gap-2',
+    'kui-field-input h-12 kui-date-input-box w-44',
+    'kui-date-range-input-separator mx-1',
+    'kui-field-input h-12 kui-time-input w-32',
   ]
 
   test.each(restyled)('draws class="%s"', (classes) => {
@@ -89,7 +93,7 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
   })
 
   test('the browser build of an island carries the restyled classes as well', () => {
-    for (const classes of ['text-xl', 'justify-end', 'uppercase', 'py-4', 'h-12', 'tracking-wide', 'rounded-none'])
+    for (const classes of ['text-xl', 'justify-end', 'uppercase', 'py-4', 'h-12', 'tracking-wide', 'rounded-none', 'w-72', 'h-9'])
       expect(browser).toContain(classes)
   })
 

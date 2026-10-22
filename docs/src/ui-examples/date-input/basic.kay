@@ -1,0 +1,8 @@
+---
+import DateInput from '@kaynooo/kayjs-ui/date-input.kay'
+
+const due = signal('2026-10-21')
+---
+.flex.flex-col.items-start.gap-2
+  DateInput(aria-label="Due date" value={due()} onChange={due.set})
+  p.text-kui-subtext0 Due on {due() || 'no date'}.

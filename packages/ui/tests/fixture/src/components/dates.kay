@@ -1,0 +1,15 @@
+---
+import DateInput from '@kaynooo/kayjs-ui/date-input.kay'
+import DateRangeInput from '@kaynooo/kayjs-ui/date-range-input.kay'
+import TimeInput from '@kaynooo/kayjs-ui/time-input.kay'
+import type { DateRange } from '@kaynooo/kayjs-ui'
+
+// What the test reads back: each change as it happened.
+const { onDate, onRange, onTime, min, max, firstDay } = props<{ onDate: (value: string) => void, onRange: (value: DateRange) => void, onTime: (value: string) => void, min?: string | undefined, max?: string | undefined, firstDay?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | undefined }>()
+---
+form
+  DateInput#date(aria-label="Day" name="day" value="2026-10-21" min={min} max={max} firstDay={firstDay} onChange={onDate})
+  DateInput#plain(aria-label="Plain" name="plain")
+  DateRangeInput#range(label="Stay" fromName="from" toName="to" firstDay={firstDay} onChange={onRange})
+  TimeInput#time(aria-label="Start" name="start" value="09:30" onChange={onTime})
+  button#reset(type="reset") Reset
