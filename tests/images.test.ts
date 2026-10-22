@@ -1,13 +1,13 @@
 import type { AvifResult, AvifTask } from '../src/server/avif-worker'
 import { mkdir, mkdtemp, readdir, rm, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import process from 'node:process'
+import { join, resolve } from 'node:path'
 import { deflateSync, inflateSync } from 'node:zlib'
 import decodeAvif from '@jsquash/avif/decode.js'
 import { afterAll, beforeAll, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { testWorker } from '../src/build/assets'
+import { cacheDir } from '../src/project'
 import { cappedSizes, DEFAULT_ASPECTS, image, imageUrl, recordVariants, registerImage, setAspects, setImageWidths, setMaxDensity, setRemoteImages, shareCard, shareImage } from '../src/runtime/image'
 import { logSink, setLogSink } from '../src/runtime/log'
 import { imageSize, processImage } from '../src/server'
@@ -310,7 +310,7 @@ describe('image route', () => {
     expect(responses.map(response => response.status)).toEqual([200, 200, 200, 200, 200, 200])
     expect(new Set(bodies.map(body => Bun.hash(body))).size).toBe(1)
     expect((await new Bun.Image(bodies[0]!).metadata()).width).toBe(960)
-    expect((await readdir(join(process.cwd(), `.kay/cache/images${testWorker()}`))).filter(name => name.endsWith('.tmp'))).toEqual([])
+    expect((await readdir(cacheDir(resolve('tests/fixtures/images'), `images${testWorker()}`))).filter(name => name.endsWith('.tmp'))).toEqual([])
   })
 
   it('refuses a runtime image too large to decode safely, from its header alone', async () => {

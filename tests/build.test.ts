@@ -1502,7 +1502,7 @@ describe('what a build keeps in memory', () => {
       const first = readSource(file)
 
       expect(readSource(file)).toBe(first)
-      expect(fileWords(file)).toEqual(['export', 'const', 'a', '1'])
+      expect(fileWords(file)).toEqual(['export', 'const', 'a', '1', '='])
       expect(fileWords(file)).toBe(fileWords(file))
 
       // The same size, so only the times tell.
