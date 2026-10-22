@@ -112,6 +112,7 @@ describe('icons', () => {
     expect(thrown('!~icons/tabler/home')).toMatchObject({ name: 'KayError', code: 'icon-unresolved' })
     expect(thrown('/src/routes/*.kay', '!~icons/tabler/home')).toMatchObject({ code: 'icon-unresolved' })
     expect(thrown('~icons/tabler/home', '!~icons/tabler/home')).toBeUndefined()
+    expect(globFiles(['~icons/tabler/{home,mail}', '!~icons/{tabler/home,mdi/cat}'], importer, process.cwd()).size).toBe(1)
   })
 
   it('bundles the icons a glob names and no others, eager or behind a function', async () => {

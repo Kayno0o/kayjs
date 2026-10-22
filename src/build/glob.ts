@@ -66,7 +66,7 @@ export function globFiles(patterns: string[], importer: string, root: string): M
 }
 
 // The icons of the installed sets an icon pattern names, `~icons/<set>/<name>` with the wildcards and braces of a glob, each as its import specifier; a negated one leaves its icons out.
-// A name written out, or an alternative of its braces, that no installed set has fails the build, as a misspelt import does; so does a negated pattern with no icon pattern to leave icons out of.
+// A name written out, or an alternative of its braces, that no installed set has fails the build, as a misspelt import does; so does a negated pattern with no icon pattern to leave icons out of, and a malformed glob such as `[` matches nothing.
 function iconMatches(patterns: string[], root: string): Map<string, string> {
   const wanted = patterns.filter(pattern => pattern.startsWith(ICONS))
   const negated = patterns.filter(pattern => pattern.startsWith(`!${ICONS}`))
@@ -79,14 +79,6 @@ function iconMatches(patterns: string[], root: string): Map<string, string> {
 
   const sets = installedIconSets(root)
   const names = new Map<string, string[]>()
-  const glob = (pattern: string) => {
-    try {
-      return new Bun.Glob(pattern)
-    }
-    catch {
-      throw new KayError('icon-unresolved', `kay: ${pattern} is not a valid glob`)
-    }
-  }
   // Only the sets the pattern's first segment names are read, and each once; an icon whose name an import cannot spell is not one a glob offers either.
   const setNames = (prefix: string, file: string) => {
     if (!names.has(prefix))
@@ -97,8 +89,8 @@ function iconMatches(patterns: string[], root: string): Map<string, string> {
   const matching = (pattern: string) => {
     const path = pattern.slice(ICONS.length)
     const slash = path.indexOf('/')
-    const named = glob(slash === -1 ? path : path.slice(0, slash))
-    const matcher = glob(path)
+    const named = new Bun.Glob(slash === -1 ? path : path.slice(0, slash))
+    const matcher = new Bun.Glob(path)
 
     return [...sets].filter(([prefix]) => named.match(prefix)).flatMap(([prefix, file]) => setNames(prefix, file)).filter(name => matcher.match(name))
   }
@@ -116,9 +108,12 @@ function iconMatches(patterns: string[], root: string): Map<string, string> {
     }
   }
 
+  // Braces are expanded first, as a brace can span the slash after the set, `{tabler/home,lucide/mail}`.
   for (const pattern of negated) {
-    for (const name of matching(pattern.slice(1)))
-      found.delete(`${ICONS}${name}`)
+    for (const alternative of expandAlternatives(pattern.slice(1))) {
+      for (const name of matching(alternative))
+        found.delete(`${ICONS}${name}`)
+    }
   }
 
   return found
