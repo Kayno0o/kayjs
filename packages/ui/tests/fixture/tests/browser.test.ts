@@ -1050,3 +1050,82 @@ inBrowser('a CopyButton on a served page', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 })
+
+inBrowser('a non-modal SidePanel and the space skin on a served page', () => {
+  test('hydrates a non-modal SidePanel the server rendered open without closing or reopening it, its close link the IconButton look, above a sticky header', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/beside-open')
+    await page.waitUntil(() => document.querySelector('#state')?.textContent?.includes('open'))
+    await Bun.sleep(300)
+
+    expect(await page.evaluate(() => (document.querySelector('#beside') as HTMLDialogElement).open)).toBe(true)
+    expect(await page.text('#state')).toBe('open 0')
+
+    const close = await page.evaluate(() => {
+      const link = document.querySelector('#beside a')!
+      const styles = (selector: string) => Number.parseInt(getComputedStyle(document.querySelector(selector)!).zIndex)
+
+      return { tag: link.tagName, classes: link.className, part: link.getAttribute('data-part'), tooltip: link.getAttribute('data-tooltip'), href: link.getAttribute('href'), panelZ: styles('#beside'), headerZ: styles('header') }
+    })
+
+    expect(close).toMatchObject({ tag: 'A', part: 'root', tooltip: 'Close', href: '/list' })
+    expect(close.classes).toContain('kui-icon-btn')
+    expect(close.panelZ).toBeGreaterThan(close.headerZ)
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
+  test('draws the space skin: a tick in the checked box, one chevron on the select and a visible focus on every control', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/space')
+    await page.click('.kui-multi-select-trigger')
+    await page.waitFor('.kui-multi-select-checkbox')
+
+    // A Tab inside the open panel makes the focus the next calls move a keyboard one, which :focus-visible follows.
+    await page.press('Tab')
+    await page.waitFor('.kui-multi-select-checkbox')
+
+    const seen = await page.evaluate(() => {
+      const one = (selector: string) => document.querySelector<HTMLElement>(selector)!
+      const boxes = [one('#ticked'), one('#plain')].map((box) => {
+        const tick = getComputedStyle(box, '::before')
+
+        return { appearance: getComputedStyle(box).appearance, display: getComputedStyle(box).display, place: getComputedStyle(box).placeContent, size: box.getBoundingClientRect().width, tick: { width: tick.width, transform: tick.transform, clip: tick.clipPath } }
+      })
+      const select = getComputedStyle(one('#kind'))
+      // The multi-select box shows its focus on the option row that holds it, an accent bar.
+      const focusRing = (element: HTMLElement, shown: HTMLElement = element) => {
+        element.focus()
+        const style = getComputedStyle(shown)
+
+        return { focused: element.matches(':focus-visible'), outline: style.outlineStyle !== 'none' && Number.parseFloat(style.outlineWidth) > 0, shadow: style.boxShadow !== 'none', border: style.borderTopColor }
+      }
+
+      return {
+        boxes,
+        select: { appearance: select.appearance, image: select.backgroundImage, supported: CSS.supports('appearance', 'base-select') },
+        // The open panel first: focusing a control outside it closes the panel.
+        focus: { multiSelect: focusRing(one('.kui-multi-select-checkbox'), one('.kui-multi-select-option')), checkbox: focusRing(one('#ticked')), select: focusRing(one('#kind')), key: focusRing(one('#key')), iconKey: focusRing(one('#icon-key')) },
+      }
+    })
+    const [ticked, plain] = seen.boxes
+
+    expect(ticked!.appearance).toBe('none')
+    expect(ticked!.place).toBe('center')
+    expect(ticked!.size).toBeGreaterThan(10)
+    expect(ticked!.tick.width).toBe('10px')
+    expect(ticked!.tick.clip).toContain('polygon')
+    expect(ticked!.tick.transform).toBe('matrix(1, 0, 0, 1, 0, 0)')
+    expect(plain!.tick.transform).toBe('matrix(0, 0, 0, 0, 0, 0)')
+    // A browser with base-select draws its own picker icon, so the gradient chevron is off; otherwise the two gradients are the one chevron.
+    expect(seen.select.appearance).toBe(seen.select.supported ? 'base-select' : 'none')
+    expect(seen.select.image === 'none').toBe(seen.select.supported)
+
+    for (const [name, ring] of Object.entries(seen.focus))
+      expect(ring.focused && (ring.outline || ring.shadow), `${name} ${JSON.stringify(ring)}`).toBe(true)
+
+    expect(await page.a11y()).toEqual([])
+    expect(page.errors).toEqual([])
+  }, 120_000)
+})

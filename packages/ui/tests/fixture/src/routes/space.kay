@@ -1,0 +1,21 @@
+---
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
+import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
+import Select from '@kaynooo/kayjs-ui/select.kay'
+import '../space.css'
+
+const kinds = [{ value: 'post', label: 'Post' }, { value: 'page', label: 'Page' }]
+---
+//- The space skin over the controls it redraws, for the browser test to read and axe to check.
+head
+  title Space skin
+main.starfield.flex.flex-col.items-start.gap-4.p-8
+  h1 Space skin
+  Checkbox#ticked(label="Ticked" checked)
+  Checkbox#plain(label="Plain")
+  Select#kind(value="post" options={kinds} aria-label="Kind")
+  MultiSelect(label="Planets" options={kinds} value={['post']})
+  Button#key(label="Key")
+  IconButton#icon-key(icon="close" label="Close")
