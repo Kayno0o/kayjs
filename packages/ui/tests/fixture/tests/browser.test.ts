@@ -1055,22 +1055,43 @@ inBrowser('a non-modal SidePanel and the space skin on a served page', () => {
   test('hydrates a non-modal SidePanel the server rendered open without closing or reopening it, its close link the IconButton look, above a sticky header', async () => {
     const site = await shared()
 
-    await using page = await site.open('/beside-open')
-    await page.waitUntil(() => document.querySelector('#state')?.textContent?.includes('open'))
-    await Bun.sleep(300)
+    await using page = await site.open('/')
+    // Counts the calls that open or close a dialog from before the page's own scripts run, so a close then a reopen during hydration cannot hide.
+    await page.initScript(() => {
+      const calls: string[] = []
+      const proto = HTMLDialogElement.prototype
+
+      for (const name of ['show', 'showModal', 'close'] as const) {
+        const original = proto[name]
+
+        proto[name] = function (this: HTMLDialogElement, ...args: never[]) {
+          calls.push(name)
+
+          return (original as (...rest: never[]) => void).apply(this, args)
+        }
+      }
+
+      Object.assign(window, { dialogCalls: calls })
+    })
+    await page.goto('/beside-open')
+    await page.waitFor('#state')
+    // Hydration is eager, so it ran before goto resolved; a beat of the event loop lets a late effect land.
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
 
     expect(await page.evaluate(() => (document.querySelector('#beside') as HTMLDialogElement).open)).toBe(true)
     expect(await page.text('#state')).toBe('open 0')
+    expect(await page.evaluate(() => (window as unknown as { dialogCalls: string[] }).dialogCalls)).toEqual([])
 
     const close = await page.evaluate(() => {
       const link = document.querySelector('#beside a')!
       const styles = (selector: string) => Number.parseInt(getComputedStyle(document.querySelector(selector)!).zIndex)
 
-      return { tag: link.tagName, classes: link.className, part: link.getAttribute('data-part'), tooltip: link.getAttribute('data-tooltip'), href: link.getAttribute('href'), panelZ: styles('#beside'), headerZ: styles('header') }
+      return { tag: link.tagName, classes: link.className, part: link.getAttribute('data-part'), tooltip: link.getAttribute('data-tooltip'), href: link.getAttribute('href'), panelZ: styles('#beside'), headerZ: styles('header.kui-app-header'), headerPosition: getComputedStyle(document.querySelector('header.kui-app-header')!).position }
     })
 
     expect(close).toMatchObject({ tag: 'A', part: 'root', tooltip: 'Close', href: '/list' })
     expect(close.classes).toContain('kui-icon-btn')
+    expect(close.headerPosition).toBe('sticky')
     expect(close.panelZ).toBeGreaterThan(close.headerZ)
     expect(page.errors).toEqual([])
   }, 120_000)
@@ -1091,7 +1112,7 @@ inBrowser('a non-modal SidePanel and the space skin on a served page', () => {
       const boxes = [one('#ticked'), one('#plain')].map((box) => {
         const tick = getComputedStyle(box, '::before')
 
-        return { appearance: getComputedStyle(box).appearance, display: getComputedStyle(box).display, place: getComputedStyle(box).placeContent, size: box.getBoundingClientRect().width, tick: { width: tick.width, transform: tick.transform, clip: tick.clipPath } }
+        return { appearance: getComputedStyle(box).appearance, display: getComputedStyle(box).display, place: getComputedStyle(box).placeContent, size: box.getBoundingClientRect().width, tick: { width: tick.width, transform: tick.transform, clip: tick.clipPath, colour: tick.backgroundColor, opacity: tick.opacity }, ground: getComputedStyle(box).backgroundColor }
       })
       const select = getComputedStyle(one('#kind'))
       // The multi-select box shows its focus on the option row that holds it, an accent bar.
@@ -1104,7 +1125,7 @@ inBrowser('a non-modal SidePanel and the space skin on a served page', () => {
 
       return {
         boxes,
-        select: { appearance: select.appearance, image: select.backgroundImage, supported: CSS.supports('appearance', 'base-select') },
+        select: { appearance: select.appearance, image: select.backgroundImage, supported: CSS.supports('appearance', 'base-select'), pickerIcon: getComputedStyle(one('#kind'), '::picker-icon').display },
         // The open panel first: focusing a control outside it closes the panel.
         focus: { multiSelect: focusRing(one('.kui-multi-select-checkbox'), one('.kui-multi-select-option')), checkbox: focusRing(one('#ticked')), select: focusRing(one('#kind')), key: focusRing(one('#key')), iconKey: focusRing(one('#icon-key')) },
       }
@@ -1117,10 +1138,18 @@ inBrowser('a non-modal SidePanel and the space skin on a served page', () => {
     expect(ticked!.tick.width).toBe('10px')
     expect(ticked!.tick.clip).toContain('polygon')
     expect(ticked!.tick.transform).toBe('matrix(1, 0, 0, 1, 0, 0)')
+    expect(ticked!.tick.opacity).toBe('1')
+    expect(ticked!.tick.colour).not.toBe(ticked!.ground)
     expect(plain!.tick.transform).toBe('matrix(0, 0, 0, 0, 0, 0)')
     // A browser with base-select draws its own picker icon, so the gradient chevron is off; otherwise the two gradients are the one chevron.
     expect(seen.select.appearance).toBe(seen.select.supported ? 'base-select' : 'none')
     expect(seen.select.image === 'none').toBe(seen.select.supported)
+
+    // The one chevron: the browser's own picker icon where base-select is supported, else the skin's two gradient strokes and no picker icon.
+    if (seen.select.supported)
+      expect(seen.select.pickerIcon).not.toBe('none')
+    else
+      expect(seen.select.image.match(/linear-gradient/g)).toHaveLength(2)
 
     for (const [name, ring] of Object.entries(seen.focus))
       expect(ring.focused && (ring.outline || ring.shadow), `${name} ${JSON.stringify(ring)}`).toBe(true)
