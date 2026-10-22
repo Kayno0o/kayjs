@@ -91,6 +91,14 @@ describe('a template reading ctx', () => {
     })
   }
 
+  it('loads for a page reaching the template only through import.meta.glob', async () => {
+    const page = await get({ base: '', dev: false, locale: false }, '/globbed', ADA)
+
+    expect(page.html).toContain('<p id="who">Ada</p>')
+    expect(page.loads).toHaveLength(1)
+    expect(page.headers.get('cache-control')).toBe('private, no-cache')
+  })
+
   it('is refused in a prerendered page, which holds no request', async () => {
     const request = new Request('http://localhost/gated')
 
@@ -102,7 +110,7 @@ describe('a template reading ctx', () => {
     const root = resolve(FIXTURE)
     const wrapped = async (extensions: { name: string, context?: string }[]) => (await scanRoutes(resolve(FIXTURE, 'src/routes'), routeMounts(root, extensions))).filter(route => route.layouts.some(layout => layout.includes('context-layout'))).map(route => route.pattern).sort()
 
-    expect(await wrapped([EXTENSION])).toEqual(['/bare', '/deep', '/fenced', '/gated', '/inline', '/inner/page'])
+    expect(await wrapped([EXTENSION])).toEqual(['/bare', '/deep', '/fenced', '/gated', '/globbed', '/inline', '/inner/page'])
     expect(await wrapped([{ name: 'none' }])).toEqual([])
   })
 

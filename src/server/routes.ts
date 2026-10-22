@@ -1,7 +1,9 @@
 import type { KayExtension } from '../config'
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
-import { findKayFiles, findProjectFiles, KAY_FILE, TS_FILE } from '../build/files'
+import { findKayFiles, findProjectFiles, KAY_FILE, scriptLoader, TS_FILE } from '../build/files'
+import { globbedFiles } from '../build/glob'
+import { fences, packageRoot } from '../build/libraries'
 import { throughLinks } from '../build/links'
 import { KayError } from '../compiler/errors'
 import { TRAILING_SLASH } from '../runtime/base'
@@ -404,7 +406,7 @@ function realFile(file: string): string {
   }
 }
 
-// The files a module imports that the walk follows: components anywhere, scripts of the app only.
+// The files a module imports that the walk follows, whether through an import or an `import.meta.glob` pattern: components anywhere, scripts of the app only.
 function importsOf(file: string, read: LayoutsRead): string[] {
   let memo = importsRead.get(read)
 
@@ -424,15 +426,29 @@ function importsOf(file: string, read: LayoutsRead): string[] {
     }
     catch {}
 
+    const followed = (real: string) => KAY_FILE.test(real) || (TS_FILE.test(real) && !real.split(sep).includes('node_modules'))
+
     // Text such as `from 'Bob'` matches too, so each specifier resolves on its own and one that does not is skipped.
     for (const [, specifier] of source.matchAll(IMPORT)) {
       try {
         const real = realFile(Bun.resolveSync(specifier!, dirname(file)))
 
-        if (KAY_FILE.test(real) || (TS_FILE.test(real) && !real.split(sep).includes('node_modules')))
+        if (followed(real))
           found.push(real)
       }
       catch {}
+    }
+
+    try {
+      for (const path of globbedFiles(KAY_FILE.test(file) ? fences(source) : source, file, packageRoot(dirname(file)), KAY_FILE.test(file) ? 'ts' : scriptLoader(file)) ?? []) {
+        const real = realFile(path)
+
+        if (followed(real))
+          found.push(real)
+      }
+    }
+    catch {
+      // A glob the build cannot read, which the build or the check reports as it reaches the module.
     }
   }
 

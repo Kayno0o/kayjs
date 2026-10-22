@@ -45,5 +45,5 @@ export default defineContext(async (request: Request) => ({ plan: await planOf(r
 - A page with `prerender: true` that reaches a template reading `ctx` fails the build asking for a render per request, as any request read does.
 - A load that throws fails the render like a fence's would: an extension answering a missing session returns no user rather than throwing.
 - A template's `ctx` holds the extensions' values only: the request (`ctx.params`, `ctx.url`) is read in a `--- server` fence.
-- The walk reads literal import specifiers: a component reached only through `import.meta.glob` or a script in `node_modules` is not followed, so a page reaching it alone throws when the template reads `ctx`.
+- The walk follows import specifiers and the files an `import.meta.glob` pattern matches, in `.kay` files and in scripts of the app: a component reached only through a script in `node_modules` is not followed, so import it in the page, or its `ctx` read throws.
 - The pages that load them are found as `layout: { file, reaching }` finds them ([Component libraries](component-libraries.md#extensions)).

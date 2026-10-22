@@ -1,0 +1,8 @@
+---
+import type { Component } from 'kay'
+
+const parts = import.meta.glob<Component>('../parts/*.kay', { eager: true, import: 'default' })
+---
+for Part of Object.values(parts)
+  Part
+    p#inside Inside
