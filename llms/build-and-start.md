@@ -20,7 +20,7 @@ kay build --compile server
 PORT=8080 ./server
 ```
 
-A server entry that never calls `listen`, as the one `kay new` writes, and kay's own server are listened on `PORT`, 3000 by default, and on `HOST` when it is set (`HOST=127.0.0.1 ./server`), every address otherwise, by `kay dev`, `kay start`, `kay render` and the executable; an entry calling `listen` itself keeps its own port and address, and one starting a server through `Bun.serve` before its module ends is left alone, while one whose top-level code never ends is never listened; `kay dev` ignores `HOST` and listens on localhost, or what `--host` opens, unless the app names a `hostname` itself.
+A server entry that never calls `listen`, as the one `kay new` writes, and kay's own server are listened on `PORT`, 3000 by default, and on `HOST` when it is set (`HOST=127.0.0.1 ./server`), every address otherwise, by `kay dev`, `kay start`, `kay render` and the executable; an entry calling `listen` itself keeps its own port and address, and one serving the app itself through `Bun.serve` (its `fetch`, or the `PORT`) before its module ends is left alone, while a second server on a port of its own does not stop the listen, and one whose top-level code never ends is never listened; `kay dev` ignores `HOST` and listens on localhost, or what `--host` opens, unless the app names a `hostname` itself.
 
 A project with no `src/server.ts` and no `--entry` runs kay's own server of its pages on `PORT` and `HOST`, as `kay dev`, `kay start` and `kay render` do, so an app with nothing custom on its server writes no entry: it adds one to mount a plugin, a job or an `onStop` hook.
 
