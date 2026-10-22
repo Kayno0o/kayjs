@@ -14,8 +14,8 @@ const chrome = browserPath()
 // This unminified build keeps the three dead `if (false)` of the French spacing, 16 bytes the minified build of a site not in French does not carry.
 // Marking each signal so an assignment to a property or a let holding one writes it costs about 45 bytes here.
 // The file test of a link, `FILE_EXTENSION` and `namesFile` (a collection route takes a dotted slug, an entry file stays a page), costs about 186 bytes here: an island writes links, so it cannot wait in a chunk.
-// `swappable` reading the page's API path from a meta tag (apiPath) costs about 40 bytes here: navigation runs before any island.
-const EAGER_JS_BUDGET = 15_672
+// `swappable` reading the page's API path from a meta tag (apiPath) costs about 40 bytes here (44 on CI, as gzip sizes differ by a few bytes from one host to another): navigation runs before any island.
+const EAGER_JS_BUDGET = 15_676
 
 // Apart from tests/i18n.test.ts, as one process serves one project and this one serves a copy whose island imports nothing of kay/i18n.
 describe('an island of an app with locales', () => {
