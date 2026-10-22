@@ -4095,7 +4095,7 @@ describe.concurrent('kay check, unused code', () => {
     try {
       const { output } = await runCheck(root)
 
-      expect(output.match(/deprecated-identity-key/g)).toHaveLength(3)
+      expect(output.match(/deprecated-identity-key/g)).toHaveLength(6)
       expect(output).not.toContain('unknown-lint')
       expect(output).not.toContain('no lint or group')
       await Bun.write(join(root, 'kay.config.ts'), 'export default {\n  lints: { \'identity-key\': \'allow\', },\n}\n')
@@ -4345,6 +4345,7 @@ describe.concurrent('kay check, unused code', () => {
       'src/mail.ts': 'import { mailer } from \'@kaynooo/kayjs-mail\'\nexport const a = mailer({ lang: \'fr\' })\n',
       'src/cms.ts': 'import { forgejo } from \'@kaynooo/kayjs-cms\'\nexport const a = forgejo({ url: \'https://x.test\' })\n',
       'src/files.ts': 'import { files } from \'kay/server\'\nexport const a = files.url(\'a.png\', { expires: \'1d\' })\n',
+      'src/auth.ts': 'import { createAuth } from \'@kaynooo/kayjs-auth\'\nexport const a = createAuth({ rememberMaxAge: \'1d\', email: { expires: {} }, organizations: { invitationMaxAge: \'1d\' } })\n',
       'src/clean.ts': 'import { files } from \'kay/server\'\nexport const a = files.url(\'a.png\', { maxAge: \'1d\' })\n',
     })
 

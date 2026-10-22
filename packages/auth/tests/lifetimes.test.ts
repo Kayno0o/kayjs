@@ -120,5 +120,8 @@ describe('email.expires', () => {
     expect(() => setup({ maxAge: { verify: '1d' } as never })).toThrow('kay: email.maxAge.verify is no link or code')
     expect(() => setup({ maxAge: { constructor: '1d' } as never })).toThrow('kay: email.maxAge.constructor is no link or code')
     expect(() => setup({ maxAge: { 'magic-link': '0s' } })).toThrow('kay: email.maxAge.magic-link is \'0s\'')
+    expect(() => setup({ expires: { 'verify-email': 'a week' as Duration } })).toThrow('kay: email.expires.verify-email is \'a week\'')
+    expect(() => setup({ expires: { verify: '1d' } as never })).toThrow('kay: email.expires.verify is no link or code')
+    expect(() => setup({ expires: { 'magic-link': '0s' }, maxAge: { 'verify-email': 'a week' as Duration } })).toThrow('kay: email.maxAge.verify-email is')
   })
 })
