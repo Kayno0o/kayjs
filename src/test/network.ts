@@ -569,7 +569,11 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
         await send('Network.setCacheDisabled', { cacheDisabled: false })
       }
     },
-    offline: async offline => send('Network.emulateNetworkConditions', { offline, ...NO_THROTTLE }),
+    offline: async (offline) => {
+      await send('Network.emulateNetworkConditions', { offline, ...NO_THROTTLE })
+      // The command is answered before the network service applies the condition, so a request sent at once could still see the old one; a call that service must answer too, sent after it, holds the reply until it has.
+      await send('Network.getCookies')
+    },
     waitForResponse: async (match, options = {}) => {
       const test = matches(match)
       const found = () => responses.find(({ url, complete }) => test(new URL(url)) && (complete || options.complete === false))
