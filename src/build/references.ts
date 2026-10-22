@@ -9,28 +9,32 @@ const COMMENT = /\/\*[\s\S]*?\*\//g
 const NEEDS_THEME = /@apply\b|@variant\b|\btheme\(|--(?:theme|alpha|spacing)\(/
 // Tailwind's own import, whose statement the references follow: ahead of it the app's `@theme` overrides stop being written.
 const TAILWIND_STATEMENT = /@import\s+(?:url\(\s*)?['"]tailwindcss['"][^;]*;/
-const registered = new Map<string, string[]>()
+const configured = new Map<string, Promise<string[]>>()
 
-// The stylesheets the extensions ask the app's own to reference, remembered for the root: the stylesheet build, the dev class check and the design system all read them.
-export function registerReferences(root: string, extensions: KayExtension[] | undefined): void {
-  registered.set(root, [...new Set((extensions ?? []).flatMap(extension => extension.references ?? []))])
+// The stylesheets the extensions ask the app's own to reference; the stylesheet build, the dev class check and the design system are handed them.
+export function referencesOf(extensions: KayExtension[] | undefined): string[] {
+  return [...new Set((extensions ?? []).flatMap(extension => extension.references ?? []))]
+}
+
+async function readConfigReferences(root: string): Promise<string[]> {
+  try {
+    return referencesOf((await loadConfig(root)).extensions)
+  }
+  catch {
+    return []
+  }
 }
 
 // For a process that builds nothing, as the formatter: the references the config's extensions list, read once per root; none when the config does not load.
-export async function loadReferences(root: string): Promise<void> {
-  if (registered.has(root))
-    return
+export async function configReferences(root: string): Promise<string[]> {
+  let known = configured.get(root)
 
-  try {
-    registerReferences(root, (await loadConfig(root)).extensions)
+  if (known === undefined) {
+    known = readConfigReferences(root)
+    configured.set(root, known)
   }
-  catch {
-    registered.set(root, [])
-  }
-}
 
-export function referencesOf(root: string): string[] {
-  return registered.get(root) ?? []
+  return known
 }
 
 // Whether `file` is a stylesheet of the app itself, which is the only kind given references.
@@ -50,7 +54,7 @@ export function withReferences(css: string, file: string, root: string, referenc
   if (at === null && !NEEDS_THEME.test(bare))
     return css
 
-  const missing = references.filter(reference => !css.includes(reference))
+  const missing = references.filter(reference => !bare.includes(reference))
 
   if (missing.length === 0)
     return css

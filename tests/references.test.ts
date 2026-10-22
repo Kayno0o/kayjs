@@ -29,6 +29,12 @@ describe('withReferences', () => {
     expect(withReferences(applying, FILE, ROOT, [])).toBe(applying)
   })
 
+  it('does not take a reference named only in a comment for one the stylesheet has', () => {
+    const css = `/* @reference ${JSON.stringify(THEME)}; */ .a { @apply p-1; }`
+
+    expect(withReferences(css, FILE, ROOT, [THEME])).toBe(`${REFERENCE} ${css}`)
+  })
+
   it('gives a stylesheet importing Tailwind the reference though it applies nothing itself', () => {
     expect(withReferences('@import \'tailwindcss\';\n@import \'./parts.css\';\n', FILE, ROOT, [THEME])).toContain(REFERENCE)
   })

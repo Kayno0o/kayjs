@@ -13,7 +13,7 @@ import { bothBundles, bundleIslands, bundleStyles, classTableOf, clearClientOutp
 import { CSS_FILE, forgetSources, inWalkScope, keepSources, readSource, readSourcePaths, readText, writeAtomically } from '../build/files'
 import { fileWords, sourceWords } from '../build/libraries'
 import { classTokens, NAMING_FILE } from '../build/prune'
-import { registerReferences } from '../build/references'
+import { referencesOf } from '../build/references'
 import { inSignalsScope } from '../build/signals'
 import { mapBundleToKay } from '../build/sourcemap'
 import { styleSignature } from '../build/styles'
@@ -86,7 +86,7 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
   // What each chunk's map was pointed at `.kay` lines for, and the rewriting still going on after the build answered.
   const mapKeys = new Map<string, string>()
   let mapWork: { stop: boolean, done: Promise<void> } | undefined
-  const classesOf = async (built: Built) => built.classes ??= tailwindClasses(root, built.styleInputs)
+  const classesOf = async (built: Built) => built.classes ??= tailwindClasses(root, built.styleInputs, referencesOf(options.extensions))
   const stamps = new BuildStamps(root, output, key)
   let attempted = false
 
@@ -143,7 +143,7 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
   }
 
   const build = async (changed: string[] | null): Promise<BuildOutcome> => {
-    registerReferences(root, options.extensions)
+    const references = referencesOf(options.extensions)
 
     // A full build reads every module's imports afresh.
     if (changed === null) {
@@ -163,8 +163,8 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
     // By real path, as the bundler names its inputs.
     const files = (changed ?? []).map(file => join(realRoot, file))
     const texts = new Map(await Promise.all(files.map(async file => [file, await readText(file)] as const)))
-    const classTable = await classTableOf(root, sources)
-    const islandTable = await islandClassTableOf(root, sources, graph)
+    const classTable = await classTableOf(root, sources, references)
+    const islandTable = await islandClassTableOf(root, sources, references, graph)
     const classTableText = JSON.stringify([classTable, islandTable])
     // `src/ui.ts` is written into the components it restyles, none of which imports it, so no chunk lists it among its inputs.
     const islandsAgain = !previous || !sameEntries(previous.sources.islands, sources.islands) || files.some(file => previous.islandInputs.has(file) || file === join(realRoot, UI_FILE)) || previous.classTable !== classTableText

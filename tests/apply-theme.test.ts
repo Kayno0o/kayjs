@@ -5,6 +5,8 @@ import tailwind from 'bun-plugin-tailwind'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { ui } from '../packages/ui/src/extension'
 import { buildClient } from '../src/build/client'
+import { referencesOf } from '../src/build/references'
+import { tailwindClasses } from '../src/dev/tailwind'
 import { scratchDir } from './scratch'
 
 const LAYOUT = '---\nimport \'../app.css\'\n---\nslot\n'
@@ -52,6 +54,19 @@ function mantleDeclarations(css: string): number {
 
 afterAll(async () => {
   await Promise.all(roots.map(async root => rm(root, { recursive: true, force: true })))
+})
+
+describe('the dev class check of an app applying a kui utility with no @reference', () => {
+  it('compiles the stylesheet with the references it is given, and tells a class from a word', async () => {
+    const root = await app('')
+    const css = join(root, 'src/app.css')
+    const check = await tailwindClasses(root, [css], referencesOf([ui()]))
+
+    expect(check).toBeDefined()
+    expect((await tailwindClasses(root, [css], referencesOf([ui()])))!(['frobnicate'], 'frobnicate')).toBe(false)
+    expect(check!(['bg-kui-mantle'], 'bg-kui-mantle')).toBe(true)
+    expect(await tailwindClasses(root, [css])).toBeUndefined()
+  }, 120_000)
 })
 
 describe('@apply of a kui utility in the app\'s stylesheet with ui() alone', () => {

@@ -36,7 +36,7 @@ import { throughLinks } from './links'
 import { kay } from './plugin'
 import { buildFiles, promotedFiles } from './promotion'
 import { unusedLibraryClasses } from './prune'
-import { referencesOf, registerReferences } from './references'
+import { referencesOf } from './references'
 import { sizeReport } from './report'
 import { ANCHOR, runtimeAnchor, runtimeChunk } from './runtime-chunk'
 import { builtinChains, refusedBuiltins, refuseServerOnlyReads } from './server-only'
@@ -158,7 +158,6 @@ function rootMargin(value: string | undefined, fallback: string, what: string): 
 const builtGraph: ImportGraph = new Map()
 
 async function bundleClient(root: string, options: ClientOptions): Promise<ClientBuild> {
-  registerReferences(root, options.extensions)
   rootMargin(options.hydration?.visible, '200px', 'visible')
   rootMargin(options.hydration?.serverIslands, '100% 0px', 'serverIslands')
 
@@ -167,8 +166,9 @@ async function bundleClient(root: string, options: ClientOptions): Promise<Clien
   await clearClientOutput(root)
   await writeClasses(root, sources.classes)
 
-  const classTable = await classTableOf(root, sources)
-  const [scripts, styles] = await bothBundles(bundleIslands(root, sources.islands, options, classTable, await islandClassTableOf(root, sources, builtGraph)), bundleStyles(root, sources, options))
+  const references = referencesOf(options.extensions)
+  const classTable = await classTableOf(root, sources, references)
+  const [scripts, styles] = await bothBundles(bundleIslands(root, sources.islands, options, classTable, await islandClassTableOf(root, sources, references, builtGraph)), bundleStyles(root, sources, options))
   const manifest: ClientManifest = { ...scripts.manifest, styles: styles.styles, ...classTable && { classTable }, ...styles.uses && { styleUses: styles.uses }, ...options.hot && { problems: sources.problems } }
 
   if (options.sourcemap === 'external')
@@ -338,11 +338,11 @@ export async function writeClasses(root: string, classes: Set<string>): Promise<
 
 // The table of Tailwind classes a later one overrides, from every word of the components and of the other files an app writes markup in; none when the app has no Tailwind.
 // Only an app with Tailwind reads them, and only its sources: a test or a hidden file read here would be one more input a test edit makes `kay dev` build again for.
-export async function classTableOf(root: string, sources: Pick<ClientSources, 'words'>): Promise<ClassTable | undefined> {
-  if (await tailwindDesign(root) === undefined)
+export async function classTableOf(root: string, sources: Pick<ClientSources, 'words'>, references: string[] = []): Promise<ClassTable | undefined> {
+  if (await tailwindDesign(root, references) === undefined)
     return undefined
 
-  return buildClassTable(root, (await markupFiles(root, sources)).flatMap(file => fileWords(file)).concat([...sources.words]))
+  return buildClassTable(root, (await markupFiles(root, sources)).flatMap(file => fileWords(file)).concat([...sources.words]), references)
 }
 
 // Both tables of a build read the same files, found once for the sources they are given.
@@ -365,10 +365,10 @@ async function markupFiles(root: string, sources: object): Promise<string[]> {
 
 // The table the islands ship: the app-wide one cut to the classes a merge in the browser can meet, those written in a module an island bundles or in one that renders an island and hands it a class.
 // The server keeps the whole table; none is sent when no island has two classes to merge, nor when the app has no island or no Tailwind.
-export async function islandClassTableOf(root: string, sources: Pick<ClientSources, 'islands' | 'libraries' | 'shorthand'>, graph?: ImportGraph): Promise<ClassTable | undefined> {
+export async function islandClassTableOf(root: string, sources: Pick<ClientSources, 'islands' | 'libraries' | 'shorthand'>, references: string[] = [], graph?: ImportGraph): Promise<ClassTable | undefined> {
   const { islands, libraries, shorthand } = sources
 
-  if (islands.size === 0 || await tailwindDesign(root) === undefined)
+  if (islands.size === 0 || await tailwindDesign(root, references) === undefined)
     return undefined
 
   const entries = new Set([...islands.values()].map(file => realpathSync(file)))
@@ -388,7 +388,7 @@ export async function islandClassTableOf(root: string, sources: Pick<ClientSourc
     }
   }
 
-  return buildClassTable(root, words)
+  return buildClassTable(root, words, references)
 }
 
 // `inputs` holds the modules of each chunk, `maps` the source maps written.
@@ -571,7 +571,7 @@ export async function bundleStyles(root: string, { pages, libraries, classes, sh
     minify: options.minify ?? false,
     metafile: true,
     naming: { entry: '[name]-[hash].[ext]', chunk: '[name]-[hash].[ext]', asset: '[name]-[hash].[ext]' },
-    plugins: [styleImports(root, libraries, shrunk, reached), ...mergingSupports(options.plugins ?? [], async nodes => pruneNodes(nodes, await unusedClasses), { root, files: referencesOf(root) })],
+    plugins: [styleImports(root, libraries, shrunk, reached), ...mergingSupports(options.plugins ?? [], async nodes => pruneNodes(nodes, await unusedClasses), { root, files: referencesOf(options.extensions) })],
   }), unusedClasses])
 
   if (!build.success)

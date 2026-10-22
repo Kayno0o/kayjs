@@ -2,7 +2,7 @@ import type { ClassSorter } from '../compiler/format'
 import { existsSync } from 'node:fs'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { CSS_FILE, findProjectFiles } from '../build/files'
-import { loadReferences, referencesOf, withReferences } from '../build/references'
+import { configReferences, withReferences } from '../build/references'
 import { stylesheetPath, TAILWIND_IMPORT } from '../dev/tailwind'
 
 export interface Design {
@@ -34,20 +34,18 @@ const loads = new Map<string, { entry: string, loaded: Promise<Loaded> }>()
 
 // Tailwind's own order for a class list, from the design system of the app's `tailwindcss` and its entry stylesheet, as `eslint-plugin-better-tailwindcss` orders a class string: unknown classes first as written, then by Tailwind's index.
 // Undefined when the app does not use Tailwind or its design system does not load, which leaves the classes as written; a design system that did not load is tried again on the next call.
-export async function tailwindSorter(root: string): Promise<ClassSorter | undefined> {
-  return (await tailwindLoad(root, false))?.sorter
+export async function tailwindSorter(root: string, references?: string[]): Promise<ClassSorter | undefined> {
+  return (await tailwindLoad(root, false, references ?? await configReferences(root)))?.sorter
 }
 
 // The design system of the app's Tailwind, loaded as the sorter's is and kept while no stylesheet it read changes; undefined when the app does not use Tailwind, and a `failure` instead of the design when it does not load.
-export async function tailwindDesign(root: string): Promise<{ design?: Design | undefined, failure?: string | undefined } | undefined> {
-  return tailwindLoad(root, true)
+export async function tailwindDesign(root: string, references: string[]): Promise<{ design?: Design | undefined, failure?: string | undefined } | undefined> {
+  return tailwindLoad(root, true, references)
 }
 
-async function tailwindLoad(root: string, parts: boolean): Promise<Loaded | undefined> {
-  await loadReferences(root)
-
+async function tailwindLoad(root: string, parts: boolean, references: string[]): Promise<Loaded | undefined> {
   const entry = await tailwindEntry(root, parts)
-  const key = `${root}\0${parts}\0${referencesOf(root).join('\0')}`
+  const key = `${root}\0${parts}\0${references.join('\0')}`
 
   if (entry === undefined)
     return undefined
@@ -61,7 +59,7 @@ async function tailwindLoad(root: string, parts: boolean): Promise<Loaded | unde
       return loaded
   }
 
-  const loaded = loadDesign(entry, root)
+  const loaded = loadDesign(entry, root, references)
 
   loads.set(key, { entry, loaded })
 
@@ -131,15 +129,15 @@ function assertResolvable(id: string, from: string): void {
     throw new Error(`${name} is not installed`)
 }
 
-async function loadDesign(entry: string, root: string): Promise<Loaded> {
+async function loadDesign(entry: string, root: string, references: string[]): Promise<Loaded> {
   const files = new Map([[entry, Bun.file(entry).lastModified]])
-  const { design, failure } = await loadDesignSystem(entry, files, root)
+  const { design, failure } = await loadDesignSystem(entry, files, root, references)
 
   return { sorter: design && (classes => design.getClassOrder(classes).toSorted(([, a], [, b]) => compareIndex(a, b)).map(([name]) => name)), design, failure, files }
 }
 
 // Runs the project's own Tailwind plugin and config modules, as its build does, so the order holds for the utilities they add; none that is not installed.
-async function loadDesignSystem(entry: string, files: Map<string, number>, root: string): Promise<{ design?: Design, failure?: string }> {
+async function loadDesignSystem(entry: string, files: Map<string, number>, root: string, references: string[]): Promise<{ design?: Design, failure?: string }> {
   try {
     const base = dirname(entry)
 
@@ -147,7 +145,7 @@ async function loadDesignSystem(entry: string, files: Map<string, number>, root:
       return { failure: 'tailwindcss is not installed' }
 
     const tailwind = await import(Bun.resolveSync('tailwindcss', base)) as { __unstable__loadDesignSystem?: LoadDesign }
-    const design = await tailwind.__unstable__loadDesignSystem?.(withReferences(await Bun.file(entry).text(), entry, root, referencesOf(root)), {
+    const design = await tailwind.__unstable__loadDesignSystem?.(withReferences(await Bun.file(entry).text(), entry, root, references), {
       base,
       loadStylesheet: async (id: string, from: string) => {
         assertResolvable(id, from)
