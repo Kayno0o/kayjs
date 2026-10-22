@@ -477,7 +477,8 @@ export function serverExtensions(root: string, extensions: KayExtension[] | unde
 
 // The server plugins the extensions carry, in their order, those given as a function built now.
 export async function extensionServers(extensions: KayExtension[] | undefined, root: string): Promise<{ name: string, server: AnyElysia }[]> {
-  const names = (extensions ?? []).map(extension => extension.name)
+  // An extension carrying only a catalog of messages is what an installed library's `kay.messages` adds to every app, not something the config lists.
+  const names = (extensions ?? []).filter(extension => Object.keys(extension).some(key => key !== 'name' && key !== 'messages')).map(extension => extension.name)
 
   return Promise.all((extensions ?? []).flatMap((extension) => {
     const { name, server, serverModule } = extension

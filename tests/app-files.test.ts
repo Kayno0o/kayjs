@@ -211,18 +211,19 @@ describe('auth() beside mail()', () => {
       'src/mail.ts': 'import { mailer, outbox } from \'@kaynooo/kayjs-mail\'\n\nexport const mail = mailer({ from: \'site@localhost\', transport: outbox })\n',
     })
 
-    const [listed, unlisted, elsewhere] = await Promise.all([written(files(true)), written(files(false)), scratchDir('app-files-elsewhere-')])
+    const [listed, unlisted, elsewhere, other] = await Promise.all([written(files(true)), written(files(false)), scratchDir('app-files-elsewhere-'), scratchDir('app-files-other-')])
 
     try {
       const answers: unknown[] = []
 
-      for (const root of [listed, unlisted]) {
+      // Each executable runs in a folder of its own, as each opens its own data/auth.db.
+      for (const [root, cwd] of [[listed, elsewhere], [unlisted, other]] as const) {
         const built = await run([process.execPath, CLI, 'build', '--no-check', '--compile', 'server', '--entry', 'serve.ts'], root)
 
         expect(built.stderr).not.toContain('error')
         expect(built.code).toBe(0)
 
-        const ran = await run([join(root, 'server')], elsewhere, { KAY_SECRET: 'a-secret-long-enough-for-a-kay-session-cookie' })
+        const ran = await run([join(root, 'server')], cwd, { KAY_SECRET: 'a-secret-long-enough-for-a-kay-session-cookie' })
 
         expect(ran.code).toBe(0)
         answers.push(JSON.parse((JSON.parse(ran.stdout) as { probe: string }).probe))
@@ -232,7 +233,7 @@ describe('auth() beside mail()', () => {
       expect(answers).toEqual([[{ subject: 'Confirm your email for localhost', styled: true }], [{ subject: 'Confirm your email for localhost', styled: false }]])
     }
     finally {
-      await Promise.all([listed, unlisted, elsewhere].map(async dir => rm(dir, { recursive: true, force: true })))
+      await Promise.all([listed, unlisted, elsewhere, other].map(async dir => rm(dir, { recursive: true, force: true })))
     }
   }, 240_000)
 })

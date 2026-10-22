@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { Elysia } from 'elysia'
 import { appModules, setSite } from 'kay/library'
 import { memoryAuthStore } from '../src/memoryStore'
+import { emailOf, MAIL_EXTENSION } from '../src/own'
 import { auth, LOAD_AUTH } from '../src/pages'
 
 const PASSWORD = 'correct horse battery'
@@ -307,5 +308,16 @@ describe('the types of auth() with no module', () => {
     auth({ roles: { admin: [] }, defaultRoles: ['editor'] })
 
     expect(extension.name).toBe('@kaynooo/kayjs-auth')
+  })
+})
+
+describe('the mailer auth() picks', () => {
+  const send = () => undefined
+  const app = (extensions: string[]) => ({ root, extensions, modules: { mail: { mail: { send } } } })
+
+  test('sends kayjs-auth\'s own mails through the app\'s mailer unless kayjs-mail is among the extensions', async () => {
+    expect((await emailOf(undefined, app([])))?.mailer?.send).toBe(send)
+    expect((await emailOf(undefined, app(['other'])))?.mailer?.send).toBe(send)
+    expect((await emailOf(undefined, app([MAIL_EXTENSION])))?.mailer?.send).not.toBe(send)
   })
 })

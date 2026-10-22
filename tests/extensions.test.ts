@@ -5,7 +5,7 @@ import { basename, dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { parse } from 'devalue'
-import { t } from 'elysia'
+import { Elysia, t } from 'elysia'
 import { treeEntries } from '../src/build/files'
 import { servedByTheApp, servedLocales } from '../src/check/diagnose'
 import { readShadowSettings } from '../src/check/shadow'
@@ -477,6 +477,22 @@ describe('an extension naming its server plugin by module', () => {
     expect(whole?.server).toBe(built?.server)
     await expect(extensionServers([{ name: 'c', serverModule: { path: './plugins', export: 'nothing' } }], root)).rejects.toThrow('the extension c takes its server from ./plugins')
     await expect(extensionServers([{ name: 'd', serverModule: { path: './plugins', export: 'missing' } }], root)).rejects.toThrow('the extension d')
+  })
+})
+
+describe('the server function of an extension', () => {
+  it('is told the names of the extensions the config lists, not the message catalogs of installed libraries', async () => {
+    const root = await scratchDir('extension-names-')
+    const seen: string[][] = []
+    const server = async (app: { extensions: string[] }) => {
+      seen.push(app.extensions)
+
+      return new Elysia()
+    }
+
+    await extensionServers([{ name: 'mail', messages: '/messages' }, { name: 'mail', server }, { name: 'other', server }, { name: 'plain', messages: '/other' }], root)
+
+    expect(seen).toEqual([['mail', 'other'], ['mail', 'other']])
   })
 })
 

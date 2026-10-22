@@ -9,7 +9,7 @@ import type { LinkType } from '../store'
 import { resolve } from 'node:path'
 import { appModules, configError } from 'kay/library'
 import { pickLocale } from '../locale'
-import { buildOwn, ownEnv } from '../own'
+import { buildOwn, MAIL_EXTENSION, ownEnv } from '../own'
 
 export interface AuthPagesOptions {
   // Where the pages are served, `/auth` by default, beside kayjs-auth's own routes: `/auth/sign-in`. `createAuth` reads it when `auth()` loads it with `module`.
@@ -292,12 +292,12 @@ export function auth(options: object = {}): AuthPages {
 // `auth()` with no module: kayjs-auth builds the whole `createAuth` as the server starts, so kay.config.ts declares everything and no file of the app is needed.
 function ownAuth(options: OwnOptions): AuthPages {
   const prefix = options.prefix ?? DEFAULT_PREFIX
-  // Built again only when the hooks or the mail module are not the ones it was built from, so a reload under `kay dev` that left them alone keeps the store it opened.
-  let current: { root: string, hooks: unknown, mail: unknown, extensions: string, built: Promise<UserMaker & { plugin: AnyElysia }> } | undefined
+  // Built again only when the hooks, the mail module or kayjs-mail's registration are not the ones it was built from, so a reload under `kay dev` that left them alone keeps the store it opened.
+  let current: { root: string, hooks: unknown, mail: unknown, mailed: boolean, built: Promise<UserMaker & { plugin: AnyElysia }> } | undefined
 
   const build = async (app: ExtensionApp) => {
-    if (current?.root !== app.root || current.hooks !== app.modules.hooks || current.mail !== app.modules.mail || current.extensions !== app.extensions.join())
-      current = { root: app.root, hooks: app.modules.hooks, mail: app.modules.mail, extensions: app.extensions.join(), built: buildOwn(options, app) }
+    if (current?.root !== app.root || current.hooks !== app.modules.hooks || current.mail !== app.modules.mail || current.mailed !== app.extensions.includes(MAIL_EXTENSION))
+      current = { root: app.root, hooks: app.modules.hooks, mail: app.modules.mail, mailed: app.extensions.includes(MAIL_EXTENSION), built: buildOwn(options, app) }
 
     return current.built
   }
