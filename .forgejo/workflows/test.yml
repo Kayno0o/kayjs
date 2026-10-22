@@ -116,8 +116,11 @@ jobs:
           bun install --silent --frozen-lockfile --cwd bench/apps/next
           bun install --silent --frozen-lockfile --cwd bench/apps/nuxt
 
+      # Prints the Bun the runner image carries, which the run shows in its log; kay refuses one under its `engines.bun`.
       - name: Check
-        run: bun run check
+        run: |
+          bun --version
+          bun run check
 
       # For the tests driving pages through `kay/test` in a real browser, which Bun.WebView finds through BUN_CHROME_PATH.
       - name: Install Chromium
