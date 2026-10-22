@@ -261,7 +261,7 @@ class ModuleShell {
     if (own.size === 0)
       return () => false
 
-    // A loop item, a snippet or slot parameter, an alias or a `const` of the template may take an import's name, and then holds any string there: the span it is bound in, which is its block.
+    // A loop item, a snippet or slot parameter, an alias or a `const` of the template may take an import's name, and then holds any string within the span it is bound in.
     const shadows = new Map<string, Span[]>()
     const bound = (span: Span | undefined, scope: Span, destructured = false) => {
       if (span === undefined)
@@ -281,8 +281,11 @@ class ModuleShell {
     const scan = (nodes: readonly Node[]) => {
       for (const node of nodes) {
         if (node.kind === 'for') {
-          bound(node.item, node, true)
-          bound(node.index, node)
+          // The item is not bound in the `else` block.
+          const loop = { start: node.start, end: node.children.at(-1)?.end ?? node.start }
+
+          bound(node.item, loop, true)
+          bound(node.index, loop)
         }
         else if (node.kind === 'slot') {
           bound(node.params, node, true)

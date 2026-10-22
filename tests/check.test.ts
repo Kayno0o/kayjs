@@ -3087,12 +3087,20 @@ describe.concurrent('kay check, markup', () => {
       '  const { waves: label } = row',
       '  div(innerHTML={waves})',
       '  div(innerHTML={label})',
+      'for waves of rows',
+      '  p {waves}',
+      'else',
+      '  div(innerHTML={waves})',
+      'snippet row(waves: string)',
+      '  div(innerHTML={waves})',
+      'div(innerHTML={waves})',
+      '{row(\'x\')}',
       '',
     ].join('\n')
     const root = await scratchProject({ 'src/scoped.kay': page, 'src/public/waves.svg': '<svg/>' })
 
     try {
-      expect((await check(root)).map(d => [basename(d.file), d.line])).toEqual([['scoped.kay', 6], ['scoped.kay', 11]])
+      expect((await check(root)).map(d => [basename(d.file), d.line])).toEqual([['scoped.kay', 6], ['scoped.kay', 11], ['scoped.kay', 17]])
     }
     finally {
       await rm(root, { recursive: true, force: true })
