@@ -1,4 +1,5 @@
 import type { KayExtension } from '../config'
+import type { ContextReads } from './context-record'
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { findKayFiles, findProjectFiles, KAY_FILE, scriptLoader, TS_FILE } from '../build/files'
@@ -222,12 +223,20 @@ export function servedPaths(routes: Route[]): Set<string> {
 }
 
 // The app's pages, then each mounted library's that no page of the app serves the path of.
-export async function scanRoutes(routesDir: string, mounts: RouteMount[] = []): Promise<Route[]> {
-  await loadContextReader(mounts)
+// The scan filling in the reads it works out, for the build to record.
+const collecting = new WeakMap<LayoutsRead, ContextReads>()
+
+// `reads` is what `kay build` recorded of the templates reading `ctx`, which a server started from disk takes in place of the compiler; given with `recorded` unset, the scan fills it in for the build to write.
+export async function scanRoutes(routesDir: string, mounts: RouteMount[] = [], reads?: ContextReads): Promise<Route[]> {
+  await loadContextReader(mounts, reads)
 
   const trees = routeTrees(routesDir, mounts)
   const routes: Route[] = []
   const read = readFor(trees)
+
+  if (reads && !reads.recorded)
+    collecting.set(read, reads)
+
   const served = new Set<string>()
   const access = new Map<string, LayoutAccess<GuardFile>>()
   const accessOf = (layout: string) => {
@@ -508,16 +517,19 @@ function walk(start: string, wanted: (file: string) => boolean, read: LayoutsRea
   return false
 }
 
-// The compiler stays out of a served app, so it loads once a scan meets the mount reading `ctx`.
+// The compiler stays out of a served app: a scan takes the build's record of the templates reading `ctx`, and loads the compiler only for a mount reading it that no record covers.
 let contextReader: ((source: string) => boolean) | undefined
+// Keyed by file, so the records of several projects in one process never meet.
+const recordedReads = new Map<string, boolean>()
 
-function loadedFirst(): never {
-  throw new KayError('route-invalid', 'kay: the templates reading ctx are read before scanRoutes loaded the compiler')
-}
-
-async function loadContextReader(mounts: RouteMount[]): Promise<void> {
-  if (contextReader === undefined && mounts.some(mount => mount.reaching === 'context'))
+async function loadContextReader(mounts: RouteMount[], reads: ContextReads | undefined): Promise<void> {
+  if (reads?.recorded) {
+    for (const [file, found] of reads.files)
+      recordedReads.set(file, found)
+  }
+  else if (contextReader === undefined && mounts.some(mount => mount.reaching === 'context')) {
     contextReader = (await import('./context-reads')).readsImplicitContext
+  }
 }
 
 const contextRead = new WeakMap<LayoutsRead, Map<string, boolean>>()
@@ -535,13 +547,20 @@ function readsContext(file: string, read: LayoutsRead): boolean {
   let found = memo.get(file)
 
   if (found === undefined) {
-    const reader = contextReader ?? loadedFirst()
+    found = recordedReads.get(file)
 
-    try {
-      found = reader(readFileSync(file, 'utf8'))
-    }
-    catch {
-      found = false
+    if (found === undefined) {
+      if (contextReader === undefined)
+        throw new KayError('route-invalid', `kay: the build recorded nothing of ${file}, which a route reaches; run kay build again`)
+
+      try {
+        found = contextReader(readFileSync(file, 'utf8'))
+      }
+      catch {
+        found = false
+      }
+
+      collecting.get(read)?.files.set(file, found)
     }
 
     memo.set(file, found)

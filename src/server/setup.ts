@@ -110,7 +110,7 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
 
   void Promise.allSettled([scanning])
 
-  const routes = await source.routes(paths.routes, mounts)
+  const routes = await source.routes(project, mounts)
 
   // A server's check claims the routes itself, once the locales are known.
   if (refuse)

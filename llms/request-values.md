@@ -14,7 +14,7 @@ nav
     a(href="/admin") Admin
 ```
 
-They are loaded before the render, so the markup is in the first bytes with JavaScript off. A page whose imports (its layouts, components and helpers, however deep) reach no template reading `ctx` loads nothing and reads no session. A page that does is the visitor's own: its answer is `private, no-cache` with `Vary: cookie`, and a page kept by the build is rendered per request.
+They are loaded before the render, so the markup is in the first bytes with JavaScript off. A page whose imports (its layouts, components and helpers, however deep) reach no template reading `ctx` loads nothing and reads no session. A page that does is the visitor's own: its answer is `private, no-cache` with `Vary: cookie`, and a page kept by the build is rendered per request. `kay build` records which templates read `ctx` in `.kay/client/context-reads.json`, which a server started from disk reads in place of the templates.
 
 ### Give templates request values from an extension
 

@@ -1,4 +1,7 @@
+import { existsSync } from 'node:fs'
+import { rm } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { compileKay } from '../src/compiler'
 import { loadContextValues, useContexts } from '../src/server/context-values'
@@ -188,4 +191,87 @@ describe('a template reading ctx', () => {
     expect(text).toContain('\'nope\'')
     expect(text).not.toContain('routes/typed.kay')
   })
+})
+
+describe('a production server started from disk', () => {
+  // A process of its own, as the test process compiled `.kay` files already and Babel fills `require.cache` once loaded.
+  async function run(script: string, failing = false): Promise<string> {
+    const child = Bun.spawn([process.execPath, '-e', script], { stdout: 'pipe', stderr: 'pipe' })
+    const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+    expect({ code, errors: failing ? '' : errors }).toEqual({ code: 0, errors: '' })
+
+    return output.trim()
+  }
+
+  async function project(extensions: { name: string, context?: string }[], base?: string): Promise<{ root: string, options: string }> {
+    const root = resolve(await fixtureCopy('request-values'))
+    const mapped = extensions.map(extension => extension.context === undefined ? extension : { ...extension, context: resolve(root, 'lib/context.ts') })
+
+    return { root, options: JSON.stringify({ root, extensions: mapped, prebuilt: true, security: false, inlineStyles: false, site: 'https://site.example', ...base !== undefined && { base } }) }
+  }
+
+  async function build(options: string): Promise<void> {
+    await run(`import { buildProject } from ${JSON.stringify(resolve('src/build/pipeline'))}\nconst options = ${options}\nconst built = await buildProject(options.root, { extensions: options.extensions, security: false, inlineStyles: false, site: options.site, base: options.base }, { check: false })\nif (built.failed) throw built.failed.error\n`)
+  }
+
+  // The status and body of a page of the server, as a proxy stripping the base forwards it, started from the build in `options`.
+  async function get(options: string, path: string, failing = false): Promise<{ status: number, html: string }> {
+    const script = `const options = ${options}\nconst { pages } = await import(${JSON.stringify(resolve('src/server'))})\nconst app = await pages(options)\nconst response = await app.handle(new Request('http://localhost${path}', { headers: { 'x-user': 'Ada', 'x-roles': 'admin' } }))\nconsole.log(JSON.stringify({ status: response.status, html: await response.text() }))\n`
+
+    return JSON.parse(await run(script, failing)) as { status: number, html: string }
+  }
+
+  // The routes a scan finds and the packages of the compiler it loaded, with the record of the build or without.
+  async function scan(root: string, options: string, recorded: boolean) {
+    const script = `const { routeMounts, scanRoutes } = await import(${JSON.stringify(resolve('src/server/routes'))})\nconst { readContextRecord } = await import(${JSON.stringify(resolve('src/server/context-record'))})\nconst root = ${JSON.stringify(root)}\nconst record = ${recorded} ? await readContextRecord(root + '/.kay/client', root) : undefined\nconst routes = await scanRoutes(root + '/src/routes', routeMounts(root, (${options}).extensions), record)\nconst loaded = Object.keys(require.cache).filter(key => key.includes('@babel/parser') || key.includes('context-reads'))\nconsole.log(JSON.stringify({ routes: routes.map(route => [route.pattern, route.layouts]), loaded: loaded.length }))\n`
+
+    return JSON.parse(await run(script)) as { routes: [string, string[]][], loaded: number }
+  }
+
+  for (const base of [undefined, '/repo']) {
+    it(`serves a page reaching a template reading ctx from the build's record, base ${base ?? 'unset'}`, async () => {
+      const { root, options } = await project([EXTENSION], base)
+
+      await build(options)
+      expect(await Bun.file(resolve(root, '.kay/client/context-reads.json')).json()).toMatchObject({ 'lib/gate.kay': true, 'src/routes/plain.kay': false })
+      expect(await get(options, '/gated')).toMatchObject({ status: 200, html: expect.stringContaining('<p id="who">Ada</p>') })
+    }, 120_000)
+  }
+
+  it('scans the same routes from the record as from the templates, without loading the compiler', async () => {
+    const { root, options } = await project([EXTENSION])
+
+    await build(options)
+
+    const recorded = await scan(root, options, true)
+    const compiled = await scan(root, options, false)
+
+    expect(recorded.routes).toEqual(compiled.routes)
+    expect(recorded.routes.filter(([, layouts]) => layouts.some(layout => layout.includes('context-layout'))).map(([pattern]) => pattern).sort()).toEqual(['/bare', '/deep', '/fenced', '/gated', '/inline', '/inner/page'])
+    expect(recorded.loaded).toBe(0)
+    expect(compiled.loaded).toBeGreaterThan(0)
+  }, 120_000)
+
+  it('takes the record over the templates, and the templates when the build recorded none', async () => {
+    const { root, options } = await project([EXTENSION])
+
+    await build(options)
+
+    const record = resolve(root, '.kay/client/context-reads.json')
+    const answers = await Bun.file(record).json() as Record<string, boolean>
+
+    await Bun.write(record, JSON.stringify({ ...answers, 'lib/gate.kay': false }))
+    expect((await get(options, '/gated', true)).status).toBe(500)
+    await rm(record)
+    expect(await get(options, '/gated')).toMatchObject({ status: 200, html: expect.stringContaining('<p id="who">Ada</p>') })
+  }, 120_000)
+
+  it('writes no record without a context', async () => {
+    const { root, options } = await project([{ name: 'none' }])
+
+    await build(options)
+    expect(existsSync(resolve(root, '.kay/client/context-reads.json'))).toBe(false)
+    expect(await get(options, '/plain')).toMatchObject({ status: 200 })
+  }, 120_000)
 })

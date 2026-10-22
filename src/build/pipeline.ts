@@ -27,6 +27,7 @@ import { writeCards } from '../server/card'
 import { ENTRY_RECORD, EXECUTABLE_RECORD, PRERENDERED_DIR } from '../server/client'
 import { compressFiles } from '../server/compress'
 import { remoteLimits } from '../server/config-limits'
+import { writeContextRecord } from '../server/context-record'
 import { writeDictionaryCopies } from '../server/dictionary'
 import { FAVICON_DIR, faviconSource } from '../server/favicon'
 import { fontFiles } from '../server/fonts'
@@ -35,7 +36,7 @@ import { setImageColors } from '../server/image-color'
 import { assetFiles, hookPrerendered } from '../server/page-hook'
 import { prerenderPages } from '../server/prerender'
 import { remoteImages, remotePatterns } from '../server/remote'
-import { slashedPath } from '../server/routes'
+import { routeMounts, scanRoutes, slashedPath } from '../server/routes'
 import { linkStoredFiles } from '../server/storage'
 import { budgetLints, checkBudget, footprintLints } from './budget'
 import { cacheCounts, resetCacheCounts } from './cache'
@@ -277,6 +278,8 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
     await options.onStage?.('export', result)
   }
 
+  await recordContextReads(project)
+
   if (options.compile) {
     const stage = performance.now()
 
@@ -318,6 +321,19 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
     await writeStoredReport(reportFile, storedReport(result.built.report, result.built.summary, exported))
 
   return result
+}
+
+// Which templates read `ctx`, for a server started from this build to find the pages reaching them without the compiler. Only an app with an extension giving a context has any.
+async function recordContextReads({ root, config, paths }: Project): Promise<void> {
+  const mounts = routeMounts(root, config.extensions, false)
+
+  if (!mounts.some(mount => mount.reaching === 'context'))
+    return
+
+  const reads = { files: new Map<string, boolean>(), recorded: false }
+
+  await scanRoutes(paths.routes, mounts, reads)
+  await writeContextRecord(paths.output, root, reads)
 }
 
 // What the browser build bundles, the fonts the pages declare and the icon sets they inline.
