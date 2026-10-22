@@ -2,14 +2,13 @@ import type { SQL } from 'bun'
 import type { LiveStore } from '../runtime/live-value'
 import type { PgHandle } from './pg-data'
 import { kayLog } from '../runtime/log'
+import { DB_TIMEOUT_MS, EVENT_TTL_MS, eventWindow, POLL_MS, pollerOf, timeLimited } from './pg-poll'
 import { NOW, query } from './pg-sql'
 import { onReload } from './reload'
 
-// How often a process reads what the others set, and how long a message is kept for one that reads late.
-const POLL_MS = 500
-const EVENT_TTL_MS = 60_000
-// Ids this far behind the last one read are read again, as a transaction that began earlier may commit its event after a later one.
-const OVERLAP = 100
+// Writes waiting behind a database that stopped answering: past this many a new one is dropped and logged, rather than held in memory.
+const MAX_QUEUED = 10_000
+const START_EVENTS = 100
 const ESCAPED = /\\(.)/g
 
 // Postgres text holds no NUL, which a key made of a visitor's input may carry: it is stored as `\0`, a backslash doubled.
@@ -24,12 +23,10 @@ export function pgLive(pg: PgHandle): LiveStore {
   const self = crypto.randomUUID()
   const listeners = new Set<Listener>()
   let tail: Promise<void> = Promise.resolve()
-  let poller: ReturnType<typeof setInterval> | undefined
-  let seen: number | undefined
-  const recent = new Set<number>()
-  let polling = false
-  // A streak of failed reads logs once, as the poll runs twice a second.
-  let failing = false
+  let stopPolling: (() => void) | undefined
+  const events = eventWindow()
+  let queued = 0
+  let overflowing = false
   let closed = false
   // The keys with a write of this process still to commit, and the ones heard meanwhile: their row is read once the write ends, so an older row never replaces the newer local value.
   const pending = new Map<string, number>()
@@ -58,12 +55,22 @@ export function pgLive(pg: PgHandle): LiveStore {
 
   // The row and its message go together, so a process that heard the message finds the row.
   const write = async (what: string, id: string, key: string, change: (tx: SQL) => Promise<unknown>): Promise<void> => {
+    if (queued >= MAX_QUEUED) {
+      if (!overflowing)
+        kayLog('error', `${what} the live value ${id} failed: ${MAX_QUEUED} writes wait for the database, the ones after are dropped until it answers`)
+
+      overflowing = true
+
+      return
+    }
+
     const at = `${escaped(id)}\0${escaped(key)}`
 
+    queued++
     pending.set(at, (pending.get(at) ?? 0) + 1)
 
     try {
-      await ordered(async () => {
+      await ordered(async () => timeLimited((async () => {
         const db = await pg.db()
 
         await db.begin(async (tx) => {
@@ -71,12 +78,15 @@ export function pgLive(pg: PgHandle): LiveStore {
           await query(tx, `INSERT INTO kay_live_events (origin, id, key, at) VALUES ($1, $2, $3, ${NOW})`, [self, escaped(id), escaped(key)])
           await query(tx, `DELETE FROM kay_live_events WHERE at < ${NOW} - ${EVENT_TTL_MS}`)
         })
-      })
+      })(), DB_TIMEOUT_MS, 'the write'))
     }
     catch (error) {
       kayLog('error', `${what} the live value ${id} failed`, error)
     }
     finally {
+      queued--
+      overflowing &&= queued > 0
+
       if (pending.get(at) === 1)
         pending.delete(at)
       else
@@ -85,18 +95,14 @@ export function pgLive(pg: PgHandle): LiveStore {
   }
 
   // Where the events stand: the ones in the overlap are noted as known, so they are not heard again.
-  const startAt = async (db: SQL): Promise<number> => {
-    const known = await query<{ seq: string }>(db, 'SELECT seq::text AS seq FROM kay_live_events ORDER BY seq DESC LIMIT $1', [OVERLAP])
+  const startAt = async (db: SQL) => {
+    const known = await query<{ seq: string }>(db, 'SELECT seq::text AS seq FROM kay_live_events ORDER BY seq DESC LIMIT $1', [START_EVENTS])
 
-    for (const event of known)
-      recent.add(Number(event.seq))
-
-    return Math.max(0, ...known.map(event => Number(event.seq)))
+    events.start(known.map(event => Number(event.seq)))
   }
 
-  // The events of the other processes since the last poll, each value read once however many times it was set.
-  const hear = async (db: SQL, after: number): Promise<{ heard: [id: string, key: string, text: string | undefined][], last: number, fresh: number[], read: string[] }> => {
-    let last = after
+  // The events of the other processes since the last poll, each value read once however many times it was set, all the rows in one query.
+  const hear = async (db: SQL, after: number): Promise<{ heard: [id: string, key: string, text: string | undefined][], fresh: number[], read: string[] }> => {
     // The events are noted as known only once their rows are read, so a failed read hears them again.
     const fresh: number[] = []
     const changed = new Map<string, [string, string]>()
@@ -106,14 +112,13 @@ export function pgLive(pg: PgHandle): LiveStore {
         changed.set(at, event)
     }
 
-    for (const event of await query<{ seq: string, id: string, key: string }>(db, 'SELECT seq::text AS seq, id, key FROM kay_live_events WHERE seq > $1::bigint AND origin != $2 ORDER BY seq', [after - OVERLAP, self])) {
+    for (const event of await query<{ seq: string, id: string, key: string }>(db, 'SELECT seq::text AS seq, id, key FROM kay_live_events WHERE seq > $1::bigint AND origin != $2 ORDER BY seq', [after, self])) {
       const seq = Number(event.seq)
 
-      if (recent.has(seq))
+      if (events.has(seq))
         continue
 
       fresh.push(seq)
-      last = Math.max(last, seq)
 
       const at = `${event.id}\0${event.key}`
 
@@ -123,70 +128,46 @@ export function pgLive(pg: PgHandle): LiveStore {
         changed.set(at, [event.id, event.key])
     }
 
-    const heard: [id: string, key: string, text: string | undefined][] = []
+    const wanted: [string, [string, string]][] = []
 
-    const read: string[] = []
-
-    for (const [at, [id, key]] of changed) {
+    for (const [at, entry] of changed) {
       // A write of this process began since: the row is read once it ends.
-      if (pending.has(at)) {
-        deferred.set(at, [id, key])
-
-        continue
-      }
-
-      const [row] = await query<{ value: string }>(db, 'SELECT value FROM kay_live WHERE id = $1 AND key = $2', [id, key])
-
-      heard.push([unescaped(id), unescaped(key), row?.value])
-      read.push(at)
+      if (pending.has(at))
+        deferred.set(at, entry)
+      else
+        wanted.push([at, entry])
     }
 
-    return { heard, last, fresh, read }
+    const values = new Map<string, string>()
+
+    if (wanted.length > 0) {
+      const rows = await query<{ id: string, key: string, value: string }>(db, 'SELECT id, key, value FROM kay_live WHERE (id, key) IN (SELECT e->>0, e->>1 FROM jsonb_array_elements($1::text::jsonb) e)', [JSON.stringify(wanted.map(([, entry]) => entry))])
+
+      for (const row of rows)
+        values.set(`${row.id}\0${row.key}`, row.value)
+    }
+
+    return {
+      heard: wanted.map(([at, [id, key]]) => [unescaped(id), unescaped(key), values.get(at)]),
+      fresh,
+      read: wanted.map(([at]) => at),
+    }
   }
 
-  const poll = async () => {
-    if (polling || listeners.size === 0 || closed)
-      return
+  const poll = async (db: SQL) => {
+    // What was set before this process first used the store is in what it reads from the store already.
+    if (events.from() === undefined)
+      await startAt(db)
 
-    polling = true
+    const read = await hear(db, events.from() ?? 0)
 
-    let heard: [id: string, key: string, text: string | undefined][] = []
+    for (const id of read.fresh)
+      events.note(id)
 
-    try {
-      const db = await pg.db()
+    for (const at of read.read)
+      deferred.delete(at)
 
-      // What was set before this process first used the store is in what it reads from the store already.
-      seen ??= await startAt(db)
-
-      const read = await hear(db, seen)
-
-      heard = read.heard
-      seen = read.last
-
-      for (const id of read.fresh)
-        recent.add(id)
-
-      for (const at of read.read)
-        deferred.delete(at)
-
-      for (const id of recent) {
-        if (id <= seen - OVERLAP)
-          recent.delete(id)
-      }
-
-      failing = false
-    }
-    catch (error) {
-      if (!failing)
-        kayLog('error', 'reading the live values the other processes set failed; trying again', error)
-
-      failing = true
-    }
-    finally {
-      polling = false
-    }
-
-    for (const [id, key, text] of heard) {
+    for (const [id, key, text] of read.heard) {
       for (const listener of listeners) {
         try {
           listener(id, key, text)
@@ -199,8 +180,8 @@ export function pgLive(pg: PgHandle): LiveStore {
   }
 
   const stop = () => {
-    clearInterval(poller)
-    poller = undefined
+    stopPolling?.()
+    stopPolling = undefined
     listeners.clear()
   }
 
@@ -216,7 +197,8 @@ export function pgLive(pg: PgHandle): LiveStore {
       return ordered(async () => {
         const db = await pg.db()
 
-        seen ??= await startAt(db)
+        if (events.from() === undefined)
+          await startAt(db)
 
         return (await query<{ id: string, key: string, value: string }>(db, 'SELECT id, key, value FROM kay_live')).map(row => [unescaped(row.id), unescaped(row.key), row.value] as [string, string, string])
       })
@@ -226,11 +208,10 @@ export function pgLive(pg: PgHandle): LiveStore {
     subscribe(listener) {
       listeners.add(listener)
 
-      if (poller !== undefined || closed)
+      if (stopPolling !== undefined || closed)
         return
 
-      poller = setInterval(() => void poll(), POLL_MS)
-      poller.unref()
+      stopPolling = pollerOf(pg).add({ every: POLL_MS, wanted: () => listeners.size > 0 && !closed, run: poll, failed: 'reading the live values the other processes set failed' }, false)
     },
   }
 }

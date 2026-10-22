@@ -4,6 +4,7 @@ import type { PgHandle } from './pg-data'
 import type { AsyncRoomStore } from './rooms'
 import { optionMs } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
+import { eventWindow, pollerOf } from './pg-poll'
 import { NOW, query } from './pg-sql'
 import { onReload } from './reload'
 
@@ -14,8 +15,6 @@ const EXPIRY = 10_000
 const KEPT = 30_000
 const WATCH_KEPT = 30_000
 const DEFAULT_POLL = optionMs('250ms', '')
-// Ids this far behind the last one read are read again, as a transaction that began earlier may commit its message after a later one.
-const OVERLAP = 100
 
 interface Own {
   room: string
@@ -53,13 +52,9 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
   const watched = new Map<string, number>()
   const listeners = new Set<Listener>()
   let tail: Promise<void> = Promise.resolve()
-  let last: number | undefined
-  const recent = new Set<number>()
-  let reading: ReturnType<typeof setInterval> | undefined
+  const events = eventWindow()
+  let stopReadingTask: (() => void) | undefined
   let beating: ReturnType<typeof setInterval> | undefined
-  let polling = false
-  // A streak of failed reads logs once, as the poll runs several times a second.
-  let failing = false
   let pruned = 0
   let closed = false
 
@@ -158,67 +153,46 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
     if (listeners.size === 0)
       return
 
-    if (last === undefined) {
+    const from = events.from()
+
+    if (from === undefined) {
       // Read from now on: what others published before anyone here listened is for the members they had then.
       const [latest] = await query<{ id: string }>(db, 'SELECT coalesce(max(id), 0)::text AS id FROM kay_room_messages')
 
-      last = Number(latest?.id ?? 0)
+      events.start([Number(latest?.id ?? 0)])
 
       return
     }
 
-    for (const row of await query<{ id: string, room: string, text: string, skipped: string | null, recipient: string | null }>(db, 'SELECT id::text, room, text, skipped, recipient FROM kay_room_messages WHERE id > $1::bigint AND process <> $2 ORDER BY id', [last - OVERLAP, self])) {
+    for (const row of await query<{ id: string, room: string, text: string, skipped: string | null, recipient: string | null }>(db, 'SELECT id::text, room, text, skipped, recipient FROM kay_room_messages WHERE id > $1::bigint AND process <> $2 ORDER BY id', [from, self])) {
       const id = Number(row.id)
 
-      if (recent.has(id))
+      if (events.has(id))
         continue
 
-      recent.add(id)
-      last = Math.max(last, id)
+      events.note(id)
 
       for (const listener of listeners)
         listener(row.room, row.text, { ...row.skipped !== null && { except: row.skipped }, ...row.recipient !== null && { to: row.recipient } })
     }
-
-    for (const id of recent) {
-      if (id <= last - OVERLAP)
-        recent.delete(id)
-    }
   }
 
   const stopReading = () => {
-    clearInterval(reading)
-    reading = undefined
-    last = undefined
-    recent.clear()
+    stopReadingTask?.()
+    stopReadingTask = undefined
+    events.forget()
   }
 
-  const read = async () => {
-    if (polling || closed)
-      return
-
-    polling = true
-
+  const read = async (db: SQL) => {
     try {
-      const db = await pg.db()
-
       await readMembers(db)
       await readMessages(db)
-      failing = false
-    }
-    catch (error) {
-      if (!failing)
-        kayLog('error', 'reading the rooms of the other processes failed; trying again', error)
-
-      failing = true
     }
     finally {
-      polling = false
+      // Rooms nobody asks about any more may have ended the reading.
+      if (watched.size === 0 && listeners.size === 0)
+        stopReading()
     }
-
-    // Rooms nobody asks about any more may have ended the reading.
-    if (watched.size === 0 && listeners.size === 0)
-      stopReading()
   }
 
   // The process says it is alive only while it holds a connection, and reads the others' members and messages only while it has someone to tell or something asked.
@@ -237,12 +211,10 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
 
     const wanted = !closed && (listeners.size > 0 || watched.size > 0)
 
-    if (wanted && reading === undefined) {
-      reading = setInterval(() => void read(), pollMs)
-      reading.unref()
-      void read()
+    if (wanted && stopReadingTask === undefined) {
+      stopReadingTask = pollerOf(pg).add({ every: pollMs, wanted: () => !closed, run: read, failed: 'reading the rooms of the other processes failed' }, true)
     }
-    else if (!wanted && reading !== undefined) {
+    else if (!wanted && stopReadingTask !== undefined) {
       stopReading()
     }
   }
@@ -339,9 +311,8 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
 
       closed = true
       clearInterval(beating)
-      clearInterval(reading)
+      stopReading()
       beating = undefined
-      reading = undefined
       listeners.clear()
       own.clear()
 

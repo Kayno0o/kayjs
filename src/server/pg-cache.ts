@@ -1,18 +1,14 @@
+import type { SQL } from 'bun'
 import type { CacheStore } from '../runtime/cache'
 import type { PgHandle } from './pg-data'
 import { DEPS_PREFIX, readsOf, trackStore, untrackStore } from '../runtime/cache'
-import { kayLog } from '../runtime/log'
 import { rowsOf } from './pg-jobs'
+import { EVENT_TTL_MS, eventWindow, POLL_MS, pollerOf } from './pg-poll'
 import { NOW } from './pg-sql'
 import { onReload } from './reload'
 
-// How often a process reads what the others sharing a store invalidated, and how long a message is kept for one that reads late.
-const POLL_MS = 500
-const EVENT_TTL_MS = 60_000
 // Tells this process's own messages apart from the others', whatever store instance wrote them.
 const PROCESS = crypto.randomUUID()
-// Ids this far behind the last one read are read again, as a transaction that began earlier may commit its event after a later one.
-const OVERLAP = 100
 
 // Values kept in Postgres: they survive restarts and deploys, and every replica shares them. Each process keeps its own copy in memory, and hears within about half a second what another one's `invalidate` or `invalidatePage` dropped.
 // Every call answers with a promise, so `invalidate` drops the stored rows in the background, and a read right after it waits for that.
@@ -20,12 +16,8 @@ export function pgCache(pg: PgHandle): CacheStore {
   const listeners: ((message: string) => void)[] = []
   // The writes still running, which a listing of the keys waits for so an `invalidate` never misses a row being written.
   const writing = new Set<Promise<unknown>>()
-  let poller: ReturnType<typeof setInterval> | undefined
-  let seen: number | undefined
-  const recent = new Set<number>()
-  let polling = false
-  // A streak of failed reads logs once, as the poll runs twice a second.
-  let failing = false
+  let stopPolling: (() => void) | undefined
+  const events = eventWindow()
   let closed = false
 
   const write = async <Result>(work: Promise<Result>): Promise<Result> => {
@@ -39,63 +31,37 @@ export function pgCache(pg: PgHandle): CacheStore {
     }
   }
 
-  const poll = async () => {
-    if (polling || listeners.length === 0)
+  const poll = async (db: SQL) => {
+    const from = events.from()
+
+    if (from === undefined) {
+      // What was published before this process first used the store is in what it reads from the store already.
+      const [last] = await rowsOf<{ id: string | null }>(db`SELECT max(id)::text AS id FROM kay_events`)
+
+      events.start([Number(last?.id ?? 0)])
+
       return
-
-    polling = true
-
-    try {
-      const db = await pg.db()
-
-      if (seen === undefined) {
-        // What was published before this process first used the store is in what it reads from the store already.
-        const [last] = await rowsOf<{ id: string | null }>(db`SELECT max(id)::text AS id FROM kay_events`)
-
-        seen = Number(last?.id ?? 0)
-
-        return
-      }
-
-      for (const event of await rowsOf<{ id: string, message: string }>(db`SELECT id::text, message FROM kay_events WHERE id > ${seen - OVERLAP}::bigint AND origin != ${PROCESS} ORDER BY id`)) {
-        const id = Number(event.id)
-
-        if (recent.has(id))
-          continue
-
-        recent.add(id)
-        seen = Math.max(seen, id)
-
-        for (const listener of listeners)
-          listener(event.message)
-      }
-
-      for (const id of recent) {
-        if (id <= seen - OVERLAP)
-          recent.delete(id)
-      }
-
-      failing = false
     }
-    catch (error) {
-      if (!failing)
-        kayLog('error', 'reading what the other processes invalidated failed; trying again', error)
 
-      failing = true
-    }
-    finally {
-      polling = false
+    for (const event of await rowsOf<{ id: string, message: string }>(db`SELECT id::text, message FROM kay_events WHERE id > ${from}::bigint AND origin != ${PROCESS} ORDER BY id`)) {
+      const id = Number(event.id)
+
+      if (events.has(id))
+        continue
+
+      events.note(id)
+
+      for (const listener of listeners)
+        listener(event.message)
     }
   }
 
   // Started by the first call that needs the database, so only an app that reads, writes or invalidates a value connects.
   const start = () => {
-    if (poller !== undefined || closed)
+    if (stopPolling !== undefined || closed)
       return
 
-    poller = setInterval(() => void poll(), POLL_MS)
-    poller.unref()
-    void poll()
+    stopPolling = pollerOf(pg).add({ every: POLL_MS, wanted: () => listeners.length > 0, run: poll, failed: 'reading what the other processes invalidated failed' }, true)
   }
 
   const store: CacheStore = {
@@ -158,7 +124,7 @@ export function pgCache(pg: PgHandle): CacheStore {
   // A reload ends the polling for the module that named the store; the module running again names a store of its own.
   onReload(() => {
     closed = true
-    clearInterval(poller)
+    stopPolling?.()
     untrackStore(store)
   })
 
