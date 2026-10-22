@@ -266,7 +266,7 @@ const column = elementSize()
 - A block the server rendered `catch` for keeps that markup as it came, since the error stayed on the server.
 - `catch` takes the error under a name or none, typed `unknown`.
 - A `try` without `catch` renders nothing when it throws.
-- An `await` block with no `catch` inside a `try` renders the `try`'s `catch` when its value rejects, in place of the block alone and after the page rendered, on the server, in an island and in `renderToString`, the error reported as the `try`'s own is.
+- An `await` block with no `catch` inside a `try` of the same template, a snippet declared in it included, and not in a component the `try` renders, renders the `try`'s `catch` when its value rejects, in place of the block alone and after the page rendered, on the server, in an island and in `renderToString`, the error reported as the `try`'s own is.
 - On the server, what a block that threw set in the page's `head`, an island's title included, goes with it: the page serves the title of an island it rendered, or its own.
 - An error no `try` catches in the browser, from an effect, a handler or a promise nobody awaited, is reported the same way.
 - An island whose script throws as it hydrates keeps its server markup, lifeless.

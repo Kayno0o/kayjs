@@ -1209,10 +1209,12 @@ export function awaited(element: Node | null, start: Node | null, end: Node | nu
           }
           // The enclosing `try`'s `catch` takes the place of the block, the error reported as the `try` reports one.
           else if (fallback) {
-            reportError(error, islandOf(region.parent))
+            if (own === version)
+              reportError(error, islandOf(region.parent))
+
             land(() => fallback(error))
           }
-          else {
+          else if (own === version) {
             reportError(error, islandOf(region.parent))
           }
 
@@ -1233,7 +1235,7 @@ export function awaited(element: Node | null, start: Node | null, end: Node | nu
 }
 
 // A `try` block: its content under an owner catching what its effects throw later, or its `catch` block once it throws, the error reported either way.
-export function attempt(element: Node | null, start: Node | null, end: Node | null, render: () => unknown, fallback: ((error: unknown) => unknown) | undefined): void {
+export function attempt(element: Node | null, start: Node | null, end: Node | null, render: (caught: (error: unknown) => unknown) => unknown, fallback: ((error: unknown) => unknown) | undefined): void {
   const region = new Region(element, start, end)
 
   // The server rendered the `catch` block: kept as it came, since the error it shows stayed on the server.
@@ -1267,7 +1269,7 @@ export function attempt(element: Node | null, start: Node | null, end: Node | nu
     disposeContent = dispose
 
     try {
-      swap(block, render)
+      swap(block, () => render(fallback ?? (() => null)))
     }
     catch (error) {
       // Markup the island would not claim is the island's to recover from, rendering it afresh, not the block's to fall back from.

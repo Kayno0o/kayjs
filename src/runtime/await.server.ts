@@ -19,14 +19,19 @@ export interface PendingBlock {
   site?: Error | undefined
 }
 
+// The errors already given a block's place, so a promise shared by several blocks or renders keeps one.
+const placed = new WeakSet<Error>()
+
 // A rejection no `catch` of the block takes, with the block's place added to its stack so the dev overlay and `.kay/dev/errors.json` show the `await` line; a rejection that is no error becomes one.
 export function rejectedAt(block: PendingBlock, reason: unknown): unknown {
-  if (block.site === undefined)
+  if (block.site === undefined || (reason instanceof Error && placed.has(reason)))
     return reason
 
   const frames = (block.site.stack ?? '').split('\n').filter(line => line.trimStart().startsWith('at ') && !line.includes('await.server')).join('\n')
 
   if (reason instanceof Error) {
+    placed.add(reason)
+
     try {
       reason.stack = `${reason.stack ?? `${reason.name}: ${reason.message}`}\n${frames}`
     }

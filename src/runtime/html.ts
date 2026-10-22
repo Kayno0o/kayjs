@@ -430,13 +430,14 @@ export function serverIsland<P>(fn: (props: P) => unknown, props: P, mode: Serve
 }
 
 // A `try` block: what it renders, or once that throws, its `catch` block, the error reported. The marker tells an island hydrating to keep that markup as it came, since the error stayed on the server.
-export function attempt(render: () => string, fallback?: (error: unknown) => string): string {
+// The content gets the `catch` block as a function, or one rendering nothing, for an `await` inside with no `catch` of its own to fall back to.
+export function attempt(render: (caught: (error: unknown) => string) => string, fallback?: (error: unknown) => string): string {
   const mark = idMark()
   const checkpoint = headCheckpoint()
   const restoreIslands = islandCheckpoint()
 
   try {
-    return render()
+    return render(fallback ?? (() => ''))
   }
   catch (error) {
     // The head tags and islands the block set go with it: its islands are not in the page.

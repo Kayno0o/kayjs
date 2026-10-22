@@ -73,8 +73,8 @@ class Markup {
 
 // A template as code building its markup: what pages, layouts and static components render to outside islands, with no reactive runtime.
 export class HtmlTemplate extends TemplateWriter {
-  // The `try` whose content is being written, which an `await` without a `catch` inside falls back to.
-  private enclosing: { branch: TryNode['rejected'] } | undefined
+  // The names the `try` blocks being written give their `catch`, which an `await` without a `catch` inside falls back to: the runtime hands the function, or one rendering nothing, to the content of the `try`.
+  private readonly catches: string[] = []
 
   constructor(b: CodeBuilder, src: string, facts: TemplateFacts, private readonly options: HtmlOptions = {}) {
     super(b, src, facts)
@@ -319,13 +319,12 @@ export class HtmlTemplate extends TemplateWriter {
     const { b } = this
 
     b.wrap(node, () => {
-      b.add(`${helperName('attempt')}(() => `)
+      const name = `KayCatch${this.catches.length}`
 
-      const outer = this.enclosing
-
-      this.enclosing = { branch: node.rejected }
+      b.add(`${helperName('attempt')}((${name}) => `)
+      this.catches.push(name)
       this.markup(node.children)
-      this.enclosing = outer
+      this.catches.pop()
 
       const branch = node.rejected
 
@@ -374,21 +373,8 @@ export class HtmlTemplate extends TemplateWriter {
       }
 
       // With no `catch` of its own, a rejection renders the enclosing `try`'s, or nothing when that has none.
-      if (!node.rejected && this.enclosing) {
-        const branch = this.enclosing.branch
-
-        b.add(', fallback: (')
-
-        if (branch?.alias)
-          b.addSource(branch.alias)
-
-        b.add(') => ')
-
-        if (branch)
-          this.value(branch.children)
-        else
-          b.add('\'\'')
-      }
+      if (!node.rejected && this.catches.length > 0)
+        b.add(`, fallback: (error) => ${helperName('html')}(${this.catches.at(-1)!}(error))`)
 
       b.add(' }))')
     })

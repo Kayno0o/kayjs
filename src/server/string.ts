@@ -42,7 +42,7 @@ async function settled(view: () => unknown): Promise<string> {
     catch (error) {
       // With no `catch` block, nor a `try` around the block, the mail would go out with the content missing, so the render fails instead.
       if (!block.failed && !block.fallback)
-        throw rejectedAt(block, error)
+        throw error
 
       const failed = block.failed ?? block.fallback!
 

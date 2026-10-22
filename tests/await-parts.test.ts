@@ -153,6 +153,16 @@ describe('an await block given an async iterable', () => {
     expect([before.reported, after.reported].map(errors => (errors as Error[]).map(error => error.message))).toEqual([['Down'], ['Cut']])
   })
 
+  it('without a catch block, renders the fallback of the try around the block and reports the failure, before a part or after one', async () => {
+    const fallback = (error: unknown) => html(`<p class="fallback">${(error as Error).message}</p>`)
+    const before = await streamed([{ ...block(parts([], 0, new Error('Down'))), fallback }])
+    const after = await streamed([{ ...block(parts(['a'], 0, new Error('Cut'))), fallback }])
+
+    expect(templatesOf(before.page, 'b')).toEqual(['<p class="fallback">Down</p>'])
+    expect(templatesOf(after.page, 'b')).toEqual(['<!--kay-await:b--><p>a</p><!--/kay-await:b-->', '<p class="fallback">Cut</p>'])
+    expect([before.reported, after.reported].map(errors => (errors as Error[]).map(error => error.message))).toEqual([['Down'], ['Cut']])
+  })
+
   it('stops reading an iterable whose then block throws, reporting it rather than showing the catch block', async () => {
     let returned = false
 
