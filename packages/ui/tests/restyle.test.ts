@@ -111,6 +111,23 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     'kui-save-bar-status italic',
     'kui-save-bar-actions gap-4',
     'kui-command-palette rounded-2xl',
+    'kui-tabs-tab px-5',
+    'kui-tabs-panel pt-4',
+    'kui-tab-nav-link font-semibold',
+    'kui-site-nav-link rounded-md',
+    'kui-site-nav-list gap-3',
+    'kui-site-nav kui-app-header-nav',
+    'kui-app-header-brand text-lg',
+    'kui-app-header-end ml-auto',
+    'kui-pagination-step px-4',
+    'kui-pagination-page min-w-10',
+    'kui-split-layout-sidebar-head h-14',
+    'kui-split-layout-list overflow-auto',
+    'kui-split-layout-detail p-6',
+    'kui-split-layout-resizer w-2',
+    'kui-tree-view-item py-1',
+    'kui-tree-view-label truncate',
+    'kui-virtual-list h-96',
   ]
 
   test.each(restyled)('draws class="%s"', (classes) => {

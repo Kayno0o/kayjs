@@ -1,12 +1,14 @@
 ---
 import type { JSX, Snippet } from 'kay'
-import { onMount, signal } from 'kay'
+import { onMount, recipe, signal } from 'kay'
 import IconButton from './icon-button.kay'
 import { wording } from 'kay/words'
 
 const WIDTH = { default: 260, min: 180, max: 560, step: 20 }
 
-const { list, detail, listHead, detailHead, sidebar, sidebarTitle = '', detailOpen = false, sidebarOpen = false, onSidebarClose, resizableList = false, listWidthKey, resizeLabel = wording('ui.splitLayout.resizeLabel', 'Resize list'), backLabel = wording('ui.splitLayout.backLabel', 'Back'), class: className, style, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'style' | 'children'> & {
+const look = recipe({ parts: { root: 'kui-split-layout', sidebar: 'kui-split-layout-sidebar', sidebarHead: 'kui-split-layout-sidebar-head', sidebarTitle: 'kui-split-layout-sidebar-title', sidebarBody: 'kui-split-layout-sidebar-body', list: 'kui-split-layout-list', listHead: 'kui-split-layout-list-head', resizer: 'kui-split-layout-resizer', detail: 'kui-split-layout-detail', detailHead: 'kui-split-layout-detail-head' } })
+
+const { list, detail, listHead, detailHead, sidebar, sidebarTitle = '', detailOpen = false, sidebarOpen = false, onSidebarClose, resizableList = false, listWidthKey, resizeLabel = wording('ui.splitLayout.resizeLabel', 'Resize list'), backLabel = wording('ui.splitLayout.backLabel', 'Back'), style, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'style' | 'children'> & {
   list: Snippet
   detail: Snippet
   listHead?: Snippet
@@ -25,7 +27,6 @@ const { list, detail, listHead, detailHead, sidebar, sidebarTitle = '', detailOp
   listWidthKey?: string | undefined
   resizeLabel?: string | undefined
   backLabel?: string | undefined
-  class?: string | undefined
   style?: string | undefined
 }>()
 
@@ -97,24 +98,24 @@ function resizeByKey(event: KeyboardEvent) {
 }
 ---
 // The sidebar is rendered once: from `md` up a column, below it the overlay `data-sidebar-open` shows.
-.kui-split-layout({...rest} class={className} style={`--kui-split-list-width: ${listWidth()}px;${style ? ` ${style}` : ''}`} data-sidebar={sidebar ? '' : undefined} data-sidebar-open={sidebarOpen ? '' : undefined} data-detail-open={detailOpen ? '' : undefined})
+div({...rest} part="root" style={`--kui-split-list-width: ${listWidth()}px;${style ? ` ${style}` : ''}`} data-sidebar={sidebar ? '' : undefined} data-sidebar-open={sidebarOpen ? '' : undefined} data-detail-open={detailOpen ? '' : undefined})
   if sidebar
-    aside.kui-split-layout-sidebar
-      .kui-split-layout-sidebar-head
+    aside(part="sidebar")
+      div(part="sidebarHead")
         IconButton(icon="back" label={backLabel} variant="ghost" size="lg" onClick={() => onSidebarClose?.()})
-        span.kui-split-layout-sidebar-title {sidebarTitle}
-      .kui-split-layout-sidebar-body
+        span(part="sidebarTitle") {sidebarTitle}
+      div(part="sidebarBody")
         | {sidebar}
-  section.kui-split-layout-list
+  section(part="list")
     if listHead
-      .kui-split-layout-list-head
+      div(part="listHead")
         | {listHead}
     | {list}
     if resizableList
       // A focusable separator is a widget, moved with the arrow keys as well as dragged.
-      .kui-split-layout-resizer(role="separator" tabindex="0" aria-label={resizeLabel} aria-orientation="vertical" aria-valuenow={listWidth()} aria-valuemin={WIDTH.min} aria-valuemax={WIDTH.max} onPointerDown={startResize} onKeyDown={resizeByKey})
-  section.kui-split-layout-detail
+      div(part="resizer" role="separator" tabindex="0" aria-label={resizeLabel} aria-orientation="vertical" aria-valuenow={listWidth()} aria-valuemin={WIDTH.min} aria-valuemax={WIDTH.max} onPointerDown={startResize} onKeyDown={resizeByKey})
+  section(part="detail")
     if detailHead
-      .kui-split-layout-detail-head
+      div(part="detailHead")
         | {detailHead}
     | {detail}

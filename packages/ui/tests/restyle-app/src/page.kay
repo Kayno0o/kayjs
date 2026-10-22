@@ -1,4 +1,5 @@
 ---
+import AppHeader from '@kaynooo/kayjs-ui/app-header.kay'
 import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
 import Badge from '@kaynooo/kayjs-ui/badge.kay'
 import BarList from '@kaynooo/kayjs-ui/bar-list.kay'
@@ -24,6 +25,7 @@ import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import PageHeader from '@kaynooo/kayjs-ui/page-header.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
 import Popover from '@kaynooo/kayjs-ui/popover.kay'
 import RangeInput from '@kaynooo/kayjs-ui/range-input.kay'
 import Rating from '@kaynooo/kayjs-ui/rating.kay'
@@ -31,13 +33,19 @@ import SaveForm from '@kaynooo/kayjs-ui/save-form.kay'
 import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
 import Select from '@kaynooo/kayjs-ui/select.kay'
 import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
+import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
 import Slider from '@kaynooo/kayjs-ui/slider.kay'
+import SplitLayout from '@kaynooo/kayjs-ui/split-layout.kay'
 import Stat from '@kaynooo/kayjs-ui/stat.kay'
 import Table from '@kaynooo/kayjs-ui/table.kay'
+import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
+import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
 import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import TimeInput from '@kaynooo/kayjs-ui/time-input.kay'
 import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
+import VirtualList from '@kaynooo/kayjs-ui/virtual-list.kay'
 import Widget from '@kaynooo/kayjs-ui/widget.kay'
 
 const planets = [{ id: 1, name: 'Mars' }]
@@ -107,3 +115,29 @@ ConfirmDelete#confirm-inline(message="Sure?" ask="inline" trigger="button" onCon
 SaveForm#save(dirty={false} onSave={() => undefined})
   p field
 CommandPalette#palette(entries={[]})
+Tabs#tabs(label="Sections" value="a" tabs={[{ value: 'a', label: 'A', icon: 'info' }, { value: 'b', label: 'B' }]})
+  @panel(shown)
+    p {shown}
+TabNav#tabnav(label="Pages" current="/a" links={[{ href: '/a', label: 'A' }, { href: '/b', label: 'B' }]})
+SiteNav#sitenav(label="Main" current="/" links={[{ href: '/', label: 'Home', icon: 'info' }]})
+AppHeader#appheader(label="App" current="/" links={[{ href: '/', label: 'Home' }]})
+  @brand
+    span brand
+  @end
+    span end
+Pagination#pager(page={2} pages={5} url="/list")
+SplitLayout#split(sidebarTitle="Filters" resizableList)
+  @sidebar
+    p side
+  @listHead
+    p lhead
+  @list
+    p list
+  @detailHead
+    p dhead
+  @detail
+    p detail
+TreeView#tree(label="Files" selected="b" expanded={['a']} nodes={[{ id: 'a', label: 'A', icon: 'info', children: [{ id: 'b', label: 'B' }] }, { id: 'c', label: 'C' }]})
+VirtualList#virtual(label="Rows" items={[1, 2]})
+  @item(row)
+    p {row}

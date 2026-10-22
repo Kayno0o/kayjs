@@ -1,9 +1,11 @@
 ---
 import type { JSX } from 'kay'
-import { onMount } from 'kay'
+import { onMount, recipe } from 'kay'
 import { currentTab, keptHref } from './tab-nav'
 
-const { links, current, keep = [], label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & {
+const look = recipe({ parts: { root: 'kui-tab-nav', link: 'kui-tab-nav-link' } })
+
+const { links, current, keep = [], label, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & {
   links: readonly { href: string, label: string }[]
   // The `href` of the page on screen, which the link to it marks as current; or its URL, `ctx.url`, matched by its path and the params a link sets.
   current: string | URL
@@ -11,7 +13,6 @@ const { links, current, keep = [], label, class: className, ...rest } = props<Om
   keep?: readonly string[] | undefined
   // Names the navigation for screen readers.
   label: string
-  class?: string | undefined
 }>()
 
 let nav: HTMLElement | undefined
@@ -32,6 +33,6 @@ onMount(() => {
 })
 ---
 // Links rather than buttons: each tab is a page of its own, which a reload, a new tab or a shared url opens. The bar sits mid-page, so following a tab keeps the window where it was (`data-keep-scroll` on the link), except a link to a `#section`, which scrolls to it.
-nav.kui-tab-nav({...rest} ref={element => nav = element} aria-label={label} class={className})
+nav({...rest} part="root" ref={element => nav = element} aria-label={label})
   for link of links key={link.href}
-    a.kui-tab-nav-link(data-keep-scroll={link.href.includes('#') ? undefined : ''} href={keptHref(link.href, current, keep)} aria-current={link.href === marked() ? 'page' : undefined}) {link.label}
+    a(part="link" data-keep-scroll={link.href.includes('#') ? undefined : ''} href={keptHref(link.href, current, keep)} aria-current={link.href === marked() ? 'page' : undefined}) {link.label}

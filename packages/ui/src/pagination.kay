@@ -1,10 +1,13 @@
 ---
+import { recipe } from 'kay'
 import type { JSX } from 'kay'
 import type { PagedList } from './pagination'
 import { currentPage, openSteps, pageHref, pageItems } from './pagination'
 import { wording } from 'kay/words'
 
-const { of, page, pages, offset, limit, more, url, param, siblings = 1, label = wording('ui.pagination.label', 'Pagination'), previousLabel = wording('ui.pagination.previousLabel', 'Previous'), nextLabel = wording('ui.pagination.nextLabel', 'Next'), class: className, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & ({
+const look = recipe({ parts: { root: 'kui-pagination', step: 'kui-pagination-step', gap: 'kui-pagination-gap', page: 'kui-pagination-page' } })
+
+const { of, page, pages, offset, limit, more, url, param, siblings = 1, label = wording('ui.pagination.label', 'Pagination'), previousLabel = wording('ui.pagination.previousLabel', 'Previous'), nextLabel = wording('ui.pagination.nextLabel', 'Next'), ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & ({
   // A page kay's `paginate()` gave, which links each page at its own path: `Pagination(of={list})`.
   of: PagedList
   page?: never
@@ -51,7 +54,6 @@ const { of, page, pages, offset, limit, more, url, param, siblings = 1, label = 
   label?: string | undefined
   previousLabel?: string | undefined
   nextLabel?: string | undefined
-  class?: string | undefined
 }>()
 
 const total = of?.pages ?? pages ?? 0
@@ -63,27 +65,27 @@ const steps = () => more === undefined ? undefined : openSteps(limit === undefin
 // Plain links, through the query or at the paths `paginate()` gives, so a page renders on the server, its pages crawlable, and needs no island.
 if steps() as open
   if open.previous || open.next
-    nav.kui-pagination({...rest} aria-label={label} class={className})
+    nav({...rest} part="root" aria-label={label})
       if open.previous
-        a.kui-pagination-step(href={open.previous} rel="prev") {previousLabel}
+        a(part="step" href={open.previous} rel="prev") {previousLabel}
       else
-        span.kui-pagination-step {previousLabel}
+        span(part="step") {previousLabel}
       if open.next
-        a.kui-pagination-step(href={open.next} rel="next") {nextLabel}
+        a(part="step" href={open.next} rel="next") {nextLabel}
       else
-        span.kui-pagination-step {nextLabel}
+        span(part="step") {nextLabel}
 else if total > 1
-  nav.kui-pagination({...rest} aria-label={label} class={className})
+  nav({...rest} part="root" aria-label={label})
     if shown() > 1
-      a.kui-pagination-step(href={href(shown() - 1)} rel="prev") {previousLabel}
+      a(part="step" href={href(shown() - 1)} rel="prev") {previousLabel}
     else
-      span.kui-pagination-step {previousLabel}
+      span(part="step") {previousLabel}
     for item, index of pageItems(shown(), total, siblings) key={index}
       if item === 'gap'
-        span.kui-pagination-gap(aria-hidden="true") …
+        span(part="gap" aria-hidden="true") …
       else
-        a.kui-pagination-page(href={href(item)} aria-current={item === shown() ? 'page' : undefined}) {item}
+        a(part="page" href={href(item)} aria-current={item === shown() ? 'page' : undefined}) {item}
     if shown() < total
-      a.kui-pagination-step(href={href(shown() + 1)} rel="next") {nextLabel}
+      a(part="step" href={href(shown() + 1)} rel="next") {nextLabel}
     else
-      span.kui-pagination-step {nextLabel}
+      span(part="step") {nextLabel}

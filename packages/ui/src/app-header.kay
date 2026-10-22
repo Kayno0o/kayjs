@@ -1,9 +1,12 @@
 ---
+import { recipe } from 'kay'
 import type { JSX, Snippet } from 'kay'
 import type { NavLink } from './defaults'
 import SiteNav from './site-nav.kay'
 
-const { links, current, label, menuLabel, brand, end, sticky = true, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['header'], 'class' | 'children'> & {
+const look = recipe({ parts: { root: 'kui-app-header', brand: 'kui-app-header-brand', nav: 'kui-app-header-nav', end: 'kui-app-header-end' } })
+
+const { links, current, label, menuLabel, brand, end, sticky = true, ...rest } = props<Omit<JSX.IntrinsicElements['header'], 'class' | 'children'> & {
   links: readonly NavLink[]
   // The path of the page on screen, as for `SiteNav`.
   current: string
@@ -17,15 +20,14 @@ const { links, current, label, menuLabel, brand, end, sticky = true, class: clas
   end?: Snippet
   // Stays at the top of the page while it scrolls; `false` lets it scroll away.
   sticky?: boolean | undefined
-  class?: string | undefined
 }>()
 ---
 // The bar across the top of an app: its brand, its main links, which fold into a menu on a narrow screen, and an area at the far end.
-header.kui-app-header({...rest} data-sticky={sticky ? '' : undefined} class={className})
+header({...rest} part="root" data-sticky={sticky ? '' : undefined})
   if brand
-    .kui-app-header-brand
+    div(part="brand")
       | {brand}
-  SiteNav(links={links} current={current} label={label} menuLabel={menuLabel} class="kui-app-header-nav")
+  SiteNav(links={links} current={current} label={label} menuLabel={menuLabel} part="nav")
   if end
-    .kui-app-header-end
+    div(part="end")
       | {end}

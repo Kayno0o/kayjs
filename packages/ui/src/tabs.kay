@@ -2,7 +2,7 @@
 import type { JSX, Snippet } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
-import { effect, signal, uid, untrack } from 'kay'
+import { effect, recipe, signal, uid, untrack } from 'kay'
 import { stepIndex } from './cycle'
 import Icon from './icon.kay'
 
@@ -16,7 +16,9 @@ const MOVES: Partial<Record<string, (index: number, count: number) => number>> =
 
 const FLIPPED: Partial<Record<string, string>> = { ArrowLeft: 'ArrowRight', ArrowRight: 'ArrowLeft' }
 
-const { tabs, value, label, onChange, panel, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange'> & {
+const look = recipe({ parts: { root: 'kui-tabs', list: 'kui-tabs-list', tab: 'kui-tabs-tab', icon: 'kui-tabs-icon', panel: 'kui-tabs-panel' } })
+
+const { tabs, value, label, onChange, panel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange'> & {
   // `icon` sits before the label; `disabled` keeps that tab from being shown, and the arrow keys skip it.
   tabs: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[]
   // The tab shown to start with; tabs whose parent passes another follow it.
@@ -27,7 +29,6 @@ const { tabs, value, label, onChange, panel, class: className, ...rest } = props
   // Draws each tab's panel: `@panel(tab)`, given the tab's value. Every panel is drawn once and hidden while its tab is not shown, so what it holds survives a switch.
   // A hidden panel is hidden until found: find in page, a link to an id inside it, or kay's `focusInvalid` reaching a field in it shows its tab.
   panel: Snippet<[value: Value]>
-  class?: string | undefined
 }>()
 
 const id = uid()
@@ -72,14 +73,14 @@ function keyDown(event: KeyboardEvent) {
   list?.querySelectorAll<HTMLElement>('[role="tab"]')[next]?.focus()
 }
 ---
-.kui-tabs({...rest} class={className})
-  .kui-tabs-list(ref={element => list = element} role="tablist" aria-label={label} onKeyDown={keyDown})
+div({...rest} part="root")
+  div(part="list" ref={element => list = element} role="tablist" aria-label={label} onKeyDown={keyDown})
     for tab, index of tabs key={tab.value}
-      button.kui-tabs-tab(type="button" role="tab" id={`${id}-tab-${index}`} aria-controls={`${id}-panel-${index}`} aria-selected={shown() === tab.value ? 'true' : 'false'} tabindex={shown() === tab.value ? 0 : -1} disabled={tab.disabled} onClick={() => show(tab.value)})
+      button(part="tab" type="button" role="tab" id={`${id}-tab-${index}`} aria-controls={`${id}-panel-${index}`} aria-selected={shown() === tab.value ? 'true' : 'false'} tabindex={shown() === tab.value ? 0 : -1} disabled={tab.disabled} onClick={() => show(tab.value)})
         if tab.icon
-          Icon(icon={tab.icon} class="kui-tabs-icon")
+          Icon(icon={tab.icon} part="icon")
         | {tab.label}
   for tab, index of tabs key={tab.value}
-    .kui-tabs-panel(ref={element => element.addEventListener('beforematch', () => show(tab.value))} role="tabpanel" id={`${id}-panel-${index}`} aria-labelledby={`${id}-tab-${index}`} tabindex={shown() === tab.value ? 0 : undefined} hidden={shown() === tab.value ? undefined : 'until-found'})
+    div(part="panel" ref={element => element.addEventListener('beforematch', () => show(tab.value))} role="tabpanel" id={`${id}-panel-${index}`} aria-labelledby={`${id}-tab-${index}`} tabindex={shown() === tab.value ? 0 : undefined} hidden={shown() === tab.value ? undefined : 'until-found'})
       // Untracked, so a tab relabelled, such as with a count, keeps its panel and the focus inside it.
       | {untrack(() => panel(tab.value))}

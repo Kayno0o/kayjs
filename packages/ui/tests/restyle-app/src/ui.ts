@@ -42,4 +42,13 @@ export default defineUi({
   '@kaynooo/kayjs-ui/confirm-delete.kay': { parts: { armed: 'gap-2', message: 'text-sm' } },
   '@kaynooo/kayjs-ui/save-form.kay': { parts: { bar: 'sticky', status: 'italic', actions: 'gap-4' } },
   '@kaynooo/kayjs-ui/command-palette.kay': { parts: 'rounded-2xl' },
+  '@kaynooo/kayjs-ui/tabs.kay': { parts: { tab: 'px-5', panel: 'pt-4', icon: 'size-3' } },
+  '@kaynooo/kayjs-ui/tab-nav.kay': { parts: { link: 'font-semibold' } },
+  '@kaynooo/kayjs-ui/site-nav.kay': { parts: { link: 'rounded-md', list: 'gap-3', menuIcon: 'size-6' } },
+  '@kaynooo/kayjs-ui/app-header.kay': { parts: { brand: 'text-lg', end: 'ml-auto' } },
+  '@kaynooo/kayjs-ui/pagination.kay': { parts: { step: 'px-4', page: 'min-w-10', gap: 'opacity-50' } },
+  '@kaynooo/kayjs-ui/split-layout.kay': { parts: { sidebarHead: 'h-14', list: 'overflow-auto', detail: 'p-6', resizer: 'w-2' } },
+  '@kaynooo/kayjs-ui/tree-view.kay': { parts: { item: 'py-1', label: 'truncate', icon: 'size-3' } },
+  '@kaynooo/kayjs-ui/load-more.kay': { parts: { failed: 'gap-3', loading: 'text-sm' } },
+  '@kaynooo/kayjs-ui/virtual-list.kay': { parts: 'h-96' },
 })
