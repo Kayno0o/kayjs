@@ -8,6 +8,10 @@ const KEY = /wording\(\s*'(cms\.[A-Za-z.]+)'/g
 // The files the editor runs in once the page has loaded, whose keys no island's own source names.
 const AFTER_LOAD_FILES = ['bulk-message.ts', 'components/entry-body.kay', 'components/entry-bulk.kay', 'components/entry-field.kay', 'components/entry-identity.kay', 'components/entry-notices.kay', 'components/entry-save-state.kay', 'components/reset-button.kay', 'components/session-ended.kay', 'editor/bulk.ts', 'editor/datetime-input.kay', 'editor/entry-fields.kay', 'editor/entry-form.kay', 'editor/field-input.kay', 'editor/file-input.kay', 'editor/ready-input.kay', 'editor/page-list-tools.kay', 'editor/page-lists.ts', 'editor/reorder.kay', 'editor/save.ts', 'editor/upload.ts', 'upload-text.ts', 'fields.ts', 'listing.ts']
 
+async function wordsText(): Promise<string> {
+  return (await Promise.all(['words.md', 'words-media-to-uploads.md'].map(async file => Bun.file(join(import.meta.dir, '../llms', file)).text()))).join('\n')
+}
+
 async function keysOf(file: string): Promise<string[]> {
   return Array.from((await Bun.file(join(SRC, file)).text()).matchAll(KEY), match => match[1]!)
 }
@@ -20,7 +24,7 @@ async function everyKey(): Promise<string[]> {
 
 describe('the cms.* keys', () => {
   test('are all listed in llms/words.md, and it lists no other', async () => {
-    const listed = await Bun.file(join(import.meta.dir, '../llms/words.md')).text()
+    const listed = await wordsText()
     const documented = new Set(Array.from(listed.matchAll(/^- `cms\.(\w+)\.\*`: (.*)$/gm), ([, area, rest]) => Array.from(rest!.matchAll(/`(\w+)` \(/g), leaf => `cms.${area}.${leaf[1]}`)).flat())
 
     expect([...documented].sort()).toEqual(await everyKey())
@@ -52,7 +56,7 @@ describe.each(LOCALES)('the %s catalog the cms ships', (locale) => {
   })
 
   test('holds the placeholders of the English, in each of its plural forms or none', async () => {
-    const listed = await Bun.file(join(import.meta.dir, '../llms/words.md')).text()
+    const listed = await wordsText()
     const english = new Map<string, string>()
 
     for (const [, area, rest] of listed.matchAll(/^- `cms\.(\w+)\.\*`: (.*)$/gm)) {

@@ -476,7 +476,7 @@ kayjs-cms ships the French of all of them. A site whose locale is `fr` shows Fre
 
 A key a locale lacks reads the English, and `kay check` leaves the `cms` keys out of its comparison between locales. The API's refusals are worded in the locale of the page that called.
 
-<ReadMore href="/llms/kayjs-cms-words">Every `cms.*` key and its English is in the full kayjs-cms reference.</ReadMore>
+<ReadMore href="/llms/kayjs-cms-words">Every `cms.*` key and its English is in the full kayjs-cms reference, from `media` to `uploads` in [its second part](/llms/kayjs-cms-words-media-to-uploads).</ReadMore>
 
 ## Raw HTML in a body
 

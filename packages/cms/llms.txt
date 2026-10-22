@@ -17,3 +17,4 @@
 - [Form fields and drafts](llms/api.md): `fieldsOf`, `fieldOf`, `humanize`, `emptyValue`, markers, `createDrafts` and the path helpers
 - [Renaming an entry's slug](llms/rename.md): the Rename button, the old URL redirecting by itself, a saver's `move`
 - [Texts and languages](llms/words.md): the `cms.*` messages that word every text of the screens and the editor
+- [Texts and languages: media to uploads](llms/words-media-to-uploads.md): the `cms.*` messages of the media, page, redirect, role, save, sign-in, store, table, trash and upload areas

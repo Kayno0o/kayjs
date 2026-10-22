@@ -225,5 +225,6 @@ Topics of the kayjs-ui reference the sections above do not link:
 - [Icons, buttons, toasts, dialogs, cards, popovers and stats](/llms/kayjs-ui-basics)
 - [Inputs, selects, editors and forms](/llms/kayjs-ui-forms)
 - [Forms, FormDialog and Steps](/llms/kayjs-ui-forms-and-steps)
-- [Tables, tabs, pagination, page layout, command palette and trees](/llms/kayjs-ui-tables-navigation-and-layout)
+- [Tables, tabs and pagination](/llms/kayjs-ui-tables-navigation-and-layout)
+- [Page layout, command palette and trees](/llms/kayjs-ui-page-layout-palette-and-trees)
 - [Charts, drag and drop, galleries and image tools](/llms/kayjs-ui-charts-drag-and-media)

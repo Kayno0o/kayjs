@@ -778,7 +778,8 @@ Under `kay dev`, the dev tool has an Auth tab with nothing to set up. It shows w
 
 Topics of the kayjs-auth reference the sections above do not link:
 
-- [Setup, pages, the signed-in user, sessions and guards](/llms/kayjs-auth-setup)
+- [Setup, pages and the signed-in user](/llms/kayjs-auth-setup)
+- [Sessions and guards](/llms/kayjs-auth-sessions-and-guards)
 - [OAuth sign-in, two-factor, passkeys, re-proof and the account](/llms/kayjs-auth-oauth-passkeys-two-factor)
 - [Passwords, guests, mailed links and security mails](/llms/kayjs-auth-passwords-and-mails)
 - [The signed-in user in templates](/llms/kayjs-auth-signed-in-components)
