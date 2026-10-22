@@ -6,7 +6,8 @@ import type { LintLevels } from './lints'
 import type { ImportedSignals, SignalKind } from './module-signals'
 import type { NameFindings } from './rewrite'
 import type { ParsedFence, ScriptAnalysis, ServerAnalysis, SignalPropType } from './script'
-import { basename, relative } from 'node:path'
+import { statSync } from 'node:fs'
+import { basename, join, relative } from 'node:path'
 import process from 'node:process'
 import { installedIconSets } from '../build/icons'
 import { drawIcons, elementsIn, templateFacts, visitNodes } from './ast'
@@ -125,9 +126,43 @@ const BACKSLASH = /\\/g
 // An icon of an installed set, `~icons/tabler/home`, which the template may draw as a tag.
 const ICON_IMPORT = /^~icons\//
 
-// The prefixes of the icon sets the project at `root` installs, which decide whether an icon import is data; unset without a root or an icon import to decide.
+// The prefixes of the icon sets the project at `root` installs, which decide whether an icon import is data; unset without a root or an icon import to decide. Kept per root until its package.json or its icon sets change.
+const iconSetCache = new Map<string, { stamp: string, sets: ReadonlySet<string> }>()
+
 function iconSetsOf(source: string, root: string | undefined): ReadonlySet<string> | undefined {
-  return root === undefined || !source.includes('~icons/') ? undefined : new Set(installedIconSets(root).keys())
+  if (root === undefined || !source.includes('~icons/'))
+    return undefined
+
+  const stamp = [join(root, 'package.json'), join(root, 'node_modules/@iconify-json')].map((path) => {
+    try {
+      return statSync(path, { throwIfNoEntry: false })?.mtimeMs ?? 0
+    }
+    catch {
+      return 0
+    }
+  }).join(':')
+  const kept = iconSetCache.get(root)
+
+  if (kept?.stamp === stamp)
+    return kept.sets
+
+  let sets: ReadonlySet<string>
+
+  try {
+    sets = new Set(installedIconSets(root).keys())
+  }
+  catch {
+    sets = new Set()
+  }
+
+  iconSetCache.set(root, { stamp, sets })
+
+  return sets
+}
+
+// What the installed icon sets add to the key of a cached compile: the promotion of a component depends on them.
+export function iconSetsKey(source: string, root: string): string {
+  return [...iconSetsOf(source, root) ?? []].toSorted().join(',')
 }
 
 // The live values a script imports, which make its component an island: the server changes them and the page follows.

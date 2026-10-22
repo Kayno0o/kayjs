@@ -178,10 +178,10 @@ function appendedAction(path: string, existing: string, name: string): string | 
   if (lines[0]?.trimEnd() !== SERVER_FENCE || lines.slice(1).some(line => ANY_FENCE.test(line)))
     return undefined
 
-  if (new RegExp(`\\bexport\\s+(?:(?:const|let|var|class)\\s+${name}\\b|(?:async\\s+)?function(?:\\s*\\*\\s*|\\s+)${name}\\b|\\{[^}]*\\b${name}\\b|(?:const|let|var)\\s*[{\\[][^=]*\\b${name}\\b(?!\\s*:))`).test(existing))
+  if (new RegExp(`\\bexport\\s+(?:(?:const|let|var|class)\\s+${name}\\b|(?:async\\s+)?function(?:\\s*\\*\\s*|\\s+)${name}\\b|\\{[^}]*\\b${name}\\b|(?:const|let|var)\\s*[{\\[][^}\\]]*\\b${name}\\b(?!\\s*:))`).test(existing))
     throw new Error(`kay generate: nothing was written, ${path} already exports \`${name}\``)
 
-  if (new RegExp(`\\b(?:const|let|var|class|function)\\s*\\*?\\s*${name}\\b|\\b(?:const|let|var)\\s*[{\\[][^=]*\\b${name}\\b(?!\\s*:)|\\bimport\\b[^;'"]*\\b${name}\\b(?!\\s+as\\b)[^;'"]*\\bfrom\\b`).test(existing))
+  if (new RegExp(`\\b(?:(?:const|let|var|class)\\s+|function(?:\\s*\\*\\s*|\\s+))${name}\\b|\\b(?:const|let|var)\\s*[{\\[][^}\\]]*\\b${name}\\b(?!\\s*:)|\\bimport\\b[^;'"]*\\b${name}\\b(?!\\s+as\\b)[^;'"]*\\bfrom\\b`).test(existing))
     throw new Error(`kay generate: nothing was written, ${path} already declares or imports \`${name}\``)
 
   if (!S_IMPORT.test(existing)) {

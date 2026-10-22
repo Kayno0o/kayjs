@@ -476,8 +476,14 @@ function functionReturnsData(fn: FunctionNode, scope: FunctionScope): boolean {
   return !values.some(value => holdsFunction(value, inner))
 }
 
+// The globals whose functions return a number, a string, a date or nothing from plain arguments, `Math.max(1, 2)` or `Date.now()`.
+const DATA_NAMESPACES = new Set(['Math', 'Number', 'String', 'Boolean', 'BigInt', 'Date', 'console'])
+
 // A callback given to a list method over data: its parameters are items of that data.
 function callbackReturnsData(callback: t.Node, scope: FunctionScope): boolean {
+  if (callback.type === 'MemberExpression' && callback.object.type === 'Identifier' && isGlobalFunctionMember(callback, name => scope.functions.has(name)))
+    return DATA_NAMESPACES.has(callback.object.name)
+
   if (callback.type === 'Identifier')
     return scope.data.has(callback.name)
 
@@ -517,7 +523,7 @@ function isDataCall(call: t.CallExpression, scope: FunctionScope): boolean {
   if (owner !== undefined && STATICS.has(owner))
     return STATICS.get(owner)!.has(method) && call.arguments.every((argument, index) => owner === 'Array' && method === 'from' && index === 1 ? callbackReturnsData(argument, scope) : plain(argument))
 
-  if (PRIMITIVE_METHODS.has(method))
+  if (PRIMITIVE_METHODS.has(method) || (owner !== undefined && DATA_NAMESPACES.has(owner) && !scope.functions.has(owner)))
     return call.arguments.every(plain)
 
   if (holdsFunction(callee.object, scope))

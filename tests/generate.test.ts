@@ -115,6 +115,7 @@ it('adds an action to an existing _actions.kay that holds a server fence alone',
     ['import { s } from \'kay\'\nimport helper from \'./helper\'', 'helper', 'already declares or imports'],
     ['import {\n  other as renamed,\n  more,\n} from \'./x\'', 'renamed', 'already declares or imports'],
     ['const local = 1', 'local', 'already declares or imports'],
+    ['export const { a = 1, defaulted } = make()', 'defaulted', 'already exports'],
     ['const { a: inner } = make()', 'inner', 'already declares or imports'],
   ]
 
@@ -127,6 +128,11 @@ it('adds an action to an existing _actions.kay that holds a server fence alone',
   await Bun.write(actions, '--- server\nimport { other as renamed } from \'./x\'\nconst { a: inner } = make()\n')
   await generate(dir, 'action', 'team/other')
   await generate(dir, 'action', 'team/a')
+
+  // A name that only starts with a keyword is not a declaration of the keyword's.
+  await Bun.write(actions, '--- server\nexport const constant = 1\nconst letter = 2\n')
+  await generate(dir, 'action', 'team/ant')
+  await generate(dir, 'action', 'team/ter')
 
   await Bun.write(actions, '--- server\nimport { s } from \'kay\'\n\nexport const sent = action(s.Object({}), () => 1)\n---\nbutton Go\n')
   await expect(generate(dir, 'action', 'team/fourth')).rejects.toThrow('add the action by hand')

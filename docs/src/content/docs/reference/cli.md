@@ -108,7 +108,7 @@ kay generate guard admin
 | `page pricing` | `src/routes/pricing.kay`, with a title and an `h1`; `blog/[slug]` and `(group)/about` are routes too, and Tailwind's shorthand classes are on the `h1` when the project has Tailwind |
 | `component card` | `src/components/card.kay`, taking a `label` prop |
 | `island likes` | `src/components/likes.kay`, a signal and a button |
-| `action team/removeTissue` | the action `removeTissue` in `src/routes/team/_actions.kay`; one that exists and holds a server fence alone gets the action appended (with `import { s } from 'kay'` when it lacks it), an action it already exports stops the command, and one with a template or other fences is left alone and the action printed to add by hand |
+| `action team/removeTissue` | the action `removeTissue` in `src/routes/team/_actions.kay`; one that exists and holds a server fence alone gets the action appended (with `import { s } from 'kay'` when it lacks it), a name it already exports, declares or imports stops the command, and one with a template or other fences is left alone and the action printed to add by hand |
 | `api notes` | `src/api/notes.ts`, served at `/api/notes` |
 | `guard admin` | `src/routes/admin/_guard.ts` (`/` for the root one), letting every request through until you write the rule, with a test visiting the shallowest page below the folder when there is one |
 

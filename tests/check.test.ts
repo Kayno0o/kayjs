@@ -13,7 +13,7 @@ import { DESCRIPTION_LENGTH, pageSeoLints, TITLE_LENGTH } from '../src/check/seo
 import { compileShadow, shadowPath, shadowSource } from '../src/check/shadow'
 import { writeShadowTypes } from '../src/check/shadow-types'
 import { warnOtherKay } from '../src/commands/command'
-import { compileKay } from '../src/compiler'
+import { compileKay, iconSetsKey } from '../src/compiler'
 import { isErrorCode } from '../src/compiler/errors'
 import { SHADOW_DIR } from '../src/project'
 import { limiter } from '../src/server/limit'
@@ -631,6 +631,9 @@ describe.concurrent('kay check, edge cases', () => {
       panel: ['const panel = (color: string) => { const svg = `<svg fill="${color}"/>`; return `data:${svg}` }\nconst slides = [{ src: panel(\'red\') }]', 'Child(format={slides})'],
       icon: ['import Brand from \'~icons/tabler/brand-github\'', 'Child(format={Brand})'],
       constant: ['const biggest = Math.PI + Number.MAX_VALUE', 'Child(format={biggest})'],
+      called: ['const biggest = Math.max(1, 2)\nconst now = Date.now()\nconst absolute = [-1].map(Math.abs)', 'Child(format={[biggest, now, absolute]})'],
+      mapped_global: ['const { rows } = props<{ rows: number[] }>()', 'Child(format={rows.map(Math.abs)})'],
+      named: ['', 'Child(format={Math.max.name})'],
       found: ['const { rows, current } = props<{ rows: { id: number }[], current: number }>()', 'Child(format={rows.find(row => row.id === current)})'],
       from: ['const items = Array.from({ length: 3 }, (_, index) => ({ id: index }))', 'Child(format={items})'],
       dated: ['const days = Array.from({ length: 2 }, (_, index) => new Date(Date.UTC(2026, 0, 1 + index)).toISOString().slice(0, 10))', 'Child(format={days})'],
@@ -671,6 +674,18 @@ describe.concurrent('kay check, edge cases', () => {
       const found = (await check(root)).filter(d => d.code === 'promoted-island')
 
       expect(found.map(d => d.file.slice(root.length + 1)).sort()).toEqual(Object.keys(functions).map(name => `src/components/${name}.kay`).sort())
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('keys a cached compile on the icon sets the project installs, for a source importing icons only', async () => {
+    const root = await scratchProject({ 'package.json': JSON.stringify({ name: 'app', private: true, devDependencies: { '@iconify-json/tabler': '*' } }) })
+
+    try {
+      expect(iconSetsKey('import home from \'~icons/tabler/home\'', root)).toBe('tabler')
+      expect(iconSetsKey('p hi', root)).toBe('')
     }
     finally {
       await rm(root, { recursive: true, force: true })

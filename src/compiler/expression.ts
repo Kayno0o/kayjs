@@ -28,6 +28,7 @@ function isFunctionExpression(code: string): boolean {
 
 // The globals whose members are functions, `Math.max` or `console.log`, bar their constants, `Math.PI` or `Number.NaN`, which start with a capital.
 const LOWERCASE = /^[a-z]/
+const NOT_FUNCTIONS = new Set(['name', 'length', 'prototype'])
 const FUNCTION_NAMESPACES = new Set(['Math', 'console', 'JSON', 'Object', 'Array', 'Number', 'String', 'Boolean', 'Date', 'Promise', 'Reflect', 'Intl', 'BigInt'])
 
 // Whether a node reads a function off a global, `Math.max` as a value; `shadowed` says whether the script declares the global's name itself.
@@ -35,7 +36,7 @@ export function isGlobalFunctionMember(node: t.Node, shadowed: (name: string) =>
   if ((node.type !== 'MemberExpression' && node.type !== 'OptionalMemberExpression') || node.computed || node.object.type !== 'Identifier' || node.property.type !== 'Identifier')
     return false
 
-  return FUNCTION_NAMESPACES.has(node.object.name) && !shadowed(node.object.name) && LOWERCASE.test(node.property.name)
+  return FUNCTION_NAMESPACES.has(node.object.name) && !shadowed(node.object.name) && LOWERCASE.test(node.property.name) && !NOT_FUNCTIONS.has(node.property.name)
 }
 
 // Values no island prop check needs to see.
@@ -124,13 +125,19 @@ export function mayHoldFunction(code: string, names: ReadonlySet<string>): boole
 
     if (node.type === 'CallExpression' && node.callee.type === 'MemberExpression' && !node.callee.computed && node.callee.property.type === 'Identifier' && BUILDER_METHODS.has(node.callee.property.name)) {
       const [callback, ...rest] = node.arguments
+      // `rows.map(Math.abs)` calls the function, it does not pass it on.
+      const body = callback?.type === 'ArrowFunctionExpression' && !callback.async ? callback.body : callback
 
-      return visit(node.callee.object) || visit(callback?.type === 'ArrowFunctionExpression' && !callback.async ? callback.body : callback) || visit(rest)
+      return visit(node.callee.object) || (callback !== undefined && !isGlobalFunctionMember(callback, name => names.has(name)) && visit(body)) || visit(rest)
     }
 
     // A call of `Math.max` returns what its arguments make, it does not pass the function on.
-    if (node.type === 'CallExpression' && isGlobalFunctionMember(node.callee, name => names.has(name)))
+    if ((node.type === 'CallExpression' || node.type === 'OptionalCallExpression') && isGlobalFunctionMember(node.callee, name => names.has(name)))
       return visit(node.arguments)
+
+    // A property of a global's function, `Math.max.name`, is not the function.
+    if ((node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') && isGlobalFunctionMember(node.object, name => names.has(name)))
+      return false
 
     if (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression' || node.type === 'ClassExpression' || isGlobalFunctionMember(node, name => names.has(name)))
       return true
