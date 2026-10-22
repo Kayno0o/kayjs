@@ -787,7 +787,7 @@ import { sharedKey, signStamp } from ${JSON.stringify(join(import.meta.dir, '../
 const warnings = []
 setLogSink((level, message) => warnings.push(level + ' ' + message))
 process.env.NODE_ENV = 'production'
-await pages({ routes: ${JSON.stringify(join(import.meta.dir, '../', ROUTES))}, prebuilt: false${options} })
+await pages({ root: ${JSON.stringify(join(import.meta.dir, 'fixtures/seo'))}, routes: ${JSON.stringify(join(import.meta.dir, '../', ROUTES))}, prebuilt: false${options} })
 signStamp('a', 1)
 console.log(JSON.stringify({ warnings, shared: sharedKey('x')?.toString('hex') }))
 process.exit(0)
@@ -818,7 +818,7 @@ import { signStamp } from ${JSON.stringify(join(import.meta.dir, '../src/server/
 const warnings = []
 setLogSink((level, message) => warnings.push(level + ' ' + message))
 process.env.NODE_ENV = ${JSON.stringify(env)}
-await pages({ routes: ${JSON.stringify(join(import.meta.dir, '../', ROUTES))}, prebuilt: false })
+await pages({ root: ${JSON.stringify(join(import.meta.dir, 'fixtures/seo'))}, routes: ${JSON.stringify(join(import.meta.dir, '../', ROUTES))}, prebuilt: false })
 signStamp('a', 1)
 console.log(JSON.stringify(warnings))
 process.exit(0)
