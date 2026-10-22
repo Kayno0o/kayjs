@@ -8,7 +8,7 @@ import { basename, posix, relative } from 'node:path'
 import { NON_ROOT_TRAILING_SLASH } from '../runtime/base'
 import { escape } from '../runtime/escape'
 import { inLocale, passGuards } from './actions'
-import { API_PREFIX, openApiPaths } from './api-modules'
+import { API_PREFIX, KAY_PREFIX, openApiPaths } from './api-modules'
 import { sharedContext } from './render'
 import { apiRoutePath } from './routes'
 import { markPrivate } from './scope'
@@ -174,6 +174,14 @@ function snakeCase(name: string): string {
   return name.replace(WORD_BREAK, '$1_$2').toLowerCase()
 }
 
+// A path below `apiRoot`, or below `/_kay` for the API modules of an extension served there; any other path as it is.
+function belowRoot(path: string, apiRoot: string): string {
+  if (path.startsWith(KAY_PREFIX))
+    return path.slice(KAY_PREFIX.length - 1)
+
+  return path.startsWith(apiRoot) ? path.slice(apiRoot.length) : path
+}
+
 // An OpenAPI 3.1 document of every route the modules serve, read from the schemas their routes declare, and of the actions that opted in to being tools; a route behind a guard names it, as `x-kay-guards`.
 // Each operation has an `operationId`, the route's own `detail.operationId` as written or its method and path: `get_items_id` for `GET /api/items/{id}`. The MCP tools are named after them, made safe as names.
 export function openApiDocument(modules: MountedApi[], options: { title: string, version: string, base: string, root?: string, apiPath?: string }, actions: DocumentedAction[] = []): Schema {
@@ -194,7 +202,7 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
       for (const path of routePaths(module, route)) {
         const tool = toolSettings(hooks.detail?.tool)
         const operation: Operation = {
-          tags: hooks.detail?.tags ?? [module.mount.slice(apiRoot.length + 1) || 'api'],
+          tags: hooks.detail?.tags ?? [belowRoot(module.mount, apiRoot).slice(1) || 'api'],
           ...hooks.detail?.summary !== undefined && { summary: hooks.detail.summary },
           ...hooks.detail?.description !== undefined && { description: hooks.detail.description },
           ...hooks.detail?.deprecated === true && { deprecated: true },
@@ -264,7 +272,7 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
 
   for (const [path, methods] of Object.entries(paths)) {
     for (const [method, operation] of Object.entries(methods))
-      operation.operationId ??= toolName(`${method}/${path.startsWith(apiRoot) ? path.slice(apiRoot.length) : path}`, tools)
+      operation.operationId ??= toolName(`${method}/${belowRoot(path, apiRoot)}`, tools)
   }
 
   for (const action of actions) {

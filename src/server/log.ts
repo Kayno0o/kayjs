@@ -179,16 +179,16 @@ export function announceStart(app: Elysia, logger: Exclude<Logger, false>, prere
   })
 }
 
-// Logs one line per request, `GET /blog/hello 200 12ms AZnL...`, in the format the `log` option of this `pages()` says; kay's own `/_kay/` routes and the health route are left out.
+// Logs one line per request, `GET /blog/hello 200 12ms AZnL...`, in the format the `log` option of this `pages()` says; kay's own `/_kay/` routes, an extension's API modules served there excepted, and the health route are left out.
 // A hook, so it reaches the app's routes registered after `pages()`.
-export function logRequests(app: Elysia, logger: Exclude<Logger, false>, healthPath?: string): void {
+export function logRequests(app: Elysia, logger: Exclude<Logger, false>, healthPath?: string, apiPrefixes: readonly string[] = []): void {
   const started = new WeakMap<Request, { at: number, method: string, path: string, answered?: number }>()
   const writeLine = writerFor(logger)
 
   app.onRequest(({ request }) => {
     const pathname = pathOf(request.url)
 
-    if (!pathname.startsWith(ASSET_PREFIX) && pathname !== healthPath)
+    if ((!pathname.startsWith(ASSET_PREFIX) || apiPrefixes.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`))) && pathname !== healthPath)
       started.set(request, { at: performance.now(), method: request.method, path: pathname })
   })
 

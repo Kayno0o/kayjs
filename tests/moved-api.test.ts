@@ -40,3 +40,15 @@ it('leaves the app\'s own rewrite in charge of every other path, and is none whe
   expect(withMovedApi(own, [], '/api', '')).toBe(own)
   expect(withMovedApi(undefined, [], '/api', '')).toBeUndefined()
 })
+
+it('leaves a path an API module of the app serves to it, and aliases the rest below the former prefix', () => {
+  const rewrite = withMovedApi(undefined, MOVED, '/api', '', ['/api/cms', '/api/cmsx'])!
+  const below = withMovedApi(undefined, MOVED, '/api', '', ['/api/cms/hook'])!
+
+  expect(rewrite(url('/api/cms'), request)).toBeUndefined()
+  expect(rewrite(url('/api/cms/entries/posts/a'), request)).toBeUndefined()
+  expect(below(url('/api/cms/hook'), request)).toBeUndefined()
+  expect(below(url('/api/cms/hook/x'), request)).toBeUndefined()
+  expect(below(url('/api/cms/entries'), request)).toBe('/_kay/cms/entries')
+  expect(below(url('/api/cms'), request)).toBe('/_kay/cms')
+})

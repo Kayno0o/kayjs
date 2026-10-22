@@ -760,6 +760,11 @@ export function apiMounts(root: string, extensions: KayExtension[] = []): RouteM
   return extensions.flatMap(({ api }) => api ? [{ dir: throughLinks(root, resolve(root, api.dir)), prefix: mountPrefix(api.prefix) }] : [])
 }
 
+// The prefixes under `/_kay` that extensions serve API modules at, which are no files of kay's own.
+export function kayApiPrefixes(extensions: KayExtension[] = []): string[] {
+  return extensions.flatMap(({ api }) => api === undefined ? [] : [mountPrefix(api.prefix)]).filter(prefix => prefix.startsWith('/_kay/'))
+}
+
 // The paths under `apiPath` that extensions moved under `/_kay`, from the prefix they had to where their modules are served now.
 export function movedApiPrefixes(extensions: KayExtension[] = []): { former: string, prefix: string }[] {
   return extensions.flatMap(({ api }) => api?.former === undefined ? [] : [{ former: mountPrefix(api.former), prefix: mountPrefix(api.prefix) }])

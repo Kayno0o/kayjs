@@ -76,7 +76,7 @@ import { remoteImages, remotePatterns } from './remote'
 import { reportServerError, useAppOnError } from './report'
 import { rewriteRequests, withMovedApi } from './rewrite'
 import { routeMatch, routeTable } from './route-table'
-import { movedApiPrefixes, READ_METHODS } from './routes'
+import { kayApiPrefixes, movedApiPrefixes, READ_METHODS } from './routes'
 import { knowRuntimeRules, missingRedirector } from './runtime-redirect-api'
 import { withSavedData } from './save-data'
 import { securityHeaders, setSecurityHeaders } from './security'
@@ -398,9 +398,10 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   useLogger(typeof log === 'boolean' || log)
 
   if (log !== false)
-    logRequests(app, log, options.health === false ? undefined : options.health?.path ?? HEALTH_PATH)
+    logRequests(app, log, options.health === false ? undefined : options.health?.path ?? HEALTH_PATH, kayApiPrefixes(options.extensions))
 
-  const rewrite = withMovedApi(options.rewrite, movedApiPrefixes(options.extensions), apiPathOf(options.apiPath), base)
+  const apiMountsServed: string[] = []
+  const rewrite = withMovedApi(options.rewrite, movedApiPrefixes(options.extensions), apiPathOf(options.apiPath), base, apiMountsServed)
 
   if (rewrite)
     rewriteRequests(app, rewrite, app)
@@ -466,6 +467,8 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   // A flag, not the limits themselves, which the dev tool's closure would otherwise keep alive with whatever they reach.
   const hasActions = actionLimits.size > 0
   const api = await serveApi(app, apiModules, actionOptions)
+
+  apiMountsServed.push(...apiModules.map(module => module.mount))
 
   await serveEndpoints(app, endpoints, actionOptions)
 

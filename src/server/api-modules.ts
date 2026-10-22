@@ -28,9 +28,8 @@ export interface ApiGuard {
 }
 
 export const API_PREFIX = '/api'
-// A prefix an extension's API tree starts with to be served outside `apiPath`.
-const KAY_PREFIX = '/_kay/'
-
+// Where kay serves its own files, and the start of the prefix of an extension's API tree served outside `apiPath`.
+export const KAY_PREFIX = '/_kay/'
 export const OPENAPI_PATH = `${API_PREFIX}/openapi.json`
 export const REFERENCE_PATH = `${API_PREFIX}/reference`
 
@@ -73,7 +72,7 @@ function servedPath(value: unknown, what: string): string {
   if (typeof value !== 'string' || !SERVED_PATH.test(value) || value.includes('//') || value.split('/').includes('..') || value.split('/').includes('.'))
     throw new KayError('config-invalid', `kay: ${what} is ${JSON.stringify(value)}; it takes an absolute path of plain segments without a trailing slash, such as '/tools'`)
 
-  if (value === '/_kay' || value.startsWith('/_kay/'))
+  if (value === '/_kay' || value.startsWith(KAY_PREFIX))
     throw new KayError('config-invalid', `kay: ${what} is ${value}, under /_kay where kay serves its own files; pick another path`)
 
   return value

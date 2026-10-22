@@ -128,7 +128,7 @@ Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(paylo
 - A server started with no NODE_ENV warns as it boots, as it then bundles its browser code at boot and Elysia answers a refused API request with the schema it failed: set NODE_ENV=production where the app is deployed.
 - With NODE_ENV=production, a server's first line, once it listens, says where it listens and what runs: `kay: listening on http://localhost:3000, kay 1.30.0 in production, 12 pages prerendered`.
 - Then every request kay or the app's routes registered after `.use(await pages())` answer is logged to stdout as one line: `GET /blog/hello 200 12ms AZnLe0vUe9qD0uXq9vLwZw`, the method, the path without its query string, which may carry tokens, the status, the milliseconds until the response was made, a streamed one's headers, and the request's id.
-- kay's own `/_kay/` routes, assets included, and the health route, wherever `health.path` puts it, are left out.
+- kay's own `/_kay/` routes, assets included (an extension's API modules served there, kayjs-cms's `/_kay/cms`, are logged), and the health route, wherever `health.path` puts it, are left out.
 - `true` in kay.config.ts's `log` logs them outside production too, `false` never.
 - kay's own messages, an error it caught, a warning about the app, a shutdown notice, go out in any mode, as `kay: ` and the message, an error's source-mapped stack on the lines below.
 - `log` sets the format of both: `'json'` writes one JSON object per line for a log collector, on stdout for info and on stderr for warnings and errors, and a function receives each entry instead, typed `LogEntry` from `kay/server`:

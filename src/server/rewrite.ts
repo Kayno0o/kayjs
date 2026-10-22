@@ -89,7 +89,8 @@ export function rewriteRequests(app: Elysia, rewrite: Rewrite, fallback: Elysia)
 }
 
 // `rewrite`, after the paths under `apiPath` that an extension moved under `/_kay` answer as the paths they moved to, so an older page or client still reaches them.
-export function withMovedApi(rewrite: Rewrite | undefined, moved: { former: string, prefix: string }[], apiPath: string, base: string): Rewrite | undefined {
+// A path an API module of the app serves (`served`, filled as the modules are known) is left to it.
+export function withMovedApi(rewrite: Rewrite | undefined, moved: { former: string, prefix: string }[], apiPath: string, base: string, served: readonly string[] = []): Rewrite | undefined {
   if (moved.length === 0)
     return rewrite
 
@@ -99,7 +100,7 @@ export function withMovedApi(rewrite: Rewrite | undefined, moved: { former: stri
     for (const { former, prefix } of moved) {
       const from = `${apiPath}${former}`
 
-      if (path === from || path.startsWith(`${from}/`))
+      if ((path === from || path.startsWith(`${from}/`)) && !served.some(mount => (mount === from || mount.startsWith(`${from}/`)) && (path === mount || path.startsWith(`${mount}/`))))
         return `${url.pathname.slice(0, url.pathname.length - path.length)}${prefix}${path.slice(from.length)}${url.search}`
     }
 
