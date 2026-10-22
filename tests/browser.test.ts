@@ -353,14 +353,15 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
 
   it('names an element no alignment brings into the view as out of view', async () => {
     for (const javaScript of [true, false]) {
-      const own = await site.open('/', { javaScript, timeout: '600ms' })
+      const own = await site.open('/', { javaScript })
 
       try {
         // Above the top of the page, where no scroll reaches.
         await own.evaluate(() => {
           document.body.insertAdjacentHTML('afterbegin', '<a id="above" href="#above" style="position:absolute;top:-3000px;left:0;display:block;height:30px">above</a>')
         })
-        await expect(own.click('#above')).rejects.toThrow('kay: #above is out of view, waiting for it to be actionable')
+        // The short wait is the click's alone: the page loads within the default one, which a busy runner needs.
+        await expect(own.click('#above', { timeout: '600ms' })).rejects.toThrow('kay: #above is out of view, waiting for it to be actionable')
         expect(await own.evaluate(() => location.hash)).toBe('')
       }
       finally {
