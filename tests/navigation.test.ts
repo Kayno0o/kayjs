@@ -887,7 +887,8 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(await page.value('input[name="title"]')).toBe('taken')
     expect(await sameDocument()).toBe(true)
     expect(await page.text('button.player')).toBe('Played 3')
-  })
+    // Above the sum of its waits (two of 20 s, the rest 5 s each), so a hang fails on the wait that names what it waited for.
+  }, 60_000)
 
   it('goes back by swapping too, the page as it was', async () => {
     await page.back()
