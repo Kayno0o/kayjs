@@ -85,7 +85,7 @@ test('a conversation past the input cap gets 413 and words from the chat action,
 
 test('a chat tells the visitor they talk to an AI whose provider gets their messages, a prop words it and an empty one hides it', async () => {
   const shown = (await site.visit('/assistant')).html
-  const line = /<p class="kai-chat-disclosure">([^<]*)<\/p>/
+  const line = /<p class="kai-chat-disclosure"[^>]*>([^<]*)<\/p>/
 
   expect(shown.match(line)?.[1]).toBe('You are talking to an AI. Your messages are sent to its provider to answer.')
   expect((await site.visit('/named')).html.match(line)?.[1]).toBe('Answers come from Ollama on our own server.')

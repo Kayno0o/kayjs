@@ -1,5 +1,8 @@
 ---
 import type { ToolCall } from './types'
+import { recipe } from 'kay'
+
+const look = recipe({ parts: { root: 'kai-chat-calls', summary: 'kai-chat-calls-summary', list: 'kai-chat-calls-list', call: 'kai-chat-call', name: 'kai-chat-call-name', status: 'kai-chat-call-status', title: 'kai-chat-call-title', code: 'kai-chat-call-code' } })
 
 const { calls, labels, details, runningLabel, doneLabel, failedLabel, argumentsLabel, resultLabel } = props<{
   calls: ToolCall[]
@@ -36,23 +39,23 @@ function summary() {
   return failed ? `${line} (${LABELS.failed})` : line
 }
 ---
-details.kai-chat-calls
-  summary.kai-chat-calls-summary {summary()}
-  ul.kai-chat-calls-list
+details(part="root")
+  summary(part="summary") {summary()}
+  ul(part="list")
     for call of calls key={call.id}
-      li.kai-chat-call(data-status={call.status})
+      li(part="call" data-status={call.status})
         if details
           details
             summary
-              span.kai-chat-call-name {call.name}
+              span(part="name") {call.name}
               |
-              span.kai-chat-call-status {status(call)}
-            p.kai-chat-call-title {argumentsLabel}
-            pre.kai-chat-call-code {JSON.stringify(call.input, null, 2)}
+              span(part="status") {status(call)}
+            p(part="title") {argumentsLabel}
+            pre(part="code") {JSON.stringify(call.input, null, 2)}
             if call.result !== undefined
-              p.kai-chat-call-title {resultLabel}
-              pre.kai-chat-call-code {call.result}
+              p(part="title") {resultLabel}
+              pre(part="code") {call.result}
         else
-          span.kai-chat-call-name {call.name}
+          span(part="name") {call.name}
           |
-          span.kai-chat-call-status {status(call)}
+          span(part="status") {status(call)}

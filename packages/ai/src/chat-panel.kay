@@ -1,9 +1,11 @@
 ---
 import type { Snippet } from 'kay'
-import { signal, uid } from 'kay'
+import { recipe, signal, uid } from 'kay'
 import { wording } from 'kay/words'
 
-const { label = wording('ai.chat.label', 'Chat'), openLabel = wording('ai.chat.open', 'Open the chat'), closeLabel = wording('ai.chat.close', 'Close the chat'), icon, closeIcon, newIcon, expandIcon, collapseIcon, newLabel = wording('ai.chat.new', 'New conversation'), expandLabel = wording('ai.chat.expand', 'Enlarge the chat'), collapseLabel = wording('ai.chat.collapse', 'Shrink the chat'), class: className } = props<{
+const look = recipe({ parts: { root: 'kai-launcher', panel: 'kai-launcher-panel', head: 'kai-launcher-head', title: 'kai-launcher-title', actions: 'kai-launcher-actions', action: 'kui-icon-btn', expand: 'kui-icon-btn kai-launcher-expand', body: 'kai-launcher-body', button: 'kui-icon-btn kai-launcher-button', glyph: 'kai-launcher-glyph' } })
+
+const { label = wording('ai.chat.label', 'Chat'), openLabel = wording('ai.chat.open', 'Open the chat'), closeLabel = wording('ai.chat.close', 'Close the chat'), icon, closeIcon, newIcon, expandIcon, collapseIcon, newLabel = wording('ai.chat.new', 'New conversation'), expandLabel = wording('ai.chat.expand', 'Enlarge the chat'), collapseLabel = wording('ai.chat.collapse', 'Shrink the chat') } = props<{
   // Names the panel for screen readers and heads it.
   label?: string | undefined
   // Name and tooltip of the button while the panel is closed, and while it is open.
@@ -19,7 +21,6 @@ const { label = wording('ai.chat.label', 'Chat'), openLabel = wording('ai.chat.o
   newLabel?: string | undefined
   expandLabel?: string | undefined
   collapseLabel?: string | undefined
-  class?: string | undefined
 }>()
 
 const open = signal(false)
@@ -52,21 +53,21 @@ function keyDown(event: KeyboardEvent) {
   }
 }
 ---
-.kai-launcher(class={className} onKeyDown={keyDown})
-  section.kai-launcher-panel(id={panelId} role="dialog" aria-labelledby={`${panelId}-title`} tabindex="-1" hidden={!open()} data-large={large()} ref={element => { panel = element }})
-    header.kai-launcher-head
-      h2.kai-launcher-title(id={`${panelId}-title`}) {label}
-      .kai-launcher-actions
-        button.kui-icon-btn(type="button" aria-label={newLabel} data-tooltip={newLabel} data-size="md" data-variant="ghost" data-tooltip-placement="bottom span-left" data-tone="neutral" onClick={startOver})
+div(part="root" onKeyDown={keyDown})
+  section(part="panel" id={panelId} role="dialog" aria-labelledby={`${panelId}-title`} tabindex="-1" hidden={!open()} data-large={large()} ref={element => { panel = element }})
+    header(part="head")
+      h2(part="title" id={`${panelId}-title`}) {label}
+      div(part="actions")
+        button(part="action" type="button" aria-label={newLabel} data-tooltip={newLabel} data-size="md" data-variant="ghost" data-tooltip-placement="bottom span-left" data-tone="neutral" onClick={startOver})
           | {newIcon}
-        button.kui-icon-btn.kai-launcher-expand(type="button" aria-label={large() ? collapseLabel : expandLabel} data-tooltip={large() ? collapseLabel : expandLabel} data-size="md" data-variant="ghost" data-tooltip-placement="bottom span-left" data-tone="neutral" onClick={() => large.set(!large())})
+        button(part="expand" type="button" aria-label={large() ? collapseLabel : expandLabel} data-tooltip={large() ? collapseLabel : expandLabel} data-size="md" data-variant="ghost" data-tooltip-placement="bottom span-left" data-tone="neutral" onClick={() => large.set(!large())})
           | {large() ? collapseIcon : expandIcon}
-        button.kui-icon-btn(type="button" aria-label={closeLabel} data-tooltip={closeLabel} data-size="md" data-variant="ghost" data-tooltip-placement="bottom span-left" data-tone="neutral" onClick={hide})
+        button(part="action" type="button" aria-label={closeLabel} data-tooltip={closeLabel} data-size="md" data-variant="ghost" data-tooltip-placement="bottom span-left" data-tone="neutral" onClick={hide})
           | {closeIcon}
-    .kai-launcher-body
+    div(part="body")
       slot
-  button.kui-icon-btn.kai-launcher-button(type="button" ref={element => { button = element }} aria-label={openLabel} aria-expanded={open()} aria-controls={panelId} data-tooltip={open() ? closeLabel : openLabel} data-tooltip-placement="left" data-size="lg" data-variant="solid" data-tone="accent" onClick={() => open() ? hide() : show()})
-    span.kai-launcher-glyph(hidden={open()})
+  button(part="button" type="button" ref={element => { button = element }} aria-label={openLabel} aria-expanded={open()} aria-controls={panelId} data-tooltip={open() ? closeLabel : openLabel} data-tooltip-placement="left" data-size="lg" data-variant="solid" data-tone="accent" onClick={() => open() ? hide() : show()})
+    span(part="glyph" hidden={open()})
       | {icon}
-    span.kai-launcher-glyph(hidden={!open()})
+    span(part="glyph" hidden={!open()})
       | {closeIcon}

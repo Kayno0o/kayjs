@@ -1,13 +1,26 @@
 ---
 import type { Action, ActionStream, Failure, SanitizeOptions, Snippet } from 'kay'
 import type { CodeBlock, Message, Progress, ToolCall } from './types'
-import { ActionError, effect, onCleanup, onMount, sanitizeHtml, signal, trustHtml, untrack } from 'kay'
+import { ActionError, effect, onCleanup, onMount, recipe, sanitizeHtml, signal, trustHtml, untrack } from 'kay'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import { markdownHtml } from 'kay/markdown'
 import { wording } from 'kay/words'
 import { MARK, MARKED, withoutMarker } from './marker'
 import { posted, POSTED_CHARACTERS, restored, shrunk, stored } from './chat-history'
 import Calls from './chat-calls.kay'
 import './chat.css'
+
+// The chat's own classes are its parts, so an app restyles them from src/ui.ts or a `class` object. The table of a reply is built as a string and keeps its class.
+const look = recipe({
+  parts: { root: 'kai-chat', empty: 'kai-chat-empty', greeting: 'kai-chat-greeting', suggestions: 'kai-chat-suggestions', suggestion: 'kai-chat-suggestion', log: 'kai-chat-log', turn: 'kai-chat-turn', text: 'kai-chat-text', thinking: 'kai-chat-text kai-chat-thinking', note: 'kai-chat-note', status: 'kai-chat-status', disclosure: 'kai-chat-disclosure', form: 'kai-chat-form', field: 'kui-field-input', send: 'kai-chat-send' },
+  variants: {
+    variant: { bubble: '', plain: '' },
+    tone: { accent: '', neutral: '' },
+    size: { sm: '', md: '', lg: '' },
+  },
+  defaults: { variant: 'bubble', tone: 'accent', size: 'md' },
+})
 
 // What a reply keeps of markdown: no image, which a model reading a hostile page could point at a URL carrying the conversation, and no task checkbox. Tables stay.
 const REPLY: SanitizeOptions = { tags: ['table', 'thead', 'tbody', 'tr', 'th', 'td'] }
@@ -32,7 +45,7 @@ interface Turn extends Message {
   code?: CodeBlock[] | undefined
 }
 
-const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placeholder = wording('ai.chat.placeholder', 'Write a message…'), sendLabel = wording('ai.chat.send', 'Send'), stopLabel = wording('ai.chat.stop', 'Stop'), retryLabel = wording('ai.chat.retry', 'Try again'), thinkingLabel = wording('ai.chat.thinking', 'Thinking…'), stoppedLabel = wording('ai.chat.stopped', 'Stopped'), errorMessage = wording('ai.chat.error', 'The reply failed.'), keep = 20, maxChars = POSTED_CHARACTERS, tableLabel = wording('ai.chat.table', 'Table'), toolDetails = true, greeting = wording('ai.chat.greeting', 'How can I help?'), disclosure = wording('ai.chat.disclosure', 'You are talking to an AI. Your messages are sent to its provider to answer.'), suggestions = [], toolLabels = {}, sendIcon, stopIcon, remember, links = 'apart', runningLabel = wording('ai.chat.running', 'Running'), doneLabel = wording('ai.chat.done', 'Done'), failedLabel = wording('ai.chat.failed', 'Failed'), argumentsLabel = wording('ai.chat.arguments', 'Arguments'), resultLabel = wording('ai.chat.result', 'Result'), class: className } = props<{
+const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placeholder = wording('ai.chat.placeholder', 'Write a message…'), sendLabel = wording('ai.chat.send', 'Send'), stopLabel = wording('ai.chat.stop', 'Stop'), retryLabel = wording('ai.chat.retry', 'Try again'), thinkingLabel = wording('ai.chat.thinking', 'Thinking…'), stoppedLabel = wording('ai.chat.stopped', 'Stopped'), errorMessage = wording('ai.chat.error', 'The reply failed.'), keep = 20, maxChars = POSTED_CHARACTERS, tableLabel = wording('ai.chat.table', 'Table'), toolDetails = true, greeting = wording('ai.chat.greeting', 'How can I help?'), disclosure = wording('ai.chat.disclosure', 'You are talking to an AI. Your messages are sent to its provider to answer.'), suggestions = [], toolLabels = {}, sendIcon, stopIcon, remember, links = 'apart', runningLabel = wording('ai.chat.running', 'Running'), doneLabel = wording('ai.chat.done', 'Done'), failedLabel = wording('ai.chat.failed', 'Failed'), argumentsLabel = wording('ai.chat.arguments', 'Arguments'), resultLabel = wording('ai.chat.result', 'Result'), variant = 'bubble', tone = 'accent', size = 'md' } = props<{
   // The page's streaming action, `action(schema, ({ messages }) => ask(messages))`, which may also `ctx.fail`; the chat posts the latest messages to it and reads the reply as it streams.
   // Returning `ask(messages, { tools }).progress()` instead streams the tool calls as well, which the chat shows before the text of their turn.
   action: Action<{ messages: Message[] }, AsyncIterable<string | Progress> | Failure<unknown>>
@@ -79,7 +92,12 @@ const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placehol
   remember?: string | undefined
   // Where a link of a reply opens: `apart` in a new tab, so following it does not swap the page and drop a conversation that lives in it; `here` for a link of this site opens in place, for a chat that survives a swap (kept by `persist`, or by `remember`), while a link to another site still opens apart.
   links?: 'apart' | 'here' | undefined
-  class?: string | undefined
+  // The form: `bubble` frames the visitor's messages, `plain` draws them as bare text.
+  variant?: 'bubble' | 'plain' | undefined
+  // `accent` colours the send button and the visitor's bubble, `neutral` draws them in the text colour.
+  tone?: 'accent' | 'neutral' | undefined
+  // The type scale of the turns and the suggestions.
+  size?: 'sm' | 'md' | 'lg' | undefined
 }>()
 
 let nextId = 0
@@ -399,58 +417,58 @@ function scrolled() {
 }
 ---
 // The inline icons follow Tabler Icons and Feather (MIT), whose notices are in THIRD-PARTY-NOTICES.md.
-section.kai-chat(class={className} onKeyDown={escape} data-empty={history().length === 0 && !busy()} ref={element => element.addEventListener('kai-chat-new', reset)})
+section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !busy()} data-variant={variant} data-tone={tone} data-size={size} ref={element => element.addEventListener('kai-chat-new', reset)})
   if history().length === 0 && !busy()
-    .kai-chat-empty
-      p.kai-chat-greeting {greeting}
+    div(part="empty")
+      p(part="greeting") {greeting}
       if suggestions.length > 0
-        ul.kai-chat-suggestions
+        ul(part="suggestions")
           for question of suggestions key={question}
             li
-              button.kai-chat-suggestion(type="button" onClick={() => ask(question)}) {question}
+              button(part="suggestion" type="button" onClick={() => ask(question)}) {question}
   // The log is the turns so far; the reply streaming in is hidden from screen readers until it is whole, so the finished turn is announced once, not word by word. The status line says the thinking label, then each tool call as it starts and ends.
-  .kai-chat-log(role="log" aria-label={label} tabindex="0" ref={watch} onScroll={scrolled})
+  div(part="log" role="log" aria-label={label} tabindex="0" ref={watch} onScroll={scrolled})
     for turn of history() key={turn.id}
-      article.kai-chat-turn(data-role={turn.role})
+      article(part="turn" data-role={turn.role})
         if turn.role === 'user'
-          p.kai-chat-text {turn.content}
+          p(part="text") {turn.content}
         else
           if turn.calls && turn.calls.length > 0
             Calls(calls={turn.calls} labels={toolLabels} details={toolDetails} runningLabel={runningLabel} doneLabel={doneLabel} failedLabel={failedLabel} argumentsLabel={argumentsLabel} resultLabel={resultLabel})
           if turn.content !== ''
-            .kai-chat-text(innerHTML={markdown(turn.content, turn.code)})
+            div(part="text" innerHTML={markdown(turn.content, turn.code)})
           if turn.stopped
-            small.kai-chat-note {stoppedLabel}
+            small(part="note") {stoppedLabel}
     if busy()
-      article.kai-chat-turn(data-role="assistant" data-pending="" aria-hidden="true")
+      article(part="turn" data-role="assistant" data-pending="" aria-hidden="true")
         if calls().length > 0
           Calls(calls={calls()} labels={toolLabels} details={toolDetails} runningLabel={runningLabel} doneLabel={doneLabel} failedLabel={failedLabel} argumentsLabel={argumentsLabel} resultLabel={resultLabel})
         if partial() !== ''
-          .kai-chat-text(innerHTML={markdown(partial(), code(), false)})
+          div(part="text" innerHTML={markdown(partial(), code(), false)})
         else if calls().length === 0
-          p.kai-chat-text.kai-chat-thinking {thinkingLabel}
-  .kai-chat-status(role="status" aria-atomic="false")
+          p(part="thinking") {thinkingLabel}
+  div(part="status" role="status" aria-atomic="false")
     for line of spoken() key={line.id}
       p {line.text}
     if busy() && partial() === '' && calls().length === 0
       p {thinkingLabel}
   if failure()
-    .kui-notice(role="alert" data-tone="danger")
+    Notice(tone="danger")
       | {failure()}
       |
       if !busy() && !takenBack() && history().at(-1)?.role === 'user'
-        button.kui-btn(type="button" onClick={() => void send(true)}) {retryLabel}
+        Button(label={retryLabel} onClick={() => { void send(true) }})
   if disclosure !== ''
-    p.kai-chat-disclosure {disclosure}
-  form.kai-chat-form(onSubmit={event => { event.preventDefault(); void send() }})
-    textarea.kui-field-input(ref={element => { field = element }} bind:value={draft} rows="1" aria-label={label} placeholder={placeholder} onKeyDown={keyDown})
+    p(part="disclosure") {disclosure}
+  form(part="form" onSubmit={event => { event.preventDefault(); void send() }})
+    textarea(part="field" ref={element => { field = element }} bind:value={draft} rows="1" aria-label={label} placeholder={placeholder} onKeyDown={keyDown})
     if busy()
-      button.kai-chat-send(type="button" aria-label={stopLabel} data-tooltip={stopLabel} onClick={stop})
+      button(part="send" type="button" aria-label={stopLabel} data-tooltip={stopLabel} onClick={stop})
         slot stopIcon
           svg.kui-icon(viewBox="0 0 24 24" fill="currentColor" aria-hidden="true")
             rect(x="6" y="6" width="12" height="12" rx="2")
     else
-      button.kai-chat-send(type="submit" aria-label={sendLabel} data-tooltip={sendLabel})
+      button(part="send" type="submit" aria-label={sendLabel} data-tooltip={sendLabel})
         slot sendIcon
           svg.kui-icon(viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true")
             path(d="M12 19V5M5 12l7-7 7 7")

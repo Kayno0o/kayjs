@@ -441,3 +441,28 @@
   color: inherit;
   text-decoration: underline;
 }
+
+/* The chat's props: `tone="neutral"` draws the send button and the visitor's bubble in the text colour instead of the accent, `variant="plain"` draws the visitor's message as bare text, `size` scales the type of the turns and the suggestions. */
+.kai-chat[data-tone='neutral'] {
+  --kai-chat-accent: var(--color-kui-text);
+}
+
+.kai-chat[data-tone='neutral'] .kai-chat-send {
+  color: var(--color-kui-canvas);
+}
+
+.kai-chat[data-variant='plain'] .kai-chat-turn[data-role='user'] {
+  max-width: none;
+  padding: 0;
+  border-radius: 0;
+  background-color: transparent;
+  font-weight: 600;
+}
+
+.kai-chat[data-size='sm'] :where(.kai-chat-turn, .kai-chat-suggestion) {
+  font-size: 0.8125rem;
+}
+
+.kai-chat[data-size='lg'] :where(.kai-chat-turn, .kai-chat-suggestion) {
+  font-size: 1rem;
+}
