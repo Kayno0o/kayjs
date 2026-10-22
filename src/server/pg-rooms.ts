@@ -184,10 +184,10 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
     events.forget()
   }
 
-  const read = async (db: SQL) => {
+  const read = async (db: SQL): Promise<void | 'busy'> => {
     // A restarted reading does not begin while the one given up on is still running.
     if (reading)
-      return
+      return 'busy'
 
     reading = true
 

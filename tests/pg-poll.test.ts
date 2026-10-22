@@ -1,6 +1,7 @@
 import type { SQL } from 'bun'
 import type { PgHandle } from '../src/server/pg-data'
 import { describe, expect, it } from 'bun:test'
+import { logSink, setLogSink } from '../src/runtime/log'
 import { pgCache } from '../src/server/pg-cache'
 import { pgHandle } from '../src/server/pg-data'
 import { pgLive } from '../src/server/pg-live'
@@ -60,6 +61,37 @@ describe('the shared event poller', () => {
     await Bun.sleep(400)
     remove()
     expect(started).toBeLessThanOrEqual(4)
+  })
+
+  it('logs a streak of failed runs once, and a run skipped as busy does not end it', async () => {
+    const sink = logSink()
+    const logged: string[] = []
+
+    setLogSink((level, message) => void logged.push(`${level}: ${message}`))
+
+    try {
+      const outcomes: ('fail' | 'busy' | 'ok')[] = ['fail', 'busy', 'fail', 'ok', 'fail']
+      const done: number[] = []
+      const remove = pollerOf({ db: async () => ({}) as SQL }).add({ every: 5, wanted: () => true, run: async () => {
+        const outcome = outcomes[done.length] ?? 'ok'
+
+        done.push(done.length)
+
+        if (outcome === 'fail')
+          throw new Error('down')
+
+        return outcome === 'busy' ? 'busy' : undefined
+      }, failed: 'reading failed' }, true)
+
+      while (done.length < outcomes.length)
+        await Bun.sleep(10)
+
+      remove()
+      expect(logged.filter(line => line.includes('reading failed'))).toHaveLength(2)
+    }
+    finally {
+      setLogSink(sink!)
+    }
   })
 
   it('drops the writes past the queue bound while the database does not answer', async () => {

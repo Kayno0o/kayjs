@@ -70,7 +70,8 @@ export interface PollTask {
   every: number
   // Whether there is anything to read; the database is not reached when not.
   wanted: () => boolean
-  run: (db: SQL) => Promise<void>
+  // Resolves 'busy' when it did not read because its last run is still going: that is neither a success nor a failure, so a streak of failed runs goes on.
+  run: (db: SQL) => Promise<void | 'busy'>
   // What the log says when a streak of failed runs begins.
   failed: string
 }
@@ -123,8 +124,10 @@ function createPoller(pg: PgHandle): Poller {
 
   const runEntry = async (entry: Entry, db: Promise<SQL>) => {
     try {
-      await timeLimited((async () => entry.task.run(await db))(), DB_TIMEOUT_MS, 'reading the events')
-      entry.failing = false
+      const outcome = await timeLimited((async () => entry.task.run(await db))(), DB_TIMEOUT_MS, 'reading the events')
+
+      if (outcome !== 'busy')
+        entry.failing = false
     }
     catch (error) {
       // A streak of failed reads logs once, as the poll runs several times a second.
