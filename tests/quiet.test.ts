@@ -8,7 +8,8 @@ import { scratchDir } from './scratch'
 
 const cli = join(import.meta.dir, '../src/cli.ts')
 const dirs: string[] = []
-const COLOUR_ENV = new Set(['NO_COLOR', 'FORCE_COLOR', 'NODE_DISABLE_COLORS'])
+// The worker id goes too: a kay command run under it reads its build from `.kay/client-<id>`, not the `.kay/client` these projects hold.
+const LEFT_OUT_ENV = new Set(['NO_COLOR', 'FORCE_COLOR', 'NODE_DISABLE_COLORS', 'BUN_TEST_WORKER_ID'])
 const unformatted = '---  client\nconst a = 1\n---\np {a}\n'
 const counter = '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {n()}\n'
 
@@ -27,7 +28,7 @@ async function project(files: Record<string, string>): Promise<string> {
 
 // The environment of a pipe with no colour asked either way, the test runner's own taken off.
 async function kay(args: string[], cwd: string, env: Record<string, string> = {}) {
-  const inherited = Object.fromEntries(Object.entries(process.env).filter(([name]) => !COLOUR_ENV.has(name)))
+  const inherited = Object.fromEntries(Object.entries(process.env).filter(([name]) => !LEFT_OUT_ENV.has(name)))
   const child = Bun.spawn([process.execPath, cli, ...args], { cwd, env: { ...inherited, ...env }, stdout: 'pipe', stderr: 'pipe' })
   const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
