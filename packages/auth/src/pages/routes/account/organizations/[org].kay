@@ -48,7 +48,10 @@ export const revoke = action(schemas.id, async ({ id }, ctx) => {
   return result.ok ? 'done' : ctx.fail(400, { error: result.error })
 })
 
-export const leave = action(async (ctx) => {
+export const leave = action(schemas.adminDelete, async ({ confirm }, ctx) => {
+  if (confirm !== true)
+    return ctx.fail(400, { error: 'form' })
+
   const auth = ctx.locals.auth
   const result = await auth.leaveOrganization(String(ctx.params.org))
 
@@ -171,7 +174,10 @@ if manages
         input(name="slug" maxlength="64" autocapitalize="none" value={organization.slug ?? ''})
       Button(type="submit" label={wording('auth.organizations.save', 'Save')})
 PageSection(title={wording('auth.organizations.leave', 'Leave the organization')})
-  form(action={leave})
+  form.flex.flex-col.gap-3(action={leave})
+    label.flex.items-center.gap-2
+      input(type="checkbox" name="confirm" required)
+      | {wording('auth.organizations.leaveConfirm', 'I want to leave')}
     Button(type="submit" tone="danger" label={wording('auth.organizations.leave', 'Leave the organization')})
 if owns
   PageSection(title={wording('auth.organizations.delete', 'Delete the organization')})

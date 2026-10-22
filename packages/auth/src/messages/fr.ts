@@ -152,6 +152,7 @@ export default defineMessages({
       rename: 'Nom et adresse',
       save: 'Enregistrer',
       leave: 'Quitter l’organisation',
+      leaveConfirm: 'Je veux partir',
       delete: 'Supprimer l’organisation',
       deleteIntro: 'L’organisation, ses membres et ses invitations sont supprimés définitivement. Cela ne peut pas être annulé.',
       deleteConfirm: 'J’ai compris',

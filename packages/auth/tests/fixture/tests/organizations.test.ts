@@ -85,7 +85,8 @@ describe('the organization pages', () => {
     expect(page.status).toBe(200)
     expect(text(page, 'title')).toBe('Acme Gate - Organizations')
     expect(page.find('[data-member]').map(row => row.attributes['data-member'])).toEqual([owner.id])
-    expect(page.find('input[name="confirm"]')).toHaveLength(1)
+    // The ticked boxes of leaving and of deleting.
+    expect(page.find('input[name="confirm"]')).toHaveLength(2)
 
     const other = await person('new-other@example.com')
     const lists = await other.visitor.visit(LIST)
@@ -102,7 +103,7 @@ describe('the organization pages', () => {
     const stranger = await person('roles-stranger@example.com')
     const seen = await plain.visitor.visit(from)
 
-    expect([seen.find('input[name="email"]').length, seen.find('[data-member] form').length, seen.find('input[name="roles"]').length, seen.find('input[name="confirm"]').length]).toEqual([0, 0, 0, 0])
+    expect([seen.find('input[name="email"]').length, seen.find('[data-member] form').length, seen.find('input[name="roles"]').length, seen.find('input[name="confirm"]').length]).toEqual([0, 0, 0, 1])
 
     const forbidden = { error: 'forbidden' }
 
@@ -124,7 +125,7 @@ describe('the organization pages', () => {
 
     expect(adminView.find(`[data-member="${owner.id}"] form`)).toHaveLength(0)
     expect(adminView.find(`[data-member="${plain.id}"] input[name="roles"]`).map(box => box.attributes.value)).toEqual(['admin', 'member'])
-    expect(adminView.find('input[name="confirm"]')).toHaveLength(0)
+    expect(adminView.find('input[name="confirm"]')).toHaveLength(1)
 
     // A post from a page of an organization they are in never reaches another one.
     for (const action of [setRoles, removeMember])
@@ -141,7 +142,7 @@ describe('the organization pages', () => {
     expect(await owner.visitor.call(setRoles, { userId: owner.id, roles: ['admin'] }, { from })).toBe('done')
 
     // `second` is the last owner now.
-    for (const [action, input] of [[setRoles, { userId: second.id, roles: ['admin'] }], [removeMember, { userId: second.id }], [leave, {}]] as const)
+    for (const [action, input] of [[setRoles, { userId: second.id, roles: ['admin'] }], [removeMember, { userId: second.id }], [leave, { confirm: true }]] as const)
       expect((await second.visitor.refusal(action, input as never, { from })).data).toEqual({ error: 'last-owner' })
 
     expect((await store.members!.get((await store.organizations!.findBySlug('last-owner'))!.id, second.id))!.roles).toEqual(['owner'])
@@ -161,7 +162,9 @@ describe('the organization pages', () => {
     // A member leaving goes back to the list and is no longer in it.
     const bob = await member('renamed-cycle', owner, 'cycle-bob@example.com', ['member'])
 
-    expect((await bob.visitor.submit(leave, {}, { from: `${LIST}/renamed-cycle` })).url).toBe(LIST)
+    expect((await bob.visitor.refusal(leave, {}, { from: `${LIST}/renamed-cycle` })).data).toEqual({ error: 'form' })
+    expect((await bob.visitor.visit(LIST)).find('[data-organization]')).toHaveLength(1)
+    expect((await bob.visitor.submit(leave, { confirm: 'on' }, { from: `${LIST}/renamed-cycle` })).url).toBe(LIST)
     expect((await bob.visitor.visit(LIST)).find('[data-organization]')).toHaveLength(0)
     expect((await owner.visitor.refusal(remove, {}, { from: `${LIST}/renamed-cycle` })).data).toEqual({ error: 'form' })
     expect((await owner.visitor.submit(remove, { confirm: 'on' }, { from: `${LIST}/renamed-cycle` })).url).toBe(LIST)
