@@ -50,7 +50,7 @@ it('pins a notice, which every open board hears of at once and confirmed members
   // The queue runs the announcement, which queues one mail per confirmed member but the author, sent as the queues drain.
   await outbox.waitFor(reader, { site })
   expect(outbox.to(reader).map(each => each.subject)).toEqual(['New notice: Bake sale'])
-  expect(outbox.to(reader)[0]!.html).toContain(`http://localhost:3000/notices/${id}`)
+  expect(outbox.to(reader)[0]!.html).toContain(`http://localhost/notices/${id}`)
   expect(outbox.to(author)).toEqual([])
   expect(outbox.to(unconfirmed)).toEqual([])
 

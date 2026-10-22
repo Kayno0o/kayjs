@@ -834,9 +834,19 @@ describe('kay new', () => {
       // The first migration is generated on a Postgres the test user may create databases on, which CI always has: the tests then run on a database per file.
       if ((TEST_DATABASE_URL ?? '') !== '' || (process.env.CI ?? '') !== '') {
         const env = { ...process.env, ...TEST_DATABASE_URL !== undefined && TEST_DATABASE_URL !== '' && { DATABASE_URL: TEST_DATABASE_URL } }
-        // The owner's URL in .env is read before DATABASE_URL, so the generation names the test database itself; the tests keep their copy per file.
-        const generate = Bun.spawn([process.execPath, 'run', 'db:generate', 'init'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...env, ...TEST_DATABASE_URL !== undefined && TEST_DATABASE_URL !== '' && { MIGRATE_DATABASE_URL: TEST_DATABASE_URL } } })
+        // The owner's URL in .env is read before DATABASE_URL, so the generation is pointed at an empty database of its own: the one TEST_DATABASE_URL names need not exist, as the tests make their copy per file.
+        const scratch = TEST_DATABASE_URL !== undefined && TEST_DATABASE_URL !== '' ? new URL(TEST_DATABASE_URL) : undefined
+        const admin = scratch && new Bun.SQL(Object.assign(new URL(scratch), { pathname: '/postgres' }).href)
+        const name = `kay_new_generate_${process.pid}`
+
+        await admin?.unsafe(`DROP DATABASE IF EXISTS ${name}`)
+        await admin?.unsafe(`CREATE DATABASE ${name}`)
+
+        const generate = Bun.spawn([process.execPath, 'run', 'db:generate', 'init'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...env, ...scratch && { MIGRATE_DATABASE_URL: Object.assign(new URL(scratch), { pathname: `/${name}` }).href } } })
         const [generated, generateErrors] = await Promise.all([new Response(generate.stdout).text(), new Response(generate.stderr).text(), generate.exited])
+
+        await admin?.unsafe(`DROP DATABASE IF EXISTS ${name}`)
+        await admin?.close()
 
         expect({ generated: generated.includes('Generated'), generateErrors }).toEqual({ generated: true, generateErrors: expect.not.stringContaining('rror') })
 
