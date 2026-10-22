@@ -11,17 +11,17 @@ describe('the Bun kay runs on', () => {
     const floor = engines.bun.replace('>=', '')
 
     expect(bunProblem({ version: floor })).toBeUndefined()
-    expect(bunProblem({ version: '1.4.4-canary.1+6c1eb067e', range: '>=1.4.3' })).toBeUndefined()
-    expect(bunProblem({ version: '1.4.2', path: '/usr/bin/bun', range: '>=1.4.3' })).toBe('Bun 1.4.2 at /usr/bin/bun is under the >=1.4.3 kay needs: run `bun upgrade`')
+    expect(bunProblem({ version: '1.4.4-canary.1+6c1eb067e', range: '>=1.4.4' })).toBeUndefined()
+    expect(bunProblem({ version: '1.4.2', path: '/usr/bin/bun', range: '>=1.4.4' })).toBe('Bun 1.4.2 at /usr/bin/bun is under the >=1.4.4 kay needs: run `bun upgrade`')
   })
 
   it('names the npm bun package of the project, or of a workspace above it, as the one to update, not a global one', () => {
-    const problem = (path: string, cwd: string) => bunProblem({ version: '1.4.2', path, cwd, range: '>=1.4.3' })
+    const problem = (path: string, cwd: string) => bunProblem({ version: '1.4.2', path, cwd, range: '>=1.4.4' })
     const npmBun = 'a dependency installed the npm `bun` package, which package scripts run ahead of the system Bun; run `bun update bun`'
 
-    expect(problem('/app/node_modules/bun/bin/bun.exe', '/app')).toBe(`Bun 1.4.2 at /app/node_modules/bun/bin/bun.exe is under the >=1.4.3 kay needs: ${npmBun}`)
-    expect(problem('/repo/node_modules/bun/bin/bun.exe', '/repo/sites/blog')).toBe(`Bun 1.4.2 at /repo/node_modules/bun/bin/bun.exe is under the >=1.4.3 kay needs: ${npmBun}`)
-    expect(problem('/usr/lib/node_modules/bun/bin/bun.exe', '/app')).toBe('Bun 1.4.2 at /usr/lib/node_modules/bun/bin/bun.exe is under the >=1.4.3 kay needs: run `bun upgrade`')
+    expect(problem('/app/node_modules/bun/bin/bun.exe', '/app')).toBe(`Bun 1.4.2 at /app/node_modules/bun/bin/bun.exe is under the >=1.4.4 kay needs: ${npmBun}`)
+    expect(problem('/repo/node_modules/bun/bin/bun.exe', '/repo/sites/blog')).toBe(`Bun 1.4.2 at /repo/node_modules/bun/bin/bun.exe is under the >=1.4.4 kay needs: ${npmBun}`)
+    expect(problem('/usr/lib/node_modules/bun/bin/bun.exe', '/app')).toBe('Bun 1.4.2 at /usr/lib/node_modules/bun/bin/bun.exe is under the >=1.4.4 kay needs: run `bun upgrade`')
   })
 
   it('is the floor the docs name', async () => {

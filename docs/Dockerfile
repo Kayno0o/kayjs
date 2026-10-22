@@ -1,6 +1,6 @@
 # Built from the root of kay's repository, as the docs run on its checkout: docker build -f docs/Dockerfile .
 # Not a `--compile` executable: the chat reads llms.txt, llms/, the docs' pages and the libraries' docs from disk at run time.
-FROM oven/bun:1.4.3
+FROM oven/bun:1.4.4
 # Installed and built as the user that serves, which writes into .kay at startup.
 RUN mkdir /kay && chown bun:bun /kay
 USER bun

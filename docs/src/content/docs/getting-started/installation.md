@@ -4,7 +4,7 @@ order: 3
 description: Point Bun at the registry, scaffold a project with kay new and start the dev server.
 ---
 
-You need [Bun](https://bun.sh) 1.4.3 or later. kay is published as `@kaynooo/kayjs` on its own registry, not on npm. Tell Bun where the `@kaynooo` scope lives once, then create a project.
+You need [Bun](https://bun.sh) 1.4.4 or later. kay is published as `@kaynooo/kayjs` on its own registry, not on npm. Tell Bun where the `@kaynooo` scope lives once, then create a project.
 
 A project depends on kay under the name `kay`, so imports read `kay` and `kay/server`. `kay new` writes the line `"kay": "npm:@kaynooo/kayjs@~<version>"` in `package.json` for you.
 
@@ -78,7 +78,7 @@ An editor or highlighter that takes a TextMate grammar can use `kay/kay.tmLangua
 
 ## Troubleshooting
 
-kay refuses a Bun older than 1.4.3 and says how to update it.
+kay refuses a Bun older than 1.4.4 and says how to update it.
 
 If the old Bun is the npm `bun` package that a dependency installed, run `bun update bun` in the project. Package scripts run that copy ahead of the system Bun.
 

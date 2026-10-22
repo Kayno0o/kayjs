@@ -55,7 +55,7 @@ kay migrate astro ../my-astro-site --outdir ../my-kay-site
 - Before the first `kay new`, Bun is told once where the `@kaynooo` scope lives, in `~/.bunfig.toml`: `[install.scopes]` with `"@kaynooo" = "https://git.kaynooo.fr/api/packages/kaynooo/npm/"`.
 - `bunx -p @kaynooo/kayjs kay new my-app` writes a project that, after `cd my-app && bun install`, checks, builds and runs (`bun run dev`), both of those included: this setup, a layout, a page, a `_404.kay` and islands, or only what is picked of them (see [Commands](#commands) for the presets and features).
 
-- kay runs on Bun 1.4.3 or later, as its `engines` says: the CLI and `pages()` refuse an older one, naming its version, its path and the fix, `bun update bun` when it is the project's npm `bun` package, which a plugin's peer dependency installs and package scripts run ahead of the system Bun.
+- kay runs on Bun 1.4.4 or later, as its `engines` says: the CLI and `pages()` refuse an older one, naming its version, its path and the fix, `bun update bun` when it is the project's npm `bun` package, which a plugin's peer dependency installs and package scripts run ahead of the system Bun.
 
 - A folder of the project holding its own `package.json` or `kay.config.ts`, such as a workspace package or a second kay app, is a project of its own: `kay check` and `kay build` leave its files out of the app's, and the app reaches a package there through `node_modules`, as it would one installed.
 

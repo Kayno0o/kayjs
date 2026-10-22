@@ -45,7 +45,7 @@ describe('mergeSupports', () => {
   it('keeps every override Tailwind nests in a rule for a color-mix(), through Bun, minified or not', async () => {
     const css = `:root {\n  --a: var(--x);\n  ${TAILWIND} {\n    & {\n      --a: color-mix(in srgb, var(--x) 14%, var(--y));\n    }\n  }\n  --b: var(--z);\n  ${TAILWIND} {\n    & {\n      --b: color-mix(in srgb, var(--z) 12%, transparent);\n    }\n  }\n}\n`
 
-    // Bun 1.4.3 drops it: once this fails, Bun fixed it and the merge can go.
+    // Bun 1.4.4 still drops it: once this fails, Bun fixed it and the merge can go.
     expect(await bundled(css)).not.toContain('--b: color-mix')
 
     for (const minify of [false, true]) {
@@ -61,7 +61,7 @@ describe('mergeSupports', () => {
   it('keeps a rule nested in a rule holding only custom properties, followed by one with the same selector', async () => {
     const css = `:root {\n  & { --a: 2; }\n  --c: 1;\n  & { --b: 2; }\n  .p { --d: 2; }\n  .p { --e: 2; }\n}\n`
 
-    // Bun 1.4.3 drops it: once this fails, Bun fixed it and the merge can go.
+    // Bun 1.4.4 still drops it: once this fails, Bun fixed it and the merge can go.
     expect(await bundled(css)).not.toContain('--a: 2')
 
     for (const minify of [false, true]) {

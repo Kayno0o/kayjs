@@ -4,7 +4,7 @@ import { engines } from '../package.json'
 
 // Where a package keeps its files, the npm `bun` package its binary.
 const NODE_MODULES = /[\\/]node_modules[\\/]/
-// A canary counts as the release it leads to, which a range's prerelease rules would refuse; it fails open, so a 1.4.3 canary passes `>=1.4.3` though it may predate the release.
+// A canary counts as the release it leads to, which a range's prerelease rules would refuse; it fails open, so a 1.4.4 canary passes `>=1.4.4` though it may predate the release.
 const PRERELEASE = /[-+].*$/
 
 interface Runtime {

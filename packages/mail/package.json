@@ -38,7 +38,7 @@
     "types"
   ],
   "engines": {
-    "bun": ">=1.4.3"
+    "bun": ">=1.4.4"
   },
   "scripts": {
     "prepare": "$npm_execpath ../../scripts/link-fixture.ts",

@@ -12,7 +12,7 @@ The GitHub repository mirrors the one at git.kaynooo.fr, where releases are cut 
 
 ## Setup
 
-kay needs [Bun](https://bun.sh) 1.4.3 or later.
+kay needs [Bun](https://bun.sh) 1.4.4 or later.
 
 ```sh
 git clone https://github.com/Kayno0o/kayjs
