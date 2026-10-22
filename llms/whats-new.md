@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.70.0
 
 - A component call can hand several parts on to the component it calls, `Busy(part="root spinner")`, so a Button with an `onClick` takes the `spinner` part of `button.kay` in `src/ui.ts` like every other Button ([Styling](../llms/styles-and-assets.md)).
 - kayjs-ui `Accordion`, `Skeleton`, `Progress`, `Breadcrumb`, `RadioGroup` and the MarkdownEditor preview take parts, so `src/ui.ts` restyles each piece and a `class` object reaches it ([Setup](../packages/ui/llms/setup.md)).
@@ -85,40 +85,4 @@ What each release of kay and its libraries adds, newest first, each feature with
 - [Recipes](recipes.md) build a database CRUD, a dashboard behind sign-in with roles, and a blog with tags, RSS and a sitemap, each with its test.
 - kayjs-auth names its methods `list*`, `get*`, `revoke*` and `delete*` (`listSessions()`, `getOrganization(ref)`, `revokeSession(id)`, `revokeBearerToken(id)`, `updatePasskeyName`, `rejectInvitation` and `updateLocale` answering `{ ok }`), the old names kept three minors ([Setup](../packages/auth/llms/setup.md)).
 
-## 1.69.0
-
-- A second `kay build --compile` costs what the first did: a build removes the last executable, and the last `--static` folder, before it starts, so Tailwind no longer scans them ([Build and start](build-and-start.md)).
-- kayjs-cms: a `passwordGuard` the app wraps in its own guard keeps its sign-in screen ([Options](../packages/cms/llms/options.md)).
-- `kay check` reports an `async` function returning kayjs-ai's `ask()` (`async-reply`, fixed by removing `async`), and the reply has `.stream()` for one that awaits first ([Lints](lints.md)).
-- `page.text()` and `find().text` keep the text of sibling blocks apart, `Sites Traffic` rather than `SitesTraffic`, as a visitor reads it ([Testing](testing.md)).
-- `kay check` and `kay dev` report a `guards` or `layouts` setting held in a variable, an expression or a spread, which the server used to ignore without a message ([Page settings](routing.md#page-settings)).
-- `kay migrate astro` keeps a script after `</html>`, draws astro-icon icons from `~icons`, moves Fontsource imports to `fonts`, and lists `Astro.self`, `import.meta.env`, UnoCSS and a script a Content-Security-Policy blocks ([Moving over](project.md#move-an-astro-project-over)).
-- A font file a stylesheet imports, as `@fontsource/inter/400.css` names, is served as an asset instead of inlined into the page CSS as a data URL ([Fonts](sitemap-search-fonts.md)).
-- A `site.open` that stalls because six pages following a live value are still open fails at the timeout naming them, and `await using page = await site.open(...)` closes a page when its test ends ([Browser tests](testing-browser.md)).
-- `iconProps(set, 'tabler:home')` draws the prefixed name `iconField` stores, `undefined` for another set's prefix ([Images](images.md)).
-- A `single` collection still showing its `seed` is editable on the page in edit mode, its fields marked as the entry's first save writes ([A collection of one entry](content.md)).
-- The build no longer warns of a class value that is literals and `undefined` (`cond ? undefined : 'a'`, a function returning `'a'` or `undefined`): `undefined`, `null` and `false` read as no class ([Styles and assets](styles-and-assets.md)).
-- `kay/test` keeps Chrome open five minutes after the last page closes instead of one second, so a file pausing between pages launches it once ([Browser tests](testing-browser.md)).
-- `kay/test/dom` keeps `fetch`, `Response` and the other web classes as Bun's, so a preloaded DOM no longer breaks a test serving with `Bun.serve` ([Testing](testing.md)).
-- kayjs-ui's Table hands `@bulk` keys, `selected` and `onSelect` the type of its `rowKey`, so a `string[]` parameter takes them with no cast ([Tables](../packages/ui/llms/tables-navigation-and-layout.md)).
-- kayjs-cms's `@kaynooo/kayjs-cms/test` signs a test site in through `passwordGuard` in one call, `cmsSignInAs(site, role?)`, with `cmsSignOut(site)` and `cmsSignInWith(site, password)` for a wrong password ([Options](../packages/cms/llms/options.md)).
-
-## 1.68.0
-
-- kayjs-ui's LineChart takes `stacked`: each series drawn on the ones before it with the bands filled, the tooltip, announcements and table reading each series' own value plus a `Total` (`totalLabel`, or the `ui.lineChart.total` word) ([LineChart](../packages/ui/llms/charts-drag-and-media.md)).
-
-## 1.67.0
-
-- `previewUrl(path, { entry })` from `kay/server` gives a signed link showing one entry's draft on its page alone, with no cookie nor preview mode for the visitor ([Preview mode](content-cms.md)); kayjs-cms's entry screen has a Share preview button for it ([screens](../packages/cms/llms/screens.md)).
-- kayjs-cms has an activity log at `<prefix>/activity`: who created, saved, published, deleted, restored or renamed which entry and when, across the collections that keep a history ([The activity log](../packages/cms/llms/history.md)).
-- kayjs-cms: `cms({ collections: { notes: { history: false } } })` keeps no revisions nor trash for one collection ([History and the trash](../packages/cms/llms/history.md)).
-- kayjs-cms's editor adds, removes and reorders a list's items, blocks included, on the page: a toolbar on the item under the pointer or the focus, an Add on an empty list, Alt+Shift with the arrows, Delete or Enter on the keyboard, and Undo for a removal ([Screens](../packages/cms/llms/screens.md)).
-- kayjs-ui's LineChart heads its tooltip with a date label in the page's locale, time of day and seconds included when the points need them, labels the x-axis of a span under a day with times, keeps the tooltip at its natural width inside the viewport, and takes `formatLabel` to write any label itself ([LineChart](../packages/ui/llms/charts-drag-and-media.md)).
-
-## 1.66.0
-
-- kayjs-cms's entry editor has a Rename button for a slug: a folder file is moved (one commit on Forgejo), a loaded entry keeps its history, the entries referring to it follow the new slug, and the old page redirects to the new one by itself ([renaming](../packages/cms/llms/rename.md)).
-- kayjs-cms's editor outlines the field under the pointer and, with a toggle (on by default on a phone), every marked field, attributes and comment pairs included; it asks which field when an element holds several, names each tab stop, and has a Browse toggle that lets links and menus work with the editor open ([Screens](../packages/cms/llms/screens.md)).
-- kayjs-cms moves the uploads an older release kept per collection into its shared `cms-media` folder when the server starts, pointing the entries at the copies, and its media library pages 48 uploads at a time with a search ([kayjs-cms](../packages/cms/llms/uploads.md)).
-
-Releases before 1.66 are in [What's new, older releases](whats-new-archive.md).
+Releases before 1.70 are in [What's new, older releases](whats-new-archive.md).

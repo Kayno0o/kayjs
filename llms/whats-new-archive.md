@@ -1,6 +1,42 @@
 # What's new, older releases
 
-What each release before 1.66 added, newest first, each feature with where it is documented. The newer releases are in [What's new](whats-new.md); what a release breaks is in [Upgrading](upgrading.md).
+What each release before 1.70 added, newest first, each feature with where it is documented. The newer releases are in [What's new](whats-new.md); what a release breaks is in [Upgrading](upgrading.md).
+
+## 1.69.0
+
+- A second `kay build --compile` costs what the first did: a build removes the last executable, and the last `--static` folder, before it starts, so Tailwind no longer scans them ([Build and start](build-and-start.md)).
+- kayjs-cms: a `passwordGuard` the app wraps in its own guard keeps its sign-in screen ([Options](../packages/cms/llms/options.md)).
+- `kay check` reports an `async` function returning kayjs-ai's `ask()` (`async-reply`, fixed by removing `async`), and the reply has `.stream()` for one that awaits first ([Lints](lints.md)).
+- `page.text()` and `find().text` keep the text of sibling blocks apart, `Sites Traffic` rather than `SitesTraffic`, as a visitor reads it ([Testing](testing.md)).
+- `kay check` and `kay dev` report a `guards` or `layouts` setting held in a variable, an expression or a spread, which the server used to ignore without a message ([Page settings](routing.md#page-settings)).
+- `kay migrate astro` keeps a script after `</html>`, draws astro-icon icons from `~icons`, moves Fontsource imports to `fonts`, and lists `Astro.self`, `import.meta.env`, UnoCSS and a script a Content-Security-Policy blocks ([Moving over](project.md#move-an-astro-project-over)).
+- A font file a stylesheet imports, as `@fontsource/inter/400.css` names, is served as an asset instead of inlined into the page CSS as a data URL ([Fonts](sitemap-search-fonts.md)).
+- A `site.open` that stalls because six pages following a live value are still open fails at the timeout naming them, and `await using page = await site.open(...)` closes a page when its test ends ([Browser tests](testing-browser.md)).
+- `iconProps(set, 'tabler:home')` draws the prefixed name `iconField` stores, `undefined` for another set's prefix ([Images](images.md)).
+- A `single` collection still showing its `seed` is editable on the page in edit mode, its fields marked as the entry's first save writes ([A collection of one entry](content.md)).
+- The build no longer warns of a class value that is literals and `undefined` (`cond ? undefined : 'a'`, a function returning `'a'` or `undefined`): `undefined`, `null` and `false` read as no class ([Styles and assets](styles-and-assets.md)).
+- `kay/test` keeps Chrome open five minutes after the last page closes instead of one second, so a file pausing between pages launches it once ([Browser tests](testing-browser.md)).
+- `kay/test/dom` keeps `fetch`, `Response` and the other web classes as Bun's, so a preloaded DOM no longer breaks a test serving with `Bun.serve` ([Testing](testing.md)).
+- kayjs-ui's Table hands `@bulk` keys, `selected` and `onSelect` the type of its `rowKey`, so a `string[]` parameter takes them with no cast ([Tables](../packages/ui/llms/tables-navigation-and-layout.md)).
+- kayjs-cms's `@kaynooo/kayjs-cms/test` signs a test site in through `passwordGuard` in one call, `cmsSignInAs(site, role?)`, with `cmsSignOut(site)` and `cmsSignInWith(site, password)` for a wrong password ([Options](../packages/cms/llms/options.md)).
+
+## 1.68.0
+
+- kayjs-ui's LineChart takes `stacked`: each series drawn on the ones before it with the bands filled, the tooltip, announcements and table reading each series' own value plus a `Total` (`totalLabel`, or the `ui.lineChart.total` word) ([LineChart](../packages/ui/llms/charts-drag-and-media.md)).
+
+## 1.67.0
+
+- `previewUrl(path, { entry })` from `kay/server` gives a signed link showing one entry's draft on its page alone, with no cookie nor preview mode for the visitor ([Preview mode](content-cms.md)); kayjs-cms's entry screen has a Share preview button for it ([screens](../packages/cms/llms/screens.md)).
+- kayjs-cms has an activity log at `<prefix>/activity`: who created, saved, published, deleted, restored or renamed which entry and when, across the collections that keep a history ([The activity log](../packages/cms/llms/history.md)).
+- kayjs-cms: `cms({ collections: { notes: { history: false } } })` keeps no revisions nor trash for one collection ([History and the trash](../packages/cms/llms/history.md)).
+- kayjs-cms's editor adds, removes and reorders a list's items, blocks included, on the page: a toolbar on the item under the pointer or the focus, an Add on an empty list, Alt+Shift with the arrows, Delete or Enter on the keyboard, and Undo for a removal ([Screens](../packages/cms/llms/screens.md)).
+- kayjs-ui's LineChart heads its tooltip with a date label in the page's locale, time of day and seconds included when the points need them, labels the x-axis of a span under a day with times, keeps the tooltip at its natural width inside the viewport, and takes `formatLabel` to write any label itself ([LineChart](../packages/ui/llms/charts-drag-and-media.md)).
+
+## 1.66.0
+
+- kayjs-cms's entry editor has a Rename button for a slug: a folder file is moved (one commit on Forgejo), a loaded entry keeps its history, the entries referring to it follow the new slug, and the old page redirects to the new one by itself ([renaming](../packages/cms/llms/rename.md)).
+- kayjs-cms's editor outlines the field under the pointer and, with a toggle (on by default on a phone), every marked field, attributes and comment pairs included; it asks which field when an element holds several, names each tab stop, and has a Browse toggle that lets links and menus work with the editor open ([Screens](../packages/cms/llms/screens.md)).
+- kayjs-cms moves the uploads an older release kept per collection into its shared `cms-media` folder when the server starts, pointing the entries at the copies, and its media library pages 48 uploads at a time with a search ([kayjs-cms](../packages/cms/llms/uploads.md)).
 
 ## 1.65.0
 
@@ -54,39 +90,4 @@ What each release before 1.66 added, newest first, each feature with where it is
 - kayjs-cms's list has an `unpublish` row action, a save shown only after a rebuild turns to `Live now` once the public page serves it, and a delete confirmation lists the entries that reference the one deleted ([Screens](../packages/cms/llms/screens.md)).
 - kayjs-cms's list Status column shows `Ends` and `Ended` for an `unpublishAt` date, also for a collection with that date alone ([Screens](../packages/cms/llms/screens.md)).
 
-## 1.62.0
-
-- `a(href="/docs" section)` is marked `aria-current="true"` on the pages below `/docs`, and `page` on it, so a header lights a section with no path passed down; the attribute is never written out and `section-not-a-link` flags it on anything but a link ([Navigation](navigation.md)).
-- `analytics()`'s notice and information line read in French on a page whose `lang` is `fr`, English elsewhere, and the app's `consent` / `info` strings still win ([Analytics](analytics.md)).
-- kayjs-auth sets a readable `kay_user` cookie at sign-in, and kayjs-cms's script reads it, so an editor sees Edit this page on the first page after signing in ([hint](../packages/cms/llms/page-links.md)).
-- kayjs-auth's `forwardAuth: 'example.com'` serves `/auth/forward` for nginx `auth_request`, Traefik and Caddy: 204 with `Remote-*` headers or a sign-in that returns to the guarded site ([forward auth](../packages/auth/llms/oauth-server-and-tokens.md)).
-- kayjs-auth's `kay auth create-user ada@example.com --role admin` makes a user from the terminal, asking the password without echo, so a site with `signUp: false` needs no script for its first user ([Passwords](../packages/auth/llms/passwords-and-mails.md)).
-- kayjs-mail's `contactForm` takes `honeypot: 'nectar'` to rename its honeypot field, which frees `website` as a field of yours, and `consent: true` for a required consent checkbox, refused when unticked in the page's language and left out of the mail; kayjs-ui's `ContactForm` draws it from the action and links `privacy="/privacy"` ([A contact form](../packages/mail/llms/contact-form-and-testing.md)).
-- A post in place keeps the focus inside a held deferred server island, which goes to the same field (by `id`, else `name`) once the island's fetch lands, and an island of its own still waiting to hydrate no longer logs a missing client chunk ([Prerendering](prerendering.md#prerendering)).
-- `page.click` in kay/test reaches an element covered at the middle of the view, such as one under a fixed bar or the dev tool's open panel: it scrolls it to the other alignments and aims at a point of its box nothing covers, and one covered everywhere fails naming what covers it ([Testing in a browser](testing-browser.md)).
-- `persisted('theme', 'light', { values: ['light', 'dark'] })` reads a cookie or localStorage value outside `values` as the default, on the server and in the browser, so an app no longer re-checks the signal behind a helper, and types it as their union with the default checked ([Shared and persisted state](islands.md#shared-and-persisted-state)).
-- A loaded collection's `save({ data })` is typed from the collection's `schema` (defaults filled in, dates as text) instead of `unknown`, so a loader no longer casts it in every `save` ([Loaded collections](content-cms.md#loaded-collections)).
-- An action's `messages.serverError` may be a function, sync or async, given the error and the action's `ctx`, so the failure text can read a collection entry, a setting or `ctx.locale` without a `try`/`catch` in the handler; one that throws leaves kay's message, both errors logged ([Refused posts](actions.md#refused-posts)).
-- A schema says how kayjs-cms enters a field: `fieldInput(schema, { placeholder, prefix, suffix, rows, type, labels, lines, titleField, when })` from `kay/content`, and a collection takes a `description`; the schema's own `format`, `maxLength`, `minimum`, `maximum` and `integer` already shape the input, and a toggle keeps its hint and issue ([Field kinds and entering a field](../packages/cms/llms/fields.md)).
-- `kay migrate content` rewrites the entry files of the folder collections that declare `migrations`, keeping each file's format and body; a refused folder entry with no `migrations` points at them, and `unique()` reads a field of an `Intersect` ([Loaded collections](content-cms.md#loaded-collections)).
-- `kay build` and `kay check` word a refused entry field in the site's default locale from its catalogs (`kay.entry.*`), the English where it gives none, instead of always in English ([Locales](locales.md#texts-from-kay-and-its-libraries)).
-- A stored image shows its mean colour until it loads, as an imported one does: `files.put` reads it once on upload and keeps it in the key (`photos/<id>.1600x1200-c86432.jpg`), so no store changes and no request reads it; keys stored before have none, and a key with a colour is 7 characters longer ([Stored files](files.md)).
-- `kay build`'s page footprint counts the `html`, `head`, `body` and `tbody` elements a browser makes up, so a page's DOM count and EcoIndex score can move a little (a `budget.grade` near a boundary may change); `(600px <= width)` media ranges are read ([Lints](lints.md)).
-- A `Save-Data` page keeps the chunk preloads of its `hydrate="load"` and `hydrate="client"` islands, which hydrate at once, and injects no preload of the code waiting for the viewport when none of its islands wait ([Islands](islands.md)).
-- A collection declared `single: true` is one entry: kayjs-cms's content list links to its form, titled with the collection's `title`, with no list row, slug, New entry or Delete; `seed` fills the form until the first save, and `home.one()` reads the entry typed, with a fallback ([A collection of one entry](content.md), [kayjs-cms](../packages/cms/llms.txt)).
-- A GIF that Bun.Image cannot decode but a browser draws, such as some 1x1 uploads, is answered as it is by `/_kay/image` instead of a `415`, so its preview no longer breaks; an imported one gets no variants instead of failing the build ([Responsive images](images.md#responsive-images)).
-- kayjs-cms file and image fields are easier to use (Clear, a drop zone saying what it takes, upload progress with Cancel, a picker of stored uploads), and `imageField(...)` and `fileField(...)` set per-field limits and pair an image with its alt text and size ([Uploads and image fields](../packages/cms/llms/uploads.md)).
-- kayjs-cms gives an "Edit this page" link to any signed-in editor on every page they read, with no app code and no page losing its static copy: a readable `kay_editor` cookie marks the browser and the guard is asked on each page; `cms({ pageLink: false })` leaves it out and an `a(data-cms-edit-page)` of the app's own takes its place ([Edit this page link](../packages/cms/llms/page-links.md)).
-- An entry of a collection a page lists in its `sitemap`, or that a page without params reads by its slug (a section on `/`), now has its page, so the cms shows Edit on page for it; an entry no page shows has none ([content CMS](content-cms.md)).
-- kayjs-cms's form helps fix a refused save: focus goes to the first refused field, a summary of links lists them, an edit clears only its own issue, schema limits are checked as typed, unparsed JSON blocks Save, a taken slug marks its field ([Fixing a refused save](../packages/cms/llms/screens.md#fixing-a-refused-save)).
-- kayjs-cms's admin sets `layouts: false` on its layout, which a library layout can do to start its own chain, and draws its own chrome instead of the site's header and footer ([Libraries](component-libraries.md), [kayjs-cms](../packages/cms/llms/screens.md)).
-- A page swap keeps a fetched deferred server island on screen while its next copy is fetched, so a post back to the same page no longer swaps the form for its inert copy and back, which jumped the scroll ([Prerendering](prerendering.md#prerendering)).
-- kayjs-cms ships the French of every `cms.*` text, read on a French page after the app's own catalog with no setup; another language is a `cms` block in the app's `src/messages/<locale>.ts`, and `tests/words.test.ts` fails for a new key without its French ([Texts and languages](../packages/cms/llms/words.md)).
-- `ctx.redirect()` to a page puts on its `trailingSlash` spelling and, on a site with `i18n`, the page's locale, as `llms/routing.md` said it did (`/login` from an English page now goes to `/en/login`), so a post, a page swap or an island call lands on the page in one response ([Pages and routing](routing.md)).
-- A content entry the schema refuses reads as a sentence naming the field by its label (`Date de parution is not a valid date-time`), in the CMS editor, `kay build` and `kay check`, worded under `kay.entry.*` in the site's locale ([Locales](locales.md#texts-from-kay-and-its-libraries)).
-- kayjs-cms list fields are easier to scan and fill: compact rows, items folded under their title, `minItems`/`maxItems` shown and held, duplicate and undoable remove, items started from their `default`, and Alt+Shift with an arrow to reorder ([kayjs-cms](../packages/cms/llms.txt)).
-- The kayjs-cms on-page editor keeps previewing when one entry fails its schema, that entry showing its saved text, says `Updating the page…` while it renders, and shows unsaved edits again after in-app navigation ([content CMS](content-edit.md#edit-mode)).
-- A stored entry the schema refuses (a database row from before a schema change) is left out of its loaded collection and logged instead of failing every page that reads it, and the CMS still lists and opens it; the error names the whole path of a nested problem and no longer repeats a type, and defaults fill nested objects and list items ([Loaded collections](content-cms.md#loaded-collections)).
-- `migrations` on a collection carries stored entries over after a schema change, with `renameField`, `setField` and `convertField` for the common steps, a loader's migrated entry written back through its `save` once; `unique()` refuses a save repeating another entry's value ([Loaded collections](content-cms.md#loaded-collections)).
-
-Releases before 1.62 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
+Releases before 1.63 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
