@@ -29,12 +29,12 @@ const TYPE_OPENERS = '{[(<'
 const TYPE_CLOSERS = '}])>'
 // The name a `bind:` on a component writes: a signal, a prop of the component, or a member of one.
 const BOUND_NAME = /^\s*[A-Z_$][\w$]*(?:\s*\.\s*[A-Z_$][\w$]*)*\s*$/i
-// `files.url(key)` alone: a stored file's URL holds its size, which kay writes on the `img` showing it, but not once more is joined to it.
 // Utilities of the base breakpoint that give a box its ratio and its sizes: a variant (`sm:`) leaves the base without one.
-const ASPECT_CLASS = /^!?aspect-(?!auto$)\S/
-const WIDTH_CLASS = /^!?(?:w|size)-(?!auto$)\S/
-const HEIGHT_CLASS = /^!?(?:h|size)-(?!auto$)\S/
+const ASPECT_CLASS = /^!?aspect-(?!auto!?$)\S/
+const WIDTH_CLASS = /^!?(?:w|size)-(?!auto!?$)\S/
+const HEIGHT_CLASS = /^!?(?:h|size)-(?!auto!?$)\S/
 const ASPECT_STYLE = /(?:^|;)\s*aspect-ratio\s*:\s*(?!auto\s*(?:;|$))\S/i
+// `files.url(key)` alone: a stored file's URL holds its size, which kay writes on the `img` showing it, but not once more is joined to it.
 const STORED_URL = /^[\w.]+\.url\((?:[^()]|\([^()]*\))*\)$/
 const COMPOUND_EVENT = /^(dbl|key|mouse|pointer|touch|drag|focus|context|before|after)(click|down|up|press|move|enter|leave|over|out|start|end|cancel|in|menu|input)$/
 const HEAD_TAGS = new Set(['title', 'meta', 'link', 'style', 'script', 'base', 'html'])
