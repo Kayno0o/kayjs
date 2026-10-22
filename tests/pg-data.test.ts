@@ -475,10 +475,17 @@ pgDescribe('pgCache', () => {
     const receiver = await boot('bus-b', second!)
     const heard: string[] = []
 
-    receiver.store.subscribe!(message => heard.push(message))
-    // The receiver reads from the moment it first uses the store.
+    const probe = '{"keys":[]}'
+    let polling = false
+
+    receiver.store.subscribe!(message => message === probe ? void (polling = true) : heard.push(message))
+    // The receiver reads from the moment it first uses the store, and a probe is heard once its poller runs.
     await receiver.store.keys()
-    await Bun.sleep(100)
+    await waitFor(async () => {
+      await sender.store.publish!(probe)
+
+      return polling
+    }, 'the receiver to poll')
     await sender.store.publish!('{"keys":["a"]}')
     await waitFor(() => heard.length === 1, 'the message')
     expect(heard).toEqual(['{"keys":["a"]}'])
@@ -538,14 +545,25 @@ pgDescribe('pgRooms', () => {
     const own: string[] = []
     const other: [string, string, unknown][] = []
 
-    first!.subscribe((room, text) => own.push(`${room}:${text}`))
-    second!.subscribe((room, text, recipients) => other.push([room, text, recipients]))
-    await Bun.sleep(150)
+    const probed = [false, false]
+
+    // A probe each way is seen once both pollers have read their starting position, which a message published before is lost to.
+    first!.subscribe((room, text) => text.startsWith('probe') ? void (probed[0] ||= text === 'probe-second') : own.push(`${room}:${text}`))
+    second!.subscribe((room, text, recipients) => text.startsWith('probe') ? void (probed[1] ||= text === 'probe-first') : other.push([room, text, recipients]))
+    await waitFor(() => {
+      first!.publish('probe', 'probe-first', {})
+      second!.publish('probe', 'probe-second', {})
+
+      return probed.every(Boolean)
+    }, 'both pollers to run')
     first!.publish('lobby', 'hello', {})
     first!.publish('lobby', 'quiet', { except: 'c1', to: '"bob"' })
     expect(own).toEqual(['lobby:hello', 'lobby:quiet'])
     await waitFor(() => other.length === 2, 'both messages')
-    expect(other).toEqual([['lobby', 'hello', {}], ['lobby', 'quiet', { except: 'c1', to: '"bob"' }]])
+    // Their order is not asserted: they were read in reverse once under load.
+    expect(other).toHaveLength(2)
+    expect(other).toContainEqual(['lobby', 'hello', {}])
+    expect(other).toContainEqual(['lobby', 'quiet', { except: 'c1', to: '"bob"' }])
     second!.publish('lobby', 'back', {})
     expect(other).toHaveLength(3)
     await waitFor(() => own.length === 3, 'the message back')
