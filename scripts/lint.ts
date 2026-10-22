@@ -1,6 +1,7 @@
 // `bun run lint`: kay's own files, linted in one process per group of type-aware files (`typeAwareSlices`) and one for everything else, each under a heap of its own, so a lint peaks under 2 GB where one process over every file reaches 4 GB.
 import { join } from 'node:path'
 import { typeAwareSlices } from '../eslint.slices'
+import { dropStaleLintCache } from './lint-cache'
 
 const HEAP_MB = 1536
 const keslint = join(import.meta.dir, '../node_modules/.bin/keslint')
@@ -10,6 +11,9 @@ const flags = process.argv.slice(2)
 // Files named on the command line are one pass, not one in each group.
 const passes = flags.some(flag => !flag.startsWith('-')) ? [[]] : [...typeAwareSlices, null]
 let status = 0
+
+// A dependency install changes the types a file's lint reads, so results cached before it are dropped.
+await dropStaleLintCache(join(import.meta.dir, '..'))
 
 for (const [index, slice] of passes.entries()) {
   const child = Bun.spawnSync([keslint, '--cache', '--cache-location', `.eslintcache-${index}`, ...flags, ...slice ?? rest], {
