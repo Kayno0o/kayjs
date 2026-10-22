@@ -1610,6 +1610,22 @@ describe('what a build keeps in memory', () => {
     expect(after).not.toContain('text-red-500')
   })
 
+  it('builds again from a changed module that an earlier build of the process read for its imports', async () => {
+    const root = await scratchProject({
+      'src/clicks.kay': 'button(type="button" onClick={() => {}}) Go\n',
+      'src/link.ts': 'import \'./clicks.kay\'\n',
+      'src/other.kay': '---\nimport \'./link\'\n---\np Other\n',
+      'src/wrap.kay': '---\nimport Other from \'./other.kay\'\n\nfunction pick() {}\n---\nOther(format={pick})\n',
+      'src/routes/index.kay': '---\nimport Wrap from \'../wrap.kay\'\nimport Clicks from \'../clicks.kay\'\n---\nWrap\nClicks\n',
+    })
+    const promoted = async () => (await buildClient(root, { minify: true, report: 'sizes' })).report!.islands.filter(island => island.promoted).map(island => island.file)
+
+    expect(await promoted()).toEqual(['src/wrap.kay'])
+
+    await Bun.write(join(root, 'src/link.ts'), 'export {}\n')
+    expect(await promoted()).toEqual([])
+  })
+
   it('finds the runtime chunk once while the modules it was found in, and what the key says, stay as they were', async () => {
     const dir = resolve(await scratchDir('kay-runtime-'))
     const entry = join(dir, 'out/entry.ts')
