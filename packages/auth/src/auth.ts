@@ -582,16 +582,19 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return providerToken(this[STATE], provider)
   }
 
-  // Sets the language the signed-in user's mails are written in, a BCP 47 tag such as `fr`; false when signed out or not a tag.
-  async setLocale(locale: string): Promise<boolean> {
+  // Sets the language the signed-in user's mails are written in, a BCP 47 tag such as `fr`; refused with `signed-out`, or `invalid-locale` for anything else than a tag.
+  async updateLocale(locale: string): Promise<{ ok: true } | { ok: false, error: 'signed-out' | 'invalid-locale' }> {
     const record = await this.record()
 
-    if (!record || !validLocale(locale))
-      return false
+    if (!record)
+      return { ok: false, error: 'signed-out' }
+
+    if (!validLocale(locale))
+      return { ok: false, error: 'invalid-locale' }
 
     this.resolving = Promise.resolve(await this.core.store.users.update(record.id, { locale }) ?? { ...record, locale })
 
-    return true
+    return { ok: true }
   }
 
   // What the config enables, for a page to show only what works: the providers, mail, passkeys, scopes and the prebuilt pages.
@@ -614,8 +617,8 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return approvedClients(this[STATE])
   }
 
-  // Takes an app's approval back with every token it was given; false when there was none.
-  async revokeOAuthClient(clientId: string): Promise<boolean> {
+  // Takes an app's approval back with every token it was given; refused with `not-found` when there was none, and `signed-out` outside the user's own session.
+  async revokeOAuthGrant(clientId: string): Promise<{ ok: true } | { ok: false, error: 'signed-out' | 'not-found' }> {
     return revokeClient(this[STATE], clientId)
   }
 
@@ -792,7 +795,8 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return listPasskeys(this[STATE])
   }
 
-  async renamePasskey(id: string, name: string): Promise<boolean> {
+  // Renames one of the signed-in user's passkeys; refused with `not-found` for one that is not theirs and `invalid-name` for a blank name.
+  async updatePasskeyName(id: string, name: string): Promise<{ ok: true } | { ok: false, error: 'signed-out' | 'not-found' | 'invalid-name' }> {
     return renamePasskey(this[STATE], id, name)
   }
 
@@ -1031,7 +1035,8 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return acceptInvitation(this[STATE], invitationId) as Promise<AcceptResult<OrgRole>>
   }
 
-  async declineInvitation(invitationId: string): Promise<boolean> {
+  // Turns down an invitation open to the user; `not-found` for any other.
+  async rejectInvitation(invitationId: string): Promise<{ ok: true } | { ok: false, error: 'signed-out' | 'not-found' }> {
     return declineInvitation(this[STATE], invitationId)
   }
 
@@ -1040,7 +1045,8 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return listTokens(this[STATE])
   }
 
-  async revokeToken(id: string): Promise<boolean> {
+  // Revokes one of the signed-in user's bearer tokens, from a browser session only: `signed-out` through a token, `not-found` for one that is not theirs.
+  async revokeBearerToken(id: string): Promise<{ ok: true } | { ok: false, error: 'signed-out' | 'not-found' }> {
     return revokeToken(this[STATE], id)
   }
 
@@ -1122,6 +1128,31 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   /** @deprecated Renamed `revokeSession`, which answers `{ ok }`; kept three minors. */
   async endSession(id: string): Promise<boolean> {
     return (await this.revokeSession(id)).ok
+  }
+
+  /** @deprecated Renamed `revokeBearerToken`, which answers `{ ok }`; kept three minors. */
+  async revokeToken(id: string): Promise<boolean> {
+    return (await this.revokeBearerToken(id)).ok
+  }
+
+  /** @deprecated Renamed `revokeOAuthGrant`, which answers `{ ok }`; kept three minors. */
+  async revokeOAuthClient(clientId: string): Promise<boolean> {
+    return (await this.revokeOAuthGrant(clientId)).ok
+  }
+
+  /** @deprecated Renamed `updatePasskeyName`, which answers `{ ok }`; kept three minors. */
+  async renamePasskey(id: string, name: string): Promise<boolean> {
+    return (await this.updatePasskeyName(id, name)).ok
+  }
+
+  /** @deprecated Renamed `rejectInvitation`, which answers `{ ok }`; kept three minors. */
+  async declineInvitation(invitationId: string): Promise<boolean> {
+    return (await this.rejectInvitation(invitationId)).ok
+  }
+
+  /** @deprecated Renamed `updateLocale`, which answers `{ ok }`; kept three minors. */
+  async setLocale(locale: string): Promise<boolean> {
+    return (await this.updateLocale(locale)).ok
   }
 
   // Under a new session id, so one planted before is worth nothing; `method` says how, for the `signed-in` event.

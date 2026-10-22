@@ -62,7 +62,7 @@ export const addPasskey = action(schemas.registerPasskey, async (input, ctx) => 
 })
 
 export const renamePasskey = action(schemas.renamePasskey, async ({ id, name }, ctx) => {
-  return await ctx.locals.auth.renamePasskey(id, name) ? name : ctx.fail(404, { error: 'not-found' })
+  return (await ctx.locals.auth.updatePasskeyName(id, name)).ok ? name : ctx.fail(404, { error: 'not-found' })
 })
 
 export const removePasskey = action(schemas.removePasskey, async (input, ctx) => {

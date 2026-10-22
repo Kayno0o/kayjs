@@ -62,8 +62,9 @@ describe('locales', () => {
     const { user } = await ada.json('/call/register', speaking('en', { email: 'ada@example.com', password: PASSWORD, locale: 'fr' })) as { user: { id: string } }
 
     expect(mails.at(-1)!.locale).toBe('fr')
+    expect(await ada.call('updateLocale', 'not a tag')).toEqual({ ok: false, error: 'invalid-locale' })
+    expect(await ada.call('updateLocale', 'en-GB')).toEqual({ ok: true })
     expect(await ada.call('setLocale', 'not a tag')).toBe(false)
-    expect(await ada.call('setLocale', 'en-GB')).toBe(true)
     expect(await ada.json('/me')).toMatchObject({ locale: 'en-GB' })
 
     await ada.call('requestPasswordReset', 'ada@example.com')

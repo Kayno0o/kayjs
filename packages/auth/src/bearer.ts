@@ -156,10 +156,13 @@ export async function listTokens(state: RequestState): Promise<BearerToken[]> {
   return record && state.via() === 'session' ? (await state.core.store.bearerTokens.listByUser(record.id)).filter(token => !token.oauth).map(publicToken) : []
 }
 
-export async function revokeToken(state: RequestState, id: string): Promise<boolean> {
+export async function revokeToken(state: RequestState, id: string): Promise<{ ok: true } | { ok: false, error: 'signed-out' | 'not-found' }> {
   const record = await state.current()
 
-  return record && state.via() === 'session' ? state.core.store.bearerTokens.delete(record.id, id) : false
+  if (!record || state.via() !== 'session')
+    return { ok: false, error: 'signed-out' }
+
+  return (await state.core.store.bearerTokens.delete(record.id, id)) ? { ok: true } : { ok: false, error: 'not-found' }
 }
 
 // Whether a request carries an `Authorization: Bearer` token, which no page can add to a cross-site request; a browser sends Basic credentials on its own.

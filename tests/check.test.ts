@@ -3360,6 +3360,8 @@ describe.concurrent('kay check, unused code', () => {
         '  const mine = await ctx.locals.auth.organization("acme")',
         '  await rooms.members("lobby")',
         '  await auth.removePasskey(id, { password: "x" })',
+        '  if (await auth.revokeToken(id)) return 1',
+        '  await auth.setLocale("fr")',
         '  const ended = await auth.endSession(open[0].id)',
         '  return auth.endSession(mine.id)',
         '}',
@@ -3377,7 +3379,7 @@ describe.concurrent('kay check, unused code', () => {
     try {
       const { output } = await runCheck(root)
 
-      expect(output.match(/deprecated-auth-method/g)).toHaveLength(7)
+      expect(output.match(/deprecated-auth-method/g)).toHaveLength(9)
       await runCheck(root, '--fix')
       expect(await Bun.file(join(root, 'src/a.ts')).text()).toBe([
         'export async function a(ctx: { locals: { auth: any } }, auth: any, rooms: any) {',
@@ -3385,6 +3387,8 @@ describe.concurrent('kay check, unused code', () => {
         '  const mine = await ctx.locals.auth.getOrganization("acme")',
         '  await rooms.members("lobby")',
         '  await auth.revokePasskey(id, { password: "x" })',
+        '  if ((await auth.revokeBearerToken(id)).ok) return 1',
+        '  await auth.updateLocale("fr")',
         '  const ended = (await auth.revokeSession(open[0].id)).ok',
         '  return auth.endSession(mine.id)',
         '}',

@@ -223,7 +223,7 @@ describe('organizations', () => {
 
     const third = (await ada.browser.callOk('invite', org, 'grace@example.com')).invitation
 
-    expect(await grace.browser.call('declineInvitation', third.id)).toBe(true)
+    expect(await grace.browser.call('rejectInvitation', third.id)).toEqual({ ok: true })
 
     const fourth = (await ada.browser.callOk('invite', org, 'grace@example.com')).invitation
 
@@ -459,6 +459,7 @@ describe('organizations', () => {
     mails.length = 0
 
     expect(await bearer(graceToken, 'acceptInvitation', invitation.id)).toEqual({ ok: false, error: 'signed-out' })
+    expect(await bearer(graceToken, 'rejectInvitation', invitation.id)).toEqual({ ok: false, error: 'signed-out' })
     expect(await bearer(graceToken, 'declineInvitation', invitation.id)).toBe(false)
     expect(await bearer(graceToken, 'createOrganization', { name: 'Mine' })).toEqual({ ok: false, error: 'signed-out' })
     expect(await bearer(adaToken, 'updateOrganization', org, { name: 'Renamed' })).toEqual({ ok: false, error: 'signed-out' })

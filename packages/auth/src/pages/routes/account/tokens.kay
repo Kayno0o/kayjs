@@ -26,7 +26,7 @@ export const create = action(schemas.createToken, async (input, ctx) => {
 })
 
 export const revoke = action(schemas.id, async ({ id }, ctx) => {
-  return await ctx.locals.auth.revokeToken(id) ? 'revoked' : ctx.fail(404, { error: 'not-found' })
+  return (await ctx.locals.auth.revokeBearerToken(id)).ok ? 'revoked' : ctx.fail(404, { error: 'not-found' })
 })
 
 const auth = ctx.locals.auth

@@ -8,7 +8,7 @@ import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 
 export const revoke = action(schemas.oauthClient, async ({ id }, ctx) => {
-  return await ctx.locals.auth.revokeOAuthClient(id) ? 'revoked' : ctx.fail(404, { error: 'not-found' })
+  return (await ctx.locals.auth.revokeOAuthGrant(id)).ok ? 'revoked' : ctx.fail(404, { error: 'not-found' })
 })
 
 const clients = await ctx.locals.auth.listOAuthClients()

@@ -458,7 +458,8 @@ describe('refresh tokens', () => {
     const { app, ada, client_id, first } = await signedInClient()
 
     expect(await ada.call('listOAuthClients')).toEqual([expect.objectContaining({ id: client_id, name: 'Claude Code', scopes: ['posts:read'] })])
-    expect(await ada.call('revokeOAuthClient', client_id)).toBe(true)
+    expect(await ada.call('revokeOAuthGrant', client_id)).toEqual({ ok: true })
+    expect(await ada.call('revokeOAuthGrant', client_id)).toEqual({ ok: false, error: 'not-found' })
     expect(await ada.call('revokeOAuthClient', client_id)).toBe(false)
     expect(await ada.call('listOAuthClients')).toEqual([])
     expect((await token(app, { grant_type: 'refresh_token', refresh_token: String(first.body.refresh_token), client_id })).body.error).toBe('invalid_grant')

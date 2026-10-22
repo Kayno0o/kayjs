@@ -441,6 +441,7 @@ const OUTCOMES: RenamedName[] = [
 
 // kayjs-auth's methods: `list*` for a collection, `get*` for one, `revoke*` for a credential and `delete*` for a record.
 const WHY = 'kayjs-auth names a collection `list*`, one item `get*`, a credential `revoke*` and a record `delete*`'
+const OK_WHY = 'a kayjs-auth method that can be refused answers `{ ok }` under a new name, so a boolean test of the old one cannot silently stay true'
 const AUTH_METHODS: RenamedName[] = [
   { from: 'sessions', to: 'listSessions', kind: 'method', receiver: true, why: WHY },
   { from: 'passkeys', to: 'listPasskeys', kind: 'method', receiver: true, why: WHY },
@@ -458,6 +459,11 @@ const AUTH_METHODS: RenamedName[] = [
   { from: 'removePasskey', to: 'revokePasskey', kind: 'method', receiver: true, why: WHY },
   { from: 'removeMember', to: 'deleteMember', kind: 'method', receiver: true, why: WHY },
   { from: 'endSession', to: 'revokeSession', kind: 'method', receiver: true, answersOk: true, why: `${WHY}, and a refusal answers \`{ ok }\`` },
+  { from: 'revokeToken', to: 'revokeBearerToken', kind: 'method', receiver: true, answersOk: true, why: OK_WHY },
+  { from: 'revokeOAuthClient', to: 'revokeOAuthGrant', kind: 'method', receiver: true, answersOk: true, why: OK_WHY },
+  { from: 'renamePasskey', to: 'updatePasskeyName', kind: 'method', receiver: true, answersOk: true, why: OK_WHY },
+  { from: 'declineInvitation', to: 'rejectInvitation', kind: 'method', receiver: true, answersOk: true, why: OK_WHY },
+  { from: 'setLocale', to: 'updateLocale', kind: 'method', receiver: true, answersOk: true, why: OK_WHY },
 ]
 
 // The renames of the 1.70 naming conventions, each under its own lint.

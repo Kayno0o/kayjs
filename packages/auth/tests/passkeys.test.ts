@@ -341,10 +341,11 @@ describe('a passkey as second factor and as proof', () => {
     const bob = await registered(app, 'bob@example.com')
     const id = device.credentials[0]!.id
 
-    expect(await bob.call('renamePasskey', id, 'Mine')).toBe(false)
-    expect(await ada.call('renamePasskey', id, ' ')).toBe(false)
-    expect(await ada.call('renamePasskey', id, 'Work laptop')).toBe(true)
+    expect(await bob.call('updatePasskeyName', id, 'Mine')).toEqual({ ok: false, error: 'not-found' })
+    expect(await ada.call('updatePasskeyName', id, ' ')).toEqual({ ok: false, error: 'invalid-name' })
+    expect(await ada.call('updatePasskeyName', id, 'Work laptop')).toEqual({ ok: true })
     expect(await ada.call('listPasskeys')).toMatchObject([{ name: 'Work laptop' }])
+    expect(await ada.call('renamePasskey', id, 'Old name')).toBe(true)
   })
 })
 

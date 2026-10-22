@@ -541,16 +541,20 @@ export async function acceptInvitation(state: RequestState, invitationId: string
   return { ok: true, membership: membership(organization, member) }
 }
 
-// The invited user turns it down; false when it is not open to them.
-export async function declineInvitation(state: RequestState, invitationId: string): Promise<boolean> {
+// The invited user turns it down; `not-found` when it is not open to them, whoever it was meant for.
+export async function declineInvitation(state: RequestState, invitationId: string): Promise<{ ok: true } | { ok: false, error: 'signed-out' | 'not-found' }> {
   const { store } = organizationsOf(state.core)
   const record = await state.current()
+
+  if (!record || state.via() !== 'session')
+    return { ok: false, error: 'signed-out' }
+
   const invitation = await live(store, invitationId)
 
-  if (state.via() !== 'session' || record?.email == null || record.email === '' || record.emailVerifiedAt === null || invitation?.email !== record.email)
-    return false
+  if (record.email == null || record.email === '' || record.emailVerifiedAt === null || invitation?.email !== record.email)
+    return { ok: false, error: 'not-found' }
 
-  return store.invitations.delete(invitation.id)
+  return (await store.invitations.delete(invitation.id)) ? { ok: true } : { ok: false, error: 'not-found' }
 }
 
 // The signed-in user's membership of the organization `ref` names, holding `role` there when given; with `session`, a bearer or OAuth token is refused as signed out.

@@ -148,17 +148,24 @@ export async function listPasskeys(state: RequestState): Promise<Passkey[]> {
   return record ? (await state.core.store.passkeys.listByUser(record.id)).map(passkey => publicPasskey(passkey)) : []
 }
 
-export async function renamePasskey(state: RequestState, id: string, name: string): Promise<boolean> {
+export async function renamePasskey(state: RequestState, id: string, name: string): Promise<{ ok: true } | { ok: false, error: 'signed-out' | 'not-found' | 'invalid-name' }> {
   const record = await state.current()
+
+  if (!record || state.via() !== 'session')
+    return { ok: false, error: 'signed-out' }
+
   const passkey = await state.core.store.passkeys.get(id)
   const cleaned = cleanName(name)
 
-  if (!record || state.via() !== 'session' || passkey?.userId !== record.id || cleaned === undefined)
-    return false
+  if (passkey?.userId !== record.id)
+    return { ok: false, error: 'not-found' }
+
+  if (cleaned === undefined)
+    return { ok: false, error: 'invalid-name' }
 
   await state.core.store.passkeys.update(id, { name: cleaned })
 
-  return true
+  return { ok: true }
 }
 
 // Removes one of the signed-in user's passkeys once `proof` re-proves them, unless it is their last way in.
