@@ -478,10 +478,16 @@ export function followBuilds(): void {
     if (typeof message === 'object' && message !== null && 'typeErrors' in message) {
       const problems = message.typeErrors as TypeProblem[]
 
+      const before = typeTexts.length
+
       typeTexts = problems.map(problem => problem.report)
-      lastTypes = `event: types\ndata: ${JSON.stringify(typeTexts)}\n\n`
       recordTypeErrors(problems)
-      broadcast(lastTypes)
+
+      // The pages hear a change, not a list that is empty again.
+      if (typeTexts.length > 0 || before > 0) {
+        lastTypes = `event: types\ndata: ${JSON.stringify(typeTexts)}\n\n`
+        broadcast(lastTypes)
+      }
 
       return
     }
