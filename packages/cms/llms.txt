@@ -5,7 +5,7 @@
 ## Topics
 
 - [Setup and saving files](llms/setup.md): `kay add cms`, `forgejo()`, `workingTree()`, a saver of your own, and how a save names the version it was made from so editors never overwrite each other
-- [Options of cms()](llms/options.md): `prefix`, `logo`, `guard`, `files`, `uploads` and their checks, `pageSize`, `collections`, `rawHtml`, `author`, `onSave`, sign-in and roles
+- [Options of cms()](llms/options.md): `prefix`, `logo`, `role`, `guard`, `files` and the `CMS_*` variables, `uploads` and their checks, `pageSize`, `collections`, `rawHtml`, `author`, `onSave`, sign-in and roles
 - [The editor on the page](llms/editor.md): edit mode, the markers kay writes, the panel, unsaved drafts, the entries API and the dev tool tab
 - [The admin screens](llms/admin.md): each screen under `<prefix>`: content list, entry form, new entry, translations, media, unused uploads and missing pages
 - [Arranging and replacing the screens](llms/screens.md): `cms({ collections })` for a form's field order, rows and hidden fields and a list's columns and row actions; an app's page at a screen's path; `createEntryForm` and the entry parts to build an entry screen

@@ -72,7 +72,7 @@ export default api({ maxSize: uploadMaxSize })
   // Only whom the app's guard admits may delete, since an edit cookie is tied to no user; a file referenced since the screen was drawn is kept.
   .post('/unused/delete', async ({ body, status }) => {
     if (!settings().guard)
-      return status(403, wording('cms.uploads.needsGuard', 'Deleting uploads needs cms({ guard })'))
+      return status(403, wording('cms.uploads.needsGuard', 'Deleting uploads needs cms({ role }) or cms({ guard })'))
 
     const result = await deleteUnusedUploads(body.keys)
 

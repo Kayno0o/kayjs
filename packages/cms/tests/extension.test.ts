@@ -50,7 +50,7 @@ describe('cms()', () => {
     expect(() => {
       if (typeof server === 'function')
         void server()
-    }).toThrow('kay: a production server saves no edit to the working tree')
+    }).toThrow('kay: a production server saves no edit to the working tree, which the next deploy replaces: set CMS_BASE_URL, CMS_REPO and CMS_TOKEN')
   })
 
   test('boots a production server told where files go, and any server outside production', () => {
@@ -116,10 +116,6 @@ describe('cms()', () => {
       process.env.CMS_BASE_URL = variables.CMS_BASE_URL
 
       expect(boot).toThrow('lacks CMS_REPO and CMS_TOKEN')
-    })
-
-    test('stops the boot naming the variables when none is set', () => {
-      expect(boot).toThrow('set CMS_BASE_URL, CMS_REPO and CMS_TOKEN')
     })
   })
 

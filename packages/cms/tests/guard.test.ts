@@ -164,7 +164,7 @@ describe('cms({ role })', () => {
       return roles.includes(require) ? { id: 'u1', roles } : ctx.deny(403)
     }
 
-    return Object.assign(ctx, { locals: { auth: { user: async () => ({ id: 'u1', roles }), requireUser } } })
+    return Object.assign(ctx, { locals: { auth: { user: async () => ({ id: 'u1', roles }), requireUser, [Symbol.for('kayjs-auth.requires')]: true } } })
   }
 
   test('lets in whom kayjs-auth\'s requireUser({ require: role }) admits, and refuses the others', async () => {
@@ -177,14 +177,17 @@ describe('cms({ role })', () => {
     expect(asked).toEqual(['editor', 'editor'])
   })
 
-  test('refuses every request with no kayjs-auth in its locals, logging it once', async () => {
+  test('refuses every request with no kayjs-auth in its locals, or one too old to read require, logging it once', async () => {
     configure({ role: 'editor' })
+
+    // A kayjs-auth before require, whose requireUser() admits every signed-in user.
+    const older = Object.assign(context('POST', '/entries/posts/hello', false), { locals: { auth: { user: async () => ({ id: 'u1' }), requireUser: async () => ({ id: 'u1' }) } } })
 
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
       expect(await admitted(context('POST', '/entries/posts/hello', false))).toBe(false)
-      expect(await admitted(context('POST', '/entries/posts/hello', false))).toBe(false)
+      expect(await admitted(older)).toBe(false)
       expect(logged.mock.calls.map(call => String(call[0]))).toEqual([expect.stringContaining('cms({ role: \'editor\' }) found no kayjs-auth')])
     }
     finally {

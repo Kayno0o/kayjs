@@ -2,6 +2,9 @@ import type { Guard, GuardContext } from 'kay'
 import { log } from './log'
 
 // The part of kayjs-auth's `ctx.locals.auth` the cms reads: found by its shape, so the cms works without it installed.
+// Set by a kayjs-auth whose `requireUser()` reads `require`; an older one ignores it and would admit every signed-in user.
+const REQUIRES = Symbol.for('kayjs-auth.requires')
+
 interface AuthLike {
   bareUser?: () => Promise<MemberLike | null>
   user?: () => Promise<MemberLike | null>
@@ -9,6 +12,7 @@ interface AuthLike {
   signInUrl?: (back?: string) => string
   signOut?: () => Promise<void>
   requireUser?: (options: { require: string }) => Promise<unknown>
+  [REQUIRES]?: unknown
 }
 
 interface MemberLike {
@@ -31,10 +35,10 @@ export function roleGuard(role: string): Guard {
   return async (ctx) => {
     const auth = authOf(ctx)
 
-    if (typeof auth?.requireUser !== 'function') {
+    if (typeof auth?.requireUser !== 'function' || auth[REQUIRES] !== true) {
       if (!unauthed) {
         unauthed = true
-        log.error(`cms({ role: '${role}' }) found no kayjs-auth on the request, so it refuses every editor: list auth() in the extensions of kay.config.ts, or give cms({ guard }) instead`)
+        log.error(`cms({ role: '${role}' }) found no kayjs-auth of this release on the request, so it refuses every editor: list auth() in the extensions of kay.config.ts at the cms's version, or give cms({ guard }) instead`)
       }
 
       return ctx.deny(403)

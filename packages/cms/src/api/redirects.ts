@@ -5,7 +5,7 @@ import { addRedirect, clearPaths, dismissPaths, MAX_BULK, removeRedirects, siteP
 import { settings } from '../settings'
 
 function needsGuard(): string {
-  return wording('cms.redirects.needsGuard', 'Redirects need cms({ guard })')
+  return wording('cms.redirects.needsGuard', 'Redirects need cms({ role }) or cms({ guard })')
 }
 
 const STATUS = s.Optional(s.Union([s.Literal(301), s.Literal(302), s.Literal(307), s.Literal(308), s.Literal(410)]))

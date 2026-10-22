@@ -75,6 +75,8 @@ export type { AuthSessionData, BareUser, OAuthApp, Profile, User } from './core'
 
 const STATE = Symbol('kayjs-auth.state')
 const TAKE_COOKIES = Symbol('kayjs-auth.takeCookies')
+// Says `requireUser()` reads `require`, so kayjs-cms's `role` refuses a request rather than trust an older kayjs-auth that ignores it.
+const REQUIRES: unique symbol = Symbol.for('kayjs-auth.requires')
 
 // The readable cookie telling a script of the site that a person is signed in, so a library's script (kayjs-cms's Edit this page link) asks the server only for a browser that may get an answer.
 export const SIGNED_IN_HINT = 'kay_user'
@@ -225,6 +227,7 @@ function hooked<Args extends unknown[], Result>(hook: ((...args: never[]) => Res
 // Auth for one request, as `auth` in the context: `ctx.locals.auth` in a page, an action or a guard.
 export class Auth<Scope extends string = string, Role extends string = string, OrgRole extends string = string, UserData extends object = Record<string, unknown>> {
   readonly [STATE]: RequestState
+  readonly [REQUIRES] = true
   private known?: { record: Promise<UserRecord | null>, at: number } | undefined
   private source: 'session' | 'bearer' | null = null
   private tokenScopes: string[] | null = null

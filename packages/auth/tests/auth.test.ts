@@ -491,6 +491,33 @@ describe('guard', () => {
     expect(await ask('admin')).toBe(403)
   })
 
+  test('requireUser({ require }) asks the app\'s authorize, with the level of the request, and says it reads require to kayjs-cms', async () => {
+    const asked: unknown[] = []
+    const { auth, browser, store } = testApp({ authorize: async (user, requirement, level) => {
+      asked.push([user?.id, requirement, level])
+
+      return requirement === 'admin'
+    } })
+    const ada = browser()
+
+    await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', roles: ['editor'] }))
+    await ada.fetch('/sign-in/u1', POST)
+    const { auth: signedIn } = (await contextOf(auth.plugin, `kay_session=${ada.cookies.get('kay_session')}`)) as { auth: Auth }
+    const outcome = async (require: 'editor' | 'admin') => {
+      try {
+        return (await signedIn.requireUser({ require })).id
+      }
+      catch (refused) {
+        return (refused as { status?: number }).status
+      }
+    }
+
+    expect(await outcome('admin')).toBe('u1')
+    expect(await outcome('editor')).toBe(403)
+    expect(asked).toEqual([['u1', 'admin', 'read'], ['u1', 'editor', 'read']])
+    expect((signedIn as unknown as Record<symbol, unknown>)[Symbol.for('kayjs-auth.requires')]).toBe(true)
+  })
+
   test('lets a scoped bearer token through only with one of the scopes asked', async () => {
     const { auth, browser } = testApp({ scopes: ['posts:read', 'posts:write'] })
     const ada = browser()

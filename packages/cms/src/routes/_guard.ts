@@ -9,7 +9,7 @@ export default guard(async (ctx) => {
   const { guard: admits, pageLink } = settings()
 
   if (!admits)
-    return ctx.deny(403, 'kayjs-cms has no guard: give cms() one, such as kayjs-auth\'s auth.guard(), or passwordGuard()')
+    return ctx.deny(403, 'kayjs-cms has no guard: give cms() a kayjs-auth role, cms({ role: \'editor\' }), or a guard such as passwordGuard()')
 
   try {
     await admits(ctx)

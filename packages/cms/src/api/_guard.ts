@@ -91,7 +91,7 @@ function refusal(editing: boolean, reading: boolean): string {
   if (!editing)
     return wording('cms.guard.notEditing', 'Not in edit mode')
 
-  return reading ? wording('cms.guard.notOnPage', 'Not an entry of the pages shown in edit mode') : wording('cms.guard.needsGuard', 'Saving needs cms({ guard })')
+  return reading ? wording('cms.guard.notOnPage', 'Not an entry of the pages shown in edit mode') : wording('cms.guard.needsGuard', 'Saving needs cms({ role }) or cms({ guard })')
 }
 
 // An edit cookie or link reads the entries the pages it opened render, leaves edit mode, and under `kay dev` writes while the app has no guard; every other request is whom the app's guard admits, and any other server without one admits no write at all.
