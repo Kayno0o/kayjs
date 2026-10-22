@@ -8,6 +8,7 @@ import { s } from '../src/runtime/schema'
 import { defineEnv } from '../src/server'
 import { publicEnvFiles } from '../src/server/env-state'
 import { overrideEnv } from '../src/test'
+import { kayInProject } from './check-helper'
 import { scratchDir } from './scratch'
 
 // Many cases spawn the CLI, which a loaded host runs slowly.
@@ -35,11 +36,20 @@ async function project(files: Record<string, string>): Promise<string> {
   return root
 }
 
-async function kay(args: string[], cwd: string, env: Record<string, string> = {}) {
+async function kaySpawned(args: string[], cwd: string, env: Record<string, string>) {
   const child = Bun.spawn([process.execPath, cli, ...args], { cwd, env: { PATH: process.env.PATH!, ...env }, stdout: 'pipe', stderr: 'pipe' })
   const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
-  return { stdout, stderr, code }
+  return { code, output: stderr, report: stdout }
+}
+
+// The first run of a project by `env` or `check` is in this process; a case that needs a process without the modules the other cases loaded, such as an extension's, or is about the command as a program, spawns it.
+async function kay(args: string[], cwd: string, env: Record<string, string> = {}, inProcess = true) {
+  const name = args[0]
+  const spawned = async () => kaySpawned(args, cwd, env)
+  const answer = inProcess && (name === 'env' || name === 'check') && cwd !== process.cwd() ? await kayInProject(name, args.slice(1), cwd, env, spawned) : await spawned()
+
+  return { stdout: answer.report, stderr: answer.output, code: answer.code }
 }
 
 describe('a variable required in production only', () => {
@@ -203,7 +213,7 @@ describe('kay env', () => {
 
   it('lists the variables of the app\'s schemas and of the extensions\', and kay\'s own, with whether each is required and its default, without the environment', async () => {
     const root = await project(files)
-    const { stdout, stderr, code } = await kay(['env', '--format', 'json'], root)
+    const { stdout, stderr, code } = await kay(['env', '--format', 'json'], root, {}, false)
 
     expect(code, stderr).toBe(0)
     expect(stdout.trimEnd().split('\n')).toHaveLength(1)
@@ -262,7 +272,7 @@ describe('kay env', () => {
       'kay.config.ts': 'import { mail } from \'@kaynooo/kayjs-mail\'\n\nexport default { favicon: false, extensions: [mail({ module: \'./src/defineEnv-mail/mail.ts\' })] }\n',
       'src/defineEnv-mail/mail.ts': 'import { mailer } from \'@kaynooo/kayjs-mail\'\nimport { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({ OWN: s.String() }))\nexport const mail = mailer({ optional: true })\n',
     })
-    const { stdout, stderr, code } = await kay(['env', '--format', 'json'], root)
+    const { stdout, stderr, code } = await kay(['env', '--format', 'json'], root, {}, false)
 
     expect(code, stderr).toBe(0)
 

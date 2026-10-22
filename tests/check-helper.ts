@@ -7,6 +7,7 @@ import process from 'node:process'
 import { build } from '../src/commands/build'
 import { check } from '../src/commands/check'
 import { runCommand } from '../src/commands/command'
+import { env as envCommand } from '../src/commands/env'
 import { USAGES } from '../src/commands/usages'
 import { loaderLoaded } from '../src/server/loader'
 
@@ -146,6 +147,39 @@ export async function kayBuild(args: string[], env: Record<string, string> = { N
         delete process.env[name]
       else
         process.env[name] = value
+    }
+  }
+}
+
+const inProject = new Set<string>()
+const IN_PROJECT = { env: envCommand, check } as const
+
+// `kay env` or `kay check` run in this process from the project's folder, with `env` added to the process's variables, for the first run of a project: a second one would meet the modules and config the first loaded, so it, like a root this process loaded another way, goes to `spawned`, a process of its own.
+export async function kayInProject(name: keyof typeof IN_PROJECT, args: string[], cwd: string, env: Record<string, string>, spawned: () => Promise<Run>): Promise<Run> {
+  const root = resolve(cwd)
+
+  if (inProject.has(root) || loaderLoaded(root))
+    return spawned()
+
+  inProject.add(root)
+
+  const previous = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]))
+  const origin = process.cwd()
+
+  Object.assign(process.env, env)
+  process.chdir(root)
+
+  try {
+    return await kayRun(IN_PROJECT[name], name, args)
+  }
+  finally {
+    process.chdir(origin)
+
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined)
+        delete process.env[key]
+      else
+        process.env[key] = value
     }
   }
 }
