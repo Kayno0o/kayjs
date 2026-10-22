@@ -208,6 +208,51 @@ pgDescribe('pgData live values', () => {
     other.stop?.()
   })
 
+  pgIt('does not replace a value this replica is still writing with the older row another replica set', async () => {
+    const sql = await fresh()
+    const [mine, theirs] = twoReplicas()
+    const [locker] = replicas(1)
+
+    await mine.entries()
+    await theirs.entries()
+
+    const heard = listen(mine)
+
+    await theirs.set('app:race', '', '[1]')
+    await waitFor(() => heard.length === 1, 'the first value')
+
+    let release: () => void = () => undefined
+    let locked: () => void = () => undefined
+    const gotLock = new Promise<void>((resolve) => {
+      locked = resolve
+    })
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    // Holds the row, so this replica's write waits while the other replica's event is already there.
+    const holding = locker!.begin(async (tx) => {
+      await tx.unsafe('SELECT 1 FROM kay_live WHERE id = \'app:race\' FOR UPDATE')
+      locked()
+      await held
+    })
+
+    await gotLock
+
+    const writing = mine.set('app:race', '', '[2]')
+
+    await Bun.sleep(100)
+    await sql.unsafe('INSERT INTO kay_live_events (origin, id, key, at) VALUES (\'another\', \'app:race\', \'\', 0)')
+    await Bun.sleep(1200)
+    release()
+    await holding
+    await writing
+    await Bun.sleep(1200)
+    expect(heard.slice(1).every(([, , text]) => text !== '[1]')).toBe(true)
+    expect((await sql.unsafe<{ value: string }[]>('SELECT value FROM kay_live WHERE id = \'app:race\''))[0]?.value).toBe('[2]')
+    mine.stop?.()
+    theirs.stop?.()
+  })
+
   pgIt('a value set while the store is still being read is not overwritten by an older row', async () => {
     const sql = await fresh()
     const [other] = twoReplicas()

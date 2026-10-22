@@ -31,6 +31,9 @@ export function pgLive(pg: PgHandle): LiveStore {
   // A streak of failed reads logs once, as the poll runs twice a second.
   let failing = false
   let closed = false
+  // The keys with a write of this process still to commit, and the ones heard meanwhile: their row is read once the write ends, so an older row never replaces the newer local value.
+  const pending = new Map<string, number>()
+  const deferred = new Map<string, [string, string]>()
 
   // Runs `work` once the ones before it ended, failed or not.
   const ordered = async <Result>(work: () => Promise<Result>): Promise<Result> => {
@@ -55,6 +58,10 @@ export function pgLive(pg: PgHandle): LiveStore {
 
   // The row and its message go together, so a process that heard the message finds the row.
   const write = async (what: string, id: string, key: string, change: (tx: SQL) => Promise<unknown>): Promise<void> => {
+    const at = `${escaped(id)}\0${escaped(key)}`
+
+    pending.set(at, (pending.get(at) ?? 0) + 1)
+
     try {
       await ordered(async () => {
         const db = await pg.db()
@@ -69,6 +76,12 @@ export function pgLive(pg: PgHandle): LiveStore {
     catch (error) {
       kayLog('error', `${what} the live value ${id} failed`, error)
     }
+    finally {
+      if (pending.get(at) === 1)
+        pending.delete(at)
+      else
+        pending.set(at, (pending.get(at) ?? 1) - 1)
+    }
   }
 
   // Where the events stand: the ones in the overlap are noted as known, so they are not heard again.
@@ -82,9 +95,16 @@ export function pgLive(pg: PgHandle): LiveStore {
   }
 
   // The events of the other processes since the last poll, each value read once however many times it was set.
-  const hear = async (db: SQL, after: number): Promise<{ heard: [id: string, key: string, text: string | undefined][], last: number }> => {
+  const hear = async (db: SQL, after: number): Promise<{ heard: [id: string, key: string, text: string | undefined][], last: number, fresh: number[], read: string[] }> => {
     let last = after
+    // The events are noted as known only once their rows are read, so a failed read hears them again.
+    const fresh: number[] = []
     const changed = new Map<string, [string, string]>()
+
+    for (const [at, event] of deferred) {
+      if (!pending.has(at))
+        changed.set(at, event)
+    }
 
     for (const event of await query<{ seq: string, id: string, key: string }>(db, 'SELECT seq::text AS seq, id, key FROM kay_live_events WHERE seq > $1::bigint AND origin != $2 ORDER BY seq', [after - OVERLAP, self])) {
       const seq = Number(event.seq)
@@ -92,20 +112,36 @@ export function pgLive(pg: PgHandle): LiveStore {
       if (recent.has(seq))
         continue
 
-      recent.add(seq)
+      fresh.push(seq)
       last = Math.max(last, seq)
-      changed.set(`${event.id}\0${event.key}`, [event.id, event.key])
+
+      const at = `${event.id}\0${event.key}`
+
+      if (pending.has(at))
+        deferred.set(at, [event.id, event.key])
+      else
+        changed.set(at, [event.id, event.key])
     }
 
     const heard: [id: string, key: string, text: string | undefined][] = []
 
-    for (const [id, key] of changed.values()) {
+    const read: string[] = []
+
+    for (const [at, [id, key]] of changed) {
+      // A write of this process began since: the row is read once it ends.
+      if (pending.has(at)) {
+        deferred.set(at, [id, key])
+
+        continue
+      }
+
       const [row] = await query<{ value: string }>(db, 'SELECT value FROM kay_live WHERE id = $1 AND key = $2', [id, key])
 
       heard.push([unescaped(id), unescaped(key), row?.value])
+      read.push(at)
     }
 
-    return { heard, last }
+    return { heard, last, fresh, read }
   }
 
   const poll = async () => {
@@ -126,6 +162,12 @@ export function pgLive(pg: PgHandle): LiveStore {
 
       heard = read.heard
       seen = read.last
+
+      for (const id of read.fresh)
+        recent.add(id)
+
+      for (const at of read.read)
+        deferred.delete(at)
 
       for (const id of recent) {
         if (id <= seen - OVERLAP)

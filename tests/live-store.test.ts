@@ -146,6 +146,22 @@ process.exit(0)`)
     setupStore(undefined)
   })
 
+  it('leaves a value as it was when a synchronous store refuses the write, and fails the setup of one that cannot be read', async () => {
+    const refusing = declare(0, 'test:refused', 'refused')
+    const store: LiveStore = { entries: () => [], set: () => {
+      throw new Error('closed')
+    }, delete: () => undefined, subscribe: () => undefined }
+
+    setupStore({ live: store })
+    expect(() => refusing.set(5)).toThrow('closed')
+    expect(refusing()).toBe(0)
+    setupStore(undefined)
+
+    setupStore({ live: { ...store, entries: async () => Promise.reject(new Error('database down')) } })
+    await expect(liveStoreReady()).rejects.toThrow('database down')
+    setupStore(undefined)
+  })
+
   it('tells the watchers of another process a key was deleted, and a value never declared there stays held', async () => {
     const path = await storePath()
     const setter = spawnProcess(path, 'room.set(\'z\', { id: \'z\', users: 3, since: new Date(0) })\nconsole.log(\'set\')\nawait Bun.sleep(1500)\nroom.delete(\'z\')\nroom.delete(\'never\')')

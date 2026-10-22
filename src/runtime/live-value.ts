@@ -282,9 +282,6 @@ async function readLater(store: LiveStore, pending: Promise<Entries>): Promise<v
         hear(id, key, text, true)
     }
   }
-  catch (error) {
-    kayLog('error', 'reading the live values held in the store failed; they are left out', error)
-  }
   finally {
     if (kept.written === written)
       kept.written = undefined
@@ -423,7 +420,7 @@ function serverLive(id: string, initial: unknown, name: string | undefined): Han
 
     // The store first, so a refusal leaves the value as it was.
     if (shared(slot))
-      sendToStore(slot.id, key, async store => store.set(slot.id, key, encodeValue(value)))
+      sendToStore(slot.id, key, (store): void | Promise<void> => store.set(slot.id, key, encodeValue(value)))
 
     slot.values.set(key, value)
     notify(slot, key)
@@ -441,7 +438,7 @@ function serverLive(id: string, initial: unknown, name: string | undefined): Han
           return
 
         if (shared(slot))
-          sendToStore(slot.id, keyText(key), async store => store.delete(slot.id, keyText(key)))
+          sendToStore(slot.id, keyText(key), (store): void | Promise<void> => store.delete(slot.id, keyText(key)))
 
         slot.values.delete(keyText(key))
         notify(slot, keyText(key))
