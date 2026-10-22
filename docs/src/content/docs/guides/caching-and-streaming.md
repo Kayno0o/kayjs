@@ -42,7 +42,7 @@ invalidate(key => key.startsWith('post:'))
 
 ### A function that invalidates itself
 
-`cache(load, { ttl })` returns a function with its key taken from the module and its name, so a mistyped string cannot silently miss. Declare it as a top-level `const` in a `.ts` module.
+`cache(load, { ttl })` returns a function with its key taken from the module and its name, so a mistyped string cannot silently miss. Declare it as a top-level `const` in a `.ts` or `.tsx` module. Renaming it or moving the file changes the key, and elsewhere the key is the calling line, right for one process only.
 
 ```ts
 import { cache, cacheTag } from 'kay/cache'

@@ -56,7 +56,7 @@ export function cacheIds(source: string, file: string, root: string, jsx = false
       if (id.type !== 'Identifier' || init?.type !== 'CallExpression' || init.callee.type !== 'Identifier' || locals.get(init.callee.name) !== init.arguments.length)
         continue
 
-      const text = JSON.stringify(liveId(file, root, id.name))
+      const text = JSON.stringify(`${id.name}.${liveId(file, root, id.name)}`)
 
       // After the last token of the last argument, parentheses and a trailing comma included, before any comment closing the call.
       let at = init.end! - 1

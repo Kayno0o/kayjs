@@ -4,7 +4,7 @@ import { liveId } from '../src/build/live-ids'
 
 const ROOT = '/app'
 const FILE = '/app/src/posts.ts'
-const id = (name: string) => JSON.stringify(liveId(FILE, ROOT, name))
+const id = (name: string) => JSON.stringify(`${name}.${liveId(FILE, ROOT, name)}`)
 
 describe('cacheIds', () => {
   it('gives each top-level cache and tag the id of its module and name', () => {

@@ -28,7 +28,7 @@ invalidate(key => key.startsWith('post:'))
 
 ### Cache a function with no key to type
 
-`cache(load, { ttl })` from `kay/cache` returns a function whose key is its module and name, so `invalidate` is a method on it and a mistyped string cannot miss. Declare it as a top-level `const`, in a module of its own (a `.ts` file): the build gives it the id, the same in every process and after a restart.
+`cache(load, { ttl })` from `kay/cache` returns a function whose key is its module and name, so `invalidate` is a method on it and a mistyped string cannot miss. Declare it as a top-level `const` in a `.ts` or `.tsx` module: the build gives it an id from the module path and the name, the same in every process, in an executable and after a restart. Renaming the constant or moving the file changes the key, so a store's old rows are left behind to expire.
 
 ```ts
 import { cache, cacheTag } from 'kay/cache'
@@ -38,7 +38,7 @@ export const posts = cache(listPosts, { ttl: '5m', tags: [postTag] })
 export const post = cache(async (slug: string) => findPost(slug), { ttl: '5m', tags: [postTag] })
 ```
 
-`await posts()` gives the value as `cached` does, `posts.invalidate()` drops it, `post('a')` keeps a value per arguments, `post.invalidate('a')` drops one and `post.invalidate()` all of them. `postTag.invalidate()` drops every value naming the tag, with no string key in the app. A prerendered page that read the function or a tag is refreshed by the invalidation, as for `cached`. `live` and `store` are options beside `ttl`.
+`await posts()` gives the value as `cached` does, `posts.invalidate()` drops it, `post('a')` keeps a value per arguments, `post.invalidate('a')` drops one and `post.invalidate()` all of them. `postTag.invalidate()` drops every value naming the tag, with no string key in the app. A prerendered page that read the function or a tag is refreshed by the invalidation, as for `cached`. Arguments are part of the key, kept as devalue writes them, so keep them small and plain. `live` and `store` are options beside `ttl`.
 
 ### Keep a cached value across restarts
 
@@ -132,7 +132,7 @@ const posts = await cached('posts', '5m', listPosts)
 - A refresh that throws is logged and keeps the stale value, trying again a minute later at most.
 - For a visitor in preview mode (see [Preview mode](content-cms.md#preview-mode)), every call runs `load` and keeps nothing, so they see what it gives now.
 - `invalidate(key)` from `kay/cache`, or `invalidate(key => key.startsWith('post:'))`, drops keys so the next call loads afresh, and marks stale every prerendered page that read a dropped key: call it from the action that changed what they hold.
-- `cache(load, { ttl, live, store, tags })` is `cached` with the key derived and `.invalidate()` on the result; a `cacheTag()` in `tags` is a key like any other that the value depends on, so dropping it drops the value and refreshes the pages that read it. Called outside a top-level `const` (or without the build, as a bare unit test), the key is the calling line and column, right for one process only; `cached` and `invalidate(key)` stay for keys built at runtime, such as `post:${id}`.
+- `cache(load, { ttl, live, store, tags })` is `cached` with the key derived and `.invalidate()` on the result; a `cacheTag()` in `tags` is a key like any other that the value depends on, so dropping it drops the value and refreshes the pages that read it. Called anywhere else (inside a function, a `.js` file, a `--- server` fence, or without the build, as in a bare unit test), the key is the calling line and column, right for one process only and not for an executable; `cached` and `invalidate(key)` stay for keys built at runtime, such as `post:${id}`.
 - `{ live: true }` as the fourth argument has every open page that read the key in its server fence follow it: an `invalidate` of the key, or of one it was built from, shows the page afresh in each tab (see [Following cached values](live-values.md#following-cached-values)).
 - A value also depends on the keys and collections its own `load` read: dropping `news` drops a `cached('latest', ...)` built from `news.all()`, and the pages hitting it. Not tracked: module-level data, and a store's value another process loaded.
 - A load already running for a dropped key never lands in the cache.

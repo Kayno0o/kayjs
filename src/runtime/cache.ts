@@ -86,9 +86,12 @@ export interface CacheFunctionOptions<Ttl extends Duration = Duration> extends C
   tags?: CacheTag[] | undefined
 }
 
+declare const TAG: unique symbol
+
 // A group of cached values to drop together, made once and named in the `tags` of each `cache` call that belongs to it.
 export interface CacheTag {
   invalidate: () => void
+  readonly [TAG]: true
 }
 
 // The function `cache` gives: calling it gives the cached value, `invalidate()` drops every value it holds and `invalidate(...args)` the one for those arguments.
@@ -97,24 +100,28 @@ export interface CachedFunction<A extends unknown[], T> {
   invalidate: (...args: A | []) => void
 }
 
+const AT = /^at /
 const CLOSING_PAREN = /\)$/
 const DIGITS = /^\d+$/
-const OWN_FRAME = /\/runtime\/cache(?:\.server)?\.ts:/
 
 // The path, line and column a stack line names, with a `file://` and a `?` query a reload adds taken off, or nothing for a native frame.
 function frameAt(line: string): { path: string, line: string, column: string } | undefined {
-  const parts = line.trim().replace(CLOSING_PAREN, '').split(':')
+  const parts = line.trim().replace(AT, '').replace(CLOSING_PAREN, '').split(':')
   const column = parts.pop()
   const row = parts.pop()
   const place = parts.join(':')
-  const path = place.slice(Math.max(place.lastIndexOf('('), place.lastIndexOf('at ') + 2) + 1).replace('file://', '')
+  const path = (place.includes(' (') ? place.slice(place.lastIndexOf(' (') + 2) : place).replace('file://', '')
 
   return column !== undefined && row !== undefined && DIGITS.test(column) && DIGITS.test(row) && path !== '' ? { path: path.includes('?') ? path.slice(0, path.indexOf('?')) : path, line: row, column } : undefined
 }
 
-// The module, line and column of the code calling the function that calls this one, which names a cache or a tag the same in every process and after a restart.
-function callSite(kind: string): string {
-  const found = (new Error('call site').stack ?? '').split('\n').slice(1).filter(line => !OWN_FRAME.test(line)).map(frameAt).find(frame => frame !== undefined)
+// The module, line and column of the code calling `caller`, the frames up to it cut by function so a bundle that holds this module reads as it does from source. Right for one process only: a bundle's lines are not the source's.
+function callSite(kind: string, caller: (...args: never[]) => unknown): string {
+  const holder: { stack?: string } = {}
+
+  Error.captureStackTrace(holder, caller)
+
+  const found = (holder.stack ?? '').split('\n').slice(1).map(frameAt).find(frame => frame !== undefined)
 
   if (!found)
     throw new Error(`kay: ${kind} could not tell which module calls it`)
@@ -128,15 +135,25 @@ function callSite(kind: string): string {
 // A cached function, its key taken from the module and the place that calls `cache`, so no string is typed twice: call it where it is declared, once, at the top of a module.
 // `await posts()` gives the value as `cached` does, `posts.invalidate()` drops it, and a function taking arguments keeps a value for each.
 export function cache<A extends unknown[], T, const Ttl extends Duration = Duration>(load: (...args: A) => T | Promise<T>, options: CacheFunctionOptions<Ttl>, id?: string): CachedFunction<A, T> {
-  const site = id === undefined ? callSite('cache') : `cache:${id}`
+  const site = id === undefined ? callSite('cache', cache) : `cache:${id}`
   const { ttl, tags = [], ...rest } = options
+
+  durationSeconds(ttl, `${site}'s ttl`)
+
   const tagKeys = tags.map(tag => tagKey(tag))
-  const keyOf = (args: unknown[]) => args.length === 0 ? site : `${site}${JSON.stringify(args)}`
+  const keyOf = (args: unknown[]) => args.length === 0 ? site : `${site}${stringify(args)}`
 
   const call = async (...args: A): Promise<T> => cachedFor<T>(keyOf(args), ttl, async () => load(...args), rest, renderingForVisitor(), tagKeys)
 
   return Object.assign(call, {
-    invalidate: (...args: A | []) => invalidate(args.length === 0 ? (key: string) => key === site || key.startsWith(`${site}[`) : keyOf(args)),
+    invalidate: (...args: A | []) => {
+      if (args.length > 0)
+        return invalidate(keyOf(args))
+
+      // The bare key is named too, so the other processes hear of it even when this one holds no value.
+      invalidate(site)
+      invalidate(key => key.startsWith(`${site}[`))
+    },
   })
 }
 
@@ -153,8 +170,8 @@ function tagKey(tag: CacheTag): string {
 
 // A group of cached values, for the `tags` of `cache`: `invalidate()` drops all of them with no key typed anywhere.
 export function cacheTag(id?: string): CacheTag {
-  const key = id === undefined ? callSite('tag') : `tag:${id}`
-  const tag: CacheTag = { invalidate: () => invalidate(key) }
+  const key = id === undefined ? callSite('tag', cacheTag) : `tag:${id}`
+  const tag = { invalidate: () => invalidate(key) } as CacheTag
 
   tagNames.set(tag, key)
 
@@ -187,13 +204,17 @@ async function cachedFor<T, const Ttl extends Duration = Duration>(key: string, 
 
     if (kept) {
       entry = kept
+
+      if (tagKeys.length > 0)
+        kept.deps = [...new Set([...tagKeys, ...kept.deps ?? []])]
+
       remember(key, kept)
       trim()
     }
   }
 
   if (!entry) {
-    const pending: Entry = { value: undefined, freshUntil: 0, loaded: false }
+    const pending: Entry = { value: undefined, freshUntil: 0, loaded: false, ...tagKeys.length > 0 ? { deps: tagKeys } : {} }
 
     entries.set(key, pending)
     trim()
