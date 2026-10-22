@@ -28,7 +28,7 @@ export interface CompileOptions {
 
 // Bun embeds an asset directory under its last path component, beside the executable's entry.
 const CLIENT_ASSETS = 'client'
-// What a server reading the build it embeds never runs, each with what it says if called: the client bundler, the `.kay` loader and the prerenderer, which bring the compiler, the dev tool's Head and Sizes tabs, which reach it too, and the SVG favicon drawer, which brings resvg.
+// What a server reading the build it embeds never runs, each with what it says if called: the client bundler, the `.kay` loader, the prerenderer and the reader of the templates reading `ctx`, which bring the compiler, the dev tool's Head and Sizes tabs, which reach it too, and the SVG favicon drawer, which brings resvg.
 const LEFT_OUT_MODULES = new Map([
   [join(import.meta.dir, 'client.ts'), 'an executable serves the build it embeds, and carries no compiler'],
   [join(import.meta.dir, 'plugin.ts'), 'an executable serves the build it embeds, and carries no compiler'],
@@ -36,6 +36,7 @@ const LEFT_OUT_MODULES = new Map([
   [join(import.meta.dir, '../server/dev-head.ts'), 'an executable runs in production, where the dev tool\'s Head tab does not exist'],
   [join(import.meta.dir, '../server/dev-sizes.ts'), 'an executable runs in production, where the dev tool\'s Sizes tab does not exist'],
   [join(import.meta.dir, '../server/prerender.ts'), 'an executable serves the pages `kay build` prerendered, and carries no compiler to read a template with'],
+  [join(import.meta.dir, '../server/context-reads.ts'), 'an executable serves the routes `kay build` scanned, and carries no compiler to read a template with'],
 ])
 const LEFT_OUT = 'kay-left-out'
 const RELATIVE = /^\.\.?\//

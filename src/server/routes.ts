@@ -4,9 +4,6 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { findKayFiles, findProjectFiles, KAY_FILE, TS_FILE } from '../build/files'
 import { throughLinks } from '../build/links'
 import { KayError } from '../compiler/errors'
-import { parseKay } from '../compiler/parser'
-import { analyzeScript } from '../compiler/script'
-import { templateReads } from '../compiler/template-reads'
 import { TRAILING_SLASH } from '../runtime/base'
 
 const chains = new WeakMap<string[], { file: string, files: string[], key: string }>()
@@ -224,6 +221,8 @@ export function servedPaths(routes: Route[]): Set<string> {
 
 // The app's pages, then each mounted library's that no page of the app serves the path of.
 export async function scanRoutes(routesDir: string, mounts: RouteMount[] = []): Promise<Route[]> {
+  await loadContextReader(mounts)
+
   const trees = routeTrees(routesDir, mounts)
   const routes: Route[] = []
   const read: LayoutsRead = new Map()
@@ -479,6 +478,18 @@ function walk(start: string, wanted: (file: string) => boolean, read: LayoutsRea
   return false
 }
 
+// The compiler stays out of a served app, so it loads once a scan meets the mount reading `ctx`.
+let contextReader: ((source: string) => boolean) | undefined
+
+function loadedFirst(): never {
+  throw new Error('kay: the templates reading ctx are read before scanRoutes loaded the compiler')
+}
+
+async function loadContextReader(mounts: RouteMount[]): Promise<void> {
+  if (contextReader === undefined && mounts.some(mount => mount.reaching === 'context'))
+    contextReader = (await import('./context-reads')).readsImplicitContext
+}
+
 const contextRead = new WeakMap<LayoutsRead, Map<string, boolean>>()
 
 // Whether the template of a `.kay` file reads `ctx` with no `ctx` of its own, as the compiler decides when it imports the one of kay.
@@ -494,11 +505,10 @@ function readsContext(file: string, read: LayoutsRead): boolean {
   let found = memo.get(file)
 
   if (found === undefined) {
-    try {
-      const source = readFileSync(file, 'utf8')
-      const parsed = parseKay(source)
+    const reader = contextReader ?? loadedFirst()
 
-      found = analyzeScript(source, parsed.script, [], templateReads(parsed), parsed.module).implicit.includes('ctx')
+    try {
+      found = reader(readFileSync(file, 'utf8'))
     }
     catch {
       found = false
