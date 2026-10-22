@@ -1,13 +1,25 @@
+import { existsSync } from 'node:fs'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
-import { describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it } from 'bun:test'
+import { dropStore, NOT_FOUND_FILE } from '../src/server/not-found'
 import { pages } from './shared-pages'
 
 const PRODUCTION = 'tests/fixtures/production'
 const KEY = 'k'.repeat(40)
 const HEADER = 'x-upstream-key'
+
+// The production servers built here count the paths they answered 404 in the working folder's store, which this file leaves as it found it.
+const storeKept = existsSync(NOT_FOUND_FILE)
+
+afterAll(async () => {
+  dropStore()
+
+  if (!storeKept)
+    await rm(NOT_FOUND_FILE, { force: true })
+})
 
 type Options = NonNullable<Parameters<typeof pages>[0]>
 
