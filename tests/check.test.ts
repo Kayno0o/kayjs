@@ -657,6 +657,7 @@ describe.concurrent('kay check, edge cases', () => {
       global: ['const biggest = Math.max', 'Child(format={biggest})'],
       logged: ['const log = console.log', 'Child(format={log})'],
       inline: ['', 'Child(format={Math.max})'],
+      bound: ['', 'Child(format={Math.max.bind(null, 1)})'],
       uninstalled: ['import Brand from \'~icons/not-installed/brand-github\'', 'Child(format={Brand})'],
     }
     const all = { ...data, ...functions }

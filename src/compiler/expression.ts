@@ -136,7 +136,7 @@ export function mayHoldFunction(code: string, names: ReadonlySet<string>): boole
       return visit(node.arguments)
 
     // A property of a global's function, `Math.max.name`, is not the function.
-    if ((node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') && isGlobalFunctionMember(node.object, name => names.has(name)))
+    if ((node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') && !node.computed && node.property.type === 'Identifier' && NOT_FUNCTIONS.has(node.property.name) && isGlobalFunctionMember(node.object, name => names.has(name)))
       return false
 
     if (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression' || node.type === 'ClassExpression' || isGlobalFunctionMember(node, name => names.has(name)))
