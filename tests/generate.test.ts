@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises'
+import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { expect, it } from 'bun:test'
@@ -56,7 +56,71 @@ it('writes into a project, refusing a file that exists and honouring --dry-run',
   await expect(generate(dir, 'action', 'action')).rejects.toThrow('that are no reserved word')
   await expect(generate(dir, 'page', 'save')).resolves.toEqual({ written: ['src/routes/save.kay', 'tests/save.test.ts'] })
   await expect(generate(dir, 'page', 'pricing/index')).rejects.toThrow('src/routes/pricing.kay already exists')
-  await expect(generate(dir, 'action', 'send')).rejects.toThrow('add the action to its server fence by hand')
+  await expect(generate(dir, 'action', 'interface')).rejects.toThrow('that are no reserved word')
+  await expect(generate(dir, 'action', 'package')).rejects.toThrow('that are no reserved word')
+  await expect(generate(dir, 'action', 'eval')).rejects.toThrow('that are no reserved word')
+  await expect(generate(dir, 'action', 'arguments')).rejects.toThrow('that are no reserved word')
+})
+
+it('skips the rival of the root index page', async () => {
+  const dir = join(await scratchDir('generate-'), 'app')
+
+  await createProject(dir, { kay: '^1.0.0', features: PRESETS.site.features })
+  await rm(join(dir, 'src/routes/index.kay'), { force: true })
+  await Bun.write(join(dir, 'src/routes.kay'), 'h1 Rival\n')
+
+  expect((await generate(dir, 'page', 'index')).written).toContain('src/routes/index.kay')
+  await expect(generate(dir, 'page', 'team/index')).resolves.toBeDefined()
+  await Bun.write(join(dir, 'src/routes/docs.kay'), 'h1 Docs\n')
+  await expect(generate(dir, 'page', 'docs/index')).rejects.toThrow('src/routes/docs.kay already exists')
+})
+
+it('adds an action to an existing _actions.kay that holds a server fence alone', async () => {
+  const dir = join(await scratchDir('generate-'), 'app')
+  const actions = join(dir, 'src/routes/team/_actions.kay')
+
+  await createProject(dir, { kay: '^1.0.0', features: PRESETS.server.features })
+  await generate(dir, 'action', 'team/first')
+
+  expect(await Bun.file(actions).text()).toStartWith('--- server\nimport { s } from \'kay\'\n')
+
+  expect((await generate(dir, 'action', 'team/second', { dryRun: true })).written).toEqual(['src/routes/team/_actions.kay', 'tests/action-team-second.test.ts'])
+  expect(await Bun.file(actions).text()).not.toContain('second')
+
+  expect((await generate(dir, 'action', 'team/second')).written).toEqual(['src/routes/team/_actions.kay', 'tests/action-team-second.test.ts'])
+
+  const text = await Bun.file(actions).text()
+
+  expect(text.match(/import \{ s \}/g)).toHaveLength(1)
+  expect(text).toContain('export const first = action(')
+  expect(text).toContain('\n\nexport const second = action(')
+  expect(text.endsWith(')\n')).toBe(true)
+
+  await expect(generate(dir, 'action', 'team/second')).rejects.toThrow('already exports `second`')
+  await expect(generate(dir, 'action', 'team/first')).rejects.toThrow('already exports `first`')
+  expect(await Bun.file(actions).text()).toBe(text)
+
+  await Bun.write(actions, '--- server\nexport const legacy = action(s.Object({}), () => 1)\n')
+  await generate(dir, 'action', 'team/third')
+  expect(await Bun.file(actions).text()).toStartWith('--- server\nimport { s } from \'kay\'\n\nexport const legacy')
+
+  await Bun.write(actions, '--- server\nimport { s } from \'kay\'\n\nexport const sent = action(s.Object({}), () => 1)\n---\nbutton Go\n')
+  await expect(generate(dir, 'action', 'team/fourth')).rejects.toThrow('add the action by hand')
+  expect(await Bun.file(actions).text()).toContain('button Go')
+  expect(await Bun.file(join(dir, 'tests/action-team-fourth.test.ts')).exists()).toBe(false)
+})
+
+it('writes a guard test visiting a page below the folder when there is one', async () => {
+  const dir = join(await scratchDir('generate-'), 'app')
+
+  await createProject(dir, { kay: '^1.0.0', features: PRESETS.server.features })
+  await Bun.write(join(dir, 'src/routes/admin/users/[id].kay'), 'h1 User\n')
+  await Bun.write(join(dir, 'src/routes/admin/users/index.kay'), 'h1 Users\n')
+
+  expect((await generate(dir, 'guard', 'admin')).written).toEqual(['src/routes/admin/_guard.ts', 'tests/guard-admin.test.ts'])
+  expect(await Bun.file(join(dir, 'tests/guard-admin.test.ts')).text()).toContain('site.visit(\'/admin/users\')')
+  expect((await generate(dir, 'guard', 'empty')).written).toEqual(['src/routes/empty/_guard.ts'])
+  expect(generatedFiles('guard', 'admin', { tailwind: false, tests: true, auth: true, guardPage: '/admin' })['tests/guard-admin.test.ts']).toContain('/auth/sign-in')
 })
 
 it('runs as kay generate', async () => {
@@ -84,9 +148,12 @@ it('writes files that pass kay check and their own tests', async () => {
 
   await createProject(dir, { kay: '^1.0.0', features: PRESETS.server.features })
   await mkdir(join(dir, 'src/routes'), { recursive: true })
+  await Bun.write(join(dir, 'src/routes/admin/index.kay'), 'head\n  title Admin\nh1 Admin\n')
 
   for (const [kind, name] of [['page', 'pricing'], ['page', 'blog/[slug]'], ['component', 'card'], ['island', 'likes'], ['action', 'team/removeTissue'], ['action', 'save'], ['api', 'notes'], ['guard', 'admin']] as const)
     await generate(dir, kind, name)
+
+  await generate(dir, 'action', 'team/addTissue')
 
   await Bun.write(join(dir, 'src/routes/team/index.kay'), 'head\n  title Team\nh1 Team\n')
 

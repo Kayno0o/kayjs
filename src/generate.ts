@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { detectFeatures } from './add'
 
@@ -13,9 +13,13 @@ const ROUTE_SEGMENT = /^(?:[a-z0-9][\w-]*|\[(?:\.\.\.)?[a-z]\w*\]|\([a-z][\w-]*\
 const ACTION_NAME = /^[a-z][a-z0-9]*$/i
 const WORD_BREAK = /[-_]+/g
 // Words an action cannot be exported as, or that its own file already names: the `action` and `s` it calls, `title` its handler reads.
-const RESERVED = new Set(['action', 's', 'title', 'await', 'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger', 'default', 'delete', 'do', 'else', 'enum', 'export', 'extends', 'false', 'finally', 'for', 'function', 'if', 'import', 'in', 'instanceof', 'let', 'new', 'null', 'return', 'static', 'super', 'switch', 'this', 'throw', 'true', 'try', 'typeof', 'var', 'void', 'while', 'with', 'yield'])
+const RESERVED = new Set(['action', 's', 'title', 'await', 'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger', 'default', 'delete', 'do', 'else', 'enum', 'export', 'extends', 'false', 'finally', 'for', 'function', 'if', 'import', 'in', 'instanceof', 'let', 'new', 'null', 'return', 'static', 'super', 'switch', 'this', 'throw', 'true', 'try', 'typeof', 'var', 'void', 'while', 'with', 'yield', 'implements', 'interface', 'package', 'private', 'protected', 'public', 'eval', 'arguments'])
 // The `_actions.kay` fence an action is added to, for the hint printed when the file exists.
 const ACTION_BODY = (name: string) => `export const ${name} = action(\n  s.Object({ title: s.String({ minLength: 1, maxLength: 200 }) }),\n  ({ title }) => title,\n)\n`
+const SERVER_FENCE = '--- server'
+const ANY_FENCE = /^---(?:\s|$)/
+const IMPORT_END = /^(?:import\s.*\sfrom\s.*|\}\s*from\s.*)$/
+const S_IMPORT = /^import\s*\{[^}]*\bs\b[^}]*\}\s*from\s*['"]kay['"]/m
 const DYNAMIC = /[[(]/
 const LEADING_DIGIT = /^\d/
 const DASH_LETTER = /-(\w)/g
@@ -104,14 +108,23 @@ function apiFiles(segments: readonly string[], tests: boolean, auth: boolean): R
   return files
 }
 
-function guardFiles(segments: readonly string[]): Record<string, string> {
-  return {
+// The test visits a page below the folder, found by `generate`: the stub lets it through, and the assertion is the one to change with the rule.
+function guardFiles(segments: readonly string[], page: string | undefined, tests: boolean, auth: boolean): Record<string, string> {
+  const files: Record<string, string> = {
     [`src/routes/${segments.map(segment => `${segment}/`).join('')}_guard.ts`]: 'import { guard } from \'kay\'\n\n// Runs before every page and action in this folder and below: redirect or deny here, such as `return deny(403, "Admins only")`.\nexport default guard(() => undefined)\n',
   }
+
+  if (tests && page !== undefined) {
+    const assertion = auth ? 'expect(page.url).toStartWith(\'/auth/sign-in\')' : 'expect(page.status).toBe(200)'
+
+    files[`tests/guard-${segments.length === 0 ? 'root' : slugOf(segments.join('/'))}.test.ts`] = `${TEST_HEAD}\nconst site = await testSite()\n\nit('answers ${page} through the guard', async () => {\n  const page = await site.visit('${page}')\n\n  ${assertion}\n})\n`
+  }
+
+  return files
 }
 
 // The files `kay generate <kind> <name>` writes, by path from the project root. Tailwind adds its shorthand classes to a page, and a project with tests gets a test of a page, an action or an API module, which a guard, a component or an island has no URL of its own to be tested at.
-export function generatedFiles(kind: Kind, name: string, project: { tailwind: boolean, tests: boolean, auth: boolean }): Record<string, string> {
+export function generatedFiles(kind: Kind, name: string, project: { tailwind: boolean, tests: boolean, auth: boolean, guardPage?: string | undefined }): Record<string, string> {
   // `/` names the root guard, which every page and action sits below.
   const segments = kind === 'guard' && name === '/' ? [] : segmentsOf(kind === 'guard' ? 'page' : kind, name)
 
@@ -127,13 +140,54 @@ export function generatedFiles(kind: Kind, name: string, project: { tailwind: bo
     case 'api':
       return apiFiles(segments, project.tests, project.auth)
     case 'guard':
-      return guardFiles(segments)
+      return guardFiles(segments, project.guardPage, project.tests, project.auth)
   }
+}
+
+// The URL of a page below a guard's folder, the shallowest static one, which its test visits.
+async function pageBelow(dir: string, name: string): Promise<string | undefined> {
+  const folder = name === '/' ? [] : name.split('/').filter(segment => segment !== '')
+  const root = join(dir, 'src/routes')
+  const found: string[][] = []
+
+  for await (const file of new Bun.Glob(`${folder.map(segment => `${segment}/`).join('')}**/*.kay`).scan({ cwd: root })) {
+    const segments = file.slice(0, -'.kay'.length).split('/')
+
+    if (!segments.some(segment => segment.startsWith('_')) && urlOf(segments) !== undefined)
+      found.push(segments)
+  }
+
+  found.sort((a, b) => a.length - b.length || a.join('/').localeCompare(b.join('/')))
+
+  return found[0] === undefined ? undefined : urlOf(found[0])
+}
+
+// The `_actions.kay` text with `name` added, when the file is a server fence alone and does not export it yet; `undefined` when it holds a template or other fences. A name it exports already throws.
+function appendedAction(path: string, existing: string, name: string): string | undefined {
+  const lines = existing.split('\n')
+
+  if (lines[0]?.trimEnd() !== SERVER_FENCE || lines.slice(1).some(line => ANY_FENCE.test(line)))
+    return undefined
+
+  if (new RegExp(`\\bexport\\s+(?:(?:const|let|var|class|(?:async\\s+)?function\\*?)\\s+${name}\\b|\\{[^}]*\\b${name}\\b)`).test(existing))
+    throw new Error(`kay generate: nothing was written, ${path} already exports \`${name}\``)
+
+  if (!S_IMPORT.test(existing)) {
+    const after = lines.findLastIndex(line => IMPORT_END.test(line))
+
+    lines.splice(Math.max(after + 1, 1), 0, 'import { s } from \'kay\'', ...after === -1 ? [''] : [])
+  }
+
+  return `${lines.join('\n').trimEnd()}\n\n${ACTION_BODY(name)}`
 }
 
 // The other file that serves the same URL as a page file: `pricing.kay` and `pricing/index.kay` both serve /pricing, which `kay check` refuses.
 function rivalRoutes(page: string): string[] {
   const base = page.slice(0, -'.kay'.length)
+
+  // The root index has no rival: `src/routes.kay` serves nothing.
+  if (base === 'src/routes/index')
+    return []
 
   return base.endsWith('/index') ? [`${base.slice(0, -'/index'.length)}.kay`] : [`${base}/index.kay`]
 }
@@ -147,21 +201,36 @@ export async function generate(dir: string, kind: string, name: string, options:
     throw new Error(`kay generate: ${dir} has no package.json: run it in a project`)
 
   const features = await detectFeatures(dir)
-  const files = generatedFiles(kind as Kind, name, { tailwind: features.has('tailwind'), tests: features.has('tests'), auth: features.has('auth') })
+  const files = generatedFiles(kind as Kind, name, { tailwind: features.has('tailwind'), tests: features.has('tests'), auth: features.has('auth'), guardPage: kind === 'guard' ? await pageBelow(dir, name) : undefined })
+  const appended = new Map<string, string>()
+  const actions = kind === 'action' ? Object.keys(files).find(path => path.endsWith('_actions.kay')) : undefined
+
+  if (actions !== undefined && existsSync(join(dir, actions))) {
+    const text = appendedAction(actions, await readFile(join(dir, actions), 'utf8'), name.split('/').at(-1)!)
+
+    if (text !== undefined) {
+      appended.set(actions, text)
+      delete files[actions]
+    }
+  }
+
   const taken = [...Object.keys(files), ...kind === 'page' ? rivalRoutes(Object.keys(files)[0]!) : []].filter(path => existsSync(join(dir, path)))
 
   if (taken.length > 0) {
-    const hint = taken.some(path => path.endsWith('_actions.kay')) ? `: add the action to its server fence by hand, from this shape:\n\n${ACTION_BODY(name.split('/').at(-1)!)}` : ''
+    const hint = taken.some(path => path.endsWith('_actions.kay')) ? `: its fences hold more than a server fence, so add the action by hand, from this shape:\n\n${ACTION_BODY(name.split('/').at(-1)!)}` : ''
 
     throw new Error(`kay generate: nothing was written, ${taken.join(', ')} already exist${taken.length === 1 ? 's' : ''}${hint}`)
   }
 
   if (options.dryRun !== true) {
+    for (const [path, text] of appended)
+      await writeFile(join(dir, path), text)
+
     for (const [path, text] of Object.entries(files)) {
       await mkdir(dirname(join(dir, path)), { recursive: true })
       await writeFile(join(dir, path), text, { flag: 'wx' })
     }
   }
 
-  return { written: Object.keys(files) }
+  return { written: [...appended.keys(), ...Object.keys(files)] }
 }
