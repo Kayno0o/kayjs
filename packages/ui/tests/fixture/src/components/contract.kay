@@ -1,11 +1,12 @@
 ---
-import { CASES, COMPONENTS } from '../contract'
+import { CASES, COMPONENTS, VARIANTS } from '../contract'
 
 // A component of the library drawn with its fixture props, in an island of its own, which a ref makes it, so one taking a function renders where the server meets it as the browser does.
 const { name } = props<{ name: string }>()
 
-const Target = COMPONENTS[name]!
-const given = CASES[name]!
+const variant = VARIANTS[name]
+const Target = COMPONENTS[variant?.of ?? name]!
+const given = variant?.props ?? CASES[name]!
 ---
 div(ref={() => undefined})
   Target({...given})

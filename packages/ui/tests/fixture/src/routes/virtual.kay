@@ -1,0 +1,11 @@
+---
+import '../app.css'
+import VirtualGrow from '../components/virtual-grow.kay'
+---
+main
+  .w-240#wide
+    VirtualGrow
+  .w-96#narrow
+    VirtualGrow
+  .w-240#sorted
+    VirtualGrow(sorted)

@@ -143,6 +143,34 @@ describe('Table with virtual', () => {
     expect(rowsOf(root, 'tbody tr[aria-hidden]')).toHaveLength(2)
   })
 
+  test('keeps a measured height with its row when a sort moves it, and measures a row at the index it moved to', async () => {
+    mounted = await mountComponent('src/components/virtual-table.kay', { count: 30 })
+
+    const { root } = mounted
+    const rowNamed = (name: string) => rowsOf(root, 'tbody tr.kui-table-row').find(row => row.textContent?.includes(name))
+    const spacers = () => (rowsOf(root, 'tbody tr[aria-hidden]') as HTMLElement[]).reduce((sum, row) => sum + Number.parseFloat(row.style.height), 0)
+    // The whole table's height as the estimate and the measures give it: the rows drawn at 48 but for the measured ones, and the room for the others.
+    const total = (measured: Record<string, number>) => spacers() + rowsOf(root, 'tbody tr.kui-table-row').reduce((sum, row) => sum + (measured[row.textContent?.match(/Row \d+/)?.[0] ?? ''] ?? 48), 0)
+
+    Resize.made.at(-1)!.callback([{ target: rowNamed('Row 5'), borderBoxSize: [{ blockSize: 100 }] }])
+    await settle()
+    expect(total({ 'Row 5': 100 })).toBe(29 * 48 + 100)
+
+    // Sorted descending, Row 5 moves to another index and its 100 pixels go with it.
+    click(root.querySelectorAll('th button')[0]!)
+    await settle()
+    expect(rowNamed('Row 5')?.getAttribute('data-virtual-index')).toBe('4')
+    expect(total({ 'Row 5': 100 })).toBe(29 * 48 + 100)
+
+    // Row 29 was past the window and now sits among the first rows, a resize reporting it at its new index.
+    const moved = rowNamed('Row 29')!
+
+    expect(Number(moved.getAttribute('data-virtual-index'))).toBeLessThan(29)
+    Resize.made.at(-1)!.callback([{ target: moved, borderBoxSize: [{ blockSize: 100 }] }])
+    await settle()
+    expect(total({ 'Row 5': 100, 'Row 29': 100 })).toBe(28 * 48 + 200)
+  })
+
   test('draws every row without it', async () => {
     mounted = await mountComponent('src/components/table.kay', { rows: [{ id: 1, name: 'Mars', moons: 2 }, { id: 2, name: 'Earth', moons: 1 }] })
 

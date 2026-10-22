@@ -27,7 +27,7 @@ const EFFECT_REMOVED: Record<string, string | undefined> = {
 }
 
 // The fixture app is no part of this package's type check, so its table is imported by a path no import is resolved for.
-const { CASES } = await import(join(process.env.KAY_ROOT!, 'src', 'contract.ts')) as { CASES: Record<string, unknown> }
+const { CASES, VARIANTS } = await import(join(process.env.KAY_ROOT!, 'src', 'contract.ts')) as { CASES: Record<string, unknown>, VARIANTS: Record<string, unknown> }
 const mounted: { unmount: () => void }[] = []
 
 afterEach(() => {
@@ -157,7 +157,7 @@ test('every component the library exports has fixture props', () => {
 describe('component contract', () => {
   const wrapper = 'src/components/contract.kay'
 
-  for (const name of Object.keys(CASES)) {
+  for (const name of [...Object.keys(CASES), ...Object.keys(VARIANTS)]) {
     test(name, async () => {
       const { default: render } = await import(`${process.env.KAY_ROOT}/${wrapper}`) as { default: (props: { name: string }) => { t: string } }
       const server = render({ name }).t

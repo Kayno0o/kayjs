@@ -88,6 +88,13 @@ const days = Array.from({ length: 14 }, (_, index) => ({ date: `2026-09-${String
 const columns = [{ key: 'name', header: 'Name', sortValue: true as const }, { key: 'moons', header: 'Moons', numeric: true as const }]
 const planets = [{ name: 'Mars', moons: 2 }, { name: 'Earth', moons: 1 }]
 
+// Variants of one component that draw other markup, tested beside the cases: a long table the island windows.
+const longRows = Array.from({ length: 200 }, (_, index) => ({ id: index, name: `Row ${index}`, moons: index % 7 }))
+
+export const VARIANTS: Record<string, { of: string, props: Record<string, unknown> }> = {
+  'table-virtual': { of: 'table', props: { columns, rows: longRows, rowKey: 'id', virtual: true, filter: ['name'], sort: { key: 'name', direction: 'desc' } } },
+}
+
 // The component each file under `src` of the library exports, drawn by `components/contract.kay`.
 export const COMPONENTS = {
   'accordion': Accordion,

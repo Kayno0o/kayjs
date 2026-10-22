@@ -70,6 +70,81 @@ inBrowser('in the browser', () => {
   }, 120_000)
 })
 
+inBrowser('virtual Table', () => {
+  // Scrolls a table's box and reports where its header row and the first drawn row sit against the box, once the window has followed.
+  const scrolled = async (page: { evaluate: (...args: never[]) => Promise<unknown>, waitUntil: (...args: never[]) => Promise<void> }, within: string, top: number) => {
+    await page.evaluate(((selector: string, to: number) => {
+      document.querySelector(`${selector} .kui-table-wrap`)!.scrollTop = to
+    }) as never, within as never, top as never)
+    await page.waitUntil(((selector: string, to: number) => {
+      const first = document.querySelector(`${selector} .kui-table-row`)
+
+      return first !== null && Number(first.getAttribute('data-virtual-index')) * 30 > to / 4
+    }) as never, undefined as never, within as never, top as never)
+
+    return await page.evaluate(((selector: string) => {
+      const box = document.querySelector(`${selector} .kui-table-wrap`)!.getBoundingClientRect()
+      const thead = document.querySelector(`${selector} thead`)!
+      const stack = getComputedStyle(thead).position
+      // Wide, each header cell sticks; stacked, the block of sort buttons does.
+      const head = (stack === 'sticky' ? thead : document.querySelector(`${selector} .kui-table-head-cell`)!).getBoundingClientRect()
+
+      return { head: head.top - box.top, headVisible: head.bottom > box.top, stack, rows: document.querySelectorAll(`${selector} .kui-table-row`).length }
+    }) as never, within as never) as { head: number, headVisible: boolean, stack: string, rows: number }
+  }
+
+  test('keeps its headers on top while it scrolls, wide, narrow and sorted', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/virtual')
+
+    for (const within of ['#wide', '#sorted']) {
+      await page.waitFor(`${within} .kui-table-row`)
+      const moved = await scrolled(page as never, within, 5000)
+
+      expect(moved.headVisible, within).toBe(true)
+      expect(Math.abs(moved.head), within).toBeLessThan(2)
+      expect(moved.rows, within).toBeLessThan(60)
+    }
+
+    await page.waitFor('#narrow .kui-table-row')
+    const stacked = await scrolled(page as never, '#narrow', 5000)
+
+    // Stacked, the headers are one block of sort buttons, which is what stays.
+    expect(stacked.stack).toBe('sticky')
+    expect(Math.abs(stacked.head)).toBeLessThan(2)
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
+  test('keeps what is in view in place when the rows above it change height', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/virtual')
+
+    await page.waitFor('#wide .kui-table-row')
+    await scrolled(page as never, '#wide', 6000)
+    // Where a row sits against the box: the first by default, the one crossing the box's top edge, which the rows above it growing must not move.
+    const placed = async (index: string | null) => page.evaluate(((wanted: string | null) => {
+      const box = document.querySelector('#wide .kui-table-wrap')!.getBoundingClientRect()
+      const rows = [...document.querySelectorAll('#wide .kui-table-row')]
+      const row = wanted === null ? rows.find(one => one.getBoundingClientRect().bottom > box.top + 1) : rows.find(one => one.getAttribute('data-virtual-index') === wanted)
+
+      return row === undefined ? null : { index: row.getAttribute('data-virtual-index'), offset: row.getBoundingClientRect().top - box.top, height: row.getBoundingClientRect().height }
+    }) as never, index as never) as Promise<{ index: string, offset: number, height: number } | null>
+    const before = (await placed(null))!
+
+    await page.click('#wide #grow')
+    await page.waitUntil((() => [...document.querySelectorAll('#wide .kui-table-row')].some(row => row.getBoundingClientRect().height > 80)) as never)
+    await page.evaluate((async () => new Promise(resolve => setTimeout(resolve, 300))) as never)
+    const after = await placed(before.index)
+
+    expect(after).not.toBeNull()
+    // The rows above it grew by dozens of pixels each, and the scroll followed.
+    expect(Math.abs(after!.offset - before.offset)).toBeLessThan(4)
+    expect(page.errors).toEqual([])
+  }, 120_000)
+})
+
 inBrowser('HoverCard and ZoomPane', () => {
   // The card's box and the anchor's, with whether the card is open.
   const boxes = async (page: { evaluate: (...args: never[]) => Promise<unknown> }, anchor: string) => page.evaluate(((selector: string) => {
