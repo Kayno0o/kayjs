@@ -21,7 +21,8 @@ async function finished() {
 
 // A `for` between two markers of a parent, each row a `p` with a fade transition of 200 ms, or a plain one.
 async function mountList(animated: boolean, initial: number[] = []) {
-  const { loop, markers, transition } = await import('../src/runtime/dom')
+  const { markers, transition } = await import('../src/runtime/dom')
+  const { loop } = await import('../src/runtime/dom-loop')
   const { createSignal, root } = await import('../src/runtime/reactive')
   const parent = document.createElement('div')
   const [items, setItems] = createSignal(initial)

@@ -11,12 +11,16 @@ import { addBindWrite, addHandler, addStyleArguments, bindRead, END_MARKER, esca
 import { SUBJECT } from './names'
 import { bindEvent } from './validate'
 
-// The `kay/dom` helpers browser output calls, each imported under a `Kay` name; `image` and `pendingCall` are in modules of their own, as their runtimes weigh on a page with no image or no pending block.
-const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'choose', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'errorParagraph', 'fragment', 'holdSubmits', 'insert', 'listen', 'listenSubmit', 'loop', 'markers', 'memo', 'merge', 'omit', 'outside', 'partClass', 'partHanded', 'partsClass', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'spreadAttributes', 'spreadWith', 'template', 'text', 'transition', 'untrack']
+// The `kay/dom` helpers browser output calls, each imported under a `Kay` name.
+const DOM_HELPERS = ['append', 'attribute', 'branches', 'choose', 'close', 'component', 'componentClass', 'effect', 'errorParagraph', 'fragment', 'holdSubmits', 'insert', 'listen', 'listenSubmit', 'markers', 'memo', 'merge', 'omit', 'outside', 'partClass', 'partHanded', 'partsClass', 'property', 'ref', 'setClass', 'setStyle', 'spreadAttributes', 'spreadWith', 'template', 'text', 'transition', 'untrack']
+// The helpers in modules of their own, as their runtimes weigh on a page whose islands use none of them: the module of each is only loaded by a page with an island that compiles to it.
+const APART = [['kay/dom-loop', ['loop', 'rowKey']], ['kay/dom-await', ['awaited']], ['kay/dom-try', ['attempt']], ['kay/dom-spread', ['dynamic', 'spread']], ['kay/dom-image', ['image']], ['kay/pending', ['pendingCall']]] as const
 const TRANSITION_PART = 'transition:'
 
 export function domHelperImport(): string {
-  return `import { ${DOM_HELPERS.map(helper => `${helper} as ${helperName(helper)}`).join(', ')} } from 'kay/dom'\nimport { image as ${helperName('image')} } from 'kay/dom-image'\nimport { pendingCall as ${helperName('pendingCall')} } from 'kay/pending'\n`
+  const named = (helpers: readonly string[]) => helpers.map(helper => `${helper} as ${helperName(helper)}`).join(', ')
+
+  return `import { ${named(DOM_HELPERS)} } from 'kay/dom'\n${APART.map(([module, helpers]) => `import { ${named(helpers)} } from '${module}'\n`).join('')}`
 }
 
 // A node of a template, so the code can reach the ones it binds: through `firstChild` and `nextSibling`, and past a dynamic part through its end marker.

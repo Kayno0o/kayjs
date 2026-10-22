@@ -108,6 +108,22 @@
       "types": "./types/runtime/pending.d.ts",
       "default": "./src/runtime/pending.ts"
     },
+    "./dom-loop": {
+      "types": "./types/runtime/dom-loop.d.ts",
+      "default": "./src/runtime/dom-loop.ts"
+    },
+    "./dom-await": {
+      "types": "./types/runtime/dom-await.d.ts",
+      "default": "./src/runtime/dom-await.ts"
+    },
+    "./dom-try": {
+      "types": "./types/runtime/dom-try.d.ts",
+      "default": "./src/runtime/dom-try.ts"
+    },
+    "./dom-spread": {
+      "types": "./types/runtime/dom-spread.d.ts",
+      "default": "./src/runtime/dom-spread.ts"
+    },
     "./dom-image": {
       "types": "./types/runtime/dom-image.d.ts",
       "default": "./src/runtime/dom-image.ts"

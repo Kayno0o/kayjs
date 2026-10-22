@@ -130,7 +130,7 @@ describe('client bundle', () => {
 
 describe('a dynamic tag', () => {
   it('refuses a tag that is no element name, and takes from its props what a spread may set', async () => {
-    const { dynamic } = await import('../src/runtime/dom')
+    const { dynamic } = await import('../src/runtime/dom-spread')
     const frame = dynamic('iframe', { srcdoc: '<script>alert(1)</script>', onclick: 'alert(1)', title: 'a' }) as Element
 
     expect(frame.outerHTML).toBe('<iframe title="a"></iframe>')

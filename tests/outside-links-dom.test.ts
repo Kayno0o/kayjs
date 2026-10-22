@@ -120,7 +120,7 @@ describe('a link of an island leaving the site', () => {
 
 describe('a dynamic tag naming a link', () => {
   it('opens in a new tab as the server writes it, unless the props write a target', async () => {
-    const { dynamic } = await import('../src/runtime/dom')
+    const { dynamic } = await import('../src/runtime/dom-spread')
     const attributesOf = (props: Record<string, unknown>) => {
       const link = dynamic('a', props) as Element
 
@@ -136,7 +136,8 @@ describe('a dynamic tag naming a link', () => {
 
 describe('a spread link whose href changes', () => {
   it('rebuilds no children and keeps target and rel in step', async () => {
-    const { dynamic, render } = await import('../src/runtime/dom')
+    const { dynamic } = await import('../src/runtime/dom-spread')
+    const { render } = await import('../src/runtime/dom')
     const { signal } = await import('../src/runtime/core')
     const href = signal('https://other.example/x')
     const container = document.createElement('div')

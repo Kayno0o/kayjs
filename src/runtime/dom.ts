@@ -4,15 +4,14 @@
 import type { Owner } from './reactive'
 import { rebasedAttribute } from './base'
 import { frenchText, frenchTree } from './french'
-import { FAILED, ISLAND, PART_END, PART_START } from './markers'
+import { ISLAND, PART_END, PART_START } from './markers'
 import { place } from './move'
 import { browserKeepsSameTab, leavesSite } from './outside'
-import { activeOwner, catchError, createSignal, getOwner, hydrationEnded, hydrationStarted, isHydrating, memo, onCleanup, renderEffect, reportError, root, runWithOwner, scope, unrecorded, untrack } from './reactive'
+import { activeOwner, hydrationEnded, hydrationStarted, isHydrating, memo, onCleanup, renderEffect, root, runWithOwner, scope, unrecorded, untrack } from './reactive'
 import { clearHeldMarkup, isHeldMarkup } from './safe-html'
-import { isSnapshots, readSnapshots } from './snapshots'
 import { freshPrefix, withIds } from './uid'
 import { safeUrl } from './url'
-import { attributeName, attributeValue, classText, eachChild, elementName, handlerName, merge, spreadAttributes, styleText } from './values'
+import { attributeValue, classText, eachChild, styleText } from './values'
 
 // Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
 declare const KAY_BROWSER: true | undefined
@@ -64,6 +63,11 @@ interface DelegatingDocument extends Document {
 }
 
 let claim: Claim | undefined
+
+// Whether an island is hydrating, claiming the server's nodes rather than building them.
+export function claiming(): boolean {
+  return claim !== undefined
+}
 
 // The element being claimed in, inside the island being hydrated, which orders the titles of several by their place in the page.
 export function islandHost(): Element | undefined {
@@ -133,7 +137,7 @@ export function fresh<T>(render: () => T): T {
   }
 }
 
-function claimNode(): Node {
+export function claimNode(): Node {
   const node = claim!.next
 
   if (!node)
@@ -312,7 +316,7 @@ export function markers(parent: Node): [start: Node, end: Node] {
 // ---- regions
 
 // The content of a dynamic part: what sits between two markers, or all of an element's content.
-class Region {
+export class Region {
   constructor(readonly element: Node | null, readonly start: Node | null, readonly end: Node | null) {}
 
   get parent(): Node {
@@ -354,7 +358,7 @@ class Region {
   }
 }
 
-function insertUnit(parent: Node, unit: Unit, before: Node | null): void {
+export function insertUnit(parent: Node, unit: Unit, before: Node | null): void {
   // Before its own first node: already in place, and moving its nodes one by one before that one would put them in front of it, unless some are gone.
   if (before === firstOf(unit) && !isStale(unit))
     return
@@ -417,7 +421,7 @@ function withHeld(nodes: Node[], held: DocumentFragment): Node[] {
 }
 
 // An element with a `transition` plays its leave phase first; the rest of a range waits in a fragment of its own.
-function removeUnit(unit: Unit): void {
+export function removeUnit(unit: Unit): void {
   if (!(unit instanceof Range)) {
     transitions ? transitions.leave(unit) : unit.parentNode?.removeChild(unit)
 
@@ -439,14 +443,14 @@ function removeUnit(unit: Unit): void {
 }
 
 // What a block shows after its first render plays its enter phase, the elements with a `transition` it starts with.
-function entered(unit: Unit | null): void {
+export function entered(unit: Unit | null): void {
   if (unit) {
     for (const node of nodesOf(unit))
       transitions?.enter(node)
   }
 }
 
-function animated(unit: Unit | null): boolean {
+export function animated(unit: Unit | null): boolean {
   return unit !== null && transitions !== undefined && nodesOf(unit).some(transitions.has)
 }
 
@@ -467,15 +471,15 @@ function claimUnits(region: Region, render: () => unknown): Unit[] {
   return claimed
 }
 
-function firstOf(unit: Unit): Node {
+export function firstOf(unit: Unit): Node {
   return unit instanceof Range ? unit.first : unit
 }
 
-function lastOf(unit: Unit): Node {
+export function lastOf(unit: Unit): Node {
   return unit instanceof Range ? unit.last : unit
 }
 
-function rowUnit(made: Unit[]): Unit | null {
+export function rowUnit(made: Unit[]): Unit | null {
   if (made.length === 0)
     return null
 
@@ -486,7 +490,7 @@ function rowUnit(made: Unit[]): Unit | null {
 let target: Node | undefined
 
 // The value, once `parent` is noted as where its units go.
-function within<T>(parent: Node, value: T): T {
+export function within<T>(parent: Node, value: T): T {
   target = parent
 
   return value
@@ -503,7 +507,7 @@ function keepingParent<T>(add: (part: T) => void): (part: T) => void {
 }
 
 // The units a value renders to, read by `eachChild`: a text node for its text, a node or a range as it is.
-function units(value: unknown): Unit[] {
+export function units(value: unknown): Unit[] {
   const out: Unit[] = []
 
   const add = (part: string | object) => {
@@ -658,19 +662,19 @@ export function insert(element: Node | null, start: Node | null, end: Node | nul
 }
 
 // What a block shows in its region, the root it built that under when it owns one, and whether it rendered before, so what it shows next plays its enter phase.
-interface Block {
+export interface Block {
   region: Region
   units: Unit[]
   dispose: (() => void) | undefined
   rendered: boolean
 }
 
-function blockIn(region: Region): Block {
+export function blockIn(region: Region): Block {
   return { region, units: [], dispose: undefined, rendered: false }
 }
 
 // Shows what `render` returns in place of what the block showed, claimed instead when hydrating; `owned` builds it under a root of its own, disposed when the block shows something else.
-function swap(block: Block, render: () => unknown, owned = false): void {
+export function swap(block: Block, render: () => unknown, owned = false): void {
   const entering = block.rendered
 
   release(block)
@@ -684,7 +688,7 @@ function swap(block: Block, render: () => unknown, owned = false): void {
   block.rendered = true
 }
 
-function release(block: Block): void {
+export function release(block: Block): void {
   block.dispose?.()
   block.dispose = undefined
 }
@@ -754,550 +758,9 @@ export function choose(element: Node | null, start: Node | null, end: Node | nul
   })
 }
 
-interface Row {
-  key: unknown
-  unit: Unit | null
-  setItem: (item: unknown) => void
-  setIndex: ((index: number) => void) | undefined
-  dispose: () => void
-}
-
-// The key of a row whose `for` names none: the item's `id` when it has one, else the item itself.
-export function rowKey(item: unknown): unknown {
-  return typeof item === 'object' && item !== null && 'id' in item ? item.id : item
-}
-
-// A `for`: one row per item, matched to the rows of the last render by key, or by position when `keyed` is false.
-// A row reads its item through a function, and its index through one too when keyed, so a row kept across renders follows the new values.
-export function loop<T>(element: Node | null, start: Node | null, end: Node | null, each: () => readonly T[] | null | undefined | false, key: ((item: T) => unknown) | false, render: (item: () => T, index: (() => number) | number) => unknown, fallback?: () => unknown): void {
-  const region = new Region(element, start, end)
-  // The fallback, and whether the loop rendered before, so the rows it makes then play their enter phase.
-  const empty = blockIn(region)
-  // The rows a run made, which enter once it is done.
-  const built: Row[] = []
-  let rows: Row[] = []
-
-  onCleanup(() => {
-    for (const row of rows)
-      row.dispose()
-
-    release(empty)
-  })
-
-  const makeRow = (item: T, index: number, rowKey: unknown): Row => {
-    const row = unrecorded(() => root((dispose): Row => {
-      const [readItem, setItem] = createSignal(item)
-      let setIndex: ((index: number) => void) | undefined
-      let readIndex: (() => number) | number = index
-
-      // Made on the first read, as most rows never read their index.
-      if (key !== false) {
-        let signal: ReturnType<typeof createSignal<number>> | undefined
-
-        readIndex = () => (signal ??= createSignal(index))[0]()
-        setIndex = (next) => {
-          index = next
-          signal?.[1](next)
-        }
-      }
-
-      const value = render(readItem, readIndex)
-      const made = units(typeof KAY_FRENCH === 'undefined' ? value : within(region.parent, value))
-
-      return { key: rowKey, unit: rowUnit(made), setItem: setItem as (item: unknown) => void, setIndex, dispose }
-    }))
-
-    built.push(row)
-
-    return row
-  }
-
-  renderEffect(() => {
-    const items = each()
-    const list = items === false || items == null ? [] : items
-
-    untrack(() => {
-      const entering = empty.rendered
-
-      // A run that threw part way leaves the rows it made and never kept.
-      for (const row of built) {
-        if (!rows.includes(row))
-          removeRow(row)
-      }
-
-      built.length = 0
-      rows = claim && !entering ? region.claim(() => list.map((item, index) => makeRow(item, index, key === false ? index : key(item)))) : reconcileRows(region, rows, list, key, makeRow)
-
-      if (entering) {
-        for (const row of built)
-          entered(row.unit)
-      }
-
-      built.length = 0
-
-      // Owning a root of its own, the fallback shows while it has one.
-      if (list.length === 0 && !empty.dispose && fallback)
-        swap(empty, fallback, true)
-      else if (list.length > 0 && empty.dispose)
-        swap(empty, () => null)
-
-      empty.rendered = true
-    })
-  })
-}
-
-function reconcileRows<T>(region: Region, previous: Row[], list: readonly T[], key: ((item: T) => unknown) | false, makeRow: (item: T, index: number, key: unknown) => Row): Row[] {
-  if (list.length === 0) {
-    removeRows(region, previous, true)
-
-    return []
-  }
-
-  return key === false ? positionalRows(region, previous, list, makeRow) : keyedRows(region, previous, list, key, makeRow)
-}
-
-// By position: the first rows take the new items, the rest come and go at the end.
-function positionalRows<T>(region: Region, previous: Row[], list: readonly T[], makeRow: (item: T, index: number, key: unknown) => Row): Row[] {
-  const next: Row[] = []
-
-  for (const [index, item] of list.entries()) {
-    const row = previous[index]
-
-    if (row) {
-      row.setItem(item)
-      next.push(row)
-    }
-    else {
-      const made = makeRow(item, index, index)
-
-      if (made.unit)
-        region.insert(made.unit)
-
-      next.push(made)
-    }
-  }
-
-  removeRows(region, previous.slice(list.length), false)
-
-  return next
-}
-
-function keyedRows<T>(region: Region, previous: Row[], list: readonly T[], key: (item: T) => unknown, makeRow: (item: T, index: number, key: unknown) => Row): Row[] {
-  const keys = list.map(key)
-  const update = (row: Row, index: number) => {
-    row.setItem(list[index])
-    row.setIndex?.(index)
-  }
-  let start = 0
-  let oldEnd = previous.length
-  let newEnd = list.length
-
-  // The rows keeping their place at either end only take their new item and index.
-  while (start < oldEnd && start < newEnd && previous[start]!.key === keys[start]) {
-    update(previous[start]!, start)
-    start++
-  }
-
-  while (start < oldEnd && start < newEnd && previous[oldEnd - 1]!.key === keys[newEnd - 1])
-    update(previous[--oldEnd]!, --newEnd)
-
-  if (start === oldEnd && start === newEnd)
-    return previous
-
-  const after = firstNode(previous, oldEnd) ?? region.end
-  const byKey = new Map<unknown, Row>()
-
-  for (let index = start; index < oldEnd; index++) {
-    const row = previous[index]!
-    const twin = byKey.get(row.key)
-
-    // Of two rows under one key, only the last can be matched: the other goes.
-    if (twin)
-      removeRow(twin)
-
-    byKey.set(row.key, row)
-  }
-
-  const matched: (Row | undefined)[] = []
-  let fresh = false
-
-  for (let index = start; index < newEnd; index++) {
-    const row = byKey.get(keys[index])
-
-    if (row)
-      byKey.delete(keys[index])
-    else if (typeof keys[index] === 'object' && keys[index] !== null)
-      fresh = true
-
-    matched.push(row)
-  }
-
-  // A list of plain objects edited immutably comes back as copies no key matches: a copy takes the row left unmatched in its place between the rows around it, so an edit, a removal or an insertion keeps the other rows' nodes, fields and focus.
-  const replaced = fresh && key === rowKey && byKey.size > 0 ? pairCopies(previous, matched, keys, byKey, start, oldEnd) : undefined
-  const middle: Row[] = []
-  let added = 0
-
-  for (let index = start; index < newEnd; index++) {
-    const row = matched[index - start] ?? replaced?.get(index)
-
-    if (row) {
-      update(row, index)
-      middle.push(row)
-    }
-    else {
-      middle.push(makeRow(list[index]!, index, keys[index]))
-      added++
-    }
-  }
-
-  removeRows(region, [...byKey.values()], byKey.size === previous.length)
-
-  // Only new rows between what stays: one insertion.
-  if (added === middle.length) {
-    const holder = document.createDocumentFragment()
-
-    for (const row of middle) {
-      if (row.unit)
-        insertUnit(holder, row.unit, null)
-    }
-
-    region.parent.insertBefore(holder, after)
-  }
-  else {
-    const kept = new Set(middle)
-
-    moveRows(region.parent, previous.slice(start, oldEnd).filter(row => kept.has(row)), middle, after)
-  }
-
-  return [...previous.slice(0, start), ...middle, ...previous.slice(oldEnd)]
-}
-
-// Gives each unmatched object key a row left in `byKey` that sits, in the old order, between the old rows matched around it, and takes those rows out of `byKey`, the pair's key being the new one. Best effort: a removal and an edit in the same gap pair the first leftover row with the copy.
-function pairCopies(previous: Row[], matched: (Row | undefined)[], keys: unknown[], byKey: Map<unknown, Row>, start: number, oldEnd: number): Map<number, Row> {
-  const oldAt = new Map<Row, number>()
-
-  for (let index = start; index < oldEnd; index++)
-    oldAt.set(previous[index]!, index)
-
-  const left = [...byKey.values()].sort((a, b) => oldAt.get(a)! - oldAt.get(b)!)
-  const paired = new Map<number, Row>()
-  // The old index of the next matched row after each position.
-  const next: number[] = []
-  let following = oldEnd
-  let before = start - 1
-  let cursor = 0
-
-  for (let at = matched.length - 1; at >= 0; at--) {
-    if (matched[at])
-      following = Math.min(following, oldAt.get(matched[at]!)!)
-
-    next[at] = following
-  }
-
-  for (let at = 0; at < matched.length; at++) {
-    const row = matched[at]
-
-    if (row) {
-      before = Math.max(before, oldAt.get(row)!)
-
-      continue
-    }
-
-    const key = keys[start + at]
-
-    if (typeof key !== 'object' || key === null)
-      continue
-
-    while (cursor < left.length && oldAt.get(left[cursor]!)! <= before)
-      cursor++
-
-    const candidate = left[cursor]
-
-    if (candidate && oldAt.get(candidate)! < next[at]! && typeof candidate.key === 'object' && candidate.key !== null) {
-      paired.set(start + at, candidate)
-      byKey.delete(candidate.key)
-      candidate.key = key
-      cursor++
-    }
-  }
-
-  return paired
-}
-
-// Takes rows out; when they are all the region holds, its whole content is cleared at once, unless a row plays its leave phase, which that would cut.
-function removeRows(region: Region, rows: Row[], all: boolean): void {
-  if (all && rows.length > 0 && !region.start && !rows.some(row => animated(row.unit))) {
-    for (const row of rows)
-      row.dispose()
-
-    region.clear()
-
-    return
-  }
-
-  for (const row of rows)
-    removeRow(row)
-}
-
-function removeRow(row: Row): void {
-  row.dispose()
-
-  if (row.unit)
-    removeUnit(row.unit)
-}
-
-// The first node of the rows from `index` on, where what is inserted before them goes.
-function firstNode(rows: Row[], index: number): Node | null {
-  for (let at = index; at < rows.length; at++) {
-    const unit = rows[at]!.unit
-
-    if (unit)
-      return firstOf(unit)
-  }
-
-  return null
-}
-
-// Puts the rows in their new order with as few moves as it can, as udomdiff does: the common start and end stay, a swap is two moves, and a row out of place moves before the one that follows it.
-function moveRows(parent: Node, kept: Row[], next: Row[], after: Node | null): void {
-  const a = kept.filter(row => row.unit)
-  const b = next.filter(row => row.unit)
-  let aStart = 0
-  let bStart = 0
-  let aEnd = a.length
-  let bEnd = b.length
-  let positions: Map<Row, number> | undefined
-
-  const nextAfter = (row: Row) => lastOf(row.unit!).nextSibling
-
-  while (aStart < aEnd || bStart < bEnd) {
-    if (aStart < aEnd && bStart < bEnd && a[aStart] === b[bStart]) {
-      aStart++
-      bStart++
-
-      continue
-    }
-
-    while (aStart < aEnd && bStart < bEnd && a[aEnd - 1] === b[bEnd - 1]) {
-      aEnd--
-      bEnd--
-    }
-
-    if (aEnd === aStart) {
-      const before = bEnd < b.length ? firstOf(b[bEnd]!.unit!) : after
-
-      while (bStart < bEnd)
-        insertUnit(parent, b[bStart++]!.unit!, before)
-    }
-    // Every row left in `a` is kept, so once `b` is placed they already are too.
-    else if (bEnd === bStart) {
-      break
-    }
-    else if (a[aStart] === b[bEnd - 1] && b[bStart] === a[aEnd - 1]) {
-      const before = nextAfter(a[--aEnd]!)
-
-      insertUnit(parent, b[bStart++]!.unit!, nextAfter(a[aStart++]!))
-      insertUnit(parent, b[--bEnd]!.unit!, before)
-      a[aEnd] = b[bEnd]!
-    }
-    else {
-      if (!positions) {
-        positions = new Map()
-
-        for (let index = bStart; index < bEnd; index++)
-          positions.set(b[index]!, index)
-      }
-
-      const index = positions.get(a[aStart]!)
-
-      if (index === undefined) {
-        removeUnit(a[aStart++]!.unit!)
-
-        continue
-      }
-
-      if (index <= bStart || index >= bEnd) {
-        aStart++
-
-        continue
-      }
-
-      let sequence = 1
-
-      for (let i = aStart + 1; i < aEnd && i < bEnd; i++) {
-        if (positions.get(a[i]!) !== index + sequence)
-          break
-
-        sequence++
-      }
-
-      if (sequence > index - bStart) {
-        const before = firstOf(a[aStart]!.unit!)
-
-        while (bStart < index)
-          insertUnit(parent, b[bStart++]!.unit!, before)
-      }
-      // The row out of place stays where it is until its own turn moves it: taking a row of several nodes out would lose all but its first.
-      else {
-        insertUnit(parent, b[bStart++]!.unit!, firstOf(a[aStart++]!.unit!))
-      }
-    }
-  }
-}
-
-// An iterable's parts render at most this often in an island, about once a frame.
-const FRAME_MS = 16
-
-// An `await` block: the pending block while the value is a promise, then the `then` or `catch` block once it settles, or with no `catch` the enclosing `try`'s as `fallback`; a plain value renders `then` at once, and an async iterable renders `then` again with each part, at most once a frame.
-export function awaited(element: Node | null, start: Node | null, end: Node | null, value: () => unknown, pending: (() => unknown) | undefined, ready: (value: unknown) => unknown, failed: ((error: unknown) => unknown) | undefined, fallback?: ((error: unknown) => unknown) | undefined): void {
-  const region = new Region(element, start, end)
-  const block = blockIn(region)
-  let version = 0
-
-  renderEffect(() => {
-    const settled = value()
-    const own = ++version
-
-    untrack(() => {
-      const parts = isSnapshots(settled)
-
-      if (!parts && !(settled instanceof Promise)) {
-        unrecorded(() => swap(block, () => ready(settled)))
-
-        return
-      }
-
-      // Where the block was declared, for one landing later to read what was provided there.
-      const parent = getOwner()
-
-      // Gone before the promise settles, the block never lands.
-      onCleanup(() => {
-        version++
-        release(block)
-      })
-
-      // The pending block and the block replacing it each own what they create, so landing disposes the pending one.
-      unrecorded(() => swap(block, () => pending?.(), true))
-
-      const land = (render: () => unknown) => {
-        if (own === version)
-          runWithOwner(parent, () => unrecorded(() => swap(block, render, true)))
-      }
-
-      // A part whose `then` block throws is a bug in the page, reported rather than shown as `catch`, and the iterable is not read further.
-      let broken = false
-      const reader = parts
-        ? readSnapshots(settled, FRAME_MS, (value) => {
-          try {
-            land(() => ready(value))
-          }
-          catch (error) {
-            broken = true
-            reader!.stop()
-            reportError(error)
-          }
-        })
-        : undefined
-
-      onCleanup(() => reader?.stop())
-
-      // A `then` block that throws while rendering is not the promise failing, so it stays out of the catch.
-      const settle = async () => {
-        let result: { value: unknown, shown?: boolean } | undefined
-
-        try {
-          result = reader ? await reader.done : { value: await settled }
-        }
-        catch (error) {
-          if (broken)
-            return
-
-          if (failed) {
-            land(() => failed(error))
-          }
-          // The enclosing `try`'s `catch` takes the place of the block, the error reported as the `try` reports one.
-          else if (fallback) {
-            if (own === version)
-              reportError(error, islandOf(region.parent))
-
-            land(() => fallback(error))
-          }
-          else if (own === version) {
-            reportError(error, islandOf(region.parent))
-          }
-
-          return
-        }
-
-        // A last part shown already stays as it is, focus and selection inside it too.
-        if (broken || result?.shown === true)
-          return
-
-        // An iterable ending with no value leaves nothing in place of its pending block.
-        land(result ? () => ready(result.value) : () => null)
-      }
-
-      void settle()
-    })
-  })
-}
-
-// A `try` block: its content under an owner catching what its effects throw later, or its `catch` block once it throws, the error reported either way.
-export function attempt(element: Node | null, start: Node | null, end: Node | null, render: (caught: (error: unknown) => unknown) => unknown, fallback: ((error: unknown) => unknown) | undefined): void {
-  const region = new Region(element, start, end)
-
-  // The server rendered the `catch` block: kept as it came, since the error it shows stayed on the server.
-  if (claim && failedOnServer(region))
-    return
-
-  const block = blockIn(region)
-  let failed = false
-  let disposeContent: (() => void) | undefined
-  const parent = getOwner()
-
-  onCleanup(() => release(block))
-
-  const fail = (error: unknown) => {
-    reportError(error, islandOf(region.parent))
-
-    if (failed)
-      return
-
-    failed = true
-    disposeContent?.()
-    // What the block built, or claimed before it threw, goes; the fallback is built afresh.
-    region.clear()
-    block.units = []
-
-    if (fallback)
-      runWithOwner(parent, () => unrecorded(() => fresh(() => swap(block, () => fallback(error), true))))
-  }
-
-  catchError((dispose) => {
-    disposeContent = dispose
-
-    try {
-      swap(block, () => render(fallback ?? (() => null)))
-    }
-    catch (error) {
-      // Markup the island would not claim is the island's to recover from, rendering it afresh, not the block's to fall back from.
-      if (error instanceof HydrationMismatchError)
-        throw error
-
-      fail(error)
-    }
-  }, fail)
-}
-
 // The island a node sits in, named in what an error report says.
-function islandOf(node: Node): string | undefined {
+export function islandOf(node: Node): string | undefined {
   return (node instanceof Element ? node : node.parentElement)?.closest<HTMLElement>(ISLAND)?.dataset.component
-}
-
-function failedOnServer(region: Region): boolean {
-  const first = region.start ? region.start.nextSibling : region.element!.firstChild
-
-  return first?.nodeType === 8 && (first as Comment).data === FAILED
 }
 
 // ---- components
@@ -1307,22 +770,7 @@ export function component<P>(fn: (props: P) => unknown, props: P): unknown {
   return untrack(() => scope(() => fn(props)))
 }
 
-// A component tag read off a prop or through a call: a string names an element, a function is the component.
-export function dynamic(tag: unknown, props: Record<string, unknown>): unknown {
-  if (typeof tag === 'function')
-    return component(tag as (props: unknown) => unknown, props)
-
-  if (typeof tag !== 'string')
-    return null
-
-  const element = claim ? claimNode() as Element : createElement(elementName(tag))
-
-  spread(element, () => [spreadAttributes(props)], 'children' in props, element.localName === 'a')
-
-  return element
-}
-
-function createElement(tag: string): Element {
+export function createElement(tag: string): Element {
   const element = document.createElement(tag)
 
   return element instanceof HTMLUnknownElement && !tag.includes('-') ? document.createElementNS('http://www.w3.org/2000/svg', tag) : element
@@ -1344,7 +792,7 @@ export function attribute(element: Element, name: string, value: unknown, writte
 
 let keepsSameTab: boolean | undefined
 
-function leavesInBrowser(href: unknown): boolean {
+export function leavesInBrowser(href: unknown): boolean {
   keepsSameTab ??= browserKeepsSameTab()
 
   return !keepsSameTab && leavesSite(href, location.origin)
@@ -1366,14 +814,6 @@ export function outside<T>(element: Element, href: T, ownRel = false): T {
   }
 
   return href
-}
-
-// A link's spread props, getters kept, with the `target` and `rel` of a link leaving the site, unless it writes its own.
-function outsideProps(props: Record<string, unknown>): Record<string, unknown> {
-  if (Object.hasOwn(props, 'target') || !leavesInBrowser(props.href))
-    return props
-
-  return merge(props, Object.hasOwn(props, 'rel') ? { target: '_blank' } : { target: '_blank', rel: 'noopener' })
 }
 
 // A property where the element has one, such as an input's `value`; an attribute otherwise.
@@ -1492,79 +932,6 @@ export function ref(element: Element, target: unknown): void {
 
   if (typeof cleanup === 'function')
     onCleanup(cleanup as () => void)
-}
-
-// Attributes and handlers from objects only known at render time; with `content`, a `children`, `innerHTML` or `textContent` among them sets the element's content.
-// `link` is for an `a`, whose attributes gain the `target` and `rel` of a link leaving the site.
-export function spread(element: Element, sources: () => readonly object[], content = false, link = false): void {
-  const set = new Map<string, unknown>()
-
-  // Children render in a part of their own, so a change to another prop does not build them again.
-  if (content)
-    insert(element, null, null, () => merge(...sources()).children)
-
-  // The handlers belong to the component, not to the effect a prop change runs again.
-  const owner = getOwner()
-
-  renderEffect(() => {
-    const merged = merge(...sources())
-    const props = link ? outsideProps(merged) : merged
-    const seen = new Set<string>()
-
-    for (const name of Object.keys(props)) {
-      if (name === 'children' || !attributeName(name))
-        continue
-
-      const value = props[name]
-
-      seen.add(name)
-
-      if (set.get(name) === value)
-        continue
-
-      set.set(name, value)
-
-      if (name === 'ref') {
-        runWithOwner(owner, () => ref(element, value))
-      }
-      else if (handlerName(name) && typeof value === 'function') {
-        runWithOwner(owner, () => (submits.listen ?? listen)(element, name, value as (event: Event) => void))
-      }
-      // A handler given as text runs as script, which the server never writes either.
-      else if (handlerName(name)) {
-        continue
-      }
-      // A function that is no handler, such as a slot given to the component, has no attribute form.
-      else if (typeof value === 'function' && name !== 'class' && name !== 'style') {
-        continue
-      }
-      else if (name === 'class') {
-        setClass(element, value)
-      }
-      else if (name === 'style') {
-        setStyle(element, value)
-      }
-      else {
-        try {
-          property(element, name, value, Object.hasOwn(props, 'hreflang'))
-        }
-        // A name the server writes but the browser refuses to set, such as `@click`.
-        catch {}
-      }
-    }
-
-    for (const [name, previous] of set) {
-      if (seen.has(name))
-        continue
-
-      set.delete(name)
-
-      if (handlerName(name) && typeof previous === 'function')
-        unlisten(element, name)
-      else if (name !== 'ref' && !handlerName(name))
-        property(element, name, undefined)
-    }
-  })
 }
 
 // ---- mounting

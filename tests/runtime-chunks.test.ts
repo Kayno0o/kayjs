@@ -40,6 +40,46 @@ describe('the runtime modules a page loads', () => {
   }, 120_000)
 })
 
+// The function only the module of each block holds, as the client build names them.
+const BLOCKS = { loop: 'function keyedRows', await: 'function awaited(', try: 'function attempt(', spread: 'function spread(' }
+const BLOCK_ISLANDS: Record<string, string> = {
+  loopy: '---\nconst rows = signal([{ id: 1 }, { id: 2 }])\n---\nbutton.add(onClick={() => rows.set(list => [...list, { id: list.length + 1 }])}) Add\nul\n  for row of rows()\n    li.row {row.id}\n',
+  awaity: '---\nconst reply = signal(Promise.resolve(\'ready\'))\n---\nawait reply()\n  p.pending Waiting\nthen text\n  p.ready {text}\n',
+  trying: '---\nconst count = signal(0)\n---\nbutton.bump(onClick={() => count.set(count() + 1)}) Bump\ntry\n  p.shown {count()}\ncatch\n  p.fallback Failed\n',
+  spreading: '---\nconst label = signal(\'one\')\n---\nbutton.spreading({...{ title: label() }} onClick={() => label.set(\'two\')}) {label()}\n',
+}
+
+describe('the blocks an island compiles to', () => {
+  it('load their modules only with an island using them: a loop, an await, a try and a spread each ride with their own islands', async () => {
+    const root = resolve(await fixtureCopy('runtime-chunks'))
+
+    dirs.push(root)
+    await Promise.all(Object.entries(BLOCK_ISLANDS).map(async ([name, source]) => Bun.write(join(root, `src/components/${name}.kay`), source)))
+    await Bun.write(join(root, 'src/routes/blocks.kay'), `--- script\n${Object.keys(BLOCK_ISLANDS).map(name => `import ${name[0]!.toUpperCase()}${name.slice(1)} from '../components/${name}.kay'`).join('\n')}\n---\nh1 Blocks\n${Object.keys(BLOCK_ISLANDS).map(name => `${name[0]!.toUpperCase()}${name.slice(1)}`).join('\n')}\n`)
+
+    const client = await buildClient(root)
+    const loaded = async (chunks: string[]) => (await Promise.all(chunks.map(async chunk => chunkText(client, chunk)))).join('\n')
+    const uses = { loopy: 'loop', awaity: 'await', trying: 'try', spreading: 'spread' } as const
+    const plain = await loaded(client.islands['src/components/plain-one.kay']!)
+
+    for (const marker of Object.values(BLOCKS)) {
+      expect(plain).not.toContain(marker)
+      expect(await chunkText(client, client.entry!)).not.toContain(marker)
+    }
+
+    for (const [island, block] of Object.entries(uses)) {
+      const text = await loaded(client.islands[`src/components/${island}.kay`]!)
+
+      expect(text, `the ${island} island loads the ${block} module`).toContain(BLOCKS[block])
+
+      for (const [other, marker] of Object.entries(BLOCKS)) {
+        if (other !== block)
+          expect(text, `the ${island} island loads the ${other} module`).not.toContain(marker)
+      }
+    }
+  }, 120_000)
+})
+
 describe('the page swap', () => {
   it('keeps the code for streamed pages and refused forms in chunks of their own, loaded by the swaps needing them', async () => {
     const root = resolve(await fixtureCopy('runtime-chunks'))
