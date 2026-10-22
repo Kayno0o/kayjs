@@ -1387,7 +1387,9 @@ function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => 
     times.hidden = true
     close.type = 'button'
     setIcon(close, 'Dismiss this problem', 'x')
-    close.onclick = () => dismiss([problem.text])
+    const key = problem.text
+
+    close.onclick = () => dismiss([key])
     text.append(...withPositions(problem.text, tool))
 
     if (CHUNK_FRAME.test(problem.text)) {
@@ -1414,7 +1416,7 @@ function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => 
       element.onpointerleave = () => tool.hideOutline()
     }
 
-    shown.set(problem.text, { problem, kind, element, times, count: 1 })
+    shown.set(key, { problem, kind, element, times, count: 1 })
     groups.get(kind)!.list.append(element)
     update()
   }

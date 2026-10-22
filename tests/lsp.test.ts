@@ -787,7 +787,12 @@ describe('kay lsp publishing after an edit', () => {
   it('publishes the edited file first, then the open files importing it, directly or through another, and never the others', async () => {
     const from = editor.publishes.length
 
-    await editor.change(badge, '---\nconst { label, size } = props<{ label: string, size: number }>()\n---\nspan {label} {size}\n', 2)
+    const edited = editor.change(badge, '---\nconst { label, size } = props<{ label: string, size: number }>()\n---\nspan {label} {size}\n', 2)
+
+    await edited
+    // The importing files wait for a quiet spell of their own.
+    await Bun.sleep(DIAGNOSTICS_DELAY * 2)
+    expect(publishedAfter(from)).toEqual([editor.uri(badge)])
     await settled(editor)
 
     const [first, ...rest] = publishedAfter(from)

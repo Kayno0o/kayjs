@@ -147,6 +147,8 @@ export class KayLanguageServer {
   private dependentsTimer: Timer | undefined
   // The run publishing them, one at a time: those asked for meanwhile join it, and see the latest text.
   private publishing: Promise<void> | undefined
+  // Whether the run in flight takes the files of `later` too, which only the quiet spell after an edit asks for.
+  private takesLater = false
   private projectChecksTimer?: Timer
   // The run of the project-wide checks in flight, and whether a save came during it.
   private projectChecks: Promise<void> | undefined
@@ -529,7 +531,7 @@ export class KayLanguageServer {
       return
 
     clearTimeout(this.dependentsTimer)
-    this.dependentsTimer = setTimeout(() => void guard(this.publishQueued()), DEPENDENTS_DELAY)
+    this.dependentsTimer = setTimeout(() => void guard(this.publishQueued(true)), DEPENDENTS_DELAY)
   }
 
   // What `kay check` finds across the project, run after a save rather than on every keystroke, since it reads every collection, catalog and route.
@@ -629,7 +631,8 @@ export class KayLanguageServer {
   }
 
   // Publishes the files waiting, the urgent ones first and the rest a few at a time, one run at a time so a slow tsgo is not asked twice for a file; those asked for meanwhile join the run.
-  private async publishQueued(): Promise<void> {
+  private async publishQueued(withLater = false): Promise<void> {
+    this.takesLater ||= withLater
     this.publishing ??= this.publishRun()
 
     return this.publishing
@@ -657,6 +660,7 @@ export class KayLanguageServer {
     }
     finally {
       this.publishing = undefined
+      this.takesLater = false
     }
 
     if (failure)
@@ -664,7 +668,8 @@ export class KayLanguageServer {
   }
 
   private nextBatch(): string[] {
-    const batch = this.urgent.size > 0 ? [...this.urgent] : [...this.later].slice(0, DEPENDENTS_BATCH)
+    const waiting = this.takesLater ? [...this.later].slice(0, DEPENDENTS_BATCH) : []
+    const batch = this.urgent.size > 0 ? [...this.urgent] : waiting
 
     for (const uri of batch) {
       this.urgent.delete(uri)

@@ -71,8 +71,11 @@ export function devStackMapper(dir: string): (stack: string) => Promise<string> 
   return mapFrames(load)
 }
 
-function mapFrames(load: (name: string) => Promise<LoadedMap | undefined>): (stack: string) => Promise<string> {
+function mapFrames(read: (name: string) => Promise<LoadedMap | undefined>): (stack: string) => Promise<string> {
   return async (stack) => {
+    // Each map is read once for the frames of one stack.
+    const held = new Map<string, Promise<LoadedMap | undefined>>()
+    const load = async (name: string) => held.get(name) ?? held.set(name, read(name)).get(name)!
     const lines = stack.split('\n')
 
     for (const [at, text] of lines.slice(0, MAX_FRAMES).entries()) {
