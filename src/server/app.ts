@@ -309,8 +309,8 @@ function labelWeight(label: string): number {
 }
 
 // The Elysia app behind `pages()`, serving whatever browser build `loadClient` provides.
-export async function servePages(project: Project<PagesOptions>, loadClient: () => ClientBuild | Promise<ClientBuild>) {
-  return (await pagesApp(project, loadClient)).app
+export async function servePages(project: Project<PagesOptions>, loadClient: () => ClientBuild | Promise<ClientBuild>, skipBroken = false) {
+  return (await pagesApp(project, loadClient, false, skipBroken)).app
 }
 
 // The modules declaring an `s.Public` field run before any build starts, so a name meant for the server alone is refused first and the values are there before a page or the browser reads them. Returns their paths.
@@ -330,7 +330,7 @@ async function loadPublicModules(root: string): Promise<string[]> {
 }
 
 // The app, with every path it serves, each claimed as its feature registers it; `exported` when `kay build --static` reads the site from it, its check having reported a missing site.
-export async function pagesApp(project: Project<PagesOptions>, loadClient: () => ClientBuild | Promise<ClientBuild>, exported = false) {
+export async function pagesApp(project: Project<PagesOptions>, loadClient: () => ClientBuild | Promise<ClientBuild>, exported = false, skipBroken = false) {
   const { root, config: options, paths, mode } = project
   // The one spelling every redirect goes through, handed to the setup's render options and the actions alike; it reads the routes, so it is set once they are known.
   let spell = (location: string) => location
@@ -458,7 +458,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   for (const route of app.routes)
     earlier.add(`${route.method} ${route.path}`)
 
-  const actionOptions = { dev: mode.dev, onError: options.onError, i18n: locales, base, redirectSpelling: (location: string) => spell(location), requireGuards: options.requireGuards, cors: options.cors }
+  const actionOptions = { skipBroken, dev: mode.dev, onError: options.onError, i18n: locales, base, redirectSpelling: (location: string) => spell(location), requireGuards: options.requireGuards, cors: options.cors }
   const [{ limits: actionLimits, tools: toolActions }, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(table, matchers, options.trailingSlash), actionOptions), apiImport])
   // A flag, not the limits themselves, which the dev tool's closure would otherwise keep alive with whatever they reach.
   const hasActions = actionLimits.size > 0

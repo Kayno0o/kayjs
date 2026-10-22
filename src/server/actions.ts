@@ -133,6 +133,8 @@ export interface ActionOptions {
   redirectSpelling?: ((location: string) => string) | undefined
   // The app's `cors`, the rule of every API module that sets none.
   cors?: CorsOptions | undefined
+  // A page or layout that does not compile serves no action instead of failing the whole app, as a test site does so the tests of other pages go on; the visit of that page fails with its error.
+  skipBroken?: boolean | undefined
 }
 
 export interface RouteMatch {
@@ -156,7 +158,15 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
   const tools: DocumentedAction[] = []
 
   for (const [file, { guards, ...page }] of actionFiles(routes, options.requireGuards)) {
-    const module = await importModule<Record<string, unknown>>(file)
+    let module: Record<string, unknown> = {}
+
+    try {
+      module = await importModule<Record<string, unknown>>(file)
+    }
+    catch (error) {
+      if (options.skipBroken !== true || !(error instanceof Error) || error.name !== 'KayCompileError')
+        throw error
+    }
 
     for (const [name, value] of Object.entries(module)) {
       if (!isAction(value))

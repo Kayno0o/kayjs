@@ -174,7 +174,7 @@ it('opens its panel on a click', async () => {
 
 ### Test site
 
-`kay/test` serves the project's pages and actions inside the test process, with no server and no browser; its islands are built for the browser as a check, never loaded:
+`kay/test` serves the project's pages and actions inside the test process, with no server and no browser; its islands are built for the browser as a check, never loaded, and a `.kay` file that does not compile fails only the visit of a page importing it, with its own error, not every site (a `browser` site needs the build and fails whole):
 
 ```ts
 import { expect, it } from 'bun:test'

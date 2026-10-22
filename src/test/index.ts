@@ -15,6 +15,7 @@ import { afterAll, beforeEach } from 'bun:test'
 import { Elysia } from 'elysia'
 import { clientDir, inOutput, testWorker } from '../build/assets'
 import { buildClient } from '../build/client'
+import { KayCompileError } from '../build/transform'
 import { withConfig } from '../config'
 import { clientOptionsOf, PRODUCTION, resolveProject } from '../project'
 import { encodeCall, minTimeOf, readActionResponse, SETTLED, STAMP_FIELD } from '../runtime/action'
@@ -291,6 +292,19 @@ async function islandsBuilt(root: string, options: ClientOptions, inBrowser: boo
   return build
 }
 
+// Without a browser the build is only a check, so a file that does not compile does not fail every site: the visit of a page importing it fails with that file's error, and the tests of other pages go on.
+async function islandsChecked(root: string, options: ClientOptions, inBrowser: boolean): Promise<ClientBuild | undefined> {
+  try {
+    return await islandsBuilt(root, options, inBrowser)
+  }
+  catch (error) {
+    if (inBrowser || !(error instanceof KayCompileError))
+      throw error
+
+    return undefined
+  }
+}
+
 // The project's pages and actions without a server, their islands built for the browser as a check: pages then render their islands' markup and no scripts.
 export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const root = testRoot(options.root)
@@ -305,11 +319,11 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const config = { ...loaded, site: loaded.site ?? ORIGIN, storage: options.storage ?? memoryFiles(), store: options.store === undefined && loaded.store !== undefined ? { jobs: memoryJobs(), rates: memoryRates(), rooms: memoryRooms(), vitals: memoryVitals() } : loaded.store }
   const project = resolveProject(root, config, { dev: config.dev === true, prebuilt: false, underKayDev: false })
   const inBrowser = options.browser !== undefined && options.browser !== false
-  const wanted = inBrowser || options.islands !== false ? await islandsBuilt(root, clientOptionsOf(config, PRODUCTION), inBrowser) : undefined
-  // Without a browser the pages render their islands' markup and load no script, so the build only had to succeed.
+  const wanted = inBrowser || options.islands !== false ? await islandsChecked(root, clientOptionsOf(config, PRODUCTION), inBrowser) : undefined
+  // Without a browser the pages render their islands' markup and load no script, so the build was only a check.
   const client: ClientBuild = inBrowser && wanted ? wanted : { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: clientDir(root) }
   const browser = typeof options.browser === 'object' ? options.browser : {}
-  const pages = await servePages(project, () => client)
+  const pages = await servePages(project, () => client, true)
   const locals = options.locals
   const before = [...options.use ?? [], ...locals ? [new Elysia().derive({ as: 'global' }, async ({ request }) => locals(request))] : []]
   const app = before.length === 0 ? pages : before.reduce<AnyElysia>((served, plugin) => served.use(plugin), new Elysia()).use(pages)
