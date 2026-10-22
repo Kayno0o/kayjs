@@ -37,6 +37,9 @@ export interface ParserOptions {
 const BLOCK = 'kay.tsx'
 // How long the editor's lint waits on `kay types` before giving up on it rather than hang.
 const TYPES_TIMEOUT = 60_000
+
+// The Bun that runs this bundle, not whichever `bun` comes first on PATH (under `bun run`, node_modules/.bin can hold another version); under Node there is only PATH.
+const BUN = process.versions.bun ? process.execPath : 'bun'
 // The classes of a template are written into the TSX as strings of their own, which only the rules about classes judge: any other rule on one would report the generated string.
 const TAILWIND_RULE = /^better-tailwindcss\//
 // What ESLint names the block `preprocess` returns: the .kay file's path, then `<index>_kay.tsx`.
@@ -100,13 +103,34 @@ export const processor = {
   },
 }
 
-// Roots whose `kay types` failed, so a broken config or a missing `bun` costs one run per ESLint process, not one per file.
-const typesFailed = new Set<string>()
+// Roots whose `kay types` failed, with the reason, so a broken config or a missing `bun` costs one run per ESLint process, not one per file.
+const typesFailed = new Map<string, string>()
+
+// A child that never ran `kay types` (no status, or killed by a signal) says nothing about the project, so it is tried once more.
+function runTypes(kay: string, root: string): { ok: boolean, why: string } {
+  let why = ''
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const child = spawnSync(BUN, [join(kay, 'src/cli.ts'), 'types', root, '--quiet'], { stdio: ['ignore', 'ignore', 'pipe'], timeout: TYPES_TIMEOUT, encoding: 'utf8' })
+
+    if (child.status === 0)
+      return { ok: true, why }
+
+    why = `kay types ${child.error ? `did not run (${child.error.message})` : `exited with status ${child.status}, signal ${child.signal}`}: ${(child.stderr ?? '').trim().slice(-500)}`
+
+    if (child.status !== null && !child.signal)
+      break
+  }
+
+  return { ok: false, why }
+}
 
 // Runs `kay types` for a project whose types nothing wrote yet, as in an editor's ESLint on a fresh app, and tells whether it did: this is a Node bundle, so Bun runs the project's own kay as a child.
 function writeTypes(root: string): boolean {
   if (typesFailed.has(root))
     return false
+
+  let why = ''
 
   try {
     // `kay/package.json` is not exported, so kay is found from `kay/eslint`, the file ESLint loaded this from.
@@ -115,12 +139,18 @@ function writeTypes(root: string): boolean {
     while (!existsSync(join(kay, 'package.json')))
       kay = dirname(kay)
 
-    if (spawnSync('bun', [join(kay, 'src/cli.ts'), 'types', root, '--quiet'], { stdio: 'ignore', timeout: TYPES_TIMEOUT }).status === 0)
-      return true
-  }
-  catch {}
+    const run = runTypes(kay, root)
 
-  typesFailed.add(root)
+    if (run.ok)
+      return true
+
+    why = run.why
+  }
+  catch (error) {
+    why = `kay was not found from ${root}: ${error instanceof Error ? error.message : String(error)}`
+  }
+
+  typesFailed.set(root, why)
 
   return false
 }
@@ -140,7 +170,7 @@ export function shadowParser<Options extends ParserOptions, Result>(parser: { pa
       const shadow = shadowPath(root, file)
 
       if ((Boolean(options.project) || Boolean(options.projectService)) && !existsSync(shadow) && !writeTypes(root))
-        throw new Error(`${relative(root, file)} has no type information yet: run kay check, or kay dev, before linting it`)
+        throw new Error(`${relative(root, file)} has no type information yet: run kay check, or kay dev, before linting it (${typesFailed.get(root)})`)
 
       return parser.parseForESLint(code, { ...options, filePath: shadow })
     },

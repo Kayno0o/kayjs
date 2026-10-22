@@ -1,5 +1,5 @@
 import type { LintMessage } from '../src/eslint'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { chmod, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
@@ -158,6 +158,37 @@ describe('kay/eslint', () => {
     }
     finally {
       await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('runs kay types with the Bun running ESLint, not the first bun on PATH, and names why a run failed', async () => {
+    const root = await scratchDir('eslint-types-path-')
+    const stubs = await scratchDir('eslint-types-stub-')
+    const path = process.env.PATH
+    const seen: string[] = []
+    const parser = shadowParser({ parseForESLint: (_code: string, options: { filePath?: string, projectService?: boolean }) => seen.push(options.filePath ?? '') })
+    const block = join(root, 'src/routes/index.kay/0_kay.tsx')
+
+    try {
+      await Bun.write(join(root, 'package.json'), '{"type":"module"}')
+      await Bun.write(join(root, 'tsconfig.json'), '{"extends":"kay/tsconfig.json"}')
+      await Bun.write(join(root, 'src/routes/index.kay'), 'h1 Hello\n')
+      await Bun.write(join(stubs, 'bun'), '#!/bin/sh\necho stub bun refused >&2\nexit 1\n')
+      await chmod(join(stubs, 'bun'), 0o755)
+      process.env.PATH = `${stubs}:${path}`
+      parser.parseForESLint('', { filePath: block, projectService: true })
+
+      expect(seen).toEqual([join(root, '.kay/types/src/routes/index.kay.tsx')])
+
+      // A run that fails says how, so a lint that cannot get types is not a mystery.
+      await rm(join(root, '.kay'), { recursive: true, force: true })
+      await Bun.write(join(root, 'kay.config.ts'), 'export default {{\n')
+      expect(() => parser.parseForESLint('', { filePath: block, projectService: true })).toThrow('exited with status 1, signal null')
+    }
+    finally {
+      process.env.PATH = path
+      await rm(root, { recursive: true, force: true })
+      await rm(stubs, { recursive: true, force: true })
     }
   })
 })
