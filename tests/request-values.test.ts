@@ -238,7 +238,7 @@ describe('a production server started from disk', () => {
       const { root, options } = await project([EXTENSION], base)
 
       await build(options)
-      expect(await Bun.file(recordFile(root)).json()).toMatchObject({ 'lib/gate.kay': true, 'src/routes/plain.kay': false })
+      expect(await Bun.file(recordFile(root)).json()).toMatchObject({ reads: { 'lib/gate.kay': true, 'src/routes/plain.kay': false }, globs: { 'src/routes/globbed.kay': ['src/parts/gate.kay'] } })
       expect(await get(options, '/gated')).toMatchObject({ status: 200, html: expect.stringContaining('<p id="who">Ada</p>') })
     }, 120_000)
   }
@@ -263,9 +263,9 @@ describe('a production server started from disk', () => {
     await build(options)
 
     const record = recordFile(root)
-    const answers = await Bun.file(record).json() as Record<string, boolean>
+    const answers = await Bun.file(record).json() as { reads: Record<string, boolean> }
 
-    await Bun.write(record, JSON.stringify({ ...answers, 'lib/gate.kay': false }))
+    await Bun.write(record, JSON.stringify({ ...answers, reads: { ...answers.reads, 'lib/gate.kay': false } }))
     expect((await get(options, '/gated', true)).status).toBe(500)
     await rm(record)
     expect(await get(options, '/gated')).toMatchObject({ status: 200, html: expect.stringContaining('<p id="who">Ada</p>') })
@@ -289,9 +289,9 @@ describe('a production server started from disk', () => {
     await build(options)
 
     const record = recordFile(root)
-    const answers = await Bun.file(record).json() as Record<string, boolean>
+    const answers = await Bun.file(record).json() as { reads: Record<string, boolean> }
 
-    delete answers['lib/gate.kay']
+    delete answers.reads['lib/gate.kay']
     await Bun.write(record, JSON.stringify(answers))
     await expect(run(`const options = ${options}\nconst { pages } = await import(${JSON.stringify(resolve('src/server'))})\nawait pages(options)\n`, true)).rejects.toThrow()
   }, 120_000)

@@ -2,9 +2,7 @@ import type { KayExtension } from '../config'
 import type { ContextReads } from './context-record'
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
-import { findKayFiles, findProjectFiles, KAY_FILE, scriptLoader, TS_FILE } from '../build/files'
-import { GLOB_CALL, globbedFiles } from '../build/glob'
-import { fences, packageRoot } from '../build/libraries'
+import { findKayFiles, findProjectFiles, KAY_FILE, TS_FILE } from '../build/files'
 import { throughLinks } from '../build/links'
 import { KayError } from '../compiler/errors'
 import { TRAILING_SLASH } from '../runtime/base'
@@ -226,17 +224,18 @@ export function servedPaths(routes: Route[]): Set<string> {
 const collecting = new WeakMap<LayoutsRead, ContextReads>()
 
 // Every template reading `ctx` that a scan of the routes and of the fallback pages meets, answered by the compiler, for `kay build` to record.
-export async function contextReadsOf(routesDir: string, mounts: RouteMount[]): Promise<Map<string, boolean>> {
-  const reads: ContextReads = { files: new Map(), recorded: false }
+export async function contextReadsOf(routesDir: string, mounts: RouteMount[]): Promise<ContextReads> {
+  const reads: ContextReads = { files: new Map(), globs: new Map(), recorded: false }
 
   await scanRoutes(routesDir, mounts, reads)
 
-  const read: LayoutsRead = new Map()
+  const trees = routeTrees(routesDir, mounts)
+  const read = readFor(trees)
 
   collecting.set(read, reads)
-  specialPagesOf(routeTrees(routesDir, mounts), '', read)
+  specialPagesOf(trees, '', read)
 
-  return reads.files
+  return reads
 }
 
 // The app's pages, then each mounted library's that no page of the app serves the path of.
@@ -429,6 +428,11 @@ function ownLayouts(trees: RouteMount[], at: string, file: string, read: Layouts
   return [...outers, ...layouts]
 }
 
+// Loaded once a scan with no record has a mount whose walk follows imports.
+let globEdges: typeof import('./glob-edges').globEdges | undefined
+// Keyed by file, as the reads are.
+const recordedGlobs = new Map<string, string[]>()
+
 // Every specifier a module names, static or dynamic; one in a comment or a string only adds a file the walk follows for nothing.
 const IMPORT = /\b(?:from|import)\s*(?:\(\s*)?['"]([^'"]+)['"]/g
 const importsRead = new WeakMap<LayoutsRead, Map<string, string[]>>()
@@ -477,7 +481,7 @@ function importsOf(file: string, read: LayoutsRead): string[] {
     }
 
     try {
-      for (const path of source.includes(GLOB_CALL) ? globbedFiles(KAY_FILE.test(file) ? fences(source) : source, file, globRoots.get(read) ?? packageRoot(dirname(file)), KAY_FILE.test(file) ? 'ts' : scriptLoader(file)) ?? [] : []) {
+      for (const path of globsOf(source, file, read)) {
         const real = realFile(path)
 
         if (followed(real))
@@ -488,6 +492,23 @@ function importsOf(file: string, read: LayoutsRead): string[] {
       // A glob the build cannot read, which the build or the check reports as it reaches the module.
     }
   }
+
+  return found
+}
+
+// The files a module's `import.meta.glob` calls expand to: the build's record where it holds the module, else the glob reader.
+function globsOf(source: string, file: string, read: LayoutsRead): string[] {
+  if (!source.includes('import.meta.glob'))
+    return []
+
+  const recorded = collecting.has(read) ? undefined : recordedGlobs.get(file)
+
+  if (recorded !== undefined)
+    return recorded
+
+  const found = globEdges?.(source, file, globRoots.get(read)) ?? []
+
+  collecting.get(read)?.globs.set(file, found)
 
   return found
 }
@@ -537,9 +558,15 @@ let contextReader: ((source: string) => boolean) | undefined
 const recordedReads = new Map<string, boolean>()
 
 async function loadContextReader(mounts: RouteMount[], reads: ContextReads | undefined): Promise<void> {
+  if (!reads?.recorded && globEdges === undefined && mounts.some(mount => mount.reaching !== undefined))
+    globEdges = (await import('./glob-edges')).globEdges
+
   if (reads?.recorded) {
     for (const [file, found] of reads.files)
       recordedReads.set(file, found)
+
+    for (const [file, paths] of reads.globs)
+      recordedGlobs.set(file, paths)
   }
   else if (contextReader === undefined && mounts.some(mount => mount.reaching === 'context')) {
     contextReader = (await import('./context-reads')).readsImplicitContext
