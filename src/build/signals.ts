@@ -2,9 +2,11 @@ import type { ImportedSignals, SignalKind } from '../compiler/module-signals'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { readFileSync, statSync } from 'node:fs'
 import { moduleSignals } from '../compiler/module-signals'
+import { parseKay } from '../compiler/parser'
 import { resolveFrom, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
 import { fences } from './libraries'
 
+const KAY_FILE = /\.kay$/
 const KAY_MODULE = /^kay(?:\/|$)/
 const scanned = new Map<string, { stamp: string, signals: Record<string, SignalKind> }>()
 
@@ -73,7 +75,7 @@ function readImportedSignals(file: string, source: string): ImportedSignals {
   for (const specifier of specifiers) {
     const path = KAY_MODULE.test(specifier) ? undefined : resolveFrom(specifier, file)
 
-    if (path === undefined || !SCRIPT_FILE.test(path) || (!specifier.startsWith('.') && path.includes('/node_modules/')))
+    if (path === undefined || !(SCRIPT_FILE.test(path) || KAY_FILE.test(path)) || (!specifier.startsWith('.') && path.includes('/node_modules/')))
       continue
 
     const signals = signalsOf(path)
@@ -106,8 +108,9 @@ function signalsOf(path: string): Record<string, SignalKind> {
     if (known?.stamp === stamp)
       return known.signals
 
-    const loader = scriptLoader(path)
-    const signals = moduleSignals(readFileSync(path, 'utf8'), loader === 'tsx' || loader === 'jsx')
+    const text = readFileSync(path, 'utf8')
+    // A component's signals are the ones its `--- module` fence exports.
+    const signals = KAY_FILE.test(path) ? moduleSignals(moduleFence(text)) : moduleSignals(text, ['tsx', 'jsx'].includes(scriptLoader(path)))
 
     scanned.set(path, { stamp, signals })
 
@@ -116,4 +119,10 @@ function signalsOf(path: string): Record<string, SignalKind> {
   catch {
     return {}
   }
+}
+
+function moduleFence(text: string): string {
+  const { module } = parseKay(text)
+
+  return module ? text.slice(module.start, module.end) : ''
 }

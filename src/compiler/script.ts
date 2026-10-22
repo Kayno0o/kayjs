@@ -101,6 +101,8 @@ export interface ScriptAnalysis {
   plain: string[]
   diagnostics: Diagnostic[]
   fence?: ParsedFence | undefined
+  // The `--- module` fence, parsed beside the script's.
+  moduleFence?: ParsedFence | undefined
   // A fence Babel cannot parse and nothing could be recovered of, emitted whole at module level so the editor completes in it through TypeScript's own recovery.
   unparsed?: Span | undefined
   // The top-level statements of a fence being typed that Babel cannot parse, left out of the analysis: kept in `body` where they are written, or in `brokenModule` when an import, so the editor still completes in them while the rest of the fence is analysed.
@@ -163,6 +165,7 @@ function analyzeModule(source: string, module: Span): ScriptAnalysis {
 function withModule(script: ScriptAnalysis, module: ScriptAnalysis): ScriptAnalysis {
   return {
     ...script,
+    moduleFence: module.fence,
     hoisted: [...script.hoisted, ...module.hoisted].toSorted((a, b) => a.start - b.start),
     imports: [...script.imports, ...module.imports],
     specifiers: [...script.specifiers, ...module.specifiers],

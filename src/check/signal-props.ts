@@ -89,7 +89,7 @@ export async function deprecatedSignalProps(root: string, options: CheckOptions)
 
 function signalPropsOf(path: string, source: string, root: string): Prop[] {
   const file = parseKay(source)
-  const script = analyzeScript(source, file.script)
+  const script = analyzeScript(source, file.script, [], [], file.module)
   let compiled: ReturnType<typeof compileKay>
 
   try {
@@ -112,7 +112,7 @@ function sitesOf(path: string, source: string, props: Map<string, Prop[]>): { si
   const file = parseKay(source)
   const components = new Map<string, Prop[]>()
   const known = new Set<string>()
-  const imports = [...analyzeScript(source, file.script).imports, ...analyzeServer(source, file.server)?.imports ?? []]
+  const imports = [...analyzeScript(source, file.script, [], [], file.module).imports, ...analyzeServer(source, file.server)?.imports ?? []]
 
   for (const binding of imports) {
     const resolved = binding.imported === 'default' ? resolveFrom(binding.source, path) : undefined

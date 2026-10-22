@@ -22,7 +22,7 @@ function offered(file: string): { parts: Set<string>, variants: Record<string, s
   if (parsed.server !== undefined || ROUTE_FILES.has(basename(file)))
     return 'page'
 
-  const script = analyzeScript(source, parsed.script)
+  const script = analyzeScript(source, parsed.script, [], [], parsed.module)
   const parts = templateFacts(parsed, script.recipe).parts
 
   return parts?.merges === true ? { parts: new Set(parts.names.keys()), variants: script.recipe === undefined ? {} : script.recipeVariants } : undefined

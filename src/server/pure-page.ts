@@ -185,10 +185,14 @@ function moduleStateAt(file: string, source: string, unchanged: Unchanged | unde
   const server = analyzeServer(source, fence)
 
   // A `--- module` fence is all module level, so what it holds is state as in a module of its own.
-  const inModule = module === undefined ? undefined : stateAt(source.slice(module.start, module.end), SETTING_NAMES, unchanged)
+  const moduleRisks = new Map<string, number>()
+  const inModule = module === undefined ? undefined : stateAt(source.slice(module.start, module.end), SETTING_NAMES, unchanged, moduleRisks)
 
   if (module !== undefined && inModule !== undefined)
     return module.start + inModule
+
+  for (const [name, at] of moduleRisks)
+    risks.set(name, module!.start + at)
 
   if (fence === undefined || server === undefined)
     return undefined

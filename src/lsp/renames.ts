@@ -23,7 +23,7 @@ export function movedPath(path: string, moves: ReadonlyMap<string, string>): str
 // The relative imports of a file that point somewhere else once `moves` happen, whether the imported file moved or the importing one did. `file` is where the source is now.
 export function importEdits(file: string, source: string, moves: ReadonlyMap<string, string>): ImportEdit[] {
   const parsed = parseKay(source)
-  const specifiers = [...analyzeScript(source, parsed.script).specifiers, ...analyzeServer(source, parsed.server)?.specifiers ?? []]
+  const specifiers = [...analyzeScript(source, parsed.script, [], [], parsed.module).specifiers, ...analyzeServer(source, parsed.server)?.specifiers ?? []]
   const placed = movedPath(file, moves)
   const edits: ImportEdit[] = []
 

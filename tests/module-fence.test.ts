@@ -90,3 +90,48 @@ describe('what reads the fences of a file', () => {
     expect(fences('--- module\nimport \'./a.css\'\nexport const kinds = { primary: \'btn-primary\' }\n--- script\nconst x = 1\n---\np\n')).toContain('btn-primary')
   })
 })
+
+describe('what the analyses read of a module fence', () => {
+  const found = (source: string, options: Parameters<typeof compileKay>[2] = {}) => compileKay(source, 'part.kay', { check: true, ...options }).diagnostics.map(diagnostic => diagnostic.code)
+
+  it('lints its imports, stylesheets, markup props and browser reads as the script\'s own', () => {
+    const island = '--- module\nimport { signal } from \'kay\'\nimport { sqliteCache } from \'kay/cache\'\nimport theme from \'./theme.css\'\n\nexport const open = signal(false)\nconsole.log(sqliteCache, theme)\n---\nbutton(onClick={() => open.set(true)}) go\n'
+
+    expect(found(island)).toEqual(expect.arrayContaining(['server-only-import', 'css-import-without-text']))
+    expect(found('--- module\nimport type { JSX } from \'kay\'\nexport type Row = { cell: JSX.Element }\nexport const read = (row: Row) => row\n---\np x\n')).not.toContain('deprecated-markup-prop')
+    expect(found('--- module\nexport const width = window.innerWidth\n---\np {width}\n')).toContain('browser-only-read')
+    expect(found('--- module\nexport const width = typeof window === \'undefined\' ? 0 : window.innerWidth\n---\np {width}\n')).not.toContain('browser-only-read')
+  })
+
+  it('knows a signal a module fence exports in its importers, so assigning it writes it', async () => {
+    const root = await scratchDir('module-fence-signals-')
+
+    try {
+      await Promise.all(Object.entries({
+        'counter.kay': files['counter.kay']!,
+        'bump.kay': '---\nimport { visits } from \'./counter.kay\'\n---\nbutton(onClick={() => visits++}) {visits()}\n',
+      }).map(async ([name, text]) => Bun.write(join(root, name), text)))
+
+      const source = await Bun.file(join(root, 'bump.kay')).text()
+      const { importedSignals } = await import('../src/build/signals')
+      const signals = importedSignals(join(root, 'bump.kay'), source)
+
+      expect(signals).toEqual({ './counter.kay': { visits: 'signal' } })
+      expect(compileKay(source, join(root, 'bump.kay'), { importedSignals: signals, output: 'dom', root }).tsx).toContain('visits.set(')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('does not call an exported signal constant, as an importer may write it', () => {
+    expect(found('--- module\nimport { signal } from \'kay\'\nexport const shown = signal(1)\nconst hidden = signal(2)\n---\np {shown()} {hidden()}\n')).toEqual(['constant-signal'])
+  })
+
+  it('moves the imports of a module fence with a renamed file', async () => {
+    const { importEdits } = await import('../src/lsp/renames')
+    const source = '--- module\nimport { x } from \'../lib/x.kay\'\nexport const y = x\n---\np {y}\n'
+
+    expect(importEdits('/app/src/routes/part.kay', source, new Map([['/app/src/lib/x.kay', '/app/src/shared/x.kay']])).map(edit => edit.text)).toEqual(['../shared/x.kay'])
+  })
+})

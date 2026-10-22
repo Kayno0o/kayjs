@@ -641,7 +641,8 @@ class RewriteFinder {
     if (binding && kind !== undefined)
       this.signalBinding(binding, id.name, kind)
 
-    if (start !== undefined && made === 'signal' && onlyRead(binding, this.uncalled))
+    // An exported signal may be written by an importer.
+    if (start !== undefined && made === 'signal' && !path.parentPath.parentPath?.isExportNamedDeclaration() && onlyRead(binding, this.uncalled))
       this.constantSignals.set(start, { name: { start, end: start + id.name.length }, value: sourceSpan(this.input.map, init.arguments[0]) })
   }
 

@@ -5,7 +5,7 @@ import type { ErrorName } from './errors'
 import type { LintLevels } from './lints'
 import type { ImportedSignals, SignalKind } from './module-signals'
 import type { NameFindings } from './rewrite'
-import type { ScriptAnalysis, ServerAnalysis, SignalPropType } from './script'
+import type { ParsedFence, ScriptAnalysis, ServerAnalysis, SignalPropType } from './script'
 import { basename, relative } from 'node:path'
 import process from 'node:process'
 import { drawIcons, elementsIn, templateFacts, visitNodes } from './ast'
@@ -160,6 +160,11 @@ export function browserRole(original: string, filename: string, imported?: Impor
   return promotionCause(file, script) === undefined ? undefined : 'promotable'
 }
 
+// The fences of the script and of the module that the browser reads.
+function scriptFences(script: ScriptAnalysis): ParsedFence[] {
+  return [script.fence, script.moduleFence].filter(fence => fence !== undefined)
+}
+
 // The server-only imports in the script of a component the build promotes to an island, which only the project knows: compiling it alone cannot tell whether it is.
 export function promotedChecks(original: string): Diagnostic[] {
   const { file } = parseExpanded(original)
@@ -171,7 +176,7 @@ export function promotedChecks(original: string): Diagnostic[] {
   const announced = site === undefined || marker !== undefined ? [] : [{ ...site.span, code: 'promoted-island', message: `This component renders as an island: ${site.cause}`, note: 'a function or a block with parameters cannot be sent to the browser as data, so the component hydrates itself', help: 'write `// kay-island` in it to say so, or pass the island what can be serialized', checkOnly: true }]
   const contradicted = marker?.kind === 'static' && site !== undefined ? [{ start: marker.start, end: marker.end, code: 'island-marker', message: `This component renders as an island, and \`// kay-static\` says it does not: ${site.cause}`, note: 'it passes an island what only an island can send', help: 'delete the marker, or pass the island what can be serialized', checkOnly: true }] : []
 
-  return [...script.fence === undefined ? [] : serverOnlyImports(script.fence), ...announced, ...contradicted]
+  return [...scriptFences(script).flatMap(fence => serverOnlyImports(fence)), ...announced, ...contradicted]
 }
 
 // Compiles a .kay component: to TSX the type checker reads, or with `output` to the HTML strings and DOM code that run.
@@ -233,12 +238,12 @@ export function compileKay(original: string, filename: string, options: CompileO
   const broken = diagnostics.some(diagnostic => !diagnostic.checkOnly)
 
   if (checked) {
-    const fenceLints = [script.fence, server?.fence].flatMap(fence => fence ? [...cssImportsWithoutText(fence), ...asyncReplies(fence)] : [])
+    const fenceLints = [script.fence, script.moduleFence, server?.fence].flatMap(fence => fence ? [...cssImportsWithoutText(fence), ...asyncReplies(fence)] : [])
     // The script runs in the browser as an island's and in a component only islands render; a static one that may be promoted to an island is read by the project check, which knows whether the build promotes it.
-    const browserScript = (island !== undefined || options.insideIsland === true) && !routeFile ? script.fence : undefined
-    const unusedLints = broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, file.script, found.findings)]
+    const browserScript = (island !== undefined || options.insideIsland === true) && !routeFile ? scriptFences(script) : []
+    const unusedLints = broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, [file.script, file.module], found.findings)]
 
-    diagnostics.push(...unboundedFields(server), ...fenceLints, ...script.fence ? markupProps(script.fence) : [], ...browserScript === undefined ? [] : serverOnlyImports(browserScript), ...unusedLints, ...templateLints(file))
+    diagnostics.push(...unboundedFields(server), ...fenceLints, ...scriptFences(script).flatMap(fence => markupProps(fence)), ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...unusedLints, ...templateLints(file))
   }
 
   const marker = checked ? islandMarker(source) : undefined
@@ -335,9 +340,9 @@ function unreadNames(source: string, template: Node[], script: ScriptAnalysis, s
   return unread
 }
 
-// The signals the component script declares and nothing writes.
-function constantSignals(source: string, script: Span | undefined, found: NameFindings): Diagnostic[] {
-  return found.constantSignals.filter(({ name }) => script !== undefined && name.start >= script.start && name.end <= script.end).map(({ name, value }) => {
+// The signals the component script and the module fence declare and nothing writes.
+function constantSignals(source: string, fences: (Span | undefined)[], found: NameFindings): Diagnostic[] {
+  return found.constantSignals.filter(({ name }) => fences.some(fence => fence !== undefined && name.start >= fence.start && name.end <= fence.end)).map(({ name, value }) => {
     const text = source.slice(name.start, name.end)
 
     return {

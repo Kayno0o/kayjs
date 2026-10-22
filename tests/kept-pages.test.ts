@@ -600,6 +600,17 @@ describe('a kept page and the state a script declares', () => {
       expect(await readsNothing(route(root, `src/routes/${name}.kay`)), name).toBe(kept)
   })
 
+  it('notes an exported container of a module fence as a risk, stopping a page only when it takes it', async () => {
+    const root = await scratch({
+      'src/box.kay': '--- module\nexport const seen: string[] = []\nexport const size = 1\n---\np box\n',
+      'src/routes/idle.kay': '---\nimport { size } from \'../box.kay\'\n---\np {size}\n',
+      'src/routes/taken.kay': '---\nimport { seen } from \'../box.kay\'\n---\np {seen.length}\n',
+    })
+
+    expect(await readsNothing(route(root, 'src/routes/idle.kay'))).toBe(true)
+    expect(await readsNothing(route(root, 'src/routes/taken.kay'))).toBe(false)
+  })
+
   it('tells them apart in a server fence too', async () => {
     const root = await scratch({
       'src/routes/list.kay': '--- server\nconst a = 1,\n  b = 2,\n  seen: Map<string, number> = new Map()\n\nexport const save = action(s.Object({}), async () => {\n  seen.set(\'a\', a + b)\n})\n---\np {seen.size}\n',

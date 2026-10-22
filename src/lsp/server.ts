@@ -1326,16 +1326,17 @@ function mergedImport(tsx: string, edit: TextEdit): string | undefined {
   return added.length > 0 ? `import { ${added.join(', ')} } from ${before[2]}` : undefined
 }
 
-// After the last import of the server fence for server code, of the component script otherwise; a file without a script gets one.
+// After the last import of the fence the offset is in, the component script by default; a file without a script gets one.
 function importEdit(source: string, offset: number, declaration: string): TextEdit {
-  const { script, server } = parseKay(source)
+  const { script, server, module } = parseKay(source)
   const inServer = server !== undefined && offset >= server.start && offset <= server.end
-  const fence = inServer ? server : script
+  const inModule = module !== undefined && offset >= module.start && offset <= module.end
+  const fence = inServer ? server : [module, script][inModule ? 0 : 1]
 
   if (!fence)
     return { range: { start: toPosition(source, 0), end: toPosition(source, 0) }, newText: `---\n${declaration.replace(TRAILING_SEMICOLON, '')}\n---\n` }
 
-  const hoisted = (inServer ? analyzeServer(source, fence)?.hoisted : analyzeScript(source, fence).hoisted) ?? []
+  const hoisted = (inServer ? analyzeServer(source, fence)?.hoisted : analyzeScript(source, script, [], [], module).hoisted.filter(span => span.start >= fence.start && span.end <= fence.end)) ?? []
   const last = hoisted.filter(span => source.startsWith('import', span.start)).at(-1)
   const position = toPosition(source, last ? last.end : fence.start)
   // tsgo reads the semicolon style off generated code; the fence's own imports, or kay's style without them, decide instead.

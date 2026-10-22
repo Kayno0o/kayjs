@@ -62,7 +62,7 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
   const names = browserGlobals()
   const { source } = file
   const expressions = templateExpressions(file)
-  const texts = [file.script ? source.slice(file.script.start, file.script.end) : '', ...expressions.map(expression => source.slice(expression.span.start, expression.span.end))]
+  const texts = [file.script ? source.slice(file.script.start, file.script.end) : '', file.module ? source.slice(file.module.start, file.module.end) : '', ...expressions.map(expression => source.slice(expression.span.start, expression.span.end))]
 
   if (!texts.some(text => Array.from(text.matchAll(WORD)).some(match => names.has(match[0])) || (island && VARYING_HINT.test(text))))
     return []
@@ -292,6 +292,10 @@ function buildProgram(file: KayFile, serverNames: string[], expressions: { span:
     segments.push({ generated: code.length, source: span.start, length: span.end - span.start })
     code += `${source.slice(span.start, span.end)}${after}`
   }
+
+  // The module fence runs once as the file loads, on the server too.
+  if (file.module)
+    add(file.module, '', '\n')
 
   if (file.script)
     add(file.script, '', '\n')
