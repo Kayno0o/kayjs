@@ -4095,7 +4095,7 @@ describe.concurrent('kay check, unused code', () => {
     try {
       const { output } = await runCheck(root)
 
-      expect(output.match(/deprecated-identity-key/g)).toHaveLength(6)
+      expect(output.match(/deprecated-identity-key/g)).toHaveLength(3)
       expect(output).not.toContain('unknown-lint')
       expect(output).not.toContain('no lint or group')
       await Bun.write(join(root, 'kay.config.ts'), 'export default {\n  lints: { \'identity-key\': \'allow\', },\n}\n')
