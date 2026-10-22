@@ -794,7 +794,7 @@ async function scanned(file: string, root: string | undefined, scans: object): P
   if (file.endsWith('.kay')) {
     const { file: parts } = parseExpanded(source)
     const server = analyzeServer(parts.source, parts.server)
-    const implicit = [...new Set([...analyzeScript(parts.source, parts.script, server?.data.map(({ name }) => name), templateReads(parts)).implicit, ...server?.implicit ?? []])]
+    const implicit = [...new Set([...analyzeScript(parts.source, parts.script, server?.data.map(({ name }) => name), templateReads(parts), parts.module).implicit, ...server?.implicit ?? []])]
 
     if (implicit.length > 0)
       imports.push({ clause: `{ ${implicit.join(', ')} }`, specifier: 'kay', index: 0, length: 0 })

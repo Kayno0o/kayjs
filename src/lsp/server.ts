@@ -814,7 +814,8 @@ export class KayLanguageServer {
 
   // The components a file imports; a local `.kay` one is read for the props and blocks it takes.
   private async importedComponents(document: Document): Promise<TemplateData['components']> {
-    const { imports } = analyzeScript(document.source, parseKay(document.source).script)
+    const parsed = parseKay(document.source)
+    const { imports } = analyzeScript(document.source, parsed.script, [], [], parsed.module)
     const found: TemplateData['components'] = []
 
     for (const binding of imports.filter(candidate => CAPITALIZED.test(candidate.local) && !candidate.typeOnly)) {
@@ -1331,7 +1332,8 @@ function importEdit(source: string, offset: number, declaration: string): TextEd
   const { script, server, module } = parseKay(source)
   const inServer = server !== undefined && offset >= server.start && offset <= server.end
   const inModule = module !== undefined && offset >= module.start && offset <= module.end
-  const fence = inServer ? server : [module, script][inModule ? 0 : 1]
+  const component = inModule ? module : script
+  const fence = inServer ? server : component
 
   if (!fence)
     return { range: { start: toPosition(source, 0), end: toPosition(source, 0) }, newText: `---\n${declaration.replace(TRAILING_SEMICOLON, '')}\n---\n` }

@@ -34,7 +34,7 @@ export async function renamedUiProps(root: string, options: CheckOptions): Promi
     const levelAt = lintLevels(source, options.lints)
     const tags = new Map<string, (typeof RENAMES)[number]>()
 
-    for (const binding of [...analyzeScript(source, parsed.script).imports, ...analyzeServer(source, parsed.server)?.imports ?? []]) {
+    for (const binding of [...analyzeScript(source, parsed.script, [], [], parsed.module).imports, ...analyzeServer(source, parsed.server)?.imports ?? []]) {
       const rename = binding.imported === 'default' ? RENAMES.find(candidate => binding.source === `@kaynooo/kayjs-ui/${candidate.component}`) : undefined
 
       if (rename)

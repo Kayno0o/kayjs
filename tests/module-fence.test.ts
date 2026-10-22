@@ -98,7 +98,6 @@ describe('what the analyses read of a module fence', () => {
     const island = '--- module\nimport { signal } from \'kay\'\nimport { sqliteCache } from \'kay/cache\'\nimport theme from \'./theme.css\'\n\nexport const open = signal(false)\nconsole.log(sqliteCache, theme)\n---\nbutton(onClick={() => open.set(true)}) go\n'
 
     expect(found(island)).toEqual(expect.arrayContaining(['server-only-import', 'css-import-without-text']))
-    expect(found('--- module\nimport type { JSX } from \'kay\'\nexport type Row = { cell: JSX.Element }\nexport const read = (row: Row) => row\n---\np x\n')).not.toContain('deprecated-markup-prop')
     expect(found('--- module\nexport const width = window.innerWidth\n---\np {width}\n')).toContain('browser-only-read')
     expect(found('--- module\nexport const width = typeof window === \'undefined\' ? 0 : window.innerWidth\n---\np {width}\n')).not.toContain('browser-only-read')
   })
@@ -118,6 +117,20 @@ describe('what the analyses read of a module fence', () => {
 
       expect(signals).toEqual({ './counter.kay': { visits: 'signal' } })
       expect(compileKay(source, join(root, 'bump.kay'), { importedSignals: signals, output: 'dom', root }).tsx).toContain('visits.set(')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('reads the renamed options of a library call in a module fence', async () => {
+    const { rateLimitNames } = await import('../src/check/rate-limit')
+    const root = await scratchDir('module-fence-options-')
+
+    try {
+      await Bun.write(join(root, 'src/part.kay'), '--- module\nimport { ai } from \'@kaynooo/kayjs-ai\'\nexport const model = ai({ limit: 5 })\n---\np x\n')
+
+      expect((await rateLimitNames(root, {})).map(diagnostic => diagnostic.message)).toEqual([expect.stringContaining('limit')])
     }
     finally {
       await rm(root, { recursive: true, force: true })

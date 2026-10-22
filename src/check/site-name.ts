@@ -30,7 +30,7 @@ export async function siteNames(root: string, options: CheckOptions): Promise<Ch
       continue
 
     const parsed = file.endsWith('.kay') ? parseKay(source) : undefined
-    const spans = parsed ? [parsed.script, parsed.server].filter(span => span !== undefined) : [{ start: 0, end: source.length }]
+    const spans = parsed ? [parsed.script, parsed.server, parsed.module].filter(span => span !== undefined) : [{ start: 0, end: source.length }]
 
     for (const { start: base, end } of spans) {
       let ast: t.File

@@ -107,7 +107,7 @@ export function capNewest(page: string, archive: string, cap = NEWEST_CAP): { pa
   const pointer = `The rest of this release is in ${link}.\n`
   const heading = section.slice(0, section.indexOf('\n'))
   const starts = bulletStarts(section)
-  const cut = starts.findLast(start => Buffer.byteLength(`${section.slice(0, start).trimEnd()}\n\n${pointer}`) <= cap)
+  const cut = starts.findLast(start => Buffer.byteLength(`${section.slice(0, start).trimEnd()}\n\n${pointer}\n`) <= cap)
 
   // A release whose first bullet alone outgrows the cap has nowhere to be cut.
   if (cut === undefined || cut === starts[0])

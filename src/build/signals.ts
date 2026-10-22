@@ -110,7 +110,7 @@ function signalsOf(path: string): Record<string, SignalKind> {
 
     const text = readFileSync(path, 'utf8')
     // A component's signals are the ones its `--- module` fence exports.
-    const signals = KAY_FILE.test(path) ? moduleSignals(moduleFence(text)) : moduleSignals(text, ['tsx', 'jsx'].includes(scriptLoader(path)))
+    const signals = KAY_FILE.test(path) ? kayModuleSignals(text) : moduleSignals(text, scriptLoader(path) === 'tsx' || scriptLoader(path) === 'jsx')
 
     scanned.set(path, { stamp, signals })
 
@@ -121,8 +121,8 @@ function signalsOf(path: string): Record<string, SignalKind> {
   }
 }
 
-function moduleFence(text: string): string {
-  const { module } = parseKay(text)
+function kayModuleSignals(text: string): Record<string, SignalKind> {
+  const { module } = text.includes('--- module') ? parseKay(text) : {}
 
-  return module ? text.slice(module.start, module.end) : ''
+  return module ? moduleSignals(text.slice(module.start, module.end)) : {}
 }
