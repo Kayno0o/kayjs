@@ -32,8 +32,6 @@ import { pages } from './shared-pages'
 
 const PRODUCTION = 'tests/fixtures/production'
 const SEO = 'tests/fixtures/seo'
-// The seo fixture's routes, for the one site served from the checkout's own build.
-const ROUTES = `${SEO}/src/routes`
 // Bun's own timeout per test is 5 s: a test waiting here sets a longer one, so this error shows first.
 const UNTIL_TEST_MS = 20_000
 
@@ -215,7 +213,7 @@ describe('security headers', () => {
     const dev = { dev: true, prebuilt: false, underKayDev: false }
 
     expect(await scriptSources(await pages({ root: SEO, prebuilt: false, dev: true }))).toEqual(['\'self\'', ...inlineScriptHashes({ dev: true })])
-    expect(await scriptSources(await servePages(resolveProject(process.cwd(), { routes: ROUTES }, dev), async () => (await readClient(process.cwd()))!))).toEqual(['\'self\'', ...inlineScriptHashes({ dev: true })])
+    expect(await scriptSources(await servePages(resolveProject(SEO, { routes: 'src/routes' }, dev), async () => (await readClient(SEO))!))).toEqual(['\'self\'', ...inlineScriptHashes({ dev: true })])
   })
 
   it('merges the app\'s directives and headers over kay\'s, false leaving one out', async () => {
