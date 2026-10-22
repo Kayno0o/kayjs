@@ -321,6 +321,79 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
     expect(page.errors).toEqual([])
   }, 30_000)
 
+  it('overlapping view transitions leave one click listener on the document, and none once they end', async () => {
+    await using page = await opened(true)
+
+    await page.evaluate(() => {
+      const add = document.addEventListener.bind(document)
+      const remove = document.removeEventListener.bind(document)
+      const start = document.startViewTransition.bind(document)
+      const held = window as { kayLive?: Set<unknown>, kayPeak?: number, kayEnd?: () => void }
+      const live = new Set<unknown>()
+      const ends: (() => void)[] = []
+
+      held.kayLive = live
+      held.kayPeak = 0
+      held.kayEnd = () => {
+        for (const end of ends.splice(0)) {
+          end()
+        }
+      }
+      document.addEventListener = ((type: string, listener: unknown, ...rest: unknown[]) => {
+        if (type === 'click') {
+          live.add(listener)
+          held.kayPeak = Math.max(held.kayPeak!, live.size)
+        }
+
+        return (add as (...args: unknown[]) => void)(type, listener, ...rest)
+      }) as typeof document.addEventListener
+      document.removeEventListener = ((type: string, listener: unknown, ...rest: unknown[]) => {
+        if (type === 'click')
+          live.delete(listener)
+
+        return (remove as (...args: unknown[]) => void)(type, listener, ...rest)
+      }) as typeof document.removeEventListener
+      // Each transition finishes only when kayEnd says so.
+      document.startViewTransition = ((update: () => void) => {
+        const real = start(update)
+        const gate = new Promise<void>((resolve) => {
+          ends.push(resolve)
+        })
+
+        return { finished: gate, updateCallbackDone: real.updateCallbackDone, skipTransition: () => real.skipTransition() }
+      }) as unknown as typeof document.startViewTransition
+    })
+    await page.click('a.cross')
+    await page.waitFor('h1', { text: 'Other' })
+    await page.click('a.home')
+    await page.waitFor('h1', { text: 'Home' })
+
+    const state = async () => page.evaluate(() => {
+      const held = window as { kayLive?: Set<unknown>, kayPeak?: number }
+
+      return { live: held.kayLive!.size, peak: held.kayPeak! }
+    })
+    const overlapping = await state()
+
+    await page.evaluate(() => (window as { kayEnd?: () => void }).kayEnd!())
+    await page.waitUntil(() => !document.documentElement.hasAttribute('aria-busy'), { timeout: '5s' })
+
+    const ended = await state()
+
+    // A click after the end is the eager listener's alone, none of the transitions'.
+    await page.click('a.cross')
+    await page.waitFor('h1', { text: 'Other' })
+    await page.evaluate(() => (window as { kayEnd?: () => void }).kayEnd!())
+    await page.waitUntil(() => !document.documentElement.hasAttribute('aria-busy'), { timeout: '5s' })
+
+    expect(overlapping.live).toBe(1)
+    expect(overlapping.peak).toBe(1)
+    expect(ended.live).toBe(0)
+    expect(await state()).toEqual({ live: 0, peak: 1 })
+    expect(await page.path()).toBe('/other')
+    expect(page.errors).toEqual([])
+  }, 30_000)
+
   it('back arrives on the page it goes to when an action refreshes during it', async () => {
     await using page = await opened(false)
 

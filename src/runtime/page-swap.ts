@@ -323,6 +323,9 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
   }
 }
 
+// The click listener of the view transition running, at most one.
+let underTransition: ((event: MouseEvent) => void) | undefined
+
 // Puts a fetched page in place of this one; anything that is no page of this build, a file or an error answered as text, is loaded or shown as the browser would.
 export async function show(page: FetchedPage, hash: string, swap: Swap, isCurrent: () => boolean = () => true): Promise<void> {
   const target = new URL(page.url)
@@ -429,7 +432,11 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
     const skip = () => transition.skipTransition()
     const onRoot = (event: MouseEvent) => linkUnderTransition(event, skip)
 
-    document.addEventListener('click', onRoot)
+    // A newer transition skips the older one, so the older listener goes now rather than when its swap settles.
+    if (underTransition)
+      document.removeEventListener('click', underTransition)
+
+    document.addEventListener('click', underTransition = onRoot)
 
     try {
       // A transition stuck, as in a tab the browser keeps from painting, is skipped, which still runs the commit.
@@ -441,6 +448,9 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
     }
     finally {
       document.removeEventListener('click', onRoot)
+
+      if (underTransition === onRoot)
+        underTransition = undefined
     }
   }
   else {
