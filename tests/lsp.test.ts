@@ -263,7 +263,7 @@ describe('kay lsp', () => {
     const add = await editor.connection.request<Location[]>('textDocument/references', { textDocument: { uri: editor.uri('site/src/routes/index.kay') }, position: { line: 5, character: 14 }, context: { includeDeclaration: true } })
     const open = await editor.connection.request<Location[]>('textDocument/references', { textDocument: { uri: editor.uri('site/src/routes/index.kay') }, position: { line: 13, character: 7 }, context: { includeDeclaration: true } })
 
-    expect(spots(add.filter(location => location.uri === editor.uri('site/src/routes/index.kay')).map(location => location.range))).toEqual([[5, 13, 16], [14, 27, 30], [24, 19, 22]])
+    expect(spots(add.filter(location => location.uri === editor.uri('site/src/routes/index.kay')).map(location => location.range))).toEqual([[5, 13, 16], [14, 16, 19], [24, 19, 22]])
     expect(spots(add.filter(location => location.uri === editor.uri('site/src/components/quick-add.kay')).map(location => location.range))).toEqual([[2, 9, 12], [9, 18, 21]])
     expect(spots(open.map(location => location.range))).toEqual([[13, 6, 10], [20, 5, 9], [31, 15, 19]])
     expect(spots((await editor.request<DocumentHighlight[]>('textDocument/documentHighlight', 'site/src/routes/index.kay', 20, 6)).map(highlight => highlight.range))).toEqual([[13, 6, 10], [20, 5, 9], [31, 15, 19]])

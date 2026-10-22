@@ -9,3 +9,5 @@ then list
   ul
     for comment of list key={comment}
       li {comment}
+catch
+  p Could not load the comments.

@@ -752,7 +752,7 @@ function authModule(postgres: boolean): string {
 export const auth = createAuth({
   sessions: session<AuthSessionData>(),
   store: pgStore(db),
-  site: '__SITE__',
+  name: '__SITE__',
   pages: true,
 })
 `
