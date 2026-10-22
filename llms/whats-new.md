@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- The on-page editor offers Publish, Unpublish and Delete for the entry beside Save, with the role's refusal as tooltip ([Editor](../packages/cms/llms/editor.md)).
 - kayjs-auth's `SignedIn`, `SignedOut` and `UserMenu` show the user in the first bytes with no `viewer: true`: a page reads the session only when its imports reach one of them, and an extension's `layout: { file, reaching }` wraps only the pages reaching its files ([Templates](../packages/auth/llms/signed-in-components.md), [Extensions](component-libraries.md#extensions)).
 - kayjs-ui Card, Badge and Notice draw their look in recipe utilities, so `src/ui.ts` replaces a value instead of fighting a rule; their part classes are gone (`deprecated-ui-class`, [Setup](../packages/ui/llms/setup.md)).
 - kayjs-ui labels take `--kui-label-case` and `--kui-label-font`, and two skins ship: `@kaynooo/kayjs-ui/skins/brutalist.css` and `soft.css` ([Setup](../packages/ui/llms/setup.md)).

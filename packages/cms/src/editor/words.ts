@@ -52,6 +52,7 @@ export const AFTER_LOAD: readonly string[] = [
   'cms.entry.unclickable',
   'cms.entry.unpublish',
   'cms.entry.unpublishFailure',
+  'cms.entry.unpublishMessage',
   'cms.entry.unsaved',
   'cms.entry.viewLive',
   'cms.field.add',

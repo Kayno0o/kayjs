@@ -419,3 +419,11 @@ html.kcms-editing [data-kay-field][aria-invalid="true"] {
 .kcms-page-lists .kcms-list-bar:focus-within .kcms-list-outline {
   display: block;
 }
+
+.kcms-entry-more {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-block: 0.5rem;
+}

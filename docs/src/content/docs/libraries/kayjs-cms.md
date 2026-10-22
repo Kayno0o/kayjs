@@ -115,6 +115,8 @@ If the sign-in ends while an editor is typing, the save says the session ended i
 
 In edit mode, kay renders the editor at the end of every page, with the entries the page read, in the order the page shows them, so the forms stay in place as you type. The "Edit on page" links on the screens put an editor the guard admitted in edit mode. The editor's "Stop editing" button leaves it. With changes not saved, it asks first: Keep editing, or Drop them and stop.
 
+Each entry in the editor has Publish (or Unpublish, behind a confirmation) when its collection has a draft flag, and Delete unless the collection is a single one. Publish and Unpublish change only that flag, so with edits not saved they ask you to save first and write nothing. A role that may not publish or delete sees the button disabled, with the reason as its tooltip. Delete asks first, names the entries that refer to this one, and reads the page again once the entry is gone.
+
 ### Typing on the page
 
 Click a one-line text on the page and type in it where it stands, with no form to find. The text is edited as plain text: what you type or paste stays text, never markup, and a line break becomes a space. Enter keeps the text and ends the edit, as does a click elsewhere, and Escape puts back the text from before. Switching to another window does not end it.
