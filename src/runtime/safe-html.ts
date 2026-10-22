@@ -16,7 +16,7 @@ export function holdServerMarkup(standIn: string): void {
 }
 
 export function isHeldMarkup(value: unknown): boolean {
-  return held.size > 0 && held.has(value as string)
+  return typeof value === 'string' && held.has(value)
 }
 
 export function clearHeldMarkup(): void {

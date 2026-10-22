@@ -7,7 +7,7 @@ import { frenchText, frenchTree } from './french'
 import { FAILED, ISLAND, PART_END, PART_START } from './markers'
 import { place } from './move'
 import { browserKeepsSameTab, leavesSite } from './outside'
-import { activeOwner, catchError, createSignal, getOwner, hydrationEnded, hydrationStarted, memo, onCleanup, renderEffect, reportError, root, runWithOwner, scope, unrecorded, untrack } from './reactive'
+import { activeOwner, catchError, createSignal, getOwner, hydrationEnded, hydrationStarted, isHydrating, memo, onCleanup, renderEffect, reportError, root, runWithOwner, scope, unrecorded, untrack } from './reactive'
 import { clearHeldMarkup, isHeldMarkup } from './safe-html'
 import { isSnapshots, readSnapshots } from './snapshots'
 import { freshPrefix, withIds } from './uid'
@@ -107,8 +107,11 @@ export function hydrate<T>(render: () => T, container: Node): T {
   }
   finally {
     claim = previous
-    clearHeldMarkup()
     hydrationEnded()
+
+    // An island nested in another's render leaves the outer one's stand-ins.
+    if (!isHydrating())
+      clearHeldMarkup()
   }
 }
 

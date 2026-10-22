@@ -66,6 +66,39 @@ describe('markdownHtml in an island', () => {
     expect(element.innerHTML).toBe('<p>new</p>')
   })
 
+  it('draws a later island\'s write of the very text a finished island held', async () => {
+    const { markdownHtml } = await shell('forgotten-same')
+    const first = document.createElement('div')
+    const second = document.createElement('div')
+
+    first.innerHTML = '<div></div>'
+    second.innerHTML = '<div><h1>Old</h1></div>'
+
+    const element = second.firstElementChild!
+
+    root(() => hydrate(() => markdownHtml('# a'), first))
+    root(() => hydrate(() => renderEffect(() => property(element, 'innerHTML', '<p># a</p>\n')), second))
+    flush()
+    expect(element.innerHTML).toBe('<p># a</p>\n')
+  })
+
+  it('keeps the server\'s markup of every markdown of an island', async () => {
+    const { markdownHtml } = await shell('two')
+    const container = document.createElement('div')
+
+    container.innerHTML = '<div><h1>A</h1></div><div><h2>B</h2></div>'
+
+    const [one, two] = Array.from(container.children)
+
+    root(() => hydrate(() => {
+      renderEffect(() => property(one!, 'innerHTML', markdownHtml('# A')))
+      renderEffect(() => property(two!, 'innerHTML', markdownHtml('## B')))
+    }, container))
+    flush()
+    expect(one!.innerHTML).toBe('<h1>A</h1>')
+    expect(two!.innerHTML).toBe('<h2>B</h2>')
+  })
+
   it('keeps the server\'s markup when another prop is written before the markdown\'s innerHTML', async () => {
     const { markdownHtml } = await shell('other-prop')
     const container = document.createElement('div')
