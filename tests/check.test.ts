@@ -2582,7 +2582,7 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
       '  return { id, org, slug, typo }',
       '})',
       'export const rename = action(s.Object({ name: s.String({ maxLength: 20 }) }), async ({ name }, ctx) => ({ name, id: ctx.params.id satisfies number }))',
-      'export const mixed = action(async ({ params }) => params.id.toFixed(0), { minTime: 0 })',
+      'export const mixed = action(async ({ params }) => params.id.toFixed(0), { minTime: \'1s\' })',
       '---',
       'p hi',
       '',
