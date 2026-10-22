@@ -23,6 +23,8 @@ export interface JsxOptions {
   staticLoops: boolean
   // The props passed an island reach the browser as they are written, so `kay check` asserts they can.
   sendsIslandProps: boolean
+  // Names the script declares as plain data written out, which an island prop check takes as serializable whatever type the declaration gives them.
+  plain: ReadonlySet<string>
 }
 
 // JSX collapses a run of spaces in text, which `pre` and `textarea` would show, so a run goes out as a string.
@@ -878,6 +880,13 @@ export class JsxTemplate {
     }
 
     const { start, end } = attribute.expression
+
+    if (this.options.plain.has(this.src.slice(start, end).trim())) {
+      this.attributeName(attribute).add('={KayPlainProp(').addSource(element.tag).add(')((').addSource(attribute.expression).add('))}')
+
+      return true
+    }
+
     const sent = sentParts(this.src.slice(start, end)) ?? { parts: [{ start: 0, end: end - start }], functions: false }
     let at = start
 

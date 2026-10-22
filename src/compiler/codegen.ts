@@ -204,6 +204,7 @@ class ModuleShell {
       check: this.mode === 'check',
       staticLoops: this.staticLoops,
       sendsIslandProps: this.kind === 'static' || this.kind === 'twin',
+      plain: new Set([...this.script.plain, ...this.server?.plain ?? []]),
     }, this.sites)
   }
 

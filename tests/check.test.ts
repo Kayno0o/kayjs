@@ -1819,6 +1819,34 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('sends an island a declared Column<Row>[] written out in the page, and still refuses a function the type allows from elsewhere, with or without a boolean prop', async () => {
+    const page = '---\nimport Grid from \'../components/grid.kay\'\nimport type { Column } from \'../table\'\nimport { fromModule } from \'../columns\'\n\ninterface Moon { id: number, name: string }\n\nconst moons: Moon[] = [{ id: 1, name: \'Io\' }]\nconst written: Column<Moon>[] = [{ key: \'name\', sortValue: true }]\nconst asConst = [{ key: \'name\', sortValue: true }] satisfies Column<Moon>[]\nlet reassigned: Column<Moon>[] = [{ key: \'name\', sortValue: true }]\nconst people: { email: string }[] = [{ email: \'a@b.c\' }]\n---\nGrid(columns={written} rows={moons})\nGrid(columns={written} rows={moons} virtual)\nGrid(columns={asConst} rows={moons})\nGrid(columns={fromModule} rows={moons})\nGrid(columns={fromModule} rows={moons} virtual)\nGrid(columns={reassigned} rows={moons})\nGrid(columns={written} rows={people})\n'
+    const root = await scratchProject({
+      'src/table.ts': 'export interface Column<Row> { key: string, sortValue?: ((row: Row) => string | number) | true }\n',
+      'src/columns.ts': 'import type { Column } from \'./table\'\n\nexport const fromModule: Column<{ id: number, name: string }>[] = [{ key: \'name\', sortValue: row => row.name }]\n',
+      'src/components/grid.kay': '--- <Row>\nimport { signal } from \'kay\'\nimport type { Column } from \'../table\'\n\nconst { columns, rows, virtual = false } = props<{ columns: Column<Row>[], rows: Row[], virtual?: boolean }>()\nconst chosen = signal(0)\n---\nbutton(onClick={() => chosen.set(columns.length + rows.length + (virtual ? 1 : 0))}) {chosen()}\n',
+      'src/routes/index.kay': `--- server${page.slice(3)}`,
+      // A static component imports no value that may be a function, which would have the build promote it and leave it unchecked.
+      'src/components/panel.kay': page.replaceAll('../components/', './').replace('import { fromModule } from \'../columns\'\n', '').replace(/Grid\(columns=\{fromModule\}[^\n]*\n/g, ''),
+    })
+
+    try {
+      const found = (await check(root)).filter(d => d.code?.startsWith('TS')).map(d => [d.file.slice(d.file.lastIndexOf('/') + 1), d.line, d.message.includes('sends an island its props serialized'), d.message.includes('kayPath: "[].sortValue"')])
+
+      expect(found).toEqual([
+        ['panel.kay', 16, true, true],
+        ['panel.kay', 17, false, false],
+        ['index.kay', 17, true, true],
+        ['index.kay', 18, true, true],
+        ['index.kay', 19, true, true],
+        ['index.kay', 20, false, false],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports two extensions giving an editor at the config', async () => {
     const root = await scratchProject({ 'src/routes/index.kay': 'p home\n' })
 

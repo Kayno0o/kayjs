@@ -1155,9 +1155,9 @@ function isBoundCheck(node: t.Node): boolean {
   return node.type === 'CallExpression' && node.callee.type === 'CallExpression' && node.callee.callee.type === 'Identifier' && node.callee.callee.name === 'KayBound'
 }
 
-// The type check wraps a component's prop in `KayProp(Tag)(value)`.
+// The type check wraps a component's prop in `KayProp(Tag)(value)`, or `KayPlainProp(Tag)(value)` for plain data written out.
 function isPropCheck(node: t.Node): boolean {
-  return node.type === 'CallExpression' && node.callee.type === 'CallExpression' && node.callee.callee.type === 'Identifier' && node.callee.callee.name === 'KayProp'
+  return node.type === 'CallExpression' && node.callee.type === 'CallExpression' && node.callee.callee.type === 'Identifier' && (node.callee.callee.name === 'KayProp' || node.callee.callee.name === 'KayPlainProp')
 }
 
 // Babel's message ends in the position within the generated code, which means nothing to the user; the error lands on the source it was generated from.

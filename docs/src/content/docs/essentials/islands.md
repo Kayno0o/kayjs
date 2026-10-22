@@ -67,6 +67,8 @@ A static component that passes an island a function is listed too, as `format pa
 
 A static parent can pass an island objects, arrays, strings, numbers, booleans, dates, maps and sets. kay sends them to the browser.
 
+A `const` written out as literals in the page's script is sent whatever type declares it, so a `Column<Row>[]` of `sortValue: true` passes to a `Table`. A value from an import or a call is checked by its type, and `kay check` names the function field it holds.
+
 They travel in the page as JSON in an attribute. Every byte counts on every page, so pass an island what it reads rather than a whole object it picks from.
 
 Children render on the server with the page. The island shows them where its template has `slot`, and an island among them hydrates on its own.

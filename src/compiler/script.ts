@@ -97,6 +97,8 @@ export interface ScriptAnalysis {
   recipeVariants?: Record<string, string[]> | undefined
   // The names the component body declares that may hold a function, a class or an instance of one, which no page can send an island.
   functions: string[]
+  // The `const` names the component body declares as plain data written out, literals in arrays and objects, which a static parent sends an island whatever type the declaration gives them.
+  plain: string[]
   diagnostics: Diagnostic[]
   fence?: ParsedFence | undefined
   // A fence Babel cannot parse and nothing could be recovered of, emitted whole at module level so the editor completes in it through TypeScript's own recovery.
@@ -119,7 +121,7 @@ export interface ParsedFence {
 // Splits a component script into module-level code (imports, types) and the component body, and finds the props macro.
 // `serverNames` are the names the `--- server` fence hands the script, which a type may take the type of, and `templateReads` the values of `kay` the template reads, which the compiler imports like the script's own.
 export function analyzeScript(source: string, script: Span | undefined, serverNames: string[] = [], templateReads: readonly string[] = []): ScriptAnalysis {
-  const analysis: ScriptAnalysis = { hoisted: [], imports: [], specifiers: [], body: [], broken: [], brokenModule: [], reactive: false, implicit: [], functions: [], diagnostics: [] }
+  const analysis: ScriptAnalysis = { hoisted: [], imports: [], specifiers: [], body: [], broken: [], brokenModule: [], reactive: false, implicit: [], functions: [], plain: [], diagnostics: [] }
 
   if (!script) {
     analysis.implicit = templateReads.filter(name => !serverNames.includes(name))
@@ -153,6 +155,7 @@ export function analyzeScript(source: string, script: Span | undefined, serverNa
         analysis.diagnostics.push({ ...span, message: 'A component script exports only types', help: 'move the value to a `.ts` module and import it' })
 
       analysis.functions.push(...functionNames(statement))
+      analysis.plain.push(...plainNames(statement))
       analysis.body.push(span)
     }
   }
@@ -285,6 +288,34 @@ function functionNames(statement: t.Statement): string[] {
   return statement.declarations.flatMap(declaration => declaration.id.type === 'Identifier' && declaration.init && holdsFunction(declaration.init) ? [declaration.id.name] : [])
 }
 
+function plainNames(statement: t.Statement): string[] {
+  if (statement.type !== 'VariableDeclaration' || statement.kind !== 'const')
+    return []
+
+  return statement.declarations.flatMap(declaration => declaration.id.type === 'Identifier' && declaration.init && isPlainData(declaration.init) ? [declaration.id.name] : [])
+}
+
+const PLAIN_LITERALS = new Set(['StringLiteral', 'NumericLiteral', 'BooleanLiteral', 'NullLiteral', 'BigIntLiteral'])
+
+function isPlainData(value: t.Node): boolean {
+  if (value.type === 'TSAsExpression' || value.type === 'TSSatisfiesExpression' || value.type === 'TSNonNullExpression' || value.type === 'ParenthesizedExpression')
+    return isPlainData(value.expression)
+
+  if (value.type === 'ArrayExpression')
+    return value.elements.every(element => element !== null && element.type !== 'SpreadElement' && isPlainData(element))
+
+  if (value.type === 'ObjectExpression')
+    return value.properties.every(property => property.type === 'ObjectProperty' && !property.computed && isPlainData(property.value))
+
+  if (value.type === 'TemplateLiteral')
+    return value.expressions.length === 0
+
+  if (value.type === 'UnaryExpression')
+    return (value.operator === '-' || value.operator === '+') && value.argument.type === 'NumericLiteral'
+
+  return PLAIN_LITERALS.has(value.type)
+}
+
 function holdsFunction(value: t.Node): boolean {
   if (value.type === 'ObjectExpression')
     return value.properties.some(property => property.type === 'ObjectMethod' || holdsFunction(property.type === 'SpreadElement' ? property.argument : property.value))
@@ -349,6 +380,8 @@ export interface ServerAnalysis {
   implicit: string[]
   // Names declared at the top of the fence: `load` returns them and the template reads them.
   data: ServerData[]
+  // The `const` names among them declared as plain data written out.
+  plain: string[]
   // Settings exported under their own names, which belong in `page`.
   separate: SeparateSetting[]
   diagnostics: Diagnostic[]
@@ -363,7 +396,7 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
   if (!server)
     return undefined
 
-  const analysis: ServerAnalysis = { hoisted: [], imports: [], specifiers: [], exports: [], exportNames: [], actionNames: [], toolActions: [], body: [], broken: [], brokenModule: [], implicit: [], data: [], separate: [], diagnostics: [] }
+  const analysis: ServerAnalysis = { hoisted: [], imports: [], specifiers: [], exports: [], exportNames: [], actionNames: [], toolActions: [], body: [], broken: [], brokenModule: [], implicit: [], data: [], plain: [], separate: [], diagnostics: [] }
   const split = splitFence(source, server, [], analysis)
 
   if (!split)
@@ -417,6 +450,8 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
       else {
         analysis.body.push(...gap, span)
       }
+
+      analysis.plain.push(...plainNames(statement))
 
       for (const identifier of declaredIdentifiers(statement)) {
         if (!analysis.data.some(data => data.name === identifier.name))

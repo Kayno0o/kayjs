@@ -264,8 +264,32 @@ type HoldsAction<T, Open extends boolean, Depth extends unknown[] = []> = 0 exte
 // An island whose props name no action receives one as a bare function, which its chunk cannot revive: it needs `Action` imported from `kay` in its script, as the type of the prop. `kay check` reports it as the `island-action` lint.
 type ActionProp<Component, Value> = true extends HoldsAction<Value, false> ? Component extends (props: infer Props) => unknown ? true extends HoldsAction<Props, true> ? unknown : { kayLint: 'island-action' } : unknown : unknown
 
+// The paths to the function-typed fields a value holds, in arrays as `columns[].sortValue`, so the error names which one to look at; a type seen further up ends there, and eight levels are read at most.
+type FunctionPaths<T, Seen = never, Depth extends unknown[] = [], Prefix extends string = ''> = 0 extends 1 & T
+  ? never
+  : T extends Sendable | symbol
+    ? never
+    : T extends ((...args: never[]) => unknown)
+      ? Prefix
+      : Depth['length'] extends 8
+        ? never
+        : true extends Visiting<T, Seen>
+          ? never
+          : T extends ReadonlyMap<unknown, infer Value>
+            ? FunctionPaths<Value, Seen | T, [...Depth, 0], `${Prefix}[]`>
+            : T extends ReadonlySet<infer Item> | readonly (infer Item)[]
+              ? FunctionPaths<Item, Seen | T, [...Depth, 0], `${Prefix}[]`>
+              : T extends object
+                ? { [Key in keyof T & string]-?: FunctionPaths<T[Key], Seen | T, [...Depth, 0], Joined<Prefix, Key>> }[keyof T & string]
+                : never
+
+type NotSerializable<Value> = [FunctionPaths<Value>] extends [never] ? { kayError: 'A layout, or a page with a server fence, sends an island its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances; a component of its own passing one renders as an island in its place' } : { kayError: 'A layout, or a page with a server fence, sends an island its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances; a component of its own passing one renders as an island in its place', kayPath: FunctionPaths<Value> }
+
 // Props a static parent passes to an island are serialized for the browser, so they must survive it, and are public, so they should hold no secret-looking field. `kay check` reports the second as the `secret-prop` lint.
-export type IslandProp<Component, Value> = Component extends IslandBrand ? [IsSerializable<Value>] extends [true] ? SecretProp<Value> & ActionProp<Component, Value> : { kayError: 'A layout, or a page with a server fence, sends an island its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances; a component of its own passing one renders as an island in its place' } : unknown
+export type IslandProp<Component, Value> = Component extends IslandBrand ? [IsSerializable<Value>] extends [true] ? SecretProp<Value> & ActionProp<Component, Value> : NotSerializable<Value> : unknown
+
+// What a static parent sends an island for a name its script declares as plain data written out: it serializes whatever type the declaration gives it, such as a `Column<Row>[]` whose `sortValue` could have been a function.
+export type PlainIslandProp<Component, Value> = Component extends IslandBrand ? SecretProp<Value> & ActionProp<Component, Value> : unknown
 
 // A function written in the attribute is checked apart from its value, which a wrapping call would stop a generic component from typing: `0` stands for the attribute.
 export type FunctionProp<Component> = Component extends IslandBrand ? { kayError: 'A layout, or a page with a server fence, sends an island its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances; a component of its own passing one renders as an island in its place' } : 0

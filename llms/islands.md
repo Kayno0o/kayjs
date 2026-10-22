@@ -196,6 +196,7 @@ const column = elementSize()
 - Text alone, as in `Label Save`, is a string prop like any other.
 - The island cannot change what a block renders: one it calls with values takes parameters.
 - A function, a `Snippet<[...]>` (a block with parameters or a local `snippet`), a class instance or a symbol cannot be serialized; an action is the exception, going as its URL ([actions](actions-from-islands.md#pass-an-action-to-a-component)).
+- A `const` the script or server fence writes out as literals is sent as it is whatever type declares it, so `const columns: Column<Row>[] = [{ key: 'name', sortValue: true }]` passes to a `Table`; a value from an import or a call is checked by its type, and `kay check` names the function field it holds, `columns[].sortValue`.
 - Props are written into the page source, so a field named like a secret (`passwordHash`, `token`, `apiKey`, `email`) is reported as `secret-prop`: pick the fields the island shows, or `// kay-allow secret-prop` for a public one.
 - A static component passing one to an island renders as an island itself, decided as it renders, its own props serialized instead: a component rendering `Picker(format={shout})` hydrates whole, while one passing only data stays static and ships nothing.
 - Its own props must then be serializable, else the component rendering it renders as an island in turn.
