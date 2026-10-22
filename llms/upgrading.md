@@ -7,6 +7,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### `src/plugins` holds server plugins
 
 Every `src/plugins/<name>.ts` (not `_*`, `*.test.ts`, `*.d.ts`) is now used as a server plugin before the pages, and the server stops with a message naming the file when its default export is not an Elysia plugin. An app keeping other code there (a Bun build plugin, a helper) moves it elsewhere or renames it to start with `_`. No `kay check` lint can recognise it, as any file there may be meant either way.
+
 ### A page action's `ctx.params` has the types of the route
 
 Under `[id=integer]`, `ctx.params.id` is a `number`, so a cast such as `ctx.params.id as string` is now a type error: drop the cast.
