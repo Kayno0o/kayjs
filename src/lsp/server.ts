@@ -103,7 +103,8 @@ const QUICK_FIX = 'quickfix'
 const PACKAGE_TYPES = join(SHADOW_DIR, 'kay-packages.d.ts')
 const DEFAULT_MEMBER = '.default'
 // Completions offer names from modules not imported yet, as editors do for TypeScript by default; added imports are quoted the way kay's own code is, since generated code would mislead the guess.
-const TYPESCRIPT_SETTINGS = { suggest: { autoImports: true }, preferences: { quoteStyle: 'single' } }
+// Types come from the project's own packages, so the server fetches none with npm, which would also run in a project with no npm of its own.
+const TYPESCRIPT_SETTINGS = { suggest: { autoImports: true }, preferences: { quoteStyle: 'single' }, disableAutomaticTypeAcquisition: true }
 const TYPESCRIPT_SECTIONS = new Set(['js/ts', 'typescript', 'javascript'])
 // How far a question follows names through generated code.
 const MAX_HOPS = 16
