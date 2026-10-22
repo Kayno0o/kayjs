@@ -1,0 +1,96 @@
+--- server
+import { localize } from 'kay/i18n'
+import { wording } from 'kay/words'
+import Message from '../components/message.kay'
+import Panel from '../components/panel.kay'
+import { failure, schemas } from '../forms'
+import { organizationPage, organizationsPage } from '../organizationPage'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+
+// Whoever holds the link opens this page, signed in or not, so none of the app's guards run here. The id sits in the address, which no Referer header may carry to another site.
+export const page = { guards: false, security: { headers: { 'referrer-policy': 'same-origin' } } }
+
+const ID_MAX = 128
+
+// The id the form posts is the one in the address, read again by the method, which answers for the signed-in user's address only.
+export const accept = action(schemas.id, async ({ id }, ctx) => {
+  const auth = ctx.locals.auth
+
+  if (!auth.features().organizations)
+    return ctx.fail(404, { error: 'not-found' })
+
+  const result = await auth.acceptInvitation(id)
+
+  if (!result.ok)
+    return ctx.fail(400, { error: result.error })
+
+  const { organization } = result.membership
+
+  return ctx.redirect(organizationPage(auth.features(), organization.slug ?? organization.id))
+})
+
+export const reject = action(schemas.id, async ({ id }, ctx) => {
+  const auth = ctx.locals.auth
+
+  if (!auth.features().organizations)
+    return ctx.fail(404, { error: 'not-found' })
+
+  const result = await auth.rejectInvitation(id)
+
+  return result.ok ? ctx.redirect(organizationsPage(auth.features())) : ctx.fail(400, { error: result.error })
+})
+
+// Signs the wrong account out and comes back to this link to sign in with the right one.
+export const switchAccount = action(schemas.id, async ({ id }, ctx) => {
+  const auth = ctx.locals.auth
+  const { signInPage, pages, prefix } = auth.features()
+  const signIn = localize(signInPage)
+
+  await auth.signOut()
+
+  return ctx.redirect(`${signIn}${signIn.includes('?') ? '&' : '?'}redirect=${encodeURIComponent(`${pages?.prefix ?? prefix}/invitation?invitation=${encodeURIComponent(id)}`)}`)
+})
+
+const auth = ctx.locals.auth
+const features = auth.features()
+
+if (!features.organizations)
+  ctx.notFound()
+
+const prefix = features.pages?.prefix ?? features.prefix
+const requested = ctx.url.searchParams.get('invitation') ?? accept.failed()?.values.id ?? reject.failed()?.values.id ?? ''
+const id = requested.length <= ID_MAX ? requested : ''
+const invitation = id !== '' ? await auth.getInvitation(id) : null
+const user = invitation && await auth.via() === 'session' ? await auth.user() : null
+const signedIn = user !== null && !user.guest
+const mine = signedIn && user.email === invitation?.email
+const back = encodeURIComponent(`${prefix}/invitation?invitation=${encodeURIComponent(id)}`)
+const refused = [accept, reject].map(form => form.failed()?.data?.error).find(error => error !== undefined)
+---
+head
+  title {wording('auth.invitation.title', 'Invitation')}
+Panel(title={wording('auth.invitation.title', 'Invitation')})
+  if invitation === null
+    Message(text={wording('auth.invitation.invalid', 'This invitation is invalid, expired or already used.')})
+  else
+    p {wording('auth.invitation.intro', 'You are invited to join {organization}.', { organization: invitation.organization.name })}
+    p.text-kui-muted {wording('auth.invitation.sentTo', 'Sent to {email}.', { email: invitation.email })}
+    if refused
+      Message(text={failure(refused)})
+    if mine
+      form.flex.flex-wrap.gap-3(action={accept})
+        input(type="hidden" name="id" value={invitation.id})
+        Button(type="submit" tone="accent" label={wording('auth.invitation.accept', 'Join')})
+      form(action={reject})
+        input(type="hidden" name="id" value={invitation.id})
+        Button(type="submit" label={wording('auth.invitation.reject', 'Decline')})
+    else if signedIn
+      Message(text={failure('wrong-account')})
+      form(action={switchAccount})
+        input(type="hidden" name="id" value={invitation.id})
+        Button(type="submit" label={wording('auth.invitation.switch', 'Sign in with another account')})
+    else
+      p {wording('auth.invitation.signInFirst', 'Sign in or create an account with this address to join.')}
+      .flex.flex-wrap.gap-3
+        a(href={localize(`${prefix}/sign-in?redirect=${back}`)}) {wording('auth.invitation.signIn', 'Sign in')}
+        a(href={localize(`${prefix}/register?redirect=${back}`)}) {wording('auth.invitation.register', 'Create an account')}

@@ -38,6 +38,12 @@ export const ERRORS = {
   'unknown-role': 'This role does not exist.',
   'admin': 'An admin cannot be changed this way: take the admin role away first.',
   'until': 'Choose a date in the future.',
+  'invalid-name': 'Use 1 to 100 characters for the name, with no line breaks.',
+  'invalid-slug': 'Use lowercase letters, digits and dashes for the address.',
+  'slug-taken': 'This address is already used by another organization.',
+  'invalid-email': 'Type a valid address.',
+  'member': 'This person is already a member.',
+  'wrong-account': 'This invitation is for another address: sign in with the address it was sent to.',
 } as const
 
 export const OAUTH_ERRORS = {

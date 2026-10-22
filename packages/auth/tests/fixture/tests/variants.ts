@@ -106,6 +106,38 @@ if (process.env.FIXTURE_ADMIN) {
   process.exit(0)
 }
 
+if (process.env.FIXTURE_ORG) {
+  // The organization pages and the invitation page link under the base and the prefix, and the invitation mail opens the prebuilt page.
+  const { create } = await import(join(PAGES, 'account', 'organizations', 'index.kay'))
+  const { invite } = await import(join(PAGES, 'account', 'organizations', '[org].kay'))
+
+  await site.submit(register, { email: 'org-base@example.com', password: PASSWORD }, { from: await site.visit(`${PAGES_AT}/register`) })
+
+  const owner = (await store.users.findByEmail('org-base@example.com'))!
+
+  await store.users.update(owner.id, { emailVerifiedAt: new Date() })
+
+  const made = await site.submit(create, { name: 'Base Co', slug: 'base-co' }, { from: await site.visit(`${PAGES_AT}/account/organizations`) })
+  const list = await site.visit(`${PAGES_AT}/account/organizations`)
+  const detail = await site.visit(`${PAGES_AT}/account/organizations/base-co`)
+
+  await site.submit(invite, { email: 'org-guest@example.com' }, { from: detail })
+
+  const link = linkOf('invitation')
+  const visitor = await testSite({ root: ROOT, ...process.env.FIXTURE_BASE && { base: process.env.FIXTURE_BASE } })
+  const invitation = await visitor.visit(`${PAGES_AT}/invitation${link.search}`)
+
+  console.log(JSON.stringify({
+    made: made.url,
+    tabs: list.find('.kui-tab-nav a').map(a => a.attributes.href).filter(href => href?.includes('organizations')),
+    row: list.find('[data-organization] a').map(a => a.attributes.href),
+    back: detail.find('a').map(a => a.attributes.href).filter(href => href?.endsWith('/organizations')),
+    mailed: link.pathname,
+    links: invitation.find('a').map(a => a.attributes.href).filter(href => href?.includes('redirect')),
+  }))
+  process.exit(0)
+}
+
 const out: Record<string, unknown> = { signIn: await shown(`${PAGES_AT}/sign-in`), register: await shown(`${PAGES_AT}/register`) }
 
 // A newcomer lands where the page sends them, and a sign-in with the box left alone lasts what the setting says.

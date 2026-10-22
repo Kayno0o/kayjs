@@ -27,4 +27,4 @@ extensions: [auth({ admin: 'admin', roles: { admin: ['editor'], editor: [] }, au
 - `auth.requireAdmin()` is the guard of the pages for your own admin page: the signed-in admin as themselves, else the refusal above.
 - `features().admin` is whether an admin is named and `features().audit` whether the audit log is kept; the roles an admin may give are `auth.adminRoles()`, server-side.
 - The words are `auth.admin.*` and `auth.impersonation.*` in the app's catalogs; English and French ship.
-- Organization pages (members, roles, invitations) are not prebuilt yet: the methods in [admin and organizations](admin-and-organizations.md) have no screen.
+- The organization methods in [admin and organizations](admin-and-organizations.md) have their pages in [the organization pages](organization-pages.md).

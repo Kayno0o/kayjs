@@ -120,3 +120,16 @@ test('with the audit log off, the admin pages keep the users tab alone and the a
 
   expect(seen).toMatchObject({ tabs: ['/auth/admin'], audit: ['The audit log is off: set the audit option to keep one.'] })
 }, 60_000)
+
+test('the organization pages and the invitation page link under the base and the prefix, and the invitation mail opens the prebuilt page', async () => {
+  const seen = await variant({ FIXTURE_ORG: '1', FIXTURE_PREFIX: '/members', FIXTURE_BASE: '/app' })
+
+  expect(seen).toEqual({
+    made: '/app/members/account/organizations/base-co',
+    tabs: ['/app/members/account/organizations'],
+    row: ['/app/members/account/organizations/base-co'],
+    back: ['/app/members/account/organizations', '/app/members/account/organizations'],
+    mailed: '/members/invitation',
+    links: [expect.stringMatching(/^\/app\/members\/sign-in\?redirect=%2Fmembers%2Finvitation/), expect.stringMatching(/^\/app\/members\/register\?redirect=%2Fmembers%2Finvitation/)],
+  })
+}, 60_000)

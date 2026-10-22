@@ -9,6 +9,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `mountComponent` names the island and the imports down to the server module a browser cannot take, as `kay build` does, and the error says an island cannot import a server module ([Browser-only components](browser-only.md#browser-only-components)).
 - `markdownHtml` from `kay/markdown` loads marked in an island on its first call instead of with the island, showing the text as written until it arrives, which takes about 17 KB gzip off every chat island ([Content](content.md)).
 - A page whose islands use no `for`, `await`, `try` or spread ships about 1.4 KB less JS: the code of each block loads only with the islands compiled to it ([Build and start](build-and-start.md#build-and-start-commands)).
+- kayjs-auth serves organization pages in the account area (members, roles, invitations) and an invitation page that invitation mails open by default, with no declaration beyond `organizations` ([Organization pages](../packages/auth/llms/organization-pages.md)).
 
 ## 1.71.0
 

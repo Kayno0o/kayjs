@@ -1,0 +1,86 @@
+--- server
+import { formatDate } from 'kay/i18n'
+import { wording } from 'kay/words'
+import Message from '../../../components/message.kay'
+import { failure, schemas } from '../../../forms'
+import { organizationPage } from '../../../organizationPage'
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+
+export const create = action(schemas.organization, async ({ name, slug }, ctx) => {
+  const result = await ctx.locals.auth.createOrganization({ name: name.trim(), ...slug?.trim() && { slug: slug.trim() } })
+
+  if (!result.ok)
+    return ctx.fail(400, { error: result.error })
+
+  const { organization } = result.membership
+
+  return ctx.redirect(organizationPage(ctx.locals.auth.features(), organization.slug ?? organization.id))
+})
+
+// An invitation is accepted or turned down by its id, which only the signed-in user's own open ones answer to.
+export const accept = action(schemas.id, async ({ id }, ctx) => {
+  const result = await ctx.locals.auth.acceptInvitation(id)
+
+  if (!result.ok)
+    return ctx.fail(400, { error: result.error })
+
+  const { organization } = result.membership
+
+  return ctx.redirect(organizationPage(ctx.locals.auth.features(), organization.slug ?? organization.id))
+})
+
+export const reject = action(schemas.id, async ({ id }, ctx) => {
+  const result = await ctx.locals.auth.rejectInvitation(id)
+
+  return result.ok ? 'rejected' : ctx.fail(400, { error: result.error })
+})
+
+const auth = ctx.locals.auth
+const features = auth.features()
+const memberships = await auth.listOrganizations()
+const invitations = await auth.listMyInvitations()
+const refused = [create, accept, reject].map(form => form.failed()?.data?.error).find(error => error !== undefined)
+const date = (value: Date) => formatDate(value, { dateStyle: 'medium' })
+---
+PageSection(title={wording('auth.organizations.title', 'Organizations')})
+  .flex.flex-col.gap-2
+    for membership of memberships key={membership.organization.id}
+      CardRow(data-organization={membership.organization.id})
+        .flex.flex-col
+          a(href={organizationPage(features, membership.organization.slug ?? membership.organization.id)}) {membership.organization.name}
+          span.flex.flex-wrap.items-center.gap-2
+            for role of membership.roles key={role}
+              Badge(label={role} tone="accent")
+            span.text-kui-muted {wording('auth.organizations.joined', 'Joined {date}', { date: date(membership.joinedAt) })}
+    else
+      EmptyState(title={wording('auth.organizations.none', 'You belong to no organization yet.')})
+if invitations.length > 0
+  PageSection(title={wording('auth.organizations.invitationsForYou', 'Invitations for you')})
+    .flex.flex-col.gap-2
+      for invitation of invitations key={invitation.id}
+        CardRow(data-invitation={invitation.id})
+          @right
+            .flex.flex-wrap.gap-2
+              form(action={accept})
+                input(type="hidden" name="id" value={invitation.id})
+                Button(type="submit" tone="accent" label={wording('auth.organizations.accept', 'Join')} aria-label={`${wording('auth.organizations.accept', 'Join')}: ${invitation.organization.name}`})
+              form(action={reject})
+                input(type="hidden" name="id" value={invitation.id})
+                Button(type="submit" label={wording('auth.organizations.reject', 'Decline')} aria-label={`${wording('auth.organizations.reject', 'Decline')}: ${invitation.organization.name}`})
+          .flex.flex-col
+            strong {invitation.organization.name}
+            span.text-kui-muted {wording('auth.organizations.expires', 'Expires {date}', { date: date(invitation.expiresAt) })}
+if refused
+  Message(text={failure(refused)})
+PageSection(title={wording('auth.organizations.create', 'Create an organization')})
+  form.flex.flex-col.gap-3(action={create})
+    FormField(label={wording('auth.organizations.name', 'Name')} required)
+      input(name="name" maxlength="100" required)
+    FormField(label={wording('auth.organizations.slug', 'Address')} hint={wording('auth.organizations.slugHint', 'Lowercase letters, digits and dashes. Leave empty for none.')})
+      input(name="slug" maxlength="64" autocapitalize="none")
+    Button(type="submit" tone="accent" label={wording('auth.organizations.create', 'Create an organization')})

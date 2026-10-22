@@ -89,6 +89,10 @@ export const schemas = {
   adminRole: t.Object({ role: t.String({ maxLength: 100 }) }),
   adminDelete: t.Object({ confirm: t.Optional(t.Boolean()) }),
   adminBan: t.Object({ reason: t.Optional(t.String({ maxLength: 500 })), until: t.Optional(t.String({ maxLength: 10 })) }),
+  organization: t.Object({ name: t.String({ maxLength: 200 }), slug: t.Optional(t.String({ maxLength: 100 })) }),
+  memberRoles: t.Object({ userId: t.String({ maxLength: 128 }), roles: t.Optional(t.Array(t.String({ maxLength: 100 }), { maxItems: 100 })) }),
+  member: t.Object({ userId: t.String({ maxLength: 128 }) }),
+  invite: t.Object({ email, roles: t.Optional(t.Array(t.String({ maxLength: 100 }), { maxItems: 100 })) }),
   oauthClient: t.Object({ id: t.String({ maxLength: 2048 }) }),
   // The authorization request the consent page was shown for, which the answer is checked against again.
   oauthConsent: t.Object({ client_id: t.String({ maxLength: 2048 }), redirect_uri: t.String({ maxLength: 2048 }), code_challenge: t.String({ maxLength: 128 }), scope: t.String({ maxLength: 2048 }), state: t.String({ maxLength: 2048 }), resource: t.String({ maxLength: 2048 }), decision: t.Union([t.Literal('allow'), t.Literal('deny')]) }),

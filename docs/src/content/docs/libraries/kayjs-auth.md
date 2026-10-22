@@ -559,7 +559,7 @@ if (made.ok)
 - `updateOrganization(ref, { name, slug })` renames it and `deleteOrganization(ref)` deletes it. Only owners delete.
 - Creating, renaming or deleting an organization, changing roles, removing members and everything about invitations (sending, listing, revoking, accepting, declining) need a signed-in browser session. A bearer token or an OAuth token for an API client or an AI agent cannot do them, so a leaked key cannot wipe a team.
 
-`invite(ref, email, roles?)` mails a link to `invitationPage` with `?invitation=<id>`. It needs a mailer. The page reads `getInvitation(id)` and posts to an action calling `acceptInvitation(id)`. Only an account verified at the invited address joins.
+`invite(ref, email, roles?)` mails a link to `invitationPage` with `?invitation=<id>`, or to the prebuilt `/auth/invitation` page when you set none. It needs a mailer. The page reads `getInvitation(id)` and posts to an action calling `acceptInvitation(id)`. Only an account verified at the invited address joins.
 
 `listMyInvitations()` lists those open to the user, and `rejectInvitation(id)` turns one down and answers `{ ok }`, `{ ok: false, error: 'not-found' }` for one not open to the user. `listInvitations(ref)` and `revokeInvitation(ref, id)` are for managers.
 
@@ -573,6 +573,16 @@ export default auth.guard({ redirect: '/login', require: auth.memberOf('admin') 
 ```
 
 An action scopes what it touches by `ctx.params.org`, never by its input.
+
+### Organization pages
+
+With `organizations` set, the prebuilt pages add an `Organizations` tab to the account area, under `/auth/account/organizations`. It needs nothing more.
+
+- The list shows the user's organizations, the invitations open to their verified address, and a form to create one.
+- An organization's page, `/auth/account/organizations/<slug or id>`, shows the members and their roles. A manager changes the roles of members below them, removes them, invites an address with chosen roles, revokes open invitations and renames the organization. Any member can leave. An owner can delete it, behind a ticked box.
+- `/auth/invitation?invitation=<id>` is the page an invitation mail opens. A visitor can sign in or create an account and comes back to it. The invited account joins or declines. Any other account is told the invitation is for another address.
+
+The pages ask the same of the methods as your own would: a member without the role gets a refusal, a manager cannot touch an owner, and the last owner cannot leave or lose the role. A stranger to an organization gets a 404, and a site with no `organizations` option gets a 404 for all of them. `invitationPage` still names a page of your own.
 
 ## OAuth
 

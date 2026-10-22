@@ -190,6 +190,7 @@ describe('features', () => {
       oauthServer: false,
       signInPage: '/',
       admin: false,
+      organizations: null,
       audit: false,
       pages: null,
       rules: { password: { min: 10, max: 128 }, username: { min: 2, max: 32 } },

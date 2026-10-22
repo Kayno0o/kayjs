@@ -1,0 +1,183 @@
+--- server
+import { formatDate } from 'kay/i18n'
+import { wording } from 'kay/words'
+import Message from '../../../components/message.kay'
+import { failure, schemas } from '../../../forms'
+import { organizationPage, organizationsPage } from '../../../organizationPage'
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+
+// Every action answers about the organization the route names, never one the input names, and the methods behind them check who may.
+export const rename = action(schemas.organization, async ({ name, slug }, ctx) => {
+  const auth = ctx.locals.auth
+  const result = await auth.updateOrganization(String(ctx.params.org), { name: name.trim(), slug: slug?.trim() || null })
+
+  if (!result.ok)
+    return ctx.fail(400, { error: result.error })
+
+  const { organization } = result
+
+  return ctx.redirect(organizationPage(auth.features(), organization.slug ?? organization.id))
+})
+
+export const setRoles = action(schemas.memberRoles, async ({ userId, roles }, ctx) => {
+  const result = await ctx.locals.auth.setMemberRoles(String(ctx.params.org), userId, (roles ?? []) as never[])
+
+  return result.ok ? 'done' : ctx.fail(400, { error: result.error })
+})
+
+export const removeMember = action(schemas.member, async ({ userId }, ctx) => {
+  const result = await ctx.locals.auth.deleteMember(String(ctx.params.org), userId)
+
+  return result.ok ? 'done' : ctx.fail(400, { error: result.error })
+})
+
+export const invite = action(schemas.invite, async ({ email, roles }, ctx) => {
+  const result = await ctx.locals.auth.invite(String(ctx.params.org), email.trim(), roles?.length ? roles as never[] : undefined)
+
+  return result.ok ? result.invitation.email : ctx.fail(400, { error: result.error })
+})
+
+export const revoke = action(schemas.id, async ({ id }, ctx) => {
+  const result = await ctx.locals.auth.revokeInvitation(String(ctx.params.org), id)
+
+  return result.ok ? 'done' : ctx.fail(400, { error: result.error })
+})
+
+export const leave = action(async (ctx) => {
+  const auth = ctx.locals.auth
+  const result = await auth.leaveOrganization(String(ctx.params.org))
+
+  return result.ok ? ctx.redirect(organizationsPage(auth.features())) : ctx.fail(400, { error: result.error })
+})
+
+export const remove = action(schemas.adminDelete, async ({ confirm }, ctx) => {
+  if (confirm !== true)
+    return ctx.fail(400, { error: 'form' })
+
+  const auth = ctx.locals.auth
+  const result = await auth.deleteOrganization(String(ctx.params.org))
+
+  return result.ok ? ctx.redirect(organizationsPage(auth.features())) : ctx.fail(400, { error: result.error })
+})
+
+const auth = ctx.locals.auth
+const features = auth.features()
+const settings = features.organizations!
+const found = await auth.getOrganization(String(ctx.params.org))
+
+if (found === null)
+  ctx.notFound()
+
+const { organization } = found
+const me = await auth.user()
+const held = new Set<string>()
+
+for (const role of settings.roles) {
+  if (await auth.isMember(organization.id, role as never))
+    held.add(role)
+}
+
+const manages = held.has(settings.manage)
+const owns = held.has(settings.owner)
+const members = await auth.listMembers(organization.id)
+const people = members.ok ? members.members : []
+const open = manages ? await auth.listInvitations(organization.id) : null
+const invitations = open?.ok ? open.invitations : []
+// A manager changes only members holding no role above theirs, and gives only roles they hold.
+const editable = (roles: string[]) => manages && roles.every(role => held.has(role))
+const grantable = settings.roles.filter(role => held.has(role))
+const refused = [rename, setRoles, removeMember, invite, revoke, leave, remove].map(form => form.failed()?.data?.error).find(error => error !== undefined)
+const invited = invite.succeeded()?.data
+const date = (value: Date) => formatDate(value, { dateStyle: 'medium' })
+const label = (user: { email: string | null, username: string | null, id: string }) => user.username ?? user.email ?? user.id
+---
+head
+  title {`${organization.name} - ${wording('auth.organizations.title', 'Organizations')}`}
+PageSection(title={organization.name})
+  @actions
+    a(href={organizationsPage(features)}) {wording('auth.organizations.back', 'All organizations')}
+  .flex.flex-wrap.items-center.gap-2
+    for role of found.roles key={role}
+      Badge(label={role} tone="accent")
+    if organization.slug
+      span.text-kui-muted {organization.slug}
+  if invited
+    Message(tone="success" text={wording('auth.organizations.invited', 'Invitation sent to {email}.', { email: invited })})
+  if refused
+    Message(text={failure(refused)})
+PageSection(title={wording('auth.organizations.members', 'Members')})
+  .flex.flex-col.gap-2
+    for member of people key={member.user.id}
+      CardRow(data-member={member.user.id})
+        @right
+          if editable(member.roles) && member.user.id !== me?.id
+            form(action={removeMember})
+              input(type="hidden" name="userId" value={member.user.id})
+              Button(type="submit" tone="danger" label={wording('auth.organizations.remove', 'Remove')} aria-label={`${wording('auth.organizations.remove', 'Remove')}: ${label(member.user)}`})
+        .flex.flex-col.gap-2
+          span.flex.flex-wrap.items-center.gap-2
+            strong {label(member.user)}
+            if member.user.id === me?.id
+              Badge(label={wording('auth.organizations.you', 'You')})
+            for role of member.roles key={role}
+              Badge(label={role} tone="accent")
+          span.text-kui-muted {wording('auth.organizations.joined', 'Joined {date}', { date: date(member.joinedAt) })}
+          if editable(member.roles) && member.user.id !== me?.id
+            form.flex.flex-wrap.items-center.gap-3(action={setRoles})
+              input(type="hidden" name="userId" value={member.user.id})
+              for role of grantable key={role}
+                label.flex.items-center.gap-2
+                  input(type="checkbox" name="roles" value={role} checked={(member.roles as string[]).includes(role)})
+                  | {role}
+              Button(type="submit" label={wording('auth.organizations.saveRoles', 'Save the roles')} aria-label={`${wording('auth.organizations.saveRoles', 'Save the roles')}: ${label(member.user)}`})
+if manages
+  PageSection(title={wording('auth.organizations.invitations', 'Invitations')})
+    .flex.flex-col.gap-2
+      for invitation of invitations key={invitation.id}
+        CardRow(data-invitation={invitation.id})
+          @right
+            form(action={revoke})
+              input(type="hidden" name="id" value={invitation.id})
+              Button(type="submit" tone="danger" label={wording('auth.organizations.revoke', 'Revoke')} aria-label={`${wording('auth.organizations.revoke', 'Revoke')}: ${invitation.email}`})
+          .flex.flex-col
+            strong {invitation.email}
+            span.flex.flex-wrap.items-center.gap-2
+              for role of invitation.roles key={role}
+                Badge(label={role} tone="accent")
+              span.text-kui-muted {wording('auth.organizations.expires', 'Expires {date}', { date: date(invitation.expiresAt) })}
+      else
+        EmptyState(title={wording('auth.organizations.noInvitations', 'No open invitation.')})
+    if features.email
+      form.flex.flex-col.gap-3(action={invite})
+        FormField(label={wording('auth.organizations.inviteEmail', 'Email address')} required)
+          input(type="email" name="email" maxlength="254" required)
+        if grantable.length > 0
+          FormField(label={wording('auth.organizations.inviteRoles', 'Roles')} group)
+            for role of grantable key={role}
+              label.flex.items-center.gap-2
+                input(type="checkbox" name="roles" value={role})
+                | {role}
+        Button(type="submit" tone="accent" label={wording('auth.organizations.invite', 'Invite')})
+  PageSection(title={wording('auth.organizations.rename', 'Name and address')})
+    form.flex.flex-col.gap-3(action={rename})
+      FormField(label={wording('auth.organizations.name', 'Name')} required)
+        input(name="name" maxlength="100" value={organization.name} required)
+      FormField(label={wording('auth.organizations.slug', 'Address')} hint={wording('auth.organizations.slugHint', 'Lowercase letters, digits and dashes. Leave empty for none.')})
+        input(name="slug" maxlength="64" autocapitalize="none" value={organization.slug ?? ''})
+      Button(type="submit" label={wording('auth.organizations.save', 'Save')})
+PageSection(title={wording('auth.organizations.leave', 'Leave the organization')})
+  form(action={leave})
+    Button(type="submit" tone="danger" label={wording('auth.organizations.leave', 'Leave the organization')})
+if owns
+  PageSection(title={wording('auth.organizations.delete', 'Delete the organization')})
+    form.flex.flex-col.gap-3(action={remove})
+      p {wording('auth.organizations.deleteIntro', 'The organization, its memberships and its invitations are deleted for good. This cannot be undone.')}
+      label.flex.items-center.gap-2
+        input(type="checkbox" name="confirm" required)
+        | {wording('auth.organizations.deleteConfirm', 'I understand')}
+      Button(type="submit" tone="danger" label={wording('auth.organizations.delete', 'Delete the organization')})

@@ -31,7 +31,7 @@ export interface OrganizationsOptions<OrgRole extends string, Role extends strin
   defaultRoles?: NoInfer<OrgRole>[] | undefined
   // Who may create an organization, a site role or a predicate; anyone signed in by default.
   create?: Requirement<BareUser, NoInfer<Role>> | undefined
-  // The app's page an invitation link opens, the invitation's id in `?invitation=`: it shows `invitation(id)` and accepts it. Inviting answers 'unavailable' without it.
+  // The app's page an invitation link opens, the invitation's id in `?invitation=`: it shows `getInvitation(id)` and accepts it. The prebuilt pages' own `/auth/invitation` by default; inviting answers 'unavailable' without either.
   invitationPage?: string | undefined
   // How long an invitation lasts, `invitations: { maxAge: '7d' }`, a week by default.
   invitations?: { maxAge?: Duration | undefined } | undefined
@@ -359,7 +359,12 @@ export async function removeMember(state: RequestState, ref: string, userId: str
   return { ok: true }
 }
 
-// Mails the address a link to the app's `invitationPage`; an invitation the address already had is replaced.
+// The page an invitation link opens: the app's `invitationPage`, else the prebuilt pages' own, and none without either.
+export function invitationPageOf(core: Core): string | undefined {
+  return core.organizations?.invitationPage ?? (core.pages ? `${core.pages.prefix}/invitation` : undefined)
+}
+
+// Mails the address a link to the invitation page; an invitation the address already had is replaced.
 export async function invite(state: RequestState, ref: string, email: string, roles?: string[]): Promise<InviteResult> {
   const { core } = state
   const { config, store } = organizationsOf(core)
@@ -385,7 +390,9 @@ export async function invite(state: RequestState, ref: string, email: string, ro
 
   const mail = core.email
 
-  if (!mail || config.invitationPage === undefined)
+  const page = invitationPageOf(core)
+
+  if (!mail || page === undefined)
     return { ok: false, error: 'unavailable' }
 
   const address = normalizeEmail(email)
@@ -408,7 +415,7 @@ export async function invite(state: RequestState, ref: string, email: string, ro
 
   await store.invitations.create(invitation)
 
-  const url = `${core.url}${config.invitationPage}?invitation=${invitation.id}`
+  const url = `${core.url}${page}?invitation=${invitation.id}`
   const { locale, templates } = writing(mail, [invitee?.locale, found.record.locale, ...state.languages])
 
   try {

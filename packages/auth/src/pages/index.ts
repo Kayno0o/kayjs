@@ -97,6 +97,8 @@ export interface AuthFeatures {
   oauthServer: boolean
   // Whether the `admin` option names who manages users. The prebuilt admin pages answer 404 without it.
   admin: boolean
+  // The `organizations` option as the prebuilt organization pages need it: every role in declaration order, who owns an organization and who manages it; null without the option, when the pages answer 404.
+  organizations: { roles: string[], owner: string, manage: string } | null
   // Whether the `audit` option keeps the audit log.
   audit: boolean
   // Where a sign-in that failed goes, and where a guard sends an anonymous visitor once the prebuilt pages are on.
@@ -139,6 +141,7 @@ export function featuresOf(core: Core): AuthFeatures {
     oauthServer: core.oauthServer !== undefined,
     signInPage: core.signInPage,
     admin: core.admin !== undefined,
+    organizations: core.organizations ? { roles: [...core.organizations.roles], owner: core.organizations.owner, manage: core.organizations.manage } : null,
     audit: core.audit !== undefined,
     rules: { password: { min: core.rules.password.min, max: core.rules.password.max }, username: { ...core.rules.username } },
     pages: core.pages ? { prefix: core.pages.prefix, home: core.pages.home, remember: core.pages.remember } : null,
