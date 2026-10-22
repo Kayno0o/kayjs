@@ -1,6 +1,8 @@
 import type { EmailOptions } from '../src/email'
 import { describe, expect, test } from 'bun:test'
+import { flattenMessages, translate } from '../../../src/runtime/i18n'
 import { acceptedLocales, pickLocale } from '../src/locale'
+import french from '../src/messages/fr'
 import { testApp } from './helpers/app'
 import { mailbox } from './helpers/mail'
 
@@ -86,5 +88,17 @@ describe('locales', () => {
     await take({ kind: 'magic-link' })
 
     expect(mails.map(mail => [mail.kind, mail.locale, mail.subject])).toEqual([['verify-email', 'de', 'Bestätigen Site'], ['magic-link', 'de', 'magic de']])
+  })
+})
+
+describe('the French wording', () => {
+  const fr = { locale: 'fr', messages: flattenMessages(french) }
+
+  test('a count picks the plural form of the recovery codes left and of the days a token lasts', () => {
+    const codes = (count: number) => translate(fr, 'auth.account.twoFactor.codesLeft', { count })
+    const days = (count: number) => translate(fr, 'auth.account.tokens.days', { count })
+
+    expect([codes(0), codes(1), codes(2)]).toEqual(['Plus aucun code de secours', '1 code de secours restant', '2 codes de secours restants'])
+    expect([days(1), days(30)]).toEqual(['Dans 1 jour', 'Dans 30 jours'])
   })
 })
