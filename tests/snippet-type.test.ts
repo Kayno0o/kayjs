@@ -28,7 +28,7 @@ async function diagnostics(files: Record<string, string>) {
 }
 
 async function problems(files: Record<string, string>): Promise<[string, number, string | undefined][]> {
-  return (await diagnostics(files)).filter(d => d.code !== 'promoted-island').map(d => [d.file, d.line, d.code])
+  return (await diagnostics(files)).map(d => [d.file, d.line, d.code])
 }
 
 const LIST = '---\nimport type { Snippet } from \'kay\'\n\nconst { items, row, empty } = props<{ items: string[], row: Snippet<[item: string, index: number]>, empty?: Snippet }>()\n---\nfor item, i of items\n  slot row(item, i)\nslot empty\n  p none\n'
@@ -128,7 +128,7 @@ describe('Snippet', () => {
     })).toEqual([['src/routes/_layout.kay', 5, 'TS2345']])
     expect(await problems({
       'src/routes/index.kay': '---\nimport Wrap from \'../wrap.kay\'\n---\nWrap\n',
-      'src/wrap.kay': '---\nimport Toggle from \'./toggle.kay\'\n---\nToggle\n  @row(name)\n    b {name}\n',
+      'src/wrap.kay': '---\n// kay-island\nimport Toggle from \'./toggle.kay\'\n---\nToggle\n  @row(name)\n    b {name}\n',
       'src/toggle.kay': island,
     })).toEqual([])
   })

@@ -153,7 +153,7 @@ describe('kay check', () => {
 
   it('reports type errors at the line and column of the .kay source', async () => {
     const diagnostics = await check(join(fixtures, 'broken'))
-    const brief = diagnostics.filter(d => d.code !== 'promoted-island').map(d => ({ file: d.file.slice(fixtures.length + 1), line: d.line, column: d.column, code: d.code, message: firstLine(d.message) }))
+    const brief = diagnostics.map(d => ({ file: d.file.slice(fixtures.length + 1), line: d.line, column: d.column, code: d.code, message: firstLine(d.message) }))
 
     expect(brief).toEqual([
       ...[7, 9].map(line => ({ file: 'broken/src/routes/feed.kay', line, column: 1, code: 'uncaught-await', message: 'Nothing renders in place of this block once its value rejects' })),
@@ -182,6 +182,7 @@ describe('kay check', () => {
       { file: 'broken/src/todo-list.kay', line: 5, column: 3, code: 'TS2741', message: expect.stringContaining('Property \'todo\' is missing') },
       { file: 'broken/src/main.ts', line: 3, column: 38, code: 'TS2741', message: expect.stringContaining('\'done\' is missing') },
       { file: 'broken/src/routes/_guard.ts', line: 5, column: 14, code: 'TS2345', message: expect.stringContaining('No page, public file or app route serves /sign/in') },
+      { file: 'broken/src/routes/generic.kay', line: 6, column: 1, code: 'promoted-island', message: 'This component renders as an island: `show` passed to List, line 6' },
     ])
   })
 
@@ -629,6 +630,7 @@ describe.concurrent('kay check, edge cases', () => {
       mapped: ['const links = [\'a\', \'b\'].map(name => ({ href: `/${name}`, label: name }))', 'Child(format={links})'],
       panel: ['const panel = (color: string) => { const svg = `<svg fill="${color}"/>`; return `data:${svg}` }\nconst slides = [{ src: panel(\'red\') }]', 'Child(format={slides})'],
       icon: ['import Brand from \'~icons/tabler/brand-github\'', 'Child(format={Brand})'],
+      constant: ['const biggest = Math.PI + Number.MAX_VALUE', 'Child(format={biggest})'],
       found: ['const { rows, current } = props<{ rows: { id: number }[], current: number }>()', 'Child(format={rows.find(row => row.id === current)})'],
       from: ['const items = Array.from({ length: 3 }, (_, index) => ({ id: index }))', 'Child(format={items})'],
       dated: ['const days = Array.from({ length: 2 }, (_, index) => new Date(Date.UTC(2026, 0, 1 + index)).toISOString().slice(0, 10))', 'Child(format={days})'],
@@ -649,11 +651,16 @@ describe.concurrent('kay check, edge cases', () => {
       model: ['const money = Money.from(5)', 'Child(format={money})'],
       handed: ['const hours = [\'a\']', 'Child(format={hours.map(hour => () => hour)})'],
       tested: ['function handler() {}\nconst { rows } = props<{ rows: unknown[] }>()', 'Child(format={[handler].find(one => one === rows[0])})'],
+      global: ['const biggest = Math.max', 'Child(format={biggest})'],
+      logged: ['const log = console.log', 'Child(format={log})'],
+      inline: ['', 'Child(format={Math.max})'],
+      uninstalled: ['import Brand from \'~icons/not-installed/brand-github\'', 'Child(format={Brand})'],
     }
     const all = { ...data, ...functions }
     const component = ([script, call]: [string, string]) => `---\nimport Child from './island.kay'\n${script}\n---\n${call}\n`
     const names = Object.keys(all)
     const root = await scratchProject({
+      'package.json': JSON.stringify({ name: 'app', private: true, devDependencies: { '@iconify-json/tabler': '*' } }),
       'src/routes/index.kay': `---\n${names.map(name => `import ${name[0]!.toUpperCase()}${name.slice(1)} from '../components/${name}.kay'`).join('\n')}\n---\n${names.map(name => `${name[0]!.toUpperCase()}${name.slice(1)}`).join('\n')}\n`,
       ...Object.fromEntries(names.map(name => [`src/components/${name}.kay`, component(all[name]!)])),
       'src/handlers.ts': 'export const handlers = [() => 1]\n',

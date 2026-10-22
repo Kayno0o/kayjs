@@ -119,7 +119,7 @@ async function moduleLints(root: string, options: CheckOptions): Promise<CheckDi
   const texts = new Map(await Promise.all(files.map(async file => [file, await Bun.file(file).text()] as const)))
   // Following the imports of every component is worth it only when some module or component names the entry, or one passes an island a function.
   const componentTexts = new Map(await Promise.all((await findKayFiles(root, { project: true, ownKayOnly: true })).map(async file => [file, await Bun.file(file).text()] as const)))
-  const named = [...texts.values(), ...componentTexts.values()].some(text => text.includes('kay/cache')) || [...componentTexts].some(([file, text]) => browserRole(text, file) === 'promotable')
+  const named = [...texts.values(), ...componentTexts.values()].some(text => text.includes('kay/cache')) || [...componentTexts].some(([file, text]) => browserRole(text, file, undefined, root) === 'promotable')
   const { modules: inBrowser, promoted } = named ? await browserModules(root, projectPaths(root, options).routes, options.extensions, componentTexts) : { modules: new Set<string>(), promoted: new Set<string>() }
   const report = (file: string, source: string, diagnostics: ReturnType<typeof moduleChecks>) => {
     const levelAt = lintLevels(source, levels)
@@ -136,7 +136,7 @@ async function moduleLints(root: string, options: CheckOptions): Promise<CheckDi
 
       return report(file, source, moduleChecks(source, inBrowser.has(realpathSync(file))))
     }),
-    ...[...promoted].flatMap(file => report(file, componentTexts.get(file)!, promotedChecks(componentTexts.get(file)!))),
+    ...[...promoted].flatMap(file => report(file, componentTexts.get(file)!, promotedChecks(componentTexts.get(file)!, root))),
   ]
 
   return found

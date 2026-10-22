@@ -6,7 +6,7 @@ import type { SignalKind } from './module-signals'
 import type { PageSettingName } from './page-settings'
 import { parse } from '@babel/parser'
 import { eachNode } from './each-node'
-import { SENDABLE_CLASSES } from './expression'
+import { isGlobalFunctionMember, SENDABLE_CLASSES } from './expression'
 import { KAY_VALUES } from './kay-exports'
 import { PAGE, PAGE_SETTINGS, unreadSettingReport } from './page-settings'
 import { loadTraverse, POSITION_SUFFIX } from './rewrite'
@@ -123,14 +123,35 @@ export interface ParsedFence {
 // Splits a component script into module-level code (imports, types) and the component body, and finds the props macro.
 // `serverNames` are the names the `--- server` fence hands the script, which a type may take the type of, and `templateReads` the values of `kay` the template reads, which the compiler imports like the script's own.
 // `module` is the `--- module` fence, whose code stays at module level beside the script's imports and types.
-export function analyzeScript(source: string, script: Span | undefined, serverNames: string[] = [], templateReads: readonly string[] = [], module?: Span): ScriptAnalysis {
-  const analysis = analyzeComponentScript(source, script, serverNames, templateReads)
+// `iconSets` are the prefixes of the icon sets the project installs: an icon of one is data, and one of a set that is not is left to the app's own resolution, which may make it a component. Unset, every `~icons/` import is data.
+export function analyzeScript(source: string, script: Span | undefined, serverNames: string[] = [], templateReads: readonly string[] = [], module?: Span, iconSets?: ReadonlySet<string>): ScriptAnalysis {
+  const analysis = analyzeComponentScript(source, script, serverNames, templateReads, iconSets)
 
-  return module === undefined ? analysis : withModule(analysis, analyzeModule(source, module))
+  return module === undefined ? analysis : withModule(analysis, analyzeModule(source, module, iconSets))
+}
+
+const ICON_SET = /^~icons\/([a-z0-9-]+)\//
+
+// What the imports hold that a static component passing it is promoted for: every value import, bar an icon of an installed set.
+function importedFunctions(analysis: ScriptAnalysis, scope: FunctionScope, iconSets: ReadonlySet<string> | undefined): void {
+  for (const binding of analysis.imports) {
+    if (binding.typeOnly)
+      continue
+
+    const set = ICON_SET.exec(binding.source)?.[1]
+
+    if (set !== undefined && (iconSets === undefined || iconSets.has(set)))
+      continue
+
+    scope.functions.add(binding.local)
+
+    if (set !== undefined)
+      analysis.functions.push(binding.local)
+  }
 }
 
 // The `--- module` fence as module-level code: every statement is hoisted, the exports among them are the file's own.
-function analyzeModule(source: string, module: Span): ScriptAnalysis {
+function analyzeModule(source: string, module: Span, iconSets: ReadonlySet<string> | undefined): ScriptAnalysis {
   const analysis: ScriptAnalysis = { hoisted: [], imports: [], specifiers: [], body: [], broken: [], brokenModule: [], reactive: false, implicit: [], functions: [], plain: [], diagnostics: [] }
   const scope: FunctionScope = { functions: new Set(), data: new Set() }
   const split = splitFence(source, module, [], analysis)
@@ -138,10 +159,7 @@ function analyzeModule(source: string, module: Span): ScriptAnalysis {
   if (!split)
     return analysis
 
-  for (const binding of analysis.imports) {
-    if (!binding.typeOnly && !binding.source.startsWith('~icons/'))
-      scope.functions.add(binding.local)
-  }
+  importedFunctions(analysis, scope, iconSets)
 
   analysis.reactive = analysis.implicit.some(name => !STATIC_EXPORTS.has(name)) || analysis.imports.some(importsReactiveValue)
 
@@ -176,7 +194,7 @@ function withModule(script: ScriptAnalysis, module: ScriptAnalysis): ScriptAnaly
   }
 }
 
-function analyzeComponentScript(source: string, script: Span | undefined, serverNames: string[], templateReads: readonly string[]): ScriptAnalysis {
+function analyzeComponentScript(source: string, script: Span | undefined, serverNames: string[], templateReads: readonly string[], iconSets: ReadonlySet<string> | undefined): ScriptAnalysis {
   const analysis: ScriptAnalysis = { hoisted: [], imports: [], specifiers: [], body: [], broken: [], brokenModule: [], reactive: false, implicit: [], functions: [], plain: [], diagnostics: [] }
   const scope: FunctionScope = { functions: new Set(), data: new Set() }
 
@@ -194,10 +212,7 @@ function analyzeComponentScript(source: string, script: Span | undefined, server
 
   const { ast, shift } = split
 
-  for (const binding of analysis.imports) {
-    if (!binding.typeOnly && !binding.source.startsWith('~icons/'))
-      scope.functions.add(binding.local)
-  }
+  importedFunctions(analysis, scope, iconSets)
 
   analysis.reactive = analysis.implicit.some(name => !STATIC_EXPORTS.has(name)) || analysis.imports.some(importsReactiveValue)
 
@@ -534,7 +549,7 @@ function holdsFunction(value: t.Node, scope: FunctionScope): boolean {
     return scope.functions.has(value.name)
 
   if (value.type === 'MemberExpression' || value.type === 'OptionalMemberExpression')
-    return holdsFunction(value.object, scope)
+    return isGlobalFunctionMember(value, name => scope.functions.has(name)) || holdsFunction(value.object, scope)
 
   if (value.type === 'ConditionalExpression')
     return holdsFunction(value.consequent, scope) || holdsFunction(value.alternate, scope)

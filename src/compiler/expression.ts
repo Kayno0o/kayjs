@@ -26,6 +26,17 @@ function isFunctionExpression(code: string): boolean {
   }
 }
 
+// The globals whose members are functions, `Math.max` or `console.log`, bar their constants, `Math.PI` or `Number.MAX_VALUE`, which are written in capitals.
+const FUNCTION_NAMESPACES = new Set(['Math', 'console', 'JSON', 'Object', 'Array', 'Number', 'String', 'Boolean', 'Date', 'Promise', 'Reflect', 'Intl', 'BigInt'])
+
+// Whether a node reads a function off a global, `Math.max` as a value; `shadowed` says whether the script declares the global's name itself.
+export function isGlobalFunctionMember(node: t.Node, shadowed: (name: string) => boolean): boolean {
+  if ((node.type !== 'MemberExpression' && node.type !== 'OptionalMemberExpression') || node.computed || node.object.type !== 'Identifier' || node.property.type !== 'Identifier')
+    return false
+
+  return FUNCTION_NAMESPACES.has(node.object.name) && !shadowed(node.object.name) && node.property.name !== node.property.name.toUpperCase()
+}
+
 // Values no island prop check needs to see.
 const LITERALS = new Set(['StringLiteral', 'NumericLiteral', 'BooleanLiteral', 'NullLiteral', 'BigIntLiteral', 'TemplateLiteral'])
 
@@ -116,7 +127,11 @@ export function mayHoldFunction(code: string, names: ReadonlySet<string>): boole
       return visit(node.callee.object) || visit(callback?.type === 'ArrowFunctionExpression' && !callback.async ? callback.body : callback) || visit(rest)
     }
 
-    if (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression' || node.type === 'ClassExpression')
+    // A call of `Math.max` returns what its arguments make, it does not pass the function on.
+    if (node.type === 'CallExpression' && isGlobalFunctionMember(node.callee, name => names.has(name)))
+      return visit(node.arguments)
+
+    if (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression' || node.type === 'ClassExpression' || isGlobalFunctionMember(node, name => names.has(name)))
       return true
 
     if (node.type === 'NewExpression' && (node.callee.type !== 'Identifier' || !SENDABLE_CLASSES.has(node.callee.name)))

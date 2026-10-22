@@ -8,6 +8,7 @@ import type { NameFindings } from './rewrite'
 import type { ParsedFence, ScriptAnalysis, ServerAnalysis, SignalPropType } from './script'
 import { basename, relative } from 'node:path'
 import process from 'node:process'
+import { installedIconSets } from '../build/icons'
 import { drawIcons, elementsIn, templateFacts, visitNodes } from './ast'
 import { browserReads } from './browser'
 import { generate, isInteractive, islandCause, islandMessages, promotionCause, promotionSite, typesAction } from './codegen'
@@ -124,6 +125,11 @@ const BACKSLASH = /\\/g
 // An icon of an installed set, `~icons/tabler/home`, which the template may draw as a tag.
 const ICON_IMPORT = /^~icons\//
 
+// The prefixes of the icon sets the project at `root` installs, which decide whether an icon import is data; unset without a root or an icon import to decide.
+function iconSetsOf(source: string, root: string | undefined): ReadonlySet<string> | undefined {
+  return root === undefined || !source.includes('~icons/') ? undefined : new Set(installedIconSets(root).keys())
+}
+
 // The live values a script imports, which make its component an island: the server changes them and the page follows.
 function liveBindings(script: ScriptAnalysis, imported: ImportedSignals | undefined): ScriptAnalysis['imports'] {
   return script.imports.filter(binding => !binding.typeOnly && imported?.[binding.source]?.[binding.imported] === 'live')
@@ -144,7 +150,7 @@ export function rendersAsIsland(original: string, imported?: ImportedSignals): b
 }
 
 // Whether a component is an island, or a static component that may be promoted to one by what it passes, which the build does only when its imports reach an island; a page, a layout and a special page are neither.
-export function browserRole(original: string, filename: string, imported?: ImportedSignals): 'island' | 'promotable' | undefined {
+export function browserRole(original: string, filename: string, imported?: ImportedSignals, root?: string): 'island' | 'promotable' | undefined {
   const { file } = parseExpanded(original)
   const source = file.source
 
@@ -152,7 +158,7 @@ export function browserRole(original: string, filename: string, imported?: Impor
     return undefined
 
   const server = analyzeServer(source, file.server)
-  const script = analyzeScript(source, file.script, server?.data.map(data => data.name), templateReads(file), file.module)
+  const script = analyzeScript(source, file.script, server?.data.map(data => data.name), templateReads(file), file.module, iconSetsOf(source, root))
 
   if (file.client !== undefined || isInteractive(file, script) || liveImport(script, imported) !== undefined)
     return 'island'
@@ -166,11 +172,11 @@ function scriptFences(script: ScriptAnalysis): ParsedFence[] {
 }
 
 // The server-only imports in the script of a component the build promotes to an island, which only the project knows: compiling it alone cannot tell whether it is.
-export function promotedChecks(original: string): Diagnostic[] {
+export function promotedChecks(original: string, root?: string): Diagnostic[] {
   const { file } = parseExpanded(original)
   const source = file.source
   const server = analyzeServer(source, file.server)
-  const script = analyzeScript(source, file.script, server?.data.map(data => data.name), templateReads(file), file.module)
+  const script = analyzeScript(source, file.script, server?.data.map(data => data.name), templateReads(file), file.module, iconSetsOf(source, root))
   const site = promotionSite(file, script)
   const marker = islandMarker(source)
   const announced = site === undefined || marker !== undefined ? [] : [{ ...site.span, code: 'promoted-island', message: `This component renders as an island: ${site.cause}`, note: 'a function or a block with parameters cannot be sent to the browser as data, so the component hydrates itself', help: 'write `// kay-island` in it to say so, or pass the island what can be serialized', checkOnly: true }]
@@ -184,7 +190,7 @@ export function compileKay(original: string, filename: string, options: CompileO
   const { file, expansion, problems } = parseExpanded(original)
   const source = file.source
   const server = analyzeServer(source, file.server)
-  const script = analyzeScript(source, file.script, server?.data.map(data => data.name), templateReads(file), file.module)
+  const script = analyzeScript(source, file.script, server?.data.map(data => data.name), templateReads(file), file.module, iconSetsOf(source, options.root))
 
   drawIcons(file, new Set([...script.imports, ...server?.imports ?? []].filter(binding => !binding.typeOnly && binding.imported === 'default' && ICON_IMPORT.test(binding.source)).map(binding => binding.local)))
 
