@@ -3844,6 +3844,33 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('gives a bare auth() beside an app module exporting auth plugin: false, and leaves one with a module, or no such module, as written', async () => {
+    const root = await scratchProject({ 'kay.config.ts': 'import { auth } from \'@kaynooo/kayjs-auth\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [auth()] })\n', 'src/auth.ts': 'export const auth = 1\n' })
+
+    try {
+      expect((await runCheck(root)).output).toContain('deprecated-library-registration')
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('import { auth } from \'@kaynooo/kayjs-auth\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [auth({ plugin: false })] })\n')
+
+      await Bun.write(join(root, 'kay.config.ts'), 'import { auth } from \'@kaynooo/kayjs-auth\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [auth({ roles: {} })] })\n')
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('import { auth } from \'@kaynooo/kayjs-auth\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [auth({ roles: {}, plugin: false })] })\n')
+
+      const kept = 'import { auth } from \'@kaynooo/kayjs-auth\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [auth({ module: \'./src/auth\' })] })\n'
+
+      await Bun.write(join(root, 'kay.config.ts'), kept)
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe(kept)
+
+      await rm(join(root, 'src/auth.ts'))
+      await Bun.write(join(root, 'kay.config.ts'), 'import { auth } from \'@kaynooo/kayjs-auth\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [auth()] })\n')
+      expect((await runCheck(root)).output).not.toContain('deprecated-library-registration')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('leaves an old authPages alone where its module exports no named auth', async () => {
     const source = 'import { authPages } from \'@kaynooo/kayjs-auth\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [authPages({ auth: () => import(\'./src/auth\') })] })\n'
     const root = await scratchProject({ 'kay.config.ts': source, 'src/auth.ts': 'const auth = 1\n\nexport { auth as default }\n' })

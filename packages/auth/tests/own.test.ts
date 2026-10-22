@@ -133,7 +133,26 @@ describe('found by convention', () => {
     expect(sent.map(mail => new URL(mail.url!).pathname)).toEqual(['/auth/verify-email'])
   })
 
-  test('hooks given as a loader win over the file, and email: false sends no mail', async () => {
+  test('a src/auth.ts exporting an auth object is refused, pointing at module and plugin: false', async () => {
+    mkdirSync(join(root, 'src'))
+    writeFileSync(join(root, 'src/auth.ts'), 'export const auth = { plugin: {} }\n')
+
+    await expect(served({})).rejects.toThrow('auth({ plugin: false })')
+  })
+
+  test('an inline hook wins over the file\'s, and a src/auth.ts with no hooks is fine', async () => {
+    mkdirSync(join(root, 'src'))
+    writeFileSync(join(root, 'src/auth.ts'), 'export const other = 1\n')
+
+    const called: string[] = []
+    const { register } = await served({ email: false, onSignUp: ({ user }) => void called.push(user.email!) })
+
+    await register()
+
+    expect(called).toEqual(['ada@example.com'])
+  })
+
+  test('hooks given as a loader replace the file, and email: false sends no mail', async () => {
     mkdirSync(join(root, 'src'))
     writeFileSync(join(root, 'src/mail.ts'), 'export const mail = { enqueue: async () => { throw new Error("sent") } }\n')
 
@@ -147,9 +166,8 @@ describe('found by convention', () => {
 })
 
 describe('the store', () => {
-  test('is a SQLite file data/auth.db under the working directory by default', async () => {
-    const extension = auth({ captcha: false })
-    const plugin = await (extension.server as () => Promise<AnyElysia>)()
+  async function registerOn(options: Options) {
+    const plugin = await (auth({ captcha: false, ...options }).server as () => Promise<AnyElysia>)()
     const app = new Elysia().use(plugin).post('/register', async (context) => {
       const { auth: current } = context as unknown as { auth: { register: (input: unknown) => Promise<unknown> } }
 
@@ -157,8 +175,31 @@ describe('the store', () => {
     })
 
     await app.handle(new Request('http://localhost/register', { method: 'POST' }))
+  }
+
+  test('is a SQLite file at the url given, data/auth.db for sqlite://data/auth.db', async () => {
+    await registerOn({ store: { url: 'sqlite://data/auth.db' } })
 
     expect(existsSync(join(root, 'data/auth.db'))).toBe(true)
+  })
+
+  test('is KAYJS_AUTH_DATABASE_URL when set', async () => {
+    process.env.KAYJS_AUTH_DATABASE_URL = 'sqlite://data/other.db'
+
+    await registerOn({})
+
+    expect(existsSync(join(root, 'data/other.db'))).toBe(true)
+  })
+
+  test('is in memory under test, so no file is kept between runs', async () => {
+    await registerOn({})
+
+    expect(existsSync(join(root, 'data'))).toBe(false)
+  })
+
+  test('lists the database url for kay env while the app gives no store', () => {
+    expect(Object.keys((auth({}).env as unknown as { properties: object }).properties)).toEqual(['KAYJS_AUTH_DATABASE_URL'])
+    expect(Object.keys((auth({ store: memoryAuthStore() }).env as unknown as { properties: object }).properties)).toEqual([])
   })
 
   test('is the function the app gives, called as the server starts', async () => {

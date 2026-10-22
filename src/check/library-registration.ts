@@ -182,8 +182,10 @@ export function oldRegistrations(root: string, options: CheckOptions): CheckDiag
     }
   }
 
+  const bare = bareAuthCalls(ast, source, file, root, level === 'warn' ? 'warning' : 'error')
+
   if (imports.length === 0)
-    return []
+    return bare
 
   const found: Found[] = []
   // Every use of an old name that is not the import: all must be a call this rewrites, else the import stays and so do the calls.
@@ -219,7 +221,7 @@ export function oldRegistrations(root: string, options: CheckOptions): CheckDiag
   })
 
   if (found.length === 0)
-    return []
+    return bare
 
   const severity = level === 'warn' ? 'warning' : 'error'
   // An old name is fixed only where its import and every use go together, and `authPages` with `authExtension` would give two `auth` extensions, so those stay as written.
@@ -246,6 +248,50 @@ export function oldRegistrations(root: string, options: CheckOptions): CheckDiag
       ...fixable.has(form.old) && { fixes: [{ title: `Use ${form.now}({ module })`, edits, safe: true }] },
     })
   }
+
+  return [...diagnostics, ...bare]
+}
+
+// A bare `auth()` or `auth({ ...options })` beside an app module that exports its own `auth`: it used to serve the pages alone for a plugin mounted by hand, and now builds a second auth of its own. `plugin: false` keeps the old meaning.
+function bareAuthCalls(ast: t.File, source: string, file: string, root: string, severity: CheckDiagnostic['severity']): CheckDiagnostic[] {
+  const imported = ast.program.body.some(statement => statement.type === 'ImportDeclaration' && statement.importKind !== 'type' && statement.source.value === '@kaynooo/kayjs-auth' && statement.specifiers.some(specifier => specifier.type === 'ImportSpecifier' && specifier.local.name === 'auth' && (specifier.imported.type === 'Identifier' ? specifier.imported.name : specifier.imported.value) === 'auth'))
+
+  if (!imported || !exportsAuth(root, './src/auth'))
+    return []
+
+  const diagnostics: CheckDiagnostic[] = []
+
+  walk(ast, (node) => {
+    if (node.type !== 'CallExpression' || node.callee.type !== 'Identifier' || node.callee.name !== 'auth' || node.arguments.length > 1)
+      return
+
+    const [options] = node.arguments
+
+    if (options !== undefined && options.type !== 'ObjectExpression')
+      return
+
+    const properties = options?.properties ?? []
+
+    if (properties.some(property => property.type !== 'ObjectProperty' || ['module', 'server', 'plugin'].includes(keyOf(property) ?? '')))
+      return
+
+    const last = properties.at(-1)
+    let edit: Edit = { start: node.start!, end: node.end!, text: 'auth({ plugin: false })' }
+
+    if (options !== undefined)
+      edit = last === undefined ? { start: options.start!, end: options.end!, text: '{ plugin: false }' } : { start: last.end!, end: last.end!, text: ', plugin: false' }
+
+    diagnostics.push({
+      file,
+      ...positionAt(source, node.callee.start!),
+      end: node.callee.end!,
+      message: '`auth()` with no module builds its own auth, and `src/auth.ts` exports one the app mounts by hand',
+      help: 'give `auth({ plugin: false })` to keep mounting it by hand, or `auth({ module: \'./src/auth\' })` to have kay mount it',
+      code: 'deprecated-library-registration',
+      severity,
+      fixes: [{ title: 'Use auth({ plugin: false })', edits: [edit], safe: true }],
+    })
+  })
 
   return diagnostics
 }

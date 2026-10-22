@@ -38,10 +38,10 @@ export default defineConfig({
 
 - The session is kay's `session()`, on the app secret ([The app secret](/guides/sessions-and-guards#the-app-secret)).
 - The site's public origin, which OAuth callbacks, mailed links and passkeys are built on, is the `site` of `kay.config.ts` (or `SITE_URL`).
-- The store is a SQLite file `data/auth.db` kept through pg-orm. Set `KAYJS_AUTH_DATABASE_URL` to a Postgres or SQLite url, or give `store`: `{ url }`, `pgStore(db)` over your own database, or a function returning a store.
-- Mail goes through `mail.enqueue` of `src/mail.ts` when it exports `mail` (kayjs-mail). `email: false` sends none, and an `email` of your own replaces it.
+- The store is a SQLite file `data/auth.db` kept through pg-orm, and in memory under `bun test`. Set `KAYJS_AUTH_DATABASE_URL` to a Postgres or SQLite database of kayjs-auth's own, where it creates its tables. To use your app's database, give `store: () => pgStore(db)`; `store` also takes `{ url }` or a store.
+- Mail goes through `mail.enqueue` of `src/mail.ts` when it exports `mail` (kayjs-mail, themed when `mail()` is in `kay.config.ts`). `email: false` sends none, and an `email` of your own replaces it.
 - `oauth: { github: true }` reads `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` from the environment, and `kay env` lists them. The presets are github, discord, google, microsoft and gitlab. An object adds `label`, `scopes` or `keepTokens`, and `clientId` and `clientSecret` skip the environment.
-- Hooks such as `onSignUp` and `onDelete` are options too. Hooks that need your database go in an optional `src/auth.ts` that exports `hooks`, which kay finds by itself, or in `hooks: () => import('./src/auth')`, which `kay build --compile` can bake in.
+- Hooks such as `onSignUp` and `onDelete` are options too, and win over the file. Hooks that need your database go in an optional `src/auth.ts` that exports `hooks` (`satisfies AuthHooks`), which kay finds by itself, or in `hooks: () => import('./src/auth')`. An executable from `kay build --compile` bakes in only the second, and not `src/mail.ts`: give `email` in the config for one.
 - The prebuilt pages are on under `prefix` (`/auth`), and `home` (`/`) is where sign-ins and sign-outs go. `pages: false` leaves them out.
 
 Every page, action and guard can now read `ctx.locals.auth`, typed. A file of yours at a page's path, such as `src/routes/auth/sign-in.kay`, replaces that page.

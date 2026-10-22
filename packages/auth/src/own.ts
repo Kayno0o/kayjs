@@ -5,13 +5,14 @@ import type { EmailOptions } from './email'
 import type { ProviderOptions } from './oauth/providers'
 import type { AuthPagesConfig, AuthPagesOptions, UserMaker } from './pages'
 import type { AuthStore } from './store'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { s } from 'kay'
 import { configError } from 'kay/library'
 import { session } from 'kay/server'
 import { log } from './log'
+import { memoryAuthStore } from './memoryStore'
 import { discordProvider, githubProvider, gitlabProvider, googleProvider, microsoftProvider } from './oauth/providers'
 
 /** What a provider preset takes beside its credentials, which the environment supplies when they are left out. */
@@ -68,6 +69,8 @@ export interface OwnOptions<Role extends string = string, Prefix extends string 
 
 export type OwnPlugin<Role extends string, Prefix extends string, Scope extends string, OrgRole extends string, UserData extends object> = ReturnType<typeof CreateAuth<AuthSessionData, Role, Prefix, Scope, OrgRole, UserData>>['plugin']
 
+const MAIL_REGISTERED = /\bmail\(/
+
 function isPreset(app: true | PresetApp | OAuthApp): app is true | PresetApp {
   return app === true || !('provider' in app)
 }
@@ -116,20 +119,39 @@ async function storeOf(store: StoreOption | undefined): Promise<AuthStore> {
   if (store !== undefined && isStore(store))
     return store
 
-  const url = store?.url ?? process.env.KAYJS_AUTH_DATABASE_URL ?? 'sqlite://data/auth.db'
+  const url = store?.url ?? process.env.KAYJS_AUTH_DATABASE_URL
+
+  // Tests start from no users each run, as a file kept between them would not.
+  if (url === undefined && process.env.NODE_ENV === 'test')
+    return memoryAuthStore()
+
+  let orm: typeof import('@kaynooo/pg-orm')
+  let pg: typeof import('./pg')
 
   try {
-    const { Database } = await import('@kaynooo/pg-orm')
-    const { authTables, pgStore } = await import('./pg')
-    const db = new Database({ url, tables: [...authTables] })
-
-    await db.sync()
-
-    return pgStore(db)
+    orm = await import('@kaynooo/pg-orm')
+    pg = await import('./pg')
   }
   catch (error) {
-    throw configError(`kayjs-auth could not open its database (needs @kaynooo/pg-orm): ${error instanceof Error ? error.message : String(error)}. Give \`store\` to auth() to keep the data elsewhere`, { cause: error })
+    throw configError('the store of auth() is a pg-orm database, and @kaynooo/pg-orm is not installed: install it, or give `store` an AuthStore', { cause: error })
   }
+
+  const db = new orm.Database({ url: url ?? 'sqlite://data/auth.db', tables: [...pg.authTables] })
+
+  await db.sync()
+
+  return pg.pgStore(db)
+}
+
+// The hooks of `src/auth.ts`, which an app mounting its own `createAuth` result from there has not meant for this.
+async function conventionalHooks(): Promise<AuthHooks | undefined> {
+  const loaded = await conventional('src/auth.ts')
+  const own = loaded?.auth
+
+  if (typeof own === 'object' && own !== null && 'plugin' in own)
+    throw configError('src/auth.ts exports `auth`, a createAuth result, while auth() builds its own: give `auth({ module: \'./src/auth\' })` for kay to mount it, or `auth({ plugin: false })` if you mount it by hand')
+
+  return loaded?.hooks as AuthHooks | undefined
 }
 
 // The module by convention at `path` under the working directory, undefined when the app has none.
@@ -149,22 +171,36 @@ async function emailOf(email: OwnOptions['email']): Promise<EmailOptions | undef
   const mail = (await conventional('src/mail.ts'))?.mail as { enqueue?: (message: never) => unknown, send?: (message: never) => unknown } | undefined
   const send = mail?.enqueue ?? mail?.send
 
-  return send && { mailer: { send: send as never } }
+  if (send === undefined)
+    return undefined
+
+  // kayjs-mail registered in kay.config.ts brings its wording, views and theme to the mails, as `kay add auth` writes it.
+  if (!MAIL_REGISTERED.test(existsSync(resolve(process.cwd(), 'kay.config.ts')) ? readFileSync(resolve(process.cwd(), 'kay.config.ts'), 'utf8') : ''))
+    return { mailer: { send: send as never } }
+
+  try {
+    const { authMailer } = await import('@kaynooo/kayjs-mail')
+
+    return { mailer: authMailer(send as never) }
+  }
+  catch {
+    return { mailer: { send: send as never } }
+  }
 }
 
 /** The `createAuth` an `auth()` with no module makes as the server starts: kay's session, the store, the mailer and the hooks found, the pages on. */
 export async function buildOwn(options: OwnOptions): Promise<UserMaker & { plugin: AnyElysia }> {
   const { createAuth } = await import('./auth')
   const { hooks: loadHooks, store, oauth, email, pages, prefix, home, ...rest } = options
-  const hooks = loadHooks ? (await loadHooks()).hooks : (await conventional('src/auth.ts'))?.hooks as AuthHooks | undefined
+  const hooks = loadHooks ? (await loadHooks()).hooks : await conventionalHooks()
   const mailer = await emailOf(email)
 
   if (store === undefined && process.env.NODE_ENV === 'production' && process.env.KAYJS_AUTH_DATABASE_URL === undefined)
     log.warn('auth() keeps its users in data/auth.db, a SQLite file: set KAYJS_AUTH_DATABASE_URL, or `store`, for a database that outlives a deploy')
 
   const made = createAuth({
-    ...rest,
     ...hooks,
+    ...rest,
     ...prefix !== undefined && { prefix },
     sessions: session<AuthSessionData>(),
     store: await storeOf(store),
