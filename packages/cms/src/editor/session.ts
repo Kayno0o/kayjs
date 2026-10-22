@@ -15,11 +15,31 @@ export function isSignedOut(error: unknown): boolean {
   return error instanceof ApiError && error.status === 401
 }
 
-// The cms's sign-in, which leads back to the page the editor is on. It opens in a new tab, so the edits on this one are not lost.
-export function signInHref(): string {
+// The page the editor is on, under the site's mount point as its routes know it.
+function pageHere(): string {
   const base = document.querySelector<HTMLMetaElement>('meta[name="kay-base"]')?.content ?? ''
   const here = location.pathname + location.search
-  const path = base !== '' && (here === base || here.startsWith(`${base}/`)) ? here.slice(base.length) || '/' : here
 
-  return apiUrl(signInApi, '/', { query: { redirect: path } })
+  return base !== '' && (here === base || here.startsWith(`${base}/`)) ? here.slice(base.length) || '/' : here
+}
+
+// The cms's sign-in, which leads back to the page the editor is on. It opens in a new tab, so the edits on this one are not lost.
+export function signInHref(): string {
+  return apiUrl(signInApi, '/', { query: { redirect: pageHere() } })
+}
+
+const TRAILING_SLASHES = /\/+$/
+
+// Whether the page shown is the one at `url`, whatever its trailing slash and the way its characters are escaped.
+export function isShown(url: string): boolean {
+  const same = (left: string, right: string) => left.replace(TRAILING_SLASHES, '') === right.replace(TRAILING_SLASHES, '')
+  const [here = ''] = pageHere().split('?')
+  const decoded = (path: string) => {
+    try {
+      return decodeURI(path)
+    }
+    catch { return path }
+  }
+
+  return same(here, url) || same(decoded(here), decoded(url))
 }

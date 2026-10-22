@@ -4,11 +4,11 @@ import type { EntryRef } from '../kay/contract'
 import type { SavedState } from './live'
 import type { FieldPath } from '../markers'
 import Button from '@kaynooo/kayjs-ui/button.kay'
-import { refresh, resource, untrack } from 'kay'
+import { navigate, refresh, resource, untrack } from 'kay'
 import { wording } from 'kay/words'
 import editorApi from '../api/editor'
 import entriesApi from '../api/entries'
-import { collectionTitle, entryTitle, SINGLE_SLUG } from '../listing'
+import { collectionPath, collectionTitle, entryTitle, SINGLE_SLUG } from '../listing'
 import { BODY, entryKey } from '../markers'
 import { drafts } from './drafts'
 import { registerInline } from './inline'
@@ -24,6 +24,7 @@ import EntryState from '../components/entry-state.kay'
 import ResetButton from '../components/reset-button.kay'
 import { entryRoom } from '../room'
 import { changeField, deleteSaved, saveDraft, showRefusal } from './save'
+import { isShown } from './session'
 import { saveShortcut } from './shortcut'
 
 const { entry, focus, unclickable = [] } = props<{ entry: EntryRef, focus?: FieldPath | undefined, unclickable?: Unclickable[] }>()
@@ -143,15 +144,26 @@ async function askReferrers(): Promise<void> {
   referrers.set(found[entry.slug] ?? [])
 }
 
-// The page the entry rendered is gone with it, so the page is read again.
+// Set once the entry is deleted, which locks its form until the page has moved on.
+const removed = signal(false)
+
+// The page the entry rendered is gone with it. When it was the entry's own page, there is nothing to read again: the editor leads to the collection's screen, replacing that page in the history. Any other page is read again.
 async function remove(): Promise<void> {
   if (saving())
     return
 
-  if (await deleteSaved(entry, drafts.version(entry) ?? source.value()?.entry.version)) {
-    drafts.reset(entry)
+  const url = source.value()?.entry.url
+
+  if (!await deleteSaved(entry, drafts.version(entry) ?? source.value()?.entry.version))
+    return
+
+  drafts.reset(entry)
+  removed.set(true)
+
+  if (url !== undefined && isShown(url))
+    await navigate(collectionPath(can.value()?.prefix ?? '/', entry.collection), { replace: true })
+  else
     await refresh()
-  }
 }
 
 saveShortcut(save)
@@ -164,13 +176,13 @@ section.kcms-entry(aria-busy={saving()} ref={element => box = element})
         p.kcms-entry-slug {subtitle()}
     .kcms-entry-actions
       EntrySaveState(changed={drafts.changed(entry)} saving={saving()} saved={lastSave()} url={source.value()?.entry.url})
-      ResetButton(disabled={saving() || !unsaved()} onReset={() => drafts.reset(entry)})
-      Button(label={saving() ? wording('cms.entry.saving', 'Saving…') : wording('cms.entry.save', 'Save')} tone="accent" busy={saving()} disabled={saving() || !unsaved()} onClick={save})
+      ResetButton(disabled={saving() || removed() || !unsaved()} onReset={() => drafts.reset(entry)})
+      Button(label={saving() ? wording('cms.entry.saving', 'Saving…') : wording('cms.entry.save', 'Save')} tone="accent" busy={saving()} disabled={saving() || removed() || !unsaved()} onClick={save})
   // Under the head, which stays on one line on a phone.
   if source.value() as answer
     if draftField() !== undefined || (!isSingle() && !answer.seeded)
       .kcms-entry-more
-        EntryState(draftField={draftField()} draft={isDraft()} dirty={unsaved()} saving={saving()} denied={can.value()?.denied} title={title()} url={answer.entry.url} referrers={referrers()} deletable={!isSingle() && !answer.seeded} onPublish={() => setDraft(false)} onUnpublish={() => setDraft(true)} onRemove={remove} onAskReferrers={askReferrers})
+        EntryState(draftField={draftField()} draft={isDraft()} dirty={unsaved()} saving={saving() || removed()} denied={can.value()?.denied} title={title()} url={answer.entry.url} referrers={referrers()} deletable={!isSingle() && !answer.seeded} onPublish={() => setDraft(false)} onUnpublish={() => setDraft(true)} onRemove={remove} onAskReferrers={askReferrers})
   EntryPresence(room={room.room} member={room.member})
   if source.status() === 'failed'
     p.kcms-entry-failure {wording('cms.entry.loadFailure', 'Could not load this entry: {message}', { message: source.error()?.message ?? '' })}
@@ -181,7 +193,7 @@ section.kcms-entry(aria-busy={saving()} ref={element => box = element})
       p.kcms-entry-hint {wording('cms.entry.unclickable', 'A click on the page cannot reach {fields}, which it shows changed or not at all: edit it here.', { fields: unmarked() })}
     if frozen() !== ''
       p.kcms-entry-hint {wording('cms.entry.frozen', 'A click on the page cannot reach {fields}, held by a frozen object: edit it here.', { fields: frozen() })}
-    fieldset.kcms-entry-fields(disabled={saving()})
+    fieldset.kcms-entry-fields(disabled={saving() || removed()})
       EntryFields(form={scope()!})
   else
     p.kcms-entry-loading {wording('cms.entry.loading', 'Loading…')}
