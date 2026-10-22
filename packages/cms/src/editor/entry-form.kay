@@ -89,9 +89,10 @@ effect(() => {
 // A text that does not parse keeps Save and Reset enabled, so pressing Save says what to fix.
 const unsaved = () => drafts.changed(entry) || drafts.blocked(entry).length > 0
 
-async function save(): Promise<void> {
+// True once the draft is saved.
+async function save(): Promise<boolean> {
   if (!unsaved() || saving())
-    return
+    return false
 
   saving = true
 
@@ -114,6 +115,8 @@ async function save(): Promise<void> {
   // The fields are unlocked by now, so the focus can land in one.
   if (!saved)
     await showRefusal(drafts, entry)
+
+  return saved
 }
 
 // Publish and Unpublish change the draft flag alone: with edits not saved they refuse, saving nothing, and a refused save puts the flag back.
@@ -126,15 +129,14 @@ async function setDraft(value: boolean): Promise<void> {
   if (field === undefined || saving())
     return
 
-  if (drafts.changed(entry))
+  if (unsaved())
     return refuseUnsaved()
 
   const before = drafts.value(entry, field)
 
   drafts.set(entry, field, value)
-  await save()
 
-  if (drafts.changed(entry))
+  if (!await save())
     drafts.set(entry, field, before)
 }
 
@@ -152,7 +154,10 @@ async function askReferrers(): Promise<void> {
 
 // The page the entry rendered is gone with it, so the page is read again.
 async function remove(): Promise<void> {
-  if (await deleteSaved(entry, source.value()?.entry.version)) {
+  if (saving())
+    return
+
+  if (await deleteSaved(entry, drafts.version(entry) ?? source.value()?.entry.version)) {
     drafts.reset(entry)
     await refresh()
   }
@@ -170,23 +175,24 @@ section.kcms-entry(aria-busy={saving()} ref={element => box = element})
       EntrySaveState(changed={drafts.changed(entry)} saving={saving()} saved={lastSave()} url={source.value()?.entry.url})
       ResetButton(disabled={saving() || !unsaved()} onReset={() => drafts.reset(entry)})
       Button(label={saving() ? wording('cms.entry.saving', 'Saving…') : wording('cms.entry.save', 'Save')} tone="accent" busy={saving()} disabled={saving() || !unsaved()} onClick={save})
-  // Beside the head, which stays on one line on a phone.
+  // Under the head, which stays on one line on a phone.
   if source.value() as answer
-    .kcms-entry-more
-      if draftField() !== undefined
-        if can.value()?.denied.publish as reason
-          Refused(label={isDraft() ? wording('cms.entry.publish', 'Publish') : wording('cms.entry.unpublish', 'Unpublish')} reason={reason})
-        else if isDraft()
-          Button(label={wording('cms.entry.publish', 'Publish')} disabled={saving()} onClick={() => setDraft(false)})
-        else if drafts.changed(entry)
-          Button(label={wording('cms.entry.unpublish', 'Unpublish')} disabled={saving()} onClick={() => setDraft(true)})
-        else
-          ConfirmDelete(tone="neutral" trigger="button" label={wording('cms.entry.unpublish', 'Unpublish')} message={wording('cms.entry.unpublishMessage', 'Unpublish {title}? Visitors stop seeing it until you publish it again.', { title: title() })} failure={wording('cms.entry.unpublishFailure', 'Could not unpublish')} onConfirm={() => setDraft(true)})
-      if !isSingle() && !answer.seeded
-        if can.value()?.denied.delete as reason
-          Refused(label={wording('cms.bulk.delete', 'Delete')} reason={reason} tone="danger")
-        else
-          ConfirmDelete(message={deleteMessage(title(), answer.entry.url, 'entry', referrers())} onOpen={askReferrers} failure={wording('cms.save.deleteFailure', 'Could not delete')} trigger="button" onConfirm={remove})
+    if draftField() !== undefined || (!isSingle() && !answer.seeded)
+      .kcms-entry-more
+        if draftField() !== undefined
+          if can.value()?.denied.publish as reason
+            Refused(label={isDraft() ? wording('cms.entry.publish', 'Publish') : wording('cms.entry.unpublish', 'Unpublish')} reason={reason})
+          else if isDraft()
+            Button(label={wording('cms.entry.publish', 'Publish')} disabled={saving()} onClick={() => setDraft(false)})
+          else if unsaved()
+            Button(label={wording('cms.entry.unpublish', 'Unpublish')} disabled={saving()} onClick={() => setDraft(true)})
+          else
+            ConfirmDelete(tone="neutral" trigger="button" label={wording('cms.entry.unpublish', 'Unpublish')} message={wording('cms.entry.unpublishMessage', 'Unpublish {title}? Visitors stop seeing it until you publish it again.', { title: title() })} failure={wording('cms.entry.unpublishFailure', 'Could not unpublish')} onConfirm={() => setDraft(true)})
+        if !isSingle() && !answer.seeded
+          if can.value()?.denied.delete as reason
+            Refused(label={wording('cms.bulk.delete', 'Delete')} reason={reason} tone="danger")
+          else
+            ConfirmDelete(message={deleteMessage(title(), answer.entry.url, 'entry', referrers())} onOpen={askReferrers} failure={wording('cms.save.deleteFailure', 'Could not delete')} trigger="button" onConfirm={remove})
   EntryPresence(room={room.room} member={room.member})
   if source.status() === 'failed'
     p.kcms-entry-failure {wording('cms.entry.loadFailure', 'Could not load this entry: {message}', { message: source.error()?.message ?? '' })}

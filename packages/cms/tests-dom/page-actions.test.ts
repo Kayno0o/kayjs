@@ -18,10 +18,10 @@ afterEach(() => {
   localStorage.clear()
 })
 
-interface Options { collection?: object, draft?: boolean, denied?: Record<string, string>, save?: Response, locale?: string }
+interface Options { collection?: object, draft?: boolean, denied?: Record<string, string>, save?: Response, locale?: string, referrers?: Record<string, string[]> }
 
 // The entries API holding one entry, answering the role's limits and recording every write.
-function server({ collection = POSTS, draft = true, denied = {}, save, locale }: Options = {}) {
+function server({ collection = POSTS, draft = true, denied = {}, save, locale, referrers = {} }: Options = {}) {
   const writes: { method: string, url: string, body?: { data: Record<string, unknown> } }[] = []
   const stored = { slug: 'hello', locale, data: { title: 'Hello', draft }, draft, version: 'v1', url: '/posts/hello' }
 
@@ -33,7 +33,7 @@ function server({ collection = POSTS, draft = true, denied = {}, save, locale }:
       return Response.json({ denied })
 
     if (path.includes('/referrers'))
-      return Response.json({})
+      return Response.json(referrers)
 
     if (method === 'GET')
       return Response.json({ collection, entry: stored })
@@ -173,4 +173,50 @@ test('a single entry cannot be deleted from the page, a role that may not delete
   const refused = head(root).querySelectorAll('.kcms-refused')
 
   expect([...refused].map(each => each.getAttribute('data-tooltip'))).toContain('Your role may not delete')
+})
+
+test('Delete after a save names the version that save left, and the confirmation names the entries referring to it', async () => {
+  const writes = server({ referrers: { hello: ['Pages: About'] } })
+  const root = await open()
+
+  button(root, 'Publish')!.click()
+  await settle()
+  await Bun.sleep(50)
+  button(root, 'Delete')!.click()
+  await settle()
+  await Bun.sleep(50)
+  expect(document.body.textContent).toContain('Pages: About')
+
+  const confirm = [...document.querySelectorAll('button')].filter(each => each.textContent?.trim() === 'Delete').at(-1)!
+
+  confirm.click()
+  await settle()
+  await Bun.sleep(50)
+
+  const deleted = writes.find(write => write.method === 'DELETE')!
+
+  expect(new URL(deleted.url, 'http://localhost').searchParams.get('version')).toBe('v2')
+})
+
+test('Unpublish with edits not saved refuses without opening a confirmation or writing', async () => {
+  const writes = server({ draft: false })
+  const root = await open()
+  const title = root.querySelector<HTMLInputElement>('input')!
+
+  title.value = 'Mine'
+  title.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle()
+  button(root, 'Unpublish')!.click()
+  await settle()
+
+  expect(writes).toEqual([])
+  expect(button(root, 'Unpublish')).toBeDefined()
+})
+
+test('a single collection with no draft flag shows no row of actions', async () => {
+  server({ collection: SETTINGS })
+
+  const root = await open({ collection: 'index', slug: 'index' })
+
+  expect(root.querySelector('.kcms-entry-more')).toBeNull()
 })
