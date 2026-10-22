@@ -25,7 +25,7 @@ const URL_SCHEME = /^[a-z][\w+.-]*:/i
 const TEXT_IMPORT = /\bfrom\s*(['"])([^'"\n]+)\1\s*(?:with|assert)\s*\{[^}]*\btype\s*:\s*(['"])text\3[^}]*\}|\bimport\(\s*(['"])([^'"\n]+)\4\s*,\s*\{\s*with\s*:\s*\{[^}]*\btype\s*:\s*(['"])text\6[^}]*\}\s*(?:,\s*)?\}\s*\)/g
 const ANY = /.*/
 // What Tailwind resolves against the app's theme, which a stylesheet of its own reads through `@reference`.
-const THEME_USE = /@apply\b|@variant\b|@custom-variant\b|\btheme\(/
+const THEME_USE = /@apply\b|@variant\b|@custom-variant\b|\btheme\(|--(?:spacing|alpha)\(/
 const SCOPED_FILE = /^[\da-z]+\.css$/
 // Whether this process wrote or kept a scoped stylesheet, which a full build leaves in place when it prunes.
 let scopedTouched = false
@@ -123,7 +123,7 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
 
     const scoped = rebaseUrls(scopeCss(css, scopeAttribute(moduleId)), dirname(path), dirname(file))
     // `@apply` in a stylesheet of its own needs the app's Tailwind entry as a reference, which kay writes so the fence needs no line of it.
-    const entry = THEME_USE.test(scoped) ? await tailwindEntry(root, false) : undefined
+    const entry = THEME_USE.test(scoped) ? await tailwindEntry(root, true) : undefined
     const contents = entry === undefined ? scoped : `@reference ${JSON.stringify(relative(dirname(file), entry).split(sep).join('/'))};\n${scoped}`
 
     // Renamed into place, so a build reading the file while another writes it meets the old text or the new, never half of it.
