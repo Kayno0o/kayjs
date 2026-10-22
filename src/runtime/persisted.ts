@@ -13,7 +13,7 @@ export interface PersistedOptions<T> extends SignalOptions<T> {
   storage?: PersistStorage | undefined
   // How long a cookie is kept after the last write, a year by default: `'30d'`. Only the cookie takes one; `local` and `query` keep no time.
   maxAge?: Duration | undefined
-  // The values the signal may hold, the default among them: a kept value outside them, stale or edited by hand, reads as the default, on the server and in the browser. Compared as `===`, so for text, numbers and booleans. Cookie and `local` storage only.
+  // The values the signal may hold, the default among them: a kept value outside them, stale or edited by hand, reads as the default, on the server and in the browser. Compared as `===`, so for text, numbers and booleans.
   values?: readonly T[] | undefined
 }
 
@@ -21,13 +21,14 @@ export interface PersistedOptions<T> extends SignalOptions<T> {
 // A string unless `T` says otherwise, for a param the page's `query` schema reads as another type: the URL holds text.
 export function persisted<T = string>(name: string, value: NoInfer<PlainValue<T>>, options: Omit<PersistedOptions<NoInfer<T>>, 'maxAge' | 'values'> & { storage: 'query' }): Signal<T>
 // `values` types the signal as their union, and the default must be one of them.
+export function persisted<const T extends string | number | boolean>(name: string, value: NoInfer<T>, options: Omit<PersistedOptions<T>, 'maxAge'> & { storage: 'query', values: readonly T[] }): Signal<T>
 export function persisted<const T extends string | number | boolean>(name: string, value: NoInfer<T>, options: PersistedOptions<T> & { storage?: 'cookie' | undefined, values: readonly T[] } | Omit<PersistedOptions<T>, 'maxAge'> & { storage: 'local', values: readonly T[] }): Signal<T>
 export function persisted<T>(name: string, value: PlainValue<T>, options?: Omit<PersistedOptions<T>, 'values'> & { storage?: 'cookie' | undefined } | Omit<PersistedOptions<T>, 'maxAge' | 'values'> & { storage: 'local' }): Signal<T>
 export function persisted<T>(name: string, value: PlainValue<T>, options?: PersistedOptions<T>): Signal<T> {
   const [own, write] = createSignal<T>(value, options)
   const storage = options?.storage ?? 'cookie'
   // The same as `queryParam(name)`, `value` standing for the param left out.
-  const kept = storage === 'query' ? keepParam(name, own, write, value as T) : keepValue(name, storage, own, write, options?.maxAge, options?.values)
+  const kept = storage === 'query' ? keepParam(name, own, write, value as T, options?.values) : keepValue(name, storage, own, write, options?.maxAge, options?.values)
 
   return withSetter(kept.read, (next) => {
     write(next)

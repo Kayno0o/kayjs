@@ -10,6 +10,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui has a `BarChart`: vertical bars over a time or category axis in plain HTML, a bar coloured and annotated from its own status, stacked series ([BarChart](../packages/ui/llms/charts-drag-and-media.md)).
 - A `.kay` file that does not compile fails only the `testSite()` visit of the pages importing it, with the error naming the file, so the tests of other pages stay green ([Test site](testing.md#test-site)).
 - `unannounced-click` leaves a `dialog` or `alertdialog` role, or `aria-modal`, alone, as a backdrop closing on a click is a pointer shortcut for Escape ([Checks](checks.md)).
+- `persisted(name, value, { storage: 'query', values })` reads a param outside `values` as the default and types the signal as their union ([Islands](islands.md)).
 - kayjs-ui's `TooltipHost` shows a `data-hint` under the pointer, a hover explanation of read-only text that `unreachable-tooltip` leaves alone ([Icons, buttons, toasts, dialogs](../packages/ui/llms/basics.md)).
 - `innerHTML={waves}` takes a project file imported as text, `import waves from './waves.svg' with { type: 'text' }`, with no `trustHtml` ([Templates](templates.md)).
 - `unannounced-click` leaves a `dialog` or `alertdialog` role, or `aria-modal` other than `"false"`, alone, as a backdrop closing on a click is a pointer shortcut for Escape ([Checks](checks.md)).

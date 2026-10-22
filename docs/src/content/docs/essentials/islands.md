@@ -132,7 +132,7 @@ export const theme = persisted('theme', 'light')
 
 `persisted` keeps its value across pages and visits in a cookie. The server reads the cookie too, so the first paint is right. The cookie lasts a year; pass `{ maxAge: '30d' }` for another time.
 
-A cookie can hold a value your app never offers, after an old release or an edit by hand. Name the values the signal may hold, and anything else reads as the default, on the server and in the browser: `persisted('theme', 'light', { values: ['light', 'dark'] })`. The signal is then typed `'light' | 'dark'`, and a default outside them is a type error.
+A cookie can hold a value your app never offers, after an old release or an edit by hand. Name the values the signal may hold, and anything else reads as the default, on the server and in the browser: `persisted('theme', 'light', { values: ['light', 'dark'] })`. The signal is then typed `'light' | 'dark'`, and a default outside them is a type error. A param kept in the URL takes `values` too: `persisted('tab', 'site', { storage: 'query', values: ['site', 'logs'] })`.
 
 Pass `{ storage: 'query' }` to keep a string in the page's URL instead, as `?q=...`. A filter then survives a reload and a shared link.
 

@@ -174,6 +174,15 @@ describe('page swap, on the server', () => {
     expect(read('http://localhost/?page=x')).toEqual(['all', 1])
   })
 
+  it('reads a persisted query param outside its values as the default, on the server', () => {
+    const report = () => undefined
+    const read = (url: string) => inServerScope(new Request(url), report, (): unknown[] => [persisted('tab', 'site', { storage: 'query', values: ['site', 'logs'] })(), persisted('n', 1, { storage: 'query', values: [1, 2] })()], undefined, { n: { type: 'integer' } })
+
+    expect(read('http://localhost/?tab=logs&n=2')).toEqual(['logs', 2])
+    expect(read('http://localhost/?tab=nope&n=3')).toEqual(['site', 1])
+    expect(read('http://localhost/')).toEqual(['site', 1])
+  })
+
   it('marks an island kept across navigations, under its component or a key of its own', () => {
     const Player = island('player.kay', () => rendered('<button>Play</button>'))
 
@@ -414,6 +423,14 @@ describe('page swap, checking a form in the browser', () => {
       document.head.innerHTML = ''
       timers.restore()
     }
+  })
+
+  it('reads a persisted query param outside its values as the default, in the browser', () => {
+    setURL('http://localhost/list?tab=nope')
+    expect(persisted('tab', 'site', { storage: 'query', values: ['site', 'logs'] })()).toBe('site')
+
+    setURL('http://localhost/list?tab=logs')
+    expect(persisted('tab', 'site', { storage: 'query', values: ['site', 'logs'] })()).toBe('logs')
   })
 
   it('writes fast-changing query params with one replaceState per 200 ms for all of them, the latest values in the address, the signals always current', () => {

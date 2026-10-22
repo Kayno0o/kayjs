@@ -76,16 +76,17 @@ function fromText(rule: ParamRule, text: string): unknown {
 
 // What `queryParam` reads and keeps, around the signal's own `read`: the server reads the request's param, the browser the page's address once, then each write takes the current history entry's place.
 // A param left out reads as the signal's own value, `fallback` for `persisted(name, fallback, { storage: 'query' })`, which writing it leaves out too.
-export function keepParam<T>(name: string, read: () => T, write: (value: T) => void, fallback?: T): Persisted<T> {
+// A value outside `values` reads as the param left out.
+export function keepParam<T>(name: string, read: () => T, write: (value: T) => void, fallback?: T, values?: readonly unknown[]): Persisted<T> {
   return keep<T>({
-    request: scope => found(scope.param(name)),
-    stored: () => found(readParam(pageRules(), name, new URL(location.href).searchParams)),
+    request: scope => found(scope.param(name), values),
+    stored: () => found(readParam(pageRules(), name, new URL(location.href).searchParams), values),
     save: value => saveParam(name, value, fallback),
   }, read, write)
 }
 
-function found<T>(value: unknown): Stored<T> {
-  return value === undefined ? { found: false } : { found: true, value: value as T }
+function found<T>(value: unknown, values?: readonly unknown[]): Stored<T> {
+  return value === undefined || (values !== undefined && !values.includes(value)) ? { found: false } : { found: true, value: value as T }
 }
 
 function pageRules(): QueryRules | undefined {

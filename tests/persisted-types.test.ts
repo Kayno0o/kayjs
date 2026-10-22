@@ -14,10 +14,15 @@ it('types a persisted signal as the union of the values it names, and refuses a 
   // @ts-expect-error a value the signal is set to must be one of the values
   theme.set('blue')
 
+  const tab: Signal<'site' | 'logs'> = persisted('tab', 'site', { storage: 'query', values: ['site', 'logs'] })
+
+  // @ts-expect-error the default of a query param must be one of the values
+  persisted('outside', 'blue', { storage: 'query', values: ['site', 'logs'] })
+
   // @ts-expect-error local storage keeps no time
   persisted('local', 'a', { values: ['a', 'b'], storage: 'local', maxAge: '30d' })
 
-  expect([theme, size, kept, named]).toHaveLength(4)
+  expect([theme, size, kept, named, tab]).toHaveLength(5)
 })
 
 it('leaves a persisted signal without values typed from its default, or from the type given', () => {
