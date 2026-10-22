@@ -21,7 +21,7 @@ import { pages } from 'kay/server'
 export const app = new Elysia().get('/mine', () => 'mine').use(await pages())
 
 await Bun.sleep(100)
-app.listen({ port: Number(process.env.PORT), hostname: '127.0.0.1' })
+app.listen({ port: Number(process.env.PORT) + 1, hostname: '127.0.0.1' })
 `
 
 function freePort(): number {
@@ -118,7 +118,7 @@ describe('an entry that does not listen', () => {
     const child = await started(late, port)
 
     try {
-      expect(await until(async () => body(`http://127.0.0.1:${port}/mine`))).toBe('mine')
+      expect(await until(async () => body(`http://127.0.0.1:${port + 1}/mine`))).toBe('mine')
       await Bun.sleep(300)
       expect(child.exitCode).toBeNull()
     }

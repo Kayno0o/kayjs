@@ -1,10 +1,12 @@
 import type { AnyElysia } from 'elysia'
 import process from 'node:process'
+import { kayLog } from '../runtime/log'
 
 // On `globalThis`, as `kay dev`'s preload reads it from its own copy of this module.
 const PENDING = Symbol.for('kay.autoListen')
-// How long an app `pages()` returned may go unused before it is taken to be the whole app.
+// How long an app `pages()` returned may go unused before it is left alone.
 const UNUSED_MS = 200
+// One turn of the event loop, enough for an entry to reach its `listen` after `await pages()`.
 const TURN_MS = 5
 
 interface WithParent {
@@ -43,9 +45,26 @@ function listening(app: AnyElysia): boolean {
 function listen(app: AnyElysia): void {
   const { HOST } = process.env
 
+  const original = app.listen
+
   app.listen({ port: Number(process.env.PORT ?? 3000), ...HOST !== undefined && { hostname: HOST } })
-  // An entry reaching its own `listen` after an `await` finds the server it asked for.
-  app.listen = (() => app) as AnyElysia['listen']
+  // An entry reaching its own `listen` after an `await` replaces the server kay started with the one it asks for.
+  app.listen = ((...args: Parameters<AnyElysia['listen']>) => {
+    void app.server?.stop(true)
+    app.server = null
+    app.listen = original
+
+    return original(...args)
+  }) as AnyElysia['listen']
+}
+
+function listenSafely(app: AnyElysia): void {
+  try {
+    listen(app)
+  }
+  catch (error) {
+    kayLog('error', 'the server could not listen', error)
+  }
 }
 
 // The apps of a run that a reload replaced are not listened: their servers were stopped to be taken over.
@@ -53,7 +72,7 @@ export function forgetIdleApps(): void {
   pending().clear()
 }
 
-// Listens every app waiting at once, as `kay dev` does right after a reload, whose entry ran to its end, and compares the servers started with the run before.
+// Listens every app waiting at once, for `kay dev` right after a reload, whose entry ran to its end.
 export function listenIdleApps(): void {
   const apps = pending()
 
@@ -67,7 +86,7 @@ export function listenIdleApps(): void {
   }
 }
 
-// An app is listened a turn after it was seen in the entry's app, as an `await` on `pages()` returns a turn after it was made, or past `UNUSED_MS` when it is the entry's whole app.
+// An app is listened a turn after it was seen in the entry's app, as an `await` on `pages()` returns a turn after it was made, or dropped past `UNUSED_MS` when no app ever used it.
 function settle(): void {
   const apps = pending()
 
@@ -80,8 +99,8 @@ function settle(): void {
     if (listening(app) || (used && idle.seen) || (!used && Date.now() - idle.since > UNUSED_MS)) {
       apps.delete(plugin)
 
-      if (!listening(app))
-        listen(app)
+      if (used && !listening(app))
+        listenSafely(app)
     }
     else if (used) {
       idle.seen = true
