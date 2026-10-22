@@ -111,8 +111,10 @@ async function listenAfterEntry(): Promise<void> {
   try {
     await import(Bun.main)
   }
-  catch {
-    // The entry failed, which it reports itself.
+  catch (error) {
+    // The entry failing reports itself; this says it left the app unlistened.
+    kayLog('error', 'the server was not listened, as its entry did not run to its end', error)
+
     return
   }
 

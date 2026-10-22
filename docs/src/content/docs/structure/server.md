@@ -14,7 +14,7 @@ import { pages } from 'kay/server'
 export const app = new Elysia().use(await pages())
 ```
 
-The entry never calls `listen`: `kay dev`, `kay start` and the executable listen it on `PORT` (3000 by default) and `HOST`, and one that calls `listen` itself keeps its own port and address.
+The entry never calls `listen`: `kay dev`, `kay start` and the executable listen it on `PORT` (3000 by default) and `HOST`, and one that calls `listen` itself keeps its own port and address. The listen happens once the entry module has run to its end, so an entry that starts a `Bun.serve` server of its own is left alone, and one whose top-level code never ends is never listened.
 
 Exporting `app` lets `kay check` check links against your own routes and type `ctx.locals`, from what the app's Elysia plugins add. `kay dev` and `kay build --compile` run this entry by default, and `--entry` names another.
 

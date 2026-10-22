@@ -249,14 +249,15 @@ describe('kay dev with a HOST exported', () => {
     const port = freePort()
     const dir = await project('auto-listen-host-', IDLE)
     const before = process.env.HOST
-
-    // An address this machine does not have: listening on it would fail.
-    process.env.HOST = '203.0.113.7'
-
-    const lines: string[] = []
-    const stop = await dev(dir, { port, log: line => lines.push(line) })
+    let stop: (() => Promise<void>) | undefined
 
     try {
+      // An address this machine does not have: listening on it would fail.
+      process.env.HOST = '203.0.113.7'
+
+      const lines: string[] = []
+
+      stop = await dev(dir, { port, log: line => lines.push(line) })
       expect(await until(async () => body(`http://localhost:${port}/mine`))).toBe('mine')
     }
     finally {
@@ -265,7 +266,8 @@ describe('kay dev with a HOST exported', () => {
       else
         process.env.HOST = before
 
-      await stop()
+      await stop?.()
+
       await Bun.$`rm -rf ${dir}`.quiet()
     }
   }, 60_000)

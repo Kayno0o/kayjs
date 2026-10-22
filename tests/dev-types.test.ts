@@ -43,8 +43,10 @@ function groupAlive(pid: number): boolean {
   }
 }
 
+// A check held for 30 s by a config that sleeps once the types process loads it, which it says by writing a marker first.
 async function midCheck(): Promise<{ types: TypesProcess, pid: number, stdin: { end: () => unknown } }> {
-  const root = await project({ 'src/routes/index.kay': 'h1 Home\n' })
+  const marker = join(await scratchDir('dev-types-marker-'), 'loading')
+  const root = await project({ 'src/routes/index.kay': 'h1 Home\n', 'kay.config.ts': `import { writeFileSync } from 'node:fs'\n\nif (process.argv[1]?.endsWith('types.ts')) {\n  writeFileSync(${JSON.stringify(marker)}, 'x')\n  await Bun.sleep(30_000)\n}\n\nexport default {}\n` })
   const types = new TypesProcess(root, undefined)
   const checking = types.write(false, REFUSE, CHECK)
   const current = () => (types as unknown as { child?: { pid: number, stdin: { end: () => unknown } } }).child
@@ -55,11 +57,9 @@ async function midCheck(): Promise<{ types: TypesProcess, pid: number, stdin: { 
     }
     catch {}
   })()
-  await until(() => current() !== undefined)
+  await until(() => existsSync(marker))
 
   const child = current()!
-
-  await until(() => groupAlive(child.pid))
 
   return { types, pid: child.pid, stdin: child.stdin }
 }
@@ -179,7 +179,7 @@ describe('the type check beside kay dev', () => {
 
     try {
       void stdin.end()
-      await until(() => !groupAlive(pid), 10_000)
+      await until(() => !groupAlive(pid), 5000)
     }
     finally {
       types.close()
