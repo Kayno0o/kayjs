@@ -494,10 +494,12 @@ describe('data', () => {
 
   test('Progress is a named progressbar, determinate with a value out of max (100 by default) and indeterminate without', async () => {
     expect(await attributes('/data', '#progress [role="progressbar"]', ['aria-valuenow', 'aria-label', 'data-indeterminate'])).toEqual([{ 'aria-valuenow': '43', 'aria-label': 'Export', 'data-indeterminate': null }])
+    expect(await attributes('/data', '#progress [data-part=fill]', ['data-indeterminate'])).toEqual([{ 'data-indeterminate': null }])
     expect((await one('/data', '#progress [data-part=fill]')).attributes.style).toBe('width: 42.6%')
     expect(await attributes('/data', '#progress-max [role="progressbar"]', ['aria-valuenow'])).toEqual([{ 'aria-valuenow': '50' }])
     expect((await one('/data', '#progress-max [data-part=fill]')).attributes.style).toBe('width: 50%')
     expect(await attributes('/data', '#indeterminate [role="progressbar"]', ['aria-valuenow', 'data-indeterminate'])).toEqual([{ 'aria-valuenow': null, 'data-indeterminate': '' }])
+    expect(await attributes('/data', '#indeterminate [data-part=fill]', ['data-indeterminate'])).toEqual([{ 'data-indeterminate': '' }])
   })
 
   test('Skeleton hides its bars from screen readers, shortens the last, and announces its label as a status', async () => {
