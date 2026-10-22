@@ -1,4 +1,5 @@
 import type { AnyElysia } from 'elysia'
+import type { ExtensionApp } from 'kay/server'
 import type { AuthOptions, createAuth as CreateAuth } from './auth'
 import type { AuthSessionData, OAuthApp } from './core'
 import type { EmailOptions } from './email'
@@ -61,7 +62,7 @@ export interface OwnOptions<Role extends string = string, Prefix extends string 
   store?: StoreOption | undefined
   // Mail for verification, resets and magic links. Left out, `src/mail.ts` exporting kayjs-mail's `mail` sends them; `false` sends none.
   email?: EmailOptions | false | undefined
-  // The hooks as a module the app loads, `() => import('./src/auth')`, in place of `src/auth.ts` exporting `hooks`, which is read by convention but cannot be baked into an executable.
+  // The hooks as a module the app loads, `() => import('./src/auth')`, in place of `src/auth.ts` exporting `hooks`, which kay reads by convention, bakes into an executable and reloads under `kay dev`.
   hooks?: (() => Promise<{ hooks: AuthHooks }>) | undefined
   // As with a module: the user is read ahead of the pages reaching `SignedIn`, `SignedOut` or `UserMenu`, of every page for `true`, of none for `false`.
   viewer?: boolean | undefined
@@ -70,6 +71,8 @@ export interface OwnOptions<Role extends string = string, Prefix extends string 
 export type OwnPlugin<Role extends string, Prefix extends string, Scope extends string, OrgRole extends string, UserData extends object> = ReturnType<typeof CreateAuth<AuthSessionData, Role, Prefix, Scope, OrgRole, UserData>>['plugin']
 
 const MAIL_REGISTERED = /\bmail\(/
+// A relative SQLite path: `sqlite://data/auth.db`, not `sqlite:///srv/auth.db` or `sqlite://:memory:`.
+const SQLITE_FILE = /^sqlite:(?:\/\/)?(?![/:])([^?]+)$/
 
 function isPreset(app: true | PresetApp | OAuthApp): app is true | PresetApp {
   return app === true || !('provider' in app)
@@ -112,7 +115,14 @@ function isStore(store: AuthStore | StoreUrl): store is AuthStore {
   return 'users' in store
 }
 
-async function storeOf(store: StoreOption | undefined): Promise<AuthStore> {
+// A SQLite file named by a relative path is kept under the project root, wherever the process runs.
+function underRoot(url: string, root: string): string {
+  const file = SQLITE_FILE.exec(url)?.[1]
+
+  return file === undefined ? url : `sqlite://${resolve(root, file)}`
+}
+
+async function storeOf(store: StoreOption | undefined, root: string): Promise<AuthStore> {
   if (typeof store === 'function')
     return store()
 
@@ -136,7 +146,7 @@ async function storeOf(store: StoreOption | undefined): Promise<AuthStore> {
     throw configError('the store of auth() is a pg-orm database, and @kaynooo/pg-orm is not installed: install it, or give `store` an AuthStore', { cause: error })
   }
 
-  const db = new orm.Database({ url: url ?? 'sqlite://data/auth.db', tables: [...pg.authTables] })
+  const db = new orm.Database({ url: underRoot(url ?? 'sqlite://data/auth.db', root), tables: [...pg.authTables] })
 
   await db.sync()
 
@@ -144,8 +154,7 @@ async function storeOf(store: StoreOption | undefined): Promise<AuthStore> {
 }
 
 // The hooks of `src/auth.ts`, which an app mounting its own `createAuth` result from there has not meant for this.
-async function conventionalHooks(): Promise<AuthHooks | undefined> {
-  const loaded = await conventional('src/auth.ts')
+function conventionalHooks(loaded: Record<string, unknown> | undefined): AuthHooks | undefined {
   const own = loaded?.auth
 
   if (typeof own === 'object' && own !== null && 'plugin' in own)
@@ -154,28 +163,21 @@ async function conventionalHooks(): Promise<AuthHooks | undefined> {
   return loaded?.hooks as AuthHooks | undefined
 }
 
-// The module by convention at `path` under the working directory, undefined when the app has none.
-async function conventional(path: string): Promise<Record<string, unknown> | undefined> {
-  const file = resolve(process.cwd(), path)
-
-  return existsSync(file) ? await import(file) as Record<string, unknown> : undefined
-}
-
-async function emailOf(email: OwnOptions['email']): Promise<EmailOptions | undefined> {
+async function emailOf(email: OwnOptions['email'], app: ExtensionApp): Promise<EmailOptions | undefined> {
   if (email === false)
     return undefined
 
   if (email !== undefined)
     return email
 
-  const mail = (await conventional('src/mail.ts'))?.mail as { enqueue?: (message: never) => unknown, send?: (message: never) => unknown } | undefined
+  const mail = app.modules.mail?.mail as { enqueue?: (message: never) => unknown, send?: (message: never) => unknown } | undefined
   const send = mail?.enqueue ?? mail?.send
 
   if (send === undefined)
     return undefined
 
   // kayjs-mail registered in kay.config.ts brings its wording, views and theme to the mails, as `kay add auth` writes it.
-  if (!MAIL_REGISTERED.test(existsSync(resolve(process.cwd(), 'kay.config.ts')) ? readFileSync(resolve(process.cwd(), 'kay.config.ts'), 'utf8') : ''))
+  if (!MAIL_REGISTERED.test(existsSync(resolve(app.root, 'kay.config.ts')) ? readFileSync(resolve(app.root, 'kay.config.ts'), 'utf8') : ''))
     return { mailer: { send: send as never } }
 
   try {
@@ -189,11 +191,11 @@ async function emailOf(email: OwnOptions['email']): Promise<EmailOptions | undef
 }
 
 /** The `createAuth` an `auth()` with no module makes as the server starts: kay's session, the store, the mailer and the hooks found, the pages on. */
-export async function buildOwn(options: OwnOptions): Promise<UserMaker & { plugin: AnyElysia }> {
+export async function buildOwn(options: OwnOptions, app: ExtensionApp): Promise<UserMaker & { plugin: AnyElysia }> {
   const { createAuth } = await import('./auth')
   const { hooks: loadHooks, store, oauth, email, pages, prefix, home, ...rest } = options
-  const hooks = loadHooks ? (await loadHooks()).hooks : await conventionalHooks()
-  const mailer = await emailOf(email)
+  const hooks = loadHooks ? (await loadHooks()).hooks : conventionalHooks(app.modules.hooks)
+  const mailer = await emailOf(email, app)
 
   if (store === undefined && process.env.NODE_ENV === 'production' && process.env.KAYJS_AUTH_DATABASE_URL === undefined)
     log.warn('auth() keeps its users in data/auth.db, a SQLite file: set KAYJS_AUTH_DATABASE_URL, or `store`, for a database that outlives a deploy')
@@ -203,7 +205,7 @@ export async function buildOwn(options: OwnOptions): Promise<UserMaker & { plugi
     ...rest,
     ...prefix !== undefined && { prefix },
     sessions: session<AuthSessionData>(),
-    store: await storeOf(store),
+    store: await storeOf(store, app.root),
     ...oauth && { oauth: Object.fromEntries(Object.entries(oauth).map(([name, app]) => [name, appOf(name, app)])) },
     ...mailer && { email: mailer },
     pages: pages === false ? undefined : { prefix: prefix ?? '/auth', home: home ?? '/', ...typeof pages === 'object' && pages },

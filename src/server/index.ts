@@ -12,7 +12,7 @@ import { recordBootFailure, trackDevErrors } from './dev-errors'
 import { START_PARENT } from './parent'
 import { projectSource } from './source'
 
-export type { ExtensionProblem, KayConfig, KayExtension } from '../config'
+export type { ExtensionApp, ExtensionProblem, KayConfig, KayExtension } from '../config'
 export { defineConfig } from '../config'
 export type { LiveStore } from '../runtime/live-value'
 export type { PreviewScope } from '../runtime/preview'

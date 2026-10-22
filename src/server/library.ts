@@ -17,6 +17,7 @@ export interface Logo {
 }
 export { KAY_DIR, underKayDev } from '../build/assets'
 export type { KayCommand, Parsed } from '../commands/command'
+export { appModules } from '../config'
 export type { DataValue, JsonSchema } from '../content/edit'
 export type { ToolResult } from '../mcp/protocol'
 export { byteSize } from '../runtime/byte-size'

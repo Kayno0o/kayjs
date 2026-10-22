@@ -317,6 +317,27 @@ describe.concurrent('kay dev reloading', () => {
     }
   }, 60_000)
 
+  it('reloads the files an extension names in appFiles when one is added, edited or removed, in the one process', async () => {
+    const project = await served({
+      'src/routes/index.kay': 'p home\n',
+      'kay.config.ts': 'import { Elysia } from \'elysia\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [{ name: \'probe\', appFiles: { hooks: \'src/probe.ts\' }, server: ({ modules }) => new Elysia().get(\'/probe\', () => `word:${modules.hooks?.word ?? \'none\'}`) }] })\n',
+    })
+
+    try {
+      await project.sees('word:none', '/probe')
+      await project.write('src/probe.ts', 'export const word = "one"\n')
+      await project.sees('word:one', '/probe')
+      await project.replace('src/probe.ts', 'export const word = "two"\n')
+      await project.sees('word:two', '/probe')
+      await rm(join(project.root, 'src/probe.ts'))
+      await project.sees('word:none', '/probe')
+      expect(project.children).toHaveLength(1)
+    }
+    finally {
+      await project.cleanup()
+    }
+  }, 60_000)
+
   it('holds one listener and one interval of the entry after twenty reloads', async () => {
     const project = await served({ 'src/routes/index.kay': 'h1 Edit 0\n' })
     const counts = join(project.root, '.counts')
@@ -471,6 +492,30 @@ describe('the modules a change leaves stale', () => {
       expect(planReload({ ...input, changed: ['kay.config.ts'] })).toEqual({ restart: 'kay.config.ts is the config' })
       expect(planReload({ ...input, changed: ['src/server.ts'] })).toEqual({ restart: 'src/server.ts is the server entry' })
       expect(planReload({ ...input, changed: ['content/post.md'] })).toEqual({ restart: 'content/post.md is no module kay loaded' })
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('treats the files an extension names as its own: an added one reloads the app, an edited one and one that imports a helper too, and an undeclared file still needs a new process', async () => {
+    const dir = await scratchDir('reload-plan-app-files-')
+
+    await Bun.write(join(dir, 'src/probe.ts'), 'import { word } from "./lib/word"\nexport const hooks = word\n')
+    await Bun.write(join(dir, 'src/lib/word.ts'), 'export const word = 1\n')
+    await Bun.write(join(dir, 'src/server.ts'), '')
+    await Bun.write(join(dir, 'kay.config.ts'), 'export default {}\n')
+
+    try {
+      const real = realpathSync(dir)
+      const at = (file: string) => join(real, file)
+      const input = { root: dir, loaded: ['src/probe.ts', 'src/lib/word.ts', 'src/server.ts', 'kay.config.ts'].map(at), owned: [at('src/routes'), at('src/api')], files: [at('src/probe.ts'), at('src/added.ts')], config: at('kay.config.ts'), entry: at('src/server.ts') }
+
+      expect(planReload({ ...input, changed: ['src/probe.ts'] })).toEqual({ evict: [at('src/probe.ts'), at('src/server.ts')] })
+      expect('evict' in planReload({ ...input, changed: ['src/lib/word.ts'] })).toBe(true)
+      // Added, so loaded by no one yet.
+      expect(planReload({ ...input, changed: ['src/added.ts'] })).toEqual({ evict: [at('src/server.ts')] })
+      expect(planReload({ ...input, files: [], changed: ['src/added.ts'] })).toEqual({ restart: 'src/added.ts is no module kay loaded' })
     }
     finally {
       await rm(dir, { recursive: true, force: true })

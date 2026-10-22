@@ -22,8 +22,8 @@ import type { Rewrite } from './server/rewrite'
 import type { Prefetch } from './server/speculation'
 import type { FileStore } from './server/storage'
 import type { Tracer } from './server/trace'
-import { existsSync, readdirSync, realpathSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { existsSync, readdirSync, realpathSync, statSync } from 'node:fs'
+import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { libraryMessageExtensions } from './build/manifests'
 import { KayError } from './compiler/errors'
@@ -400,6 +400,13 @@ export interface ExtensionProblem {
   help?: string | undefined
 }
 
+// What kay hands an extension's `server` function: the root its own files (a database file, a cache) live under, and the modules of the files it named in `appFiles`.
+export interface ExtensionApp {
+  // The project root, or the folder an executable runs in.
+  root: string
+  modules: Record<string, Record<string, unknown> | undefined>
+}
+
 // What a library hands the app to list in `extensions`: pages it serves, the texts they show, the config it needs and the server plugin they run on, as if they were the app's own.
 export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   name: string
@@ -411,7 +418,9 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   staticFiles?: Record<string, string> | undefined
   // An Elysia plugin `pages()` uses before the pages, actions and API modules, so its derives reach their `ctx.locals` and `kay check` types them; scoped or global hooks reach them, local ones only the plugin's own routes.
   // Given as a function, it is called only when `pages()` builds the app, never when `kay check`, the editor or `kay build` read the config: the way to hand a plugin built on a database or the server's environment.
-  server?: Server | (() => Server | Promise<Server>) | undefined
+  server?: Server | ((app: ExtensionApp) => Server | Promise<Server>) | undefined
+  // Optional files of the app the extension reads, by the name it reads them by and their path under the project root: `{ hooks: 'src/auth.ts' }`. kay imports each one that exists as the server starts and hands the modules to a `server` function as `app.modules` (undefined for a file the app has not written), bakes them into an executable `kay build --compile` makes, and reloads them under `kay dev` when one is edited, added or removed. A path outside the project root stops the server.
+  appFiles?: Record<string, string> | undefined
   // The server plugin named by the module that exports it, `{ path: './src/auth', export: 'auth' }` for `export const auth` (`default` by default): imported only as `pages()` builds the app, and baked into an executable `kay build --compile` makes, which a path built at run time inside a library could not be. The export is the plugin, a function building it, or an object carrying it as `plugin`, as a library's `createAuth` result does. `kay check` types the locals off the module itself, and off the extension's `Server` argument when it has one; used beside `server`, the module wins. A path is relative to the project root. `prepare` runs with the export before the plugin is taken from it, for a library to hand the app's module what the extension was given; a throw stops the server.
   serverModule?: { path: string, export?: string | undefined, prepare?: ((exported: unknown) => void | Promise<void>) | undefined } | undefined
   // Config laid under the app's `kay.config.ts`: objects merged key by key, arrays joined with the extension's items first, any other value the app sets winning. Bun plugins the library's files need go in its `plugins`.
@@ -458,12 +467,52 @@ export function serverExtensions(root: string, extensions: KayExtension[] | unde
 
 // The server plugins the extensions carry, in their order, those given as a function built now.
 export async function extensionServers(extensions: KayExtension[] | undefined, root: string): Promise<{ name: string, server: AnyElysia }[]> {
-  return Promise.all((extensions ?? []).flatMap(({ name, server, serverModule }) => {
+  return Promise.all((extensions ?? []).flatMap((extension) => {
+    const { name, server, serverModule } = extension
+
     if (serverModule !== undefined)
       return [(async () => ({ name, server: await serverFromModule(name, serverModule, root) }))()]
 
-    return server === undefined ? [] : [(async () => ({ name, server: typeof server === 'function' ? await server() : server }))()]
+    return server === undefined ? [] : [(async () => ({ name, server: typeof server === 'function' ? await server({ root: bundled() ? process.cwd() : root, modules: await appModules(root, extension) }) : server }))()]
   }))
+}
+
+// The file of `path` under `root` that an extension names in `appFiles`, refusing one outside the root.
+function appFileOf(root: string, extension: string, name: string, path: string): string {
+  const file = resolve(root, path)
+  const inside = relative(root, file)
+
+  if (inside === '' || inside === '..' || inside.startsWith(`..${sep}`) || isAbsolute(inside))
+    throw new KayError('config-invalid', `kay: the extension ${extension} names its file ${name} as ${path}, which is not under the project root`)
+
+  return file
+}
+
+function hasAppFile(file: string): boolean {
+  const held = bundled()
+
+  return held ? file in held.modules : statSync(file, { throwIfNoEntry: false })?.isFile() === true
+}
+
+// The files the extensions name in `appFiles`, absolute under the project root, written or not.
+export function declaredAppFiles(root: string, extensions: KayExtension[] | undefined): string[] {
+  return (extensions ?? []).flatMap(({ name, appFiles }) => Object.entries(appFiles ?? {}).map(([key, path]) => appFileOf(root, name, key, path)))
+}
+
+// Those of them the app has written.
+export function extensionAppFiles(root: string, extensions: KayExtension[] | undefined): string[] {
+  return declaredAppFiles(root, extensions).filter(file => hasAppFile(file))
+}
+
+// The modules of the files an extension names in `appFiles`, undefined for one the app has not written; an executable holds the copies its build found under the root it was built in.
+export async function appModules(root: string, { name, appFiles }: Pick<KayExtension, 'name' | 'appFiles'>): Promise<ExtensionApp['modules']> {
+  const base = bundled()?.root ?? root
+
+  return Object.fromEntries(await Promise.all(Object.entries(appFiles ?? {}).map(async ([key, path]) => {
+    const file = appFileOf(base, name, key, path)
+
+    return [key, hasAppFile(file) ? await importModule<Record<string, unknown>>(file) : undefined] as const
+  })))
 }
 
 // The module files the extensions name their server plugin by, as the executable holds them.

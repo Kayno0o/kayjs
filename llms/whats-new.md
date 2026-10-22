@@ -6,6 +6,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 - kayjs-auth's `SignedIn`, `SignedOut` and `UserMenu` show the user in the first bytes with no `viewer: true`: a page reads the session only when its imports reach one of them, and an extension's `layout: { file, reaching }` wraps only the pages reaching its files ([Templates](../packages/auth/llms/signed-in-components.md), [Extensions](component-libraries.md#extensions)).
 - kayjs-ui labels take `--kui-label-case` and `--kui-label-font`, and two skins ship: `@kaynooo/kayjs-ui/skins/brutalist.css` and `soft.css` ([Setup](../packages/ui/llms/setup.md)).
+- An extension names optional app files with `appFiles: { hooks: 'src/auth.ts' }` and gets their modules in `server({ root, modules })`: kay bakes them into `kay build --compile` and reloads them under `kay dev`, so `auth()` reads `src/auth.ts` and `src/mail.ts` in an executable too ([Extensions](component-libraries.md#extensions)).
 - A handler of an API module names its own routes with `apiUrl(request, path)`, with no reference to the module inside its own chain ([API modules](api-routes.md)).
 - `call.track(module, path)` gives an API route's calls an action `track()`'s result, `{ ok, status, errors, data }` instead of a throw ([API from islands](api-from-islands.md)).
 - An action's third argument groups its checks under `protect: { rateLimit, honeypot, minTime, proofOfWork }`, beside `maxSize`, `messages` and `tool` ([Protecting actions](action-protection.md#protecting-an-action)).

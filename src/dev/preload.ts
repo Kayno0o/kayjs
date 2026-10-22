@@ -2,7 +2,7 @@ import type { Server } from 'bun'
 import { join } from 'node:path'
 import process from 'node:process'
 import { loadTraverse } from '../compiler/rewrite'
-import { CONFIG_FILE, loadConfig } from '../config'
+import { CONFIG_FILE, declaredAppFiles, loadConfig } from '../config'
 import { reloadableFolders } from '../content/edit'
 import { projectPaths } from '../project'
 import { forgetIdleApps, listenIdleApps } from '../server/auto-listen'
@@ -355,16 +355,20 @@ async function reload(request: ReloadRequest): Promise<void> {
 async function reloaded({ code, startedAt, changed, files }: ReloadRequest): Promise<{ reloaded: true } | { restart: string }> {
   const root = process.cwd()
   let paths: ReturnType<typeof projectPaths>
+  let appFiles: string[]
 
   try {
-    paths = projectPaths(root, await loadConfig(root))
+    const config = await loadConfig(root)
+
+    paths = projectPaths(root, config)
+    appFiles = declaredAppFiles(root, config.extensions)
   }
   catch {
     return { restart: 'the config does not load' }
   }
 
   const collectionFolders = reloadableFolders()
-  const plan = files === null ? { restart: 'too many files changed' } : planReload({ root, changed: files, loaded: Object.keys(require.cache), owned: [paths.routes, paths.api], content: collectionFolders === undefined ? undefined : { file: paths.content, folders: collectionFolders }, config: join(root, CONFIG_FILE), entry: Bun.main })
+  const plan = files === null ? { restart: 'too many files changed' } : planReload({ root, changed: files, loaded: Object.keys(require.cache), owned: [paths.routes, paths.api], files: appFiles, content: collectionFolders === undefined ? undefined : { file: paths.content, folders: collectionFolders }, config: join(root, CONFIG_FILE), entry: Bun.main })
 
   if ('restart' in plan)
     return plan

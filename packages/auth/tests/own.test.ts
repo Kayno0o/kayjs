@@ -1,4 +1,5 @@
 import type { AnyElysia } from 'elysia'
+import type { KayExtension } from 'kay/server'
 import type { AuthMailMessage } from '../src/mail'
 import type { OwnOptions } from '../src/own'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
@@ -6,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { Elysia } from 'elysia'
-import { setSite } from 'kay/library'
+import { appModules, setSite } from 'kay/library'
 import { memoryAuthStore } from '../src/memoryStore'
 import { auth, LOAD_AUTH } from '../src/pages'
 
@@ -34,10 +35,15 @@ afterEach(() => {
 
 type Options = OwnOptions<string, string>
 
+// What kay's `pages()` hands the server function: the root, and the app files the extension named.
+async function boot(extension: KayExtension, at = root): Promise<AnyElysia> {
+  return (extension.server as (app: unknown) => Promise<AnyElysia>)({ root: at, modules: await appModules(at, extension) })
+}
+
 // The app an `auth()` with no module serves, the way kay's `pages()` mounts its server.
 async function served(options: Options) {
   const extension = auth({ captcha: false, store: memoryAuthStore(), ...options })
-  const plugin = await (extension.server as () => Promise<AnyElysia>)()
+  const plugin = await boot(extension)
 
   const app = new Elysia()
     .use(plugin)
@@ -86,9 +92,9 @@ describe('auth() with no module', () => {
 
   test('the app\'s auth reaches the commands, built once', async () => {
     const extension = auth({ store: memoryAuthStore() })
-    const load = (extension as unknown as Record<symbol, () => Promise<unknown>>)[LOAD_AUTH]!
+    const load = (extension as unknown as Record<symbol, (root: string) => Promise<unknown>>)[LOAD_AUTH]!
 
-    expect(await load()).toBe(await load())
+    expect(await load(root)).toBe(await load(root))
   })
 })
 
@@ -116,6 +122,35 @@ describe('OAuth by convention', () => {
 })
 
 describe('found by convention', () => {
+  test('names its two files for kay to find, bake and reload, rather than importing them itself', () => {
+    expect(auth({}).appFiles).toEqual({ hooks: 'src/auth.ts', mail: 'src/mail.ts' })
+  })
+
+  test('are read under the project root the server is given, not the working directory', async () => {
+    const elsewhere = mkdtempSync(join(tmpdir(), 'kayjs-auth-cwd-'))
+
+    mkdirSync(join(root, 'src'))
+    writeFileSync(join(root, 'src/auth.ts'), 'export const hooks = { onSignUp: ({ user }) => { globalThis.signedUpAt = user.email } }\n')
+
+    try {
+      process.chdir(elsewhere)
+      Object.assign(globalThis, { signedUpAt: undefined })
+
+      const app = new Elysia().use(await boot(auth({ captcha: false, store: memoryAuthStore(), email: false }), root)).post('/register', async (context) => {
+        const { auth: current } = context as unknown as { auth: { register: (input: unknown) => Promise<unknown> } }
+
+        return current.register({ email: 'ada@example.com', password: PASSWORD })
+      })
+
+      await app.handle(new Request('http://localhost/register', { method: 'POST' }))
+      expect((globalThis as unknown as { signedUpAt?: string }).signedUpAt).toBe('ada@example.com')
+    }
+    finally {
+      process.chdir(root)
+      rmSync(elsewhere, { recursive: true, force: true })
+    }
+  })
+
   test('src/auth.ts exporting hooks and src/mail.ts exporting mail are read when the app has them', async () => {
     mkdirSync(join(root, 'src'))
     writeFileSync(join(root, 'src/auth.ts'), 'export const hooks = { onSignUp: ({ user }) => { globalThis.signedUp = user.email } }\n')
@@ -167,7 +202,7 @@ describe('found by convention', () => {
 
 describe('the store', () => {
   async function registerOn(options: Options) {
-    const plugin = await (auth({ captcha: false, ...options }).server as () => Promise<AnyElysia>)()
+    const plugin = await boot(auth({ captcha: false, ...options }))
     const app = new Elysia().use(plugin).post('/register', async (context) => {
       const { auth: current } = context as unknown as { auth: { register: (input: unknown) => Promise<unknown> } }
 
@@ -189,6 +224,31 @@ describe('the store', () => {
     await registerOn({})
 
     expect(existsSync(join(root, 'data/other.db'))).toBe(true)
+  })
+
+  test('follows the project root when the process runs elsewhere, as kay/test of a nested project does', async () => {
+    const elsewhere = mkdtempSync(join(tmpdir(), 'kayjs-auth-cwd-'))
+
+    try {
+      process.chdir(elsewhere)
+      await registerOn({ store: { url: 'sqlite://data/auth.db' } })
+      await registerOn({ store: { url: 'sqlite:data/plain.db' } })
+
+      expect(existsSync(join(root, 'data/auth.db'))).toBe(true)
+      expect(existsSync(join(root, 'data/plain.db'))).toBe(true)
+      expect(existsSync(join(elsewhere, 'data'))).toBe(false)
+    }
+    finally {
+      process.chdir(root)
+      rmSync(elsewhere, { recursive: true, force: true })
+    }
+  })
+
+  test('keeps an absolute SQLite path as it is', async () => {
+    await registerOn({ store: { url: `sqlite://${join(root, 'elsewhere/auth.db')}` } })
+
+    expect(existsSync(join(root, 'elsewhere/auth.db'))).toBe(true)
+    expect(existsSync(join(root, 'data'))).toBe(false)
   })
 
   test('is in memory under test, so no file is kept between runs', async () => {
