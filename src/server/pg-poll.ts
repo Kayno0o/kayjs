@@ -8,7 +8,7 @@ export const EVENT_TTL_MS = 60_000
 // A read or a write that takes longer is given up, so a database that stopped answering holds neither the poll nor a store's queue.
 export const DB_TIMEOUT_MS = 30_000
 // Ids this far behind the last one read are read again, as a transaction that began earlier may commit its event after a later one.
-const OVERLAP = 100
+export const OVERLAP = 100
 
 // Gives up on `work` after `ms`; the work itself keeps running, its result ignored.
 export async function timeLimited<Result>(work: Promise<Result>, ms: number, what: string): Promise<Result> {
@@ -88,7 +88,7 @@ interface Poller {
 
 const pollers = new WeakMap<PgHandle, Poller>()
 
-// One timer per handle for every store reading events on it, ticking at the shortest `every` of its tasks, and one `pg.db()` a tick however many tasks are due; a task runs again only once its last run ended.
+// One timer per handle for every store reading events on it, and one `pg.db()` a tick however many tasks are due; a task whose last run was given up at the time limit may run again while that run still ends.
 export function pollerOf(pg: PgHandle): Poller {
   let poller = pollers.get(pg)
 
@@ -100,10 +100,26 @@ export function pollerOf(pg: PgHandle): Poller {
   return poller
 }
 
+// Tasks due within this of each other share a tick, so stores started a few milliseconds apart still reach the database once.
+const GROUP_MS = 25
+
 function createPoller(pg: PgHandle): Poller {
   const entries = new Set<Entry>()
-  let timer: ReturnType<typeof setInterval> | undefined
-  let tickMs = 0
+  let timer: ReturnType<typeof setTimeout> | undefined
+
+  // One timeout at the earliest due time of the tasks not running; a task ending schedules again.
+  const schedule = () => {
+    clearTimeout(timer)
+    timer = undefined
+
+    const idle = [...entries].filter(entry => !entry.running)
+
+    if (idle.length === 0)
+      return
+
+    timer = setTimeout(tick, Math.max(0, Math.min(...idle.map(entry => entry.next)) - Date.now()))
+    timer.unref()
+  }
 
   const runEntry = async (entry: Entry, db: Promise<SQL>) => {
     try {
@@ -119,43 +135,30 @@ function createPoller(pg: PgHandle): Poller {
     }
     finally {
       entry.running = false
+      schedule()
     }
   }
 
-  const tick = () => {
+  function tick() {
     const now = Date.now()
     let db: Promise<SQL> | undefined
 
     for (const entry of entries) {
-      if (entry.running || entry.next > now + tickMs / 2 || !entry.task.wanted())
+      if (entry.running || entry.next > now + GROUP_MS)
+        continue
+
+      entry.next = now + entry.task.every
+
+      if (!entry.task.wanted())
         continue
 
       entry.running = true
-      entry.next = now + entry.task.every
       db ??= timeLimited(pg.db(), DB_TIMEOUT_MS, 'reaching the database')
       // A database that fails fails every task of the tick, each logging its own streak.
       void runEntry(entry, db)
     }
-  }
 
-  const retime = () => {
-    const wanted = Math.min(...[...entries].map(entry => entry.task.every))
-
-    if (entries.size === 0) {
-      clearInterval(timer)
-      timer = undefined
-      tickMs = 0
-
-      return
-    }
-
-    if (wanted === tickMs)
-      return
-
-    clearInterval(timer)
-    tickMs = wanted
-    timer = setInterval(tick, tickMs)
-    timer.unref()
+    schedule()
   }
 
   return {
@@ -163,14 +166,11 @@ function createPoller(pg: PgHandle): Poller {
       const entry: Entry = { task, next: now ? 0 : Date.now() + task.every, running: false, failing: false }
 
       entries.add(entry)
-      retime()
-
-      if (now)
-        tick()
+      schedule()
 
       return () => {
         entries.delete(entry)
-        retime()
+        schedule()
       }
     },
   }

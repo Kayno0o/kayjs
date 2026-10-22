@@ -54,6 +54,7 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
   let tail: Promise<void> = Promise.resolve()
   const events = eventWindow()
   let stopReadingTask: (() => void) | undefined
+  let reading = false
   let beating: ReturnType<typeof setInterval> | undefined
   let pruned = 0
   let closed = false
@@ -184,11 +185,19 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
   }
 
   const read = async (db: SQL) => {
+    // A restarted reading does not begin while the one given up on is still running.
+    if (reading)
+      return
+
+    reading = true
+
     try {
       await readMembers(db)
       await readMessages(db)
     }
     finally {
+      reading = false
+
       // Rooms nobody asks about any more may have ended the reading.
       if (watched.size === 0 && listeners.size === 0)
         stopReading()

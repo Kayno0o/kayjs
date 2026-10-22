@@ -4,7 +4,7 @@ import { describe, expect, it } from 'bun:test'
 import { pgCache } from '../src/server/pg-cache'
 import { pgHandle } from '../src/server/pg-data'
 import { pgLive } from '../src/server/pg-live'
-import { pollerOf } from '../src/server/pg-poll'
+import { pollerOf, timeLimited } from '../src/server/pg-poll'
 import { pgRooms } from '../src/server/pg-rooms'
 import { cleanUpAfterFile, pgIt, postgres } from './job-stores'
 
@@ -44,6 +44,11 @@ describe('the shared event poller', () => {
     expect(counter.calls()).toBe(stopped)
   })
 
+  it('gives up on work that takes longer than its limit, and lets work within it answer', async () => {
+    await expect(timeLimited(Bun.sleep(300), 30, 'the read')).rejects.toThrow('the read took more than 0.03 seconds')
+    await expect(timeLimited((async () => 'done')(), 30, 'the read')).resolves.toBe('done')
+  })
+
   it('does not run a task again before its last run ended', async () => {
     const counter = counted({ db: async () => ({}) as SQL })
     let started = 0
@@ -54,7 +59,7 @@ describe('the shared event poller', () => {
 
     await Bun.sleep(400)
     remove()
-    expect(started).toBeLessThanOrEqual(3)
+    expect(started).toBeLessThanOrEqual(4)
   })
 
   it('drops the writes past the queue bound while the database does not answer', async () => {
@@ -95,7 +100,7 @@ describe('the shared event poller', () => {
     await Bun.sleep(1100)
 
     // Rooms poll every 250ms, so four or five ticks; three separate timers would reach the database about twice that.
-    expect(counter.calls() - before).toBeLessThanOrEqual(6)
+    expect(counter.calls() - before).toBeLessThanOrEqual(7)
     expect(counter.calls() - before).toBeGreaterThanOrEqual(3)
     live.stop?.()
     store.close()

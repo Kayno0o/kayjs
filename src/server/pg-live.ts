@@ -2,13 +2,12 @@ import type { SQL } from 'bun'
 import type { LiveStore } from '../runtime/live-value'
 import type { PgHandle } from './pg-data'
 import { kayLog } from '../runtime/log'
-import { DB_TIMEOUT_MS, EVENT_TTL_MS, eventWindow, POLL_MS, pollerOf, timeLimited } from './pg-poll'
+import { DB_TIMEOUT_MS, EVENT_TTL_MS, eventWindow, OVERLAP, POLL_MS, pollerOf, timeLimited } from './pg-poll'
 import { NOW, query } from './pg-sql'
 import { onReload } from './reload'
 
 // Writes waiting behind a database that stopped answering: past this many a new one is dropped and logged, rather than held in memory.
 const MAX_QUEUED = 10_000
-const START_EVENTS = 100
 const ESCAPED = /\\(.)/g
 
 // Postgres text holds no NUL, which a key made of a visitor's input may carry: it is stored as `\0`, a backslash doubled.
@@ -70,6 +69,7 @@ export function pgLive(pg: PgHandle): LiveStore {
     pending.set(at, (pending.get(at) ?? 0) + 1)
 
     try {
+      // A write given up at the time limit may still commit later, after the next write of its key.
       await ordered(async () => timeLimited((async () => {
         const db = await pg.db()
 
@@ -96,7 +96,7 @@ export function pgLive(pg: PgHandle): LiveStore {
 
   // Where the events stand: the ones in the overlap are noted as known, so they are not heard again.
   const startAt = async (db: SQL) => {
-    const known = await query<{ seq: string }>(db, 'SELECT seq::text AS seq FROM kay_live_events ORDER BY seq DESC LIMIT $1', [START_EVENTS])
+    const known = await query<{ seq: string }>(db, 'SELECT seq::text AS seq FROM kay_live_events ORDER BY seq DESC LIMIT $1', [OVERLAP])
 
     events.start(known.map(event => Number(event.seq)))
   }
@@ -128,15 +128,7 @@ export function pgLive(pg: PgHandle): LiveStore {
         changed.set(at, [event.id, event.key])
     }
 
-    const wanted: [string, [string, string]][] = []
-
-    for (const [at, entry] of changed) {
-      // A write of this process began since: the row is read once it ends.
-      if (pending.has(at))
-        deferred.set(at, entry)
-      else
-        wanted.push([at, entry])
-    }
+    const wanted = [...changed]
 
     const values = new Map<string, string>()
 
