@@ -247,7 +247,7 @@ input(type="file" bind:files={picked})
 
 `bind:files` holds the `FileList` the person picked, and setting the signal to `null` clears the input; the server never renders it. The `type` of `bind:group` and `bind:files` is written out, not computed.
 
-`bind:` and `style:` work next to a spread too: the binding sets the value after the spread's and writes back from the event, a handler the spread brings for that event running first, and the `style:` pairs merge into the `style` the spread brings. A `type` only the spread brings is not seen by `bind:`, so write it on the element.
+`bind:` and `style:` work next to a spread too: the binding sets the value after the spread's and writes back from the event, a handler the spread brings for that event running first, and the `style:` pairs merge into the `style` the spread brings. A `type` or `value` only the spread brings is not seen by `bind:`, so write them on the element.
 
 `style:color={color()}` sets one property of the `style` and `style:--gap={gap()}` a custom one, merged after the written `style` and left out while the value is `null`, `undefined` or `false`.
 

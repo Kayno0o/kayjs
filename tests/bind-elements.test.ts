@@ -205,6 +205,16 @@ describe('style:prop and bind: next to a spread', () => {
 
     expect(element('input', sources).t).toBe('<input value="v" style="top:1px;color:red">')
     expect(element('input', spreadWith([{}], [['color', null]])).t).toBe('<input>')
+    expect(element('textarea', spreadWith([{}], undefined, [['value', () => 'v', 'onInput', () => undefined]])).t).toBe('<textarea>v</textarea>')
+  })
+
+  it('runs a handler of any case the spread brings, and takes two binds of one property', () => {
+    const calls: string[] = []
+    const sources = spreadWith([{ oninput: () => calls.push('spread') }], undefined, [['value', () => 'a', 'onInput', () => calls.push('a')], ['value', () => 'b', 'onInput', () => calls.push('b')]])
+    const last = sources.at(-1) as { value: string, onInput: (event: Event) => void }
+
+    last.onInput(new Event('input'))
+    expect([last.value, calls]).toEqual(['b', ['spread', 'b']])
   })
 })
 

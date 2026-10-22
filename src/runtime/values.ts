@@ -86,10 +86,12 @@ export function spreadWith(sources: readonly object[], styles?: readonly (readon
 
   for (const [name, read, event, write] of binds ?? []) {
     if (name !== undefined)
-      Object.defineProperty(over, name, { get: read, enumerable: true })
+      Object.defineProperty(over, name, { get: read, enumerable: true, configurable: true })
 
     over[event] = (kayEvent: Event) => {
-      const handler = merge(...sources)[event]
+      const brought = merge(...sources)
+      // Event names are case-insensitive, so a spread's `oninput` is found beside `onInput`.
+      const handler = brought[Object.keys(brought).findLast(key => key.toLowerCase() === event.toLowerCase()) ?? event]
 
       if (typeof handler === 'function')
         (handler as (event: Event) => void)(kayEvent)
