@@ -37,7 +37,7 @@ export const ERRORS = {
   'template-invalid': {
     group: 'compile',
     summary: 'A template that reads but is not allowed: a `head` block in the wrong place, a duplicate id or class, an attribute that has no effect there, a `field`, `server` or `bind:` used wrongly, an event that is not camelCase.',
-    fix: { file: 'llms/templates.md', heading: 'Elements' },
+    fix: { file: 'llms/templates-elements-slots-snippets.md', heading: 'Elements' },
   },
   'fence-invalid': {
     group: 'compile',
@@ -192,7 +192,7 @@ export const ERRORS = {
   'markdown-invalid': {
     group: 'content',
     summary: 'Markdown or data an entry holds that kay cannot read: a component never closed, an attribute kay cannot read, JSON or YAML that does not parse.',
-    fix: { file: 'llms/content.md', heading: 'Components in Markdown' },
+    fix: { file: 'llms/content-markdown-to-caching.md', heading: 'Components in Markdown' },
   },
   'content-config-missing': {
     group: 'content',
@@ -212,12 +212,12 @@ export const ERRORS = {
   'feed-needs-site': {
     group: 'content',
     summary: 'A feed on a site with no `site` URL to build its links from.',
-    fix: { file: 'llms/content.md', heading: 'Feeds' },
+    fix: { file: 'llms/content-markdown-to-caching.md', heading: 'Feeds' },
   },
   'pagination-misuse': {
     group: 'content',
     summary: 'A page size that is not a whole number from 1, or `page()` called when no page renders.',
-    fix: { file: 'llms/content.md', heading: 'Pagination' },
+    fix: { file: 'llms/content-markdown-to-caching.md', heading: 'Pagination' },
   },
   'content-api-misuse': {
     group: 'content',

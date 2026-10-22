@@ -70,7 +70,7 @@ Links go to where each feature is documented. A row marked `Met` claims only wha
 | --- | --- | --- | --- |
 | 3.7 Dev and test environments sized to need | App | Nothing in kay adjusts them; `kay dev` and the tests run on the app's own machine | |
 | 4.1 Autoplay off | Checked | `uncontrolled-autoplay` warns of a `video` or `audio` with `autoplay` and no `controls`; a muted autoplay with controls, and an animation, are not looked at | [Lints](lints.md) |
-| 4.2 No infinite scroll | App | kay adds none; `paginate(posts, 10)` splits a collection into pages with links | [Content](content.md#pagination) |
+| 4.2 No infinite scroll | App | kay adds none; `paginate(posts, 10)` splits a collection into pages with links | [Content](content-markdown-to-caching.md#pagination) |
 | 4.4 The visitor decides on a third-party service | App | `analytics()` waits for the visitor's yes with `consent`, and a persisted signal keeps the answer for any other script, loaded only once it is yes | [Privacy](privacy.md#load-a-script-only-once-the-visitor-agreed) |
 | 4.5 Native components | App | A form field is a native `input`, `textarea` or `select`; whether the app swaps them for custom widgets is its own | [Actions](actions.md#forms) |
 | 4.8 Few downloaded fonts | App | `fonts` self-hosts font files, each family gets a metric-matched fallback, and a font of several subsets loads only the files the page's text needs; how many families the app declares is its choice | [Fonts](sitemap-search-fonts.md#fonts) |
