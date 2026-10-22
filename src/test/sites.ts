@@ -16,6 +16,11 @@ export function closeAfterTests(close: () => Promise<void>): () => void {
   return () => void sites.delete(close)
 }
 
+// How many sites are open.
+export function openSites(): number {
+  return sites.size
+}
+
 export async function closeSites(): Promise<void> {
   const open = [...sites]
 

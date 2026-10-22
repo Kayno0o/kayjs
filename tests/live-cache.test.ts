@@ -36,6 +36,12 @@ async function quiet(feed: Feed): Promise<boolean> {
   return await Promise.race([feed.next(), wait()]) === nothing
 }
 
+// The fixture's data and the values cached from it are the process's, so the next file of it starts from what this one began with.
+afterAll(() => {
+  Object.assign(db, { orders: 1, news: ['first'] })
+  invalidate(() => true)
+})
+
 describe('a cached value a page follows', () => {
   let site: TestSite
 

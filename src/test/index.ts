@@ -29,6 +29,7 @@ import { MCP_PATH, mcpPath } from '../server/api-modules'
 import { servePages } from '../server/app'
 import { basePath, routerPath } from '../server/base'
 import { shutdown } from '../server/lifecycle'
+import { forgetStamps } from '../server/live'
 import { loaderRoot } from '../server/loader'
 import { memoryRates } from '../server/protection'
 import { drainQueues, memoryJobs } from '../server/queue'
@@ -46,7 +47,7 @@ import { cookieJar, withKept } from './cookies'
 import { NativeFetch, NativeFormData, NativeHeaders, NativeRequest, NativeURL, NativeWebSocket, withNatives } from './natives'
 import { readPage, settledHtml, sitemapUrls } from './page'
 import { testRoot } from './root'
-import { closeAfterTests } from './sites'
+import { closeAfterTests, openSites } from './sites'
 
 export type { A11yViolation, BrowserOptions, ClickOptions, DialogHandler, FetchedResponse, FulfillOptions, PageDialog, PageRequest, PageResponse, RouteHandler, RouteMatch, TestPage, WaitForOptions, WaitOptions } from './browser'
 export { browse, browserPath } from './browser'
@@ -602,6 +603,10 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
 
         server = undefined
         await release()
+
+        // The last site gone, the next file of the process meets the invalidation times as a process just started would.
+        if (openSites() === 0)
+          forgetStamps()
       },
       visit: async (path, init = {}) => follow(await send(path, { headers: init.headers }), path, init.headers),
       submit: async (action, fields, init = {}) => {

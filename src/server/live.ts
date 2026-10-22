@@ -165,6 +165,14 @@ function remember(key: string): void {
   }
 }
 
+// Forgets the invalidation time of every key, for a process that served one project and goes on to another test of it, so a key is never invalidated again.
+export function forgetStamps(): void {
+  for (const key of stamped)
+    stamps.delete(key)
+
+  stamped.clear()
+}
+
 // Whether the render in progress read a key with `live: true`, which its page follows.
 export function followsCaches(): boolean {
   return (cacheReads.getStore()?.at.size ?? 0) > 0

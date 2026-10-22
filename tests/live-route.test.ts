@@ -24,6 +24,12 @@ function requestOf(page: LivePage, watch: string[]): LiveRequest {
   return { proofs: [{ keys: page.values.map(([id, key]) => [id, key] as [string, string]), at: page.at, sig: page.sig }], watch: watch.map(key => [CACHE_LIVE_ID, key] as [string, string]) }
 }
 
+// The fixture's data and the values cached from it are the process's, so the next file of it starts from what this one began with.
+afterAll(() => {
+  Object.assign(db, { orders: 1, news: ['first'] })
+  invalidate(() => true)
+})
+
 describe('a route a resource reads, following cached values', () => {
   let site: TestSite
 
