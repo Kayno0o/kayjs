@@ -447,7 +447,7 @@ class ModuleShell {
     })
     const object = `{ ${entries.join('; ')} }`
 
-    const type = `{ class?: ${parts.root === 'none' ? `${object} | { kayError: 'A template with several top elements takes an object of its parts: mark one with part="root" to take a string' }` : `string | ${object}`} }`
+    const type = `{ class?: ${parts.root === 'none' ? `${object} | { kayError: 'A template with several top elements takes an object of its parts: mark one with part="root" to take a string' }` : `string | ${object}`} | undefined }`
     const recipe = this.facts.recipe
 
     // The variants of the recipe, typed off it, so the component declares them once.

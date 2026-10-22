@@ -248,7 +248,7 @@ describe('compiling a recipe', () => {
     const { tsx } = compileKay(CARD, 'src/card.kay', { check: true })
 
     expect(tsx).toContain('KayRecipeProps<typeof card>')
-    expect(tsx).toContain('class?: string | { "root"?: string; "head"?: string; "body"?: string }')
+    expect(tsx).toContain('class?: string | { "root"?: string; "head"?: string; "body"?: string } | undefined')
   })
 
   it('reads a recipe of a component with no props declaration', () => {

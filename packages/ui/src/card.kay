@@ -1,7 +1,11 @@
 ---
 import type { JSX, Snippet } from 'kay'
+import { recipe } from 'kay'
 
-const { title, level = 3, head, bare = false, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'title'> & {
+// The base is the classes theme.css styles, so an app's CSS on them keeps working; `src/ui.ts` and the `class` object restyle each part.
+const card = recipe({ parts: { root: 'kui-card', head: 'kui-card-head', title: 'kui-card-title', body: 'kui-card-body' } })
+
+const { title, level = 3, head, bare = false, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'title'> & {
   // Engraved along the top, on a rule of its own.
   title?: string | undefined
   // The title's heading level, under the page's outline; `1` for a card that is the whole page, such as a sign-in panel.
@@ -10,29 +14,28 @@ const { title, level = 3, head, bare = false, class: className, ...rest } = prop
   head?: Snippet
   // No inset body, for content that runs to the card's edge: a chart, a table, a console.
   bare?: boolean | undefined
-  class?: string | undefined
 }>()
 ---
 // The frame a page's content is written on; every part of it is optional, so a card with no title is the frame alone.
-section.kui-card({...rest} class={className})
+section({...rest})
   if title !== undefined || head
-    .kui-card-head
+    div(part="head")
       if title !== undefined
         if level === 1
-          h1.kui-card-title {title}
+          h1(part="title") {title}
         else if level === 2
-          h2.kui-card-title {title}
+          h2(part="title") {title}
         else if level === 3
-          h3.kui-card-title {title}
+          h3(part="title") {title}
         else if level === 4
-          h4.kui-card-title {title}
+          h4(part="title") {title}
         else if level === 5
-          h5.kui-card-title {title}
+          h5(part="title") {title}
         else
-          h6.kui-card-title {title}
+          h6(part="title") {title}
       | {head}
   if bare
     slot
   else
-    .kui-card-body
+    div(part="body")
       slot

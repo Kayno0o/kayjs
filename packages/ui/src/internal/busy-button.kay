@@ -1,17 +1,19 @@
 ---
 import type { ButtonProps, TagAttributes } from '../button-props'
-import { signal } from 'kay'
-import { buttonOf, linkOf, lookOf } from '../button-props'
+import { recipe, signal } from 'kay'
+import { buttonOf, linkOf } from '../button-props'
 import { isPromiseLike } from '../change'
 import Icon from '../icon.kay'
 
-const { variant = 'solid', tone, size = 'md', icon, busy, label, class: className, onClick, ...rest } = props<ButtonProps>()
+// Button hands its root classes down as `class`, so its recipe and `src/ui.ts` reach this root as well; the spinner is this component's own part.
+const look = recipe({ parts: { spinner: 'kui-spinner' } })
+
+const { variant = 'solid', tone, size = 'md', icon, busy, label, onClick, ...rest } = props<ButtonProps>()
 
 const attributes = rest as TagAttributes
 
 const pending = signal(false)
 const spinning = () => busy ?? pending()
-const look = () => lookOf(tone, className)
 
 async function press(event: MouseEvent) {
   if (busy === undefined && pending()) {
@@ -40,15 +42,15 @@ async function press(event: MouseEvent) {
 }
 ---
 if linkOf(attributes) as link
-  a.kui-btn({...link} class={look()} data-variant={variant} data-size={size} aria-busy={spinning() ? 'true' : undefined} onClick={press})
+  a({...link} part="root" data-variant={variant} data-size={size} aria-busy={spinning() ? 'true' : undefined} onClick={press})
     if spinning()
-      Icon(icon="spinner" class="kui-spinner")
+      Icon(icon="spinner" part="spinner")
     else if icon
       Icon(icon={icon})
     | {label}
     slot
 else if buttonOf(attributes) as button
-  button.kui-btn({...button} class={look()} data-variant={variant} data-size={size} disabled={button.disabled || (busy === undefined && pending() && button.type !== 'submit' && button.type !== 'reset')} aria-busy={spinning() ? 'true' : undefined} onClick={press})
+  button({...button} part="root" data-variant={variant} data-size={size} disabled={button.disabled || (busy === undefined && pending() && button.type !== 'submit' && button.type !== 'reset')} aria-busy={spinning() ? 'true' : undefined} onClick={press})
     if spinning()
       Icon(icon="spinner" class="kui-spinner")
     else if icon

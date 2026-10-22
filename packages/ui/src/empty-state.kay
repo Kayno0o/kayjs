@@ -1,33 +1,36 @@
 ---
+import { recipe } from 'kay'
 import type { JSX, Snippet } from 'kay'
 
-const { title, level, description, actions, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'title' | 'children'> & {
+// The base is the classes theme.css styles, so an app's CSS on them keeps working; `src/ui.ts` and the `class` object restyle each part.
+const look = recipe({ parts: { root: 'kui-empty-state', title: 'kui-empty-state-title', description: 'kui-empty-state-description', actions: 'kui-empty-state-actions' } })
+
+const { title, level, description, actions, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'title' | 'children'> & {
   title: string
   // Makes the title a heading of that level, `1` for an empty state standing for the whole page, such as a 404; without it, a paragraph under the page's own heading.
   level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
   description?: string | undefined
   // Below the description: a button or a link leading out of the empty list, such as the one that adds the first item.
   actions?: Snippet
-  class?: string | undefined
 }>()
 ---
-.kui-empty-state({...rest} class={className})
+div({...rest})
   if level === 1
-    h1.kui-empty-state-title {title}
+    h1(part="title") {title}
   else if level === 2
-    h2.kui-empty-state-title {title}
+    h2(part="title") {title}
   else if level === 3
-    h3.kui-empty-state-title {title}
+    h3(part="title") {title}
   else if level === 4
-    h4.kui-empty-state-title {title}
+    h4(part="title") {title}
   else if level === 5
-    h5.kui-empty-state-title {title}
+    h5(part="title") {title}
   else if level === 6
-    h6.kui-empty-state-title {title}
+    h6(part="title") {title}
   else
-    p.kui-empty-state-title {title}
+    p(part="title") {title}
   if description
-    p.kui-empty-state-description {description}
+    p(part="description") {description}
   if actions
-    .kui-empty-state-actions
+    div(part="actions")
       | {actions}

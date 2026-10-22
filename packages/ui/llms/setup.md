@@ -88,6 +88,24 @@ export default settings
 
 `kay check` checks this module against `UiSettings`. The server, the browser, `kay build` and `bun test` all render with it.
 
+### Restyle a component
+
+Button, Card, Dialog, Table, TextInput, Textarea, Badge, Notice, Avatar, Stat, PageHeader, PageSection, EmptyState and CardRow have parts, and take their `class` as a string for the root or an object of parts, `Card(class={{ head: 'p-6' }})`. `src/ui.ts` restyles every instance of one, keyed by its import path ([Restyle a component from src/ui.ts](../../../llms/styles-and-assets.md#restyle-a-component-from-srcuits)):
+
+```ts
+import { defineUi } from 'kay'
+
+export default defineUi({
+  '@kaynooo/kayjs-ui/card.kay': { parts: { root: 'rounded-xl', head: 'p-6' } },
+  '@kaynooo/kayjs-ui/button.kay': { variants: { tone: { danger: { root: 'bg-red-600' } } } },
+})
+```
+
+- Each part keeps its `kui-` class, so a rule of yours on `.kui-card-head` keeps working beside the utilities. A utility of `src/ui.ts` or of `class` wins over a theme rule on the same property.
+- The parts are the `kui-` classes without the component's prefix: Card has `root`, `head`, `title` and `body`; Dialog `title`, `body` and `footer`; Table `table`, `headCell`, `row`, `cell`, `cellBody`, `sortButton` and more, listed in the component's script; Button `root` and `spinner`. The variants are the props that already exist: `tone` (Button, Badge, Notice), `variant` and `size` (Button).
+- Button restyled through `button.kay` reaches the button with an `onClick` too, but its `spinner` while busy needs the `internal/busy-button.kay` key.
+- The other components have no parts yet and still restyle through their `kui-` classes.
+
 ### Testing an app's use of it
 
 A page that uses the components renders them in `testSite()` like the app's own. To test what their handlers do, `mountComponent(file, props)` from `kay/test` renders a component of the app into the DOM `kay/test/dom` registers, listed after `kay/test/preload` under `[test] preload` in bunfig.toml with `@happy-dom/global-registrator` installed; it shims the popover API happy-dom lacks, which Toaster and Popover use.
@@ -95,5 +113,5 @@ A page that uses the components renders them in `testSite()` like the app's own.
 ## Reference
 
 - Import each component by its `.kay` path: `import Button from '@kaynooo/kayjs-ui/button.kay'`. Types, `toast`, `attempt`, `messageOf`, `editing`, `infiniteList` and the defaults come from the package itself: `import { toast } from '@kaynooo/kayjs-ui'`, and the drag and drop controllers from `@kaynooo/kayjs-ui/dnd`.
-- Components write no Tailwind utility, only the classes of `theme.css`, every one prefixed `kui-` as its tokens are, so a site's own `btn`, `card` or `--color-accent` never meets them. A rule of the app's on one of those classes restyles every instance, and `--kui-border-width` sets the keyline of every framed box; utilities passed through a component's `class` prop restyle one.
+- Components write no Tailwind utility, only the classes of `theme.css`, every one prefixed `kui-` as its tokens are, so a site's own `btn`, `card` or `--color-accent` never meets them. A rule of the app's on one of those classes restyles every instance, and `--kui-border-width` sets the keyline of every framed box; utilities passed through a component's `class` prop restyle one, and `src/ui.ts` restyles the parts of a component with some, see [Restyle a component](#restyle-a-component).
 - `toast` only shows in the browser, called from an island. The server's toast list, shared by every request, stays empty. `ui()` in kay.config.ts (`kay add ui`) mounts one `Toaster`, one `TooltipHost` and the theme on every page. An extension may render its own: while one is mounted, a second renders nothing until the first unmounts.

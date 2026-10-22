@@ -804,7 +804,7 @@ describe('the texts a component shows by default, in the app\'s catalogs', () =>
     expect(graph).toMatch(/class="kui-contribution-month"[^>]*>sept\./)
     expect((await visit('/charts')).html).toMatch(/class="kui-contribution-month"[^>]*>Sep/)
     expect(filtered).toContain('Filtrer')
-    expect(filtered).toMatch(/class="kui-table-count" role="status">\d+ lignes?</)
+    expect(filtered).toMatch(/class="kui-table-count" data-part="count" role="status">\d+ lignes?</)
   })
 })
 

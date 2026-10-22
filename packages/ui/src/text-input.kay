@@ -1,12 +1,13 @@
 ---
 import type { JSX } from 'kay'
-import { untrack } from 'kay'
+import { recipe, untrack } from 'kay'
 import { controlledValue } from './controlled-value'
 import { startRef } from './form-reset'
 
-type Field = Omit<JSX.IntrinsicElements['input'], 'value' | 'type' | 'class' | 'children' | 'onInput' | 'onChange'> & {
-  class?: string | undefined
-}
+type Field = Omit<JSX.IntrinsicElements['input'], 'value' | 'type' | 'class' | 'children' | 'onInput' | 'onChange'>
+
+// The base is the classes theme.css styles, so an app's CSS on them keeps working; `src/ui.ts` and the `class` object restyle each part.
+const input = recipe({ parts: { root: 'kui-field-input' } })
 
 type AsText = Field & {
   // Without it, the box starts empty and keeps what is typed, for a form posting it by its `name`.
@@ -25,7 +26,7 @@ type AsNumber = Field & {
   onChange?: ((value: number | null) => void) | undefined
 }
 
-const { value, onInput, onChange, onBlur, type = 'text', class: className, ...rest } = props<AsText | AsNumber>()
+const { value, onInput, onChange, onBlur, type = 'text', ...rest } = props<AsText | AsNumber>()
 
 let box: HTMLInputElement | undefined
 
@@ -76,4 +77,4 @@ function left(event: FocusEvent & { currentTarget: HTMLInputElement, target: Ele
   onBlur?.(event)
 }
 ---
-input.kui-field-input({...rest} ref={ref} type={type} value={untrack(() => value === undefined ? undefined : spelled(value))} class={className} onInput={event => report(onInput, event.currentTarget)} onChange={event => report(onChange, event.currentTarget)} onBlur={left})
+input({...rest} ref={ref} type={type} value={untrack(() => value === undefined ? undefined : spelled(value))} onInput={event => report(onInput, event.currentTarget)} onChange={event => report(onChange, event.currentTarget)} onBlur={left})

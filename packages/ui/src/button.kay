@@ -1,11 +1,23 @@
 ---
 import type { JSX } from 'kay'
+import { recipe } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
 import type { TagAttributes } from './button-props'
 import BusyButton from './internal/busy-button.kay'
-import { buttonOf, linkOf, lookOf } from './button-props'
+import { buttonOf, linkOf } from './button-props'
 import Icon from './icon.kay'
+
+// The base is the classes theme.css styles, so an app's CSS on them keeps working; `src/ui.ts` and the `class` object restyle each part.
+const look = recipe({
+  parts: { root: 'kui-btn', spinner: 'kui-spinner' },
+  variants: {
+    variant: { solid: '', ghost: '', inline: '' },
+    tone: { neutral: '', accent: 'kui-btn-accent', danger: 'kui-btn-danger' },
+    size: { xs: '', sm: '', md: '', lg: '' },
+  },
+  defaults: { variant: 'solid', tone: 'neutral', size: 'md' },
+})
 
 // The props the docs list, which button-props.ts repeats for BusyButton.
 interface Look {
@@ -20,7 +32,6 @@ interface Look {
   // Left out, a button with an `onClick` is busy and disabled by itself while the promise it returned is pending, and a submit button is busy while its form's `onSubmit` returns one; given, `busy` has the last word.
   busy?: boolean | undefined
   label?: string | undefined
-  class?: string | undefined
 }
 
 type AsButton = Omit<JSX.IntrinsicElements['button'], 'type' | 'class'> & Look & {
@@ -36,25 +47,24 @@ type AsLink = Omit<JSX.IntrinsicElements['a'], 'class'> & Look & {
 }
 
 // A button with an `onClick` goes through BusyButton, which holds itself busy on the promise it returns: the others stay static markup on a page.
-const { variant = 'solid', tone, size = 'md', icon, busy, label, class: className, ...rest } = props<AsButton | AsLink>()
+const { variant = 'solid', tone, size = 'md', icon, busy, label, ...rest } = props<AsButton | AsLink>()
 
 const attributes = rest as TagAttributes
 // What the button was given besides its own props, handed on whole: an `onClick` named here would make this component an island itself.
 const handedOn = rest as Record<string, never>
-const look = () => lookOf(tone, className)
 ---
 if rest.onClick
-  BusyButton({...handedOn} variant={variant} tone={tone} size={size} icon={icon} busy={busy} label={label} class={className})
+  BusyButton({...handedOn} variant={variant} tone={tone} size={size} icon={icon} busy={busy} label={label} part="root")
 else if linkOf(attributes) as link
-  a.kui-btn({...link} class={look()} data-variant={variant} data-size={size} aria-busy={busy ? 'true' : undefined})
+  a({...link} part="root" data-variant={variant} data-size={size} aria-busy={busy ? 'true' : undefined})
     if busy
-      Icon(icon="spinner" class="kui-spinner")
+      Icon(icon="spinner" part="spinner")
     else if icon
       Icon(icon={icon})
     | {label}
     slot
 else if buttonOf(attributes) as button
-  button.kui-btn({...button} class={look()} data-variant={variant} data-size={size} aria-busy={busy ? 'true' : undefined})
+  button({...button} part="root" data-variant={variant} data-size={size} aria-busy={busy ? 'true' : undefined})
     if busy
       Icon(icon="spinner" class="kui-spinner")
     else if icon

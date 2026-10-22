@@ -1,7 +1,11 @@
 ---
+import { recipe } from 'kay'
 import type { JSX, Snippet } from 'kay'
 
-const { title, meta, description, actions, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['header'], 'class' | 'title'> & {
+// The base is the classes theme.css styles, so an app's CSS on them keeps working; `src/ui.ts` and the `class` object restyle each part.
+const look = recipe({ parts: { root: 'kui-page-header', head: 'kui-page-header-head', title: 'kui-page-header-title', meta: 'kui-page-header-meta', actions: 'kui-page-header-actions', description: 'kui-page-header-description' } })
+
+const { title, meta, description, actions, ...rest } = props<Omit<JSX.IntrinsicElements['header'], 'class' | 'title'> & {
   // The page's one `h1`.
   title: string
   // Beside the title: a badge, a count, a link back.
@@ -10,19 +14,18 @@ const { title, meta, description, actions, class: className, ...rest } = props<O
   description?: string | undefined
   // After the title, past a divider: a `+` Button, a link, a row of controls.
   actions?: Snippet
-  class?: string | undefined
 }>()
 ---
 // The head of a page: its title, the actions on the whole page, and under them its description and what the children add.
-header.kui-page-header({...rest} class={className})
-  .kui-page-header-head
-    h1.kui-page-header-title {title}
+header({...rest})
+  div(part="head")
+    h1(part="title") {title}
     if meta
-      .kui-page-header-meta
+      div(part="meta")
         | {meta}
     if actions
-      .kui-page-header-actions
+      div(part="actions")
         | {actions}
   if description
-    p.kui-page-header-description {description}
+    p(part="description") {description}
   slot

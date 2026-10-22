@@ -1,22 +1,25 @@
 ---
+import { recipe } from 'kay'
 import type { JSX, Snippet } from 'kay'
 
-const { left, right, actions, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class'> & {
+// The base is the classes theme.css styles, so an app's CSS on them keeps working; `src/ui.ts` and the `class` object restyle each part.
+const look = recipe({ parts: { root: 'kui-card-row', body: 'kui-card-row-body', actions: 'kui-card-row-actions' } })
+
+const { left, right, actions, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class'> & {
   // The leading element: a toggle, an icon, a colour dot.
   left?: Snippet
   // A trailing readout, always shown.
   right?: Snippet
   // Controls at the end of the row, dimmed until the row is hovered or focused.
   actions?: Snippet
-  class?: string | undefined
 }>()
 ---
 // One line of a list drawn as cards: the children are its body, between what leads and what trails.
-.kui-card-row({...rest} class={className})
+div({...rest})
   | {left}
-  .kui-card-row-body
+  div(part="body")
     slot
   | {right}
   if actions
-    .kui-card-row-actions
+    div(part="actions")
       | {actions}

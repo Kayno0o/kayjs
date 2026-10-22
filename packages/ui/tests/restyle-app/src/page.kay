@@ -1,0 +1,38 @@
+---
+import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import Card from '@kaynooo/kayjs-ui/card.kay'
+import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
+import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import Notice from '@kaynooo/kayjs-ui/notice.kay'
+import PageHeader from '@kaynooo/kayjs-ui/page-header.kay'
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import Stat from '@kaynooo/kayjs-ui/stat.kay'
+import Table from '@kaynooo/kayjs-ui/table.kay'
+import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
+
+const planets = [{ id: 1, name: 'Mars' }]
+---
+//- Renders components `src/ui.ts` restyles, for the library's restyle test.
+Card#card(title="Hi" class={{ body: 'p-9' }}) Body
+Button#plain(label="Plain" tone="danger")
+Button#busy(label="Busy" variant="inline" icon="info" onClick={() => undefined})
+Button#link(label="Link" href="/" variant="inline")
+Badge#badge(label="New" tone="success")
+Notice#notice(label="Saved" tone="danger")
+TextInput#text(name="a")
+Textarea#area(name="b")
+Dialog#dialog(open={true} title="Rename" onOpenChange={() => undefined})
+  @footer
+    p footer
+  p body
+Table#table(columns={[{ key: 'name', header: 'Name', sortValue: true as const }]} rows={planets} rowKey="id")
+Avatar#avatar(name="Mars")
+Stat#stat(value={3} label="moons")
+PageHeader#header(title="Planets")
+PageSection#section(title="Inner")
+EmptyState#empty(title="Nothing" description="Add one.")
+CardRow#row(left="L") Middle

@@ -100,6 +100,24 @@ const save = () => toast.success('Saved')
 Button(label="Save" tone="accent" onClick={save})
 ```
 
+## Restyle a component
+
+Button, Card, Dialog, Table, TextInput, Textarea, Badge, Notice, Avatar, Stat, PageHeader, PageSection, EmptyState and CardRow have parts, and take their `class` as a string for the root or an object of parts, `Card(class={{ head: 'p-6' }})`. `src/ui.ts` restyles every instance of one, keyed by its import path ([Restyle a component from src/ui.ts](/essentials/styling-and-assets/#restyle-a-component-from-srcuits)):
+
+```ts
+import { defineUi } from 'kay'
+
+export default defineUi({
+  '@kaynooo/kayjs-ui/card.kay': { parts: { root: 'rounded-xl', head: 'p-6' } },
+  '@kaynooo/kayjs-ui/button.kay': { variants: { tone: { danger: { root: 'bg-red-600' } } } },
+})
+```
+
+- Each part keeps its `kui-` class, so a rule of yours on `.kui-card-head` keeps working beside the utilities. A utility of `src/ui.ts` or of `class` wins over a theme rule on the same property.
+- The parts are the `kui-` classes without the component's prefix: Card has `root`, `head`, `title` and `body`; Dialog `title`, `body` and `footer`; Table `table`, `headCell`, `row`, `cell`, `cellBody`, `sortButton` and more, listed in the component's script; Button `root` and `spinner`. The variants are the props that already exist: `tone` (Button, Badge, Notice), `variant` and `size` (Button).
+- Button restyled through `button.kay` reaches the button with an `onClick` too, but its `spinner` while busy needs the `internal/busy-button.kay` key.
+- The other components have no parts yet and still restyle through their `kui-` classes.
+
 <Callout type="warning">
 
 A page can pass a Dialog or a Popover its content. A layout, or a page with a `--- server` fence, cannot pass a function or a block with parameters, such as a Table's `@cell`, but can pass an action. Put those in a component of yours, which then renders as an island.

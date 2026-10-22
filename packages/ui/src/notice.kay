@@ -1,16 +1,22 @@
 ---
 import type { JSX } from 'kay'
+import { recipe } from 'kay'
 
-const { tone = 'info', label, compact = false, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'role'> & {
+// The base is the classes theme.css styles, so an app's CSS on them keeps working; `src/ui.ts` restyles the box or a tone.
+const notice = recipe({
+  parts: { root: 'kui-notice' },
   // A danger is an alert, read out at once; the other tones are a status, read once the reader is idle.
-  tone?: 'info' | 'success' | 'warning' | 'danger' | undefined
+  variants: { tone: { info: '', success: '', warning: '', danger: '' } },
+  defaults: { tone: 'info' },
+})
+
+const { tone = 'info', label, compact = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'role'> & {
   label?: string | undefined
   // A line of text without the box, such as under a form's fields.
   compact?: boolean | undefined
-  class?: string | undefined
 }>()
 ---
 // A form's outcome or a refusal, in place: what a toast says in passing, said where the page stays.
-.kui-notice({...rest} role={tone === 'danger' ? 'alert' : 'status'} data-tone={tone} data-compact={compact ? '' : undefined} class={className})
+div({...rest} role={tone === 'danger' ? 'alert' : 'status'} data-tone={tone} data-compact={compact ? '' : undefined})
   | {label}
   slot

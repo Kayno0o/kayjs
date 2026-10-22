@@ -1,29 +1,32 @@
 ---
+import { recipe } from 'kay'
 import type { JSX, Snippet } from 'kay'
 
-const { title, level = 2, actions, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'title'> & {
+// The base is the classes theme.css styles, so an app's CSS on them keeps working; `src/ui.ts` and the `class` object restyle each part.
+const look = recipe({ parts: { root: 'kui-page-section', head: 'kui-page-section-head', title: 'kui-page-section-title' } })
+
+const { title, level = 2, actions, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'title'> & {
   title: string
   // The title's heading level, `1` for a section holding a whole page.
   level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
   // The end of the head line: a `+` IconButton, a link, a row of controls.
   actions?: Snippet
-  class?: string | undefined
 }>()
 ---
 // A titled stretch of a page, its title one level under the page's own unless `level` says otherwise.
-section.kui-page-section({...rest} class={className})
-  .kui-page-section-head
+section({...rest})
+  div(part="head")
     if level === 1
-      h1.kui-heading-section.kui-page-section-title {title}
+      h1.kui-heading-section(part="title") {title}
     else if level === 2
-      h2.kui-heading-section.kui-page-section-title {title}
+      h2.kui-heading-section(part="title") {title}
     else if level === 3
-      h3.kui-heading-section.kui-page-section-title {title}
+      h3.kui-heading-section(part="title") {title}
     else if level === 4
-      h4.kui-heading-section.kui-page-section-title {title}
+      h4.kui-heading-section(part="title") {title}
     else if level === 5
-      h5.kui-heading-section.kui-page-section-title {title}
+      h5.kui-heading-section(part="title") {title}
     else
-      h6.kui-heading-section.kui-page-section-title {title}
+      h6.kui-heading-section(part="title") {title}
     | {actions}
   slot

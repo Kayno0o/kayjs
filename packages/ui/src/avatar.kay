@@ -1,16 +1,19 @@
 ---
+import { recipe } from 'kay'
 import type { JSX } from 'kay'
 import { isDark, stringToHexColor } from '@kaynooo/utils/colors'
 import { effect, signal } from 'kay'
 
-const { src, name, size = 'md', label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children' | 'role'> & {
+// The base is the classes theme.css styles, so an app's CSS on them keeps working; `src/ui.ts` and the `class` object restyle each part.
+const look = recipe({ parts: { root: 'kui-avatar', image: 'kui-avatar-image', initial: 'kui-avatar-initial' } })
+
+const { src, name, size = 'md', label, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children' | 'role'> & {
   src?: string | null | undefined
   // Seeds the fallback's colour and gives its initial.
   name: string
   size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
   // Names the picture for screen readers; without it the avatar is decorative, the name being written beside it.
   label?: string | undefined
-  class?: string | undefined
 }>()
 
 const failed = signal(false)
@@ -24,9 +27,9 @@ effect(() => {
 const ground = () => stringToHexColor(name)
 ---
 // The picture, or the name's initial on a colour seeded by the name when there is none or it fails to load.
-span.kui-avatar({...rest} data-size={size} role={label ? 'img' : undefined} aria-label={label} class={className})
+span({...rest} data-size={size} role={label ? 'img' : undefined} aria-label={label})
   if src && !failed()
     // kay-allow unsized-image
-    img.kui-avatar-image(src={src} alt="" onError={() => failed.set(true)})
+    img(part="image" src={src} alt="" onError={() => failed.set(true)})
   else
-    span.kui-avatar-initial(aria-hidden="true" style={`background-color: ${ground()}; color: ${isDark(ground()) ? '#fff' : '#000'}`}) {[...name.trim()][0]}
+    span(part="initial" aria-hidden="true" style={`background-color: ${ground()}; color: ${isDark(ground()) ? '#fff' : '#000'}`}) {[...name.trim()][0]}

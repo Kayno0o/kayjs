@@ -1,16 +1,18 @@
 ---
 import type { JSX } from 'kay'
-import { untrack } from 'kay'
+import { recipe, untrack } from 'kay'
 import { controlledValue } from './controlled-value'
 import { startRef } from './form-reset'
 
-const { value, onInput, onChange, onBlur, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onChange'> & {
+// The base is the classes theme.css styles, so an app's CSS on them keeps working; `src/ui.ts` and the `class` object restyle each part.
+const textarea = recipe({ parts: { root: 'kui-field-input' } })
+
+const { value, onInput, onChange, onBlur, ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onChange'> & {
   // Without it, the box starts empty and keeps what is typed, for a form posting it by its `name`.
   value?: string | undefined
   onInput?: ((value: string) => void) | undefined
   // Called once the value is committed, on blur, after `onInput`.
   onChange?: ((value: string) => void) | undefined
-  class?: string | undefined
 }>()
 
 let box: HTMLTextAreaElement | undefined
@@ -37,4 +39,4 @@ const ref = startRef<HTMLTextAreaElement>((element) => {
 }, rest.ref)
 
 ---
-textarea.kui-field-input({...rest} ref={ref} value={untrack(() => value)} class={className} onInput={event => { heard(event.currentTarget.value); onInput?.(event.currentTarget.value) }} onChange={event => { heard(event.currentTarget.value); onChange?.(event.currentTarget.value) }} onBlur={event => { sync(true); onBlur?.(event) }})
+textarea({...rest} ref={ref} value={untrack(() => value)} onInput={event => { heard(event.currentTarget.value); onInput?.(event.currentTarget.value) }} onChange={event => { heard(event.currentTarget.value); onChange?.(event.currentTarget.value) }} onBlur={event => { sync(true); onBlur?.(event) }})

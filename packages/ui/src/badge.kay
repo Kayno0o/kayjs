@@ -1,23 +1,29 @@
 ---
 import type { JSX } from 'kay'
 import type { IconProps } from 'kay/icons'
+import { recipe } from 'kay'
 import type { IconSlot } from './defaults'
 import Icon from './icon.kay'
 
-const { tone = 'neutral', icon, label, stamp = false, solid = false, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class'> & {
-  tone?: 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info' | undefined
+// The base is the classes theme.css styles, so an app's CSS on them keeps working; `src/ui.ts` and the `class` object restyle each part.
+const badge = recipe({
+  parts: { root: 'kui-badge', icon: 'kui-badge-icon' },
+  variants: { tone: { neutral: '', accent: '', success: '', warning: '', danger: '', info: '' } },
+  defaults: { tone: 'neutral' },
+})
+
+const { tone = 'neutral', icon, label, stamp = false, solid = false, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class'> & {
   icon?: IconSlot | IconProps | undefined
   label?: string | number | undefined
   // Drawn as a rubber stamp: a hairline in its text colour, small spaced capitals, filled again while a `.group` holding it is hovered.
   stamp?: boolean | undefined
   // Filled with the tone, its text in `--kui-badge-solid-text`. A stamp keeps its own ground.
   solid?: boolean | undefined
-  class?: string | undefined
 }>()
 ---
 // A label that does nothing: a count, a status, a tag.
-span.kui-badge({...rest} data-tone={tone} data-stamp={stamp ? '' : undefined} data-solid={solid && !stamp ? '' : undefined} class={className})
+span({...rest} data-tone={tone} data-stamp={stamp ? '' : undefined} data-solid={solid && !stamp ? '' : undefined})
   if icon
-    Icon(icon={icon} class="kui-badge-icon")
+    Icon(icon={icon} part="icon")
   | {label}
   slot

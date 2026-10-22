@@ -1,5 +1,5 @@
 {
   "extends": "../../tsconfig.base.json",
   "include": ["src", "tests", "tests-dom", "env.d.ts"],
-  "exclude": ["tests/fixture"]
+  "exclude": ["tests/fixture", "tests/restyle-app"]
 }

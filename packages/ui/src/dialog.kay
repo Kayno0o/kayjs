@@ -1,8 +1,11 @@
 ---
 import type { JSX, Snippet } from 'kay'
-import { effect, signal } from 'kay'
+import { effect, recipe, signal } from 'kay'
 
-const { open, title, level = 2, dirty = false, onOpenChange, footer, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'onClose' | 'onInput' | 'closedby' | 'closedBy'> & {
+// The base is the classes theme.css styles, so an app's CSS on them keeps working; `src/ui.ts` and the `class` object restyle each part.
+const look = recipe({ parts: { root: 'kui-dialog', title: 'kui-dialog-title', body: 'kui-dialog-body', footer: 'kui-dialog-footer' } })
+
+const { open, title, level = 2, dirty = false, onOpenChange, footer, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'onClose' | 'onInput' | 'closedby' | 'closedBy'> & {
   // Shows the dialog as a modal; the parent sets it back to false in `onOpenChange`.
   open: boolean
   title: string
@@ -11,7 +14,6 @@ const { open, title, level = 2, dirty = false, onOpenChange, footer, class: clas
   // Work the dialog must not drop, such as a request in flight: a click outside or Escape leaves it open. Typing inside the dialog counts on its own, though Escape still closes one with no footer.
   dirty?: boolean | undefined
   footer?: Snippet
-  class?: string | undefined
   // Called with `false` however the dialog closes, a click outside and Escape included. Closed by Escape or a click outside, its content is still there to read; closed by the parent setting `open` to false, it is already gone.
   onOpenChange: (open: boolean) => void
 }>()
@@ -49,20 +51,20 @@ function closed() {
 }
 ---
 // Named by its title for screen readers, which announce the dialog as it opens.
-dialog.kui-dialog(aria-label={title} {...rest} ref={element => dialog = element} closedby={closeWatcher()} onInput={() => edited.set(true)} onClose={closed} class={className})
+dialog(aria-label={title} {...rest} ref={element => dialog = element} closedby={closeWatcher()} onInput={() => edited.set(true)} onClose={closed})
   if open
     if level === 2
-      h2.kui-dialog-title {title}
+      h2(part="title") {title}
     else if level === 3
-      h3.kui-dialog-title {title}
+      h3(part="title") {title}
     else if level === 4
-      h4.kui-dialog-title {title}
+      h4(part="title") {title}
     else if level === 5
-      h5.kui-dialog-title {title}
+      h5(part="title") {title}
     else
-      h6.kui-dialog-title {title}
-    .kui-dialog-body
+      h6(part="title") {title}
+    div(part="body")
       slot
     if footer
-      .kui-dialog-footer
+      div(part="footer")
         | {footer}

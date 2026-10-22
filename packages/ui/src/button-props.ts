@@ -15,7 +15,6 @@ export interface Look {
   // Left out, a button with an `onClick` is busy and disabled by itself while the promise it returned is pending, and a submit button is busy while its form's `onSubmit` returns one; given, `busy` has the last word.
   busy?: boolean | undefined
   label?: string | undefined
-  class?: string | undefined
 }
 
 export type AsButton = Omit<JSX.IntrinsicElements['button'], 'type' | 'class'> & Look & {
