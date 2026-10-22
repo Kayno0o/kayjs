@@ -570,6 +570,12 @@ describe('a11y lints', () => {
     expect(only('missing-label', 'input(name="q" placeholder="Search")\ninput(name="r" aria-label="R" placeholder="Search")\nmeter(value="3" max="5")\nmeter(value="3" max="5" aria-label="Storage")\ndiv(role="slider" aria-valuenow="2")\nlabel\n  | Rating\n  meter(value="2")\n')).toEqual(['missing-label input', 'missing-label meter', 'missing-label div'])
   })
 
+  it('asks no key of a for over a module-level constant, the retired identity-key lint included', () => {
+    const source = '---\nconst CELLS = [[1, 2], [3, 4]] as const\nconst GROUPS = [[\'a\', \'b\'], [\'c\']]\n---\nul\n  for cell of CELLS\n    li {cell[0]}\n  for group of GROUPS\n    li {group.length}\n'
+
+    expect(lints(source).map(d => d.code)).toEqual([])
+  })
+
   it('refuses a click with no role, and warns of one whose role names no widget', () => {
     const source = 'div(onClick={go}) a\ndiv(role="presentation" onClick={go}) b\nli(role="option" onClick={go}) c\ndiv(role={kind} onClick={go}) d\nspan(role="button" tabindex="0" onClick={go}) e\nsection(role="region" onClick={go}) f\n'
 
