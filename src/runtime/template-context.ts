@@ -44,6 +44,7 @@ function valuesNow(key: string | symbol): Record<string, unknown> {
 }
 
 // The request values templates read, as `ctx.user` or `ctx.can('admin')`: kay imports it where a template reads `ctx` and the file declares none of its own.
+// eslint-disable-next-line ts/no-unnecessary-type-assertion -- an app's extensions augment TemplateContext, which an empty target then lacks the keys of
 export const ctx = new Proxy({} as TemplateContext, {
   get: (_, key) => valuesNow(key)[key as string],
   has: (_, key) => key in valuesNow(key),
