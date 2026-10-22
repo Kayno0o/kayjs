@@ -288,6 +288,19 @@ export function refuseUnsaved(): void {
   toast.error(wording('cms.save.saveFirst', 'You have unsaved changes. Save or cancel them first, so this does not save them too.'))
 }
 
+// Saves one field's new value alone, as Publish and Unpublish do, for the screens and the page editor: with edits not saved yet it refuses, and a refused save puts the field back, so the form never shows what is not stored. The caller has checked no save is on its way.
+export async function changeField(drafts: Drafts, ref: EntryRef, field: string, value: unknown, { dirty, save }: { dirty: boolean, save: () => Promise<boolean> }): Promise<void> {
+  if (dirty)
+    return refuseUnsaved()
+
+  const before = drafts.value(ref, field)
+
+  drafts.set(ref, field, value)
+
+  if (!await save())
+    drafts.set(ref, field, before)
+}
+
 // Saves an older version of an entry again, naming the version the editor opened, and says how it went; true once restored.
 export async function restoreVersion(ref: EntryRef, at: number, version?: string | undefined): Promise<boolean> {
   const outcome = await attempt(async () => call(historyApi, '/:collection/:slug/restore', {

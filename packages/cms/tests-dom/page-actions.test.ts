@@ -8,6 +8,8 @@ const POSTS = { name: 'posts', title: 'Posts', kind: 'folder', localized: false,
 const SETTINGS = { name: 'index', title: 'Home', single: true, kind: 'file', localized: false, components: [], schema: { type: 'object', properties: { title: { type: 'string' } } } }
 const PLAIN = { name: 'notes', title: 'Notes', kind: 'folder', localized: false, components: [], schema: { type: 'object', properties: { title: { type: 'string' } } } }
 let mounted: Mounted | undefined
+// Lets the save a `hold` server keeps waiting go through.
+let releaseSave: () => void = () => undefined
 
 Object.assign(document, { caretPositionFromPoint: () => null, elementsFromPoint: () => [] })
 
@@ -18,10 +20,13 @@ afterEach(() => {
   localStorage.clear()
 })
 
-interface Options { collection?: object, draft?: boolean, denied?: Record<string, string>, save?: Response, locale?: string, referrers?: Record<string, string[]> }
+interface Options { hold?: boolean, collection?: object, draft?: boolean, denied?: Record<string, string>, save?: Response, locale?: string, referrers?: Record<string, string[]> }
 
 // The entries API holding one entry, answering the role's limits and recording every write.
-function server({ collection = POSTS, draft = true, denied = {}, save, locale, referrers = {} }: Options = {}) {
+function server({ hold = false, collection = POSTS, draft = true, denied = {}, save, locale, referrers = {} }: Options = {}) {
+  const held = new Promise<void>((resolve) => {
+    releaseSave = resolve
+  })
   const writes: { method: string, url: string, body?: { data: Record<string, unknown> } }[] = []
   const stored = { slug: 'hello', locale, data: { title: 'Hello', draft }, draft, version: 'v1', url: '/posts/hello' }
 
@@ -40,6 +45,9 @@ function server({ collection = POSTS, draft = true, denied = {}, save, locale, r
 
     if (path.includes('/entries/'))
       writes.push({ method, url: path, body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined })
+
+    if (method === 'POST' && hold)
+      await held
 
     return method === 'POST' && save ? save.clone() : Response.json({ saved: true, version: 'v2' })
   }) as unknown as typeof fetch)
@@ -219,4 +227,18 @@ test('a single collection with no draft flag shows no row of actions', async () 
   const root = await open({ collection: 'index', slug: 'index' })
 
   expect(root.querySelector('.kcms-entry-more')).toBeNull()
+})
+
+test('Delete waits while a save runs', async () => {
+  server({ hold: true })
+  const root = await open()
+
+  button(root, 'Publish')!.click()
+  await settle()
+  expect(button(root, 'Delete')!.disabled).toBe(true)
+
+  releaseSave()
+  await settle()
+  await Bun.sleep(50)
+  expect(button(root, 'Delete')!.disabled).toBe(false)
 })

@@ -13,7 +13,7 @@ import { createDrafts } from './drafts'
 import { savedHandler } from './editor/live'
 import { rebuildFinished } from './editor/rebuild'
 import { readReferrers } from './editor/referrers'
-import { deleteSaved, refuseUnsaved, renameSaved, saveDraft, showRefusal } from './editor/save'
+import { changeField, deleteSaved, renameSaved, saveDraft, showRefusal } from './editor/save'
 import { saveShortcut } from './editor/shortcut'
 import { readHeldSlugs, reportSlug } from './editor/slugs'
 import { shipWords } from './editor/words'
@@ -304,20 +304,12 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
     await saveNow('another')
   }
 
-  // Saves one field's new value alone, and puts the field back when the save is refused, so the form never shows what is not stored.
+  // Saves one field's new value alone, putting it back when the save is refused.
   async function change(field: string | undefined, value: unknown): Promise<void> {
     if (!first || field === undefined || saving())
       return
 
-    if (drafts.changed(ref))
-      return refuseUnsaved()
-
-    const before = drafts.value(ref, field)
-
-    drafts.set(ref, field, value)
-
-    if (!await saveNow())
-      drafts.set(ref, field, before)
+    await changeField(drafts, ref, field, value, { dirty: drafts.changed(ref), save: saveNow })
   }
 
   saveShortcut(async () => {

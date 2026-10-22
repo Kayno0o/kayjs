@@ -2,13 +2,13 @@
 import type { EntryForm } from '../form'
 import Badge from '@kaynooo/kayjs-ui/badge.kay'
 import Button from '@kaynooo/kayjs-ui/button.kay'
-import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
 import { wording } from 'kay/words'
 import type { Denials } from '../access'
 import { shareDraft } from '../editor/save'
-import { collectionPath, deleteMessage, historyPath, onPagePath } from '../listing'
+import { collectionPath, historyPath, onPagePath } from '../listing'
 import EntryRename from './entry-rename.kay'
 import Refused from './refused.kay'
+import EntryState from './entry-state.kay'
 import EntrySaveState from './entry-save-state.kay'
 import ResetButton from './reset-button.kay'
 
@@ -53,22 +53,7 @@ else if form.ends() as at
       Button(href={historyPath(form.prefix, { collection: form.collection.name, slug: entry.slug, locale: entry.locale })} label={wording('cms.history.open', 'History')})
     if !form.collection.single
       EntryRename(form={form} denied={denied})
-    if form.isDraft()
-      if denied.publish !== undefined
-        Refused(label={wording('cms.entry.publish', 'Publish')} reason={denied.publish})
-      else
-        Button(label={wording('cms.entry.publish', 'Publish')} disabled={form.saving()} onClick={form.publish})
-    else if form.collection.draftField !== undefined && denied.publish !== undefined
-      Refused(label={wording('cms.entry.unpublish', 'Unpublish')} reason={denied.publish})
-    else if form.collection.draftField !== undefined && form.dirty()
-      // The dialog would only lead to a refusal over unsaved edits.
-      Button(label={wording('cms.entry.unpublish', 'Unpublish')} disabled={form.saving()} onClick={form.unpublish})
-    else if form.collection.draftField !== undefined
-      ConfirmDelete(tone="neutral" trigger="button" label={wording('cms.entry.unpublish', 'Unpublish')} message={wording('cms.entry.unpublishMessage', 'Unpublish {title}? Visitors stop seeing it until you publish it again.', { title: form.name })} failure={wording('cms.entry.unpublishFailure', 'Could not unpublish')} onConfirm={form.unpublish})
-    if !form.collection.single && denied.delete !== undefined
-      Refused(label={wording('cms.bulk.delete', 'Delete')} reason={denied.delete} tone="danger")
-    else if !form.collection.single
-      ConfirmDelete(message={deleteMessage(form.name, entry.url, 'entry', form.referrers())} onOpen={form.askReferrers} failure={wording('cms.save.deleteFailure', 'Could not delete')} trigger="button" onConfirm={form.remove})
+    EntryState(draftField={form.collection.draftField} draft={form.isDraft()} dirty={form.dirty()} saving={form.saving()} denied={denied} title={form.name} url={entry.url} referrers={form.referrers()} deletable={!form.collection.single} onPublish={form.publish} onUnpublish={form.unpublish} onRemove={form.remove} onAskReferrers={form.askReferrers})
   if form.dirty()
     ResetButton(disabled={form.saving()} onReset={form.reset})
   if !entry && !form.collection.single

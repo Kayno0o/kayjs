@@ -87,6 +87,7 @@ test('Save waits for an edit, the state line says so, and a save locks the form 
   expect(save().textContent?.trim()).toBe('Saving…')
   expect(root.querySelector('fieldset')!.disabled).toBe(true)
   expect(root.querySelector('form')!.getAttribute('aria-busy')).toBe('true')
+  expect(button(root, 'Delete')!.disabled).toBe(true)
 
   release()
   await pause()

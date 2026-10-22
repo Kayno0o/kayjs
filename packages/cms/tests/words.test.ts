@@ -6,7 +6,7 @@ import { emptyFile, tooLarge, tooLargeForServer } from '../src/upload-text'
 const SRC = join(import.meta.dir, '../src')
 const KEY = /wording\(\s*'(cms\.[A-Za-z.]+)'/g
 // The files the editor runs in once the page has loaded, whose keys no island's own source names.
-const AFTER_LOAD_FILES = ['bulk-message.ts', 'components/entry-body.kay', 'components/entry-bulk.kay', 'components/entry-field.kay', 'components/entry-identity.kay', 'components/entry-notices.kay', 'components/entry-save-state.kay', 'components/reset-button.kay', 'components/session-ended.kay', 'editor/bulk.ts', 'editor/datetime-input.kay', 'editor/entry-fields.kay', 'editor/entry-form.kay', 'editor/field-input.kay', 'editor/file-input.kay', 'editor/ready-input.kay', 'editor/page-list-tools.kay', 'editor/page-lists.ts', 'editor/reorder.kay', 'editor/save.ts', 'editor/upload.ts', 'upload-text.ts', 'fields.ts', 'listing.ts']
+const AFTER_LOAD_FILES = ['bulk-message.ts', 'components/entry-body.kay', 'components/entry-bulk.kay', 'components/entry-field.kay', 'components/entry-identity.kay', 'components/entry-notices.kay', 'components/entry-save-state.kay', 'components/entry-state.kay', 'components/reset-button.kay', 'components/session-ended.kay', 'editor/bulk.ts', 'editor/datetime-input.kay', 'editor/entry-fields.kay', 'editor/entry-form.kay', 'editor/field-input.kay', 'editor/file-input.kay', 'editor/ready-input.kay', 'editor/page-list-tools.kay', 'editor/page-lists.ts', 'editor/reorder.kay', 'editor/save.ts', 'editor/upload.ts', 'upload-text.ts', 'fields.ts', 'listing.ts']
 
 async function wordsText(): Promise<string> {
   return (await Promise.all(['words.md', 'words-media-to-uploads.md'].map(async file => Bun.file(join(import.meta.dir, '../llms', file)).text()))).join('\n')
