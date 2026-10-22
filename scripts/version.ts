@@ -28,10 +28,12 @@ const version = parts.join('.')
 // Any patch of the minor, so an app a patch behind the libraries meets their peer.
 const peer = `~${parts[0]}.${parts[1]}.0`
 const libraries = await Array.fromAsync(new Glob('packages/*/package.json').scan())
-const manifests = ['package.json', ...libraries]
+// The editor extension is released at kay's version too, with no peer on kay: the kay it runs is the project's own.
+const EXTENSION = 'editors/vscode/package.json'
+const manifests = ['package.json', ...libraries, EXTENSION]
 
 const texts = await Promise.all(manifests.map(async path => ({ path, text: await Bun.file(path).text() })))
-const missing = texts.filter(({ path, text }) => !VERSION.test(text) || (path !== 'package.json' && !KAY_PEER.test(text))).map(({ path }) => path)
+const missing = texts.filter(({ path, text }) => !VERSION.test(text) || (path !== 'package.json' && path !== EXTENSION && !KAY_PEER.test(text))).map(({ path }) => path)
 
 if (missing.length > 0)
   throw new Error(`${missing.join(', ')}: no version or no peer on kay to move`)

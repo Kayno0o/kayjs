@@ -70,12 +70,18 @@ export const TAILWIND_CLASS_REGEX: (string | [string, string])[] = [
   [String.raw`(?:^|\n|#\[)[ \t]*(?:[A-Za-z][\w-]*)?(?:#[^\s.#(\[\]]+)?((?:\.${SHORTHAND_CLASS})+)`, String.raw`\.(${SHORTHAND_CLASS})`],
 ]
 
-// `.vscode/settings.json`: the ESLint extension lints only the languages it lists, which replaces its default ones, and Tailwind IntelliSense reads `.kay` as HTML.
+// `.vscode/settings.json`: kay formats `.kay` files on save, the ESLint extension lints only the languages it lists, which replaces its default ones, and Tailwind IntelliSense reads `.kay` as HTML.
 function editorSettings({ has }: Setup): Record<string, unknown> {
   return {
+    '[kay]': { 'editor.defaultFormatter': 'kaynooo.kay', 'editor.formatOnSave': true },
     ...has('eslint') && { 'eslint.validate': ['javascript', 'javascriptreact', 'typescript', 'typescriptreact', 'kay'] },
     ...has('tailwind') && { 'tailwindCSS.includeLanguages': { kay: 'html' }, 'tailwindCSS.experimental.classRegex': TAILWIND_CLASS_REGEX },
   }
+}
+
+// `.vscode/extensions.json`: VS Code offers the kay extension, and those of the features that have one, when the folder opens.
+function editorExtensions({ has }: Setup): { recommendations: string[] } {
+  return { recommendations: ['kaynooo.kay', ...has('eslint') ? ['dbaeumer.vscode-eslint'] : [], ...has('tailwind') ? ['bradlc.vscode-tailwindcss'] : []] }
 }
 
 // astro-template's look: Tailwind over the Catppuccin Mocha palette, the accent one of its colours, which the picker in the header changes.
@@ -907,7 +913,8 @@ export function templateFiles(features: ReadonlySet<Feature>, settings: ConfigSe
     ...has('starter') && starterFiles(setup),
     ...has('accents') && ACCENT_FILES,
     ...server && { 'src/server.ts': SERVER_ENTRY },
-    ...(has('eslint') || has('tailwind')) && { '.vscode/settings.json': `${JSON.stringify(editorSettings(setup), null, 2)}\n` },
+    '.vscode/settings.json': `${JSON.stringify(editorSettings(setup), null, 2)}\n`,
+    '.vscode/extensions.json': `${JSON.stringify(editorExtensions(setup), null, 2)}\n`,
     // Type-aware, .kay fences included, over the types `kay lint`, `kay check` and `kay dev` write.
     ...has('eslint') && { 'eslint.config.ts': 'import { defineConfig } from \'@kaynooo/eslint\'\n\nexport default defineConfig({ strict: true, kay: true })\n' },
     ...has('tests') && {

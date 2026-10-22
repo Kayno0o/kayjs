@@ -19,3 +19,4 @@ bench/sites/results*.md
 codecs/avif/.cache
 
 docs/data/
+editors/vscode/LICENSE

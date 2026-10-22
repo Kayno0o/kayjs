@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'bun:test'
 import { TAILWIND_CLASS_REGEX, templateFiles } from '../src/templates'
 
+const KAY_FORMAT = { 'editor.defaultFormatter': 'kaynooo.kay', 'editor.formatOnSave': true }
+
 // How Tailwind IntelliSense reads a classRegex: a string's first group is a class list, a pair's container group is searched for the inner regex.
 function classesIn(text: string): string[] {
   return TAILWIND_CLASS_REGEX.flatMap((entry) => {
@@ -53,9 +55,19 @@ describe('the starter app\'s Tailwind IntelliSense setting', () => {
   it('is written to the settings of an app with Tailwind, beside the ESLint one', () => {
     const settings = (...features: Parameters<typeof templateFiles>[0] extends ReadonlySet<infer F> ? F[] : never) => templateFiles(new Set(features))['.vscode/settings.json']
 
-    expect(JSON.parse(settings('tailwind')!)).toEqual({ 'tailwindCSS.includeLanguages': { kay: 'html' }, 'tailwindCSS.experimental.classRegex': TAILWIND_CLASS_REGEX })
-    expect(Object.keys(JSON.parse(settings('tailwind', 'eslint')!))).toEqual(['eslint.validate', 'tailwindCSS.includeLanguages', 'tailwindCSS.experimental.classRegex'])
-    expect(JSON.parse(settings('eslint')!)).toEqual({ 'eslint.validate': ['javascript', 'javascriptreact', 'typescript', 'typescriptreact', 'kay'] })
-    expect(settings()).toBeUndefined()
+    expect(JSON.parse(settings('tailwind')!)).toEqual({ '[kay]': KAY_FORMAT, 'tailwindCSS.includeLanguages': { kay: 'html' }, 'tailwindCSS.experimental.classRegex': TAILWIND_CLASS_REGEX })
+    expect(Object.keys(JSON.parse(settings('tailwind', 'eslint')!))).toEqual(['[kay]', 'eslint.validate', 'tailwindCSS.includeLanguages', 'tailwindCSS.experimental.classRegex'])
+    expect(JSON.parse(settings('eslint')!)).toEqual({ '[kay]': KAY_FORMAT, 'eslint.validate': ['javascript', 'javascriptreact', 'typescript', 'typescriptreact', 'kay'] })
+  })
+
+  it('formats .kay files on save with the kay extension, whatever the features', () => {
+    expect(JSON.parse(templateFiles(new Set())['.vscode/settings.json']!)).toEqual({ '[kay]': KAY_FORMAT })
+  })
+
+  it('recommends the kay extension, and those of the features that have one', () => {
+    const recommendations = (...features: Parameters<typeof templateFiles>[0] extends ReadonlySet<infer F> ? F[] : never) => (JSON.parse(templateFiles(new Set(features))['.vscode/extensions.json']!) as { recommendations: string[] }).recommendations
+
+    expect(recommendations()).toEqual(['kaynooo.kay'])
+    expect(recommendations('eslint', 'tailwind')).toEqual(['kaynooo.kay', 'dbaeumer.vscode-eslint', 'bradlc.vscode-tailwindcss'])
   })
 })

@@ -2,5 +2,7 @@
 !dist/extension.js
 !language-configuration.json
 !syntaxes/**
+!snippets/**
+!LICENSE
 !package.json
 !README.md

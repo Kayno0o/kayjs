@@ -293,7 +293,7 @@ export const authors = collection('content/authors', {
     const report = await migrateAstroProject(root, out, { kay: '^1.0.0' })
     const packageJson = await Bun.file(join(out, 'package.json')).json() as { scripts: Record<string, string>, dependencies: Record<string, string>, devDependencies: Record<string, string> }
 
-    expect(report.written.toSorted()).toEqual(['.gitignore', '.npmrc', '.vscode/settings.json', 'AGENTS.md', 'kay.config.ts', 'package.json', 'src/layouts/layout.kay', 'src/routes/index.kay', 'src/server.ts', 'tsconfig.json'])
+    expect(report.written.toSorted()).toEqual(['.gitignore', '.npmrc', '.vscode/extensions.json', '.vscode/settings.json', 'AGENTS.md', 'kay.config.ts', 'package.json', 'src/layouts/layout.kay', 'src/routes/index.kay', 'src/server.ts', 'tsconfig.json'])
     expect(report.copied.toSorted()).toEqual(['public/.well-known/security.txt', 'public/favicon.svg', 'src/styles/global.css'])
     expect(await Bun.file(join(out, 'src/routes/index.kay')).text()).toBe('--- server\nimport Layout from \'../layouts/layout.kay\'\n---\nLayout\n  h1 Accueil\n')
     expect(await Bun.file(join(out, 'kay.config.ts')).text()).toBe('import tailwind from \'bun-plugin-tailwind\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({\n  lang: \'fr\',\n  site: \'https://example.com\',\n  base: \'/docs\',\n  plugins: [tailwind],\n})\n')

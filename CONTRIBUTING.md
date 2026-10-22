@@ -30,7 +30,7 @@ The repository's `.npmrc` already points the `@kaynooo` scope at its registry. T
 - `docs/`: the documentation site, plain prose for people, built with kay itself.
 - `examples/`: the tutorial's app and an app using every library.
 - `tests/`: kay's tests, with their fixtures.
-- `editors/vscode/`: the editor extension, on `kay lsp`.
+- `editors/vscode/`: the editor extension, on `kay lsp`; `bun run package` there writes `kay.vsix`, and a release tag builds and publishes it.
 
 ## Checks
 

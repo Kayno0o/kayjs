@@ -17,6 +17,16 @@ const libraries = await Promise.all((await Array.fromAsync(new Glob('packages/*/
 const names = new Set(libraries.map(({ manifest }) => manifest.name))
 const [major, minor] = root.version.split('.')
 
+// The editor extension ships as a .vsix at kay's version, so the release attaches the one its tag names.
+describe('the editor extension', () => {
+  it('is at kay\'s version and not private', async () => {
+    const extension = await Bun.file('editors/vscode/package.json').json() as Manifest & { private?: boolean }
+
+    expect(extension.version).toBe(root.version)
+    expect(extension.private).toBeUndefined()
+  })
+})
+
 // scripts/version.ts moves kay and its libraries together: a library a version apart, or naming another by a range, would publish the drift the monorepo exists to prevent.
 describe('kay\'s libraries', () => {
   it.each(libraries)('$path is at kay\'s version and peers on kay\'s minor', ({ manifest }) => {

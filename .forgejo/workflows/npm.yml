@@ -153,3 +153,49 @@ jobs:
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
           DISCORD_WEBHOOK: ${{secrets.DISCORD_WEBHOOK}}
+
+      # The editor extension is released at kay's version: its own checks and tests, then the .vsix attached to the release the changelog step made (created here when that found nothing to say). Reruns replace the asset of the same name.
+      - name: Build the VS Code extension
+        run: |
+          cd editors/vscode
+          bun install --silent --frozen-lockfile
+          bun run check
+          bun run test
+          bun run package
+          mv kay.vsix "kay-$(jq -r .version package.json).vsix"
+
+      - name: Attach the extension to the release
+        run: |
+          file=$(ls editors/vscode/kay-*.vsix)
+          name=$(basename "$file")
+          api="$API/repos/$GITHUB_REPOSITORY/releases"
+          id=$(curl -sf -H "Authorization: token $TOKEN" "$api/tags/$GITHUB_REF_NAME" | jq -r '.id // empty' || true)
+          if [ -z "$id" ]; then
+            id=$(curl -sf -X POST -H "Authorization: token $TOKEN" -H 'Content-Type: application/json' -d "{\"tag_name\":\"$GITHUB_REF_NAME\",\"name\":\"$GITHUB_REF_NAME\"}" "$api" | jq -r .id)
+          fi
+          for asset in $(curl -sf -H "Authorization: token $TOKEN" "$api/$id/assets" | jq -r ".[] | select(.name == \"$name\") | .id"); do
+            curl -sf -X DELETE -H "Authorization: token $TOKEN" "$api/$id/assets/$asset"
+          done
+          curl -sf -X POST -H "Authorization: token $TOKEN" -F "attachment=@$file" "$api/$id/assets?name=$name"
+        env:
+          API: ${{ github.server_url }}/api/v1
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Each registry is published only when its token is set, so the release works before the accounts exist. A version already there is skipped by the registry's own refusal, which a rerun must not fail on.
+      - name: Publish the extension to the Marketplace and Open VSX
+        run: |
+          cd editors/vscode
+          file=$(ls kay-*.vsix)
+          if [ -n "$VSCE_PAT" ]; then
+            bunx @vscode/vsce@4.0.0 publish --packagePath "$file" --pat "$VSCE_PAT" --skip-duplicate
+          else
+            echo "VSCE_PAT is not set, the Marketplace is skipped"
+          fi
+          if [ -n "$OVSX_PAT" ]; then
+            bunx ovsx@1.3.0 publish "$file" --pat "$OVSX_PAT" --skip-duplicate
+          else
+            echo "OVSX_PAT is not set, Open VSX is skipped"
+          fi
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}

@@ -10,3 +10,6 @@ const result = await Bun.build({
 
 if (!result.success)
   throw new AggregateError(result.logs, 'Extension build failed')
+
+// vsce refuses a licensed extension without the file, and the repository keeps one copy.
+await Bun.write('LICENSE', Bun.file('../../LICENSE'))

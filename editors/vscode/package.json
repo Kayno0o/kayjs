@@ -2,11 +2,14 @@
   "publisher": "kaynooo",
   "name": "kay",
   "displayName": "Kay",
-  "version": "0.1.0",
-  "private": true,
+  "version": "1.69.0",
   "description": "Language support for .kay components: highlighting, diagnostics, hover, completion, go-to-definition and formatting through the kay language server",
-  "license": "UNLICENSED",
-  "repository": "https://github.com/Kayno0o/kayjs",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kayno0o/kayjs",
+    "directory": "editors/vscode"
+  },
   "categories": [
     "Programming Languages"
   ],
@@ -66,7 +69,7 @@
   "scripts": {
     "build": "bun build.ts",
     "check": "bun ../../src/tsgo.ts --noEmit -p tsconfig.json",
-    "package": "bun build.ts && bunx @vscode/vsce@4.0.0 package --no-dependencies --skip-license -o kay.vsix",
+    "package": "bun build.ts && bunx @vscode/vsce@4.0.0 package --no-dependencies -o kay.vsix",
     "test": "bun test"
   },
   "devDependencies": {
@@ -74,5 +77,13 @@
     "vscode-languageclient": "10.1.2",
     "vscode-oniguruma": "2.0.1",
     "vscode-textmate": "9.3.2"
-  }
+  },
+  "homepage": "https://kayjs.kaynooo.fr",
+  "keywords": [
+    "kay",
+    "kayjs",
+    "bun",
+    "pug",
+    "template"
+  ]
 }

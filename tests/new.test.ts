@@ -521,7 +521,7 @@ describe('kay command line', () => {
 
     try {
       expect((await kay(['new', 'styled', '--kay', '^1.0.0', '--template', 'blank', '--with', 'tailwind, tests'], dir)).code).toBe(0)
-      expect((await readdir(join(dir, 'styled'), { recursive: true })).sort()).toEqual(['.gitignore', '.npmrc', '.vscode', '.vscode/settings.json', 'AGENTS.md', 'bunfig.toml', 'kay.config.ts', 'package.json', 'src', 'src/app.css', 'src/routes', 'src/routes/_layout.kay', 'src/routes/index.kay', 'tests', 'tests/home.test.ts', 'tsconfig.json'])
+      expect((await readdir(join(dir, 'styled'), { recursive: true })).sort()).toEqual(['.gitignore', '.npmrc', '.vscode', '.vscode/extensions.json', '.vscode/settings.json', 'AGENTS.md', 'bunfig.toml', 'kay.config.ts', 'package.json', 'src', 'src/app.css', 'src/routes', 'src/routes/_layout.kay', 'src/routes/index.kay', 'tests', 'tests/home.test.ts', 'tsconfig.json'])
       expect((await kay(['new', 'lean', '--kay', '^1.0.0', '--without', 'docker,ci'], dir)).code).toBe(0)
       expect(await readdir(join(dir, 'lean'))).not.toEqual(expect.arrayContaining(['Dockerfile']))
       expect(await Bun.file(join(dir, 'lean/src/server.ts')).exists()).toBe(true)
@@ -619,7 +619,7 @@ describe('kay new', () => {
     // A warning is shown, and fails CI only where the app adds `--deny-warnings`.
     expect(manifest.scripts.check).toBe('kay check')
     expect(manifest.scripts.lint).toBe('kay lint --cache')
-    expect(await Bun.file(join(dir, '.vscode/settings.json')).json()).toEqual({ 'eslint.validate': ['javascript', 'javascriptreact', 'typescript', 'typescriptreact', 'kay'], 'tailwindCSS.includeLanguages': { kay: 'html' }, 'tailwindCSS.experimental.classRegex': TAILWIND_CLASS_REGEX })
+    expect(await Bun.file(join(dir, '.vscode/settings.json')).json()).toEqual({ '[kay]': { 'editor.defaultFormatter': 'kaynooo.kay', 'editor.formatOnSave': true }, 'eslint.validate': ['javascript', 'javascriptreact', 'typescript', 'typescriptreact', 'kay'], 'tailwindCSS.includeLanguages': { kay: 'html' }, 'tailwindCSS.experimental.classRegex': TAILWIND_CLASS_REGEX })
     expect(await Bun.file(join(dir, 'AGENTS.md')).text()).toContain('run `bun run check`, `bun run fmt`, `bun run lint`, and `bun run test`.')
     expect(await Bun.file(join(dir, 'Dockerfile')).text()).toContain('RUN bun run compile')
     expect(await Bun.file(join(dir, 'Dockerfile')).text()).toContain('HEALTHCHECK --interval=30s --timeout=6s CMD ["./server", "--health"]')
@@ -888,7 +888,7 @@ describe('kay new', () => {
       const files = await createProject(dir, { kay: '^1.0.0', features: PRESETS.blank.features })
       const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies: Record<string, string>, devDependencies: Record<string, string>, scripts: Record<string, string> }
 
-      expect(files).toEqual(['.gitignore', '.npmrc', 'AGENTS.md', 'kay.config.ts', 'package.json', 'src/routes/_layout.kay', 'src/routes/index.kay', 'tsconfig.json'])
+      expect(files).toEqual(['.gitignore', '.npmrc', '.vscode/extensions.json', '.vscode/settings.json', 'AGENTS.md', 'kay.config.ts', 'package.json', 'src/routes/_layout.kay', 'src/routes/index.kay', 'tsconfig.json'])
       // kay itself comes from the registry this names, whatever else is left out.
       expect(await Bun.file(join(dir, '.npmrc')).text()).toBe('@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/\n')
       expect(manifest.scripts).toEqual({ dev: 'kay dev', build: 'kay build --static', check: 'kay check', fmt: 'kay fmt' })
