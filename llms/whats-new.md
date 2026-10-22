@@ -7,6 +7,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-cms's entry screen swaps its form for a notice linking the collection when a leave after a delete is declined, and `createEntryForm` returns `stranded` ([Screens](../packages/cms/llms/screens.md)).
 - `navigate()` resolves to `false` when a leave guard was declined and the page stayed, `true` otherwise ([Navigation](navigation.md)).
 - kayjs-ui's `ConfirmDelete` takes `disabled`, which disables its trigger and confirm button while the caller is busy and keeps an open dialog open ([Dialogs](../packages/ui/llms/basics.md)).
+- kayjs-ui `SidePanel(modal={false})` shows a detail beside a live view, the page under it staying interactive, and `closeHref` makes its close button a link for a panel the URL drives ([Page layout](../packages/ui/llms/page-layout-palette-and-trees.md)).
 - The on-page editor offers Publish, Unpublish and Delete for the entry beside Save, with the role's refusal as tooltip ([Editor](../packages/cms/llms/editor.md)).
 - `proxy: { key: 'x-upstream-key' }` refuses with 403 every request lacking the key the proxy shares (`KAY_PROXY_KEY` or `KAY_PROXY_KEY_FILE`), with the health route and `open` paths left out ([Proxies](proxy-and-security.md#behind-a-proxy)).
 - `rooms({ store: appStore().rooms })` is typed `StoreRooms`, whose `state` and `update` give the state or a promise of it, so `await` them with no narrowing ([Rooms](rooms.md)).

@@ -143,6 +143,8 @@ Popover#popover(open={false})
   p panel
 SidePanel#side(open={true} title="Filters" onOpenChange={() => undefined})
   p body
+SidePanel#beside(open={true} modal={false} closeHref="/list" title="Detail" onOpenChange={() => undefined})
+  p detail
 ConfirmDelete#confirm-link(message="Sure?" trigger="link" onConfirm={() => undefined})
 ConfirmDelete#confirm-inline(message="Sure?" ask="inline" trigger="button" onConfirm={() => undefined})
 SaveForm#save(dirty={false} onSave={() => undefined})

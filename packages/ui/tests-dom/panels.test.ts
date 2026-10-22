@@ -60,6 +60,47 @@ describe('SidePanel', () => {
   })
 })
 
+describe('SidePanel with modal={false}', () => {
+  test('shows beside the page, stays open on a click outside, and closes on Escape or its close link through onClose', async () => {
+    const root = await panels()
+    const panel = root.querySelector<HTMLDialogElement>('#beside')!
+
+    click(root.querySelector('#open-beside'))
+    await settle()
+
+    expect(panel.open).toBe(true)
+    expect(panel.hasAttribute('data-modal')).toBe(true)
+    expect(panel.getAttribute('closedby')).toBe('none')
+    expect(panel.matches(':modal')).toBe(false)
+
+    click(root.querySelector('#open'))
+    await settle()
+
+    expect(panel.open).toBe(true)
+    expect(closes).toBe(0)
+
+    key(document.body, 'Escape')
+    await settle()
+
+    expect(panel.open).toBe(false)
+    expect(closes).toBe(1)
+
+    click(root.querySelector('#open-beside'))
+    await settle()
+    const close = panel.querySelector<HTMLAnchorElement>('a.kui-icon-btn')!
+
+    expect(close.getAttribute('href')).toBe('/list')
+    expect(close.getAttribute('aria-label')).toBe('Close')
+
+    close.addEventListener('click', event => event.preventDefault())
+    click(close)
+    await settle()
+
+    expect(panel.open).toBe(false)
+    expect(closes).toBe(2)
+  })
+})
+
 describe('SplitLayout', () => {
   test('renders its panes once, with the sidebar\'s and the detail\'s state for the narrow layout, and the sidebar\'s back button asks the parent to close it', async () => {
     const root = await panels()

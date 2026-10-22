@@ -2118,7 +2118,7 @@
     }
   }
 
-  /* A modal dialog along the right edge, sliding in when it opens. */
+  /* A dialog along the right edge, modal unless `modal` is false, sliding in when it opens. */
   .kui-side-panel {
     @apply inset-y-0 right-0 left-auto m-0 flex h-dvh max-h-dvh w-full max-w-[min(42rem,100vw)] flex-col overflow-hidden border-0 border-solid border-l-(length:--kui-border-width) border-kui-overlay0 bg-kui-surface0 p-0 text-kui-text;
     transition:
@@ -2134,6 +2134,11 @@
 
     &:where(:not([open])) {
       translate: 100% 0;
+    }
+
+    /* Shown with show(), beside the page: a dialog not shown as a modal is positioned absolute and sits in the page, so it is fixed to the edge and above the page. */
+    &:where([data-modal='false']) {
+      @apply fixed z-30 [box-shadow:var(--kui-shadow-raised)];
     }
 
     &::backdrop {

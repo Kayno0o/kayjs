@@ -7,9 +7,11 @@ import SplitLayout from '@kaynooo/kayjs-ui/split-layout.kay'
 const { onClose, listWidthKey } = props<{ onClose: () => void, listWidthKey?: string }>()
 
 const open = signal(false)
+const beside = signal(false)
 const sidebarOpen = signal(true)
 ---
 button#open(onClick={() => open.set(true)}) Open
+button#open-beside(onClick={() => beside.set(true)}) Open beside
 button#shut(onClick={() => open.set(false)}) Shut
 SidePanel#panel(open={open()} title="Mars" onOpenChange={() => { open.set(false); onClose() }})
   @actions
@@ -17,6 +19,8 @@ SidePanel#panel(open={open()} title="Mars" onOpenChange={() => { open.set(false)
   @footer
     button#save Save
   p#body Fourth planet
+SidePanel#beside(open={beside()} modal={false} closeHref="/list" title="Venus" onOpenChange={() => { beside.set(false); onClose() }})
+  p#beside-body Second planet
 SplitLayout#split(sidebarOpen={sidebarOpen()} onSidebarClose={() => sidebarOpen.set(false)} sidebarTitle="Planets" resizableList listWidthKey={listWidthKey} detailOpen)
   @sidebar
     nav Inner, outer
