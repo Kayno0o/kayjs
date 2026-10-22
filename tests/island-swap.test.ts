@@ -8,7 +8,8 @@ import { pages } from './shared-pages'
 
 const ROOT = 'tests/fixtures/island-swap'
 const browserInstalled = browserPath() !== undefined
-const VIEWPORT = { width: 1280, height: 720 }
+// A page waits 20 s for an element, as a loaded run takes more than the default 5 s to fetch, swap and settle.
+const VIEWPORT = { width: 1280, height: 720, timeout: '20s' } as const
 const FETCHED = 'slot[data-kay-server]:not([inert]) form[action]'
 
 interface Snapshot { inert: boolean, form: boolean, label: string }
