@@ -508,6 +508,12 @@ describe('the prebuilt pages', () => {
     expect(page.find('[data-impersonating] form').map(form => form.attributes.action)).toEqual(['/auth/stop-impersonating'])
     expect(page.find('#member')).toHaveLength(1)
 
+    // A page whose only reader of `ctx` is the banner has it in the first bytes too.
+    const alone = await root.visit('/banner')
+
+    expect(alone.html).not.toContain('kay-await')
+    expect(alone.find('[data-impersonating]')).toHaveLength(1)
+
     const french = await root.visit('/fr/nav')
 
     expect(text(french, '[data-impersonating] span')).toBe('Vous agissez comme banner-acted@example.com.')

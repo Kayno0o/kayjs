@@ -20,7 +20,7 @@ extensions: [auth({ admin: 'admin', roles: { admin: ['editor'], editor: [] }, au
 
 ### Show who an admin acts as
 
-`impersonate` signs the admin in as the user, and a banner says so on every prebuilt page and, with `viewer: true`, on every page of the app: `You are acting as ada@example.com.` with a `Back to my account` button that posts to `<prefix>/stop-impersonating` (`redirect` for where to go, a path of the site) and lands on the admin pages. Put `ImpersonationBanner` from `@kaynooo/kayjs-auth/components/impersonation-banner.kay` in a layout of your own where `viewer: true` does not reach.
+`impersonate` signs the admin in as the user, and a banner says so on every prebuilt page and, with `viewer: true`, on every page of the app: `You are acting as ada@example.com.` with a `Back to my account` button that posts to `<prefix>/stop-impersonating` (`redirect` for where to go, a path of the site) and lands on the admin pages. Put `ImpersonationBanner` in a layout of your own where `viewer: true` does not reach ([the signed-in user in templates](signed-in-components.md#show-the-impersonation-banner)).
 
 ## Reference
 

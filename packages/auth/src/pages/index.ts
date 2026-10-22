@@ -262,7 +262,7 @@ export function authPages(options: AuthPagesOptions & { auth?: (() => Promise<Au
 const VIEWER_LAYOUT = `${import.meta.dir}/../viewer-layout/_layout.kay`
 const CONTEXT = `${import.meta.dir}/../context.ts`
 
-// `ctx.user` and `ctx.can` for the templates, read ahead of the pages reaching one; `viewer: true` also reads the user ahead of every page, for an app whose own components call `currentUser`.
+// `ctx.user`, `ctx.can` and `ctx.impersonator` for the templates, read ahead of the pages reaching one; `viewer: true` also reads the user ahead of every page, for an app whose own components call `currentUser`.
 function viewerExtension(viewer: boolean | undefined): { context: string, layout?: string } {
   return { context: CONTEXT, ...viewer === true && { layout: VIEWER_LAYOUT } }
 }
@@ -274,7 +274,7 @@ export interface AuthExtensionOptions extends AuthPagesOptions {
   server?: (() => AnyElysia | Promise<AnyElysia>) | undefined
   // `false` leaves out the prebuilt pages and serves the plugin alone, for an app writing every page itself. `true` by default.
   pages?: boolean | undefined
-  // Templates read `ctx.user` and `ctx.can(role)` with no option, as `SignedIn`, `SignedOut` and `UserMenu` do, the session being read before the render of each page reaching one of them and of no other. `true` also reads the user ahead of every page, for an app whose own components call `currentUser`.
+  // Templates read `ctx.user`, `ctx.can(role)` and `ctx.impersonator` with no option, as `SignedIn`, `SignedOut`, `UserMenu` and `ImpersonationBanner` do, the session being read before the render of each page reaching one of them and of no other. `true` also reads the user ahead of every page, for an app whose own components call `currentUser`.
   viewer?: boolean | undefined
   // `false` builds no plugin, for an app mounting the plugin by hand, `new Elysia().use(auth.plugin).use(await pages())`: the extension then serves the pages alone.
   plugin?: false | undefined

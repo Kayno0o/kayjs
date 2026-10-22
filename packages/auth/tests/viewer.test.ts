@@ -2,7 +2,7 @@ import type { Auth } from '../src/auth'
 import type { BareUser as User } from '../src/core'
 import { afterEach, expect, test } from 'bun:test'
 import { requestOfContext } from 'kay/library'
-import { claimBanner, currentImpersonator, currentUser, isSignedOut, loadViewer, readRequestWith, registerViewer, viewerValues } from '../src/viewer'
+import { claimBanner, currentUser, isSignedOut, loadViewer, readRequestWith, registerViewer, viewerValues } from '../src/viewer'
 
 // Bun shares modules between test files, so the reader `createAuth` set goes back after each test.
 afterEach(() => readRequestWith(requestOfContext))
@@ -77,16 +77,11 @@ test('a failed read ahead leaves it to the component, which reads again', async 
   expect(await currentUser()).toMatchObject({ id: 'u1' })
 })
 
-test('the admin behind an impersonation is read ahead with the user, and a request draws its banner once', async () => {
+test('a request draws its banner once', async () => {
   const request = new Request('http://localhost/')
-  const admin = user({ id: 'root', roles: ['admin'] })
 
-  registerViewer(request, { auth: { impersonator: async () => admin, bareUser: async () => user({}) } as unknown as Auth, isGranted })
+  registerViewer(request, { auth: { impersonator: async () => null, bareUser: async () => user({}) } as unknown as Auth, isGranted })
   readRequestWith(() => request)
-
-  expect(currentImpersonator()).toBeInstanceOf(Promise)
-  await loadViewer(request)
-  expect(currentImpersonator()).toMatchObject({ id: 'root' })
   expect([claimBanner(), claimBanner()]).toEqual([true, false])
 })
 
@@ -99,4 +94,11 @@ test('ctx.impersonator is the admin acting as the signed-in user, and null for a
 
   expect((await viewerValues(acted)).impersonator).toMatchObject({ id: 'root' })
   expect((await viewerValues(plain)).impersonator).toBeNull()
+
+  for (const found of [null, user({ guest: true })]) {
+    const request = new Request('http://localhost/other')
+
+    registerViewer(request, { auth: { impersonator: async () => user({ id: 'root' }), bareUser: async () => found } as unknown as Auth, isGranted })
+    expect((await viewerValues(request)).impersonator).toBeNull()
+  }
 })

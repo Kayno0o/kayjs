@@ -1,0 +1,8 @@
+--- server
+export const page = { guards: false }
+---
+---
+import ImpersonationBanner from '@kaynooo/kayjs-auth/components/impersonation-banner.kay'
+---
+ImpersonationBanner
+p#content Content

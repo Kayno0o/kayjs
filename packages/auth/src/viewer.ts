@@ -86,13 +86,6 @@ async function read(auth: Auth, within: (user: BareUser | null) => BareUser | nu
   return within(await auth.bareUser())
 }
 
-// The admin acting as the signed-in user of the page being rendered, null for none: the admin itself once `loadViewer` read it, else a promise.
-export function currentImpersonator(): BareUser | null | Promise<BareUser | null> {
-  const { auth, request } = currentViewer()
-
-  return impersonators.has(request) ? impersonators.get(request)! : auth.impersonator()
-}
-
 // True the first time it is asked for the request being rendered, false after.
 export function claimBanner(): boolean {
   const { request } = currentViewer()

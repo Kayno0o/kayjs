@@ -4,7 +4,7 @@
 
 ### Read the signed-in user in a layout or component with no fence
 
-A template reads `ctx.<key>` for the request values an extension gives it, with no `--- server` fence and no import. kayjs-auth gives `ctx.user` and `ctx.can(role)`:
+A template reads `ctx.<key>` for the request values an extension gives it, with no `--- server` fence and no import. kayjs-auth gives `ctx.user`, `ctx.can(role)` and `ctx.impersonator`:
 
 ```kay
 nav
