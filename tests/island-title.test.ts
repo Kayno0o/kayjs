@@ -3,7 +3,7 @@ import { Elysia } from 'elysia'
 import { head, headMark, setsIslandTitle } from '../src/runtime/head'
 import { pages } from './shared-pages'
 
-const app = new Elysia().use(await pages({ routes: 'tests/fixtures/title/src/routes', prebuilt: false, security: false }))
+const app = new Elysia().use(await pages({ root: 'tests/fixtures/title', prebuilt: false, security: false }))
 
 async function marked(path: string): Promise<string[]> {
   const html = await (await app.handle(new Request(`http://localhost${path}`))).text()

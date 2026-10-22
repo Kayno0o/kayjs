@@ -102,7 +102,7 @@ describe('cached', () => {
   })
 
   it('shares a value across requests from a page\'s server fence', async () => {
-    const app = new Elysia().use(await pages({ routes: 'tests/fixtures/production/src/routes', prebuilt: false, security: false }))
+    const app = new Elysia().use(await pages({ root: 'tests/fixtures/production', prebuilt: false, security: false }))
     const visit = async () => (await app.handle(new Request('http://localhost/feed'))).text()
 
     feed.items = ['one']
@@ -210,15 +210,15 @@ describe('cached with a store', () => {
   })
 
   it('marks a prerendered page stale when another process sharing a store invalidated it, rendering it afresh with no one request\'s timings', async () => {
-    const build = await scratchBuild({ routes: 'tests/fixtures/production/src/routes' })
+    const build = await scratchBuild({}, false, resolve('tests/fixtures/production'))
     const { news } = await import('./fixtures/production/src/news')
     const path = await storePath()
 
     sqliteCache(path)
 
     try {
-      await build.prerender({ routes: 'tests/fixtures/production/src/routes' })
-      const app = await build.serve({ routes: 'tests/fixtures/production/src/routes', security: false, serverTiming: true })
+      await build.prerender({})
+      const app = await build.serve({ root: 'tests/fixtures/production', security: false, serverTiming: true })
       const visit = async () => (await app.handle(new Request('http://localhost/news'))).text()
 
       expect(await visit()).toContain('<h1>Edition 1</h1>')

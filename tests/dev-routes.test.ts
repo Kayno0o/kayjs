@@ -1,6 +1,6 @@
 import type { DevRoute, DevRoutes } from '../src/server/dev'
 import type { PlumbingServed } from '../src/server/plumbing'
-import { join, relative } from 'node:path'
+import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
@@ -21,7 +21,7 @@ async function site(files: Record<string, string> = {}) {
 
   await Promise.all(Object.entries({ 'routes/index.kay': 'h1 Home\n', ...files }).map(async ([name, text]) => Bun.write(join(dir, name), text)))
 
-  return { routes: relative(process.cwd(), join(dir, 'routes')), publicDir: relative(process.cwd(), join(dir, 'public')) }
+  return { root: dir, routes: 'routes', publicDir: 'public' }
 }
 
 async function listed(options: Parameters<typeof pages>[0]): Promise<DevRoutes> {

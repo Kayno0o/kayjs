@@ -314,7 +314,7 @@ await none() then text
   p.none {text}
 `),
     ])
-    app = await pages({ routes: join(dir, 'routes'), prebuilt: false, security: false })
+    app = await pages({ root: dir, routes: 'routes', prebuilt: false, security: false })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))

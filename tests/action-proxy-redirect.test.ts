@@ -2,9 +2,9 @@ import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { pages } from './shared-pages'
 
-const site = 'tests/fixtures/site/src/routes'
-const redirects = 'tests/fixtures/locale-actions/src/routes'
-const ADD = '/_kay/action/tests/fixtures/site/src/routes/index.kay/add'
+const site = 'tests/fixtures/site'
+const redirects = 'tests/fixtures/locale-actions'
+const ADD = '/_kay/action/src/routes/index.kay/add'
 // The address the visitor's browser used, and the plain-http one the proxy reaches kay on.
 const PUBLIC = 'https://shop.example'
 const INTERNAL = 'http://shop.example'
@@ -25,13 +25,13 @@ interface Variant { base: string, trailingSlash: 'always' | 'never' | 'ignore', 
 // One app per routes folder and variant for the file, as the tests only post to it and read the answer.
 const served = new Map<string, Promise<Elysia>>()
 
-async function serve(routes: string, variant: Variant): Promise<Elysia> {
-  const key = JSON.stringify([routes, variant])
+async function serve(root: string, variant: Variant): Promise<Elysia> {
+  const key = JSON.stringify([root, variant])
   const { base, trailingSlash, dev, proxy, site: configured } = variant
   let app = served.get(key)
 
   if (app === undefined) {
-    app = (async () => new Elysia().use(await pages({ routes, prebuilt: false, security: false, base: base || undefined, trailingSlash, dev, site: configured, proxy: proxy === 'declared' ? { header: 'x-real-ip' } : undefined })))()
+    app = (async () => new Elysia().use(await pages({ root, prebuilt: false, security: false, base: base || undefined, trailingSlash, dev, site: configured, proxy: proxy === 'declared' ? { header: 'x-real-ip' } : undefined })))()
     served.set(key, app)
   }
 

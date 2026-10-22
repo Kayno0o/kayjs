@@ -39,10 +39,10 @@ import { pages } from './shared-pages'
 const FIXTURE = 'tests/fixtures/cms'
 const SECRET = 'a-preview-secret-long-enough-for-kay-0123456789'
 // A CMS's extension: its editor, and its admin screens under `/admin`.
-const EDITOR = { name: 'editor', editor: `${FIXTURE}/src/components/draft-editor.kay`, routes: { dir: `${FIXTURE}/admin`, prefix: '/admin' } }
+const EDITOR = { name: 'editor', editor: 'src/components/draft-editor.kay', routes: { dir: 'admin', prefix: '/admin' } }
 // Another extension, whose pages are content the editor edits.
-const BLOG = { name: 'blog', routes: { dir: `${FIXTURE}/blog`, prefix: '/blog' } }
-const options = { routes: `${FIXTURE}/src/routes`, content: `${FIXTURE}/src/content.config.ts`, api: `${FIXTURE}/src/api`, site: 'https://news.example', inlineStyles: false, security: false as const, preview: { secret: SECRET }, extensions: [EDITOR, BLOG] }
+const BLOG = { name: 'blog', routes: { dir: 'blog', prefix: '/blog' } }
+const options = { root: FIXTURE, routes: 'src/routes', content: 'src/content.config.ts', api: 'src/api', site: 'https://news.example', inlineStyles: false, security: false as const, preview: { secret: SECRET }, extensions: [EDITOR, BLOG] }
 const app = await pages({ ...options, prebuilt: false })
 const COOKIE = /^kay_preview=([^;]+);/
 const HYDRATION_MARK = /<!--[[\]]-->/g
@@ -837,8 +837,8 @@ describe('the collections a CMS edits', () => {
   it('gives a folder entry\'s file as the editor wrote it, keeping its format and body, for the CMS to commit', async () => {
     const hello = 'tests/fixtures/cms/src/content/articles/fr/hello.md'
 
-    expect(await entrySource('articles', 'hello', { title: 'Salut', published: '2026-01-01T00:00:00.000Z' }, { locale: 'fr' })).toEqual({ file: { path: hello, absolute: join(process.cwd(), hello), repoPath: hello, text: '---\ntitle: Salut\npublished: 2026-01-01T00:00:00.000Z\n---\n\nSalut.\n' } })
-    expect(await entrySource('articles', 'new-one', { title: 'New' }, { locale: 'en', body: '# Hi' })).toMatchObject({ file: { path: 'tests/fixtures/cms/src/content/articles/en/new-one.md', text: '---\ntitle: New\n---\n\n# Hi\n' } })
+    expect(await entrySource('articles', 'hello', { title: 'Salut', published: '2026-01-01T00:00:00.000Z' }, { locale: 'fr' })).toEqual({ file: { path: 'src/content/articles/fr/hello.md', absolute: join(process.cwd(), hello), repoPath: hello, text: '---\ntitle: Salut\npublished: 2026-01-01T00:00:00.000Z\n---\n\nSalut.\n' } })
+    expect(await entrySource('articles', 'new-one', { title: 'New' }, { locale: 'en', body: '# Hi' })).toMatchObject({ file: { path: 'src/content/articles/en/new-one.md', text: '---\ntitle: New\n---\n\n# Hi\n' } })
     expect(await entrySource('articles', '../escape', { title: 3 })).toEqual({ issues: [
       { collection: 'articles', slug: '../escape', path: '', key: 'slug', message: 'has a slug naming another file than its own: its parts are not empty, ., .. nor hidden' },
       { collection: 'articles', slug: '../escape', path: '', key: 'locale', message: 'names no locale, which each entry of a localized collection has' },
@@ -848,7 +848,7 @@ describe('the collections a CMS edits', () => {
   })
 
   it('gives the file of an entry that replaces another in its format, and the page it would have', async () => {
-    expect(await entrySource('pages', 'about-us', { title: 'About', order: 1 }, { create: true, replacing: 'contact' })).toMatchObject({ file: { path: 'tests/fixtures/cms/src/content/pages/about-us.yaml' } })
+    expect(await entrySource('pages', 'about-us', { title: 'About', order: 1 }, { create: true, replacing: 'contact' })).toMatchObject({ file: { path: 'src/content/pages/about-us.yaml' } })
     expect(await entrySource('pages', 'about-us', { title: 'About', order: 1 }, { create: true })).toMatchObject({ file: { path: expect.stringMatching(/about-us\.md$/) } })
     expect(await entryPage('articles', { slug: 'renamed', locale: 'fr', data: { title: 'Nouveau' } })).toBe('/articles/renamed')
   })
@@ -873,10 +873,10 @@ describe('the collections a CMS edits', () => {
     const hello = 'tests/fixtures/cms/src/content/articles/fr/hello.md'
     const contact = 'tests/fixtures/cms/src/content/pages/contact.yaml'
 
-    expect(await entryFile('articles', 'hello', { locale: 'fr' })).toEqual({ file: { path: hello, absolute: join(process.cwd(), hello), repoPath: hello } })
-    expect(await entryFile('pages', 'contact')).toEqual({ file: { path: contact, absolute: join(process.cwd(), contact), repoPath: contact } })
+    expect(await entryFile('articles', 'hello', { locale: 'fr' })).toEqual({ file: { path: 'src/content/articles/fr/hello.md', absolute: join(process.cwd(), hello), repoPath: hello } })
+    expect(await entryFile('pages', 'contact')).toEqual({ file: { path: 'src/content/pages/contact.yaml', absolute: join(process.cwd(), contact), repoPath: contact } })
     // An option given as undefined is absent, and a JSON entry is found as any other.
-    expect(await entryFile('pages', 'about', { locale: undefined })).toMatchObject({ file: { path: 'tests/fixtures/cms/src/content/pages/about.json' } })
+    expect(await entryFile('pages', 'about', { locale: undefined })).toMatchObject({ file: { path: 'src/content/pages/about.json' } })
     expect(await entryFile('pages', 'missing')).toEqual({ issues: [{ collection: 'pages', slug: 'missing', path: '', key: 'slug', message: 'names no entry of the collection' }] })
     expect(await entryFile('articles', 'hello')).toMatchObject({ issues: [{ key: 'locale' }] })
     expect(await entryFile('pages', '../pages/about')).toMatchObject({ issues: [{ key: 'slug' }] })
@@ -896,7 +896,7 @@ describe('the collections a CMS edits', () => {
     for (const slug of ['.hidden', 'guide/index', 'a\u0000b', 'a//b', ''])
       expect(await entrySource('pages', slug, { title: 'T', order: 1 })).toMatchObject({ issues: [{ key: 'slug' }] })
 
-    expect(await entrySource('pages', 'index', { title: 'T', order: 1 })).toMatchObject({ file: { path: 'tests/fixtures/cms/src/content/pages/index.md' } })
+    expect(await entrySource('pages', 'index', { title: 'T', order: 1 })).toMatchObject({ file: { path: 'src/content/pages/index.md' } })
     // `en/index.md` would read back as an entry `en` outside any locale.
     expect(await entrySource('articles', 'index', { title: 'T' }, { locale: 'en' })).toEqual({ issues: [{ collection: 'articles', slug: 'index', locale: 'en', path: '', key: 'slug', message: 'has a slug whose file, en/index, reads back as no entry of a locale: give the entry another slug' }] })
     expect(await entrySource('pages', 'guide/index', { title: 'T', order: 1 })).toMatchObject({ issues: [{ key: 'slug', message: 'has a slug whose file, guide/index, reads back as guide: write the entry as guide' }] })
@@ -920,7 +920,7 @@ describe('the collections a CMS edits', () => {
     for (const entry of await entries('pages', { locale: undefined })) {
       const written = await entrySource('pages', entry.slug, entry.data, { locale: entry.locale, body: entry.body })
 
-      expect(written).toMatchObject({ file: { path: entry.path } })
+      expect(written).toMatchObject({ file: { path: entry.path!.slice(FIXTURE.length + 1) } })
       expect('file' in written && written.file.text).toBe(await Bun.file(entry.path!).text())
     }
 
@@ -1141,7 +1141,7 @@ describe('the collections a CMS edits', () => {
     expect(await entrySource('pages', 'about', { title: 'About', order: 2 }, { create: true })).toEqual(taken('pages', 'about'))
     expect(await entrySource('pages', 'contact', { title: 'Contact', order: 3 }, { create: true })).toEqual(taken('pages', 'contact'))
     expect(await entrySource('articles', 'hello', { title: 'Salut' }, { locale: 'fr', create: true })).toEqual(taken('articles', 'hello', 'fr'))
-    expect(await entrySource('pages', 'fresh', { title: 'Fresh', order: 9 }, { create: true })).toMatchObject({ file: { path: 'tests/fixtures/cms/src/content/pages/fresh.md' } })
+    expect(await entrySource('pages', 'fresh', { title: 'Fresh', order: 9 }, { create: true })).toMatchObject({ file: { path: 'src/content/pages/fresh.md' } })
 
     const base = await scratchDir('cms-')
 
@@ -1395,7 +1395,7 @@ describe('preview mode', () => {
   it('renders the extension\'s editor last in edit mode alone, kept alive across pages, given each entry the page read', async () => {
     const edit = await previewCookie(previewUrl('/news', { edit: true }))
     const preview = await previewCookie(previewUrl('/news'))
-    const editor = `${FIXTURE}/src/components/draft-editor.kay`
+    const editor = 'src/components/draft-editor.kay'
     const slot = new RegExp(`<slot data-component="${editor}" data-props='[^']+' data-persist="${editor}"(?: data-chunk="[^"]+")?><button class="count">[\\s\\S]*<ul class="edited">(.*)</ul></slot></body></html>$`)
     const edited = async (path: string) => slot.exec((await get(path, edit)).html)?.[1]?.replaceAll(HYDRATION_MARK, '')
 
@@ -2066,7 +2066,7 @@ describe('preview mode', () => {
   })
 
   it('renders a prerendered page afresh for a visitor in preview mode, the copy served to everyone else', async () => {
-    const build = await scratchBuild(options)
+    const build = await scratchBuild(options, false, resolve(FIXTURE))
 
     try {
       // The page visited below, and four that read nothing from a request.
@@ -2096,8 +2096,8 @@ describe('preview mode', () => {
 
   // Three builds of the fixture in a row, each several seconds on a loaded host.
   it('needs a long secret, and refuses its helpers without one', async () => {
-    await expect(pages({ routes: options.routes, prebuilt: false, preview: { secret: 'short' } })).rejects.toThrow('kay: preview.secret in kay.config.ts is 5 characters long')
-    await pages({ routes: options.routes, prebuilt: false })
+    await expect(pages({ ...options, prebuilt: false, preview: { secret: 'short' } })).rejects.toThrow('kay: preview.secret in kay.config.ts is 5 characters long')
+    await pages({ ...options, prebuilt: false, preview: undefined })
 
     try {
       expect(() => previewUrl('/news')).toThrow('kay: previewUrl() needs preview in kay.config.ts')

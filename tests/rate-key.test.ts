@@ -6,11 +6,11 @@ import { testSite } from '../src/test'
 import { parsingRoutes } from './elysia'
 import { pages } from './shared-pages'
 
-const routes = 'tests/fixtures/rate-keys/src/routes'
+const root = 'tests/fixtures/rate-keys'
 const locals = (request: Request) => ({ user: request.headers.get('x-user') ?? undefined })
-const sites = await Promise.all(Array.from({ length: 4 }, async () => testSite({ routes, islands: false, locals })))
+const sites = await Promise.all(Array.from({ length: 4 }, async () => testSite({ root, islands: false, locals })))
 const [first, second, third, fourth] = sites as [typeof sites[0], typeof sites[0], typeof sites[0], typeof sites[0]]
-const mounted = await testSite({ routes, islands: false, base: '/blog', trailingSlash: 'always', locals })
+const mounted = await testSite({ root, islands: false, base: '/blog', trailingSlash: 'always', locals })
 const actions = await import(join(import.meta.dir, 'fixtures/rate-keys/src/routes/index.kay')) as Record<'perUser' | 'empty' | 'throws' | 'rejects' | 'notText' | 'long' | 'counted' | 'inLocale', Action<Record<never, never>, string>>
 
 afterAll(async () => {
@@ -72,7 +72,7 @@ describe('a rate limit with a key', () => {
   })
 
   it('leaves Elysia parsing no cookie, query or header on a route whose action has a key', async () => {
-    expect(parsingRoutes(await pages({ routes, prebuilt: false, security: false }))).toEqual([])
+    expect(parsingRoutes(await pages({ root, prebuilt: false, security: false }))).toEqual([])
   })
 
   it('reads the request locale', async () => {

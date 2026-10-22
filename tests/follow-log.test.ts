@@ -2,7 +2,7 @@ import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { browserPath, testSite } from '../src/test'
 
-const site = await testSite({ routes: 'tests/fixtures/follow-log/src/routes', browser: true })
+const site = await testSite({ root: 'tests/fixtures/follow-log', browser: true })
 const path = browserPath()
 
 afterAll(async () => site.close())

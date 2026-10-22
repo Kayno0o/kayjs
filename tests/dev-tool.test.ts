@@ -1,6 +1,6 @@
 import type { DevTool } from '../src/runtime/dev-tool'
 import type { DevHead, DevResponse } from '../src/server/dev'
-import { join, relative } from 'node:path'
+import { join } from 'node:path'
 import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test'
@@ -1253,7 +1253,7 @@ describe('the dev tool', () => {
 
   it('lists the env the browser receives, as the server sends it, flags what looks like a secret, and says when the app sends none', async () => {
     const dir = await scratchDir('dev-tool-env-')
-    const routes = relative(process.cwd(), join(dir, 'routes'))
+    const routes = 'routes'
     const names = ['KAY_TEST_ZOOM', 'KAY_TEST_MAP_KEY', 'KAY_TEST_SESSION', 'KAY_TEST_FEED', 'KAY_TEST_REGION', 'KAY_TEST_HEX', 'KAY_TEST_AWS', 'KAY_TEST_PUBLISHABLE_KEY'] as const
     const given = { KAY_TEST_ZOOM: '12', KAY_TEST_MAP_KEY: 'pk.123', KAY_TEST_SESSION: 'q8Zr3VxK1mT9yB2nWd5LpC7aHs4JfE6u', KAY_TEST_FEED: 'postgres://app:hunter2@db.internal/app', KAY_TEST_REGION: 'eu-west-1', KAY_TEST_HEX: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08', KAY_TEST_AWS: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY1', KAY_TEST_PUBLISHABLE_KEY: 'pk_live_abc' }
 
@@ -1264,7 +1264,7 @@ describe('the dev tool', () => {
     const { happyDOM } = window as unknown as { happyDOM: { setURL: (url: string) => void } }
     const { href } = location
     const asked: string[] = []
-    let app = await pages({ routes, dev: true, publicEnv })
+    let app = await pages({ root: dir, routes, dev: true, publicEnv })
     const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string) => {
       asked.push(url)
 
@@ -1311,7 +1311,7 @@ describe('the dev tool', () => {
       typeFilter('#kay-dev-env', '')
 
       // No `publicEnv`: nothing reaches the browser, and the tab says so after the restart.
-      app = await pages({ routes, dev: true })
+      app = await pages({ root: dir, routes, dev: true })
       window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ changed: 'kay.config.ts', ms: 1 }) }))
       await Bun.sleep(20)
 

@@ -3,9 +3,10 @@ import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { testSite } from '../src/test'
 
-const api = resolve(import.meta.dir, 'fixtures/ws-body/src/api')
+const root = resolve(import.meta.dir, 'fixtures/ws-body')
+const api = resolve(root, 'src/api')
 const { default: rooms } = await import(resolve(api, 'rooms.ts')) as typeof import('./fixtures/ws-body/src/api/rooms')
-const site = await testSite({ api })
+const site = await testSite({ root })
 
 // The server the site starts with its first socket, whose port a raw socket needs.
 const serve = Bun.serve

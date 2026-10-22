@@ -48,7 +48,7 @@ describe('base on a server', () => {
   })
 
   it('puts the links, assets and redirects of every page under the mount point', async () => {
-    const app = new Elysia().use(await pages({ routes: 'tests/fixtures/static/src/routes', prebuilt: false, security: false, site: 'https://x.example', base: '/repo/', inlineStyles: false, redirects: { '/old': '/about' } }))
+    const app = new Elysia().use(await pages({ root: 'tests/fixtures/static', prebuilt: false, security: false, site: 'https://x.example', base: '/repo/', inlineStyles: false, redirects: { '/old': '/about' } }))
     const visit = async (path: string) => app.handle(new Request(`http://localhost${path}`))
     const about = await (await visit('/about')).text()
 
@@ -57,13 +57,13 @@ describe('base on a server', () => {
     expect((await visit('/old')).headers.get('location')).toBe('/repo/about')
     expect((await visit('/about/')).headers.get('location')).toBe('/repo/about')
 
-    const favicon = new Elysia().use(await pages({ routes: 'tests/fixtures/static/src/routes', prebuilt: false, security: false, base: '/repo', favicon: 'tests/fixtures/static/src/hero.png' }))
+    const favicon = new Elysia().use(await pages({ root: 'tests/fixtures/static', prebuilt: false, security: false, base: '/repo', favicon: 'tests/fixtures/static/src/hero.png' }))
     const manifest = await (await favicon.handle(new Request('http://localhost/manifest.webmanifest'))).json() as { start_url: string, icons: { src: string }[] }
 
     expect(manifest.start_url).toBe('/repo/')
     expect(manifest.icons[0]!.src).toBe('/repo/icon-192.png')
     // No seo.description, no description.
     expect(manifest).not.toHaveProperty('description')
-    await expect(pages({ routes: 'tests/fixtures/static/src/routes', prebuilt: false, base: 'repo' })).rejects.toThrow('base is repo, which is no path such as /docs')
+    await expect(pages({ root: 'tests/fixtures/static', prebuilt: false, base: 'repo' })).rejects.toThrow('base is repo, which is no path such as /docs')
   })
 })
