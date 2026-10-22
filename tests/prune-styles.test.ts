@@ -422,4 +422,11 @@ describe('sourceWords', () => {
 
     expect(words).toEqual(expect.arrayContaining(['flex', 'border-(length:--kui-border-width)', 'px-2.5', '[font-family:var(--kui-label-font,inherit)]', 'p-4', 'gap-1.5']))
   })
+
+  it('adds no piece of an arbitrary value, nor a bare separator, to the words', () => {
+    const words = sourceWords('x = \'[font-family:var(--a,b)] border-(length:--x)\'')
+
+    expect(words.toSorted()).toEqual(['[font-family:var(--a,b)]', 'border-(length:--x)', 'x'])
+    expect(new Set(words).size).toBe(words.length)
+  })
 })
