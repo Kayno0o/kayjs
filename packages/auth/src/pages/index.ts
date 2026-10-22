@@ -295,10 +295,13 @@ export function auth(options: object = {}): AuthPages {
 // `auth()` with no module: kayjs-auth builds the whole `createAuth` as the server starts, so kay.config.ts declares everything and no file of the app is needed.
 function ownAuth(options: OwnOptions): AuthPages {
   const prefix = options.prefix ?? DEFAULT_PREFIX
-  // Built again only when the hooks, the mail module or kayjs-mail's registration are not the ones it was built from, so a reload under `kay dev` that left them alone keeps the store it opened.
+  // Built again only when the hooks, the mail module or kayjs-mail's registration are not the ones it was built from, so a reload under `kay dev` that left them alone keeps the store it opened; a test site always builds its own, so two sites of one project do not share a store.
   let current: { root: string, hooks: unknown, mail: unknown, mailed: boolean, built: Promise<UserMaker & { plugin: AnyElysia }> } | undefined
 
   const build = async (app: ExtensionApp) => {
+    if (app.testCookies)
+      return buildOwn(options, app)
+
     if (current?.root !== app.root || current.hooks !== app.modules.hooks || current.mail !== app.modules.mail || current.mailed !== app.extensions.includes(MAIL_EXTENSION))
       current = { root: app.root, hooks: app.modules.hooks, mail: app.modules.mail, mailed: app.extensions.includes(MAIL_EXTENSION), built: buildOwn(options, app) }
 

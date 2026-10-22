@@ -1,0 +1,9 @@
+{
+  "name": "kayjs-auth-own-fixture",
+  "private": true,
+  "dependencies": {
+    "@iconify-json/tabler": "*",
+    "@kaynooo/kayjs-auth": "*",
+    "@kaynooo/kayjs-ui": "*"
+  }
+}
