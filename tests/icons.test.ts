@@ -38,7 +38,7 @@ describe('icons', () => {
   })
 
   it('renders an imported icon as an svg on the server, an alias as its parent', async () => {
-    const app = await pages({ routes: 'tests/fixtures/icons/src/routes', prebuilt: false })
+    const app = await pages({ root: 'tests/fixtures/icons', prebuilt: false })
     const html = await (await app.handle(new Request('http://localhost/'))).text()
 
     expect(html).toContain(`<svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" class="icon"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="${HOME_PATH}"/>`)
@@ -46,7 +46,7 @@ describe('icons', () => {
   })
 
   it('draws an icon imported under a capitalised name as a tag, as the svg spreading it', async () => {
-    const app = await pages({ routes: 'tests/fixtures/icons/src/routes', prebuilt: false })
+    const app = await pages({ root: 'tests/fixtures/icons', prebuilt: false })
     const html = await (await app.handle(new Request('http://localhost/'))).text()
 
     expect(html).toContain(`<svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" data-name="home" class="size-5"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="${HOME_PATH}"/>`)

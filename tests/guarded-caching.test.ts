@@ -36,13 +36,13 @@ describe('a guarded route is private', () => {
       Bun.write(join(dir, 'api/open.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => ({ ok: true }))\n'),
     ])
 
-    const routes = join(dir, 'routes')
-    const api = join(dir, 'api')
+    const routes = 'routes'
+    const api = 'api'
 
-    servers.production = await pages({ routes, api, prebuilt: false, security: false })
-    servers.dev = await pages({ routes, api, prebuilt: false, security: false, dev: true })
-    servers.documented = await pages({ routes, api: join(dir, 'documented'), prebuilt: false, security: false, openapi: { reference: true } })
-    servers.mounted = await pages({ routes, api, prebuilt: false, security: false, base: '/app' })
+    servers.production = await pages({ root: dir, routes, api, prebuilt: false, security: false })
+    servers.dev = await pages({ root: dir, routes, api, prebuilt: false, security: false, dev: true })
+    servers.documented = await pages({ root: dir, routes, api: 'documented', prebuilt: false, security: false, openapi: { reference: true } })
+    servers.mounted = await pages({ root: dir, routes, api, prebuilt: false, security: false, base: '/app' })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))

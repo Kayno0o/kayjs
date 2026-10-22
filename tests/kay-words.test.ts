@@ -1,6 +1,6 @@
 import type { Action } from '../src/runtime'
 import { mkdir, rm, symlink } from 'node:fs/promises'
-import { join, relative } from 'node:path'
+import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { libraryMessageExtensions } from '../src/build/manifests'
@@ -12,8 +12,8 @@ import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
 const FIXTURE = 'tests/fixtures/kay-words'
-const i18n = { locales: ['en', 'fr'], defaultLocale: 'en', messages: `${FIXTURE}/src/messages` }
-const site = await testSite({ routes: `${FIXTURE}/src/routes`, i18n, maxSize: 1024 * 1024 })
+const i18n = { locales: ['en', 'fr'], defaultLocale: 'en', messages: 'src/messages' }
+const site = await testSite({ root: FIXTURE, i18n, maxSize: 1024 * 1024 })
 const { check, listed, guarded, owned, boom } = await import(join(import.meta.dir, 'fixtures/kay-words/src/routes/index.kay')) as {
   check: Action<Record<string, string>, unknown>
   listed: Action<Record<string, string | string[]>, unknown>
@@ -114,7 +114,7 @@ describe('sizeText', () => {
 
 describe('the offline page', () => {
   it('is worded in the default locale, in English without the keys', async () => {
-    const keys = { routes: `${FIXTURE}/src/routes`, prebuilt: false, offline: true as const }
+    const keys = { root: FIXTURE, prebuilt: false, offline: true as const }
     const english = await offlinePage(await pages({ ...keys, i18n }))
     const french = await offlinePage(await pages({ ...keys, i18n: { ...i18n, defaultLocale: 'fr' } }))
 
@@ -195,7 +195,7 @@ describe('kay check on the catalogs', () => {
   })
 
   it('lets a locale word the kay.* keys the default locale does not give', async () => {
-    expect(await messageProblems(process.cwd(), { ...i18n, messages: `${FIXTURE}/src/messages` })).toEqual([])
+    expect(await messageProblems(process.cwd(), { ...i18n, messages: resolve(`${FIXTURE}/src/messages`) })).toEqual([])
   })
 })
 

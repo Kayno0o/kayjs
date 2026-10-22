@@ -1,6 +1,5 @@
 import { rm } from 'node:fs/promises'
 import { join, relative } from 'node:path'
-import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { stringify } from 'devalue'
 import { writeShadowTypes } from '../src/check'
@@ -20,7 +19,7 @@ describe('requireGuards', () => {
 
   const status = async (app: typeof required, path: string, headers: Record<string, string> = {}) => (await app.handle(new Request(`http://localhost${path}`, { headers }))).status
   const post = async (file: string, name: string, headers: Record<string, string> = {}, app = required) => {
-    const response = await app.handle(new Request(`http://localhost/_kay/action/${relative(process.cwd(), join(dir, 'routes'))}/${file}/${name}`, {
+    const response = await app.handle(new Request(`http://localhost/_kay/action/routes/${file}/${name}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'referer': 'http://localhost/', ...headers },
       body: stringify({}),
@@ -54,8 +53,8 @@ describe('requireGuards', () => {
       Bun.write(join(dir, 'api/admin/_guard.ts'), ADMINS),
       Bun.write(join(dir, 'api/admin/index.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => \'secret\')\n'),
     ])
-    required = await pages({ routes: join(dir, 'routes'), api: join(dir, 'api'), prebuilt: false, requireGuards: true })
-    optional = await pages({ routes: join(dir, 'routes'), api: join(dir, 'api'), prebuilt: false })
+    required = await pages({ root: dir, routes: 'routes', api: 'api', prebuilt: false, requireGuards: true })
+    optional = await pages({ root: dir, routes: 'routes', api: 'api', prebuilt: false })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))
@@ -137,7 +136,7 @@ describe('input a guarded route\'s schema refuses', () => {
   let app: Awaited<ReturnType<typeof pages>>
 
   const act = async (folder: string, headers: Record<string, string> = {}, form = false) => {
-    const response = await app.handle(new Request(`http://localhost/_kay/action/${relative(process.cwd(), join(dir, 'routes'))}/${folder}/index.kay/rename`, {
+    const response = await app.handle(new Request(`http://localhost/_kay/action/routes/${folder}/index.kay/rename`, {
       method: 'POST',
       headers: { referer: `http://localhost/${folder}`, ...form ? { 'content-type': 'application/x-www-form-urlencoded' } : { 'content-type': 'application/json', 'x-kay-action': '1' }, ...headers },
       body: form ? 'name=secret-value' : stringify({ name: 'secret-value' }),
@@ -171,7 +170,7 @@ describe('input a guarded route\'s schema refuses', () => {
       Bun.write(join(dir, 'api/admin/_guard.ts'), ADMINS),
       Bun.write(join(dir, 'api/admin/index.ts'), 'import { t } from \'elysia\'\nimport { api } from \'kay/server\'\n\nexport default api().post(\'/\', ({ body }) => body.name, { body: t.Object({ name: t.String({ maxLength: 3 }) }) }).post(\'/upload\', () => \'ok\', { body: t.Object({ file: t.File({ type: \'image/png\' }) }) })\n'),
     ])
-    app = await pages({ routes: join(dir, 'routes'), api: join(dir, 'api'), prebuilt: false })
+    app = await pages({ root: dir, routes: 'routes', api: 'api', prebuilt: false })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))
@@ -212,7 +211,7 @@ describe('input a guarded route\'s schema refuses', () => {
 
       return (await app.handle(new Request(`http://localhost${path}`, { method: 'POST', headers: { referer: 'http://localhost/admin/upload', ...headers }, body: form }))).status
     }
-    const action = `/_kay/action/${relative(process.cwd(), join(dir, 'routes'))}/admin/upload.kay/upload`
+    const action = `/_kay/action/routes/admin/upload.kay/upload`
 
     expect(await upload(action)).toBe(403)
     expect(await upload(action, { 'x-admin': '1' })).toBe(422)
@@ -253,7 +252,7 @@ describe('the OpenAPI document on a site requiring guards', () => {
       Bun.write(join(dir, 'api/notes.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => [])\n'),
       Bun.write(join(dir, 'api/health.ts'), 'import { api } from \'kay/server\'\n\nexport default api({ guards: false }).get(\'/\', () => \'up\')\n'),
     ])
-    const app = await pages({ routes: join(dir, 'routes'), api: join(dir, 'api'), prebuilt: false, requireGuards: true, openapi: true })
+    const app = await pages({ root: dir, routes: 'routes', api: 'api', prebuilt: false, requireGuards: true, openapi: true })
     const status = async (headers: Record<string, string> = {}) => (await app.handle(new Request('http://localhost/api/openapi.json', { headers }))).status
 
     expect(await status()).toBe(403)
@@ -273,13 +272,13 @@ describe('the OpenAPI document on a site requiring guards', () => {
     const status = async (app: Awaited<ReturnType<typeof pages>>, headers: Record<string, string> = {}) => (await app.handle(new Request('http://localhost/api/openapi.json', { headers }))).status
 
     for (const requireGuards of [false, true]) {
-      const app = await pages({ routes: join(dir, 'routes'), api: join(dir, 'none'), prebuilt: false, requireGuards, openapi: true, extensions })
+      const app = await pages({ root: dir, routes: 'routes', api: join(dir, 'none'), prebuilt: false, requireGuards, openapi: true, extensions })
 
       expect(await status(app)).toBe(403)
       expect(await status(app, { 'x-lib': '1' })).toBe(200)
     }
 
-    expect(await status(await pages({ routes: join(dir, 'routes'), api: join(dir, 'open-api'), prebuilt: false, requireGuards: true, openapi: true }))).toBe(200)
+    expect(await status(await pages({ root: dir, routes: 'routes', api: join(dir, 'open-api'), prebuilt: false, requireGuards: true, openapi: true }))).toBe(200)
   })
 
   it('stays refused with a library\'s modules under guards of their own beside an open module, and with no module at all', async () => {
@@ -293,7 +292,7 @@ describe('the OpenAPI document on a site requiring guards', () => {
       Bun.write(join(lib, 'b/m.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => \'b\')\n'),
     ])
     const extensions = [{ name: 'two', api: { dir: lib, prefix: 'two' } }]
-    const status = async (api: string, more = extensions) => (await (await pages({ routes: join(dir, 'routes'), api: join(dir, api), prebuilt: false, requireGuards: true, openapi: true, extensions: more })).handle(new Request('http://localhost/api/openapi.json'))).status
+    const status = async (api: string, more = extensions) => (await (await pages({ root: dir, routes: 'routes', api: join(dir, api), prebuilt: false, requireGuards: true, openapi: true, extensions: more })).handle(new Request('http://localhost/api/openapi.json'))).status
 
     expect(await status('open-api')).toBe(403)
     expect(await status('none', [])).toBe(403)

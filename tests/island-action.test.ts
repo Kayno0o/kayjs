@@ -1,5 +1,5 @@
 import type { Action } from '../src/runtime'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { actionStub, reviveActions } from '../src/runtime/action'
@@ -8,11 +8,10 @@ import { island, IslandPropsError } from '../src/runtime/island.server'
 import { decodeValue, encodeValue, noActionReviver, serverWritten, unflattenValue } from '../src/runtime/wire'
 import { browserPath, testSite } from '../src/test'
 
-const routes = 'tests/fixtures/island-action/src/routes'
-const site = await testSite({ routes, browser: true })
-const mounted = await testSite({ routes, islands: false, base: '/blog', trailingSlash: 'always' })
-const localized = await testSite({ routes, islands: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' } })
-const developed = await testSite({ routes, islands: false, dev: true })
+const site = await testSite({ root: 'tests/fixtures/island-action', browser: true })
+const mounted = await testSite({ root: 'tests/fixtures/island-action', islands: false, base: '/blog', trailingSlash: 'always' })
+const localized = await testSite({ root: 'tests/fixtures/island-action', islands: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') } })
+const developed = await testSite({ root: 'tests/fixtures/island-action', islands: false, dev: true })
 const fixture = join(import.meta.dir, 'fixtures/island-action/src')
 const { greet } = await import(join(fixture, 'routes/index.kay')) as { greet: Action<{ name: string }, string> }
 const { shout } = await import(join(fixture, 'routes/other.kay')) as { shout: Action<{ name: string }, string> }

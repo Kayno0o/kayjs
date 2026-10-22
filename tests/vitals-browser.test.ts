@@ -21,7 +21,7 @@ let open: TestSite[] = []
 
 async function started(options: Parameters<typeof vitals>[0] = {}) {
   const store = memoryVitals()
-  const site = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path }, onError: () => undefined, extensions: [vitals(options)], store: { vitals: store } })
+  const site = await testSite({ root: 'tests/fixtures/navigation', browser: { path }, onError: () => undefined, extensions: [vitals(options)], store: { vitals: store } })
 
   open.push(site)
   setupStore({ vitals: store })

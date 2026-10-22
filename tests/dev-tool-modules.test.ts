@@ -20,7 +20,7 @@ async function site() {
     Bun.write(join(dir, 'two.js'), 'export default () => undefined\n'),
   ])
 
-  return { routes: relative(process.cwd(), routes), dir }
+  return { root: relative(process.cwd(), dir), routes: 'routes', dir }
 }
 
 const get = async (app: Awaited<ReturnType<typeof pages>>, path: string) => app.handle(new Request(`http://localhost${path}`))
@@ -31,9 +31,9 @@ async function loaded(app: Awaited<ReturnType<typeof pages>>): Promise<string[]>
 
 describe('the dev tool modules of extensions', () => {
   it('serves the libraries\' own modules as browser code with no import left', async () => {
-    const { routes } = await site()
+    const { root, routes } = await site()
     const modules = ['auth', 'mail', 'cms'].map(name => ({ name, devTool: { module: join(import.meta.dir, '..', 'packages', name, 'src', 'devTool.ts') } }))
-    const app = await pages({ routes, dev: true, extensions: modules })
+    const app = await pages({ root, routes, dev: true, extensions: modules })
     const urls = await loaded(app)
 
     expect(urls).toHaveLength(3)
@@ -49,8 +49,8 @@ describe('the dev tool modules of extensions', () => {
   })
 
   it('loads each module an extension names after the tool, served as browser code, and nothing else', async () => {
-    const { routes, dir } = await site()
-    const app = await pages({ routes, dev: true, extensions: [{ name: 'one', devTool: { module: join(dir, 'one.ts') } }, { name: 'two', devTool: { module: join(dir, 'two.js') } }] })
+    const { root, routes, dir } = await site()
+    const app = await pages({ root, routes, dev: true, extensions: [{ name: 'one', devTool: { module: join(dir, 'one.ts') } }, { name: 'two', devTool: { module: join(dir, 'two.js') } }] })
     const urls = await loaded(app)
 
     expect(urls).toHaveLength(2)
@@ -71,20 +71,20 @@ describe('the dev tool modules of extensions', () => {
   })
 
   it('loads a file two extensions name once, and relative to the project root', async () => {
-    const { routes, dir } = await site()
+    const { root, routes, dir } = await site()
     const file = join(dir, 'one.ts')
-    const app = await pages({ routes, dev: true, extensions: [{ name: 'a', devTool: { module: file } }, { name: 'b', devTool: { module: relative(process.cwd(), file) } }] })
+    const app = await pages({ root, routes, dev: true, extensions: [{ name: 'a', devTool: { module: file } }, { name: 'b', devTool: { module: relative(dir, file) } }] })
 
     expect(await loaded(app)).toHaveLength(1)
   })
 
   it('adds nothing for an app whose extensions name no module, and serves nothing in production', async () => {
-    const { routes, dir } = await site()
-    const plain = await pages({ routes, dev: true, extensions: [{ name: 'plain' }] })
+    const { root, routes, dir } = await site()
+    const plain = await pages({ root, routes, dev: true, extensions: [{ name: 'plain' }] })
 
     expect(await (await get(plain, '/_kay/dev/tool.js')).text()).not.toContain('loadDevModules(window.$kayDev')
 
-    const served = await pages({ routes, extensions: [{ name: 'one', devTool: { module: join(dir, 'one.ts') } }] })
+    const served = await pages({ root, routes, extensions: [{ name: 'one', devTool: { module: join(dir, 'one.ts') } }] })
 
     expect((await get(served, '/_kay/dev/tool.js')).status).toBe(404)
     expect((await get(served, '/_kay/dev/extension/0.js')).status).toBe(404)
@@ -92,10 +92,10 @@ describe('the dev tool modules of extensions', () => {
   })
 
   it('serves the modules where the tool is, under a base and either trailing slash setting', async () => {
-    const { routes, dir } = await site()
+    const { root, routes, dir } = await site()
 
     for (const trailingSlash of ['always', 'never'] as const) {
-      const app = await pages({ routes, dev: true, base: '/docs', trailingSlash, extensions: [{ name: 'one', devTool: { module: join(dir, 'one.ts') } }] })
+      const app = await pages({ root, routes, dev: true, base: '/docs', trailingSlash, extensions: [{ name: 'one', devTool: { module: join(dir, 'one.ts') } }] })
       const [url] = await loaded(app)
 
       expect((await get(app, url!)).status).toBe(200)

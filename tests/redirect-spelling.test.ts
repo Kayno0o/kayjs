@@ -1,6 +1,7 @@
 import type { I18nConfig } from '../src/config'
 import type { LocaleSettings } from '../src/runtime/i18n'
 import type { LocaleState } from '../src/runtime/locale-state'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { runInLocale } from '../src/runtime/locale-state'
@@ -8,8 +9,7 @@ import { refusalOutcome } from '../src/server/render'
 import { Redirect } from '../src/server/signals'
 import { pages } from './shared-pages'
 
-const routes = 'tests/fixtures/redirect-spelling/src/routes'
-const messages = 'tests/fixtures/i18n/src/messages'
+const messages = resolve('tests/fixtures/i18n/src/messages')
 const ACTION = /action="([^"]*\/_kay\/action\/[^"]*)"/
 
 type Slash = 'always' | 'never' | 'ignore' | undefined
@@ -21,7 +21,7 @@ interface Variant { base: string, trailingSlash: Slash, locales: boolean, dev: b
 async function serve({ base, trailingSlash, locales, dev }: Variant): Promise<Elysia> {
   const i18n: I18nConfig | undefined = locales ? { locales: ['fr', 'en'], defaultLocale: 'fr', messages } : undefined
 
-  return new Elysia().use(await pages({ routes, prebuilt: false, security: false, site: 'https://x.example', i18n, base: base || undefined, trailingSlash, dev }))
+  return new Elysia().use(await pages({ root: 'tests/fixtures/redirect-spelling', prebuilt: false, security: false, site: 'https://x.example', i18n, base: base || undefined, trailingSlash, dev }))
 }
 
 // Where `to` sends a visit, posted or read the way each `way` does, from the page in `locale`; the answer as the browser would read it, with the base taken off.
@@ -150,13 +150,11 @@ describe('a redirect to a path that is hostile or odd', () => {
 })
 
 describe('a redirect on a site whose root catch-all page could take any path', () => {
-  const shadowed = 'tests/fixtures/redirect-shadow/src/routes'
-  const api = 'tests/fixtures/redirect-shadow/src/api'
   const extension = { name: 'kay-test-auth', server: new Elysia({ name: 'kay-test-auth' }).get('/auth/:provider', () => 'auth').get('/contact', () => 'contact') }
 
   for (const dev of [false, true]) {
     it(`spells a page and leaves what else serves the path as written, ${dev ? 'dev' : 'production'}`, async () => {
-      const app = new Elysia().use(await pages({ routes: shadowed, api, publicDir: 'tests/fixtures/redirect-shadow/public', prebuilt: false, security: false, trailingSlash: 'always', dev, extensions: [extension] }))
+      const app = new Elysia().use(await pages({ root: 'tests/fixtures/redirect-shadow', prebuilt: false, security: false, trailingSlash: 'always', dev, extensions: [extension] }))
 
       const where = async (to: string) => {
         const response = await app.handle(new Request(`http://localhost/bounce/?to=${encodeURIComponent(to)}`))
@@ -188,7 +186,7 @@ describe('the dev tool\'s guard outcome', () => {
 
 describe('the dev tool\'s guard outcome in a render', () => {
   // A redirect answers without a page, so no dev tool carries its outcome: a denial is the refusal a dev render shows.
-  const served = async (dev: boolean) => new Elysia().use(await pages({ routes: 'tests/fixtures/guard-outcome/src/routes', prebuilt: false, security: false, site: 'https://x.example', dev }))
+  const served = async (dev: boolean) => new Elysia().use(await pages({ root: 'tests/fixtures/guard-outcome', prebuilt: false, security: false, site: 'https://x.example', dev }))
   const visit = async (dev: boolean) => (await served(dev)).handle(new Request('http://localhost/gated', { headers: { accept: 'text/html' } }))
 
   it('names what the refusing guard did in a dev render', async () => {

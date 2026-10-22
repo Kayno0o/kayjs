@@ -1,5 +1,5 @@
 import { chmod } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { Database } from 'bun:sqlite'
 import { beforeEach, describe, expect, it } from 'bun:test'
@@ -203,7 +203,7 @@ describe('a path that is gone', () => {
   })
 
   it('answers 410 from a served app, under a base, without a location', async () => {
-    const served = new Elysia().use(await pages({ routes: 'tests/fixtures/routing/src/routes', prebuilt: false, security: false, base: '/app' }))
+    const served = new Elysia().use(await pages({ root: 'tests/fixtures/routing', prebuilt: false, security: false, base: '/app' }))
 
     addRuntimeRedirect('/rt-retired', '', { status: 410 })
 
@@ -242,7 +242,7 @@ describe('what the app tells the screens', () => {
 
 describe('a served app', () => {
   async function app(options: { base?: string, trailingSlash?: 'always' | 'never' | 'ignore', redirects?: Record<string, string>, runtimeRedirects?: { hosts: string[] } } = {}) {
-    return new Elysia().use(await pages({ routes: 'tests/fixtures/routing/src/routes', prebuilt: false, security: false, ...options }))
+    return new Elysia().use(await pages({ root: 'tests/fixtures/routing', prebuilt: false, security: false, ...options }))
   }
 
   it('answers a missing path with the redirect, the config\'s status, the query and the base', async () => {
@@ -263,7 +263,7 @@ describe('a served app', () => {
   })
 
   it('answers a missing path with the redirect to a client taking compression, whatever the 404 page weighs', async () => {
-    const served = new Elysia().use(await pages({ routes: 'tests/fixtures/site/src/routes', prebuilt: false, security: false, compress: true }))
+    const served = new Elysia().use(await pages({ root: 'tests/fixtures/site', prebuilt: false, security: false, compress: true }))
 
     addRuntimeRedirect('/rt-zipped', '/about')
 
@@ -310,7 +310,7 @@ describe('a served app', () => {
   })
 
   it('answers a path under a locale prefix as the visitor asked for it', async () => {
-    const served = new Elysia().use(await pages({ routes: 'tests/fixtures/i18n/src/routes', prebuilt: false, security: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' } }))
+    const served = new Elysia().use(await pages({ root: 'tests/fixtures/i18n', prebuilt: false, security: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') } }))
 
     addRuntimeRedirect('/en/rt-loc-old', '/en')
     addRuntimeRedirect('/rt-loc-bare', '/en')

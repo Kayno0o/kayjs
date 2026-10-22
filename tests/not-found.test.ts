@@ -1,6 +1,6 @@
 import type { MissingPath } from '../src/server/not-found'
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, setSystemTime } from 'bun:test'
 import { Elysia } from 'elysia'
@@ -404,7 +404,7 @@ describe('countMissing', () => {
 
 describe('a served app', () => {
   it('counts its own 404s in production, under a base and with a trailing slash setting', async () => {
-    const app = new Elysia().use(await pages({ routes: 'tests/fixtures/routing/src/routes', prebuilt: false, security: false, base: '/app', trailingSlash: 'always' }))
+    const app = new Elysia().use(await pages({ root: 'tests/fixtures/routing', prebuilt: false, security: false, base: '/app', trailingSlash: 'always' }))
     const response = await app.handle(new Request('http://localhost/missing-page-x/', { headers: { referer: 'https://elsewhere.example/' } }))
 
     expect(response.status).toBe(404)
@@ -412,7 +412,7 @@ describe('a served app', () => {
   })
 
   it('counts a path under a locale prefix and one with dot segments as the visitor asked for it', async () => {
-    const app = new Elysia().use(await pages({ routes: 'tests/fixtures/i18n/src/routes', prebuilt: false, security: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' } }))
+    const app = new Elysia().use(await pages({ root: 'tests/fixtures/i18n', prebuilt: false, security: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') } }))
 
     expect((await app.handle(new Request('http://localhost/en/page-nobody-has-y'))).status).toBe(404)
     await app.handle(new Request('http://localhost/a/../page-nobody-has-z'))
@@ -422,8 +422,8 @@ describe('a served app', () => {
   })
 
   it('records nothing in development, where only production counts', async () => {
-    const dev = new Elysia().use(await pages({ routes: 'tests/fixtures/routing/src/routes', prebuilt: false, security: false, dev: true }))
-    const production = new Elysia().use(await pages({ routes: 'tests/fixtures/routing/src/routes', prebuilt: false, security: false }))
+    const dev = new Elysia().use(await pages({ root: 'tests/fixtures/routing', prebuilt: false, security: false, dev: true }))
+    const production = new Elysia().use(await pages({ root: 'tests/fixtures/routing', prebuilt: false, security: false }))
 
     await dev.handle(new Request('http://localhost/page-only-dev-sees'))
     await production.handle(new Request('http://localhost/page-only-production-sees'))
@@ -632,7 +632,7 @@ describe('kay not-found', () => {
 
 describe('routes the counter must not reach', () => {
   it('leaves the 404s of routes registered after the pages alone, whatever they answer with', async () => {
-    const app = new Elysia().use(await pages({ routes: 'tests/fixtures/routing/src/routes', prebuilt: false, security: false })).get('/api/users/42', ({ status }) => status(404, { error: 'none' })).get('/api/set/9', ({ set }) => {
+    const app = new Elysia().use(await pages({ root: 'tests/fixtures/routing', prebuilt: false, security: false })).get('/api/users/42', ({ status }) => status(404, { error: 'none' })).get('/api/set/9', ({ set }) => {
       set.status = 404
 
       return { error: 'none' }

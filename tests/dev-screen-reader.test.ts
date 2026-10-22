@@ -6,7 +6,6 @@ import { readingFlags } from '../src/runtime/dev-tool'
 import { browserPath, testSite } from '../src/test'
 
 const path = browserPath()
-const ROUTES = 'tests/fixtures/dev-screen-reader/src/routes'
 
 // The tab's rows as the page shows them: role, accessible name, chips and flags.
 function reading() {
@@ -94,7 +93,7 @@ describe.skipIf(path === undefined)('the screen reader tab of the dev tool', () 
   beforeAll(async () => {
     // As under `kay dev`, which marks every element with its `.kay` position.
     process.env.KAY_DEV_CODE = '0'
-    dev = await testSite({ routes: ROUTES, browser: { path }, dev: true, onError: () => undefined })
+    dev = await testSite({ root: 'tests/fixtures/dev-screen-reader', browser: { path }, dev: true, onError: () => undefined })
   }, 60_000)
 
   afterEach(async () => {
@@ -311,7 +310,7 @@ describe.skipIf(path === undefined)('the screen reader tab of the dev tool', () 
   }, 60_000)
 
   it('is no part of a production page', async () => {
-    const prod = await testSite({ routes: ROUTES, dev: false })
+    const prod = await testSite({ root: 'tests/fixtures/dev-screen-reader', dev: false })
     const visit = await prod.visit('/')
 
     expect(visit.html).not.toContain('/_kay/dev/')

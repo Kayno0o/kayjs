@@ -710,7 +710,7 @@ describe('sessions', () => {
 
   it('reaches pages, actions and their redirects as ctx.locals.session', async () => {
     const { sessions } = await import(SESSIONS) as { sessions: Elysia }
-    const app = new Elysia().use(sessions).use(await pages({ routes: 'tests/fixtures/production/src/routes', prebuilt: false, security: false }))
+    const app = new Elysia().use(sessions).use(await pages({ root: 'tests/fixtures/production', prebuilt: false, security: false }))
     const { signIn, signOut } = await import(ACCOUNT) as { signIn: Action<{ user: string }, void>, signOut: Action<object, void> }
     const visit = browser(app)
     const post = async (url: string, form: Record<string, string>) => visit(url, { method: 'POST', body: new URLSearchParams(form), headers: { 'content-type': 'application/x-www-form-urlencoded' } })
@@ -740,7 +740,7 @@ describe('a refused form post on a running server', () => {
     const app = new Elysia()
       .use(session({ secret: SECRET }))
       .derive({ as: 'global' }, () => ({ greeting: 'Hello' }))
-      .use(await pages({ routes: 'tests/fixtures/session/src/routes', prebuilt: false, security: false }))
+      .use(await pages({ root: 'tests/fixtures/session', prebuilt: false, security: false }))
       .listen({ port: 0, hostname: 'localhost' })
     const { signIn } = await import(SIGN_IN) as { signIn: Action<{ name: string }, unknown> }
     const origin = `http://localhost:${app.server!.port}`
@@ -764,8 +764,8 @@ describe('a page read by who sent it', () => {
     const app = new Elysia()
       .use(session({ secret: SECRET }))
       .derive({ as: 'global' }, () => ({ greeting: 'Hello' }))
-      .use(await pages({ routes: 'tests/fixtures/session/src/routes', prebuilt: false, security: false }))
-    const plain = new Elysia().use(await pages({ routes: 'tests/fixtures/production/src/routes', prebuilt: false, security: false }))
+      .use(await pages({ root: 'tests/fixtures/session', prebuilt: false, security: false }))
+    const plain = new Elysia().use(await pages({ root: 'tests/fixtures/production', prebuilt: false, security: false }))
     const personal = await app.handle(new Request('http://localhost/'))
     const shared = await plain.handle(new Request('http://localhost/feed'))
     // Asking whether a form post failed depends on a cookie even when the request carries none.

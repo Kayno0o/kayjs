@@ -10,7 +10,7 @@ import { testSite } from '../src/test'
 import { scratchDir } from './scratch'
 
 const APP = 'https://app.example.com'
-const site = await testSite({ routes: 'tests/fixtures/cors/src/routes', api: 'tests/fixtures/cors/src/api' })
+const site = await testSite({ root: 'tests/fixtures/cors' })
 
 afterAll(async () => {
   await site.close()
@@ -254,7 +254,7 @@ describe('answers of a route\'s own under a cors rule', () => {
   })
 
   it('compresses a large Response made per request, each answer naming its own caller', async () => {
-    const compressed = await testSite({ routes: 'tests/fixtures/cors/src/routes', api: 'tests/fixtures/cors/src/api', compress: true })
+    const compressed = await testSite({ root: 'tests/fixtures/cors', compress: true })
 
     try {
       const grants: (string | null)[] = []

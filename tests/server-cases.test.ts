@@ -1,4 +1,5 @@
 import type { RouterShape } from '../src/server/params'
+import { resolve } from 'node:path'
 import { beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { slashSpelling } from '../src/server/params'
@@ -6,8 +7,7 @@ import { canonicalPath, decodePath, guardUrl } from '../src/server/routes'
 import { pages } from './shared-pages'
 
 // Pins what a page request answers (status, headers in order, body) on the paths the per-request work touches, so a change to that work shows any byte it moves.
-const routes = 'tests/fixtures/server-cases/src/routes'
-const messages = 'tests/fixtures/server-cases/src/messages'
+const messages = resolve('tests/fixtures/server-cases/src/messages')
 const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages }
 
 const sites = {
@@ -35,7 +35,7 @@ describe.each(Object.entries(sites))('the page answers of a site with %s', (_nam
 
   beforeAll(async () => {
     // One boot at a time: each builds the client bundle into the same `.kay`.
-    served = new Elysia().use(await pages({ routes, prebuilt: false, site: 'https://x.example', ...options }))
+    served = new Elysia().use(await pages({ root: 'tests/fixtures/server-cases', prebuilt: false, site: 'https://x.example', ...options }))
   })
 
   it('answers every path as pinned', async () => {

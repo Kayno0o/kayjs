@@ -12,7 +12,7 @@ import { fixtureCopy } from './scratch'
 import { pages } from './shared-pages'
 
 const routes = 'tests/fixtures/typography/src/routes'
-const messages = 'tests/fixtures/typography/src/messages'
+const messages = resolve('tests/fixtures/typography/src/messages')
 const content = 'tests/fixtures/typography/src/content.config.ts'
 
 const N = '\u00A0'
@@ -252,10 +252,10 @@ function expectPlain(html: string): void {
 
 describe('a French page served', () => {
   beforeAll(async () => {
-    await pages({ routes, content, prebuilt: false })
+    await pages({ root: 'tests/fixtures/typography', prebuilt: false })
   }, 60_000)
 
-  const site = async (more: Record<string, unknown> = {}) => new Elysia().use(await pages({ routes, content, prebuilt: false, security: false, lang: 'fr', inlineStyles: false, onError: () => undefined, ...more }))
+  const site = async (more: Record<string, unknown> = {}) => new Elysia().use(await pages({ root: 'tests/fixtures/typography', prebuilt: false, security: false, lang: 'fr', inlineStyles: false, onError: () => undefined, ...more }))
 
   it('writes a non-breaking space for the template, a prop, a constant, a collection, the head and a streamed block, and leaves the rest', async () => {
     const { status, html } = await get(await site(), '/')
@@ -392,7 +392,7 @@ describe('a French page served', () => {
   it('writes the spaces of the page a visitor offline gets', async () => {
     const i18n = { locales: ['fr'], defaultLocale: 'fr', messages }
     const offline = async (more: Record<string, unknown> = {}) => {
-      const served = await pages({ routes, content, prebuilt: false, security: false, site: 'https://x.example', offline: true, i18n, ...more })
+      const served = await pages({ root: 'tests/fixtures/typography', prebuilt: false, security: false, site: 'https://x.example', offline: true, i18n, ...more })
       const script = await (await served.handle(new Request('http://localhost/sw.js'))).text()
 
       return (JSON.parse((/const KAY = (.*)\n/).exec(script)![1]!) as { offline: string }).offline

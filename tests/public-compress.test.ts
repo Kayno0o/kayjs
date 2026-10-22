@@ -1,6 +1,6 @@
 import * as fs from 'node:fs'
 import { chmod, rm, utimes, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { brotliDecompressSync } from 'node:zlib'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
@@ -19,7 +19,7 @@ let dir: string
 
 async function serve(options: { base?: string, dev?: boolean, trailingSlash?: 'always' | 'never', onError?: (error: unknown) => void } = {}) {
   // `prebuilt: false` is what a test run means by default, spelled out so the client build is the one shared for the file.
-  return pages({ routes: 'tests/fixtures/site/src/routes', prebuilt: false, publicDir: join(dir, 'public'), compress: true, log: false, ...options })
+  return pages({ root: 'tests/fixtures/site', prebuilt: false, publicDir: join(dir, 'public'), compress: true, log: false, ...options })
 }
 
 async function get(app: Awaited<ReturnType<typeof serve>>, path: string, headers: Record<string, string> = {}, method = 'GET') {
@@ -504,7 +504,7 @@ describe('a deleted public file is a path nothing serves', () => {
 
     await writeFile(path, MEDIUM)
 
-    const app = await pages({ routes: 'tests/fixtures/i18n/src/routes', publicDir: join(dir, 'public'), compress: true, log: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: MESSAGES } })
+    const app = await pages({ root: 'tests/fixtures/i18n', publicDir: join(dir, 'public'), compress: true, log: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve(MESSAGES) } })
 
     expect((await get(app, '/locale.json')).status).toBe(200)
     await rm(path)

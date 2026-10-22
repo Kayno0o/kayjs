@@ -30,7 +30,7 @@ await Bun.write(join(uploads, 'small.webp'), (await processImage(Bun.file(HERO),
 // Wider than the ladder's last width.
 await Bun.write(join(uploads, 'wide.png'), encodePng(new Uint8Array(3000 * 2 * 4).fill(90), 3000, 2))
 
-const app = await pages({ routes: 'tests/fixtures/images/src/routes', prebuilt: false, images: { dirs: { '/uploads/': uploads } } })
+const app = await pages({ root: 'tests/fixtures/images', prebuilt: false, images: { dirs: { '/uploads/': uploads } } })
 const html = await (await app.handle(new Request('http://localhost/'))).text()
 const heroUrl = decodeURIComponent((/src=%2F_kay%2Fassets%2F([^&]+)&amp;/).exec(html)![1]!)
 
@@ -187,17 +187,17 @@ describe('density cap', () => {
 
   it('takes images.maxDensity from the config, and refuses one under 1', async () => {
     try {
-      const uncapped = await pages({ routes: 'tests/fixtures/images/src/routes', prebuilt: false, images: { maxDensity: Infinity } })
+      const uncapped = await pages({ root: 'tests/fixtures/images', prebuilt: false, images: { maxDensity: Infinity } })
       const markup = await (await uncapped.handle(new Request('http://localhost/'))).text()
 
       expect(markup).toContain('sizes="50vw"')
 
       // Islands read it off the page, where it is written only when it is not the default.
-      const withIslands = await pages({ routes: 'tests/fixtures/navigation/src/routes', prebuilt: false, images: { maxDensity: 3 } })
+      const withIslands = await pages({ root: 'tests/fixtures/navigation', prebuilt: false, images: { maxDensity: 3 } })
 
       expect(await (await withIslands.handle(new Request('http://localhost/'))).text()).toContain('<meta name="kay-max-density" content="3">')
       expect(html).not.toContain('kay-max-density')
-      await expect(pages({ routes: 'tests/fixtures/images/src/routes', prebuilt: false, images: { maxDensity: 0.5 } })).rejects.toThrow('images.maxDensity is 0.5')
+      await expect(pages({ root: 'tests/fixtures/images', prebuilt: false, images: { maxDensity: 0.5 } })).rejects.toThrow('images.maxDensity is 0.5')
     }
     finally {
       setMaxDensity(2)
@@ -760,12 +760,12 @@ describe('crops and share cards', () => {
 
   it('takes the aspect ratios images.aspects lists', async () => {
     try {
-      const wide = await pages({ routes: 'tests/fixtures/images/src/routes', prebuilt: false, images: { aspects: ['5/1'] } })
+      const wide = await pages({ root: 'tests/fixtures/images', prebuilt: false, images: { aspects: ['5/1'] } })
 
       expect(image(hero, { aspect: '5/1' })).toMatchObject({ width: 1000, height: 200 })
       expect(() => image(hero, { aspect: '1/1' })).toThrow('does not list')
       expect((await wide.handle(new Request(`http://localhost/_kay/image?src=${encodeURIComponent(heroSrc())}&w=1000&crop=5x1`))).status).toBe(200)
-      await expect(pages({ routes: 'tests/fixtures/images/src/routes', prebuilt: false, images: { aspects: ['16:9'] } })).rejects.toThrow('images.aspects holds 16:9')
+      await expect(pages({ root: 'tests/fixtures/images', prebuilt: false, images: { aspects: ['16:9'] } })).rejects.toThrow('images.aspects holds 16:9')
     }
     finally {
       setAspects(DEFAULT_ASPECTS)
@@ -862,7 +862,7 @@ describe('remote images', () => {
 
   it('gives a listed remote image its variants through the route, and refuses an unlisted one as the server renders it', async () => {
     try {
-      await pages({ routes: 'tests/fixtures/images/src/routes', prebuilt: false, images: { remote: ['https://cms.example.com/uploads/'] } })
+      await pages({ root: 'tests/fixtures/images', prebuilt: false, images: { remote: ['https://cms.example.com/uploads/'] } })
 
       const props = image('https://cms.example.com/uploads/a.jpg', { width: 1000, height: 600 })
 
@@ -881,7 +881,7 @@ describe('remote images', () => {
 
       expect(() => shareCard({ title: 'x', image: 'https://elsewhere.example.com/a.jpg' })).toThrow('so the card cannot be drawn on it')
       expect(image('https://elsewhere.example.com/a.svg', { width: 10, height: 10 })).toEqual({ src: 'https://elsewhere.example.com/a.svg', width: 10, height: 10 })
-      await expect(pages({ routes: 'tests/fixtures/images/src/routes', prebuilt: false, images: { remote: ['cms.example.com'] } })).rejects.toThrow('images.remote holds cms.example.com')
+      await expect(pages({ root: 'tests/fixtures/images', prebuilt: false, images: { remote: ['cms.example.com'] } })).rejects.toThrow('images.remote holds cms.example.com')
     }
     finally {
       setRemoteImages(undefined)

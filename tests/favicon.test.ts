@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { mkdtemp, readdir, rename, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { outputDir } from '../src/build/assets'
@@ -11,10 +11,9 @@ import { ServedPaths } from '../src/server/served-paths'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
-const ROUTES = 'tests/fixtures/seo/src/routes'
 const SOURCE = 'tests/fixtures/seo/src/favicon.png'
 const scratch = await mkdtemp(join(tmpdir(), 'kay-favicon-'))
-const app = await pages({ routes: ROUTES, prebuilt: false, favicon: SOURCE, seo: { name: 'Kay site', description: 'A site made with kay' }, manifest: { shortName: 'Kay', themeColor: '#1e1e2e', display: 'standalone' } })
+const app = await pages({ root: 'tests/fixtures/seo', prebuilt: false, favicon: resolve(SOURCE), seo: { name: 'Kay site', description: 'A site made with kay' }, manifest: { shortName: 'Kay', themeColor: '#1e1e2e', display: 'standalone' } })
 
 afterAll(async () => {
   await rm(scratch, { recursive: true, force: true })
@@ -90,7 +89,7 @@ describe('favicon', () => {
 
     await Bun.write(maskableSource, await new Bun.Image(SOURCE).modulate({ brightness: 0.5 }).png().bytes())
 
-    const installed = await pages({ routes: ROUTES, prebuilt: false, favicon: SOURCE, seo: { name: 'Kay site' }, manifest: { maskable: maskableSource, startUrl: '/notes', scope: '/', orientation: 'any', shortcuts: [{ name: 'New note', shortName: 'New', description: 'Write a note', url: '/notes/new' }] } })
+    const installed = await pages({ root: 'tests/fixtures/seo', prebuilt: false, favicon: resolve(SOURCE), seo: { name: 'Kay site' }, manifest: { maskable: maskableSource, startUrl: '/notes', scope: '/', orientation: 'any', shortcuts: [{ name: 'New note', shortName: 'New', description: 'Write a note', url: '/notes/new' }] } })
     const fetch = async (path: string, headers: Record<string, string> = {}) => installed.handle(new Request(`http://localhost${path}`, { headers }))
     const manifest = await (await fetch('/manifest.webmanifest')).json() as { icons: unknown[] }
     const maskable = await fetch('/icon-maskable-512.png')
@@ -135,21 +134,21 @@ describe('favicon', () => {
   })
 
   it('stops the server as it boots on a manifest path that is no path of the site', async () => {
-    await expect(pages({ routes: ROUTES, prebuilt: false, manifest: { startUrl: 'notes' } })).rejects.toThrow('kay: the manifest\'s startUrl is a path of the site')
+    await expect(pages({ root: 'tests/fixtures/seo', prebuilt: false, manifest: { startUrl: 'notes' } })).rejects.toThrow('kay: the manifest\'s startUrl is a path of the site')
   })
 
   it('leaves a path to the public file serving it', async () => {
     await Bun.write(join(scratch, 'public/favicon.ico'), 'own icon')
 
-    const own = await pages({ routes: ROUTES, prebuilt: false, favicon: SOURCE, publicDir: join(scratch, 'public') })
+    const own = await pages({ root: 'tests/fixtures/seo', prebuilt: false, favicon: resolve(SOURCE), publicDir: join(scratch, 'public') })
 
     expect(await (await own.handle(new Request('http://localhost/favicon.ico'))).text()).toBe('own icon')
     expect((await own.handle(new Request('http://localhost/icon-192.png'))).status).toBe(200)
   })
 
   it('serves kay\'s mark when the project names no favicon, and none once it is turned off', async () => {
-    const plain = await pages({ routes: ROUTES, prebuilt: false })
-    const off = await pages({ routes: ROUTES, prebuilt: false, favicon: false })
+    const plain = await pages({ root: 'tests/fixtures/seo', prebuilt: false })
+    const off = await pages({ root: 'tests/fixtures/seo', prebuilt: false, favicon: false })
     const icon = await plain.handle(new Request('http://localhost/icon-512.png'))
 
     const svg = await plain.handle(new Request('http://localhost/favicon.svg'))
@@ -169,7 +168,7 @@ describe('favicon', () => {
 
     await Bun.write(svg, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"/>')
 
-    const own = await pages({ routes: ROUTES, prebuilt: false, favicon: { image: SOURCE, svg } })
+    const own = await pages({ root: 'tests/fixtures/seo', prebuilt: false, favicon: { image: resolve(SOURCE), svg } })
     const served = await own.handle(new Request('http://localhost/favicon.svg'))
 
     expect(served.headers.get('content-type')).toBe('image/svg+xml')
@@ -187,7 +186,7 @@ describe('favicon', () => {
 
     await Bun.write(svg, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="#c00"/></svg>')
 
-    const own = await pages({ routes: ROUTES, prebuilt: false, favicon: svg })
+    const own = await pages({ root: 'tests/fixtures/seo', prebuilt: false, favicon: svg })
     const served = await own.handle(new Request('http://localhost/favicon.svg'))
     const files = await faviconFiles({ image: svg, svg })
     const ico = files.get('/favicon.ico')!
@@ -221,7 +220,7 @@ describe('favicon', () => {
     try {
       await writeFavicons({ image: stale, svg: stale }, built)
 
-      const own = await pages({ routes: ROUTES, prebuilt: false, favicon: svg })
+      const own = await pages({ root: 'tests/fixtures/seo', prebuilt: false, favicon: svg })
 
       expect(await (await own.handle(new Request('http://localhost/favicon.svg'))).text()).toBe(await Bun.file(svg).text())
     }
@@ -302,7 +301,7 @@ describe('favicon', () => {
   })
 
   it('gives every page the theme colour with the favicon turned off, the site linking its own', async () => {
-    const off = await pages({ routes: ROUTES, prebuilt: false, favicon: false, manifest: { themeColor: '#1e1e2e' } })
+    const off = await pages({ root: 'tests/fixtures/seo', prebuilt: false, favicon: false, manifest: { themeColor: '#1e1e2e' } })
 
     expect(await (await off.handle(new Request('http://localhost/about'))).text()).toContain('<meta name="theme-color" content="#1e1e2e">')
   })

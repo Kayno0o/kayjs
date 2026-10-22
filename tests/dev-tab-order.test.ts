@@ -21,7 +21,7 @@ describe.skipIf(path === undefined)('the tab order overlay of the dev tool', () 
   let dev: TestSite
 
   beforeAll(async () => {
-    dev = await testSite({ routes: 'tests/fixtures/dev-tab-order/src/routes', browser: { path }, dev: true, onError: () => undefined })
+    dev = await testSite({ root: 'tests/fixtures/dev-tab-order', browser: { path }, dev: true, onError: () => undefined })
   }, 60_000)
 
   afterAll(async () => dev?.close())

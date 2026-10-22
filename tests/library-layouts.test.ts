@@ -1,12 +1,13 @@
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { pages } from './shared-pages'
 
 const FIXTURE = 'tests/fixtures/library-chrome'
 // A base path is stripped by the proxy in front of kay, so requests carry none.
 // One library whose layout starts its own chain, mounted under a folder the app has a layout over, and one whose layout leaves the chain alone.
-const OWN = { name: 'own', routes: { dir: `${FIXTURE}/lib/own`, prefix: '/studio/admin' } }
-const SHARED = { name: 'shared', routes: { dir: `${FIXTURE}/lib/shared`, prefix: '/plain' } }
-const I18N = { locales: ['en', 'fr'], defaultLocale: 'en', messages: `${FIXTURE}/src/messages` }
+const OWN = { name: 'own', routes: { dir: resolve(`${FIXTURE}/lib/own`), prefix: '/studio/admin' } }
+const SHARED = { name: 'shared', routes: { dir: resolve(`${FIXTURE}/lib/shared`), prefix: '/plain' } }
+const I18N = { locales: ['en', 'fr'], defaultLocale: 'en', messages: 'src/messages' }
 
 interface Variant { base: string, dev: boolean, locale: boolean }
 
@@ -20,7 +21,7 @@ async function get(variant: Variant, path: string, security = false): Promise<{ 
   let held = apps.get(key)
 
   if (!held) {
-    held = pages({ routes: `${FIXTURE}/src/routes`, extensions: [OWN, SHARED], prebuilt: false, security: security ? undefined : false, inlineStyles: false, site: 'https://site.example', dev: variant.dev, base: variant.base || undefined, i18n: variant.locale ? I18N : undefined })
+    held = pages({ root: FIXTURE, extensions: [OWN, SHARED], prebuilt: false, security: security ? undefined : false, inlineStyles: false, site: 'https://site.example', dev: variant.dev, base: variant.base || undefined, i18n: variant.locale ? I18N : undefined })
     apps.set(key, held)
   }
 

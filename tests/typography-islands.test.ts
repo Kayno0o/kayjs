@@ -1,4 +1,5 @@
 import type { TestPage, TestSite } from '../src/test'
+import { resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { clientOptionsOf, PRODUCTION } from '../src/project'
@@ -8,8 +9,7 @@ import { browserPath, testSite } from '../src/test'
 import { eagerJs } from './eager-js'
 
 const path = browserPath()
-const routes = 'tests/fixtures/french-islands/src/routes'
-const messages = 'tests/fixtures/french-islands/src/messages'
+const messages = resolve('tests/fixtures/french-islands/src/messages')
 const N = '\u00A0'
 const THIN = '\u202F'
 // A string only the code spacing an island's text holds.
@@ -21,7 +21,7 @@ afterAll(async () => {
 })
 
 async function made(options: Parameters<typeof testSite>[0]): Promise<TestSite> {
-  const site = await testSite({ routes, browser: { path }, ...options })
+  const site = await testSite({ root: 'tests/fixtures/french-islands', browser: { path }, ...options })
 
   sites.push(site)
 

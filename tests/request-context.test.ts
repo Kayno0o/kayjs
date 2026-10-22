@@ -1,6 +1,5 @@
 import { rm } from 'node:fs/promises'
-import { join, relative } from 'node:path'
-import process from 'node:process'
+import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { stringify } from 'devalue'
 import { scratchDir } from './scratch'
@@ -28,7 +27,7 @@ describe('the request context', () => {
     return { status: response.status, location: response.headers.get('location'), seen: response.headers.get('x-seen'), cookie: response.headers.get('set-cookie'), body: await response.text() }
   }
   const post = async (path: string, name: string, headers: Record<string, string> = {}, server = app, plain = false) => {
-    const response = await server.handle(new Request(`http://localhost/_kay/action/${relative(process.cwd(), join(dir, 'routes'))}/${path}/${name}`, {
+    const response = await server.handle(new Request(`http://localhost/_kay/action/routes/${path}/${name}`, {
       method: 'POST',
       headers: { 'content-type': plain ? 'application/x-www-form-urlencoded' : 'application/json', ...(!plain && { 'x-kay-action': '1' }), 'referer': 'http://localhost/open', 'cookie': 'theme=dark', ...headers },
       body: plain ? '' : stringify({}),
@@ -53,10 +52,10 @@ describe('the request context', () => {
       Bun.write(join(dir, 'routes/peek.txt.ts'), PEEK),
       Bun.write(join(dir, 'routes/calm.txt.ts'), CALM),
     ])
-    app = await pages({ routes: join(dir, 'routes'), prebuilt: false, security: false, api: join(dir, 'api') })
-    mounted = await pages({ routes: join(dir, 'routes'), prebuilt: false, security: false, base: '/app' })
-    translated = await pages({ routes: join(dir, 'routes'), prebuilt: false, security: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: join(dir, 'messages') } })
-    french = await pages({ routes: join(dir, 'routes'), prebuilt: false, security: false, lang: 'fr' })
+    app = await pages({ root: dir, routes: 'routes', prebuilt: false, security: false, api: 'api' })
+    mounted = await pages({ root: dir, routes: 'routes', prebuilt: false, security: false, base: '/app' })
+    translated = await pages({ root: dir, routes: 'routes', prebuilt: false, security: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: join(dir, 'messages') } })
+    french = await pages({ root: dir, routes: 'routes', prebuilt: false, security: false, lang: 'fr' })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))

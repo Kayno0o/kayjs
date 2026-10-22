@@ -111,7 +111,7 @@ describe('a sitemap past its limits', () => {
 
     await Bun.write(join(copy, 'src/routes/[slug].kay'), '--- server\nexport const page = { prerender: false }\n---\nh1 Slug\n')
 
-    const served = await pages({ routes: join(copy, 'src/routes'), prebuilt: false, security: false, site: 'https://x.example' })
+    const served = await pages({ root: copy, prebuilt: false, security: false, site: 'https://x.example' })
 
     expect((await read(served, '/sitemap-guide')).text).toContain('Slug')
   })
@@ -166,7 +166,7 @@ describe('a lastmod that cannot be read', () => {
         await Bun.write(join(copy, 'src/routes/posts/[slug].kay'), `--- server\nprocess.env.OVERFLOW_BUILDS = String(Number(process.env.OVERFLOW_BUILDS ?? 0) + 1)\nexport const page = { sitemap: [{ slug: 'a' }, { slug: 'b' }, { slug: 'c' }], lastmod: ({ slug }) => { if (slug === 'b') throw new Error('Database down'); return slug === 'a' ? '2026-02-31' : '2026-05-06' } }\n---\nh1 Post\n`)
         errors.length = 0
 
-        const served = await pages({ routes: join(copy, 'src/routes'), prebuilt: false, security: false, site: 'https://x.example', dev, onError: ({ error, request }) => void errors.push([error, request]) })
+        const served = await pages({ root: copy, prebuilt: false, security: false, site: 'https://x.example', dev, onError: ({ error, request }) => void errors.push([error, request]) })
         const { status, text } = await read(served, '/sitemap.xml')
 
         expect(status).toBe(200)
@@ -193,7 +193,7 @@ describe('a sitemap built without a lastmod', () => {
     await Bun.write(join(copy, 'src/routes/posts/[slug].kay'), '--- server\nprocess.env.OVERFLOW_BUILDS = String(Number(process.env.OVERFLOW_BUILDS ?? 0) + 1)\nexport const page = { sitemap: [{ slug: \'a\' }], lastmod: () => { if ((globalThis as { sitemapDatabaseDown?: boolean }).sitemapDatabaseDown) throw new Error(\'Database down\'); return \'2026-05-06\' } }\n---\nh1 Post\n')
 
     try {
-      const served = await pages({ routes: join(copy, 'src/routes'), prebuilt: false, security: false, site: 'https://x.example', onError: ({ error, request }) => void errors.push([error, request]) })
+      const served = await pages({ root: copy, prebuilt: false, security: false, site: 'https://x.example', onError: ({ error, request }) => void errors.push([error, request]) })
       const fetched = async () => served.handle(new Request('http://localhost/sitemap.xml'))
 
       down.sitemapDatabaseDown = true
@@ -228,7 +228,7 @@ describe('a sitemap with a lastmod that is no date', () => {
     errors.length = 0
 
     try {
-      const served = await pages({ routes: join(copy, 'src/routes'), prebuilt: false, security: false, site: 'https://x.example', onError: ({ error, request }) => void errors.push([error, request]) })
+      const served = await pages({ root: copy, prebuilt: false, security: false, site: 'https://x.example', onError: ({ error, request }) => void errors.push([error, request]) })
       const fetched = async () => served.handle(new Request('http://localhost/sitemap.xml'))
       const first = await fetched()
 
@@ -278,7 +278,7 @@ describe('a sitemap whose build read more keys than a page keeps', () => {
 
     await Bun.write(join(copy, 'src/routes/overflow/[n].kay'), page)
 
-    const served = await pages({ routes: join(copy, 'src/routes'), prebuilt: false, security: false, site: 'https://x.example' })
+    const served = await pages({ root: copy, prebuilt: false, security: false, site: 'https://x.example' })
     const builds = () => Number(process.env.OVERFLOW_BUILDS)
 
     await read(served, '/sitemap.xml')
@@ -304,7 +304,7 @@ describe('a sitemap built while a key is invalidated', () => {
     await Bun.write(join(copy, 'src/routes/inflight/[n].kay'), page)
     process.env.INFLIGHT_BUILDS = '0'
 
-    const served = await pages({ routes: join(copy, 'src/routes'), prebuilt: false, security: false, site: 'https://x.example' })
+    const served = await pages({ root: copy, prebuilt: false, security: false, site: 'https://x.example' })
     const first = read(served, '/sitemap.xml')
     const { invalidate } = await import('../src/runtime/cache')
 

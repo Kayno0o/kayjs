@@ -1,5 +1,6 @@
 import type { RenderedPage } from '../src/check/seo'
 import type { KayConfig } from '../src/config'
+import { resolve } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { readManifest } from '../src/server/client'
@@ -11,7 +12,7 @@ import { pages } from './shared-pages'
 const ROOT = 'tests/fixtures/site-output'
 
 async function appWith(options: Parameters<typeof pages>[0] = {}) {
-  return pages({ routes: `${ROOT}/src/routes`, publicDir: `${ROOT}/public`, prebuilt: false, security: false, ...options })
+  return pages({ root: ROOT, prebuilt: false, security: false, ...options })
 }
 
 async function fetchFrom(app: Awaited<ReturnType<typeof pages>>, path: string, headers: Record<string, string> = {}): Promise<Response> {
@@ -137,13 +138,13 @@ describe('robots', () => {
   })
 
   it('lists a path in every locale of a site served by path', async () => {
-    const app = await appWith({ site, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: `${ROOT}/src/messages` }, robots: { disallow: ['/private'] } })
+    const app = await appWith({ site, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'src/messages' }, robots: { disallow: ['/private'] } })
 
     expect(await text(app)).toContain('Disallow: /private\nDisallow: /en/private\n')
   })
 
   it('lists a path in the locale of the host asking, with that host\'s sitemap', async () => {
-    const app = await appWith({ site: 'https://x.fr', i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', domains: { fr: 'x.fr', en: 'x.com' }, messages: `${ROOT}/src/messages` }, robots: { disallow: ['/private'] } })
+    const app = await appWith({ site: 'https://x.fr', i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', domains: { fr: 'x.fr', en: 'x.com' }, messages: 'src/messages' }, robots: { disallow: ['/private'] } })
 
     expect(await text(app, 'http://x.com/robots.txt')).toBe('User-agent: *\nAllow: /\nDisallow: /private\n\nSitemap: https://x.com/sitemap.xml\n')
     expect(await text(app, 'http://x.fr/robots.txt')).toContain('Sitemap: https://x.fr/sitemap.xml\n')
@@ -160,7 +161,7 @@ describe('robots', () => {
   })
 
   it('gives way to a robots.txt in public/', async () => {
-    const app = await appWith({ site, publicDir: 'tests/fixtures/seo/public', robots: { disallow: ['/private'] } })
+    const app = await appWith({ site, publicDir: resolve('tests/fixtures/seo/public'), robots: { disallow: ['/private'] } })
 
     expect(await text(app)).toBe('User-agent: *\nDisallow: /private\n')
   })
@@ -198,14 +199,14 @@ describe('sitemap lastmod', () => {
   }, 60_000)
 
   it('keeps it with the trailing slash, the base and every locale\'s copy', async () => {
-    const xml = await sitemap({ trailingSlash: 'always', base: '/docs', i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: `${ROOT}/src/messages` } })
+    const xml = await sitemap({ trailingSlash: 'always', base: '/docs', i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'src/messages' } })
 
     expect(xml).toContain('<loc>https://x.example/docs/posts/a/</loc><lastmod>2026-03-04T10:00:00.000Z</lastmod><xhtml:link')
     expect(xml).toContain('<loc>https://x.example/docs/en/posts/a/</loc><lastmod>2026-03-04T10:00:00.000Z</lastmod>')
   })
 
   it('gives each host of a site by domain its own pages with the lastmod', async () => {
-    const xml = await sitemap({ site: 'https://x.fr', i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', domains: { fr: 'x.fr', en: 'x.com' }, messages: `${ROOT}/src/messages` } }, 'http://x.com/sitemap.xml')
+    const xml = await sitemap({ site: 'https://x.fr', i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', domains: { fr: 'x.fr', en: 'x.com' }, messages: 'src/messages' } }, 'http://x.com/sitemap.xml')
 
     expect(xml).toContain('<loc>https://x.com/posts/b</loc><lastmod>2026-05-06</lastmod>')
     expect(xml).not.toContain('<loc>https://x.fr')
@@ -239,7 +240,7 @@ describe('theme color', () => {
   })
 
   it('is the same under every locale', async () => {
-    const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: `${ROOT}/src/messages` }
+    const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'src/messages' }
 
     expect(await themes({ i18n, seo: { themeColor: { light: '#fff', dark: '#111' } } }, '/en/about')).toHaveLength(2)
   })
@@ -259,7 +260,7 @@ describe('layout settings', () => {
 
     await Bun.write(`${root}/src/routes/private/open.kay`, '--- server\nexport const page = { noindex: false }\n---\nh1 Open\n')
 
-    const app = await appWith({ routes: `${root}/src/routes`, site: 'https://x.example' })
+    const app = await appWith({ root, site: 'https://x.example' })
 
     expect(await (await fetchFrom(app, '/private/open')).text()).not.toContain('noindex')
     expect(await (await fetchFrom(app, '/sitemap.xml')).text()).toContain('<loc>https://x.example/private/open</loc>')

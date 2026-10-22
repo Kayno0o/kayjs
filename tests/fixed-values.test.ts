@@ -28,8 +28,8 @@ describe('health.timeout', () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
-      const tight = await pages({ routes: ROUTES, prebuilt: false, health: { check: slow(300), timeout: '100ms' } })
-      const loose = await pages({ routes: ROUTES, prebuilt: false, health: { check: slow(300), timeout: '2s' } })
+      const tight = await pages({ root: 'tests/fixtures/production', prebuilt: false, health: { check: slow(300), timeout: '100ms' } })
+      const loose = await pages({ root: 'tests/fixtures/production', prebuilt: false, health: { check: slow(300), timeout: '2s' } })
 
       expect((await tight.handle(new Request('http://localhost/_kay/health'))).status).toBe(503)
       expect(logged.mock.calls.map(call => String(call[0]))).toEqual([expect.stringContaining('the health check took longer than 0.1 s')])
@@ -43,7 +43,7 @@ describe('health.timeout', () => {
   it('runs the check once for the probes of a few seconds, and again after', async () => {
     let calls = 0
     let healthy = true
-    const app = await pages({ routes: ROUTES, prebuilt: false, health: { check: () => {
+    const app = await pages({ root: 'tests/fixtures/production', prebuilt: false, health: { check: () => {
       calls += 1
 
       return healthy
@@ -70,7 +70,7 @@ describe('health.timeout', () => {
 
   it('is 5 seconds when unset, and refused when it is no positive duration', async () => {
     for (const timeout of [0, -1, '5 s', Number.NaN, '30d'])
-      await expect(pages({ routes: ROUTES, prebuilt: false, health: { timeout } as never })).rejects.toThrow('health.timeout is')
+      await expect(pages({ root: 'tests/fixtures/production', prebuilt: false, health: { timeout } as never })).rejects.toThrow('health.timeout is')
 
     expect(await probeHealth({ timeout: '0s' })).toBe(1)
   })
@@ -83,7 +83,7 @@ describe('health.timeout', () => {
   })
 
   it('makes the probe wait as long as the check may', async () => {
-    const serve = async () => new Elysia().use(await pages({ routes: ROUTES, prebuilt: false, health: { path: '/up', check: slow(200), timeout: '1s' } })).listen(0)
+    const serve = async () => new Elysia().use(await pages({ root: 'tests/fixtures/production', prebuilt: false, health: { path: '/up', check: slow(200), timeout: '1s' } })).listen(0)
     const [patient, hurried] = [await serve(), await serve()]
 
     try {
@@ -206,7 +206,7 @@ describe('requestIdHeader', () => {
 
 describe('redirects with a status', () => {
   it('answer 301 or 302 when asked, and keep 308 and 307 otherwise', async () => {
-    const app = await pages({ routes: ROUTES, prebuilt: false, redirects: { '/a': { to: '/contact', status: 301 }, '/b': { to: '/contact', status: 302 }, '/c': '/contact', '/d': { to: '/contact', permanent: false }, '/e': { to: '/contact', permanent: true, status: 301 }, '/f/*': { to: '/contact?x=*', status: 302 } } })
+    const app = await pages({ root: 'tests/fixtures/production', prebuilt: false, redirects: { '/a': { to: '/contact', status: 301 }, '/b': { to: '/contact', status: 302 }, '/c': '/contact', '/d': { to: '/contact', permanent: false }, '/e': { to: '/contact', permanent: true, status: 301 }, '/f/*': { to: '/contact?x=*', status: 302 } } })
     const statusOf = async (path: string) => (await app.handle(new Request(`http://localhost${path}`))).status
 
     expect(await Promise.all(['/a', '/b', '/c', '/d', '/e', '/f/1'].map(statusOf))).toEqual([301, 302, 308, 307, 301, 302])
@@ -242,7 +242,7 @@ describe('options that also take false', () => {
   })
 
   it('reads proxy: false on an app as no proxy, a forwarded address and id both ignored', async () => {
-    const app = new Elysia().use(await pages({ routes: ROUTES, prebuilt: false, proxy: false })).get('/who', ({ request }) => clientAddress(request, undefined))
+    const app = new Elysia().use(await pages({ root: 'tests/fixtures/production', prebuilt: false, proxy: false })).get('/who', ({ request }) => clientAddress(request, undefined))
     const headers = { 'x-forwarded-for': '9.9.9.9', 'x-real-ip': '9.9.9.9', 'x-request-id': 'edge-1' }
     const who = await app.handle(new Request('http://localhost/who', { headers }))
     const page = await app.handle(new Request('http://localhost/contact', { headers }))
@@ -252,8 +252,8 @@ describe('options that also take false', () => {
   })
 
   it('reads preview: false as no preview, serving none of its routes', async () => {
-    const withPreview = await pages({ routes: ROUTES, prebuilt: false, preview: { secret: 'a'.repeat(40) } })
-    const without = await pages({ routes: ROUTES, prebuilt: false, preview: false })
+    const withPreview = await pages({ root: 'tests/fixtures/production', prebuilt: false, preview: { secret: 'a'.repeat(40) } })
+    const without = await pages({ root: 'tests/fixtures/production', prebuilt: false, preview: false })
     const draft = async (app: typeof without) => app.handle(new Request('http://localhost/_kay/draft', { method: 'POST' }))
 
     expect((await draft(withPreview)).status).not.toBe(404)
@@ -301,7 +301,7 @@ describe('images.webp', () => {
 
 describe('one Not Found spelling', () => {
   it('answers the image route 404 as Not Found, as the pages and endpoints do', async () => {
-    const app = await pages({ routes: ROUTES, prebuilt: false })
+    const app = await pages({ root: 'tests/fixtures/production', prebuilt: false })
     const text = async (path: string) => (await app.handle(new Request(`http://localhost${path}`))).text()
 
     expect(await text('/_kay/image?src=%2Fnone.png&w=320')).toBe('Not Found')

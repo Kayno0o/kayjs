@@ -32,7 +32,7 @@ await mkdir(media)
 await Promise.all([Bun.write(join(uploads, 'still.gif'), still), Bun.write(join(uploads, 'animated.gif'), animated), Bun.write(join(uploads, 'undecodable.gif'), undecodable), Bun.write(join(uploads, 'tiny.gif'), tiny), Bun.write(join(uploads, 'broken.png'), new Uint8Array((await Bun.file(HERO).bytes()).subarray(0, 64))), Bun.write(join(uploads, 'hero.avif'), avif), Bun.write(join(uploads, 'burst.avif'), avif), Bun.write(join(media, '7'), Bun.file(HERO)), Bun.write(join(media, '8'), animated), Bun.write(join(media, '9'), avif)])
 
 const app = await pages({
-  routes: 'tests/fixtures/images/src/routes',
+  root: 'tests/fixtures/images',
   prebuilt: false,
   images: {
     dirs: { '/uploads/': uploads },
@@ -245,7 +245,7 @@ describe('images.resolve and images.guard', () => {
 
   it('hands the guards the locals of the app and the cookies of the request, and its answer what they set and the request id', async () => {
     const withLocals = new Elysia().derive({ as: 'global' }, () => ({ user: 'ada' })).use(await pages({
-      routes: 'tests/fixtures/images/src/routes',
+      root: 'tests/fixtures/images',
       prebuilt: false,
       images: {
         guard: (ctx) => {

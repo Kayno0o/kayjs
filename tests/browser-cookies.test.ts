@@ -58,7 +58,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('browse wit
 
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('site.as(cookie).open', () => {
   it('signs the browser in with the cookie it was made with', async () => {
-    const site = await testSite({ routes: 'tests/fixtures/base-site/src/routes', api: 'tests/fixtures/base-site/src/api', browser: { path } })
+    const site = await testSite({ root: 'tests/fixtures/base-site', browser: { path } })
 
     try {
       const page = await site.as('session=abc').open('/api/cookies/read')

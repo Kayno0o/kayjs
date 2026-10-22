@@ -1,16 +1,15 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { pages } from '../src/server'
 import { sourceHash } from '../src/server/csp'
 import { builtFonts, prepareFonts } from '../src/server/fonts'
 
-const ROUTES = 'tests/fixtures/seo/src/routes'
 const FONTS = [
-  { family: 'Display "One"', src: 'tests/fixtures/seo/src/fonts/display.woff2', weight: '100 900', preload: true },
-  { family: 'Body', src: './tests/fixtures/seo/src/fonts/body-italic.woff', style: 'italic' as const, display: 'optional' as const, unicodeRange: 'U+0000-00FF' },
+  { family: 'Display "One"', src: resolve('tests/fixtures/seo/src/fonts/display.woff2'), weight: '100 900', preload: true },
+  { family: 'Body', src: resolve('./tests/fixtures/seo/src/fonts/body-italic.woff'), style: 'italic' as const, display: 'optional' as const, unicodeRange: 'U+0000-00FF' },
 ]
 const scratch = await mkdtemp(join(tmpdir(), 'kay-fonts-'))
 
@@ -20,7 +19,7 @@ afterAll(async () => {
 
 describe('fonts', () => {
   it('declares every font in the head and preloads the ones asked for', async () => {
-    const app = await pages({ routes: ROUTES, prebuilt: false, fonts: FONTS })
+    const app = await pages({ root: 'tests/fixtures/seo', prebuilt: false, fonts: FONTS })
     const html = await (await app.handle(new Request('http://localhost/about'))).text()
     const preloads = [...html.matchAll(/<link rel="preload" href="([^"]+)" as="font" type="([^"]+)" crossorigin="">/g)].map(match => [match[1], match[2]])
     const css = (/<style>([^<]+)<\/style>/).exec(html)![1]!
@@ -36,7 +35,7 @@ describe('fonts', () => {
   })
 
   it('preloads no font unless one asks for it, still declaring them', async () => {
-    const app = await pages({ routes: ROUTES, prebuilt: false, fonts: [{ ...FONTS[0]!, preload: false }, FONTS[1]!] })
+    const app = await pages({ root: 'tests/fixtures/seo', prebuilt: false, fonts: [{ ...FONTS[0]!, preload: false }, FONTS[1]!] })
     const html = await (await app.handle(new Request('http://localhost/about'))).text()
 
     expect(html).not.toContain('rel="preload"')
@@ -45,7 +44,7 @@ describe('fonts', () => {
 
   it('lets its rules through a style-src without unsafe-inline by their hash, leaving one with it untouched', async () => {
     const policy = async (styleSrc?: string[]) => {
-      const app = await pages({ routes: ROUTES, prebuilt: false, fonts: FONTS, ...styleSrc ? { security: { csp: { 'style-src': styleSrc } } } : {} })
+      const app = await pages({ root: 'tests/fixtures/seo', prebuilt: false, fonts: FONTS, ...styleSrc ? { security: { csp: { 'style-src': styleSrc } } } : {} })
       const response = await app.handle(new Request('http://localhost/about'))
       const css = (/<style>([^<]+)<\/style>/).exec(await response.text())![1]!
 

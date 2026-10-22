@@ -6,7 +6,7 @@ import { testSite } from '../src/test'
 import { scratchDir } from './scratch'
 
 const KEY = { 'x-key': 'open' }
-const moved = await testSite({ routes: 'tests/fixtures/openapi/src/routes', api: 'tests/fixtures/openapi/src/api', apiPath: '/v1', openapi: { reference: true }, mcp: true, base: '/shop' })
+const moved = await testSite({ root: 'tests/fixtures/openapi', apiPath: '/v1', openapi: { reference: true }, mcp: true, base: '/shop' })
 
 afterAll(async () => {
   await moved.close()
@@ -44,7 +44,7 @@ describe('apiPath', () => {
   })
 
   it('keeps /api and sets no meta when left out', async () => {
-    const plain = await testSite({ routes: 'tests/fixtures/openapi/src/routes', api: 'tests/fixtures/openapi/src/api' })
+    const plain = await testSite({ root: 'tests/fixtures/openapi' })
 
     try {
       expect((await plain.fetch('/api/items/1', { headers: KEY })).status).toBe(200)

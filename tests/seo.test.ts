@@ -1,3 +1,4 @@
+import { resolve } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { loadConfig } from '../src/config'
@@ -6,13 +7,12 @@ import { isCrossSite } from '../src/server/actions'
 import { siteOrigin } from '../src/server/seo'
 import { pages } from './shared-pages'
 
-const ROUTES = 'tests/fixtures/seo/src/routes'
 const HEAD = /<head>([\s\S]*)<\/head>/
 
 const app = await pages({
-  routes: ROUTES,
+  root: 'tests/fixtures/seo',
   prebuilt: false,
-  publicDir: 'tests/fixtures/seo/share',
+  publicDir: resolve('tests/fixtures/seo/share'),
   site: 'https://example.com/',
   seo: {
     name: 'Kay site',
@@ -177,7 +177,7 @@ describe('seo head', () => {
   })
 
   it('leaves the head alone when the project sets neither site nor seo', async () => {
-    const plain = await pages({ routes: ROUTES, prebuilt: false })
+    const plain = await pages({ root: 'tests/fixtures/seo', prebuilt: false })
     const html = await (await plain.handle(new Request('http://localhost/about'))).text()
 
     expect(html).toContain('<title>About</title>')
@@ -202,7 +202,7 @@ describe('seo head', () => {
         process.env.ORIGIN = origin
 
         expect((await loadConfig('tests/fixtures/seo')).site).toBeUndefined()
-        await pages({ routes: ROUTES, prebuilt: false })
+        await pages({ root: 'tests/fixtures/seo', prebuilt: false })
 
         expect(() => currentSiteOrigin()).toThrow('nor SITE_URL')
       }
@@ -210,7 +210,7 @@ describe('seo head', () => {
       process.env.ORIGIN = 'http://localhost:4701/'
 
       expect((await loadConfig('tests/fixtures/seo')).site).toBe('http://localhost:4701/')
-      await pages({ routes: ROUTES, prebuilt: false })
+      await pages({ root: 'tests/fixtures/seo', prebuilt: false })
 
       expect(currentSiteOrigin()).toBe('http://localhost:4701')
 
@@ -250,7 +250,7 @@ describe('seo head', () => {
         [{}, undefined],
       ] as const) {
         set(env)
-        await pages({ routes: ROUTES, prebuilt: false, base: '/kay' })
+        await pages({ root: 'tests/fixtures/seo', prebuilt: false, base: '/kay' })
 
         if (expected === undefined)
           expect(() => currentSiteOrigin()).toThrow('nor SITE_URL')
@@ -259,13 +259,13 @@ describe('seo head', () => {
       }
 
       set({ ORIGIN: 'http://localhost:4701' })
-      const app = await pages({ routes: ROUTES, prebuilt: false, base: '/kay' })
+      const app = await pages({ root: 'tests/fixtures/seo', prebuilt: false, base: '/kay' })
 
       expect(siteUrl('/contact')).toBe('http://localhost:4701/kay/contact')
       expect(await (await app.handle(new Request('http://localhost/about'))).text()).toContain('<link rel="canonical" href="http://localhost:4701/kay/about">')
       expect(isCrossSite(post)).toBe(false)
 
-      await pages({ routes: ROUTES, prebuilt: false, site: 'https://example.com' })
+      await pages({ root: 'tests/fixtures/seo', prebuilt: false, site: 'https://example.com' })
 
       expect(currentSiteOrigin()).toBe('https://example.com')
     }
@@ -280,7 +280,7 @@ describe('seo head', () => {
     process.env.SITE_URL = 'https://preview.example.com'
 
     try {
-      const preview = await pages({ routes: ROUTES, prebuilt: false, base: '/kay' })
+      const preview = await pages({ root: 'tests/fixtures/seo', prebuilt: false, base: '/kay' })
       const html = await (await preview.handle(new Request('http://localhost/about'))).text()
 
       expect(html).toContain('<link rel="canonical" href="https://preview.example.com/kay/about">')
@@ -288,7 +288,7 @@ describe('seo head', () => {
       expect(currentSiteOrigin()).toBe('https://preview.example.com')
 
       // What the config sets wins.
-      await pages({ routes: ROUTES, prebuilt: false, site: 'https://example.com' })
+      await pages({ root: 'tests/fixtures/seo', prebuilt: false, site: 'https://example.com' })
 
       expect(currentSiteOrigin()).toBe('https://example.com')
     }
@@ -350,8 +350,8 @@ describe('sitemap and robots', () => {
   })
 
   it('leaves both to a public file of the same name, and serves neither without a site', async () => {
-    const own = await pages({ routes: ROUTES, publicDir: 'tests/fixtures/seo/public', prebuilt: false, site: 'https://example.com' })
-    const plain = await pages({ routes: ROUTES, prebuilt: false })
+    const own = await pages({ root: 'tests/fixtures/seo', prebuilt: false, site: 'https://example.com' })
+    const plain = await pages({ root: 'tests/fixtures/seo', publicDir: 'none', prebuilt: false })
 
     expect(await (await own.handle(new Request('http://localhost/robots.txt'))).text()).toBe('User-agent: *\nDisallow: /private\n')
     expect((await own.handle(new Request('http://localhost/sitemap.xml'))).status).toBe(200)

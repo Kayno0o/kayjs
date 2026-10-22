@@ -1,15 +1,15 @@
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { leavesSite } from '../src/runtime/outside'
 import { pages } from './shared-pages'
 
-const routes = 'tests/fixtures/outside-links/src/routes'
 const LINK = /<a\b[^>]*>/g
 const OUT = ' target="_blank" rel="noopener"'
 
 // Each link tag of the page by its class, class name apart.
 async function links(options: Record<string, unknown> = {}, path = '/'): Promise<Record<string, string>> {
-  const site = new Elysia().use(await pages({ routes, prebuilt: false, security: false, inlineStyles: false, ...options }))
+  const site = new Elysia().use(await pages({ root: 'tests/fixtures/outside-links', prebuilt: false, security: false, inlineStyles: false, ...options }))
   const html = await (await site.handle(new Request(`http://localhost${path}`))).text()
   const found: Record<string, string> = {}
 
@@ -91,7 +91,7 @@ describe('a link leaving the site, in templates', () => {
   })
 
   it('opens the page\'s own links as on a localized page too', async () => {
-    const tags = await links({ site: 'https://x.example', i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' } }, '/en')
+    const tags = await links({ site: 'https://x.example', i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') } }, '/en')
 
     expect(tags.static).toContain(OUT)
     expect(tags.root).not.toContain('target')

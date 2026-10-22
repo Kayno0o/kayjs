@@ -64,7 +64,7 @@ describe('images.widths', () => {
     try {
       await Bun.write(join(uploads, 'photo.png'), Bun.file(HERO))
 
-      const app = await pages({ routes: 'tests/fixtures/images/src/routes', prebuilt: false, images: { dirs: { '/uploads/': uploads }, widths: [400, 800] } })
+      const app = await pages({ root: 'tests/fixtures/images', prebuilt: false, images: { dirs: { '/uploads/': uploads }, widths: [400, 800] } })
       const get = async (path: string) => app.handle(new Request(`http://localhost/_kay/image?src=${encodeURIComponent('/uploads/photo.png')}&${path}`))
 
       expect((await get('w=400')).status).toBe(200)
@@ -85,11 +85,11 @@ describe('images.widths on the page', () => {
   afterAll(() => setImageWidths(undefined))
 
   it('is written for the islands to read when it is set, and left out otherwise', async () => {
-    const withWidths = await pages({ routes: 'tests/fixtures/navigation/src/routes', prebuilt: false, images: { widths: [480, 960] } })
+    const withWidths = await pages({ root: 'tests/fixtures/navigation', prebuilt: false, images: { widths: [480, 960] } })
 
     expect(await (await withWidths.handle(new Request('http://localhost/'))).text()).toContain('<meta name="kay-image-widths" content="480,960">')
 
-    const plain = await pages({ routes: 'tests/fixtures/navigation/src/routes', prebuilt: false })
+    const plain = await pages({ root: 'tests/fixtures/navigation', prebuilt: false })
 
     expect(await (await plain.handle(new Request('http://localhost/'))).text()).not.toContain('kay-image-widths')
   })
@@ -113,7 +113,7 @@ describe('image() quality', () => {
     try {
       await Bun.write(join(uploads, 'photo.png'), Bun.file(HERO))
 
-      const app = await pages({ routes: 'tests/fixtures/images/src/routes', prebuilt: false, images: { dirs: { '/uploads/': uploads } } })
+      const app = await pages({ root: 'tests/fixtures/images', prebuilt: false, images: { dirs: { '/uploads/': uploads } } })
       const get = async (query: string) => app.handle(new Request(`http://localhost/_kay/image?src=${encodeURIComponent('/uploads/photo.png')}&w=640${query}`))
       const bytesOf = async (query: string) => Bun.hash(await (await get(query)).bytes())
       const [plain, low, high] = [await bytesOf(''), await bytesOf('&q=5'), await bytesOf('&q=100')]
@@ -524,9 +524,9 @@ describe('Markdown settings', () => {
 
   it('are what pages({ markdown }) sets, and its own readingSpeed is refused when it is zero', async () => {
     try {
-      await pages({ routes: 'tests/fixtures/images/src/routes', prebuilt: false, markdown: { headingLinks: false, readingSpeed: 120, imageSizes: '50vw' } })
+      await pages({ root: 'tests/fixtures/images', prebuilt: false, markdown: { headingLinks: false, readingSpeed: 120, imageSizes: '50vw' } })
       expect(markdownOf({})).toMatchObject({ headingLinks: false, readingSpeed: 120, imageSizes: '50vw' })
-      await expect(pages({ routes: 'tests/fixtures/images/src/routes', prebuilt: false, markdown: { readingSpeed: 0 } })).rejects.toThrow(/readingSpeed/)
+      await expect(pages({ root: 'tests/fixtures/images', prebuilt: false, markdown: { readingSpeed: 0 } })).rejects.toThrow(/readingSpeed/)
     }
     finally {
       setMarkdownDefaults(undefined)

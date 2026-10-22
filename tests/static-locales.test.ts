@@ -49,7 +49,7 @@ describe('kay build --static localizes links as the server render does', () => {
     it(`on ${variant.name}`, async () => {
       const copy = await fixtureCopy('static-locales')
       const base = variant.base ?? ''
-      const i18n: I18nConfig = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: `${copy}/src/messages`, ...variant.prefixDefault !== undefined && { prefixDefault: variant.prefixDefault } }
+      const i18n: I18nConfig = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'src/messages', ...variant.prefixDefault !== undefined && { prefixDefault: variant.prefixDefault } }
       const options = { site: SITE, ...variant.base !== undefined && { base: variant.base }, ...variant.trailingSlash !== undefined && { trailingSlash: variant.trailingSlash } }
       const config = `export default ${JSON.stringify({ ...options, favicon: false, i18n: { ...i18n, messages: 'src/messages' } })}\n`
 
@@ -60,7 +60,7 @@ describe('kay build --static localizes links as the server render does', () => {
       expect(errors).toBe('')
       expect(code).toBe(0)
 
-      const served = new Elysia().use(await pages({ routes: `${copy}/src/routes`, content: `${copy}/src/content.config.ts`, prebuilt: false, security: false, i18n, ...options }))
+      const served = new Elysia().use(await pages({ root: copy, prebuilt: false, security: false, i18n, ...options }))
       const slash = variant.trailingSlash === 'always' ? '/' : ''
 
       for (const locale of [variant.prefixDefault === true ? '/fr' : '', '/en']) {

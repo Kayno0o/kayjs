@@ -124,7 +124,6 @@ describe('HOST', () => {
 
   it('probes the health route where HOST says the server listens', async () => {
     const quiet = spyOn(console, 'error').mockImplementation(() => undefined)
-    const routes = 'tests/fixtures/production/src/routes'
 
     try {
       for (const [bound, host, expected] of [
@@ -138,7 +137,7 @@ describe('HOST', () => {
         ['127.0.0.1', OTHER, 1],
         ...binds('::1') ? [['::1', '::1', 0], ['::1', '[::1]', 0], ['::1', '127.0.0.1', 1]] as const : [],
       ] as const) {
-        const app = new Elysia().use(await pages({ routes, prebuilt: false, health: { path: '/up' } })).listen({ port: 0, hostname: bound })
+        const app = new Elysia().use(await pages({ root: 'tests/fixtures/production', prebuilt: false, health: { path: '/up' } })).listen({ port: 0, hostname: bound })
 
         try {
           expect({ bound, host, status: await probeHealth({ path: '/up' }, String(app.server!.port), host) }).toEqual({ bound, host, status: expected })

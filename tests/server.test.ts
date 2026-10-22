@@ -1608,7 +1608,7 @@ describe('failed actions', () => {
   })
 
   it('renders the page the post came from under the mount point it is served at', async () => {
-    const mounted = new Elysia().use(await pages({ routes: 'tests/fixtures/site/src/routes', prebuilt: false, security: false, base: '/repo' }))
+    const mounted = new Elysia().use(await pages({ root: 'tests/fixtures/site', prebuilt: false, security: false, base: '/repo' }))
     const page = await mounted.handle(new Request(ADD, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/repo/' }, body: new URLSearchParams({ title: '' }) }))
     const html = await page.text()
 
@@ -1619,7 +1619,7 @@ describe('failed actions', () => {
   })
 
   it('renders the page again for a post refused again from the page a refusal answered, and goes back to it once one goes through', async () => {
-    const mounted = new Elysia().use(await pages({ routes: 'tests/fixtures/site/src/routes', prebuilt: false, security: false, base: '/repo' }))
+    const mounted = new Elysia().use(await pages({ root: 'tests/fixtures/site', prebuilt: false, security: false, base: '/repo' }))
     // The browser shows the action's URL, so the next post sends it as its `Referer`, to where the page's form says, the mount point a proxy takes off.
     const post = async (url: string, referer: string, title: string) => mounted.handle(new Request(new URL(url.replace('/repo/', '/'), 'http://localhost'), { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', referer }, body: new URLSearchParams({ title }) }))
     const actionOf = (html: string) => FORM_ACTION.exec(html)![1]!.replaceAll('&amp;', '&')
@@ -1797,14 +1797,14 @@ describe('public files', () => {
 
 describe('problems kay check reports', () => {
   it('reach the problems panel of every page in development, never in production', async () => {
-    const routes = 'tests/fixtures/problems/src/routes'
-    const dev = new Elysia().use(await pages({ routes, dev: true, security: false }))
+    const root = 'tests/fixtures/problems'
+    const dev = new Elysia().use(await pages({ root, dev: true, security: false }))
     const block = (/<script type="application\/json" id="kay-check-problems">(.*?)<\/script>/).exec(await (await dev.handle(new Request('http://localhost/'))).text())?.[1]
 
     expect(block).not.toContain('<')
-    expect(JSON.parse(block!)).toContainEqual(expect.stringMatching(/^error\[missing-alt\]: An `img` needs `alt`\n --> tests\/fixtures\/problems\/src\/routes\/index\.kay:1:1\n/))
+    expect(JSON.parse(block!)).toContainEqual(expect.stringMatching(/^error\[missing-alt\]: An `img` needs `alt`\n --> src\/routes\/index\.kay:1:1\n/))
 
-    const production = new Elysia().use(await pages({ routes, prebuilt: false, security: false }))
+    const production = new Elysia().use(await pages({ root, prebuilt: false, security: false }))
 
     expect(await (await production.handle(new Request('http://localhost/'))).text()).not.toContain('kay-check-problems')
   })
@@ -1916,7 +1916,7 @@ describe('special pages', () => {
   })
 
   it('shows the message and the stack in development, times each load and shows browser problems on the page, never in production', async () => {
-    const dev = await pages({ routes: 'tests/fixtures/site/src/routes', dev: true })
+    const dev = await pages({ root: 'tests/fixtures/site', dev: true })
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
@@ -1982,7 +1982,7 @@ describe('tracing and timing in production', () => {
   afterAll(() => setTracer(undefined))
 
   it('times the guards, imports, loads and render in a Server-Timing header when the config asks', async () => {
-    const timed = await pages({ routes: 'tests/fixtures/site/src/routes', serverTiming: true })
+    const timed = await pages({ root: 'tests/fixtures/site', serverTiming: true })
     const guarded = await new Elysia().use(auth).use(timed).handle(new Request('http://localhost/admin', { headers: { 'x-user': 'ada' } }))
 
     expect(guarded.status).toBe(200)
@@ -1993,7 +1993,7 @@ describe('tracing and timing in production', () => {
 
   it('hands a tracer a span per page request with one per load and the render in it', async () => {
     const { tracer, ended } = recordingTracer()
-    const traced = await pages({ routes: 'tests/fixtures/site/src/routes', tracer })
+    const traced = await pages({ root: 'tests/fixtures/site', tracer })
 
     const home = await traced.handle(new Request('http://localhost/'))
 
@@ -2008,7 +2008,7 @@ describe('tracing and timing in production', () => {
 
   it('marks a span whose load threw, and the request it failed', async () => {
     const { tracer, ended } = recordingTracer()
-    const traced = await pages({ routes: 'tests/fixtures/site/src/routes', tracer })
+    const traced = await pages({ root: 'tests/fixtures/site', tracer })
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
@@ -2022,7 +2022,7 @@ describe('tracing and timing in production', () => {
 
   it('leaves a span ended by a redirect or a 404 unmarked, as the app meant it', async () => {
     const { tracer, ended } = recordingTracer()
-    const traced = await pages({ routes: 'tests/fixtures/site/src/routes', tracer })
+    const traced = await pages({ root: 'tests/fixtures/site', tracer })
 
     expect((await traced.handle(new Request('http://localhost/todos/abc'))).status).toBe(302)
     expect((await traced.handle(new Request('http://localhost/todos/999'))).status).toBe(404)
@@ -2056,7 +2056,7 @@ describe('tracing and timing in production', () => {
     try {
       for (const log of [false, true]) {
         const { tracer, ended } = recordingTracer()
-        const traced = await pages({ routes: 'tests/fixtures/production/src/routes', api: 'tests/fixtures/production/src/api', prebuilt: false, tracer, log })
+        const traced = await pages({ root: 'tests/fixtures/production', prebuilt: false, tracer, log })
 
         expect(await (await traced.handle(new Request('http://localhost/api/echo', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: 'hello' }))).text()).toBe('5')
         // Elysia runs the hook ending it once the response is out.

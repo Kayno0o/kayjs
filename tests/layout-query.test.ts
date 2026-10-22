@@ -1,5 +1,5 @@
 import type { Elysia } from 'elysia'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { layoutQueries } from '../src/check/shadow'
 import { s } from '../src/runtime'
@@ -7,11 +7,10 @@ import { chainQuery } from '../src/server/query'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
-const routes = 'tests/fixtures/layout-query/src/routes'
 const READ = /<p class="read">([^<]*)<\/p>/
-const app = await pages({ routes, prebuilt: false, security: false })
-const slashed = await pages({ routes, prebuilt: false, security: false, base: '/repo', trailingSlash: 'always' })
-const localized = await pages({ routes, prebuilt: false, security: false, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: 'tests/fixtures/layout-query/src/messages' } })
+const app = await pages({ root: 'tests/fixtures/layout-query', prebuilt: false, security: false })
+const slashed = await pages({ root: 'tests/fixtures/layout-query', prebuilt: false, security: false, base: '/repo', trailingSlash: 'always' })
+const localized = await pages({ root: 'tests/fixtures/layout-query', prebuilt: false, security: false, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: resolve('tests/fixtures/layout-query/src/messages') } })
 
 async function get(server: Elysia, path: string): Promise<{ status: number, html: string }> {
   const response = await server.handle(new Request(`http://localhost${path}`))

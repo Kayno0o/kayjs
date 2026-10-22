@@ -1,6 +1,6 @@
 import type { ToolResult } from 'kay/library'
 import type { Action } from '../src/runtime'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { actionTool, currentRequest } from 'kay/library'
@@ -8,14 +8,12 @@ import { pages } from 'kay/server'
 import { encodeValue } from '../src/runtime/wire'
 import { testSite } from '../src/test'
 
-const routes = 'tests/fixtures/library-tools/src/routes'
-const api = 'tests/fixtures/library-tools/src/api'
 const locals = (request: Request) => ({ key: request.headers.get('authorization') === 'Bearer open' ? 'open' : undefined })
 
 // No `mcp`: a library calls actions as tools in-process whether or not the app serves the endpoint.
-const site = await testSite({ routes, api, islands: false, locals })
-const mounted = await testSite({ routes, api, islands: false, base: '/shop', trailingSlash: 'always', locals })
-const localized = await testSite({ routes, api, islands: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' } })
+const site = await testSite({ root: 'tests/fixtures/library-tools', islands: false, locals })
+const mounted = await testSite({ root: 'tests/fixtures/library-tools', islands: false, base: '/shop', trailingSlash: 'always', locals })
+const localized = await testSite({ root: 'tests/fixtures/library-tools', islands: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') } })
 
 // Imported once a site loads `.kay` modules.
 const { current, later, names, recorded, run, shape, unregistered } = await import(join(import.meta.dir, 'fixtures/library-tools/src/routes/index.kay')) as { current: Action<Record<never, never>, string | null>, later: Action<Record<never, never>, undefined>, names: Action<Record<never, never>, string[]>, recorded: Action<Record<never, never>, string | null | undefined>, unregistered: Action<Record<never, never>, string>, run: Action<{ name: string, args: Record<string, unknown> }, ToolResult>, shape: Action<{ name: string }, Record<string, unknown> | undefined> }
@@ -117,7 +115,7 @@ describe('an action as a tool', () => {
   })
 
   it('asks the proof of work of the same action posted with a forged marker header', async () => {
-    const url = '/_kay/action/tests/fixtures/library-tools/src/routes/targets/_actions.kay/solve'
+    const url = '/_kay/action/src/routes/targets/_actions.kay/solve'
     const headers = { 'content-type': 'application/json', 'x-kay-action': '1', 'origin': 'http://localhost', 'x-kay-agent': 'guess', 'x-kay-agent-client': '1.2.3.4', 'x-kay-agent-tool': 'solve' }
 
     expect((await site.fetch(url, { method: 'POST', headers, body: encodeValue({}) })).status).toBe(422)
@@ -181,7 +179,7 @@ describe('the current request', () => {
 describe('a tool call with no server, as under app.handle()', () => {
   // Each app has its own default locale, which a tool call runs in, so a call dispatched into the wrong app shows.
   async function build(locales: string[]) {
-    return new Elysia().use(await pages({ routes, api, prebuilt: false, security: false, i18n: { locales, defaultLocale: locales[0]!, messages: 'tests/fixtures/i18n/src/messages' } }))
+    return new Elysia().use(await pages({ root: 'tests/fixtures/library-tools', prebuilt: false, security: false, i18n: { locales, defaultLocale: locales[0]!, messages: resolve('tests/fixtures/i18n/src/messages') } }))
   }
 
   it('runs in the app answering the request, whichever app was built last', async () => {

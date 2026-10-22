@@ -10,7 +10,7 @@ import { pages } from './shared-pages'
 
 const FIXTURE = 'tests/fixtures/cms'
 const SECRET = 'a-preview-secret-long-enough-for-kay-0123456789'
-const options = { routes: `${FIXTURE}/src/routes`, content: `${FIXTURE}/src/content.config.ts`, api: `${FIXTURE}/src/api`, site: 'https://news.example', inlineStyles: false, security: false as const, preview: { secret: SECRET } }
+const options = { root: FIXTURE, site: 'https://news.example', inlineStyles: false, security: false as const, preview: { secret: SECRET } }
 const roadmap = { collection: 'news', slug: 'roadmap' }
 
 afterEach(() => {

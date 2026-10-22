@@ -1,5 +1,5 @@
 import type { Action, ActionStream } from '../src/runtime'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
@@ -7,10 +7,9 @@ import { action, ActionRedirectError, encodeCall, SETTLED } from '../src/runtime
 import { actionStream } from '../src/runtime/action-stream'
 import { browserPath, testSite } from '../src/test'
 
-const routes = 'tests/fixtures/action-streams/src/routes'
-const site = await testSite({ routes, browser: true, mcp: true })
-const mounted = await testSite({ routes, islands: false, base: '/blog', trailingSlash: 'always' })
-const localized = await testSite({ routes, islands: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' } })
+const site = await testSite({ root: 'tests/fixtures/action-streams', browser: true, mcp: true })
+const mounted = await testSite({ root: 'tests/fixtures/action-streams', islands: false, base: '/blog', trailingSlash: 'always' })
+const localized = await testSite({ root: 'tests/fixtures/action-streams', islands: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') } })
 const fixture = join(import.meta.dir, 'fixtures/action-streams/src')
 const actions = await import(join(fixture, 'routes/index.kay')) as {
   count: Action<{ to: number }, AsyncIterable<number>>
@@ -200,7 +199,7 @@ describe('an action returning an async iterable', () => {
   })
 
   it('counts its rate limit before the first value', async () => {
-    const jar = await testSite({ routes, islands: false })
+    const jar = await testSite({ root: 'tests/fixtures/action-streams', islands: false })
 
     expect(await jar.call(actions.limited)).toEqual(['ok'])
     expect((await jar.refusal(actions.limited, {})).status).toBe(429)
@@ -279,7 +278,7 @@ describe('an action returning an async iterable', () => {
   })
 
   it('sends each value as it comes when compressed, and stops once the client goes away', async () => {
-    const compressed = await testSite({ routes, islands: false, compress: true })
+    const compressed = await testSite({ root: 'tests/fixtures/action-streams', islands: false, compress: true })
     const before = seen.stopped
     const { headers, body } = encodeCall(undefined)
     const response = await compressed.fetch(actions.endless.url, { method: 'POST', headers: { ...headers, 'origin': 'http://localhost', 'accept-encoding': 'gzip' }, body })
@@ -299,7 +298,7 @@ describe('an action returning an async iterable', () => {
   })
 
   it('counts a succeeded-only rate limit once the first value is there', async () => {
-    const limited = await testSite({ routes, islands: false })
+    const limited = await testSite({ root: 'tests/fixtures/action-streams', islands: false })
 
     expect((await limited.refusal(actions.counted, { fail: true })).status).toBe(500)
     expect((await limited.refusal(actions.counted, { fail: true })).status).toBe(500)

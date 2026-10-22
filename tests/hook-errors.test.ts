@@ -43,7 +43,7 @@ const TARGETS = [
 ] as const
 
 async function served(options: { dev: boolean, base?: string, onError?: (error: unknown) => void, beforeKay?: boolean }) {
-  const kay = await pages({ routes: join(dir, 'routes'), api: join(dir, 'api'), publicDir: join(dir, 'public'), prebuilt: false, dev: options.dev, base: options.base ?? '', onError: options.onError, log: false })
+  const kay = await pages({ root: dir, routes: 'routes', api: 'api', publicDir: 'public', prebuilt: false, dev: options.dev, base: options.base ?? '', onError: options.onError, log: false })
   const app: AnyElysia = options.beforeKay === false ? new Elysia().use(kay).onRequest(hook) : new Elysia().onRequest(hook).use(kay)
 
   return app
@@ -160,7 +160,7 @@ describe('an onRequest hook that throws', () => {
       ])
 
       for (const dev of [false, true]) {
-        const kay = await pages({ routes: join(own, 'routes'), api: join(own, 'api'), prebuilt: false, dev, log: false })
+        const kay = await pages({ root: own, routes: 'routes', api: 'api', prebuilt: false, dev, log: false })
         const app = new Elysia().onRequest(hook).use(kay)
         const page = await ask(app, TARGETS[0], 'error')
         const api = await ask(app, TARGETS[1], 'error')
@@ -187,7 +187,7 @@ describe('an onRequest hook that throws', () => {
         Bun.write(join(own, 'routes/index.kay'), 'p Home\n'),
         Bun.write(join(own, 'routes/_error.kay'), '--- server\nconst who = (ctx.locals as { who?: string }).who ?? \'nobody\'\n---\nh1 Oops {who}\n'),
       ])
-      const kay = await pages({ routes: join(own, 'routes'), prebuilt: false, dev: false, log: false })
+      const kay = await pages({ root: own, routes: 'routes', prebuilt: false, dev: false, log: false })
       const app = new Elysia().derive({ as: 'global' }, () => ({ who: 'ann' })).onBeforeHandle({ as: 'global' }, hook).use(kay)
       const page = await ask(app, TARGETS[0], 'error')
 
@@ -208,7 +208,7 @@ describe('an onRequest hook that throws', () => {
       try {
         await Bun.write(join(own, 'routes/index.kay'), 'p Home\n')
 
-        const kay = await pages({ routes: join(own, 'routes'), prebuilt: false, dev: false, log: false })
+        const kay = await pages({ root: own, routes: 'routes', prebuilt: false, dev: false, log: false })
         const base = form === 'minified' ? new Elysia() : new Elysia().use(kay)
 
         if (form === 'minified') {
@@ -254,7 +254,7 @@ describe('an onRequest hook that throws', () => {
         Bun.write(join(own, 'routes/index.kay'), 'p Home\n'),
         Bun.write(join(own, 'routes/_error.kay'), '--- server\nthrow new Error(\'error page broke\')\n---\nh1 Oops\n'),
       ])
-      const app = new Elysia().onRequest(hook).use(await pages({ routes: join(own, 'routes'), prebuilt: false, dev: false, log: false }))
+      const app = new Elysia().onRequest(hook).use(await pages({ root: own, routes: 'routes', prebuilt: false, dev: false, log: false }))
       const page = await ask(app, TARGETS[0], 'error')
 
       expect(page).toMatchObject({ status: 500, body: 'Internal Server Error', type: expect.stringContaining('text/plain') })
@@ -275,7 +275,7 @@ describe('an onRequest hook that throws', () => {
         Bun.write(join(own, 'routes/_error.kay'), '--- server\nimport { t } from \'kay/i18n\'\n\nconst home = t(\'nav.home\')\nconst { status } = ctx.error\n---\nh1 Oops {status} {home}\n'),
       ])
       const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: join(process.cwd(), 'tests/fixtures/i18n/src/messages') }
-      const app = new Elysia().onRequest(hook).use(await pages({ routes: join(own, 'routes'), prebuilt: false, dev: false, log: false, i18n }))
+      const app = new Elysia().onRequest(hook).use(await pages({ root: own, routes: 'routes', prebuilt: false, dev: false, log: false, i18n }))
 
       for (const [path, heading] of [['/', 'Oops 500 Accueil'], ['/en', 'Oops 500 Home']] as const) {
         const page = await app.handle(new NativeRequest(`http://localhost${path}`, { headers: { 'accept': 'text/html', 'x-throw': 'error' } }))
@@ -331,7 +331,7 @@ describe('an onRequest hook that throws', () => {
 
     const app = new Elysia()
       .error({ Custom })
-      .use(await pages({ routes: join(dir, 'routes'), prebuilt: false, dev: false, log: false }))
+      .use(await pages({ root: dir, routes: 'routes', prebuilt: false, dev: false, log: false }))
       .get('/custom', () => {
         throw new Custom('mine')
       })
@@ -342,7 +342,7 @@ describe('an onRequest hook that throws', () => {
   })
 
   it('does not hide an error the app answers in its own onError', async () => {
-    const app = new Elysia().onError(() => new Response('mine', { status: 503 })).onRequest(hook).use(await pages({ routes: join(dir, 'routes'), prebuilt: false, dev: false, log: false }))
+    const app = new Elysia().onError(() => new Response('mine', { status: 503 })).onRequest(hook).use(await pages({ root: dir, routes: 'routes', prebuilt: false, dev: false, log: false }))
     const response = await app.handle(new NativeRequest('http://localhost/', { headers: { 'x-throw': 'error' } }))
 
     expect(response.status).toBe(503)
@@ -356,7 +356,7 @@ describe('a hook kay runs itself that throws', () => {
     const reported: unknown[] = []
 
     try {
-      const app = await pages({ routes: join(dir, 'routes'), prebuilt: false, dev: false, log: false, onError: error => void reported.push(error) })
+      const app = await pages({ root: dir, routes: 'routes', prebuilt: false, dev: false, log: false, onError: error => void reported.push(error) })
       const response = await app.handle(new NativeRequest('http://localhost/items/explode'))
 
       expect(response.status).toBe(500)
@@ -374,7 +374,7 @@ describe('a hook kay runs itself that throws', () => {
     const reported: unknown[] = []
 
     try {
-      const app = await pages({ routes: join(dir, 'routes'), prebuilt: false, dev: false, log: false, onError: error => void reported.push(error), rewrite: () => {
+      const app = await pages({ root: dir, routes: 'routes', prebuilt: false, dev: false, log: false, onError: error => void reported.push(error), rewrite: () => {
         throw new Error(SECRET)
       } })
       const response = await app.handle(new NativeRequest('http://localhost/'))
@@ -395,7 +395,7 @@ describe('a hook kay runs itself that throws', () => {
       const server = new Elysia({ name: 'throwing' }).onRequest(() => {
         throw new Error(SECRET)
       })
-      const app = await pages({ routes: join(dir, 'routes'), prebuilt: false, dev: false, log: false, extensions: [{ name: 'throwing', server }] })
+      const app = await pages({ root: dir, routes: 'routes', prebuilt: false, dev: false, log: false, extensions: [{ name: 'throwing', server }] })
       const response = await app.handle(new NativeRequest('http://localhost/'))
 
       expect(response.status).toBe(500)
@@ -412,7 +412,7 @@ describe('a hook kay runs itself that throws', () => {
 
     try {
       await Bun.write(join(dir, 'api/broken.ts'), `import { api } from 'kay/server'\n\nexport default api().get('/', () => {\n  throw new Error('${SECRET}')\n})\n`)
-      const app = await pages({ routes: join(dir, 'routes'), api: join(dir, 'api'), prebuilt: false, dev: true, log: false, onError: error => void reported.push(error) })
+      const app = await pages({ root: dir, routes: 'routes', api: 'api', prebuilt: false, dev: true, log: false, onError: error => void reported.push(error) })
       const response = await app.handle(new NativeRequest('http://localhost/api/broken'))
 
       expect(response.status).toBe(500)

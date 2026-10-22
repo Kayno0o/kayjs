@@ -5,7 +5,7 @@ import { testSite } from '../src/test'
 import { kayCheck } from './check-helper'
 import { fixtureCopy } from './scratch'
 
-const site = await testSite({ routes: 'tests/fixtures/shared-schema/src/routes' })
+const site = await testSite({ root: 'tests/fixtures/shared-schema' })
 
 afterAll(async () => site.close())
 

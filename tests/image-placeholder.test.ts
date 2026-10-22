@@ -228,12 +228,12 @@ describe('placeholder on a page', () => {
   const img = (html: string, name: string) => new RegExp(`<img [^>]*class="${name}"[^>]*>`).exec(html)?.[0]
 
   async function open(options: Record<string, unknown> = {}): Promise<Elysia> {
-    return pages({ routes: join(dir, 'src/routes'), prebuilt: false, images: { dirs: { '/uploads/': uploads } }, ...options })
+    return pages({ root: dir, prebuilt: false, images: { dirs: { '/uploads/': uploads } }, ...options })
   }
 
   beforeAll(async () => {
     dir = await fixtureCopy('image-placeholder')
-    uploads = join(dir, 'uploads')
+    uploads = resolve(dir, 'uploads')
     await mkdir(uploads)
 
     const orange = flat(200, 100, 50)
@@ -342,7 +342,7 @@ describe('placeholder on a page', () => {
     const remote = `http://127.0.0.1:${host.port}/photos/a.png`
 
     try {
-      const app = await open({ images: { dirs: { '/uploads/': uploads }, remote: [`http://127.0.0.1:${host.port}/photos/`], resolve: () => join(dir, 'src/photo.png') } })
+      const app = await open({ images: { dirs: { '/uploads/': uploads }, remote: [`http://127.0.0.1:${host.port}/photos/`], resolve: () => resolve(dir, 'src/photo.png') } })
       const ask = async (src: string) => app.handle(new Request(`http://localhost/_kay/image?src=${encodeURIComponent(src)}&w=64`))
 
       expect(image(remote, { width: 64, height: 48 }).style).toBeUndefined()

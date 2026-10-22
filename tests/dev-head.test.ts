@@ -1,5 +1,5 @@
 import type { DevHead } from '../src/server/dev'
-import { join, relative } from 'node:path'
+import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { DEV_HEAD } from '../src/server/dev'
@@ -19,7 +19,7 @@ async function site() {
     Bun.write(join(dir, 'routes/hidden.kay'), '--- server\nexport const page = { sitemap: false }\n---\nh1 Hidden\n'),
   ])
 
-  return relative(process.cwd(), join(dir, 'routes'))
+  return { root: relative(process.cwd(), dir), routes: 'routes' }
 }
 
 async function askAbout(options: Parameters<typeof pages>[0], path: string, headers: Record<string, string> = { 'x-kay-dev': '1' }, mount = ''): Promise<{ status: number, head?: DevHead | undefined }> {
@@ -32,8 +32,8 @@ async function askAbout(options: Parameters<typeof pages>[0], path: string, head
 
 describe('the dev tool\'s head check', () => {
   it('says whether the sitemap lists the page and what `kay check` flags in its head, with the origin and the limit', async () => {
-    const routes = await site()
-    const options = { routes, site: 'https://shop.example', seo: { name: 'Shop', description: 'A shop' } }
+    const place = await site()
+    const options = { ...place, site: 'https://shop.example', seo: { name: 'Shop', description: 'A shop' } }
     const home = (await askAbout(options, '/')).head!
 
     expect(home).toMatchObject({ descriptionLength: 160, site: 'https://shop.example', sitemap: 'listed' })
@@ -44,33 +44,33 @@ describe('the dev tool\'s head check', () => {
     expect(long.sitemap).toBe('listed')
     expect(long.problems.map(problem => problem.code)).toEqual(['long-description', 'noindex-in-sitemap'])
     expect((await askAbout(options, '/hidden')).head!.sitemap).toBe('unlisted')
-    expect((await askAbout({ routes, site: options.site }, '/bare')).head!.problems.map(problem => problem.code)).toEqual(['untitled-page', 'undescribed-page'])
+    expect((await askAbout({ ...place, site: options.site }, '/bare')).head!.problems.map(problem => problem.code)).toEqual(['untitled-page', 'undescribed-page'])
   })
 
   it('says there is no sitemap without an origin, and that the origin is missing when `seo` is set', async () => {
-    const routes = await site()
-    const { head } = await askAbout({ routes, seo: { name: 'Shop' } }, '/')
+    const place = await site()
+    const { head } = await askAbout({ ...place, seo: { name: 'Shop' } }, '/')
 
     expect(head).toMatchObject({ sitemap: 'none' })
     expect(head!.site).toBeUndefined()
     expect(head!.problems.map(problem => problem.code)).toContain('missing-site')
-    expect((await askAbout({ routes }, '/')).head!.problems).toEqual([])
+    expect((await askAbout(place, '/')).head!.problems).toEqual([])
   })
 
   it('lists a page under a base, with a trailing slash or a locale, and answers for a sitemap that fails', async () => {
-    const routes = await site()
-    const based = { routes, site: 'https://shop.example', base: '/shop', seo: { name: 'Shop' } }
+    const place = await site()
+    const based = { ...place, site: 'https://shop.example', base: '/shop', seo: { name: 'Shop' } }
 
     expect((await askAbout(based, '/', undefined, '/shop')).head).toMatchObject({ sitemap: 'listed' })
     expect((await askAbout(based, '/hidden', undefined, '/shop')).head).toMatchObject({ sitemap: 'unlisted' })
     expect((await askAbout({ ...based, trailingSlash: 'always' }, '/long/', undefined, '/shop')).head).toMatchObject({ sitemap: 'listed' })
-    expect((await askAbout({ ...based, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: 'tests/fixtures/layout-query/src/messages' } }, '/fr/long', undefined, '/shop')).head).toMatchObject({ sitemap: 'listed' })
+    expect((await askAbout({ ...based, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: resolve('tests/fixtures/layout-query/src/messages') } }, '/fr/long', undefined, '/shop')).head).toMatchObject({ sitemap: 'listed' })
 
     const dir = await scratchDir('dev-head-broken-')
 
     await Bun.write(join(dir, 'routes/index.kay'), '--- server\nexport const page = { sitemap: () => { throw new Error(\'no database\') } }\n---\nh1 Home\n')
 
-    const broken = (await askAbout({ routes: relative(process.cwd(), join(dir, 'routes')), site: 'https://shop.example' }, '/')).head!
+    const broken = (await askAbout({ root: dir, routes: 'routes', site: 'https://shop.example' }, '/')).head!
 
     expect(broken.sitemap).toBe('error')
     expect(broken.sitemapError).toContain('no database')
@@ -83,7 +83,7 @@ describe('the dev tool\'s head check', () => {
     await Bun.write(counter, '')
     await Bun.write(join(dir, 'routes/items/[id].kay'), `--- server\nimport { appendFileSync } from 'node:fs'\nexport const page = { sitemap: () => { appendFileSync(${JSON.stringify(counter)}, 'x'); return [{ id: '1' }] } }\n---\nh1 Home\n`)
 
-    const dev = await pages({ routes: relative(process.cwd(), join(dir, 'routes')), site: 'https://shop.example', prebuilt: false, security: false, dev: true })
+    const dev = await pages({ root: dir, routes: 'routes', site: 'https://shop.example', prebuilt: false, security: false, dev: true })
     const ask = async () => (await dev.handle(new Request(`http://localhost${DEV_HEAD}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-dev': '1' }, body: JSON.stringify({ path: '/items/1', head: '<head><title>Home</title></head>' }) }))).json() as Promise<DevHead>
 
     expect((await ask()).sitemap).toBe('listed')
@@ -96,7 +96,7 @@ describe('the dev tool\'s head check', () => {
     await Bun.write(flag, '')
     await Bun.write(join(broken, 'routes/items/[id].kay'), `--- server\nimport { existsSync, rmSync } from 'node:fs'\nexport const page = { sitemap: () => { if (existsSync(${JSON.stringify(flag)})) { rmSync(${JSON.stringify(flag)}); throw new Error('once') } return [{ id: '1' }] } }\n---\nh1 Home\n`)
 
-    const retry = await pages({ routes: relative(process.cwd(), join(broken, 'routes')), site: 'https://shop.example', prebuilt: false, security: false, dev: true })
+    const retry = await pages({ root: broken, routes: 'routes', site: 'https://shop.example', prebuilt: false, security: false, dev: true })
     const again = async () => (await retry.handle(new Request(`http://localhost${DEV_HEAD}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-dev': '1' }, body: JSON.stringify({ path: '/items/1', head: '<head><title>Home</title></head>' }) }))).json() as Promise<DevHead>
 
     expect((await again()).sitemap).toBe('error')
@@ -104,9 +104,9 @@ describe('the dev tool\'s head check', () => {
   })
 
   it('refuses a request the dev tool did not make', async () => {
-    const routes = await site()
+    const place = await site()
 
-    expect((await askAbout({ routes }, '/', {})).status).toBe(403)
-    expect((await askAbout({ routes }, '/', { 'x-kay-dev': '1', 'sec-fetch-site': 'cross-site' })).status).toBe(403)
+    expect((await askAbout(place, '/', {})).status).toBe(403)
+    expect((await askAbout(place, '/', { 'x-kay-dev': '1', 'sec-fetch-site': 'cross-site' })).status).toBe(403)
   })
 })

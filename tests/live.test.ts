@@ -26,7 +26,7 @@ const components = {
 
 await Promise.all(Object.entries(components).map(async ([path, source]) => Bun.write(join(fixture, path), source)))
 const reported: unknown[] = []
-const site = await testSite({ routes: `${fixture}/src/routes`, api: `${fixture}/src/api`, locals: request => ({ user: request.headers.get('x-user') ?? undefined }), onError: error => void reported.push(error) })
+const site = await testSite({ root: fixture, locals: request => ({ user: request.headers.get('x-user') ?? undefined }), onError: error => void reported.push(error) })
 // Imported once the site is up: the modules it mounted, where their routes are served.
 const { default: chat } = await import(join(apiDir, 'chat.ts')) as typeof import('./fixtures/live/src/api/chat')
 const { default: secret } = await import(join(apiDir, 'private/index.ts')) as typeof import('./fixtures/live/src/api/private/index')
@@ -1728,7 +1728,7 @@ describe('site.api, default headers and socketRefusal', () => {
   })
 
   it('sends default headers with every method, a call\'s own header winning in any case', async () => {
-    const named = await testSite({ routes: `${fixture}/src/routes`, api: `${fixture}/src/api`, locals: request => ({ user: request.headers.get('x-user') ?? undefined }), headers: { 'x-user': 'ada' }, onError: error => void reported.push(error) })
+    const named = await testSite({ root: fixture, locals: request => ({ user: request.headers.get('x-user') ?? undefined }), headers: { 'x-user': 'ada' }, onError: error => void reported.push(error) })
 
     try {
       expect(await (await named.fetch('/api/private/me')).json()).toEqual({ user: 'ada' })
