@@ -34,9 +34,7 @@ async function site() {
 
 describe('the default contact mail', () => {
   it('renders from `site` alone, without the deprecated `origin`', async () => {
-    // A path held in a variable, as the check has no declarations for a .kay module the tests import by name: kaynooo/kayjs#1844
-    const file = '../src/contact-mail.kay'
-    const { default: view } = await import(file) as { default: never }
+    const { default: view } = await import('../src/contact-mail.kay')
     const props = { subject: 'Hi', name: 'Ada', email: 'ada@example.com', message: 'Hello', fields: [], site: 'https://fixture.test' } satisfies ContactMailProps
 
     await mailer({ from: 'a@fixture.test' }).send({ to: 'team@fixture.test', subject: props.subject, view, props })
