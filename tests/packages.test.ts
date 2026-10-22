@@ -247,7 +247,7 @@ describe('the naming conventions', () => {
   it('mount a library\'s internal routes under /_kay/<library>, outside /api', () => {
     const find = (_: string, __: string, text: string): string[] => text.match(/['"`]\/api\/[\w-]+/g) ?? []
 
-    expect(drift(find, [{ library: 'cms', match: /^.\/api\/cms$/, issue: '#1691' }])).toEqual([])
+    expect(drift(find, [{ library: 'cms', match: /^.\/api\/cms$/, issue: '#1782' }])).toEqual([])
   })
 
   it('name cookies and tables with kay_, a library\'s own tables included', () => {
@@ -258,7 +258,7 @@ describe('the naming conventions', () => {
 
     expect(drift(find, [
       { library: 'cms', match: /^.kcms_session.$/, issue: '#1691, the name before 1.70 kept three minors' },
-      { library: 'auth', match: /^auth_/, issue: '#1691' },
+      { library: 'auth', match: /^auth_/, issue: '#1782' },
     ])).toEqual([])
   })
 
