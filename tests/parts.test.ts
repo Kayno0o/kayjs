@@ -22,6 +22,7 @@ const files: Record<string, string> = {
   'panel.kay': '---\nimport Card from \'./card.kay\'\n---\nsection.panel\n  Card(part="card" title="t") body\n',
   'busy.kay': '---\n---\nbutton.btn(part="root")\n  span.spin(part="spinner") wait\n',
   'hands.kay': '---\nimport Busy from \'./busy.kay\'\n---\nBusy(part="root spinner")\n',
+  'hands-short.kay': '---\nimport Busy from \'./busy.kay\'\n---\nBusy.mt-4(part="root spinner")\n',
   'plain.kay': '---\nconst { class: className } = props<{ class?: string }>()\n---\ndiv.base(class={className}) plain\n',
   'rooted.kay': 'header.p-2(part="top") a\nfooter.p-2(part="root") b\n',
   'wrapper.kay': '---\nimport Card from \'./card.kay\'\n---\nCard(title="w" part="root" class="from-wrapper") inside\n',
@@ -122,27 +123,31 @@ describe('a component with parts, on the server', () => {
 })
 
 // Each element's tag, class and data-part, in order, whatever order the attributes were written in.
-function summary(element: Element): [string, string | null, string | null][] {
-  return [...element.querySelectorAll('section, header, p, li, button')].map(found => [found.localName, found.getAttribute('class'), found.getAttribute('data-part')])
+function summary(element: Element, selector = 'section, header, p, li, button'): [string, string | null, string | null][] {
+  return [...element.querySelectorAll(selector)].map(found => [found.localName, found.getAttribute('class'), found.getAttribute('data-part')])
 }
 
 describe('a component with parts, as an island', () => {
   let render!: (fn: () => unknown, element: Element) => () => void
   let island!: (props: object) => unknown
   let client!: (props: object) => unknown
+  let hands!: (props: object) => unknown
+  let handsShort!: (props: object) => unknown
 
   beforeAll(async () => {
     GlobalRegistrator.register()
-    await Bun.write(join(scratch, 'entry.ts'), 'import { render } from \'kay/dom\'\nimport Client from \'./client.kay\'\nimport Island from \'./island.kay\'\n\nexport { Client, Island, render }\n')
+    await Bun.write(join(scratch, 'entry.ts'), 'import { render } from \'kay/dom\'\nimport Client from \'./client.kay\'\nimport Hands from \'./hands.kay\'\nimport HandsShort from \'./hands-short.kay\'\nimport Island from \'./island.kay\'\n\nexport { Client, Hands, HandsShort, Island, render }\n')
 
     const build = await Bun.build({ entrypoints: [join(scratch, 'entry.ts')], outdir: join(scratch, 'out'), target: 'browser', plugins: [kay()] })
 
     if (!build.success)
       throw new AggregateError(build.logs, 'client build failed')
 
-    const module = await import(build.outputs[0]!.path) as { Client: typeof client, Island: typeof island, render: typeof render }
+    const module = await import(build.outputs[0]!.path) as { Client: typeof client, Hands: typeof hands, HandsShort: typeof handsShort, Island: typeof island, render: typeof render }
 
     client = module.Client
+    hands = module.Hands
+    handsShort = module.HandsShort
     island = module.Island
     render = module.render
   }, 60_000)
@@ -170,6 +175,27 @@ describe('a component with parts, as an island', () => {
 
     expect(summary(root)).toEqual([['section', 'card p-4 mt-6', null], ['header', 'p-6', 'head'], ['li', 'p-8', 'item'], ['li', 'p-8', 'item'], ['button', 'btn p-9', 'action']])
     expect(summary(holder)).toEqual(summary(root))
+    stop()
+  })
+
+  it('hands the called component the parts a call names beside its own, as the server does', async () => {
+    const props = { class: { root: { spinner: 'size-7' }, spinner: 'size-5' } }
+    const server = await import(join(scratch, 'hands.kay')) as { default: (props: object) => unknown }
+    const holder = document.createElement('div')
+
+    holder.innerHTML = child(server.default(props)).replace(MARKERS, '')
+
+    const { root, stop } = mount(hands, props)
+
+    expect(summary(root, 'button, span')).toEqual([['button', 'btn', 'root'], ['span', 'spin size-5 size-7', 'spinner']])
+    expect(summary(holder, 'button, span')).toEqual(summary(root, 'button, span'))
+    stop()
+  })
+
+  it('hands a part beside a shorthand on the call, the shorthand joining the root', async () => {
+    const { root, stop } = mount(handsShort, { class: { spinner: 'size-5' } })
+
+    expect(summary(root, 'button, span')).toEqual([['button', 'btn mt-4', 'root'], ['span', 'spin size-5', 'spinner']])
     stop()
   })
 
@@ -202,6 +228,13 @@ describe('a component with parts, as an island', () => {
 })
 
 describe('kay check on parts', () => {
+  it('refuses a part named twice on a call, and root handed beside the first name', () => {
+    const call = (part: string) => `---\nimport Busy from './busy.kay'\n---\nBusy(part="${part}")\n`
+
+    expect(diagnostics(call('root root'))).toEqual([expect.stringContaining('named once')])
+    expect(diagnostics(call('spinner root'))).toEqual([expect.stringContaining('`root` is the first name')])
+  })
+
   it('refuses several parts on an element, which only a component call hands on', () => {
     expect(diagnostics('---\n---\ndiv(part="root spinner")\n')).toEqual([expect.stringContaining('Only a component call names several parts')])
   })

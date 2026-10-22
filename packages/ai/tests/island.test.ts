@@ -44,8 +44,10 @@ test('the Chat island ships none of the default icons of kayjs-ui', async () => 
   expect(await run.exited, output).toBe(0)
 
   const dist = join(fixture, '.kay/client/dist')
-  const chunk = (await readdir(dist)).find(file => (/^chat-\w+\.js$/).test(file))
+  const scripts = (await readdir(dist)).filter(file => file.endsWith('.js'))
 
-  expect(chunk).toBeDefined()
-  expect(await Bun.file(join(dist, chunk!)).text()).not.toContain('M12 3a9 9 0 1 0 9 9')
+  expect(scripts.some(file => (/^chat-\w+\.js$/).test(file))).toBe(true)
+
+  for (const file of scripts)
+    expect(await Bun.file(join(dist, file)).text(), file).not.toContain('M12 3a9 9 0 1 0 9 9')
 }, 180_000)

@@ -454,11 +454,26 @@ class Validator {
       this.error(noscript.name, '`noscript` takes the text of its link', { help: 'such as `noscript="Show the contact form"`' })
   }
 
+  // Several parts on one component call: the first is the part the call is, the others are parts of this component whose entries it hands on to the called one, each named once and none of them `root`, which a call hands on by being the root.
+  private severalParts(element: ElementNode, attribute: Extract<NamedAttribute, { kind: 'static' }>): void {
+    const names = attribute.text.trim().split(WHITESPACE)
+
+    if (names.length === 1)
+      return
+
+    if (!element.component)
+      this.error(attribute.name, 'Only a component call names several parts: `part="root spinner"`', { note: 'the first is the part the call is, the others are parts of this component whose entries it hands on to the called one', help: 'name one part on an element' })
+    else if (new Set(names).size !== names.length)
+      this.error(attribute.name, 'A part is named once on a call', { help: 'delete the repeated name' })
+    else if (names.slice(1).includes('root'))
+      this.error(attribute.name, '`root` is the first name of a call that hands parts on, or is not handed', { help: 'write `part="root spinner"`, the root first' })
+  }
+
   private attribute(element: ElementNode, attribute: NamedAttribute, name: string): void {
     if (name === 'part' && (attribute.kind !== 'static' || !attribute.text.trim().split(WHITESPACE).every(part => PART_NAME.test(part))))
       this.error(attribute.name, '`part` names a part with a string: `part="head"`', { note: 'the `class` type of the component is built from the names at compile time', help: 'write a name of letters, digits and dashes' })
-    else if (name === 'part' && attribute.kind === 'static' && !element.component && attribute.text.trim().split(WHITESPACE).length > 1)
-      this.error(attribute.name, 'Only a component call names several parts: `part="root spinner"`', { note: 'the first is the part the call is, the others are parts of this component whose entries it hands on to the called one', help: 'name one part on an element' })
+    else if (name === 'part' && attribute.kind === 'static')
+      this.severalParts(element, attribute)
 
     if (name === 'transition' || name.startsWith(TRANSITION_PART)) {
       if (element.component)

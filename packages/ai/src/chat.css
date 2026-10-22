@@ -226,7 +226,7 @@
   }
 
   /* The send and stop button: a filled circle as tall as the field's first line. */
-  .kai-chat-send {
+  .kai-chat .kai-chat-send {
     display: inline-flex;
     flex: none;
     align-items: center;

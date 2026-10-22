@@ -158,13 +158,13 @@ export function partHanded(part: string, list: readonly unknown[]): unknown {
   return taggedParts({ [part]: partsClass(list) })
 }
 
-// Several objects of parts as one, a part two of them give joined in order: the later one overrides, unless it is a part of a part, which the later one replaces.
+// Several objects of parts as one, a part two of them give joined in order when both are classes, the later one replacing it when either is the parts of a component.
 function mergeParts(found: readonly Parts[]): Parts {
   const merged: Record<string, unknown> = {}
 
   for (const parts of found) {
     for (const [name, entry] of Object.entries(parts)) {
-      const earlier = merged[name]
+      const earlier = Object.hasOwn(merged, name) ? merged[name] : undefined
       const joins = (value: unknown) => typeof value === 'string' || Array.isArray(value)
 
       merged[name] = joins(earlier) && joins(entry) ? [earlier, entry] : entry ?? earlier
