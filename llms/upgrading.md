@@ -6,7 +6,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### kay needs Bun 1.4.4
 
-kay and its libraries require Bun 1.4.4 or later (`bun upgrade`, or `bun update bun` where the project has the npm `bun` package), and the CLI and `pages()` refuse an older one. Bun 1.4.4 reads a glob differently: `*(1).txt`, `+(a)`, `@(a|b)` and `!(g)` are extglobs, and `{1..3}` is a range. A pattern of an `import.meta.glob` call or of `publicCache` that wrote one of these as literal text escapes it (`*[(]1).txt`); `(group)` folders are unchanged. Bun 1.4.4 also renders a slash tag in Markdown, such as `<div/onclick=x>`, as escaped text, as CommonMark reads it, where 1.4.3 passed it through as HTML.
+kay and its libraries require Bun 1.4.4 or later (`bun upgrade`, then `bun update bun` in the project: `bun-plugin-tailwind`'s peer installs the npm `bun` package, which package scripts run ahead of the system Bun), and the CLI and `pages()` refuse an older one. Bun 1.4.4 reads a glob differently: `*(1).txt`, `+(a)`, `@(a|b)` and `!(g)` are extglobs, and `{1..3}` is a range. A pattern of an `import.meta.glob` call or of `publicCache` that wrote one of these as literal text escapes it (`*[(]1).txt`); `(group)` folders are unchanged. Bun 1.4.4 also renders a slash tag in Markdown, such as `<div/onclick=x>`, as escaped text, as CommonMark reads it, where 1.4.3 passed it through as HTML.
 
 ### `markdownHtml` formats in an island once marked has loaded
 
