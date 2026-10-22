@@ -1,8 +1,9 @@
 ---
 import type { Snippet } from 'kay'
 import { signal, uid } from 'kay'
+import { wording } from 'kay/words'
 
-const { label = 'Chat', openLabel = 'Open the chat', closeLabel = 'Close the chat', icon, closeIcon, newIcon, expandIcon, collapseIcon, newLabel = 'New conversation', expandLabel = 'Enlarge the chat', collapseLabel = 'Shrink the chat', class: className } = props<{
+const { label = wording('ai.chat.label', 'Chat'), openLabel = wording('ai.chat.open', 'Open the chat'), closeLabel = wording('ai.chat.close', 'Close the chat'), icon, closeIcon, newIcon, expandIcon, collapseIcon, newLabel = wording('ai.chat.new', 'New conversation'), expandLabel = wording('ai.chat.expand', 'Enlarge the chat'), collapseLabel = wording('ai.chat.collapse', 'Shrink the chat'), class: className } = props<{
   // Names the panel for screen readers and heads it.
   label?: string | undefined
   // Name and tooltip of the button while the panel is closed, and while it is open.

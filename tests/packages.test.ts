@@ -298,4 +298,41 @@ describe('the llms topic files', () => {
 
     expect(found).toEqual([])
   })
+
+  // One lookup and one registration (llms/component-libraries.md, Texts): `wording` from `kay/words`, a shipped `fr.ts` and no `en.ts`, declared by `kay.messages` in package.json.
+  it('word every text through wording, with a French catalog registered in package.json', async () => {
+    // Libraries still on `t()` and an `en.ts`, until #1777 moves them.
+    const waiting = new Set(['auth', 'mail'])
+    const found: string[] = []
+
+    for (const library of folders) {
+      if (waiting.has(library))
+        continue
+
+      const manifest = await Bun.file(`packages/${library}/package.json`).json() as { kay?: { messages?: string } }
+      const sources = await Array.fromAsync(new Glob('src/**/*.{kay,ts}').scan({ cwd: `packages/${library}` }))
+      const files = await Promise.all(sources.map(async path => ({ path, text: await Bun.file(`packages/${library}/${path}`).text() })))
+      const wording = files.some(({ text }) => (/\bwording\(/).test(text))
+
+      for (const { path, text } of files) {
+        if ((/import \{[^}]*\bt\b[^}]*\} from 'kay\/i18n'/).test(text))
+          found.push(`${library}: ${path} looks text up with t(), use wording()`)
+      }
+
+      if (wording && manifest.kay?.messages === undefined)
+        found.push(`${library}: uses wording() but package.json has no kay.messages`)
+
+      if (manifest.kay?.messages !== undefined) {
+        const directory = manifest.kay.messages
+
+        if (!(await Bun.file(`packages/${library}/${directory}/fr.ts`).exists()))
+          found.push(`${library}: ${directory} ships no fr.ts`)
+
+        if (await Bun.file(`packages/${library}/${directory}/en.ts`).exists())
+          found.push(`${library}: ${directory}/en.ts, the English is inline in wording()`)
+      }
+    }
+
+    expect(found).toEqual([])
+  })
 })
