@@ -241,7 +241,7 @@ export interface SecurityConfig {
   headers?: Record<string, string | false> | undefined
 }
 
-// `hops` or `header`, not both: read only from a request coming from this machine or a private network, so a client reaching the server directly cannot forge it.
+// `hops` or `header`, not both, and with `key` alone one proxy is in front: read only from a request coming from this machine or a private network, so a client reaching the server directly cannot forge it.
 export interface ProxyConfig {
   // The proxies that each append to `X-Forwarded-For`: 1 for nginx or Caddy alone, 2 for Cloudflare then nginx.
   hops?: number | undefined
@@ -249,6 +249,10 @@ export interface ProxyConfig {
   header?: string | undefined
   // The public address ranges the proxy reaches the server from, such as a CDN's published ones, `173.245.48.0/20`: trusted besides this machine and private networks.
   trusted?: string[] | undefined
+  // The header the proxy sends with a key it shares with the server, such as `x-upstream-key`: a request without it, or with another value, is refused with 403, so a process or a container reaching the port directly skips nothing the proxy does. The key is read from `KAY_PROXY_KEY`, else from the file `KAY_PROXY_KEY_FILE` names, and compared in constant time. Off under `kay dev` and outside production without a key; a production server with none does not boot.
+  key?: string | undefined
+  // Paths, and what is under them, that need no key besides the health route: `['/api/push']`, read after the base is taken off.
+  open?: string[] | undefined
 }
 
 export interface FontConfig {

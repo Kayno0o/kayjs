@@ -68,6 +68,7 @@ import { loadPrerendered, pageResponder, servePageRoutes } from './page-routes'
 import { plumbing } from './plumbing'
 import { DRAFT_BODY_LIMIT, serveDrafts, servePreview } from './preview'
 import { checkProxy, requestId, requestIdHeader, setRequestIdHeader, trustProxy } from './protection'
+import { requireProxyKey } from './proxy-key'
 import { claimPublic, publicCacheRules, servePublic } from './public'
 import { NOT_PUBLISHING, watchPublishing } from './publishing'
 import { redirectSpelling } from './redirect-spelling'
@@ -381,6 +382,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   setRequestIdHeader(options.requestIdHeader)
   trustProxy(app, options.proxy)
+  requireProxyKey(app, checkProxy(options.proxy), { dev: mode.dev, exported, base, health: options.health === false ? undefined : options.health?.path ?? HEALTH_PATH })
   refuseForeignHosts(app, site)
 
   if (security)

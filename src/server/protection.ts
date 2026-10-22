@@ -43,6 +43,8 @@ const MAX_WINDOWS = 10_000
 // How often the SQLite store sweeps the windows that closed.
 const SWEEP_MS = 60_000
 const ZONE = /%.*$/
+// An HTTP header name: the token characters.
+const HEADER_NAME = /^[\w!#$%&'*+.^`|~-]+$/
 const LEADING_ZEROS = /^0+(?=.)/
 // Loopback, private, shared (CGNAT, Tailscale) and link-local ranges, IPv4 ones mapped into IPv6 included: where a proxy in front of the server connects from.
 const LOOPBACK_OR_PRIVATE = /^(?:(?:::ffff:)?(?:127\.|10\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.|100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|169\.254\.)|::1$|f[cd]|fe[89ab])/i
@@ -604,22 +606,29 @@ export function requestServer(request: Request): Server<unknown> | undefined {
 export function checkProxy(setting: ProxyConfig | number | boolean | undefined): ProxyConfig | undefined {
   const proxy = proxyOf(setting)
 
-  if (proxy) {
-    const { hops, header } = proxy
+  if (!proxy)
+    return undefined
 
-    if ((hops === undefined) === (header === undefined))
-      throw new KayError('config-invalid', 'kay: proxy takes either hops, the number of proxies in front, or header, the one a proxy sets to the client\'s address')
+  const { hops, header, key, open } = proxy
 
-    if (hops !== undefined && (!Number.isInteger(hops) || hops < 1))
-      throw new KayError('config-invalid', `kay: proxy.hops is the number of proxies in front, a whole number from 1; got ${hops}`)
+  if ((hops !== undefined && header !== undefined) || (hops === undefined && header === undefined && key === undefined))
+    throw new KayError('config-invalid', 'kay: proxy takes either hops, the number of proxies in front, or header, the one a proxy sets to the client\'s address')
 
-    if (header !== undefined && header.trim() === '')
-      throw new KayError('config-invalid', 'kay: proxy.header names the header a proxy sets to the client\'s address, such as cf-connecting-ip')
+  if (key !== undefined && !HEADER_NAME.test(key))
+    throw new KayError('config-invalid', 'kay: proxy.key names the header the proxy sends its shared key in, such as x-upstream-key')
 
-    rangesOf(proxy)
-  }
+  if (open !== undefined && (key === undefined || open.some(path => !path.startsWith('/'))))
+    throw new KayError('config-invalid', 'kay: proxy.open lists paths starting with / that need no key, and goes with proxy.key')
 
-  return proxy
+  if (hops !== undefined && (!Number.isInteger(hops) || hops < 1))
+    throw new KayError('config-invalid', `kay: proxy.hops is the number of proxies in front, a whole number from 1; got ${hops}`)
+
+  if (header !== undefined && header.trim() === '')
+    throw new KayError('config-invalid', 'kay: proxy.header names the header a proxy sets to the client\'s address, such as cf-connecting-ip')
+
+  rangesOf(proxy)
+
+  return key === undefined || hops !== undefined || header !== undefined ? proxy : { ...proxy, hops: 1 }
 }
 
 // Records the app's proxy settings on each request it gets, for `clientAddress` to read them wherever it is called from.

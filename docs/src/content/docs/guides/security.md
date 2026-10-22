@@ -286,6 +286,20 @@ Each entry is an IPv4 or IPv6 range or a single address. Cloudflare publishes th
 
 Pass `X-Forwarded-Proto` from the proxy on every location, websockets included. kay's cookies are `Secure`, and the session is named `__Host-kay_session` over https, so a request that says `http` reads no session.
 
+### Refuse requests that skipped the proxy
+
+A process or a container that reaches the port directly skips whatever the proxy does, such as a login. Have the proxy send a key in a header, and name that header.
+
+```ts
+export default defineConfig({
+  proxy: { key: 'x-upstream-key' },
+})
+```
+
+The key itself is not in the config. Kay reads it from `KAY_PROXY_KEY`, or from the file `KAY_PROXY_KEY_FILE` names, such as a container secret. A request without the header, or with another value, is refused with 403. A production server with `key` and no key to compare with does not start. Nothing is checked under `kay dev`.
+
+The health route stays open, since the container asks it without the key. `open` lists other paths that need none, such as `open: ['/api/push']`, each with what is under it.
+
 <ReadMore href="/llms/proxy-and-security#behind-a-proxy">How `hops` reads `X-Forwarded-For`, the warnings kay logs and `clientAddress` in a plain Elysia app.</ReadMore>
 
 ## Allow another site to call an API
