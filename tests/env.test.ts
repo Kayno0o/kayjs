@@ -414,6 +414,17 @@ describe('kay env against compose and .env.example', () => {
     expect(code).toBe(0)
   })
 
+  it('names a compose file setting neither KAY_PROXY_KEY nor KAY_PROXY_KEY_FILE while proxy.key is set, and passes with either', async () => {
+    const config = 'export default { favicon: false, proxy: { key: "x-upstream-key" } }\n'
+    const withKey = (line: string) => files['compose.yaml'].replace('      SESSION_SECRET', `      ${line}\n      SESSION_SECRET`)
+    const messages = async (compose: string, kayConfig = config) => (await run(await project({ ...files, 'kay.config.ts': kayConfig, 'compose.yaml': compose }), ['--compose', 'compose.yaml'])).findings!.map(({ message }) => message)
+
+    expect(await messages(files['compose.yaml'])).toEqual(['KAY_PROXY_KEY is required in production (proxy.key in kay.config.ts) and no service of compose.yaml sets it or KAY_PROXY_KEY_FILE'])
+    expect(await messages(withKey('KAY_PROXY_KEY: abc'))).toEqual([])
+    expect(await messages(withKey('KAY_PROXY_KEY_FILE: /run/secrets/proxy'))).toEqual([])
+    expect(await messages(files['compose.yaml'], files['kay.config.ts'])).toEqual([])
+  })
+
   it('names a variable no compose service sets, in the file it is missing from', async () => {
     const root = await project({ ...files, 'app.env': '' })
     const { code, findings } = await run(root, ['--compose', 'compose.yaml'])

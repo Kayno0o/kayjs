@@ -507,6 +507,7 @@ kay env --compose compose.prod.yaml --example .env.example
 This checks your deploy files against what the project declares. It reports an error when:
 
 - a variable production needs is set by no service of the compose file, in `environment` or in an `env_file`
+- `proxy.key` is set and no service sets `KAY_PROXY_KEY` or `KAY_PROXY_KEY_FILE`
 - a variable production needs is missing from the example file, unless a compose service gives it a value
 - the example file lists a variable that no schema declares, no service sets and the compose file never reads as `${VAR}`
 

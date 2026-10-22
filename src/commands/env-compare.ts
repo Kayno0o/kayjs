@@ -201,10 +201,16 @@ export async function compareEnv(root: string, variables: Listed[], files: EnvFi
   }
 
   if (composeRead) {
+    const composeNames = composes.map(file => relative(root, file)).join(' or ')
+
     for (const variable of variables.filter(({ required, source }) => required !== false && source !== 'kay')) {
       if (!set.has(variable.name))
-        problems.push(diagnostic('error', composes[0]!, 1, `${variable.name} is required in production (${variable.source}) and no service of ${composes.map(file => relative(root, file)).join(' or ')} sets it`))
+        problems.push(diagnostic('error', composes[0]!, 1, `${variable.name} is required in production (${variable.source}) and no service of ${composeNames} sets it`))
     }
+
+    // The proxy key is kay's own variable, but a server with `proxy.key` refuses to boot in production without it, given directly or as a file.
+    if (variables.some(({ name }) => name === 'KAY_PROXY_KEY') && !set.has('KAY_PROXY_KEY') && !set.has('KAY_PROXY_KEY_FILE'))
+      problems.push(diagnostic('error', composes[0]!, 1, `KAY_PROXY_KEY is required in production (proxy.key in kay.config.ts) and no service of ${composeNames} sets it or KAY_PROXY_KEY_FILE`))
   }
 
   if (examplePath !== undefined) {
