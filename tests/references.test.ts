@@ -1,6 +1,6 @@
 import { sep } from 'node:path'
 import { describe, expect, it } from 'bun:test'
-import { withReferences } from '../src/build/references'
+import { readingAs, withReferences } from '../src/build/references'
 
 const ROOT = `${sep}app`
 const FILE = `${ROOT}${sep}src${sep}app.css`
@@ -18,8 +18,8 @@ describe('withReferences', () => {
     expect(withReferences('.a { @apply p-1; }', FILE, ROOT, [THEME])).toBe(`${REFERENCE} .a { @apply p-1; }`)
   })
 
-  it('leaves alone a stylesheet reading no theme, one outside the project, in node_modules, or naming the reference', () => {
-    const plain = '@import \'tailwindcss\';\n.a { color: red; }\n'
+  it('leaves alone a stylesheet with no Tailwind import reading no theme, one outside the project, in node_modules, or naming the reference', () => {
+    const plain = '.a { color: red; }\n'
     const applying = '.a { @apply p-1; }'
 
     expect(withReferences(plain, FILE, ROOT, [THEME])).toBe(plain)
@@ -29,8 +29,37 @@ describe('withReferences', () => {
     expect(withReferences(applying, FILE, ROOT, [])).toBe(applying)
   })
 
+  it('gives a stylesheet importing Tailwind the reference though it applies nothing itself', () => {
+    expect(withReferences('@import \'tailwindcss\';\n@import \'./parts.css\';\n', FILE, ROOT, [THEME])).toContain(REFERENCE)
+  })
+
+  it('skips an import written in a comment', () => {
+    const css = '/* @import \'tailwindcss\'; */\n@import \'tailwindcss\';\n.a { @apply p-1; }'
+
+    expect(withReferences(css, FILE, ROOT, [THEME]).indexOf(REFERENCE)).toBeGreaterThan(css.indexOf('*/'))
+  })
+
   it('reads the functions that look a token up as needing the theme', () => {
     expect(withReferences('.a { color: --theme(--color-x); }', FILE, ROOT, [THEME])).toContain(REFERENCE)
     expect(withReferences('.a { color: --alpha(red / 50%); }', FILE, ROOT, [THEME])).toContain(REFERENCE)
+  })
+})
+
+describe('readingAs', () => {
+  it('gives the text only to the reads inside its scope, of its path', async () => {
+    const path = import.meta.path
+    const [inside, other] = await Promise.all([
+      readingAs(path, 'given', async () => {
+        await Bun.sleep(5)
+
+        return [await Bun.file(path).text(), (await Bun.file(`${import.meta.dir}/scratch.ts`).text()).slice(0, 6)]
+      }),
+      readingAs('/nowhere/a.css', 'other', async () => (await Bun.file(path).text()).slice(0, 6)),
+    ])
+
+    expect(inside[0]).toBe('given')
+    expect(inside[1]).not.toBe('given')
+    expect(other).toBe('import')
+    expect((await Bun.file(path).text()).slice(0, 6)).toBe('import')
   })
 })

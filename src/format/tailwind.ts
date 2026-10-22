@@ -2,7 +2,7 @@ import type { ClassSorter } from '../compiler/format'
 import { existsSync } from 'node:fs'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { CSS_FILE, findProjectFiles } from '../build/files'
-import { referencesOf, withReferences } from '../build/references'
+import { loadReferences, referencesOf, withReferences } from '../build/references'
 import { stylesheetPath, TAILWIND_IMPORT } from '../dev/tailwind'
 
 export interface Design {
@@ -44,6 +44,8 @@ export async function tailwindDesign(root: string): Promise<{ design?: Design | 
 }
 
 async function tailwindLoad(root: string, parts: boolean): Promise<Loaded | undefined> {
+  await loadReferences(root)
+
   const entry = await tailwindEntry(root, parts)
   const key = `${root}\0${parts}\0${referencesOf(root).join('\0')}`
 

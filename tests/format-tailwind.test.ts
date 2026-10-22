@@ -61,6 +61,12 @@ describe('Tailwind\'s order', () => {
   const entry = '@import \'tailwindcss\';\n'
   const page = 'div.hover:bg-red-500.md:flex.unknown-class.p-4.flex.w-[10px] x\n'
 
+  it('sorts an app applying a kui utility with ui() and no reference', async () => {
+    const root = await project({ 'kay.config.ts': 'import { ui } from \'../../../packages/ui/src/extension\'\n\nexport default { extensions: [ui()] }\n', 'src/app.css': `${entry}.card { @apply bg-kui-mantle; }\n`, 'src/routes/index.kay': page })
+
+    expect((await tailwindSorter(root))?.(['p-4', 'flex'])).toEqual(['flex', 'p-4'])
+  })
+
   it('sorts as Tailwind does for an app importing it: unknown classes first as written, then by its index', async () => {
     const root = await project({ 'src/app.css': entry, 'src/routes/index.kay': page })
     const sorter = (await tailwindSorter(root))!

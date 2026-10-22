@@ -92,6 +92,14 @@ describe('@apply of a kui utility in the app\'s stylesheet with ui() alone', () 
     expect(await stylesheet(root, { hot: false })).toMatch(/background-image: url\((?:"|')?(?:data:image\/png|[^)]*dot[^)]*\.png)/)
   }, 120_000)
 
+  it('builds an @apply of a partial the app\'s stylesheet imports', async () => {
+    const root = await app('@import \'./parts.css\';', '')
+
+    await Bun.write(join(root, 'src/parts.css'), '.card { @apply bg-kui-mantle; }\n')
+
+    expect(await stylesheet(root, { hot: false })).toMatch(/\.card\s*\{[^}]*background-color: var\(--color-kui-mantle[,)]/)
+  }, 120_000)
+
   it('leaves an app without ui() to the reference it writes', async () => {
     expect(await failure(await app(''), [])).toContain('border-kui-surface2')
     expect(await failure(await app(REFERENCE), [])).toBe('')

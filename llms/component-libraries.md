@@ -107,7 +107,7 @@ export function auth({ prefix = '/auth' } = {}): KayExtension {
   - It runs in the project of the current directory, loaded only when run and when `kay --help` lists it under the library's name; `kay i18n` lists those under `i18n`.
   - A name kay has (`check`, `i18n missing`), one under a kay command that takes arguments (`check foo`), or one two extensions give stops the command, naming both.
   - `missingTranslations(root, config)` and `writeDraftMessages(root, config, locale, messages)` from `kay/library` give such a command what each locale lacks and write messages as drafts (see [Locales](locales.md#messages)).
-- `references: [path]` lists stylesheets the app's own may `@apply` and read `theme()` of with no `@reference` line, as if each began with one (kayjs-ui lists its `theme.css`): added right after the stylesheet's Tailwind import, only to a stylesheet of the app using `@apply`, `@variant` or a theme function, so no rule is written twice.
+- `references: [path]` lists stylesheets the app's own may `@apply` and read `theme()` of with no `@reference` line, as if each began with one (kayjs-ui lists its `theme.css`): added after the Tailwind import of each stylesheet of the app (or of one using `@apply`, `@variant` or a theme function without it), and it writes no rule.
 - `devTool: { module }` names a browser module, `${import.meta.dir}/devTool.ts`, that adds a tab to the dev tool every dev page carries, with no declaration in the app: see [A tab for a library](dev-tool.md#a-tab-for-a-library).
 
 ### Conventions
