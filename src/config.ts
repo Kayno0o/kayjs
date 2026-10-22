@@ -88,6 +88,8 @@ export interface KayConfig {
   compress?: boolean | undefined
   // The route a load balancer or a container polls, `/_kay/health` unless `path` names another, or `false` for none.
   health?: HealthConfig | false | undefined
+  // Serves `/metrics` in the Prometheus text format for a collector: requests by method, route and status, their durations, scheduled runs, cache reads and live connections. Read only from this machine or a private network by a request no proxy forwarded, or from anywhere with the `Authorization: Bearer` token `KAY_METRICS_TOKEN` holds; `{ path }` moves it. Off by default, and under `kay dev`.
+  metrics?: boolean | MetricsConfig | undefined
   // One line per request on stdout, on by default when NODE_ENV is production, `false` for none; `'json'` writes it and kay's own messages as one JSON object each instead, and a function receives them all.
   log?: Logger | undefined
   // A `Server-Timing` header on each page rendered per request, timing its guards, the import of its modules, its loads and its render for the browser's network panel: on in development, off otherwise unless set.
@@ -221,6 +223,10 @@ export interface LiveConfig {
   connections?: number | undefined
   // How many it may open in a minute, 120 by default.
   perMinute?: number | undefined
+}
+
+export interface MetricsConfig {
+  path?: string | undefined
 }
 
 export interface HealthConfig {

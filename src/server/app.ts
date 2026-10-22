@@ -56,9 +56,10 @@ import { refuseLocaleClashes } from './i18n'
 import { avifQuality, serveImages, webpQuality } from './image'
 import { countWrites } from './kept-pages'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
-import { serveLive } from './live'
+import { liveConnections, serveLive } from './live'
 import { announceStart, logRequests, pathOf, requestRefusalLogger, useLogger } from './log'
 import { mcpBodyLimit, receiveDispatched, serveMcp, serveToolCallsThrough } from './mcp'
+import { METRICS_PATH, metricsOf, serveMetrics } from './metrics'
 import { countMissing, knowRedirects } from './not-found'
 import { serveServiceWorker } from './offline'
 import { claimApi, openApiDocument, openApiSettings, serveOpenApi } from './openapi'
@@ -381,13 +382,17 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   const hasPreview = options.preview !== undefined && options.preview !== false
 
+  // Offered, so an app file at the path keeps it; only a running server counts, as `kay dev` restarts on every change and an export serves nothing.
+  const metricsConfig = mode.dev || exported ? undefined : metricsOf(options.metrics)
+  const metrics: Claim | undefined = metricsConfig && { path: metricsConfig.path ?? METRICS_PATH, owner: 'the metrics route', kind: 'kay' }
+
   setRequestIdHeader(options.requestIdHeader)
   trustProxy(app, options.proxy)
   // Before the key check reads the mark, and dropped from the request there, so no handler reads it.
   app.onRequest(({ request }) => {
     receiveInternal(request)
   })
-  requireProxyKey(app, checkProxy(options.proxy), { dev: mode.dev, exported, base, health: options.health === false ? undefined : options.health?.path ?? HEALTH_PATH, logRefused: requestRefusalLogger(log) })
+  requireProxyKey(app, checkProxy(options.proxy), { dev: mode.dev, exported, base, health: options.health === false ? undefined : options.health?.path ?? HEALTH_PATH, metrics: () => metrics && served.holds(metrics) ? metrics.path : undefined, logRefused: requestRefusalLogger(log) })
   refuseForeignHosts(app, site)
 
   if (security)
@@ -436,6 +441,11 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     served.offer(health)
     // Before the extension servers, whose hooks it answers ahead of; it answers only where the claims, known once all are in, leave it the path.
     serveHealth(app, lifecycle, () => served.holds(health), options.health === false ? undefined : options.health)
+  }
+
+  if (metrics) {
+    served.offer(metrics)
+    serveMetrics(app, { path: metrics.path, base, proxy: checkProxy(options.proxy), health: health?.path, holds: () => served.holds(metrics), connections: liveConnections })
   }
 
   if (options.publicEnv)

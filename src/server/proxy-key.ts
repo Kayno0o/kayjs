@@ -44,7 +44,7 @@ function isOpen(path: string, open: readonly string[]): boolean {
 
 // Refuses with 403 every request that does not carry the proxy's shared key in the header `proxy.key` names, so a process or a container reaching the port directly skips nothing the proxy does.
 // Off under `kay dev`, in a static export, and outside production while no key is given; a production server with `key` and no key to compare with does not boot.
-export function requireProxyKey(app: Elysia, proxy: ProxyConfig | undefined, options: { dev: boolean, exported: boolean, base: string, health: string | undefined, logRefused?: ((request: Request, status: number) => void) | undefined }): void {
+export function requireProxyKey(app: Elysia, proxy: ProxyConfig | undefined, options: { dev: boolean, exported: boolean, base: string, health: string | undefined, metrics?: (() => string | undefined) | undefined, logRefused?: ((request: Request, status: number) => void) | undefined }): void {
   const header = proxy?.key
 
   if (header === undefined || options.dev || options.exported)
@@ -65,7 +65,11 @@ export function requireProxyKey(app: Elysia, proxy: ProxyConfig | undefined, opt
   const open = [...(proxy?.open ?? []).map(entry => entry.length > 1 && entry.endsWith('/') ? entry.slice(0, -1) : entry), ...options.health === undefined ? [] : [options.health]]
 
   app.onRequest(({ request }) => {
-    if (isInternal(request) || isOpen(routerPath(pathOf(request.url), options.base), open))
+    const path = routerPath(pathOf(request.url), options.base)
+    const metrics = options.metrics?.()
+
+    // The metrics route answers by its own rule, so a collector on the private network needs no key.
+    if (isInternal(request) || isOpen(path, open) || (metrics !== undefined && isOpen(path, [metrics])))
       return
 
     const given = request.headers.get(header)

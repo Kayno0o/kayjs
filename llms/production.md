@@ -155,6 +155,15 @@ Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(paylo
 - An API request is a server span from its guards to its response, `POST /api/upload`; spans its handler starts do not nest under it, since Elysia runs the handler outside any call kay makes.
 - Spans nest across `await` through the context manager the SDK registers, which Bun's `AsyncLocalStorage` backs.
 
+### Metrics for a collector
+
+- `metrics: true` in kay.config.ts serves `/metrics` in the Prometheus text format, for Prometheus or any compatible collector (Grafana Alloy, the OpenTelemetry collector's Prometheus receiver): `metrics: { path: '/_internal/metrics' }` moves it. It is off by default, and a server run by `kay dev` or a static export serves none.
+- It holds `kay_http_requests_total{method,route,status}` and the histogram `kay_http_request_duration_seconds{method,route}`, `kay_job_runs_total{schedule,result}` (`ok`, `failed`, `skipped` when another process held the lock), `kay_cache_reads_total{result}` (`hit` or `miss` of `cached` and `cache`), `kay_live_connections`, `kay_process_resident_memory_bytes` and `kay_process_uptime_seconds`.
+- A page counts under its pattern, `/shop/:item`, an API route under its route, and a path nothing serves under `unmatched`, so a scan adds no series; at most 500 routes are kept, the rest read `other`. The scrape itself and the health route are not counted.
+- It is never public by default: only a request that reached the socket from this machine or a private network (a collector in the same compose network, a sidecar) and carries no `X-Forwarded-*`, `X-Real-IP`, `Forwarded`, `Via` or `CF-Connecting-IP` header, nor the header `proxy.header` names, is answered; every other gets 403, a trailing slash, a query or the `base` in the path included. Do not forward the path from the reverse proxy: one that adds none of those headers cannot be told from a collector.
+- With `KAY_METRICS_TOKEN` set, only a request with `Authorization: Bearer <token>` is answered, from any address, for a collector reaching the server across networks.
+- `proxy.key` lets a request on this path past the key, as it does the health route, since the collector does not go through the proxy; the rules above still apply. An app file or page at `/metrics` keeps the path, and kay serves none there.
+
 ### Health and shutdown
 
 - `/_kay/health` answers `200 ok` while the server takes requests, for a load balancer or a container's health check.

@@ -1,6 +1,7 @@
 import type { PositiveDuration } from './checks'
 import type { Duration } from './duration'
 import { parse, stringify } from 'devalue'
+import { cacheReads } from './counters'
 import { durationSeconds } from './duration'
 import { kayLog } from './log'
 import { previewing, renderingForVisitor } from './preview'
@@ -279,6 +280,8 @@ async function cachedFor<T, const Ttl extends Duration = Duration>(key: string, 
       trim()
     }
   }
+
+  cacheReads[entry ? 'hit' : 'miss']++
 
   if (!entry) {
     const pending: Entry = { value: undefined, freshUntil: 0, loaded: false, ...tagKeys.length > 0 ? { deps: tagKeys } : {} }

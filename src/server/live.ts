@@ -199,6 +199,16 @@ onKeysInvalidated((matches) => {
 
 const open = new Map<string, number>()
 
+// How many event streams are open now, for `metrics`.
+export function liveConnections(): number {
+  let total = 0
+
+  for (const count of open.values())
+    total += count
+
+  return total
+}
+
 // The proof that a page read these keys of these values: whoever holds it is let watch exactly them, as whoever rendered the page was.
 function proofText(keys: [string, string][], at: number): string {
   return `${at}\n${keys.map(key => JSON.stringify(key)).toSorted().join('\n')}`

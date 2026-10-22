@@ -709,6 +709,11 @@ function passedId(request: Request): string | undefined {
   return address === undefined || fromTrusted(address, proxies.get(request) ?? undefined) ? id : undefined
 }
 
+// Whether `address` is this machine or a private network.
+export function fromPrivateNetwork(address: string): boolean {
+  return LOOPBACK_OR_PRIVATE.test(address)
+}
+
 // This machine, a private network, or a range the setting trusts.
 function fromTrusted(address: string, proxy: ProxyConfig | null | undefined): boolean {
   if (LOOPBACK_OR_PRIVATE.test(address))

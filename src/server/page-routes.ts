@@ -12,6 +12,7 @@ import type { Candidate, RouteTable } from './route-table'
 import type { SpecialPages } from './routes'
 import type { ServedPaths } from './served-paths'
 import { join } from 'node:path'
+import { pageRoutes } from '../runtime/counters'
 import { localePath, splitLocale, untranslatedPath } from '../runtime/i18n'
 import { localeState, runInLocale } from '../runtime/locale-state'
 import { overHttps } from './actions'
@@ -218,6 +219,8 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
       // A span per page request, its loads and render nested in it.
       if (params) {
         const { method } = context.request
+
+        pageRoutes.set(context.request, route.pattern)
 
         return traced(() => `${method} ${route.pattern}`, () => ({ kind: SERVER_SPAN, attributes: { 'http.request.method': method, 'http.route': route.pattern, 'url.path': url.pathname, 'kay.request.id': requestId(context.request) } }), async (span) => {
           const response = await respond(route, params, context, url)

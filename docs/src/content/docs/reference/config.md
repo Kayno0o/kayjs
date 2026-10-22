@@ -113,6 +113,7 @@ Every option is optional. The tables give each option's default. The full refere
 | `shutdownTimeout` | How long a stopping server lets open requests finish, as seconds or `'30s'`. 10 seconds by default |
 | `onError` | Receives `{ error, request }` for every error a load, render, guard, action, API route, job or island throws, for an error tracker; the request is `undefined` outside one |
 | `serverTiming` | A `Server-Timing` header on pages rendered per request. On in development, off otherwise unless set |
+| `metrics` | `true` serves `/metrics` in the Prometheus text format: requests by route and status, their durations, scheduled runs, cache reads and live connections. Answered only to a request straight from this machine or a private network, or carrying `KAY_METRICS_TOKEN` as a bearer token. `{ path }` moves it. Off by default |
 | `tracer` | An OpenTelemetry tracer, as `trace.getTracer('my-site')`, giving a span per page and API request. None by default |
 
 <ReadMore href="/llms/project">Every option and its exact behaviour are in the full project reference, with the head, locales and production references for the topics above.</ReadMore>

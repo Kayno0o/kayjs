@@ -4,6 +4,7 @@ import type { JobStore } from './queue'
 import process from 'node:process'
 import { Elysia } from 'elysia'
 import { KayError } from '../compiler/errors'
+import { countJobRun } from '../runtime/counters'
 import { DURATION_TEXT, durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { MAX_TIMER_MS } from './config-limits'
@@ -229,8 +230,11 @@ function scheduledRun(label: string, slotMs: number, job: Job, options: Schedule
     try {
       const lock = options.lock === false ? undefined : options.lock ?? auto?.name()
 
-      if (lock !== undefined && !await taken(lock, boot, slotMs, options, options.lock === undefined))
+      if (lock !== undefined && !await taken(lock, boot, slotMs, options, options.lock === undefined)) {
+        countJobRun(label, 'skipped')
+
         return
+      }
 
       const limit = new Promise<never>((_, reject) => {
         if (timeout !== undefined) {
@@ -256,11 +260,14 @@ function scheduledRun(label: string, slotMs: number, job: Job, options: Schedule
       })
 
       await Promise.race([job(controller.signal), limit])
+      countJobRun(label, 'ok')
     }
     catch (error) {
       // A run the stop cut short is no failure to report.
-      if (controller.signal.reason !== STOPPED)
+      if (controller.signal.reason !== STOPPED) {
+        countJobRun(label, 'failed')
         await reportBackgroundError(`the job scheduled ${label} failed`, error)
+      }
     }
     finally {
       clearTimeout(timer)
