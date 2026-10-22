@@ -11,9 +11,10 @@ Every `src/plugins/<name>.ts` (not `_*`, `*.test.ts`, `*.d.ts`) is now used as a
 ### A page action's `ctx.params` has the types of the route
 
 Under `[id=integer]`, `ctx.params.id` is a `number`, so a cast such as `ctx.params.id as string` is now a type error: drop the cast.
+
 ### The app's `store` keeps sessions and cached values
 
-With `store` set in kay.config.ts, a `session()` naming no store keeps its data there, the cookie carrying an id, so a site whose sessions were in their cookie signs everyone out once: a cookie holding its data, which no sign-out could end, opens no session from then on. A `cached` naming no store keeps its value there too, so it outlives a restart and a deploy: give a value built from the code itself `{ store: false }`, so a deploy does not serve the last one's. A value devalue cannot carry stays in memory with a warning. A `store` of your own sets `sessions` and `cache` to opt in; `sqliteData` sets both.
+With `store` set in kay.config.ts, a `session()` naming no store keeps its data there, the cookie carrying an id, so a site whose sessions were in their cookie signs everyone out once: a cookie holding its data, which no sign-out could end, opens no session from then on. A `cached` naming no store keeps its value there too, so it outlives a restart and a deploy. Look through every `cached` and `cache()` of an app with `store: sqliteData(...)`: one whose value comes from the code itself (a computed menu, a shape a deploy changes) takes `{ store: false }`, or a deploy serves the last one's until its ttl ends. A value devalue cannot carry stays in memory with a warning. A `store` of your own sets `sessions` and `cache` to opt in; `sqliteData` sets both. No `deprecated` lint covers this: the config is unchanged and only its meaning grows, which `kay check` cannot tell apart from an app wanting it.
 
 ### `bind:` next to a spread is an error
 

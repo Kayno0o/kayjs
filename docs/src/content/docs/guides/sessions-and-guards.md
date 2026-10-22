@@ -63,7 +63,7 @@ Without a store, the data travels in the cookie. It is sealed, but limited to ab
 
 Adding a store signs everyone out once. A cookie sealed before holds its data, and a stolen copy of it could never be revoked, so kay no longer accepts it.
 
-To end every session of one person, call `deleteWhere` on `memoryStore()` or `sqliteStore()`. Use it when someone asks to be erased or changes their password.
+To end every session of one person, call `deleteWhere` on `memoryStore()` or `sqliteStore()`. With `store: sqliteData(path)`, `sqliteStore(path)` of the same file gives the store the sessions are in. Use it when someone asks to be erased or changes their password.
 
 ```ts
 await store.deleteWhere(data => data.userId === id)

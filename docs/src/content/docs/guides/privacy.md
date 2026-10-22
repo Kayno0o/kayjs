@@ -44,7 +44,8 @@ import { files, queue, sqliteStore } from 'kay/server'
 import { db } from './db'
 import { sendMail } from './mail'
 
-export const sessions = sqliteStore('data/sessions.sqlite')
+// The file store: sqliteData('data/app.sqlite') names in kay.config.ts.
+export const sessions = sqliteStore('data/app.sqlite')
 export const mail = queue('mail', async (job: { userId: string, to: string, text: string }) => sendMail(job))
 
 export async function erase(userId: string) {

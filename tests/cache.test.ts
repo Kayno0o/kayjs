@@ -7,7 +7,7 @@ import { Database } from 'bun:sqlite'
 import { afterAll, afterEach, describe, expect, it, mock, setSystemTime, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { onKeysInvalidated, refreshLocally } from '../src/runtime/cache'
-import { cached, invalidate, sqliteCache } from '../src/runtime/cache.server'
+import { cache, cached, invalidate, sqliteCache } from '../src/runtime/cache.server'
 import { setupStore } from '../src/server/app-store'
 import { feed } from './fixtures/production/src/news'
 import { scratchBuild } from './prerendered'
@@ -427,6 +427,21 @@ describe('cached with a store', () => {
       await cached('app-memory', '60s', () => 2, { store: false })
       expect(own.keys()).toEqual(['app-own'])
       expect(app.keys()).toEqual([])
+    })
+
+    it('keeps a cache() function\'s values in the app\'s store, and invalidate empties it', async () => {
+      const store = sqliteCache(await storePath())
+      let loads = 0
+      const post = cache((slug: string) => ({ slug, loads: ++loads }), { ttl: '5m' })
+
+      setupStore({ cache: store })
+      expect(await post('a')).toEqual({ slug: 'a', loads: 1 })
+      expect(store.keys()).toHaveLength(1)
+      post.invalidate()
+      expect(store.keys()).toEqual([])
+      await cached('app-dropped', '60s', () => 1)
+      invalidate('app-dropped')
+      expect(store.keys()).toEqual([])
     })
 
     it('keeps a value the app\'s store cannot hold in memory, warning once for its key', async () => {

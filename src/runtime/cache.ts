@@ -49,8 +49,9 @@ const entries = new Map<string, Entry>()
 const stores = new Set<CacheStore>()
 // The app's `store.cache`, for each call naming no store of its own.
 let appCache: CacheStore | undefined
-// The keys whose value the app's store could not hold, warned about once each.
+// The keys whose value the app's store could not hold, warned about once each, up to a bound so per-visitor keys cannot grow it.
 const unstorable = new Set<string>()
+const MAX_UNSTORABLE = 100
 // What hears the page paths another process marked stale: the server serving them.
 const pageListeners = new Set<(paths: string[]) => void>()
 // What learns of the keys a page render reads, and of the keys an invalidation drops: the server, to refresh the prerendered pages built from them.
@@ -550,7 +551,7 @@ function storedText(key: string, value: unknown, inherited: boolean): string | u
     if (!inherited)
       throw new Error(`kay: cached('${key}') cannot keep its value in a store: ${reason}`)
 
-    if (!unstorable.has(key)) {
+    if (!unstorable.has(key) && unstorable.size < MAX_UNSTORABLE) {
       unstorable.add(key)
       kayLog('warn', `cached('${key}') keeps its value in this process's memory, as the app's store.cache cannot hold it: ${reason}; give it { store: false } to say so`)
     }
