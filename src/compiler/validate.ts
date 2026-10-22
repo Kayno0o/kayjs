@@ -30,6 +30,11 @@ const TYPE_CLOSERS = '}])>'
 // The name a `bind:` on a component writes: a signal, a prop of the component, or a member of one.
 const BOUND_NAME = /^\s*[A-Z_$][\w$]*(?:\s*\.\s*[A-Z_$][\w$]*)*\s*$/i
 // `files.url(key)` alone: a stored file's URL holds its size, which kay writes on the `img` showing it, but not once more is joined to it.
+// Utilities of the base breakpoint that give a box its ratio and its sizes: a variant (`sm:`) leaves the base without one.
+const ASPECT_CLASS = /^!?aspect-(?!auto$)\S/
+const WIDTH_CLASS = /^!?(?:w|size)-(?!auto$)\S/
+const HEIGHT_CLASS = /^!?(?:h|size)-(?!auto$)\S/
+const ASPECT_STYLE = /(?:^|;)\s*aspect-ratio\s*:\s*(?!auto\s*(?:;|$))\S/i
 const STORED_URL = /^[\w.]+\.url\((?:[^()]|\([^()]*\))*\)$/
 const COMPOUND_EVENT = /^(dbl|key|mouse|pointer|touch|drag|focus|context|before|after)(click|down|up|press|move|enter|leave|over|out|start|end|cancel|in|menu|input)$/
 const HEAD_TAGS = new Set(['title', 'meta', 'link', 'style', 'script', 'base', 'html'])
@@ -635,7 +640,7 @@ class Validator {
       this.lint(at, required[0] === 'alt' ? 'missing-alt' : 'missing-title', required[1], { help: required[2] })
 
     if (this.unsized(element, names))
-      this.lint(at, 'unsized-image', `This \`${element.name}\` has no \`width\` and \`height\`, so the page shifts as it loads`, { help: 'write both, as the image\'s own size: only their ratio matters, CSS sets how large it is drawn; `// kay-allow unsized-image` keeps an image whose box CSS already reserves' })
+      this.lint(at, 'unsized-image', `This \`${element.name}\` has no \`width\` and \`height\`, so the page shifts as it loads`, { help: 'write both, as the image\'s own size: only their ratio matters, CSS sets how large it is drawn; `// kay-allow unsized-image` keeps an image whose box CSS reserves in a way the lint cannot read, as a bound class' })
 
     if (element.name === 'input' && type?.kind === 'static' && type.text === 'image' && !names.has('alt'))
       this.lint(at, 'missing-alt', 'An image button needs `alt`', { help: 'name what it does' })
@@ -663,6 +668,9 @@ class Validator {
     if (names.has('width') && names.has('height'))
       return false
 
+    if (this.reservesBox(element, names))
+      return false
+
     // Writing either drops the size kay would have written.
     if (names.has('width') || names.has('height'))
       return element.name === 'img' || this.isImageInput(element)
@@ -682,6 +690,30 @@ class Validator {
     const expression = this.text(src.expression).trim()
 
     return !this.sizedImports.has(expression) && !STORED_URL.test(expression)
+  }
+
+  // Only a static class and `style` are read, as an expression could be anything: an image whose classes are bound is still reported, and `// kay-allow unsized-image` keeps it.
+  // The box is reserved by an aspect ratio with a width or a height, written as an attribute or a utility, to derive the other from, or by both sizes written as utilities; `aspect-ratio` in a static `style` counts alone.
+  private reservesBox(element: ElementNode, names: Set<string>): boolean {
+    const tokens = element.classes.map(span => this.text(span))
+    let style = false
+
+    for (const attribute of element.attributes) {
+      if (attribute.kind !== 'static')
+        continue
+
+      const name = this.text(attribute.name)
+
+      if (name === 'class')
+        tokens.push(...attribute.text.split(WHITESPACE))
+      else if (name === 'style' && ASPECT_STYLE.test(attribute.text))
+        style = true
+    }
+
+    const width = names.has('width') || tokens.some(token => WIDTH_CLASS.test(token))
+    const height = names.has('height') || tokens.some(token => HEIGHT_CLASS.test(token))
+
+    return style || (tokens.some(token => ASPECT_CLASS.test(token)) && (width || height)) || (width && height)
   }
 
   private isImageInput(element: ElementNode): boolean {

@@ -696,6 +696,14 @@ describe('unsized-image', () => {
     expect(only(`${imports}img(src="/a.png" width={w} alt="A")\nimg(src="/a.png" height="20" alt="B")\nimg(src="/a.png" width={w} height={h} alt="C")\nimg(src="/a.png" width="1" height="1" alt="D")\n`)).toEqual(['warning img', 'warning img'])
   })
 
+  it('leaves an img whose classes or style reserve its box, and warns of one whose reserve is partial, variant-only or bound', () => {
+    const reserved = ['img.aspect-video.w-full(src={url} alt="A")', 'img(src={url} class="aspect-square w-24" alt="A")', 'img(src={url} class="aspect-[4/3] h-40" alt="A")', 'img(src={url} class="!aspect-video w-full" alt="A")', 'img(src={url} class="w-8 h-8" alt="A")', 'img.size-8(src={url} alt="A")', 'img(src={url} style="aspect-ratio: 16 / 9" alt="A")', 'img.aspect-video(src={url} width="300" alt="A")']
+    const reported = ['img.aspect-video(src={url} alt="A")', 'img.sm:aspect-video.w-full(src={url} alt="A")', 'img(src={url} class="aspect-video sm:w-full" alt="A")', 'img(src={url} class="aspect-auto w-full" alt="A")', 'img(src={url} class="w-full h-auto" alt="A")', 'img(src={url} class="w-full" alt="A")', 'img(src={url} class={url} alt="A")', 'img(src={url} class={[\'aspect-video\', \'w-full\']} alt="A")', 'img(src={url} style="aspect-ratio: auto" alt="A")', 'img(src={url} style={url} alt="A")']
+
+    expect(only(`${imports}${reserved.join('\n')}\n`)).toEqual([])
+    expect(only(`${imports}${reported.join('\n')}\n`)).toEqual(reported.map(() => 'warning img'))
+  })
+
   it('warns of an image button too, and of no other input', () => {
     expect(only('input(type="image" src="/go.png" alt="Go")\ninput(type="image" src="/go.png" alt="Go" width="20" height="20")\ninput(type="text" aria-label="T")\n')).toEqual(['warning input'])
   })
