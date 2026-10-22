@@ -624,22 +624,39 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
-  it('does not report a component passing an island data built by a call, an icon import or a predicate callback', async () => {
-    const component = (script: string, call: string) => `---\nimport Child from './island.kay'\n${script}\n---\n${call}\n`
+  it('reports a component passing an island what a call may return as a function, and none passing data built by a call, an icon import or a predicate callback', async () => {
+    const data: Record<string, [script: string, call: string]> = {
+      mapped: ['const links = [\'a\', \'b\'].map(name => ({ href: `/${name}`, label: name }))', 'Child(format={links})'],
+      local: ['const panel = (color: string) => { const svg = `<svg fill="${color}"/>`; return `data:${svg}` }\nconst slides = [{ src: panel(\'red\') }]', 'Child(format={slides})'],
+      icon: ['import Brand from \'~icons/tabler/brand-github\'', 'Child(format={Brand})'],
+      found: ['const { rows, current } = props<{ rows: { id: number }[], current: number }>()', 'Child(format={rows.find(row => row.id === current)})'],
+      from: ['const items = Array.from({ length: 3 }, (_, index) => ({ id: index }))', 'Child(format={items})'],
+      ordered: ['const ids = [3, 1].map(id => id + 1)\nconst sorted = ids.filter(id => id > 1).slice(0, 1)', 'Child(format={sorted})'],
+    }
+    const functions: Record<string, [script: string, call: string]> = {
+      returned: ['const pick = (value: number) => () => value\nconst built = [1].map(value => pick(value))', 'Child(format={built})'],
+      filtered: ['const entries = [{ label: \'a\', enabled: true, onSelect: () => 1 }]\nconst shown = entries.filter(entry => entry.enabled)', 'Child(format={shown})'],
+      spread: ['const entries = [{ onSelect: () => 1 }]\nconst copy = [...entries].sort()', 'Child(format={copy})'],
+      shorthand: ['function run() {}\nconst rows = [1].map(index => ({ index, run }))', 'Child(format={rows})'],
+      passthrough: ['function handler() {}\nconst id = (value: unknown) => value\nconst same = id(handler)', 'Child(format={same})'],
+      selected: ['function handler() {}\nconst pick = (flag: boolean) => flag ? handler : 1\nconst chosen = pick(true)', 'Child(format={chosen})'],
+      concat: ['const joined = [1].concat(() => 1)', 'Child(format={joined})'],
+      model: ['const money = Money.from(5)', 'Child(format={money})'],
+      tested: ['function handler() {}\nconst { rows } = props<{ rows: unknown[] }>()', 'Child(format={[handler].find(one => one === rows[0])})'],
+    }
+    const all = { ...data, ...functions }
+    const component = ([script, call]: [string, string]) => `---\nimport Child from './island.kay'\n${script}\n---\n${call}\n`
+    const names = Object.keys(all)
     const root = await scratchProject({
-      'src/routes/index.kay': '---\nimport Mapped from \'../components/mapped.kay\'\nimport Local from \'../components/local.kay\'\nimport Icon from \'../components/icon.kay\'\nimport Found from \'../components/found.kay\'\nimport Hidden from \'../components/hidden.kay\'\n---\nMapped\nLocal\nIcon\nFound\nHidden\n',
-      'src/components/mapped.kay': component('const links = [\'a\', \'b\'].map(name => ({ href: `/${name}`, label: name }))', 'Child(format={links})'),
-      'src/components/local.kay': component('const panel = (color: string) => { const svg = `<svg fill="${color}"/>`; return `data:${svg}` }\nconst slides = [{ src: panel(\'red\') }]', 'Child(format={slides})'),
-      'src/components/icon.kay': component('import Brand from \'~icons/tabler/brand-github\'', 'Child(format={Brand})'),
-      'src/components/found.kay': component('const { rows, current } = props<{ rows: { id: number }[], current: number }>()\nconst pick = rows.find(row => row.id === current)', 'Child(format={rows.find(row => row.id === current)})'),
-      'src/components/hidden.kay': component('const pick = (value: number) => () => value\nconst built = [1].map(value => pick(value))', 'Child(format={built})'),
+      'src/routes/index.kay': `---\n${names.map(name => `import ${name[0]!.toUpperCase()}${name.slice(1)} from '../components/${name}.kay'`).join('\n')}\n---\n${names.map(name => `${name[0]!.toUpperCase()}${name.slice(1)}`).join('\n')}\n`,
+      ...Object.fromEntries(names.map(name => [`src/components/${name}.kay`, component(all[name]!)])),
       'src/components/island.kay': '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\nconst { format } = props<{ format: unknown }>()\n---\nbutton(onClick={() => count++}) {count()} {String(format)}\n',
     })
 
     try {
       const found = (await check(root)).filter(d => d.code === 'promoted-island')
 
-      expect(found.map(d => d.file.slice(root.length + 1))).toEqual(['src/components/hidden.kay'])
+      expect(found.map(d => d.file.slice(root.length + 1)).sort()).toEqual(Object.keys(functions).map(name => `src/components/${name}.kay`).sort())
     }
     finally {
       await rm(root, { recursive: true, force: true })

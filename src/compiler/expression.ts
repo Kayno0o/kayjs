@@ -82,7 +82,7 @@ export function sentParts(code: string): { parts: Span[], functions: boolean } |
   return { parts, functions }
 }
 
-// Array methods whose callback only tests or orders the items, so what it reads or writes is not passed on.
+// Array methods whose argument only tests or orders the items, so what it reads or writes is not passed on.
 const PREDICATE_METHODS = new Set(['find', 'findLast', 'findIndex', 'findLastIndex', 'some', 'every', 'filter', 'sort', 'toSorted'])
 
 // Whether an expression may hold a function, a class or an instance of one, which no static parent can send an island: it writes one, or reads one of `names`.
@@ -106,7 +106,7 @@ export function mayHoldFunction(code: string, names: ReadonlySet<string>): boole
     const node = value as t.Node
 
     if (node.type === 'CallExpression' && node.callee.type === 'MemberExpression' && !node.callee.computed && node.callee.property.type === 'Identifier' && PREDICATE_METHODS.has(node.callee.property.name))
-      return visit(node.callee.object) || node.arguments.some(argument => argument.type !== 'ArrowFunctionExpression' && argument.type !== 'FunctionExpression' && visit(argument))
+      return visit(node.callee.object)
 
     if (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression' || node.type === 'ClassExpression')
       return true

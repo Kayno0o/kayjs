@@ -130,7 +130,7 @@ export function analyzeScript(source: string, script: Span | undefined, serverNa
 // The `--- module` fence as module-level code: every statement is hoisted, the exports among them are the file's own.
 function analyzeModule(source: string, module: Span): ScriptAnalysis {
   const analysis: ScriptAnalysis = { hoisted: [], imports: [], specifiers: [], body: [], broken: [], brokenModule: [], reactive: false, implicit: [], functions: [], plain: [], diagnostics: [] }
-  const dataFunctions = new Set<string>()
+  const scope: FunctionScope = { functions: new Set(), data: new Set() }
   const split = splitFence(source, module, [], analysis)
 
   if (!split)
@@ -148,7 +148,7 @@ function analyzeModule(source: string, module: Span): ScriptAnalysis {
     if (statement.type === 'ExportDefaultDeclaration')
       analysis.diagnostics.push({ ...span, message: 'The component is the default export of its file', help: 'export a name instead' })
 
-    analysis.functions.push(...functionNames(statement, dataFunctions))
+    analysis.functions.push(...functionNames(statement, scope))
     analysis.hoisted.push(span)
   }
 
@@ -170,7 +170,7 @@ function withModule(script: ScriptAnalysis, module: ScriptAnalysis): ScriptAnaly
 
 function analyzeComponentScript(source: string, script: Span | undefined, serverNames: string[], templateReads: readonly string[]): ScriptAnalysis {
   const analysis: ScriptAnalysis = { hoisted: [], imports: [], specifiers: [], body: [], broken: [], brokenModule: [], reactive: false, implicit: [], functions: [], plain: [], diagnostics: [] }
-  const dataFunctions = new Set<string>()
+  const scope: FunctionScope = { functions: new Set(), data: new Set() }
 
   if (!script) {
     analysis.implicit = templateReads.filter(name => !serverNames.includes(name))
@@ -203,7 +203,7 @@ function analyzeComponentScript(source: string, script: Span | undefined, server
       if (isExport(statement))
         analysis.diagnostics.push({ ...span, message: 'A component script exports only types', help: 'move the value to a `.ts` module and import it' })
 
-      analysis.functions.push(...functionNames(statement, dataFunctions))
+      analysis.functions.push(...functionNames(statement, scope))
       analysis.plain.push(...plainNames(statement))
       analysis.body.push(span)
     }
@@ -324,11 +324,17 @@ function splitFence(source: string, fence: Span, names: string[], analysis: Fenc
   return { ...parsed, statements, recipes, tail: [...carried, ...textAround(cursor, fence.end, parsed.broken, analysis.brokenModule)] }
 }
 
-// What a body declaration may hold a function or an instance of a class by: writing one, or a call returning one.
-const FUNCTION_VALUES = new Set(['ArrowFunctionExpression', 'FunctionExpression', 'ClassExpression', 'NewExpression', 'CallExpression', 'AwaitExpression'])
+// What a body declaration may hold a function or an instance of a class by: writing one, awaiting one, or a call returning one.
+const FUNCTION_VALUES = new Set(['ArrowFunctionExpression', 'FunctionExpression', 'ClassExpression', 'AwaitExpression'])
 
-// Functions of the script whose every return is plain data, so a call to one is not a function in disguise.
-function noteDataFunction(statement: t.Statement, dataFunctions: Set<string>) {
+// The names the script declared so far that hold a function, and the functions among them whose returns are plain data.
+interface FunctionScope {
+  functions: Set<string>
+  data: Set<string>
+}
+
+// The names a statement declares that hold a function, which it adds to the scope along with the functions returning data.
+function functionNames(statement: t.Statement, scope: FunctionScope): string[] {
   const declared: [string, t.Node][] = []
 
   if (statement.type === 'FunctionDeclaration' && statement.id)
@@ -336,22 +342,23 @@ function noteDataFunction(statement: t.Statement, dataFunctions: Set<string>) {
   else if (statement.type === 'VariableDeclaration')
     declared.push(...statement.declarations.flatMap(declaration => declaration.id.type === 'Identifier' && declaration.init ? [[declaration.id.name, declaration.init] as [string, t.Node]] : []))
 
-  for (const [name, fn] of declared) {
-    if ((fn.type === 'ArrowFunctionExpression' || fn.type === 'FunctionExpression' || fn.type === 'FunctionDeclaration') && !fn.async && !('generator' in fn && fn.generator) && returnsData(fn, dataFunctions))
-      dataFunctions.add(name)
+  const found: string[] = []
+
+  for (const [name, init] of declared) {
+    if ((init.type === 'ArrowFunctionExpression' || init.type === 'FunctionExpression' || init.type === 'FunctionDeclaration') && functionReturnsData(init, scope))
+      scope.data.add(name)
+
+    if (init.type === 'FunctionDeclaration' || holdsFunction(init, scope))
+      found.push(name)
   }
-}
 
-function functionNames(statement: t.Statement, dataFunctions: Set<string>): string[] {
-  noteDataFunction(statement, dataFunctions)
+  if (statement.type === 'ClassDeclaration' && statement.id)
+    found.push(statement.id.name)
 
-  if ((statement.type === 'FunctionDeclaration' || statement.type === 'ClassDeclaration') && statement.id)
-    return [statement.id.name]
+  for (const name of found)
+    scope.functions.add(name)
 
-  if (statement.type !== 'VariableDeclaration')
-    return []
-
-  return statement.declarations.flatMap(declaration => declaration.id.type === 'Identifier' && declaration.init && holdsFunction(declaration.init, dataFunctions) ? [declaration.id.name] : [])
+  return found
 }
 
 function plainNames(statement: t.Statement): string[] {
@@ -402,38 +409,92 @@ function returned(body: t.Node): t.Expression[] | undefined {
   return body.type === 'VariableDeclaration' || body.type === 'ExpressionStatement' || body.type === 'EmptyStatement' || body.type === 'FunctionDeclaration' ? [] : undefined
 }
 
-function returnsData(fn: t.ArrowFunctionExpression | t.FunctionExpression | t.FunctionDeclaration, dataFunctions: ReadonlySet<string>): boolean {
+type FunctionNode = t.ArrowFunctionExpression | t.FunctionExpression | t.FunctionDeclaration
+
+// A function of the script whose returns are plain data: its parameters may be anything, so returning one is not.
+function functionReturnsData(fn: FunctionNode, scope: FunctionScope): boolean {
   const values = fn.body.type === 'BlockStatement' ? returned(fn.body) : [fn.body]
 
-  return values !== undefined && !values.some(value => holdsFunction(value, dataFunctions))
+  if (fn.async || fn.generator || values === undefined || fn.params.some(param => param.type !== 'Identifier'))
+    return false
+
+  const inner: FunctionScope = { ...scope, functions: new Set([...scope.functions, ...fn.params.map(param => (param as t.Identifier).name)]) }
+
+  return !values.some(value => holdsFunction(value, inner))
 }
 
-// Array methods and statics returning data when the callbacks they take do.
-const DATA_METHODS = new Set(['map', 'filter', 'flatMap', 'flat', 'slice', 'concat', 'toSorted', 'toReversed', 'sort', 'reverse', 'join', 'split', 'from', 'of', 'entries', 'keys', 'values', 'fromEntries', 'assign', 'stringify', 'parse'])
+// A callback given to a list method over data: its parameters are items of that data.
+function callbackReturnsData(callback: t.Node, scope: FunctionScope): boolean {
+  if (callback.type === 'Identifier')
+    return scope.data.has(callback.name)
 
-// A call whose result is plain data: a method of the list above whose callbacks return data, or a call to a function of the script that does.
-function isDataCall(value: t.CallExpression, dataFunctions: ReadonlySet<string>): boolean {
-  const { callee } = value
-  const known = callee.type === 'Identifier' ? dataFunctions.has(callee.name) : callee.type === 'MemberExpression' && !callee.computed && callee.property.type === 'Identifier' && DATA_METHODS.has(callee.property.name) && !holdsFunction(callee.object, dataFunctions)
+  if (callback.type !== 'ArrowFunctionExpression' && callback.type !== 'FunctionExpression')
+    return false
 
-  return known && value.arguments.every(argument => argument.type === 'ArrowFunctionExpression' || argument.type === 'FunctionExpression' ? returnsData(argument, dataFunctions) : !holdsFunction(argument, dataFunctions))
+  const values = callback.body.type === 'BlockStatement' ? returned(callback.body) : [callback.body]
+
+  return !callback.async && !callback.generator && values !== undefined && !values.some(value => holdsFunction(value, scope))
 }
 
-function holdsFunction(value: t.Node, dataFunctions: ReadonlySet<string>): boolean {
+// What the list methods and statics return when it is given data, `filter`, `sort` and `toSorted` only testing or ordering the items they are called on.
+const STATICS = new Map([['Array', new Set(['from', 'of'])], ['Object', new Set(['entries', 'keys', 'values', 'fromEntries', 'assign'])], ['JSON', new Set(['stringify', 'parse'])]])
+const LIST_BUILDERS = new Set(['map', 'flatMap'])
+const LIST_ORDERS = new Set(['filter', 'sort', 'toSorted'])
+const LIST_PLAIN = new Set(['slice', 'concat', 'flat', 'reverse', 'toReversed', 'join', 'split'])
+
+// A call whose result is plain data: a list method or static over data, or a call to a function of the script returning data.
+function isDataCall(call: t.CallExpression, scope: FunctionScope): boolean {
+  const { callee } = call
+  const plain = (argument: t.Node) => !holdsFunction(argument, scope)
+
+  if (callee.type === 'Identifier')
+    return scope.data.has(callee.name) && call.arguments.every(plain)
+
+  if (callee.type !== 'MemberExpression' || callee.computed || callee.property.type !== 'Identifier')
+    return false
+
+  const method = callee.property.name
+  const owner = callee.object.type === 'Identifier' ? callee.object.name : undefined
+
+  if (owner !== undefined && STATICS.has(owner))
+    return STATICS.get(owner)!.has(method) && call.arguments.every((argument, index) => owner === 'Array' && method === 'from' && index === 1 ? callbackReturnsData(argument, scope) : plain(argument))
+
+  if (holdsFunction(callee.object, scope))
+    return false
+
+  if (LIST_ORDERS.has(method))
+    return true
+
+  return LIST_BUILDERS.has(method) ? call.arguments.every(argument => callbackReturnsData(argument, scope)) : LIST_PLAIN.has(method) && call.arguments.every(plain)
+}
+
+function holdsFunction(value: t.Node, scope: FunctionScope): boolean {
   if (value.type === 'ObjectExpression')
-    return value.properties.some(property => property.type === 'ObjectMethod' || holdsFunction(property.type === 'SpreadElement' ? property.argument : property.value, dataFunctions))
+    return value.properties.some(property => property.type === 'ObjectMethod' || holdsFunction(property.type === 'SpreadElement' ? property.argument : property.value, scope))
 
   if (value.type === 'ArrayExpression')
-    return value.elements.some(element => element !== null && holdsFunction(element.type === 'SpreadElement' ? element.argument : element, dataFunctions))
+    return value.elements.some(element => element !== null && holdsFunction(element.type === 'SpreadElement' ? element.argument : element, scope))
 
   if (value.type === 'NewExpression')
     return value.callee.type !== 'Identifier' || !SENDABLE_CLASSES.has(value.callee.name)
 
   if (value.type === 'CallExpression')
-    return !isDataCall(value, dataFunctions)
+    return !isDataCall(value, scope)
 
   if (value.type === 'TSAsExpression' || value.type === 'TSSatisfiesExpression' || value.type === 'TSNonNullExpression' || value.type === 'ParenthesizedExpression')
-    return holdsFunction(value.expression, dataFunctions)
+    return holdsFunction(value.expression, scope)
+
+  if (value.type === 'Identifier')
+    return scope.functions.has(value.name)
+
+  if (value.type === 'MemberExpression')
+    return holdsFunction(value.object, scope)
+
+  if (value.type === 'ConditionalExpression')
+    return holdsFunction(value.consequent, scope) || holdsFunction(value.alternate, scope)
+
+  if (value.type === 'LogicalExpression')
+    return holdsFunction(value.left, scope) || holdsFunction(value.right, scope)
 
   return FUNCTION_VALUES.has(value.type)
 }
