@@ -41,6 +41,13 @@ export function hoistLayerOrder(css: string): string {
 
     const char = css[index]!
 
+    // An escaped quote or brace in a selector, such as Tailwind's `content-['it\'s']`, opens nothing.
+    if (char === '\\') {
+      index += 2
+
+      continue
+    }
+
     if (char === '{') {
       depth++
       blockSeen = true

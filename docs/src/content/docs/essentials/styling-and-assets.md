@@ -18,7 +18,7 @@ article.card
   slot
 ```
 
-`@import`, nesting and relative `url()` assets work in the stylesheet. It may put its rules in `@layer components { }`: the layer order your own stylesheet states still holds, though a component imported before it lands first in the bundle.
+`@import`, nesting and relative `url()` assets work in the stylesheet. It may put its rules in `@layer components { }`: the layer order your own stylesheet states still holds, though a component imported before it lands first in the bundle: the build moves every top-level `@layer` statement to the start of the stylesheet, in the order written.
 
 Imported `with { type: 'text' }`, a stylesheet is its text as a string instead. Use it to inline CSS in a mail or a generated page. It joins no page stylesheet.
 

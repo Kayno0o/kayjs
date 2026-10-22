@@ -18,6 +18,15 @@ describe('hoistLayerOrder', () => {
     expect(hoistLayerOrder(css)).toBe(css)
   })
 
+  it('reads past an escaped quote or brace in a selector', () => {
+    expect(hoistLayerOrder(String.raw`.a\'b{color:red}.c\{{}@layer x{.y{}}@layer a,b;`)).toBe(String.raw`@layer a,b;.a\'b{color:red}.c\{{}@layer x{.y{}}`)
+    expect(hoistLayerOrder(String.raw`.c\}{}@layer x{@layer n;}`)).toBe(String.raw`.c\}{}@layer x{@layer n;}`)
+  })
+
+  it('puts a late statement ahead of an @import, which CSS allows', () => {
+    expect(hoistLayerOrder('@import url("a.css");@layer x{.y{}}@layer a;')).toBe('@layer a;@import url("a.css");@layer x{.y{}}')
+  })
+
   it('keeps @charset first', () => {
     expect(hoistLayerOrder('@charset "utf-8";.x{}@layer a, b;')).toBe('@charset "utf-8";@layer a, b;.x{}')
   })

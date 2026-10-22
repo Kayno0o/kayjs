@@ -570,7 +570,8 @@ export async function bundleStyles(root: string, { pages, libraries, classes, sh
 
   const server: UnresolvedClass[] = []
   const markup = reached.open.size > 0 ? await findProjectFiles(root, MARKUP_FILE, { project: true, ownKayOnly: true }) : []
-  const uses = styleUses(root, pages, await Promise.all(build.outputs.filter(output => CSS_FILE.test(output.path)).map(async output => Bun.file(output.path).text())), reached, shorthand, markup, {
+  const cssOutputs = await Promise.all(build.outputs.filter(output => CSS_FILE.test(output.path)).map(async output => ({ path: output.path, text: await Bun.file(output.path).text() })))
+  const uses = styleUses(root, pages, cssOutputs.map(output => output.text), reached, shorthand, markup, {
     // kay's own runtime sets the classes of the pages it swaps in, which the pages name.
     own: file => !file.startsWith(KAY_SOURCE) && !file.includes(`${sep}node_modules${sep}`) && !libraries.some(library => file.startsWith(`${library.dir}${sep}`) || file.startsWith(`${library.realDir}${sep}`)),
     islands: islands.values(),
@@ -589,13 +590,12 @@ export async function bundleStyles(root: string, { pages, libraries, classes, sh
   const fallbacks = options.fonts === undefined ? new Map<string, FontFallback>() : fontFallbacks(root, options.fonts)
   const base = options.base ?? ''
 
-  await Promise.all(build.outputs.filter(output => CSS_FILE.test(output.path)).map(async (output) => {
-    const written = await Bun.file(output.path).text()
-    const css = withFontFallbacks(hoistLayerOrder(written), fallbacks)
+  await Promise.all(cssOutputs.map(async ({ path, text }) => {
+    const css = withFontFallbacks(hoistLayerOrder(text), fallbacks)
     const rebased = base === '' ? css : rebaseCss(css, base)
 
-    if (rebased !== written)
-      await Bun.write(output.path, rebased)
+    if (rebased !== text)
+      await Bun.write(path, rebased)
   }))
 
   return { styles, inputs: Object.keys(build.metafile!.inputs).map(input => resolve(input)), followed: [...shrunk], unused, uses, server }
