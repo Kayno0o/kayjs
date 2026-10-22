@@ -57,6 +57,7 @@ A prop is now always a value. A child that writes its parent's state types the p
 ### `forgejo({ url })` is `forgejo({ baseUrl })`
 
 kayjs-cms's `forgejo` names the forge's address `baseUrl`, as the other service options of kay do. `url` still works for three minors (the `deprecated-option-name` lint), and `kay upgrade` renames it. A `url` in an object held in a variable is not found: rename it where it is passed.
+
 ### Environment variables were renamed
 
 No lint can recognise an environment variable, so kay warns at boot for each old name still set and reads it until 1.73. Rename in the compose files, `.env` files and hosts.
@@ -77,6 +78,7 @@ No lint can fix it safely, as its fields move to another file, so kay warns at b
 ### kayjs-auth's `url` defaults to the site
 
 Drop `url` from `createAuth` when it repeats `site` or `SITE_URL`. OAuth sign-in and mailed links with no `url` and no site stop the server as it starts.
+
 ### A duration is a string with its unit
 
 Every option, store argument and test helper of kay and its libraries takes a `Duration` (`'250ms'`, `'30s'`, `'5m'`, `'7d'`), so a bare number is a type error. `kay check --fix` (or `kay upgrade`) rewrites a literal as `'<n>s'`, or `'<n>ms'` where the option took milliseconds (`kay/test`'s `timeout`, a toast's `duration`). A `SessionStore.set` (its `maxAge`), a `RateStore.hit`, a kayjs-auth `attempts`/`prune` store and a kayjs-ai provider now receive a `Duration` string where they got a number: `durationMs` from `kay` turns it into milliseconds. The runtime reads the old numbers until 1.73.
@@ -88,15 +90,19 @@ Every option, store argument and test helper of kay and its libraries takes a `D
 ### A lifetime is `maxAge`
 
 How long something stays valid is `maxAge` in every option, as the conventions say ([Component libraries](component-libraries.md)): `files.url(key, { expires })`, a token's `expiresIn` (`createToken`, `issueToken`), kayjs-auth's `email.expires`, `rememberMaxAge` (now `remember: { maxAge }`) and `organizations.invitationMaxAge` (now `invitations: { maxAge }`), `session.lifetime()` (now `session.maxAge()`), and the `expires` a mail carries for a template and a mailer (`MailData`, `Mail`, kayjs-mail's `AuthMail`). The old names still work for three minors, until 1.73. `kay check --fix` (or `kay upgrade`) renames those it finds in a `createAuth` or `files.url` call written out (`deprecated-option-name`); a token's `expiresIn`, `session.lifetime()` and a template's `data.expires` are on objects `kay check` cannot tell by name, and a `files.url` inside a template expression is not read, so rename them where they are written. Where both names are given, the new one wins.
+
 ### `kay migrate --out`, `kay new --host` and `ToolOutcome.failed` are renamed
 
 Use `--outdir` for `kay migrate astro`, `--forge` for `kay new`, and `ok` for a provider written by hand reading a `ToolOutcome` (`!failed`; a `ToolOutcome` your code builds now needs `ok` too). The old forms still work until 1.73: the CLI warns on a flag, and `failed` is still set beside `ok`. `kay check` cannot see a flag in a shell command or a custom provider, so there is no lint for them.
+
 ### Hooks take one event object
 
 `onError` (kay.config.ts), a queue's `onFailed` (kayjs-mail's `queue.onFailed` too), kayjs-auth's `onSignUp` and `onDelete` take one object, `onError({ error, request })`, `onFailed({ payload, error })`, `onSignUp({ user, profile })`, `onDelete({ user })`, and the two that return data are named for it: `onExport` is `exportData({ user })` and `onProviderProfile` is `profileFields({ user, profile })`. The old shape (two parameters, or one that is not destructured) and the old names are read until 1.73, and the `deprecated-hook-shape` lint reports them: `kay upgrade` destructures the parameters it can read as plain names. A new-shape hook written `(event) => ...` is read as the old one until then: destructure it. The options are typed with the new shape only, so `kay check` reports old code as a type error at once, and `kay upgrade` rewrites what it can. The switches already follow the rule (`false` turns off what is on, `true` turns on what is off), mail's `optional: true` included, so none changes.
+
 ### kayjs-cms's `logo` moves to its settings module
 
 Give the admin logo in a settings module instead of `cms({ logo })`: `settings: { '@kaynooo/kayjs-cms': './src/cms-settings.ts' }` in `kay.config.ts`, and `export default { ...defaults, logo: { src: '/logo.svg', alt: 'Acme' } }` there (`defaults` from `@kaynooo/kayjs-cms`). `cms({ logo })` works until 1.73, with an empty `alt`. No lint can recognise it, as the fix writes a module the app owns.
+
 ### `kay new --with auth` writes kayjs-auth, not a demo sign-in
 
 An app made before keeps its `login.kay`, `Member` table and `src/session.ts`, and works as it did; `kay add` no longer reads it as holding `auth` (that is `src/auth.ts` beside a root guard), so `kay add` plans files against the generated shape and may report a conflict on its hand-made `src/server.ts`, `.env` or compose file, and `kay add postgres` on it plans kayjs-auth's files too. To move to kayjs-auth, run `kay add auth` and delete the demo files.
@@ -175,32 +181,4 @@ An `img` kay resizes now carries `style="background-color:#c86432"` until it loa
 
 `SiteNav` and `AppHeader` render their menu toggle as a `popovertarget` button over a `popover` list, with no island. The nav no longer carries `data-open`, and the toggle no longer carries `aria-expanded` and `aria-controls` as attributes (the browser exposes the state), so CSS or a test reading them changes: style the open list with `:popover-open` and read `matches(':popover-open')`; `kay check` cannot flag a CSS selector, so no lint warns of the old form. A link to a `#section` of the page leaves the menu open until a press outside or Escape. A browser without the Popover API (before Chrome and Edge 114, Firefox 125, Safari 17) shows the links as a plain list and hides the toggle.
 
-## 1.60.0
-
-### French pages get non-breaking spaces
-
-A page whose `lang` is `fr` or `fr-...` now has its plain space before `: ; ! ?` and inside `« »` rewritten as U+00A0 in its text and its `alt`, `title`, `aria-label` and description, so the markup of a French site changes and a test or a snapshot reading `Total : 3` with a plain space fails. Expect `Total\u00A0: 3`, or set `typography: false` in `kay.config.ts` to keep the text as it was typed. A U+00A0 or U+202F typed already is kept. An island on such a page writes the same spaces in the browser, so a component test or a browser test reading an island's French text expects them too. No lint can see it, as it is a rendering change; the `&nbsp;` and `\u00A0` an app typed by hand can go ([Locales](locales.md#french-typography)).
-
-### A `pending` block is a hidden `slot`
-
-The block a form shows while it posts renders as `<slot data-kay-pending hidden>` the runtime unhides, instead of a `<div data-kay-pending hidden>` inside a `<div role="status">` with a `<style>` of its own, and its announcement comes from a live region kay writes outside the form. CSS or a test reaching the block through `[role=status]` or as a `div` reads `[data-kay-pending]` instead, and the slot lays out as its contents; no lint can see a selector in a stylesheet or a test ([Actions](actions.md#show-that-a-form-is-posting)).
-
-## 1.59.0
-
-### `pending` is a reserved line start
-
-A template line that starts with `pending` and nothing else is the `pending` block of a form posting to an action, and `pending text` is an error ("takes nothing on its line"); before, both were an element named `pending`. Rename such an element (`pending-note`, `pending.note` and `Pending` still read as before).
-
-### An action that cannot fail has `unknown` failure data
-
-`FailureData<Output>` is `unknown`, not `never`, for an output naming no `Failure`, so `ctx.failed(action)?.data`, `action.refused(error)`'s `data`, a tracked call's refusal and `kay/test`'s `refusal` read `unknown` for such an action, and one is no longer assignable to a prop typed with a `Failure<...>` it never returns. Narrow the data where it is read, or type the prop with the success output alone, which a handler that can `ctx.fail` fits too. `kay check` cannot recognise the old form, so no lint ships with it.
-
-### A shorthand class ending in `-` takes no attribute list
-
-A `(` right after a `-` in the `.class` shorthand opens Tailwind's variable group, `.bg-(--brand)`, so `div.btn-(id="x")` reads one class where it read `btn-` and an attribute. Write the attributes after a class that does not end in `-`, or put the class in `class="..."`.
-
-### More kayjs-ui boxes follow `--kui-border-width`
-
-The keyline now also sizes ChipGroup's chips, IconPicker's grid, the ScatterChart plot, ImageCropper's stage, Toggle's track and Table's filter and selection bars and narrow sort buttons, which drew 1px whatever it held, so a skin that set it above `1px` sees them thicken. Nothing to change unless a skin wants them thin: no lint can recognise it.
-
-Releases before 1.59 are in [Upgrading, older releases](upgrading-archive.md).
+Releases before 1.61 are in [Upgrading, older releases](upgrading-archive.md).
