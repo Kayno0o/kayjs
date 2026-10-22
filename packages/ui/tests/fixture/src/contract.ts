@@ -39,6 +39,7 @@ import PageHeader from '@kaynooo/kayjs-ui/page-header.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
 import Popover from '@kaynooo/kayjs-ui/popover.kay'
+import Progress from '@kaynooo/kayjs-ui/progress.kay'
 import QrCode from '@kaynooo/kayjs-ui/qr-code.kay'
 import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
 import RangeInput from '@kaynooo/kayjs-ui/range-input.kay'
@@ -120,6 +121,7 @@ export const COMPONENTS = {
   'page-section': PageSection,
   'pagination': Pagination,
   'popover': Popover,
+  'progress': Progress,
   'qr-code': QrCode,
   'radio-group': RadioGroup,
   'range-input': RangeInput,
@@ -191,6 +193,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'page-section': { title: 'Moons', children: 'Phobos' },
   'pagination': { page: 2, pages: 5, url: '/posts' },
   'popover': { trigger: noop },
+  'progress': { value: 0.4, label: 'Export' },
   'qr-code': { value: 'https://kaynooo.fr', label: 'Site' },
   'radio-group': { label: 'Planet', options, value: 'mars' },
   'range-input': { label: 'Hours', min: 0, max: 24 },

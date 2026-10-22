@@ -377,6 +377,12 @@ describe('data', () => {
     expect(await attributes('/data', '#meter [role="meter"]', ['aria-valuenow', 'aria-valuemin', 'aria-valuemax', 'aria-label'])).toEqual([{ 'aria-valuenow': '100', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-label': 'Disk' }])
   })
 
+  test('Progress is a named progressbar, determinate with a value from 0 to 1 and indeterminate without', async () => {
+    expect(await attributes('/data', '#progress [role="progressbar"]', ['aria-valuenow', 'aria-label', 'data-indeterminate'])).toEqual([{ 'aria-valuenow': '43', 'aria-label': 'Export', 'data-indeterminate': null }])
+    expect((await one('/data', '#progress .kui-progress-fill')).attributes.style).toBe('width: 42.6%')
+    expect(await attributes('/data', '#indeterminate [role="progressbar"]', ['aria-valuenow', 'data-indeterminate'])).toEqual([{ 'aria-valuenow': null, 'data-indeterminate': '' }])
+  })
+
   test('Skeleton hides its bars from screen readers, shortens the last, and announces its label as a status', async () => {
     expect((await find('/data', '#skeleton .kui-skeleton-block')).map(found => [attr(found, 'aria-hidden'), attr(found, 'data-last')])).toEqual([['true', null], ['true', null], ['true', '']])
     expect((await find('/data', '#skeleton [role="status"]')).map(found => found.text)).toEqual(['Loading'])

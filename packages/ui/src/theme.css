@@ -138,6 +138,16 @@
 }
 
 /* Every selector below weighs one class plus its state, with variants and nested parts inside :where(), so rules win in source order and the app's own, imported later, win over these. */
+@keyframes kui-progress-slide {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(250%);
+  }
+}
+
 @layer components {
   /* A rectangle drawn as a fill on the element and a hairline in ::before, so the line adds nothing to the box. Variants only redeclare --kui-shell-line and --kui-shell-fill. */
   .kui-shell,
@@ -1505,6 +1515,19 @@
 
   .kui-skeleton-label {
     @apply sr-only;
+  }
+
+  .kui-progress {
+    @apply relative h-2 w-full overflow-hidden bg-kui-surface0;
+  }
+
+  .kui-progress-fill {
+    @apply h-full bg-kui-accent transition-[width] motion-reduce:transition-none;
+
+    /* Indeterminate: a bar sliding across the track, held still and half-filled under reduced motion. */
+    &:where([data-indeterminate] > *) {
+      @apply w-2/5 animate-[kui-progress-slide_1.4s_ease-in-out_infinite] motion-reduce:animate-none;
+    }
   }
 
   .kui-page-header {
