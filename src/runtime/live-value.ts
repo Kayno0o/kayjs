@@ -31,14 +31,17 @@ export interface LiveByKey<K extends LiveKey, T> {
 // What both halves return for either shape; `live()` types the two apart for the app.
 type Handle = Live<unknown> & LiveByKey<LiveKey, unknown>
 
-// Where live values are kept beyond one process, `store.live` of kay.config.ts: `sqliteLive(path)` for the processes of a machine. A value is its text, as `encodeValue` writes it.
+type Entries = [id: string, key: string, text: string][]
+
+// Where live values are kept beyond one process, `store.live` of kay.config.ts: `sqliteLive(path)` for the processes of a machine, `pgData(db).live` for replicas on Postgres. A value is its text, as `encodeValue` writes it.
+// A store over a network answers with promises: `entries` is awaited before the server serves, and `set` and `delete` are written behind, `live.set` staying synchronous, so a promise must not reject and the store keeps its writes in order. A store answering synchronously may throw to refuse a write, which leaves the value as it was.
 export interface LiveStore {
   // Every value held, read when the server starts.
-  entries: () => [id: string, key: string, text: string][]
+  entries: () => Entries | Promise<Entries>
   // Keeps a value and tells the other processes sharing the store, which hear it through `subscribe`.
-  set: (id: string, key: string, text: string) => void
+  set: (id: string, key: string, text: string) => void | Promise<void>
   // Drops a key and tells the other processes.
-  delete: (id: string, key: string) => void
+  delete: (id: string, key: string) => void | Promise<void>
   // Calls `listener` with the text now held for a key another process set, or undefined once it deleted it; never for this process's own.
   subscribe: (listener: (id: string, key: string, text: string | undefined) => void) => void
   // Stops following the other processes, as when another store replaces this one; a later `subscribe` follows again.
@@ -137,6 +140,10 @@ interface ServerState {
   // The ids with rows read at the start.
   startup: Set<string>
   checkWrite: ((label: string, value: unknown) => void) | undefined
+  // The keys set or deleted here while the store is still being read, which an older stored row must not overwrite.
+  written: Set<string> | undefined
+  // The read of a store that answers late.
+  reading: Promise<void> | undefined
 }
 
 const STATE = Symbol.for('kay.live.state')
@@ -146,7 +153,7 @@ const UNDECLARED_ROWS = 10_000
 function state(): ServerState {
   const holder = globalThis as Record<symbol, ServerState | undefined>
 
-  return holder[STATE] ??= { store: undefined, subscribed: new WeakSet(), undeclared: new Map(), undeclaredRows: 0, startup: new Set(), checkWrite: undefined }
+  return holder[STATE] ??= { store: undefined, subscribed: new WeakSet(), undeclared: new Map(), undeclaredRows: 0, startup: new Set(), checkWrite: undefined, written: undefined, reading: undefined }
 }
 
 // Installed by the server: refuses a value a browser could not be sent where it is set.
@@ -219,7 +226,7 @@ function keepUndeclared(id: string, key: string, text: string | undefined, atSta
   }
 }
 
-// Called by the setup of a server with the config's `store.live`: reads what it holds, then follows what the other processes set.
+// Called by the setup of a server with the config's `store.live`: reads what it holds, then follows what the other processes set. A store that reads over a network is waited for with `liveStoreReady`.
 export function setLiveStore(store: LiveStore | undefined): void {
   const kept = state()
 
@@ -238,8 +245,57 @@ export function setLiveStore(store: LiveStore | undefined): void {
   if (store === undefined)
     return
 
-  for (const [id, key, text] of store.entries())
+  const held = store.entries()
+
+  if (!Array.isArray(held)) {
+    kept.reading = readLater(store, held)
+
+    return
+  }
+
+  for (const [id, key, text] of held)
     hear(id, key, text, true)
+
+  follow(store)
+}
+
+// Resolves once the store last given to `setLiveStore` was read, at once for one that answers synchronously.
+export async function liveStoreReady(): Promise<void> {
+  await state().reading
+}
+
+// Reads a store that answers late: a value set here meanwhile is newer than its rows, and a store that cannot be read is followed all the same.
+async function readLater(store: LiveStore, pending: Promise<Entries>): Promise<void> {
+  const kept = state()
+  const written = new Set<string>()
+
+  kept.written = written
+
+  try {
+    const held = await pending
+
+    if (kept.store !== store)
+      return
+
+    for (const [id, key, text] of held) {
+      if (!written.has(writtenKey(id, key)))
+        hear(id, key, text, true)
+    }
+  }
+  catch (error) {
+    kayLog('error', 'reading the live values held in the store failed; they are left out', error)
+  }
+  finally {
+    if (kept.written === written)
+      kept.written = undefined
+  }
+
+  if (kept.store === store)
+    follow(store)
+}
+
+function follow(store: LiveStore): void {
+  const kept = state()
 
   if (kept.subscribed.has(store))
     return
@@ -250,6 +306,31 @@ export function setLiveStore(store: LiveStore | undefined): void {
     if (kept.store === store)
       hear(id, key, text)
   })
+}
+
+function writtenKey(id: string, key: string): string {
+  return `${id}\0${key}`
+}
+
+// Hands a change to the store: a synchronous store may throw to refuse it, and a promise runs behind with its failure logged.
+function sendToStore(id: string, key: string, change: (store: LiveStore) => void | Promise<void>): void {
+  const kept = state()
+
+  kept.written?.add(writtenKey(id, key))
+
+  const sent = change(kept.store!)
+
+  if (sent !== undefined)
+    void logged(sent, id)
+}
+
+async function logged(sent: Promise<void>, id: string): Promise<void> {
+  try {
+    await sent
+  }
+  catch (error) {
+    kayLog('error', `the live value ${id} could not be written to the store`, error)
+  }
 }
 
 function decoded(text: string, id: string): { value: unknown } | undefined {
@@ -342,7 +423,7 @@ function serverLive(id: string, initial: unknown, name: string | undefined): Han
 
     // The store first, so a refusal leaves the value as it was.
     if (shared(slot))
-      state().store!.set(slot.id, key, encodeValue(value))
+      sendToStore(slot.id, key, async store => store.set(slot.id, key, encodeValue(value)))
 
     slot.values.set(key, value)
     notify(slot, key)
@@ -360,7 +441,7 @@ function serverLive(id: string, initial: unknown, name: string | undefined): Han
           return
 
         if (shared(slot))
-          state().store!.delete(slot.id, keyText(key))
+          sendToStore(slot.id, keyText(key), async store => store.delete(slot.id, keyText(key)))
 
         slot.values.delete(keyText(key))
         notify(slot, keyText(key))

@@ -1,9 +1,10 @@
+import type { LiveStore } from '../src/runtime/live-value'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
-import { live, liveSlot, setLiveStore, watchSlot } from '../src/runtime/live-value'
+import { live, liveSlot, liveStoreReady, setLiveStore, watchSlot } from '../src/runtime/live-value'
 import { setupStore } from '../src/server/app-store'
 import { sqliteLive } from '../src/server/sqlite-live'
 
@@ -93,7 +94,7 @@ process.exit(0)`)
     const path = await storePath()
     const store = sqliteLive(path)
 
-    store.set('test:late', '', '[7]')
+    void store.set('test:late', '', '[7]')
     setLiveStore(store)
 
     const late = declare(0, 'test:late', 'late')
@@ -113,6 +114,36 @@ process.exit(0)`)
     setupStore(undefined)
     wired.set(10)
     expect(store.entries()).toEqual([['test:wired', '', '[9]']])
+  })
+
+  it('waits for a store that reads late, keeps a value set meanwhile, and writes behind without rejecting', async () => {
+    const written: string[] = []
+    const late = declare(0, 'test:late-read', 'lateRead')
+    const kept = declare(0, 'test:late-kept', 'lateKept')
+    const store: LiveStore = {
+      entries: async () => {
+        await Bun.sleep(30)
+
+        return [['test:late-read', '', '[3]'], ['test:late-kept', '', '[3]']]
+      },
+      set: async (id, _key, text) => {
+        written.push(`${id}=${text}`)
+
+        throw new Error('the database is gone')
+      },
+      delete: async () => Promise.resolve(),
+      subscribe: () => undefined,
+    }
+
+    setupStore({ live: store })
+    kept.set(5)
+    expect(late()).toBe(0)
+    await liveStoreReady()
+    expect(late()).toBe(3)
+    expect(kept()).toBe(5)
+    expect(written).toEqual(['test:late-kept=[5]'])
+    await Bun.sleep(10)
+    setupStore(undefined)
   })
 
   it('tells the watchers of another process a key was deleted, and a value never declared there stays held', async () => {

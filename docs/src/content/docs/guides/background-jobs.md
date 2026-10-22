@@ -183,7 +183,7 @@ A claim and its hold use the database's clock, so replicas need not keep their c
 
 #### The whole app store on Postgres
 
-`pgData(db)` is `sqliteData` on Postgres. It keeps the sessions, the cached values, the jobs, the schedule locks, the rate limit counts, the members of presence rooms and the Web Vitals in `kay_*` tables of the same database, so replicas on several machines share them.
+`pgData(db)` is `sqliteData` on Postgres. It keeps the sessions, the cached values, the jobs, the schedule locks, the rate limit counts, the members of presence rooms, the live values and the Web Vitals in `kay_*` tables of the same database, so replicas on several machines share them.
 
 ```ts
 import { defineConfig, pgData } from 'kay/server'
@@ -195,7 +195,7 @@ export default defineConfig({
 
 It takes what `pgJobs` takes, and creates its tables when they are missing and its role may. If the role may not, the owner runs `await createDataTables(db)` once in a boot script, and pg-orm's `ignoreTables` lists `dataTables` from `kay/server`.
 
-Replicas learn of each other's invalidations and room messages by polling, within about half a second, so nothing needs LISTEN and a pooler in front of Postgres works. A room shares its members and messages, and `rooms({ store: pgData(db).rooms, state })` keeps its state there too, with `state` and `update` giving promises.
+Replicas learn of each other's invalidations, live values and room messages by polling, within about half a second, so nothing needs LISTEN and a pooler in front of Postgres works. A room shares its members and messages, and `rooms({ store: pgData(db).rooms, state })` keeps its state there too, with `state` and `update` giving promises.
 
 ### Your own store
 

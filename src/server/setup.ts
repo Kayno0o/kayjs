@@ -15,6 +15,7 @@ import { extensionServers, serverExtensions } from '../config'
 import { setContentMode, setMarkdownDefaults } from '../content/load'
 import { projectCollections } from '../content/server'
 import { renderOptionsOf } from '../project'
+import { liveStoreReady } from '../runtime/live-value'
 import { setSite } from '../runtime/site'
 import { setupStore } from './app-store'
 import { basePath } from './base'
@@ -146,6 +147,7 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
     setTracer(config.tracer)
     setupStorage(config.storage, join(imageCache, 'stored'), imageCache)
     setupStore(config.store)
+    await liveStoreReady()
     // A test's server restarts with its process and has no replica, so a key of the process is right there.
     warnOnStampKey(!mode.dev && process.env.NODE_ENV !== 'test')
   }

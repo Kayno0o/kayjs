@@ -4,6 +4,7 @@ import type { PgJobsSource } from './pg-jobs'
 import type { SessionStore } from './session'
 import { pgCache } from './pg-cache'
 import { connectionOf, createJobTables, jobTables, pgJobs, rowsOf } from './pg-jobs'
+import { pgLive } from './pg-live'
 import { pgRooms } from './pg-rooms'
 import { pgRates, pgSessions, pgVitals } from './pg-stores'
 import { onReload } from './reload'
@@ -13,7 +14,7 @@ const MIGRATION_LOCK = 'kay_data'
 const INSUFFICIENT_PRIVILEGE = '42501'
 
 // The tables `pgData` creates besides the jobs' ones.
-const OWN_TABLES = ['kay_sessions', 'kay_cache', 'kay_events', 'kay_rates', 'kay_meta', 'kay_vitals', 'kay_room_members', 'kay_room_processes', 'kay_room_messages', 'kay_room_state'] as const
+const OWN_TABLES = ['kay_sessions', 'kay_cache', 'kay_events', 'kay_rates', 'kay_meta', 'kay_vitals', 'kay_room_members', 'kay_room_processes', 'kay_room_messages', 'kay_room_state', 'kay_live', 'kay_live_events'] as const
 
 // The names of the tables `pgData` keeps its data in, the jobs' included, for a pg-orm `ignoreTables` of an app that creates them with `createDataTables`.
 export const dataTables = [...jobTables, ...OWN_TABLES] as readonly string[]
@@ -47,6 +48,9 @@ export async function createDataTables(source: PgJobsSource): Promise<void> {
       await tx`CREATE TABLE IF NOT EXISTS kay_room_messages (id bigserial PRIMARY KEY, room text NOT NULL, text text NOT NULL, process text NOT NULL, skipped text, recipient text, at bigint NOT NULL)`
       await tx`CREATE INDEX IF NOT EXISTS kay_room_messages_at ON kay_room_messages (at)`
       await tx`CREATE TABLE IF NOT EXISTS kay_room_state (room text PRIMARY KEY, state text NOT NULL)`
+      await tx`CREATE TABLE IF NOT EXISTS kay_live (id text NOT NULL, key text NOT NULL, value text NOT NULL, PRIMARY KEY (id, key))`
+      await tx`CREATE TABLE IF NOT EXISTS kay_live_events (seq bigserial PRIMARY KEY, origin text NOT NULL, id text NOT NULL, key text NOT NULL, at bigint NOT NULL)`
+      await tx`CREATE INDEX IF NOT EXISTS kay_live_events_at ON kay_live_events (at)`
     })
   }
   finally {
@@ -93,7 +97,7 @@ export function pgHandle(db: SQL): PgHandle {
   } }
 }
 
-// Sessions, cached values, jobs, rate counts, the members of presence rooms and the Web Vitals visitors reported in the app's Postgres, shared by every process of every replica opening it: `store: pgData(db)` in kay.config.ts, `db` a Bun `SQL`, a pg-orm `Database` or a connection URL as `pgJobs` takes.
+// Sessions, cached values, jobs, rate counts, the members of presence rooms, the values of `live()` and the Web Vitals visitors reported in the app's Postgres, shared by every process of every replica opening it: `store: pgData(db)` in kay.config.ts, `db` a Bun `SQL`, a pg-orm `Database` or a connection URL as `pgJobs` takes.
 // The `kay_*` tables are created when missing, which takes a role that may create tables: with one that may not, `createDataTables` run by the owner makes them. Replicas hear each other's invalidations and room messages by polling, within about half a second, so nothing needs LISTEN and a pooler in front of Postgres is fine.
 // A room's state is kept there too, so `rooms({ state, store: pgData(db).rooms })` answers `state` and `update` with promises.
 export function pgData(source: PgJobsSource) {
@@ -105,6 +109,5 @@ export function pgData(source: PgJobsSource) {
 
   const handle = pgHandle(db)
 
-  // Live values stay in the process until Postgres keeps them too: kaynooo/kayjs#1873.
-  return { sessions: pgSessions(handle), cache: pgCache(handle), jobs: pgJobs(db), rates: pgRates(handle), rooms: pgRooms(handle), vitals: pgVitals(handle) } satisfies { [Kind in Exclude<keyof AppStore, 'live'>]-?: NonNullable<AppStore[Kind]> } & { sessions: SessionStore & { deleteWhere: NonNullable<SessionStore['deleteWhere']> } }
+  return { sessions: pgSessions(handle), cache: pgCache(handle), jobs: pgJobs(db), rates: pgRates(handle), rooms: pgRooms(handle), vitals: pgVitals(handle), live: pgLive(handle) } satisfies { [Kind in keyof AppStore]-?: NonNullable<AppStore[Kind]> } & { sessions: SessionStore & { deleteWhere: NonNullable<SessionStore['deleteWhere']> } }
 }
