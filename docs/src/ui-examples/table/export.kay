@@ -1,5 +1,4 @@
 ---
-import type { Column } from '@kaynooo/kayjs-ui'
 import Table from '@kaynooo/kayjs-ui/table.kay'
 
 interface Moon {
@@ -14,9 +13,10 @@ const moons: Moon[] = [
   { id: 3, name: 'Amalthea', radius: 84 },
 ]
 
-const columns: Column<Moon>[] = [
-  { key: 'name', header: 'Name', sortValue: true },
-  { key: 'radius', header: 'Radius (km)', numeric: true },
+// Plain literals rather than `Column<Moon>[]`, which a static file cannot hand an island yet (kaynooo/kayjs#1772).
+const columns = [
+  { key: 'name', header: 'Name', sortValue: true as const },
+  { key: 'radius', header: 'Radius (km)', numeric: true as const },
 ]
 ---
 Table(columns={columns} rows={moons} rowKey="id" filter={['name']} exportable exportName="moons.csv")
