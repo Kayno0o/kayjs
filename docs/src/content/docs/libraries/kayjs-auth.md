@@ -39,6 +39,8 @@ export const auth = createAuth({
 })
 ```
 
+The site's public origin, which OAuth callbacks, mailed links and passkeys are built on, is the `site` of `kay.config.ts` (or `SITE_URL`): `createAuth` reads it, so it is set once. `site: 'https://example.com'` in `createAuth` overrides it. `name: 'Example'` is the name mails and authenticator apps show, the origin's host by default. Before 1.70 `url` was the origin and `site` the name; both still work until 1.73, and `kay check` reports them as `deprecated-site-name`.
+
 The session takes kay's `KAY_SECRET`, and kayjs-auth takes its key from the session's secret, so one secret serves all three ([The app secret](/guides/sessions-and-guards#the-app-secret)). Pass `secret` (at least 32 characters) only to keep a separate one for kayjs-auth.
 
 With the default, the TOTP secrets and stored provider tokens are sealed with a key derived from the session secret. When you rotate it, keep the old session secrets in the list for as long as that data exists, or set `secret` separately. To move an app from `AUTH_SECRET` to the default, pass `secret: [...sessions.deriveSecret('kayjs-auth'), process.env.AUTH_SECRET!]` until nothing sealed under the old one is left.
@@ -150,7 +152,7 @@ form(method="post" action="/auth/sign-out")
 
 A plain Elysia app has no Origin check of kay's own. A browser's cross-site POST or websocket upgrade reads the session as signed out, and a session write from it, such as a sign-in or a sign-out, is refused with a 403.
 
-The request's `Origin` must name its host or the host of `url`. An app behind a proxy that does not pass `Host` on sets `url`. `auth.socketUser(ws)` answers `null` and closes such a socket.
+The request's `Origin` must name its host or the host of `site`. An app behind a proxy that does not pass `Host` on sets `site`. `auth.socketUser(ws)` answers `null` and closes such a socket.
 
 Requests with no `Origin` (scripts, webhooks), safe methods and `Authorization: Bearer` tokens are left alone.
 
@@ -332,7 +334,7 @@ A page of your own calls `auth.profile(locale)` and `auth.saveProfile(values)`. 
 
 ## Passkeys in `createAuth`
 
-`passkeys: { rpName, userVerification }` in `createAuth` sets the name the authenticator shows, `site` by default, and whether answering a second factor with a passkey requires a PIN or a biometric: `'required'`, `'preferred'` (the default) or `'discouraged'`. Adding a passkey, signing in with one and re-proving always require it.
+`passkeys: { rpName, userVerification }` in `createAuth` sets the name the authenticator shows, `name` by default, and whether answering a second factor with a passkey requires a PIN or a biometric: `'required'`, `'preferred'` (the default) or `'discouraged'`. Adding a passkey, signing in with one and re-proving always require it.
 
 A passkey stored before kayjs-auth always asked for user verification may have been made without it, and could never sign in: `listPasskeys()` lists each with `userVerified`, and one with `false` does not count as a way in, so it cannot be what keeps a user from removing their last password or provider. A sign-in or a re-proof with it proves it; otherwise add a new passkey and remove the old one.
 
@@ -501,14 +503,13 @@ An action scopes what it touches by `ctx.params.org`, never by its input.
 
 ## OAuth
 
-Each entry of `oauth` adds `/auth/<name>` and `/auth/<name>/callback`. Register `url` plus the callback path at the provider.
+Each entry of `oauth` adds `/auth/<name>` and `/auth/<name>/callback`. Register `site` plus the callback path at the provider.
 
 ```ts
 import { createAuth, discordProvider } from '@kaynooo/kayjs-auth'
 
 createAuth({
   // ...
-  url: 'https://example.com',
   oauth: {
     discord: {
       provider: discordProvider(),
@@ -529,7 +530,7 @@ Opening that link again while a sign-in is under way goes on with it, and never 
 
 Every preset takes `scopes` and `params`, extra parameters for the authorize URL. A provider a server can host takes its base `url`: `githubProvider({ url: 'https://git.example.com' })` for GitHub Enterprise Server, `gitlabProvider({ url })`, `discordProvider({ url })`. A trailing slash is dropped and a path kept, and production refuses an `http://` one.
 
-A site whose `url` is https refuses a provider on plain http in every environment, and the endpoints a provider's discovery document names too.
+A site whose `site` is https refuses a provider on plain http in every environment, and the endpoints a provider's discovery document names too.
 
 GitHub hides the email of a user who keeps it private. With `githubProvider({ scopes: ['read:user', 'user:email'] })` the primary verified address is read off `/user/emails`, so that user signs up with an email all the same. An unverified or non-primary address is never taken, and when GitHub fails to answer the profile's public email is used.
 
@@ -558,7 +559,6 @@ The `examples/noticeboard` project in the kay repository runs kayjs-auth on Post
 ```ts
 createAuth({
   sessions: session<AuthSessionData>({ secret, cookie: 'login', domain: 'example.com' }),
-  url: 'https://auth.example.com',
   forwardAuth: 'example.com',
   // ...
 })
@@ -568,7 +568,7 @@ The cookie needs the domain so the guarded sites receive it. `forwardAuth` names
 
 Name your own domain: kay has no list of public suffixes, so `co.uk` or `github.io` are accepted and would open every site under them. A user without two-factor is sent to the account security page, passkey holders included, as a session does not record how it signed in.
 
-The sign-in page is sent by its full URL, so without `site` in `kay.config.ts` or `url` in `createAuth` the app stops at startup in production.
+The sign-in page is sent by its full URL, so without `site` in `kay.config.ts` or in `createAuth` the app stops at startup in production.
 
 The route is `/auth/forward`. For a person signed in with a session it answers 204 with `Remote-User`, `Remote-Name`, `Remote-Email` and `Remote-Groups` (the roles, comma-separated). A guest, a bearer token and a sign-in waiting for its second factor are not signed in. Otherwise it answers 401 with the sign-in page in `Location`, which brings the visitor back to the page they asked for. `/auth/forward?role=admin` also refuses a user without that role with a 403.
 
@@ -643,7 +643,7 @@ createAuth({
 
 The agents can only ask for the scopes you declare. An agent that asks for none is given no scope, so its token reaches only routes marked `scope: false`. Name the scopes such an agent gets with `oauthServer: { defaultScopes: ['notes:read'] }`.
 
-In production, set `site` in `kay.config.ts` or `url` in `createAuth`: the OAuth server names itself from it. Without one its documents and endpoints answer an error, and `/mcp` points at no authorization server, as a Host header could name it otherwise. Registrations are limited per address; `rateLimit: { oauthRegisterAll }` adds a ceiling on all addresses together.
+In production, set `site` in `kay.config.ts` or in `createAuth`: the OAuth server names itself from it. Without one its documents and endpoints answer an error, and `/mcp` points at no authorization server, as a Host header could name it otherwise. Registrations are limited per address; `rateLimit: { oauthRegisterAll }` adds a ceiling on all addresses together.
 
 The new tables are created by `db.sync()` if you use Postgres or SQLite.
 

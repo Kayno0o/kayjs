@@ -22,6 +22,10 @@ With Tailwind, classes merged from the shorthand, `class`, a spread and a compon
 
 kayjs-ai's `ai({ limit })` is `ai({ rateLimit })`, its `ai({ visitor })` and `ask(messages, { visitor })` are `key`, and kayjs-auth's `createAuth({ limits })` is `rateLimit`, as kay's actions and API routes already name theirs. The old names still work for three minors (the `deprecated-rate-limit` lint), and `kay upgrade` renames them. kayjs-mail's `smtp({ rateLimit: 5 })` and `mailer({ smtp: { rateLimit: 5 } })` are `{ max: 5, window: '1s' }`, and `SMTP_RATE_LIMIT` reads `5/1s` (a bare `5` still means 5 a second). A `limit`, `limits` or number held in a variable is not found: change the option where it is passed.
 
+### `site` is the origin and `name` the display name
+
+kayjs-auth's `createAuth({ url, site: 'Example' })` is `createAuth({ site: 'https://example.com', name: 'Example' })`, and the origin defaults to the `site` of kay.config.ts (or `SITE_URL`), so `url` can usually go. The old forms work for three minors (the `deprecated-site-name` lint, and `kay upgrade` renames them); `site` is told a name from an origin by not being a URL. A custom auth mail template or view reads `mail.name` and `data.name` for the name: `mail.site` and `data.site` keep working until 1.73, and the contact mail view's `origin` prop is `site` the same way. The messages keep their `{site}` placeholder.
+
 ### Runtime error classes end in `Error` and carry a `code`
 
 kay's `HydrationMismatch` of `kay/dom`, `ActionRedirect` from `kay`, `CspViolation` from `kay/server` and `RedirectRefused` of `kay/library` are `HydrationMismatchError`, `ActionRedirectError`, `CspViolationError` and `RedirectRefusedError` (their `name` changes with them), kayjs-cms's `SaveConflict` is `SaveConflictError` and kayjs-mail's `MailNotConfigured` is `MailNotConfiguredError`; the old names stay as aliases three minors, and `kay upgrade` renames the imports and their uses (the `deprecated-renamed-export` lint). Every error class a library exports has a `code` (`'save-conflict'`, `'mail-not-configured'`, `'oauth-exchange'`, `'forge-refused'`), and `AiError` has `code` beside `kind`, the same value.

@@ -275,7 +275,7 @@ The page shows it with [ContactForm](/ui/contact-form) from kayjs-ui, or with it
 
 The action checks a one-line `name`, an `email` and a `message` of at most 5000 characters, then the `fields` you add, whose schemas are yours. It mails them to `to`, or `MAIL_TO` when left out, with the visitor in `replyTo` and the message quoted.
 
-Use `labels` to rename a field in the mail. Use `subject` and `view` to replace the subject and the mail's component, which gets `ContactMailProps`.
+Use `labels` to rename a field in the mail. Use `subject` and `view` to replace the subject and the mail's component, which gets `ContactMailProps`, with the site's origin as `site`.
 
 ### Spam protection
 

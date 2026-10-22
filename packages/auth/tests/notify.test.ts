@@ -15,8 +15,8 @@ async function verified() {
   const mails: Mail[] = []
   const events: AuthEventInfo[] = []
   const app = testApp({
-    url: 'https://site.test',
-    site: 'Site',
+    site: 'https://site.test',
+    name: 'Site',
     email: { mailer: { send: mail => void mails.push(mail) }, links: LINKS, requireVerified: false },
     onAuthEvent: (info) => {
       events.push(info)
@@ -70,7 +70,7 @@ describe('changes to what protects the account', () => {
     await ada.call('changeEmail', { password: PASSWORD }, 'ada@new.test')
     await ada.call('confirmEmailChange', new URL(mails.at(-1)!.url!).searchParams.get('token')!)
 
-    expect(mails.at(-1)).toMatchObject({ to: 'ada@example.com', kind: 'email-changed', site: 'Site', detail: 'ada@new.test' })
+    expect(mails.at(-1)).toMatchObject({ to: 'ada@example.com', kind: 'email-changed', name: 'Site', site: 'Site', detail: 'ada@new.test' })
     expect(mails.at(-1)!.text).toContain('ada@new.test')
   })
 
@@ -127,8 +127,8 @@ describe('a slow mailer', () => {
     const sent: Mail[] = []
     let failing = false
     const app = testApp({
-      url: 'https://site.test',
-      site: 'Site',
+      site: 'https://site.test',
+      name: 'Site',
       email: {
         mailer: {
           send: async (mail) => {
@@ -166,7 +166,7 @@ describe('a slow mailer', () => {
 })
 
 describe('sendAside', () => {
-  const mail = { to: 'ada@example.com', kind: 'new-sign-in', site: 'Site', locale: 'en', subject: 's', text: 't', html: 'h' } satisfies Mail
+  const mail = { to: 'ada@example.com', kind: 'new-sign-in', name: 'Site', site: 'Site', locale: 'en', subject: 's', text: 't', html: 'h' } satisfies Mail
 
   test('gives up on a mailer that stays silent, and frees its place', async () => {
     jest.useFakeTimers()

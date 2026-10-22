@@ -13,12 +13,12 @@ export function rootUsable(core: Core): boolean {
   return rootIsFixed(core) || process.env.NODE_ENV !== 'production'
 }
 
-// Where the app is served, mount point included: the `site` and `base` kay.config.ts sets, else the `url` of `createAuth`, else the request's origin outside production, where the Host header would name the issuer.
+// Where the app is served, mount point included: the `site` and `base` kay.config.ts sets, else the `site` of `createAuth`, else the request's origin outside production, where the Host header would name the issuer.
 export function siteRoot(core: Core, request: Request): string {
   const fixed = configuredSite()?.origin ?? core.url
 
   if (!rootUsable(core))
-    throw configError('the OAuth server needs the site\'s origin in production: set `site` in kay.config.ts or `url` in createAuth, as the Host header cannot name the issuer')
+    throw configError('the OAuth server needs the site\'s origin in production: set `site` in kay.config.ts or in createAuth, as the Host header cannot name the issuer')
 
   return (fixed ?? new URL(request.url).origin).replace(TRAILING_SLASH, '')
 }

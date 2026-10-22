@@ -38,7 +38,7 @@ export default function auth(project: Project) {
 export const auth = createAuth({
   sessions: session<AuthSessionData>(),
   store: pgStore(db),
-  site: '${siteName(project.name)}',
+  name: '${siteName(project.name)}',
   pages: true,${mailed ? '\n  email: { mailer: { send: mail.enqueue } },' : ''}
 })
 `

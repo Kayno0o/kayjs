@@ -131,12 +131,14 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   // At least 32 characters, from the environment; each use gets its own key derived from it. A list rotates them: the first writes, every one reads. Left out, kayjs-auth derives its own from the session's secret, so one secret serves both.
   secret?: string | string[] | undefined
   store: AuthStore
-  // The site's public origin, such as `https://example.com`: OAuth callbacks and mailed links are built on it. The `site` of kay.config.ts or `SITE_URL` when left out.
+  // The site's public origin, such as `https://example.com`, which OAuth callbacks, mailed links and passkeys are built on: the `site` of kay.config.ts (or SITE_URL) when left out, so an app on kay sets it once.
+  site?: string | undefined
+  /** @deprecated The old name of `site`, taken until 1.73: where both are set, `site` wins. */
   url?: string | undefined
   // Where kayjs-auth's routes live, `/auth` by default: `/auth/discord` starts a Discord sign-in.
   prefix?: Prefix | undefined
-  // The site's name, as mails and authenticator apps show it; the URL's host by default.
-  site?: string | undefined
+  // The site's name, as mails and authenticator apps show it; the origin's host by default. A `site` that is not a URL is taken as the name until 1.73, the form before `name` existed.
+  name?: string | undefined
   // Where a sign-in that failed goes, with `?error=` saying why; the prebuilt sign-in page with `pages`, else `/`. Without `pages`, it is also where `guard()` and `requireUser()` send an anonymous visitor opening a page.
   signInPage?: string | undefined
   // Where every failed OAuth sign-in goes instead, with no reason in the URL, so that whether an account may sign in does not leak, as with an `allow` list.
@@ -198,7 +200,7 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   rateLimit?: LimitsOption | undefined
   // The old name of `rateLimit`, taken until 1.73: where both name a limit, `rateLimit` wins.
   limits?: LimitsOption | undefined
-  // Passkeys are made for `url`'s host and its origin; `rpId` widens them to a parent domain, `origins` lists every origin the site's pages are served from, and `rpName` is the name the authenticator shows (`site` by default). `userVerification` is how hard answering a second factor with a passkey asks for a PIN or a biometric, `'preferred'` by default: adding a passkey, signing in with one and re-proving always require it, as a passkey alone is two factors.
+  // Passkeys are made for `site`'s host and its origin; `rpId` widens them to a parent domain, `origins` lists every origin the site's pages are served from, and `rpName` is the name the authenticator shows (`name` by default). `userVerification` is how hard answering a second factor with a passkey asks for a PIN or a biometric, `'preferred'` by default: adding a passkey, signing in with one and re-proving always require it, as a passkey alone is two factors.
   passkeys?: { rpId?: string, origins?: string[], rpName?: string, userVerification?: 'required' | 'preferred' | 'discouraged' } | undefined
   // A CAPTCHA asked of registering, password sign-in, password resets and magic links: kay's proof of work by default, `proofOfWork({ difficulty })` to tune it, `{ verify: turnstile(secret) }` for a third party's, false for none.
   captcha?: CaptchaOptions | false | undefined
@@ -1316,7 +1318,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
         return exported.error === 'stale' ? status(403, 'Sign in again to continue') : status(401, 'Sign in to continue')
       }
 
-      set.headers['content-disposition'] = `attachment; filename="${core.site.replaceAll(/[^\w.-]/g, '-')}-data.json"`
+      set.headers['content-disposition'] = `attachment; filename="${core.name.replaceAll(/[^\w.-]/g, '-')}-data.json"`
       set.headers['cache-control'] = 'no-store'
 
       return exported.data
@@ -1378,7 +1380,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
   if (core.forward) {
     if (!rootUsable(core))
-      throw configError('forwardAuth sends visitors to the sign-in page by its full URL: set `site` in kay.config.ts, SITE_URL or `url` in createAuth')
+      throw configError('forwardAuth sends visitors to the sign-in page by its full URL: set `site` in kay.config.ts, SITE_URL or in createAuth')
 
     serveForwardAuth(plugin as unknown as Elysia, core, core.forward, ctx => (ctx as { auth: Auth }).auth, (role, user) => isGranted(role, user.roles))
   }
@@ -1663,6 +1665,18 @@ function pagesHandle(core: Core, options: { pages?: boolean | AuthPagesConfig | 
   }
 }
 
+const HAS_SCHEME = /^[a-z][\d+.a-z-]*:\/\//i
+
+// The origin and the display name the options give, whichever form they are written in: `site` is the origin, and until 1.73 `url` too, while a `site` that is no URL is the name it meant before `name` existed.
+function siteOptions(options: { site?: string | undefined, url?: string | undefined, name?: string | undefined }): { origin: string | undefined, name: string | undefined } {
+  const site = options.site
+
+  if (site !== undefined && !HAS_SCHEME.test(site))
+    return { origin: options.url, name: options.name ?? site }
+
+  return { origin: site ?? options.url, name: options.name }
+}
+
 function noSecret(): never {
   throw configError('`secret` is missing and the session plugin cannot derive one; pass a secret of at least 32 characters, or a plugin from kay\'s `session()`')
 }
@@ -1672,7 +1686,7 @@ interface SiteBound {
   url: string | undefined
   oauth: Core['oauth']
   refreshers: Core['refreshers']
-  site: string
+  name: string
   passkeys: Core['passkeys']
 }
 
@@ -1680,7 +1694,8 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
   const prefix = options.prefix ?? '/auth'
 
   const oauthApps = Object.entries(options.oauth ?? {})
-  const given = options.url?.replace(TRAILING_SLASH, '')
+  const { origin, name } = siteOptions(options)
+  const given = origin?.replace(TRAILING_SLASH, '')
   const locales = options.email?.locales !== undefined && options.email.locales.length > 0 ? [...options.email.locales] : ['en']
   const pages = pagesOf(options.pages)
   const paths = pages && pagePaths(pages.prefix)
@@ -1698,7 +1713,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     const url = given ?? configuredSite()?.origin.replace(TRAILING_SLASH, '')
 
     if (needsUrl && url === undefined)
-      throw configError('OAuth sign-in and mailed links need the site\'s public origin to build their URLs: set `site` in kay.config.ts or SITE_URL, or `url` in createAuth')
+      throw configError('OAuth sign-in and mailed links need the site\'s public origin to build their URLs: set `site` in kay.config.ts or SITE_URL, or in createAuth')
 
     if (url === undefined && waiting)
       return waiting
@@ -1712,10 +1727,10 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
       url,
       oauth: clients,
       refreshers: new Map(),
-      site: options.site ?? (url === undefined ? 'kayjs-auth' : new URL(url).host),
+      name: name ?? (url === undefined ? 'kayjs-auth' : new URL(url).host),
       passkeys: url === undefined
         ? undefined
-        : { id: options.passkeys?.rpId ?? new URL(url).hostname, name: options.passkeys?.rpName ?? options.site ?? new URL(url).host, origins: options.passkeys?.origins ?? [new URL(url).origin], userVerification: options.passkeys?.userVerification ?? 'preferred' },
+        : { id: options.passkeys?.rpId ?? new URL(url).hostname, name: options.passkeys?.rpName ?? name ?? new URL(url).host, origins: options.passkeys?.origins ?? [new URL(url).origin], userVerification: options.passkeys?.userVerification ?? 'preferred' },
     }
 
     if (url === undefined)
@@ -1743,8 +1758,8 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     ownSignInPage: options.signInPage,
     twoFactorPage: options.twoFactorPage ?? paths?.twoFactor ?? '/two-factor',
     pages,
-    get site() {
-      return bind().site
+    get name() {
+      return bind().name
     },
     limits: resolveLimits(options.limits, options.rateLimit),
     rules: asConfigError(() => resolveRules(options.rules)),

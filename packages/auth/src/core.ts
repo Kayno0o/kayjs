@@ -91,7 +91,7 @@ export interface User<Data extends object = Record<string, unknown>> extends Bar
 export interface Core {
   store: AuthStore
   keys: Keys
-  // The site's public origin: `url` of createAuth, else the site kay.config.ts or SITE_URL sets.
+  // The site's public origin: `site` of createAuth, else the site kay.config.ts or SITE_URL sets.
   url?: string | undefined
   // Builds what depends on the site's origin, throwing while OAuth sign-in or mailed links lack one; a server asks as it boots and on each request until it has one.
   settle: () => void
@@ -103,7 +103,7 @@ export interface Core {
   // The prebuilt pages' prefix and home, with the `pages` option.
   pages?: { prefix: string, home: string, remember: RememberMode, profile?: ProfileOptions | undefined } | undefined
   // The site's name, as mails and authenticators show it.
-  site: string
+  name: string
   limits: Limits
   // Seconds a session signed in with `remember: true` lives unseen.
   rememberMaxAge: number

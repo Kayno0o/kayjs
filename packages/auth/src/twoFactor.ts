@@ -184,7 +184,7 @@ export async function setUpTwoFactor(state: RequestState, proof: Proof): Promise
     return { ok: false, error: 'enabled' }
 
   const secret = generateTotpSecret()
-  const uri = otpauthUri({ secret, account: proved.record.email ?? proved.record.username ?? proved.record.id, issuer: state.core.site })
+  const uri = otpauthUri({ secret, account: proved.record.email ?? proved.record.username ?? proved.record.id, issuer: state.core.name })
 
   await state.core.store.users.update(proved.record.id, { totpSecret: state.core.keys.encrypt(secret, totpContext(proved.record.id)) })
 

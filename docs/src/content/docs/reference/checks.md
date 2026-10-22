@@ -115,6 +115,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `deprecated-bare-duration` | warn | deprecated | A bare number where a duration goes, which is written with its unit since 1.70; `kay check --fix` rewrites a literal |
 | `deprecated-identity-key` | warn | deprecated | A `kay-allow identity-key` comment or an `identity-key` entry in `lints`, from the lint dropped in 1.69 |
 | `deprecated-rate-limit` | warn | deprecated | `limit`, `visitor` and `limits` of kayjs-ai and kayjs-auth, now `rateLimit` and `key`, and kayjs-mail's `rateLimit: 5`, now `{ max, window }` |
+| `deprecated-site-name` | warn | deprecated | `url` and a display-name `site` in kayjs-auth's `createAuth`, now `site` (the origin) and `name` |
 | `deprecated-renamed-export` | warn | deprecated | An import of `HydrationMismatch`, `ActionRedirect`, `CspViolation`, `RedirectRefused`, `SaveConflict` or `MailNotConfigured`, renamed in 1.70 to end in `Error`. Also the exports of kayjs-auth, kayjs-mail, kayjs-ui and kayjs-cms that clashed across libraries (`memoryStore`, `Settings`, `defaults`, `postgresLoader`...) |
 | `deprecated-markup-prop` | warn | deprecated | A markup prop typed `JSX.Element` or a function returning it, now a `Snippet` from `kay` |
 | `deprecated-hook-shape` | warn | deprecated | An `on*` hook with positional arguments, which takes one event object since 1.70 |

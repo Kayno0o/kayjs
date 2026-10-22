@@ -10,6 +10,7 @@ const URL = 'https://site.test/verify?token=a&b'
 const link: AuthMail = {
   to: 'ada@example.com',
   kind: 'verify-email',
+  name: 'Site',
   site: 'Site',
   locale: 'fr',
   subject: 'kayjs-auth\'s subject',

@@ -136,7 +136,7 @@ export default function shopTab(tool: DevTool): void {
 How kay and its libraries name the same idea, written before the renames land: a new option, export, class or file follows the target form, and each `(#n)` is the issue moving the existing code to it. `tests/packages.test.ts` checks the prefixes, error class names and doc headings, listing the drift still waiting on its issue, so a new violation fails.
 
 **Options**
-- `site` is a public origin and defaults to kay's `site`; `name` is a display name. A library's other origin options (`origin`, `host`, `publicUrl`) are spelled `site` (#1680). A third-party service's API root is `baseUrl`, not `url` (#1696).
+- `site` is a public origin and defaults to kay's `site`; `name` is a display name. An option holding the site's own origin is spelled `site` (kayjs-auth's, the contact mail view's prop); `publicUrl` of `s3Files` and the `host` of an analytics provider hold another address (a bucket's, a provider's), so they keep their names. A third-party service's API root is `baseUrl`, not `url` (#1696).
 - A duration is one `Duration` type, a string with its unit (`'250ms'`, `'5m'`), in every option, store argument and test helper of kay and the libraries: never a bare number, never a unit in a name (`timeoutMs`). The runtime still reads the old numbers until 1.73, and `kay check --fix` rewrites them (`deprecated-bare-duration`) (#1639).
 - How long something stays valid is `maxAge`, how long to wait is `timeout`, an absolute date is `expires`; never `expiresIn` or `lifetime`, and a second lifetime is a nested `maxAge`, not `rememberMaxAge` (#1685).
 - A size limit is `maxSize: ByteSize` (a number of bytes or `'2mb'`); `bodyLimit` and `maxBytes` go (#1686).

@@ -24,7 +24,7 @@ const CARRIES: Partial<Record<AuthKind, Partial<AuthMail>>> = {
 
 // A mail of `kind` as kayjs-auth hands it, for the samples page, which renders it in the site's default language: its locale, subject, text and html go unread.
 export function authSample(kind: AuthKind): AuthMail {
-  return { to: 'ada@example.com', kind, site: 'Example', locale: '', subject: '', text: '', html: '', ...CARRIES[kind] }
+  return { to: 'ada@example.com', kind, name: 'Example', site: 'Example', locale: '', subject: '', text: '', html: '', ...CARRIES[kind] }
 }
 
 // The samples page's names for kayjs-auth's mails, every kind of it.

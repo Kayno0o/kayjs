@@ -16,7 +16,7 @@ beforeEach(() => outbox.clear())
 describe('with kayjs-mail', () => {
   test('sends a mailed link through it, the html wrapped in a document and the text kept as written', async () => {
     const mail = mailer({ from: 'Site <site@site.test>', queue: { name: 'auth-sent' } })
-    const ada = testApp({ url: 'https://site.test', site: 'Site', email: { mailer: { send: mail.send }, links: LINKS } }).browser()
+    const ada = testApp({ site: 'https://site.test', name: 'Site', email: { mailer: { send: mail.send }, links: LINKS } }).browser()
 
     await ada.call('register', { email: 'ada@example.com', password: 'correct horse battery' })
 
@@ -30,7 +30,7 @@ describe('with kayjs-mail', () => {
 
   test('queues the mails through enqueue, sent once the queue runs', async () => {
     const mail = mailer({ from: 'site@site.test', queue: { name: 'auth-queued' } })
-    const ada = testApp({ url: 'https://site.test', site: 'Site', email: { mailer: { send: mail.enqueue }, links: LINKS } }).browser()
+    const ada = testApp({ site: 'https://site.test', name: 'Site', email: { mailer: { send: mail.enqueue }, links: LINKS } }).browser()
 
     await ada.call('register', { email: 'ada@example.com', password: 'correct horse battery' })
     expect(outbox.mails).toEqual([])
@@ -49,8 +49,8 @@ describe('kayjs-mail\'s auth views', () => {
   for (const [locale, messages] of [['en', en], ['fr', fr]] as const) {
     test(`open on kayjs-auth's own lead in ${locale}`, () => {
       const words = messages.mail.auth as unknown as Record<string, { lead: string }> & { link: string }
-      const data = { site: 'Site', email: 'ada@example.com', detail: 'Acme', url: 'https://site.test/l', locale }
-      const values: Record<string, string> = { site: data.site, email: data.email, detail: data.detail, what: words.link }
+      const data = { name: 'Site', site: 'Site', email: 'ada@example.com', detail: 'Acme', url: 'https://site.test/l', locale }
+      const values: Record<string, string> = { site: data.name, email: data.email, detail: data.detail, what: words.link }
 
       for (const [kind, template] of Object.entries(builtInTemplates[locale]!))
         expect(template(data).text).toContain(words[kind]!.lead.replaceAll(PLACEHOLDER, (_, name: string) => values[name]!))

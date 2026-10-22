@@ -25,7 +25,7 @@ export function authWords(mail: AuthMail): AuthWords {
   if (!isLinkKind(kind) && !isNoticeKind(kind))
     throw configError(`${kind} is no kind of mail kayjs-auth sends`)
 
-  const of = (line: 'subject' | 'lead' | 'ending'): string => t(`mail.auth.${kind}.${line}`, { site: mail.site, email: mail.to, detail: mail.detail ?? '', what: t(mail.url === undefined ? 'mail.auth.code' : 'mail.auth.link') })
+  const of = (line: 'subject' | 'lead' | 'ending'): string => t(`mail.auth.${kind}.${line}`, { site: mail.name, email: mail.to, detail: mail.detail ?? '', what: t(mail.url === undefined ? 'mail.auth.code' : 'mail.auth.link') })
   // How long a link works, left unsaid when its `lasts` is empty; the figure kayjs-auth was set to when it sends one, the default wording otherwise.
   const maxAge = mail.maxAge ?? mail.expires
   const link = maxAge?.link === undefined ? undefined : durationWords(maxAge.link, mail.locale) + (kind === 'magic-link' ? t('mail.auth.once') : '')

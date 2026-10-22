@@ -10,13 +10,15 @@ import { wording } from 'kay/words'
 import { log } from './log'
 import { MailNotConfiguredError, wasLogged } from './mailer'
 
-// What the view of a contact mail is given: the visitor's answers as `fields` (the name and email first, the message apart), the `subject` and the site's `origin`.
+// What the view of a contact mail is given: the visitor's answers as `fields` (the name and email first, the message apart), the `subject` and the `site`, its origin.
 export interface ContactMailProps {
   subject: string
   name: string
   email: string
   message: string
   fields: MailField[]
+  site: string
+  /** @deprecated The old name of `site`, given until 1.73. */
   origin: string
 }
 
@@ -121,7 +123,7 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
         replyTo: { name, address: email },
         subject,
         view: options.view ?? await defaultView(),
-        props: { subject, name, email, message, fields: given, origin },
+        props: { subject, name, email, message, fields: given, site: origin, origin },
       })
     }
     catch (error) {

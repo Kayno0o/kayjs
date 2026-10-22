@@ -653,7 +653,7 @@ it('adds kayjs-auth over a SQLite file of its own, with the guard and the ui ext
     const source = await Bun.file(join(dir, 'src/auth.ts')).text()
 
     expect(source).toContain('export const db = new Database({ url: \'sqlite://data/auth.db\', tables: [...authTables] })')
-    expect(source).toContain('site: \'My Shop\'')
+    expect(source).toContain('name: \'My Shop\'')
     expect(source).not.toContain('mail.')
     expect(await Bun.file(join(dir, 'src/routes/_guard.ts')).text()).toContain('export default auth.guard()')
 

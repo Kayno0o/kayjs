@@ -16,11 +16,13 @@ export interface MailContent {
   html: string
 }
 
-// A mail for the app's mailer to send: `subject`, `text` and `html` are filled from the templates, and `kind`, `site`, `detail` and `url` let an app with its own templating ignore them.
+// A mail for the app's mailer to send: `subject`, `text` and `html` are filled from the templates, and `kind`, `name`, `detail` and `url` let an app with its own templating ignore them.
 export interface AuthMailMessage extends MailContent {
   to: string
   kind: MailKind
   // The site's name, as the templates write it.
+  name: string
+  /** @deprecated The old name of `name`, kept until 1.73. */
   site: string
   // The organization an invitation is to, or the provider, passkey, token or new address an event is about.
   detail?: string
@@ -46,8 +48,10 @@ export type Mail = AuthMailMessage
 /** @deprecated Renamed `AuthMailer` in 1.70, as kayjs-mail has a `Mailer` of its own; the old name goes in 1.73. */
 export type Mailer = AuthMailer
 
-// What a template is given: the site's name, the address written to, the link and the code when the mail carries them, and the provider or token an event is about, or the organization an invitation is to.
+// What a template is given: the site's `name`, the address written to, the link and the code when the mail carries them, and the provider or token an event is about, or the organization an invitation is to.
 export interface MailData {
+  name: string
+  /** @deprecated The old name of `name`, kept until 1.73. */
   site: string
   email: string
   url?: string | undefined
@@ -139,7 +143,7 @@ function lasting(words: Wording, data: MailData, once = false): string {
 // With a `url`, a link to where the user reviews what happened, such as the list of where they are signed in.
 function noticeMail(words: Wording, data: MailData, subject: string, lead: string, ending = words.notYou): MailContent {
   return {
-    subject: words.onSite(subject, data.site),
+    subject: words.onSite(subject, data.name),
     text: [lead, data.url === undefined ? undefined : `${words.review} ${data.url}`, ending].filter(part => part !== undefined).join('\n\n'),
     html: `<div lang="${escape(data.locale)}" style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#1a1a1a">
   <p style="font-size:16px;line-height:1.5;margin:0 0 20px">${escape(lead)}</p>${data.url === undefined
@@ -154,55 +158,55 @@ function noticeMail(words: Wording, data: MailData, subject: string, lead: strin
 const en = ENGLISH
 
 export const defaultTemplates: Templates = {
-  'verify-email': data => linkMail(en, data, `Confirm your email for ${data.site}`, `Confirm ${data.email} as the address of your ${data.site} account.`, 'Confirm my email', `${lasting(en, data)} If you did not create an account, ignore this mail.`),
-  'reset-password': data => linkMail(en, data, `Reset your ${data.site} password`, `Someone asked to reset the password of the ${data.site} account for ${data.email}.`, 'Choose a new password', `${lasting(en, data)} If you did not ask for it, ignore this mail: your password stays as it is.`),
-  'magic-link': data => linkMail(en, data, `Sign in to ${data.site}`, `Here is your ${data.url === undefined ? 'code' : 'link'} to sign in to ${data.site}.`, 'Sign in', `${lasting(en, data, true)} If you did not ask for it, ignore this mail.`),
-  'change-email': data => linkMail(en, data, `Confirm your new email for ${data.site}`, `Confirm ${data.email} as the new address of your ${data.site} account.`, 'Confirm the change', `${lasting(en, data)} If you did not ask for this change, ignore this mail.`),
-  'invitation': data => linkMail(en, data, `Join ${data.detail} on ${data.site}`, `You are invited to join ${data.detail} on ${data.site}, with an account at ${data.email}.`, 'See the invitation', 'If you did not expect it, ignore this mail.'),
-  'account-exists': data => linkMail(en, data, `You already have a ${data.site} account`, `Someone tried to create a ${data.site} account for ${data.email}, which has one already. Sign in to it, or ask for a new password on the sign-in page if you forgot yours.`, 'Sign in', 'If this was not you, ignore this mail: nothing changed on your account.'),
-  'new-sign-in': data => noticeMail(en, data, 'New sign-in', `Your ${data.site} account was just signed into from a device or network it had not used before.`),
-  'sign-in-locked': data => noticeMail(en, data, 'Sign-in locked', `Too many wrong passwords or codes were tried on your ${data.site} account, so signing in to it is paused for a while.`),
-  'password-changed': data => noticeMail(en, data, 'Password changed', `The password of your ${data.site} account was changed, and its other sessions signed out.`),
-  'email-changed': data => noticeMail(en, data, 'Email changed', `Your ${data.site} account moved from ${data.email} to ${data.detail}. This address no longer signs into it.`, en.contactSite),
-  'two-factor-enabled': data => noticeMail(en, data, 'Two-factor turned on', `Your ${data.site} account now asks for a code from your authenticator when signing in.`),
-  'two-factor-disabled': data => noticeMail(en, data, 'Two-factor turned off', `Your ${data.site} account no longer asks for a code when signing in.`),
-  'recovery-code-used': data => noticeMail(en, data, 'Recovery code used', `A recovery code was just used on your ${data.site} account; it will not work again.`),
-  'recovery-codes-regenerated': data => noticeMail(en, data, 'New recovery codes', `Your ${data.site} account has a new set of recovery codes, and the old ones no longer work.`),
-  'provider-linked': data => noticeMail(en, data, 'Account linked', `A ${data.detail} account can now sign into your ${data.site} account.`),
-  'provider-unlinked': data => noticeMail(en, data, 'Account unlinked', `Your ${data.detail} account no longer signs into your ${data.site} account.`),
-  'passkey-added': data => noticeMail(en, data, 'New passkey', `A passkey named ${data.detail} can now sign into your ${data.site} account.`),
-  'passkey-removed': data => noticeMail(en, data, 'Passkey removed', `The passkey named ${data.detail} no longer signs into your ${data.site} account.`),
-  'token-created': data => noticeMail(en, data, 'New access token', `An access token named ${data.detail} was created for your ${data.site} account.`),
-  'signed-out-everywhere': data => noticeMail(en, data, 'Signed out everywhere', `Your ${data.site} account was signed out everywhere: every session and access token it had has ended.`),
-  'account-deleted': data => noticeMail(en, data, 'Account deleted', `Your ${data.site} account was deleted.`, en.contactSite),
-  'organization-handed-over': data => noticeMail(en, data, 'You own an organization', `You are now an owner of ${data.detail} on ${data.site}: its only owner's account was deleted.`, en.contactSite),
+  'verify-email': data => linkMail(en, data, `Confirm your email for ${data.name}`, `Confirm ${data.email} as the address of your ${data.name} account.`, 'Confirm my email', `${lasting(en, data)} If you did not create an account, ignore this mail.`),
+  'reset-password': data => linkMail(en, data, `Reset your ${data.name} password`, `Someone asked to reset the password of the ${data.name} account for ${data.email}.`, 'Choose a new password', `${lasting(en, data)} If you did not ask for it, ignore this mail: your password stays as it is.`),
+  'magic-link': data => linkMail(en, data, `Sign in to ${data.name}`, `Here is your ${data.url === undefined ? 'code' : 'link'} to sign in to ${data.name}.`, 'Sign in', `${lasting(en, data, true)} If you did not ask for it, ignore this mail.`),
+  'change-email': data => linkMail(en, data, `Confirm your new email for ${data.name}`, `Confirm ${data.email} as the new address of your ${data.name} account.`, 'Confirm the change', `${lasting(en, data)} If you did not ask for this change, ignore this mail.`),
+  'invitation': data => linkMail(en, data, `Join ${data.detail} on ${data.name}`, `You are invited to join ${data.detail} on ${data.name}, with an account at ${data.email}.`, 'See the invitation', 'If you did not expect it, ignore this mail.'),
+  'account-exists': data => linkMail(en, data, `You already have a ${data.name} account`, `Someone tried to create a ${data.name} account for ${data.email}, which has one already. Sign in to it, or ask for a new password on the sign-in page if you forgot yours.`, 'Sign in', 'If this was not you, ignore this mail: nothing changed on your account.'),
+  'new-sign-in': data => noticeMail(en, data, 'New sign-in', `Your ${data.name} account was just signed into from a device or network it had not used before.`),
+  'sign-in-locked': data => noticeMail(en, data, 'Sign-in locked', `Too many wrong passwords or codes were tried on your ${data.name} account, so signing in to it is paused for a while.`),
+  'password-changed': data => noticeMail(en, data, 'Password changed', `The password of your ${data.name} account was changed, and its other sessions signed out.`),
+  'email-changed': data => noticeMail(en, data, 'Email changed', `Your ${data.name} account moved from ${data.email} to ${data.detail}. This address no longer signs into it.`, en.contactSite),
+  'two-factor-enabled': data => noticeMail(en, data, 'Two-factor turned on', `Your ${data.name} account now asks for a code from your authenticator when signing in.`),
+  'two-factor-disabled': data => noticeMail(en, data, 'Two-factor turned off', `Your ${data.name} account no longer asks for a code when signing in.`),
+  'recovery-code-used': data => noticeMail(en, data, 'Recovery code used', `A recovery code was just used on your ${data.name} account; it will not work again.`),
+  'recovery-codes-regenerated': data => noticeMail(en, data, 'New recovery codes', `Your ${data.name} account has a new set of recovery codes, and the old ones no longer work.`),
+  'provider-linked': data => noticeMail(en, data, 'Account linked', `A ${data.detail} account can now sign into your ${data.name} account.`),
+  'provider-unlinked': data => noticeMail(en, data, 'Account unlinked', `Your ${data.detail} account no longer signs into your ${data.name} account.`),
+  'passkey-added': data => noticeMail(en, data, 'New passkey', `A passkey named ${data.detail} can now sign into your ${data.name} account.`),
+  'passkey-removed': data => noticeMail(en, data, 'Passkey removed', `The passkey named ${data.detail} no longer signs into your ${data.name} account.`),
+  'token-created': data => noticeMail(en, data, 'New access token', `An access token named ${data.detail} was created for your ${data.name} account.`),
+  'signed-out-everywhere': data => noticeMail(en, data, 'Signed out everywhere', `Your ${data.name} account was signed out everywhere: every session and access token it had has ended.`),
+  'account-deleted': data => noticeMail(en, data, 'Account deleted', `Your ${data.name} account was deleted.`, en.contactSite),
+  'organization-handed-over': data => noticeMail(en, data, 'You own an organization', `You are now an owner of ${data.detail} on ${data.name}: its only owner's account was deleted.`, en.contactSite),
 }
 
 const fr = FRENCH
 
 export const frenchTemplates: Templates = {
-  'verify-email': data => linkMail(fr, data, `Confirmez votre adresse pour ${data.site}`, `Confirmez ${data.email} comme adresse de votre compte ${data.site}.`, 'Confirmer mon adresse', `${lasting(fr, data)} Si vous n'avez pas créé de compte, ignorez ce message.`),
-  'reset-password': data => linkMail(fr, data, `Réinitialisez votre mot de passe ${data.site}`, `Quelqu'un a demandé à réinitialiser le mot de passe du compte ${data.site} de ${data.email}.`, 'Choisir un nouveau mot de passe', `${lasting(fr, data)} Si vous ne l'avez pas demandé, ignorez ce message : votre mot de passe reste inchangé.`),
-  'magic-link': data => linkMail(fr, data, `Connexion à ${data.site}`, `Voici votre ${data.url === undefined ? 'code' : 'lien'} pour vous connecter à ${data.site}.`, 'Me connecter', `${lasting(fr, data, true)} Si vous ne l'avez pas demandé, ignorez ce message.`),
-  'change-email': data => linkMail(fr, data, `Confirmez votre nouvelle adresse pour ${data.site}`, `Confirmez ${data.email} comme nouvelle adresse de votre compte ${data.site}.`, 'Confirmer le changement', `${lasting(fr, data)} Si vous n'avez pas demandé ce changement, ignorez ce message.`),
-  'invitation': data => linkMail(fr, data, `Rejoignez ${data.detail} sur ${data.site}`, `Vous êtes invité à rejoindre ${data.detail} sur ${data.site}, avec un compte à l'adresse ${data.email}.`, 'Voir l\'invitation', 'Si vous ne l\'attendiez pas, ignorez ce message.'),
-  'account-exists': data => linkMail(fr, data, `Vous avez déjà un compte ${data.site}`, `Quelqu'un a tenté de créer un compte ${data.site} pour ${data.email}, qui en a déjà un. Connectez-vous-y, ou demandez un nouveau mot de passe depuis la page de connexion si vous l'avez oublié.`, 'Me connecter', 'Si ce n\'était pas vous, ignorez ce message : rien n\'a changé sur votre compte.'),
-  'sign-in-locked': data => noticeMail(fr, data, 'Connexion suspendue', `Trop de mots de passe ou de codes incorrects ont été essayés sur votre compte ${data.site} : la connexion est suspendue pour un moment.`),
-  'new-sign-in': data => noticeMail(fr, data, 'Nouvelle connexion', `Votre compte ${data.site} vient d'être utilisé depuis un appareil ou un réseau qu'il n'avait jamais utilisé.`),
-  'password-changed': data => noticeMail(fr, data, 'Mot de passe modifié', `Le mot de passe de votre compte ${data.site} a été modifié, et ses autres sessions déconnectées.`),
-  'email-changed': data => noticeMail(fr, data, 'Adresse modifiée', `Votre compte ${data.site} est passé de ${data.email} à ${data.detail}. Cette adresse ne permet plus de s'y connecter.`, fr.contactSite),
-  'two-factor-enabled': data => noticeMail(fr, data, 'Double authentification activée', `Votre compte ${data.site} demande désormais un code de votre application d'authentification à chaque connexion.`),
-  'two-factor-disabled': data => noticeMail(fr, data, 'Double authentification désactivée', `Votre compte ${data.site} ne demande plus de code à la connexion.`),
-  'recovery-code-used': data => noticeMail(fr, data, 'Code de secours utilisé', `Un code de secours vient d'être utilisé sur votre compte ${data.site} ; il ne fonctionnera plus.`),
-  'recovery-codes-regenerated': data => noticeMail(fr, data, 'Nouveaux codes de secours', `Votre compte ${data.site} a de nouveaux codes de secours, et les anciens ne fonctionnent plus.`),
-  'provider-linked': data => noticeMail(fr, data, 'Compte associé', `Un compte ${data.detail} peut désormais se connecter à votre compte ${data.site}.`),
-  'provider-unlinked': data => noticeMail(fr, data, 'Compte dissocié', `Votre compte ${data.detail} ne permet plus de se connecter à votre compte ${data.site}.`),
-  'passkey-added': data => noticeMail(fr, data, 'Nouvelle clé d\'accès', `Une clé d'accès nommée ${data.detail} peut désormais se connecter à votre compte ${data.site}.`),
-  'passkey-removed': data => noticeMail(fr, data, 'Clé d\'accès supprimée', `La clé d'accès nommée ${data.detail} ne permet plus de se connecter à votre compte ${data.site}.`),
-  'token-created': data => noticeMail(fr, data, 'Nouveau jeton d\'accès', `Un jeton d'accès nommé ${data.detail} a été créé pour votre compte ${data.site}.`),
-  'signed-out-everywhere': data => noticeMail(fr, data, 'Déconnexion partout', `Votre compte ${data.site} a été déconnecté partout : toutes ses sessions et tous ses jetons d'accès ont pris fin.`),
-  'account-deleted': data => noticeMail(fr, data, 'Compte supprimé', `Votre compte ${data.site} a été supprimé.`, fr.contactSite),
-  'organization-handed-over': data => noticeMail(fr, data, 'Vous dirigez une organisation', `Vous êtes désormais propriétaire de ${data.detail} sur ${data.site} : le compte de son seul propriétaire a été supprimé.`, fr.contactSite),
+  'verify-email': data => linkMail(fr, data, `Confirmez votre adresse pour ${data.name}`, `Confirmez ${data.email} comme adresse de votre compte ${data.name}.`, 'Confirmer mon adresse', `${lasting(fr, data)} Si vous n'avez pas créé de compte, ignorez ce message.`),
+  'reset-password': data => linkMail(fr, data, `Réinitialisez votre mot de passe ${data.name}`, `Quelqu'un a demandé à réinitialiser le mot de passe du compte ${data.name} de ${data.email}.`, 'Choisir un nouveau mot de passe', `${lasting(fr, data)} Si vous ne l'avez pas demandé, ignorez ce message : votre mot de passe reste inchangé.`),
+  'magic-link': data => linkMail(fr, data, `Connexion à ${data.name}`, `Voici votre ${data.url === undefined ? 'code' : 'lien'} pour vous connecter à ${data.name}.`, 'Me connecter', `${lasting(fr, data, true)} Si vous ne l'avez pas demandé, ignorez ce message.`),
+  'change-email': data => linkMail(fr, data, `Confirmez votre nouvelle adresse pour ${data.name}`, `Confirmez ${data.email} comme nouvelle adresse de votre compte ${data.name}.`, 'Confirmer le changement', `${lasting(fr, data)} Si vous n'avez pas demandé ce changement, ignorez ce message.`),
+  'invitation': data => linkMail(fr, data, `Rejoignez ${data.detail} sur ${data.name}`, `Vous êtes invité à rejoindre ${data.detail} sur ${data.name}, avec un compte à l'adresse ${data.email}.`, 'Voir l\'invitation', 'Si vous ne l\'attendiez pas, ignorez ce message.'),
+  'account-exists': data => linkMail(fr, data, `Vous avez déjà un compte ${data.name}`, `Quelqu'un a tenté de créer un compte ${data.name} pour ${data.email}, qui en a déjà un. Connectez-vous-y, ou demandez un nouveau mot de passe depuis la page de connexion si vous l'avez oublié.`, 'Me connecter', 'Si ce n\'était pas vous, ignorez ce message : rien n\'a changé sur votre compte.'),
+  'sign-in-locked': data => noticeMail(fr, data, 'Connexion suspendue', `Trop de mots de passe ou de codes incorrects ont été essayés sur votre compte ${data.name} : la connexion est suspendue pour un moment.`),
+  'new-sign-in': data => noticeMail(fr, data, 'Nouvelle connexion', `Votre compte ${data.name} vient d'être utilisé depuis un appareil ou un réseau qu'il n'avait jamais utilisé.`),
+  'password-changed': data => noticeMail(fr, data, 'Mot de passe modifié', `Le mot de passe de votre compte ${data.name} a été modifié, et ses autres sessions déconnectées.`),
+  'email-changed': data => noticeMail(fr, data, 'Adresse modifiée', `Votre compte ${data.name} est passé de ${data.email} à ${data.detail}. Cette adresse ne permet plus de s'y connecter.`, fr.contactSite),
+  'two-factor-enabled': data => noticeMail(fr, data, 'Double authentification activée', `Votre compte ${data.name} demande désormais un code de votre application d'authentification à chaque connexion.`),
+  'two-factor-disabled': data => noticeMail(fr, data, 'Double authentification désactivée', `Votre compte ${data.name} ne demande plus de code à la connexion.`),
+  'recovery-code-used': data => noticeMail(fr, data, 'Code de secours utilisé', `Un code de secours vient d'être utilisé sur votre compte ${data.name} ; il ne fonctionnera plus.`),
+  'recovery-codes-regenerated': data => noticeMail(fr, data, 'Nouveaux codes de secours', `Votre compte ${data.name} a de nouveaux codes de secours, et les anciens ne fonctionnent plus.`),
+  'provider-linked': data => noticeMail(fr, data, 'Compte associé', `Un compte ${data.detail} peut désormais se connecter à votre compte ${data.name}.`),
+  'provider-unlinked': data => noticeMail(fr, data, 'Compte dissocié', `Votre compte ${data.detail} ne permet plus de se connecter à votre compte ${data.name}.`),
+  'passkey-added': data => noticeMail(fr, data, 'Nouvelle clé d\'accès', `Une clé d'accès nommée ${data.detail} peut désormais se connecter à votre compte ${data.name}.`),
+  'passkey-removed': data => noticeMail(fr, data, 'Clé d\'accès supprimée', `La clé d'accès nommée ${data.detail} ne permet plus de se connecter à votre compte ${data.name}.`),
+  'token-created': data => noticeMail(fr, data, 'Nouveau jeton d\'accès', `Un jeton d'accès nommé ${data.detail} a été créé pour votre compte ${data.name}.`),
+  'signed-out-everywhere': data => noticeMail(fr, data, 'Déconnexion partout', `Votre compte ${data.name} a été déconnecté partout : toutes ses sessions et tous ses jetons d'accès ont pris fin.`),
+  'account-deleted': data => noticeMail(fr, data, 'Compte supprimé', `Votre compte ${data.name} a été supprimé.`, fr.contactSite),
+  'organization-handed-over': data => noticeMail(fr, data, 'Vous dirigez une organisation', `Vous êtes désormais propriétaire de ${data.detail} sur ${data.name} : le compte de son seul propriétaire a été supprimé.`, fr.contactSite),
 }
 
 // kayjs-auth's own templates by language, English for any other.

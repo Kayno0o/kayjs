@@ -26,7 +26,7 @@ export function mailNotice(core: RequestState['core'], languages: readonly strin
 
   const { locale, templates } = writing(mail, [record.locale, ...languages])
 
-  sendAside(mail, () => ({ to, kind: event, site: core.site, locale, ...url === undefined ? {} : { url }, ...detail === undefined ? {} : { detail }, ...templates[event]({ site: core.site, email: to, detail, url, locale }) }), event)
+  sendAside(mail, () => ({ to, kind: event, name: core.name, site: core.name, locale, ...url === undefined ? {} : { url }, ...detail === undefined ? {} : { detail }, ...templates[event]({ name: core.name, site: core.name, email: to, detail, url, locale }) }), event)
 }
 
 // Mails a sign-in from a device or network the account has not used before, then remembers this one.

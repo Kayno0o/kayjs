@@ -340,7 +340,7 @@ export async function warnHolder(state: RequestState, holder: UserRecord): Promi
   const { locale, templates } = writing(mail, [holder.locale, ...state.languages])
   const url = `${core.url}${core.signInPage}`
 
-  sendAside(mail, () => ({ to: email, kind: 'account-exists', site: core.site, locale, url, ...templates['account-exists']({ site: core.site, email, url, locale }) }), 'account-exists')
+  sendAside(mail, () => ({ to: email, kind: 'account-exists', name: core.name, site: core.name, locale, url, ...templates['account-exists']({ name: core.name, site: core.name, email, url, locale }) }), 'account-exists')
 }
 
 // Signs in with the code a magic link mail carried, in the session that asked for it.
@@ -526,7 +526,7 @@ async function issue(state: RequestState, record: UserRecord, type: LinkType, em
 
   const maxAge = lifetimesOf(mail, type, content)
 
-  await mail.mailer.send({ to: email, kind: type, site: core.site, locale, ...content, maxAge, expires: maxAge, ...templates[type]({ site: core.site, email, locale, ...content, maxAge, expires: maxAge }) })
+  await mail.mailer.send({ to: email, kind: type, name: core.name, site: core.name, locale, ...content, maxAge, expires: maxAge, ...templates[type]({ name: core.name, site: core.name, email, locale, ...content, maxAge, expires: maxAge }) })
 }
 
 // The token's user, once the token is spent; a link for an address the account no longer has is spent for nothing.

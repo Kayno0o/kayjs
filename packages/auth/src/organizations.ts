@@ -412,7 +412,7 @@ export async function invite(state: RequestState, ref: string, email: string, ro
   const { locale, templates } = writing(mail, [invitee?.locale, found.record.locale, ...state.languages])
 
   try {
-    await mail.mailer.send({ to: address, kind: 'invitation', site: core.site, detail: found.organization.name, locale, url, ...templates.invitation({ site: core.site, email: address, url, detail: found.organization.name, locale }) })
+    await mail.mailer.send({ to: address, kind: 'invitation', name: core.name, site: core.name, detail: found.organization.name, locale, url, ...templates.invitation({ name: core.name, site: core.name, email: address, url, detail: found.organization.name, locale }) })
   }
   // Nobody would ever hear of an invitation left behind.
   catch (error) {

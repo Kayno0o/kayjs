@@ -4,7 +4,7 @@
 
 ### OAuth
 
-Each entry of `oauth` names a provider app: `{ provider, clientId, clientSecret }`. Its routes are `/auth/<name>` and `/auth/<name>/callback`, and the callback URL to register at the provider is `url` + `/auth/<name>/callback`.
+Each entry of `oauth` names a provider app: `{ provider, clientId, clientSecret }`. Its routes are `/auth/<name>` and `/auth/<name>/callback`, and the callback URL to register at the provider is `site` + `/auth/<name>/callback`.
 
 ```kay
 a(href="/auth/discord?redirect=/account" data-no-prefetch) Sign in with Discord
@@ -70,7 +70,7 @@ catch (caught) {
 
 ### Passkey rules
 
-Passkeys are made for `url`'s host and checked against its origin: `passkeys: { rpId, origins }` widens them to a parent domain, or lists every origin the pages are served from. `passkeys: { rpName }` is the name the authenticator shows, `site` by default. `passkeys: { userVerification }` (`'required'`, `'preferred'` by default, or `'discouraged'`) is how hard answering a second factor with a passkey asks for a PIN or a biometric; `'required'` also refuses an answer given without it. Adding a passkey, signing in with one and re-proving always require it, as a passkey alone is two factors, so a passkey made without it never exists to count as a way in. Each method below gives the options for the browser, kept as a challenge in the session that works once, for five minutes.
+Passkeys are made for `site`'s host and checked against its origin: `passkeys: { rpId, origins }` widens them to a parent domain, or lists every origin the pages are served from. `passkeys: { rpName }` is the name the authenticator shows, `name` by default. `passkeys: { userVerification }` (`'required'`, `'preferred'` by default, or `'discouraged'`) is how hard answering a second factor with a passkey asks for a PIN or a biometric; `'required'` also refuses an answer given without it. Adding a passkey, signing in with one and re-proving always require it, as a passkey alone is two factors, so a passkey made without it never exists to count as a way in. Each method below gives the options for the browser, kept as a challenge in the session that works once, for five minutes.
 
 - `@kaynooo/kayjs-auth/browser` is what an island calls, with the browser's own WebAuthn JSON methods and no library: `canAskPasskey()` and `canMakePasskey()` say whether to show the button, `askPasskey(options)` and `makePasskey(options)` take the options an action returned and answer the typed JSON for the next action, or null when the person picked none, `rememberChoice()` reads the page's "keep me signed in" box (`input[name=remember]`) for the `remember` of `signInWithPasskey`, undefined when the page has none, and `passkeyFailure(caught, errors, failed)` is the message for what threw: the one of `errors` for the code an action refused with, nothing when the person dismissed the prompt, else `failed`.
 - `passkeyAssertion` (`signInWithPasskey`, `verifyTwoFactorPasskey`, a `{ passkey }` proof) and `passkeyAttestation` (`registerPasskey`) are the schemas an action takes the answer with: typed as the method takes it, so no cast, and refused with a 422 when the answer lacks `id`, `rawId`, `type: 'public-key'` or a part of `response` the ceremony reads. The signature and challenge are the ceremony's to check.

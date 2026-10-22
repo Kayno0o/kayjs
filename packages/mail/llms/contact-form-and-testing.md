@@ -17,7 +17,7 @@ export const contact = action(...contactForm(mail, { fields: { phone: s.Optional
 ```
 
 - Pair it with `ContactForm(action={contact})` from kayjs-ui, or a form of your own with `field="name"`, `field="email"`, `field="message"` and one per extra field; `kay check` cannot read the schema through the spread, so it does not run `unbounded-string` on the extras: give them a `maxLength`.
-- The action checks a one-line `name` (100 characters), an `email` and a `message` (`maxLength`, 5000 by default), then `fields`, a record of schemas of yours, listed in the mail in order after the email. It sends to `to` or `MAIL_TO`, `replyTo` the visitor, the message quoted. `labels` names an extra field in the mail (its key with a capital by default), `subject` is `(input) => string`, `view` a `.kay` component given `ContactMailProps` (`subject`, `name`, `email`, `message`, `fields`, `origin`).
+- The action checks a one-line `name` (100 characters), an `email` and a `message` (`maxLength`, 5000 by default), then `fields`, a record of schemas of yours, listed in the mail in order after the email. It sends to `to` or `MAIL_TO`, `replyTo` the visitor, the message quoted. `labels` names an extra field in the mail (its key with a capital by default), `subject` is `(input) => string`, `view` a `.kay` component given `ContactMailProps` (`subject`, `name`, `email`, `message`, `fields`, `site`, the origin, with `origin` until 1.73).
 - More than `maxLinks` links (3) is refused with 422. `protection` replaces the defaults: `rateLimit` 30 posts and 5 that went through every 10 minutes, `minTime` `'3s'`; the honeypot is the `website` field, with `pretend`, which `honeypot: 'nectar'` renames (a name no autofill knows; the form renders it by itself, and `website` is then free as a field of yours).
 - `consent: true` adds a required `consent` checkbox for a form collecting personal data: an unticked or missing one is refused with the `mail.contact.errors.consent` message (`errors.consent` replaces it), it is checked by the server and left out of the mail. `ContactForm` draws it for this field only (not for an extra field of yours named `consent`; its `consent` prop forces the box), with a `privacy="/privacy"` link; a form of your own writes `input(field="consent" type="checkbox")`.
 - `MailNotConfiguredError` answers 503 and any other send failure 502, as a refusal the form shows through `contact.error()`; the cause is logged, by the mailer for a delivery that failed and by the form for a mail that never got to it (not configured, a view that does not render). `reach` is named in the 503, the 502 and the rate-limit refusal.
@@ -110,7 +110,7 @@ export default defineMessages({
 
 Keeping the layout around the app's own lines: `AuthLink` (a link or a code) and `AuthNotice` (news of a change) are the views `authMailer` ships, taking `mail` and any line as a prop over the default wording (`heading`, `lead`, `button` or `review`, `ending`), and children, which go under the lead. `authWords(mail)` gives the default wording of a mail in the language it renders in, for a view written from scratch; it throws for a `mail.kind` kayjs-auth does not send, so a view reading `kind` as any string checks it first.
 
-Replacing a kind: `views` takes the app's own `.kay` view for any kind, imported once its first mail goes, as a module imported with kay.config.ts cannot load a `.kay` file. The view gets `{ mail }` (the `AuthMail` type): `mail.site`, `mail.to`, `mail.url`, `mail.code`, `mail.detail` and `mail.kind`; its subject stays the messages' `subject`:
+Replacing a kind: `views` takes the app's own `.kay` view for any kind, imported once its first mail goes, as a module imported with kay.config.ts cannot load a `.kay` file. The view gets `{ mail }` (the `AuthMail` type): `mail.name` (the site's name; `mail.site` until 1.73), `mail.to`, `mail.url`, `mail.code`, `mail.detail` and `mail.kind`; its subject stays the messages' `subject`:
 
 ```ts
 authMailer(mail.enqueue, { views: { 'reset-password': () => import('./mails/auth/reset-password.kay') } })
@@ -125,7 +125,7 @@ import Paragraph from '@kaynooo/kayjs-mail/paragraph.kay'
 
 const { mail } = props<{ mail: AuthMail }>()
 ---
-AuthLink(mail={mail} lead={t('resetLead', { site: mail.site })})
+AuthLink(mail={mail} lead={t('resetLead', { name: mail.name })})
   Paragraph {t('neverByMail')}
 ```
 

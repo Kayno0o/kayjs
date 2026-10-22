@@ -9,7 +9,7 @@ import { sessions } from './session'
 export const auth = createAuth({
   sessions,
   store: pgStore(db),
-  site: 'Noticeboard',
+  name: 'Noticeboard',
   pages: true,
   email: {
     mailer: authMailer(mail.enqueue),

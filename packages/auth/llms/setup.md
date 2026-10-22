@@ -24,7 +24,7 @@ export const db = new Database({ url: process.env.DATABASE_URL!, tables: [...aut
 export const auth = createAuth({
   sessions: session<AuthSessionData & { cart: string[] }>(),
   store: pgStore(db),
-  site: 'Example',
+  name: 'Example',
   signInPage: '/login',
   oauth: { discord: { provider: discordProvider(), clientId: process.env.DISCORD_CLIENT_ID!, clientSecret: process.env.DISCORD_CLIENT_SECRET! } },
   email: { mailer: { send: mail.enqueue }, links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' } },
@@ -41,6 +41,7 @@ export default defineConfig({
   extensions: [auth({ module: './src/auth' })],
 })
 ```
+
 
 ### Prebuilt pages
 
@@ -96,7 +97,7 @@ A plain Elysia app, or one mounting the plugin by hand, uses it before the pages
 - `sessions`: the plugin kay's `session()` returns, its data type including `AuthSessionData`: the signed-in state lives in the app's kay session, and kayjs-auth sets no cookie of its own.
 - `secret`: left out, kayjs-auth derives its own key from the session's secret, which is kay's `KAY_SECRET` unless `session()` gets one ([The app secret](../../../llms/environment.md#the-app-secret); `sessions.deriveSecret('kayjs-auth')`, HKDF, so it says nothing of the session's key and a rotated list stays rotated), and one secret serves both. Pass one (at least 32 characters, from the environment, a list rotates) to keep a second secret for kayjs-auth; a session plugin that is not kay's `session()` needs it. Each use gets its own key derived from it: encrypting TOTP secrets and provider tokens, and digesting where a sign-in came from. The first writes, every one reads. With the default, TOTP secrets and stored provider tokens are sealed under a key derived from the session secret: keep the old session secrets in its list while such data exists, or set `secret` separately. Moving an app from `AUTH_SECRET` to the default needs `secret: [...sessions.deriveSecret('kayjs-auth'), process.env.AUTH_SECRET!]` for as long as data sealed under it exists. After a rotation each user gets one `new-sign-in` mail, since the digest of where they sign in from changes with the secret.
 - `store`: see Stores.
-- `url`: the site's public origin, needed for OAuth callbacks and mailed links; it is kay's `site` (`site` in kay.config.ts, else `SITE_URL`) when left out, so the app sets it once, and only `url` of a plain Elysia app is its own. With OAuth or mail configured and no origin anywhere, the server refuses to start and a request answers 500, naming `SITE_URL`; `kay dev` supplies `http://localhost:<port>`, so development needs none. `site`: the site's name in mails and authenticator apps, the URL's host by default.
+- `site`: the site's public origin, for OAuth callbacks, mailed links and passkeys; it is kay's `site` (`site` in kay.config.ts, else `SITE_URL`) when left out, so the app sets it once, and only `site` of a plain Elysia app is its own. With OAuth or mail configured and no origin anywhere, the server refuses to start and a request answers 500, naming `SITE_URL`; `kay dev` supplies `http://localhost:<port>`, so development needs none. `name`: the site's name in mails and authenticator apps, the origin's host by default. `url` and a `site` that is a name are the old forms of both, kept until 1.73 (`deprecated-site-name`).
 - `prefix`: where the OAuth routes live, `/auth` by default.
 - `signInPage`: where a failed OAuth sign-in goes with `?error=`, `/` by default, and where `guard()` and `requireUser()` send an anonymous visitor opening a page when there are no `pages`. `failurePage`: where every failed OAuth sign-in goes instead, with no reason in the URL, so that whether an account may sign in does not leak through an `allow` list. `twoFactorPage`: where a sign-in goes to ask for the code, `/two-factor` by default. `pages`: see Prebuilt pages, which these then default to.
 - `oauth`, `allow`, `onSignUp`, `profileFields`: see OAuth. The hooks take one event object, `onSignUp({ user, profile })`, `onDelete({ user })`; the positional shape is read until 1.73. `signUp`, `rules`: see Passwords. `email`: see Mailed links. `onDelete`: see Account. `onAuthEvent`: see Security mails. `roles`, `defaultRoles`, `authorize`: see Guards and gates. `scopes`: see Bearer tokens. `rateLimit`: see Limits. `captcha`, `breachedPasswords`: see Bots and breached passwords. `remember`, `sessionsPage`, `locate`: see Sessions. `passkeys`: see Passkeys. `audit`: see Events and the audit log. `admin`: see Admin. `organizations`: see Organizations. `oauthServer`: see OAuth server for MCP clients.

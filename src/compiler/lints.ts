@@ -552,6 +552,15 @@ export const LINTS = {
     wrong: 'ai({ limit: { max: 10, window: \'1m\' }, visitor: request => request.headers.get(\'x-user\') ?? undefined })',
     right: 'ai({ rateLimit: { max: 10, window: \'1m\' }, key: request => request.headers.get(\'x-user\') ?? undefined })',
   },
+  'deprecated-site-name': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.70',
+    site: true,
+    summary: 'kayjs-auth\'s `createAuth({ ... })` written with `url` for the site\'s origin and `site` for its display name, which are `site` and `name` since 1.70, so `site` means the origin everywhere, as in kay.config.ts. The origin now defaults to kay\'s own site, so `url` is usually dropped. The old forms still work for now. A `site` is a name when it is a string literal that is no URL; the call is found by name where it is imported from the library, in the project\'s TypeScript files and `.kay` fences, and an object held in a variable is not read. The fix renames the keys, unless the new name is given beside the old one.',
+    wrong: 'createAuth({ url: \'https://example.com\', site: \'Example\' })',
+    right: 'createAuth({ site: \'https://example.com\', name: \'Example\' })',
+  },
   'deprecated-renamed-export': {
     level: 'warn',
     group: 'deprecated',

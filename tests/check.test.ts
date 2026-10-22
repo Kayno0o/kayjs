@@ -3539,6 +3539,25 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports createAuth\'s url and display-name site, and --fix writes site and name, leaving a name beside a name and a site that is an expression', async () => {
+    const source = 'import * as auths from \'@kaynooo/kayjs-auth\'\nimport { createAuth } from \'@kaynooo/kayjs-auth\'\n\nconst url = \'https://c.test\'\nconst label = process.env.NAME\n\nexport const both = createAuth({ url: \'https://a.test\', site: \'Example\' })\nexport const urlOnly = createAuth({ url })\nexport const nameOnly = createAuth({ site: \'Example\' })\nexport const spaced = auths.createAuth({ "url": \'https://b.test\' })\nexport const doubled = createAuth({ url, site: \'Example\', name: \'Other\' })\nexport const expression = createAuth({ site: label })\nexport const done = createAuth({ site: \'https://d.test\', name: \'Done\' })\n'
+    const root = await scratchProject({
+      'kay.config.ts': 'export default {}\n',
+      'src/auth.ts': source,
+    })
+
+    try {
+      const { output } = await runCheck(root)
+
+      expect(output.match(/deprecated-site-name/g)).toHaveLength(7)
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/auth.ts')).text()).toBe(source.replace('{ url: \'https://a.test\', site: \'Example\' }', '{ site: \'https://a.test\', name: \'Example\' }').replace('createAuth({ url })', 'createAuth({ site: url })').replace('createAuth({ site: \'Example\' })', 'createAuth({ name: \'Example\' })').replace('"url"', 'site'))
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports the rate limit options under their old names and --fix renames them, leaving a call that gives both and an object held elsewhere', async () => {
     const config = 'import { ai, ask } from \'@kaynooo/kayjs-ai\'\nimport * as auths from \'@kaynooo/kayjs-auth\'\nimport { createAuth } from \'@kaynooo/kayjs-auth\'\nimport { mailer, smtp } from \'@kaynooo/kayjs-mail\'\n\nconst limit = { max: 1, window: \'1m\' }\nconst held = { limit }\n\nexport const extensions = [ai({ limit, visitor: request => request.headers.get(\'x-user\') ?? undefined })]\nexport const both = ai({ limit, rateLimit: limit })\nexport const unread = ai(held)\nexport const auth = createAuth({ limits: { signIn: { max: 3, window: \'1h\' } } })\nexport const asked = ask(\'hi\', { visitor: \'job\' })\nexport const spaced = auths.createAuth({ "limits": {} })\nexport const sent = smtp({ host: \'mail.test\', rateLimit: 5 })\nexport const nested = mailer({ smtp: { rateLimit: 2 } })\nexport const done = smtp({ host: \'mail.test\', rateLimit: { max: 5, window: \'1s\' } })\nexport const other = ai({ budget: { tokens: 1, window: \'1d\' } })\n'
     const root = await scratchProject({

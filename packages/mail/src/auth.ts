@@ -27,6 +27,8 @@ export interface AuthMail {
   to: string
   kind: string
   // The site's name.
+  name: string
+  /** @deprecated The old name of `name`, kept until 1.73. */
   site: string
   locale: string
   subject: string
