@@ -1,11 +1,11 @@
 import type { SafeHtml } from './checks'
-import { createSignal } from './reactive'
-import { vouch } from './safe-html'
+import { isHydrating, ownSignal } from './reactive'
+import { SERVER_MARKUP, vouch } from './safe-html'
 
 const ESCAPED = /[&<>"]/g
 const ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }
 
-const loaded = createSignal<((markdown: string) => SafeHtml) | undefined>(undefined)
+const loaded = ownSignal<((markdown: string) => SafeHtml) | undefined>(undefined)
 let requested = false
 
 // The text as written, in a paragraph, which stands in until the renderer has arrived.
@@ -33,5 +33,6 @@ export function markdownHtml(markdown: string): SafeHtml {
   if (!requested)
     void load()
 
-  return asWritten(markdown)
+  // The server wrote this Markdown formatted: an island claiming it keeps that until the renderer arrives.
+  return isHydrating() ? vouch(SERVER_MARKUP) : asWritten(markdown)
 }

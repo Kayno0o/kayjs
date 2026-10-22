@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
+import { clientDir } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
 import { renderMarkdown } from '../src/content'
 import { sanitizedMarkdown } from '../src/runtime/markdown'
@@ -178,7 +179,7 @@ describe('markdownHtml', () => {
       expect(marked(report!.entry!.modules)).toBe(false)
       // The renderer is a chunk of its own that the first call fetches: the note island only carries the stand-in drawing the text as written.
       expect(note!.size.gzip - counter!.size.gzip).toBeLessThan(600)
-      expect((await readdir(join(root, '.kay/client/dist'))).some(file => file.startsWith('markdown-render.client-'))).toBe(true)
+      expect((await readdir(clientDir(root))).some(file => file.startsWith('markdown-render.client-'))).toBe(true)
     }
     finally {
       await rm(root, { recursive: true, force: true })

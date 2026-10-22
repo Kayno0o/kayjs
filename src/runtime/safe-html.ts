@@ -8,6 +8,9 @@ let young = new Set<string>()
 let old = new Set<string>()
 let size = 0
 
+// What an island hydrating returns for markup it has not got yet: `property` leaves the server's own markup in place for it.
+export const SERVER_MARKUP = '<!--kay-server-markup-->'
+
 export function vouch(markup: string, always = false): SafeHtml {
   if (always) {
     forever.add(markup)

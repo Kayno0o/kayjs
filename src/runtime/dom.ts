@@ -8,6 +8,7 @@ import { FAILED, ISLAND, PART_END, PART_START } from './markers'
 import { place } from './move'
 import { browserKeepsSameTab, leavesSite } from './outside'
 import { activeOwner, catchError, createSignal, getOwner, hydrationEnded, hydrationStarted, memo, onCleanup, renderEffect, reportError, root, runWithOwner, scope, unrecorded, untrack } from './reactive'
+import { SERVER_MARKUP } from './safe-html'
 import { isSnapshots, readSnapshots } from './snapshots'
 import { freshPrefix, withIds } from './uid'
 import { safeUrl } from './url'
@@ -1370,6 +1371,10 @@ function outsideProps(props: Record<string, unknown>): Record<string, unknown> {
 
 // A property where the element has one, such as an input's `value`; an attribute otherwise.
 export function property(element: Element, name: string, value: unknown, written = false): void {
+  // Markup the island cannot draw yet, such as Markdown whose renderer is still loading, leaves what the server wrote.
+  if (claim && name === 'innerHTML' && value === SERVER_MARKUP)
+    return
+
   // The server wrote this value, and what the person typed, ticked or opened since stays for the replayed event to read.
   if (claim && (name === 'value' || name === 'checked' || name === 'open')) {
     // A toggle or a close does not bubble to the document, so one made before hydrating is never replayed: the element tells its own listener once the island is in.

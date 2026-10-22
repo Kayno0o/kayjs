@@ -414,7 +414,7 @@ div(innerHTML={markdownHtml(text())})
 
 A link leaving your site opens in a new tab with `rel="nofollow ugc noopener"`, the server and the island alike, unless you set `links: { outside: 'same-tab' }`.
 
-The server renders it with Bun.markdown and the island with marked, and both write the same HTML. Only the islands importing it load marked, about 17 KB gzipped, and only when they first render Markdown: until it arrives the island shows the text as written, then the formatted one. Call it in a template or an effect, which runs again once marked has loaded.
+The server renders it with Bun.markdown and the island with marked, and both write the same HTML. Only the islands importing it load marked, about 15 KB gzipped, and only when they first render Markdown: until it arrives the island shows the text as written, then the formatted one. Call it in a template or an effect, which runs again once marked has loaded.
 
 It is sync, so it can run again on every chunk of a stream. Headings come out plain, with no id or anchor.
 
