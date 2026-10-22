@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- `mountComponent` names the island and the imports down to the server module a browser cannot take, as `kay build` does, and the error says an island cannot import a server module ([Browser-only components](browser-only.md#browser-only-components)).
+
 ## 1.71.0
 
 - kayjs-auth `requireUser({ bare: true })` answers the user without `providers` and reads none, which kayjs-cms's `role` guard now uses ([Setup](../packages/auth/llms/setup.md)).

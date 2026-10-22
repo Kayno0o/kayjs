@@ -274,7 +274,7 @@ The value is not checked against the schema, so a string given to a number field
 
 ## Islands that fail the browser build
 
-Every `testSite()` call builds the islands for the browser. It throws that build's error when one fails, such as an island importing a module that reaches `bun:sqlite` or the database. Pages still render without scripts, and no browser is needed.
+Every `testSite()` call builds the islands for the browser. It throws that build's error when one fails, such as an island importing a module that reaches `bun:sqlite` or the database, naming the island and the imports down to that module (`mountComponent` reports the same chain). Pages still render without scripts, and no browser is needed.
 
 A `.kay` file that does not compile is the exception: only the visit of a page importing it answers 500 and logs the error naming the file, so the tests of other pages stay green; a file no page imports goes unreported. A site opened with `browser` needs the whole build and throws it.
 

@@ -1,6 +1,7 @@
 import type { NodePath, Scope } from '@babel/traverse'
 import type * as t from '@babel/types'
 import { readFileSync } from 'node:fs'
+import { builtinModules } from 'node:module'
 import { basename, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { parse } from '@babel/parser'
@@ -432,4 +433,22 @@ export function builtinChains(root: string, inputs: BundleInputs, islands: Itera
   }
 
   return chains
+}
+
+// Every builtin, the ones Bun polyfills included: one whose polyfill lacks an export would fail the build that only looks for the way to the others.
+const BUILTINS = [...builtinModules, 'node:*', 'bun', 'bun:*']
+
+// Bun names the module importing a builtin a browser lacks, not the island reaching it: the same build with every builtin left out, in memory, gives the imports leading there.
+// An island bundles all of a module it imports, whatever it opens as it loads included, so the fix is in that chain.
+export async function refuseBuiltinImports(root: string, logs: readonly (BuildMessage | ResolveMessage)[], islands: Iterable<string>, config: Bun.BuildConfig): Promise<void> {
+  const builtins = refusedBuiltins(logs)
+
+  if (builtins.length === 0)
+    return
+
+  const probe = await Bun.build({ ...config, external: [...config.external ?? [], ...BUILTINS], throw: false })
+  const chains = probe.success ? builtinChains(root, probe.metafile!.inputs, islands, builtins) : []
+
+  if (chains.length > 0)
+    throw new KayError('browser-builtin-import', `kay: an island cannot import a server module, and a browser has no ${builtins.join(', ')}: ${chains.join('; ')}. An island bundles every module it imports, the database or environment one opens as it loads included: move what the island needs, a constant or a type, to a module importing no server code, or pass it as a prop.`)
 }

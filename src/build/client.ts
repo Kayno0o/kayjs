@@ -12,7 +12,6 @@ import type { Reached } from './styles'
 import type { FileDiagnostic } from './transform'
 import { existsSync, realpathSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
-import { builtinModules } from 'node:module'
 import { basename, join, relative, resolve, sep } from 'node:path'
 import { formatDiagnostic } from '../compiler'
 import { buildFailure, errorCodeOf, KayError, raisedMark } from '../compiler/errors'
@@ -39,7 +38,7 @@ import { unusedLibraryClasses } from './prune'
 import { referencesOf } from './references'
 import { sizeReport } from './report'
 import { ANCHOR, runtimeAnchor, runtimeChunk } from './runtime-chunk'
-import { builtinChains, refusedBuiltins, refuseServerOnlyReads } from './server-only'
+import { refuseBuiltinImports, refuseServerOnlyReads } from './server-only'
 import { inSignalsScope } from './signals'
 import { forgetBundleMaps, keepBundleMap } from './sourcemap'
 import { styleUses } from './style-uses'
@@ -112,9 +111,6 @@ const OBJECT_URL = /\bcreateObjectURL\(/
 const WORKER_URL = /["']\.\/(?:assets\/)?([\w.~-]+\.js)["']/g
 // kay's own sources, when it runs from a checkout rather than from `node_modules`.
 const KAY_SOURCE = `${resolve(import.meta.dir, '..')}${sep}`
-
-// Every builtin, the ones Bun polyfills included: one whose polyfill lacks an export would fail the build that only looks for the way to the others.
-const BUILTINS = [...builtinModules, 'node:*', 'bun', 'bun:*']
 
 // What the components say before anything is bundled: the islands by id, the classes of the `.class` shorthand, what `kay check` would report of them, and the pages and layouts the stylesheets are gathered from.
 export interface ClientSources {
@@ -481,7 +477,7 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
   const build = await Bun.build({ ...config, outdir: clientDir(root) })
 
   if (!build.success) {
-    await refuseBuiltinImports(root, build.logs, islands, config)
+    await refuseBuiltinImports(root, build.logs, islands.values(), config)
 
     throw buildFailure(build.logs, 'kay: client build failed', since)
   }
@@ -535,21 +531,6 @@ async function islandDirectives(root: string, outputs: Bun.BuildArtifact[]): Pro
     directives['worker-src'] = ['\'self\'', 'blob:']
 
   return Object.keys(directives).length > 0 ? directives : undefined
-}
-
-// Bun names the module importing a builtin a browser lacks, not the island reaching it: the same build with every builtin left out, in memory, gives the imports leading there.
-// An island bundles all of a module it imports, whatever it opens as it loads included, so the fix is in that chain.
-async function refuseBuiltinImports(root: string, logs: Bun.BuildOutput['logs'], islands: Map<string, string>, config: Bun.BuildConfig): Promise<void> {
-  const builtins = refusedBuiltins(logs)
-
-  if (builtins.length === 0)
-    return
-
-  const probe = await Bun.build({ ...config, external: [...config.external ?? [], ...BUILTINS], throw: false })
-  const chains = probe.success ? builtinChains(root, probe.metafile!.inputs, islands.values(), builtins) : []
-
-  if (chains.length > 0)
-    throw new KayError('browser-builtin-import', `kay: a browser has no ${builtins.join(', ')}, and islands import modules reaching ${builtins.length === 1 ? 'it' : 'them'}: ${chains.join('; ')}. An island bundles every module it imports, the database or environment one opens as it loads included: move what the island needs to a module importing none of it, or pass it as a prop.`)
 }
 
 // Each page and layout is an entry whose code shrinks to its imports, so what comes out is the stylesheet of everything it renders: each one's URL by the file relative to the root, and every module the build read, `followed` adding the ones it shrank to their imports, which the bundler's list of inputs leaves out.

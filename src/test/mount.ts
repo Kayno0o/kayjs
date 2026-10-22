@@ -3,6 +3,7 @@ import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { VOUCH_MODULE } from '../build/icons'
 import { kay } from '../build/plugin'
+import { refuseBuiltinImports } from '../build/server-only'
 import { loadConfig } from '../config'
 import { projectPaths, writesFrench } from '../project'
 import { COOKIE_NAME } from '../runtime/persist'
@@ -150,21 +151,19 @@ async function bundle(root: string, file: string): Promise<string> {
   try {
     await Bun.write(join(work, 'entry.ts'), entry(file))
 
-    const config = await loadConfig(root)
-    const trees = apiTrees(root, config)
-    let output: Bun.BuildArtifact
+    const loaded = await loadConfig(root)
+    const trees = apiTrees(root, loaded)
+    const config = { entrypoints: [join(work, 'entry.ts')], target: 'browser', metafile: true, define: { KAY_FRENCH: writesFrench(loaded) ? 'true' : 'undefined' }, plugins: [apiStubs(trees), kay({ root, settings: loaded.settings, api: trees }), sharedMarks], throw: false } satisfies Bun.BuildConfig
+    const build = await Bun.build({ ...config, outdir: join(work, 'out') })
 
-    try {
-      output = (await Bun.build({ entrypoints: [join(work, 'entry.ts')], outdir: join(work, 'out'), target: 'browser', define: { KAY_FRENCH: writesFrench(config) ? 'true' : 'undefined' }, plugins: [apiStubs(trees), kay({ root, settings: config.settings, api: trees }), sharedMarks] })).outputs[0]!
-    }
-    catch (error) {
-      // Bun throws on a failed build, its messages in `errors`.
-      const errors = error instanceof AggregateError ? error.errors : [error]
+    if (!build.success) {
+      // Bun names the module importing a builtin, not the island reaching it.
+      await refuseBuiltinImports(root, build.logs, [file], config)
 
-      throw new AggregateError(errors, `kay: bundling ${file} for the browser failed: ${errors.map(String).join('\n')}`)
+      throw new AggregateError(build.logs, `kay: bundling ${file} for the browser failed: ${build.logs.map(String).join('\n')}`)
     }
 
-    return await output.text()
+    return await build.outputs[0]!.text()
   }
   finally {
     await rm(work, { recursive: true, force: true })

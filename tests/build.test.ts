@@ -98,6 +98,17 @@ describe('kay build', () => {
       message: 'src/counter.kay -> src/links.ts -> src/db.ts -> bun:sqlite',
     },
     {
+      name: 'an island reaching a Node builtin through a package, in a development build, the chain cut at the package',
+      files: {
+        'node_modules/orm/package.json': JSON.stringify({ name: 'orm', version: '1.0.0', type: 'module', main: 'index.js' }),
+        'node_modules/orm/index.js': 'import readline from \'readline\'\nexport const connect = () => readline\n',
+        'src/tokens.ts': 'import { connect } from \'orm\'\n\nexport const PREFIX = \'tk_\'\nexport const open = () => connect()\n',
+        'src/counter.kay': counter('import { PREFIX } from \'./tokens\'\n', '{PREFIX} {n()}'),
+      },
+      options: { hot: true },
+      message: 'src/counter.kay -> src/tokens.ts -> orm -> readline',
+    },
+    {
       name: 'an island building a schema with kay\'s t, naming the module taking it from kay',
       files: {
         // A schema module shared by an action and an island's own check.

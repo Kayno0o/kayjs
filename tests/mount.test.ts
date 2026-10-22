@@ -286,6 +286,37 @@ describe('mount', () => {
     }
   })
 
+  it('names the island and the imports down to the server module a browser build cannot take', async () => {
+    const dir = await scratchDir('mount-')
+    const file = join(dir, 'paired.kay')
+
+    try {
+      await Bun.write(join(dir, 'db.ts'), 'import { Database } from \'bun:sqlite\'\n\nexport const db = new Database(\':memory:\')\n')
+      await Bun.write(join(dir, 'links.ts'), 'import { db } from \'./db\'\n\nexport const prefix = \'/items/\'\nexport const count = () => db.query(\'select 1\').get()\n')
+      await Bun.write(file, '---\nimport { prefix } from \'./links\'\n---\np {prefix}\n')
+
+      let message = ''
+
+      try {
+        await mountComponent(file)
+      }
+      catch (error) {
+        message = (error as Error).message
+      }
+
+      const names = ['paired.kay', 'links.ts', 'db.ts'].map((name): number => message.indexOf(name))
+
+      expect(message).toContain('bun:sqlite')
+      expect(names.every(at => at > 0)).toBe(true)
+      expect(names).toEqual([...names].sort((a, b) => a - b))
+      expect(message).toContain(' -> ')
+      expect(message).toContain('cannot import a server module')
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('reports a component that does not compile, and builds it again once fixed', async () => {
     const dir = await scratchDir('mount-')
     const file = join(dir, 'broken.kay')

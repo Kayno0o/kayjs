@@ -50,5 +50,5 @@ onMount(() => drawMap(center))
 - A read in the block of a `try` with a `catch` passes too, as the `catch` takes the error a missing global throws.
 - A read through `globalThis` is not seen, nor one in a chunk carrying a `process` polyfill of its own, which binds the name.
 - `kay dev` and `bun test` build the same way, so they refuse it too.
-- An island reaching a builtin a browser lacks, `bun:sqlite` or `async_hooks` through a database library say, is refused with the imports leading there, one line per island: `src/counter.kay -> src/links.ts -> src/db.ts -> bun:sqlite`, cut at the first package since the fix is never inside one.
+- An island reaching a builtin a browser lacks, `bun:sqlite` or `async_hooks` through a database library say, is refused with the imports leading there, one line per island: `src/counter.kay -> src/links.ts -> src/db.ts -> bun:sqlite`, cut at the first package since the fix is never inside one. The message says an island cannot import a server module: keep the constants and types an island needs in a module importing no server code. `mountComponent` in `bun test` reports the same chain.
 - An island bundles all of a module it imports, so a helper beside a database the module opens as it loads brings the database along: move the helper to a module importing none of it.
