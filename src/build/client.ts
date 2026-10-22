@@ -153,17 +153,20 @@ function rootMargin(value: string | undefined, fallback: string, what: string): 
   return value
 }
 
+// What each module imports, kept by the builds of this process: a module whose content is unchanged is not read for its imports again, as the dev builder does across its rebuilds.
+const builtGraph: ImportGraph = new Map()
+
 async function bundleClient(root: string, options: ClientOptions): Promise<ClientBuild> {
   rootMargin(options.hydration?.visible, '200px', 'visible')
   rootMargin(options.hydration?.serverIslands, '100% 0px', 'serverIslands')
 
-  const sources = await readClientSources(root, options)
+  const sources = await readClientSources(root, options, builtGraph)
 
   await clearClientOutput(root)
   await writeClasses(root, sources.classes)
 
   const classTable = await classTableOf(root, sources)
-  const [scripts, styles] = await bothBundles(bundleIslands(root, sources.islands, options, classTable, await islandClassTableOf(root, sources)), bundleStyles(root, sources, options))
+  const [scripts, styles] = await bothBundles(bundleIslands(root, sources.islands, options, classTable, await islandClassTableOf(root, sources, builtGraph)), bundleStyles(root, sources, options))
   const manifest: ClientManifest = { ...scripts.manifest, styles: styles.styles, ...classTable && { classTable }, ...styles.uses && { styleUses: styles.uses }, ...options.hot && { problems: sources.problems } }
 
   if (options.sourcemap === 'external')

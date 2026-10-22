@@ -187,7 +187,7 @@ describe('sitemap lastmod', () => {
 
       await Bun.write(`${root}/src/routes/posts/[slug].kay`, `--- server\nexport const page = { sitemap: [{ slug: 'a' }], lastmod: ${lastmod} }\n---\nh1 Post\n`)
 
-      return (await (await appWith({ routes: `${root}/src/routes`, site })).handle(new Request('http://localhost/sitemap.xml'))).text()
+      return (await (await appWith({ root, routes: 'src/routes', publicDir: `${root}/public`, site })).handle(new Request('http://localhost/sitemap.xml'))).text()
     }
 
     expect(await xml('() => null')).toContain('<url><loc>https://x.example/posts/a</loc></url>')
