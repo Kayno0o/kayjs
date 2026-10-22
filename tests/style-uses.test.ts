@@ -433,3 +433,54 @@ describe('which classes are set from a value the build cannot read', () => {
     expect(found).toEqual([])
   })
 })
+
+describe('which classes a page keeps when its data holds them', () => {
+  // Several files of an app: `entries` are the pages, `edges` what each imports, `open` the files rendering a collection and `markup` the files that write markup.
+  async function held(files: Record<string, string>, edges: Record<string, string[]>, entries: string[] = ['page.kay'], extra: { open?: string[], markup?: string[] } = {}) {
+    const root = await scratchDir('style-uses-data-')
+    const found: UnresolvedClass[] = []
+    const at = (name: string) => join(root, name)
+
+    await Promise.all(Object.entries(files).map(async ([name, source]) => Bun.write(at(name), source)))
+
+    const uses = styleUses(root, entries.map(at), [CSS], { edges: new Map(Object.entries(edges).map(([from, to]) => [at(from), to.map(at)])), open: new Set((extra.open ?? []).map(at)) }, new Map(), (extra.markup ?? []).map(at), { own: () => true, islands: [at('child.kay')], unresolved: (all) => {
+      found.push(...all)
+    } })
+
+    return {
+      warned: found.map(({ file, how }) => `${relative(root, file)} ${how}`),
+      classes: Object.fromEntries(entries.map(entry => [entry, (uses.entries[entry] as number[]).map(index => uses.classes[index]!).sort()])),
+    }
+  }
+
+  const child = 'const { items } = props<{ items: { color: string }[] }>()\n---\nfor item of items\n  span(class={item.color}) a\n'
+  const rows = '--- server\nconst rows = [{ color: \'mt-1\' }, { color: \'p-1\' }]\n---\nChild(items={rows})\n'
+
+  it('keeps the rules of classes a parent writes as literals for a child to set, with no warning', async () => {
+    expect(await held({ 'page.kay': rows, 'child.kay': child }, { 'page.kay': ['child.kay'] })).toEqual({ warned: [], classes: { 'page.kay': ['mt-1', 'p-1'] } })
+  })
+
+  it('reads the rows from a JSON file a module imports', async () => {
+    const page = '--- server\nimport rows from \'./rows.json\' with { type: \'json\' }\n---\nChild(items={rows})\n'
+
+    expect(await held({ 'page.kay': page, 'child.kay': child, 'rows.json': '[{"color":"mt-1"},{"color":"btn-primary"}]' }, { 'page.kay': ['child.kay'] })).toEqual({ warned: [], classes: { 'page.kay': ['btn-primary', 'mt-1'] } })
+  })
+
+  it('still warns when the strings are no class, or only the element itself writes one', async () => {
+    expect(await held({ 'page.kay': rows.replace('mt-1', 'banana').replace('p-1', 'apple'), 'child.kay': child }, { 'page.kay': ['child.kay'] })).toMatchObject({ warned: ['child.kay class attribute'] })
+    expect(await held({ 'page.kay': 'div(class="mt-1")\nChild(items={x})\n', 'child.kay': child }, { 'page.kay': ['child.kay'] })).toMatchObject({ warned: ['child.kay class attribute'] })
+  })
+
+  it('warns when one of the pages reaching the component holds no such string', async () => {
+    const files = { 'page.kay': rows, 'other.kay': 'Child(items={x})\n', 'child.kay': child }
+
+    expect(await held(files, { 'page.kay': ['child.kay'], 'other.kay': ['child.kay'] }, ['page.kay', 'other.kay'])).toMatchObject({ warned: ['child.kay class attribute'] })
+  })
+
+  it('takes the Markdown of a page rendering a collection for the data a class is read from', async () => {
+    const files = { 'page.kay': 'Child(items={entry.data})\n', 'child.kay': child, 'post.md': 'A <span class="mt-1">x</span>\n' }
+
+    expect(await held(files, { 'page.kay': ['child.kay'] }, ['page.kay'], { open: ['page.kay'], markup: ['post.md'] })).toMatchObject({ warned: [] })
+    expect(await held(files, { 'page.kay': ['child.kay'] }, ['page.kay'], { markup: ['post.md'] })).toMatchObject({ warned: ['child.kay class attribute'] })
+  })
+})

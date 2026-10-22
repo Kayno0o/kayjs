@@ -32,6 +32,9 @@ const SCRIPT_OR_KAY = /\.(?:kay|[cm]?[jt]sx?)$/
 const RENDERED_FRAGMENT = 'language-'
 // A relative named import, the only one whose values a class is read from.
 const IMPORTS_MODULE = /\bimport\s+(?:[\w$]+\s*,\s*)?\{[^}]*\}\s*from\s*["']\./
+// A relative import of a JSON file, whose strings are data a class may be read from.
+const IMPORTS_JSON = /\bfrom\s*["'](\.[^"']*\.json)["']/g
+const AFTER_CLASS = /\bclass\s*[=:]\s*$/
 const CSS_IMPORT = /@import\s*(?:url\(\s*)?["']([^"']+)["']/g
 // Tailwind 4.1's `@source inline("...")`, which names classes to generate whatever the sources say; `@source not inline` leaves them out and is not matched.
 const SOURCE_INLINE = /@source\s+inline\(\s*(["'])((?:\\.|(?!\1)[^\\])*)\1\s*\)/g
@@ -65,6 +68,29 @@ function literalWords(file: string): string[] {
   const found: string[] = []
 
   for (const literal of readSource(file).text.matchAll(STRING_LITERAL)) {
+    for (const word of literal[0].slice(1, -1).split(COARSE)) {
+      if (word !== '')
+        found.push(word)
+    }
+  }
+
+  return found
+}
+
+// The JSON files a script or component imports by a relative path.
+function jsonImports(text: string, file: string): string[] {
+  return [...text.matchAll(IMPORTS_JSON)].map(match => resolve(dirname(file), match[1]!)).filter(path => existsSync(path))
+}
+
+// The class-like words of the strings a file holds as data, leaving out the value of a `class` it writes itself: `class="mt-1"` styles that element, it says nothing of a value read elsewhere.
+function dataWords(file: string): string[] {
+  const { text } = readSource(file)
+  const found: string[] = []
+
+  for (const literal of text.matchAll(STRING_LITERAL)) {
+    if (AFTER_CLASS.test(text.slice(Math.max(0, literal.index - 24), literal.index)))
+      continue
+
     for (const word of literal[0].slice(1, -1).split(COARSE)) {
       if (word !== '')
         found.push(word)
@@ -323,9 +349,32 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
         for (const name of completing(fragment))
           found.add(name)
       }
+
+      // Rows read from a JSON file the module imports are where its classes come from.
+      for (const module of jsonImports(text, file)) {
+        for (const name of named(module))
+          found.add(name)
+      }
     }
 
     return found
+  }
+  // Whether the pages reaching a file all hold, in another module of the app they reach or a JSON file one imports, a string that is a styled class: a value read from that data has its rule on the page, whichever component builds the value.
+  const dataByEntry = new Map<string, string[] | true>()
+  const dataVouched = (entry: string, own: StyleUsesOptions['own'], setter: string): boolean => {
+    let found = dataByEntry.get(entry)
+
+    if (found === undefined) {
+      const reach = closure([entry], reached)
+      const open = [...reach].some(module => reached.open.has(module))
+      const files = [...reach].filter(module => own?.(module) === true && existsSync(module))
+      const holders = files.filter(module => SCRIPT_OR_KAY.test(module)).flatMap(module => [module, ...jsonImports(readSource(module).text, module)])
+
+      found = open && markup.some(module => named(module).size > 0) ? true : holders.filter(module => dataWords(module).some(word => styled.has(word)))
+      dataByEntry.set(entry, found)
+    }
+
+    return found === true || found.some(module => module !== setter)
   }
   // Whether a file reaches a stylesheet of the app and a script of the app writing out, as a string, a class that stylesheet declares: that script is the vocabulary the value is read from, and the stylesheet keeps the rule of each class whatever builds it.
   const vouchedByFile = new Map<string, boolean>()
@@ -383,10 +432,12 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
 
       for (const runtime of runtimeClasses(readSource(file).text, judge, file)) {
         // A value with no part to match is the app's to vouch for with an `@source inline` of its own, or with a stylesheet its file reaches whose classes a script it reaches names.
-        if (runtime.part === '' && (vouched.length > 0 || sheetVouched(file, own)))
+        const by = [...reachedBy.get(file) ?? []]
+
+        if (runtime.part === '' && (vouched.length > 0 || sheetVouched(file, own) || (by.length > 0 && by.every(entry => dataVouched(entry, own, file)))))
           continue
 
-        found.push({ file, ...runtime, client: client.has(file), by: [...reachedBy.get(file) ?? []] })
+        found.push({ file, ...runtime, client: client.has(file), by })
       }
     }
 
