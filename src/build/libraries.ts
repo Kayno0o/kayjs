@@ -226,7 +226,7 @@ export async function reachableLibraryFiles(root: string, libraries: KayLibrary[
   const components: string[] = []
   const scripts: string[] = []
   const visit = async (file: string): Promise<void> => {
-    await Promise.all((await followedImports(root, project, libraries, file, graph)).map(async ({ path, library }) => {
+    await Promise.all(followedImports(root, project, libraries, file, graph).map(async ({ path, library }) => {
       // The project's own components are entries already.
       if ((KAY_FILE.test(path) && library === undefined) || seen.has(path))
         return
@@ -245,6 +245,21 @@ export async function reachableLibraryFiles(root: string, libraries: KayLibrary[
   return { components: components.sort(), scripts: scripts.sort() }
 }
 
+// The import graph of each project root, shared by the scan of the routes and the estimate of what they load: a module is read again only when its text changed.
+const projectGraphs = new Map<string, ImportGraph>()
+
+export function projectImportGraph(root: string): ImportGraph {
+  const real = realpathSync(root)
+  let graph = projectGraphs.get(real)
+
+  if (graph === undefined) {
+    graph = new Map<string, Imports>()
+    projectGraphs.set(real, graph)
+  }
+
+  return graph
+}
+
 // The modules a module imports that a build follows, real paths, each read once for the calls sharing it.
 export type ImportEdges = (file: string) => Promise<string[]>
 
@@ -256,7 +271,7 @@ export function importEdges(root: string, libraries: KayLibrary[], graph?: Impor
     let paths = read.get(file)
 
     if (paths === undefined) {
-      paths = (async () => (await followedImports(root, project, libraries, file, graph)).map(({ path }) => path))()
+      paths = Promise.resolve(followedImports(root, project, libraries, file, graph).map(({ path }) => path))
       read.set(file, paths)
     }
 
@@ -321,15 +336,15 @@ export async function reachingAny(from: string[], targets: ReadonlySet<string>, 
   return new Set(from.filter(file => reaching.has(file)))
 }
 
-// The modules `file` imports, its `import.meta.glob` matches included, that a build follows, by real path as Bun resolves them: `project`'s own, the root's real path, and its kay libraries', `library` naming which; never another package's.
+// The modules `file` imports, its `import.meta.glob` matches included, that a build follows, by real path as Bun resolves them: `project`'s own, the root's real path, and its kay libraries', `library` naming which; never another package's; with `components`, any `.kay` file too, as an extension installed from a path is no library of the project.
 // With `graph`, a module with a glob is read again each time, and one whose paths found are gone; a file written since that shadows a path found, `./foo.ts` beside `./foo/index.ts`, goes unseen until the module changes, as Bun keeps what it resolved anyway.
-async function followedImports(root: string, project: string, libraries: KayLibrary[], file: string, graph?: ImportGraph): Promise<{ path: string, library: KayLibrary | undefined }[]> {
+export function followedImports(root: string, project: string, libraries: KayLibrary[], file: string, graph?: ImportGraph, components = false): { path: string, library: KayLibrary | undefined }[] {
   const { text: source, hash } = readSource(file)
   let imports = graph?.get(file)
 
   // A path gone with no event, as an install dropping a library's component, has the imports found again.
   if (imports?.hash !== hash || !imports.paths.every(path => existsSync(path))) {
-    imports = await importsIn(root, file, source, hash)
+    imports = importsIn(root, file, source, hash)
 
     if (imports.globbed)
       graph?.delete(file)
@@ -342,11 +357,11 @@ async function followedImports(root: string, project: string, libraries: KayLibr
   return paths.flatMap((path) => {
     const library = libraryOf(libraries, path)
 
-    return (KAY_FILE.test(path) || SCRIPT_FILE.test(path)) && (library !== undefined || (path.startsWith(project) && !path.slice(project.length - 1).includes(`${sep}node_modules${sep}`))) ? [{ path, library }] : []
+    return (KAY_FILE.test(path) || SCRIPT_FILE.test(path)) && (library !== undefined || (components && KAY_FILE.test(path)) || (path.startsWith(project) && !path.slice(project.length - 1).includes(`${sep}node_modules${sep}`))) ? [{ path, library }] : []
   })
 }
 
-async function importsIn(root: string, file: string, source: string, hash: number | bigint): Promise<Imports> {
+function importsIn(root: string, file: string, source: string, hash: number | bigint): Imports {
   const kay = KAY_FILE.test(file)
   const code = kay ? fences(source) : source
   const missing: string[] = []
@@ -363,7 +378,7 @@ async function importsIn(root: string, file: string, source: string, hash: numbe
     // A glob the build cannot read, which the check or the build reports as it reaches the module.
   }
 
-  for (const specifier of await importsOf(file, source)) {
+  for (const specifier of scannedImports(file, source)) {
     const path = resolvedPath(specifier, file)
 
     if (path !== undefined)
@@ -454,7 +469,11 @@ export function fileWords(file: string): string[] {
 
 // What a module imports: a component's fences, or a script whole.
 export async function importsOf(file: string, source?: string): Promise<string[]> {
-  source ??= await Bun.file(file).text()
+  return scannedImports(file, source ?? await Bun.file(file).text())
+}
+
+// The same, for a source already read: static and dynamic imports, none of what a comment or a string only names.
+function scannedImports(file: string, source: string): string[] {
   const kay = KAY_FILE.test(file)
 
   try {

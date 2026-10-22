@@ -1,0 +1,6 @@
+--- server
+throw new Error('broken on purpose')
+--- script
+import Who from '../../lib/who.kay'
+---
+Who

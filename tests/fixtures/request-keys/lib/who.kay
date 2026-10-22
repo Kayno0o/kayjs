@@ -1,0 +1,2 @@
+if ctx.user as user
+  p#who {user.name}

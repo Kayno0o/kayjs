@@ -1,0 +1,4 @@
+---
+const { cartCount, user } = props<{ cartCount: number, user: { name: string } | null }>()
+---
+p#spread {cartCount} {user?.name}

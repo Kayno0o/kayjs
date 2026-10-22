@@ -36,6 +36,25 @@ import { defineContext } from 'kay/library'
 export default defineContext(async (request: Request) => ({ plan: await planOf(request) }))
 ```
 
+### Load a value only for the pages that show it
+
+`defineContext` also takes an object of loaders, one per key. A loader runs at most once per request and only for a page whose templates read that key, so a cart count costs nothing on a page showing no cart, nor does the session read on a page showing no user:
+
+```ts
+// src/context.ts
+import { defineContext } from 'kay/library'
+
+export default defineContext({
+  cartCount: async (request: Request) => countCart(request),
+  user: async (request: Request) => userOf(request),
+})
+```
+
+```kay
+// a component reading only ctx.cartCount loads only that
+a(href="/cart") Cart ({ctx.cartCount})
+```
+
 ## Reference
 
 - The keys are typed from the extension's module in `kay check` and the editor: `kay check` writes them into `.kay/types/kay-env.d.ts`.
@@ -45,5 +64,8 @@ export default defineContext(async (request: Request) => ({ plan: await planOf(r
 - A page with `prerender: true` that reaches a template reading `ctx` fails the build asking for a render per request, as any request read does.
 - A load that throws fails the render like a fence's would: an extension answering a missing session returns no user rather than throwing.
 - A template's `ctx` holds the extensions' values only: the request (`ctx.params`, `ctx.url`) is read in a `--- server` fence.
-- The walk follows import specifiers and the files an `import.meta.glob` pattern matches, in `.kay` files and in scripts of the app: a component reached only through a script in `node_modules` is not followed, so import it in the page, or its `ctx` read throws.
+- The walk is the one that finds islands: it follows static and literal dynamic imports, aliases and `import.meta.glob`, a library's components wherever it is installed and the app's scripts. A computed `import(x)` or a script in `node_modules` is not followed, so a page reaching a template only through one throws when the template reads `ctx`.
+- A template using `ctx` any other way than `ctx.name`, passed whole, spread or indexed, loads every key, as does an error page or a 404, which may show keys the failed page did not. A key is read off `ctx` in a template or its script, not in a `--- server` fence, whose `ctx` is the request.
+- Values hold no prototype: `ctx.hasOwnProperty` is undefined and `String(ctx)` throws.
+- A function `defineContext(load)` still loads all its keys at once.
 - The pages that load them are found as `layout: { file, reaching }` finds them ([Component libraries](component-libraries.md#extensions)).

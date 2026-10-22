@@ -1,0 +1,1 @@
+p#ctor {typeof ctx.constructor} {typeof ctx.__proto__} {typeof ctx.hasOwnProperty}

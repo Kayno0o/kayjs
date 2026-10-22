@@ -326,11 +326,11 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
   return result
 }
 
-// Which templates read `ctx`, for a server started from this build to find the pages reaching them without the compiler. Only an app with an extension giving a context has any.
+// What the walk of the imports met while scanning the routes, and which templates read `ctx`, for a server started from this build to find the pages reaching them without the compiler. Only an app with an extension giving a context or a layout reaching files has any.
 async function recordContextReads({ root, config, paths }: Project): Promise<void> {
   const mounts = routeMounts(root, config.extensions, false)
 
-  if (!mounts.some(mount => mount.reaching === 'context'))
+  if (!mounts.some(mount => mount.reaching !== undefined))
     return
 
   await writeContextRecord(paths.output, root, await contextReadsOf(paths.routes, mounts))

@@ -238,7 +238,7 @@ describe('a production server started from disk', () => {
       const { root, options } = await project([EXTENSION], base)
 
       await build(options)
-      expect(await Bun.file(recordFile(root)).json()).toMatchObject({ reads: { 'lib/gate.kay': true, 'src/routes/plain.kay': false }, globs: { 'src/routes/globbed.kay': ['src/parts/gate.kay'] } })
+      expect(await Bun.file(recordFile(root)).json()).toMatchObject({ reads: { 'lib/gate.kay': true, 'src/routes/plain.kay': false }, keys: { 'lib/gate.kay': ['can', 'user'] }, edges: { 'src/routes/globbed.kay': expect.arrayContaining(['src/parts/gate.kay']) } })
       expect(await get(options, '/gated')).toMatchObject({ status: 200, html: expect.stringContaining('<p id="who">Ada</p>') })
     }, 120_000)
   }

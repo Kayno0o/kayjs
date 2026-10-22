@@ -3,12 +3,21 @@ const CONTEXT = Symbol.for('kay.context')
 // What an extension's `context` module default-exports: how its request values are loaded, once per request.
 export interface ContextDefinition<Values extends object = object> {
   readonly [CONTEXT]: true
-  readonly load: (request: Request) => Values | Promise<Values>
+  // Loads every key at once, whichever the page reads.
+  readonly load?: ((request: Request) => Values | Promise<Values>) | undefined
+  // One loader per key, run only for a page whose templates read it.
+  readonly loaders?: Record<string, (request: Request) => unknown> | undefined
+  // The values as typed, never set.
+  readonly values?: Values | undefined
 }
 
-// Declares the request values an extension's `context` module gives templates as `ctx.<key>`: `load` runs at most once per request, ahead of the render of each page reaching a template that reads `ctx`, and the keys of what it returns are typed from it in `kay check` and the editor.
-export function defineContext<Values extends object>(load: (request: Request) => Values | Promise<Values>): ContextDefinition<Values> {
-  return { [CONTEXT]: true, load }
+// Declares the request values an extension's `context` module gives templates as `ctx.<key>`, typed from it in `kay check` and the editor.
+// A function loads every key at once, at most once per request, ahead of the render of each page reaching a template that reads `ctx`.
+// An object of loaders, `{ cartCount: request => ... }`, runs each loader at most once per request and only for a page whose templates read that key, so a page pays for what it shows.
+export function defineContext<Values extends object>(load: (request: Request) => Values | Promise<Values>): ContextDefinition<Values>
+export function defineContext<Loaders extends Record<string, (request: Request) => unknown>>(loaders: Loaders): ContextDefinition<{ [Key in keyof Loaders]: Awaited<ReturnType<Loaders[Key]>> }>
+export function defineContext(loading: ((request: Request) => object | Promise<object>) | Record<string, (request: Request) => unknown>): ContextDefinition {
+  return typeof loading === 'function' ? { [CONTEXT]: true, load: loading } : { [CONTEXT]: true, loaders: loading }
 }
 
 export function isContextDefinition(value: unknown): value is ContextDefinition {

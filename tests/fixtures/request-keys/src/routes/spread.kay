@@ -1,0 +1,4 @@
+---
+import Show from '../../lib/show.kay'
+---
+Show({...ctx})

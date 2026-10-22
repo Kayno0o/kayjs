@@ -1,11 +1,13 @@
 import type { KayExtension } from '../config'
 import type { ContextReads } from './context-record'
-import { existsSync, readFileSync, realpathSync } from 'node:fs'
+import type { Reach } from './reach'
+import { existsSync, readFileSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { findKayFiles, findProjectFiles, KAY_FILE, TS_FILE } from '../build/files'
 import { throughLinks } from '../build/links'
 import { KayError } from '../compiler/errors'
 import { TRAILING_SLASH } from '../runtime/base'
+import { reachOver } from './reach'
 
 const chains = new WeakMap<string[], { file: string, files: string[], key: string }>()
 
@@ -61,6 +63,8 @@ export interface Route {
   actionAccess?: LayoutAccess<GuardFile>[] | undefined
   // What each layout's actions are behind, as `layouts` lists them, read at scan time since a compiled server has no source to read.
   layoutAccess?: LayoutAccess<GuardFile>[] | undefined
+  // The keys of `ctx` the templates of the page read, when it reaches some and none uses `ctx` whole: only their loaders run, every key otherwise.
+  contextKeys?: string[] | undefined
   special: SpecialPages
   // `_guard.ts` files covering the page and its actions, outermost first.
   guards: GuardFile[]
@@ -113,6 +117,8 @@ export interface RouteMount {
   outer?: string | undefined
   // Set with `outer`: the layout wraps only the pages reaching one of these files, or for `'context'` a template that reads `ctx`.
   reaching?: string[] | 'context' | undefined
+  // The project root, set with `reaching` for the walk of the imports.
+  root?: string | undefined
 }
 
 // The nearest `_404.kay` and `_error.kay` up the directory tree.
@@ -220,36 +226,24 @@ export function servedPaths(routes: Route[]): Set<string> {
   return new Set(routes.flatMap(route => patternShapes(route.pattern)))
 }
 
-// The scans filling in the reads they work out, for the build to record.
-const collecting = new WeakMap<LayoutsRead, ContextReads>()
-
-// Every template reading `ctx` that a scan of the routes and of the fallback pages meets, answered by the compiler, for `kay build` to record.
+// Every file the reach walk meets while scanning the routes and the fallback pages, with what it reads of each, for `kay build` to record.
 export async function contextReadsOf(routesDir: string, mounts: RouteMount[]): Promise<ContextReads> {
-  const reads: ContextReads = { files: new Map(), globs: new Map(), recorded: false }
+  const reads: ContextReads = { keys: new Map(), edges: new Map(), recorded: false }
 
   await scanRoutes(routesDir, mounts, reads)
-
-  const trees = routeTrees(routesDir, mounts)
-  const read = readFor(trees)
-
-  collecting.set(read, reads)
-  specialPagesOf(trees, '', read)
+  specialPagesOf(routeTrees(routesDir, mounts), '')
 
   return reads
 }
 
 // The app's pages, then each mounted library's that no page of the app serves the path of.
-// `reads` is what `kay build` recorded of the templates reading `ctx`, which a server started from disk takes in place of the compiler; given with `recorded` unset, the scan fills it in for the build to write.
+// `reads` is what `kay build` recorded of the imports and the templates reading `ctx`, which a server started from disk walks in place of the compiler; given with `recorded` unset, the scan fills it in for the build to write.
 export async function scanRoutes(routesDir: string, mounts: RouteMount[] = [], reads?: ContextReads): Promise<Route[]> {
-  await loadContextReader(mounts, reads)
+  await openReaches(mounts, reads)
 
   const trees = routeTrees(routesDir, mounts)
   const routes: Route[] = []
-  const read = readFor(trees)
-
-  if (reads && !reads.recorded)
-    collecting.set(read, reads)
-
+  const read: LayoutsRead = new Map()
   const served = new Set<string>()
   const access = new Map<string, LayoutAccess<GuardFile>>()
   const accessOf = (layout: string) => {
@@ -271,12 +265,12 @@ export async function scanRoutes(routesDir: string, mounts: RouteMount[] = [], r
         const at = virtualDir(trees, dirname(file))
         const open = setsFalse(file, 'guards', read)
 
-        const layouts = layoutsOf(trees, at, file, read)
+        const { layouts, keys } = layoutsAndKeys(trees, at, file, read)
         const mounted = tree !== trees[0]
 
         const actionModules = directoriesUp(at).flatMap(dir => fileAt(trees, dir, ACTIONS) ?? []).reverse()
 
-        own.push({ ...route, layouts, layoutAccess: layouts.map(accessOf), ...actionModules.length > 0 && { actionModules, actionAccess: actionModules.map(accessOf) }, special: specialPagesOf(trees, at, read), guards: open ? [] : guardsOf(trees, at, read), ...(open || mounted) && { open: true }, ...tree.editor && { editorOwn: true } })
+        own.push({ ...route, layouts, ...keys !== undefined && { contextKeys: keys }, layoutAccess: layouts.map(accessOf), ...actionModules.length > 0 && { actionModules, actionAccess: actionModules.map(accessOf) }, special: specialPagesOf(trees, at, read), guards: open ? [] : guardsOf(trees, at, read), ...(open || mounted) && { open: true }, ...tree.editor && { editorOwn: true } })
       }
     }
 
@@ -293,7 +287,7 @@ export async function scanRoutes(routesDir: string, mounts: RouteMount[] = [], r
 export async function scanEndpoints(routesDir: string, mounts: RouteMount[] = []): Promise<Endpoint[]> {
   const trees = routeTrees(routesDir, mounts)
   const endpoints: Endpoint[] = []
-  const read = readFor(trees)
+  const read: LayoutsRead = new Map()
   const served = new Set<string>()
 
   for (const tree of pageTrees(trees)) {
@@ -390,26 +384,18 @@ export function paramsIn(shape: string, route: Pick<Route, 'catchAll'>): string[
 // The keys each file read so far sets to `false` in its `page`, so a scan reads a layout once however many pages it wraps.
 type LayoutsRead = Map<string, Set<string>>
 
-// The project root of the mounts `routeMounts` built, which the walk expands an `import.meta.glob` pattern against as the build does.
-const mountRoots = new WeakMap<RouteMount, string>()
-const globRoots = new WeakMap<LayoutsRead, string>()
-
-function readFor(trees: RouteMount[]): LayoutsRead {
-  const read: LayoutsRead = new Map()
-  const root = trees.map(tree => mountRoots.get(tree)).find(found => found !== undefined)
-
-  if (root !== undefined)
-    globRoots.set(read, root)
-
-  return read
-}
-
 // The layouts around a page, outermost first. The one loading the values of `ctx` stays first even for a page leaving the chain, as it has no place in what it draws.
 function layoutsOf(trees: RouteMount[], at: string, file: string, read: LayoutsRead): string[] {
-  const chain = ownLayouts(trees, at, file, read)
-  const loading = trees.flatMap(tree => tree.reaching === 'context' && tree.outer !== undefined && reaches([file, ...chain], 'context', read) ? [tree.outer] : [])
+  return layoutsAndKeys(trees, at, file, read).layouts
+}
 
-  return [...loading, ...chain]
+// The same with the keys of `ctx` the page reaches, none narrower than every key unless the templates it reaches name them all.
+function layoutsAndKeys(trees: RouteMount[], at: string, file: string, read: LayoutsRead): { layouts: string[], keys: string[] | undefined } {
+  const chain = ownLayouts(trees, at, file, read)
+  const loader = trees.find(tree => tree.reaching === 'context' && tree.outer !== undefined)
+  const keys = loader === undefined ? undefined : reachOf(loader).contextKeys([file, ...chain])
+
+  return { layouts: [...keys === undefined ? [] : [loader!.outer!], ...chain], keys: keys === 'all' ? undefined : keys }
 }
 
 function ownLayouts(trees: RouteMount[], at: string, file: string, read: LayoutsRead): string[] {
@@ -423,190 +409,54 @@ function ownLayouts(trees: RouteMount[], at: string, file: string, read: Layouts
   if (reset !== -1)
     return layouts.slice(reset)
 
-  const outers = trees.flatMap(tree => tree.outer !== undefined && tree.reaching !== 'context' && (tree.reaching === undefined || reaches([file, ...layouts], tree.reaching, read)) ? [tree.outer] : [])
+  const outers = trees.flatMap(tree => tree.outer !== undefined && tree.reaching !== 'context' && (tree.reaching === undefined || reachOf(tree).reaches([file, ...layouts], tree.reaching)) ? [tree.outer] : [])
 
   return [...outers, ...layouts]
 }
 
-// Loaded once a scan with no record has a mount whose walk follows imports.
-let globEdges: typeof import('./glob-edges').globEdges | undefined
-// Keyed by file, as the reads are.
-const recordedGlobs = new Map<string, string[]>()
+// What each project root reaches, opened by the scan of the routes: the compiler it needs stays out of a served app until a mount asks for it.
+const reached = new Map<string, Reach>()
 
-// Every specifier a module names, static or dynamic; one in a comment or a string only adds a file the walk follows for nothing.
-const IMPORT = /\b(?:from|import)\s*(?:\(\s*)?['"]([^'"]+)['"]/g
-const importsRead = new WeakMap<LayoutsRead, Map<string, string[]>>()
-const reachRead = new WeakMap<LayoutsRead, Map<string, boolean>>()
+async function openReaches(mounts: RouteMount[], reads: ContextReads | undefined): Promise<void> {
+  const roots = new Set(mounts.flatMap(mount => mount.reaching === undefined ? [] : [mount.root]))
 
-function realFile(file: string): string {
-  try {
-    return realpathSync(file)
-  }
-  catch {
-    return file
-  }
-}
-
-// The files a module imports that the walk follows, whether through an import or an `import.meta.glob` pattern: components anywhere, scripts of the app only.
-function importsOf(file: string, read: LayoutsRead): string[] {
-  let memo = importsRead.get(read)
-
-  if (memo === undefined)
-    importsRead.set(read, memo = new Map<string, string[]>())
-
-  let found = memo.get(file)
-
-  if (found === undefined) {
-    found = []
-    memo.set(file, found)
-
-    let source = ''
-
-    try {
-      source = readFileSync(file, 'utf8')
-    }
-    catch {}
-
-    const followed = (real: string) => KAY_FILE.test(real) || (TS_FILE.test(real) && !real.split(sep).includes('node_modules'))
-
-    // Text such as `from 'Bob'` matches too, so each specifier resolves on its own and one that does not is skipped.
-    for (const [, specifier] of source.matchAll(IMPORT)) {
-      try {
-        const real = realFile(Bun.resolveSync(specifier!, dirname(file)))
-
-        if (followed(real))
-          found.push(real)
-      }
-      catch {}
-    }
-
-    try {
-      for (const path of globsOf(source, file, read)) {
-        const real = realFile(path)
-
-        if (followed(real))
-          found.push(real)
-      }
-    }
-    catch {
-      // A glob the build cannot read, which the build or the check reports as it reaches the module.
-    }
-  }
-
-  return found
-}
-
-// The files a module's `import.meta.glob` calls expand to: the build's record where it holds the module, else the glob reader.
-function globsOf(source: string, file: string, read: LayoutsRead): string[] {
-  if (!source.includes('import.meta.glob'))
-    return []
-
-  const recorded = collecting.has(read) ? undefined : recordedGlobs.get(file)
-
-  if (recorded !== undefined)
-    return recorded
-
-  const found = globEdges?.(source, file, globRoots.get(read)) ?? []
-
-  collecting.get(read)?.globs.set(file, found)
-
-  return found
-}
-
-// Whether the import graph from `starts` reaches one of `targets`, or a template reading `ctx` for `'context'`.
-function reaches(starts: string[], targets: string[] | 'context', read: LayoutsRead): boolean {
-  let memo = reachRead.get(read)
-
-  if (memo === undefined)
-    reachRead.set(read, memo = new Map<string, boolean>())
-
-  const files = targets === 'context' ? undefined : new Set(targets.map(realFile))
-  const wanted = files === undefined ? (file: string) => readsContext(file, read) : (file: string) => files.has(file)
-  const key = targets === 'context' ? targets : targets.join('\0')
-
-  return starts.some((start) => {
-    const at = `${key}\0${start}`
-    let found = memo.get(at)
-
-    if (found === undefined)
-      memo.set(at, found = walk(realFile(start), wanted, read))
-
-    return found
-  })
-}
-
-function walk(start: string, wanted: (file: string) => boolean, read: LayoutsRead): boolean {
-  const seen = new Set<string>()
-  const queue = [start]
-
-  for (let file = queue.pop(); file !== undefined; file = queue.pop()) {
-    if (wanted(file))
-      return true
-
-    if (!seen.has(file)) {
-      seen.add(file)
-      queue.push(...importsOf(file, read))
-    }
-  }
-
-  return false
-}
-
-// The compiler stays out of a served app: a scan takes the build's record of the templates reading `ctx`, and loads the compiler only for a mount reading it that no record covers.
-let contextReader: ((source: string) => boolean) | undefined
-// Keyed by file, so the records of several projects in one process never meet.
-const recordedReads = new Map<string, boolean>()
-
-async function loadContextReader(mounts: RouteMount[], reads: ContextReads | undefined): Promise<void> {
-  if (!reads?.recorded && globEdges === undefined && mounts.some(mount => mount.reaching !== undefined))
-    globEdges = (await import('./glob-edges')).globEdges
+  if (roots.size === 0)
+    return
 
   if (reads?.recorded) {
-    for (const [file, found] of reads.files)
-      recordedReads.set(file, found)
+    for (const root of roots) {
+      if (root !== undefined)
+        reached.set(root, reachOver(recordedData(reads)))
+    }
 
-    for (const [file, paths] of reads.globs)
-      recordedGlobs.set(file, paths)
+    return
   }
-  else if (contextReader === undefined && mounts.some(mount => mount.reaching === 'context')) {
-    contextReader = (await import('./context-reads')).readsImplicitContext
+
+  const { openReach } = await import('./reach-walk')
+
+  for (const root of roots) {
+    if (root !== undefined)
+      reached.set(root, await openReach(root, reads))
   }
 }
 
-const contextRead = new WeakMap<LayoutsRead, Map<string, boolean>>()
-
-// Whether the template of a `.kay` file reads `ctx` with no `ctx` of its own, as the compiler decides when it imports the one of kay.
-function readsContext(file: string, read: LayoutsRead): boolean {
-  if (!KAY_FILE.test(file))
-    return false
-
-  let memo = contextRead.get(read)
-
-  if (memo === undefined)
-    contextRead.set(read, memo = new Map<string, boolean>())
-
-  let found = memo.get(file)
-
-  if (found === undefined) {
-    // A scan collecting answers from the templates, whatever a record read earlier says.
-    found = collecting.has(read) ? undefined : recordedReads.get(file)
-
-    if (found === undefined) {
-      if (contextReader === undefined)
-        throw new KayError('route-invalid', `kay: ${file} is reached by a route and neither the build's record nor a scan with the compiler covers it; run kay build again`)
-
-      try {
-        found = contextReader(readFileSync(file, 'utf8'))
-      }
-      catch {
-        found = false
-      }
-
-      collecting.get(read)?.files.set(file, found)
-    }
-
-    memo.set(file, found)
+// What the build recorded of the walk, which asks nothing of a file it did not meet.
+function recordedData(reads: ContextReads) {
+  const missing = (file: string): never => {
+    throw new KayError('route-invalid', `kay: ${file} is reached by a route and the build's record does not cover it; run kay build again`)
   }
+
+  return {
+    edges: (file: string) => reads.edges.get(file) ?? missing(file),
+    keys: (file: string) => KAY_FILE.test(file) ? reads.keys.get(file) ?? missing(file) : false as const,
+  }
+}
+
+function reachOf(tree: RouteMount): Reach {
+  const found = tree.root === undefined ? undefined : reached.get(tree.root)
+
+  if (found === undefined)
+    throw new KayError('route-invalid', 'kay: the layouts of the extensions are placed before scanRoutes opened what the pages reach')
 
   return found
 }
@@ -839,7 +689,7 @@ function withoutLayouts(special: SpecialPages): SpecialPages {
 }
 
 // The special pages for a directory of the URL tree, `''` for the root, `/account` below it.
-export function specialPagesOf(trees: RouteMount[], at: string, read: LayoutsRead = readFor(trees)): SpecialPages {
+export function specialPagesOf(trees: RouteMount[], at: string, read: LayoutsRead = new Map()): SpecialPages {
   const nearest = (name: string): SpecialPage | undefined => {
     for (const dir of directoriesUp(at)) {
       const tree = treeHolding(trees, dir, name)
@@ -866,10 +716,10 @@ export function routeTrees(routesDir: string, mounts: RouteMount[] = []): RouteM
 const OUTER_PREFIX = '/\0outer'
 
 // The layout kay mounts first when an extension gives a `context`, loading its values for the pages reaching a template that reads `ctx`.
-const CONTEXT_LAYOUT = `${import.meta.dir}/context-layout/_layout.kay`
+export const CONTEXT_LAYOUT = `${import.meta.dir}/context-layout/_layout.kay`
 
-function outerMount(layout: string, reaching?: string[] | 'context'): RouteMount {
-  return { dir: dirname(layout), prefix: OUTER_PREFIX, outer: layout, ...reaching !== undefined && { reaching } }
+function outerMount(root: string, layout: string, reaching?: string[] | 'context'): RouteMount {
+  return { dir: dirname(layout), prefix: OUTER_PREFIX, outer: layout, ...reaching !== undefined && { reaching, root } }
 }
 
 // The files a layout's `reaching` names, which must exist: a typo would wrap no page and say nothing.
@@ -897,17 +747,12 @@ function checkedLayout(root: string, layout: string, verify: boolean): string {
 // The routes each extension in `extensions` mounts, its directory as the project reaches it under `node_modules`, where a linked library's real path would name its actions after a path outside the project.
 // `verify` is false in an executable, whose library code names the folders it was bundled from and whose routes are embedded already.
 export function routeMounts(root: string, extensions: KayExtension[] = [], verify = true): RouteMount[] {
-  const contexts = extensions.some(extension => extension.context !== undefined) ? [outerMount(CONTEXT_LAYOUT, 'context')] : []
+  const contexts = extensions.some(extension => extension.context !== undefined) ? [outerMount(root, CONTEXT_LAYOUT, 'context')] : []
 
-  const mounts = [...contexts, ...extensions.flatMap(({ routes, editor, layout }) => [
+  return [...contexts, ...extensions.flatMap(({ routes, editor, layout }) => [
     ...routes ? [{ dir: throughLinks(root, resolve(root, routes.dir)), prefix: mountPrefix(routes.prefix), ...editor !== undefined && { editor: true as const } }] : [],
-    ...layout === undefined ? [] : [typeof layout === 'string' ? outerMount(throughLinks(root, checkedLayout(root, layout, verify))) : outerMount(throughLinks(root, checkedLayout(root, layout.file, verify)), reachingFiles(root, layout.reaching, verify))],
+    ...layout === undefined ? [] : [typeof layout === 'string' ? outerMount(root, throughLinks(root, checkedLayout(root, layout, verify))) : outerMount(root, throughLinks(root, checkedLayout(root, layout.file, verify)), reachingFiles(root, layout.reaching, verify))],
   ])]
-
-  for (const mount of mounts)
-    mountRoots.set(mount, root)
-
-  return mounts
 }
 
 // The API directories each extension in `extensions` mounts, reached as its routes are.

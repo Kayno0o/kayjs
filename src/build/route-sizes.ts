@@ -3,14 +3,17 @@ import type { ElementNode, NamedAttribute, Node, SlotNode, Span } from '../compi
 import type { ClientBuild } from '../server/client'
 import type { Stop } from '../server/pure-page'
 import type { Route } from '../server/routes'
+import type { ImportEdges } from './libraries'
 import type { RouteSize, SizeReport } from './report'
-import { join, relative } from 'node:path'
+import { realpathSync } from 'node:fs'
+import { join, relative, sep } from 'node:path'
 import { actionOf, elementsIn, serverIslandOf } from '../compiler/ast'
 import { parseKay } from '../compiler/parser'
 import { bindingNames, scopedBlocks } from '../compiler/template-reads'
 import { describeStop } from '../server/pure-page'
 import { ASSET_PREFIX } from './assets'
 import { resolveFrom, SCRIPT_FILE } from './files'
+import { findKayLibraries, importEdges, projectImportGraph } from './libraries'
 import { gzipSize } from './report'
 
 // A script a page loads from the build, whatever the mount point puts before it.
@@ -66,6 +69,13 @@ export async function routeSizes(root: string, client: ClientBuild, routes: Rout
 
   const entryChunks = report?.entry?.chunks ?? []
   const reads = new Map<string, Promise<SourceFacts>>()
+  // The import graph the scan of the routes read, with the libraries a component may come from; opened once a file is read, as a root with no files has none to open.
+  let opened: Promise<Imports> | undefined
+  const imports: () => Promise<Imports> = async () => opened ??= (async () => {
+    const real = realpathSync(root)
+
+    return { edges: importEdges(real, await findKayLibraries(root), projectImportGraph(root)), real }
+  })()
   const bySize = new Map<string, RouteSize>()
 
   // What the files a component imports, however deep and whatever they are, lead to.
@@ -83,7 +93,7 @@ export async function routeSizes(root: string, client: ClientBuild, routes: Rout
     if (islandChunks.has(name))
       found.islands.add(name)
 
-    const facts = await factsOf(file, root, reads)
+    const facts = await factsOf(file, root, reads, imports)
 
     found.ships ||= (facts.posts && client.navigation === true) || facts.defers
     found.waits ||= facts.waits || facts.defers
@@ -165,22 +175,30 @@ interface Reach {
   waits: boolean
 }
 
-async function factsOf(file: string, root: string, memo: Map<string, Promise<SourceFacts>>): Promise<SourceFacts> {
+// The import graph of the project, and where its root really is.
+interface Imports {
+  edges: ImportEdges
+  real: string
+}
+
+async function factsOf(file: string, root: string, memo: Map<string, Promise<SourceFacts>>, imports: () => Promise<Imports>): Promise<SourceFacts> {
   let facts = memo.get(file)
 
   if (facts === undefined) {
     facts = (async () => {
       try {
         const source = await Bun.file(file).text()
-        const imports = [...source.matchAll(IMPORT)].flatMap(([, specifier]) => followed(resolveFrom(specifier!, file), root) ?? [])
+        const { edges, real } = await imports()
+        // A file of the project, named as the route lists it rather than by its real path.
+        const followedFiles = (await edges(realpathSync(file))).map(path => path.startsWith(real + sep) ? join(root, path.slice(real.length)) : path)
 
         if (!file.endsWith('.kay'))
-          return { imports, uses: new Map(), posts: false, defers: false, waits: false }
+          return { imports: followedFiles, uses: new Map(), posts: false, defers: false, waits: false }
 
         const { template } = parseKay(source)
         const elements = [...elementsIn(template)]
 
-        return { imports, uses: usesOf(source, file, root, template), posts: elements.some(element => actionOf(element, source) !== undefined), defers: elements.some(element => serverIslandOf(element, source)?.mode === 'defer'), waits: elements.some(element => waitsToHydrate(element, source)) }
+        return { imports: followedFiles, uses: usesOf(source, file, root, template), posts: elements.some(element => actionOf(element, source) !== undefined), defers: elements.some(element => serverIslandOf(element, source)?.mode === 'defer'), waits: elements.some(element => waitsToHydrate(element, source)) }
       }
       catch {
         return { imports: [], uses: new Map(), posts: false, defers: false, waits: false }

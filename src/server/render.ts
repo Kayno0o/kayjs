@@ -39,7 +39,7 @@ import { rebaseHtml } from './base'
 import { importModule, onForgetModules } from './bundle'
 import { INLINE_LIMIT, islandChunks } from './client'
 import { preferredEncoding, STYLE_TAG, wholeResponse } from './compress'
-import { useContexts } from './context-values'
+import { loadEveryContextKey, useContexts } from './context-values'
 import { cookieJar, requestCookies } from './cookies'
 import { A11Y_SCRIPT, DEV_BOOT, devToolScripts, errorPageScripts, liveReload, problemsBlock, STYLES_SCRIPT, typeProblemsBlock } from './dev'
 import { noteRedirect } from './dev-notes'
@@ -62,7 +62,7 @@ import { matchesEtag } from './public'
 import { chainQuery, queryRules, queryScript, readQuery, readQueryLeniently } from './query'
 import { reportServerError } from './report'
 import { RequestReadError } from './request-read'
-import { guardUrl, routeChain } from './routes'
+import { CONTEXT_LAYOUT, guardUrl, routeChain } from './routes'
 import { savesLess } from './save-data'
 import { askedForEndedEntry, inServerScope, markPrivate, readPersonally, wasReadPersonally, withEndedEntries, withOutcome } from './scope'
 import { Denied, NotFound, Redirect, stoppers } from './signals'
@@ -237,7 +237,7 @@ const NOT_ASCII = /[^\x20-\x7E]/g
 
 // The params come resolved, each matcher's value in place of its text.
 export async function renderPage(route: ServedRoute, context: RequestContext, params: Record<string, unknown>, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
-  const rendering = createRendering(context, params, options)
+  const rendering = createRendering(context, params, options, route.contextKeys)
 
   rendering.guarded = options.guarded ?? route.guards.length > 0
 
@@ -537,7 +537,7 @@ function storedEncodings(encoded: ServedPage['encoded']): { names: StoredEncodin
 // What `kay build` rendered, behind the page's guards, revalidated by its ETag.
 // `spliced` gives the page with what changes per request filled in, as its stamps, gzipped when the browser takes it.
 export async function servePrerendered(route: ServedRoute, page: ServedPage, params: Record<string, unknown>, context: RequestContext, client: ClientBuild, options: RenderOptions = {}, spliced?: () => Promise<{ body: Written, gzip: boolean }>): Promise<Response> {
-  const rendering = createRendering(context, params, options)
+  const rendering = createRendering(context, params, options, route.contextKeys)
   const refusing = refused(route, rendering, client, withEditor(route, options))
   const refusal = refusing === undefined ? undefined : await refusing
 
@@ -614,7 +614,7 @@ export interface RenderedServerIslands {
 // The server islands of a prerendered page, rendered for this request: its loads run again, then only the components on the way to an island render, as `path` lists them; without one, the whole page renders once to find them.
 // A refusal, a redirect or a failed load answers as the page would.
 export async function renderServerIslands(route: ServedRoute, context: RequestContext, params: Record<string, unknown>, client: ClientBuild, options: RenderOptions, path: Set<unknown> | undefined, skip?: ServerIslandMode): Promise<RenderedServerIslands | Response> {
-  const rendering = createRendering(context, params, options)
+  const rendering = createRendering(context, params, options, route.contextKeys)
   const { request } = rendering.ctx
   const report = (error: unknown) => reportServerError(error, request, options.onError)
   const own = withEditor(route, options)
@@ -704,11 +704,11 @@ export async function renderUncaught(error: unknown, special: SpecialPages, cont
   return withOutcome(rendering.outcome, async () => renderFailure(error, special, rendering, new Map(), client, options))
 }
 
-function createRendering(context: RequestContext, params: Record<string, unknown>, { prerendering = false, lang = DEFAULT_LANG, base = '', contexts }: RenderOptions): Rendering {
+function createRendering(context: RequestContext, params: Record<string, unknown>, { prerendering = false, lang = DEFAULT_LANG, base = '', contexts }: RenderOptions, contextKeys?: readonly string[]): Rendering {
   const { request } = context
 
   if (contexts !== undefined && contexts.length > 0)
-    useContexts(request, contexts, prerendering)
+    useContexts(request, contexts, prerendering, contextKeys)
 
   const jar = cookieJar(request)
   let flash: Flash | SuccessFlash | null | undefined
@@ -881,6 +881,10 @@ async function renderSpecialPage(page: SpecialPage, rendering: Rendering, loaded
 
   for (const files of layoutsFailed ? [chains.alone] : [chains.full, chains.alone]) {
     try {
+      // The failed page may have loaded fewer keys of `ctx` than this one reads, and its layouts keep what their loads returned.
+      if (files.includes(CONTEXT_LAYOUT))
+        await loadEveryContextKey(rendering.ctx.request)
+
       const modules = knownModules(files, options) ?? await importAll(files, options)
 
       if (!rendering.queryRead() && !options.prerendering)

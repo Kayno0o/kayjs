@@ -1,0 +1,4 @@
+---
+import Cart from '../../lib/cart.kay'
+---
+Cart

@@ -329,6 +329,29 @@ describe.concurrent('kay dev reloading', () => {
     }
   }, 60_000)
 
+  it('wraps a page in the layout of the files it reaches once an edit imports one, and unwraps it once the import goes, in the one process', async () => {
+    const project = await served({
+      'src/routes/index.kay': 'p home\n',
+      'lib/widget.kay': 'p widget\n',
+      'lib/layout/_layout.kay': 'div#wrap\n  slot\n',
+      'kay.config.ts': 'import { defineConfig } from "kay/server"\n\nexport default defineConfig({ extensions: [{ name: "lib", layout: { file: "lib/layout/_layout.kay", reaching: ["lib/widget.kay"] } }] })\n',
+    })
+
+    try {
+      await project.sees('home')
+      expect(await project.text()).not.toContain('id="wrap"')
+      await project.replace('src/routes/index.kay', '---\nimport Widget from "../../lib/widget.kay"\n---\np home\nWidget\n')
+      await project.sees('id="wrap"')
+      await project.replace('src/routes/index.kay', 'p home again\n')
+      await until(async () => (await project.text()).includes('home again'))
+      expect(await project.text()).not.toContain('id="wrap"')
+      expect(project.children).toHaveLength(1)
+    }
+    finally {
+      await project.cleanup()
+    }
+  }, 60_000)
+
   it('holds one listener and one interval of the entry after twenty reloads', async () => {
     const project = await served({ 'src/routes/index.kay': 'h1 Edit 0\n' })
     const counts = join(project.root, '.counts')
