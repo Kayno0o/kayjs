@@ -42,7 +42,7 @@ async function press(event: MouseEvent) {
 }
 ---
 if linkOf(attributes) as link
-  a({...link} part="root" data-variant={variant} data-size={size} data-spinner={spinner ? undefined : 'off'} aria-busy={spinning() ? 'true' : undefined} onClick={press})
+  a(part="root" {...link} data-variant={variant} data-size={size} data-spinner={spinner ? undefined : 'off'} aria-busy={spinning() ? 'true' : undefined} onClick={press})
     if spinning() && spinner
       Icon(icon="spinner" part="spinner")
     else if icon
@@ -50,7 +50,7 @@ if linkOf(attributes) as link
     | {label}
     slot
 else if buttonOf(attributes) as button
-  button({...button} part="root" data-variant={variant} data-size={size} data-spinner={spinner ? undefined : 'off'} disabled={button.disabled || (busy === undefined && pending() && button.type !== 'submit' && button.type !== 'reset')} aria-busy={spinning() ? 'true' : undefined} onClick={press})
+  button(part="root" {...button} data-variant={variant} data-size={size} data-spinner={spinner ? undefined : 'off'} disabled={button.disabled || (busy === undefined && pending() && button.type !== 'submit' && button.type !== 'reset')} aria-busy={spinning() ? 'true' : undefined} onClick={press})
     if spinning() && spinner
       Icon(icon="spinner" part="spinner")
     else if icon

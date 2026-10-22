@@ -171,3 +171,10 @@ test('tone success draws the success button', async () => {
 
   expect(mounted.root.querySelector('#success')!.className).toBe('kui-btn kui-btn-success')
 })
+
+test('a Button used as a part of another component keeps the part name its caller hands it, busy or not', async () => {
+  mounted = await mountComponent('src/components/button-part.kay', {})
+
+  expect(mounted.root.querySelector('#plain')?.getAttribute('data-part')).toBe('cta')
+  expect(mounted.root.querySelector('#busy')?.getAttribute('data-part')).toBe('busyCta')
+})

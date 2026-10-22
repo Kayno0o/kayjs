@@ -1,0 +1,9 @@
+---
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import { recipe } from 'kay'
+
+const look = recipe({ parts: { root: 'frame', cta: '', busyCta: '' } })
+---
+div(part="root")
+  Button#plain(label="Plain" part="cta")
+  Button#busy(label="Busy" part="busyCta" onClick={() => undefined})

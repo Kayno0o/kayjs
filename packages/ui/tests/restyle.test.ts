@@ -162,7 +162,7 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
   })
 
   test('a button with an onClick takes the restyle of Button once, not twice', () => {
-    expect(html).toMatch(/<button id="busy"[^>]* class="kui-btn tracking-wide">/)
+    expect(html).toMatch(/<button[^>]* id="busy"[^>]* class="kui-btn tracking-wide">/)
   })
 
   test('a busy button and a busy link draw the spinner part restyled, a button with an onClick its own spinner part', () => {
@@ -176,7 +176,7 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
   })
 
   test('a class string on a button with an onClick joins the restyle', () => {
-    expect(html).toMatch(/<button id="single"[^>]* class="kui-btn rounded-none">/)
+    expect(html).toMatch(/<button[^>]* id="single"[^>]* class="kui-btn rounded-none">/)
   })
 
   test('the browser build of an island carries the restyled classes as well', () => {
