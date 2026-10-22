@@ -90,9 +90,10 @@ export class CodeBuilder {
       this.code += rewrite.after ?? ''
 
       if (rewrite.probe) {
-        const at = this.code.lastIndexOf(PROBE, this.code.length)
+        const at = this.code.lastIndexOf(PROBE)
 
-        this.ranges.push({ generated: { start: at, end: at + PROBE.length }, source: rewrite.probe })
+        if (at >= 0)
+          this.ranges.push({ generated: { start: at, end: at + PROBE.length }, source: rewrite.probe })
       }
 
       cursor = rewrite.end
