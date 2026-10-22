@@ -76,7 +76,7 @@ ChatLauncher(action={reply} label="Ask the docs")
 
 ### Restyle
 
-Its parts - `root`, `empty`, `greeting`, `suggestions`, `suggestion`, `log`, `turn`, `text`, `thinking`, `note`, `status`, `disclosure`, `form`, `field` and `send` - keep their `kai-` classes and take utilities from `src/ui.ts` or a `class` object: `defineUi({ '@kaynooo/kayjs-ai/chat.kay': { parts: { send: 'size-12', turn: 'text-base' } } })`, `Chat(class={{ log: 'max-h-96' }})`. A `class` string restyles the root. The tool calls are `@kaynooo/kayjs-ai/chat-calls.kay` (`root`, `summary`, `list`, `call`, `name`, `status`, `title`, `code`) and the launcher's panel `@kaynooo/kayjs-ai/chat-panel.kay` (`root`, `panel`, `head`, `title`, `actions`, `action`, `expand`, `body`, `button`, `glyph`). A table of a reply is built from the reply's markup and keeps `.kai-chat-table`.
+Its parts - `root`, `empty`, `greeting`, `suggestions`, `suggestion`, `log`, `turn`, `text`, `thinking`, `note`, `status`, `disclosure`, `form`, `field`, `send` and `retry` (the Try again button, shown only after a failed reply) - keep their `kai-` classes and take utilities from `src/ui.ts` or a `class` object: `defineUi({ '@kaynooo/kayjs-ai/chat.kay': { parts: { send: 'size-12', turn: 'text-base' } } })`, `Chat(class={{ log: 'max-h-96' }})`. A `class` string restyles the root. The tool calls are `@kaynooo/kayjs-ai/chat-calls.kay` (`root`, `summary`, `list`, `call`, `name`, `status`, `title`, `code`) and the launcher's panel `@kaynooo/kayjs-ai/chat-panel.kay` (`root`, `panel`, `head`, `title`, `actions`, `action`, `expand`, `body`, `button`, `glyph`). A table of a reply is built from the reply's markup and keeps `.kai-chat-table`.
 
 ### Behaviour
 

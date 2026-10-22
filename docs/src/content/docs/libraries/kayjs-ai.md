@@ -147,7 +147,7 @@ Its header has a New conversation button, which clears the log and the kept hist
 
 Every element is a part that keeps its `kai-` class and takes utilities from `src/ui.ts` or a `class` object, `defineUi({ '@kaynooo/kayjs-ai/chat.kay': { parts: { send: 'size-12' } } })` or `Chat(class={{ log: 'max-h-96' }})`; a `class` string restyles the root.
 
-- `chat.kay`: `root`, `empty`, `greeting`, `suggestions`, `suggestion`, `log`, `turn`, `text`, `thinking`, `note`, `status`, `disclosure`, `form`, `field` and `send`.
+- `chat.kay`: `root`, `empty`, `greeting`, `suggestions`, `suggestion`, `log`, `turn`, `text`, `thinking`, `note`, `status`, `disclosure`, `form`, `field`, `send` and `retry` (the Try again button, shown only after a failed reply).
 - `chat-calls.kay` (the tool calls): `root`, `summary`, `list`, `call`, `name`, `status`, `title` and `code`.
 - `chat-panel.kay` (the launcher's panel): `root`, `panel`, `head`, `title`, `actions`, `action`, `expand`, `body`, `button` and `glyph`.
 - A table of a reply is built from the reply's markup and keeps `.kai-chat-table`.
