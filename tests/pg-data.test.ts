@@ -492,6 +492,33 @@ pgDescribe('pgCache', () => {
     await Bun.sleep(700)
     expect(heard).toHaveLength(1)
   })
+
+  pgIt('tells another process the invalidations in the order they were made when their ids gain a digit', async () => {
+    const sql = await fresh()
+    const [first, second] = handles(2)
+    const sender = await boot('bus-a', first!)
+    const receiver = await boot('bus-b', second!)
+    const heard: string[] = []
+    let polling = false
+
+    receiver.store.subscribe!(message => message === '{"keys":[]}' ? void (polling = true) : heard.push(message))
+    await receiver.store.keys()
+    await waitFor(async () => {
+      await sender.store.publish!('{"keys":[]}')
+
+      return polling
+    }, 'the receiver to poll')
+    await sql.unsafe('ALTER SEQUENCE kay_events_id_seq RESTART WITH 90')
+
+    const messages = Array.from({ length: 30 }, (_, at) => `{"keys":["k${at}"]}`)
+
+    for (const message of messages)
+      await sender.store.publish!(message)
+
+    await waitFor(() => heard.length === messages.length, 'every message')
+    await Bun.sleep(150)
+    expect(heard).toEqual(messages)
+  })
 })
 
 pgDescribe('pgRooms', () => {
@@ -560,14 +587,38 @@ pgDescribe('pgRooms', () => {
     first!.publish('lobby', 'quiet', { except: 'c1', to: '"bob"' })
     expect(own).toEqual(['lobby:hello', 'lobby:quiet'])
     await waitFor(() => other.length === 2, 'both messages')
-    // Their order is not asserted: they were read in reverse once under load.
-    expect(other).toHaveLength(2)
-    expect(other).toContainEqual(['lobby', 'hello', {}])
-    expect(other).toContainEqual(['lobby', 'quiet', { except: 'c1', to: '"bob"' }])
+    expect(other).toEqual([['lobby', 'hello', {}], ['lobby', 'quiet', { except: 'c1', to: '"bob"' }]])
     second!.publish('lobby', 'back', {})
     expect(other).toHaveLength(3)
     await waitFor(() => own.length === 3, 'the message back')
     expect(own[2]).toBe('lobby:back')
+    await closed(first!, second!)
+  })
+
+  pgIt('delivers messages in the order they were published when their ids gain a digit', async () => {
+    const sql = await fresh()
+    const [first, second] = handles(2).map(handle => pgRooms(handle, { poll: '20ms' }))
+    const heard: string[] = []
+    let polling = false
+
+    second!.subscribe((_room, text) => text === 'probe' ? void (polling = true) : heard.push(text))
+    await waitFor(() => {
+      first!.publish('lobby', 'probe', {})
+
+      return polling
+    }, 'the other poller to run')
+    // The ids are text in the read, so '100' sorted before '99' and a message published after another reached the other replica before it.
+    await waitFor(async () => (await rows(sql, 'SELECT id FROM kay_room_messages')).length >= 1, 'the probe row')
+    await sql.unsafe('ALTER SEQUENCE kay_room_messages_id_seq RESTART WITH 90')
+
+    const texts = Array.from({ length: 30 }, (_, at) => `m${at}`)
+
+    for (const text of texts)
+      first!.publish('lobby', text, {})
+
+    await waitFor(() => heard.length === texts.length, 'every message')
+    await Bun.sleep(150)
+    expect(heard).toEqual(texts)
     await closed(first!, second!)
   })
 

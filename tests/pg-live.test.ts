@@ -92,6 +92,28 @@ pgDescribe('pgData live values', () => {
     second.stop?.()
   })
 
+  pgIt('is heard in the order the sets were made when their sequence numbers gain a digit', async () => {
+    const sql = await fresh()
+    const [first, second] = twoReplicas()
+
+    await first.entries()
+    await second.entries()
+
+    const onSecond = listen(second)
+
+    await sql.unsafe('ALTER SEQUENCE kay_live_events_seq_seq RESTART WITH 90')
+
+    const keys = Array.from({ length: 30 }, (_, at) => `k${at}`)
+
+    for (const key of keys)
+      await first.set('app:room', key, '[1]')
+
+    await waitFor(() => onSecond.length >= keys.length, 'the second replica to hear the sets')
+    expect(onSecond.map(([, key]) => key)).toEqual(keys)
+    first.stop?.()
+    second.stop?.()
+  })
+
   pgIt('hands a restarted replica what is held, and a set in between is heard once', async () => {
     await fresh()
 

@@ -43,7 +43,8 @@ export function pgCache(pg: PgHandle): CacheStore {
       return
     }
 
-    for (const event of await rowsOf<{ id: string, message: string }>(db`SELECT id::text, message FROM kay_events WHERE id > ${from}::bigint AND origin != ${PROCESS} ORDER BY id`)) {
+    // Ordered by the table column: a bare `id` is the text of the select list, where '100' sorts before '99'.
+    for (const event of await rowsOf<{ id: string, message: string }>(db`SELECT id::text, message FROM kay_events WHERE id > ${from}::bigint AND origin != ${PROCESS} ORDER BY kay_events.id`)) {
       const id = Number(event.id)
 
       if (events.has(id))

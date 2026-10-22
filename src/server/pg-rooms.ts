@@ -165,7 +165,8 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
       return
     }
 
-    for (const row of await query<{ id: string, room: string, text: string, skipped: string | null, recipient: string | null }>(db, 'SELECT id::text, room, text, skipped, recipient FROM kay_room_messages WHERE id > $1::bigint AND process <> $2 ORDER BY id', [from, self])) {
+    // Ordered by the table column: a bare `id` is the text of the select list, where '100' sorts before '99'.
+    for (const row of await query<{ id: string, room: string, text: string, skipped: string | null, recipient: string | null }>(db, 'SELECT id::text, room, text, skipped, recipient FROM kay_room_messages WHERE id > $1::bigint AND process <> $2 ORDER BY kay_room_messages.id', [from, self])) {
       const id = Number(row.id)
 
       if (events.has(id))
