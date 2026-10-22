@@ -24,7 +24,7 @@ const { items, multiple = false, boxed = true, panel, class: className, ...rest 
 }>()
 
 const group = uid()
-const firstOpen = items.findIndex(item => item.open)
+const firstOpen = () => items.findIndex(item => item.open)
 let root: HTMLElement | undefined
 
 // Arrow, Home and End keys move between the headers, which are the summaries of the sections.
@@ -47,5 +47,5 @@ function keyDown(event: KeyboardEvent) {
 // Native details sharing a `name` close one another without script; the keys need an island.
 .kui-accordion({...rest} ref={element => root = element} onKeyDown={keyDown} class={className})
   for item, index of items key={item.value}
-    CollapsibleSection(title={item.title} name={multiple ? undefined : group} open={multiple ? item.open === true : index === firstOpen} boxed={boxed})
+    CollapsibleSection(title={item.title} name={multiple ? undefined : group} open={multiple ? item.open === true : index === firstOpen()} boxed={boxed})
       | {untrack(() => panel(item.value))}

@@ -47,3 +47,20 @@ test('shares one name across its sections and opens the flagged one', async () =
   expect(sections[0]!.getAttribute('name')).not.toBeNull()
   expect(sections.map(section => section.open)).toEqual([false, true, false])
 })
+
+test('with multiple, shares no name and honors every open flag', async () => {
+  mounted = await mountComponent('src/components/moon-accordion.kay', { multiple: true })
+
+  const sections = [...mounted.root.querySelectorAll('details')]
+
+  expect(sections.map(section => section.getAttribute('name'))).toEqual([null, null, null])
+  expect(sections.map(section => section.open)).toEqual([false, true, false])
+})
+
+test('leaves a chord to the browser', async () => {
+  mounted = await mountComponent('src/components/moon-accordion.kay')
+  mounted.root.querySelector('summary')!.focus()
+
+  for (const chord of [{ shiftKey: true }, { altKey: true }, { metaKey: true }])
+    expect(key('ArrowDown', chord).defaultPrevented).toBe(false)
+})

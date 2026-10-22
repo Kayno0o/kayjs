@@ -1,8 +1,9 @@
 ---
 import Accordion from '@kaynooo/kayjs-ui/accordion.kay'
 
+const { multiple = false } = props<{ multiple?: boolean }>()
 const items = [{ value: 'mars', title: 'Mars' }, { value: 'venus', title: 'Venus', open: true }, { value: 'earth', title: 'Earth' }]
 ---
-Accordion(items={items})
+Accordion(items={items} multiple={multiple})
   @panel(value)
     p {value}
