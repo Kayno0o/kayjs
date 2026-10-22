@@ -50,7 +50,7 @@ test('stopping editing leaves edit mode, the page rendering no editor again', as
   const leaving = await testSite({ root: ROOT })
 
   expect((await leaving.visit('/admin/page?path=/blog/hello')).find('aside.kcms-editor')).toHaveLength(1)
-  expect(await (await leaving.fetch('/api/cms/preview/exit', { method: 'POST' })).json()).toEqual({ left: true })
+  expect(await (await leaving.fetch('/_kay/cms/preview/exit', { method: 'POST' })).json()).toEqual({ left: true })
   expect((await leaving.visit('/blog/hello')).find('aside.kcms-editor')).toEqual([])
 })
 
@@ -264,7 +264,7 @@ test('the extension\'s guard covers an app page standing in for a screen, and th
     expect((await site.fetch(path, denied)).status).toBe(403)
 
   expect((await site.fetch('/admin/collections/shop/lamp')).status).toBe(200)
-  expect((await site.fetch('/api/cms/entries/shop/lamp', denied)).status).toBe(403)
+  expect((await site.fetch('/_kay/cms/entries/shop/lamp', denied)).status).toBe(403)
 })
 
 test('the missing-pages screen lists what visitors found nothing at, most visited first, with where they came from and a redirect to copy', async () => {
@@ -397,7 +397,7 @@ test('opening a page through the screens puts it in edit mode, its fields marked
 })
 
 async function send(method: string, path: string, body?: object): Promise<{ status: number, answer: unknown }> {
-  const response = await site.fetch(`/api/cms/entries/${path}`, body === undefined ? { method } : { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+  const response = await site.fetch(`/_kay/cms/entries/${path}`, body === undefined ? { method } : { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
 
   return { status: response.status, answer: await response.json() }
 }
@@ -424,7 +424,7 @@ test('saving a file entry hands the file kay wrote to the saver, as a commit by 
 
 test('a save through the route lands in the test site\'s copy of a loaded collection, the app\'s own store untouched, and a reset drops it', async () => {
   const titleOf = async () => {
-    const response = await site.fetch('/api/cms/entries/ledger/first')
+    const response = await site.fetch('/_kay/cms/entries/ledger/first')
 
     return response.ok ? ((await response.json()) as { entry?: { data: { name: string } } }).entry?.data.name : undefined
   }
@@ -488,7 +488,7 @@ test('a duplicate is a draft copy under a free slug, and a collection\'s entries
   expect((await send('POST', 'posts/nope/duplicate')).answer).toHaveProperty('issues.0.key', 'slug')
   expect((await send('POST', 'welcome/index/duplicate')).answer).toHaveProperty('issues.0.message', expect.stringContaining('cannot be duplicated'))
   expect((await send('GET', 'posts')).answer).toEqual({ choices: [{ slug: 'hello', title: 'Hello world' }, { slug: 'notes/garden', title: 'Spring garden' }], complete: true })
-  expect((await site.fetch('/api/cms/entries/nothing')).status).toBe(404)
+  expect((await site.fetch('/_kay/cms/entries/nothing')).status).toBe(404)
 })
 
 test('the content list shows each collection\'s drafts and a New entry, and an empty collection offers one', async () => {
@@ -617,18 +617,18 @@ test('an upload is stored in the folder every collection shares, named by its ha
 
   form.append('file', new File([PIXEL], 'pixel.png', { type: 'image/png' }))
 
-  const response = await site.fetch('/api/cms/files/products', { method: 'POST', body: form })
+  const response = await site.fetch('/_kay/cms/files/products', { method: 'POST', body: form })
   const { path } = await response.json() as { path: string }
 
   expect(path).toMatch(/^\/_kay\/files\/cms-media\/\w+\.1x1(?:-[\da-f]{6})?\.png$/)
   expect(new Uint8Array(await (await site.fetch(path)).arrayBuffer())).toEqual(PIXEL)
-  expect((await site.fetch('/api/cms/files/nope', { method: 'POST', body: form })).status).toBe(404)
+  expect((await site.fetch('/_kay/cms/files/nope', { method: 'POST', body: form })).status).toBe(404)
 
   const refused = new FormData()
 
   refused.append('file', new File(['alert(1)'], 'app.js', { type: 'image/png' }))
 
-  const refusal = await site.fetch('/api/cms/files/products', { method: 'POST', body: refused })
+  const refusal = await site.fetch('/_kay/cms/files/products', { method: 'POST', body: refused })
 
   expect(refusal.status).toBe(415)
   expect(await refusal.text()).toContain('which uploads here do not take')
@@ -640,7 +640,7 @@ test('an image upload answers its size, a file that is no image none, and the up
 
     form.append('file', file)
 
-    return await (await site.fetch('/api/cms/files/products', { method: 'POST', body: form })).json() as { path: string, width?: number, height?: number }
+    return await (await site.fetch('/_kay/cms/files/products', { method: 'POST', body: form })).json() as { path: string, width?: number, height?: number }
   }
   const image = await send(new File([PIXEL, new Uint8Array([5])], 'size.png', { type: 'image/png' }))
   const pdf = await send(new File(['%PDF-1.4\n%%EOF'], 'doc.pdf', { type: 'application/pdf' }))
@@ -649,7 +649,7 @@ test('an image upload answers its size, a file that is no image none, and the up
   expect(pdf).not.toHaveProperty('width')
   expect(pdf).not.toHaveProperty('height')
 
-  const listed = async (query = '') => await (await site.fetch(`/api/cms/files/products${query}`)).json() as { path: string, name: string }[]
+  const listed = async (query = '') => await (await site.fetch(`/_kay/cms/files/products${query}`)).json() as { path: string, name: string }[]
   const everything = (await listed()).map(upload => upload.path)
   const images = (await listed('?images=true')).map(upload => upload.path)
 
@@ -657,13 +657,13 @@ test('an image upload answers its size, a file that is no image none, and the up
   expect(images).toContain(image.path)
   expect(images).not.toContain(pdf.path)
   expect((await listed()).find(upload => upload.path === image.path)?.name).toBe('size.png')
-  expect((await site.fetch('/api/cms/files/nope')).status).toBe(404)
+  expect((await site.fetch('/_kay/cms/files/nope')).status).toBe(404)
 })
 
 test('the icons route pages through the set an icon field registered, caps a page and answers nothing for an unknown set or a hostile query', async () => {
   iconField({ prefix: 'probe', icons: Object.fromEntries(Array.from({ length: 150 }, (_, at) => [`i${at}`, { body: '<path d="M0 0"/>' }])) })
 
-  const page = async (query: string) => await (await site.fetch(`/api/cms/icons?${query}`)).json() as { name: string, icon: { innerHTML: string } }[]
+  const page = async (query: string) => await (await site.fetch(`/_kay/cms/icons?${query}`)).json() as { name: string, icon: { innerHTML: string } }[]
 
   expect((await page('set=probe&query=&limit=5&offset=2')).map(found => found.name)).toEqual(['probe:i2', 'probe:i3', 'probe:i4', 'probe:i5', 'probe:i6'])
   expect(await page('set=probe&query=&limit=5000&offset=0')).toHaveLength(100)
@@ -671,13 +671,13 @@ test('the icons route pages through the set an icon field registered, caps a pag
   expect((await page('set=probe&query=&limit=1&offset=0'))[0]?.icon.innerHTML).toBe('<path d="M0 0"/>')
   expect(await page('set=nope&query=&limit=5&offset=0')).toEqual([])
   expect(await page('set=probe&query=%5E.*%24%28&limit=5&offset=0')).toEqual([])
-  expect((await site.fetch('/api/cms/icons?set=probe&query=&limit=0&offset=0')).status).toBe(422)
-  expect((await site.fetch(`/api/cms/icons?set=probe&query=${'x'.repeat(201)}&limit=5&offset=0`)).status).toBe(422)
-  expect((await site.fetch('/api/cms/icons?set=probe&query=&limit=5&offset=-1')).status).toBe(422)
+  expect((await site.fetch('/_kay/cms/icons?set=probe&query=&limit=0&offset=0')).status).toBe(422)
+  expect((await site.fetch(`/_kay/cms/icons?set=probe&query=${'x'.repeat(201)}&limit=5&offset=0`)).status).toBe(422)
+  expect((await site.fetch('/_kay/cms/icons?set=probe&query=&limit=5&offset=-1')).status).toBe(422)
 })
 
 test('the editor is told the types and the size an upload may have', async () => {
-  const rules = await (await site.fetch('/api/cms/files/rules')).json() as { accept: string, images: string, maxSize: number }
+  const rules = await (await site.fetch('/_kay/cms/files/rules')).json() as { accept: string, images: string, maxSize: number }
 
   expect(rules.accept.split(',')).toContain('application/pdf')
   expect(rules.images.split(',')).not.toContain('application/pdf')
@@ -694,7 +694,7 @@ test('an upload whose bytes are not its name\'s type is refused 415 and stored n
 
     form.append('file', new File([content], name, { type: 'image/png' }))
 
-    const response = await site.fetch('/api/cms/files/products', { method: 'POST', body: form })
+    const response = await site.fetch('/_kay/cms/files/products', { method: 'POST', body: form })
 
     expect(response.status).toBe(415)
     expect(await response.text()).toBe(`${name} is not a real image/png`)
@@ -709,7 +709,7 @@ test('an upload exactly at uploads.maxSize is stored, one byte over refused by t
 
     form.append('file', new File(size === 0 ? [] : [Buffer.from('%PDF-1.7\n'), new Uint8Array(Math.max(0, size - 9))], 'big.pdf', { type: 'application/pdf' }))
 
-    return site.fetch('/api/cms/files/products', { method: 'POST', body: form })
+    return site.fetch('/_kay/cms/files/products', { method: 'POST', body: form })
   }
 
   expect((await post(64 * 1024)).status).toBe(200)
@@ -729,7 +729,7 @@ test('an upload exactly at uploads.maxSize is stored, one byte over refused by t
 
 test('a save the schema refuses names each field by its label, nested ones on their own path', async () => {
   const save = async (headers: Record<string, string>, data: object) => {
-    const response = await site.fetch('/api/cms/entries/products/lamp', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ data }) })
+    const response = await site.fetch('/_kay/cms/entries/products/lamp', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ data }) })
 
     return ((await response.json()) as { issues: { path: string, message: string }[] }).issues.map(({ path, message }) => [path, message])
   }
@@ -748,18 +748,18 @@ test('the API refusals come back in the locale of the page that called, English 
 
     return form
   }
-  const upload = async (headers: Record<string, string>) => (await site.fetch('/api/cms/files/products', { method: 'POST', body: refused(), headers })).text()
+  const upload = async (headers: Record<string, string>) => (await site.fetch('/_kay/cms/files/products', { method: 'POST', body: refused(), headers })).text()
 
   expect(await upload(french)).toContain('que les envois ici n\'acceptent pas')
   expect(await upload(english)).toContain('which uploads here do not take')
-  expect(await (await site.fetch('/api/cms/entries/products/nope', { headers: french })).text()).toBe('Aucune entrée nope dans products')
-  expect(await (await site.fetch('/api/cms/entries/products/nope', { headers: english })).text()).toBe('No entry nope in products')
-  expect(await (await site.fetch('/api/cms/entries/nope/x', { headers: { 'accept-language': 'fr' } })).text()).toBe('Aucune collection nope')
+  expect(await (await site.fetch('/_kay/cms/entries/products/nope', { headers: french })).text()).toBe('Aucune entrée nope dans products')
+  expect(await (await site.fetch('/_kay/cms/entries/products/nope', { headers: english })).text()).toBe('No entry nope in products')
+  expect(await (await site.fetch('/_kay/cms/entries/nope/x', { headers: { 'accept-language': 'fr' } })).text()).toBe('Aucune collection nope')
 
   outage.message = 'down'
 
   try {
-    const remove = async (headers: Record<string, string>) => (await site.fetch('/api/cms/files/unused/delete', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ keys: ['products/x.png'] }) })).text()
+    const remove = async (headers: Record<string, string>) => (await site.fetch('/_kay/cms/files/unused/delete', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ keys: ['products/x.png'] }) })).text()
 
     expect(await remove(french)).toContain('Rien n\'a été supprimé')
     expect(await remove(english)).toContain('Nothing was deleted')
@@ -776,11 +776,11 @@ test('the unused-uploads screen lists an upload no entry mentions, and deleting 
 
     form.append('file', new File([PIXEL, new Uint8Array([salt])], 'pixel.png', { type: 'image/png' }))
 
-    return ((await (await site.fetch('/api/cms/files/products', { method: 'POST', body: form })).json()) as { path: string }).path
+    return ((await (await site.fetch('/_kay/cms/files/products', { method: 'POST', body: form })).json()) as { path: string }).path
   }
   const [used, stray] = [await upload(1), await upload(2)]
   const keyOf = (path: string) => path.slice('/_kay/files/'.length)
-  const remove = async (keys: string[]) => site.fetch('/api/cms/files/unused/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ keys }) })
+  const remove = async (keys: string[]) => site.fetch('/_kay/cms/files/unused/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ keys }) })
 
   // The scan holds back what is under a day old.
   setSystemTime(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000))
@@ -813,9 +813,9 @@ test('the media library lists an upload with its name, size and the entries usin
 
   form.append('file', new File([PIXEL, new Uint8Array([4])], 'team photo.png', { type: 'image/png' }))
 
-  const { path } = await (await site.fetch('/api/cms/files/products', { method: 'POST', body: form })).json() as { path: string }
+  const { path } = await (await site.fetch('/_kay/cms/files/products', { method: 'POST', body: form })).json() as { path: string }
   const key = path.slice('/_kay/files/'.length)
-  const rename = async (name: string, at = key) => site.fetch('/api/cms/files/media/rename', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: at, name }) })
+  const rename = async (name: string, at = key) => site.fetch('/_kay/cms/files/media/rename', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: at, name }) })
 
   products.push({ slug: 'team', data: { name: 'Team', photo: path } as { name: string } })
 
@@ -846,7 +846,7 @@ test('in the browser, the media library renames an upload in place and deletes a
 
     form.append('file', new File([PIXEL, new Uint8Array([salt])], name, { type: 'image/png' }))
 
-    return ((await (await built.fetch('/api/cms/files/products', { method: 'POST', body: form })).json()) as { path: string }).path
+    return ((await (await built.fetch('/_kay/cms/files/products', { method: 'POST', body: form })).json()) as { path: string }).path
   }
   const [used, stray] = [await upload(11, 'in use.png'), await upload(12, 'stray.png')]
 
@@ -1097,7 +1097,7 @@ test('an upload stored before can be picked again from the field, and fills it',
   form.append('file', new File([PIXEL, new Uint8Array([6])], 'again.png', { type: 'image/png' }))
 
   const built = await browser()
-  const { path } = await (await built.fetch('/api/cms/files/products', { method: 'POST', body: form })).json() as { path: string }
+  const { path } = await (await built.fetch('/_kay/cms/files/products', { method: 'POST', body: form })).json() as { path: string }
 
   await using page = await built.open('/admin/collections/products/mug')
 
@@ -1209,7 +1209,7 @@ test('the unused-uploads screen fits a 375 px phone with an upload to delete', a
   form.append('file', new File([PIXEL, new Uint8Array([3])], 'phone.png', { type: 'image/png' }))
 
   const built = await browser()
-  const key = ((await (await built.fetch('/api/cms/files/products', { method: 'POST', body: form })).json()) as { path: string }).path.slice('/_kay/files/'.length)
+  const key = ((await (await built.fetch('/_kay/cms/files/products', { method: 'POST', body: form })).json()) as { path: string }).path.slice('/_kay/files/'.length)
 
   setSystemTime(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000))
 
@@ -1218,7 +1218,7 @@ test('the unused-uploads screen fits a 375 px phone with an upload to delete', a
     expect(await phoneProblems('/admin/uploads')).toEqual([])
   }
   finally {
-    await built.fetch('/api/cms/files/unused/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ keys: [key] }) })
+    await built.fetch('/_kay/cms/files/unused/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ keys: [key] }) })
     setSystemTime()
   }
 }, 60_000)
@@ -1287,31 +1287,31 @@ test('every page carries one line looking for the editor hint, and the screens s
 
   expect(french).toHaveLength(1)
   expect(french[0]!.html).toBe(loader[0]!.html)
-  expect(french[0]!.html).toContain('"/cms/editor/module.js"')
+  expect(french[0]!.html).toContain('"/_kay/cms/editor/module.js"')
   expect((await site.fetch('/admin', { headers: { 'x-deny': '1' } })).headers.get('set-cookie')).toBeNull()
 })
 
 test('the check answers an editor the guard admits with the link\'s words in the page\'s language, refreshing the hint, and a signed-out browser with a refusal', async () => {
-  const signedIn = await site.fetch('/api/cms/editor')
+  const signedIn = await site.fetch('/_kay/cms/editor')
 
   expect(await signedIn.json()).toEqual({ label: 'Edit this page', href: '/admin/page' })
   expect(signedIn.headers.get('set-cookie')).toContain('kay_editor=1')
   expect(signedIn.headers.get('cache-control')).toBe('no-store')
-  expect(((await (await site.fetch('/api/cms/editor', { headers: { referer: 'http://localhost/fr/about' } })).json()) as { label: string }).label).toBe('Modifier cette page')
+  expect(((await (await site.fetch('/_kay/cms/editor', { headers: { referer: 'http://localhost/fr/about' } })).json()) as { label: string }).label).toBe('Modifier cette page')
 
-  const refused = await site.fetch('/api/cms/editor', { headers: { 'x-deny': '1' } })
+  const refused = await site.fetch('/_kay/cms/editor', { headers: { 'x-deny': '1' } })
 
   expect(refused.status).toBe(403)
   expect(refused.headers.get('set-cookie')).toBeNull()
 })
 
 test('the check refreshes the hint Secure behind a TLS-terminating proxy', async () => {
-  expect((await site.fetch('/api/cms/editor', { headers: { 'x-forwarded-proto': 'https' } })).headers.get('set-cookie')).toContain('Secure')
-  expect((await site.fetch('/api/cms/editor')).headers.get('set-cookie')).not.toContain('Secure')
+  expect((await site.fetch('/_kay/cms/editor', { headers: { 'x-forwarded-proto': 'https' } })).headers.get('set-cookie')).toContain('Secure')
+  expect((await site.fetch('/_kay/cms/editor')).headers.get('set-cookie')).not.toContain('Secure')
 })
 
 test('the module an editor\'s browser loads is open to every request, holding nothing private', async () => {
-  const module = await site.fetch('/api/cms/editor/module.js', { headers: { 'x-deny': '1' } })
+  const module = await site.fetch('/_kay/cms/editor/module.js', { headers: { 'x-deny': '1' } })
   const text = await module.text()
 
   expect(module.status).toBe(200)
@@ -1357,15 +1357,15 @@ test('the dev tool\'s CMS tab state answers under kay dev alone, in the language
   try {
     process.env.KAY_DEV_CODE = '0'
 
-    const english = await (await site.fetch('/api/cms/dev')).json() as { editing: boolean, prefix: string, words: Record<string, string> }
-    const french = await (await site.fetch('/api/cms/dev', { headers: { referer: 'http://localhost/fr/' } })).json() as { words: Record<string, string> }
+    const english = await (await site.fetch('/_kay/cms/dev')).json() as { editing: boolean, prefix: string, words: Record<string, string> }
+    const french = await (await site.fetch('/_kay/cms/dev', { headers: { referer: 'http://localhost/fr/' } })).json() as { words: Record<string, string> }
 
     expect(english).toMatchObject({ editing: false, prefix: '/admin', words: { editing: 'You are in edit mode on this site.', readFailure: 'Could not read the edit mode: {failure}' } })
     expect(french.words.editing).not.toBe(english.words.editing)
     expect(french.words.readFailure).toContain('{failure}')
 
     delete process.env.KAY_DEV_CODE
-    expect((await site.fetch('/api/cms/dev')).status).toBe(404)
+    expect((await site.fetch('/_kay/cms/dev')).status).toBe(404)
   }
   finally {
     if (before === undefined)

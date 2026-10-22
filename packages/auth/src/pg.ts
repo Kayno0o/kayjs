@@ -4,7 +4,7 @@ import { defineTable } from '@kaynooo/pg-orm'
 import { durationSeconds } from 'kay/library'
 import { log } from './log'
 
-export const AuthUsers = defineTable('auth_user', t => ({
+export const AuthUsers = defineTable('kay_users', t => ({
   id: t.text().primaryKey(),
   email: t.text().nullable().unique(),
   email_verified_at: t.timestamptz().nullable(),
@@ -26,11 +26,11 @@ export const AuthUsers = defineTable('auth_user', t => ({
   // The app's own data on the user, from the `user` option.
   data: t.jsonb<Record<string, unknown>>().notNull().default({}),
   created_at: t.timestamptz().notNull(),
-})).withIndexes([{ columns: ['created_at'] }, { columns: ['guest', 'created_at'] }])
+})).renamedFrom('auth_user').withIndexes([{ columns: ['created_at'] }, { columns: ['guest', 'created_at'] }])
 
 const userId = () => AuthUsers
 
-export const AuthIdentities = defineTable('auth_identity', t => ({
+export const AuthIdentities = defineTable('kay_identities', t => ({
   id: t.serial().primaryKey(),
   provider: t.text().notNull(),
   provider_id: t.text().notNull(),
@@ -39,24 +39,24 @@ export const AuthIdentities = defineTable('auth_identity', t => ({
   refresh_token: t.text().nullable(),
   token_expires_at: t.timestamptz().nullable(),
   created_at: t.timestamptz().notNull(),
-})).withIndexes([{ columns: ['provider', 'provider_id'], unique: true }, { columns: ['user_id'] }])
+})).renamedFrom('auth_identity').withIndexes([{ columns: ['provider', 'provider_id'], unique: true }, { columns: ['user_id'] }])
 
-export const AuthTokens = defineTable('auth_token', t => ({
+export const AuthTokens = defineTable('kay_tokens', t => ({
   digest: t.text().primaryKey(),
   type: t.text().notNull(),
   user_id: t.text().notNull().references(userId, 'id', { onDelete: 'cascade' }),
   email: t.text().notNull(),
   redirect: t.text().nullable(),
   expires_at: t.timestamptz().notNull(),
-})).withIndexes([{ columns: ['user_id', 'type'] }, { columns: ['expires_at'] }])
+})).renamedFrom('auth_token').withIndexes([{ columns: ['user_id', 'type'] }, { columns: ['expires_at'] }])
 
-export const AuthRecoveryCodes = defineTable('auth_recovery_code', t => ({
+export const AuthRecoveryCodes = defineTable('kay_recovery_codes', t => ({
   id: t.serial().primaryKey(),
   user_id: t.text().notNull().references(userId, 'id', { onDelete: 'cascade' }),
   digest: t.text().notNull(),
-})).withIndexes([{ columns: ['user_id', 'digest'], unique: true }])
+})).renamedFrom('auth_recovery_code').withIndexes([{ columns: ['user_id', 'digest'], unique: true }])
 
-export const AuthBearerTokens = defineTable('auth_bearer_token', t => ({
+export const AuthBearerTokens = defineTable('kay_bearer_tokens', t => ({
   id: t.text().primaryKey(),
   user_id: t.text().notNull().references(userId, 'id', { onDelete: 'cascade' }),
   label: t.text().notNull(),
@@ -70,9 +70,9 @@ export const AuthBearerTokens = defineTable('auth_bearer_token', t => ({
   oauth_family: t.text().nullable(),
   // The resource (RFC 8707) the token is bound to; null for none, and for tokens stored before this column.
   oauth_resource: t.text().nullable(),
-})).withIndexes([{ columns: ['user_id'] }, { columns: ['expires_at'] }, { columns: ['user_id', 'oauth_client'] }, { columns: ['user_id', 'oauth_family'] }])
+})).renamedFrom('auth_bearer_token').withIndexes([{ columns: ['user_id'] }, { columns: ['expires_at'] }, { columns: ['user_id', 'oauth_client'] }, { columns: ['user_id', 'oauth_family'] }])
 
-export const AuthSessions = defineTable('auth_session', t => ({
+export const AuthSessions = defineTable('kay_auth_sessions', t => ({
   id: t.text().primaryKey(),
   user_id: t.text().notNull().references(userId, 'id', { onDelete: 'cascade' }),
   version: t.int4().notNull(),
@@ -81,9 +81,9 @@ export const AuthSessions = defineTable('auth_session', t => ({
   created_at: t.timestamptz().notNull(),
   last_seen_at: t.timestamptz().notNull(),
   max_age: t.int4().nullable(),
-})).withIndexes([{ columns: ['user_id'] }, { columns: ['last_seen_at'] }, { columns: ['created_at'] }])
+})).renamedFrom('auth_session').withIndexes([{ columns: ['user_id'] }, { columns: ['last_seen_at'] }, { columns: ['created_at'] }])
 
-export const AuthPasskeys = defineTable('auth_passkey', t => ({
+export const AuthPasskeys = defineTable('kay_passkeys', t => ({
   id: t.text().primaryKey(),
   user_id: t.text().notNull().references(userId, 'id', { onDelete: 'cascade' }),
   name: t.text().notNull(),
@@ -97,10 +97,10 @@ export const AuthPasskeys = defineTable('auth_passkey', t => ({
   user_verified: t.bool().notNull().default(false),
   created_at: t.timestamptz().notNull(),
   last_used_at: t.timestamptz().nullable(),
-})).withIndexes([{ columns: ['user_id'] }])
+})).renamedFrom('auth_passkey').withIndexes([{ columns: ['user_id'] }])
 
 // No reference to the user: the log outlives them.
-export const AuthAudit = defineTable('auth_audit', t => ({
+export const AuthAudit = defineTable('kay_audits', t => ({
   id: t.text().primaryKey(),
   user_id: t.text().notNull(),
   event: t.text().notNull(),
@@ -109,26 +109,26 @@ export const AuthAudit = defineTable('auth_audit', t => ({
   user_agent: t.text().notNull(),
   actor_id: t.text().nullable(),
   at: t.timestamptz().notNull(),
-})).withIndexes([{ columns: ['user_id', 'at'] }, { columns: ['at'] }, { columns: ['actor_id'] }])
+})).renamedFrom('auth_audit').withIndexes([{ columns: ['user_id', 'at'] }, { columns: ['at'] }, { columns: ['actor_id'] }])
 
-export const AuthOrganizations = defineTable('auth_organization', t => ({
+export const AuthOrganizations = defineTable('kay_organizations', t => ({
   id: t.text().primaryKey(),
   name: t.text().notNull(),
   slug: t.text().nullable().unique(),
   created_at: t.timestamptz().notNull(),
-}))
+})).renamedFrom('auth_organization')
 
 const organizationId = () => AuthOrganizations
 
-export const AuthMembers = defineTable('auth_member', t => ({
+export const AuthMembers = defineTable('kay_members', t => ({
   id: t.serial().primaryKey(),
   organization_id: t.text().notNull().references(organizationId, 'id', { onDelete: 'cascade' }),
   user_id: t.text().notNull().references(userId, 'id', { onDelete: 'cascade' }),
   roles: t.array(t.text()).notNull(),
   created_at: t.timestamptz().notNull(),
-})).withIndexes([{ columns: ['organization_id', 'user_id'], unique: true }, { columns: ['user_id'] }])
+})).renamedFrom('auth_member').withIndexes([{ columns: ['organization_id', 'user_id'], unique: true }, { columns: ['user_id'] }])
 
-export const AuthInvitations = defineTable('auth_invitation', t => ({
+export const AuthInvitations = defineTable('kay_invitations', t => ({
   id: t.text().primaryKey(),
   organization_id: t.text().notNull().references(organizationId, 'id', { onDelete: 'cascade' }),
   email: t.text().notNull(),
@@ -136,16 +136,16 @@ export const AuthInvitations = defineTable('auth_invitation', t => ({
   invited_by: t.text().nullable().references(userId, 'id', { onDelete: 'set null' }),
   created_at: t.timestamptz().notNull(),
   expires_at: t.timestamptz().notNull(),
-})).withIndexes([{ columns: ['organization_id'] }, { columns: ['email'] }, { columns: ['expires_at'] }])
+})).renamedFrom('auth_invitation').withIndexes([{ columns: ['organization_id'] }, { columns: ['email'] }, { columns: ['expires_at'] }])
 
-export const AuthOAuthClients = defineTable('auth_oauth_client', t => ({
+export const AuthOAuthClients = defineTable('kay_oauth_clients', t => ({
   id: t.text().primaryKey(),
   name: t.text().notNull(),
   redirect_uris: t.array(t.text()).notNull(),
   created_at: t.timestamptz().notNull(),
-})).withIndexes([{ columns: ['created_at'] }])
+})).renamedFrom('auth_oauth_client').withIndexes([{ columns: ['created_at'] }])
 
-export const AuthOAuthGrants = defineTable('auth_oauth_grant', t => ({
+export const AuthOAuthGrants = defineTable('kay_oauth_grants', t => ({
   id: t.serial().primaryKey(),
   user_id: t.text().notNull().references(userId, 'id', { onDelete: 'cascade' }),
   client_id: t.text().notNull(),
@@ -153,9 +153,9 @@ export const AuthOAuthGrants = defineTable('auth_oauth_grant', t => ({
   scopes: t.array(t.text()).nullable(),
   created_at: t.timestamptz().notNull(),
   last_used_at: t.timestamptz().nullable(),
-})).withIndexes([{ columns: ['user_id', 'client_id'], unique: true }, { columns: ['client_id'] }])
+})).renamedFrom('auth_oauth_grant').withIndexes([{ columns: ['user_id', 'client_id'], unique: true }, { columns: ['client_id'] }])
 
-export const AuthOAuthCodes = defineTable('auth_oauth_code', t => ({
+export const AuthOAuthCodes = defineTable('kay_oauth_codes', t => ({
   digest: t.text().primaryKey(),
   user_id: t.text().notNull().references(userId, 'id', { onDelete: 'cascade' }),
   client_id: t.text().notNull(),
@@ -168,9 +168,9 @@ export const AuthOAuthCodes = defineTable('auth_oauth_code', t => ({
   created_at: t.timestamptz().notNull(),
   expires_at: t.timestamptz().notNull(),
   used_at: t.timestamptz().nullable(),
-})).withIndexes([{ columns: ['expires_at'] }, { columns: ['user_id'] }])
+})).renamedFrom('auth_oauth_code').withIndexes([{ columns: ['expires_at'] }, { columns: ['user_id'] }])
 
-export const AuthOAuthRefresh = defineTable('auth_oauth_refresh', t => ({
+export const AuthOAuthRefresh = defineTable('kay_oauth_refresh_tokens', t => ({
   digest: t.text().primaryKey(),
   user_id: t.text().notNull().references(userId, 'id', { onDelete: 'cascade' }),
   client_id: t.text().notNull(),
@@ -181,13 +181,13 @@ export const AuthOAuthRefresh = defineTable('auth_oauth_refresh', t => ({
   created_at: t.timestamptz().notNull(),
   expires_at: t.timestamptz().notNull(),
   used_at: t.timestamptz().nullable(),
-})).withIndexes([{ columns: ['user_id', 'family'] }, { columns: ['user_id', 'client_id'] }, { columns: ['expires_at'] }])
+})).renamedFrom('auth_oauth_refresh').withIndexes([{ columns: ['user_id', 'family'] }, { columns: ['user_id', 'client_id'] }, { columns: ['expires_at'] }])
 
-export const AuthAttempts = defineTable('auth_attempt', t => ({
+export const AuthAttempts = defineTable('kay_attempts', t => ({
   key: t.text().primaryKey(),
   count: t.int4().notNull(),
   reset_at: t.timestamptz().notNull(),
-})).withIndexes([{ columns: ['reset_at'] }])
+})).renamedFrom('auth_attempt').withIndexes([{ columns: ['reset_at'] }])
 
 // The tables to list in the app's `new Database({ tables })`, so `db.sync()` creates them.
 export const authTables = [AuthUsers, AuthIdentities, AuthTokens, AuthRecoveryCodes, AuthBearerTokens, AuthSessions, AuthPasskeys, AuthAudit, AuthOrganizations, AuthMembers, AuthInvitations, AuthAttempts, AuthOAuthClients, AuthOAuthGrants, AuthOAuthCodes, AuthOAuthRefresh] as const
@@ -230,18 +230,18 @@ export function pgStore(db: Database): AuthStore {
       },
       async staleGuests(createdBefore, limit) {
         const rows = await db.raw<{ id: string }>`
-          SELECT "id" FROM "auth_user"
-          WHERE "guest" = ${true} AND "created_at" < ${createdBefore} AND NOT EXISTS (SELECT 1 FROM "auth_session" WHERE "auth_session"."user_id" = "auth_user"."id")
+          SELECT "id" FROM "kay_users"
+          WHERE "guest" = ${true} AND "created_at" < ${createdBefore} AND NOT EXISTS (SELECT 1 FROM "kay_auth_sessions" WHERE "kay_auth_sessions"."user_id" = "kay_users"."id")
           ORDER BY "created_at" LIMIT ${limit}`
 
         return rows.length === 0 ? [] : (await users.read.findMany(q => q.where({ id: { in: rows.map(row => row.id) } }).orderBy('created_at', 'asc'))).map(row => toUser(row)!)
       },
       async staleUnverified(createdBefore, limit) {
         const rows = await db.raw<{ id: string }>`
-          SELECT "id" FROM "auth_user"
+          SELECT "id" FROM "kay_users"
           WHERE "guest" = ${false} AND "email" IS NOT NULL AND "email_verified_at" IS NULL AND "created_at" < ${createdBefore}
-            AND NOT EXISTS (SELECT 1 FROM "auth_session" WHERE "auth_session"."user_id" = "auth_user"."id")
-            AND NOT EXISTS (SELECT 1 FROM "auth_identity" WHERE "auth_identity"."user_id" = "auth_user"."id")
+            AND NOT EXISTS (SELECT 1 FROM "kay_auth_sessions" WHERE "kay_auth_sessions"."user_id" = "kay_users"."id")
+            AND NOT EXISTS (SELECT 1 FROM "kay_identities" WHERE "kay_identities"."user_id" = "kay_users"."id")
           ORDER BY "created_at" LIMIT ${limit}`
 
         return rows.length === 0 ? [] : (await users.read.findMany(q => q.where({ id: { in: rows.map(row => row.id) } }).orderBy('created_at', 'asc'))).map(row => toUser(row)!)
@@ -475,10 +475,10 @@ export function pgStore(db: Database): AuthStore {
 
         // One statement, so two attempts at once both count: a window still open is raised, an ended one starts over.
         const [row] = await db.raw<{ count: number }>`
-          INSERT INTO "auth_attempt" ("key", "count", "reset_at") VALUES (${key}, 1, ${new Date(now.getTime() + durationSeconds(window, 'an attempts window') * 1000)})
+          INSERT INTO "kay_attempts" ("key", "count", "reset_at") VALUES (${key}, 1, ${new Date(now.getTime() + durationSeconds(window, 'an attempts window') * 1000)})
           ON CONFLICT ("key") DO UPDATE SET
-            "count" = CASE WHEN "auth_attempt"."reset_at" > ${now} THEN "auth_attempt"."count" + 1 ELSE 1 END,
-            "reset_at" = CASE WHEN "auth_attempt"."reset_at" > ${now} THEN "auth_attempt"."reset_at" ELSE EXCLUDED."reset_at" END
+            "count" = CASE WHEN "kay_attempts"."reset_at" > ${now} THEN "kay_attempts"."count" + 1 ELSE 1 END,
+            "reset_at" = CASE WHEN "kay_attempts"."reset_at" > ${now} THEN "kay_attempts"."reset_at" ELSE EXCLUDED."reset_at" END
           RETURNING "count"`
 
         return row!.count
@@ -493,7 +493,7 @@ export function pgStore(db: Database): AuthStore {
           oauthCodes.write.deleteMany({ expires_at: { lte: now } }),
           oauthRefresh.write.deleteMany({ expires_at: { lte: now } }),
           // A client that registered itself and that nobody approved within a month.
-          db.raw`DELETE FROM "auth_oauth_client" WHERE "created_at" < ${new Date(now.getTime() - UNUSED_CLIENT_MS)} AND NOT EXISTS (SELECT 1 FROM "auth_oauth_grant" WHERE "auth_oauth_grant"."client_id" = "auth_oauth_client"."id")`,
+          db.raw`DELETE FROM "kay_oauth_clients" WHERE "created_at" < ${new Date(now.getTime() - UNUSED_CLIENT_MS)} AND NOT EXISTS (SELECT 1 FROM "kay_oauth_grants" WHERE "kay_oauth_grants"."client_id" = "kay_oauth_clients"."id")`,
         ])),
         tokens.write.deleteMany({ expires_at: { lte: now } }),
         invitations.write.deleteMany({ expires_at: { lte: now } }),
@@ -502,7 +502,7 @@ export function pgStore(db: Database): AuthStore {
         sessions.write.deleteMany({ last_seen_at: { lt: new Date(now.getTime() - durationSeconds(sessionMaxAge, 'sessionMaxAge') * 1000) } }),
         sessions.write.deleteMany({ created_at: { lt: new Date(now.getTime() - durationSeconds(sessionAbsoluteMaxAge, 'sessionAbsoluteMaxAge') * 1000) } }),
         // A session the user's version moved past is already refused, so its row goes too.
-        db.raw`DELETE FROM "auth_session" WHERE "version" < (SELECT "session_version" FROM "auth_user" WHERE "auth_user"."id" = "auth_session"."user_id")`,
+        db.raw`DELETE FROM "kay_auth_sessions" WHERE "version" < (SELECT "session_version" FROM "kay_users" WHERE "kay_users"."id" = "kay_auth_sessions"."user_id")`,
       ])
     },
   }
@@ -528,7 +528,7 @@ async function withoutMissingOAuthTables(run: () => Promise<unknown>): Promise<v
 
     if (!warnedMissingOAuthTables) {
       warnedMissingOAuthTables = true
-      log.warn('the auth_oauth_* tables are missing, so the OAuth server is skipped: generate a migration with `bunx pg-orm generate` (or run db.sync())')
+      log.warn('the kay_oauth_* tables are missing, so the OAuth server is skipped: generate a migration with `bunx pg-orm generate` (or run db.sync())')
     }
   }
 }

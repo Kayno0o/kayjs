@@ -15,7 +15,7 @@ import previewApi from './preview'
 // The modules whose mount tells where the cms is served: an app can replace any of them with its own, which is then not mounted, so the first one that is mounted gives the root.
 const ANCHORS: unknown[] = [devApi, previewApi, iconsApi]
 
-// Where the cms's modules are mounted (`/api/cms`, `/v1/cms` under an `apiPath`, behind the `base`), or undefined when none of its anchor modules is mounted.
+// Where the cms's modules are mounted (`/_kay/cms`, behind the `base`), or undefined when none of its anchor modules is mounted.
 function mountRoot(): string | undefined {
   for (const module of ANCHORS) {
     try {

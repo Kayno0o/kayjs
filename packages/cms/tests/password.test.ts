@@ -7,7 +7,7 @@ class Denied {
 }
 
 function context(cookie?: string, name = SESSION_COOKIE): GuardContext {
-  const url = new URL('http://site.test/api/cms/entries/posts/hello')
+  const url = new URL('http://site.test/_kay/cms/entries/posts/hello')
   const cookies = new Bun.CookieMap(cookie === undefined ? '' : `${name}=${cookie}`)
 
   return { request: new Request(url), url, cookies, deny: (status: number, message?: string) => {

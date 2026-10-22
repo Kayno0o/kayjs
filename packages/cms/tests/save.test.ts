@@ -16,8 +16,8 @@ const { sessionEnded } = await import('../src/editor/session')
 const { uploadFile, uploading } = await import('../src/editor/upload')
 
 // What kay's build gives an API module's default export in the browser: where it is served.
-Object.assign(entriesApi, { [Symbol.for('kay.api')]: '/api/cms/entries' })
-Object.assign(filesApi, { [Symbol.for('kay.api')]: '/api/cms/files' })
+Object.assign(entriesApi, { [Symbol.for('kay.api')]: '/_kay/cms/entries' })
+Object.assign(filesApi, { [Symbol.for('kay.api')]: '/_kay/cms/files' })
 
 const post: DraftEntry = { collection: 'posts', slug: 'hello', data: { title: 'Hello' } }
 
@@ -114,7 +114,7 @@ describe('saveDraft targets', () => {
     const second = saveDraft(drafts, post, { slug: 'b', locale: 'fr' })
 
     expect(await Promise.all([first, second])).toEqual([true, true])
-    expect(sent.map(({ url, body }) => [url, body.data.title])).toEqual([['/api/cms/entries/posts/a', 'First'], ['/api/cms/entries/posts/b', 'Second']])
+    expect(sent.map(({ url, body }) => [url, body.data.title])).toEqual([['/_kay/cms/entries/posts/a', 'First'], ['/_kay/cms/entries/posts/b', 'Second']])
   })
 
   it('toasts a refusal once when the join under another slug is refused the same way', async () => {
@@ -157,7 +157,7 @@ describe('deleteSaved', () => {
 
     expect(await deleteSaved(post, 'v1')).toBe(true)
     expect(await deleteSaved(post)).toBe(true)
-    expect(sent.map(({ method, url }) => [method, url])).toEqual([['DELETE', '/api/cms/entries/posts/hello?version=v1'], ['DELETE', '/api/cms/entries/posts/hello']])
+    expect(sent.map(({ method, url }) => [method, url])).toEqual([['DELETE', '/_kay/cms/entries/posts/hello?version=v1'], ['DELETE', '/_kay/cms/entries/posts/hello']])
   })
 })
 

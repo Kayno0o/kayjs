@@ -760,6 +760,11 @@ export function apiMounts(root: string, extensions: KayExtension[] = []): RouteM
   return extensions.flatMap(({ api }) => api ? [{ dir: throughLinks(root, resolve(root, api.dir)), prefix: mountPrefix(api.prefix) }] : [])
 }
 
+// The paths under `apiPath` that extensions moved under `/_kay`, from the prefix they had to where their modules are served now.
+export function movedApiPrefixes(extensions: KayExtension[] = []): { former: string, prefix: string }[] {
+  return extensions.flatMap(({ api }) => api?.former === undefined ? [] : [{ former: mountPrefix(api.former), prefix: mountPrefix(api.prefix) }])
+}
+
 // The editor an extension in `extensions` gives, reached as its routes are; a site edits through one.
 export function extensionEditor(root: string, extensions: KayExtension[] = []): string | undefined {
   const giving = extensions.filter(extension => extension.editor !== undefined)

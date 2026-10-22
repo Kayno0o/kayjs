@@ -7,13 +7,13 @@ const site = await testSite({ root: join(import.meta.dir, '..') })
 const JSON_BODY = { 'content-type': 'application/json' }
 
 async function post(path: string, body: unknown): Promise<Record<string, unknown>> {
-  return await (await site.fetch(`/api/cms/entries/${path}`, { method: 'POST', headers: JSON_BODY, body: JSON.stringify(body) })).json() as Record<string, unknown>
+  return await (await site.fetch(`/_kay/cms/entries/${path}`, { method: 'POST', headers: JSON_BODY, body: JSON.stringify(body) })).json() as Record<string, unknown>
 }
 
 test('an entry\'s screen links to its history, which lists the saves and restores one as a new save', async () => {
   expect(await post('journal/day', { data: { title: 'Monday' }, create: true })).toMatchObject({ saved: true })
 
-  const opened = await (await site.fetch('/api/cms/entries/journal/day')).json() as { entry: { version: string } }
+  const opened = await (await site.fetch('/_kay/cms/entries/journal/day')).json() as { entry: { version: string } }
 
   expect(await post('journal/day', { data: { title: 'Tuesday' }, version: opened.entry.version })).toMatchObject({ saved: true })
   expect((await site.visit('/admin/collections/journal/day')).find('a[href="/admin/history/journal/day"]')).toHaveLength(1)
@@ -27,8 +27,8 @@ test('an entry\'s screen links to its history, which lists the saves and restore
   expect(rows[1]!.text).toContain('Created')
   expect(page.title()).toContain('History of Tuesday')
 
-  const now = await (await site.fetch('/api/cms/entries/journal/day')).json() as { entry: { version: string } }
-  const restored = await site.fetch('/api/cms/history/journal/day/restore', { method: 'POST', headers: JSON_BODY, body: JSON.stringify({ at: 1, version: now.entry.version }) })
+  const now = await (await site.fetch('/_kay/cms/entries/journal/day')).json() as { entry: { version: string } }
+  const restored = await site.fetch('/_kay/cms/history/journal/day/restore', { method: 'POST', headers: JSON_BODY, body: JSON.stringify({ at: 1, version: now.entry.version }) })
 
   expect(await restored.json()).toMatchObject({ issues: [{ message: 'That version is not kept any more' }] })
 })
@@ -41,9 +41,9 @@ test('the history of a collection whose loader keeps none is not found', async (
 test('a deleted entry is listed in the collection\'s trash, which restoring empties', async () => {
   expect(await post('journal/gone', { data: { title: 'Gone soon' }, create: true })).toMatchObject({ saved: true })
 
-  const opened = await (await site.fetch('/api/cms/entries/journal/gone')).json() as { entry: { version: string } }
+  const opened = await (await site.fetch('/_kay/cms/entries/journal/gone')).json() as { entry: { version: string } }
 
-  expect(await (await site.fetch(`/api/cms/entries/journal/gone?version=${opened.entry.version}`, { method: 'DELETE' })).json()).toMatchObject({ saved: true })
+  expect(await (await site.fetch(`/_kay/cms/entries/journal/gone?version=${opened.entry.version}`, { method: 'DELETE' })).json()).toMatchObject({ saved: true })
   expect((await site.visit('/admin/collections/journal')).find('a[href="/admin/trash/journal"]')).toHaveLength(1)
 
   const trash = await site.visit('/admin/trash/journal')
@@ -56,36 +56,36 @@ test('a deleted entry is listed in the collection\'s trash, which restoring empt
 test('a deleted entry is restored through the trash API, which leaves the trash empty, and an entry no longer there is refused', async () => {
   expect(await post('journal/back', { data: { title: 'Back soon' }, create: true })).toMatchObject({ saved: true })
 
-  const opened = await (await site.fetch('/api/cms/entries/journal/back')).json() as { entry: { version: string } }
+  const opened = await (await site.fetch('/_kay/cms/entries/journal/back')).json() as { entry: { version: string } }
 
-  await site.fetch(`/api/cms/entries/journal/back?version=${opened.entry.version}`, { method: 'DELETE' })
+  await site.fetch(`/_kay/cms/entries/journal/back?version=${opened.entry.version}`, { method: 'DELETE' })
 
   const [row] = (await site.visit('/admin/trash/journal')).find('.kcms-revision')
 
   expect(row!.text).toContain('Back soon')
 
-  expect((await site.fetch('/api/cms/entries/journal/back')).status).toBe(404)
+  expect((await site.fetch('/_kay/cms/entries/journal/back')).status).toBe(404)
 
   const id = (await trashOf('journal')).find(item => item.slug === 'back')!.id
-  const restored = await site.fetch(`/api/cms/trash/journal/${id}/restore`, { method: 'POST' })
+  const restored = await site.fetch(`/_kay/cms/trash/journal/${id}/restore`, { method: 'POST' })
 
   expect(await restored.json()).toMatchObject({ saved: true })
-  expect(((await (await site.fetch('/api/cms/entries/journal/back')).json()) as { entry: { data: { title: string } } }).entry.data.title).toBe('Back soon')
+  expect(((await (await site.fetch('/_kay/cms/entries/journal/back')).json()) as { entry: { data: { title: string } } }).entry.data.title).toBe('Back soon')
   expect((await site.visit('/admin/trash/journal')).find('.kcms-revision').filter(each => each.text.includes('Back soon'))).toHaveLength(0)
-  expect(await (await site.fetch(`/api/cms/trash/journal/${id}/restore`, { method: 'POST' })).json()).toMatchObject({ issues: [{ message: 'That entry is not in the trash any more' }] })
+  expect(await (await site.fetch(`/_kay/cms/trash/journal/${id}/restore`, { method: 'POST' })).json()).toMatchObject({ issues: [{ message: 'That entry is not in the trash any more' }] })
 })
 
 test('restoring from the trash of an unknown collection is a 404', async () => {
-  expect((await site.fetch('/api/cms/trash/nowhere/1/restore', { method: 'POST' })).status).toBe(404)
+  expect((await site.fetch('/_kay/cms/trash/nowhere/1/restore', { method: 'POST' })).status).toBe(404)
 })
 
 test('the activity screen lists a save then a delete newest first, pages, and leaves out a collection that opts out', async () => {
   expect(await post('journal/logged', { data: { title: 'Logged' }, create: true })).toMatchObject({ saved: true })
   expect(await post('scratch/quiet', { data: { title: 'Quiet' }, create: true })).toMatchObject({ saved: true })
 
-  const opened = await (await site.fetch('/api/cms/entries/journal/logged')).json() as { entry: { version: string } }
+  const opened = await (await site.fetch('/_kay/cms/entries/journal/logged')).json() as { entry: { version: string } }
 
-  await site.fetch(`/api/cms/entries/journal/logged?version=${opened.entry.version}`, { method: 'DELETE' })
+  await site.fetch(`/_kay/cms/entries/journal/logged?version=${opened.entry.version}`, { method: 'DELETE' })
   expect((await site.visit('/admin')).find('a[href="/admin/activity"]')).toHaveLength(1)
 
   const page = await site.visit('/admin/activity')
@@ -114,7 +114,7 @@ test('the activity screen pages at the page size', async () => {
 })
 
 test('a draft is shared by a signed link to its own page, and an entry with no page is refused', async () => {
-  const shared = await (await site.fetch('/api/cms/entries/posts/notes%2Fgarden/share', { method: 'POST' })).json() as { link: string }
+  const shared = await (await site.fetch('/_kay/cms/entries/posts/notes%2Fgarden/share', { method: 'POST' })).json() as { link: string }
   const page = shared.link.slice(0, shared.link.indexOf('?'))
 
   expect(page).toStartWith('/blog/')
@@ -124,5 +124,5 @@ test('a draft is shared by a signed link to its own page, and an entry with no p
   expect((await site.fetch(`${page}?kay_preview=garbage`)).status).toBe(404)
 
   expect(await post('journal/pageless', { data: { title: 'No page' }, create: true })).toMatchObject({ saved: true })
-  expect(await (await site.fetch('/api/cms/entries/journal/pageless/share', { method: 'POST' })).json()).toMatchObject({ issues: [{ message: 'This entry has no page to share' }] })
+  expect(await (await site.fetch('/_kay/cms/entries/journal/pageless/share', { method: 'POST' })).json()).toMatchObject({ issues: [{ message: 'This entry has no page to share' }] })
 })

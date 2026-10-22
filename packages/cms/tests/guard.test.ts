@@ -16,14 +16,14 @@ void mock.module('kay/server', () => ({
 const { default: devApi } = await import('../src/api/dev')
 
 // The guard names the cms's routes below the mount of its own modules, which a mounted site sets.
-Object.assign(devApi, { [Symbol.for('kay.api')]: '/api/cms/dev' })
+Object.assign(devApi, { [Symbol.for('kay.api')]: '/_kay/cms/dev' })
 
 const { default: apiGuard } = await import('../src/api/_guard')
 const { default: screenGuard } = await import('../src/routes/_guard')
 const ada = { name: 'Ada', email: 'ada@example.com' }
 
 function context(method: string, path: string, edit: boolean | string): GuardContext {
-  const url = new URL(`http://site.test/api/cms${path}`)
+  const url = new URL(`http://site.test/_kay/cms${path}`)
 
   return {
     request: new Request(url, { method, headers: edit === false ? {} : { 'x-edit': edit === true ? 'posts/hello' : edit } }),

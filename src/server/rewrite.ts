@@ -1,6 +1,7 @@
 import type { Elysia } from 'elysia'
 import { ASSET_PREFIX } from '../build/assets'
 import { kayLog } from '../runtime/log'
+import { routerPath } from './base'
 import { keepRequestId, requestId } from './protection'
 
 // Returns the path, query included, to serve the request from instead, or undefined to serve it as it came.
@@ -85,4 +86,23 @@ export function rewriteRequests(app: Elysia, rewrite: Rewrite, fallback: Elysia)
 
     return server ? server.fetch(forwarded) : fallback.handle(forwarded)
   })
+}
+
+// `rewrite`, after the paths under `apiPath` that an extension moved under `/_kay` answer as the paths they moved to, so an older page or client still reaches them.
+export function withMovedApi(rewrite: Rewrite | undefined, moved: { former: string, prefix: string }[], apiPath: string, base: string): Rewrite | undefined {
+  if (moved.length === 0)
+    return rewrite
+
+  return (url, request) => {
+    const path = routerPath(url.pathname, base)
+
+    for (const { former, prefix } of moved) {
+      const from = `${apiPath}${former}`
+
+      if (path === from || path.startsWith(`${from}/`))
+        return `${url.pathname.slice(0, url.pathname.length - path.length)}${prefix}${path.slice(from.length)}${url.search}`
+    }
+
+    return rewrite?.(url, request)
+  }
 }

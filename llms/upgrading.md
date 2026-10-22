@@ -10,6 +10,13 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### `auth()` with no module builds the plugin itself
 
 kayjs-auth's `auth()` with neither `module` nor `server` now makes the whole auth object (kay's session, a SQLite store, the mailer of `src/mail.ts`) instead of serving the pages alone. An app mounting `auth.plugin` by hand, `new Elysia().use(auth.plugin).use(await pages())`, gives `auth({ plugin: false })`; `kay check --fix` gives it (`deprecated-library-registration`) to an `authPages(...)` that loaded no module and to a bare `auth(...)` beside a `src/auth.ts` exporting `auth`; a hand-mounted plugin elsewhere is not recognised, and a `src/auth.ts` exporting `auth` stops the server with a message naming `plugin: false`.
+### kayjs-cms is served under `/_kay/cms`, kayjs-auth's tables are `kay_*`
+
+kayjs-cms's API moves from `/api/cms/*` to `/_kay/cms/*`, whatever `apiPath` is. The old path keeps answering through 1.73, so a script, a webhook or an open editor tab calling it still works; an app writing the path itself (`fetch('/api/cms/...')`, a proxy rule, a CSP or a rate limit on it) writes `/_kay/cms/...`. No `kay check` lint can recognise a path inside a string, so none reports it.
+
+kayjs-auth's 16 `auth_*` tables become `kay_*` (`auth_user` is `kay_users`, `auth_session` is `kay_auth_sessions`, the OAuth ones `kay_oauth_clients`, `kay_oauth_grants`, `kay_oauth_codes` and `kay_oauth_refresh_tokens`), each declared `renamedFrom` its old name. `db.sync()` or `bunx pg-orm generate` renames them and keeps the rows and their foreign keys, so apply the generated migration as for any change to your tables, and read it before applying it: it must hold `RENAME` statements, no `DROP TABLE`. The kayjs-auth tables listed in `authTables` need nothing else; a query of your own on an `auth_*` table, which no check can find, names the `kay_*` one. The `renamedFrom` of the tables goes in 1.74.
+
+The `data-cms-edit-page` attribute on a link kayjs-cms fills in is `data-kcms-edit-page`; the `deprecated-cms-edit-page` lint reports it and `kay upgrade` renames it.
 
 ### `src/plugins` holds server plugins
 

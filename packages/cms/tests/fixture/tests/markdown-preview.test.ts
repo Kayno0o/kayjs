@@ -6,10 +6,10 @@ import { testSite } from 'kay/test'
 const site = await testSite({ root: join(import.meta.dir, '..') })
 
 async function render(markdown: string, headers: Record<string, string> = {}, place: Record<string, string> = {}): Promise<Response> {
-  return site.fetch('/api/cms/markdown', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ markdown, ...place }) })
+  return site.fetch('/_kay/cms/markdown', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ markdown, ...place }) })
 }
 
-const image = async (path: string, collection = 'posts', slug = 'hello') => site.fetch(`/api/cms/markdown/image?${new URLSearchParams({ collection, slug, path })}`)
+const image = async (path: string, collection = 'posts', slug = 'hello') => site.fetch(`/_kay/cms/markdown/image?${new URLSearchParams({ collection, slug, path })}`)
 const link = join(import.meta.dir, '../src/content/posts/escape.png')
 
 afterAll(async () => {
@@ -51,7 +51,7 @@ test('answers 422 with the reason for a component kay cannot read, and refuses w
   expect(bad.status).toBe(422)
   expect(await bad.text()).toContain('</Card> closes no component')
   expect((await render('x', { 'x-deny': '1' })).status).toBe(403)
-  expect((await site.fetch('/api/cms/markdown', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).status).toBe(422)
+  expect((await site.fetch('/_kay/cms/markdown', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).status).toBe(422)
 })
 
 test('highlights a fenced block with the site\'s highlighter, keeping its colours and nothing that runs or loads', async () => {
@@ -68,7 +68,7 @@ test('highlights a fenced block with the site\'s highlighter, keeping its colour
 test('shows an image written as a path in the entry\'s folder from there, and leaves other sources alone', async () => {
   const { html } = await (await render('![a](./pic.png) ![b](/uploads/b.png) ![c](https://example.com/c.png) ![d](//example.com/d.png)', {}, { collection: 'posts', slug: 'hello' })).json() as { html: string }
 
-  expect(html).toContain('src="/api/cms/markdown/image?collection=posts&amp;slug=hello&amp;path=.%2Fpic.png"')
+  expect(html).toContain('src="/_kay/cms/markdown/image?collection=posts&amp;slug=hello&amp;path=.%2Fpic.png"')
   expect(html).toContain('src="/uploads/b.png"')
   expect(html).toContain('src="https://example.com/c.png"')
   expect(html).not.toContain('d.png')
@@ -108,7 +108,7 @@ test('lets the browser keep a preview image but ask again, an unchanged file ans
   expect(first.headers.get('cache-control')).toBe('private, no-cache')
   expect(etag).toStartWith('W/"')
 
-  const again = await site.fetch(`/api/cms/markdown/image?${new URLSearchParams({ collection: 'posts', slug: 'hello', path: './pic.png' })}`, { headers: { 'if-none-match': etag } })
+  const again = await site.fetch(`/_kay/cms/markdown/image?${new URLSearchParams({ collection: 'posts', slug: 'hello', path: './pic.png' })}`, { headers: { 'if-none-match': etag } })
 
   expect(again.status).toBe(304)
   expect(await again.text()).toBe('')

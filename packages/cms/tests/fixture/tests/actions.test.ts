@@ -63,7 +63,7 @@ describe('Save', () => {
     expect(typed.slug()).toBe('ete-a-la-ferme')
     typed.typeSlug(' Notes / Œufs du Marché ')
     await typed.save()
-    expect(sent.map(each => decodeURIComponent(each.url))).toEqual(['/api/cms/entries/talks/notes/oeufs-du-marche'])
+    expect(sent.map(each => decodeURIComponent(each.url))).toEqual(['/_kay/cms/entries/talks/notes/oeufs-du-marche'])
   })
 
   test('sends nothing when asked with nothing to save', async () => {

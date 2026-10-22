@@ -36,9 +36,9 @@ test('a role is named when the guard holds several, and a second call switches r
   await expect(cmsSignInAs(site, 'nobody')).rejects.toThrow('"nobody"')
 
   await cmsSignInAs(site, 'editor')
-  expect((await site.fetch('/api/cms/redirects/paths?q=a')).status).toBe(403)
+  expect((await site.fetch('/_kay/cms/redirects/paths?q=a')).status).toBe(403)
   await cmsSignInAs(site, 'admin')
-  expect((await site.fetch('/api/cms/redirects/paths?q=a')).status).toBe(200)
+  expect((await site.fetch('/_kay/cms/redirects/paths?q=a')).status).toBe(200)
 })
 
 test('a wrong password is answered 401 through the form, the right one signs in', async () => {

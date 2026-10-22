@@ -454,7 +454,7 @@ A path that is only noise, such as a mistyped link from nowhere, takes Dismiss. 
 
 The target box suggests the pages of your site as you type.
 
-The buttons call `POST /api/cms/redirects` with `{ from, to, status }`, where `status` is 307, 308 or 410. `POST /api/cms/redirects/remove` takes `{ froms }`, `/dismiss` takes `{ paths }` and `/clear` takes nothing. A refusal comes back as a 400 with its reason. Your own code may call them too, and they need the same `guard`.
+The buttons call `POST /_kay/cms/redirects` with `{ from, to, status }`, where `status` is 307, 308 or 410. `POST /_kay/cms/redirects/remove` takes `{ froms }`, `/dismiss` takes `{ paths }` and `/clear` takes nothing. A refusal comes back as a 400 with its reason. Your own code may call them too, and they need the same `guard`.
 
 ## Languages
 
@@ -626,9 +626,9 @@ It writes `to`, then removes `from`; `forgejo()` does both in one commit. It thr
 
 ## The entries API
 
-The editor, the sidebar and the screens change entries through one API under `/api/cms/entries/:collection/:slug`. `GET` answers the collection and the entry with its `version`; add `?locale=` for a localized entry. A missing entry is a 404. `POST` saves, `DELETE` deletes, `POST` to `…/publish` publishes a draft and `POST` to `…/unpublish` makes a published one a draft. `POST` to `…/move?direction=up` or `down` reorders.
+The editor, the sidebar and the screens change entries through one API under `/_kay/cms/entries/:collection/:slug`. `GET` answers the collection and the entry with its `version`; add `?locale=` for a localized entry. A missing entry is a 404. `POST` saves, `DELETE` deletes, `POST` to `…/publish` publishes a draft and `POST` to `…/unpublish` makes a published one a draft. `POST` to `…/move?direction=up` or `down` reorders.
 
-`POST` to `…/rename` with `{ slug }` and the `?version=` renames the entry, and answers the `unpointed` entries it could not point. `POST` to `…/duplicate` saves a draft copy and answers its `slug`. `GET /api/cms/entries/:collection` lists the entries a reference can pick. `POST /api/cms/markdown` takes `{ markdown }` and answers the sanitized `{ html }` the editor's Preview shows, with the same guard as a save. kay checks the data against the schema before anything is written.
+`POST` to `…/rename` with `{ slug }` and the `?version=` renames the entry, and answers the `unpointed` entries it could not point. `POST` to `…/duplicate` saves a draft copy and answers its `slug`. `GET /_kay/cms/entries/:collection` lists the entries a reference can pick. `POST /_kay/cms/markdown` takes `{ markdown }` and answers the sanitized `{ html }` the editor's Preview shows, with the same guard as a save. kay checks the data against the schema before anything is written.
 
 ## Saves and conflicts
 
@@ -674,7 +674,7 @@ A title with no letter or digit leaves the slug empty and the box says to type o
 
 What you type in the slug box is cleaned as you type: accents go, spaces become dashes and capitals become lowercase. A `/` stays, to put the entry in a folder. A loaded collection keeps the slug as typed.
 
-The slug is marked as taken the moment the collection holds it. Under the box the form says which folder the entry lands in, which folder it creates, and when a new folder looks like a typo of an existing one (`No folder guidse yet: did you mean guides?`). It reads the slugs from `GET /api/cms/slugs/:collection`, for signed-in editors only.
+The slug is marked as taken the moment the collection holds it. Under the box the form says which folder the entry lands in, which folder it creates, and when a new folder looks like a typo of an existing one (`No folder guidse yet: did you mean guides?`). It reads the slugs from `GET /_kay/cms/slugs/:collection`, for signed-in editors only.
 
 ## Arranging a collection
 

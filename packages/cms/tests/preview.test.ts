@@ -1,7 +1,7 @@
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 
 // What kay's build gives an API module's default export in the browser: where it is served.
-void mock.module('../src/api/markdown', () => ({ default: { [Symbol.for('kay.api')]: '/api/cms/markdown' } }))
+void mock.module('../src/api/markdown', () => ({ default: { [Symbol.for('kay.api')]: '/_kay/cms/markdown' } }))
 
 const { previewMarkdown } = await import('../src/editor/preview')
 
@@ -25,7 +25,7 @@ test('posts the text and gives back the HTML', async () => {
   const { requests } = answering(() => Response.json({ html: '<p>Hi</p>' }))
 
   expect(await previewMarkdown('Hi')).toBe('<p>Hi</p>')
-  expect(requests[0]?.url).toContain('/api/cms/markdown')
+  expect(requests[0]?.url).toContain('/_kay/cms/markdown')
   expect(requests[0]?.init?.method).toBe('POST')
   expect(JSON.parse(String(requests[0]?.init?.body))).toEqual({ markdown: 'Hi' })
 })

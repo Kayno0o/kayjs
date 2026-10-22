@@ -22,14 +22,14 @@ void mock.module('../src/store', () => ({
 const { default: devApi } = await import('../src/api/dev')
 
 // The guard names the cms's routes below the mount of its own modules, which a mounted site sets.
-Object.assign(devApi, { [Symbol.for('kay.api')]: '/api/cms/dev' })
+Object.assign(devApi, { [Symbol.for('kay.api')]: '/_kay/cms/dev' })
 
 const { default: apiGuard } = await import('../src/api/_guard')
 
 interface Asks { method?: string, path: string, body?: unknown, cookie?: string, user?: { roles: string[], email?: string } | null, headers?: Record<string, string> }
 
 function ask({ method = 'POST', path, body, cookie, user, headers }: Asks): GuardContext {
-  const url = new URL(`http://site.test/api/cms${path}`)
+  const url = new URL(`http://site.test/_kay/cms${path}`)
   const sent = { ...headers, ...body === undefined ? {} : { 'content-type': 'application/json' }, ...cookie === undefined ? {} : { cookie: `${SESSION_COOKIE}=${cookie}` } }
 
   return {
@@ -197,7 +197,7 @@ describe('roles', () => {
 
     for (const [body, type] of [[form, undefined], ['data={"draft":false}', 'text/plain'], ['not json', 'application/json'], ['{"data":"x"}', 'application/json'], ['null', 'application/json']] as const) {
       const ctx = ask({ path: '/entries/posts/hello', user: { roles: ['editor'] } })
-      const url = new URL('http://site.test/api/cms/entries/posts/hello')
+      const url = new URL('http://site.test/_kay/cms/entries/posts/hello')
 
       Object.assign(ctx, { request: new Request(url, { method: 'POST', body, ...type === undefined ? {} : { headers: { 'content-type': type } } }) })
       expect(await statusOf(ctx), String(type)).toBe(403)

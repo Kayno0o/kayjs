@@ -6,10 +6,10 @@ Changing the slug of an entry from the editor, what follows from it (the entries
 
 ### Rename an entry
 
-The entry editor's Rename button, or the Rename row action of the entries list, asks for a new slug and opens the entry under it; the entries naming it follow and the old page redirects to the new one by itself. The editor calls `POST /api/cms/entries/:collection/:slug/rename` with `{ slug }`.
+The entry editor's Rename button, or the Rename row action of the entries list, asks for a new slug and opens the entry under it; the entries naming it follow and the old page redirects to the new one by itself. The editor calls `POST /_kay/cms/entries/:collection/:slug/rename` with `{ slug }`.
 
 ```ts
-await fetch(`/api/cms/entries/posts/hello/rename?version=${version}`, { method: 'POST', body: JSON.stringify({ slug: 'hello-world' }) })
+await fetch(`/_kay/cms/entries/posts/hello/rename?version=${version}`, { method: 'POST', body: JSON.stringify({ slug: 'hello-world' }) })
 ```
 
 ### Keep translations paired through a rename
@@ -44,7 +44,7 @@ A `FileSaver` may have `move(move)`, which renames a folder entry's file: `move.
 
 ### Renaming
 
-The entry editor's Rename button (off for a collection of one entry and while the form has unsaved edits), and the Rename row action of the entries list (`list.actions` keeps it by default), ask for a new slug, cleaned as it is typed (Rename is off, with the reason beside the field, for a taken slug; a new folder is announced; the entries naming this one are listed; a refusal shows in the dialog), and opens the entry under it. It calls `POST /api/cms/entries/:collection/:slug/rename` with `{ slug }`, `?locale=` and the `?version=` the editor showed, which the server requires, and the store's `renameEntry(ref, slug, { author, version, required })`: a folder entry's file is moved through the saver, keeping its format and body, and a loaded entry is saved under the new slug and removed from the old, never going to the trash, its history moving with it. A `slug` field in the entry's data is set to the new slug. It is refused, writing nothing, for a new slug that is taken or names another place (`..`, a slash or a hidden part), a collection of one entry, a saver without `move`, an entry naming it that cannot be saved (from a folder outside the repository, or whose version cannot be read), a collection that could hold entries naming it and fails to read (so no reference is left dangling), and a `version` that is not the entry's. `onSave` gets the verb `rename`, `slug` the new one and `from` the old. `unique` fields do not count the entry's own values as taken by its old slug.
+The entry editor's Rename button (off for a collection of one entry and while the form has unsaved edits), and the Rename row action of the entries list (`list.actions` keeps it by default), ask for a new slug, cleaned as it is typed (Rename is off, with the reason beside the field, for a taken slug; a new folder is announced; the entries naming this one are listed; a refusal shows in the dialog), and opens the entry under it. It calls `POST /_kay/cms/entries/:collection/:slug/rename` with `{ slug }`, `?locale=` and the `?version=` the editor showed, which the server requires, and the store's `renameEntry(ref, slug, { author, version, required })`: a folder entry's file is moved through the saver, keeping its format and body, and a loaded entry is saved under the new slug and removed from the old, never going to the trash, its history moving with it. A `slug` field in the entry's data is set to the new slug. It is refused, writing nothing, for a new slug that is taken or names another place (`..`, a slash or a hidden part), a collection of one entry, a saver without `move`, an entry naming it that cannot be saved (from a folder outside the repository, or whose version cannot be read), a collection that could hold entries naming it and fails to read (so no reference is left dangling), and a `version` that is not the entry's. `onSave` gets the verb `rename`, `slug` the new one and `from` the old. `unique` fields do not count the entry's own values as taken by its old slug.
 
 ### The entries naming it
 

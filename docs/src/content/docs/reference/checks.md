@@ -115,6 +115,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `deprecated-auth-method` | warn | deprecated | A kayjs-auth method called on `auth` by its old name, such as `sessions()` for `listSessions()`, or `revokeToken()` for `revokeBearerToken()`, which answers `{ ok }` |
 | `deprecated-signal-prop` | warn | deprecated | A required prop typed `Signal<T>` or `Memo<T>`, from 1.70: use `Bindable<T>` with `bind:`, or a plain value prop |
 | `deprecated-option-name` | warn | deprecated | An option of a library function under its old name, such as `forgejo({ url })`, now `baseUrl`, `mailer({ lang })`, now `locale`, or a lifetime now `maxAge`: `rememberMaxAge`, `email.expires`, `invitationMaxAge`, `files.url`'s `expires` |
+| `deprecated-cms-edit-page` | warn | deprecated | `data-cms-edit-page` on a link kayjs-cms fills in, now `data-kcms-edit-page` |
 | `deprecated-bare-duration` | warn | deprecated | A bare number where a duration goes, which is written with its unit since 1.70; `kay check --fix` rewrites a literal |
 | `deprecated-identity-key` | warn | deprecated | A `kay-allow identity-key` comment or an `identity-key` entry in `lints`, from the lint dropped in 1.69 |
 | `deprecated-rate-limit` | warn | deprecated | `limit`, `visitor` and `limits` of kayjs-ai and kayjs-auth, now `rateLimit` and `key`, and kayjs-mail's `rateLimit: 5`, now `{ max, window }` |

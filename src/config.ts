@@ -422,7 +422,8 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   // A `.kay` layout wrapping every page outside the app's own layouts, rendering its `slot` and then what the library mounts on every page, as a toaster: absolute or relative to the project root, and alone in its directory. A page or layout setting `layouts: false` starts afresh without it. `{ file, reaching }` wraps only the pages whose import graph (the page, its layouts and every `.kay` file and app script they import, however deep) reaches one of the `reaching` files, so a library needing per-request data on the first bytes pays for it only where its components are used.
   layout?: string | { file: string, reaching: string[] } | undefined
   // A directory of API modules laid over the app's under `prefix`, the root by default, as `routes` is over its pages: `{ dir: 'api', prefix: 'auth' }` serves `api/session.ts` at `/api/auth/session`, unless the app has `src/api/auth/session.ts`.
-  api?: { dir: string, prefix?: string | undefined } | undefined
+  // A prefix starting with `/_kay/` is absolute, served there whatever `apiPath` is. `former` is the prefix it had under `apiPath` before it moved: that path still answers, as the new one, for the releases the library says.
+  api?: { dir: string, prefix?: string | undefined, former?: string | undefined } | undefined
   // A directory of message catalogs, `<locale>.ts` each, under the app's own: a key the app translates is the app's.
   messages?: string | undefined
   // The environment variables the library reads, as a `defineEnv` schema: `kay env` lists them with the app's own, so a deploy script knows what to set without wiring the library. A field with `requiredInProduction: true` is one production needs.

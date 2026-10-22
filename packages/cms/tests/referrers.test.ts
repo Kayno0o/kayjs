@@ -1,7 +1,7 @@
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 
 // What kay's build gives an API module's default export in the browser: where it is served.
-void mock.module('../src/api/referrers', () => ({ default: { [Symbol.for('kay.api')]: '/api/cms/referrers' } }))
+void mock.module('../src/api/referrers', () => ({ default: { [Symbol.for('kay.api')]: '/_kay/cms/referrers' } }))
 
 const { readReferrers } = await import('../src/editor/referrers')
 
@@ -20,7 +20,7 @@ test('asks the referrers API for the slugs when called, and tells none for a fai
 
   expect(await readReferrers('people', ['ada'])).toEqual({ ada: ['Posts: One'] })
   expect(urls).toHaveLength(1)
-  expect(decodeURIComponent(urls[0]!)).toContain('/api/cms/referrers/people?slugs=["ada"]')
+  expect(decodeURIComponent(urls[0]!)).toContain('/_kay/cms/referrers/people?slugs=["ada"]')
   expect(await readReferrers('people', [])).toEqual({})
 
   spyOn(globalThis, 'fetch').mockImplementation((async () => Response.json({ error: 'down' }, { status: 500 })) as unknown as typeof fetch)

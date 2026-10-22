@@ -28,6 +28,9 @@ export interface ApiGuard {
 }
 
 export const API_PREFIX = '/api'
+// A prefix an extension's API tree starts with to be served outside `apiPath`.
+const KAY_PREFIX = '/_kay/'
+
 export const OPENAPI_PATH = `${API_PREFIX}/openapi.json`
 export const REFERENCE_PATH = `${API_PREFIX}/reference`
 
@@ -156,9 +159,9 @@ export function sharedGuards(modules: ApiModule[]): string[] {
   return shared
 }
 
-// Where a module at `name` in a tree mounted at `prefix` is served: `/api/auth/session` for `session.ts` under `/auth`.
+// Where a module at `name` in a tree mounted at `prefix` is served: `/api/auth/session` for `session.ts` under `/auth`, `/_kay/cms/dev` for `dev.ts` under `/_kay/cms`, which `apiPath` never moves.
 function mountOf(apiPath: string, prefix: string, name: string): string {
-  return `${apiPath}${`${prefix}/${name.replace(TS_FILE, '').replace(INDEX, '')}`.replace(TRAILING_SLASH, '')}`
+  return `${prefix.startsWith(KAY_PREFIX) ? '' : apiPath}${`${prefix}/${name.replace(TS_FILE, '').replace(INDEX, '')}`.replace(TRAILING_SLASH, '')}`
 }
 
 // The guards of a directory of the API tree and above, `''` for its root, outermost first: the app's at each level, else a library's.

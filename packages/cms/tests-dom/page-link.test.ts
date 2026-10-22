@@ -84,7 +84,7 @@ test('shows a link into edit mode on the page the signed-in editor reads, naming
 
   expect(link?.textContent).toBe('Edit this page')
   expect(link?.getAttribute('href')).toBe(`/admin/page?path=${encodeURIComponent('/about?lang=fr')}`)
-  expect(String(fetched.mock.calls[0]![0])).toBe(`/api${CHECK_PATH}`)
+  expect(String(fetched.mock.calls[0]![0])).toBe(CHECK_PATH)
 })
 
 test('takes the base off a meta into the requests and the link', async () => {
@@ -95,7 +95,7 @@ test('takes the base off a meta into the requests and the link', async () => {
 
     await run()
 
-    expect(String(fetched.mock.calls[0]![0])).toBe(`/site/api${CHECK_PATH}`)
+    expect(String(fetched.mock.calls[0]![0])).toBe(`/site${CHECK_PATH}`)
     expect(document.querySelector(BUTTON)?.getAttribute('href')).toStartWith('/site/admin/page?path=')
   }
   finally {
@@ -103,7 +103,7 @@ test('takes the base off a meta into the requests and the link', async () => {
   }
 })
 
-test('asks where the page says the API is mounted', async () => {
+test('asks under /_kay whatever apiPath the page says', async () => {
   document.head.insertAdjacentHTML('beforeend', '<meta name="kay-api" content="/v1">')
 
   try {
@@ -111,7 +111,7 @@ test('asks where the page says the API is mounted', async () => {
 
     await run()
 
-    expect(String(fetched.mock.calls[0]![0])).toBe(`/v1${CHECK_PATH}`)
+    expect(String(fetched.mock.calls[0]![0])).toBe(CHECK_PATH)
   }
   finally {
     document.head.querySelector('meta[name=kay-api]')?.remove()
@@ -308,7 +308,7 @@ test('the loader imports the module from under the base a meta names, and waits 
     expect(imported).toEqual([])
     window.dispatchEvent(new Event('DOMContentLoaded'))
     window.dispatchEvent(new Event('DOMContentLoaded'))
-    expect(imported).toEqual(['/site/fr/api/cms/editor/module.js'])
+    expect(imported).toEqual(['/site/fr/_kay/cms/editor/module.js'])
   }
   finally {
     document.head.querySelector('meta[name="kay-base"]')?.remove()

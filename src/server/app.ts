@@ -74,9 +74,9 @@ import { redirectSpelling } from './redirect-spelling'
 import { claimRedirects, readRedirects, redirectStatus, serveRedirects } from './redirects'
 import { remoteImages, remotePatterns } from './remote'
 import { reportServerError, useAppOnError } from './report'
-import { rewriteRequests } from './rewrite'
+import { rewriteRequests, withMovedApi } from './rewrite'
 import { routeMatch, routeTable } from './route-table'
-import { READ_METHODS } from './routes'
+import { movedApiPrefixes, READ_METHODS } from './routes'
 import { knowRuntimeRules, missingRedirector } from './runtime-redirect-api'
 import { withSavedData } from './save-data'
 import { securityHeaders, setSecurityHeaders } from './security'
@@ -400,8 +400,10 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   if (log !== false)
     logRequests(app, log, options.health === false ? undefined : options.health?.path ?? HEALTH_PATH)
 
-  if (options.rewrite)
-    rewriteRequests(app, options.rewrite, app)
+  const rewrite = withMovedApi(options.rewrite, movedApiPrefixes(options.extensions), apiPathOf(options.apiPath), base)
+
+  if (rewrite)
+    rewriteRequests(app, rewrite, app)
 
   // The build every answer names, so a page of an older build learns of a deploy from any of them, a 404 for a chunk or an action the new build dropped included.
   const build = mode.dev ? undefined : client.build

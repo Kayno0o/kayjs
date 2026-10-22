@@ -64,7 +64,7 @@ test('a path with and without its trailing slash is one row with two visits and 
 })
 
 test('adds the suggested redirect, which answers at once and is listed with its Remove, then undoes it; a hostile target is refused', async () => {
-  const post = async (path: string, body: object, headers: Record<string, string> = {}) => site.fetch(`/api/cms/redirects${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) })
+  const post = async (path: string, body: object, headers: Record<string, string> = {}) => site.fetch(`/_kay/cms/redirects${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) })
 
   expect((await post('', { from: '/Empty', to: '/empty' }, { 'x-deny': '1' })).status).toBe(403)
 
@@ -108,7 +108,7 @@ test('offers a box for the target on a path with no suggestion', async () => {
   throw new Error('the path was never listed')
 })
 
-const post = async (path: string, body: object, headers: Record<string, string> = {}) => site.fetch(`/api/cms/redirects${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) })
+const post = async (path: string, body: object, headers: Record<string, string> = {}) => site.fetch(`/_kay/cms/redirects${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) })
 
 // Waits for a path to be listed, counted once the response is sent.
 async function listed(path: string, shown = true) {
@@ -193,12 +193,12 @@ test('sends no site paths with the page, offers them as a target is typed, and n
   expect(page.find('datalist option')).toEqual([])
   expect(page.find('main a').map(link => link.attributes.href).filter(href => href?.includes('evil.example'))).toEqual([])
 
-  const offered = async (q: string) => (await site.fetch(`/api/cms/redirects/paths?q=${encodeURIComponent(q)}`)).json() as Promise<string[]>
+  const offered = async (q: string) => (await site.fetch(`/_kay/cms/redirects/paths?q=${encodeURIComponent(q)}`)).json() as Promise<string[]>
 
   expect(await offered('ABO')).toContain('/about')
   expect(await offered('')).toContain('/about')
   expect(await offered('no-such-page-anywhere')).toEqual([])
-  expect((await site.fetch('/api/cms/redirects/paths', { headers: { 'x-deny': '1' } })).status).toBe(403)
+  expect((await site.fetch('/_kay/cms/redirects/paths', { headers: { 'x-deny': '1' } })).status).toBe(403)
 })
 
 test('keeps the 301 or 302 status of a stored redirect edited in place', async () => {

@@ -665,6 +665,15 @@ export const LINTS = {
     wrong: 'Select(value={size} options={sizes} loading={sizes.length === 0})',
     right: 'Select(value={size} options={sizes} busy={sizes.length === 0})',
   },
+  'deprecated-cms-edit-page': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.70',
+    site: true,
+    summary: 'The `data-cms-edit-page` attribute on a link the app renders for kayjs-cms to fill in, which is `data-kcms-edit-page` since 1.70, as a library\'s data attributes are `data-k<library>-`. The module still matches the old name three minors. The fix renames the attribute, unless the new one is given beside it.',
+    wrong: 'a(data-cms-edit-page href="/admin") Edit this page',
+    right: 'a(data-kcms-edit-page href="/admin") Edit this page',
+  },
   'deprecated-bare-duration': {
     level: 'warn',
     group: 'deprecated',

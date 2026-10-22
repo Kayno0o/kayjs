@@ -38,9 +38,9 @@ if (reachable) {
     const store = pgStore(db)
 
     await store.users.create(userRecord({ id: 'u1' }))
-    await db.raw(`INSERT INTO "auth_oauth_code" ("digest", "user_id", "client_id", "redirect_uri", "challenge", "family", "created_at", "expires_at") VALUES ('legacy-code', 'u1', 'c1', 'http://127.0.0.1/cb', 'x', 'f1', now(), now() + interval '1 hour')`, [])
-    await db.raw(`INSERT INTO "auth_oauth_refresh" ("digest", "user_id", "client_id", "family", "created_at", "expires_at") VALUES ('legacy-refresh', 'u1', 'c1', 'f1', now(), now() + interval '1 hour')`, [])
-    await db.raw(`INSERT INTO "auth_bearer_token" ("id", "user_id", "label", "digest", "created_at", "oauth_client", "oauth_family") VALUES ('b1', 'u1', 'Agent', 'legacy-bearer', now(), 'c1', 'f1')`, [])
+    await db.raw(`INSERT INTO "kay_oauth_codes" ("digest", "user_id", "client_id", "redirect_uri", "challenge", "family", "created_at", "expires_at") VALUES ('legacy-code', 'u1', 'c1', 'http://127.0.0.1/cb', 'x', 'f1', now(), now() + interval '1 hour')`, [])
+    await db.raw(`INSERT INTO "kay_oauth_refresh_tokens" ("digest", "user_id", "client_id", "family", "created_at", "expires_at") VALUES ('legacy-refresh', 'u1', 'c1', 'f1', now(), now() + interval '1 hour')`, [])
+    await db.raw(`INSERT INTO "kay_bearer_tokens" ("id", "user_id", "label", "digest", "created_at", "oauth_client", "oauth_family") VALUES ('b1', 'u1', 'Agent', 'legacy-bearer', now(), 'c1', 'f1')`, [])
 
     expect((await store.oauth!.codes.use('legacy-code', new Date()))?.code.resource).toBeNull()
     expect((await store.oauth!.refresh.get!('legacy-refresh'))?.usedAt).toBeNull()
@@ -54,7 +54,7 @@ if (reachable) {
   test('pgStore adds the data column to an older users table and reads its rows as empty', async () => {
     await db.raw(`TRUNCATE ${authTables.map(table => `"${table.name}"`).join(', ')} CASCADE`, [])
     await store().users.create(userRecord({ id: 'u1' }))
-    await db.raw('ALTER TABLE "auth_user" DROP COLUMN "data"', [])
+    await db.raw('ALTER TABLE "kay_users" DROP COLUMN "data"', [])
 
     try {
       await db.sync({ allowDestructive: true })
@@ -68,7 +68,7 @@ if (reachable) {
 
   // An app whose migrations predate the OAuth server: its sign-in, magic-link and reset flows revoke bearer tokens and prune, and must not fail on the missing tables.
   test('pgStore skips the OAuth tables an older schema lacks', async () => {
-    await db.raw('DROP TABLE IF EXISTS "auth_oauth_refresh", "auth_oauth_code", "auth_oauth_grant", "auth_oauth_client" CASCADE', [])
+    await db.raw('DROP TABLE IF EXISTS "kay_oauth_refresh_tokens", "kay_oauth_codes", "kay_oauth_grants", "kay_oauth_clients" CASCADE', [])
 
     try {
       const store = pgStore(db)

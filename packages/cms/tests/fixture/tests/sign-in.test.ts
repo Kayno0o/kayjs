@@ -65,11 +65,11 @@ test('a wrong password stays on the screen and says so; the right one signs in a
 test('the signed-in editor sees who they are, may edit, and is refused what the role does not list', async () => {
   const entry = { data: { title: 'Hello' }, create: false }
 
-  expect((await site.fetch('/api/cms/entries/posts/hello', { method: 'DELETE' })).status).toBe(403)
-  expect((await site.fetch('/api/cms/entries/posts/hello/publish', { method: 'POST' })).status).toBe(403)
-  expect((await site.fetch('/api/cms/redirects/paths?q=a')).status).toBe(403)
+  expect((await site.fetch('/_kay/cms/entries/posts/hello', { method: 'DELETE' })).status).toBe(403)
+  expect((await site.fetch('/_kay/cms/entries/posts/hello/publish', { method: 'POST' })).status).toBe(403)
+  expect((await site.fetch('/_kay/cms/redirects/paths?q=a')).status).toBe(403)
   expect((await site.fetch('/admin/not-found')).status).toBe(403)
-  expect((await site.fetch('/api/cms/entries/posts/hello')).status).toBe(200)
+  expect((await site.fetch('/_kay/cms/entries/posts/hello')).status).toBe(200)
   expect(entry.create).toBe(false)
 })
 
@@ -79,14 +79,14 @@ test('signing out ends the sign-in: the screens send the visitor to sign in agai
   // It leads to the site's home, which the fixture has no page for.
   expect(out.url).toBe('/')
   expect((await site.fetch('/admin')).status).toBe(302)
-  expect((await site.fetch('/api/cms/entries/posts/hello', { method: 'DELETE' })).status).toBe(401)
+  expect((await site.fetch('/_kay/cms/entries/posts/hello', { method: 'DELETE' })).status).toBe(401)
 })
 
 test('a sign-in with the admin password carries the admin role', async () => {
   await site.submit(signIn, { password: 'pw-admin' }, { from: '/admin/sign-in' })
 
   expect((await site.fetch('/admin/not-found')).status).toBe(200)
-  expect((await site.fetch('/api/cms/redirects/paths?q=a')).status).toBe(200)
+  expect((await site.fetch('/_kay/cms/redirects/paths?q=a')).status).toBe(200)
   await site.submit(signOut, {}, { from: '/admin' })
 })
 
@@ -109,14 +109,14 @@ test('a forged sign-in cookie opens nothing', async () => {
 })
 
 test('the editor\'s sign-in link leads to the sign-in screen and back to the page, and never off the site', async () => {
-  const back = await site.fetch('/api/cms/sign-in?redirect=%2Fadmin%2Fcollections%2Fposts%3Fq%3Da')
+  const back = await site.fetch('/_kay/cms/sign-in?redirect=%2Fadmin%2Fcollections%2Fposts%3Fq%3Da')
   const location = new URL(back.headers.get('location')!, 'http://site.test')
 
   expect(back.status).toBe(302)
   expect(location.pathname).toBe('/admin/sign-in')
   expect(location.searchParams.get('redirect')).toBe('/admin/collections/posts?q=a')
 
-  const hostile = await site.fetch('/api/cms/sign-in?redirect=%2F%2Fevil.example')
+  const hostile = await site.fetch('/_kay/cms/sign-in?redirect=%2F%2Fevil.example')
 
   expect(new URL(hostile.headers.get('location')!, 'http://site.test').searchParams.get('redirect')).toBe('/admin')
 })

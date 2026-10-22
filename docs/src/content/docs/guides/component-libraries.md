@@ -83,7 +83,7 @@ export default defineConfig({ extensions: [shopPages()] })
 An extension may set these fields. Only `name` is required.
 
 - `routes`: a folder of `.kay` pages, layouts and guards, served at `prefix`. A file of the app at the same path replaces the library's.
-- `api`: a folder of API modules, served at `/api/<prefix>`, replaceable the same way.
+- `api`: a folder of API modules, served at `/api/<prefix>`, replaceable the same way. A `prefix` starting with `/_kay/` is served there whatever `apiPath` is, and `former` names the prefix it had under `apiPath`, which keeps answering as the new one.
 - `config`: config laid under the app's own. Objects merge, arrays join with yours first, and a value the app sets wins.
 - `server`: an Elysia plugin used before the pages and API modules. Give a function to build it only when the server starts.
 - `serverModule`: the same plugin named by a file, `{ path: './src/shop', export: 'shop' }`. Unlike a path built at run time, `kay build --compile` carries it. The export may be the plugin, a function building it, or an object carrying it as `plugin`, and `kay check` types the locals off the file itself. This is how a library takes the app's module: kayjs-auth and kayjs-mail are `auth({ module: './src/auth' })` and `mail({ module: './src/mail' })`.

@@ -4251,6 +4251,27 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports data-cms-edit-page and --fix renames it to data-kcms-edit-page, leaving a tag that gives both', async () => {
+    const page = [
+      'a(data-cms-edit-page href="/admin") Edit',
+      'a(data-cms-edit-page data-kcms-edit-page href="/admin") Edit',
+      '// kay-allow deprecated-cms-edit-page',
+      'a(data-cms-edit-page href="/admin") Edit',
+      'a(data-kcms-edit-page href="/admin") Edit',
+      '',
+    ].join('\n')
+    const root = await scratchProject({ 'src/routes/index.kay': page })
+
+    try {
+      expect((await runCheck(root)).output.match(/warning\[deprecated-cms-edit-page\]/g)).toHaveLength(2)
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/routes/index.kay')).text()).toBe(page.replace('a(data-cms-edit-page href="/admin") Edit\na(data-cms', 'a(data-kcms-edit-page href="/admin") Edit\na(data-cms'))
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports the lifetimes renamed to maxAge and --fix writes the new form, leaving a call that gives both', async () => {
     const config = [
       'import { createAuth } from \'@kaynooo/kayjs-auth\'',
