@@ -1,0 +1,6 @@
+---
+import Beside from '../components/beside-open.kay'
+import '../app.css'
+---
+main
+  Beside

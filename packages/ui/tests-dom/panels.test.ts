@@ -97,6 +97,8 @@ describe('SidePanel with modal={false}', () => {
 
     expect(close.getAttribute('href')).toBe('/list')
     expect(close.getAttribute('aria-label')).toBe('Close')
+    expect(close.getAttribute('data-part')).toBe('root')
+    expect(close.getAttribute('data-tooltip')).toBe('Close')
 
     let prevented: boolean | undefined
 

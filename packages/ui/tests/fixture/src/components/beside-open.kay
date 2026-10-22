@@ -1,0 +1,13 @@
+---
+import { signal } from 'kay'
+import AppHeader from '@kaynooo/kayjs-ui/app-header.kay'
+import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
+
+// A non-modal panel the server renders open: the count of its `onOpenChange` calls shows in the page.
+const open = signal(true)
+const closes = signal(0)
+---
+AppHeader(links={[{ href: '/', label: 'Home' }]} current="/" label="Main")
+output#state {open() ? 'open' : 'shut'} {closes()}
+SidePanel#beside(open={open()} modal={false} closeHref="/list" title="Venus" onOpenChange={() => { closes.set(closes() + 1); open.set(false) }})
+  p Second planet

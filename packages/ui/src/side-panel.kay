@@ -1,7 +1,6 @@
 ---
 import type { JSX, Snippet } from 'kay'
 import { effect, listen, recipe } from 'kay'
-import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
 import { wording } from 'kay/words'
 
@@ -60,11 +59,7 @@ dialog(part="root" aria-label={title} {...rest} open={renderedOpen} data-modal={
     header(part="head")
       h2(part="title") {title}
       | {actions}
-      if closeHref !== undefined
-        a.kui-icon-btn(href={closeHref} aria-label={closeLabel} data-tooltip={closeLabel} data-size="md" data-variant="ghost" data-tone="neutral" onClick={() => panel?.close()})
-          Icon(icon="close")
-      else
-        IconButton(icon="close" label={closeLabel} variant="ghost" onClick={() => panel?.close()})
+      IconButton(icon="close" label={closeLabel} variant="ghost" href={closeHref} onClick={() => panel?.close()})
     div(part="body")
       slot
     if footer

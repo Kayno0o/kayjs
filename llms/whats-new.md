@@ -7,6 +7,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-cms's entry screen swaps its form for a notice linking the collection or the renamed entry when a leave after a delete or a rename is declined, and `createEntryForm` returns `stranded` ([Screens](../packages/cms/llms/screens.md)).
 - `navigate()` resolves to `false` when a leave guard was declined and the page stayed, `true` otherwise ([Navigation](navigation.md)).
 - kayjs-ui's `ConfirmDelete` takes `disabled`, which disables its trigger and confirm button while the caller is busy and keeps an open dialog open ([Dialogs](../packages/ui/llms/basics.md)).
+- kayjs-ui's `IconButton` and `BareIconButton` take `href` and render a link with the same look, parts and tooltip ([Basics](../packages/ui/llms/basics.md)).
 - kayjs-ui `SidePanel(modal={false})` shows a detail beside a live view, the page under it staying interactive, and `closeHref` makes its close button a link for a panel the URL drives ([Page layout](../packages/ui/llms/page-layout-palette-and-trees.md)).
 - kayjs-ui gains radius steps (`--radius-kui-sm`, `-md`, `-full`), font tokens (`--font-kui-mono`, `--font-kui-body`) and `--kui-density`, which scales the spacing tokens ([Setup](../packages/ui/llms/setup.md)).
 - kayjs-ui `Slider` takes `onChange(value)` once on release or key press, a promise holding it busy and `false` putting the thumb back ([Slider](../packages/ui/llms/forms.md)).
