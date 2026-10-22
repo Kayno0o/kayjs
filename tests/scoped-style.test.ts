@@ -28,6 +28,10 @@ afterAll(async () => {
 })
 
 describe('scopeCss', () => {
+  it('leaves a custom property whose value holds braces as a value', () => {
+    expect(scopeCss('.a { --x: { a: b }; color: red }', ATTR)).toBe(`.a[${ATTR}] { --x: { a: b }; color: red }`)
+  })
+
   it('ends the last compound of every selector on the attribute', () => {
     expect(scopeCss('.a .b > i, em { color: red }', ATTR)).toBe(`.a .b > i[${ATTR}], em[${ATTR}] { color: red }`)
   })

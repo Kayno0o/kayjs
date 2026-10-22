@@ -113,6 +113,8 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
 
     return importing(note(importer, paths.filter(followed)))
   }
+  // The app's Tailwind entry, looked up once per build for every fence using `@apply`.
+  let tailwindReference: Promise<string | undefined> | undefined
   // A `--- style` fence reaches the bundler as a stylesheet of its own, written under the cache with its selectors scoped.
   const scopedStylesheet = async (path: string, css: string) => {
     const moduleId = islandId(throughLinks(root, path), root)
@@ -123,7 +125,7 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
 
     const scoped = rebaseUrls(scopeCss(css, scopeAttribute(moduleId)), dirname(path), dirname(file))
     // `@apply` in a stylesheet of its own needs the app's Tailwind entry as a reference, which kay writes so the fence needs no line of it.
-    const entry = THEME_USE.test(scoped) ? await tailwindEntry(root, true) : undefined
+    const entry = THEME_USE.test(scoped) ? await (tailwindReference ??= tailwindEntry(root, true)) : undefined
     const contents = entry === undefined ? scoped : `@reference ${JSON.stringify(relative(dirname(file), entry).split(sep).join('/'))};\n${scoped}`
 
     // Renamed into place, so a build reading the file while another writes it meets the old text or the new, never half of it.

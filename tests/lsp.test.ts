@@ -1709,4 +1709,24 @@ describe('kay lsp lookup caches', () => {
     expect(await server.typedProps(document, project, 'Failing', './failing')).toEqual([{ name: 'label', optional: false }])
     expect(asked).toHaveBeenCalledTimes(3)
   })
+
+  it('keeps the entry a save put in place of a probe that fails while pending', async () => {
+    const server = make()
+    const lookups: Lookups = { typedProps: new Map() }
+    const project = { lookups }
+    const document = { file: '/app/src/page.kay' }
+    const key = `${document.file}\0Tag\0./tag`
+    const fresh = Promise.resolve([{ name: 'label', optional: false }])
+    let fail: (value: undefined) => void = () => undefined
+
+    spyOn(server, 'askProps').mockReturnValueOnce(new Promise(resolve => fail = resolve))
+
+    const pending = server.typedProps(document, project, 'Tag', './tag')
+
+    lookups.typedProps.set(key, fresh)
+    fail(undefined)
+
+    expect(await pending).toBeUndefined()
+    expect(lookups.typedProps.get(key)).toBe(fresh)
+  })
 })

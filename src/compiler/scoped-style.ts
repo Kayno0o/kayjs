@@ -225,7 +225,16 @@ export function scopeCss(css: string, attribute: string): string {
     const end = closing(css, stop, '{', '}')
     const prelude = css.slice(i, stop)
     const body = css.slice(stop + 1, end)
-    const at = AT_NAME.exec(prelude.slice(LEADING.exec(prelude)![0].length))
+    const head = prelude.slice(LEADING.exec(prelude)![0].length)
+    const at = AT_NAME.exec(head)
+
+    // A custom property's value may hold braces (`--x: { a: b }`), which is a value, not a rule.
+    if (head.startsWith('--')) {
+      out += css.slice(i, end + 1)
+      i = end + 1
+
+      continue
+    }
 
     out += at === null ? `${scopeRule(prelude, attribute)}{${body.includes('{') ? scopeCss(body, attribute) : body}}` : `${prelude}{${NESTING.has(at[1]!.toLowerCase()) ? scopeCss(body, attribute) : body}}`
 
