@@ -1094,13 +1094,13 @@ describe('await blocks', () => {
     }
   })
 
-  it('leaves a streamed rejection with no catch block to the log, a try around it having rendered already', async () => {
+  it('renders the catch of the try around a streamed await with no catch block, and logs the rejection', async () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
       const html = await (await bare.handle(new Request('http://localhost/guarded'))).text()
 
-      expect(html).not.toContain('Unavailable')
+      expect(html).toContain('<p class="failed">Unavailable</p>')
       expect(logged).toHaveBeenCalledWith(expect.stringContaining('Rows down'))
     }
     finally {
