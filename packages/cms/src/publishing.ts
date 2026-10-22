@@ -1,7 +1,7 @@
 import type { CollectionInfo } from './kay/contract'
 import { collectionNamed, entryScreen, heldDate } from './store'
 
-const SAVE = /\/api\/cms\/entries\/([^/]+)\/([^/]+)$/
+const SAVE = /\/cms\/entries\/([^/]+)\/([^/]+)$/
 
 // The saves of a new entry in a collection with a publish date and no draft flag, which a role that may not publish makes: the entry would go live at once, so it is written held back by a far date a publisher then changes.
 const held = new WeakSet<Request>()

@@ -30,6 +30,11 @@ export interface ApiGuard {
 export const API_PREFIX = '/api'
 export const OPENAPI_PATH = `${API_PREFIX}/openapi.json`
 export const REFERENCE_PATH = `${API_PREFIX}/reference`
+
+// The path the API modules, the OpenAPI document and its reference page are served under: `/api` by default, `apiPath` in kay.config.ts otherwise.
+export function apiPathOf(value: string | undefined): string {
+  return value === undefined ? API_PREFIX : servedPath(value, 'apiPath')
+}
 // Where `mcp` serves the app's tools.
 export const MCP_PATH = '/mcp'
 // Where an MCP client finds how to sign in, which the endpoint's 401 points to.
@@ -50,9 +55,9 @@ export function mcpPath(value: boolean | McpConfig | undefined): string | undefi
 }
 
 // The paths the OpenAPI document and its reference page are served at.
-export function openApiPaths(config: { path?: string | undefined, referencePath?: string | undefined, reference?: boolean | undefined } | undefined): { document: string, reference: string } {
-  const document = config?.path === undefined ? OPENAPI_PATH : servedPath(config.path, 'openapi.path')
-  const reference = config?.referencePath === undefined ? REFERENCE_PATH : servedPath(config.referencePath, 'openapi.referencePath')
+export function openApiPaths(config: { path?: string | undefined, referencePath?: string | undefined, reference?: boolean | undefined } | undefined, apiPath = API_PREFIX): { document: string, reference: string } {
+  const document = config?.path === undefined ? `${apiPath}/openapi.json` : servedPath(config.path, 'openapi.path')
+  const reference = config?.referencePath === undefined ? `${apiPath}/reference` : servedPath(config.referencePath, 'openapi.referencePath')
 
   if (config?.reference === true && document === reference)
     throw new KayError('config-invalid', `kay: openapi.path and openapi.referencePath are both ${document}; give the reference page a path of its own`)
@@ -85,19 +90,21 @@ const ROUTER_SYNTAX = /[:*']/
 const REGEX_SYNTAX = /[.*+?^${}()|[\]\\]/g
 
 // The app's API modules and its extensions', as `pages()` serves them.
-export async function projectApi(root: string, config: Pick<KayConfig, 'api' | 'extensions'>): Promise<ApiModule[]> {
+export async function projectApi(root: string, config: Pick<KayConfig, 'api' | 'extensions' | 'apiPath'>): Promise<ApiModule[]> {
   const [app, ...mounts] = apiTrees(root, config)
 
-  return scanApi(app!.dir, mounts)
+  return scanApi(app!.dir, mounts, app!.apiPath)
 }
 
 // The app's API directory at the root of the API tree, then each extension's under its prefix.
-export function apiTrees(root: string, config: Pick<KayConfig, 'api' | 'extensions'>): RouteMount[] {
-  return [{ dir: projectPaths(root, config).api, prefix: '' }, ...apiMounts(root, config.extensions)]
+export function apiTrees(root: string, config: Pick<KayConfig, 'api' | 'extensions' | 'apiPath'>): RouteMount[] {
+  const apiPath = apiPathOf(config.apiPath)
+
+  return [{ dir: projectPaths(root, config).api, prefix: '', apiPath }, ...apiMounts(root, config.extensions)].map(tree => ({ ...tree, apiPath }))
 }
 
 // Every module under `apiDir`, mounted at `/api` plus its path there, then each mounted library's under its prefix that no module before it is served at.
-export async function scanApi(apiDir: string, mounts: RouteMount[] = []): Promise<ApiModule[]> {
+export async function scanApi(apiDir: string, mounts: RouteMount[] = [], apiPath = API_PREFIX): Promise<ApiModule[]> {
   const trees = [{ dir: apiDir, prefix: '' }, ...mounts]
   const modules: ApiModule[] = []
 
@@ -116,7 +123,7 @@ export async function scanApi(apiDir: string, mounts: RouteMount[] = []): Promis
       if (ROUTER_SYNTAX.test(name))
         throw new KayError('route-invalid', `kay: ${join(dir, path)} has a :, * or ' in its path, which the router cannot mount; rename it`)
 
-      const mount = mountOf(prefix, name)
+      const mount = mountOf(apiPath, prefix, name)
       const at = `${prefix}/${dirname(name)}`.replace(CURRENT_DIR, '')
 
       // The app's module, or an earlier library's, at the same path replaces a library's.
@@ -150,8 +157,8 @@ export function sharedGuards(modules: ApiModule[]): string[] {
 }
 
 // Where a module at `name` in a tree mounted at `prefix` is served: `/api/auth/session` for `session.ts` under `/auth`.
-function mountOf(prefix: string, name: string): string {
-  return `${API_PREFIX}${`${prefix}/${name.replace(TS_FILE, '').replace(INDEX, '')}`.replace(TRAILING_SLASH, '')}`
+function mountOf(apiPath: string, prefix: string, name: string): string {
+  return `${apiPath}${`${prefix}/${name.replace(TS_FILE, '').replace(INDEX, '')}`.replace(TRAILING_SLASH, '')}`
 }
 
 // The guards of a directory of the API tree and above, `''` for its root, outermost first: the app's at each level, else a library's.
@@ -167,19 +174,19 @@ function guardsAt(trees: RouteMount[], at: string): ApiGuard[] {
 // A library module the app replaced gives the app's mount, which is the same path, so a library island importing it still builds.
 export function apiStubs(trees: RouteMount[]): BunPlugin {
   // A tree reached through a link, a library linked into the app, is matched by its real path too, which Bun hands for a module imported from the real side.
-  const reached = trees.flatMap(tree => [...new Set([tree.dir, existsSync(tree.dir) ? realpathSync(tree.dir) : tree.dir])].map(dir => ({ dir, prefix: tree.prefix })))
+  const reached = trees.flatMap(tree => [...new Set([tree.dir, existsSync(tree.dir) ? realpathSync(tree.dir) : tree.dir])].map(dir => ({ dir, prefix: tree.prefix, apiPath: tree.apiPath ?? API_PREFIX })))
 
   return {
     name: 'kay-api',
     setup(build) {
       build.onLoad({ filter: new RegExp(`^(?:${reached.map(({ dir }) => (dir + sep).replace(REGEX_SYNTAX, '\\$&')).join('|')}).*\\.ts$`) }, ({ path }) => {
-        const { dir, prefix } = reached.find(tree => path.startsWith(tree.dir + sep))!
+        const { dir, prefix, apiPath } = reached.find(tree => path.startsWith(tree.dir + sep))!
         const name = relative(dir, path).split(sep).join('/')
 
         if (NOT_A_MODULE.test(name))
           throw new KayError('route-invalid', `kay: an island imports ${name}, which is no module under ${basename(dir)}: only a module's default export reaches the browser, as where its routes are served`)
 
-        return { contents: `export default { [Symbol.for('kay.api')]: ${JSON.stringify(mountOf(prefix, name))} }`, loader: 'js' }
+        return { contents: `export default { [Symbol.for('kay.api')]: ${JSON.stringify(mountOf(apiPath, prefix, name))} }`, loader: 'js' }
       })
     },
   }

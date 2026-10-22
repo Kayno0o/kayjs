@@ -10,29 +10,29 @@ import { leavesPublication, restrain } from '../publishing'
 import { settings } from '../settings'
 
 // Leaving edit mode writes nothing, so an edit link alone may do it; `/entries/preview/exit` is a save to a collection named preview.
-const LEAVING = /\/api\/cms\/preview\/exit$/
+const LEAVING = /\/cms\/preview\/exit$/
 
 // What the editor reads: an entry of a collection, and the rules for an upload.
-const ENTRY = /\/api\/cms\/entries\/([^/]+)\/([^/]+)$/
-const UPLOAD_RULES = /\/api\/cms\/files\/rules$/
-const ICON_PAGE = /\/api\/cms\/icons$/
+const ENTRY = /\/cms\/entries\/([^/]+)\/([^/]+)$/
+const UPLOAD_RULES = /\/cms\/files\/rules$/
+const ICON_PAGE = /\/cms\/icons$/
 // The preview's images, read from the folder of the entry being edited.
-const PREVIEW_IMAGE = /\/api\/cms\/markdown\/image$/
+const PREVIEW_IMAGE = /\/cms\/markdown\/image$/
 // The module an editor's browser loads on each page, which holds nothing private.
-const PAGE_LINK_MODULE = /\/api\/cms\/editor\/module\.js$/
+const PAGE_LINK_MODULE = /\/cms\/editor\/module\.js$/
 // What the dev tool's tab reads, which answers under `kay dev` alone and holds the edit mode's state and the tab's texts.
-const DEV_STATE = /\/api\/cms\/dev$/
-const EDITOR_CAN = /\/api\/cms\/editor\/can$/
+const DEV_STATE = /\/cms\/dev$/
+const EDITOR_CAN = /\/cms\/editor\/can$/
 
 // What a role may be limited from, by the route: publishing, deleting, uploading and the redirects, which a rename makes.
 // Sharing a draft shows what is not published, so it is a publisher's.
-const PUBLISH = /\/api\/cms\/entries\/[^/]+\/[^/]+\/(?:publish|unpublish|share)$/
-const ENTRY_RENAME = /\/api\/cms\/entries\/[^/]+\/[^/]+\/rename$/
-const REDIRECTS = /\/api\/cms\/redirects(?:\/|$)/
-const UPLOAD = /\/api\/cms\/files\/[^/]+$/
-const MEDIA_RENAME = /\/api\/cms\/files\/media\/rename$/
-const RESTORE = /\/api\/cms\/(?:history\/[^/]+\/[^/]+|trash\/[^/]+\/[^/]+)\/restore$/
-const UNUSED_UPLOADS = /\/api\/cms\/files\/unused\/delete$/
+const PUBLISH = /\/cms\/entries\/[^/]+\/[^/]+\/(?:publish|unpublish|share)$/
+const ENTRY_RENAME = /\/cms\/entries\/[^/]+\/[^/]+\/rename$/
+const REDIRECTS = /\/cms\/redirects(?:\/|$)/
+const UPLOAD = /\/cms\/files\/[^/]+$/
+const MEDIA_RENAME = /\/cms\/files\/media\/rename$/
+const RESTORE = /\/cms\/(?:history\/[^/]+\/[^/]+|trash\/[^/]+\/[^/]+)\/restore$/
+const UNUSED_UPLOADS = /\/cms\/files\/unused\/delete$/
 
 // Which action of `cms({ roles })` a request needs, from its method and path as the router reads them.
 function actionOf(method: string, path: string): Action | undefined {

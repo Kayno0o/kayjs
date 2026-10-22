@@ -32,7 +32,7 @@ import { kayLog } from '../runtime/log'
 import { BUILD_HEADER, DRAFT_ROUTE } from '../runtime/swap'
 import { registerActionRoutes } from './actions'
 import { serveApi } from './api'
-import { mcpPath, RESOURCE_METADATA, sharedGuards } from './api-modules'
+import { apiPathOf, mcpPath, RESOURCE_METADATA, sharedGuards } from './api-modules'
 import { rebaseCss, rebaseRedirects } from './base'
 import { DEFAULT_BODY_LIMIT, limitBodies } from './body'
 import { serveBuildFiles } from './build-files'
@@ -492,6 +492,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   // Claimed before kay's own files, which give way to them; registered last, before the pages.
   const openapi = openApiSettings(options.openapi)
+  const apiAt = apiPathOf(options.apiPath)
   const servesOpenApi = openapi !== undefined && (openapi.dev !== true || mode.dev)
 
   knowRedirects(Object.keys(options.redirects ?? {}))
@@ -503,7 +504,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     pages: () => [...client.pages.keys(), ...table.paths.keys()].filter(path => !DYNAMIC_PATH.test(path)),
     base,
   })
-  claimApi(served, api.mounted, servesOpenApi ? openapi : undefined)
+  claimApi(served, api.mounted, servesOpenApi ? openapi : undefined, apiAt)
 
   const metadataPaths: string[] = []
 
@@ -519,7 +520,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   // The actions that opted in to being tools are in the document beside the routes, and the MCP endpoint reads its tools from it.
   const document = servesOpenApi || mcpAt !== undefined
-    ? openApiDocument(api.mounted, { title: openapi?.title ?? localizedText(options.seo?.name, undefined, locales.settings.defaultLocale) ?? 'API', version: openapi?.version ?? '1.0.0', base, root }, toolActions)
+    ? openApiDocument(api.mounted, { title: openapi?.title ?? localizedText(options.seo?.name, undefined, locales.settings.defaultLocale) ?? 'API', version: openapi?.version ?? '1.0.0', base, root, apiPath: apiAt }, toolActions)
     : undefined
 
   // On a site requiring guards, the document and the tool list are refused unless a guard covers every module not setting `guards: false`, or every module is open with no guard of its own, a library's guarded one counting as guarded.
@@ -527,7 +528,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const covering = async (empty: boolean) => requiredGuards(await Promise.all(sharedGuards(apiModules).map(async file => loadGuard({ file, special: {} }))), { file: paths.api, open: (apiModules.length > 0 || empty) && apiModules.every(module => module.open === true && module.guards.length === 0) ? true : undefined }, {}, options.requireGuards)
 
   if (servesOpenApi && document && openapi !== undefined)
-    serveOpenApi(app, document, openapi, await covering(false), actionOptions)
+    serveOpenApi(app, document, openapi, await covering(false), actionOptions, apiAt)
 
   if (mcpAt !== undefined && document)
     serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base, guards: await covering(true), actions: actionOptions, metadataPaths, path: mcpAt })
@@ -584,7 +585,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const prerendered = await loadPrerendered(client, dictionaryUsed)
   const guarded = new Set(routes.filter(route => route.guards.length > 0).map(route => route.pattern))
 
-  await serveServiceWorker(app, served, { client, offline: offlineOf(options, mode) && options.offline !== false ? options.offline : undefined, base, trailingSlash: options.trailingSlash, lang: options.lang, typography: options.typography, locales, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined && page.stamps === undefined).map(([path]) => path) })
+  await serveServiceWorker(app, served, { client, offline: offlineOf(options, mode) && options.offline !== false ? options.offline : undefined, base, apiPath: options.apiPath, trailingSlash: options.trailingSlash, lang: options.lang, typography: options.typography, locales, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined && page.stamps === undefined).map(([path]) => path) })
   // A server answering from a build does it in its own process; a static export is written once and `kay dev` shows every entry.
   const publishing = exported || mode.dev ? NOT_PUBLISHING : await watchPublishing(collections)
 

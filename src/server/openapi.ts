@@ -105,7 +105,7 @@ function routerPaths(module: MountedApi, route: Route): string[] {
   const path = apiRoutePath(module.mount, route.path).replace(NON_ROOT_TRAILING_SLASH, '')
   const bare = path.replace(OPTIONAL_SEGMENT, '')
 
-  return bare === path ? [path] : [bare || API_PREFIX, path.replaceAll('?', '')]
+  return bare === path ? [path] : [bare || module.mount, path.replaceAll('?', '')]
 }
 
 // The paths a route answers, as the document writes them, a wildcard named `wildcard`.
@@ -114,8 +114,8 @@ function routePaths(module: MountedApi, route: Route): string[] {
 }
 
 // Each module's routes claim their paths, after the document and the reference page when `config` serves them, which a module would hide without a word.
-export function claimApi(served: ServedPaths, modules: MountedApi[], config: OpenApiConfig | undefined): void {
-  const paths = openApiPaths(config)
+export function claimApi(served: ServedPaths, modules: MountedApi[], config: OpenApiConfig | undefined, apiPath?: string): void {
+  const paths = openApiPaths(config, apiPath)
   const own = new Map<string, string>(config ? [[paths.document, 'its document'], ...config.reference === true ? [[paths.reference, 'its reference page'] as const] : []] : [])
 
   for (const path of own.keys())
@@ -137,7 +137,6 @@ export function claimApi(served: ServedPaths, modules: MountedApi[], config: Ope
 const TOOL_NAME = /\W+/g
 const EDGE_UNDERSCORES = /^_+|_+$/g
 const WORD_BREAK = /([a-z\d])([A-Z])/g
-const API_ROOT = new RegExp(`^${API_PREFIX}`)
 // The most characters an MCP client takes in a tool's name.
 const MAX_NAME = 64
 
@@ -177,8 +176,9 @@ function snakeCase(name: string): string {
 
 // An OpenAPI 3.1 document of every route the modules serve, read from the schemas their routes declare, and of the actions that opted in to being tools; a route behind a guard names it, as `x-kay-guards`.
 // Each operation has an `operationId`, the route's own `detail.operationId` as written or its method and path: `get_items_id` for `GET /api/items/{id}`. The MCP tools are named after them, made safe as names.
-export function openApiDocument(modules: MountedApi[], options: { title: string, version: string, base: string, root?: string }, actions: DocumentedAction[] = []): Schema {
+export function openApiDocument(modules: MountedApi[], options: { title: string, version: string, base: string, root?: string, apiPath?: string }, actions: DocumentedAction[] = []): Schema {
   const paths: Record<string, Record<string, Operation>> = {}
+  const apiRoot = options.apiPath ?? API_PREFIX
   // Routes for every method, which give way to a route for one method wherever it was declared.
   const anyMethod: { path: string, operation: Operation }[] = []
   const wanted = new Map<Operation, string>()
@@ -194,7 +194,7 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
       for (const path of routePaths(module, route)) {
         const tool = toolSettings(hooks.detail?.tool)
         const operation: Operation = {
-          tags: hooks.detail?.tags ?? [module.mount.slice(API_PREFIX.length + 1) || 'api'],
+          tags: hooks.detail?.tags ?? [module.mount.slice(apiRoot.length + 1) || 'api'],
           ...hooks.detail?.summary !== undefined && { summary: hooks.detail.summary },
           ...hooks.detail?.description !== undefined && { description: hooks.detail.description },
           ...hooks.detail?.deprecated === true && { deprecated: true },
@@ -264,7 +264,7 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
 
   for (const [path, methods] of Object.entries(paths)) {
     for (const [method, operation] of Object.entries(methods))
-      operation.operationId ??= toolName(`${method}/${path.replace(API_ROOT, '')}`, tools)
+      operation.operationId ??= toolName(`${method}/${path.startsWith(apiRoot) ? path.slice(apiRoot.length) : path}`, tools)
   }
 
   for (const action of actions) {
@@ -414,8 +414,8 @@ export async function guardRefusal(guards: LoadedGuard[], context: { request: Re
   return passed instanceof Response ? passed : undefined
 }
 
-// The document at `/api/openapi.json`, and the reference page when asked for, behind the guard of the API directory itself when it has one.
-export function serveOpenApi(app: Elysia, document: Schema, config: OpenApiConfig, guards: LoadedGuard[], options: ActionOptions): void {
+// The document at `/api/openapi.json` (under the API path), and the reference page when asked for, behind the guard of the API directory itself when it has one.
+export function serveOpenApi(app: Elysia, document: Schema, config: OpenApiConfig, guards: LoadedGuard[], options: ActionOptions, apiPath?: string): void {
   const json = JSON.stringify(document)
   const admitted = async (context: { request: Request }, answer: () => Response) => {
     const response = (await guardRefusal(guards, context, options)) ?? answer()
@@ -427,7 +427,7 @@ export function serveOpenApi(app: Elysia, document: Schema, config: OpenApiConfi
     return response
   }
 
-  const paths = openApiPaths(config)
+  const paths = openApiPaths(config, apiPath)
 
   app.get(paths.document, async context => admitted(context, () => new Response(json, { headers: { 'content-type': 'application/json; charset=utf-8' } })))
 

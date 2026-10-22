@@ -106,6 +106,8 @@ export interface RouteMount {
   prefix: string
   // The extension gives the editor too.
   editor?: true | undefined
+  // Set on the trees of API modules: where the API is mounted, `/api` unless `apiPath` moves it.
+  apiPath?: string | undefined
   // A layout the extension wraps every page in, outside the app's own: the mount serves no page and holds no other layout.
   outer?: string | undefined
 }

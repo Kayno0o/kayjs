@@ -1276,7 +1276,7 @@ test('every page carries one line looking for the editor hint, and the screens s
   const loader = (await site.visit('/about')).find('script').filter(script => script.html.includes('kay_editor='))
 
   expect(loader).toHaveLength(1)
-  expect(loader[0]!.html.length).toBeLessThan(300)
+  expect(loader[0]!.html.length).toBeLessThan(320)
   expect((await site.visit('/blog/hello')).find('script').filter(script => script.html.includes('kay_editor='))).toHaveLength(1)
   expect((await site.fetch('/admin')).headers.get('set-cookie')).toMatch(/^kay_editor=1; .*Path=\/.*SameSite=Lax/)
 
@@ -1287,7 +1287,7 @@ test('every page carries one line looking for the editor hint, and the screens s
 
   expect(french).toHaveLength(1)
   expect(french[0]!.html).toBe(loader[0]!.html)
-  expect(french[0]!.html).toContain('"/api/cms/editor/module.js"')
+  expect(french[0]!.html).toContain('"/cms/editor/module.js"')
   expect((await site.fetch('/admin', { headers: { 'x-deny': '1' } })).headers.get('set-cookie')).toBeNull()
 })
 

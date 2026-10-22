@@ -2,7 +2,9 @@ import type { Action } from 'kay'
 import type { TestSite, Visit } from 'kay/test'
 import type { EntryRef, StoredEntry } from './kay/contract'
 import type { SaveOutcome } from './store'
+import { apiUrl } from 'kay'
 import { configError } from 'kay/library'
+import entriesApi from './api/entries'
 import { HINT_COOKIE } from './page-link'
 import { activePasswords, LEGACY_SESSION_COOKIE, SESSION_COOKIE, sessionCookiesOf } from './password'
 import { settings } from './settings'
@@ -61,8 +63,6 @@ export function cmsSignOut(site: CookieSite): void {
   site.cookies.delete(HINT_COOKIE)
 }
 
-const ENTRIES = '/api/cms/entries'
-
 export type CmsSaveOutcome = SaveOutcome
 
 export interface CmsSaveOptions {
@@ -98,7 +98,7 @@ async function answered(response: Response, what: string, missing = false): Prom
 // The cms as one test site uses it: sign in as an editor, save an entry and read it back, with no form and no cookie handled by hand.
 // Saves go to the content the test site holds, never to the project's.
 export function cmsTest(site: Pick<TestSite, 'cookies' | 'fetch'>): CmsTest {
-  const path = (collection: string, slug: string) => `${ENTRIES}/${encodeURIComponent(collection)}/${encodeURIComponent(slug)}`
+  const path = (collection: string, slug: string) => `${apiUrl(entriesApi)}/${encodeURIComponent(collection)}/${encodeURIComponent(slug)}`
 
   return {
     signInAs: async role => cmsSignInAs(site, role),

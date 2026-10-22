@@ -37,6 +37,8 @@ export interface KayConfig {
   routes?: string | undefined
   // Elysia modules mounted under `/api` by their path, relative to the root: `src/api/chat.ts` serves `/api/chat`. Defaults to `src/api`.
   api?: string | undefined
+  // The path the API modules, the OpenAPI document and its reference page are served under, `/api` by default: `apiPath: '/v1'` serves `src/api/chat.ts` at `/v1/chat`. Absolute, plain segments, no trailing slash, not under `/_kay`; `mcp.path` and the `openapi` paths keep their own settings. Libraries read it through `apiUrl()`.
+  apiPath?: string | undefined
   // Files served as they are at their path, relative to the root. Defaults to `public`.
   publicDir?: string | undefined
   // How long a browser keeps a file of `public/` without asking again, by the path it is served at, as a glob: `{ '/fonts/**': '365d', '**/*.png': '30d' }`; the first pattern a path matches decides, and a file none names keeps revalidating through its ETag on every visit. Ignored by `kay dev`, so an edit shows at once.

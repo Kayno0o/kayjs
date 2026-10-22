@@ -1,6 +1,5 @@
 import { realpath } from 'node:fs/promises'
 import { dirname, extname, resolve, sep } from 'node:path'
-import { withBase } from 'kay'
 import { repositoryRoot } from 'kay/content'
 import { entryFile } from './kay/content'
 import { collectionNamed } from './store'
@@ -21,7 +20,7 @@ export interface EntryPlace {
 }
 
 // Points each image of the preview written as a path in the collection's folder, such as `./cat.png`, at the route that reads it from there.
-export function imagesFromFolder(html: string, place: EntryPlace): string {
+export function imagesFromFolder(html: string, place: EntryPlace, imageUrl: string): string {
   return html.replace(IMG_SRC, (whole, before: string, src: string, after: string) => {
     if (NOT_RELATIVE.test(src))
       return whole
@@ -40,7 +39,7 @@ export function imagesFromFolder(html: string, place: EntryPlace): string {
     if (place.locale !== undefined)
       query.set('locale', place.locale)
 
-    return `${before}${withBase('/api/cms/markdown/image')}?${query.toString().replace(AMPERSAND, '&amp;')}${after}`
+    return `${before}${imageUrl}?${query.toString().replace(AMPERSAND, '&amp;')}${after}`
   })
 }
 

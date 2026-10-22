@@ -1,4 +1,5 @@
-import { ApiError, signal, withBase } from 'kay'
+import { ApiError, apiUrl, signal } from 'kay'
+import signInApi from '../api/sign-in'
 
 const ended = signal(false)
 
@@ -20,5 +21,5 @@ export function signInHref(): string {
   const here = location.pathname + location.search
   const path = base !== '' && (here === base || here.startsWith(`${base}/`)) ? here.slice(base.length) || '/' : here
 
-  return withBase(`/api/cms/sign-in?redirect=${encodeURIComponent(path)}`)
+  return apiUrl(signInApi, '/', { query: { redirect: path } })
 }

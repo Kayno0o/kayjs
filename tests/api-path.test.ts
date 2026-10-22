@@ -1,0 +1,69 @@
+import { join, resolve } from 'node:path'
+import { afterAll, describe, expect, it } from 'bun:test'
+import { apiPathOf, apiStubs, openApiPaths, scanApi } from '../src/server/api-modules'
+import { testSite } from '../src/test'
+
+const KEY = { 'x-key': 'open' }
+const moved = await testSite({ routes: 'tests/fixtures/openapi/src/routes', api: 'tests/fixtures/openapi/src/api', apiPath: '/v1', openapi: { reference: true }, mcp: true, base: '/shop' })
+
+afterAll(async () => {
+  await moved.close()
+})
+
+describe('apiPath', () => {
+  it('serves every module, the document and the reference page under it, and nothing under /api', async () => {
+    expect((await moved.fetch('/v1/items/1', { headers: KEY })).status).toBe(200)
+    expect((await moved.fetch('/api/items/1', { headers: KEY })).status).toBe(404)
+
+    const document = await (await moved.fetch('/v1/openapi.json', { headers: KEY })).json() as { paths: Record<string, Record<string, { tags: string[], operationId: string }>> }
+
+    expect(Object.keys(document.paths).filter(path => !path.startsWith('/v1/'))).toEqual([])
+    expect(document.paths['/v1/items/{id}']!.get!.operationId).toBe('get_items_id')
+    expect(document.paths['/v1/files']!.get!.tags).toEqual(['files'])
+    expect((await moved.fetch('/v1/reference', { headers: KEY })).status).toBe(200)
+    expect((await moved.fetch('/api/openapi.json', { headers: KEY })).status).toBe(404)
+  })
+
+  it('tells the browser where the API is, and keeps pages from being prefetched under it', async () => {
+    const page = await (await moved.fetch('/')).text()
+
+    expect(page).toContain('<meta name="kay-api" content="/v1">')
+    expect(page).toContain('/shop/v1/*')
+    expect(page).not.toContain('/shop/api/')
+  })
+
+  it('keeps /api and sets no meta when left out', async () => {
+    const plain = await testSite({ routes: 'tests/fixtures/openapi/src/routes', api: 'tests/fixtures/openapi/src/api' })
+
+    try {
+      expect((await plain.fetch('/api/items/1', { headers: KEY })).status).toBe(200)
+      expect(await (await plain.fetch('/')).text()).not.toContain('kay-api')
+    }
+    finally {
+      await plain.close()
+    }
+  })
+
+  it('refuses a path that is not plain segments or sits under /_kay', () => {
+    for (const bad of ['v1', '/v1/', '/', '/a//b', '/a/../b', '/_kay', '/_kay/api', '/a:b', '/a*'])
+      expect(() => apiPathOf(bad)).toThrow('apiPath')
+
+    expect(apiPathOf('/v1/public')).toBe('/v1/public')
+    expect(apiPathOf(undefined)).toBe('/api')
+  })
+
+  it('gives an island the moved mount in the browser build', async () => {
+    const dir = resolve('tests/fixtures/openapi/src/api')
+    const built = await Bun.build({ entrypoints: [join(dir, 'items.ts')], target: 'browser', plugins: [apiStubs([{ dir, prefix: '', apiPath: '/v1' }])] })
+
+    expect(await built.outputs[0]!.text()).toContain('"/v1/items"')
+  })
+
+  it('mounts library trees and the paths of the document under it', async () => {
+    const modules = await scanApi('tests/fixtures/openapi/src/api', [], '/v1')
+
+    expect(modules.every(module => module.mount.startsWith('/v1'))).toBe(true)
+    expect(openApiPaths(undefined, '/v1')).toEqual({ document: '/v1/openapi.json', reference: '/v1/reference' })
+    expect(openApiPaths({ path: '/spec.json' }, '/v1').document).toBe('/spec.json')
+  })
+})

@@ -479,6 +479,11 @@ export function routeUrl(module: unknown, path: string, options: UrlInput = {}):
   return `${mount}${joined === '/' ? '' : joined}${search}`
 }
 
+// Where a route of a module under `src/api` is served, its params filled in and its query appended, under the site's `base` in the browser: the path follows `apiPath`, so code naming a route never writes `/api/...`.
+export function apiUrl(module: unknown, path = '/', options: UrlInput = {}): string {
+  return withBase(routeUrl(module, path, options))
+}
+
 // A dot segment would be resolved by the URL parser and reach the parent route.
 function encodeSegment(value: string, path: string): string {
   if (value === '.' || value === '..')

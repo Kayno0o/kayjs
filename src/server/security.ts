@@ -12,6 +12,7 @@ import { CSP_ENDPOINT, CSP_REPORTS } from './violations'
 export interface SecurityOptions {
   security?: SecurityConfig | false | undefined
   prefetch?: Prefetch | undefined
+  apiPath?: string | undefined
   dev?: boolean | undefined
   // The origin the site is public at: HSTS is sent when it is https.
   site?: string | undefined
@@ -91,7 +92,7 @@ export function securityHeaders(options: SecurityOptions, pages: PageSecurity[] 
 
   const { csp, reports, reportOnly } = options.security ?? {}
   const base = basePath(options.base)
-  const hashes = [...inlineScriptHashes({ prefetch: options.prefetch, dev: options.dev, base, offline: offlineOf(options, { dev: options.dev === true }), lateStyles: options.lateStyles }), ...(options.scripts ?? []).map(sourceHash)]
+  const hashes = [...inlineScriptHashes({ prefetch: options.prefetch, apiPath: options.apiPath, dev: options.dev, base, offline: offlineOf(options, { dev: options.dev === true }), lateStyles: options.lateStyles }), ...(options.scripts ?? []).map(sourceHash)]
   const styles = [...new Set((options.styles ?? []).map(sourceHash))]
   const reportTo = reports === true ? `${base}${CSP_REPORTS}` : reports
 

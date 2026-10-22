@@ -2,7 +2,7 @@ import type { DevTool } from 'kay/dev-tool'
 
 // The dev tool's CMS tab, a browser module kay loads on dev pages: whether this visitor is in edit mode, with a toggle for the page they are on.
 const PLACEHOLDER = /\{(\w+)\}/g
-const STATE_URL = '/api/cms/dev'
+const STATE_PATH = '/cms/dev'
 
 interface CmsState {
   editing: boolean
@@ -23,6 +23,11 @@ const ENGLISH: Record<string, string> = {
   leaveFailure: 'Could not leave edit mode: {failure}',
   unavailable: 'kayjs-cms answers here under `kay dev` alone.',
   answered: 'the server answered {status}',
+}
+
+// Where the API is mounted, as the page's `kay-api` meta says when `apiPath` moved it.
+function apiRoot(): string {
+  return document.querySelector<HTMLMetaElement>('meta[name=kay-api]')?.content ?? '/api'
 }
 
 function base(): string {
@@ -58,7 +63,7 @@ export default function cmsDevTool(tool: DevTool): void {
     let state: CmsState
 
     try {
-      const response = await fetch(STATE_URL, { cache: 'no-store' })
+      const response = await fetch(`${base()}${apiRoot()}${STATE_PATH}`, { cache: 'no-store' })
 
       if (response.status === 404) {
         if (ask === asked)

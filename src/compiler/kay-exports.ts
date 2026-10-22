@@ -6,6 +6,7 @@ export const KAY_VALUES: readonly string[] = [
   'ActionRedirectError',
   'ApiError',
   'action',
+  'apiUrl',
   'batch',
   'call',
   'context',

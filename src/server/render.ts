@@ -138,6 +138,8 @@ export interface ServedPage extends Omit<PrerenderedPage, 'pattern' | 'file' | '
 export interface RenderOptions {
   lang?: string | undefined
   prefetch?: Prefetch | undefined
+  // Where the API is mounted, which pages are never prefetched under.
+  apiPath?: string | undefined
   // Shows thrown errors with their stack instead of a generic message.
   dev?: boolean | undefined
   // Renders once at build time: what only a request carries throws instead of reading as empty.
@@ -1022,7 +1024,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const islandData = (hasIslands || (checked !== '' && words.size > 0) ? messagesScript(words, true, hasIslands && lang !== state?.locale) : '') + (hasIslands ? outcomeScript(rendering.carried()) + queryScript(rules) : '') + liveText
   const opening = `${htmlOpen(lang, head.root)}<head>${headStart(head)}`
   const sheets = stylesheets(client, styled)
-  const closing = `${headHtml}${scripts}${islandData}${kayMetas(options, hasIslands)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${speculationRules(options.prefetch, options.base)}${rendering.guarded === true ? GUARDED_META : ''}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? devScripts(client, styled, options.lateStyles === true) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
+  const closing = `${headHtml}${scripts}${islandData}${kayMetas(options, hasIslands)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${speculationRules(options.prefetch, options.base, options.apiPath)}${rendering.guarded === true ? GUARDED_META : ''}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? devScripts(client, styled, options.lateStyles === true) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
   const written = opening + sheets + closing
   const start = marks === undefined ? written : placeFieldMarks(written, marks)
 
@@ -1045,9 +1047,9 @@ function headStart(head: RenderedHead): string {
   return `${head.charset ? '' : CHARSET}${head.prelude}${head.viewport ? '' : VIEWPORT}${head.styles}`
 }
 
-// What the islands read off the page: the mount point, and the image settings that are not the default.
+// What the islands read off the page: the mount point, where the API is when `apiPath` moved it (for a script that imports no API module, as a library's loader), and the image settings that are not the default.
 function kayMetas(options: RenderOptions, hasIslands: boolean): string {
-  const base = (options.base !== undefined && options.base !== '' ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : '') + (options.saveData === false ? '<meta name="kay-save-data" content="off">' : '') + (options.sameTabLinks === true ? '<meta name="kay-same-tab-links">' : '')
+  const base = (options.base !== undefined && options.base !== '' ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : '') + (options.apiPath !== undefined && options.apiPath !== '/api' ? `<meta name="kay-api" content="${escapeAttribute(options.apiPath)}">` : '') + (options.saveData === false ? '<meta name="kay-save-data" content="off">' : '') + (options.sameTabLinks === true ? '<meta name="kay-same-tab-links">' : '')
 
   if (!hasIslands)
     return base

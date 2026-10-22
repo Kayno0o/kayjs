@@ -84,7 +84,7 @@ test('shows a link into edit mode on the page the signed-in editor reads, naming
 
   expect(link?.textContent).toBe('Edit this page')
   expect(link?.getAttribute('href')).toBe(`/admin/page?path=${encodeURIComponent('/about?lang=fr')}`)
-  expect(String(fetched.mock.calls[0]![0])).toBe(CHECK_PATH)
+  expect(String(fetched.mock.calls[0]![0])).toBe(`/api${CHECK_PATH}`)
 })
 
 test('takes the base off a meta into the requests and the link', async () => {
@@ -95,11 +95,26 @@ test('takes the base off a meta into the requests and the link', async () => {
 
     await run()
 
-    expect(String(fetched.mock.calls[0]![0])).toBe(`/site${CHECK_PATH}`)
+    expect(String(fetched.mock.calls[0]![0])).toBe(`/site/api${CHECK_PATH}`)
     expect(document.querySelector(BUTTON)?.getAttribute('href')).toStartWith('/site/admin/page?path=')
   }
   finally {
     document.head.querySelector('meta[name=kay-base]')?.remove()
+  }
+})
+
+test('asks where the page says the API is mounted', async () => {
+  document.head.insertAdjacentHTML('beforeend', '<meta name="kay-api" content="/v1">')
+
+  try {
+    const fetched = answering(200)
+
+    await run()
+
+    expect(String(fetched.mock.calls[0]![0])).toBe(`/v1${CHECK_PATH}`)
+  }
+  finally {
+    document.head.querySelector('meta[name=kay-api]')?.remove()
   }
 })
 

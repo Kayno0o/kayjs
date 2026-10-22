@@ -1,4 +1,4 @@
-import { s, sanitizeHtml } from 'kay'
+import { apiUrl, s, sanitizeHtml } from 'kay'
 import { api } from 'kay/server'
 import { bodyHtml, MarkdownError } from '../kay/content'
 import { setCodeAside } from '../preview-code'
@@ -14,14 +14,17 @@ const LINK = /<a /g
 const KEPT = { tags: ['img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'], attributes: { img: ['src', 'alt', 'width', 'height'] } }
 
 // A Markdown text rendered by the site's own parser, for the editor's Preview: its structure, with a component shown as its content, code highlighted by the site's highlighter, and an image written as a path in the entry's folder shown from there. The HTML is sanitized, as it is shown inside the screens, which a `<script>` in a text must not run in; a link opens in a new tab so a click never leaves a draft.
-export default api()
+// The module as mounted, which the handler below reads to name its own image route: a reference to the module inside its own initializer would leave its type circular.
+const self: { module?: unknown } = {}
+
+const markdown = api()
   .onError(({ error, status }) => error instanceof UnknownCollectionError ? status(404, error.message) : undefined)
   .post('/', async ({ body, status }) => {
     try {
       const html = (await bodyHtml(body.markdown)).replace(COMPONENT_TAGS, '')
       const aside = await setCodeAside(html)
       const place = body.collection !== undefined && body.slug !== undefined ? { collection: body.collection, slug: body.slug, locale: body.locale } : undefined
-      const safe = String(sanitizeHtml(place ? imagesFromFolder(aside.html, place) : aside.html, KEPT))
+      const safe = String(sanitizeHtml(place ? imagesFromFolder(aside.html, place, apiUrl(self.module, '/image')) : aside.html, KEPT))
 
       return { html: aside.restore(safe.replace(HEADING_ANCHOR, '$1').replace(LINK, '<a target="_blank" ')) }
     }
@@ -48,3 +51,7 @@ export default api()
 
     return new Response(file, { headers })
   }, { query: s.Object({ collection: s.String(), slug: s.String(), path: s.String(), locale: s.Optional(s.String()) }) })
+
+self.module = markdown
+
+export default markdown

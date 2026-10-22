@@ -106,6 +106,8 @@ Each `.ts` module under `src/api/`, the `api` option of `kay.config.ts` naming a
 
 Files and directories starting with `_`, and `.test.ts` files, are left out.
 
+`apiPath: '/v1'` in `kay.config.ts` mounts every module, the OpenAPI document and the reference page under `/v1` instead of `/api` (an absolute path of plain segments, no trailing slash, outside `/_kay`; `mcp.path` and the `openapi` paths keep their own), and islands, the service worker's network list, the prefetch rules and the libraries follow it. `apiUrl(module, path, options)` from `kay` gives where a route is served, base included, for code that needs a URL rather than a call; a script importing no module reads the `kay-api` meta every page carries once `apiPath` moves it.
+
 ```ts
 import { s } from 'kay'
 import { api, eventStream } from 'kay/server'

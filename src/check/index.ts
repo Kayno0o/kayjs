@@ -81,6 +81,8 @@ export interface CheckOptions {
   requireGuards?: boolean | undefined
   // Reports the actions offered as tools that bot protection alone stands before.
   mcp?: boolean | McpConfig | undefined
+  // Where the API modules are mounted, `/api` by default.
+  apiPath?: string | undefined
   // Where the OpenAPI document and its reference page are served, which links to them are checked against.
   openapi?: boolean | OpenApiConfig | undefined
   // Whether to report the lints of what a site lacks before it goes public, as `kay build` and `kay check --only seo` do.
@@ -109,9 +111,9 @@ function helped({ message, help }: CheckDiagnostic): Pick<CheckDiagnostic, 'help
 }
 
 export function configCheckOptions(config: KayConfig): CheckOptions {
-  const { entry, routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, health, live, requestIdHeader, budget, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp, openapi } = config
+  const { entry, routes, publicDir, api, apiPath, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, health, live, requestIdHeader, budget, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp, openapi } = config
 
-  return { entry, routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, health, live, requestIdHeader, budget, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp, openapi }
+  return { entry, routes, publicDir, api, apiPath, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, health, live, requestIdHeader, budget, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp, openapi }
 }
 
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.

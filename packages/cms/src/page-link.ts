@@ -6,9 +6,9 @@ export const SIGNED_IN_COOKIE = 'kay_user'
 export const PAGE_LINK_ATTRIBUTE = 'data-kcms-edit-page'
 // The attribute before 1.70, still matched so an app's own link keeps working.
 export const LEGACY_PAGE_LINK_ATTRIBUTE = 'data-cms-edit-page'
-// Where the guarded check and the public module are served, under the app's base.
-export const CHECK_PATH = '/api/cms/editor'
-export const MODULE_PATH = '/api/cms/editor/module.js'
+// Where the guarded check and the public module are served, under the app's base and its `apiPath` (`/api` unless moved, which the pages' `kay-api` meta tells).
+export const CHECK_PATH = '/cms/editor'
+export const MODULE_PATH = '/cms/editor/module.js'
 const HINT_AGE = 90 * 24 * 60 * 60
 
 // What the browser runs on a page read by a signed-in editor: asks the guard whether the editor is still signed in, then shows the "Edit this page" link.
@@ -16,6 +16,7 @@ const HINT_AGE = 90 * 24 * 60 * 60
 // It runs wherever a page reads it, so it stays free of imports and of anything the server alone has.
 export function pageLink(hint: string, attribute: string, endpoint: string, signedIn: string): void {
   const base = document.querySelector<HTMLMetaElement>('meta[name=kay-base]')?.content ?? ''
+  const api = document.querySelector<HTMLMetaElement>('meta[name=kay-api]')?.content ?? '/api'
   let verified: Promise<{ label: string, href: string } | undefined> | undefined
   let verifiedFor: string | undefined
   let button: HTMLAnchorElement | undefined
@@ -36,7 +37,7 @@ export function pageLink(hint: string, attribute: string, endpoint: string, sign
     }
 
     try {
-      const response = await fetch(`${base}${endpoint}`, { headers: { accept: 'application/json' }, redirect: 'manual' })
+      const response = await fetch(`${base}${api}${endpoint}`, { headers: { accept: 'application/json' }, redirect: 'manual' })
 
       if (response.ok)
         return await response.json() as { label: string, href: string }
@@ -121,7 +122,7 @@ export function pageLinkModule(): string {
 // What the head of every page carries: one line that loads the module for a browser holding the hint or signed in, and costs any other nothing.
 // It waits for the document, as the meta naming the base comes after the head's scripts, and looks again after a page swap, as a sign-in ending in one leaves this script in place.
 export function pageLinkLoader(): string {
-  return `(()=>{let l;const go=()=>{!l&&/(?:^|; )(?:${HINT_COOKIE}=|${SIGNED_IN_COOKIE}=)/.test(document.cookie)&&(l=1,import((document.querySelector("meta[name=kay-base]")?.content??"")+"${MODULE_PATH}"))};addEventListener("DOMContentLoaded",go);document.addEventListener("kay:navigate",go)})()`
+  return `(()=>{let l;const m=n=>document.querySelector("meta[name=kay-"+n+"]")?.content,go=()=>{!l&&/(?:^|; )(?:${HINT_COOKIE}=|${SIGNED_IN_COOKIE}=)/.test(document.cookie)&&(l=1,import((m("base")??"")+(m("api")??"/api")+"${MODULE_PATH}"))};addEventListener("DOMContentLoaded",go);document.addEventListener("kay:navigate",go)})()`
 }
 
 // The cookie that marks the browser as an editor's, slid forward each time the guard lets the editor through.

@@ -1,7 +1,9 @@
+import { apiUrl } from 'kay'
 import { underKayDev } from 'kay/library'
 import { api, editRequested } from 'kay/server'
 import { wording } from 'kay/words'
 import { settings } from '../settings'
+import previewApi from './preview'
 
 // The texts of the dev tool's tab in the visitor's language, which the browser module cannot look up itself. `{failure}` is filled in there.
 function devWords(): Record<string, string> {
@@ -27,5 +29,5 @@ export default api()
 
     set.headers['cache-control'] = 'no-store'
 
-    return { editing: editRequested(request), prefix: settings().prefix, exit: '/api/cms/preview/exit', words: devWords() }
+    return { editing: editRequested(request), prefix: settings().prefix, exit: apiUrl(previewApi, '/exit'), words: devWords() }
   })

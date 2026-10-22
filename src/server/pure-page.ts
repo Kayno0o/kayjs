@@ -53,6 +53,7 @@ export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   navigate: 'free',
   refresh: 'free',
   refusalMessage: 'free',
+  apiUrl: 'free',
   ActionError: 'free',
   ActionRedirect: 'free',
   ActionRedirectError: 'free',

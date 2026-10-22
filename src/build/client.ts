@@ -56,6 +56,8 @@ export interface ClientOptions {
   extensions?: KayExtension[] | undefined
   // API directory relative to the root: an island importing a module there, or under an extension's, gets where its routes are served, not its code.
   api?: string | undefined
+  // Where the API is mounted, `/api` by default: the stubs an island imports hold it.
+  apiPath?: string | undefined
   // Links each island chunk to a map of its `.kay` sources, for the browser's devtools; the server points a map at them as it first serves it.
   // `true` links maps for development's devtools, `'external'` keeps them for the server to map the stacks islands report.
   sourcemap?: boolean | 'external' | undefined

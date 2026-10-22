@@ -202,6 +202,8 @@ export interface ServiceWorkerOptions {
   offline: true | OfflineConfig | undefined
   // The site's mount point: the worker is served under it, and controls only what is.
   base: string
+  // Where the API is mounted, `/api` by default: the worker always asks the network for it.
+  apiPath?: string | undefined
   // How the site writes a page's path, which the pages are kept under.
   trailingSlash?: TrailingSlash | undefined
   lang?: string | undefined
@@ -280,7 +282,7 @@ async function unusedSubsets(client: ClientBuild, pages: (string | undefined)[])
 }
 
 async function workerScript(options: ServiceWorkerOptions, offline: true | OfflineConfig): Promise<string> {
-  const { base, client } = options
+  const { base, client, apiPath = '/api' } = options
   const config = offline === true ? {} : offline
   const found = (await readdir(client.dir, { recursive: true, withFileTypes: true }))
     // The notices file is read once in a while, online, and never worth a copy on every visitor's device.
@@ -327,8 +329,8 @@ async function workerScript(options: ServiceWorkerOptions, offline: true | Offli
     pages,
     fallback,
     env: `${base}${PUBLIC_ENV_PATH}`,
-    network: [`${base}${ASSET_PREFIX}`, `${base}/api/`],
-    api: `${base}/api`,
+    network: [`${base}${ASSET_PREFIX}`, `${base}${apiPath}/`],
+    api: `${base}${apiPath}`,
     offline: offlinePage(options),
   }
 

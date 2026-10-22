@@ -94,7 +94,7 @@ export function cacheDir(root: string, ...names: string[]): string {
   return join(projectPaths(root).cache, ...names)
 }
 
-type ClientConfig = Pick<KayConfig, 'minify' | 'plugins' | 'routes' | 'extensions' | 'api' | 'navigation' | 'i18n' | 'base' | 'settings' | 'publicEnv' | 'lints' | 'fonts' | 'search' | 'hydration' | 'lateStyles' | 'lang' | 'typography'>
+type ClientConfig = Pick<KayConfig, 'minify' | 'plugins' | 'routes' | 'extensions' | 'api' | 'apiPath' | 'navigation' | 'i18n' | 'base' | 'settings' | 'publicEnv' | 'lints' | 'fonts' | 'search' | 'hydration' | 'lateStyles' | 'lang' | 'typography'>
 
 // How a server runs. In development it shows errors with their stack and maps and swaps islands; prebuilt, it serves the browser build `kay build` wrote rather than bundling one; under `kay dev`, each element carries its source for the inspector.
 export interface Mode {
@@ -116,7 +116,7 @@ export function offlineOf(config: Pick<KayConfig, 'offline'>, mode: Pick<Mode, '
   return config.offline !== undefined && config.offline !== false && !mode.dev
 }
 
-type RenderConfig = Pick<KayConfig, 'lang' | 'serverTiming' | 'prefetch' | 'saveData' | 'links' | 'onError' | 'base' | 'images' | 'offline' | 'lateStyles' | 'typography'>
+type RenderConfig = Pick<KayConfig, 'lang' | 'serverTiming' | 'prefetch' | 'saveData' | 'links' | 'onError' | 'base' | 'apiPath' | 'images' | 'offline' | 'lateStyles' | 'typography'>
 
 // `images.widths` sorted, or undefined for the default ladder, which the islands need not be told.
 function customWidths(widths: number[] | undefined): number[] | undefined {
@@ -130,7 +130,7 @@ function customWidths(widths: number[] | undefined): number[] | undefined {
 
 // How every page renders, served or prerendered alike.
 export function renderOptionsOf(config: RenderConfig, mode: Pick<Mode, 'dev'>, built: { head: SeoHead | undefined, maxDensity: number, editor?: string | undefined, fontCss?: string | undefined, islandPreloads?: RenderOptions['islandPreloads'] }): RenderOptions {
-  return { lang: config.lang, dev: mode.dev, serverTiming: config.serverTiming ?? mode.dev, prefetch: config.prefetch, saveData: config.saveData, sameTabLinks: config.links?.outside === 'same-tab', fontCss: config.saveData === false ? undefined : built.fontCss, islandPreloads: config.saveData === false ? undefined : built.islandPreloads, onError: config.onError, head: built.head, base: basePath(config.base), maxDensity: built.maxDensity, imageWidths: customWidths(config.images?.widths), resolvedImages: config.images?.resolve !== undefined, offline: offlineOf(config, mode), lateStyles: config.lateStyles, typography: config.typography, editor: built.editor }
+  return { lang: config.lang, dev: mode.dev, serverTiming: config.serverTiming ?? mode.dev, prefetch: config.prefetch, saveData: config.saveData, sameTabLinks: config.links?.outside === 'same-tab', fontCss: config.saveData === false ? undefined : built.fontCss, islandPreloads: config.saveData === false ? undefined : built.islandPreloads, onError: config.onError, head: built.head, base: basePath(config.base), apiPath: config.apiPath, maxDensity: built.maxDensity, imageWidths: customWidths(config.images?.widths), resolvedImages: config.images?.resolve !== undefined, offline: offlineOf(config, mode), lateStyles: config.lateStyles, typography: config.typography, editor: built.editor }
 }
 
 // A project as every entry point takes it: where it is, its config, where it keeps each part and how it runs.
@@ -158,6 +158,7 @@ export function clientOptionsOf(config: ClientConfig, mode: Pick<Mode, 'dev' | '
     routes: config.routes,
     extensions: config.extensions,
     api: config.api,
+    apiPath: config.apiPath,
     navigation: config.navigation,
     i18n: config.i18n !== undefined,
     french: writesFrench(config),

@@ -10,7 +10,7 @@ import { TS_FILE, TSX_FILE } from '../build/files'
 import { componentName } from '../compiler'
 import { CONFIG_FILE, serverExtensions } from '../config'
 import { projectPaths } from '../project'
-import { OPENAPI_PATH, openApiPaths, REFERENCE_PATH } from '../server/api-modules'
+import { apiPathOf, OPENAPI_PATH, openApiPaths, REFERENCE_PATH } from '../server/api-modules'
 import { publicEnvFiles } from '../server/env-state'
 import { FAVICON_PATHS } from '../server/favicon'
 import { DEFAULT_LANG, extensionMessageFiles, localePattern, localePrefixes, messagesFile } from '../server/i18n'
@@ -33,9 +33,9 @@ const LOCALE_MANIFESTS = `\`/manifest.\${string}.webmanifest\``
 const KAY_PATHS = [SITEMAP, ROBOTS, ...FAVICON_PATHS, HEALTH_PATH]
 
 // The paths of the OpenAPI document and its reference page, where `openapi` moved them; an invalid path is the boot's to refuse, so the defaults stand for it here.
-function openApiServed(openapi: CheckOptions['openapi']): string[] {
+function openApiServed(openapi: CheckOptions['openapi'], apiPath: string | undefined): string[] {
   try {
-    const { document, reference } = openApiPaths(typeof openapi === 'object' ? openapi : undefined)
+    const { document, reference } = openApiPaths(typeof openapi === 'object' ? openapi : undefined, apiPathOf(apiPath))
 
     return [document, reference]
   }
@@ -45,7 +45,7 @@ function openApiServed(openapi: CheckOptions['openapi']): string[] {
 }
 
 export function kayPaths(options: CheckOptions): string[] {
-  return [...KAY_PATHS, ...openApiServed(options.openapi)]
+  return [...KAY_PATHS, ...openApiServed(options.openapi, options.apiPath)]
 }
 const UNWRITABLE = /[%?#]/
 // What a browser percent-encodes in a path it is given: spaces, controls and anything outside ASCII.
