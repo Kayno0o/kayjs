@@ -2,6 +2,7 @@
 import type { Action, ActionStream, Failure, SanitizeOptions, Snippet } from 'kay'
 import type { CodeBlock, Message, Progress, ToolCall } from './types'
 import { ActionError, effect, onCleanup, onMount, recipe, sanitizeHtml, signal, trustHtml, untrack } from 'kay'
+import BareIconButton from '@kaynooo/kayjs-ui/bare-icon-button.kay'
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
 import { markdownHtml } from 'kay/markdown'
@@ -463,12 +464,12 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
   form(part="form" onSubmit={event => { event.preventDefault(); void send() }})
     Textarea(part="field" writeFocused ref={element => { field = element }} value={draft()} onInput={draft.set} rows="1" aria-label={label} placeholder={placeholder} onKeyDown={keyDown})
     if busy()
-      button(part="send" type="button" aria-label={stopLabel} data-tooltip={stopLabel} onClick={stop})
+      BareIconButton(part="send" variant="inline" label={stopLabel} onClick={stop})
         slot stopIcon
           svg.kui-icon(viewBox="0 0 24 24" fill="currentColor" aria-hidden="true")
             rect(x="6" y="6" width="12" height="12" rx="2")
     else
-      button(part="send" type="submit" aria-label={sendLabel} data-tooltip={sendLabel})
+      BareIconButton(part="send" variant="inline" type="submit" label={sendLabel})
         slot sendIcon
           svg.kui-icon(viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true")
             path(d="M12 19V5M5 12l7-7 7 7")

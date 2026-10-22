@@ -3,9 +3,10 @@ import type { JSX, Snippet } from 'kay'
 import { recipe } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
+import BareIconButton from './bare-icon-button.kay'
 import Icon from './icon.kay'
 
-const look = recipe({ parts: { root: 'kui-icon-btn' } })
+const look = recipe({ parts: { root: '' } })
 
 const { icon, label, size = 'md', variant = 'solid', tone = 'neutral', type = 'button', ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'type' | 'class' | 'children'> & {
   // A name or drawing of the icon set, or a snippet drawing it, such as an `svg` of the app's own: `IconButton(label="Send")` then `@icon` and its markup.
@@ -19,11 +20,8 @@ const { icon, label, size = 'md', variant = 'solid', tone = 'neutral', type = 'b
   tone?: 'neutral' | 'accent' | 'danger' | undefined
   type?: 'button' | 'submit' | 'reset' | undefined
 }>()
-
-// Only the solid form is framed by the shell's hairline.
-const framed = () => variant === 'solid'
 ---
-button(part="root" {...rest} type={type} aria-label={label} data-tooltip={label} data-size={size} data-variant={variant} data-tone={tone} class={{ 'kui-shell': framed(), 'kui-shell-danger': framed() && tone === 'danger' }})
+BareIconButton(part="root" {...rest} type={type} label={label} size={size} variant={variant} tone={tone})
   if typeof icon === 'function'
     | {icon}
   else

@@ -5,6 +5,7 @@ import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
 import Badge from '@kaynooo/kayjs-ui/badge.kay'
 import BarChart from '@kaynooo/kayjs-ui/bar-chart.kay'
 import BarList from '@kaynooo/kayjs-ui/bar-list.kay'
+import BareIconButton from '@kaynooo/kayjs-ui/bare-icon-button.kay'
 import Breadcrumb from '@kaynooo/kayjs-ui/breadcrumb.kay'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
@@ -91,6 +92,7 @@ export const COMPONENTS = {
   'accordion': Accordion,
   'app-header': AppHeader,
   'avatar': Avatar,
+  'bare-icon-button': BareIconButton,
   'badge': Badge,
   'bar-chart': BarChart,
   'bar-list': BarList,
@@ -170,6 +172,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'accordion': { items: [{ value: 'mars', title: 'Mars' }, { value: 'venus', title: 'Venus', open: true }], panel: (value: string) => value },
   'app-header': { links: [{ href: '/', label: 'Home', icon }, { href: '/data', label: 'Data' }], current: '/data', label: 'Main', brand: 'Moons', end: 'Ada' },
   'avatar': { name: 'Grace', label: 'Grace' },
+  'bare-icon-button': { label: 'Add' },
   'badge': { label: 'Draft', icon },
   'bar-chart': { labels: ['a', 'b'], series: [{ name: 'Runs', values: [1, 2] }], label: 'Runs' },
   'bar-list': { rows, onSelect: noop },
