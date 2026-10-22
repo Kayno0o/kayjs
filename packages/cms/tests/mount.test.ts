@@ -122,7 +122,22 @@ describe('the roles checks follow the cms\'s own mount', () => {
     mountAt('/v1/cms', ['dev'])
 
     expect(await statusOf(ask('/v1/cms', '/entries/cms/cms/publish'))).toBe(403)
-    expect(await statusOf(ask('/v1/cms', '/entries/v1/cms/a'))).toBe(200)
+  })
+
+  test('the bare mount is placed, not refused as unplaced', async () => {
+    useRoles()
+    mountAt('/v1/cms', ['dev'])
+
+    expect(await statusOf(ask('/v1/cms', '', 'GET'))).toBe(200)
+    expect(await statusOf(ask('/v1/cms', '/', 'GET'))).toBe(200)
+  })
+
+  test('a path spelling the mount with an encoded or doubled segment is refused as unplaced, which the router would not route either', async () => {
+    useRoles()
+    mountAt('/v1/cms', ['dev'])
+
+    for (const path of ['/v1/%63ms/entries/posts/a/publish', '/v1//cms/entries/posts/a/publish'])
+      expect(await statusOf(ask('', path)), path).toBe(403)
   })
 
   test('with roles set and the mount unknown, every request is refused rather than let through', async () => {

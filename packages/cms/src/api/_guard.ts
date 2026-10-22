@@ -12,14 +12,16 @@ import devApi from './dev'
 import iconsApi from './icons'
 import previewApi from './preview'
 
-// The modules whose mount tells where the cms is served, the lightest ones: an app can replace any of them with its own, which is then not mounted, so the first one that is mounted gives the root.
-const ANCHORS: [module: unknown, name: string][] = [[devApi, 'dev'], [previewApi, 'preview'], [iconsApi, 'icons']]
+// The modules whose mount tells where the cms is served: an app can replace any of them with its own, which is then not mounted, so the first one that is mounted gives the root.
+const ANCHORS: unknown[] = [devApi, previewApi, iconsApi]
 
 // Where the cms's modules are mounted (`/api/cms`, `/v1/cms` under an `apiPath`, behind the `base`), or undefined when none of its anchor modules is mounted.
 function mountRoot(): string | undefined {
-  for (const [module, name] of ANCHORS) {
+  for (const module of ANCHORS) {
     try {
-      return apiUrl(module, '/').slice(0, -(name.length + 1))
+      const mount = apiUrl(module, '/')
+
+      return mount.slice(0, mount.lastIndexOf('/'))
     }
     catch {
       // not mounted, try the next
@@ -29,13 +31,14 @@ function mountRoot(): string | undefined {
   return undefined
 }
 
-// The path below the cms's own mount (`/entries/posts/hello`), whatever `base` and `apiPath` put before it, so a collection or slug named like a route never reads as one.
+// The path below the cms's own mount (`/entries/posts/hello`, `/` for the mount itself), whatever `base` and `apiPath` put before it, so a collection or slug named like a route never reads as one.
 // Empty when the mount is unknown or not in the path, which no route pattern matches.
-function ownPath(path: string): string {
-  const root = mountRoot()
-
+function ownPath(path: string, root: string | undefined): string {
   if (root === undefined)
     return ''
+
+  if (path === root)
+    return '/'
 
   const at = path.indexOf(`${root}/`)
 
@@ -82,8 +85,8 @@ function actionOf(method: string, path: string): Action | undefined {
 }
 
 // Whether the edit cookie may read this request: only an entry the pages rendered in edit mode read, since it is tied to no user and a preview link goes to people the app has not signed in.
-function mayRead(ctx: GuardContext): boolean {
-  const path = ownPath(ctx.url.pathname)
+function mayRead(ctx: GuardContext, root: string | undefined): boolean {
+  const path = ownPath(ctx.url.pathname, root)
 
   if (UPLOAD_RULES.test(path) || ICON_PAGE.test(path) || (PREVIEW_IMAGE.test(path) && underKayDev()))
     return true
@@ -112,17 +115,18 @@ function refusal(editing: boolean, reading: boolean): string {
 export default guard(async (ctx) => {
   const { guard: admits, author } = settings()
   const { method } = ctx.request
+  const root = mountRoot()
 
-  if (method === 'GET' && (PAGE_LINK_MODULE.test(ownPath(ctx.url.pathname)) || DEV_STATE.test(ownPath(ctx.url.pathname))))
+  if (method === 'GET' && (PAGE_LINK_MODULE.test(ownPath(ctx.url.pathname, root)) || DEV_STATE.test(ownPath(ctx.url.pathname, root))))
     return
 
   const editing = editRequested(ctx.request)
 
   if (editing) {
-    if (method === 'POST' && LEAVING.test(ownPath(ctx.url.pathname)))
+    if (method === 'POST' && LEAVING.test(ownPath(ctx.url.pathname, root)))
       return
 
-    if (READ_METHODS.has(method) ? mayRead(ctx) : !admits && underKayDev())
+    if (READ_METHODS.has(method) ? mayRead(ctx, root) : !admits && underKayDev())
       return
   }
 
@@ -133,10 +137,10 @@ export default guard(async (ctx) => {
 
   if (settings().roles !== undefined) {
     // Read now so the route that tells what the person may do has it; every other route reads it only when it needs it.
-    if (method === 'GET' && EDITOR_CAN.test(ownPath(ctx.url.pathname)))
+    if (method === 'GET' && EDITOR_CAN.test(ownPath(ctx.url.pathname, root)))
       await memberOf(ctx)
 
-    const path = ownPath(routePath(ctx.url))
+    const path = ownPath(routePath(ctx.url), root)
 
     // A request the guard cannot place below the cms's mount would skip every role check, so it is refused.
     if (path === '')
