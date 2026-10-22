@@ -75,9 +75,9 @@ describe('the same branches in a browser build, KAY_BROWSER defined', () => {
 })
 
 describe('the browser bundle', () => {
-  it.each([['consent', 'answers from the browser'], ['presence', 'currentServerScope']])('leaves the server branch of %s out', async (name, server) => {
+  it.each([['consent', 'answers from the browser'], ['presence', 'currentServerScope'], ['seo', 'reads site in kay.config.ts']])('leaves the server branch of %s out', async (name, server) => {
     const unguarded = await Bun.build({ entrypoints: [join(import.meta.dir, `../src/runtime/${name}.ts`)], target: 'browser', define: { 'process.env.NODE_ENV': '"production"' } })
-    const browser = await Bun.build({ entrypoints: [join(import.meta.dir, `../src/runtime/${name}.ts`)], target: 'browser', define: { 'KAY_BROWSER': 'true', 'process.env.NODE_ENV': '"production"' } })
+    const browser = await Bun.build({ entrypoints: [join(import.meta.dir, `../src/runtime/${name}.ts`)], target: 'browser', minify: true, define: { 'KAY_BROWSER': 'true', 'process.env.NODE_ENV': '"production"' } })
 
     expect(await unguarded.outputs[0]!.text()).toContain(server)
     expect(await browser.outputs[0]!.text()).not.toContain(server)

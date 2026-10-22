@@ -1,6 +1,9 @@
 import { withBase } from './base'
 import { renderedSite } from './site'
 
+// Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
+declare const KAY_BROWSER: true | undefined
+
 // Schema.org structured data: `@type` names what it describes, every other property is the vocabulary's own.
 export interface JsonLd {
   '@context'?: string | undefined
@@ -21,9 +24,10 @@ export function jsonLd(data: JsonLd | JsonLd[]): string {
 
 // An absolute URL of the site, `siteUrl('/contact')`: from `site` and `base` in kay.config.ts on the server, from the page's own origin in the browser.
 export function siteUrl(path = '/'): string {
-  if (typeof document !== 'undefined')
-    return window.location.origin + withBase(path)
+  return typeof KAY_BROWSER !== 'undefined' || typeof document !== 'undefined' ? window.location.origin + withBase(path) : serverUrl(path)
+}
 
+function serverUrl(path: string): string {
   const site = renderedSite()
 
   if (site === undefined)
@@ -35,9 +39,10 @@ export function siteUrl(path = '/'): string {
 
 // The site's origin alone, `https://example.com`, without `base`: from `site` in kay.config.ts on the server, the page's own in the browser.
 export function siteOrigin(): string {
-  if (typeof document !== 'undefined')
-    return window.location.origin
+  return typeof KAY_BROWSER !== 'undefined' || typeof document !== 'undefined' ? window.location.origin : serverOrigin()
+}
 
+function serverOrigin(): string {
   const site = renderedSite()
 
   if (site === undefined)
