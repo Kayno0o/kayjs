@@ -1,8 +1,9 @@
 import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
+import { outputDir } from '../src/build/assets'
 import { compileKay } from '../src/compiler'
 import { loadContextValues, useContexts } from '../src/server/context-values'
 import { routeMounts, scanRoutes } from '../src/server/routes'
@@ -204,6 +205,9 @@ describe('a production server started from disk', () => {
     return output.trim()
   }
 
+  // Where the build writes it, apart for each worker of a parallel run.
+  const recordFile = (root: string) => join(outputDir(root), 'context-reads.json')
+
   async function project(extensions: { name: string, context?: string }[], base?: string): Promise<{ root: string, options: string }> {
     const root = resolve(await fixtureCopy('request-values'))
     const mapped = extensions.map(extension => extension.context === undefined ? extension : { ...extension, context: resolve(root, 'lib/context.ts') })
@@ -224,7 +228,7 @@ describe('a production server started from disk', () => {
 
   // The routes a scan finds and the packages of the compiler it loaded, with the record of the build or without.
   async function scan(root: string, options: string, recorded: boolean) {
-    const script = `const { routeMounts, scanRoutes } = await import(${JSON.stringify(resolve('src/server/routes'))})\nconst { readContextRecord } = await import(${JSON.stringify(resolve('src/server/context-record'))})\nconst root = ${JSON.stringify(root)}\nconst record = ${recorded} ? await readContextRecord(root + '/.kay/client', root) : undefined\nconst routes = await scanRoutes(root + '/src/routes', routeMounts(root, (${options}).extensions), record)\nconst loaded = Object.keys(require.cache).filter(key => key.includes('@babel/parser') || key.includes('context-reads'))\nconsole.log(JSON.stringify({ routes: routes.map(route => [route.pattern, route.layouts]), loaded: loaded.length }))\n`
+    const script = `const { routeMounts, scanRoutes } = await import(${JSON.stringify(resolve('src/server/routes'))})\nconst { readContextRecord } = await import(${JSON.stringify(resolve('src/server/context-record'))})\nconst root = ${JSON.stringify(root)}\nconst record = ${recorded} ? await readContextRecord(${JSON.stringify(outputDir(root))}, root) : undefined\nconst routes = await scanRoutes(root + '/src/routes', routeMounts(root, (${options}).extensions), record)\nconst loaded = Object.keys(require.cache).filter(key => key.includes('@babel/parser') || key.includes('context-reads'))\nconsole.log(JSON.stringify({ routes: routes.map(route => [route.pattern, route.layouts]), loaded: loaded.length }))\n`
 
     return JSON.parse(await run(script)) as { routes: [string, string[]][], loaded: number }
   }
@@ -234,7 +238,7 @@ describe('a production server started from disk', () => {
       const { root, options } = await project([EXTENSION], base)
 
       await build(options)
-      expect(await Bun.file(resolve(root, '.kay/client/context-reads.json')).json()).toMatchObject({ 'lib/gate.kay': true, 'src/routes/plain.kay': false })
+      expect(await Bun.file(recordFile(root)).json()).toMatchObject({ 'lib/gate.kay': true, 'src/routes/plain.kay': false })
       expect(await get(options, '/gated')).toMatchObject({ status: 200, html: expect.stringContaining('<p id="who">Ada</p>') })
     }, 120_000)
   }
@@ -258,7 +262,7 @@ describe('a production server started from disk', () => {
 
     await build(options)
 
-    const record = resolve(root, '.kay/client/context-reads.json')
+    const record = recordFile(root)
     const answers = await Bun.file(record).json() as Record<string, boolean>
 
     await Bun.write(record, JSON.stringify({ ...answers, 'lib/gate.kay': false }))
@@ -269,7 +273,7 @@ describe('a production server started from disk', () => {
 
   it('writes the same record when built again over the last, with no check', async () => {
     const { root, options } = await project([EXTENSION])
-    const record = resolve(root, '.kay/client/context-reads.json')
+    const record = recordFile(root)
 
     await build(options)
 
@@ -284,7 +288,7 @@ describe('a production server started from disk', () => {
 
     await build(options)
 
-    const record = resolve(root, '.kay/client/context-reads.json')
+    const record = recordFile(root)
     const answers = await Bun.file(record).json() as Record<string, boolean>
 
     delete answers['lib/gate.kay']
@@ -296,7 +300,7 @@ describe('a production server started from disk', () => {
     const { root, options } = await project([{ name: 'none' }])
 
     await build(options)
-    expect(existsSync(resolve(root, '.kay/client/context-reads.json'))).toBe(false)
+    expect(existsSync(recordFile(root))).toBe(false)
     expect(await get(options, '/plain')).toMatchObject({ status: 200 })
   }, 120_000)
 })
