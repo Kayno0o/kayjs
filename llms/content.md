@@ -59,6 +59,24 @@ article
   Content
 ```
 
+### Give each entry its page's path
+
+`route: '/blog/:slug'` on the collection gives each entry a typed `url`, the path of its page, so links and feeds write no path; `'/docs/*slug'` keeps the folders of a slug:
+
+```ts
+export const posts = collection('content/posts', {
+  schema: s.Object({ title: s.String(), date: s.Date() }),
+  route: '/blog/:slug',
+  feed: { path: '/blog/rss.xml', title: 'Blog', item: post => ({ title: post.data.title, date: post.data.date }) },
+})
+```
+
+- `a(href={post.url}) ...` links it; `url` is the path as `route()` writes it, so kay puts the base and the page's locale on it as on any link, and `localize(post.url, 'fr')` switches the locale. A localized entry's `url` has its own slug, so `(await posts.translation(post, 'fr'))?.url` is its translation's page.
+- A feed item with no `path` links the entry's `url`, absolute on the site, in the locale's feed under its prefix, as `trailingSlash` writes a page's address.
+- The route has one param, the slug: `:slug`, or `*slug` for slugs with folders, and `collection()` refuses any other.
+- `kay check` reports a route no page's pattern matches (`src/routes/blog/[slug].kay`, whatever its param is named); the page listing the entries is still the one with `prerender: posts`, which the sitemap reads.
+- A collection with no `route` has no `url`.
+
 ### Split a list into pages
 
 `paginate(posts, 10)` from `kay/content` splits a collection for a page whose one param is optional, `src/blog/[[page=integer]].kay`:

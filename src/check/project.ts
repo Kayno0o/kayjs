@@ -2,7 +2,7 @@
 import type { Subprocess } from 'bun'
 import type { CheckDiagnostic, CheckOptions } from '.'
 import type { ExtensionProblem } from '../config'
-import type { CollectionFeed } from '../content/claims'
+import type { CollectionFeed, CollectionRoute } from '../content/claims'
 import type { ComponentUse } from '../content/server'
 import type { ContentProblem } from '../content/validate'
 import type { ServedProject, ShadowTypes } from './shadow-types'
@@ -15,7 +15,7 @@ import { promotedChecks } from '../compiler'
 import { moduleChecks } from '../compiler/fence-checks'
 import { isLaunchLint, isLint, isLintGroup, isRetiredLint, LEVELS, lintLevel, lintLevels } from '../compiler/lints'
 import { CONFIG_FILE } from '../config'
-import { EXTENSIONS_MARKER, FEEDS_MARKER, PROBLEMS_MARKER, USES_MARKER } from '../content/claims'
+import { EXTENSIONS_MARKER, FEEDS_MARKER, PROBLEMS_MARKER, ROUTES_MARKER, USES_MARKER } from '../content/claims'
 import { projectPaths } from '../project'
 import { bootProblems } from './boot'
 import { configLocator } from './config-keys'
@@ -51,6 +51,7 @@ const STAMP_MARGIN = 100
 export interface ContentChecks {
   problems: CheckDiagnostic[]
   feeds: CollectionFeed[]
+  routes: CollectionRoute[]
   props: Map<number, ComponentUse>
 }
 
@@ -69,7 +70,7 @@ export async function contentChecks(root: string, options: CheckOptions, memory?
     return drafts === 'allow' ? [] : [{ ...problem, severity: drafts === 'warn' ? 'warning' : 'error', help: 'read it, then delete its `# draft` line, or save the entry from a CMS' } satisfies CheckDiagnostic]
   })
 
-  return { problems, feeds: content.feeds, props: props.lines }
+  return { problems, feeds: content.feeds, routes: content.routes, props: props.lines }
 }
 
 function readConfigSource(root: string): string | undefined {
@@ -92,7 +93,7 @@ export function configProblems(root: string, options: CheckOptions, types: Shado
 // The collections, the messages, what the server refuses when it boots and the lints of the project's scripts, reported after the type errors.
 export async function projectProblems(root: string, options: CheckOptions, content: ContentChecks, memory?: ProbeMemory, scanned?: ServedProject): Promise<CheckDiagnostic[]> {
   return inWalkScope(async () => {
-    const [messages, boot, modules] = await Promise.all([checkMessages(root, options, memory), bootProblems(resolve(root), options, content.feeds, scanned), moduleLints(root, options)])
+    const [messages, boot, modules] = await Promise.all([checkMessages(root, options, memory), bootProblems(resolve(root), options, content.feeds, scanned, content.routes), moduleLints(root, options)])
 
     return [...content.problems, ...messages, ...boot, ...modules, ...uiProblems(root)]
   })
@@ -217,16 +218,16 @@ async function checkMessages(root: string, { i18n: config, extensions = [], lint
 }
 
 // The collections' entries that fail to compile or to match their schema, the components their entries use and the feeds they serve.
-export async function checkContent(root: string, config: string | undefined, site: boolean, memory?: ProbeMemory, extensionChecks = false): Promise<{ problems: CheckDiagnostic[], uses: ComponentUse[], feeds: CollectionFeed[] }> {
+export async function checkContent(root: string, config: string | undefined, site: boolean, memory?: ProbeMemory, extensionChecks = false): Promise<{ problems: CheckDiagnostic[], uses: ComponentUse[], feeds: CollectionFeed[], routes: CollectionRoute[] }> {
   if (config === undefined && !extensionChecks && !existsSync(projectPaths(root).content))
-    return { problems: [], uses: [], feeds: [] }
+    return { problems: [], uses: [], feeds: [], routes: [] }
 
   const read = await probe(root, CONTENT_PROBLEMS, [config ?? '', site ? 'site' : ''], 'reading the collections', memory)
 
   if ('failed' in read)
-    return { problems: [{ file: projectPaths(root, { content: config }).content, line: 1, column: 1, message: read.failed }], uses: [], feeds: [] }
+    return { problems: [{ file: projectPaths(root, { content: config }).content, line: 1, column: 1, message: read.failed }], uses: [], feeds: [], routes: [] }
 
-  return { problems: [...problemsOf(root, read.marked(PROBLEMS_MARKER)), ...extensionProblemsOf(root, read.marked(EXTENSIONS_MARKER))], uses: read.marked(USES_MARKER) ?? [], feeds: read.marked(FEEDS_MARKER) ?? [] }
+  return { problems: [...problemsOf(root, read.marked(PROBLEMS_MARKER)), ...extensionProblemsOf(root, read.marked(EXTENSIONS_MARKER))], uses: read.marked(USES_MARKER) ?? [], feeds: read.marked(FEEDS_MARKER) ?? [], routes: read.marked(ROUTES_MARKER) ?? [] }
 }
 
 // A lint or a level `lints` names that kay does not have, which would otherwise pass unnoticed, reported at its entry in kay.config.ts.

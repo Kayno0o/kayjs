@@ -18,6 +18,7 @@ import { child, html, localLinks } from '../runtime/html'
 import { localeState } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
 import { previewing, previewState, sharedDraft } from '../runtime/preview'
+import { route } from '../runtime/route'
 import { checkPublishField, isDraft, publishTime } from './drafts'
 import { sizedImages } from './images'
 import { contentKey, contentMode, loadEntries, markdownOf, translationKey } from './load'
@@ -62,7 +63,14 @@ export interface Entry<Data> {
   locale?: string | undefined
   // In a localized collection, the locales with an entry of this slug, or of the same `translationKey` field when the entries set one, its own included.
   translations?: readonly string[] | undefined
+  // With the collection's `route`, the path of the entry's page, `/blog/hello`, as a literal `href` is written: kay puts the base, the page's locale and the trailing slash on it as it does on any link. Not set without a `route`.
+  url?: string | undefined
 }
+
+// An entry of a collection with a `route`, whose `url` is always there.
+export type RoutedEntry<Data> = Entry<Data> & { url: string }
+
+type EntryOf<Data, Routed extends boolean> = Routed extends true ? RoutedEntry<Data> : Entry<Data>
 
 // One entry a loader gives: its data, read against the schema as a file's, and its body as Markdown or as HTML.
 export interface LoadedEntry {
@@ -148,6 +156,8 @@ export interface CollectionOptions<Schema extends TSchema> {
   localized?: boolean | undefined
   // The path of the page showing an entry, under the base, which a CMS opens it on; by default the page whose `prerender` lists the collection.
   url?: ((entry: { slug: string, locale?: string | undefined, data: Static<Schema> }) => string) | undefined
+  // The path of the page showing an entry, with its slug as a param: `'/blog/:slug'`, or `'/docs/*slug'` for slugs with folders. Each entry gets a typed `url` from it, a feed's items link to it by default, and `kay check` reports a route no page serves.
+  route?: string | undefined
   // Every open page that read the collection follows it: once `invalidate()` drops its entries, a CMS saving or removing one included, the page shows what `all()` and `get()` give now. Needs the read in a page's server fence or a layout's; a static export of such a page fails.
   live?: boolean | undefined
   // The collection holds one entry, such as a home page's texts: a CMS opens its form straight from the content list, with no row, no New entry and no Delete, titled with the collection's `title`. Its entry is the collection's only one, `index` when it is first written, and `one()` reads it. Not for a `localized` collection.
@@ -156,7 +166,7 @@ export interface CollectionOptions<Schema extends TSchema> {
   seed?: Static<Schema> | undefined
 }
 
-export interface Collection<Data, Components extends Record<string, Component<never>> = Record<string, Component<never>>, FeedPath extends string = string, Seeded extends boolean = boolean> {
+export interface Collection<Data, Components extends Record<string, Component<never>> = Record<string, Component<never>>, FeedPath extends string = string, Seeded extends boolean = boolean, Routed extends boolean = boolean> {
   readonly [COLLECTION]: true
   readonly [FEED_PATH]?: FeedPath
   // The dates `publishAt` and `unpublishAt` read from the entries, in order and once each.
@@ -171,11 +181,11 @@ export interface Collection<Data, Components extends Record<string, Component<ne
   // The components its Markdown entries may use, typed as given, which `kay check` reads their props from.
   readonly components: Components
   // Every entry, in the collection's order; in a localized collection those of the request's locale or the one given, or every locale's outside a request.
-  all: (locale?: string) => Promise<Entry<Data>[]>
+  all: (locale?: string) => Promise<EntryOf<Data, Routed>[]>
   // The entry with that slug, or undefined; in a localized collection the request's locale's or the one given.
-  get: (slug: string, locale?: string) => Promise<Entry<Data> | undefined>
+  get: (slug: string, locale?: string) => Promise<EntryOf<Data, Routed> | undefined>
   // In a localized collection, the entry of that locale paired with this one by slug or `translationKey`, whatever its own slug, or undefined when the locale has none: for a language switcher, with no fallback to the default locale.
-  translation: (entry: { slug: string, data: unknown }, locale: string) => Promise<Entry<Data> | undefined>
+  translation: (entry: { slug: string, data: unknown }, locale: string) => Promise<EntryOf<Data, Routed> | undefined>
   // Loads the entries afresh on the next read: for a webhook a CMS calls once an entry changed. A loader's `store` passes it to every process sharing it.
   invalidate: () => void
   // For a `single` collection, its entry's data, else `fallback`, else the `seed`; undefined with none of them, so typed as the data when the collection has a `seed` or a fallback is given. Throws for a collection not declared `single`.
@@ -193,7 +203,7 @@ interface Entries<Data> {
 
 // A folder of Markdown files, or of JSON and YAML data files, read against a schema: `collection('src/content/posts', { schema })`; or the entries a loader gives, `collection({ name: 'posts', load }, { schema })`.
 // File entries compile once, each cached by its content, so a change recompiles only that entry; `kay build` compiles them all ahead for production. Loaded entries are read when first asked for, and kept as `cached` keeps a value.
-export function collection<Schema extends TSchema, Components extends Record<string, Component<never>> = Record<never, never>, const FeedPath extends string = string, Seed extends Static<Schema> | undefined = undefined>(source: string | ContentLoader<Stored<Static<Schema>>>, options: CollectionOptions<Schema> & { components?: Components, feed?: { path: FeedPath } | undefined, seed?: Seed }): Collection<Static<Schema>, Components, FeedPath, undefined extends Seed ? false : true> {
+export function collection<Schema extends TSchema, Components extends Record<string, Component<never>> = Record<never, never>, const FeedPath extends string = string, Seed extends Static<Schema> | undefined = undefined, const Route extends string = never>(source: string | ContentLoader<Stored<Static<Schema>>>, options: CollectionOptions<Schema> & { components?: Components, feed?: { path: FeedPath } | undefined, seed?: Seed, route?: Route }): Collection<Static<Schema>, Components, FeedPath, undefined extends Seed ? false : true, [Route] extends [never] ? false : true> {
   type Data = Static<Schema>
   let loading: Promise<Entries<Data>> | undefined
   const components = options.components ?? {}
@@ -203,7 +213,10 @@ export function collection<Schema extends TSchema, Components extends Record<str
   const key = contentKey(name)
   const decoded = new WeakMap<RawEntry[], Entries<Data>>()
   const raws = new WeakMap<Entries<Data>, RawEntry[]>()
-  const { draft, localized = false, publishAt, unpublishAt } = options
+  const { draft, localized = false, publishAt, unpublishAt, route: routePattern } = options
+
+  if (routePattern !== undefined)
+    checkRoute(name, routePattern)
 
   if (publishAt !== undefined)
     checkPublishField(name, options.schema, publishAt, 'publishAt')
@@ -222,7 +235,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
     const { readingSpeed, imageSizes } = markdownOf(options)
 
     try {
-      return decodeEntries(raw, options.schema, components, localized).map(({ entry, data }) => toEntry<Data>(entry, data as Data, components, localized, readingSpeed, imageSizes))
+      return decodeEntries(raw, options.schema, components, localized).map(({ entry, data }) => withUrl(toEntry<Data>(entry, data as Data, components, localized, readingSpeed, imageSizes), routePattern))
     }
     catch (error) {
       throw typeof source === 'string' ? withMigrationHint(error, migrations) : error
@@ -566,6 +579,24 @@ function byField(field: string): (a: Entry<unknown>, b: Entry<unknown>) => numbe
 
     return first < second ? -1 : 1
   }
+}
+
+const SLUG_PARAM = /^[:*]slug$/
+
+// A collection's route holds one param, its entries' slug.
+function checkRoute(name: string, pattern: string): void {
+  const params = pattern.split('/').filter(part => part.startsWith(':') || part.startsWith('*'))
+
+  if (!pattern.startsWith('/') || params.length !== 1 || !SLUG_PARAM.test(params[0]!))
+    throw new KayError('config-invalid', `kay: the collection ${name}'s route ${pattern} must start with / and hold one param named slug, \`:slug\`, or \`*slug\` for slugs with folders`)
+}
+
+// The entry with the path of its page, when the collection has a route.
+function withUrl<Data>(entry: Entry<Data>, pattern: string | undefined): Entry<Data> {
+  if (pattern !== undefined)
+    entry.url = (route as (pattern: string, params: Record<string, string>) => string)(pattern, { slug: entry.slug })
+
+  return entry
 }
 
 function toEntry<Data>(entry: RawEntry, data: Data, components: Record<string, Component<never>>, localized: boolean, readingSpeed: number, imageSizes: string | undefined): Entry<Data> {

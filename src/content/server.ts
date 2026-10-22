@@ -3,7 +3,7 @@ import type { TrailingSlash } from '../config'
 import type { LocaleState } from '../runtime/locale-state'
 import type { I18n } from '../server/i18n'
 import type { ServedPaths } from '../server/served-paths'
-import type { CollectionFeed } from './claims'
+import type { CollectionFeed, CollectionRoute } from './claims'
 import type { Collection } from './index'
 import type { RawEntry } from './load'
 import type { Segment } from './markdown'
@@ -24,7 +24,7 @@ import { revalidated } from '../server/public'
 import { projectSource } from '../server/source'
 import { claimFeed } from './claims'
 import { entries, registerCollections } from './edit'
-import { feedXml } from './feed'
+import { feedItem, feedXml } from './feed'
 import { isCollection } from './index'
 import { draftCommentLine, loadEntries, manifestFile, markdownOf, pruneContentCache, setContentPlace, translationKey } from './load'
 import { migrateEntries, withMigrationHint } from './migrate'
@@ -146,16 +146,20 @@ export async function writeContentManifests(root: string, clientBase: string, co
 
 // Every entry that fails to compile or to match its schema, across the project's collections, and the components their Markdown uses, for `kay check`. A loader's entries are read only when the server runs.
 // `site` says whether the config sets the site's URL, which a collection's feed needs.
-export async function contentProblems(root: string, config?: string, site = true): Promise<{ problems: ContentProblem[], uses: ComponentUse[], feeds: CollectionFeed[], read: string[] }> {
+export async function contentProblems(root: string, config?: string, site = true): Promise<{ problems: ContentProblem[], uses: ComponentUse[], feeds: CollectionFeed[], routes: CollectionRoute[], read: string[] }> {
   const problems: ContentProblem[] = []
   const uses: ComponentUse[] = []
   const feeds: CollectionFeed[] = []
+  const routes: CollectionRoute[] = []
   // What the collections were read from, beside the modules loaded: the config, the catalogs and each folder of entries.
   const read = [projectPaths(root, { content: config }).content, ...await catalogsOf(root)]
 
   for (const [name, collection] of await namedCollections(root, config)) {
     if (collection.options.feed)
       feeds.push(collectionFeed(collection))
+
+    if (collection.options.route !== undefined)
+      routes.push({ collection: name, route: collection.options.route })
 
     if (collection.options.feed && !site)
       problems.push({ file: relative(root, projectPaths(root, { content: config }).content), line: 1, message: feedNeedsSite(collection).message })
@@ -187,7 +191,7 @@ export async function contentProblems(root: string, config?: string, site = true
     }
   }
 
-  return { problems, uses, feeds, read }
+  return { problems, uses, feeds, routes, read }
 }
 
 // The entries of a localized collection marked with `# draft`, as `writeDraftEntry` marks a machine translation without a draft field.
@@ -269,7 +273,7 @@ export function serveFeeds(app: Elysia, served: ServedPaths, collections: Collec
         return runInLocale(stateFor(i18n, written, feed.path, request), async () => {
           const entries = (await collection.all(written)).filter(entry => entry.locale === written)
           const localized = { ...feed, path, item: (entry: Parameters<typeof feed.item>[0]) => {
-            const item = feed.item(entry)
+            const item = feedItem(feed, entry)
 
             return item && { ...item, path: localePath(settings, item.path, written, host) }
           } }

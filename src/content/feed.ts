@@ -6,8 +6,8 @@ import { slashedPath } from '../server/routes'
 
 export interface FeedItem {
   title: string
-  // The entry's page, a path on the site such as `/blog/hello`.
-  path: string
+  // The entry's page, a path on the site such as `/blog/hello`; the entry's `url` when the collection has a `route` and this is left out.
+  path?: string | undefined
   date: Date
   description?: string | undefined
   author?: string | undefined
@@ -33,10 +33,25 @@ const DEFAULT_LIMIT = 20
 // eslint-disable-next-line no-control-regex
 const INVALID_XML = /[\u0000-\u0008\v\f\u000E-\u001F\uFFFE\uFFFF]/g
 
+// What the feed shows an entry as, its page the `item`'s `path` or else the entry's `url`.
+export function feedItem<Data>(options: FeedOptions<Data>, entry: Entry<Data>): (FeedItem & { path: string }) | undefined {
+  const item = options.item(entry)
+
+  if (!item)
+    return undefined
+
+  const path = item.path ?? entry.url
+
+  if (path === undefined)
+    throw new KayError('content-invalid', `kay: the feed at ${options.path} gives ${entry.file} no \`path\`; set it in \`item\`, or give the collection a \`route\``)
+
+  return { ...item, path }
+}
+
 // The feed's XML: its items newest first, every link absolute on the site's origin and written as `trailingSlash` writes a page's canonical URL, the site's own at `home`, its locale's home page for a localized feed.
 export function feedXml<Data>(entries: Entry<Data>[], options: FeedOptions<Data>, origin: string, home = '/', trailingSlash?: TrailingSlash): string {
   const items = entries.flatMap((entry) => {
-    const item = options.item(entry)
+    const item = feedItem(options, entry)
 
     if (item && Number.isNaN(item.date.getTime()))
       throw new KayError('content-invalid', `kay: the feed at ${options.path} gives ${entry.file} an invalid date`)

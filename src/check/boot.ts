@@ -1,12 +1,12 @@
 import type { CheckDiagnostic, CheckOptions } from '.'
-import type { CollectionFeed } from '../content/claims'
+import type { CollectionFeed, CollectionRoute } from '../content/claims'
 import type { LocaleSettings } from '../runtime/i18n'
 import type { ServedProject } from './shadow-types'
 import { join, resolve } from 'node:path'
 import { checkBudget } from '../build/budget'
 import { islandId } from '../compiler'
 import { CONFIG_FILE } from '../config'
-import { claimFeed } from '../content/claims'
+import { claimFeed, unservedRoutes } from '../content/claims'
 import { projectPaths } from '../project'
 import { actionUrl } from '../runtime/action'
 import { actionClash } from '../server/action-clash'
@@ -29,7 +29,7 @@ import { queryClashes } from './queries'
 
 // What the server refuses when it boots, found by the functions it calls then, so `kay check` and the boot cannot disagree; the collections' feeds come from the process that read them.
 // A `scanned` project, the run's own, spares scanning its routes, public files and endpoints again.
-export async function bootProblems(root: string, options: CheckOptions, feeds: CollectionFeed[] = [], scanned?: ServedProject): Promise<CheckDiagnostic[]> {
+export async function bootProblems(root: string, options: CheckOptions, feeds: CollectionFeed[] = [], scanned?: ServedProject, collectionRoutes: CollectionRoute[] = []): Promise<CheckDiagnostic[]> {
   const diagnostics: CheckDiagnostic[] = []
   const config = join(root, CONFIG_FILE)
   const { routes: routesDir, public: publicDir } = projectPaths(root, options)
@@ -132,6 +132,9 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
   // API modules' routes are left to the boot, which `kay build` runs: listing them takes running the modules, which may need what only the server has.
   for (const feed of feeds)
     refused(projectPaths(root, options).content, () => claimFeed(served, feed, settings))
+
+  for (const { collection, route } of unservedRoutes(collectionRoutes, routes.map(page => page.pattern)))
+    diagnostics.push({ file: projectPaths(root, options).content, line: 1, column: 1, message: `kay: the route ${route} of the collection ${collection} is served by no page; add the page that shows its entries, such as src/routes${route.replace('*slug', '[...slug]').replace(':slug', '[slug]')}.kay`, help: 'make the route the pattern of a page' })
 
   diagnostics.push(...await actionClashes(root, [...new Set(routes.flatMap(route => [...route.layouts, ...route.actionModules ?? [], route.file]))]))
 

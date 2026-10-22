@@ -145,7 +145,7 @@ describe('draft messages', () => {
     ])
 
     const extensions = [{ name: 'kay-lib', messages: './lib/messages' }]
-    const reported = async (lints?: Record<string, 'allow' | 'warn' | 'deny'>) => (await projectProblems(root, { i18n, extensions, lints }, { problems: [], feeds: [], props: new Map() })).filter(problem => problem.code === 'draft-message')
+    const reported = async (lints?: Record<string, 'allow' | 'warn' | 'deny'>) => (await projectProblems(root, { i18n, extensions, lints }, { problems: [], feeds: [], routes: [], props: new Map() })).filter(problem => problem.code === 'draft-message')
 
     expect((await reported()).map(({ line, severity, help }) => ({ line, severity, help }))).toEqual([
       { line: 6, severity: 'warning', help: 'check it, then delete its `// draft` comment, or run `kay i18n accept <locale>` for every draft of the locale' },

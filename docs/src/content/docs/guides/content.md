@@ -238,6 +238,29 @@ div(innerHTML={snippet})
 
 A link in an entry's Markdown that leaves your site opens in a new tab, as it does in a template ([Links to other sites](/essentials/templates#links-to-other-sites)).
 
+## Entry URLs
+
+`route: '/blog/:slug'` on a collection gives each entry a typed `url`, so links and feeds write no path. Use `'/docs/*slug'` when a slug has folders.
+
+```ts
+export const posts = collection('content/posts', {
+  schema,
+  route: '/blog/:slug',
+})
+```
+
+```kay
+--- server
+import { posts } from '../../content.config'
+
+const entries = await posts.all()
+---
+for post of entries
+  a(href={post.url}) {post.data.title}
+```
+
+`url` is the path as `route()` writes it, so kay puts the base and the page's locale on it as on any link. A localized entry's `url` has its own slug, and `localize(post.url, 'fr')` switches the locale. The route has one param, the slug, and `kay check` reports a route no page matches, such as one with `src/routes/blog/[slug].kay` missing. A collection with no `route` has no `url`.
+
 ## Feeds
 
 Give a collection a `feed` and kay serves an RSS feed at its path, built from the newest items. Set `site` in `kay.config.ts` first, because feed links are absolute. The feed carries an ETag, so a reader that already holds the current version gets a short 304 instead of the whole file.
@@ -256,6 +279,8 @@ export const posts = collection('content/posts', {
   },
 })
 ```
+
+With a `route` on the collection, `path` can be left out of `item`: the feed links each entry's `url`. See [Entry URLs](#entry-urls).
 
 Add `format: 'atom'` for an Atom feed. `limit` is how many of the newest items it holds, 20 by default. `description` and `author` fill the feed's header, and Atom needs an author, so it uses the title when you set none. Return `undefined` from `item` to leave an entry out. Item links and guids are written as `trailingSlash` writes the page's address, so they match its canonical URL.
 

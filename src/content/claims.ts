@@ -1,6 +1,7 @@
 import type { LocaleSettings } from '../runtime/i18n'
 import type { ServedPaths } from '../server/served-paths'
 import { localePath } from '../runtime/i18n'
+import { routerKey } from '../server/routes'
 
 // What `kay check` reads of the content and claims for it, apart from `./server` so it loads no Elysia and no collection.
 // Starts the line `kay check` reads the content problems from.
@@ -10,6 +11,9 @@ export const USES_MARKER = 'kay-content-uses:'
 // Starts the line `kay check` reads the collections' feeds from, which it claims their paths for as the server does.
 export const FEEDS_MARKER = 'kay-content-feeds:'
 
+// Starts the line `kay check` reads the collections' routes from, which it looks for a page serving.
+export const ROUTES_MARKER = 'kay-content-routes:'
+
 // Starts the line `kay check` reads the problems the extensions' `check` found from.
 export const EXTENSIONS_MARKER = 'kay-extension-problems:'
 
@@ -18,6 +22,21 @@ export interface CollectionFeed {
   collection: string
   path: string
   localized: boolean
+}
+
+const CATCH_ALL = /\*[^/]+/
+
+// A collection's route, by the collection's name.
+export interface CollectionRoute {
+  collection: string
+  route: string
+}
+
+// The routes no page's pattern serves, `/blog/:slug` by the page `blog/[slug].kay` and `/docs/*slug` by `docs/[...slug].kay`.
+export function unservedRoutes(routes: CollectionRoute[], patterns: string[]): CollectionRoute[] {
+  const served = new Set(patterns.map(routerKey))
+
+  return routes.filter(({ route }) => !served.has(routerKey(route.replace(CATCH_ALL, '*'))))
 }
 
 // Claims where a collection's feed is served: at its path, or a localized collection's under each locale's prefix, the locale then known; with domains, each host serves its own at the path.
