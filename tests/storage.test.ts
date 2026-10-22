@@ -754,7 +754,7 @@ describe('a script signing a private link', () => {
   })
 
   it('refuses a KAY_SECRET too short, as a server does', async () => {
-    await expect(run(url(false), { KAY_SECRET: 'short' })).rejects.toThrow('KAY_SECRET is 5 characters long')
+    await expect(run(url(false), { KAY_SECRET: 'short' })).rejects.toThrow('KAY_SECRET holds a secret 5 characters long')
   })
 })
 

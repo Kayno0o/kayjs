@@ -775,8 +775,8 @@ console.log(JSON.stringify({ warnings, shared: sharedKey('x')?.toString('hex') }
     expect((await shared(`useStampSecret('the session secret, long enough!!!!', 'session'); setupStampSecret(${JSON.stringify(long)}); signStamp('a', 1)`)).shared).not.toBe(config.shared)
     expect((await shared(`useStampSecret('the preview secret, long enough!!!!', 'preview'); setupStampSecret(${JSON.stringify(long)}); signStamp('a', 1)`)).shared).toBe(config.shared)
     expect((await shared(`setupStampSecret(${JSON.stringify(long)}); useStampSecret('the preview secret, long enough!!!!', 'preview'); signStamp('a', 1)`)).shared).toBe(config.shared)
-    expect((await stamps('setupStampSecret("short")')).err).toContain('`secret` in kay.config.ts is 5 characters long')
-    expect((await stamps('setupStampSecret(undefined)', { KAY_SECRET: 'short' })).err).toContain('KAY_SECRET is 5 characters long')
+    expect((await stamps('setupStampSecret("short")')).err).toContain('`secret` in kay.config.ts holds a secret 5 characters long')
+    expect((await stamps('setupStampSecret(undefined)', { KAY_SECRET: 'short' })).err).toContain('KAY_SECRET holds a secret 5 characters long')
   })
 
   it('reaches the stamp secret from the config\'s secret and from KAY_SECRET through pages(), warning of neither', async () => {
@@ -1639,7 +1639,7 @@ describe('revalidation', () => {
 
   it('warns once at boot of a server with seo set and no site, which kay build leaves to SITE_URL', async () => {
     const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
-    const missing = 'kay: `seo` is set, but not the origin the site is public at, in kay.config.ts, SITE_URL or ORIGIN: pages get no canonical link or og:url, and the site no sitemap or robots.txt'
+    const missing = 'kay: `seo` is set, but not the origin the site is public at, in kay.config.ts or SITE_URL: pages get no canonical link or og:url, and the site no sitemap or robots.txt'
 
     try {
       await build.serve({ routes, prebuilt: true, security: false, seo: { name: 'Example' } })
