@@ -8,7 +8,8 @@ let release: () => void = () => undefined
 function hold(value: 's' | 'm' | 'l') {
   return new Promise<boolean>((resolve) => {
     release = () => resolve(false)
-    ;(window as unknown as { held: string }).held = value
+    const page = window as unknown as { held: string }
+    page.held = value
   })
 }
 ---
