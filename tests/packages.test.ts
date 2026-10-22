@@ -132,6 +132,44 @@ describe('what\'s new', () => {
     expect(capNewest(page, archive, 5)).toEqual({ page, archive })
   })
 
+  it('drops the pointer of a capped release when it moves to the archive beside its continuation', () => {
+    const page = '# New\n\nIntro.\n\n## 1.71.0\n\n- n\n\n## 1.70.0\n\n- a\n\nThe rest of this release is in [Old](old.md).\n\nReleases before 1.70 are in [Old](old.md).\n'
+    const archive = '# Old\n\nWhat each release before 1.70 added.\n\n## 1.70.0 (continued)\n\n- c\n'
+    const moved = archiveOldest(page, archive, 10)
+
+    expect(moved.page).toBe('# New\n\nIntro.\n\n## 1.71.0\n\n- n\n\nReleases before 1.71 are in [Old](old.md).\n')
+    expect(moved.archive).toBe('# Old\n\nWhat each release before 1.71 added.\n\n## 1.70.0\n\n- a\n\n## 1.70.0 (continued)\n\n- c\n')
+  })
+
+  it('never cuts a release inside a code fence', () => {
+    const a = 'a'.repeat(60)
+    const c = 'c'.repeat(200)
+    const page = `# New\n\nIntro.\n\n## 1.70.0\n\n- ${a}\n  \`\`\`ts\n- not a bullet\n  \`\`\`\n- ${c}\n\nReleases before 1.70 are in [Old](old.md).\n`
+    const archive = '# Old\n\nWhat each release before 1.70 added.\n'
+    const capped = capNewest(page, archive, 230)
+
+    // The line inside the fence would fit under 140 bytes, and is no place to cut.
+    expect(capNewest(page, archive, 140)).toEqual({ page, archive })
+
+    expect(capped.page).toContain('not a bullet')
+    expect(capped.page).not.toContain(c)
+    expect(capped.archive).toContain(`- ${c}`)
+    expect(capped.archive).not.toContain('not a bullet')
+  })
+
+  it('refuses a release whose newest What\'s new section cannot be cut under its cap', () => {
+    const files: Record<string, string> = {
+      'llms.txt': '- [Old](llms/whats-new-archive.md): before 1.69\n- [Up](llms/upgrading-archive.md): before 1.69\n',
+      'llms/whats-new.md': `# W\n\n## Unreleased\n\n- ${'x'.repeat(NEWEST_CAP + 1)}\n\nReleases before 1.69 are in [Old](whats-new-archive.md).\n`,
+      'llms/whats-new-archive.md': '# WA\n\nWhat each release before 1.69 added.\n',
+      'llms/upgrading.md': '# U\n',
+      'llms/upgrading-archive.md': '# UA\n\nWhat each release before 1.69 added.\n',
+    }
+
+    expect(() => releasePages(path => files[path]!, '1.70.0')).toThrow('stays over its')
+    expect(() => releasePages(path => files[path]!.replace('Releases before 1.69 are in [Old](whats-new-archive.md).\n', ''), '1.70.0')).toThrow('stays over its')
+  })
+
   it('keeps What\'s new far enough under the hard limit for a batch of Unreleased lines whatever the newest release weighs', () => {
     const bullets = (count: number) => Array.from({ length: count }, (_, index) => `- ${index} ${'x'.repeat(300)}\n`).join('')
     const files: Record<string, string> = {

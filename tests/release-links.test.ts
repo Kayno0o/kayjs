@@ -59,7 +59,7 @@ describe('the release\'s link check', () => {
     const texts = new Map<string, string>(await Promise.all(paths.map(async path => [path, await read(path)] as const)))
 
     // A page over its limit with an archive of its own, so a release moves 1.2.0 and 1.1.0 into the archive whatever the real pages hold.
-    texts.set('llms/whats-new.md', `# New\n\n## Unreleased\n\n- ${'a'.repeat(21_000)}\n\n## 1.2.0\n\n- b\n\n## 1.1.0\n\n- c\n\nReleases before 1.1 are in [Old](whats-new-archive.md).\n`)
+    texts.set('llms/whats-new.md', `# New\n\n## Unreleased\n\n${'- aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n'.repeat(70)}\n## 1.2.0\n\n- b\n\n## 1.1.0\n\n- c\n\nReleases before 1.1 are in [Old](whats-new-archive.md).\n`)
     texts.set('llms/whats-new-archive.md', '# Old\n\nWhat each release before 1.1 added.\n\n## 1.0.0\n\n- z\n')
     const pages = releasePages(path => texts.get(path)!, '9.9.9')
     const before = (text: string) => (/before \d+\.\d+(?:\.\d+)?/).exec(text)![0]
