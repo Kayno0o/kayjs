@@ -40,6 +40,9 @@ describe('the runtime modules a page loads', () => {
   }, 120_000)
 })
 
+// A chunk import in the single or double quotes the bundler may write, naming a file beside the importing one.
+const IMPORT_SPECIFIER = /(?:from|import)\s*["'](\.\/[^"']+\.js)["']/g
+
 // The function only the module of each block holds, as the client build names them.
 const BLOCKS = { loop: 'function keyedRows', await: 'function awaited(', try: 'function attempt(', spread: 'function spread(' }
 const BLOCK_ISLANDS: Record<string, string> = {
@@ -79,34 +82,34 @@ describe('the blocks an island compiles to', () => {
     }
   }, 120_000)
 
-  it.each([['production', {}], ['a base path', { base: '/docs' }], ['kay dev, where islands swap in', { hot: true }]] as const)('reaches the loop module of an island through relative chunk imports that resolve in %s', async (_, options) => {
+  // Two islands use the loop, so its module is a chunk of its own that each island chunk imports. The build is the same under any base, which only the served URLs carry.
+  it.each([['production', {}], ['kay dev, where islands swap in', { hot: true }]] as const)('reaches the loop module, a chunk apart from the entry and the island, through relative chunk imports that resolve in %s', async (_, options) => {
     const root = resolve(await fixtureCopy('runtime-chunks'))
 
     dirs.push(root)
-    await Bun.write(join(root, 'src/components/loopy.kay'), BLOCK_ISLANDS.loopy!)
-    await Bun.write(join(root, 'src/routes/loopy.kay'), '--- script\nimport Loopy from \'../components/loopy.kay\'\n---\nh1 Loopy\nLoopy\n')
+
+    for (const name of ['loopy', 'loopy-twin']) {
+      await Bun.write(join(root, `src/components/${name}.kay`), BLOCK_ISLANDS.loopy!)
+      await Bun.write(join(root, `src/routes/${name}.kay`), `--- script\nimport Loopy from '../components/${name}.kay'\n---\nh1 Loopy\nLoopy\n`)
+    }
 
     const client = await buildClient(root, options)
     const files = await Array.fromAsync(new Bun.Glob('*.js').scan(client.dir))
     const texts = new Map(await Promise.all(files.map(async file => [file, await Bun.file(join(client.dir, file)).text()] as const)))
-    const reached = new Set<string>()
-    const visit = (file: string) => {
-      if (reached.has(file))
-        return
+    const fileOf = (url: string) => url.slice(url.lastIndexOf('/') + 1)
+    const importsOf = (file: string) => [...texts.get(file)!.matchAll(IMPORT_SPECIFIER)].map(([, from]) => from!)
+    const own = fileOf(client.islands['src/components/loopy.kay']![0]!)
+    const holders = files.filter(file => texts.get(file)!.includes('function keyedRows'))
 
-      reached.add(file)
+    expect(holders).toHaveLength(1)
+    expect(holders[0]).not.toBe(own)
+    expect(holders[0]).not.toBe(fileOf(client.entry!))
+    expect(importsOf(own)).toContain(`./${holders[0]}`)
 
-      for (const [, from] of texts.get(file)!.matchAll(/(?:from|import)\s*"\.\/([^"]+\.js)"/g)) {
-        // A chunk the island names is a file beside it, whatever the base the page is served under.
-        expect(texts.has(from!), `${file} imports ./${from} which is not a file of the build`).toBe(true)
-        visit(from!)
-      }
+    for (const file of files) {
+      for (const from of importsOf(file))
+        expect(texts.has(from.slice(2)), `${file} imports ${from} which is not a file of the build`).toBe(true)
     }
-
-    for (const url of [...client.islands['src/components/loopy.kay']!, client.entry!])
-      visit(url.slice('/_kay/'.length))
-
-    expect([...reached].some(file => texts.get(file)!.includes('function keyedRows'))).toBe(true)
   }, 120_000)
 })
 
