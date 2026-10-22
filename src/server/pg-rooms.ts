@@ -1,7 +1,7 @@
 import type { SQL } from 'bun'
 import type { Duration } from '../runtime/duration'
 import type { PgHandle } from './pg-data'
-import type { RoomStore } from './rooms'
+import type { AsyncRoomStore } from './rooms'
 import { optionMs } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { NOW, query } from './pg-sql'
@@ -24,7 +24,7 @@ interface Own {
   at: number
 }
 
-type Listener = Parameters<RoomStore['subscribe']>[0]
+type Listener = Parameters<AsyncRoomStore['subscribe']>[0]
 
 // Runs a write once the ones before it did, its failure logged: the writes of a store go to Postgres in the order they were made.
 async function chained(prior: Promise<void>, what: string, work: () => Promise<unknown>): Promise<void> {
@@ -40,8 +40,8 @@ async function chained(prior: Promise<void>, what: string, work: () => Promise<u
 
 // Presence rooms in Postgres: a message published in one replica reaches the members connected to the others within `poll`, `'250ms'` by default; a bare number throws.
 // A replica reads the members of the rooms it holds a connection in or asked `members` about, so one it asks about for the first time lists the others' members from its next poll. A replica that stops without leaving has its members dropped once it has not been heard from for 10 seconds.
-// The store keeps no room state: `rooms({ state })` over it throws, as its calls cannot wait on Postgres.
-export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomStore {
+// A room's state is a row of `kay_room_state`, changed under a lock per room so replicas updating one room take turns, and goes with the room's last member; `state` and `update` answer with promises, so `rooms({ store })` over it gives `AsyncRooms`.
+export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): AsyncRoomStore {
   const pollMs = poll === undefined ? DEFAULT_POLL : optionMs(poll, '`pgRooms` poll')
   const self = crypto.randomUUID()
   const own = new Map<string, Own>()
@@ -65,10 +65,37 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
     tail = chained(tail, what, async () => work(await pg.db()))
   }
 
+  // Like `enqueue`, but gives the work's result, or its error, to the caller: a state is read and changed after the members written before it.
+  const ordered = async <T>(work: (db: SQL) => Promise<T>): Promise<T> => {
+    const prior = tail
+    const run = (async () => {
+      await prior
+
+      return work(await pg.db())
+    })()
+
+    tail = (async () => {
+      try {
+        await run
+      }
+      catch {
+        // The caller of `run` has the error.
+      }
+    })()
+
+    return run
+  }
+
+  // The states of rooms with no member left.
+  const dropStates = async (db: SQL) => {
+    await query(db, 'DELETE FROM kay_room_state s WHERE NOT EXISTS (SELECT 1 FROM kay_room_members m WHERE m.room = s.room)')
+  }
+
   // Drops the members of replicas gone quiet and the messages past `KEPT`.
   const prune = async (db: SQL) => {
     await query(db, `DELETE FROM kay_room_members WHERE process IN (SELECT process FROM kay_room_processes WHERE seen <= ${NOW} - ${EXPIRY})`)
     await query(db, `DELETE FROM kay_room_processes WHERE seen <= ${NOW} - ${EXPIRY}`)
+    await dropStates(db)
     await query(db, `DELETE FROM kay_room_messages WHERE at <= ${NOW} - ${KEPT}`)
   }
 
@@ -211,7 +238,7 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
     }
   }
 
-  const store: RoomStore = {
+  const store: AsyncRoomStore = {
     add(room, connection, member) {
       const key = `${room}\n${connection}`
       const at = own.get(key)?.at ?? Date.now()
@@ -224,7 +251,31 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
     remove(room, connection) {
       own.delete(`${room}\n${connection}`)
       sync()
-      enqueue('removing a member from the rooms store', async db => query(db, 'DELETE FROM kay_room_members WHERE room = $1 AND connection = $2', [room, connection]))
+      enqueue('removing a member from the rooms store', async (db) => {
+        await query(db, 'DELETE FROM kay_room_members WHERE room = $1 AND connection = $2', [room, connection])
+        await dropStates(db)
+      })
+    },
+    async state(room) {
+      const [row] = await ordered(async db => query<{ state: string }>(db, 'SELECT state FROM kay_room_state WHERE room = $1', [room]))
+
+      return row?.state
+    },
+    // The transaction's advisory lock makes updates of one room wait for each other across replicas, a room with no row yet included.
+    async update(room, change) {
+      return ordered(async db => db.begin(async (tx) => {
+        await query(tx, 'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`kay_room_state\n${room}`])
+
+        const [row] = await query<{ state: string }>(tx, 'SELECT state FROM kay_room_state WHERE room = $1', [room])
+        const next = change(row?.state)
+        const [held] = await query<{ present: boolean }>(tx, `SELECT EXISTS (SELECT 1 FROM kay_room_members m JOIN kay_room_processes p ON p.process = m.process WHERE m.room = $1 AND p.seen > ${NOW} - ${EXPIRY}) AS present`, [room])
+
+        // A room no live process has a member in keeps nothing, so a room named by a client costs no row.
+        if (held?.present === true)
+          await query(tx, 'INSERT INTO kay_room_state (room, state) VALUES ($1, $2) ON CONFLICT (room) DO UPDATE SET state = excluded.state', [room, next])
+
+        return next
+      }))
     },
     members(room) {
       watched.set(room, Date.now())
@@ -274,7 +325,10 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
       own.clear()
 
       if (had)
-        enqueue('leaving the rooms store', async db => query(db, 'DELETE FROM kay_room_members WHERE process = $1', [self]))
+        enqueue('leaving the rooms store', async (db) => {
+          await query(db, 'DELETE FROM kay_room_members WHERE process = $1', [self])
+          await dropStates(db)
+        })
     },
   }
 

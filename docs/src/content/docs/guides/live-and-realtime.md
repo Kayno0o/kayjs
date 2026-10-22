@@ -353,6 +353,8 @@ games.update(room, ({ cells }) => ({ cells: [...cells, 'x'] }))
 
 The state is kept as JSON, so a `Date` comes back as text. An `update` to a room no one is in stores nothing. The state goes when the last member leaves, in every process that shares the rooms, so a late joiner always starts from the latest state while anyone is there.
 
+Over `store: pgData(db).rooms`, replicas on several machines share the state, and `state` and `update` give promises, so `await games.update(room, ...)`. The snapshot a joiner gets is sent once the state is read.
+
 ### Sending a snapshot
 
 When many changes arrive together, `coalesce` sends the room one snapshot instead of one message each.

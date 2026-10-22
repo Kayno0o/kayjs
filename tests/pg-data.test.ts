@@ -351,11 +351,60 @@ pgDescribe('pgRooms', () => {
     await closed(first!, second!)
   })
 
-  pgIt('keeps no room state, so rooms({ state }) refuses it', async () => {
+  pgIt('keeps a room state across replicas, two replicas updating one room at once losing nothing', async () => {
+    const sql = await fresh()
+    const [first, second] = handles(2).map(handle => pgRooms(handle, { poll: '20ms' }))
+    const options = { state: () => ({ count: 0 }) }
+    const one = rooms<string, string, { count: number }>({ store: first!, ...options })
+    const two = rooms<string, string, { count: number }>({ store: second!, ...options })
+    const socket = () => ({ raw: { sendText: () => undefined } })
+
+    one.join(socket(), 'lobby', 'ada')
+    two.join(socket(), 'lobby', 'bob')
+    expect(await one.state('lobby')).toEqual({ count: 0 })
+
+    const bumps = Array.from({ length: 20 }, async (_, at) => (at % 2 === 0 ? one : two).update('lobby', state => ({ count: state.count + 1 })))
+
+    await Promise.all(bumps)
+    expect(await one.state('lobby')).toEqual({ count: 20 })
+    expect(await two.state('lobby')).toEqual({ count: 20 })
+    expect(await rows(sql, 'SELECT state FROM kay_room_state')).toEqual([{ state: '{"count":20}' }])
+    await closed(first!, second!)
+  })
+
+  pgIt('sends a joiner the state, drops it with the last member, and stores none for an empty room', async () => {
+    const sql = await fresh()
+    const [handle] = handles(1)
+    const store = pgRooms(handle!, { poll: '20ms' })
+    const live = rooms<string, undefined, { count: number }>({ store, state: () => ({ count: 0 }), snapshot: state => JSON.stringify(state) })
+    const received: string[] = []
+    const ada = { raw: { sendText: (text: string) => void received.push(text) } }
+
+    expect(await live.update('empty', state => ({ count: state.count + 5 }))).toEqual({ count: 5 })
+    expect(await rows(sql, 'SELECT 1 FROM kay_room_state')).toEqual([])
+    live.join(ada, 'lobby')
+    await waitFor(() => received.length === 1, 'the snapshot')
+    expect(received).toEqual(['{"count":0}'])
+    await live.update('lobby', () => ({ count: 3 }))
+    live.leave(ada)
+    await waitFor(async () => (await rows(sql, 'SELECT 1 FROM kay_room_state')).length === 0, 'the state to go')
+    expect(await live.state('lobby')).toEqual({ count: 0 })
+    store.close()
+  })
+
+  pgIt('rejects an update whose function throws and keeps the old state', async () => {
     await fresh()
 
-    const store = pgRooms(pgHandle((await postgres()).sql))
+    const [handle] = handles(1)
+    const store = pgRooms(handle!, { poll: '20ms' })
+    const live = rooms<string, undefined, { count: number }>({ store, state: () => ({ count: 0 }) })
 
-    expect(() => rooms<string, undefined, number>({ store, state: () => 0 })).toThrow('state')
+    live.join({ raw: { sendText: () => undefined } }, 'lobby')
+    await live.update('lobby', () => ({ count: 1 }))
+    await expect(live.update('lobby', () => {
+      throw new Error('no')
+    })).rejects.toThrow('no')
+    expect(await live.state('lobby')).toEqual({ count: 1 })
+    store.close()
   })
 })

@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { TypeCompiler } from 'elysia/type-system'
 import { s } from '../src/runtime'
 import { api } from '../src/server/api'
+import type { Rooms } from '../src/server/rooms'
 import { memoryRooms, rooms, sqliteRooms } from '../src/server/rooms'
 
 interface State { round: number, scores: Record<string, number>, at?: Date }
@@ -138,7 +139,7 @@ describe('a room\'s state in memory', () => {
 
   it('lists the joiner among the members before its snapshot is made', () => {
     const seen: string[][] = []
-    const live: ReturnType<typeof rooms<Message, string, State>> = rooms<Message, string, State>({ ...options, snapshot: (state, room) => {
+    const live: Rooms<Message, string, State> = rooms<Message, string, State>({ ...options, snapshot: (state, room) => {
       seen.push(live.members(room))
 
       return { type: 'state', state }

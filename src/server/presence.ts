@@ -1,4 +1,4 @@
-import type { RoomStore } from './rooms'
+import type { RoomStoreBase } from './rooms'
 import { kayLog } from '../runtime/log'
 import { readPresenceWith } from '../runtime/presence'
 import { appStore } from './app-store'
@@ -31,12 +31,12 @@ type Recheck = (tabs: Tab[]) => void
 // The tabs in a room by the room and the tab, and the streams watching a room.
 const seats = new Map<string, Seat>()
 const watchers = new Map<string, Set<Recheck>>()
-let fallback: RoomStore | undefined
-let subscription: { store: RoomStore, stop: () => void } | undefined
+let fallback: RoomStoreBase | undefined
+let subscription: { store: RoomStoreBase, stop: () => void } | undefined
 let ticker: ReturnType<typeof setInterval> | undefined
 
 // The store of `kay.config.ts` `store.rooms`, or this process's memory.
-function roomStore(): RoomStore {
+function roomStore(): RoomStoreBase {
   return appStore()?.rooms ?? (fallback ??= memoryRooms())
 }
 

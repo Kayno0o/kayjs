@@ -2,7 +2,7 @@ import type { RateStore } from '../runtime/action'
 import type { CacheStore } from '../runtime/cache'
 import type { LiveStore } from '../runtime/live-value'
 import type { JobStore } from './queue'
-import type { RoomStore } from './rooms'
+import type { AsyncRoomStore, RoomStore } from './rooms'
 import type { SessionStore } from './session'
 import type { VitalsStore } from './vitals-store'
 import { setAppCache } from '../runtime/cache'
@@ -16,7 +16,7 @@ export interface AppStore {
   live?: LiveStore | undefined
   jobs?: JobStore | undefined
   rates?: RateStore | undefined
-  rooms?: RoomStore | undefined
+  rooms?: RoomStore | AsyncRoomStore | undefined
   vitals?: VitalsStore | undefined
 }
 

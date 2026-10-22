@@ -13,7 +13,7 @@ const MIGRATION_LOCK = 'kay_data'
 const INSUFFICIENT_PRIVILEGE = '42501'
 
 // The tables `pgData` creates besides the jobs' ones.
-const OWN_TABLES = ['kay_sessions', 'kay_cache', 'kay_events', 'kay_rates', 'kay_meta', 'kay_vitals', 'kay_room_members', 'kay_room_processes', 'kay_room_messages'] as const
+const OWN_TABLES = ['kay_sessions', 'kay_cache', 'kay_events', 'kay_rates', 'kay_meta', 'kay_vitals', 'kay_room_members', 'kay_room_processes', 'kay_room_messages', 'kay_room_state'] as const
 
 // The names of the tables `pgData` keeps its data in, the jobs' included, for a pg-orm `ignoreTables` of an app that creates them with `createDataTables`.
 export const dataTables = [...jobTables, ...OWN_TABLES] as readonly string[]
@@ -46,6 +46,7 @@ export async function createDataTables(source: PgJobsSource): Promise<void> {
       await tx`CREATE TABLE IF NOT EXISTS kay_room_processes (process text PRIMARY KEY, seen bigint NOT NULL)`
       await tx`CREATE TABLE IF NOT EXISTS kay_room_messages (id bigserial PRIMARY KEY, room text NOT NULL, text text NOT NULL, process text NOT NULL, skipped text, recipient text, at bigint NOT NULL)`
       await tx`CREATE INDEX IF NOT EXISTS kay_room_messages_at ON kay_room_messages (at)`
+      await tx`CREATE TABLE IF NOT EXISTS kay_room_state (room text PRIMARY KEY, state text NOT NULL)`
     })
   }
   finally {
@@ -94,7 +95,7 @@ export function pgHandle(db: SQL): PgHandle {
 
 // Sessions, cached values, jobs, rate counts, the members of presence rooms and the Web Vitals visitors reported in the app's Postgres, shared by every process of every replica opening it: `store: pgData(db)` in kay.config.ts, `db` a Bun `SQL`, a pg-orm `Database` or a connection URL as `pgJobs` takes.
 // The `kay_*` tables are created when missing, which takes a role that may create tables: with one that may not, `createDataTables` run by the owner makes them. Replicas hear each other's invalidations and room messages by polling, within about half a second, so nothing needs LISTEN and a pooler in front of Postgres is fine.
-// A room keeps no state on Postgres, so `rooms({ state })` over it throws: its members and messages are shared.
+// A room's state is kept there too, so `rooms({ state, store: pgData(db).rooms })` answers `state` and `update` with promises.
 export function pgData(source: PgJobsSource) {
   const db = connectionOf(source)
 

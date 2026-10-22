@@ -21,17 +21,13 @@ export interface RoomRecipients {
 
 type RoomListener = (room: string, text: string, recipients: RoomRecipients) => void
 
-// Where members and messages are kept, for one process or every process of the machine.
-export interface RoomStore {
+// Where members and messages are kept, for one process or every process of the machine; `RoomStore` keeps a room's state at once, `AsyncRoomStore` through promises.
+export interface RoomStoreBase {
   // Records a connection of this process in a room, with its member as JSON, or drops it.
   add: (room: string, connection: string, member: string) => void
   remove: (room: string, connection: string) => void
   // The members of a room, as JSON, in every process sharing the store.
   members: (room: string) => string[]
-  // The state of a room as JSON, in every process sharing the store; undefined while it holds none. A store without it cannot keep a room's state.
-  state?: (room: string) => string | undefined
-  // Replaces a room's state with what `change` makes of the current one, as JSON, one change at a time in every process sharing the store, and gives what it stored. A room's state goes with its last member.
-  update?: (room: string, change: (current: string | undefined) => string) => string
   // Hands a message to the listeners of every process sharing the store, this one's included.
   publish: (room: string, text: string, recipients: RoomRecipients) => void
   // Called with each message published from then on; returns what stops it.
@@ -40,9 +36,22 @@ export interface RoomStore {
   close: () => void
 }
 
-export interface RoomsOptions<Message = never, State = undefined> {
-  // `sqliteRooms(path)` reaches every process of the machine; one process's memory by default.
-  store?: RoomStore | undefined
+export interface RoomStore extends RoomStoreBase {
+  // The state of a room as JSON, in every process sharing the store; undefined while it holds none. A store without it cannot keep a room's state.
+  state?: (room: string) => string | undefined
+  // Replaces a room's state with what `change` makes of the current one, as JSON, one change at a time in every process sharing the store, and gives what it stored. A room's state goes with its last member.
+  update?: (room: string, change: (current: string | undefined) => string) => string
+}
+
+// A store whose room state waits on a database, such as `pgData(db).rooms`: `rooms({ store })` over it answers `state` and `update` with promises.
+export interface AsyncRoomStore extends RoomStoreBase {
+  state?: (room: string) => Promise<string | undefined>
+  update?: (room: string, change: (current: string | undefined) => string) => Promise<string>
+}
+
+export interface RoomsOptions<Message = never, State = undefined, Store = RoomStore> {
+  // `sqliteRooms(path)` reaches every process of the machine; one process's memory by default. `pgData(db).rooms` does across replicas, and makes `state` and `update` answer with promises.
+  store?: Store | undefined
   // What a room's state is before any `update`, called each time one is read or changed while the room has none. The state is kept as JSON, whole, so a `Date` in it comes back as text.
   state?: (() => State) | undefined
   // The message a connection is sent, alone, as it joins, from the room's state as it then stands: a late joiner starts where the others are.
@@ -54,7 +63,7 @@ export interface CoalesceOptions {
   wait?: Duration | undefined
 }
 
-export interface Rooms<Message, Member = undefined, State = undefined> {
+export interface RoomsBase<Message, Member = undefined> {
   // Puts a connection in a room, with what the room lists it as; joining again changes its member.
   join: (ws: RoomConnection, room: string, ...member: undefined extends Member ? [member?: Member] : [member: Member]) => void
   // Takes a connection out of a room, or out of every room it is in, as `close` does.
@@ -67,14 +76,23 @@ export interface Rooms<Message, Member = undefined, State = undefined> {
   response: ReturnType<typeof t.Unsafe<Message>>
   // The members of a room, in every process sharing the store; a room no one is in is gone, and lists none.
   members: (room: string) => Member[]
+  // Sends a message to everyone in a room, but `except` when given, such as the connection it came from, or only to the connections joined as the member `to` names, such as a game's host.
+  publish: (room: string, message: Message, options?: { except?: RoomConnection, to?: Member }) => void
+  // A function sending a room one snapshot, read when it goes, however many times it is called within `wait`: a burst of changes goes out as one message. `read` may answer with a promise, as over an async store.
+  coalesce: (read: (room: string) => Message | Promise<Message>, options?: CoalesceOptions) => (room: string) => void
+}
+
+export interface Rooms<Message, Member = undefined, State = undefined> extends RoomsBase<Message, Member> {
   // The room's state, the `state` option's initial one while no `update` made another. A room's state is gone when its last member leaves.
   state: (room: string) => State
   // Replaces the room's state with what `change` returns for the one it has, one change at a time in every process sharing the store, and gives the new one. `change` runs inside the store's turn: it must be quick and read nothing but its argument. Nothing is sent: publish the change, or its snapshot, to the members.
   update: (room: string, change: (state: State) => State) => State
-  // Sends a message to everyone in a room, but `except` when given, such as the connection it came from, or only to the connections joined as the member `to` names, such as a game's host.
-  publish: (room: string, message: Message, options?: { except?: RoomConnection, to?: Member }) => void
-  // A function sending a room one snapshot, read when it goes, however many times it is called within `wait`: a burst of changes goes out as one message.
-  coalesce: (read: (room: string) => Message, options?: CoalesceOptions) => (room: string) => void
+}
+
+// The rooms over an `AsyncRoomStore`: `state` and `update` resolve once the store answered.
+export interface AsyncRooms<Message, Member = undefined, State = undefined> extends RoomsBase<Message, Member> {
+  state: (room: string) => Promise<State>
+  update: (room: string, change: (state: State) => State) => Promise<State>
 }
 
 const DEFAULT_WAIT = '50ms'
@@ -89,8 +107,10 @@ const UNWATCHED_POLL_MS = optionMs('25ms', '')
 const KEPT = 30_000
 
 // Rooms of websocket connections, typed by what they send: join one in `open`, leave in `close`, and publish to it from anywhere.
-export function rooms<Message, Member = undefined, State = undefined>(...[options = {}]: undefined extends State ? [options?: RoomsOptions<Message, State>] : [options: RoomsOptions<Message, State> & { state: () => State }]): Rooms<Message, Member, State> {
-  const store = options.store ?? memoryRooms()
+export function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options?: RoomsOptions<Message, State>] : [options: RoomsOptions<Message, State> & { state: () => State }]): Rooms<Message, Member, State>
+export function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options: RoomsOptions<Message, State, AsyncRoomStore> & { store: AsyncRoomStore }] : [options: RoomsOptions<Message, State, AsyncRoomStore> & { store: AsyncRoomStore, state: () => State }]): AsyncRooms<Message, Member, State>
+export function rooms<Message, Member, State>(...[options = {}]: [options?: RoomsOptions<Message, State, RoomStore | AsyncRoomStore>]): RoomsBase<Message, Member> & { state: (room: string) => State | Promise<State>, update: (room: string, change: (state: State) => State) => State | Promise<State> } {
+  const store: RoomStore | AsyncRoomStore = options.store ?? memoryRooms()
 
   if ((options.state !== undefined || options.snapshot !== undefined) && (store.state === undefined || store.update === undefined))
     throw new Error('kay: rooms({ state }) needs a store that keeps a room\'s state, and this one has no `state` and `update`')
@@ -101,11 +121,7 @@ export function rooms<Message, Member = undefined, State = undefined>(...[option
 
     return (text === undefined ? undefined : JSON.parse(text)) as State
   }
-  const readState = (room: string): State => {
-    const kept = store.state?.(room)
-
-    return kept === undefined ? initial() : JSON.parse(kept) as State
-  }
+  const readState = (room: string) => after(store.state!(room), kept => (kept === undefined ? initial() : JSON.parse(kept) as State))
   // The connections of this process in each room, by their id, with their member as JSON, or empty without one.
   const local = new Map<string, Map<string, { raw: RoomConnection['raw'], member: string }>>()
   const ids = new WeakMap<object, string>()
@@ -162,8 +178,13 @@ export function rooms<Message, Member = undefined, State = undefined>(...[option
       store.add(room, id, written)
 
       // The member is listed first, so a change made while it joins reaches it as the snapshot or as what is published after.
-      if (options.snapshot)
-        ws.raw.sendText(messageText(options.snapshot(readState(room), room)))
+      if (options.snapshot) {
+        const send = (state: State) => ws.raw.sendText(messageText(options.snapshot!(state, room)))
+        const sent = after(readState(room), send)
+
+        if (sent instanceof Promise)
+          void settled('sending a joiner its snapshot', sent)
+      }
     },
     leave(ws, room) {
       for (const name of room === undefined ? [...joined.get(ws.raw) ?? []] : [room])
@@ -172,14 +193,14 @@ export function rooms<Message, Member = undefined, State = undefined>(...[option
     roomsOf: ws => [...joined.get(ws.raw) ?? []],
     members: room => store.members(room).map(member => (member === NO_MEMBER ? undefined : JSON.parse(member)) as Member),
     state: readState,
-    update: (room, change) => JSON.parse(store.update!(room, (kept) => {
+    update: (room, change) => after(store.update!(room, (kept) => {
       const next = JSON.stringify(change(kept === undefined ? initial() : JSON.parse(kept) as State))
 
       if (next === undefined)
         throw new TypeError('kay: a room\'s state must be JSON, and `update` returned a value with none')
 
       return next
-    })) as State,
+    }), text => JSON.parse(text) as State),
     publish(room, message, { except, to } = {}) {
       store.publish(room, messageText(message), { ...except && { except: idOf(except.raw) }, ...to !== undefined && { to: JSON.stringify(to) } })
     },
@@ -196,10 +217,33 @@ export function rooms<Message, Member = undefined, State = undefined>(...[option
         waiting.add(room)
         setTimeout(guarded('sending a room its snapshot', () => {
           waiting.delete(room)
-          store.publish(room, messageText(read(room)), {})
+
+          const sent = after(read(room), message => store.publish(room, messageText(message), {}))
+
+          if (sent instanceof Promise)
+            void settled('sending a room its snapshot', sent)
         }), delay)
       }
     },
+  }
+}
+
+// What `next` makes of a value, at once for a value and once it resolved for a promise, so a sync store stays sync.
+function after<T, R>(value: T | Promise<T>, next: (value: T) => R): R | Promise<R> {
+  if (value instanceof Promise) {
+    return (async () => next(await value))()
+  }
+
+  return next(value)
+}
+
+// Awaits a promise nobody else holds, its error logged.
+async function settled(what: string, work: Promise<unknown>): Promise<void> {
+  try {
+    await work
+  }
+  catch (error) {
+    kayLog('error', `${what} failed`, error)
   }
 }
 
