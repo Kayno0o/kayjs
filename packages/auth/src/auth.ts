@@ -20,13 +20,14 @@ import type { AcceptResult, CreateOrganizationResult, Invitation, InviteResult, 
 import type { AuthFeatures, AuthPagesConfig, ProfileFieldView, ProfileProblem } from './pages'
 import type { Passkey, PasskeyOptionsResult, PasskeySignInResult, RegisterPasskeyResult } from './passkeys'
 import type { CreateUserInput, CreateUserResult, PasswordSignInInput, PasswordSignInResult, RegisterInput, RegisterResult } from './password'
+import type { Proof, ProofFailure } from './proof'
 import type { RoleHierarchy } from './roles'
 import type { CredentialRules, PasswordProblem } from './rules'
 import type { UserSession } from './sessions'
 import type { SignInOptions } from './signInOptions'
 import type { RequestState } from './state'
 import type { AuthStore, SessionRecord, UserRecord } from './store'
-import type { Proof, ProofFailure, TwoFactorResult, TwoFactorSetup } from './twoFactor'
+import type { TwoFactorResult, TwoFactorSetup } from './twoFactor'
 import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
 import { configError, nameUser, overHttps, READ_METHODS, requestOfContext, stoppers, underKayDev } from 'kay/library'
@@ -1336,6 +1337,9 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       return redirect(typeof started === 'string' ? started : failed(started.error, text(query.redirect)), 303)
     })
     .get(`${core.prefix}/:provider/callback` as `${Prefix}/:provider/callback`, async ({ auth, params, query, redirect }) => {
+      if (!core.oauth.has(params.provider))
+        return redirect(failed('oauth'), 303)
+
       const outcome = await (await load.flow()).finishOAuth(auth[STATE], params.provider, { code: text(query.code), state: text(query.state), error: text(query.error), user: text(query.user) })
 
       return redirect('error' in outcome ? failed(outcome.error, outcome.redirect) : outcome.redirect, 303)

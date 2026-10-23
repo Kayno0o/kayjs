@@ -6,6 +6,7 @@ import type { Invitation, Membership } from './organizations'
 import type { Passkey } from './passkeys'
 import type { UserSession } from './sessions'
 import type { RequestState } from './state'
+import { listTokens } from './bearer'
 import { linkedUser } from './core'
 import { impersonatorOf } from './events'
 import { spend } from './limits'
@@ -66,7 +67,7 @@ export async function exportData(state: RequestState): Promise<{ ok: true, data:
       identities: (await core.store.identities.listByUser(record.id)).map(identity => ({ provider: identity.provider, providerId: identity.providerId, createdAt: identity.createdAt })),
       sessions: await listSessions(state),
       passkeys: await (await import('./passkeys')).listPasskeys(state),
-      tokens: await (await import('./bearer')).listTokens(state),
+      tokens: await listTokens(state),
       recoveryCodesLeft: await core.store.recoveryCodes.count(record.id),
       grants: core.store.oauth ? await (await import('./authorize/grants')).approvedClients(state) : [],
       ban: record.bannedAt === null ? null : { at: record.bannedAt, until: record.bannedUntil, reason: record.banReason },

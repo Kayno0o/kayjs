@@ -1,7 +1,7 @@
+// Drives an app that uses one feature of kayjs-auth, or none, then prints the node_modules packages and the kayjs-auth modules that were loaded: `bun loaded.ts <scenario>`.
 import { discordProvider } from '../../src/oauth/providers'
 import { authPages } from '../../src/pages'
 import { testApp } from '../helpers/app'
-// Drives an app that uses one feature of kayjs-auth, or none, then prints the node_modules packages and the kayjs-auth modules that were loaded: `bun loaded.ts <scenario>`.
 import '../../src/index'
 
 const PASSWORD = 'correct horse battery'
@@ -24,6 +24,13 @@ const scenarios: Record<string, () => Promise<void>> = {
 
     await visitor.call('register', { email: 'ada@example.com', password: PASSWORD })
     await visitor.json('/me')
+  },
+  // The default app with the prebuilt pages, probed on a provider route it does not have.
+  async pages() {
+    const visitor = testApp({ pages: authPages() }).browser()
+
+    await visitor.fetch('/auth/nope/callback')
+    await visitor.fetch('/auth/nope')
   },
   async passkeys() {
     const visitor = await signedIn(testApp({ url: SITE }))

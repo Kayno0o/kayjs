@@ -1,5 +1,5 @@
 import type { Profile, User } from '../src/auth'
-import type { Proof } from '../src/twoFactor'
+import type { Proof } from '../src/proof'
 import { afterEach, describe, expect, setSystemTime, spyOn, test } from 'bun:test'
 import { discordProvider, githubProvider } from '../src/oauth/providers'
 import { totpCode, totpStep } from '../src/totp'

@@ -14,11 +14,7 @@ const FEATURES = {
   admin: { modules: ['admin.ts'], packages: [] },
   oauth: { modules: ['oauth/flow.ts'], packages: [] },
   oauthServer: { modules: ['authorize/clients.ts', 'authorize/grants.ts', 'authorize/register.ts', 'authorize/request.ts', 'authorize/token.ts'], packages: [] },
-  // The mailed links and codes, the account page's changes and the data export, which sit behind a feature's methods too.
-  email: { modules: ['email.ts'], packages: [] },
-  account: { modules: ['account.ts'], packages: [] },
   erase: { modules: ['erase.ts'], packages: [] },
-  export: { modules: ['export.ts'], packages: [] },
 } as const
 
 type Feature = keyof typeof FEATURES
@@ -41,6 +37,7 @@ function loadsOf(result: Loaded, feature: Feature): boolean {
 // A scenario drives one feature of an app and no other.
 const SCENARIOS: Record<string, { uses: Feature[] }> = {
   minimal: { uses: ['password'] },
+  pages: { uses: [] },
   passkeys: { uses: ['password', 'passkeys'] },
   twoFactor: { uses: ['password', 'twoFactor'] },
   organizations: { uses: ['password', 'organizations'] },

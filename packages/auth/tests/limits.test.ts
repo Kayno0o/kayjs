@@ -1,9 +1,9 @@
 import type { Duration } from 'kay'
 import type { LimitsOption } from '../src/limits'
 import { describe, expect, test } from 'bun:test'
+import { sealTotpSecret } from '../src/keys'
 import { DEFAULT_LIMITS } from '../src/limits'
 import { base32Encode, totpCode, totpStep } from '../src/totp'
-import { sealTotpSecret } from '../src/twoFactor'
 import { SECRET, testApp, userRecord } from './helpers/app'
 import { mailbox } from './helpers/mail'
 

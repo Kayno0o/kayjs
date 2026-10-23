@@ -20,9 +20,6 @@ const RECOVERY_CODE_LENGTH = 15
 const NOT_CODE_CHARACTERS = /[^a-z0-9]/g
 const EVERY_FIVE = /.{5}(?=.)/g
 
-export { sealTotpSecret } from './keys'
-export type { Challenge, Proof, ProofFailure } from './proof'
-
 export interface TwoFactorSetup {
   // Base32, for typing into an authenticator by hand.
   secret: string

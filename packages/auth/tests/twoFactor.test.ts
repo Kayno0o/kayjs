@@ -1,7 +1,7 @@
 import type { AuthMailMessage as Mail } from '../src/mail'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
+import { sealTotpSecret } from '../src/keys'
 import { base32Decode, base32Encode, otpauthUri, totpCode, totpStep, verifyTotp } from '../src/totp'
-import { sealTotpSecret } from '../src/twoFactor'
 import { SECRET, testApp } from './helpers/app'
 
 const PASSWORD = 'correct horse battery'

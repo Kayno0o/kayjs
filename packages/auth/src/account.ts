@@ -14,6 +14,11 @@ import { endOtherSessions } from './sessions'
 import { hasWayIn, putBack } from './wayIn'
 
 // Sets the signed-in user's password, or a first one, and ends their other sessions.
+// Nothing to put back when no admin feature stepped aside.
+const NO_ASIDE = { restore: async () => {
+  await Promise.resolve()
+} }
+
 export async function changePassword(state: RequestState, proof: Proof, password: string): Promise<{ ok: true } | { ok: false, error: ProofFailure } | { ok: false, errors: { password: PasswordProblem | 'breached' } }> {
   const problem = await newPasswordProblem(state.core, password)
 
@@ -135,9 +140,7 @@ export async function deleteAccount(state: RequestState, proof: Proof, signOut: 
 
   const aside = admins
     ? await admins.stepAside(state, proved.record)
-    : { restore: async () => {
-      await Promise.resolve()
-    } }
+    : NO_ASIDE
 
   if (!aside)
     return { ok: false, error: 'last-admin' }

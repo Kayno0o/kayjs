@@ -1,7 +1,7 @@
 import type { LimitsOption } from '../src/limits'
 import { describe, expect, test } from 'bun:test'
+import { sealTotpSecret } from '../src/keys'
 import { base32Encode } from '../src/totp'
-import { sealTotpSecret } from '../src/twoFactor'
 import { SECRET, testApp } from './helpers/app'
 import { mailbox } from './helpers/mail'
 

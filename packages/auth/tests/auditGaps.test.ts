@@ -1,10 +1,10 @@
 import type { LimitsOption } from '../src/limits'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { hcaptcha, turnstile } from '../src/captcha'
+import { sealTotpSecret } from '../src/keys'
 import { createOAuthClient } from '../src/oauth/client'
 import { discordProvider, githubProvider, oidcProvider } from '../src/oauth/providers'
 import { base32Encode } from '../src/totp'
-import { sealTotpSecret } from '../src/twoFactor'
 import { SECRET, testApp, userRecord } from './helpers/app'
 import { mailbox } from './helpers/mail'
 

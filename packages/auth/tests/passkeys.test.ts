@@ -1,5 +1,5 @@
 import type { AuthEventInfo } from '../src/events'
-import type { Proof } from '../src/twoFactor'
+import type { Proof } from '../src/proof'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { totpCode, totpStep } from '../src/totp'
 import { testApp, userRecord } from './helpers/app'
