@@ -8,6 +8,7 @@ import { setLiveStore } from '../src/runtime/live-value'
 import { createDataTables, pages, pgData } from '../src/server'
 import { setupStore } from '../src/server/app-store'
 import { pgHandle } from '../src/server/pg-data'
+import { disposeOwned } from '../src/server/reload'
 import { pgDescribe, pgIt, url } from './job-stores'
 import { scratchDir } from './scratch'
 
@@ -58,8 +59,41 @@ async function kay(root: string, database: string, ...args: string[]): Promise<{
   return { code, text: `${out}${err}` }
 }
 
+// Records who ran DDL in the database, so a kay table that shows up in a test that expects none names the process that connected and created it.
+const DDL_LOG = [
+  'CREATE TABLE zz_ddl_log (at timestamptz DEFAULT now(), pid int, application_name text, client_port int, tag text, object text)',
+  'CREATE FUNCTION zz_log_ddl() RETURNS event_trigger LANGUAGE plpgsql AS \'BEGIN INSERT INTO zz_ddl_log (pid, application_name, client_port, tag, object) SELECT pg_backend_pid(), current_setting(\'\'application_name\'\'), inet_client_port(), command_tag, object_identity FROM pg_event_trigger_ddl_commands(); END\'',
+  'CREATE EVENT TRIGGER zz_log_ddl ON ddl_command_end WHEN TAG IN (\'CREATE TABLE\') EXECUTE FUNCTION zz_log_ddl()',
+]
+
+// Opens a pgData store the way an app's module does, owned by this file, so `closeStores` ends its pool and the polling of its cache and rooms.
+function openStore(database: string) {
+  process.env.KAY_DEV_CODE = '1'
+
+  try {
+    return pgData(database)
+  }
+  finally {
+    delete process.env.KAY_DEV_CODE
+  }
+}
+
+async function closeStores(): Promise<void> {
+  await disposeOwned(new Set([import.meta.path]))
+}
+
+// The kay tables found in a database that should hold none, with the connections that created them.
+async function noKayTable(tables: () => Promise<string[]>, ddl: () => Promise<string>): Promise<void> {
+  const found = await tables()
+
+  if (found.length > 0)
+    console.error(`kay tables found: ${found.join(', ')}\nthe DDL run there, by connection (this test file is pid ${process.pid}):\n${await ddl()}`)
+
+  expect(found).toEqual([])
+}
+
 // A database of its own, dropped afterwards, and the kay tables it holds.
-async function withDatabase(run: (database: string, tables: () => Promise<string[]>) => Promise<void>): Promise<void> {
+async function withDatabase(run: (database: string, tables: () => Promise<string[]>, ddl: () => Promise<string>) => Promise<void>): Promise<void> {
   const name = `kay_live_setup_${process.pid}_${++databases}`
   const admin = new SQL(Object.assign(new URL(url!.href), { pathname: '/postgres' }).href)
   const address = Object.assign(new URL(url!.href), { pathname: `/${name}` }).href
@@ -70,9 +104,12 @@ async function withDatabase(run: (database: string, tables: () => Promise<string
   const sql = new SQL(address, { max: 1 })
 
   try {
-    await run(address, async () => (await sql.unsafe<{ tablename: string }[]>('SELECT tablename FROM pg_tables WHERE tablename LIKE \'kay\\_%\'')).map(row => row.tablename))
+    for (const statement of DDL_LOG)
+      await sql.unsafe(statement)
+    await run(address, async () => (await sql.unsafe<{ tablename: string }[]>('SELECT tablename FROM pg_tables WHERE tablename LIKE \'kay\\_%\'')).map(row => row.tablename), async () => JSON.stringify(await sql.unsafe('SELECT * FROM zz_ddl_log ORDER BY at'), null, 1))
   }
   finally {
+    await closeStores()
     await sql.close()
     await admin.unsafe(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`)
     await admin.close()
@@ -94,21 +131,21 @@ describe('a build or a check with a pgData store', () => {
   }, 60_000)
 
   pgIt('creates no kay table in a static build', async () => {
-    await withDatabase(async (database, tables) => {
+    await withDatabase(async (database, tables, ddl) => {
       const { code, text } = await kay(await project(), database, 'build', '--static', '--no-check')
 
       expect(code, text).toBe(0)
-      expect(await tables()).toEqual([])
+      await noKayTable(tables, ddl)
     })
   }, 60_000)
 
   pgIt('creates no kay table in kay check', async () => {
-    await withDatabase(async (database, tables) => {
+    await withDatabase(async (database, tables, ddl) => {
       const { code, text } = await kay(await project(), database, 'check')
 
       expect(code, text).toBe(0)
       expect(text).not.toContain('ECONNREFUSED')
-      expect(await tables()).toEqual([])
+      await noKayTable(tables, ddl)
     })
   }, 60_000)
 
@@ -167,7 +204,7 @@ pgDescribe('a server starting against Postgres', () => {
     await withDatabase(async (database, tables) => {
       const root = await project()
 
-      await pages({ root, routes: join(root, 'src/routes'), prebuilt: false, security: false, store: pgData(database) })
+      await pages({ root, routes: join(root, 'src/routes'), prebuilt: false, security: false, store: openStore(database) })
       expect(await tables()).toContain('kay_live')
     })
   }, 60_000)
@@ -210,7 +247,7 @@ pgDescribe('a pgData role that may not alter tables', () => {
       await Bun.write(join(first, 'package.json'), JSON.stringify({ name: 'shop' }))
       await Bun.write(join(second, 'package.json'), JSON.stringify({ name: 'blog' }))
 
-      const boot = async (root: string) => pages({ root, routes: join(root, 'src/routes'), prebuilt: false, security: false, store: pgData(database) })
+      const boot = async (root: string) => pages({ root, routes: join(root, 'src/routes'), prebuilt: false, security: false, store: openStore(database) })
 
       await boot(first)
       await boot(first)

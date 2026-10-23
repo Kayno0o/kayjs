@@ -867,26 +867,39 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
   })
 
   it('posts a form without a reload, pending meanwhile, and shows what the action answered', async () => {
-    const posted = page.waitForResponse('/_kay/action/*')
+    // A page of its own on the second page, which holds the form, so the test runs alone as well as after the swap one.
+    const own = await open('/')
 
-    await page.fill('input[name="title"]', 'abcd')
-    await page.click('form button')
-    await page.waitFor('form[aria-busy="true"]')
-    // Naming its page, as a `Referer` the app's `referrer-policy` cuts would not.
-    expect((await posted).requestHeaders['x-kay-page']).toBe(await page.path())
-    // On a loaded CI host the post and the swap showing its answer can outlast the default wait.
-    await page.waitFor('p.done', { text: 'Added abcd', timeout: '20000ms' })
+    try {
+      await own.click('a.second')
+      await own.waitFor('h1', { text: 'Second' })
+      await own.evaluate(() => {
+        (window as { kayAlive?: boolean }).kayAlive = true
+      })
 
-    expect(await page.count('form[aria-busy]')).toBe(0)
-    expect(await sameDocument()).toBe(true)
+      const posted = own.waitForResponse('/_kay/action/*')
 
-    await page.fill('input[name="title"]', 'taken')
-    await page.click('form button')
-    await page.waitFor('p.error', { text: 'Already taken', timeout: '20000ms' })
+      await own.fill('input[name="title"]', 'abcd')
+      await own.click('form button')
+      await own.waitFor('form[aria-busy="true"]')
+      // Naming its page, as a `Referer` the app's `referrer-policy` cuts would not.
+      expect((await posted).requestHeaders['x-kay-page']).toBe(await own.path())
+      // On a loaded CI host the post and the swap showing its answer can outlast the default wait.
+      await own.waitFor('p.done', { text: 'Added abcd', timeout: '20000ms' })
 
-    expect(await page.value('input[name="title"]')).toBe('taken')
-    expect(await sameDocument()).toBe(true)
-    expect(await page.text('button.player')).toBe('Played 3')
+      expect(await own.count('form[aria-busy]')).toBe(0)
+      expect(await sameDocument(own)).toBe(true)
+
+      await own.fill('input[name="title"]', 'taken')
+      await own.click('form button')
+      await own.waitFor('p.error', { text: 'Already taken', timeout: '20000ms' })
+
+      expect(await own.value('input[name="title"]')).toBe('taken')
+      expect(await sameDocument(own)).toBe(true)
+    }
+    finally {
+      own.close()
+    }
     // Above the sum of its waits (two of 20 s, the rest 5 s each), so a hang fails on the wait that names what it waited for.
   }, 60_000)
 
