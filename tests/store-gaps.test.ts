@@ -194,10 +194,10 @@ describe('a listener that throws', () => {
 
     setLogSink(() => undefined)
     store.set('seed', '"s"', Date.now() + 60_000)
-    store.subscribe(() => {
+    store.subscribe?.(() => {
       throw new Error('listener failed')
     })
-    store.subscribe(message => void heard.push(message))
+    store.subscribe?.(message => void heard.push(message))
 
     // Another process's invalidation, written straight into the file.
     const other = new Database(path)
