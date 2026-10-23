@@ -124,11 +124,11 @@ function declaredProps(checker: ts.TypeChecker, source: ts.SourceFile, withVaria
     return { ...prop, type: shown.length === 1 ? unwrap(shown[0]!) : shown.join(' | ') }
   })
 
-  return withVariants ? [...listed, ...variantsOf(source, defaults).filter(variant => !props.has(variant.name))] : listed
+  return withVariants ? [...variantsOf(source, defaults).filter(variant => !props.has(variant.name)), ...listed] : listed
 }
 
 // The variants of the component's recipe as props, declared there once: each value it names, the default it destructures or else the recipe's own, and the comment above the variant.
-export function variantsOf(source: ts.SourceFile, defaults = new Map<string, string>()): Prop[] {
+function variantsOf(source: ts.SourceFile, defaults = new Map<string, string>()): Prop[] {
   const config = recipeConfig(source)
   const variants = config === undefined ? undefined : objectOf(config, 'variants')
 

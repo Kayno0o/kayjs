@@ -6,7 +6,7 @@ import { controlledCheckbox } from './controlled-checkbox'
 // The track reads the input before it, named so a toggle inside another peer is left alone.
 const look = recipe({
   parts: {
-    root: 'kui-toggle relative inline-flex cursor-pointer items-center gap-2 has-[input:disabled]:cursor-not-allowed has-[input:disabled]:opacity-50 has-[input[aria-busy=true]]:cursor-progress',
+    root: 'kui-toggle relative inline-flex cursor-pointer items-center gap-2 has-[input:disabled]:opacity-50 has-[input[aria-busy=true]]:cursor-progress has-[input:disabled:not([aria-busy=true])]:cursor-not-allowed',
     input: 'peer/toggle absolute size-0 opacity-0',
     track: 'relative inline-flex h-5 w-9 shrink-0 items-center rounded-kui-md border-solid border-(length:--kui-border-width) border-kui-field-border bg-kui-surface0 transition-colors before:block before:size-3.5 before:translate-x-0.5 before:rounded-kui-sm before:bg-kui-subtext0 before:transition-transform before:content-[""] peer-checked/toggle:border-kui-accent peer-checked/toggle:bg-kui-accent peer-checked/toggle:before:translate-x-4 peer-checked/toggle:before:bg-kui-on-accent peer-focus-visible/toggle:outline-2 peer-focus-visible/toggle:outline-offset-2 peer-focus-visible/toggle:outline-kui-accent',
     label: 'text-sm text-kui-text',

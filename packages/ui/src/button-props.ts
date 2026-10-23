@@ -2,7 +2,7 @@ import type { JSX } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
 
-// Repeated in button.kay, which the docs read the props of: a prop is listed from the file declaring it.
+// What BusyButton takes, which has no recipe: `variant`, `tone` and `size` are Button's recipe variants, repeated here for it.
 export interface Look {
   // The form: `solid` is the framed button, `ghost` has no frame until hovered and `inline` reads as a link.
   variant?: 'solid' | 'ghost' | 'inline' | undefined
