@@ -465,7 +465,7 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   const linted = [...checking ? [...pageSeoLints(config, rendered, exported), ...siteSeoLints(config, rendered, others, { configFile, configSource, exported, unseen: hasUnseenPages(routes, rendered, others, exported, paths.routes), skipConfigChains: true }), ...unkeptPageLints(config, [...stops.values()]), ...pageStructureLints(config, rendered)] : [], ...budgetLints(config.budget, config.lints, sizes, routes, client.report)]
 
   // Remote originals are kept between builds, revalidated as the image route does.
-  const remote = remoteImages(cacheDir(root, 'remote'), remotePatterns(config.images?.remote), undefined, undefined, remoteLimits(config.images))
+  const remote = remoteImages(cacheDir(root, 'remote'), await remotePatterns(config.images?.remote), undefined, undefined, remoteLimits(config.images))
 
   await writeImageVariants(client.dir, webpQuality(config.images), cacheDir(root, 'variants'), { avif: exported ? undefined : avifQuality(config.images), onImage: imageProgress(report) })
   report({ step: 'writing images, cards and favicons' })

@@ -249,7 +249,7 @@ function serveDevRoutes(app: App, root: string, client: ClientBuild, mode: Mode,
 }
 
 // The paths the config names resolve where the server runs, and development serves WebP, so a page's first load does not wait on AVIF encoding.
-function imageRouteOf({ root, config: options, mode }: Project<PagesOptions>, { source, client, imageCache }: PageSetup, security: Record<string, string> | undefined, actions: ActionOptions): ImageRouteOptions {
+async function imageRouteOf({ root, config: options, mode }: Project<PagesOptions>, { source, client, imageCache }: PageSetup, security: Record<string, string> | undefined, actions: ActionOptions): Promise<ImageRouteOptions> {
   const lookup = options.images?.resolve
   const runtimeRoot = source.runtimeRoot(root)
 
@@ -261,7 +261,7 @@ function imageRouteOf({ root, config: options, mode }: Project<PagesOptions>, { 
     avif: mode.dev ? undefined : avifQuality(options.images),
     aspects: options.images?.aspects,
     saveData: options.saveData,
-    remote: remoteImages(join(imageCache, 'remote'), remotePatterns(options.images?.remote), imageCache, undefined, remoteLimits(options.images)),
+    remote: remoteImages(join(imageCache, 'remote'), await remotePatterns(options.images?.remote), imageCache, undefined, remoteLimits(options.images)),
     security,
     resolve: lookup && { find: async (src: string, ctx: GuardContext) => {
       const path = await lookup(src, ctx)
@@ -620,7 +620,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     serveDrafts(app, collections)
   }
 
-  const imageRoute = imageRouteOf(project, setup, security, actionOptions)
+  const imageRoute = await imageRouteOf(project, setup, security, actionOptions)
 
   serveFiles(app, security)
   serveImages(app, imageRoute)

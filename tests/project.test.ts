@@ -74,7 +74,7 @@ describe('setupPages', () => {
     }
     finally {
       setSite(undefined)
-      applyImageConfig(undefined)
+      await applyImageConfig(undefined)
       setContentMode({ dev: false, prebuilt: false })
       await rm(scratch, { recursive: true, force: true })
     }

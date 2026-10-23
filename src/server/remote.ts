@@ -6,7 +6,6 @@ import { JSON_FILE, writeAtomically } from '../build/files'
 import { ipVersion, isPublicAddress, pinnedLookup, PrivateAddressError, resolveHost } from './address'
 import { FETCH_TIMEOUT_MS, MAX_REMOTE_BYTES } from './config-limits'
 import { overLimit } from './protection'
-import { isPublicSuffix } from './public-suffix'
 
 export type { Resolver } from './address'
 
@@ -59,7 +58,10 @@ const MINUTE_MS = 60_000
 const DOWNLOADS = 'kay:remote-images'
 
 // `images.remote`, read once as the server boots, each entry refused with what is wrong with it.
-export function remotePatterns(entries: readonly string[] = []): RemotePattern[] {
+// The Public Suffix List, about 59 KB, is loaded only when an entry holds a wildcard.
+export async function remotePatterns(entries: readonly string[] = []): Promise<RemotePattern[]> {
+  const { isPublicSuffix } = entries.some(entry => PATTERN.exec(entry)?.[2] !== undefined) ? await import('./public-suffix') : { isPublicSuffix: () => false }
+
   return entries.map((entry) => {
     const match = PATTERN.exec(entry)
 

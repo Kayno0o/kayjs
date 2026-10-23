@@ -130,7 +130,7 @@ describe('remote images and private addresses', () => {
   let dir: string
 
   async function download(src: string, entries: string[] = [`${origin}/photos/`, 'https://*.photos.test']) {
-    return remoteImages(join(dir, `remote-${Bun.hash(src)}`), remotePatterns(entries), undefined, undefined, undefined, async (name) => {
+    return remoteImages(join(dir, `remote-${Bun.hash(src)}`), await remotePatterns(entries), undefined, undefined, undefined, async (name) => {
       asked.push(name)
 
       const address = resolved.get(name)
@@ -173,7 +173,7 @@ describe('remote images and private addresses', () => {
   it('refuses a name that resolves to a public address and a private one together', async () => {
     resolved.set('both.photos.test', '93.184.216.34')
 
-    const mixed = remoteImages(join(dir, 'mixed'), remotePatterns(['https://*.photos.test']), undefined, undefined, undefined, async () => [{ address: '93.184.216.34', family: 4 }, { address: '10.0.0.1', family: 4 }])
+    const mixed = remoteImages(join(dir, 'mixed'), await remotePatterns(['https://*.photos.test']), undefined, undefined, undefined, async () => [{ address: '93.184.216.34', family: 4 }, { address: '10.0.0.1', family: 4 }])
 
     expect(await mixed('https://both.photos.test/a.png')).toEqual({ status: 502, message: 'The host is at an address that is not public' })
   })
@@ -193,19 +193,19 @@ describe('remote images and private addresses', () => {
     expect(served).toBe(3)
   })
 
-  it('reaches no host with credentials in the URL or a spelling of an address the list does not hold', () => {
-    const patterns = remotePatterns(['https://img.example.com', `${origin}/photos/`])
+  it('reaches no host with credentials in the URL or a spelling of an address the list does not hold', async () => {
+    const patterns = await remotePatterns(['https://img.example.com', `${origin}/photos/`])
 
     for (const src of ['http://img.example.com@127.0.0.1/a.png', 'https://img.example.com@127.0.0.1/a.png', 'https://img.example.com:x@127.0.0.1/a.png', 'http://2130706433/photos/a.png', 'http://0177.0.0.1:1/photos/a.png', 'http://0x7f.1/photos/a.png', 'http://[::1]/a.png', 'http://[::ffff:127.0.0.1]/a.png', 'http://169.254.169.254/latest/meta-data/', 'http://localhost/a.png', 'http://127.0.0.2/a.png'])
       expect([src, remoteAllowed(src, patterns)]).toEqual([src, false])
   })
 
-  it('refuses a wildcard on a public suffix, and reads which entries are the app\'s own hosts', () => {
+  it('refuses a wildcard on a public suffix, and reads which entries are the app\'s own hosts', async () => {
     for (const entry of ['https://*.co.uk', 'https://*.vercel.app', 'https://*.github.io', 'https://*.com'])
-      expect(() => remotePatterns([entry])).toThrow(`images.remote holds ${entry}`)
+      await expect(remotePatterns([entry])).rejects.toThrow(`images.remote holds ${entry}`)
 
-    expect(() => remotePatterns(['https://*.example.co.uk', 'https://*.cdn.vercel.app'])).not.toThrow()
-    expect(remotePatterns(['http://127.0.0.1:8080', 'http://[::1]:8080', 'http://10.0.0.5', 'http://localhost:9000', 'https://img.example.com', 'https://*.example.com']).map(pattern => pattern.private)).toEqual([true, true, true, true, false, false])
+    await expect(remotePatterns(['https://*.example.co.uk', 'https://*.cdn.vercel.app'])).resolves.toBeDefined()
+    expect((await remotePatterns(['http://127.0.0.1:8080', 'http://[::1]:8080', 'http://10.0.0.5', 'http://localhost:9000', 'https://img.example.com', 'https://*.example.com'])).map(pattern => pattern.private)).toEqual([true, true, true, true, false, false])
   })
 
   it('connects a trusted name to the address the resolver gave, and sends a user agent', async () => {
@@ -218,7 +218,7 @@ describe('remote images and private addresses', () => {
 
     try {
       const entry = `http://localhost:${local.port}/`
-      const result = await remoteImages(join(dir, 'named'), remotePatterns([entry]), undefined, undefined, undefined, async () => [{ address: '127.0.0.1', family: 4 }])(`${entry}hero.png`)
+      const result = await remoteImages(join(dir, 'named'), await remotePatterns([entry]), undefined, undefined, undefined, async () => [{ address: '127.0.0.1', family: 4 }])(`${entry}hero.png`)
 
       expect('path' in result).toBe(true)
       expect(seen).toEqual(['kay'])
@@ -242,8 +242,8 @@ describe('remote images and private addresses', () => {
       const odd = `http://127.0.0.1:${(raw.address() as { port: number }).port}/`
       const zipped = `http://127.0.0.1:${gzip.port}/`
 
-      expect((await remoteImages(join(dir, 'odd'), remotePatterns([odd]))(`${odd}a.png`))).toEqual({ status: 502, message: 'The host did not give the image' })
-      expect((await remoteImages(join(dir, 'zipped'), remotePatterns([zipped]))(`${zipped}a.png`))).toEqual({ status: 502, message: 'The host sent the image compressed' })
+      expect((await remoteImages(join(dir, 'odd'), await remotePatterns([odd]))(`${odd}a.png`))).toEqual({ status: 502, message: 'The host did not give the image' })
+      expect((await remoteImages(join(dir, 'zipped'), await remotePatterns([zipped]))(`${zipped}a.png`))).toEqual({ status: 502, message: 'The host sent the image compressed' })
     }
     finally {
       raw.close()
@@ -251,7 +251,22 @@ describe('remote images and private addresses', () => {
     }
   })
 
-  it('reads the whole Public Suffix List, not a short sample', () => {
+  it('loads the Public Suffix List only once an entry holds a wildcard', async () => {
+    const script = `
+import { remotePatterns } from ${JSON.stringify(join(import.meta.dir, '../src/server/remote'))}
+const loaded = () => Object.keys(require.cache).some(key => key.includes('public-suffixes'))
+await remotePatterns(['https://a.example.com/x/'])
+const plain = loaded()
+await remotePatterns(['https://*.example.com'])
+console.log(JSON.stringify([plain, loaded()]))
+`
+    const run = Bun.spawn([process.execPath, '-e', script], { stdout: 'pipe', stderr: 'pipe' })
+
+    expect(JSON.parse(await new Response(run.stdout).text())).toEqual([false, true])
+    await run.exited
+  })
+
+  it('reads the whole Public Suffix List, not a short sample', async () => {
     for (const suffix of ['com', 'co.uk', 'vercel.app', 'github.io', 'myshopify.com', 'cloudfront.net', 'ck', 'azurewebsites.net', 'com.es', 'xn--55qx5d.cn', 'pages.dev', 'r2.dev', 'ondigitalocean.app', 'web.app', 'ac.jp'])
       expect(isPublicSuffix(suffix)).toBe(true)
 
@@ -264,18 +279,18 @@ describe('remote images and private addresses', () => {
     expect(isPublicSuffix('CO.UK')).toBe(true)
 
     for (const entry of ['https://*.myshopify.com', 'https://*.r2.dev', 'https://*.ac.jp', 'https://*.com.es', 'https://*.azurewebsites.net', 'https://*.anything.ck'])
-      expect(() => remotePatterns([entry])).toThrow(`images.remote holds ${entry}`)
+      await expect(remotePatterns([entry])).rejects.toThrow(`images.remote holds ${entry}`)
 
-    expect(() => remotePatterns(['https://*.www.ck', 'https://*.example.ac.jp'])).not.toThrow()
+    await expect(remotePatterns(['https://*.www.ck', 'https://*.example.ac.jp'])).resolves.toBeDefined()
   })
 
-  it('names a downloaded original after a truncated SHA-256, 32 hex digits, so addresses cannot be made to share one', () => {
+  it('names a downloaded original after a truncated SHA-256, 32 hex digits, so addresses cannot be made to share one', async () => {
     expect(cacheKey('https://img.example/a.png')).toMatch(/^[\da-f]{32}$/)
     expect(cacheKey('https://img.example/a.png')).toBe(new Bun.CryptoHasher('sha256').update('https://img.example/a.png').digest('hex').slice(0, 32))
     expect(cacheKey('https://img.example/a.png')).not.toBe(cacheKey('https://img.example/a.png?'))
   })
 
-  it('refuses a wildcard on a public suffix written with a trailing dot', () => {
-    expect(() => remotePatterns(['https://*.co.uk.'])).toThrow('images.remote holds')
+  it('refuses a wildcard on a public suffix written with a trailing dot', async () => {
+    await expect(remotePatterns(['https://*.co.uk.'])).rejects.toThrow('images.remote holds')
   })
 })

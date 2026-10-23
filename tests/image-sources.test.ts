@@ -302,8 +302,8 @@ describe('images.resolve and images.guard', () => {
     expect((await get('/media/9', 'w=999', signedIn)).headers.get('x-guarded')).toBe('yes')
   })
 
-  it('refuses a guard with no resolve, and a static export, which has no route to resolve on', () => {
-    expect(() => applyImageConfig({ guard: () => undefined })).toThrow('images.resolve is not set')
+  it('refuses a guard with no resolve, and a static export, which has no route to resolve on', async () => {
+    await expect(applyImageConfig({ guard: () => undefined })).rejects.toThrow('images.resolve is not set')
     expect(() => refuseStaticConfig({ images: { resolve: () => undefined } })).toThrow('no image route')
   })
 

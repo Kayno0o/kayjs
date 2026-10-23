@@ -701,7 +701,7 @@ export function sourceFile(src: string, options: ImageRouteOptions): { path: str
 }
 
 // `images.maxDensity`, `images.widths`, `images.aspects`, `images.remote`, `images.placeholder` and whether `images.resolve` is set, checked and set for every image this process renders, served or prerendered; `inlineStyles` is whether the site's CSP lets an element carry a `style` attribute. Returns the density.
-export function applyImageConfig(images: { maxDensity?: number | undefined, widths?: number[] | undefined, aspects?: string[] | undefined, remote?: string[] | undefined, placeholder?: false | undefined, resolve?: unknown, guard?: unknown } | undefined, inlineStyles = true): number {
+export async function applyImageConfig(images: { maxDensity?: number | undefined, widths?: number[] | undefined, aspects?: string[] | undefined, remote?: string[] | undefined, placeholder?: false | undefined, resolve?: unknown, guard?: unknown } | undefined, inlineStyles = true): Promise<number> {
   const maxDensity = images?.maxDensity ?? DEFAULT_MAX_DENSITY
 
   if (images?.guard !== undefined && images.resolve === undefined)
@@ -710,7 +710,7 @@ export function applyImageConfig(images: { maxDensity?: number | undefined, widt
   if (!(maxDensity >= 1))
     throw new Error(`images.maxDensity is ${maxDensity}: it is at least 1, or Infinity to leave the browser's choice`)
 
-  const patterns = remotePatterns(images?.remote)
+  const patterns = await remotePatterns(images?.remote)
 
   setMaxDensity(maxDensity)
   setImageWidths(images?.widths)

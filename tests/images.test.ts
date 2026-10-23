@@ -831,7 +831,7 @@ describe('remote images', () => {
   beforeAll(async () => {
     cache = await mkdtemp(join(tmpdir(), 'kay-remote-'))
     remote = new Elysia()
-    serveImages(remote, { clientDir: join(cache, 'client'), cacheDir: cache, remote: remoteImages(join(cache, 'remote'), remotePatterns([`${origin}/photos/`]), cache, 4) })
+    serveImages(remote, { clientDir: join(cache, 'client'), cacheDir: cache, remote: remoteImages(join(cache, 'remote'), await remotePatterns([`${origin}/photos/`]), cache, 4) })
   })
 
   afterAll(async () => {
@@ -840,8 +840,8 @@ describe('remote images', () => {
     await rm(cache, { recursive: true, force: true })
   })
 
-  it('reads images.remote as origins with an optional path and subdomain wildcard, refusing anything else', () => {
-    const patterns = remotePatterns(['https://cms.example.com/uploads/', 'https://*.cdn.example.com', 'http://127.0.0.1:8080', 'https://media.example.com:443/files', 'https://CAFÉ.example.com'])
+  it('reads images.remote as origins with an optional path and subdomain wildcard, refusing anything else', async () => {
+    const patterns = await remotePatterns(['https://cms.example.com/uploads/', 'https://*.cdn.example.com', 'http://127.0.0.1:8080', 'https://media.example.com:443/files', 'https://CAFÉ.example.com'])
 
     expect(remoteAllowed('https://cms.example.com/uploads/a.jpg', patterns)).toBe(true)
     expect(remoteAllowed('https://cms.example.com/private/a.jpg', patterns)).toBe(false)
@@ -857,7 +857,7 @@ describe('remote images', () => {
     expect(remoteAllowed('https://café.example.com/a.jpg', patterns)).toBe(true)
 
     for (const entry of ['cms.example.com', 'ftp://cms.example.com', 'https://cms.*.com', 'https://cms.example.com/a?b', 'https://*.com', 'https://*.localhost:8080'])
-      expect(() => remotePatterns([entry])).toThrow(`images.remote holds ${entry}`)
+      await expect(remotePatterns([entry])).rejects.toThrow(`images.remote holds ${entry}`)
   })
 
   it('gives a listed remote image its variants through the route, and refuses an unlisted one as the server renders it', async () => {

@@ -128,7 +128,7 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
 
   serveLocales(root, locales)
   const base = basePath(config.base)
-  const maxDensity = applyImageConfig(config.images, config.security === false || allowsStyleAttributes(config.security?.csp, config.security?.reportOnly))
+  const maxDensity = await applyImageConfig(config.images, config.security === false || allowsStyleAttributes(config.security?.csp, config.security?.reportOnly))
   const site = siteWithBase(config.site, config.base)
 
   // Holds copies of private files and their variants, so only this user may enter it.
