@@ -25,7 +25,8 @@ afterEach(async () => {
   document.cookie = `${EDITOR_COOKIE}=; max-age=0`
 })
 
-function server(): void {
+// `slow` holds the answer of an entry's read back, so a test clicks while it loads.
+function server(slow = 0): void {
   asked = []
   spyOn(globalThis, 'fetch').mockImplementation((async (request: string | URL | Request) => {
     const path = String(request)
@@ -34,6 +35,8 @@ function server(): void {
 
     if (path.includes('/can'))
       return Response.json({ denied: {}, prefix: '/admin' })
+
+    await Bun.sleep(slow)
 
     return path.includes('/menu/')
       ? Response.json({ collection: MENU, entry: { slug: 'index', data: { label: 'Home' }, version: 'v1', url: '/' } })
@@ -139,6 +142,25 @@ test('the first click on a text of an entry still a row types in place once the 
   document.body.append(title)
   title.click()
   await until(() => title.hasAttribute('contenteditable') || title.isContentEditable)
+
+  expect(root.contains(document.activeElement)).toBe(false)
+  expect(reads()).toHaveLength(1)
+})
+
+test('a second click on a text of an entry still loading types in place too, the side form not focused', async () => {
+  server(150)
+
+  const { root } = await open([NAV, HELLO])
+  const title = document.createElement('h1')
+
+  title.dataset.page = ''
+  title.setAttribute('data-kay-field', 'posts:hello:title')
+  title.textContent = 'Hello world'
+  document.body.append(title)
+  title.click()
+  await Bun.sleep(30)
+  title.click()
+  await until(() => title.isContentEditable)
 
   expect(root.contains(document.activeElement)).toBe(false)
   expect(reads()).toHaveLength(1)

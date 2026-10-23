@@ -702,13 +702,15 @@ async function editOnceLoaded(field: MarkedField, ticket: number, run: () => voi
 }
 
 // Types in a field on the page when it is a text or a paragraph of Markdown, else brings it up in the form. A block of Markdown needs the node clicked to know which one.
-function edit(field: MarkedField, x?: number, y?: number, back?: HTMLElement, node?: Node): void {
+function edit(field: MarkedField, x?: number, y?: number, back?: HTMLElement, node?: Node, waited = false): void {
   waiting += 1
 
-  // An entry still a row loads first, and the click is answered once it has: a text types in place at once, any other field brings up the form.
-  if (!isLoaded(field.marker) && entries.length > 1 && !isOpened(field.marker)) {
-    openEntry(field.marker)
-    void editOnceLoaded(field, waiting, () => edit(field, x, y, back, node))
+  // An entry still a row or loading is waited for, and the click answered once it has loaded, the last click winning: a text types in place at once, any other field brings up the form.
+  if (!waited && !isLoaded(field.marker)) {
+    if (!isOpened(field.marker))
+      openEntry(field.marker)
+
+    void editOnceLoaded(field, waiting, () => edit(field, x, y, back, node, true))
 
     return
   }
