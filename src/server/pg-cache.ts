@@ -2,7 +2,7 @@ import type { SQL } from 'bun'
 import type { CacheStore } from '../runtime/cache'
 import type { PgHandle } from './pg-data'
 import type { Stop } from './pg-poll'
-import { DEPS_PREFIX, PURGE_STALE_MS, readsOf, STALE_KEPT_MS, trackStore, untrackStore } from '../runtime/cache'
+import { DEPS_PREFIX, PURGE_STALE_MS, readsOf, STALE_KEPT_MS, untrackStore } from '../runtime/cache'
 import { kayLog } from '../runtime/log'
 import { rowsOf } from './pg-jobs'
 import { EVENT_TTL_MS, eventWindow, POLL_MS, pollerOf } from './pg-poll'
@@ -19,7 +19,6 @@ export function pgCache(pg: PgHandle): CacheStore {
   // The writes still running, which a listing of the keys waits for so an `invalidate` never misses a row being written.
   const writing = new Set<Promise<unknown>>()
   let polling: Stop | undefined
-  let used = false
   const events = eventWindow()
   let closed = false
   let purged = 0
@@ -72,10 +71,8 @@ export function pgCache(pg: PgHandle): CacheStore {
     return heard ? 'heard' : undefined
   }
 
-  // Started by the first call that needs the database, so only an app that reads, writes or invalidates a value connects; a later call brings a slowed poll back to its base rate.
+  // Started by the first listener, which the app's setup or a call naming the store adds, so a module naming the store connects to nothing in a build or a check, and a replica that never used the cache still hears an invalidation that marks a prerendered page stale. A later call brings a slowed poll back to its base rate.
   const start = () => {
-    used = true
-
     if (closed)
       return
 
@@ -85,7 +82,6 @@ export function pgCache(pg: PgHandle): CacheStore {
       return
     }
 
-    // Nothing to tell yet: the first listener starts it.
     if (listeners.length === 0)
       return
 
@@ -160,13 +156,10 @@ export function pgCache(pg: PgHandle): CacheStore {
     },
     subscribe(listener) {
       listeners.push(listener)
-
-      if (used)
-        start()
+      start()
     },
   }
 
-  trackStore(store)
   // A reload ends the polling for the module that named the store; the module running again names a store of its own.
   onReload(() => {
     closed = true

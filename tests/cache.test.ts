@@ -9,7 +9,10 @@ import { Elysia } from 'elysia'
 import { onKeysInvalidated, refreshLocally } from '../src/runtime/cache'
 import { cache, cached, invalidate, sqliteCache } from '../src/runtime/cache.server'
 import { setupStore } from '../src/server/app-store'
+import { pgCache } from '../src/server/pg-cache'
+import { pgHandle } from '../src/server/pg-data'
 import { feed } from './fixtures/production/src/news'
+import { cleanUpAfterFile, pgIt, postgres } from './job-stores'
 import { scratchBuild } from './prerendered'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
@@ -18,6 +21,8 @@ afterEach(() => {
   setSystemTime()
   invalidate(() => true)
 })
+
+cleanUpAfterFile()
 
 describe('cached', () => {
   it('loads once for concurrent misses and keeps the value for its ttl', async () => {
@@ -239,6 +244,45 @@ describe('cached with a store', () => {
       expect((await app.handle(new Request('http://localhost/news'))).headers.get('server-timing')).toBeNull()
     }
     finally {
+      news.edition = 1
+      await build.remove()
+    }
+  })
+
+  pgIt('marks a prerendered page stale when another replica sharing a Postgres store invalidated it, though this one never used the cache', async () => {
+    const { sql, url } = await postgres()
+    const build = await scratchBuild({}, false, resolve('tests/fixtures/production'))
+    const { news } = await import('./fixtures/production/src/news')
+
+    setupStore({ cache: pgCache(pgHandle(sql)) })
+
+    try {
+      await build.prerender({})
+
+      const app = await build.serve({ root: 'tests/fixtures/production', security: false })
+      const visit = async () => (await app.handle(new Request('http://localhost/news'))).text()
+
+      expect(await visit()).toContain('<h1>Edition 1</h1>')
+      news.edition = 7
+      // The poll reads where the events stand before the other replica publishes.
+      await Bun.sleep(300)
+
+      const script = `import { SQL } from 'bun'\nimport { setupStore } from ${JSON.stringify(resolve('src/server/app-store.ts'))}\nimport { pgCache } from ${JSON.stringify(resolve('src/server/pg-cache.ts'))}\nimport { pgHandle } from ${JSON.stringify(resolve('src/server/pg-data.ts'))}\nimport { invalidatePage } from ${JSON.stringify(resolve('src/server/stale-pages.ts'))}\nconst sql = new SQL(${JSON.stringify(url)})\nsetupStore({ cache: pgCache(pgHandle(sql)) })\ninvalidatePage('/news')\nfor (let wait = 0; wait < 100 && (await sql.unsafe('SELECT 1 FROM kay_events')).length === 0; wait++)\n  await Bun.sleep(50)\nawait sql.close()\n`
+      const child = Bun.spawn([process.execPath, '-e', script], { stderr: 'inherit' })
+
+      expect(await child.exited).toBe(0)
+
+      let html = await visit()
+
+      for (let wait = 0; !html.includes('Edition 7') && wait < 60; wait++) {
+        await Bun.sleep(50)
+        html = await visit()
+      }
+
+      expect(html).toContain('<h1>Edition 7</h1>')
+    }
+    finally {
+      setupStore(undefined)
       news.edition = 1
       await build.remove()
     }
