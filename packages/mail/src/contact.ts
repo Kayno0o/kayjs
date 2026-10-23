@@ -7,7 +7,7 @@ import { configError } from 'kay/library'
 import { siteOrigin } from 'kay/seo'
 import { wording } from 'kay/words'
 import { log } from './log'
-import { MailNotConfiguredError, wasLogged } from './mailer'
+import { MailNotConfiguredError } from './mailer'
 
 // What the view of a contact mail is given: the visitor's answers as `fields` (the name and email first, the message apart), the `subject` and the `site`, its origin.
 export interface ContactMailProps {
@@ -68,8 +68,8 @@ export type ContactInput<Extra extends Record<string, TSchema> = Record<never, T
 // The object schema built below, typed by the input it validates.
 type ContactSchema<Extra extends Record<string, TSchema>, Consent extends boolean> = TSchema & { static: ContactInput<Extra, Consent> }
 
-// The arguments of `action` for a contact form, for a page to spread: `export const contact = action(...contactForm(mail, { reach: 'hello@example.com' }))`. A post is checked, mailed to the site with the visitor in `replyTo` and answered with a refusal worded in the page's language when the mail cannot go out, with `rateLimit`, `honeypot` and `minTime` set. Pair it with `ContactForm` from kayjs-ui.
-export function contactForm<const Extra extends Record<string, TSchema> = Record<never, TSchema>, const Honeypot extends string = 'website', const Consent extends boolean = false>(mail: Pick<Mailer, 'send'>, options: ContactOptions<Extra, Honeypot, Consent> = {}): [
+// The arguments of `action` for a contact form, for a page to spread: `export const contact = action(...contactForm(mail, { reach: 'hello@example.com' }))`. A post is checked, queued as a mail to the site with the visitor in `replyTo` (the queue retries it, so a relay that is down never loses it or holds the visitor up) and answered with a refusal worded in the page's language when the mailer is not configured or the mail cannot be rendered, with `rateLimit`, `honeypot` and `minTime` set. Pair it with `ContactForm` from kayjs-ui.
+export function contactForm<const Extra extends Record<string, TSchema> = Record<never, TSchema>, const Honeypot extends string = 'website', const Consent extends boolean = false>(mail: Pick<Mailer, 'enqueue'>, options: ContactOptions<Extra, Honeypot, Consent> = {}): [
   schema: ContactSchema<Extra, Consent>,
   handler: (input: ContactInput<Extra, Consent>, ctx: ActionContext) => Promise<Failure<string> | undefined>,
   protection: ActionProtection<Honeypot>,
@@ -117,7 +117,7 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
 
     try {
       // From stays the mailer's own address so SPF and DKIM hold; replying goes to the visitor.
-      await mail.send({
+      await mail.enqueue({
         to: options.to,
         replyTo: { name, address: email },
         subject,
@@ -126,15 +126,14 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
       })
     }
     catch (error) {
-      // The mailer logs a delivery that fails after it is queued; what stops before that (not configured, a view that does not render) is logged here.
+      // A delivery that fails is logged and retried by the queue; what stops before it is queued (not configured, a view that does not render) is logged here.
       if (error instanceof MailNotConfiguredError) {
         log.error(error.message, error)
 
         return ctx.fail(503, reach === undefined ? wording('mail.contact.notConfigured', 'The form cannot send messages yet.') : wording('mail.contact.notConfiguredReach', 'The form cannot send messages yet: write to {reach}.', words))
       }
 
-      if (!wasLogged(error))
-        log.error('the contact mail could not be sent', error)
+      log.error('the contact mail could not be queued', error)
 
       return ctx.fail(502, reach === undefined ? wording('mail.contact.sendFailed', 'Your message could not be sent. Please try again later.') : wording('mail.contact.sendFailedReach', 'Your message could not be sent. Please try again later, or write to {reach}.', words))
     }

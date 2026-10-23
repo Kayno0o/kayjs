@@ -14,7 +14,8 @@ interface Answers { name: string, email: string, phone?: string, topic: 'quote' 
 // Imported by path, as the fixture is no part of this package's type check.
 const { contact } = await import(`${import.meta.dir}/fixture/src/routes/contact.kay`) as { contact: Action<Answers, unknown> }
 const { consented } = await import(`${import.meta.dir}/fixture/src/routes/consent.kay`) as { consented: Action<Answers & { consent?: boolean, website?: string, nectar?: string }, unknown> }
-const { noRecipient, serverDown, worded, unrendered } = await import(`${import.meta.dir}/fixture/src/routes/broken.kay`) as Record<'noRecipient' | 'serverDown' | 'worded' | 'unrendered', Action<Answers, unknown>>
+const { noRecipient, serverDown, slowRelay, worded, unrendered } = await import(`${import.meta.dir}/fixture/src/routes/broken.kay`) as Record<'noRecipient' | 'serverDown' | 'slowRelay' | 'worded' | 'unrendered', Action<Answers, unknown>>
+const { delivery } = await import(`${import.meta.dir}/fixture/src/counter`) as typeof import('./fixture/src/counter')
 
 // Spread into `action`, the form keeps its input typed: the extra field is there, and a field it does not have is refused.
 const typed = action(...contactForm(mailer({ from: 'a@fixture.test' }), { fields: { phone: s.Optional(s.String({ maxLength: 30 })) } }))
@@ -45,18 +46,18 @@ describe('the default contact mail', () => {
 
 describe('contactForm', () => {
   it('mails the answers to the site with the visitor in replyTo and the message quoted', async () => {
-    const { call } = await site()
+    const running = await site()
 
-    await call(contact, fields)
+    await running.call(contact, fields)
 
-    const [sent] = outbox.to('team@fixture.test')
+    const sent = await outbox.waitFor('team@fixture.test', { site: running })
 
     expect(sent).toBeDefined()
-    expect(sent!.replyTo).toEqual({ name: 'Ada Lovelace', address: 'ada@example.com' })
-    expect(sent!.subject).toBe('Message from Ada Lovelace')
-    expect(sent!.text).toContain('Subject: quote')
-    expect(sent!.text).toContain('Phone: 06 12 34 56 78')
-    expect(sent!.text).toContain('I would like a quote.')
+    expect(sent.replyTo).toEqual({ name: 'Ada Lovelace', address: 'ada@example.com' })
+    expect(sent.subject).toBe('Message from Ada Lovelace')
+    expect(sent.text).toContain('Subject: quote')
+    expect(sent.text).toContain('Phone: 06 12 34 56 78')
+    expect(sent.text).toContain('I would like a quote.')
   })
 
   it('refuses a message holding too many links, in the page\'s language', async () => {
@@ -76,30 +77,18 @@ describe('contactForm', () => {
     expect(refused.errors['']).toBe('The form cannot send messages yet: write to hello@fixture.test.')
   })
 
-  it('answers 502 when the mail server fails', async () => {
-    const { refusal } = await site()
-    const refused = await refusal(serverDown, fields)
+  it('answers success while the mail server is down, the mail waiting in the queue to be retried', async () => {
+    const { call } = await site()
 
-    expect(refused.status).toBe(502)
-    expect(refused.errors['']).toBe('Your message could not be sent. Please try again later.')
+    expect(await call(serverDown, fields)).toBeUndefined()
   })
 
-  it('logs a failed send once, the mailer having logged it already', async () => {
-    const { refusal } = await site()
-    const calls: unknown[][] = []
-    const global = globalThis as { [SINK]?: unknown }
-    const sink = global[SINK]
+  it('does not wait on the transport, which a slow relay holds up', async () => {
+    const { call } = await site()
 
-    global[SINK] = (...args: unknown[]) => calls.push(args)
-
-    try {
-      await refusal(serverDown, fields)
-    }
-    finally {
-      global[SINK] = sink
-    }
-
-    expect(calls.filter(call => call[0] === 'error')).toHaveLength(1)
+    delivery.sent = false
+    await call(slowRelay, fields)
+    expect(delivery.sent).toBe(false)
   })
 
   it('refuses a name holding a line break and a missing topic with the field\'s message', async () => {
@@ -112,17 +101,17 @@ describe('contactForm', () => {
   })
 
   it('trims the name and the message before mailing them', async () => {
-    const { call } = await site()
+    const running = await site()
 
-    await call(contact, { ...fields, name: '  Ada  ', message: '  Hello  ' })
+    await running.call(contact, { ...fields, name: '  Ada  ', message: '  Hello  ' })
 
-    expect(outbox.last()!.replyTo).toEqual({ name: 'Ada', address: 'ada@example.com' })
+    expect((await outbox.waitFor('team@fixture.test', { site: running })).replyTo).toEqual({ name: 'Ada', address: 'ada@example.com' })
   })
 
   it('refuses an extra field named like one the form has', () => {
-    const send = async () => Promise.reject(new Error('unused'))
+    const enqueue = async () => Promise.reject(new Error('unused'))
 
-    expect(() => contactForm({ send } as never, { fields: { email: s.String() } })).toThrow('already has the field email')
+    expect(() => contactForm({ enqueue } as never, { fields: { email: s.String() } })).toThrow('already has the field email')
   })
 
   it('renders the honeypot, and limits the posts that went through, naming how else to reach the site', async () => {
@@ -184,7 +173,7 @@ describe('contactForm', () => {
     const [level, message, error] = calls.find(call => call[0] === 'error') ?? []
 
     expect(level).toBe('error')
-    expect(message).toBe('the contact mail could not be sent')
+    expect(message).toBe('the contact mail could not be queued')
     expect((error as Error).message).toContain('the view does not render')
   })
 
@@ -198,7 +187,8 @@ describe('contactForm', () => {
   })
 
   it('answers a bot filling the renamed honeypot as if it worked, mailing nothing', async () => {
-    const { call } = await site()
+    const running = await site()
+    const { call } = running
     const post = (extra: Record<string, string>) => {
       const body = new FormData()
 
@@ -211,7 +201,7 @@ describe('contactForm', () => {
     expect(await call(consented, post({ nectar: 'spam' }))).toBeUndefined()
     expect(outbox.last()).toBeUndefined()
     await call(consented, post({ website: 'https://ada.test' }))
-    expect(outbox.last()).toBeDefined()
+    expect(await outbox.waitFor('team@fixture.test', { site: running })).toBeDefined()
   })
 
   it('answers a bot filling the renamed honeypot without consent as if it worked', async () => {
@@ -237,11 +227,11 @@ describe('contactForm', () => {
   })
 
   it('lets a person fill a website field once the honeypot has another name', async () => {
-    const { call } = await site()
+    const running = await site()
 
-    await call(consented, { ...fields, consent: true, website: 'https://ada.test' })
+    await running.call(consented, { ...fields, consent: true, website: 'https://ada.test' })
 
-    expect(outbox.last()!.text).toContain('Website: https://ada.test')
+    expect((await outbox.waitFor('team@fixture.test', { site: running })).text).toContain('Website: https://ada.test')
   })
 
   it('refuses an unticked or missing consent in the page\'s language, and mails nothing', async () => {
@@ -258,11 +248,11 @@ describe('contactForm', () => {
   })
 
   it('leaves the consent out of the mail', async () => {
-    const { call } = await site()
+    const running = await site()
 
-    await call(consented, { ...fields, consent: true })
+    await running.call(consented, { ...fields, consent: true })
 
-    const sent = outbox.last()!
+    const sent = await outbox.waitFor('team@fixture.test', { site: running })
 
     expect(sent.text).not.toMatch(/consent/i)
     expect(sent.html).not.toMatch(/consent/i)
@@ -278,12 +268,12 @@ describe('contactForm', () => {
   })
 
   it('refuses a field named like the honeypot or the consent', () => {
-    const send = async () => Promise.reject(new Error('unused'))
+    const enqueue = async () => Promise.reject(new Error('unused'))
 
-    expect(() => contactForm({ send } as never, { honeypot: 'nectar', fields: { nectar: s.String() } })).toThrow('already has the field nectar')
-    expect(() => contactForm({ send } as never, { consent: true, fields: { consent: s.Boolean() } })).toThrow('already has the field consent')
-    expect(() => contactForm({ send } as never, { honeypot: 'email' })).toThrow('cannot use `email` as its honeypot')
-    expect(() => contactForm({ send } as never, { fields: { website: s.String() } })).toThrow('already has the field website')
+    expect(() => contactForm({ enqueue } as never, { honeypot: 'nectar', fields: { nectar: s.String() } })).toThrow('already has the field nectar')
+    expect(() => contactForm({ enqueue } as never, { consent: true, fields: { consent: s.Boolean() } })).toThrow('already has the field consent')
+    expect(() => contactForm({ enqueue } as never, { honeypot: 'email' })).toThrow('cannot use `email` as its honeypot')
+    expect(() => contactForm({ enqueue } as never, { fields: { website: s.String() } })).toThrow('already has the field website')
   })
 
   it('types the renamed honeypot and the consent', () => {

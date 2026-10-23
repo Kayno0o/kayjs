@@ -1,11 +1,15 @@
 --- server
 import { contactForm, mailer } from '@kaynooo/kayjs-mail'
+import { delivery } from '../counter'
 
 const unconfigured = mailer({ from: 'Fixture <hello@fixture.test>', optional: true })
 const down = mailer({ from: 'Fixture <hello@fixture.test>', transport: { send: () => Promise.reject(new Error('connection refused')) } })
 
+const slow = mailer({ from: 'Fixture <hello@fixture.test>', transport: { send: async () => { await Bun.sleep(1000); delivery.sent = true } } })
+
 export const noRecipient = action(...contactForm(unconfigured, { reach: 'hello@fixture.test' }))
 export const serverDown = action(...contactForm(down, { to: 'team@fixture.test' }))
+export const slowRelay = action(...contactForm(slow, { to: 'team@fixture.test' }))
 export const worded = action(...contactForm(unconfigured, { errors: { email: 'Bad address', name: () => 'A name, please' } }))
 export const unrendered = action(...contactForm(down, { to: 'team@fixture.test', view: () => { throw new Error('the view does not render') } }))
 ---
@@ -14,6 +18,10 @@ form(action={noRecipient} novalidate)
   input(field="email" aria-label="Email")
   textarea(field="message" aria-label="Message")
 form(action={serverDown} novalidate)
+  input(field="name" aria-label="Name")
+  input(field="email" aria-label="Email")
+  textarea(field="message" aria-label="Message")
+form(action={slowRelay} novalidate)
   input(field="name" aria-label="Name")
   input(field="email" aria-label="Email")
   textarea(field="message" aria-label="Message")
