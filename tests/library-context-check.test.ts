@@ -104,14 +104,20 @@ describe('a library component', () => {
     expect(code).not.toBe(0)
   }, TIMEOUT)
 
-  it('naming a module that is not there stays untyped rather than breaking the shadow', async () => {
+  it('naming a module that is not there is reported with the package and the path', async () => {
     const root = await project(PLAIN, 'p yes\n')
     const manifest = join(root, 'node_modules/ctxlib/package.json')
     const declared = await Bun.file(manifest).json() as { kay: { context: string } }
 
     declared.kay.context = './missing.ts'
     await Bun.write(manifest, JSON.stringify(declared))
-    expect((await check(root)).output.slice(0, 600)).toMatch(CLEAN)
+
+    const { code, output } = await check(root)
+
+    expect(output).toContain('ctxlib')
+    expect(output).toContain('"kay": { "context": "./missing.ts" }')
+    expect(output).toContain('which does not exist')
+    expect(code).not.toBe(0)
   }, TIMEOUT)
 })
 

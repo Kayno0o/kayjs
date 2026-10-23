@@ -11,6 +11,7 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { findKayFiles, findProjectFiles, inWalkScope, writeIfChanged } from '../build/files'
+import { missingContextModules } from '../build/manifests'
 import { browserRole, promotedChecks } from '../compiler'
 import { moduleChecks } from '../compiler/fence-checks'
 import { isLaunchLint, isLint, isLintGroup, isRetiredLint, LEVELS, lintLevel, lintLevels } from '../compiler/lints'
@@ -100,8 +101,13 @@ export async function projectProblems(root: string, options: CheckOptions, colle
       return bootProblems(resolve(root), options, read.feeds, scanned, read.routes)
     })(), moduleLints(root, options)])
 
-    return [...content.problems, ...messages, ...boot, ...modules, ...uiProblems(root)]
+    return [...content.problems, ...messages, ...boot, ...modules, ...uiProblems(root), ...contextModuleProblems(root)]
   })
+}
+
+// A `kay.context` module a package declares that does not exist: its components stay untyped for their extension's `ctx` keys until it does.
+function contextModuleProblems(root: string): CheckDiagnostic[] {
+  return missingContextModules(root).map(({ name, file, declared }) => ({ file, line: 1, column: 1, message: `${name} declares \`"kay": { "context": "${declared}" }\`, which does not exist`, help: 'point it at the extension\'s context module, or remove it' }))
 }
 
 // A type error tsgo reports in `kay.config.ts` for a lint or level `lints` names that kay does not have, which kay's own message says better.

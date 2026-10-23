@@ -44,7 +44,7 @@ If your extension gives templates `ctx` keys through a `context` module, name th
   "kay": { "context": "./src/context.ts" }
 }
 ```
-
+ `kay check` reports a module named there that does not exist.
 Your components then read `ctx.<key>` typed, even in an app that does not call your extension. A key no extension declares is still a type error, and a plain `ctx.<key>` read keeps the page loading only that key.
 
 ## Settings the app can replace

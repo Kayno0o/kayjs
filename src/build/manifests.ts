@@ -64,11 +64,28 @@ export function packageContextModule(file: string): string | undefined {
 
       const module = typeof declared === 'string' ? resolve(dir, declared) : undefined
 
-      // A module that is not there is left to the build, which reports it, rather than typed into a shadow no line of the source maps to.
+      // A module that is not there is reported by kay check (`missingContextModules`) rather than typed into a shadow no line of the source maps to.
       return module !== undefined && existsSync(module) ? module : undefined
     }
 
     if (dir === dirname(dir))
       return undefined
   }
+}
+
+// The installed packages (and the project itself) whose package.json declares a `kay.context` module that is not there.
+export function missingContextModules(root: string): { name: string, file: string, declared: string }[] {
+  const manifest = readManifest(root)
+  const names = manifest === undefined ? [] : dependencyNames(manifest, APP_DEPENDENCIES)
+  const dirs = [{ name: manifest?.name ?? root, dir: root }, ...names.flatMap((name) => {
+    const dir = packageDir(root, name)
+
+    return dir === undefined ? [] : [{ name, dir }]
+  })]
+
+  return dirs.flatMap(({ name, dir }) => {
+    const declared = readManifest(dir)?.kay?.context
+
+    return typeof declared === 'string' && !existsSync(resolve(dir, declared)) ? [{ name, file: join(dir, 'package.json'), declared }] : []
+  })
 }
