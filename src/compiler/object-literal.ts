@@ -101,10 +101,10 @@ export function propertiesOf(object: t.ObjectExpression, bindings: Bindings): t.
       last.set(name, property)
   }
 
-  return flat.filter((property) => {
+  return flat.filter((property, index) => {
     const name = nameOf(property)
 
-    return name === undefined || last.get(name) === property
+    return name === undefined || (last.get(name) === property && flat.indexOf(property) === index)
   })
 }
 

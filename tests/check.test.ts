@@ -4371,7 +4371,7 @@ describe.concurrent('kay check, unused code', () => {
       ['const table = { filterLabel: "a" }\nexport default { ui: { table } }', 1],
       ['const ui = { table: { filterLabel: "a" } }\nexport default { ui }', 1],
       ['const base = { ui: { table: { filterLabel: "a" } } }\nexport default { ...base, other: "x" }', 1],
-      ['const base = { ui: { table: { filterLabel: "a" } } }\nexport default { ui: { table: { selectedLabel: "b" } }, ...base }', 2],
+      ['const base = { ui: { table: { filterLabel: "a" } } }\nexport default { cms: { table: { moveUpLabel: "b" } }, ...base }', 2],
       ['const table = { filterLabel: "a" }\nexport default { ui: { table }, cms: { table } }', 1],
       ['export default omit({ ui: { table: { filterLabel: "a" } } })', 1],
     ]

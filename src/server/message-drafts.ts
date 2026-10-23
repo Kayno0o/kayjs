@@ -118,7 +118,7 @@ function withMessage(source: string, parts: string[], message: Message, style: S
   let { object } = catalog
 
   for (const [index, part] of parts.entries()) {
-    const found: t.ObjectProperty | undefined = propertiesOf(object, catalog.bindings).findLast((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && keyName(property) === part)
+    const found: t.ObjectProperty | undefined = propertiesOf(object, catalog.bindings).find((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && keyName(property) === part)
 
     if (!found)
       return inserted(source, object, entryText(parts.slice(index), message, style.unit), style)
