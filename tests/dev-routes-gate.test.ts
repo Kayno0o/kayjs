@@ -2,8 +2,9 @@ import type { Server } from 'bun'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterEach, describe, expect, it } from 'bun:test'
+import { KayCompileError } from '../src/build/transform'
 import { modeOf } from '../src/project'
-import { DEV_A11Y, DEV_AXE, DEV_DATA, DEV_DATA_QUERY, DEV_DATA_ROWS, DEV_EVENTS, DEV_FOOTPRINT, DEV_HEAD, DEV_INSPECTOR, DEV_JOBS, DEV_JOBS_DELETE, DEV_JOBS_RETRY, DEV_NOT_FOUND, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_SIZES, DEV_STACK, DEV_STYLES, DEV_TAB, DEV_TOOL, DEV_UI } from '../src/server/dev'
+import { bootFailure, DEV_A11Y, DEV_AXE, DEV_DATA, DEV_DATA_QUERY, DEV_DATA_ROWS, DEV_EVENTS, DEV_FOOTPRINT, DEV_HEAD, DEV_INSPECTOR, DEV_JOBS, DEV_JOBS_DELETE, DEV_JOBS_RETRY, DEV_NOT_FOUND, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_SIZES, DEV_STACK, DEV_STYLES, DEV_TAB, DEV_TOOL, DEV_UI } from '../src/server/dev'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
@@ -88,11 +89,11 @@ describe('kay dev --host', () => {
     return (await app.handle(new Request(`http://localhost${path}`, { method, headers: HEADERS, ...method === 'POST' && { body: '{}' } }))).status
   }
 
-  it('refuses the data, UI, jobs and not-found routes from a peer that is not this machine', async () => {
-    for (const path of [DEV_DATA, DEV_DATA_ROWS, DEV_UI, DEV_JOBS, DEV_NOT_FOUND])
+  it('refuses every dev route that reads or writes the project from a peer that is not this machine', async () => {
+    for (const path of [DEV_DATA, DEV_DATA_ROWS, DEV_UI, DEV_JOBS, DEV_NOT_FOUND, DEV_ROUTES, DEV_SIZES, DEV_FOOTPRINT])
       expect([path, await reach('192.168.1.40', path)]).toEqual([path, 403])
 
-    for (const path of [DEV_JOBS_RETRY, DEV_JOBS_DELETE, DEV_DATA_QUERY, DEV_UI, DEV_NOT_FOUND])
+    for (const path of [DEV_JOBS_RETRY, DEV_JOBS_DELETE, DEV_DATA_QUERY, DEV_UI, DEV_NOT_FOUND, DEV_OPEN, DEV_STACK, DEV_HEAD])
       expect([path, await reach('192.168.1.40', path, 'POST')]).toEqual([path, 403])
   })
 
@@ -101,8 +102,42 @@ describe('kay dev --host', () => {
     for (const address of ['127.0.0.1', '::1', '::ffff:127.0.0.1'])
       expect([address, await reach(address, DEV_UI)]).toEqual([address, 400])
 
-    expect(await reach('192.168.1.40', DEV_ROUTES)).toBe(200)
+    for (const path of [DEV_EVENTS, DEV_TOOL, DEV_PATCH, DEV_A11Y, `${DEV_TAB}data.js`])
+      expect([path, await reach('192.168.1.40', path)]).toEqual([path, 200])
+
     process.env.KAY_DEV_REMOTE = '1'
     expect(await reach('192.168.1.40', DEV_UI)).toBe(400)
+  })
+})
+
+describe('a boot failure', () => {
+  const failure = new KayCompileError([])
+
+  it('serves the error page with the dev tool under kay dev, and none of it elsewhere', async () => {
+    const tooled = bootFailure(failure, process.cwd())
+
+    expect(await (await tooled.handle(new Request('http://localhost/'))).text()).toContain(DEV_TOOL)
+    expect((await tooled.handle(new Request(`http://localhost${DEV_EVENTS}`))).status).toBe(200)
+
+    const bare = bootFailure(failure, process.cwd(), false)
+    const page = await bare.handle(new Request('http://localhost/'))
+
+    expect(page.status).toBe(500)
+    expect(await page.text()).not.toContain(DEV_TOOL)
+
+    for (const path of [DEV_EVENTS, DEV_TOOL])
+      expect([path, (await bare.handle(new Request(`http://localhost${path}`))).status]).toEqual([path, 500])
+  })
+})
+
+describe('the dev-only OpenAPI document', () => {
+  const document = async () => (await (await pages({ root: 'tests/fixtures/openapi', prebuilt: false, security: false, openapi: { dev: true } })).handle(new Request('http://localhost/api/openapi.json', { headers: { 'x-key': 'open' } }))).status
+
+  it('is served under kay dev only, never because NODE_ENV says development', async () => {
+    process.env.NODE_ENV = 'development'
+    delete process.env.KAY_DEV_CODE
+    expect(await document()).toBe(404)
+    process.env.KAY_DEV_CODE = '1'
+    expect(await document()).toBe(200)
   })
 })

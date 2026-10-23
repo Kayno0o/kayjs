@@ -102,7 +102,7 @@ export async function pages(options: PagesOptions = {}) {
     kayLog('error', 'the server could not start', error)
     recordBootFailure(error)
 
-    return listened(bootFailure(error, root))
+    return listened(bootFailure(error, root, mode.devRoutes))
   }
 }
 

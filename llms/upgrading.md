@@ -33,7 +33,7 @@ In production an app that sets no `budget` now also caps all visitors together a
 A tool offered to `ask` with no `confirm` no longer runs on the model's word: it waits for the visitor's Allow in `Chat`. Mark an action that only reads with `tool: { readOnly: true }` to run it unasked, or pass `confirm: false` to `ask` to keep every tool unasked. An app with its own `confirm` changes nothing; one that posts to its action without `Chat` posts the `[kai-approved ...]` line the chat adds, or sets `confirm` ([Actions as tools](../packages/ai/llms/tools.md#allowing-a-write)).
 ### The dev tool's routes exist under `kay dev` only
 
-A server started with `NODE_ENV=development` outside `kay dev` no longer serves `/_kay/dev/*` nor the dev tool's scripts on its pages. Run it through `kay dev`, or pass `dev: true` to `pages()` yourself. Under `kay dev --host`, the Data, UI, Jobs and not-found routes answer this machine only; `KAY_DEV_REMOTE=1` opens them to the network.
+A server started with `NODE_ENV=development` outside `kay dev` no longer serves `/_kay/dev/*` nor the dev tool's scripts on its pages. Run it through `kay dev`, or pass `dev: true` to `pages()` yourself. Under `kay dev --host`, every dev route but the tool's scripts answers this machine only, and a `dev` OpenAPI document is served under `kay dev` only; `KAY_DEV_REMOTE=1` opens them to the network.
 
 A plain param value listed by `prerender` (a slug) holding `/`, `\` or a NUL is refused; only a catch-all keeps its slashes.
 

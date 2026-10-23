@@ -228,7 +228,9 @@ The dev server answers 421 to a request whose `Host` is not `localhost`, a `*.lo
 KAY_DEV_HOSTS=dev.example.com bunx kay dev --host
 ```
 
-The dev tool's routes, under `/_kay/dev/`, exist only in a server `kay dev` started. A server started with `NODE_ENV=development` any other way answers 404 on them and serves no dev tool. The Data, Styles, Jobs and not-found routes read the database or write files, so they answer a peer on this machine only, even under `--host`. The peer is the socket's, so a proxy or tunnel on this machine counts as local. Set `KAY_DEV_REMOTE=1` to let any peer reach them, on a network you trust.
+The dev tool's routes, under `/_kay/dev/`, exist only in a server `kay dev` started. A server started with `NODE_ENV=development` any other way answers 404 on them and serves no dev tool.
+
+Every route but the tool's scripts and the reload stream reads the database, writes files or opens the editor, so they answer a peer on this machine only, even under `--host`; the tool's tabs fail on another device. The OpenAPI document with `dev: true` follows the same rule. The peer is the socket's, so a proxy or tunnel on this machine counts as local. Set `KAY_DEV_REMOTE=1` to let any peer reach them, on a network you trust.
 
 ### Events for tools
 

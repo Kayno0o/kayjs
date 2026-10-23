@@ -213,6 +213,7 @@ function compress(app: App, client: ClientBuild, base: string, mode: Mode, onErr
 function serveDevRoutes(app: App, root: string, client: ClientBuild, mode: Mode, base: string, extensions: KayExtension[] | undefined) {
   const hot = hotSwap(root, client)
 
+  refuseRemoteDevTools(app)
   rememberBoot(false, hot)
   app.get(DEV_EVENTS, () => devEvents(false, hot))
   app.get(DEV_PATCH, () => devPatch())
@@ -506,8 +507,6 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   // The dev tool's Routes tab, once the endpoints and API modules are known, and its Head tab.
   if (mode.devRoutes) {
-    refuseRemoteDevTools(app)
-
     // Loaded in development only: the seo rules reach the compiler, which a production server does not load.
     const { devHead } = await import('./dev-head')
 
@@ -547,7 +546,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   // Claimed before kay's own files, which give way to them; registered last, before the pages.
   const openapi = openApiSettings(options.openapi)
   const apiAt = apiPathOf(options.apiPath)
-  const servesOpenApi = openapi !== undefined && (openapi.dev !== true || mode.dev)
+  const servesOpenApi = openapi !== undefined && (openapi.dev !== true || mode.devRoutes)
 
   knowRedirects(Object.keys(options.redirects ?? {}))
   knowRuntimeRules({

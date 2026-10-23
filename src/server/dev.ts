@@ -574,11 +574,11 @@ export function refuseForeignHosts(app: Elysia, site: string | undefined): void 
   })
 }
 
-const GUARDED_PATHS = [DEV_DATA, DEV_UI, DEV_JOBS, DEV_NOT_FOUND]
+const DEV_PREFIX = '/_kay/dev/'
 const LOOPBACK = /^(?:127\.|::1$|::ffff:127\.)/
 
-// The data, UI, jobs and not-found routes answer a peer on this machine only, as `kay dev --host` would otherwise let the network read the database and rewrite files; `KAY_DEV_REMOTE=1` lets any peer in.
-// The peer is the socket's, so a proxy or tunnel on this machine passes as local.
+// Every dev route but the tool's scripts and the reload stream answers a peer on this machine only, as `kay dev --host` would otherwise let the network read the database, rewrite files and open the editor; `KAY_DEV_REMOTE=1` lets any peer in.
+// It is mounted before the first dev route, so one added later is covered too. The peer is the socket's, so a proxy or tunnel on this machine passes as local.
 export function refuseRemoteDevTools(app: Elysia): void {
   if (process.env.KAY_DEV_REMOTE === '1')
     return
@@ -586,7 +586,7 @@ export function refuseRemoteDevTools(app: Elysia): void {
   app.onBeforeHandle(({ request, server }) => {
     const path = new URL(request.url).pathname
 
-    if (!GUARDED_PATHS.some(guarded => path === guarded || path.startsWith(`${guarded}/`)))
+    if (!path.startsWith(DEV_PREFIX) || path === DEV_EVENTS || (request.method === 'GET' && path.endsWith('.js')))
       return
 
     const address = server?.requestIP(request)?.address
@@ -599,19 +599,24 @@ export function refuseRemoteDevTools(app: Elysia): void {
 }
 
 // What a dev server serves when the project failed to boot: the errors on every page, until a fix restarts it.
-export function bootFailure(error: unknown, root: string): Elysia {
+// Without the dev tool, as a server not started by `kay dev` has none, it answers the error page alone.
+export function bootFailure(error: unknown, root: string, tools = true): Elysia {
   // Told by its name: the class's module loads the compiler, which a production server never needs.
   const built = bootId
-  const html = compileErrorPage(error instanceof Error && error.name === 'KayCompileError' ? (error as KayCompileError).diagnostics : [], error) + errorPageScripts()
+  const html = compileErrorPage(error instanceof Error && error.name === 'KayCompileError' ? (error as KayCompileError).diagnostics : [], error) + (tools ? errorPageScripts() : '')
 
   const app = new Elysia({ name: 'kay/pages', seed: root })
 
   rememberBoot(true)
   refuseForeignHosts(app, siteFromEnv())
-  app.get(DEV_EVENTS, () => devEvents(true))
-  app.get(DEV_TOOL, () => devTool())
 
-  if (underKayDev()) {
+  if (tools) {
+    refuseRemoteDevTools(app)
+    app.get(DEV_EVENTS, () => devEvents(true))
+    app.get(DEV_TOOL, () => devTool())
+  }
+
+  if (tools && underKayDev()) {
     app.get(DEV_INSPECTOR, () => devInspector())
     app.post(DEV_OPEN, async ({ request }) => openInEditor(root, request))
   }
