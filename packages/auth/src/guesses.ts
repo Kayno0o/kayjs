@@ -3,6 +3,7 @@ import type { UserRecord } from './store'
 import { comparePasswords, hashPassword } from '@kaynooo/utils'
 import { afterResponse } from './events'
 import { randomToken } from './keys'
+import { spend } from './limits'
 import { notify } from './notify'
 
 // The counts one password guess is held to: a hard stop for this client on this account, and a looser ceiling for the account from every client together.
@@ -71,4 +72,23 @@ export async function passwordMatches(record: UserRecord | undefined, password: 
   await comparePasswords(password, await decoy)
 
   return false
+}
+
+// Counts one sign-in guess at the second factor, per client and per account, and says whether it is past the cap.
+// Only the first guess past the account's cap mails the holder, and at most once a day, as for passwords.
+export async function secondFactorLimited(state: RequestState, record: UserRecord): Promise<boolean> {
+  const { store, limits } = state.core
+
+  if (await spend(store, `two-factor:${state.client}`, limits.twoFactor))
+    return true
+
+  const guesses = await store.attempts.hit(`two-factor:${record.id}`, `${limits.twoFactorAccount.window}s`)
+
+  if (guesses <= limits.twoFactorAccount.max)
+    return false
+
+  if (guesses === limits.twoFactorAccount.max + 1)
+    await mailLockout(state, record)
+
+  return true
 }

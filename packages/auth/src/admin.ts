@@ -6,8 +6,8 @@ import { clamp } from '@kaynooo/utils'
 import { banned, linkedUser, publicUser } from './core'
 import { eraseLeavingUser } from './erase'
 import { auditEntries, report } from './events'
-import { revokeBearerTokens } from './sessions'
-import { provedLately } from './twoFactor'
+import { provedLately } from './proof'
+import { openSession, revokeBearerTokens } from './sessions'
 
 const USER_PAGE_MAX = 200
 const BAN_REASON_MAX_LENGTH = 500
@@ -261,4 +261,65 @@ export async function adminAuditLog(state: RequestState, query: { userId?: strin
     return { ok: false, error: 'forbidden' }
 
   return { ok: true, entries: await auditEntries(state.core, query) }
+}
+
+// Signs this browser in as `userId`, the admin's own sign-in kept for `stopImpersonating`; 'stale' unless the admin signed in or re-proved lately. Nothing that takes a proof works meanwhile, and another admin cannot be impersonated.
+export async function impersonate(state: RequestState, userId: string): Promise<{ ok: true } | { ok: false, error: AdminFailure | 'stale' | 'self' | 'admin' | 'banned' }> {
+  const acting = await changingAdmin(state)
+  const own = await state.session.get('auth')
+
+  if (!acting.ok || !own)
+    return { ok: false, error: acting.ok ? 'forbidden' : acting.error }
+
+  const { actor } = acting
+
+  const record = await state.core.store.users.get(userId)
+
+  if (!record)
+    return { ok: false, error: 'not-found' }
+
+  if (record.id === actor.id)
+    return { ok: false, error: 'self' }
+
+  if (await isAdmin(state, record))
+    return { ok: false, error: 'admin' }
+
+  if (banned(record))
+    return { ok: false, error: 'banned' }
+
+  await state.session.unset('authChallenge')
+  await state.session.regenerate()
+
+  const session = await openSession(state.core, record, state.address, state.userAgent)
+
+  // Signed in at 0, so nothing asking for a recent sign-in passes.
+  await state.session.set('auth', { user: record.id, version: record.sessionVersion, at: 0, session, impersonator: own })
+  state.adopt(record)
+  await report(state, record, 'impersonation-started', undefined, actor)
+
+  return { ok: true }
+}
+
+// Signs the admin back in as themselves; signed out when their own sign-in ended meanwhile. False when not impersonating.
+export async function stopImpersonating(state: RequestState): Promise<boolean> {
+  const signedIn = await state.session.get('auth')
+
+  if (!signedIn?.impersonator)
+    return false
+
+  const { impersonator } = signedIn
+  const record = await state.core.store.users.get(signedIn.user)
+  const actor = await state.core.store.users.get(impersonator.user)
+
+  if (record && actor)
+    await report(state, record, 'impersonation-ended', undefined, actor)
+
+  if (signedIn.session !== undefined)
+    await state.core.store.sessions.delete(signedIn.user, signedIn.session)
+
+  await state.session.regenerate()
+  await state.session.set('auth', impersonator)
+  await state.reload()
+
+  return true
 }

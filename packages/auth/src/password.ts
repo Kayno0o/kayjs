@@ -8,8 +8,6 @@ import { localPath } from 'kay'
 import { newPasswordProblem } from './breached'
 import { admit } from './captcha'
 import { backOf, homeOf, newUserRecord, publicUser, unlinked } from './core'
-import { warnHolder, welcome } from './email'
-import { eraseUser } from './erase'
 import { afterResponse, report } from './events'
 import { failGuess, forgive, passwordMatches, startGuess } from './guesses'
 import { validLocale } from './locale'
@@ -146,7 +144,9 @@ export async function register(state: RequestState, input: RegisterInput, option
   await state.session.set('authRegistered', record.id)
   await state.session.unset('authHeld')
   await keepBack(state, options.redirect)
-  await welcome(state, record, backOf(state.core, options.redirect))
+
+  if (state.core.email)
+    await (await import('./email')).welcome(state, record, backOf(state.core, options.redirect))
 
   // A guest stays signed in: the account was theirs already.
   if (requireVerified && !guest)
@@ -228,14 +228,14 @@ export async function createUser(core: Core, input: CreateUserInput): Promise<Cr
 // Frees the address and the name at once, under a placeholder address, and erases the account, `onDelete` included, off the response's path where registering signs no one in: a held address erases nothing, and the time the hook takes would tell it was unverified.
 async function replaceUnclaimed(state: RequestState, holder: UserRecord): Promise<void> {
   if (!state.core.email?.requireVerified) {
-    await eraseUser(state.core, holder)
+    await (await import('./erase')).eraseUser(state.core, holder)
 
     return
   }
 
   // The placeholder address keeps the account listed as unverified, so the stale sweep erases it should this erase fail or never run.
   await state.core.store.users.update(holder.id, { email: `replaced+${holder.id}@invalid`, username: null })
-  await afterResponse('erasing the account a registration replaced', async () => eraseUser(state.core, holder))
+  await afterResponse('erasing the account a registration replaced', async () => (await import('./erase')).eraseUser(state.core, holder))
 }
 
 // Spends the time hashing a new password takes, so a held address answers no faster than a free one, and leaves this session as a new account's, which `sendVerification` answers alike, mailing no one.
@@ -245,7 +245,9 @@ async function answerHeld(state: RequestState, holder: UserRecord, password: str
 
   await state.session.unset('authRegistered')
   await state.session.set('authHeld', holder.email!)
-  await warnHolder(state, holder)
+
+  if (state.core.email)
+    await (await import('./email')).warnHolder(state, holder)
 
   return { ok: true, signedIn: false }
 }

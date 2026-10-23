@@ -1,6 +1,5 @@
 import type { SessionSettings } from 'kay/server'
 import type { Core } from './core'
-import { eraseUser } from './erase'
 import { log } from './log'
 
 // What expired is deleted at most this often.
@@ -62,7 +61,7 @@ async function pruneStale(core: Core, now: number, kind: 'guest' | 'unverified')
 
         try {
           if (await stillStale(core, account.id, kind)) {
-            await eraseUser(core, account)
+            await (await import('./erase')).eraseUser(core, account)
             deleted++
 
             continue

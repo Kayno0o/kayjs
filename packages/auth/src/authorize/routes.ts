@@ -2,9 +2,7 @@ import type { Elysia } from 'elysia'
 import type { Core } from '../core'
 import type { RequestState } from '../state'
 import { AUTHORIZATION_SERVER_PATH, authorizationServerMetadata, OPEN_HEADERS, OPENID_CONFIGURATION_PATH, rootIsFixed, siteRoot } from './metadata'
-import { registerClient } from './register'
 import { refused } from './reply'
-import { tokenEndpoint } from './token'
 
 const BODY_MAX_LENGTH = 16 * 1024
 const DOCUMENT_HEADERS = { ...OPEN_HEADERS, 'content-type': 'application/json; charset=utf-8' }
@@ -54,7 +52,7 @@ export function serveOAuthServer(plugin: Elysia, core: Core, stateOf: (ctx: unkn
       if (text === undefined)
         return reply(refused('invalid_request', 'The request is too large'))
 
-      return reply(await tokenEndpoint(core, state.client, new URLSearchParams(text), siteRoot(core, ctx.request)))
+      return reply(await (await import('./token')).tokenEndpoint(core, state.client, new URLSearchParams(text), siteRoot(core, ctx.request)))
     }, { parse: 'none' })
     .options(`${core.prefix}/oauth/token`, preflight)
     .post(`${core.prefix}/oauth/register`, async (ctx) => {
@@ -69,7 +67,7 @@ export function serveOAuthServer(plugin: Elysia, core: Core, stateOf: (ctx: unkn
         document = undefined
       }
 
-      return reply(await registerClient(core, state.client, document))
+      return reply(await (await import('./register')).registerClient(core, state.client, document))
     }, { parse: 'none' })
     .options(`${core.prefix}/oauth/register`, preflight)
 }

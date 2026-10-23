@@ -20,6 +20,10 @@ export interface RequestState {
   via: () => 'session' | 'bearer' | null
   // Signs `record` in, `method` saying how for the `signed-in` event, and answers where the browser goes next; refused while an admin bans them.
   complete: (record: UserRecord, redirect: string, method: string) => Promise<{ ok: true, redirect: string } | { ok: false, error: 'banned' }>
+  // Takes `record` as the user this request is, as when an admin starts acting as them.
+  adopt: (record: UserRecord) => void
+  // Reads who the session is again, and signs it out when nobody is.
+  reload: () => Promise<void>
   // Keeps this session signed in as `record` after its session version was raised, when it is that user's.
   renew: (record: UserRecord) => Promise<void>
 }

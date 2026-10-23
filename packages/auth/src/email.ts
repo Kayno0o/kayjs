@@ -1,13 +1,13 @@
 import type { Duration } from 'kay'
 import type { Core } from './core'
 import type { AuthMailer, MailData, Templates } from './mail'
+import type { Proof, ProofFailure } from './proof'
 import type { EmailProblem, PasswordProblem } from './rules'
 import type { RequestState } from './state'
 import type { CodeType, LinkType, TokenType, UserRecord } from './store'
-import type { Proof, ProofFailure } from './twoFactor'
 import { hashPassword, nanoid } from '@kaynooo/utils'
 import { localPath } from 'kay'
-import { configError, durationSeconds, trackDetached } from 'kay/library'
+import { trackDetached } from 'kay/library'
 import { newPasswordProblem } from './breached'
 import { admit } from './captcha'
 import { backOf, banned, homeOf, withBack } from './core'
@@ -17,43 +17,9 @@ import { spend, typedKey } from './limits'
 import { log } from './log'
 import { sendAside, writing } from './mail'
 import { notify } from './notify'
+import { reprove } from './proof'
 import { emailProblem, normalizeEmail } from './rules'
 import { endOtherSessions, removeIdentities, revokeBearerTokens } from './sessions'
-import { reprove } from './twoFactor'
-
-const MINUTE = 60
-const HOUR = 60 * MINUTE
-
-// How long each link and code works, in seconds, unless the `email.maxAge` option says otherwise.
-const TOKEN_LIFETIMES: Record<TokenType, number> = {
-  'verify-email': 24 * HOUR,
-  'reset-password': HOUR,
-  'magic-link': 15 * MINUTE,
-  'change-email': HOUR,
-  'sign-in-code': 10 * MINUTE,
-  'verify-code': 10 * MINUTE,
-}
-
-// The lifetimes the `maxAge` option sets over the defaults, in seconds, a bad one failing at boot naming it.
-// `legacy` holds the lifetimes given under the old `expires` name, which an error names as the app wrote them.
-export function tokenLifetimes(maxAge: EmailOptions['maxAge'], legacy: EmailOptions['expires'] = {}): Record<TokenType, number> {
-  const lifetimes = { ...TOKEN_LIFETIMES }
-  const merged = { ...legacy, ...maxAge }
-  const named = (key: string): string => `email.${Object.hasOwn(maxAge ?? {}, key) ? 'maxAge' : 'expires'}.${key}`
-  const unknown = Object.keys(merged).find(key => !Object.hasOwn(TOKEN_LIFETIMES, key))
-
-  if (unknown !== undefined)
-    throw configError(`${named(unknown)} is no link or code of kayjs-auth`)
-
-  for (const type of Object.keys(lifetimes) as TokenType[]) {
-    const wanted = merged[type]
-
-    if (wanted !== undefined)
-      lifetimes[type] = durationSeconds(wanted, named(type))
-  }
-
-  return lifetimes
-}
 
 const CODE_LENGTH = 6
 // Wrong guesses one code takes before it dies, whatever the limits leave.

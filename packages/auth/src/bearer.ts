@@ -1,14 +1,14 @@
 import type { Duration } from 'kay'
 import type { Core } from './core'
+import type { Proof, ProofFailure } from './proof'
 import type { RequestState } from './state'
 import type { BearerTokenRecord, UserRecord } from './store'
-import type { Proof, ProofFailure } from './twoFactor'
 import { durationSeconds } from 'kay/library'
 import { banned, TOUCH_EVERY_MS } from './core'
 import { digest, randomToken } from './keys'
 import { notify } from './notify'
+import { reprove } from './proof'
 import { plainName } from './text'
-import { reprove } from './twoFactor'
 
 const LABEL_MAX_LENGTH = 64
 const BEARER = /^Bearer\s+(\S+)$/i

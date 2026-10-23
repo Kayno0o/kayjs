@@ -5,6 +5,7 @@ import { lookup } from 'node:dns/promises'
 import http from 'node:http'
 import https from 'node:https'
 import { isIP } from 'node:net'
+import { v6Bytes } from '../address'
 import { spend } from '../limits'
 import { validRedirectUris } from './uris'
 
@@ -30,32 +31,6 @@ export interface OAuthClient {
 
 // Reads a client's metadata document: its parsed JSON, or why not.
 export type DocumentFetcher = (url: string) => Promise<unknown>
-
-// The 16 bytes of an IPv6 address, an embedded dotted IPv4 tail included.
-export function v6Bytes(address: string): number[] | undefined {
-  let text = address.toLowerCase()
-  const zone = text.indexOf('%')
-
-  if (zone !== -1)
-    text = text.slice(0, zone)
-
-  const dotted = !text.includes('.') ? undefined : text.slice(text.lastIndexOf(':') + 1).split('.').map(Number)
-
-  if (dotted)
-    text = `${text.slice(0, text.lastIndexOf(':') + 1)}${((dotted[0]! << 8) | dotted[1]!).toString(16)}:${((dotted[2]! << 8) | dotted[3]!).toString(16)}`
-
-  const halves = text.split('::')
-
-  if (halves.length > 2)
-    return undefined
-
-  const groups = (part: string) => part === '' ? [] : part.split(':').map(group => Number.parseInt(group, 16))
-  const head = groups(halves[0]!)
-  const tail = halves.length === 2 ? groups(halves[1]!) : []
-  const all = halves.length === 2 ? [...head, ...Array.from<number>({ length: Math.max(0, 8 - head.length - tail.length) }).fill(0), ...tail] : head
-
-  return all.length === 8 && all.every(group => Number.isInteger(group) && group >= 0 && group <= 0xFFFF) ? all.flatMap(group => [group >> 8, group & 0xFF]) : undefined
-}
 
 // Whether an address is one a client's document must not be read from: this machine, a private network, or anything else not on the public internet.
 export function privateAddress(address: string): boolean {

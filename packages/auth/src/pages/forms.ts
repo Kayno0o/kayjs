@@ -1,7 +1,7 @@
 import type { MinTimeRefusal } from 'kay'
 import type { Auth } from '../auth'
 import type { CaptchaAction } from '../captcha'
-import type { Proof } from '../twoFactor'
+import type { Proof } from '../proof'
 import type { AuthFeatures, ProfileProblem } from './index'
 import { t } from 'elysia'
 import { wording } from 'kay/words'

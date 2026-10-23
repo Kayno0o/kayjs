@@ -5,7 +5,7 @@ import type { KayConfig, Session } from 'kay/server'
 import type { ChangeUsernameResult } from './account'
 import type { AdminFailure, BanResult, DeleteResult, ManagedUser, RoleResult, UnbanResult } from './admin'
 import type { ApprovedClient } from './authorize/grants'
-import type { AuthorizeOutcome, AuthorizeParams } from './authorize/request'
+import type { AuthorizeOutcome, AuthorizeParams, decide } from './authorize/request'
 import type { BearerToken, CreateTokenResult, IssueTokenResult, TokenOptions } from './bearer'
 import type { CaptchaAction, CaptchaOptions } from './captcha'
 import type { AuthSessionData, BareUser, Core, OAuthApp, Off, Profile, SignedIn, User } from './core'
@@ -17,7 +17,7 @@ import type { ScopeRequirement } from './gate'
 import type { LimitsOption } from './limits'
 import type { LinkProviderResult, OAuthFailure } from './oauth/flow'
 import type { AcceptResult, CreateOrganizationResult, Invitation, InviteResult, Member, MemberResult, Membership, OrganizationFailure, OrganizationsOptions, UpdateOrganizationResult } from './organizations'
-import type { AuthFeatures, AuthPagesConfig, PagesHandle, ProfileFieldView, ProfileProblem } from './pages'
+import type { AuthFeatures, AuthPagesConfig, ProfileFieldView, ProfileProblem } from './pages'
 import type { Passkey, PasskeyOptionsResult, PasskeySignInResult, RegisterPasskeyResult } from './passkeys'
 import type { CreateUserInput, CreateUserResult, PasswordSignInInput, PasswordSignInResult, RegisterInput, RegisterResult } from './password'
 import type { RoleHierarchy } from './roles'
@@ -25,53 +25,51 @@ import type { CredentialRules, PasswordProblem } from './rules'
 import type { UserSession } from './sessions'
 import type { SignInOptions } from './signInOptions'
 import type { RequestState } from './state'
-import type { AuthStore, LinkType, SessionRecord, UserRecord } from './store'
+import type { AuthStore, SessionRecord, UserRecord } from './store'
 import type { Proof, ProofFailure, TwoFactorResult, TwoFactorSetup } from './twoFactor'
 import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
-import { asConfigError, callHook, configError, configuredSite, durationSeconds, nameUser, overHttps, READ_METHODS, requestOfContext, stoppers, underKayDev } from 'kay/library'
+import { configError, nameUser, overHttps, READ_METHODS, requestOfContext, stoppers, underKayDev } from 'kay/library'
 import { clientAddress, crossSiteRefused, crossSiteResponse, rateKey } from 'kay/server'
-import { changePassword, changeUsername, deleteAccount, unlink } from './account'
-import { actingAdmin, adminAuditLog, banUser, changeRole, changingAdmin, deleteUser, getUser, isAdmin, listUsers, unbanUser } from './admin'
-import { documentFetcher } from './authorize/clients'
-import { approvedClients, revokeClient } from './authorize/grants'
 import { protectedResourceMetadata, rootIsFixed, rootUsable, siteRoot } from './authorize/metadata'
-import { authorize, decide } from './authorize/request'
 import { serveOAuthServer } from './authorize/routes'
 import { bearerRequest, bearerUser, createToken, issueToken, listTokens, revokeToken, tokenUser } from './bearer'
-import { pwnedPassword } from './breached'
-import { admit, captchaChallenge, captchaRequired, proofOfWork } from './captcha'
+import { admit, captchaChallenge, captchaRequired } from './captcha'
 import { backOf, banned, guardPageOf, homeOf, isNavigation, linkedProviders, linkedUser, newUserRecord, OFF, publicUser, unlinked, withBack, withQuery } from './core'
-import { changeEmail, confirmEmailChange, pendingCode, requestMagicLink, requestPasswordReset, resetPassword, sendVerification, signInWithEmailCode, signInWithMagicLink, tokenLifetimes, verifyEmail, verifyEmailCode } from './email'
-import { soleOwned } from './erase'
 import { auditEntries, report } from './events'
-import { exportData } from './export'
-import { forwardOf, serveForwardAuth } from './forwardAuth'
+import { serveForwardAuth } from './forwardAuth'
 import { createGate, scopeAllows } from './gate'
-import { deriveKeys } from './keys'
-import { resolveLimits } from './limits'
 import { acceptedLocales, validLocale } from './locale'
-import { log } from './log'
-import { localeTemplates } from './mail'
 import { noteSignIn, notify } from './notify'
-import { createOAuthClient } from './oauth/client'
-import { finishOAuth, providerToken, sealTokens, startLink, startOAuth } from './oauth/flow'
 import { safeRedirect } from './oauth/redirect'
-import { createOAuthTokenRefresher } from './oauth/refresher'
-import { acceptInvitation, createOrganization, declineInvitation, deleteOrganization, getInvitation, getMembership, holdsInOrganization, invite, listInvitations, listMembers, listMemberships, myInvitations, organizationsCore, removeMember, revokeInvitation, setMemberRoles, updateOrganization } from './organizations'
-import { AUTH_OF, CHECK_USER, DEFAULT_PREFIX as DEFAULT_PAGES_PREFIX, featuresOf, pagePaths, PAGES_OF, pagesOf, profileLabel, profileValue } from './pages'
-import { listPasskeys, passkeyProofOptions, passkeyRegistrationOptions, passkeySignInOptions, registerPasskey, removePasskey, renamePasskey, signInWithPasskey, twoFactorPasskeyOptions, verifyTwoFactorPasskey } from './passkeys'
-import { createUser, register, signInWithPassword, userProblems } from './password'
+import { AUTH_OF, CHECK_USER, featuresOf, PAGES_OF } from './pages'
+import { challenged, completeSignIn, provedLately, reprove } from './proof'
 import { pruneWhenDue } from './prune'
 import { meetsRequirement } from './requirement'
 import { createRoleHierarchy } from './roles'
-import { normalizeEmail, normalizeUsername, PROFILE_MAX_LENGTH, resolveRules } from './rules'
 import { applyLifetime, chooseRemember, listSessions, liveSession, openSession, revokeBearerTokens } from './sessions'
-import { challenged, completeSignIn, disableTwoFactor, enableTwoFactor, provedLately, regenerateRecoveryCodes, reprove, setUpTwoFactor, verifyTwoFactor } from './twoFactor'
-import { mergedData, userDataRules } from './userData'
+import { createCore, pagesHandle } from './setup'
+import { dropSession } from './testCookies'
 import { readRequestWith, registerViewer } from './viewer'
 
 export type { AuthSessionData, BareUser, OAuthApp, Off, Profile, User } from './core'
+
+// Each feature's module, read when a request first reaches it: an app that leaves a feature off, or never calls it, never loads it.
+const load = {
+  account: async () => import('./account'),
+  admin: async () => import('./admin'),
+  email: async () => import('./email'),
+  erase: async () => import('./erase'),
+  profile: async () => import('./profile'),
+  exports: async () => import('./export'),
+  flow: async () => import('./oauth/flow'),
+  grants: async () => import('./authorize/grants'),
+  organizations: async () => import('./organizations'),
+  passkeys: async () => import('./passkeys'),
+  password: async () => import('./password'),
+  request: async () => import('./authorize/request'),
+  twoFactor: async () => import('./twoFactor'),
+}
 
 export interface RequireUserOptions<Scope extends string, Role extends string> {
   redirect?: string | undefined
@@ -90,19 +88,10 @@ const REQUIRES: unique symbol = Symbol.for('kayjs-auth.requires')
 export const SIGNED_IN_HINT = 'kay_user'
 // How long a user read stays good. A request is over long before; a websocket, which keeps its `Auth` for its life, reads its user again past it, so a sign-out, a revoked token or a ban reaches it.
 const USER_FRESH_MS = 30 * 1000
-const TRAILING_SLASH = /\/$/
-
-const DEFAULT_REMEMBER_MAX_AGE = 90 * 24 * 60 * 60
-const DEFAULT_AUDIT_MAX_AGE = 365 * 24 * 60 * 60
-const DEFAULT_GUEST_MAX_AGE = 30 * 24 * 60 * 60
-const DEFAULT_UNVERIFIED_MAX_AGE = 30 * 24 * 60 * 60
-const LINK_TYPES: LinkType[] = ['verify-email', 'reset-password', 'magic-link', 'change-email']
 // The close code of a socket whose user is gone: a policy violation.
 const SOCKET_USER_GONE = 1008
 // The sockets `socketUser` answered a user for, to close once that user is gone.
 const servedSockets = new WeakSet<object>()
-// The session cookie names `signInAs` set in a test site's jar, dropped with the default ones when the site signs out or in again.
-const signedInCookies = new WeakMap<Bun.CookieMap, string[]>()
 // What a provider posting back to the callback may say, carried over to the GET.
 const FORM_POST_FIELDS = ['code', 'state', 'error', 'user']
 
@@ -233,11 +222,6 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   authorize?: ((user: BareUser | null, requirement: AuthRequirement<Role>, level: Level, ctx: PolicyContext) => Promise<boolean>) | undefined
 }
 
-// A hook of the options as the positional function the core calls, given its event object or, in the old shape, its arguments.
-function hooked<Args extends unknown[], Result>(hook: ((...args: never[]) => Result) | undefined, event: (...args: Args) => object): ((...args: Args) => Result) | undefined {
-  return hook && ((...args: Args) => callHook(hook, event(...args), args))
-}
-
 // Auth for one request, as `auth` in the context: `ctx.locals.auth` in a page, an action or a guard.
 export class Auth<Scope extends string = string, Role extends string = string, OrgRole extends string = string, UserData extends object = Record<string, unknown>> {
   readonly [STATE]: RequestState
@@ -275,6 +259,16 @@ export class Auth<Scope extends string = string, Role extends string = string, O
       current: async () => this.record(),
       via: () => this.source,
       complete: async (record, redirect, method) => completeSignIn(this[STATE], record, redirect, method, async (signedIn, how) => this.establish(signedIn, how)),
+      adopt: (record) => {
+        this.resolving = Promise.resolve(record)
+      },
+      reload: async () => {
+        this.source = null
+        this.resolving = undefined
+
+        if (!(await this.record()))
+          await this.leave()
+      },
       renew: async (record) => {
         // Read off the session, not through `record()`: the version it holds is the one just raised past.
         const signedIn = await this.session.get('auth')
@@ -375,7 +369,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
     const user = await this.requireUser()
 
-    return await actingAdmin(this[STATE]) ? user : stoppers(this.request).deny(403)
+    return await (await load.admin()).actingAdmin(this[STATE]) ? user : stoppers(this.request).deny(403)
   }
 
   // The `guard()` of kayjs-auth, for a `_guard.ts` that cannot import the `createAuth` result: the guard of the one behind this request.
@@ -402,9 +396,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     if (!profile || !user || await this.via() !== 'session')
       return null
 
-    const held = await profile.load(user as BareUser)
-
-    return Object.entries(profile.fields).map(([name, field]) => ({ ...field, label: profileLabel(field.label, locale), name, maxLength: field.maxLength ?? PROFILE_MAX_LENGTH, value: profileValue(name, Object.hasOwn(held, name) ? held[name] : undefined) }))
+    return (await load.profile()).profileFields(profile, user as BareUser, locale)
   }
 
   // Stores the values posted from that form through `pages.profile.save`, once trimmed and checked against each field's `required` and `maxLength`: names that are no field are dropped, and nothing is stored while any field is refused.
@@ -420,30 +412,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     if (!user || await this.via() !== 'session')
       return { ok: false, error: 'signed-out' }
 
-    const clean: Record<string, string> = {}
-    const errors: Record<string, ProfileProblem> = {}
-
-    for (const [name, field] of Object.entries(profile.fields)) {
-      const raw = Object.hasOwn(values, name) ? values[name] : undefined
-      const value = typeof raw === 'string' ? raw.trim() : ''
-
-      clean[name] = value
-
-      if (value === '' && field.required)
-        errors[name] = 'required'
-      else if (value.length > (field.maxLength ?? PROFILE_MAX_LENGTH))
-        errors[name] = 'too-long'
-    }
-
-    if (Object.keys(errors).length > 0)
-      return { ok: false, errors }
-
-    const refused = await profile.save(user as BareUser, clean)
-
-    if (!refused)
-      return { ok: true }
-
-    return { ok: false, errors: Object.fromEntries(Object.entries(refused.errors).flatMap(([name, message]) => typeof message === 'string' && Object.hasOwn(profile.fields, name) ? [[name, { message }]] : [])) }
+    return (await load.profile()).saveProfile(profile, user as BareUser, values)
   }
 
   // How `user()` found the user: their session, or a bearer token; null when anonymous.
@@ -557,7 +526,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
     await chooseRemember(this[STATE], options?.remember)
 
-    return register(this[STATE], input, options)
+    return (await load.password()).register(this[STATE], input, options)
   }
 
   // Signs in with an email or a username and a password; a wrong password and an unknown account answer alike.
@@ -567,17 +536,17 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
     await chooseRemember(this[STATE], options?.remember)
 
-    return signInWithPassword(this[STATE], input, options ?? {})
+    return (await load.password()).signInWithPassword(this[STATE], input, options ?? {})
   }
 
   // Mails a new link verifying the address to the signed-in user or, with nobody signed in, to the account this browser registered or proved the password of with an 'unverified' answer.
   async sendVerification(): Promise<MailRequestResult | { ok: false, error: 'signed-out' | 'verified' }> {
-    return sendVerification(this[STATE])
+    return (await load.email()).sendVerification(this[STATE])
   }
 
   // Spends a verification link's token in the browser signed in as the account, that registered it or that proved its password, or given the account's password: `{ ok: false, error: 'confirm' }` asks for one of them, the link still usable.
   async verifyEmail(token: string, password?: string): Promise<VerifyEmailResult> {
-    return verifyEmail(this[STATE], token, password)
+    return (await load.email()).verifyEmail(this[STATE], token, password)
   }
 
   // Mails a reset link to that address when an account has it; answers alike when none does. The reset signs in to `redirect` when given.
@@ -585,12 +554,12 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     if (!this.core.switches.password)
       return OFF
 
-    return requestPasswordReset(this[STATE], email, options.captcha, options.redirect)
+    return (await load.email()).requestPasswordReset(this[STATE], email, options.captcha, options.redirect)
   }
 
   // Spends a reset link's token on a new password, signing the user out everywhere else and in here.
   async resetPassword(token: string, password: string): Promise<ResetPasswordResult | Off> {
-    return !this.core.switches.password ? OFF : resetPassword(this[STATE], token, password)
+    return !this.core.switches.password ? OFF : (await load.email()).resetPassword(this[STATE], token, password)
   }
 
   // Mails a sign-in link to that address when an account has it; answers alike when none does. `remember` holds for the link opened in this browser, or the code typed in it.
@@ -600,42 +569,42 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
     await chooseRemember(this[STATE], options.remember)
 
-    return requestMagicLink(this[STATE], email, options.redirect, options.captcha)
+    return (await load.email()).requestMagicLink(this[STATE], email, options.redirect, options.captcha)
   }
 
   // Spends a magic link's token, signing its user in.
   async signInWithMagicLink(token: string): Promise<LinkResult | Off> {
-    return !this.core.switches.magicLink ? OFF : signInWithMagicLink(this[STATE], token)
+    return !this.core.switches.magicLink ? OFF : (await load.email()).signInWithMagicLink(this[STATE], token)
   }
 
   // Signs in with the code a magic link mail carried, typed in the browser that asked for it.
   async signInWithEmailCode(code: string): Promise<CodeResult | Off> {
-    return !this.core.switches.magicLink ? OFF : signInWithEmailCode(this[STATE], code)
+    return !this.core.switches.magicLink ? OFF : (await load.email()).signInWithEmailCode(this[STATE], code)
   }
 
   // Verifies the address with the code its verification mail carried, typed in the browser that asked for it.
   async verifyEmailCode(code: string): Promise<CodeResult> {
-    return verifyEmailCode(this[STATE], code)
+    return (await load.email()).verifyEmailCode(this[STATE], code)
   }
 
   // The code this browser waits for, sign-in or verification, and the address it went to; null when none.
   async emailCodePending(): Promise<{ type: 'sign-in' | 'verify', email: string } | null> {
-    return pendingCode(this[STATE])
+    return (await load.email()).pendingCode(this[STATE])
   }
 
   // Mails the signed-in user's new address a link confirming it.
   async changeEmail(proof: Proof, email: string): Promise<ChangeEmailResult> {
-    return changeEmail(this[STATE], proof, email)
+    return (await load.email()).changeEmail(this[STATE], proof, email)
   }
 
   // Spends an email change link's token: the account moves to the new address, and the user's other sessions end.
   async confirmEmailChange(token: string): Promise<LinkResult> {
-    return confirmEmailChange(this[STATE], token)
+    return (await load.email()).confirmEmailChange(this[STATE], token)
   }
 
   // A fresh access token for the signed-in user's account at `provider`, refreshed when about to expire; null without one, or once the provider refuses a refresh.
   async providerToken(provider: string): Promise<string | null> {
-    return providerToken(this[STATE], provider)
+    return (await load.flow()).providerToken(this[STATE], provider)
   }
 
   // Sets the language the signed-in user's mails are written in, a BCP 47 tag such as `fr`; refused with `signed-out`, or `invalid-locale` for anything else than a tag.
@@ -660,22 +629,22 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
   // What the authorization endpoint does with an MCP client's request: send the visitor to sign in, show the consent page, or go back to the client with a code once they approved it for these scopes.
   async oauthAuthorize(params: AuthorizeParams): Promise<AuthorizeOutcome> {
-    return this.core.oauthServer ? authorize(this[STATE], params, siteRoot(this.core, this.request)) : { kind: 'error', error: 'client' }
+    return this.core.oauthServer ? (await load.request()).authorize(this[STATE], params, siteRoot(this.core, this.request)) : { kind: 'error', error: 'client' }
   }
 
   // The user's answer on the consent page, checked again as the request is: where the browser goes next.
   async oauthDecide(fields: AuthorizeParams, allow: boolean): Promise<Awaited<ReturnType<typeof decide>>> {
-    return this.core.oauthServer ? decide(this[STATE], fields, allow, siteRoot(this.core, this.request)) : { ok: false, error: 'client' }
+    return this.core.oauthServer ? (await load.request()).decide(this[STATE], fields, allow, siteRoot(this.core, this.request)) : { ok: false, error: 'client' }
   }
 
   // The apps the signed-in user approved to act as them.
   async listOAuthClients(): Promise<ApprovedClient[]> {
-    return approvedClients(this[STATE])
+    return (await load.grants()).approvedClients(this[STATE])
   }
 
   // Takes an app's approval back with every token it was given; refused with `not-found` when there was none, and `signed-out` outside the user's own session.
   async revokeOAuthGrant(clientId: string): Promise<{ ok: true } | { ok: false, error: 'signed-out' | 'not-found' }> {
-    return revokeClient(this[STATE], clientId)
+    return (await load.grants()).revokeClient(this[STATE], clientId)
   }
 
   // The RFC 9728 metadata of the protected resource `name` served at `path`, which kay's MCP endpoint asks for; null while the OAuth server is off. It points MCP clients at the app's own authorization server.
@@ -722,7 +691,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
   // Finishes a sign-in waiting for its second factor with an authenticator code or a recovery code.
   async verifyTwoFactor(code: string): Promise<TwoFactorResult> {
-    return verifyTwoFactor(this[STATE], code, async (record, method) => this.establish(record, method))
+    return (await load.twoFactor()).verifyTwoFactor(this[STATE], code, async (record, method) => this.establish(record, method))
   }
 
   // Whether this session signed in or re-proved its user in the last ten minutes, as `exportData()` and the admin methods ask, for a page to show a form for `reprove` first.
@@ -739,21 +708,21 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
   // A secret for the signed-in user's authenticator, as text and as a QR code; the second factor turns on once `enableTwoFactor` gets a code from it.
   async setUpTwoFactor(proof: Proof): Promise<{ ok: true, setup: TwoFactorSetup } | { ok: false, error: ProofFailure | 'enabled' } | Off> {
-    return !this.core.switches.twoFactor ? OFF : setUpTwoFactor(this[STATE], proof)
+    return !this.core.switches.twoFactor ? OFF : (await load.twoFactor()).setUpTwoFactor(this[STATE], proof)
   }
 
   // Turns the second factor on with a code from the authenticator just set up; answers the recovery codes, to show this once.
   async enableTwoFactor(code: string): Promise<{ ok: true, recoveryCodes: string[] } | { ok: false, error: 'signed-out' | 'not-set-up' | 'enabled' | 'invalid' | 'limited' } | Off> {
-    return !this.core.switches.twoFactor ? OFF : enableTwoFactor(this[STATE], code)
+    return !this.core.switches.twoFactor ? OFF : (await load.twoFactor()).enableTwoFactor(this[STATE], code)
   }
 
   async disableTwoFactor(proof: Proof): Promise<{ ok: true } | { ok: false, error: ProofFailure }> {
-    return disableTwoFactor(this[STATE], proof)
+    return (await load.twoFactor()).disableTwoFactor(this[STATE], proof)
   }
 
   // A new set of recovery codes, the old ones void.
   async regenerateRecoveryCodes(proof: Proof): Promise<{ ok: true, recoveryCodes: string[] } | { ok: false, error: ProofFailure | 'disabled' }> {
-    return regenerateRecoveryCodes(this[STATE], proof)
+    return (await load.twoFactor()).regenerateRecoveryCodes(this[STATE], proof)
   }
 
   // How many unused recovery codes the signed-in user has, to warn when few are left.
@@ -765,35 +734,35 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
   // Sets the signed-in user's password, or a first one, and ends their other sessions.
   async changePassword(proof: Proof, password: string): Promise<{ ok: true } | { ok: false, error: ProofFailure } | { ok: false, errors: { password: PasswordProblem | 'breached' } } | Off> {
-    return !this.core.switches.password ? OFF : changePassword(this[STATE], proof, password)
+    return !this.core.switches.password ? OFF : (await load.account()).changePassword(this[STATE], proof, password)
   }
 
   // Names the signed-in user, or renames them, under the rules register checks; no proof, a name being no credential.
   async changeUsername(username: string): Promise<ChangeUsernameResult> {
-    return changeUsername(this[STATE], username)
+    return (await load.account()).changeUsername(this[STATE], username)
   }
 
   // Where to send the browser to link `provider` to the signed-in user once `proof` re-proves them, the second factor when it is on; it comes back to `redirect`.
   async linkProvider(provider: string, proof: Proof, options: { redirect?: string } = {}): Promise<LinkProviderResult> {
-    return startLink(this[STATE], provider, proof, options.redirect)
+    return this.core.oauth.has(provider) ? (await load.flow()).startLink(this[STATE], provider, proof, options.redirect) : { ok: false, error: 'not-found' }
   }
 
   // Unlinks a provider from the signed-in user, unless it is their last way in.
   async unlink(provider: string, proof: Proof): Promise<{ ok: true } | { ok: false, error: ProofFailure | 'not-linked' | 'last-way-in' }> {
     this.linked = new WeakMap()
 
-    return unlink(this[STATE], provider, proof)
+    return (await load.account()).unlink(this[STATE], provider, proof)
   }
 
   // Deletes the signed-in user, calling `onDelete` for the app's own records, and signs this session out; the last admin and the only owner of an organization with other members are refused, an organization they are alone in is deleted with them.
   async deleteAccount(proof: Proof): Promise<{ ok: true } | { ok: false, error: ProofFailure | 'last-admin' | 'last-owner' }> {
-    return deleteAccount(this[STATE], proof, async () => this.signOut())
+    return (await load.account()).deleteAccount(this[STATE], proof, async () => this.signOut())
   }
 
   // The organizations deleting the signed-in user's account touches, by name: `deleted` are the ones they are the only member of, which go with them, `blocked` the ones they solely own with other members, which refuse the deletion (`last-owner`) until another owner is named.
   async deletionImpact(): Promise<{ deleted: string[], blocked: string[] }> {
     const record = await this[STATE].current()
-    const owned = record ? await soleOwned(this[STATE].core, record) : []
+    const owned = record ? await (await load.erase()).soleOwned(this[STATE].core, record) : []
 
     return { deleted: owned.filter(organization => organization.alone).map(organization => organization.name), blocked: owned.filter(organization => !organization.alone).map(organization => organization.name) }
   }
@@ -839,25 +808,25 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
   // The options for `makePasskey` of `@kaynooo/kayjs-auth/browser`, to make a passkey for the signed-in user once `proof` re-proves them, the second factor when it is on.
   async passkeyRegistrationOptions(proof: Proof): Promise<PasskeyOptionsResult<PublicKeyCredentialCreationOptionsJSON, ProofFailure | Off['error']>> {
-    return !this.core.switches.passkeys ? OFF : passkeyRegistrationOptions(this[STATE], proof)
+    return !this.core.switches.passkeys ? OFF : (await load.passkeys()).passkeyRegistrationOptions(this[STATE], proof)
   }
 
   // Keeps the passkey `makePasskey` made, under `name` or the browser and system it was made on.
   async registerPasskey(response: RegistrationResponseJSON, name?: string): Promise<RegisterPasskeyResult | Off> {
-    return !this.core.switches.passkeys ? OFF : registerPasskey(this[STATE], response, name)
+    return !this.core.switches.passkeys ? OFF : (await load.passkeys()).registerPasskey(this[STATE], response, name)
   }
 
   async listPasskeys(): Promise<Passkey[]> {
-    return listPasskeys(this[STATE])
+    return (await load.passkeys()).listPasskeys(this[STATE])
   }
 
   // Renames one of the signed-in user's passkeys; refused with `not-found` for one that is not theirs and `invalid-name` for a blank name.
   async updatePasskeyName(id: string, name: string): Promise<{ ok: true } | { ok: false, error: 'signed-out' | 'not-found' | 'invalid-name' }> {
-    return renamePasskey(this[STATE], id, name)
+    return (await load.passkeys()).renamePasskey(this[STATE], id, name)
   }
 
   async revokePasskey(id: string, proof: Proof): Promise<{ ok: true } | { ok: false, error: ProofFailure | 'not-found' | 'last-way-in' }> {
-    return removePasskey(this[STATE], id, proof)
+    return (await load.passkeys()).removePasskey(this[STATE], id, proof)
   }
 
   // The options for `askPasskey` of `@kaynooo/kayjs-auth/browser`, naming no account; with its `autofill` the browser offers the passkeys in the sign-in field's autofill.
@@ -865,7 +834,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     if (!this.core.switches.passkeys)
       throw configError('passkeys are switched off: `passkeys: false` in the options of createAuth or auth()')
 
-    return passkeySignInOptions(this[STATE])
+    return (await load.passkeys()).passkeySignInOptions(this[STATE])
   }
 
   // Signs in with the passkey that answered `passkeySignInOptions`, with no second factor after it.
@@ -875,24 +844,24 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
     await chooseRemember(this[STATE], options.remember)
 
-    return signInWithPasskey(this[STATE], response, options.redirect, async (record, method) => this.establish(record, method))
+    return (await load.passkeys()).signInWithPasskey(this[STATE], response, options.redirect, async (record, method) => this.establish(record, method))
   }
 
   // The options for answering a pending sign-in's second factor with a passkey; `none` when the user has none.
   async twoFactorPasskeyOptions(): Promise<PasskeyOptionsResult<PublicKeyCredentialRequestOptionsJSON>> {
-    return !this.core.switches.passkeys ? OFF : twoFactorPasskeyOptions(this[STATE])
+    return !this.core.switches.passkeys ? OFF : (await load.passkeys()).twoFactorPasskeyOptions(this[STATE])
   }
 
   async verifyTwoFactorPasskey(response: AuthenticationResponseJSON): Promise<TwoFactorResult | Off> {
     if (!this.core.switches.passkeys)
       return OFF
 
-    return verifyTwoFactorPasskey(this[STATE], response, async (record, method) => this.establish(record, method))
+    return (await load.passkeys()).verifyTwoFactorPasskey(this[STATE], response, async (record, method) => this.establish(record, method))
   }
 
   // The options for re-proving with a passkey, its answer then passed as `{ passkey }` wherever a proof is asked.
   async passkeyProofOptions(): Promise<PasskeyOptionsResult<PublicKeyCredentialRequestOptionsJSON>> {
-    return !this.core.switches.passkeys ? OFF : passkeyProofOptions(this[STATE])
+    return !this.core.switches.passkeys ? OFF : (await load.passkeys()).passkeyProofOptions(this[STATE])
   }
 
   // The signed-in user's own audit log, newest first, a page of `limit` (50 by default) before `before`, an instant or the last entry of the page (which tells entries of one millisecond apart); empty without the `audit` option.
@@ -904,12 +873,12 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
   // The users, newest first, a page of `limit` (50 by default) from `offset`; `search` matches part of an email or a username, or a whole id. For an admin only, as every method below.
   async listUsers(query: { search?: string, offset?: number, limit?: number } = {}): Promise<{ ok: true, users: ManagedUser[], total: number } | { ok: false, error: 'forbidden' }> {
-    return listUsers(this[STATE], query)
+    return (await load.admin()).listUsers(this[STATE], query)
   }
 
   // One user; `admin` tells whether they meet the `admin` option, whom an admin can neither ban, impersonate nor delete.
   async getUser(userId: string): Promise<{ ok: true, user: ManagedUser, admin: boolean } | { ok: false, error: AdminFailure }> {
-    return getUser(this[STATE], userId)
+    return (await load.admin()).getUser(this[STATE], userId)
   }
 
   // The roles an admin may give, those `roles` declares; none without it.
@@ -919,96 +888,41 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
   // Gives a user a role the app declares, effective on their next request.
   async grantRole(userId: string, role: Role): Promise<RoleResult> {
-    return changeRole(this[STATE], userId, role, true)
+    return (await load.admin()).changeRole(this[STATE], userId, role, true)
   }
 
   // Takes a role back; one that would leave the admin asking no longer an admin is refused (`self`), and one that races another admin's revoke and would leave none is undone (`last-admin`).
   async revokeRole(userId: string, role: Role): Promise<RoleResult> {
-    return changeRole(this[STATE], userId, role, false)
+    return (await load.admin()).changeRole(this[STATE], userId, role, false)
   }
 
   // Bars a user from signing in, for good or `until` then, and signs them out everywhere; another admin is refused.
   async banUser(userId: string, options: { reason?: string, until?: Date } = {}): Promise<BanResult> {
-    return banUser(this[STATE], userId, options)
+    return (await load.admin()).banUser(this[STATE], userId, options)
   }
 
   async unbanUser(userId: string): Promise<UnbanResult> {
-    return unbanUser(this[STATE], userId)
+    return (await load.admin()).unbanUser(this[STATE], userId)
   }
 
   // Deletes a user with everything kayjs-auth keeps for them, calling `onDelete` and mailing them the account-deleted notice; oneself and another admin are refused.
   async deleteUser(userId: string): Promise<DeleteResult> {
-    return deleteUser(this[STATE], userId)
+    return (await load.admin()).deleteUser(this[STATE], userId)
   }
 
   // Everyone's audit log, or `userId`'s, newest first.
   async listAdminAuditLog(query: { userId?: string, before?: AuditCursorInput, limit?: number } = {}): Promise<{ ok: true, entries: AuditEntry[] } | { ok: false, error: 'forbidden' }> {
-    return adminAuditLog(this[STATE], query)
+    return (await load.admin()).adminAuditLog(this[STATE], query)
   }
 
   // Signs this browser in as `userId`, the admin's own sign-in kept for `stopImpersonating`; 'stale' unless the admin signed in or re-proved lately. Nothing that takes a proof works meanwhile, and another admin cannot be impersonated.
   async impersonate(userId: string): Promise<{ ok: true } | { ok: false, error: AdminFailure | 'stale' | 'self' | 'admin' | 'banned' }> {
-    const acting = await changingAdmin(this[STATE])
-    const own = await this.session.get('auth')
-
-    if (!acting.ok || !own)
-      return { ok: false, error: acting.ok ? 'forbidden' : acting.error }
-
-    const { actor } = acting
-
-    const record = await this.core.store.users.get(userId)
-
-    if (!record)
-      return { ok: false, error: 'not-found' }
-
-    if (record.id === actor.id)
-      return { ok: false, error: 'self' }
-
-    if (await isAdmin(this[STATE], record))
-      return { ok: false, error: 'admin' }
-
-    if (banned(record))
-      return { ok: false, error: 'banned' }
-
-    await this.session.unset('authChallenge')
-    await this.session.regenerate()
-
-    const session = await openSession(this.core, record, this[STATE].address, this[STATE].userAgent)
-
-    // Signed in at 0, so nothing asking for a recent sign-in passes.
-    await this.session.set('auth', { user: record.id, version: record.sessionVersion, at: 0, session, impersonator: own })
-    this.resolving = Promise.resolve(record)
-    await report(this[STATE], record, 'impersonation-started', undefined, actor)
-
-    return { ok: true }
+    return (await load.admin()).impersonate(this[STATE], userId)
   }
 
   // Signs the admin back in as themselves; signed out when their own sign-in ended meanwhile. False when not impersonating.
   async stopImpersonating(): Promise<boolean> {
-    const signedIn = await this.session.get('auth')
-
-    if (!signedIn?.impersonator)
-      return false
-
-    const { impersonator } = signedIn
-    const record = await this.core.store.users.get(signedIn.user)
-    const actor = await this.core.store.users.get(impersonator.user)
-
-    if (record && actor)
-      await report(this[STATE], record, 'impersonation-ended', undefined, actor)
-
-    if (signedIn.session !== undefined)
-      await this.core.store.sessions.delete(signedIn.user, signedIn.session)
-
-    await this.session.regenerate()
-    await this.session.set('auth', impersonator)
-    this.source = null
-    this.resolving = undefined
-
-    if (!(await this.record()))
-      await this.leave()
-
-    return true
+    return (await load.admin()).stopImpersonating(this[STATE])
   }
 
   // The admin acting as the signed-in user, to show while they do; null otherwise.
@@ -1021,94 +935,94 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
   // Everything kayjs-auth keeps about the signed-in user, secrets left out, with the app's own from `exportData`: for a download of their data.
   async exportData(): Promise<{ ok: true, data: DataExport } | { ok: false, error: 'signed-out' | 'limited' | 'impersonating' | 'stale' }> {
-    return exportData(this[STATE])
+    return (await load.exports()).exportData(this[STATE])
   }
 
   // A new organization, the signed-in user its owner. `slug`, lowercase letters, digits and dashes, names it in URLs.
   async createOrganization(input: { name: string, slug?: string | null | undefined }): Promise<CreateOrganizationResult<OrgRole>> {
-    return createOrganization(this[STATE], input) as Promise<CreateOrganizationResult<OrgRole>>
+    return (await load.organizations()).createOrganization(this[STATE], input) as Promise<CreateOrganizationResult<OrgRole>>
   }
 
   // The organizations the signed-in user belongs to, with their roles in each.
   async listOrganizations(): Promise<Membership<OrgRole>[]> {
-    return listMemberships(this[STATE]) as Promise<Membership<OrgRole>[]>
+    return (await load.organizations()).listMemberships(this[STATE]) as Promise<Membership<OrgRole>[]>
   }
 
   // The organization `ref` names, by id or slug, with the user's roles there; null unless they are a member.
   async getOrganization(ref: string): Promise<Membership<OrgRole> | null> {
-    return getMembership(this[STATE], ref) as Promise<Membership<OrgRole> | null>
+    return (await load.organizations()).getMembership(this[STATE], ref) as Promise<Membership<OrgRole> | null>
   }
 
   // Whether the user is a member of the organization `ref` names, holding `role` there when given.
   async isMember(ref: string, role?: OrgRole): Promise<boolean> {
     const record = await this.record()
 
-    return record !== null && holdsInOrganization(this.core, record.id, ref, role)
+    return record !== null && (await load.organizations()).holdsInOrganization(this.core, record.id, ref, role)
   }
 
   // Renames it, or changes or clears its slug: for members holding `manage`.
   async updateOrganization(ref: string, patch: { name?: string | undefined, slug?: string | null | undefined }): Promise<UpdateOrganizationResult> {
-    return updateOrganization(this[STATE], ref, patch)
+    return (await load.organizations()).updateOrganization(this[STATE], ref, patch)
   }
 
   // For members holding `owner`.
   async deleteOrganization(ref: string): Promise<{ ok: true } | { ok: false, error: OrganizationFailure | 'impersonating' }> {
-    return deleteOrganization(this[STATE], ref)
+    return (await load.organizations()).deleteOrganization(this[STATE], ref)
   }
 
   // Every member, oldest first, for any member to see.
   async listMembers(ref: string): Promise<{ ok: true, members: Member<OrgRole>[] } | { ok: false, error: OrganizationFailure }> {
-    return listMembers(this[STATE], ref) as Promise<{ ok: true, members: Member<OrgRole>[] } | { ok: false, error: OrganizationFailure }>
+    return (await load.organizations()).listMembers(this[STATE], ref) as Promise<{ ok: true, members: Member<OrgRole>[] } | { ok: false, error: OrganizationFailure }>
   }
 
   // Replaces a member's roles: for members holding `manage`, giving only roles they hold, to a member holding none above theirs.
   async setMemberRoles(ref: string, userId: string, roles: OrgRole[]): Promise<MemberResult> {
-    return setMemberRoles(this[STATE], ref, userId, roles)
+    return (await load.organizations()).setMemberRoles(this[STATE], ref, userId, roles)
   }
 
   // For members holding `manage`, of a member holding no role above theirs.
   async deleteMember(ref: string, userId: string): Promise<MemberResult> {
-    return removeMember(this[STATE], ref, userId)
+    return (await load.organizations()).removeMember(this[STATE], ref, userId)
   }
 
   async leaveOrganization(ref: string): Promise<MemberResult> {
     const record = await this.record()
 
-    return record ? removeMember(this[STATE], ref, record.id) : { ok: false, error: 'signed-out' }
+    return record ? (await load.organizations()).removeMember(this[STATE], ref, record.id) : { ok: false, error: 'signed-out' }
   }
 
   // Mails `email` a link to the `invitationPage`, else the prebuilt pages' invitation page, giving `roles` (`defaultRoles` when none) once accepted: for members holding `manage` and every role it gives.
   async invite(ref: string, email: string, roles?: OrgRole[]): Promise<InviteResult<OrgRole>> {
-    return invite(this[STATE], ref, email, roles) as Promise<InviteResult<OrgRole>>
+    return (await load.organizations()).invite(this[STATE], ref, email, roles) as Promise<InviteResult<OrgRole>>
   }
 
   // The organization's open invitations, for members holding `manage`.
   async listInvitations(ref: string): Promise<{ ok: true, invitations: Invitation<OrgRole>[] } | { ok: false, error: OrganizationFailure }> {
-    return listInvitations(this[STATE], ref) as Promise<{ ok: true, invitations: Invitation<OrgRole>[] } | { ok: false, error: OrganizationFailure }>
+    return (await load.organizations()).listInvitations(this[STATE], ref) as Promise<{ ok: true, invitations: Invitation<OrgRole>[] } | { ok: false, error: OrganizationFailure }>
   }
 
   async revokeInvitation(ref: string, invitationId: string): Promise<{ ok: true } | { ok: false, error: OrganizationFailure }> {
-    return revokeInvitation(this[STATE], ref, invitationId)
+    return (await load.organizations()).revokeInvitation(this[STATE], ref, invitationId)
   }
 
   // The invitations open to the signed-in user's verified address.
   async listMyInvitations(): Promise<Invitation<OrgRole>[]> {
-    return myInvitations(this[STATE]) as Promise<Invitation<OrgRole>[]>
+    return (await load.organizations()).myInvitations(this[STATE]) as Promise<Invitation<OrgRole>[]>
   }
 
   // What the invitation link's page shows; null once revoked, accepted or expired.
   async getInvitation(invitationId: string): Promise<Invitation<OrgRole> | null> {
-    return getInvitation(this[STATE], invitationId) as Promise<Invitation<OrgRole> | null>
+    return (await load.organizations()).getInvitation(this[STATE], invitationId) as Promise<Invitation<OrgRole> | null>
   }
 
   // For an account verified at the invited address only.
   async acceptInvitation(invitationId: string): Promise<AcceptResult<OrgRole>> {
-    return acceptInvitation(this[STATE], invitationId) as Promise<AcceptResult<OrgRole>>
+    return (await load.organizations()).acceptInvitation(this[STATE], invitationId) as Promise<AcceptResult<OrgRole>>
   }
 
   // Turns down an invitation open to the user; `not-found` for any other.
   async rejectInvitation(invitationId: string): Promise<{ ok: true } | { ok: false, error: 'signed-out' | 'not-found' }> {
-    return declineInvitation(this[STATE], invitationId)
+    return (await load.organizations()).declineInvitation(this[STATE], invitationId)
   }
 
   // The signed-in user's bearer tokens, without the tokens themselves.
@@ -1305,45 +1219,12 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
     const actor = await this.core.store.users.get(signedIn.impersonator.user)
 
-    return actor !== undefined && actor.sessionVersion === signedIn.impersonator.version && !banned(actor) && await isAdmin(this[STATE], actor)
+    return actor !== undefined && actor.sessionVersion === signedIn.impersonator.version && !banned(actor) && await (await load.admin()).isAdmin(this[STATE], actor)
   }
 }
 
 // Where `kay dev` answers the dev tool's Auth tab with the session's user.
 const DEV_PATH = '/_kay/auth'
-
-// `held` with `data` laid over it as the `user` schema accepts it; throws for data it refuses, or when the app declared no schema.
-function signInAsData(core: Core, held: Record<string, unknown> | undefined, data: object): Record<string, unknown> {
-  if (!core.userData)
-    throw new Error('kayjs-auth: signInAs was given `data`, and createAuth has no `user` schema')
-
-  const merged = mergedData(core.userData, held, data)
-
-  if (merged === undefined)
-    throw new Error('kayjs-auth: signInAs was given `data` that does not fit the `user` schema')
-
-  return merged
-}
-
-// Throws when the member `signInAs` found holds other values than the fields it was given.
-function signInAsMismatch(core: Core, user: BareUser, given: { email: string | undefined, username: string | undefined, roles: string[] | undefined, data: object | undefined }): void {
-  const differs: string[] = []
-
-  if (given.email !== undefined && given.email !== user.email)
-    differs.push('email')
-
-  if (given.username !== undefined && (user.username === null || given.username.toLowerCase() !== user.username.toLowerCase()))
-    differs.push('username')
-
-  if (given.roles !== undefined && !given.roles.every(role => user.roles.includes(role)))
-    differs.push('roles')
-
-  if (given.data !== undefined && !Bun.deepEquals(signInAsData(core, user.data, given.data), user.data))
-    differs.push('data')
-
-  if (differs.length > 0)
-    throw new Error(`kayjs-auth: signInAs found a member whose ${differs.join(', ')} differ from the fields given`)
-}
 
 readRequestWith(requestOfContext)
 
@@ -1447,7 +1328,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     // A GET, so a sign-in link works without JavaScript: give it `data-no-prefetch` so a hover starts nothing.
     // Typed as their literal paths, so `kay check` checks links to them once the app registers its Elysia app.
     .get(`${core.prefix}/:provider` as `${Prefix}/:provider`, async ({ auth, params, query, redirect, status }) => {
-      const started = await startOAuth(auth[STATE], params.provider, { redirect: text(query.redirect), remember: query.remember === undefined ? undefined : query.remember === '1' })
+      const started = !core.oauth.has(params.provider) ? undefined : await (await load.flow()).startOAuth(auth[STATE], params.provider, { redirect: text(query.redirect), remember: query.remember === undefined ? undefined : query.remember === '1' })
 
       if (started === undefined)
         return status(404, 'Not Found')
@@ -1455,7 +1336,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       return redirect(typeof started === 'string' ? started : failed(started.error, text(query.redirect)), 303)
     })
     .get(`${core.prefix}/:provider/callback` as `${Prefix}/:provider/callback`, async ({ auth, params, query, redirect }) => {
-      const outcome = await finishOAuth(auth[STATE], params.provider, { code: text(query.code), state: text(query.state), error: text(query.error), user: text(query.user) })
+      const outcome = await (await load.flow()).finishOAuth(auth[STATE], params.provider, { code: text(query.code), state: text(query.state), error: text(query.error), user: text(query.user) })
 
       return redirect('error' in outcome ? failed(outcome.error, outcome.redirect) : outcome.redirect, 303)
     })
@@ -1522,45 +1403,10 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
   if (core.organizations && create !== undefined)
     core.organizations.create = async user => authorize(user, create, 'write', {})
 
-  const dropSession = (cookies: Bun.CookieMap) => {
-    for (const name of new Set(['kay_session', '__Host-kay_session', ...signedInCookies.get(cookies) ?? []]))
-      cookies.delete(name)
-
-    signedInCookies.delete(cookies)
-  }
-
-  // The Set-Cookie lines of a new session signed in as `userId`.
-  const mintSetCookies = async (userId: string, secure: boolean | undefined): Promise<string[]> => {
-    let failure: unknown
-    const signer = new Elysia().use(plugin).post('/', async ({ auth }) => {
-      try {
-        await auth.signIn({ id: userId })
-      }
-      catch (error) {
-        failure = error
-      }
-    })
-    const response = await signer.handle(new Request(secure === true ? 'https://localhost/' : 'http://localhost/', { method: 'POST', headers: secure === false ? { 'x-forwarded-proto': 'http' } : {} }))
-
-    if (failure !== undefined)
-      throw failure
-
-    return response.headers.getSetCookie()
-  }
-
-  // `name=value` off each Set-Cookie line, its attributes dropped.
-  const mintSessionCookie = async (userId: string, secure: boolean | undefined): Promise<string> => {
-    return (await mintSetCookies(userId, secure)).map((line) => {
-      const cookie = Bun.Cookie.parse(line)
-
-      return `${cookie.name}=${cookie.value}`
-    }).join('; ')
-  }
-
   const instance = withPluginOwner({
     [PAGES_OF]: core.pages && pagesHandle(core, options),
     // What `kay auth create-user` asks before the password: what `createUser` would refuse the login for.
-    [CHECK_USER]: async (input: CreateUserInput) => userProblems(core, input),
+    [CHECK_USER]: async (input: CreateUserInput) => (await load.password()).userProblems(core, input),
     // `.use(auth.plugin)` before kay's pages: it adds `auth` to the context and kayjs-auth's routes, and uses the session plugin itself.
     plugin,
     hasRole,
@@ -1571,57 +1417,19 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       return async (user, ctx) => {
         const ref: unknown = ctx.params?.[memberOptions.param ?? core.organizations?.param ?? 'org']
 
-        return user !== null && typeof ref === 'string' && holdsInOrganization(core, user.id, ref, role)
+        return user !== null && typeof ref === 'string' && (await load.organizations()).holdsInOrganization(core, user.id, ref, role)
       }
     },
 
     // The `Cookie` header of a new session signed in as `userId`, as `signIn` makes it, for a test or a script to send by hand; throws for a missing or banned user.
     // The cookie is the one kay's server names for the scheme it sees: by default the plugin signs in over `http://localhost/`, so the server's own rule applies (an https `site` in kay.config.ts makes it `__Host-kay_session` in production); `secure: true` mints the one an https request reads, `secure: false` the plain one.
     async sessionCookie(userId: string, cookieOptions: { secure?: boolean } = {}): Promise<string> {
-      return mintSessionCookie(userId, cookieOptions.secure)
+      return (await import('./testing')).mintSessionCookie(plugin as unknown as Elysia, userId, cookieOptions.secure)
     },
 
     // Signs a test site in as a member, making them first when no user has their email or username, with no form round trip: `createUser`'s fields (`email`, `username`, `password`, `roles`, `emailVerified`, `locale`) for a new member, and the app's own user `data` fields. An existing member is signed in as they are, and throws when the email, username, roles or data given differ from theirs. It sets the session cookie in the site's cookie jar, so a second call switches member; returns the user.
     async signInAs(site: { cookies: Bun.CookieMap }, who: Omit<CreateUserInput, 'roles'> & { roles?: Role[] | undefined, data?: { [Field in keyof UserData]?: UserData[Field] | undefined } | undefined }): Promise<BareUser> {
-      const { data, ...fields } = who
-      const email = fields.email === undefined ? undefined : normalizeEmail(fields.email)
-      const username = fields.username === undefined ? undefined : normalizeUsername(fields.username)
-      const found = (email === undefined ? undefined : await core.store.users.findByEmail(email)) ?? (username === undefined ? undefined : await core.store.users.findByUsername(username))
-      let user: BareUser
-
-      if (found) {
-        user = publicUser(found)
-        signInAsMismatch(core, user, { email, username, roles: fields.roles, data })
-      }
-      else {
-        // Checked before the member is made, so a refused `data` leaves no half-made member behind.
-        const merged = data === undefined ? undefined : signInAsData(core, undefined, data)
-        const created = await createUser(core, fields)
-
-        if (!created.ok)
-          throw new Error(`kayjs-auth: signInAs could not make the member: ${JSON.stringify(created.errors)}`)
-
-        user = created.user
-
-        if (merged !== undefined)
-          user = publicUser((await core.store.users.update(user.id, { data: merged }))!)
-      }
-
-      const lines = await mintSetCookies(user.id, undefined)
-      const names: string[] = []
-
-      dropSession(site.cookies)
-
-      for (const line of lines) {
-        const cookie = Bun.Cookie.parse(line)
-
-        site.cookies.set(cookie.name, cookie.value)
-        names.push(cookie.name)
-      }
-
-      signedInCookies.set(site.cookies, names)
-
-      return user
+      return (await import('./testing')).signInAs(core, plugin as unknown as Elysia, site, who)
     },
 
     // Signs a test site out, however it was signed in, by dropping its session cookie: the site is anonymous again, its other cookies kept.
@@ -1655,7 +1463,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
     // A user made by the app, as a script or an admin page makes one: checked as registering is, open with `signUp: false` too, signing no one in and mailing no one.
     async createUser(input: Omit<CreateUserInput, 'roles'> & { roles?: Role[] | undefined }): Promise<CreateUserResult> {
-      return createUser(core, input)
+      return (await load.password()).createUser(core, input)
     },
 
     // A bearer token for `userId` taking no proof and sending no mail, for a flow the app gates itself, such as pairing a device, or a script. `token` adopts one the app handed out before, so its devices keep working through a migration.
@@ -1728,276 +1536,9 @@ function withPluginOwner<Auth extends { plugin: object }>(auth: Auth): Auth {
   return auth
 }
 
-// The seconds of a lifetime option, rounded up to whole ones as a cookie's Max-Age and the stored lifetimes take them.
-function wholeSeconds(value: Duration, what: string): number {
-  return Math.ceil(durationSeconds(value, what))
-}
-
-// Seconds an account never verified is kept: only where unverified accounts cannot sign in, as one that can is an account in use.
-function unverifiedMaxAge(email: EmailOptions | undefined): number | undefined {
-  if (!email)
-    return undefined
-
-  if (email.unverifiedMaxAge !== undefined)
-    return wholeSeconds(email.unverifiedMaxAge, 'email.unverifiedMaxAge')
-
-  return email.requireVerified ?? true ? DEFAULT_UNVERIFIED_MAX_AGE : undefined
-}
-
-function auditMaxAge(audit: true | { maxAge?: Duration, ip?: 'full' | 'truncated' }): number {
-  return audit === true || audit.maxAge === undefined ? DEFAULT_AUDIT_MAX_AGE : wholeSeconds(audit.maxAge, 'audit.maxAge')
-}
-
-// Lets `auth()` hand a `createAuth({ pages: true })` its prefix and home, the paths derived from the prefix following, whichever of the two ran first.
-function pagesHandle(core: Core, options: { pages?: boolean | AuthPagesConfig | undefined, signInPage?: string | undefined, twoFactorPage?: string | undefined, sessionsPage?: string | undefined, email?: { links?: Partial<Record<LinkType, string>> | undefined } | undefined }): PagesHandle {
-  const own = typeof options.pages === 'object' ? options.pages : {}
-
-  return {
-    adopt(given) {
-      const pages = core.pages
-
-      if (!pages)
-        return
-
-      if (own.prefix !== undefined && own.prefix !== (given.prefix ?? DEFAULT_PAGES_PREFIX))
-        throw configError(`auth() serves the pages under '${given.prefix ?? DEFAULT_PAGES_PREFIX}' and createAuth({ pages: { prefix: '${own.prefix}' } }) sends users to '${own.prefix}'. Give auth({ prefix: '${own.prefix}' }), or drop the prefix of one of them`)
-
-      if (own.home === undefined && given.home !== undefined)
-        pages.home = given.home
-      else if (own.home !== undefined && given.home !== undefined && own.home !== given.home)
-        log.warn(`auth({ home: '${given.home}' }) and createAuth({ pages: { home: '${own.home}' } }) differ, and createAuth's wins: users go to '${own.home}'. Give home once, or the same in both`)
-
-      if (own.prefix !== undefined || given.prefix === undefined || given.prefix === pages.prefix)
-        return
-
-      const paths = pagePaths(given.prefix)
-
-      pages.prefix = given.prefix
-      core.signInPage = options.signInPage ?? paths.signIn
-      core.twoFactorPage = options.twoFactorPage ?? paths.twoFactor
-      core.sessionsPage = options.sessionsPage ?? paths.sessions
-      core.securityPage = paths.security
-
-      if (core.email)
-        core.email.links = emailLinks(options.email?.links, paths.links)
-    },
-  }
-}
-
-const HAS_SCHEME = /^[a-z][\d+.a-z-]*:\/\//i
-const HOST_LIKE = /^(?:[\w-]+(?:\.[\w-]+)+(?::\d+)?|[\w.-]+:\d+)$/
-
-// The origin and the display name the options give, whichever form they are written in: `site` is the origin, and until 1.73 `url` too, while a `site` that is no URL is the name it meant before `name` existed.
-function siteOptions(options: { site?: string | undefined, url?: string | undefined, name?: string | undefined }): { origin: string | undefined, name: string | undefined } {
-  const site = options.site
-
-  if (site !== undefined && !HAS_SCHEME.test(site)) {
-    if (HOST_LIKE.test(site))
-      throw configError(`\`site\` is the site's origin, such as \`https://${site}\`, and \`${site}\` has no scheme: add it, or give the display name as \`name\``)
-
-    return { origin: options.url, name: options.name ?? site }
-  }
-
-  return { origin: site ?? options.url, name: options.name }
-}
-
-function noSecret(): never {
-  throw configError('`secret` is missing and the session plugin cannot derive one; pass a secret of at least 32 characters, or a plugin from kay\'s `session()`')
-}
-
-// What createCore builds on the site's origin, once it has one.
-interface SiteBound {
-  url: string | undefined
-  oauth: Core['oauth']
-  refreshers: Core['refreshers']
-  name: string
-  passkeys: Core['passkeys']
-}
-
-function createCore<Data extends AuthSessionData, Role extends string, Prefix extends string, Scope extends string, OrgRole extends string, UserData extends object>(options: AuthOptions<Data, Role, Prefix, Scope, OrgRole, UserData>): Core {
-  const prefix = options.prefix ?? '/auth'
-
-  const oauthApps = Object.entries(options.oauth ?? {})
-  const { origin, name } = siteOptions(options)
-  const given = origin?.replace(TRAILING_SLASH, '')
-  const locales = options.email?.locales !== undefined && options.email.locales.length > 0 ? [...options.email.locales] : ['en']
-  const pages = pagesOf(options.pages)
-  const passkeyOptions = options.passkeys === false ? undefined : options.passkeys
-  const paths = pages && pagePaths(pages.prefix)
-
-  const needsUrl = oauthApps.length > 0 || options.email !== undefined
-  let bound: SiteBound | undefined
-  // What a core with no origin yet builds: with nothing to build on it is the same each time, so it is kept until an origin turns up.
-  let waiting: SiteBound | undefined
-
-  // What depends on the site's origin: `url` if given, else the `site` of kay.config.ts or SITE_URL, which a server knows once it set up. An auth made while the app's modules load asks again when first used, and keeps what it built once it has an origin.
-  const bind = (): SiteBound => {
-    if (bound)
-      return bound
-
-    const url = given ?? configuredSite()?.origin.replace(TRAILING_SLASH, '')
-
-    if (needsUrl && url === undefined)
-      throw configError('OAuth sign-in and mailed links need the site\'s public origin to build their URLs: set `site` in kay.config.ts or SITE_URL, or in createAuth')
-
-    if (url === undefined && waiting)
-      return waiting
-
-    const clients: Core['oauth'] = new Map()
-
-    for (const [name, app] of oauthApps)
-      clients.set(name, { app, client: createOAuthClient(app.provider, { clientId: app.clientId, clientSecret: app.clientSecret, redirectUri: `${url}${prefix}/${name}/callback` }) })
-
-    const made: SiteBound = {
-      url,
-      oauth: clients,
-      refreshers: new Map(),
-      name: name ?? (url === undefined ? 'kayjs-auth' : new URL(url).host),
-      passkeys: url === undefined || options.passkeys === false
-        ? undefined
-        : { id: passkeyOptions?.rpId ?? new URL(url).hostname, name: passkeyOptions?.rpName ?? name ?? new URL(url).host, origins: passkeyOptions?.origins ?? [new URL(url).origin], userVerification: passkeyOptions?.userVerification ?? 'preferred' },
-    }
-
-    if (url === undefined)
-      waiting = made
-    else
-      bound = made
-
-    refreshersFor(made)
-
-    return made
-  }
-
-  const core: Core = {
-    store: options.store,
-    keys: deriveKeys(options.secret ?? options.sessions.deriveSecret?.('kayjs-auth') ?? noSecret()),
-    get url() {
-      return bind().url
-    },
-    settle() {
-      if (needsUrl)
-        bind()
-    },
-    prefix,
-    signInPage: options.signInPage ?? paths?.signIn ?? '/',
-    ownSignInPage: options.signInPage,
-    twoFactorPage: options.twoFactorPage ?? paths?.twoFactor ?? '/two-factor',
-    pages,
-    get name() {
-      return bind().name
-    },
-    limits: resolveLimits(options.limits, options.rateLimit),
-    rules: asConfigError(() => resolveRules(options.rules)),
-    sessionsPage: options.sessionsPage ?? paths?.sessions,
-    securityPage: paths?.security,
-    locate: options.locate,
-    scopes: new Set(options.scopes),
-    get passkeys() {
-      return bind().passkeys
-    },
-    switches: { password: options.password !== false, passkeys: options.passkeys !== false, magicLink: options.magicLink !== false, twoFactor: options.twoFactor !== false },
-    captcha: options.captcha === false ? undefined : options.captcha ?? proofOfWork(),
-    breached: breachedCheck(options.breachedPasswords),
-    email: options.email && {
-      ...options.email,
-      maxAge: tokenLifetimes(options.email.maxAge, options.email.expires),
-      links: emailLinks(options.email.links, paths?.links),
-      requireVerified: options.email.requireVerified ?? true,
-      locales,
-      templates: localeTemplates(locales, options.email.templates, options.email.translations),
-      codes: typeof options.email.codes === 'string' ? { 'magic-link': options.email.codes, 'verify-email': options.email.codes } : { 'magic-link': 'link', 'verify-email': 'link', ...options.email.codes },
-    },
-    oauthServer: oauthServerOf(options, pages),
-    forward: forwardOf(options.forwardAuth, options.twoFactor !== false),
-    get oauth() {
-      return bind().oauth
-    },
-    get refreshers() {
-      return bind().refreshers
-    },
-    allow: options.allow,
-    signUp: options.signUp ?? true,
-    defaultRoles: [...(options.defaultRoles ?? [])],
-    roles: options.roles && new Set(Object.keys(options.roles)),
-    onSignUp: hooked(options.onSignUp, (user, profile) => ({ user, profile })),
-    onProviderProfile: (options.profileFields ? hooked(options.profileFields, (user, profile) => ({ user, profile })) : options.onProviderProfile) as Core['onProviderProfile'],
-    userData: options.user && userDataRules(options.user),
-    onDelete: hooked(options.onDelete, user => ({ user })),
-    guestMaxAge: options.guests === undefined ? DEFAULT_GUEST_MAX_AGE : wholeSeconds(options.guests.maxAge, 'guests.maxAge'),
-    unverifiedMaxAge: unverifiedMaxAge(options.email),
-    onExport: options.exportData ? hooked(options.exportData, user => ({ user })) : options.onExport,
-    onAuthEvent: options.onAuthEvent,
-    organizations: options.organizations && organizationsCore(options.organizations),
-    pruned: { at: 0, running: Promise.resolve() },
-    audit: options.audit == null || options.audit === false ? undefined : { maxAge: auditMaxAge(options.audit), prunedAt: 0, ip: options.audit === true ? 'truncated' : options.audit.ip ?? 'truncated' },
-    rememberMaxAge: wholeSeconds(options.remember?.maxAge ?? options.rememberMaxAge ?? `${DEFAULT_REMEMBER_MAX_AGE}s`, 'remember.maxAge'),
-  }
-
-  function refreshersFor(made: SiteBound): void {
-    for (const [name, { client }] of made.oauth) {
-      made.refreshers.set(name, createOAuthTokenRefresher({
-        oauth: client,
-        key: subject => `${name}:${subject.identity.providerId}`,
-        load: subject => subject.credential,
-        save: async (subject, tokens) => {
-          // A refusal can be a race another process won, its rotated token saved since this one was read: that one stays.
-          if (tokens === null && (await core.store.identities.find(name, subject.identity.providerId))?.refreshToken !== subject.identity.refreshToken)
-            return
-
-          const sealed = sealTokens(core, name, subject.identity.providerId, tokens)
-
-          // A refresh that rotates no refresh token leaves the one held usable.
-          await core.store.identities.update(name, subject.identity.providerId, tokens && tokens.refreshToken === undefined ? { ...sealed, refreshToken: subject.identity.refreshToken } : sealed)
-        },
-        onError: error => log.error(`refreshing a ${name} token failed`, error),
-      }))
-    }
-  }
-
-  if (given !== undefined || configuredSite() !== undefined)
-    bind()
-
-  return core
-}
-
-function oauthServerOf(options: { oauthServer?: boolean | { fetch?: ((url: string) => Promise<Response>) | undefined, defaultScopes?: readonly string[] | undefined } | undefined, scopes?: readonly string[] | undefined, store: AuthStore }, pages: Core['pages']): Core['oauthServer'] {
-  const wanted = options.oauthServer
-
-  if (wanted === false || (wanted === undefined && !(pages && options.store.oauth)))
-    return undefined
-
-  if (!pages || !options.store.oauth)
-    throw configError('`oauthServer` needs the prebuilt `pages`, for its consent page, and a store with `oauth`, as `memoryAuthStore` and `pgStore` have')
-
-  const defaultScopes = typeof wanted === 'object' ? [...new Set(wanted.defaultScopes)] : []
-
-  if (defaultScopes.some(scope => !options.scopes?.includes(scope)))
-    throw configError('`oauthServer.defaultScopes` names a scope that `scopes` does not declare')
-
-  return { fetchDocument: documentFetcher(typeof wanted === 'object' ? wanted.fetch : undefined), documents: new Map(), defaultScopes }
-}
-
-function breachedCheck(option: boolean | ((password: string) => boolean | Promise<boolean>) | undefined): ((password: string) => boolean | Promise<boolean>) | undefined {
-  if (option === true)
-    return pwnedPassword
-
-  return typeof option === 'function' ? option : undefined
-}
-
 // A query value as text: a name repeated in the URL arrives as a list, which no flow takes.
 function text(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined
-}
-
-// The page each mailed link opens: the app's, else the prebuilt one.
-function emailLinks(links: Partial<Record<LinkType, string>> | undefined, pages: Record<LinkType, string> | undefined): Record<LinkType, string> {
-  const merged = Object.fromEntries(LINK_TYPES.map(type => [type, links?.[type] ?? pages?.[type]]))
-  const missing = LINK_TYPES.filter(type => merged[type] === undefined)
-
-  if (missing.length > 0)
-    throw configError(`email.links needs a page for ${missing.join(', ')}, or \`pages\` for the prebuilt ones`)
-
-  return merged as Record<LinkType, string>
 }
 
 function authOf(ctx: object): Auth {

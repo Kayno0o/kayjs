@@ -40,3 +40,12 @@ export function digest(token: string): string {
 export function randomToken(): string {
   return randomBytes(32).toString('base64url')
 }
+
+export function totpContext(userId: string): string {
+  return `totp:${userId}`
+}
+
+// A TOTP secret sealed as kayjs-auth stores it, for a store whose rows hold plain ones from before: it seals each on read. `secret` is the value `createAuth` takes, a list included.
+export function sealTotpSecret(secret: string | string[], userId: string, plain: string): string {
+  return deriveKeys(secret).encrypt(plain, totpContext(userId))
+}

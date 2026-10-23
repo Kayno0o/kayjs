@@ -6,15 +6,11 @@ import type { Invitation, Membership } from './organizations'
 import type { Passkey } from './passkeys'
 import type { UserSession } from './sessions'
 import type { RequestState } from './state'
-import { approvedClients } from './authorize/grants'
-import { listTokens } from './bearer'
 import { linkedUser } from './core'
 import { impersonatorOf } from './events'
 import { spend } from './limits'
-import { exportedInvitations, listMemberships } from './organizations'
-import { listPasskeys } from './passkeys'
+import { provedLately } from './proof'
 import { listSessions } from './sessions'
-import { provedLately } from './twoFactor'
 
 // More than a person's year of sign-ins, so only a bot's account is cut short.
 const AUDIT_EXPORT_MAX = 100_000
@@ -60,6 +56,7 @@ export async function exportData(state: RequestState): Promise<{ ok: true, data:
     return { ok: false, error: 'limited' }
 
   const user = await linkedUser(core, record)
+  const organizations = core.organizations ? await import('./organizations') : undefined
 
   return {
     ok: true,
@@ -68,13 +65,13 @@ export async function exportData(state: RequestState): Promise<{ ok: true, data:
       user: { ...user, createdAt: record.createdAt, emailVerifiedAt: record.emailVerifiedAt, twoFactorEnabledAt: record.totpEnabledAt },
       identities: (await core.store.identities.listByUser(record.id)).map(identity => ({ provider: identity.provider, providerId: identity.providerId, createdAt: identity.createdAt })),
       sessions: await listSessions(state),
-      passkeys: await listPasskeys(state),
-      tokens: await listTokens(state),
+      passkeys: await (await import('./passkeys')).listPasskeys(state),
+      tokens: await (await import('./bearer')).listTokens(state),
       recoveryCodesLeft: await core.store.recoveryCodes.count(record.id),
-      grants: await approvedClients(state),
+      grants: core.store.oauth ? await (await import('./authorize/grants')).approvedClients(state) : [],
       ban: record.bannedAt === null ? null : { at: record.bannedAt, until: record.bannedUntil, reason: record.banReason },
-      organizations: core.organizations ? await listMemberships(state) : [],
-      invitations: core.organizations ? await exportedInvitations(state) : { received: [], sent: [] },
+      organizations: organizations ? await organizations.listMemberships(state) : [],
+      invitations: organizations ? await organizations.exportedInvitations(state) : { received: [], sent: [] },
       audit: core.audit ? (await core.store.audit!.list({ userId: record.id, limit: AUDIT_EXPORT_MAX })).map(entry => ({ ...entry, event: entry.event as AuditEntry['event'] })) : [],
       app: await core.onExport?.(user) ?? null,
     },
