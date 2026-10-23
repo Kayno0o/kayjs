@@ -130,8 +130,9 @@ describe('saveDraft targets', () => {
     expect(await Promise.all([first, second])).toEqual([false, false])
     expect(toasts().map(toast => toast.message)).toEqual(['Not saved: Forgejo did not answer'])
 
+    // A later save refused the same way finds that error still open, as kayjs-ui stacks no error worded like one already shown.
     expect(await saveDraft(drafts, post, { slug: 'b' })).toBe(false)
-    expect(toasts().map(toast => toast.message)).toEqual(['Not saved: Forgejo did not answer', 'Not saved: Forgejo did not answer'])
+    expect(toasts().map(toast => toast.message)).toEqual(['Not saved: Forgejo did not answer'])
   })
 
   it('writes the edits kept over a deleted file as a new entry, so a file made meanwhile is not written over', async () => {
