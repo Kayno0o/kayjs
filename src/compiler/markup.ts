@@ -314,7 +314,7 @@ export abstract class TemplateWriter {
         }
       }
       else if (CONTENT_PROPERTIES.has(attributeName) || (name === 'textarea' && (attributeName === 'value' || attributeName === 'defaultValue'))) {
-        plan.content = { expression: attribute.expression, property: attributeName === 'defaultValue' ? 'value' : attributeName, raw: attributeName === 'innerHTML' || RAW_ELEMENTS.has(name), bound: false }
+        plan.content = { expression: attribute.expression, property: attributeName === 'defaultValue' ? 'value' : attributeName, raw: RAW_ELEMENTS.has(name), bound: false }
       }
       else if (name === 'select' && attributeName === 'value') {
         plan.selected = { expression: attribute.expression, bound: false }

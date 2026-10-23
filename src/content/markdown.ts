@@ -65,6 +65,9 @@ const ATTRIBUTE_NAME = /^[A-Z_][\w:-]*/i
 const TAGS = /<[^>]*>/g
 // What a loader's Markdown keeps beyond a user's: a heading's id for its anchor and a code block's language class, which the headings and the highlighter read.
 const LOADED: SanitizeOptions = { tags: MARKDOWN_KEPT.tags, attributes: { ...MARKDOWN_KEPT.attributes, h1: ['id'], h2: ['id'], h3: ['id'], h4: ['id'], h5: ['id'], h6: ['id'], code: ['class'] } }
+// The only class and id kept on a code block and a heading: the language Markdown writes, and a slug in its shape, so a loader's text cannot pick a utility class or a camelCase global name.
+const CODE_CLASS = /<code class="(?!language-[\w+#.-]+")[^"]*">/g
+const HEADING_ID = /<(h[1-6]) id="(?![\p{Ll}\p{N}][\p{Ll}\p{N}_-]*")[^"]*"/gu
 // The private characters standing for a component's placeholder while the sanitizer, which reads no tag name with a hyphen, goes over the rest.
 const HELD_PLACEHOLDER = /\uE010(\d+)\uE011|\uE012(\d+)\uE011|\uE013/g
 const PRIVATE_CHARS = /[\uE010-\uE013]/g
@@ -128,7 +131,7 @@ export function countWords(html: string): number {
 function sanitizedComponents(html: string): string {
   const held = html.replace(PRIVATE_CHARS, char => `&#${char.codePointAt(0)};`).replace(PLACEHOLDER_TAG, (_, selfClosing: string | undefined, opening: string | undefined) => heldPlaceholder(selfClosing, opening))
 
-  return sanitizedMarkdown(held, () => false, LOADED).replace(HELD_PLACEHOLDER, (_, selfClosing: string | undefined, opening: string | undefined) => restoredPlaceholder(selfClosing, opening))
+  return sanitizedMarkdown(held, () => false, LOADED).replace(CODE_CLASS, '<code>').replace(HEADING_ID, '<$1').replace(HELD_PLACEHOLDER, (_, selfClosing: string | undefined, opening: string | undefined) => restoredPlaceholder(selfClosing, opening))
 }
 
 function heldPlaceholder(selfClosing: string | undefined, opening: string | undefined): string {
@@ -147,7 +150,7 @@ function restoredPlaceholder(selfClosing: string | undefined, opening: string | 
 
 // An HTML body a loader gave, as a user's markup goes through the sanitizer.
 export function sanitizedHtml(html: string): string {
-  return sanitizedMarkdown(html, () => false, LOADED)
+  return sanitizedMarkdown(html, () => false)
 }
 
 // The HTML an entry's Markdown body puts on the page, each component standing as a `<kay-component>` element around what it wraps, so a CMS can check what an editor wrote before saving it; throws a MarkdownError for components kay cannot read.
@@ -594,6 +597,9 @@ function componentSegments(html: string, components: ExtractedComponent[]): Segm
     last = match.index + tag.length
 
     if (selfClosing === undefined && opening === undefined) {
+      if (open.length === 1)
+        throw new MarkdownError(`the body writes </${PLACEHOLDER}> itself, which kay keeps for components`, 1)
+
       open.pop()
 
       continue

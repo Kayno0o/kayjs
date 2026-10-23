@@ -77,9 +77,9 @@ export type EntryOf<Data, Routed extends boolean> = Routed extends true ? Routed
 export interface LoadedEntry {
   slug: string
   data: unknown
-  // Markdown, compiled as a file entry's body is: headings listed, code highlighted, the collection's components usable.
+  // Markdown, compiled as a file entry's body is: headings listed, code highlighted, the collection's components usable; sanitized unless the collection is `trusted`.
   body?: string | undefined
-  // HTML rendered as it is, such as a CMS's rendered content: trusted, as a file entry's is.
+  // HTML such as a CMS's rendered content, sanitized unless the collection is `trusted`, when it is rendered as it is.
   html?: string | undefined
 }
 
@@ -541,7 +541,8 @@ async function compileLoaded(loader: ContentLoader, preview: boolean, markdown: 
 
     try {
       const sanitize = options.trusted !== true
-      const fromHtml = typeof html === 'string' ? { segments: [sanitize ? sanitizedHtml(html) : html], headings: [], words: countWords(html) } : undefined
+      const safe = typeof html === 'string' && sanitize ? sanitizedHtml(html) : html
+      const fromHtml = typeof safe === 'string' ? { segments: [safe], headings: [], words: countWords(safe) } : undefined
       const compiled = typeof body === 'string' ? await compileMarkdown(body, 1, markdown.highlight, markdown.headingLinks, sanitize) : fromHtml
 
       entries.push({ slug, file, data, lines: {}, segments: compiled?.segments, headings: compiled?.headings, words: compiled?.words })

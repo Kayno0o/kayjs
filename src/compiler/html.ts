@@ -13,7 +13,15 @@ const WRITTEN_AS = { image: 'src', selected: 'value' } as const
 // A number written in the template, `0` or `-1.5`, as an attribute's whole expression.
 const NUMBER_LITERAL = /^\s*-?\d+(?:\.\d+)?\s*$/
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
-const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'fieldDescribed', 'formConstraints', 'head', 'html', 'imageAttributes', 'linkHref', 'localHref', 'loop', 'memo', 'merge', 'nonEmptyAttribute', 'omit', 'outsideLink', 'partClass', 'partHanded', 'partsClass', 'raw', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'spreadAttributes', 'spreadWith', 'style', 'untrack']
+const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'fieldDescribed', 'formConstraints', 'head', 'html', 'imageAttributes', 'innerMarkup', 'linkHref', 'localHref', 'loop', 'memo', 'merge', 'nonEmptyAttribute', 'omit', 'outsideLink', 'partClass', 'partHanded', 'partsClass', 'raw', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'spreadAttributes', 'spreadWith', 'style', 'untrack']
+
+// The helper writing an element's content expression: `script` and `style` text escaped for raw text, an `innerHTML` as the markup it is, anything else as text.
+function contentHelper(content: { property: string, raw: boolean } | undefined): string {
+  if (content?.raw === true)
+    return 'raw'
+
+  return content?.property === 'innerHTML' ? 'innerMarkup' : 'child'
+}
 
 export function htmlHelperImport(): string {
   return `import { ${HTML_HELPERS.map(helper => `${helper} as ${helperName(helper)}`).join(', ')} } from 'kay/html'\n`
@@ -753,7 +761,7 @@ export class HtmlTemplate extends TemplateWriter {
     }
     else if (content) {
       markup.dynamic(() => {
-        b.add(`${helperName(plan.content?.raw === true ? 'raw' : 'child')}(`)
+        b.add(`${helperName(contentHelper(plan.content))}(`)
         content()
         b.add(')')
       })

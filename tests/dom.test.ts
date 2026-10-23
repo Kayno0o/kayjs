@@ -173,14 +173,17 @@ describe('a spread onto an element in the browser', () => {
 
 describe('a vouched innerHTML in the browser', () => {
   const mount3 = site({
-    'main.kay': '---\nimport { trustHtml } from \'kay\'\n\nconst body = trustHtml(\'<p>a</p><!-- c --><style>b{}</style><script>if (a < b) x()</script>\')\n---\ndiv.body({...{ innerHTML: body }})\n',
+    'main.kay': '---\nimport { trustHtml } from \'kay\'\n\nconst body = trustHtml(\'<p>a</p><!-- c --><style>b{}</style><script>if (a < b) x()</script>\')\n---\ndiv.body({...{ innerHTML: body }})\ndiv.direct(innerHTML={body})\n',
   })
 
   it('holds a comment, a style and a script, as the server writes them', async () => {
     const { root, dispose } = await mount3()
 
     try {
-      expect(root.querySelector('.body')!.innerHTML).toBe('<p>a</p><!-- c --><style>b{}</style><script>if (a < b) x()</script>')
+      const markup = '<p>a</p><!-- c --><style>b{}</style><script>if (a < b) x()</script>'
+
+      expect(root.querySelector('.body')!.innerHTML).toBe(markup)
+      expect(root.querySelector('.direct')!.innerHTML).toBe(markup)
     }
     finally {
       await dispose()

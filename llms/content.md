@@ -234,7 +234,7 @@ article
 - A data file's `headings` is empty, its `words` and `readingTime` are 0, and its `Content` renders nothing.
 - A `slug` in an entry's frontmatter, or in a data file, is its slug instead of its path, so a translated post gets its own: a path of non-empty parts, none `.` or `..`, with no backslash, control character, `?` or `#`, else the entry fails the collection at that line. In a localized collection it follows the locale's folder, `fr/hello.md` with `slug: bonjour` is `bonjour` in `fr`, and `translations` pairs entries by equal slug unless they set a `translationKey` field in their frontmatter, a key of your choosing that `en/hello-world.md` and `fr/bonjour-le-monde.md` both give, `translationKey: hello`; two entries of one locale cannot share a key (a slug counts as one), nor can a key be anything but a string, else the collection fails at that file. A schema that closes its fields lists `slug` and `translationKey`; the file keeps its path in `file`.
 - Two files giving one slug, `guides.md` and `guides/index.md`, fail the collection.
-- Entries are the site's own content, trusted: their HTML, links and what a highlighter returns go out as written, unsanitised.
+- A folder's entries are the site's own content, trusted: their HTML, links and what a highlighter returns go out as written, unsanitised. A loader's `body` and `html` are sanitized unless the collection is `trusted: true` ([Loaded collections](content-cms.md#loaded-collections)).
 
 #### Drafts
 

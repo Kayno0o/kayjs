@@ -818,6 +818,22 @@ describe('a loader\'s bodies', () => {
     expect(page.split('<aside').length).toBe(2)
   })
 
+  it('keep no class but a code block language and no id but a slug', async () => {
+    const { html: page } = await rendered({}, { body: '<code class="fixed inset-0 z-50">pay here</code> <h2 id="someGlobal">x</h2>\n\n## Real one\n\n```ts\nconst a = 1\n```\n' })
+
+    expect(page).not.toMatch(/fixed|inset|someGlobal/)
+    expect(page).toContain('<code>pay here</code>')
+    expect(page).toContain('<h2 id="real-one">')
+    expect(page).toContain('<code class="language-ts">')
+  })
+
+  it('count the words of what the sanitizer kept, and refuse a closing placeholder written by hand', async () => {
+    const { entry } = await rendered({}, { html: '<p>one two</p><script>three four five</script><!-- six seven -->' })
+
+    expect(entry.words).toBe(2)
+    await expect(rendered({}, { body: '</kay-component> a </kay-component> b' })).rejects.toThrow('kay-component')
+  })
+
   it('keep raw HTML with trusted: true', async () => {
     const { html: page } = await rendered({ trusted: true }, { body: hostile })
     const { html: fromHtml } = await rendered({ trusted: true }, { html: '<script>alert(1)</script><p onclick="x()">hi</p>' })

@@ -390,6 +390,13 @@ describe('static server output', () => {
     expect(html).toBe('<div><b>x</b></div><div>&lt;i></div><textarea>&lt;i></textarea><select value="C"><option value="a">A</option><option value="b">B</option><option selected>C</option></select>')
   })
 
+  it('writes an innerHTML holding a comment, a style and a script as it is, and keeps escaping a script and a style element text', async () => {
+    const body = '<p>a</p><!-- c --><style>b{}</style><script>if (a < b) x()</script>'
+    const html = await renderKay('---\nconst { markup } = props<{ markup: string }>()\n---\ndiv(innerHTML={markup})\nstyle {markup}', { markup: body })
+
+    expect(html).toBe(`<div>${body}</div><style><p>a</p><\\!-- c --><style>b{}<\\/style><script>if (a < b) x()<\\/script></style>`)
+  })
+
   it('renders a bound value as the property it binds, read off its signal', async () => {
     const source = '---\nimport { signal } from \'kay\'\n\nconst empty = signal(\'\')\nconst on = signal(true)\nconst text = signal(\'<i>\')\nconst choice = signal(\'b\')\n---\ninput(bind:value={empty})\ninput(type="checkbox" bind:checked={on})\ntextarea(bind:value={text})\nselect(bind:value={choice})\n  option(value="a") A\n  option(value="b") B'
     const html = await renderKay(source)

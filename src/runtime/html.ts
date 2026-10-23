@@ -115,7 +115,7 @@ function contentOf(name: string, isRaw: boolean, value: unknown): string {
 }
 
 // An `innerHTML` the app vouched for, written as it is: a comment, a `style` or a `script` inside it stays what the island sets.
-function innerMarkup(value: unknown): string {
+export function innerMarkup(value: unknown): string {
   let markup = ''
 
   eachChild(value, (part) => {

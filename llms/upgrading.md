@@ -41,7 +41,7 @@ A plain param value listed by `prerender` (a slug) holding `/`, `\` or a NUL is 
 Umami without a `host` (or with `https://cloud.umami.is`) now waits for the visitor's yes like `ga4`, as Umami Cloud is a third party that gets the visitor's address. An app that counted Umami Cloud at once either keeps that with `consent: false`, which it answers for, or runs Umami itself and names it as `host`. An `info` object on Umami Cloud is refused now, as on any provider that asks: word the notice with `consent` instead. No `deprecated` lint exists, as a default has no old form to recognise.
 ### A loaded collection sanitizes its entries
 
-The `body` and `html` a loader gives are sanitized like a user's Markdown (scripts, handlers, styles, iframes, comments, `javascript:` links and unlisted attributes such as `class` and `style` are dropped). A loader returning content its author wrote, such as your own CMS's HTML, adds `trusted: true` to the collection's options to keep it as it was.
+The `body` and `html` a loader gives are sanitized like a user's Markdown (scripts, handlers, styles, iframes, comments, `javascript:` links and attributes such as `class`, `style` and `width` are dropped; a link gets `rel="nofollow ugc"` and a relative URL such as `./a.png` is dropped). A loader returning content its author wrote, such as your own CMS's HTML, adds `trusted: true` to the collection's options to keep it as it was.
 
 ### kayjs-ui props take enum values: `variant`, `size` and `pixels`
 
