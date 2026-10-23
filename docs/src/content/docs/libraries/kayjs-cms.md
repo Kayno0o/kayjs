@@ -458,7 +458,7 @@ Each path has an Add redirect button: one click for the suggested target, or a b
 
 The redirect is saved where the running server reads it, so it answers at once, with no deploy, and the path leaves the list.
 
-Below the list, the redirects added here show Edit, to give a path another target or status, and Remove, which undoes one. A 301 or 302 stored earlier keeps its status when you change only its target. Tick several rows to remove them at once. The redirects of `kay.config.ts` are listed after them, to read. All of it needs the `guard` you gave `cms()`.
+Below the list, the redirects added here show Edit, to give a path another target or status, and Remove, which undoes one. A 301 or 302 stored earlier keeps its status when you change only its target. Tick several rows to remove them at once. The site keeps 1000 of them, and the 1001st is refused with a sentence saying so, until some are removed or moved to `kay.config.ts`. The redirects of `kay.config.ts` are listed after them, to read. All of it needs the `guard` you gave `cms()`.
 
 A redirect answers with a 307, which browsers do not keep, so Remove undoes it for everyone. Tick Permanent beside Add redirect for a 308 instead: browsers keep it, so Remove does not reach a visitor who has followed it already.
 

@@ -36,6 +36,22 @@ describe('adding a redirect from the screen', () => {
     expect('added' in readMissing() && readMissing()).toMatchObject({ added: [] })
   })
 
+  test('keeps 1000 redirects, tells the editor when the set is full, and still edits one of them', () => {
+    for (let index = 0; index < 1000; index++)
+      expect(addRedirect(`/full-${index}`, '/new-page')).toBeUndefined()
+
+    try {
+      expect(addRedirect('/full-one-more', '/new-page')).toMatch(/1000/)
+      expect(addRedirect('/full-1', '/other-page')).toBeUndefined()
+      expect(added().filter(row => row.from.startsWith('/full-'))).toHaveLength(1000)
+    }
+    finally {
+      removeRedirects(Array.from({ length: 1000 }, (_, index) => `/full-${index}`))
+    }
+
+    expect(added()).toEqual([])
+  })
+
   test('edits a redirect in place: the same path takes a new target and status, and may become gone', () => {
     expect(addRedirect('/edit-cms', '/new-page')).toBeUndefined()
     expect(addRedirect('/edit-cms', '/about', 308)).toBeUndefined()
