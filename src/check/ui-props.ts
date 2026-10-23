@@ -16,7 +16,6 @@ interface Rename {
   component: string
   from: string
   to: string
-  // The minor that renamed it.
   since: string
   // How far the rename is safe: `rename` always, `bare-arrow` only for a handler written `() => ...`, which ignores the argument the new prop passes, and `none` for a prop whose calls changed, where the lint only reports.
   fix: 'rename' | 'bare-arrow' | 'none'

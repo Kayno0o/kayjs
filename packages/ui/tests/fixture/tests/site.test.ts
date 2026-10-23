@@ -388,6 +388,12 @@ describe('content', () => {
     expect((await find('/content', '#solid')).map(found => found.text)).toEqual(['<b>Done</b>'])
   })
 
+  test('the old props of Badge, Notice, FormField, FileDrop and QrCode still draw as they did, and variant beats the booleans', async () => {
+    expect(await attributes('/content', '#legacy-stamp, #legacy-solid, #variant-wins', ['data-stamp', 'data-solid'])).toEqual([{ 'data-stamp': '', 'data-solid': null }, { 'data-stamp': null, 'data-solid': '' }, { 'data-stamp': null, 'data-solid': null }])
+    expect(await attributes('/content', '#legacy-compact, #legacy-field [data-compact], #legacy-drop [data-compact]', ['data-compact'])).toEqual([{ 'data-compact': '' }, { 'data-compact': '' }, { 'data-compact': '' }])
+    expect(await attributes('/content', '#legacy-qr', ['width', 'height'])).toEqual([{ width: '90', height: '90' }])
+  })
+
   test('EmptyState holds an @actions block below its description, and none without one', async () => {
     expect((await find('/content', '#empty-action [data-part=actions] a')).map(link => [link.attributes.href, link.text])).toEqual([['/paging', 'Build one']])
     expect(await find('/content', '#empty [data-part=actions]')).toEqual([])

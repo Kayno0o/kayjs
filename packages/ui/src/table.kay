@@ -118,9 +118,13 @@ effect(() => {
 
 function commit(keys: RowKeyValue<Row, Key>[]) {
   picked.set(keys)
+
+  if (!onSelect)
+    return
+
   const wanted = new Set(keys)
 
-  onSelect?.(keys, rows.filter(row => wanted.has(rowKeyOf(row, rowKey))))
+  onSelect(keys, rows.filter(row => wanted.has(rowKeyOf(row, rowKey))))
 }
 
 function pick(key: RowKeyValue<Row, Key>, on: boolean) {

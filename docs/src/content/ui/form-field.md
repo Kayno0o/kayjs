@@ -8,7 +8,7 @@ The control goes inside as the child. `label` names it, `hint` explains it below
 
 ## In a filter bar
 
-`size="sm"` sizes the field by its control rather than the row, so several fit side by side. A Select inside is as wide as its options. A compact field holds no message unless given a `name` or an `issue`. A medium Button in the same row, such as a submit button at its end, is as tall as the fields at any `--kui-density`, with no class or prop; a Button of another size, an inline one and one outside such a row keep their height.
+`size="sm"` sizes the field by its control rather than the row, so several fit side by side. A Select inside is as wide as its options. A `sm` field holds no message unless given a `name` or an `issue`. A medium Button in the same row, such as a submit button at its end, is as tall as the fields at any `--kui-density`, with no class or prop; a Button of another size, an inline one and one outside such a row keep their height.
 
 <Demo name="form-field/compact" />
 

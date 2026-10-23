@@ -24,7 +24,7 @@ const { value, options, onChange, submit = false, emptyOption, busy = false, loa
   emptyOption?: Empty
   // Shows a disabled row saying the options are on their way, and marks the select busy.
   busy?: boolean | undefined
-  // The old name of `busy`, which still works until 1.73.
+  // The old name of `busy`, which still works until 1.75.
   loading?: boolean | undefined
   loadingLabel?: string | undefined
 }>()
