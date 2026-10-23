@@ -2,6 +2,8 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { leavesSite } from '../src/runtime/outside'
+import { sourceHash } from '../src/server/csp'
+import { newTabStyles } from '../src/server/new-tab'
 import { pages } from './shared-pages'
 
 const LINK = /<a\b[^>]*>/g
@@ -123,6 +125,27 @@ describe('the cue saying a link opens in a new tab', () => {
 
     for (const name of ['target', 'empty', 'dynamicTarget', 'spreadTarget', 'spreadTargetAfter', 'same', 'root', 'hash', 'mail'])
       expect(tags[name], name).not.toContain('data-new-tab')
+  })
+
+  it('lets the rule through a strict style-src by its hash, in each locale', async () => {
+    const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/outside-links/src/messages') }
+    const site = new Elysia().use(await pages({ root: 'tests/fixtures/outside-links', prebuilt: false, site: 'https://x.example', inlineStyles: false, i18n, security: { csp: { 'style-src': ['\'self\''] } } }))
+
+    for (const path of ['/', '/en']) {
+      const response = await site.handle(new Request(`http://localhost${path}`))
+      const rule = (/<style>(a\[data-new-tab\][^<]*)<\/style>/).exec(await response.text())?.[1]
+
+      expect(rule, path).toBeDefined()
+      expect(response.headers.get('content-security-policy'), path).toContain(sourceHash(rule!))
+    }
+  })
+
+  it('escapes what a locale text holds in the css string', () => {
+    const rules = newTabStyles([{ locale: 'xx', messages: new Map([['kay.link.newTab', 'a"b\\c</style>\nd\fe']]) }])
+    const rule = rules.find(css => css.includes('a\\"b'))!
+
+    expect(rule).toContain('content:"a\\"b\\\\c\\3C /style> d e"')
+    expect(rule).not.toContain('<')
   })
 
   it('words the rule in the locale of the page, and writes none under same-tab links', async () => {

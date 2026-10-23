@@ -50,6 +50,8 @@ function mountPreview(plugin: Elysia, render: (message: MailMessage) => Promise<
     plugin.post(path, handle)
 }
 
+const NEW_TAB_MARK = /(<a\b[^>]*?) data-new-tab(?=[\s/>])/g
+
 export interface MailerOptions {
   // The address mails are sent from unless one says otherwise, `MAIL_FROM` when left out, else `noreply@` the site's host.
   from?: Address | undefined
@@ -402,7 +404,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     const rendered = message.view ? await renderLocale(chosen) : chosen ?? await renderLocale()
     const markup = message.view ? await renderToString(message.view, ...[message.props, chosen === undefined ? undefined : { locale: chosen }] as never) : message.html
     // A mail has no page stylesheet to read the mark kay puts on a link it opens in a new tab, so it goes without.
-    const html = markup === undefined ? undefined : asDocument(markup.replaceAll(' data-new-tab', ''), message.subject, rendered)
+    const html = markup === undefined ? undefined : asDocument(markup.replace(NEW_TAB_MARK, '$1'), message.subject, rendered)
 
     return {
       from: from ?? sender(),
