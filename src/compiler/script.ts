@@ -1311,12 +1311,20 @@ function undeclared(ast: ParseResult<t.File>, code: string, declared: string[], 
 
   const inTyped = new Set(typed.match(KAY_NAME) ?? [])
 
-  loadTraverse()(ast, {
-    Program(path) {
-      found.push(...mentioned.filter(name => (name in path.scope.globals || inTyped.has(name) || read.includes(name)) && !path.scope.hasBinding(name)))
-      path.stop()
-    },
-  })
+  // Babel's scope refuses a name declared twice, as an import and a `const` an edit passes through: every name mentioned and not declared is then taken as read, and the half-built scope is dropped so a later walk refuses the fence too.
+  try {
+    loadTraverse()(ast, {
+      Program(path) {
+        found.push(...mentioned.filter(name => (name in path.scope.globals || inTyped.has(name) || read.includes(name)) && !path.scope.hasBinding(name)))
+        path.stop()
+      },
+    })
+  }
+  catch {
+    loadTraverse().cache.clearScope()
+
+    return mentioned
+  }
 
   return found
 }
