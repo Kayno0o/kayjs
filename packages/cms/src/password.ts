@@ -8,7 +8,7 @@ import { log } from './log'
 
 // The cookie holding a password sign-in: `<role>.<expires>.<signature>`, signed with a key made from that role's password and the app's secret.
 export const SESSION_COOKIE = 'kay_editor_session'
-// Its name over https: the `__Host-` prefix makes a browser refuse it from a subdomain, and set it only secure, on the whole site and with no domain.
+// Its name over https: a browser takes the `__Host-` prefix only from the site itself, secure, on the whole site and with no domain, so a subdomain cannot replace it. The plain names are still read, for a sign-in made before.
 export const HOST_SESSION_COOKIE = `__Host-${SESSION_COOKIE}`
 // The name before 1.70, still read so no editor is signed out by the rename; it is never set again.
 export const LEGACY_SESSION_COOKIE = 'kcms_session'
@@ -29,6 +29,7 @@ const ROLE = /^[\w-]+$/
 const KEY_SALT = 'kayjs-cms/password/v1:'
 // A password shorter than this is refused in production, where it is all that stands between the web and the admin.
 const MIN_PASSWORD_LENGTH = 12
+let warnedOfNoSecret = false
 const REVOKED = 'cms:revoked\n'
 const FAILURES = 'cms:sign-in-failures'
 // Wrong passwords from anyone, every quarter of an hour, past which no sign-in is tried until the window closes: the per-visitor limit does not stop a guess spread over many addresses.
@@ -69,6 +70,9 @@ export class Passwords {
   constructor(passwords: Record<string, string>, maxAge: Duration, private readonly secret?: string, private readonly chosenStore?: RateStore) {
     this.seconds = durationSeconds(maxAge, '`passwordGuard({ maxAge })`')
 
+    if (chosenStore !== undefined && chosenStore.peek === undefined)
+      this.store()
+
     const entries = Object.entries(passwords)
     const production = process.env.NODE_ENV === 'production'
 
@@ -98,8 +102,14 @@ export class Passwords {
     }
   }
 
-  private store(): RateStore {
-    return this.chosenStore ?? appStore()?.rates ?? this.memory
+  // The store that signed-out cookies and the ceiling are kept in; one without `peek` could keep neither, so it is refused.
+  private store(): RateStore & Required<Pick<RateStore, 'peek'>> {
+    const store = this.chosenStore ?? appStore()?.rates ?? this.memory
+
+    if (store.peek === undefined)
+      throw configError('`passwordGuard()` needs a rate store with a `peek(key)` method, to tell a signed-out cookie and count wrong passwords; add it to `store.rates`, or use `sqliteRates()`')
+
+    return store as RateStore & Required<Pick<RateStore, 'peek'>>
   }
 
   // Slow on purpose: a cookie seen once must not let the password be guessed offline at hashing speed. Made on first use, as the app's secret may be set up after the guard.
@@ -114,8 +124,10 @@ export class Passwords {
     if (!key) {
       const secret = this.secret ?? appSecrets()?.[0] ?? ''
 
-      if (secret === '' && process.env.NODE_ENV === 'production')
+      if (secret === '' && process.env.NODE_ENV === 'production' && !warnedOfNoSecret) {
+        warnedOfNoSecret = true
         log.warn('passwordGuard() has no secret: set KAY_SECRET so a sign-in cookie cannot be checked against a guessed password offline')
+      }
 
       this.keys.set(role, key = scryptSync(password, KEY_SALT + secret, 32))
     }
@@ -141,19 +153,31 @@ export class Passwords {
     return found
   }
 
-  // Whether wrong passwords from all visitors have passed the ceiling, so no sign-in is tried until the window closes.
+  // Whether wrong passwords from all visitors have passed the ceiling, so no sign-in is tried until the window closes; a store that cannot answer counts as passed.
   async lockedOut(): Promise<boolean> {
-    const window = await this.store().peek?.(FAILURES)
+    try {
+      const window = await this.store().peek(FAILURES)
 
-    return (window?.count ?? 0) >= FAILURE_CEILING
+      return (window?.count ?? 0) >= FAILURE_CEILING
+    }
+    catch (error) {
+      log.error(`the store counting wrong passwords did not answer, so no sign-in is tried: ${error instanceof Error ? error.message : String(error)}`)
+
+      return true
+    }
   }
 
   // Counts a wrong password against the ceiling, logging the first one past it.
   async failed(): Promise<void> {
-    const window = await this.store().hit(FAILURES, FAILURE_WINDOW)
+    try {
+      const window = await this.store().hit(FAILURES, FAILURE_WINDOW)
 
-    if (window.count === FAILURE_CEILING)
-      log.warn(`${FAILURE_CEILING} wrong passwords in ${FAILURE_WINDOW}: the cms sign-in refuses every try until the window closes`)
+      if (window.count === FAILURE_CEILING)
+        log.warn(`${FAILURE_CEILING} wrong passwords in ${FAILURE_WINDOW}: the cms sign-in refuses every try until the window closes`)
+    }
+    catch (error) {
+      log.error(`a wrong password could not be counted: ${error instanceof Error ? error.message : String(error)}`)
+    }
   }
 
   // The sign-in cookie for a role this password opened.
@@ -195,7 +219,7 @@ export class Passwords {
     const signature = value?.split('.')[2] ?? ''
 
     try {
-      const window = await this.store().peek?.(REVOKED + keyedDigest('cms-session', signature))
+      const window = await this.store().peek(REVOKED + keyedDigest('cms-session', signature))
 
       return window === undefined ? role : undefined
     }

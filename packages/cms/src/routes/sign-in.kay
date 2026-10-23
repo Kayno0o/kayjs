@@ -39,7 +39,7 @@ export const signIn = action(s.Object({
     ctx.cookies.delete({ name: SESSION_COOKIE, path: '/' })
 
   if (settings().pageLink)
-    ctx.cookies.set(hintCookie(overHttps(ctx.request)))
+    ctx.cookies.set(hintCookie(secure))
 
   ctx.redirect(localPath(redirect, settings().prefix))
 }, {

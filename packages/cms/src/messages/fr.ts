@@ -441,6 +441,7 @@ export default defineMessages({
       toast: 'Votre session a pris fin. Reconnectez-vous pour enregistrer.',
     },
     signIn: {
+      locked: 'Trop de mots de passe erronés à l\'instant. Réessayez dans quelques minutes.',
       password: 'Mot de passe',
       submit: 'Se connecter',
       title: 'Connexion',

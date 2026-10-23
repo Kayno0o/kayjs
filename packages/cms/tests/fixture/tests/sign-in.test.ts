@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { expect, test } from 'bun:test'
 import { testSite } from 'kay/test'
 import { cms } from '../../../src/extension'
-import { passwordGuard, SESSION_COOKIE } from '../../../src/password'
+import { activePasswords, passwordGuard, SESSION_COOKIE } from '../../../src/password'
 
 const ROOT = join(import.meta.dir, '..')
 
@@ -146,4 +146,19 @@ test('under a base, the sign-in leads back to the page asked for under that base
   const done = await based.submit(signIn, { password: 'pw-editor', redirect: location.searchParams.get('redirect') ?? '' }, { from: '/site/admin/sign-in' })
 
   expect(done.url).toBe('/site/admin/collections/posts?q=a')
+})
+
+test('once wrong passwords from everyone pass the ceiling, even the right password is refused with a 429 and signs nobody in', async () => {
+  const passwords = activePasswords()!
+
+  for (let tried = 0; tried < 100; tried++)
+    await passwords.failed()
+
+  site.cookies.delete(SESSION_COOKIE)
+
+  const refused = await site.submit(signIn, { password: 'pw-editor' }, { from: '/admin/sign-in' })
+
+  expect(refused.status).toBe(429)
+  expect(refused.html).toContain('Too many wrong passwords')
+  expect((await site.fetch('/admin')).status).toBe(302)
 })

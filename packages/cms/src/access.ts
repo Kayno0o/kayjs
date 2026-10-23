@@ -161,8 +161,7 @@ export async function signOutOf(ctx: GuardContext): Promise<void> {
   for (const value of sessionCookiesOf(ctx.cookies))
     await activePasswords()?.revoke(value)
 
-  // A browser deletes a `__Host-` cookie only from a secure, whole-site expiry.
-  ctx.cookies.set(new Bun.Cookie(HOST_SESSION_COOKIE, '', { path: '/', maxAge: 0, secure: true }))
+  ctx.cookies.delete({ name: HOST_SESSION_COOKIE, path: '/' })
   ctx.cookies.delete({ name: SESSION_COOKIE, path: '/' })
   ctx.cookies.delete({ name: LEGACY_SESSION_COOKIE, path: '/' })
   await authOf(ctx)?.signOut?.()

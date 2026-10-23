@@ -162,12 +162,8 @@ describe('signing out', () => {
 
     ctx.cookies.delete = ((options: { name: string }) => void deleted.push(options.name)) as typeof ctx.cookies.delete
 
-    const expired: { name: string, maxAge: number | undefined, secure: boolean }[] = []
-
-    ctx.cookies.set = ((cookie: Bun.Cookie) => void expired.push({ name: cookie.name, maxAge: cookie.maxAge, secure: cookie.secure })) as typeof ctx.cookies.set
     await signOutOf(ctx)
-    expect(deleted).toEqual([SESSION_COOKIE, LEGACY_SESSION_COOKIE])
-    expect(expired).toEqual([{ name: HOST_SESSION_COOKIE, maxAge: 0, secure: true }])
+    expect(deleted).toEqual([HOST_SESSION_COOKIE, SESSION_COOKIE, LEGACY_SESSION_COOKIE])
     expect(await statusOf(context(cookie, LEGACY_SESSION_COOKIE), guard)).toBe(401)
   })
 
@@ -390,6 +386,20 @@ describe('the cookie name', () => {
     expect(passwords.issue('editor', false).name).toBe(SESSION_COOKIE)
     expect(sessionCookieOf(new Bun.CookieMap(`${HOST_SESSION_COOKIE}=a`))).toBe('a')
     expect(sessionCookieOf(new Bun.CookieMap(`${SESSION_COOKIE}=b`))).toBe('b')
+    expect(sessionCookieOf(new Bun.CookieMap(`${SESSION_COOKIE}=b; ${HOST_SESSION_COOKIE}=a`))).toBe('a')
+  })
+
+  test('is ended on sign-out with the secure expiry a browser takes for a __Host- cookie', () => {
+    const map = new Bun.CookieMap()
+
+    map.delete({ name: HOST_SESSION_COOKIE, path: '/' })
+    expect(map.toSetCookieHeaders()[0]).toContain('Secure')
+  })
+})
+
+describe('a store without peek', () => {
+  test('is refused for a store given to passwordGuard, as it could neither tell a signed-out cookie nor count the ceiling', () => {
+    expect(() => passwordGuard('pw-editor', { store: { hit: () => ({ count: 1, resetAt: 0 }) } })).toThrow('peek')
   })
 })
 
