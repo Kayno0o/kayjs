@@ -254,6 +254,21 @@ describe('SidePanel with a dock', () => {
     }
   })
 
+  test('the launcher is layered by launcherLayer alone and names its panel, whatever style the panel takes', async () => {
+    const root = await panels()
+
+    await settle()
+    click(dock(root).querySelector('.kui-icon-btn[aria-label="Close"]'))
+    await settle()
+
+    const button = launcher(root)!
+
+    expect(dock(root).style.zIndex).toBe('77')
+    expect(button.style.zIndex).toBe('41')
+    expect(button.style.opacity).toBe('')
+    expect(button.getAttribute('aria-controls')).toBe('docked')
+  })
+
   test('leaves a launcher in the corner once closed, which opens it again and holds the dev tool\'s bar off it', async () => {
     const width = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth')
 

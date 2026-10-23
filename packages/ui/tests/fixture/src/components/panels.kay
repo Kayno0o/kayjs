@@ -38,7 +38,7 @@ SplitLayout#split(sidebarOpen={sidebarOpen()} onSidebarOpenChange={() => sidebar
   @detail
     p#detail Mars
     button#edit Edit
-SidePanel#docked(open={dockOpen()} modal={false} dock={dockEdge()} size={dockSize()} onSizeChange={(size, settled) => { dockSize.set(size); if (settled) onSettled?.(size) }} title="Jupiter" launcher="Open Jupiter" onOpenChange={shown => dockOpen.set(shown)})
+SidePanel#docked(open={dockOpen()} modal={false} dock={dockEdge()} size={dockSize()} onSizeChange={(size, settled) => { dockSize.set(size); if (settled) onSettled?.(size) }} title="Jupiter" launcher="Open Jupiter" launcherLayer={41} style="z-index: 77; opacity: 0.9" onOpenChange={shown => dockOpen.set(shown)})
   p#docked-body Fifth planet
 button#open-docked(onClick={() => dockOpen.set(true)}) Open docked
 button#dock-bottom(onClick={() => dockEdge.set('bottom')}) Dock bottom

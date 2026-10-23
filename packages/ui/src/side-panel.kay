@@ -20,7 +20,7 @@ const look = recipe({
   },
 })
 
-const { open, title, actions, footer, modal = true, closeHref, launcher, onOpenChange, closeLabel = wording('ui.sidePanel.close', 'Close'), dock, size, onSizeChange, resizeLabel = wording('ui.sidePanel.resize', 'Resize'), style, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'closedby' | 'closedBy' | 'style'> & {
+const { open, title, actions, footer, modal = true, closeHref, launcher, launcherLayer, onOpenChange, closeLabel = wording('ui.sidePanel.close', 'Close'), dock, size, onSizeChange, resizeLabel = wording('ui.sidePanel.resize', 'Resize'), style, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'closedby' | 'closedBy' | 'style'> & {
   // Shows the panel along the edge, as a modal unless `modal` is false; the parent sets it back to false in `onOpenChange`.
   open: boolean
   title: string
@@ -34,8 +34,10 @@ const { open, title, actions, footer, modal = true, closeHref, launcher, onOpenC
   closeHref?: string | undefined
   // With `dock`, a closed panel leaves a button of this label in the window's bottom right corner that opens it through `onOpenChange(true)`, off the dev tool's drawer, and publishes the room it takes as `--kay-panel-right` for the dev tool's bar. Without it a closed panel leaves nothing.
   launcher?: string | undefined
-  // Written after the component's own declarations, so it wins, on the launcher too: a docked panel's `z-index` is set here.
+  // Written after the component's own declarations, so it wins: a docked panel's `z-index` is set here. The launcher takes none of it, only `launcherLayer`.
   style?: string | undefined
+  // The launcher's `z-index`, the one thing about it a parent sets; the launcher names the panel it opens through `aria-controls`, so a panel with an `id` is told apart from another one's.
+  launcherLayer?: number | undefined
   // With `modal={false}`, docks the panel to this edge as a tool beside the page: fixed along the edge next to the dev tool's docked drawer, padding the page's `body` by its size, publishing it as `--kay-panel-right` or `-bottom` (for the dev tool's bar) and `--kui-dock-right` or `-bottom`, resized by a grip on its inner edge. Only its close control closes it, Escape does not. A fixed header across the top is cleared with `--kui-dock-top` on `html`.
   dock?: 'right' | 'bottom' | undefined
   // The docked panel's width (right) or height (bottom) in px, kept within what the page and the panel need; 24rem or half the window when not given.
@@ -291,4 +293,4 @@ dialog(part="root" aria-label={title} {...rest} open={renderedOpen} data-modal={
       div(part="footer")
         | {footer}
 if docked() && !open && launcher
-  IconButton(part="launcher" icon="menu" label={launcher} variant="ghost" style={style} ref={element => launching.set(element)} onClick={() => onOpenChange(true)})
+  IconButton(part="launcher" icon="menu" label={launcher} variant="ghost" aria-controls={rest.id} style={launcherLayer === undefined ? undefined : `z-index: ${launcherLayer}`} ref={element => launching.set(element)} onClick={() => onOpenChange(true)})
