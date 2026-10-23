@@ -1847,6 +1847,45 @@ describe('lifecycle', () => {
     expect(await server.exited).toBe(1)
     expect(await status).toBe('closed')
   }, 20_000)
+
+  it('returns from shutdown(app) over a server with an open websocket, closing the socket', async () => {
+    const app = new Elysia().ws('/socket', { open() {} }).listen(0)
+    const socket = new WebSocket(`ws://localhost:${app.server!.port}/socket`)
+    const closed = new Promise<number>((resolve) => {
+      socket.onclose = event => resolve(event.code)
+    })
+
+    await new Promise<void>((resolve) => {
+      socket.onopen = () => resolve()
+    })
+    await shutdown(app)
+    expect(await closed).toBe(1001)
+    expect(app.server).toBeNull()
+  }, 10_000)
+
+  it('closes an open websocket and a request that never ends past the shutdown timeout and exits with 1', async () => {
+    const { server, url, waitFor } = await startServer({ SHUTDOWN_TIMEOUT: '0.3' })
+    const socket = new WebSocket(`${url.replace('http', 'ws')}/socket`)
+    const closed = new Promise<number>((resolve) => {
+      socket.onclose = event => resolve(event.code)
+    })
+    const hung = (async () => {
+      try {
+        return (await fetch(`${url}/hang`)).status
+      }
+      catch {
+        return 'closed'
+      }
+    })()
+
+    await waitFor('socket open\n')
+    await waitFor('hang started\n')
+    server.kill('SIGTERM')
+
+    expect(await server.exited).toBe(1)
+    expect(await hung).toBe('closed')
+    expect(typeof await closed).toBe('number')
+  }, 20_000)
 })
 
 describe('request logging', () => {

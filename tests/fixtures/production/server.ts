@@ -11,6 +11,11 @@ const app = new Elysia()
 
     return 'slow done'
   })
+  // A request that never answers.
+  .get('/hang', async () => {
+    console.log('hang started')
+    await new Promise(() => undefined)
+  })
   // An event stream that never ends by itself, as a live connection does.
   .get('/stream', () => {
     console.log('stream started')
