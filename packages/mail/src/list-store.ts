@@ -28,8 +28,10 @@ type Maybe<T> = T | Promise<T>
 
 // What the mailing lists keep their data in; `openLists` is the SQLite one, `pgLists` the Postgres one, both with the same semantics: a delivery is claimed before its mail goes, and removing or erasing a subscriber takes its deliveries with it.
 export interface ListStore {
-  // The address's row on the list, made pending when it has none. The first call to find a row forgets confirmations nobody clicked.
+  // The address's row on the list, made pending when it has none.
   ask: (list: string, email: string, id: string, locale: string, now?: number) => Maybe<Subscriber>
+  // Forgets the confirmations nobody clicked in 7 days and the broadcasts finished 30 days ago with their deliveries, which the lists run when a store opens and every hour.
+  sweep: (now?: number) => Maybe<void>
   // Whether the subscriber exists after the call; one confirmed already stays as it is.
   confirm: (list: string, id: string, now?: number) => Maybe<boolean>
   remove: (list: string, id: string) => Maybe<boolean>
@@ -147,12 +149,17 @@ export function openLists(path: string) {
     }
   })
 
+  sweepPending.run(Date.now() - PENDING_KEPT_MS)
+  sweepBroadcasts.immediate(Date.now() - BROADCAST_KEPT_MS)
+
   return {
     close: () => db.close(),
-    // The address's row on the list, made pending when it has none. The first call to find a row forgets confirmations nobody clicked.
-    ask(list: string, email: string, id: string, locale: string, now = Date.now()): Subscriber {
+    sweep(now = Date.now()): void {
       sweepPending.run(now - PENDING_KEPT_MS)
       sweepBroadcasts.immediate(now - BROADCAST_KEPT_MS)
+    },
+    // The address's row on the list, made pending when it has none.
+    ask(list: string, email: string, id: string, locale: string, now = Date.now()): Subscriber {
       insertPending.run(id, list, email, locale, now)
 
       const row = byEmail.get(list, email)

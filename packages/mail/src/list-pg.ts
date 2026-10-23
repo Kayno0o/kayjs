@@ -117,7 +117,7 @@ export function pgLists(source: PgJobsSource): ListStore & { close: () => Promis
       if (typeof source === 'string')
         await db.close()
     },
-    async ask(list, email, id, locale, now = Date.now()): Promise<Subscriber> {
+    async sweep(now = Date.now()): Promise<void> {
       const connection = await connected()
 
       await connection.begin(async (tx) => {
@@ -125,6 +125,8 @@ export function pgLists(source: PgJobsSource): ListStore & { close: () => Promis
         await rows(tx, 'DELETE FROM kay_mail_deliveries WHERE broadcast IN (SELECT id FROM kay_mail_broadcasts WHERE finished_at IS NOT NULL AND finished_at < $1::bigint)', [now - BROADCAST_KEPT_MS])
         await rows(tx, 'DELETE FROM kay_mail_broadcasts WHERE finished_at IS NOT NULL AND finished_at < $1::bigint', [now - BROADCAST_KEPT_MS])
       })
+    },
+    async ask(list, email, id, locale, now = Date.now()): Promise<Subscriber> {
       await query('INSERT INTO kay_mail_subscribers (id, list, email, status, locale, created_at) VALUES ($1, $2, $3, \'pending\', $4, $5::bigint) ON CONFLICT DO NOTHING', [id, list, email, locale, now])
 
       const [row] = await query<SubscriberRow>('SELECT * FROM kay_mail_subscribers WHERE list = $1 AND email = $2', [list, email])

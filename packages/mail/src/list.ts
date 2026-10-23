@@ -24,6 +24,9 @@ const PLACEHOLDER = 'https://unsubscribe.invalid/KAYUNSUBSCRIBE'
 const BODY_CLOSE = /<\/body>/i
 // A mail to nobody in particular, rendered once for the whole list.
 const LIST_RECIPIENT = 'list@kay.invalid'
+// The first sweep of the stores waits for the app to boot; the next ones follow at this pace.
+const FIRST_SWEEP_MS = 10_000
+const SWEEP_EVERY_MS = 3_600_000
 
 export interface ListConfirmProps {
   // The link whose click lists the address.
@@ -116,6 +119,8 @@ interface Entry {
   readonly lists: ListStore
   // What the list was made with, `file` or `store`, which a later call must not contradict.
   readonly source: ListStore | string | undefined
+  // The store when it is open or its file exists, so a sweep creates no file.
+  readonly opened: () => ListStore | undefined
   pace: { batch: number, every: Duration }
 }
 
@@ -363,9 +368,33 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
       },
     }
 
+    const opened = (): ListStore | undefined => chosen ?? files.get(file) ?? (existsSync(file) ? open(file) : undefined)
+
     return { list, source: options.store ?? options.file, get lists() {
       return lists.get()
-    }, pace }
+    }, opened, pace }
+  }
+
+  // Forgets what the lists keep past its time, in every store this process knows: the unclicked confirmations and the old broadcasts. It runs once the app has booted and every hour, off any subscribe post.
+  const sweep = async (now?: number): Promise<void> => {
+    for (const store of new Set([...entries.values()].map(entry => entry.opened()))) {
+      try {
+        await store?.sweep(now)
+      }
+      catch (error) {
+        log.warn(`a mailing list store could not be swept: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+  }
+  let sweeping = false
+
+  const startSweeping = (): void => {
+    if (sweeping)
+      return
+
+    sweeping = true
+    setTimeout(() => void sweep(), FIRST_SWEEP_MS).unref()
+    setInterval(() => void sweep(), SWEEP_EVERY_MS).unref()
   }
 
   // One process of the broadcast: mails a batch, then asks to run again after the pace until nobody is left.
@@ -423,6 +452,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
 
       if (!entry) {
         entries.set(name, entry = make(name, options))
+        startSweeping()
         host.activate()
       }
       else if ((options.store ?? options.file) !== undefined && (options.store ?? options.file) !== entry.source) {
@@ -432,6 +462,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
       return entry.list
     },
     run,
+    sweep,
     connect(connected: Pick<ListHost, 'enqueueMail' | 'enqueueRun' | 'activate'>): void {
       queues = connected
     },

@@ -69,7 +69,7 @@ for (const [kind, open, enabled] of stores) {
       expect((await store.subscribers(list)).map(row => row.email)).toEqual([email('ada')])
     })
 
-    it('forgets a confirmation nobody clicked after 7 days, and a finished broadcast after 30', async () => {
+    it('forgets a confirmation nobody clicked after 7 days, and a finished broadcast after 30, when swept and not when asking', async () => {
       const store = open()
       const { list, email } = names()
       const old = Date.now() - 8 * DAY
@@ -78,10 +78,16 @@ for (const [kind, open, enabled] of stores) {
       await store.addBroadcast(`b${run}-old-${counter}`, list, '{}', old)
       await store.finish(`b${run}-old-${counter}`, old)
       await store.ask(list, email('new'), 'new', 'en', Date.now())
-      expect(await store.confirm(list, 'old')).toBe(false)
+      expect(await store.confirm(list, 'old')).toBe(true)
       expect(await store.broadcast(`b${run}-old-${counter}`)).toBeDefined()
 
-      await store.ask(list, email('newer'), 'newer', 'en', Date.now() + 31 * DAY)
+      await store.ask(list, email('older'), 'older', 'en', old)
+      await store.sweep()
+      expect(await store.confirm(list, 'older')).toBe(false)
+      expect(await store.confirm(list, 'new')).toBe(true)
+      expect(await store.broadcast(`b${run}-old-${counter}`)).toBeDefined()
+
+      await store.sweep(Date.now() + 31 * DAY)
       expect(await store.broadcast(`b${run}-old-${counter}`)).toBeUndefined()
     })
 

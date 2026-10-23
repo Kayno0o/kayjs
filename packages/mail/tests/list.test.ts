@@ -519,6 +519,36 @@ describe('a link of a list this process does not declare', () => {
   })
 })
 
+describe('the sweep of the lists', () => {
+  const host = { configured: () => true, render: async () => ({}) as never, deliver: async () => undefined }
+
+  it('drops a pending address after 8 days with no new subscription, and keeps a confirmed one', async () => {
+    const file = join(await scratchDir('list-'), 'sweep.sqlite')
+    const store = openLists(file)
+    const lists = createLists(host)
+    const old = Date.now() - 8 * 24 * 3_600_000
+
+    store.ask('swept', 'pending@example.com', 'pending', 'en', old)
+    store.ask('swept', 'kept@example.com', 'kept', 'en', old)
+    store.confirm('swept', 'kept', old)
+    lists.list('swept', { file })
+    await lists.sweep()
+
+    expect(store.confirm('swept', 'pending')).toBe(false)
+    expect(store.confirm('swept', 'kept')).toBe(true)
+    store.close()
+  })
+
+  it('creates no file for a list nobody used', async () => {
+    const file = join(await scratchDir('list-'), 'never.sqlite')
+    const lists = createLists(host)
+
+    lists.list('unused', { file })
+    await lists.sweep()
+    expect(await Bun.file(file).exists()).toBe(false)
+  })
+})
+
 describe('the subscribe form\'s queue insert', () => {
   it('is off the response path for a new address, and absent for a listed one, so both answers take the same steps', async () => {
     const file = join(await scratchDir('list-'), 'form.sqlite')
