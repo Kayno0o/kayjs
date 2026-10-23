@@ -7,7 +7,7 @@ import { qrCodeDataUri, qrCodeSvg } from '@kaynooo/utils/tools/QrCode'
 const look = recipe({ parts: { root: 'kui-qr-code block h-auto max-w-full [&>svg]:block [&>svg]:h-auto [&>svg]:w-full' } })
 
 const { value, label, pixels, size, options, inline = false, style, ...rest } = props<Omit<JSX.IntrinsicElements['div'] & JSX.IntrinsicElements['img'], 'class' | 'src' | 'alt' | 'width' | 'height' | 'children' | 'innerHTML' | 'style'> & {
-  // Kept next to the component's own declarations, which win.
+  // Written after the component's own declarations, so it wins.
   style?: string | undefined
   // What the code holds, such as a URL.
   value: string
@@ -24,7 +24,7 @@ const { value, label, pixels, size, options, inline = false, style, ...rest } = 
 }>()
 
 const side = () => pixels ?? size
-const divStyle = () => [style, side() === undefined ? undefined : `width: ${side()}px; height: ${side()}px`].filter(Boolean).join('; ') || undefined
+const divStyle = () => [side() === undefined ? undefined : `width: ${side()}px; height: ${side()}px`, style].filter(Boolean).join('; ') || undefined
 ---
 // An SVG drawn when the page renders, on the server for a static page: dark modules on a light ground with a quiet zone, which every scanner reads. An image by default, which cannot read the page's CSS; inline, the SVG sits in the page and can.
 if inline

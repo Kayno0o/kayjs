@@ -14,24 +14,17 @@ async function styles() {
   return (selector: string) => mounted!.root.querySelector(selector)!.getAttribute('style')
 }
 
-test('a Popover and a HoverCard keep the style an app gives them before their own anchor', async () => {
+test('an app\'s style comes after the component\'s own declarations, so it wins', async () => {
   const style = await styles()
 
-  expect(style('#menu')).toBe('color: red; position-anchor: --kui-popover-menu')
-  expect(style('#card')).toMatch(/^color: red; position-anchor: /)
-})
-
-test('a QrCode keeps the style an app gives it, image or inline, beside the size it draws', async () => {
-  const style = await styles()
-
+  expect(style('#menu')).toBe('position-anchor: --kui-popover-menu; color: red; position-anchor: --mine')
+  expect(style('#card')).toMatch(/^position-anchor: .+; color: red; position-anchor: --mine$/)
   expect(style('#qr-image')).toBe('margin: 1px')
-  expect(style('#qr-inline')).toBe('margin: 1px; width: 64px; height: 64px')
+  expect(style('#qr-inline')).toBe('width: 64px; height: 64px; margin: 1px; width: 10px')
   expect(style('#qr-bare')).toBe('margin: 1px')
-})
-
-test('a Skeleton keeps the style an app gives it beside its width and height', async () => {
-  const style = await styles()
-
-  expect(style('#skeleton')).toBe('margin: 2px; --kui-skeleton-width: 50%;')
+  expect(style('#skeleton')).toBe('--kui-skeleton-width: 50%; margin: 2px; --kui-skeleton-width: 9px')
   expect(style('#skeleton-bare')).toBe('margin: 2px')
+  expect(style('#zoom')).toBe('touch-action: pan-y; touch-action: auto')
+  expect(style('#masonry')).toMatch(/--kui-masonry-gap: 12px;.*--kui-masonry-gap: 1px$/)
+  expect(style('#split')).toBe('--kui-split-list-width: 260px; --kui-split-list-width: 5px')
 })

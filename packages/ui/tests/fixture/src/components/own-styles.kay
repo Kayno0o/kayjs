@@ -2,16 +2,29 @@
 // kay-island
 import HoverCard from '@kaynooo/kayjs-ui/hover-card.kay'
 import Popover from '@kaynooo/kayjs-ui/popover.kay'
+import Masonry from '@kaynooo/kayjs-ui/masonry.kay'
 import QrCode from '@kaynooo/kayjs-ui/qr-code.kay'
 import Skeleton from '@kaynooo/kayjs-ui/skeleton.kay'
+import SplitLayout from '@kaynooo/kayjs-ui/split-layout.kay'
+import ZoomPane from '@kaynooo/kayjs-ui/zoom-pane.kay'
 ---
-Popover(id="menu" style="color: red")
+Popover(id="menu" style="color: red; position-anchor: --mine")
   @trigger(attributes)
     button({...attributes}) Menu
   p Inside
-HoverCard(id="card" anchor={null} style="color: red") Detail
+HoverCard(id="card" anchor={null} style="color: red; position-anchor: --mine") Detail
 QrCode#qr-image(value="https://kay.dev" style="margin: 1px")
-QrCode#qr-inline(value="https://kay.dev" inline pixels={64} style="margin: 1px")
+QrCode#qr-inline(value="https://kay.dev" inline pixels={64} style="margin: 1px; width: 10px")
 QrCode#qr-bare(value="https://kay.dev" inline style="margin: 1px")
-Skeleton#skeleton(width="50%" style="margin: 2px")
+Skeleton#skeleton(width="50%" style="margin: 2px; --kui-skeleton-width: 9px")
 Skeleton#skeleton-bare(style="margin: 2px")
+ZoomPane#zoom(label="Map" style="touch-action: auto")
+  p Plate
+Masonry#masonry(items={[1]} key={item => item} style="--kui-masonry-gap: 1px")
+  @tile(item)
+    p {item}
+SplitLayout#split(style="--kui-split-list-width: 5px")
+  @list
+    p List
+  @detail
+    p Detail
