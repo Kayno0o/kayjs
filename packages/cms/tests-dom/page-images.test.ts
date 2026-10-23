@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import { sameBar } from '../src/editor/image-bar'
+import { OWN } from '../src/editor/own'
 import { EDITOR_COOKIE } from '../src/page-link'
 
 const EDITOR = join(import.meta.dir, '../src/editor/editor.kay')
@@ -301,6 +302,16 @@ test('closing the editor ends the wait of an image dropped on an entry still a r
   await Bun.sleep(1200)
   expect(uploads).toBe(0)
   expect(data().photo).toBeUndefined()
+})
+
+test('the editor\'s real launcher is one of its own elements', async () => {
+  server()
+
+  const { root } = await open()
+
+  root.querySelector<HTMLElement>('[aria-label="Hide the editor"]')!.click()
+  await until(() => root.querySelector('[data-part=launcher]') !== null)
+  expect(root.querySelector('[data-part=launcher]')?.matches(OWN)).toBe(true)
 })
 
 function gallery(): HTMLImageElement[] {

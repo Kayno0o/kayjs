@@ -50,7 +50,7 @@ const PINNED = new Set(['fixed', 'sticky'])
 const SETTLE_LIMIT = 4000
 
 // kay renders it at the end of the page in edit mode only, kept across page swaps, with the entries the page read.
-// `settleEvery` shortens the wait for an entry's read, which a test would otherwise sleep through.
+// `settleEvery` is for tests alone: it shortens the wait for an entry's read, which a test would otherwise sleep through.
 const { entries, unclickable, settleEvery } = props<EditorProps & { settleEvery?: number }>()
 
 // Looks up what the editor reads only once the page has loaded, so the page sends it.

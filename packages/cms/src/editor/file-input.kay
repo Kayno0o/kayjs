@@ -14,7 +14,7 @@ type Size = { width: number, height: number } | undefined
 // An image or file field: the path of an upload dropped or picked, or one typed.
 // With `many`, the zone of a list of them: it takes several files, calls `onChange` with the path of each in order as it lands, and shows no path, clear button or alt text of its own.
 // `upload` is what the field asks of a file beyond the server's rules, `onChange` hears the size of an image the upload answered, and `alt` is the text paired with the image: its value, the issue it has and whether it is required.
-const { value, image, collection, many = false, upload = {}, alt, sizeIssues = [], onAlt, onChange } = props<{ value: string, image: boolean, collection: string, many?: boolean, upload?: UploadHints, alt?: { id: string, value: string, issue?: string | undefined, required: boolean } | undefined, sizeIssues?: { id: string, message: string }[], onAlt?: (text: string) => void, onChange: (path: string, size?: Size) => void }>()
+const { value, image, collection, many = false, disabled = false, upload = {}, alt, sizeIssues = [], onAlt, onChange } = props<{ value: string, disabled?: boolean, image: boolean, collection: string, many?: boolean, upload?: UploadHints, alt?: { id: string, value: string, issue?: string | undefined, required: boolean } | undefined, sizeIssues?: { id: string, message: string }[], onAlt?: (text: string) => void, onChange: (path: string, size?: Size) => void }>()
 
 // The share of the upload sent, from 0 to 1, while one is under way.
 const sent = signal<number>()
@@ -181,9 +181,9 @@ function pick(path: string, event: Event): void {
     for issue of sizeIssues key={issue.id}
       p.kcms-file-error(id={issue.id} role="alert") {issue.message}
   // A disabled zone is a div, so the tooltip is reachable by hover and keyboard where a disabled button's would not be.
-  FileDrop.kcms-file-drop(size="sm" accept={accept() ?? (image ? 'image/*' : undefined)} multiple={many} disabled={sent() !== undefined || denied() !== undefined} data-tooltip={denied()} tabindex={denied() === undefined ? undefined : '0'} onFiles={send} onReject={reject})
+  FileDrop.kcms-file-drop(size="sm" accept={accept() ?? (image ? 'image/*' : undefined)} multiple={many} disabled={disabled || sent() !== undefined || denied() !== undefined} data-tooltip={denied()} tabindex={denied() === undefined ? undefined : '0'} onFiles={send} onReject={reject})
     @content(zone)
-      Button(label={label()} busy={sent() !== undefined} disabled={denied() !== undefined} onClick={zone.open})
+      Button(label={label()} busy={sent() !== undefined} disabled={disabled || denied() !== undefined} onClick={zone.open})
       if sent() !== undefined
         progress.kcms-file-progress(value={sent()} max="1" aria-label={label()})
         IconButton(icon="close" label={wording('cms.file.cancel', 'Cancel the upload')} variant="ghost" size="sm" onClick={stop})
