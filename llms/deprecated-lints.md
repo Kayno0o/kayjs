@@ -2,7 +2,7 @@
 
 ## Common tasks
 
-- Move an app off every old form at once: `kay upgrade`, or `kay check --fix --since 1.72` for one minor alone; see [Apply the quick fixes](lints.md#apply-the-quick-fixes).
+- Move an app off every old form at once: `kay upgrade`, or `kay check --fix --since 1.74` for one minor alone; see [Apply the quick fixes](lints.md#apply-the-quick-fixes).
 
 ## Reference
 

@@ -82,7 +82,7 @@ const PLACEHOLDER = /\{(\w+)\}/g
 // A tag of a message, `<about>our story</about>`, which `T` renders through the block of its name; tags do not nest.
 export const MESSAGE_TAG = /<(\w[\w-]*)>(.*?)<\/\1>/gs
 
-export const PLURAL_CATEGORIES: ReadonlySet<string> = new Set<PluralCategory>(['zero', 'one', 'two', 'few', 'many', 'other'])
+const PLURAL_CATEGORIES: ReadonlySet<string> = new Set<PluralCategory>(['zero', 'one', 'two', 'few', 'many', 'other'])
 const numberFormats = new Map<string, Intl.NumberFormat>()
 const dateFormats = new Map<string, Intl.DateTimeFormat>()
 const pluralRules = new Map<string, Intl.PluralRules>()

@@ -144,3 +144,19 @@ describe('the theme names', () => {
     expect(css).toContain('--color-error: #f00;')
   })
 })
+
+describe('the removed 1.72 names', () => {
+  test('are read by no source of the libraries', async () => {
+    const OLD = /--(?:[a-z-]+-)?kui-(?!dock|sticky)[a-z0-9-]+|\b(?:bg|text|border|ring|rounded|fill|stroke|shadow|font|tracking)-kui-[a-z0-9-]+/g
+    const found: string[] = []
+
+    for (const file of new Bun.Glob('packages/*/src/**/*.{kay,css,ts}').scanSync({ cwd: `${ROOT}../..` })) {
+      const text = await Bun.file(`${ROOT}../../${file}`).text()
+
+      for (const [name] of text.matchAll(OLD))
+        found.push(`${file} ${name}`)
+    }
+
+    expect(found).toEqual([])
+  })
+})

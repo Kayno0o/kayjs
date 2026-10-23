@@ -318,7 +318,7 @@
 
 /* A select draws its text a few pixels in from its edge, so its padding gives that back to line it up with a text input's. */
 .kcms-field select {
-  padding-inline-start: calc(calc(var(--spacing) * 2.25 * var(--density)) - 0.25rem);
+  padding-inline-start: calc(var(--spacing) * 2.25 * var(--density) - 0.25rem);
 }
 
 .kcms-field[hidden] {

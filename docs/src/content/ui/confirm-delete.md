@@ -44,7 +44,7 @@ A deletion made with `call()` throws an `ApiError` when the route refuses. It is
 
 ## A message read when it opens
 
-`onOpenChange` is called with `true` when the trigger is pressed and with `false` once the dialog goes. Use it when `message` depends on something you must ask for first, such as a request: set a signal when `open` is true and pass that signal as `message`. `onOpen`, which ran on opening only, works until 1.75.
+`onOpenChange` is called with `true` when the trigger is pressed and with `false` once the dialog goes. Use it when `message` depends on something you must ask for first, such as a request: set a signal when `open` is true and pass that signal as `message`.
 
 ## Look and cancel label
 

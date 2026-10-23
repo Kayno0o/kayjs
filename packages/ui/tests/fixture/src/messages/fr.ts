@@ -6,7 +6,6 @@ export default defineMessages({
   ...mail,
   ui: {
     pagination: { label: 'Pages', previous: 'Précédent', next: 'Suivant' },
-    // BarList's pre-1.72 `emptyLabel` is still read, as MediaGallery's `empty` is; the config allows the deprecation report.
     barList: { empty: 'Aucune donnée' },
     contactForm: { submit: 'Expédier' },
     // The shipped French says `Confirmer la suppression`: the app's own wording wins key by key.
