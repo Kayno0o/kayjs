@@ -401,3 +401,11 @@ describe('startSweeping', () => {
     expect(await rowCount('trash')).toBe(1)
   })
 })
+
+describe('the trash revision row', () => {
+  test('is no trashed entry to restore', async () => {
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
+    await deleteEntry(ref, ada)
+    expect(await trash.trashed('notes', '\u0002rev')).toBeUndefined()
+  })
+})

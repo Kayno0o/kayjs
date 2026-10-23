@@ -111,7 +111,7 @@ export async function trashed(collection: string, id: string): Promise<Trashed |
   const trash = hiddenOf(collection, 'trash')
   const row = trash && await rowOf(trash, id)
 
-  return row ? trashedOf(id, row.data as Row) : undefined
+  return row && isRow(row.data) ? trashedOf(id, row.data as Row) : undefined
 }
 
 // A deleted entry's place in the trash. Returns the id it was kept under, or undefined when the collection keeps no trash or the trash could not be written, which is logged and never stops the delete.
