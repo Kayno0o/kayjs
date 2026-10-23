@@ -10,6 +10,7 @@ import type { ComponentInterface } from './component-props'
 import type { CodeAction, CodeActionParams, CodeLens, CompletionItem, CompletionList, Diagnostic, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, DocumentLink, DocumentSymbol, FileEvent, FoldingRange, Hover, InitializeParams, InlayHint, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, TsgoInlayHint, WorkspaceEdit } from './protocol'
 import type { TemplateData, Wanted } from './template-completion'
 import { existsSync } from 'node:fs'
+import { readdir } from 'node:fs/promises'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -73,7 +74,7 @@ interface Project {
   types?: ShadowTypes
   configured: boolean
   // What template completion looked up, dropped on a save and when the config is read again: the route table, the message catalog, the interface of each component read from disk and the props TypeScript gives a tag.
-  lookups: { paths?: Promise<string[]>, messages?: Promise<string[]>, routes?: Promise<Route[]>, interfaces: Map<string, ComponentInterface | undefined>, typedProps: Map<string, Promise<ComponentInterface['props'] | undefined>> }
+  lookups: { paths?: Promise<string[]>, messages?: Promise<string[]>, routes?: Promise<Route[]>, ownMatchers?: Promise<string[]>, interfaces: Map<string, ComponentInterface | undefined>, typedProps: Map<string, Promise<ComponentInterface['props'] | undefined>> }
 }
 
 interface Document extends ShadowFile {
@@ -840,7 +841,7 @@ export class KayLanguageServer {
   }
 
   // A lookup kept until the next save, forgotten when it fails so the next completion asks again; only its own failed promise is dropped, not a newer one a save put there.
-  private async remembered<Key extends 'paths' | 'messages' | 'routes'>(lookups: Project['lookups'], key: Key, ask: () => Promise<Awaited<NonNullable<Project['lookups'][Key]>>>): Promise<Awaited<NonNullable<Project['lookups'][Key]>>> {
+  private async remembered<Key extends 'paths' | 'messages' | 'routes' | 'ownMatchers'>(lookups: Project['lookups'], key: Key, ask: () => Promise<Awaited<NonNullable<Project['lookups'][Key]>>>): Promise<Awaited<NonNullable<Project['lookups'][Key]>>> {
     const kept = (lookups[key] ?? ask()) as Promise<Awaited<NonNullable<Project['lookups'][Key]>>>
 
     lookups[key] = kept as Project['lookups'][Key]
@@ -996,8 +997,19 @@ export class KayLanguageServer {
     const project = this.projectAt(projectRootOf(document.file, this.root))
     // The route table is read from disk, so a text with no route path asks for none.
     const routes = mentionsRoute(document.source) ? await this.routeTable(project) : []
+    const own = new Set(routes.some(route => route.matchers) ? await this.ownMatchers(project) : [])
 
-    return [...imports, ...routeLinks(document.source, routes, project.locales).map(link => ({ range: range(link), target: this.clientUri(link.file) }))]
+    return [...imports, ...routeLinks(document.source, routes, project.locales, own).map(link => ({ range: range(link), target: this.clientUri(link.file) }))]
+  }
+
+  // The matchers the project writes in `src/params`, which shadow the ones kay ships.
+  private async ownMatchers(project: Project): Promise<string[]> {
+    try {
+      return await this.remembered(project.lookups, 'ownMatchers', async () => (await readdir(join(project.routesDir, '..', 'params'))).filter(name => name.endsWith('.ts')).map(name => name.slice(0, -3)))
+    }
+    catch {
+      return []
+    }
   }
 
   // The pages of the project, none while its route files are ones the router refuses, which `kay check` reports itself.

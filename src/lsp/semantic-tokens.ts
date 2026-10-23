@@ -1,4 +1,4 @@
-import type { NodePath } from '@babel/traverse'
+import type { Binding, NodePath } from '@babel/traverse'
 import type * as t from '@babel/types'
 import type { Node, Span } from '../compiler/ast'
 import type { ImportedSignals, SignalKind } from '../compiler/module-signals'
@@ -41,8 +41,11 @@ type Categories = Map<string, Category>
 const LOOSE_IMPORT = /\bimport\s*(?:type\s*)?\{([^}]*)\}\s*from\s*(["'])([^"']+)\2/g
 const LOOSE_SPECIFIER = /([\w$]+)(?:\s+as\s+([\w$]+))?/g
 const LOOSE_MADE = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*[(<]/g
-const LOOSE_PROPS = /\b(?:const|let|var)\s*\{([^}]*)\}\s*=\s*props\s*[(<]/g
-const LOOSE_PROP = /(?:^|,)\s*(?:[\w$]+\s*:\s*)?([A-Z_$][\w$]*)/gi
+const LOOSE_PROPS = /\b(?:const|let|var)\s*\{/g
+const LOOSE_PROPS_TAIL = /^\s*=\s*props\s*[(<]/
+const LOOSE_PROP = /^\s*(?:[\w$]+\s*:\s*)?([A-Z_$][\w$]*)\s*(?:=|$)/i
+const OPENERS = '([{'
+const CLOSERS = ')]}'
 
 const TYPE_PARENTS = new Set(['TSTypeReference', 'TSQualifiedName', 'TSTypeQuery'])
 
@@ -72,7 +75,7 @@ export function semanticTokens(source: string, imported: ImportedSignals = {}): 
   })
   const fences = analyses.flatMap(({ analysis, fence }) => fence ? [{ analysis, fence }] : [])
 
-  for (const { span, analysis, fence } of analyses) {
+  for (const { analysis } of analyses) {
     for (const binding of analysis.imports) {
       const kind = imported[binding.source]?.[binding.imported]
 
@@ -81,8 +84,10 @@ export function semanticTokens(source: string, imported: ImportedSignals = {}): 
       if (kind)
         own.set(binding.local, signalCategory(kind))
     }
+  }
 
-    // What Babel could not parse is read as text, so the names it declares still reach the template.
+  // What Babel could not parse is read as text once every fence's imports are known, so the names it declares still reach the template.
+  for (const { span, analysis, fence } of analyses) {
     for (const region of fence ? fence.broken : [span])
       looseDeclarations(source, region, imported, made, own, add)
 
@@ -170,8 +175,8 @@ function fenceTokens(fence: ParsedFence, known: Categories, handed: Categories |
   const categoryOf = (path: NodePath<t.Identifier>): Category | undefined => {
     const binding = path.scope.getBinding(path.node.name)
 
-    // Babel gives a destructured `catch` parameter no binding.
-    if (binding === undefined && inCatchParameter(path))
+    // Babel gives a destructured `catch` parameter no binding, so a read in its block meets the file's name.
+    if (declaredByCatch(path, binding))
       return undefined
 
     if (binding === undefined)
@@ -192,6 +197,13 @@ function fenceTokens(fence: ParsedFence, known: Categories, handed: Categories |
     })
   }
   catch {}
+}
+
+// Whether the identifier is, or reads, a name a destructured `catch` parameter declares around it, unless a binding nearer than the `catch` holds the name.
+function declaredByCatch(identifier: NodePath<t.Identifier>, binding: Binding | undefined): boolean {
+  const clause = identifier.findParent(path => path.isCatchClause() && patternNames(path.node.param).includes(identifier.node.name))
+
+  return clause !== null && (binding === undefined || clause.isDescendant(binding.scope.path))
 }
 
 // Whether the identifier is declared by a `catch` parameter pattern, which Babel gives no binding when destructured.
@@ -305,12 +317,72 @@ function looseDeclarations(source: string, region: Span, imported: ImportedSigna
   }
 
   for (const match of text.matchAll(LOOSE_PROPS)) {
-    for (const entry of match[1]!.matchAll(LOOSE_PROP)) {
-      const name = entry[1]!
+    const open = match.index + match[0].length - 1
+    const close = closing(text, open)
 
-      declare(name, match.index + match[0].indexOf('{') + 1 + entry.index + entry[0].lastIndexOf(name), { type: PROPERTY, modifiers: PROP })
+    if (close === undefined || !LOOSE_PROPS_TAIL.test(text.slice(close + 1)))
+      continue
+
+    for (const [from, to] of splitEntries(text, open + 1, close)) {
+      const entry = LOOSE_PROP.exec(text.slice(from, to))
+
+      if (entry)
+        declare(entry[1]!, from + entry[0].lastIndexOf(entry[1]!), { type: PROPERTY, modifiers: PROP })
     }
   }
+}
+
+// The offset of the bracket closing the one at `open`, past nested brackets and strings; undefined when it never closes.
+function closing(text: string, open: number): number | undefined {
+  let depth = 0
+
+  for (let at = open; at < text.length; at++) {
+    const char = text[at]!
+
+    if (char === '"' || char === '\'' || char === '`')
+      at = text.indexOf(char, at + 1)
+    else if (OPENERS.includes(char))
+      depth++
+    else if (CLOSERS.includes(char) && --depth === 0)
+      return at
+
+    if (at === -1)
+      return undefined
+  }
+
+  return undefined
+}
+
+// The spans between the commas of a pattern that sit at its top level, so a default holding a call or a nested pattern stays one entry.
+function splitEntries(text: string, start: number, end: number): [number, number][] {
+  const entries: [number, number][] = []
+  let from = start
+  let depth = 0
+
+  for (let at = start; at < end; at++) {
+    const char = text[at]!
+
+    if (char === '"' || char === '\'' || char === '`') {
+      at = text.indexOf(char, at + 1)
+    }
+    else if (OPENERS.includes(char)) {
+      depth++
+    }
+    else if (CLOSERS.includes(char)) {
+      depth--
+    }
+    else if (char === ',' && depth === 0) {
+      entries.push([from, at])
+      from = at + 1
+    }
+
+    if (at === -1)
+      return entries
+  }
+
+  entries.push([from, end])
+
+  return entries
 }
 
 function encode(source: string, tokens: Token[]): number[] {

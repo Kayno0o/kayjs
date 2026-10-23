@@ -1974,6 +1974,16 @@ describe('kay lsp editor features of an app under a base', () => {
       expect(await hintsOf('src/routes/hints.kay', 2, 3)).toEqual(['2:11 : number', '2:22 left:', '2:25 right:'])
     })
 
+    const hintsIn = async (start: [number, number], end: [number, number]) => (await request<InlayHint[]>('textDocument/inlayHint', 'src/routes/hints.kay', { range: { start: { line: start[0], character: start[1] }, end: { line: end[0], character: end[1] } } })).map(hint => `${hint.position.line}:${hint.position.character} ${hint.label}`)
+
+    it('shows the hints of a range crossing the server fence and the script', async () => {
+      expect(await hintsIn([3, 0], [7, 0])).toEqual(['3:30 : number', '3:41 left:', '3:44 right:', '6:12 : Signal<number>', '6:22 value:'])
+    })
+
+    it('shows the hint right after the name a range ends on', async () => {
+      expect(await hintsIn([2, 0], [2, 11])).toEqual(['2:11 : number'])
+    })
+
     it('gives a file with a syntax error or no text no hints', async () => {
       await editor.open('src/routes/broken.kay')
       await editor.open('src/routes/empty.kay')

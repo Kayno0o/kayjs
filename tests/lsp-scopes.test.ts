@@ -92,6 +92,32 @@ describe('semantic tokens of a fence Babel cannot parse', () => {
   })
 })
 
+describe('semantic tokens of a broken import and of props read as text', () => {
+  it('gives a signal imported in a statement Babel cannot parse its token', () => {
+    const text = page('---', 'import { open } from \'../store\' garbage', 'const x = 1', '---', 'p {open}')
+
+    expect(tokens(text, { '../store': { open: 'signal' } })).toEqual(['1:9 open variable declaration,signal', '4:3 open variable signal'])
+  })
+
+  it('keeps a default holding a comma and a nested pattern in the props list', () => {
+    const text = page('---', 'const { a = f(x, y), b: { c }, d, e: renamed, ...rest } = props<{ a?: number }>()', 'const view = <b>{a}</b>', '---', 'p {a} {d} {renamed} {y} {c}')
+
+    expect(tokens(text)).toEqual(['1:8 a property declaration,prop', '1:31 d property declaration,prop', '1:37 renamed property declaration,prop', '4:3 a property prop', '4:7 d property prop', '4:11 renamed property prop'])
+  })
+
+  it('knows the signals the script fence imports in a module fence it cannot parse', () => {
+    const text = page('--- module', 'const shared = signal(0)', 'const view = <b>{shared}</b>', '---', '---', 'import { signal } from \'kay\'', '---', 'p {shared}')
+
+    expect(tokens(text)).toEqual(['1:6 shared variable declaration,signal', '7:3 shared variable signal'])
+  })
+
+  it('treats a destructured catch parameter of a fence as a binder', () => {
+    const text = page('---', 'const count = signal(0)', 'try { run() } catch ({ count }) { log(count) }', 'try { run() } catch ([count]) { log(count) }', '---')
+
+    expect(tokens(text)).toEqual(['1:6 count variable declaration,signal'])
+  })
+})
+
 describe('route links', () => {
   const route = (pattern: string, file: string, matchers?: Record<string, string>): Route => ({ pattern, file, params: [], layouts: [], special: {}, guards: [], ...matchers && { matchers } })
 
@@ -113,6 +139,20 @@ describe('route links', () => {
 
   it('accepts a param that a matcher of the project may take, as it cannot be run', () => {
     expect(routeAt('/posts/abc', [route('/posts/:id', 'mine.kay', { id: 'mine' })], [])?.file).toBe('mine.kay')
+  })
+
+  it('lets a project matcher shadow the one kay ships of its name', () => {
+    const routes = [route('/posts/:id', 'number.kay', { id: 'integer' })]
+
+    expect(routeAt('/posts/abc', routes, [])).toBeUndefined()
+    expect(routeAt('/posts/abc', routes, [], new Set(['integer']))?.file).toBe('number.kay')
+  })
+
+  it('runs the matcher of a catch-all on the rest of the path', () => {
+    const routes = [{ ...route('/docs/*', 'slug.kay', { rest: 'integer' }), catchAll: 'rest' }]
+
+    expect(routeAt('/docs/12', routes, [])?.file).toBe('slug.kay')
+    expect(routeAt('/docs/a/b', routes, [])).toBeUndefined()
   })
 
   it('reads a path under a locale prefix as the route it prefixes', () => {
@@ -143,6 +183,22 @@ describe('range formatting before the first template block', () => {
     const text = '---\nconst a = 1\n---\n\n\np Hi\n'
 
     expect(formatRange(text, { start: 4, end: 10 })).toEqual([])
+  })
+})
+
+describe('range formatting at the edges of the first block', () => {
+  it('touches nothing over the blank lines before the first block', () => {
+    const text = '---\nconst a = 1\n---\n\n\n\np   Hi\n'
+
+    expect(formatRange(text, { start: 18, end: 20 })).toEqual([])
+  })
+
+  it('folds the blank lines of a CRLF file as a whole file does', () => {
+    const text = '---\r\nconst a = 1\r\n---\r\n\r\n\r\np Hi\r\n'
+    const [edit] = formatRange(text, { start: 0, end: text.length })
+
+    expect(edit).toBeDefined()
+    expect(text.slice(0, edit!.start) + edit!.text + text.slice(edit!.end)).toBe(formatKay(text).code.replaceAll('\n', '\r\n'))
   })
 })
 

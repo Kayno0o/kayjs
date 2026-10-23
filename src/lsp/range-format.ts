@@ -49,9 +49,14 @@ export function formatRange(source: string, range: Span, options: FormatOptions 
   return edits
 }
 
-// The first block takes the blank lines before it, which a whole file drops: they run from the line after what precedes it, the closing line of a fence.
+// The first block takes the blank lines before it, which a whole file drops: they run from the line after what precedes it, the closing line of a fence, or from the block itself when it starts on that line.
 function firstStart(source: string, at: number): number {
   const before = source.slice(0, at).trimEnd()
 
-  return before === '' ? 0 : source.indexOf('\n', before.length - 1) + 1
+  if (before === '')
+    return 0
+
+  const line = source.indexOf('\n', before.length - 1) + 1
+
+  return line === 0 || line > at ? at : line
 }
