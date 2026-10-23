@@ -6,7 +6,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### The forms deprecated in 1.72 are gone
 
-- kayjs-ui's old prop names are no longer read: `Select` takes `busy` (not `loading`), `QrCode` `pixels` (not `size`), `Badge` `variant="stamp"` or `variant="solid"` (not `stamp` or `solid`), and `FormField`, `FileDrop` and `Notice` `size="sm"` (not `compact`). A prop left under its old name does nothing, and may reach the element as an attribute.
+- kayjs-ui's old prop names are no longer read: `Select` takes `busy` (not `loading`), `QrCode` `pixels` (not `size`), `Badge` `variant="stamp"` or `variant="solid"` (not `stamp` or `solid`), and `FormField`, `FileDrop` and `Notice` `size="sm"` (not `compact`). A prop left under its old name does nothing.
 - `ConfirmDelete`'s `onOpen` and `SplitLayout`'s `onSidebarClose` are gone: use `onOpenChange` (called with `false` on closing too, so `onOpenChange={open => open && ask()}` keeps running on opening alone) and `onSidebarOpenChange(false)`.
 - The old `kui-` theme tokens no longer alias the app's own names, and the components stop reading them first. Set the new name in your `@theme`, write `bg-border` for `bg-kui-surface2`, and read `var(--color-muted)` for `var(--color-kui-muted)`: a utility still written with an old name builds nothing, and an old name set in `@theme` or on an element changes nothing. `--font-label` has no default declaration any more: it falls back to the text's own font.
 
