@@ -4365,6 +4365,28 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports but does not fix a shorthand key, and reads no reassigned let or multi-argument call', async () => {
+    const cases: [string, number, boolean][] = [
+      ['const filterLabel = "x"\nexport default { ui: { table: { filterLabel } } }', 1, false],
+      ['let m = { ui: { table: { filterLabel: "a" } } }\nm = { ui: {} }\nexport default m', 0, false],
+      ['export default merge({ ui: { table: { filterLabel: "a" } } }, {})', 0, false],
+      ['export default { ui: { table: { filterLabel: "a", selectedLabel: { other: "x" } } as const } satisfies object }', 2, true],
+    ]
+
+    for (const [form, count, fixed] of cases) {
+      const root = await scratchProject({ 'src/routes/index.kay': 'p hi\n', 'src/messages/fr.ts': `${form}\n`, 'kay.config.ts': 'export default { i18n: { locales: [\'fr\'], defaultLocale: \'fr\' } }\n' })
+
+      try {
+        expect((await runCheck(root)).output.match(/warning\[deprecated-message-key\]/g)?.length ?? 0, form).toBe(count)
+        await runCheck(root, '--fix')
+        expect((await Bun.file(join(root, 'src/messages/fr.ts')).text()) !== `${form}\n`, form).toBe(fixed)
+      }
+      finally {
+        await rm(root, { recursive: true, force: true })
+      }
+    }
+  })
+
   it('reports the lifetimes renamed to maxAge and --fix writes the new form, leaving a call that gives both', async () => {
     const config = [
       'import { createAuth } from \'@kaynooo/kayjs-auth\'',

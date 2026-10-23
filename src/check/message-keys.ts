@@ -58,7 +58,7 @@ function defaultCatalog(program: t.Program): t.ObjectExpression | undefined {
   for (const statement of program.body) {
     const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
 
-    if (declaration?.type === 'VariableDeclaration') {
+    if (declaration?.type === 'VariableDeclaration' && declaration.kind === 'const') {
       for (const declarator of declaration.declarations) {
         if (declarator.id.type === 'Identifier' && declarator.init)
           bindings.set(declarator.id.name, declarator.init)
@@ -97,7 +97,7 @@ function objectOf(node: t.Node | null | undefined, bindings: Map<string, t.Expre
   if (WRAPPERS.has(node.type))
     return objectOf((node as t.TSAsExpression).expression, bindings, seen)
 
-  if (node.type === 'CallExpression')
+  if (node.type === 'CallExpression' && node.arguments.length === 1)
     return objectOf(node.arguments[0], bindings, seen)
 
   if (node.type === 'Identifier' && !seen.has(node.name))
@@ -152,7 +152,7 @@ function visit(object: t.ObjectExpression, path: string[], context: Context): vo
       help: `word it as \`${renamed}\``,
       code: 'deprecated-message-key',
       severity: level === 'warn' ? 'warning' : 'error',
-      ...!siblings.has(replacement) && { fixes: [{ title: `Rename to ${replacement}`, edits: [{ start: property.key.start!, end: property.key.end!, text: `${quote}${replacement}${quote}` }], safe: true }] },
+      ...!siblings.has(replacement) && !property.shorthand && { fixes: [{ title: `Rename to ${replacement}`, edits: [{ start: property.key.start!, end: property.key.end!, text: `${quote}${replacement}${quote}` }], safe: true }] },
     })
   }
 }
