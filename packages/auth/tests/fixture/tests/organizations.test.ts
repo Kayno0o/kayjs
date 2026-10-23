@@ -72,7 +72,7 @@ describe('the organization pages', () => {
     const stranger = await person('gate-stranger@example.com')
     const list = await stranger.visitor.visit(LIST)
 
-    expect([list.status, text(list, 'title'), list.find('.kui-empty-state-title').map(title => title.text)]).toEqual([200, 'Organizations - Your account', ['You belong to no organization yet.']])
+    expect([list.status, text(list, 'title'), list.find('.kui-empty-state [data-part="title"]').map(title => title.text)]).toEqual([200, 'Organizations - Your account', ['You belong to no organization yet.']])
     expect(list.find('.kui-tab-nav a').map(link => link.text)).toContain('Organizations')
     expect((await stranger.visitor.visit(from)).status).toBe(404)
     expect(text(await stranger.visitor.visit('/fr/auth/account/organizations'), 'title')).toBe('Organisations - Votre compte')
