@@ -40,6 +40,11 @@ async function logged(what: string, work: Promise<unknown>): Promise<void> {
   }
 }
 
+const SQLSTATE = /^[0-9A-Z]{5}$/
+
+// Whether Postgres itself refused a statement (an SQLSTATE code), as against a connection lost or a call given up on.
+const refused = (error: unknown): boolean => (/^[0-9A-Z]{5}$/).test(String((error as { errno?: unknown }).errno))
+
 // How many times a change asks for a room's lock, a stuck update elsewhere letting go meanwhile; Postgres' lock_not_available.
 const LOCK_ATTEMPTS = 3
 const LOCK_NOT_AVAILABLE = '55P03'
@@ -205,17 +210,28 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
       await readRooms(db, names)
     }
     catch (error) {
+      // A lost connection or a timeout is the poller's to log and retry.
+      if (!refused(error))
+        throw error
+
       // A room the database refuses is left out and logged, the others read on.
       kayLog('error', 'reading the members of the other processes failed; reading the rooms one by one', error)
+
+      const held = ownRooms()
 
       for (const room of names) {
         try {
           await readRooms(db, [room])
         }
         catch (single) {
+          if (!refused(single))
+            throw single
+
           kayLog('error', `reading the members of the room ${JSON.stringify(room)} failed; it is left out`, single)
-          watched.delete(room)
           remote.delete(room)
+
+          if (!held.has(room))
+            watched.delete(room)
         }
       }
     }
@@ -323,8 +339,8 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
       const key = `${room}\n${connection}`
       const at = own.get(key)?.at ?? Date.now()
 
-      watch(room)
       own.set(key, { room, connection, member, at })
+      watch(room)
       sync()
       enqueue('adding a member to the rooms store', async db => upsert(db, room, connection, member, at))
     },

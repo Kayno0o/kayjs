@@ -8,9 +8,9 @@ export const STORE_TIMEOUT_MS = 8_000
 export const READY_TIMEOUT_MS = 150_000
 
 // Runs one store call under the time limit, a call given up on being logged before its error goes on to the caller.
-export async function limited<Result>(what: string, work: () => Promise<Result>): Promise<Result> {
+export async function limited<Result>(what: string, work: () => Promise<Result>, ms = STORE_TIMEOUT_MS): Promise<Result> {
   try {
-    return await timeLimited(work, STORE_TIMEOUT_MS, what)
+    return await timeLimited(work, ms, what)
   }
   catch (error) {
     if ((error as { timedOut?: boolean }).timedOut === true)
@@ -22,12 +22,16 @@ export async function limited<Result>(what: string, work: () => Promise<Result>)
 
 // Puts the listed async methods of a store under the time limit, in place. `ready` is awaited first under its own, longer limit: the first call creates the tables, which may take a while.
 export function limitedStore<Store extends object>(store: Store, what: string, methods: readonly (keyof Store & string)[], ready?: () => Promise<unknown>): Store {
+  let found = false
+
   for (const name of methods) {
     const method = store[name] as (...args: unknown[]) => Promise<unknown>
 
     store[name] = (async (...args: unknown[]) => {
-      if (ready)
-        await timeLimited(ready, READY_TIMEOUT_MS, `${what} finding its tables`)
+      if (ready && !found) {
+        await limited(`${what} finding its tables`, ready, READY_TIMEOUT_MS)
+        found = true
+      }
 
       return limited(`${what} ${name}`, async () => method.apply(store, args))
     }) as Store[typeof name]

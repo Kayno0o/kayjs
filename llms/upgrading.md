@@ -14,6 +14,10 @@ With `cms({ roles })`, the activity screen answers 403 and its button is disable
 ### A dynamic tag, a bound URL and a style object are stricter
 
 A tag held in a value refuses `script`, `style`, `iframe`, `object`, `embed`, `base`, `meta` and `link`, and throws as it does for a name that is no element: write the element in the template. A bound `href`, `src`, `action`, `formaction`, `xlink:href`, `poster` or `data` keeps only the schemes `http`, `https`, `mailto`, `tel`, `sms`, `blob`, `data:` image, audio and video (not SVG), `data:` plain text, CSV, PDF and JSON, and relative URLs; any other, `ftp:`, `geo:` or an SVG `data:` image say, goes out as `unsafe:...`, so build such a link as text in the template. A `style` object or `style:prop` value holding a `;`, `{` or `}` outside quotes and parentheses is left out. `kay check` cannot flag them, as the tag, the URL and the value are known only at render time.
+### A room name is at most 256 characters
+
+`rooms()` throws a `RangeError` from `join`, `members`, `publish`, `state` and `update` for a name past 256 characters, where it took any. Cap a name an app builds from input before it reaches them. `pgData(db).rooms` also stores a backslash in a room name doubled, as NUL always was, so a room whose name holds one is not shared between replicas on the old and the new version during a rolling deploy, and a state stored under it is not found. `kay check` cannot see a name built at run time, so no lint flags it.
+
 ### An OAuth token bound to a resource works only under it
 
 A token the OAuth server issued for a `resource` (the `/mcp` an MCP client asks for) now passes only on requests to that path or under it, within its scopes, and is a 401 on the rest of the app, where it used to pass. The calls kay's `/mcp` endpoint dispatches to your tools count as made to `/mcp`. A client that needs your API with the same token asks for a resource covering it, such as the site root. A token asked for no resource, and one stored before the binding, work everywhere as before. `userFromToken(token)` refuses a bound token unless given the handshake's address as a second argument.

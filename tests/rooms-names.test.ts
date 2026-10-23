@@ -102,7 +102,7 @@ function watching(sql: SQL, refused: string[] = []): { handle: PgHandle, lengths
         lengths.push(names.length)
 
         if (names.some(name => refused.includes(name as string)))
-          return Promise.reject(new Error('refused'))
+          return Promise.reject(Object.assign(new Error('refused'), { errno: '22021' }))
       }
 
       return target.unsafe(text, values as never) as unknown

@@ -244,7 +244,7 @@ export function rooms<Message, Member, State>(...[options = {}]: [options?: Room
         setTimeout(guarded('sending a room its snapshot', () => {
           waiting.delete(room)
 
-          const sent = after(read(room), message => store.publish(room, messageText(message), {}))
+          const sent = after(read(room), message => store.publish(named(room), messageText(message), {}))
 
           if (sent instanceof Promise)
             void settled('sending a room its snapshot', sent)
