@@ -75,10 +75,10 @@ describe('CommandPalette', () => {
     await settle()
     expect(dialog.open).toBe(true)
 
-    const targets = [...root.querySelectorAll<HTMLAnchorElement>('a[data-part=option]')].map(link => [link.querySelector('[data-part=label]')?.textContent, link.getAttribute('target'), link.getAttribute('rel')])
+    const targets = [...root.querySelectorAll<HTMLAnchorElement>('a[data-part=option]')].map(link => [link.querySelector('[data-part=label]')?.textContent, link.getAttribute('target'), link.getAttribute('rel'), link.hasAttribute('data-new-tab')])
 
-    expect(targets.find(([label]) => label === 'Docs')).toEqual(['Docs', '_blank', 'noopener noreferrer'])
-    expect(targets.filter(([label]) => label !== 'Docs').every(([, target, rel]) => target === null && rel === null)).toBe(true)
+    expect(targets.find(([label]) => label === 'Docs')).toEqual(['Docs', '_blank', 'noopener noreferrer', true])
+    expect(targets.filter(([label]) => label !== 'Docs').every(([, target, rel, marked]) => target === null && rel === null && marked === false)).toBe(true)
   })
 
   test('matches its hotkey whatever its case', async () => {

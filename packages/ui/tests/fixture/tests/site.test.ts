@@ -844,7 +844,8 @@ describe('ContactForm', () => {
     expect(html).toContain('name="consent"')
     expect(html).toContain('type="checkbox"')
     expect(html).toContain('I agree that my details are used to answer my message.')
-    expect(html).toContain('<a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy policy</a>')
+    expect(html).toContain('<a href="/privacy" target="_blank" rel="noopener noreferrer" data-new-tab>Privacy policy</a>')
+    expect(html).toContain('a[data-new-tab]::after{content:"(opens in a new tab)"')
     expect(html).toContain('name="nectar"')
     expect((await site.visit('/fr/contact-consent')).html).toContain('Politique de confidentialité')
     expect((await site.visit('/contact-words')).html).not.toContain('name="consent"')
@@ -858,7 +859,7 @@ describe('ContactForm', () => {
     const { html } = await site.visit('/contact-privacy')
 
     expect(html).not.toContain('name="consent"')
-    expect(html).toContain('<a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy policy</a>')
+    expect(html).toContain('<a href="/privacy" target="_blank" rel="noopener noreferrer" data-new-tab>Privacy policy</a>')
   })
 
   test('draws no consent box for an app\'s own consent field, which only consent: true marks', async () => {

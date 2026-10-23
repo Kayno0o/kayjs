@@ -36,6 +36,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     // A link opens in a new tab, so following it does not swap the page and drop the conversation.
     expect(await page.evaluate(() => document.querySelector('.kai-chat-text a')?.getAttribute('target'))).toBe('_blank')
     expect(await page.evaluate(() => document.querySelector('.kai-chat-text a')?.getAttribute('rel'))).toBe('nofollow ugc noopener')
+    expect(await page.evaluate(() => document.querySelector('.kai-chat-text a')?.hasAttribute('data-new-tab'))).toBe(true)
     expect(await page.value('textarea')).toBe('')
 
     fakeAi.reply('Second answer')

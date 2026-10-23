@@ -34,7 +34,7 @@ test('shows a component as its content, a heading without its anchor, and a link
   expect(html).not.toContain('&lt;')
   expect(html).toContain('hello <strong>w</strong>')
   expect(html).toMatch(/<h1[^>]*>Title<\/h1>/)
-  expect(html).toContain('<a target="_blank" href="https://example.com"')
+  expect(html).toContain('<a target="_blank" data-new-tab href="https://example.com"')
 })
 
 test('drops what would run in the screens, whatever the collection allows in its pages', async () => {
