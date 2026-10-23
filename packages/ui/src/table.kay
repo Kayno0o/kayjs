@@ -37,6 +37,8 @@ const look = recipe({
     // Outside a narrow table a cell holds its content alone: the column header names it.
     cellLabel: 'hidden @max-[30rem]/table:block @max-[30rem]/table:text-left text-kui-micro font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)]',
     cellBody: 'contents @max-[30rem]/table:block @max-[30rem]/table:min-w-0 @max-[30rem]/table:[overflow-wrap:anywhere] @max-[30rem]/table:first:col-span-full',
+    // The rows standing for those a virtual table does not draw.
+    spacer: '@max-[30rem]/table:block',
     emptyCell: 'px-3 py-8 text-center text-xs text-kui-subtext0 @max-[30rem]/table:block',
   },
 })
@@ -228,7 +230,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
               | {column.header}
     tbody(part="body" ref={element => body = element})
       if windowed && windowed.before() > 0
-        tr(aria-hidden="true" style={`height: ${windowed.before()}px`})
+        tr(part="spacer" aria-hidden="true" style={`height: ${windowed.before()}px`})
           td(colspan={given.length + (selectable ? 1 : 0)} style="padding: 0; border: 0")
       for row, position of drawn() key={rowKeyOf(row, rowKey)}
         tr(part="row" data-virtual-index={windowed ? windowed.start() + position : undefined} aria-rowindex={windowed ? windowed.start() + position + 2 : undefined} data-selected={chosenSet().has(rowKeyOf(row, rowKey)) ? '' : undefined})
@@ -255,5 +257,5 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
             td(part="emptyCell" colspan={given.length + (selectable ? 1 : 0)})
               | {empty}
       if windowed && windowed.after() > 0
-        tr(aria-hidden="true" style={`height: ${windowed.after()}px`})
+        tr(part="spacer" aria-hidden="true" style={`height: ${windowed.after()}px`})
           td(colspan={given.length + (selectable ? 1 : 0)} style="padding: 0; border: 0")
