@@ -7,7 +7,7 @@ import { afterEach, expect } from 'bun:test'
 import { stringify } from 'devalue'
 import { cached } from '../src/runtime/cache'
 import { rateLimit, rooms } from '../src/server'
-import { appName } from '../src/server/app-identity'
+import { appName, claimDatabase } from '../src/server/app-identity'
 import { appStore, setupStore } from '../src/server/app-store'
 import { registerBundle } from '../src/server/bundle'
 import { createDataTables, dataTables, pgData, pgHandle } from '../src/server/pg-data'
@@ -1017,7 +1017,8 @@ pgDescribe('pgData app name', () => {
     process.env.KAY_ADOPT_DATABASE = 'old'
 
     try {
-      const results = await Promise.allSettled([asApp('one', async () => pgData(sql).sessions.get('a')), asApp('two', async () => pgData(sql).sessions.get('a'))])
+      // The claims race each other directly: two asApp calls at once share KAY_ROOT, so both could boot under one name.
+      const results = await Promise.allSettled([claimDatabase(sql, 'one'), claimDatabase(sql, 'two')])
 
       expect(results.map(result => result.status).sort()).toEqual(['fulfilled', 'rejected'])
     }
