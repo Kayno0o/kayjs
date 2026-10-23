@@ -184,7 +184,6 @@ async function bounded<T>(work: Promise<T>, ms: number): Promise<T | typeof LATE
   }
 }
 
-// Waits out a promise whose rejection is expected, so it is no unhandled one.
 async function settled(work: Promise<unknown>): Promise<void> {
   try {
     await work

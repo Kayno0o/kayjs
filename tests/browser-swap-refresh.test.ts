@@ -328,7 +328,6 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
     // The animations start a frame after the swap commits, later on a loaded runner.
     await page.waitUntil(() => document.getAnimations().some(animation => (animation.effect as KeyframeEffect | null)?.pseudoElement?.startsWith('::view-transition')), { timeout: '5s' })
 
-    const running = await page.evaluate(() => document.getAnimations().some(animation => (animation.effect as KeyframeEffect | null)?.pseudoElement?.startsWith('::view-transition')))
     const [x, y] = await page.evaluate(() => {
       const box = document.querySelector('a.home')!.getBoundingClientRect()
 
@@ -339,7 +338,6 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
     await page.view.click(x, y)
     await page.waitFor('h1', { text: 'Home', timeout: '3s' })
 
-    expect(running).toBe(true)
     expect(await page.path()).toBe('/')
     expect(page.errors).toEqual([])
   }, 30_000)
