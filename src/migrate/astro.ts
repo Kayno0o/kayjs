@@ -288,7 +288,7 @@ function astroEdits(node: t.Node, code: string, offset: number, role: Role, prop
     if (isMetaEnv(inner)) {
       const read = parent?.type === 'MemberExpression' && parent.object === inner && !parent.computed && parent.property.type === 'Identifier' ? `.${parent.property.name}` : ''
 
-      note(inner.loc!.start.line, `import.meta.env${read} is Vite's: declare the variable in a \`defineEnv\` schema from \`kay/server\` and read it from there (see Environment variables), or in \`publicEnv\` for an island`)
+      note(inner.loc!.start.line, `import.meta.env${read} is Vite's: declare the variable in a \`defineEnv\` schema from \`kay/server\` and read it from there (see Environment variables), or as an \`s.Public\` field for an island`)
 
       return false
     }

@@ -89,7 +89,7 @@ describe('a refused config naming files of the project', () => {
 
     const env = await refusal({ publicDir: `${dir}/public`, publicEnv: true })
 
-    expect(env.message).toContain('`publicEnv` and')
+    expect(env.message).toContain('`s.Public` and')
     expect(env.message).toContain('both serve /_kay/env.js')
     expect(env.builds).toBe(0)
 

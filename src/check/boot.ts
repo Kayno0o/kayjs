@@ -99,7 +99,7 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
   refused(routesDir, () => refuseClashes(routesDir, routes, served, settings))
 
   if (options.publicEnv)
-    served.claim({ path: PUBLIC_ENV_PATH, owner: '`publicEnv`', kind: 'kay' })
+    served.claim({ path: PUBLIC_ENV_PATH, owner: '`s.Public`', kind: 'kay' })
 
   refused(publicDir, () => claimPublic(served, files))
 

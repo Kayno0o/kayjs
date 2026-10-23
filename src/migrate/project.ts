@@ -276,7 +276,7 @@ export async function migrateAstroProject(root: string, out = root, options: Mig
 
     for (const [index, text] of (await Bun.file(join(root, file)).text()).split('\n').entries()) {
       if (META_ENV.test(text))
-        note(file, undefined, { line: index + 1, message: 'import.meta.env is Vite\'s: declare the variable in a `defineEnv` schema from `kay/server` and read it from there (see Environment variables), or in `publicEnv` for an island' })
+        note(file, undefined, { line: index + 1, message: 'import.meta.env is Vite\'s: declare the variable in a `defineEnv` schema from `kay/server` and read it from there (see Environment variables), or as an `s.Public` field for an island' })
 
       if (RAW_IMPORT.test(text))
         note(file, undefined, { line: index + 1, message: 'a `?raw` import is Vite\'s: drop the query and write `with { type: \'text\' }` after the specifier' })

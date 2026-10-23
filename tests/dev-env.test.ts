@@ -36,7 +36,8 @@ async function running(env: Record<string, string>, shell: Record<string, string
 
   await Bun.write(join(root, 'src/server.ts'), `import { Elysia } from 'elysia'\nimport { appendFileSync } from 'node:fs'\nimport { pages } from 'kay/server'\n\nappendFileSync(${JSON.stringify(seen)}, \`\${${read}}\\n\`)\nexport const app = new Elysia().use(await pages()).listen(Number(process.env.PORT))\n`)
   await Bun.write(join(root, 'src/routes/index.kay'), 'h1 Home\n')
-  await Bun.write(join(root, 'kay.config.ts'), `import { t } from 'elysia'\nimport { appendFileSync } from 'node:fs'\nimport { basename } from 'node:path'\nimport { defineConfig } from 'kay/server'\n\nappendFileSync(${JSON.stringify(configured)}, \`\${basename(process.argv[1] ?? '')} \${${read}}\\n\`)\nexport default defineConfig({ publicEnv: t.Object({ KAY_ENV_PUB: t.String({ default: '' }) }) })\n`)
+  await Bun.write(join(root, 'kay.config.ts'), `import { appendFileSync } from 'node:fs'\nimport { basename } from 'node:path'\nimport { defineConfig } from 'kay/server'\n\nappendFileSync(${JSON.stringify(configured)}, \`\${basename(process.argv[1] ?? '')} \${${read}}\\n\`)\nexport default defineConfig({})\n`)
+  await Bun.write(join(root, 'src/env.ts'), 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({ KAY_ENV_PUB: s.Public(s.String({ default: \'\' })) }))\n')
   await Promise.all(Object.entries(more).map(async ([file, content]) => Bun.write(join(root, file), content)))
   await Bun.write(join(root, '.env'), `${Object.entries(env).map(([key, value]) => `${key}=${value}`).join('\n')}\n`)
   const child: Subprocess = Bun.spawn([process.execPath, CLI, 'dev', '--port', String(port)], { cwd: root, env: { ...process.env, ...shell }, stdout: 'ignore', stderr: 'ignore' })

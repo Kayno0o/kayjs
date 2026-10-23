@@ -145,4 +145,11 @@ describe('--format json', () => {
       expect(JSON.parse(stdout)).toMatchObject({ errors: 1, warnings: 0 })
     }
   })
+
+  it('refuses the flags of before 1.74 as unknown options', async () => {
+    const root = await project({})
+
+    expect((await kay(['new', 'app', '--host', 'github', '--dry-run'], root)).stderr).toContain('unknown option --host')
+    expect((await kay(['migrate', 'astro', '--out', 'out', '--dry-run'], root)).stderr).toContain('unknown option --out')
+  })
 })

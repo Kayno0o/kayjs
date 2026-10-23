@@ -100,7 +100,7 @@ describe('served paths', () => {
 
     const messages = (await bootProblems(root, { publicEnv: true }, [{ collection: 'posts', path: '/rss.xml', localized: false }])).map(problem => problem.message)
 
-    expect(messages).toEqual([expect.stringMatching(/^kay: `publicEnv` and \S+\/public\/_kay\/env\.js both serve \/_kay\/env\.js$/), expect.stringMatching(/^kay: \S+\/public\/rss\.xml and the feed of the collection posts both serve \/rss\.xml$/)])
+    expect(messages).toEqual([expect.stringMatching(/^kay: `s.Public` and \S+\/public\/_kay\/env\.js both serve \/_kay\/env\.js$/), expect.stringMatching(/^kay: \S+\/public\/rss\.xml and the feed of the collection posts both serve \/rss\.xml$/)])
   })
 
   it('exports the paths the server sends to a page of a locale as pages sending there', async () => {

@@ -41,7 +41,7 @@ const METRICS_VARIABLES: EnvVariable[] = [
   { name: 'KAY_METRICS_TOKEN', type: 'string', required: false, secret: true, description: 'the bearer token a scrape must send to `metrics`; unset, only a request from this machine or a private network that no proxy forwarded is answered' },
 ]
 
-// Every variable the project's `defineEnv` schemas, its `publicEnv` and its extensions declare, with whether each is required, in production only or always, and its default. The server entry is not run: the modules under `src` that call `defineEnv` are imported without the server's environment.
+// Every variable the project's `defineEnv` schemas and its extensions declare, with whether each is required, in production only or always, and its default. The server entry is not run: the modules under `src` that call `defineEnv` are imported without the server's environment.
 export const env: Command = {
   usage: USAGES.env,
   options: { format: { type: 'string' }, compose: { type: 'string', multiple: true }, example: { type: 'string' }, write: { type: 'boolean' } },

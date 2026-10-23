@@ -54,7 +54,7 @@ kay new my-app --template app --without docker
 | `--template blank\|server\|site\|app` | The preset: one bare static page, an Elysia server (the default), a static site, or a server with kayjs-auth sign-in and a websocket island |
 | `--with <features>` | Adds comma-separated [features](#features) to the preset, such as `tailwind,tests` |
 | `--without <features>` | Drops features from the preset |
-| `--forge forgejo\|github` | Where the repository lives, which decides the CI workflow. |
+| `--forge forgejo\|github` | Where the repository lives, which decides the CI workflow |
 | `--runner <label>` | The runner label the CI jobs run on: `debian` on Forgejo and `ubuntu-latest` on GitHub by default |
 | `--kay <dependency>` | The `kay` dependency the project installs, such as a path to a packed copy. By default the minor of the kay running the command |
 | `-y` | Takes the `server` preset without asking |
@@ -654,7 +654,7 @@ kay migrate astro . --outdir ../kay-site
 | Option | Effect |
 | --- | --- |
 | `[dir]` | The Astro project, the current directory by default |
-| `--outdir <dir>` | Writes there instead of next to the `.astro` files. A directory with no `package.json` gets a whole kay project. |
+| `--outdir <dir>` | Writes there instead of next to the `.astro` files. A directory with no `package.json` gets a whole kay project |
 | `--dry-run` | Lists what it would write, and writes none |
 
 The [Astro guide](/migrating/from-astro) shows what it translates and how to finish what it lists.

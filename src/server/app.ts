@@ -154,7 +154,7 @@ function refuseScanned({ root, config }: Project<PagesOptions>, { routes, files,
   const table = routeTable(pages, i18n, served)
 
   if (config.publicEnv)
-    served.claim({ path: PUBLIC_ENV_PATH, owner: '`publicEnv`', kind: 'kay', exported: true })
+    served.claim({ path: PUBLIC_ENV_PATH, owner: '`s.Public`', kind: 'kay', exported: true })
 
   const publicServed = claimPublic(served, files)
 
