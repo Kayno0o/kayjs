@@ -88,8 +88,14 @@ export function sqliteCache(path: string): SyncCacheStore {
           seen = event.id
           heard = true
 
-          for (const listener of listeners)
-            listener(event.message)
+          for (const listener of listeners) {
+            try {
+              listener(event.message)
+            }
+            catch (error) {
+              kayLog('error', 'a listener of what the other processes invalidated threw', error)
+            }
+          }
         }
       }
       catch (error) {

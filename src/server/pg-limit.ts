@@ -23,12 +23,16 @@ export async function limited<Result>(what: string, work: () => Promise<Result>,
   }
 }
 
-// Puts the listed async methods of a store under the time limit, in place. `ready` is awaited first under its own, longer limit: the first call creates the tables, which may take a while. The `slow` methods scan a table and have the maintenance limit.
-export function limitedStore<Store extends object>(store: Store, what: string, methods: readonly (keyof Store & string)[], ready?: () => Promise<unknown>, slow: readonly (keyof Store & string)[] = []): Store {
+// Puts every function of a store under the time limit, in place, so a method added later is limited without being listed; the `unlimited` ones, such as a listener registration that does not touch the database, stay as they are. `ready` is awaited first under its own, longer limit: the first call creates the tables, which may take a while. The `slow` methods scan a table and have the maintenance limit.
+export function limitedStore<Store extends object>(store: Store, what: string, options: { ready?: () => Promise<unknown>, slow?: readonly (keyof Store & string)[], unlimited?: readonly (keyof Store & string)[] } = {}): Store {
+  const { ready, slow = [], unlimited = [] } = options
   let found = false
 
-  for (const name of methods) {
-    const method = store[name] as (...args: unknown[]) => Promise<unknown>
+  for (const name of Object.keys(store) as (keyof Store & string)[]) {
+    const method = store[name] as unknown
+
+    if (typeof method !== 'function' || unlimited.includes(name))
+      continue
 
     store[name] = (async (...args: unknown[]) => {
       if (ready && !found) {
@@ -36,7 +40,7 @@ export function limitedStore<Store extends object>(store: Store, what: string, m
         found = true
       }
 
-      return limited(`${what} ${name}`, async () => method.apply(store, args), slow.includes(name) ? MAINTENANCE_TIMEOUT_MS : STORE_TIMEOUT_MS)
+      return limited(`${what} ${name}`, async () => (method as (...args: unknown[]) => Promise<unknown>).apply(store, args), slow.includes(name) ? MAINTENANCE_TIMEOUT_MS : STORE_TIMEOUT_MS)
     }) as Store[typeof name]
   }
 

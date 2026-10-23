@@ -1,14 +1,16 @@
 import type { RateStore } from '../src/runtime/action'
 import { join } from 'node:path'
+import { Database } from 'bun:sqlite'
 import { afterEach, describe, expect, it, jest, setSystemTime, spyOn } from 'bun:test'
 import { Elysia, t } from 'elysia'
 import { sqliteCache } from '../src/runtime/cache.server'
+import { logSink, setLogSink } from '../src/runtime/log'
 import { solveWork } from '../src/runtime/work'
 import { setupStore } from '../src/server/app-store'
 import { countWrites } from '../src/server/kept-pages'
 import { TimeoutError } from '../src/server/pg-poll'
 import { memoryRates, overLimit } from '../src/server/protection'
-import { sqliteRooms } from '../src/server/rooms'
+import { memoryRooms, sqliteRooms } from '../src/server/rooms'
 import { verifyWork, workChallenge } from '../src/server/work-scope'
 import { scratchDir } from './scratch'
 
@@ -181,6 +183,54 @@ describe('sqliteCache', () => {
 async function settled(): Promise<void> {
   await Bun.sleep(20)
 }
+
+describe('a listener that throws', () => {
+  it('does not skip the listeners after it in the cache poll', async () => {
+    const path = join(await scratchDir('cache-listener'), 'cache.sqlite')
+    const store = sqliteCache(path)
+    const heard: string[] = []
+
+    const sink = logSink()
+
+    setLogSink(() => undefined)
+    store.set('seed', '"s"', Date.now() + 60_000)
+    store.subscribe(() => {
+      throw new Error('listener failed')
+    })
+    store.subscribe(message => void heard.push(message))
+
+    // Another process's invalidation, written straight into the file.
+    const other = new Database(path)
+
+    other.run('INSERT INTO kay_events (origin, message, at) VALUES (\'other\', ?, ?)', ['{"keys":[]}', Date.now()])
+    other.close()
+
+    for (let wait = 0; heard.length === 0 && wait < 100; wait++)
+      await Bun.sleep(25)
+
+    setLogSink(sink)
+    expect(heard).toEqual(['{"keys":[]}'])
+  })
+
+  for (const [name, open] of [['memoryRooms', () => memoryRooms()], ['sqliteRooms', () => sqliteRooms(':memory:')]] as const) {
+    it(`does not skip the listeners after it in ${name}.publish`, () => {
+      const store = open()
+      const heard: string[] = []
+      const sink = logSink()
+
+      setLogSink(() => undefined)
+
+      store.subscribe(() => {
+        throw new Error('listener failed')
+      })
+      store.subscribe((room, text) => void heard.push(`${room}:${text}`))
+      store.publish('hall', 'hi', {})
+      setLogSink(sink)
+      store.close?.()
+      expect(heard).toEqual(['hall:hi'])
+    })
+  }
+})
 
 describe('countWrites', () => {
   function app() {

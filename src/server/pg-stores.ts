@@ -102,7 +102,7 @@ export function pgSessions(pg: PgHandle): SessionStore & { deleteWhere: NonNulla
         }
       }
     },
-  }, 'the sessions store', ['get', 'set', 'delete', 'deleteWhere'], pg.db, ['deleteWhere'])
+  }, 'the sessions store', { ready: pg.db, slow: ['deleteWhere'] })
 }
 
 // Rate windows in Postgres, shared by every replica; a key is stored pseudonymised, by the app's secret or else by a random key every replica reads from the database.
@@ -153,7 +153,7 @@ export function pgRates(pg: PgHandle): RateStore {
 
       return row ? { count: row.count, resetAt: Number(row.reset_at) } : undefined
     },
-  }, 'the rates store', ['hit', 'peek'], pg.db)
+  }, 'the rates store', { ready: pg.db })
 }
 
 // Web Vitals counts in Postgres: one row per day, route, metric and bucket, so replicas add their views to the others' with one increment each.
@@ -181,7 +181,7 @@ export function pgVitals(pg: PgHandle): VitalsStore {
 
       return rows.map(row => ({ ...row, count: Number(row.count) }))
     },
-  }, 'the vitals store', ['add', 'counts'], pg.db)
+  }, 'the vitals store', { ready: pg.db })
 }
 
 // Notifications in Postgres, one row each, so replicas share a person's inbox; the clock a notification expires by is the caller's, as the store only compares.
@@ -257,5 +257,5 @@ export function pgNotifications(pg: PgHandle): NotificationStore {
     async prune(now) {
       return counted('DELETE FROM kay_notifications WHERE expires <= $1::bigint', [now])
     },
-  }, 'the notifications store', ['add', 'list', 'unread', 'markRead', 'markAllRead', 'erase', 'prune'], pg.db, ['prune'])
+  }, 'the notifications store', { ready: pg.db, slow: ['prune'] })
 }

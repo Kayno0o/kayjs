@@ -321,8 +321,14 @@ export function memoryRooms(): RoomStore {
       return next
     },
     publish(room, text, recipients) {
-      for (const listener of listeners)
-        listener(room, text, recipients)
+      for (const listener of listeners) {
+        try {
+          listener(room, text, recipients)
+        }
+        catch (error) {
+          kayLog('error', `a listener of the room ${room} threw`, error)
+        }
+      }
     },
     subscribe(listener) {
       listeners.add(listener)
@@ -568,8 +574,14 @@ function openRooms(path: string, askedMs: number | undefined): RoomStore {
 
       insert.run(room, text, self, recipients.except ?? null, recipients.to ?? null, now)
 
-      for (const listener of listeners)
-        listener(room, text, recipients)
+      for (const listener of listeners) {
+        try {
+          listener(room, text, recipients)
+        }
+        catch (error) {
+          kayLog('error', `a listener of the room ${room} threw`, error)
+        }
+      }
 
       // A process only publishing has no beat, so its publishes prune, as often as a beat would; the message is stored and delivered by now, so a failing prune is only logged.
       if (!beating && now - pruned >= HEARTBEAT) {

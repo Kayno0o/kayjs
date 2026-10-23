@@ -7,7 +7,7 @@ import { logSink, setLogSink } from '../src/runtime/log'
 import { queue as makeQueue } from '../src/server'
 import { pgCache } from '../src/server/pg-cache'
 import { connectionOf, pgJobs } from '../src/server/pg-jobs'
-import { STORE_TIMEOUT_MS } from '../src/server/pg-limit'
+import { limitedStore, STORE_TIMEOUT_MS } from '../src/server/pg-limit'
 import { pgRooms } from '../src/server/pg-rooms'
 import { pgNotifications, pgRates, pgSessions } from '../src/server/pg-stores'
 import { forgetQueue } from '../src/server/queue'
@@ -113,6 +113,53 @@ describe('the rooms store under a database that does not answer', () => {
 
     expect(lines.some(line => line.includes('was given up on'))).toBe(true)
   }, STORE_TIMEOUT_MS + 5000)
+})
+
+describe('limitedStore', () => {
+  it('limits every method of a store, so one added later needs no listing, and leaves the unlimited ones alone', async () => {
+    const store = limitedStore({ added: () => 1, later: async () => 2, listen: () => 3, name: 'x' }, 'a store', { unlimited: ['listen'] })
+
+    expect(store.listen()).toBe(3)
+    expect(store.name).toBe('x')
+
+    // A synchronous method comes back as a promise, as every limited call does.
+    const added = store.added()
+
+    expect(added).toBeInstanceOf(Promise)
+    expect(await added).toBe(1)
+    expect(await store.later()).toBe(2)
+  })
+
+  it('gives up on a method of the real stores that nobody listed', async () => {
+    const lines = await collecting(async () => {
+      const store = pgNotifications(silent) as unknown as Record<string, () => Promise<unknown>>
+
+      store.addedLater = async () => never()
+      await expect(limitedStore(store, 'the notifications store').addedLater!()).rejects.toThrow('took more than')
+    })
+
+    expect(lines.some(line => line.includes('was given up on'))).toBe(true)
+  }, STORE_TIMEOUT_MS + 5000)
+})
+
+describe('the rooms store with a throwing listener', () => {
+  pgIt('hands a published message to the listeners after one that throws', async () => {
+    const { sql } = await postgres()
+    const store = pgRooms({ db: async () => sql })
+    const heard: string[] = []
+    const lines = await collecting(async () => {
+      store.subscribe(() => {
+        throw new Error('listener failed')
+      })
+      store.subscribe((room, text) => void heard.push(`${room}:${text}`))
+      store.publish('hall', 'hi', {})
+      await Bun.sleep(50)
+    })
+
+    expect(heard).toEqual(['hall:hi'])
+    expect(lines.some(line => line.startsWith('error: a listener of the room hall threw'))).toBe(true)
+    await store.close?.()
+  })
 })
 
 describe('the connections kay opens from a URL', () => {

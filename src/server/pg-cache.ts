@@ -169,7 +169,7 @@ export function pgCache(pg: PgHandle): CacheStore {
     },
   }
 
-  limitedStore(store, 'the cache store', ['get', 'set', 'delete', 'dependencies', 'keys', 'publish'], pg.db)
+  limitedStore(store, 'the cache store', { ready: pg.db, unlimited: ['subscribe'] })
   self = store
 
   // A reload ends the polling for the module that named the store; the module running again names a store of its own.

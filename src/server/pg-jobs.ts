@@ -413,5 +413,5 @@ export function pgJobs(source: PgJobsSource): JobStore {
     },
   }
 
-  return limitedStore(store, 'the jobs store', ['add', 'claim', 'complete', 'retry', 'release', 'progress', 'state', 'fail', 'purge', 'failed', 'revive', 'jobs', 'nextRunAt', 'lock'], open, ['failed', 'jobs'])
+  return limitedStore(store, 'the jobs store', { ready: open, slow: ['failed', 'jobs'] })
 }

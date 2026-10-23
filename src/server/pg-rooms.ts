@@ -418,8 +418,14 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
         }
       })
 
-      for (const listener of listeners)
-        listener(room, text, recipients)
+      for (const listener of listeners) {
+        try {
+          listener(room, text, recipients)
+        }
+        catch (error) {
+          kayLog('error', `a listener of the room ${room} threw`, error)
+        }
+      }
     },
     subscribe(listener) {
       listeners.add(listener)
