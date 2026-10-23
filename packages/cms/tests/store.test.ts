@@ -199,13 +199,24 @@ describe('saveEntry', () => {
     }
   })
 
-  test('previews a loader\'s body as the page keeps it, and a folder\'s with an image\'s size', async () => {
+  test('previews a loader\'s body as the page keeps it, and a folder\'s or a trusted loader\'s with an image\'s size', async () => {
     const markdown = '<img src="https://x.example/a.png" width="10" alt="a"> [rel](./sibling)'
     const preview = async (collection: string) => (await markdownApi.handle(new Request('http://site.test/', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ markdown, collection }) }))).json() as Promise<{ html: string }>
 
     expect((await preview('products')).html).toContain('<img src="https://x.example/a.png" alt="a">')
     expect((await preview('products')).html).toContain('href="./sibling"')
     expect((await preview('posts')).html).toContain('width="10"')
+
+    const index = collectionList.indexOf(products)
+
+    collectionList[index] = { ...products, trusted: true }
+
+    try {
+      expect((await preview('products')).html).toContain('width="10"')
+    }
+    finally {
+      collectionList[index] = products
+    }
   })
 
   test('passes on the schema\'s issues and writes nothing', async () => {

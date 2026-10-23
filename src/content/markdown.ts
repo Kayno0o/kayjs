@@ -63,12 +63,13 @@ const INDENTED = /^(?: {4}|\t)/
 const BLANK = /^\s*$/
 const ATTRIBUTE_NAME = /^[A-Z_][\w:-]*/i
 const TAGS = /<[^>]*>/g
-// What a loader's Markdown keeps beyond a user's: a heading's id for its anchor and a code block's language class, which the headings and the highlighter read.
+// What a loader's HTML keeps beyond a user's: relative URLs, which carry no scheme to run.
 const LOADED_HTML: SanitizeOptions = { ...MARKDOWN_KEPT, relativeUrls: true }
+// And for its Markdown, a heading's id for its anchor and a code block's language class, which the headings and the highlighter read.
 const LOADED: SanitizeOptions = { ...LOADED_HTML, attributes: { ...MARKDOWN_KEPT.attributes, h1: ['id'], h2: ['id'], h3: ['id'], h4: ['id'], h5: ['id'], h6: ['id'], code: ['class'] } }
-// The only class and id kept on a code block and a heading: the language Markdown writes, and a slug in its shape, so a loader's text cannot pick a utility class or a camelCase global name.
 // A link the sanitizer wrote that stays on the site: its `href` names no http(s) URL.
 const OWN_LINK = /<a href="((?!https?:\/\/)[^"]*)" rel="nofollow ugc">/gi
+// The only class and id kept on a code block and a heading: the language Markdown writes, and a slug in its shape, so a loader's text cannot pick a utility class or a camelCase global name.
 const CODE_CLASS = /<code class="(?!language-[\w+#.-]+")[^"]*">/g
 const HEADING_ID = /<(h[1-6]) id="(?![\p{Ll}\p{N}][\p{Ll}\p{N}_-]*")[^"]*"/gu
 // The private characters standing for a component's placeholder while the sanitizer, which reads no tag name with a hyphen, goes over the rest.

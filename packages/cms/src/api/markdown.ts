@@ -37,7 +37,8 @@ const markdown = api({ maxSize: MAX_MARKDOWN })
       const html = (await bodyHtml(body.markdown)).replace(COMPONENT_TAGS, '')
       const aside = await setCodeAside(html)
       const place = body.collection !== undefined && body.slug !== undefined ? { collection: body.collection, slug: body.slug, locale: body.locale } : undefined
-      const safe = String(sanitizeHtml(place ? imagesFromFolder(aside.html, place, apiUrl(request, '/image')) : aside.html, await sanitizedOnPage(body.collection) ? LOADED : KEPT))
+      const loaded = await sanitizedOnPage(body.collection)
+      const safe = String(sanitizeHtml(place && !loaded ? imagesFromFolder(aside.html, place, apiUrl(request, '/image')) : aside.html, loaded ? LOADED : KEPT))
 
       return { html: aside.restore(safe.replace(HEADING_ANCHOR, '$1').replace(LINK, '<a target="_blank" ')) }
     }

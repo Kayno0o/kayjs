@@ -370,7 +370,7 @@ To keep two entries from sharing a value, such as a code, wrap the field in `uni
 
 `news.invalidate()` refreshes it, and every prerendered page that read it. Call it from a webhook in an API route. That one line is the whole webhook.
 
-A loader often reads content its author did not write, so a loaded `body` and `html` are sanitized as a user's Markdown is: formatted text, links, relative URLs, images and tables stay, and scripts, handlers, styles, iframes and `javascript:` links are dropped. Only a link leaving the site gets `rel="nofollow ugc"`.
+A loader often reads content its author did not write, so a loaded `body` and `html` are sanitized as a user's Markdown is: formatted text, links, relative URLs, images and tables stay, and scripts, handlers, styles, iframes and `javascript:` links are dropped. Only a link written with an http(s) URL gets `rel="nofollow ugc"`, so one to your own site by its full address has it too.
 
 A folder's files are the author's own and keep their raw HTML, and `kay check` reports `trusted` on a folder collection.
 
