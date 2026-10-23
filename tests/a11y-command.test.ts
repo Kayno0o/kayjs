@@ -172,7 +172,7 @@ describe.skipIf(skipBrowser)('kay a11y on a site', () => {
 
     const report = JSON.parse(stdout) as ReturnType<typeof reportOf> & { declaration: string }
     const paths = report.audited.map(page => page.path)
-    const browserFailures = report.skipped.filter(page => page.why.startsWith('the browser could not'))
+    const browserFailures = report.skipped.filter(page => page.failed && page.why.startsWith('the browser could not'))
 
     // A page the browser failed on names its reason here, not as a path missing below.
     expect(browserFailures).toEqual([])

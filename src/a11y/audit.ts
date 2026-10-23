@@ -35,7 +35,7 @@ export interface Audit {
   violations: Violation[]
 }
 
-// A page gets this long to answer, to load and to hydrate.
+// A page gets this long, per attempt, to answer, to load and to hydrate.
 const ANSWER_MS = 30_000
 const ATTEMPTS = 2
 const PAGE_MS = `${ANSWER_MS / 1000}s`
