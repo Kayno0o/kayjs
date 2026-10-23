@@ -424,29 +424,17 @@ pgDescribe('idle Postgres stores', () => {
   pgIt('end their polling when closed while backed off', async () => {
     await freshTables()
 
-    const saved = process.env.KAY_DEV_CODE
+    const [sql] = replicas(1)
+    const handle = pgHandle(sql!)
+    const store = pgCache(handle)
+    const values = pgLive(handle)
 
-    process.env.KAY_DEV_CODE = '1'
-
-    try {
-      const [sql] = replicas(1)
-      const store = pgCache(pgHandle(sql!))
-      const values = pgLive(pgHandle(sql!))
-
-      store.subscribe?.(() => undefined)
-      values.subscribe(() => undefined)
-      await store.get('x')
-      await clock.advance(30_000, true)
-      expect(clock.pending()).toBeGreaterThan(0)
-      values.stop?.()
-      await disposeOwned(new Set([import.meta.path]))
-      expect(clock.pending()).toBe(0)
-    }
-    finally {
-      if (saved === undefined)
-        delete process.env.KAY_DEV_CODE
-      else
-        process.env.KAY_DEV_CODE = saved
-    }
+    store.subscribe?.(() => undefined)
+    values.subscribe(() => undefined)
+    await store.get('x')
+    await clock.advance(30_000, true)
+    expect(clock.pending()).toBeGreaterThan(0)
+    await handle.close()
+    expect(clock.pending()).toBe(0)
   })
 })

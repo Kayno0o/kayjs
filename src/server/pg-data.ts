@@ -2,6 +2,7 @@ import type { SQL } from 'bun'
 import type { AppStore } from './app-store'
 import type { PgIndex, PgJobsSource } from './pg-jobs'
 import type { DeletableSessionStore } from './session'
+import { kayLog } from '../runtime/log'
 import { appName, claimDatabase } from './app-identity'
 import { pgCache } from './pg-cache'
 import { connectionOf, createJobTables, createMissingIndexes, indexStatement, jobsAfter, jobTables, privilegeRefused, relationsMissing, withMissingIndexes } from './pg-jobs'
@@ -34,6 +35,8 @@ export const dataTables = [...jobTables, ...OWN_TABLES] as readonly string[]
 // What a Postgres store reaches its database through: the connection, once the tables are in place.
 export interface PgHandle {
   db: () => Promise<SQL>
+  // Lists what the stores of this handle end when it closes: their polling, timers and room membership.
+  onClose?: (dispose: () => unknown) => void
 }
 
 // Creates every table `pgData` keeps its data in, the jobs' included, unless they exist, for an app whose migrations do not: run it as the database's owner, in a boot script, when the app connects with a role that creates nothing. `pgData` creates them itself when its role may.
@@ -96,7 +99,9 @@ async function addMissingColumns(db: SQL): Promise<void> {
 }
 
 // One connection and one table check for every store of a `pgData`.
-export function pgHandle(db: SQL): PgHandle {
+export function pgHandle(db: SQL): PgHandle & { close: () => Promise<void> } {
+  const disposers: (() => unknown)[] = []
+  let closing: Promise<void> | undefined
   let ready: Promise<SQL> | undefined
 
   const tables = async (): Promise<SQL> => {
@@ -136,19 +141,52 @@ export function pgHandle(db: SQL): PgHandle {
     return opened
   }
 
-  // A failed creation is tried again by the next call rather than kept.
-  return { db: async () => {
-    ready ??= create()
-
+  // Every disposer runs even when another fails, as a store ends the polling of its own.
+  const run = async (dispose: () => unknown) => {
     try {
-      return await ready
+      await dispose()
     }
     catch (error) {
-      ready = undefined
-
-      throw error
+      kayLog('error', 'closing a store of pgData failed', error)
     }
-  } }
+  }
+
+  const close = async () => {
+    closing ??= (async () => {
+      await Promise.all(disposers.splice(0).map(run))
+    })()
+
+    return closing
+  }
+
+  // A failed creation is tried again by the next call rather than kept.
+  return {
+    db: async () => {
+      ready ??= create()
+
+      try {
+        return await ready
+      }
+      catch (error) {
+        ready = undefined
+
+        throw error
+      }
+    },
+    // A store started after the close ends at once, so nothing polls on.
+    onClose(dispose) {
+      if (closing === undefined) {
+        disposers.push(dispose)
+      }
+      else {
+        void (async () => {
+          await closing
+          await run(dispose)
+        })()
+      }
+    },
+    close,
+  }
 }
 
 // Sessions, cached values, jobs, rate counts, the members of presence rooms, the values of `live()` and the Web Vitals visitors reported and the notifications of a person in the app's Postgres, shared by every process of every replica opening it: `store: pgData(db)` in kay.config.ts, `db` a Bun `SQL`, a pg-orm `Database` or a connection URL as `pgJobs` takes.
@@ -157,11 +195,25 @@ export function pgHandle(db: SQL): PgHandle {
 export function pgData(source: PgJobsSource) {
   const db = connectionOf(source)
 
-  // A connection opened from a URL goes with the module that opened it, so a reload does not leave its pool behind.
-  if (typeof source === 'string')
-    onReload(() => void db.close())
-
   const handle = pgHandle(db)
+  let closing: Promise<void> | undefined
 
-  return { sessions: pgSessions(handle), cache: pgCache(handle), jobs: jobsAfter(db, async () => handle.db()), rates: pgRates(handle), rooms: pgRooms(handle), vitals: pgVitals(handle), live: pgLive(handle), ...typeof source === 'string' && { database: source }, notifications: pgNotifications(handle) } satisfies { [Kind in Exclude<keyof AppStore, 'database'>]-?: NonNullable<AppStore[Kind]> } & { sessions: DeletableSessionStore }
+  // Ends the polling and timers of every store and the room membership this process held, then the pool when the store opened it from a URL; a connection the app handed in stays open, as it is the app's. Closing twice is the same as once.
+  const close = async () => {
+    closing ??= (async () => {
+      await handle.close()
+
+      if (typeof source === 'string')
+        await db.close()
+    })()
+
+    return closing
+  }
+
+  // A `kay dev` reload closes the store of the module that opened it, which then runs again and opens its own.
+  onReload(close)
+
+  const stores = { sessions: pgSessions(handle), cache: pgCache(handle), jobs: jobsAfter(db, async () => handle.db()), rates: pgRates(handle), rooms: pgRooms(handle), vitals: pgVitals(handle), live: pgLive(handle), ...typeof source === 'string' && { database: source }, notifications: pgNotifications(handle) } satisfies { [Kind in Exclude<keyof AppStore, 'database'>]-?: NonNullable<AppStore[Kind]> } & { sessions: DeletableSessionStore }
+
+  return { ...stores, close, [Symbol.asyncDispose]: close }
 }

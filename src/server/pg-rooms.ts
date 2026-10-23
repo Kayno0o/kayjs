@@ -5,9 +5,8 @@ import type { AsyncRoomStore } from './rooms'
 import { optionMs } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { limited } from './pg-limit'
-import { eventWindow, pollerOf } from './pg-poll'
+import { closeWith, eventWindow, pollerOf } from './pg-poll'
 import { escaped, NOW, query, unescaped } from './pg-sql'
-import { onReload } from './reload'
 
 // How often a process says it is alive, and how long after its last word its members stop counting.
 const HEARTBEAT = 2_000
@@ -456,7 +455,7 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
   }
 
   // A reload closes the store for the module that named it; the module running again names a store of its own.
-  onReload(store.close)
+  closeWith(pg, store.close)
 
   return store
 }

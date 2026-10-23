@@ -6,9 +6,8 @@ import { DEPS_PREFIX, PURGE_STALE_MS, readsOf, STALE_KEPT_MS, trackStore, untrac
 import { kayLog } from '../runtime/log'
 import { rowsOf } from './pg-jobs'
 import { limitedStore } from './pg-limit'
-import { EVENT_TTL_MS, eventWindow, POLL_MS, pollerOf } from './pg-poll'
+import { closeWith, EVENT_TTL_MS, eventWindow, POLL_MS, pollerOf } from './pg-poll'
 import { NOW } from './pg-sql'
-import { onReload } from './reload'
 
 // Tells this process's own messages apart from the others', whatever store instance wrote them.
 const PROCESS = crypto.randomUUID()
@@ -173,7 +172,7 @@ export function pgCache(pg: PgHandle): CacheStore {
   self = store
 
   // A reload ends the polling for the module that named the store; the module running again names a store of its own.
-  onReload(() => {
+  closeWith(pg, () => {
     closed = true
     polling?.()
     untrackStore(store)

@@ -3,6 +3,7 @@ import type { PgHandle } from './pg-data'
 import { kayLog } from '../runtime/log'
 import { delayAfter, pollClock } from '../runtime/poll-backoff'
 import { startedStatements, trackStatements } from './pg-jobs'
+import { onReload } from './reload'
 
 // How often a process reads what the others wrote while there is activity (see `delayAfter` for how it slows down when idle), and how long a message is kept for one that reads late.
 export const POLL_MS = 500
@@ -11,6 +12,14 @@ export const EVENT_TTL_MS = 60_000
 export const DB_TIMEOUT_MS = 30_000
 // Ids this far behind the last one read are read again, as a transaction that began earlier may commit its event after a later one.
 export const OVERLAP = 100
+
+// Ends what a store of `pg` runs when its `pgData` is closed, or, for a handle that keeps no list, when a `kay dev` reload runs the module that opened it again.
+export function closeWith(pg: PgHandle, dispose: () => unknown): void {
+  if (pg.onClose === undefined)
+    onReload(dispose)
+  else
+    pg.onClose(dispose)
+}
 
 // What a call given up on by `timeLimited` fails with.
 export class TimeoutError extends Error {}

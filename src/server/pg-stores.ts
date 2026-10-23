@@ -8,9 +8,8 @@ import { durationSeconds, optionMs } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { rowsOf } from './pg-jobs'
 import { limited, limitedStore, MAINTENANCE_TIMEOUT_MS } from './pg-limit'
-import { TimeoutError } from './pg-poll'
+import { closeWith, TimeoutError } from './pg-poll'
 import { NOW, query } from './pg-sql'
-import { onReload } from './reload'
 import { compileMatch, matchesSession } from './session'
 import { sharedKey } from './stamp'
 import { WINDOW_DAYS } from './vitals-store'
@@ -51,7 +50,7 @@ export function pgSessions(pg: PgHandle): DeletableSessionStore {
 
     timer = setInterval(() => void sweepLogged(), SWEEP_SESSIONS_MS)
     timer.unref()
-    onReload(() => clearInterval(timer))
+    closeWith(pg, () => clearInterval(timer))
   }
 
   return limitedStore({
@@ -214,7 +213,7 @@ export function pgNotifications(pg: PgHandle): NotificationStore {
 
     timer = setInterval(() => void sweep(), SWEEP_SESSIONS_MS)
     timer.unref()
-    onReload(() => clearInterval(timer))
+    closeWith(pg, () => clearInterval(timer))
   }
 
   return limitedStore({

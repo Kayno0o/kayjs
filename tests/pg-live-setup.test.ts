@@ -5,10 +5,10 @@ import process from 'node:process'
 import { SQL } from 'bun'
 import { afterAll, afterEach, describe, expect, it } from 'bun:test'
 import { setLiveStore } from '../src/runtime/live-value'
+import { pollClock } from '../src/runtime/poll-backoff'
 import { createDataTables, pages, pgData } from '../src/server'
 import { setupStore } from '../src/server/app-store'
 import { pgHandle } from '../src/server/pg-data'
-import { disposeOwned } from '../src/server/reload'
 import { pgDescribe, pgIt, url } from './job-stores'
 import { scratchDir } from './scratch'
 
@@ -66,20 +66,19 @@ const DDL_LOG = [
   'CREATE EVENT TRIGGER zz_log_ddl ON ddl_command_end WHEN TAG IN (\'CREATE TABLE\') EXECUTE FUNCTION zz_log_ddl()',
 ]
 
-// Opens a pgData store the way an app's module does, owned by this file, so `closeStores` ends its pool and the polling of its cache and rooms.
-function openStore(database: string) {
-  process.env.KAY_DEV_CODE = '1'
+const opened: { close: () => Promise<void> }[] = []
 
-  try {
-    return pgData(database)
-  }
-  finally {
-    delete process.env.KAY_DEV_CODE
-  }
+// Opens a pgData store the way an app does, which `closeStores` closes when the test ends.
+function openStore(database: string) {
+  const store = pgData(database)
+
+  opened.push(store)
+
+  return store
 }
 
 async function closeStores(): Promise<void> {
-  await disposeOwned(new Set([import.meta.path]))
+  await Promise.all(opened.splice(0).map(async store => store.close()))
 }
 
 // The kay tables found in a database that should hold none, with the connections that created them.
@@ -252,6 +251,94 @@ pgDescribe('a pgData role that may not alter tables', () => {
       await boot(first)
       await boot(first)
       await expect(boot(second)).rejects.toThrow('belongs to the app "shop"')
+    })
+  }, 60_000)
+})
+
+pgDescribe('closing a pgData store', () => {
+  const others = async (sql: SQL) => Number((await sql.unsafe<{ count: string }[]>('SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid()'))[0]!.count)
+
+  // The server ends a closed connection a moment after the client sent its goodbye.
+  async function settled(sql: SQL, expected: number) {
+    for (let attempt = 0; attempt < 20 && await others(sql) !== expected; attempt++)
+      await Bun.sleep(50)
+
+    expect(await others(sql)).toBe(expected)
+  }
+
+  pgIt('stops its polling and frees the pool it opened from a URL', async () => {
+    await withDatabase(async (database) => {
+      const sql = new SQL(database, { max: 1 })
+      const real = { ...pollClock }
+      const base = await others(sql)
+      let timers = 0
+
+      pollClock.setTimeout = (run, ms) => {
+        timers++
+
+        return real.setTimeout(run, ms)
+      }
+
+      try {
+        const store = pgData(database)
+
+        store.cache.subscribe?.(() => undefined)
+        await store.cache.get('key')
+        await Bun.sleep(700)
+        expect(timers).toBeGreaterThan(0)
+        expect(await others(sql)).toBeGreaterThan(base)
+        await store.close()
+        await store.close()
+        // A poll running while the store closes may arm one last timer.
+        await Bun.sleep(100)
+        timers = 0
+        await Bun.sleep(1200)
+        expect(timers).toBe(0)
+        await settled(sql, base)
+      }
+      finally {
+        Object.assign(pollClock, real)
+        await sql.close()
+      }
+    })
+  }, 60_000)
+
+  pgIt('leaves a connection it was handed open', async () => {
+    await withDatabase(async (database) => {
+      const sql = new SQL(database, { max: 1 })
+
+      try {
+        const store = pgData(sql)
+
+        await store.cache.get('key')
+        await store.close()
+        expect(await sql.unsafe('SELECT 1 AS one')).toHaveLength(1)
+      }
+      finally {
+        await sql.close()
+      }
+    })
+  }, 60_000)
+
+  pgIt('closes with await using', async () => {
+    await withDatabase(async (database) => {
+      const sql = new SQL(database, { max: 1 })
+
+      const base = await others(sql)
+
+      try {
+        {
+          await using store = pgData(database)
+
+          await store.cache.get('key')
+          expect(await others(sql)).toBeGreaterThan(base)
+        }
+
+        await settled(sql, base)
+      }
+      finally {
+        await sql.close()
+      }
     })
   }, 60_000)
 })

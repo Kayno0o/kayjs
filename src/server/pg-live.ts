@@ -4,9 +4,8 @@ import type { PgHandle } from './pg-data'
 import type { Stop } from './pg-poll'
 import { PURGE_STALE_MS } from '../runtime/cache'
 import { kayLog } from '../runtime/log'
-import { DB_TIMEOUT_MS, EVENT_TTL_MS, eventWindow, OVERLAP, POLL_MS, pollerOf, timeLimited } from './pg-poll'
+import { closeWith, DB_TIMEOUT_MS, EVENT_TTL_MS, eventWindow, OVERLAP, POLL_MS, pollerOf, timeLimited } from './pg-poll'
 import { escaped, NOW, query, unescaped } from './pg-sql'
-import { onReload } from './reload'
 
 // Writes waiting behind a database that stopped answering: past this many a new one is dropped and logged, rather than held in memory.
 const MAX_QUEUED = 10_000
@@ -227,7 +226,7 @@ export function pgLive(pg: PgHandle): LiveStore {
     listeners.clear()
   }
 
-  onReload(() => {
+  closeWith(pg, () => {
     closed = true
     stop()
   })
