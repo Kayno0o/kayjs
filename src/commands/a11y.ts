@@ -48,6 +48,7 @@ export const a11y: Command = {
       const file = typeof values.declaration === 'string' ? resolve(values.declaration) : join(root, KAY_DIR, 'a11y', 'declaration.md')
 
       const dryRun = values['dry-run'] === true
+      const nothing = report.audited.length === 0
 
       if (!dryRun) {
         mkdirSync(dirname(file), { recursive: true })
@@ -55,7 +56,7 @@ export const a11y: Command = {
       }
 
       if (format === 'json') {
-        printDocument({ ...report, declaration: file, dryRun, failure: report.audited.length === 0 ? NO_PAGE_AUDITED : null })
+        printDocument({ ...report, declaration: file, dryRun, failure: nothing ? NO_PAGE_AUDITED : null })
       }
       else {
         const counts = tally(report.criteria)
@@ -68,7 +69,7 @@ export const a11y: Command = {
         console.log(`${standard === 'rgaa' ? 'RGAA' : 'WCAG'}: ${counts.verified} verified, ${counts.failed} failed, ${counts.review} to review by hand`)
         console.log(`${dryRun ? 'Draft statement, not written' : 'Draft statement'}: ${relative(process.cwd(), file) || file}`)
 
-        if (report.audited.length === 0)
+        if (nothing)
           console.log(`kay a11y: ${NO_PAGE_AUDITED}`)
       }
 

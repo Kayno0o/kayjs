@@ -25,13 +25,16 @@ async function run(cwd: string, args: string[], env: Record<string, string> = {}
   return { code: await child.exited, stdout, stderr }
 }
 
-// Waits for a process to be gone, as a condition rather than a delay.
+// Waits for a process to be gone, as a condition rather than a delay: a zombie awaiting its reaper is gone too. Only the process itself is checked, not the children Chrome spawns.
 async function gone(pid: number): Promise<boolean> {
   const deadline = Date.now() + 15_000
 
   while (Date.now() < deadline) {
     try {
       process.kill(pid, 0)
+
+      if ((/^\d+ \(.*\) Z/).test(await readFile(`/proc/${pid}/stat`, 'utf8')))
+        return true
     }
     catch {
       return true
@@ -255,7 +258,7 @@ describe.skipIf(skipBrowser)('kay a11y on a site', () => {
     })
 
     try {
-      await Bun.write(chrome, `#!/bin/sh\necho $$ >> ${chromePids}\nexec ${browserPath()} "$@"\n`)
+      await Bun.write(chrome, `#!/bin/sh\necho $$ >> ${JSON.stringify(chromePids)}\nexec ${JSON.stringify(browserPath())} "$@"\n`)
       await chmod(chrome, 0o755)
 
       const { code } = await run(stopped, ['.', '--dry-run', '--format', 'json'], { BUN_CHROME_PATH: chrome })

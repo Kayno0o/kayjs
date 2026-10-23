@@ -85,6 +85,7 @@ export async function auditSite(root: string, config: KayConfig, progress: (path
       }
 
       const failures: unknown[] = []
+      let done = false
 
       // A tab that fails on a loaded machine gets a second, fresh try before the page is reported.
       for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
@@ -111,7 +112,7 @@ export async function auditSite(root: string, config: KayConfig, progress: (path
           if (landed !== new URL(url).pathname) {
             skipped.push({ path: target.path, route: target.route, file: target.file, why: `it lands on ${landed}`, whyFr: `elle redirige vers ${landed}`, failed: false })
 
-            failures.length = 0
+            done = true
 
             break
           }
@@ -121,7 +122,7 @@ export async function auditSite(root: string, config: KayConfig, progress: (path
           result.audited.push({ path: target.path, route: target.route, file: target.file, locale: target.locale })
           result.violations.push(...violations)
 
-          failures.length = 0
+          done = true
 
           break
         }
@@ -132,7 +133,7 @@ export async function auditSite(root: string, config: KayConfig, progress: (path
         }
       }
 
-      if (failures.length > 0) {
+      if (!done) {
         const { why, whyFr } = browserFailure(failures)
 
         skipped.push({ path: target.path, route: target.route, file: target.file, why, whyFr, failed: true })
@@ -154,7 +155,7 @@ export function browserFailure(errors: unknown[]): Pick<Skipped, 'why' | 'whyFr'
   const [first] = messages
   const last = messages.at(-1)
 
-  if (messages.length < 2 || first === last)
+  if (first === last)
     return { why: `the browser could not check it: ${last}`, whyFr: `le navigateur n'a pas pu la vérifier : ${last}` }
 
   return { why: `the browser could not check it: ${first}; then: ${last}`, whyFr: `le navigateur n'a pas pu la vérifier : ${first} ; puis : ${last}` }
