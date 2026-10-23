@@ -113,15 +113,13 @@ An extension may set these fields. Only `name` is required.
 - `check`: a function returning the problems with how the app configured the extension, as `{ message, file?, severity?, help? }`. `kay check` and the editor show them beside kay's own without starting the server, so a mistake the library would only log once the server listens is seen as you type. A warning at `kay.config.ts` unless it names a file.
 - `devTool`: a browser module adding a tab to the dev tool.
 - `references`: stylesheets the app's own can `@apply` and read `theme()` tokens of with no `@reference` line, as if each began with one. kayjs-ui lists its `theme.css`. kay adds the line after the Tailwind import of each stylesheet of the app, which writes no rule, so the stylesheet you write stays as it is.
-- `commands`: commands added to `kay`, such as `kay i18n translate`. Each names a module whose default export is a `KayCommand` from `kay/library`. It runs in the project of the current directory and gets its root and config.
+- `commands`: commands added to `kay`, such as `kay i18n translate`. Each names a module whose default export is a `KayCommand` from `kay/library`. It runs in the project of the current directory and gets its root and config. A command that rewrites the app's `src/ui.ts` reads it with `uiConfigEntries(text)` from `kay/library`, which gives each entry's key and the spans of its key and value, following const objects and spreads; `kay ui eject` uses it.
 
 Type the result `KayExtension<typeof plugin>` when it has a `server` of its own, so the plugin's locals reach the app's types.
 
 ## Tables in the app's Postgres
 
 A library that keeps its own tables in the app's Postgres reads the connection and the schema the way kay's `pgData` does. All three helpers come from `kay/library`, with the `PgJobsSource` type.
-
-A command that rewrites the app's `src/ui.ts` reads it with `uiConfigEntries(text)` from `kay/library`, which gives each entry's key and the spans of its key and value, the way kay's own build reads the file. `kay ui eject` uses it.
 
 - `connectionOf(source)` gives the Bun `SQL` of a `SQL`, a pg-orm `Database` or a connection URL.
 - `relationsMissing(db, names)` tells whether one of the tables does not exist.

@@ -10,15 +10,16 @@ const OTHER_KEY = new Uint8Array(32).fill(9)
 
 // What kay hands its libraries in place of their own copies.
 describe('kay/library', () => {
-  it('reads the entries of src/ui.ts with their spans, as the build does', () => {
+  it('reads the entries of src/ui.ts with their spans', async () => {
     const text = 'const base = { "@kaynooo/kayjs-ui/card.kay": ({ parts: { head: "p-2" } }) as const }\n// Card: nope\nexport default defineUi({ ...base, Card: { parts: { head: "p-4" } }, [computed]: 1 })\n'
-    const entries = uiConfigEntries(text)!
+    const entries = (await uiConfigEntries(text))!
 
     expect(entries.map(entry => entry.key)).toEqual(['@kaynooo/kayjs-ui/card.kay', 'Card'])
     expect(text.slice(entries[0]!.value.start, entries[0]!.value.end)).toBe('({ parts: { head: "p-2" } }) as const')
     expect(text.slice(entries[1]!.keySpan.start, entries[1]!.keySpan.end)).toBe('Card')
-    expect(uiConfigEntries('export default 3')).toEqual([])
-    expect(uiConfigEntries('export default {')).toBeUndefined()
+    expect(await uiConfigEntries('export default 3')).toEqual([])
+    expect(await uiConfigEntries('export default {')).toBeUndefined()
+    expect((await uiConfigEntries('const Card = 1\nexport default { Card, 7: \'a\' }'))!.map(entry => entry.key)).toEqual(['7'])
   })
 
   it('escapes for any place in markup what escape and escapeAttribute escape for theirs', () => {

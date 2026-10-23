@@ -234,9 +234,9 @@ async function appSources(dir: string): Promise<string[]> {
 }
 
 // The entry `src/ui.ts` has under the library's specifier or the component's name, repeated under the copy's path: the copy takes it, and the library's own components that use the component keep it. A name now names two components and reaches neither, so that key becomes the library's specifier.
-function withCopyKey(text: string, file: string, name: string, copy: string, notes: string[]): string {
+async function withCopyKey(text: string, file: string, name: string, copy: string, notes: string[]): Promise<string> {
   const specifier = `${PACKAGE}/${file}`
-  const entries = uiConfigEntries(text)
+  const entries = await uiConfigEntries(text)
 
   if (entries === undefined) {
     notes.push(`src/ui.ts could not be read: if it has an entry for ${name}, repeat it under '${copy}' by hand`)
@@ -334,7 +334,7 @@ export async function changesFor(root: string, ejection: Ejection): Promise<Chan
     let text = before
 
     if (file === uiFile)
-      text = withCopyKey(text, ejection.file, name, relativeSpecifier(file, target(ejection.file)), notes)
+      text = await withCopyKey(text, ejection.file, name, relativeSpecifier(file, target(ejection.file)), notes)
 
     text = rewritten(text, specifier => copied.has(specifier) ? relativeSpecifier(file, copied.get(specifier)!) : undefined)
 

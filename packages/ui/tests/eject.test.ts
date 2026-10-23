@@ -170,6 +170,17 @@ describe('kay ui eject', () => {
     expect(await readFile(join(root, 'src/ui.ts'), 'utf8')).toBe('export default {\n  \'@kaynooo/kayjs-ui/card.kay\': { parts: { head: "b" } },\n  \'./components/ui/card.kay\': { parts: { head: "b" } },\n}\n')
   })
 
+  test('follows an entry of src/ui.ts held in a const the default object spreads', async () => {
+    await writeFile(join(root, 'src/ui.ts'), 'const shared = {\n  \'@kaynooo/kayjs-ui/card.kay\': { parts: { root: \'a\' } },\n}\n\nexport default defineUi({ ...shared })\n')
+
+    await run(eject, ['card'])
+
+    const text = await readFile(join(root, 'src/ui.ts'), 'utf8')
+
+    expect(text).toContain('\'./components/ui/card.kay\': { parts: { root: \'a\' } }')
+    expect(text.match(/components\/ui\/card\.kay/g)).toHaveLength(1)
+  })
+
   test('reads an entry of src/ui.ts with comments and braces in strings', async () => {
     await writeFile(join(root, 'src/ui.ts'), 'export default {\n  \'@kaynooo/kayjs-ui/card.kay\': {\n    // the card\'s look }\n    parts: { root: \'a [&>*]:{b} \' }, /* } */\n  },\n}\n')
 

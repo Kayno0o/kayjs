@@ -16,7 +16,6 @@ export interface Logo {
   href?: string | undefined
 }
 export { KAY_DIR, underKayDev } from '../build/assets'
-export { uiConfigEntries } from '../build/ui'
 export type { UiConfigEntry } from '../build/ui'
 export type { KayCommand, Parsed } from '../commands/command'
 export { appModules } from '../config'
@@ -69,6 +68,7 @@ export type { TSchema } from 'elysia'
 type Translations = typeof import('./translations')
 type Drafts = typeof import('./message-drafts')
 type Entries = typeof import('./entry-drafts')
+type UiBuild = typeof import('../build/ui')
 
 // Loaded on use: they pull Babel's parser and the content loader, which a library's server otherwise never needs.
 export async function missingTranslations(...args: Parameters<Translations['missingTranslations']>): ReturnType<Translations['missingTranslations']> {
@@ -77,6 +77,10 @@ export async function missingTranslations(...args: Parameters<Translations['miss
 
 export async function writeDraftMessages(...args: Parameters<Drafts['writeDraftMessages']>): ReturnType<Drafts['writeDraftMessages']> {
   return (await import('./message-drafts')).writeDraftMessages(...args)
+}
+
+export async function uiConfigEntries(...args: Parameters<UiBuild['uiConfigEntries']>): Promise<ReturnType<UiBuild['uiConfigEntries']>> {
+  return (await import('../build/ui')).uiConfigEntries(...args)
 }
 
 export async function localizedEntry(...args: Parameters<Entries['localizedEntry']>): ReturnType<Entries['localizedEntry']> {
