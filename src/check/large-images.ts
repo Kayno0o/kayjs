@@ -88,8 +88,13 @@ function beforeQuote(prefix: string, n: number): string {
   let seen = 0
 
   for (let i = 0; i < prefix.length; i++) {
-    if (prefix[i] === '>' && seen++ === n)
+    if (prefix[i] !== '>')
+      continue
+
+    if (seen === n)
       return prefix.slice(0, i)
+
+    seen++
   }
 
   return prefix

@@ -164,10 +164,10 @@ describe('large-public-image', () => {
 
   it('measures a fence container by tab stops and keeps a quote inside a list item', async () => {
     const problems = await bare({
-      'src/routes/post.md': ['-\t```', '\t![a](/big.jpg)', '\t```', '', '- > ```', '  > ![b](/big.jpg)', '  > ```', '', '- > ```', '> ![c](/big.jpg)', '', '![d](/big.jpg)', ''].join('\n'),
+      'src/routes/post.md': ['-\t```', '\t![a](/big.jpg)', '\t```', '', '- > ```', '  > ![b](/big.jpg)', '  > ```', '', '- > ```', '> ![c](/big.jpg)', '', '![d](/big.jpg)', '', '> - > ```', '>   > ![e](/big.jpg)', '>   > ```', '> ![f](/big.jpg)', ''].join('\n'),
     })
 
-    expect(at(problems)).toEqual(['post.md:10', 'post.md:12'])
+    expect(at(problems)).toEqual(['post.md:10', 'post.md:12', 'post.md:17'])
   })
 
   it('reads an HTML img by its own attributes, a nested bracket alt and the first reference definition', async () => {
