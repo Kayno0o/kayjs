@@ -71,6 +71,25 @@ describe('the release\'s link check', () => {
     expect(pages.get('docs/src/content/docs/guides/x.md')).toBe('See [Moved](/guides/upgrading-archive).\n')
   })
 
+  it('follows the links to anchors both the What\'s new and the Upgrading pages move in one release', async () => {
+    const paths = [INDEX, ...ARCHIVES.flat()]
+    const texts = new Map<string, string>(await Promise.all(paths.map(async path => [path, await read(path)] as const)))
+
+    texts.set('llms/whats-new.md', `# New\n\n## Unreleased\n\n- a\n\n## 1.2.0\n\n${'- bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n'.repeat(140)}\nReleases before 1.2 are in [Old](whats-new-archive.md).\n`)
+    texts.set('llms/whats-new-archive.md', '# Old\n\nWhat each release before 1.2 added.\n\n## 1.1.0\n\n- z\n')
+    texts.set('llms/upgrading.md', `# Upgrading\n\n## 1.72.0\n\n### Big\n\n${'x'.repeat(21_000)}\n\n## 1.71.0\n\n### Moved thing\n\n- c\n\nReleases before 1.71 are in [Old](upgrading-archive.md).\n`)
+    texts.set('llms/upgrading-archive.md', '# Old\n\nWhat each release before 1.71 added.\n\n## 1.70.0\n\n- z\n')
+    texts.set('llms/islands.md', '# Islands\n\nSee [New](whats-new.md#120), [Moved](upgrading.md#moved-thing) and [Kept](upgrading.md#big).\n')
+    texts.set('docs/src/content/docs/guides/x.md', 'See [New](/guides/whats-new#120) and [Moved](/guides/upgrading#moved-thing).\n')
+    const linking = ['llms/islands.md', 'docs/src/content/docs/guides/x.md']
+    const pages = await releasePages(path => texts.get(path)!, '9.9.9', linking)
+
+    expect(pages.get('llms/whats-new.md')).not.toContain('## 1.2.0')
+    expect(pages.get('llms/upgrading.md')).not.toContain('Moved thing')
+    expect(pages.get('llms/islands.md')).toBe('# Islands\n\nSee [New](whats-new-archive.md), [Moved](upgrading-archive.md) and [Kept](upgrading.md#big).\n')
+    expect(pages.get('docs/src/content/docs/guides/x.md')).toBe('See [New](/guides/whats-new-archive) and [Moved](/guides/upgrading-archive).\n')
+  })
+
   it('writes llms.txt with the release each archive now starts before', async () => {
     const paths = [INDEX, ...ARCHIVES.flat()]
     const texts = new Map<string, string>(await Promise.all(paths.map(async path => [path, await read(path)] as const)))
