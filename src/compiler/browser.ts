@@ -5,7 +5,7 @@ import { parse } from '@babel/parser'
 import { visitNodes } from './ast'
 import { browserGlobals } from './globals'
 import { parameterNames } from './items'
-import { importedFromKay, loadTraverse } from './rewrite'
+import { importedFromKay, walkScope } from './rewrite'
 
 // One part of the program `browserReads` analyzes: generated text standing for the source from `source` on, character for character.
 interface Segment {
@@ -96,51 +96,49 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
   }
 
   // A name the template binds twice over the script's, which no block can tell apart, leaves nothing to report rather than failing the check.
-  try {
-    loadTraverse()(ast, {
-      Function(path) {
-        const parent = path.parentPath
+  const walked = walkScope(ast, {
+    Function(path) {
+      const parent = path.parentPath
 
-        if (parent.isCallExpression() && (parent.node.callee === path.node || rendersCallback(parent.node, path.node)))
-          transparent.add(path.node)
+      if (parent.isCallExpression() && (parent.node.callee === path.node || rendersCallback(parent.node, path.node)))
+        transparent.add(path.node)
 
-        if (path.isFunctionDeclaration() && parent.isProgram() && path.node.id)
-          functions.set(path.node.id.name, path.node)
-        else if (parent.isVariableDeclarator() && parent.node.id.type === 'Identifier' && parent.parentPath.parentPath?.isProgram())
-          functions.set(parent.node.id.name, path.node)
-      },
-      CallExpression(path) {
-        const callee = path.node.callee
+      if (path.isFunctionDeclaration() && parent.isProgram() && path.node.id)
+        functions.set(path.node.id.name, path.node)
+      else if (parent.isVariableDeclarator() && parent.node.id.type === 'Identifier' && parent.parentPath.parentPath?.isProgram())
+        functions.set(parent.node.id.name, path.node)
+    },
+    CallExpression(path) {
+      const callee = path.node.callee
 
-        if (callee.type === 'Identifier' && path.scope.getBinding(callee.name)?.scope.path.isProgram())
-          calls.push({ name: callee.name, chain: functionChain(path) })
+      if (callee.type === 'Identifier' && path.scope.getBinding(callee.name)?.scope.path.isProgram())
+        calls.push({ name: callee.name, chain: functionChain(path) })
 
-        noteVarying(path)
-      },
-      NewExpression(path) {
-        noteVarying(path)
-      },
-      Identifier(path) {
-        const { name } = path.node
+      noteVarying(path)
+    },
+    NewExpression(path) {
+      noteVarying(path)
+    },
+    Identifier(path) {
+      const { name } = path.node
 
-        if (!names.has(name) || !path.isReferencedIdentifier() || path.scope.hasBinding(name, true) || inType(path) || listenTarget(path))
-          return
+      if (!names.has(name) || !path.isReferencedIdentifier() || path.scope.hasBinding(name, true) || inType(path) || listenTarget(path))
+        return
 
-        const typeOf = path.parentPath.isUnaryExpression({ operator: 'typeof' })
+      const typeOf = path.parentPath.isUnaryExpression({ operator: 'typeof' })
 
-        if (!typeOf && guarded(path, program.code, names))
-          return
+      if (!typeOf && guarded(path, program.code, names))
+        return
 
-        const chain = functionChain(path)
-        const statement = chain.length === 0 ? path.findParent(ancestor => ancestor.parentPath?.isProgram() === true)?.node as t.Statement | undefined : undefined
+      const chain = functionChain(path)
+      const statement = chain.length === 0 ? path.findParent(ancestor => ancestor.parentPath?.isProgram() === true)?.node as t.Statement | undefined : undefined
 
-        reads.push({ name, at: path.node.start!, chain, typeOf, statement })
-      },
-    })
-  }
-  catch {
+      reads.push({ name, at: path.node.start!, chain, typeOf, statement })
+    },
+  })
+
+  if (!walked)
     return []
-  }
 
   const rendering = new Set(transparent)
   const renders = (chain: t.Node[]) => chain.every(fn => rendering.has(fn))

@@ -8,7 +8,7 @@ import { isSecret } from '../runtime/form'
 import { eachNode } from './each-node'
 import { PAGE } from './page-settings'
 import { patternNames } from './pattern-names'
-import { loadTraverse } from './rewrite'
+import { walkScope } from './rewrite'
 import { parseFence } from './script'
 
 // A line break before a line with text: a blank line moving into `page` stays blank.
@@ -185,10 +185,7 @@ function namespaceReads<Entry extends Named>(fence: ParsedFence, namespaces: Map
     }
   }
 
-  try {
-    loadTraverse()(fence.ast, { enter: (path: NodePath) => visit(path.node, path.scope) })
-  }
-  catch {
+  if (!walkScope(fence.ast, { enter: (path: NodePath) => visit(path.node, path.scope) })) {
     found.length = 0
 
     for (const statement of fence.ast.program.body)

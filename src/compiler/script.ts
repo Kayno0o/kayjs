@@ -9,7 +9,7 @@ import { eachNode } from './each-node'
 import { isGlobalFunctionMember, SENDABLE_CLASSES } from './expression'
 import { KAY_VALUES } from './kay-exports'
 import { PAGE, PAGE_SETTINGS, unreadSettingReport } from './page-settings'
-import { loadTraverse, POSITION_SUFFIX } from './rewrite'
+import { POSITION_SUFFIX, walkScope } from './rewrite'
 
 // What `kay` exports that a static component may use and stay static.
 // A broken module whose first statement, comments aside, is a static import.
@@ -769,29 +769,26 @@ function readsItself(ast: ParseResult<t.File>, declaration: t.FunctionDeclaratio
   const ownFunction = (path: NodePath) => path.findParent(parent => parent.isFunction() && !parent.isArrowFunctionExpression())?.node
   let found = true
 
-  try {
-    loadTraverse()(ast, {
-      FunctionDeclaration(path: NodePath<t.FunctionDeclaration>) {
-        if (path.node !== declaration)
-          return
+  walkScope(ast, {
+    FunctionDeclaration(path: NodePath<t.FunctionDeclaration>) {
+      if (path.node !== declaration)
+        return
 
-        found = false
-        path.traverse({
-          ThisExpression(inner) {
-            found ||= ownFunction(inner) === declaration
-          },
-          Identifier(inner) {
-            if (!inner.isReferencedIdentifier())
-              return
+      found = false
+      path.traverse({
+        ThisExpression(inner) {
+          found ||= ownFunction(inner) === declaration
+        },
+        Identifier(inner) {
+          if (!inner.isReferencedIdentifier())
+            return
 
-            found ||= inner.node.name === name ? inner.scope.getBinding(name)?.path.node === declaration : inner.node.name === 'arguments' && ownFunction(inner) === declaration
-          },
-        })
-        path.stop()
-      },
-    })
-  }
-  catch {}
+          found ||= inner.node.name === name ? inner.scope.getBinding(name)?.path.node === declaration : inner.node.name === 'arguments' && ownFunction(inner) === declaration
+        },
+      })
+      path.stop()
+    },
+  })
 
   return found
 }
@@ -838,20 +835,17 @@ function referenceCount(ast: ParseResult<t.File>, statement: t.Statement, name: 
   let count = 1
 
   // Babel refuses a fence declaring a name twice, which the fence reports itself.
-  try {
-    loadTraverse()(ast, {
-      Program(path: NodePath<t.Program>) {
-        const binding = path.scope.getBinding(name)
-        const within = (reference: NodePath) => reference.find(path => path.node === statement) !== null
+  walkScope(ast, {
+    Program(path: NodePath<t.Program>) {
+      const binding = path.scope.getBinding(name)
+      const within = (reference: NodePath) => reference.find(path => path.node === statement) !== null
 
-        if (binding && within(binding.path))
-          count = binding.referencePaths.filter(reference => !within(reference)).length
+      if (binding && within(binding.path))
+        count = binding.referencePaths.filter(reference => !within(reference)).length
 
-        path.stop()
-      },
-    })
-  }
-  catch {}
+      path.stop()
+    },
+  })
 
   return count
 }
@@ -1297,23 +1291,6 @@ export function codeOf(text: string): string {
   }
 
   return code.replaceAll(OBJECT_KEY, '$1')
-}
-
-// Walks the fence with Babel's scope, false when the scope refuses a name declared twice, as an import and a `const` an edit passes through. The half-built scope is dropped then: Babel marks a scope built before crawling it, so a later walk would read it as whole and not refuse the fence.
-function walkScope(ast: ParseResult<t.File>, visitor: Parameters<ReturnType<typeof loadTraverse>>[1]): boolean {
-  try {
-    loadTraverse()(ast, visitor)
-
-    return true
-  }
-  catch (error) {
-    if (!(error instanceof TypeError && error.message.startsWith('Duplicate declaration')))
-      throw error
-
-    loadTraverse().cache.clearScope()
-
-    return false
-  }
 }
 
 // Which of `kay`'s values, `declared` aside, the fence reads with nothing in it declaring or importing them, `typed` being the code of the statements that did not parse, where a mention counts as a read, and `read` the ones the template reads.

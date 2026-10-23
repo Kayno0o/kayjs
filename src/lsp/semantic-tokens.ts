@@ -8,7 +8,7 @@ import { nodeExpressions } from '../compiler/ast'
 import { MADE } from '../compiler/module-signals'
 import { parseKay } from '../compiler/parser'
 import { patternNames } from '../compiler/pattern-names'
-import { loadTraverse } from '../compiler/rewrite'
+import { loadTraverse, walkScope } from '../compiler/rewrite'
 import { analyzeScript, analyzeServer } from '../compiler/script'
 import { bindingNames, scopedBlocks } from '../compiler/template-reads'
 
@@ -186,17 +186,14 @@ function fenceTokens(fence: ParsedFence, known: Categories, handed: Categories |
   }
 
   // Babel refuses a name declared twice, as an import and a `const` of one name, which an edit passes through: the fence then has no tokens.
-  try {
-    loadTraverse()(fence.ast, {
-      Identifier(path) {
-        const category = categoryOf(path)
+  walkScope(fence.ast, {
+    Identifier(path) {
+      const category = categoryOf(path)
 
-        if (category && isNameSite(path))
-          add(fence.shift(path.node), category, path.isBindingIdentifier() && path.scope.getBinding(path.node.name)?.identifier === path.node)
-      },
-    })
-  }
-  catch {}
+      if (category && isNameSite(path))
+        add(fence.shift(path.node), category, path.isBindingIdentifier() && path.scope.getBinding(path.node.name)?.identifier === path.node)
+    },
+  })
 }
 
 // Whether the identifier is, or reads, a name a destructured `catch` parameter declares around it, unless a binding nearer than the `catch` holds the name.
