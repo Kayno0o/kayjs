@@ -66,8 +66,6 @@ main
   article#busy-select
     Select#busy-new(value="a" options={[{ value: 'a', label: 'A' }]} busy aria-busy="false")
     Select#busy-new-plain(value="a" options={[{ value: 'a', label: 'A' }]} busy)
-    // kay-allow deprecated-ui-prop
-    Select#busy-old(value="a" options={[{ value: 'a', label: 'A' }]} loading)
     Select#idle(value="a" options={[{ value: 'a', label: 'A' }]})
   article#app-header-bare
     AppHeader(links={[{ href: '/', label: 'Home' }]} current="/" label="Bare" sticky={false})

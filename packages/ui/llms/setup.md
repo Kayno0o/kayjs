@@ -143,24 +143,7 @@ A page that uses the components renders them in `testSite()` like the app's own.
 ## Reference
 
 - Import each component by its `.kay` path: `import Button from '@kaynooo/kayjs-ui/button.kay'`. Types, `toast`, `attempt`, `messageOf`, `editing`, `infiniteList` and the defaults come from the package itself: `import { toast } from '@kaynooo/kayjs-ui'`, and the drag and drop controllers from `@kaynooo/kayjs-ui/dnd`.
-- The theme reads the app's own names since 1.72, and the old `kui-` names alias them until 1.75 (`kay check --fix` rewrites them, `deprecated-ui-token`):
-
-| Old | New |
-| --- | --- |
-| `--color-kui-canvas`, `text` | `--color-background`, `--color-foreground` |
-| `--color-kui-accent`, `success`, `warning`, `info` | `--color-accent`, `--color-success`, `--color-warning`, `--color-info` |
-| `--color-kui-error` | `--color-danger` |
-| `--color-kui-field-border`, `field-focus` | `--color-input`, `--color-ring` |
-| `--color-kui-mantle`, `surface0`, `surface1`, `surface2` | `--color-popover`, `--color-surface`, `--color-surface-strong`, `--color-border` |
-| `--color-kui-overlay0` | `--color-border-strong` |
-| `--color-kui-muted`, `subtext0` | `--color-muted` |
-| `--color-kui-accent-hi`, `on-accent`, `row-hover` | `--color-accent-hover`, `--color-accent-foreground`, `--color-hover` |
-| `--color-kui-chart-1` to `6` | `--color-chart-1` to `6` |
-| `--text-kui-2xs` (and its `--line-height`), `--tracking-kui-label` | `--text-2xs`, `--tracking-label` |
-| `--kui-density`, `--kui-label-case`, `--kui-label-font`, `--kui-border-width` | `--density`, `--label-case`, `--font-label`, `--border-width` |
-| `--kui-shadow-raised`, `--kui-shadow-press`, `--kui-press-travel` | `--shadow-raised`, `--shadow-press`, `--press-travel` |
-
-An old name an app sets in its `@theme` still works until 1.75, but a `var(--color-kui-*)` read in the app's own CSS, or an old name set on an element, no longer resolves. Tokens that folded into a Tailwind name or a recipe (`--radius-kui-*` into `--radius-sm/md/lg`, `--kui-border-*` into `--border-width`, the badge, notice, avatar, field and stamp knobs into their recipes) are read first until 1.75 as well, and `kay check` names the recipe part of `src/ui.ts` to set instead.
+- The theme reads the app's own names (`--color-background`, `--color-foreground`, `--color-accent`, `--color-muted`, `--color-border`, `--radius-lg`, `--border-width`, `--density`...), so one `@theme` feeds the app and the library. The `kui-` names it used before 1.72 are gone since 1.75: [upgrading](../../../llms/upgrading.md) pairs each with its new name.
 
 Components write no Tailwind utility, only the classes of `theme.css`, every one prefixed `kui-`, so a site's own `btn` or `card` never meets them, while the theme's tokens carry the app's own names (`--color-accent`, `--color-background`), so one theme feeds the app and the library. A rule of the app's on one of those classes restyles every instance, and `--border-width` sets the keyline of every framed box; utilities passed through a component's `class` prop restyle one, and `src/ui.ts` restyles the parts of a component with some, see [Restyle a component](#restyle-a-component).
 - `toast` only shows in the browser, called from an island. The server's toast list, shared by every request, stays empty. `ui()` in kay.config.ts (`kay add ui`) mounts one `Toaster`, one `TooltipHost` and the theme on every page. An extension may render its own: while one is mounted, a second renders nothing until the first unmounts.

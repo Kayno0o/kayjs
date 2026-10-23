@@ -156,7 +156,7 @@ export const NOTICE_SCRIPT = `(() => {
   const tone = (name, fallback) => 'var(--kay-notice-' + name + ', ' + fallback + ')'
   const paint = element => getComputedStyle(element).backgroundColor
   const painted = element => !['transparent', 'rgba(0, 0, 0, 0)'].includes(paint(element))
-  const edge = 'var(--kui-border-width, 1px) solid '
+  const edge = 'var(--border-width, 1px) solid '
 
   function dress() {
     if (!banner)
@@ -169,7 +169,7 @@ export const NOTICE_SCRIPT = `(() => {
 
     banner.style.cssText = 'position:fixed;inset:auto 1rem 1rem 1rem;max-width:36rem;margin-inline:auto;padding:.75rem 1rem;display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;font-size:.875rem;line-height:1.45;z-index:2147483647'
       + ';background:' + tone('background', 'var(--color-surface, ' + page + ')') + ';color:' + tone('color', 'var(--color-foreground, inherit)')
-      + ';border:' + edge + tone('border', 'var(--color-border-strong, color-mix(in srgb, currentColor 22%, transparent))') + ';border-radius:' + tone('radius', 'var(--radius-kui-card, .5rem)')
+      + ';border:' + edge + tone('border', 'var(--color-border-strong, color-mix(in srgb, currentColor 22%, transparent))') + ';border-radius:' + tone('radius', 'var(--radius-lg, .5rem)')
       + ';box-shadow:' + tone('shadow', 'var(--shadow-raised, 0 10px 32px rgb(0 0 0 / 18%), 0 1px 3px rgb(0 0 0 / 10%))')
     yes.style.cssText = button + 'background:' + accent + ';color:' + tone('on-accent', 'var(--color-accent-foreground, ' + page + ')') + ';border-color:' + accent
     no.style.cssText = button + 'background:transparent;color:inherit;border-color:' + tone('line', 'var(--color-input, color-mix(in srgb, currentColor 45%, transparent))')

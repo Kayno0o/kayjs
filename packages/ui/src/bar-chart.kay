@@ -11,15 +11,15 @@ const look = recipe({
   parts: {
     // The plot leaves its left margin for the value labels, which hang outside it as they do in a ScatterChart.
     root: 'kui-bar-chart m-0 flex flex-col gap-2 pt-2 pr-3',
-    plot: 'relative ml-10 h-[var(--chart-height,var(--kui-bar-chart-height,12rem))] border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border border-t-transparent border-r-transparent border-l-transparent',
+    plot: 'relative ml-10 h-[var(--chart-height,12rem)] border-solid border-[length:var(--border-width)] border-border border-t-transparent border-r-transparent border-l-transparent',
     grid: 'absolute inset-x-0 h-px bg-border',
-    tick: 'absolute right-full mr-2 -translate-y-1/2 text-2xs whitespace-nowrap text-[var(--color-kui-overlay1,var(--color-muted))] tabular-nums',
+    tick: 'absolute right-full mr-2 -translate-y-1/2 text-2xs whitespace-nowrap text-[var(--color-muted)] tabular-nums',
     columns: 'absolute inset-0 flex gap-1',
     column: 'flex min-w-0 flex-1 items-end gap-px outline-none hover:bg-surface focus-visible:outline-2 focus-visible:outline-foreground data-stacked:flex-col-reverse data-stacked:items-stretch data-stacked:justify-start data-stacked:gap-0',
     // A stub is the mark a column keeps where its series gives it a colour or a note but no height; a stacked bar is squared and sized by its height alone.
     bar: 'min-h-px min-w-px flex-1 rounded-t-sm data-stub:h-1 data-stacked:flex-none data-stacked:rounded-none',
     axis: 'ml-10 flex gap-1',
-    axisLabel: 'flex min-w-0 flex-1 justify-center text-2xs whitespace-nowrap text-[var(--color-kui-overlay1,var(--color-muted))]',
+    axisLabel: 'flex min-w-0 flex-1 justify-center text-2xs whitespace-nowrap text-[var(--color-muted)]',
     legend: 'm-0 flex list-none flex-wrap gap-4 p-0 pl-1',
     legendItem: 'flex items-center gap-1.5 text-xs text-muted',
     key: 'size-2 shrink-0',

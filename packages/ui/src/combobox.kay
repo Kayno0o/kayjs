@@ -11,7 +11,7 @@ const look = recipe({
   parts: {
     root: 'kui-combobox relative inline-flex min-w-0 flex-col',
     input: 'kui-field-input',
-    list: 'absolute inset-x-0 top-full z-20 m-0 mt-1 max-h-64 list-none overflow-y-auto border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-popover p-1 text-sm text-foreground [&[hidden]]:hidden',
+    list: 'absolute inset-x-0 top-full z-20 m-0 mt-1 max-h-64 list-none overflow-y-auto border-solid border-[length:var(--border-width)] border-border-strong bg-popover p-1 text-sm text-foreground [&[hidden]]:hidden',
     option: 'cursor-pointer px-2 py-1.5 hover:bg-hover aria-selected:bg-hover aria-selected:outline-2 aria-selected:-outline-offset-2 aria-selected:outline-transparent aria-selected:[box-shadow:inset_2px_0_0_var(--color-accent)] aria-disabled:cursor-not-allowed aria-disabled:opacity-50 data-create:italic data-picked:font-medium data-picked:text-accent',
     status: 'sr-only',
   },

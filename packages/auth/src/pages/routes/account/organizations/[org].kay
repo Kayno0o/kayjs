@@ -104,7 +104,7 @@ PageSection(title={organization.name})
     for role of found.roles key={role}
       Badge(label={role} tone="accent")
     if organization.slug
-      span.text-kui-muted {organization.slug}
+      span.text-muted {organization.slug}
   if invited
     Message(tone="success" text={wording('auth.organizations.invited', 'Invitation sent to {email}.', { email: invited })})
   if refused
@@ -125,7 +125,7 @@ PageSection(title={wording('auth.organizations.members', 'Members')})
               Badge(label={wording('auth.organizations.you', 'You')})
             for role of member.roles key={role}
               Badge(label={role} tone="accent")
-          span.text-kui-muted {wording('auth.organizations.joined', 'Joined {date}', { date: date(member.joinedAt) })}
+          span.text-muted {wording('auth.organizations.joined', 'Joined {date}', { date: date(member.joinedAt) })}
           if editable(member.roles) && member.user.id !== me?.id
             form.flex.flex-wrap.items-center.gap-3(action={setRoles})
               input(type="hidden" name="userId" value={member.user.id})
@@ -150,7 +150,7 @@ if manages
             span.flex.flex-wrap.items-center.gap-2
               for role of invitation.roles key={role}
                 Badge(label={role} tone="accent")
-              span.text-kui-muted {wording('auth.organizations.expires', 'Expires {date}', { date: date(invitation.expiresAt) })}
+              span.text-muted {wording('auth.organizations.expires', 'Expires {date}', { date: date(invitation.expiresAt) })}
       else
         EmptyState(title={wording('auth.organizations.noInvitations', 'No open invitation.')})
     if features.email

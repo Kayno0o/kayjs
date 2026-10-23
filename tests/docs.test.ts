@@ -108,7 +108,7 @@ describe('the documentation site', () => {
     expect(props.get('tone')).toMatchObject({ type: '"neutral" | "accent" | "success" | "danger"', optional: true, default: '\'neutral\'' })
     expect(props.get('tone')!.comment).toContain('main action')
     expect(components.find(component => component.slug === 'copy-button')!.data.props.find(prop => prop.name === 'tone')!.type).toContain('"success"')
-    expect(components.find(component => component.slug === 'form-field')!.data.props.find(prop => prop.name === 'compact')).toMatchObject({ type: 'boolean', default: 'false' })
+    expect(components.find(component => component.slug === 'form-field')!.data.props.find(prop => prop.name === 'size')).toMatchObject({ default: '\'md\'' })
     expect(props.has('disabled')).toBe(false)
     expect(components.find(component => component.slug === 'table')!.data.props.find(prop => prop.name === 'onSort')!.type).toBe('(sort: SortState) => unknown')
   })

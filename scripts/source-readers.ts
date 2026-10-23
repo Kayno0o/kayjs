@@ -23,7 +23,7 @@ export const SOURCE_SCAN = /[`'"]\{?(?:src\/|packages\/[^`'"]*\/src\/)[^`'"]*\*[
 
 // Tests reading one source file through a fixed path, which neither an import graph nor `SOURCE_READERS` shows: a stylesheet or a component read as text, or loaded by a library's extension (`tests/land.test.ts` derives the `theme.css` list from `UI_THEME_USE`). Each runs only for a change to its file, as the slow and browser tests stay out.
 export const SOURCE_FILE_READERS: [RegExp, string[]][] = [
-  [/^packages\/ui\/src\/theme\.css$/, ['tests/ui-tokens.test.ts', 'tests/apply-theme.test.ts', 'tests/format-tailwind.test.ts', 'tests/prune-styles.test.ts', 'tests/inbox.test.ts']],
+  [/^packages\/ui\/src\/theme\.css$/, ['tests/apply-theme.test.ts', 'tests/format-tailwind.test.ts', 'tests/prune-styles.test.ts', 'tests/inbox.test.ts']],
   [/^packages\/ui\/src\/bell\.kay$/, ['tests/library-context-check.test.ts']],
 ]
 

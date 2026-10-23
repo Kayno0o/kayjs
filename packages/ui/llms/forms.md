@@ -13,7 +13,7 @@
   - `value` and `onChange` take the type of the options' values, so a union stays a union and a number option hands back a number: `const kind = signal<'post' | 'page'>('post')` passes `kind.set` with no cast.
   - `emptyOption` adds a first option worth `''`, labelled by the string, or blank with `true`; `value` and `onChange` then take `''` too, so hold a `signal<Kind | ''>`.
   - An option is `{ value, label, disabled? }`; `disabled` keeps it from being picked. A native option draws no icon, unlike the other groups' options.
-  - `busy` shows a disabled row saying `loadingLabel` while the options are on their way (`loading` works until 1.75, `kay upgrade` renames it).
+  - `busy` shows a disabled row saying `loadingLabel` while the options are on their way.
   - The right option stays chosen when the options arrive after the value.
   - `submit` submits the form holding it once an option is picked, after `onChange`, for a GET filter form (see Forms). A pointer pick submits at once; a keyboard pick, reported by some browsers on each arrow key, waits for Enter or blur.
 

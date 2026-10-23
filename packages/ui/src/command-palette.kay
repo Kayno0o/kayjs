@@ -11,11 +11,11 @@ import { wording } from 'kay/words'
 // 'kui-command-palette' stays as the component's name for an app's CSS and the always-hidden guard.
 const look = recipe({
   parts: {
-    root: 'kui-command-palette mx-auto mt-[10vh] mb-auto flex max-h-[min(70dvh,40rem)] w-full max-w-[min(36rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-lg border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-surface p-0 text-foreground',
+    root: 'kui-command-palette mx-auto mt-[10vh] mb-auto flex max-h-[min(70dvh,40rem)] w-full max-w-[min(36rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-lg border-solid border-[length:var(--border-width)] border-border-strong bg-surface p-0 text-foreground',
     search: 'flex shrink-0 items-center gap-2 border-b border-border px-4',
     // The icon of the search line and of an option.
-    icon: 'size-5 shrink-0 text-[var(--color-kui-overlay1,var(--color-muted))]',
-    input: 'h-11 min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-[var(--color-kui-overlay1,var(--color-muted))] focus-visible:[outline:2px_solid_var(--color-accent)] focus-visible:[outline-offset:-2px]',
+    icon: 'size-5 shrink-0 text-[var(--color-muted)]',
+    input: 'h-11 min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-[var(--color-muted)] focus-visible:[outline:2px_solid_var(--color-accent)] focus-visible:[outline-offset:-2px]',
     list: 'min-h-0 flex-1 overflow-y-auto py-1',
     heading: 'px-4 pt-2 pb-1',
     // The tint alone is too faint to find, so an accent bar marks the option Enter opens; forced colours drop both and paint the transparent outline instead. One holding a section the site search found writes data-snippet, taller than the others.

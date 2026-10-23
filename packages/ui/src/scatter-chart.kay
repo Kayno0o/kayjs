@@ -10,11 +10,11 @@ const look = recipe({
     root: 'kui-scatter-chart m-0 grid grid-cols-[auto_minmax(0,1fr)] grid-rows-[minmax(0,1fr)_auto] gap-2',
     axisLabel: 'text-center text-2xs text-muted data-[axis=x]:col-start-2 data-[axis=y]:row-start-1 data-[axis=y]:rotate-180 data-[axis=y]:self-center data-[axis=y]:[writing-mode:vertical-rl]',
     // Tick labels hang outside the plot, into the margin it keeps for them.
-    plot: 'relative col-start-2 mb-5 ml-8 h-[var(--chart-height,var(--kui-scatter-chart-height,18rem))] border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border',
+    plot: 'relative col-start-2 mb-5 ml-8 h-[var(--chart-height,18rem)] border-solid border-[length:var(--border-width)] border-border',
     grid: 'absolute bg-border data-[axis=x]:inset-y-0 data-[axis=x]:w-px data-[axis=y]:inset-x-0 data-[axis=y]:h-px',
-    tick: 'absolute text-2xs whitespace-nowrap text-[var(--color-kui-overlay1,var(--color-muted))] tabular-nums data-[axis=x]:top-full data-[axis=x]:mt-1 data-[axis=x]:-translate-x-1/2 data-[axis=y]:right-full data-[axis=y]:mr-2 data-[axis=y]:-translate-y-1/2',
+    tick: 'absolute text-2xs whitespace-nowrap text-[var(--color-muted)] tabular-nums data-[axis=x]:top-full data-[axis=x]:mt-1 data-[axis=x]:-translate-x-1/2 data-[axis=y]:right-full data-[axis=y]:mr-2 data-[axis=y]:-translate-y-1/2',
     guide: 'absolute bg-border-strong data-[axis=x]:inset-y-0 data-[axis=x]:w-px data-[axis=y]:inset-x-0 data-[axis=y]:h-px',
-    corner: 'pointer-events-none absolute text-2xs text-[var(--color-kui-overlay1,var(--color-muted))] data-[corner=bottomLeft]:bottom-1.5 data-[corner=bottomLeft]:left-2 data-[corner=bottomRight]:right-2 data-[corner=bottomRight]:bottom-1.5 data-[corner=topLeft]:top-1.5 data-[corner=topLeft]:left-2 data-[corner=topRight]:top-1.5 data-[corner=topRight]:right-2',
+    corner: 'pointer-events-none absolute text-2xs text-[var(--color-muted)] data-[corner=bottomLeft]:bottom-1.5 data-[corner=bottomLeft]:left-2 data-[corner=bottomRight]:right-2 data-[corner=bottomRight]:bottom-1.5 data-[corner=topLeft]:top-1.5 data-[corner=topLeft]:left-2 data-[corner=topRight]:top-1.5 data-[corner=topRight]:right-2',
     dot: 'absolute h-(--_dot-size) w-(--_dot-size) -translate-x-1/2 translate-y-1/2 rounded-full bg-accent opacity-70 transition-opacity hover:z-10 hover:opacity-100 data-interactive:cursor-pointer data-interactive:focus-visible:opacity-100 data-interactive:focus-visible:outline-2 data-interactive:focus-visible:outline-foreground',
   },
 })

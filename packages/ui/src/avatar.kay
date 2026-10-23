@@ -7,10 +7,10 @@ import { effect, signal } from 'kay'
 // 'kui-avatar' is the component's name for an app's CSS and tests, and carries no rule of its own that the utilities do not.
 const look = recipe({
   parts: {
-    root: 'kui-avatar inline-grid size-8 shrink-0 place-items-center overflow-hidden rounded-[var(--radius-kui-full,calc(infinity*1px))] border-solid border-[var(--color-kui-avatar-ring,var(--color-border))] bg-surface-strong [border-width:var(--kui-border-avatar,var(--kui-border-width,var(--border-width)))]',
+    root: 'kui-avatar inline-grid size-8 shrink-0 place-items-center overflow-hidden rounded-[calc(infinity*1px)] border-solid border-[var(--color-border)] bg-surface-strong [border-width:var(--border-width)]',
     image: 'size-full object-cover',
     // Its colours are set inline, seeded by the name.
-    initial: 'grid size-full place-items-center text-xs [font-weight:var(--font-weight-kui-avatar,var(--font-weight-semibold))] uppercase',
+    initial: 'grid size-full place-items-center text-xs [font-weight:var(--font-weight-semibold)] uppercase',
   },
   variants: { size: { xs: { root: 'size-5' }, sm: { root: 'size-6' }, md: '', lg: { root: 'size-12', initial: 'text-base' } } },
   defaults: { size: 'md' },

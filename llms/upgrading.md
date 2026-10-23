@@ -2,6 +2,34 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.75.0
+
+### The forms deprecated in 1.72 are gone
+
+- kayjs-ui's old prop names are no longer read: `Select` takes `busy` (not `loading`), `QrCode` `pixels` (not `size`), `Badge` `variant="stamp"` or `variant="solid"` (not `stamp` or `solid`), and `FormField`, `FileDrop` and `Notice` `size="sm"` (not `compact`). A prop left under its old name is ignored.
+- `ConfirmDelete`'s `onOpen` and `SplitLayout`'s `onSidebarClose` are gone: use `onOpenChange` (called with `false` on closing too, so `onOpenChange={open => open && ask()}` keeps running on opening alone) and `onSidebarOpenChange(false)`.
+- The old `kui-` theme tokens no longer alias the app's own names, and the components stop reading them first. Set the new name in your `@theme`, write `bg-border` for `bg-kui-surface2`, and read `var(--color-muted)` for `var(--color-kui-muted)`: a utility still written with an old name builds nothing, and an old name set in `@theme` or on an element changes nothing. `--font-label` has no default declaration any more: it falls back to the text's own font.
+
+| Old | New |
+| --- | --- |
+| `--color-kui-canvas`, `text` | `--color-background`, `--color-foreground` |
+| `--color-kui-accent`, `success`, `warning`, `info` | `--color-accent`, `--color-success`, `--color-warning`, `--color-info` |
+| `--color-kui-error` | `--color-danger` |
+| `--color-kui-field-border`, `field-focus` | `--color-input`, `--color-ring` |
+| `--color-kui-mantle`, `surface0`, `surface1`, `surface2` | `--color-popover`, `--color-surface`, `--color-surface-strong`, `--color-border` |
+| `--color-kui-overlay0` | `--color-border-strong` |
+| `--color-kui-muted`, `subtext0` | `--color-muted` |
+| `--color-kui-accent-hi`, `on-accent`, `row-hover` | `--color-accent-hover`, `--color-accent-foreground`, `--color-hover` |
+| `--color-kui-chart-1` to `6` | `--color-chart-1` to `6` |
+| `--text-kui-2xs` (and its `--line-height`), `--tracking-kui-label` | `--text-2xs`, `--tracking-label` |
+| `--kui-density`, `--kui-label-case`, `--kui-label-font`, `--kui-border-width` | `--density`, `--label-case`, `--font-label`, `--border-width` |
+| `--kui-shadow-raised`, `--kui-shadow-press`, `--kui-press-travel` | `--shadow-raised`, `--shadow-press`, `--press-travel` |
+
+The names folded into a Tailwind step or a recipe have no pair: `--radius-kui-*` is `--radius-sm/md/lg`, `--kui-border-*` is `--border-width`, and the badge, notice, avatar, field and stamp knobs are set on the part in `src/ui.ts`.
+
+- A `ui.*` or `cms.*` message key still ending in `Label` (`ui.table.filterLabel`) no longer overrides the library's text: word it as the bare name (`ui.table.filter`), `Aria` where the bare name met a visible text (`cms.admin.searchLabel` is `cms.admin.searchAria`), and `cms.history.restoreLabel` is `cms.history.restoreButton`. The props `loadingLabel`, `backLabel` and the like keep their names.
+- `deprecated-ui-prop`, `deprecated-ui-callback`, `deprecated-ui-token` and `deprecated-message-key` are gone with the forms they reported, so run `kay check --fix` on 1.74 before moving.
+
 ## 1.74.0
 
 ### The forms deprecated in 1.71 are gone

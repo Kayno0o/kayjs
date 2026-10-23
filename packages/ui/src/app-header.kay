@@ -8,7 +8,7 @@ import SiteNav from './site-nav.kay'
 const look = recipe({
   parts: {
     root: 'kui-app-header flex items-center gap-4 border-b border-border bg-background px-4 py-2 data-sticky:sticky data-sticky:top-0 data-sticky:z-20',
-    brand: 'flex min-w-0 items-center gap-2 [font-weight:var(--font-weight-kui-heading,var(--font-weight-semibold))] text-foreground [overflow-wrap:anywhere]',
+    brand: 'flex min-w-0 items-center gap-2 [font-weight:var(--font-weight-semibold)] text-foreground [overflow-wrap:anywhere]',
     nav: 'last:ml-auto lg:last:ml-0',
     end: 'ml-auto flex min-w-0 items-center gap-2 [overflow-wrap:anywhere]',
   },

@@ -58,8 +58,8 @@ Panel(title={wording('auth.consent.title', 'Allow access')})
   else if outcome?.kind === 'consent'
     p {wording('auth.consent.intro', '{client} wants to use your account.', { client: outcome.client.name })}
     if outcome.client.host
-      p.text-kui-muted {wording('auth.consent.from', 'This app lives at {host}. Only continue if you started this sign-in.', { host: outcome.client.host })}
-    p.text-kui-muted {wording('auth.consent.returnsTo', 'After you decide, you go back to {host}.', { host: outcome.redirectHost })}
+      p.text-muted {wording('auth.consent.from', 'This app lives at {host}. Only continue if you started this sign-in.', { host: outcome.client.host })}
+    p.text-muted {wording('auth.consent.returnsTo', 'After you decide, you go back to {host}.', { host: outcome.redirectHost })}
     p {wording('auth.consent.scopes', 'It will be allowed to')}
     ul.list-disc.pl-5
       if outcome.scopes === null

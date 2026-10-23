@@ -12,7 +12,7 @@ const home = localize(features.pages?.home ?? '/')
 ---
 if ctx.user as found
   .kayjs-auth.flex.flex-wrap.items-center.gap-3
-    span.text-kui-muted {found.username ?? found.email}
+    span.text-muted {found.username ?? found.email}
     if account && accountPage
       a(href={accountPage}) {wording('auth.account.title', 'Your account')}
     form(method="post" action={`${features.prefix}/sign-out`})

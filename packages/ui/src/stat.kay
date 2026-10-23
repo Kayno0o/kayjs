@@ -8,7 +8,7 @@ import Icon from './icon.kay'
 const look = recipe({
   // 'kui-stat-badge' keeps the hairline and the fill of the shell it shares with buttons; the figure alone takes the tone, so the label keeps its text colour. A tile fills its grid cell, the figure large above its label.
   parts: {
-    root: 'kui-stat-badge inline-flex items-center gap-[var(--spacing-kui-inline,calc(var(--spacing)*1.25*var(--density)))] rounded-lg px-2.25 py-0.75 text-xs',
+    root: 'kui-stat-badge inline-flex items-center gap-[calc(var(--spacing)*1.25*var(--density))] rounded-lg px-2.25 py-0.75 text-xs',
     icon: 'size-4 shrink-0',
     value: 'font-semibold text-foreground',
     label: 'text-muted',
@@ -18,9 +18,9 @@ const look = recipe({
     variant: {
       inline: '',
       tile: {
-        root: 'flex flex-col items-start gap-1 px-[var(--spacing-kui-field-x,calc(var(--spacing)*2.25*var(--density)))] py-3',
+        root: 'flex flex-col items-start gap-1 px-[calc(var(--spacing)*2.25*var(--density))] py-3',
         value: 'text-2xl/none',
-        label: '[font-size:var(--text-kui-micro,var(--text-2xs))] [line-height:var(--text-kui-micro--line-height,var(--text-2xs--line-height))] [font-weight:var(--font-weight-kui-label,var(--font-weight-normal))] tracking-label [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)]',
+        label: '[font-size:var(--text-2xs)] [line-height:var(--text-2xs--line-height)] [font-weight:var(--font-weight-normal)] tracking-label [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
       },
     },
     // Colours the figure, such as `danger` past a threshold; `neutral` keeps the text colour.

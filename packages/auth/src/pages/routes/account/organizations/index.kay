@@ -56,7 +56,7 @@ PageSection(title={wording('auth.organizations.title', 'Organizations')})
           span.flex.flex-wrap.items-center.gap-2
             for role of membership.roles key={role}
               Badge(label={role} tone="accent")
-            span.text-kui-muted {wording('auth.organizations.joined', 'Joined {date}', { date: date(membership.joinedAt) })}
+            span.text-muted {wording('auth.organizations.joined', 'Joined {date}', { date: date(membership.joinedAt) })}
     else
       EmptyState(title={wording('auth.organizations.none', 'You belong to no organization yet.')})
 if invitations.length > 0
@@ -74,7 +74,7 @@ if invitations.length > 0
                 Button(type="submit" label={wording('auth.organizations.reject', 'Decline')} aria-label={`${wording('auth.organizations.reject', 'Decline')}: ${invitation.organization.name}`})
           .flex.flex-col
             strong {invitation.organization.name}
-            span.text-kui-muted {wording('auth.organizations.expires', 'Expires {date}', { date: date(invitation.expiresAt) })}
+            span.text-muted {wording('auth.organizations.expires', 'Expires {date}', { date: date(invitation.expiresAt) })}
 if refused
   Message(text={failure(refused)})
 PageSection(title={wording('auth.organizations.create', 'Create an organization')})

@@ -7,7 +7,7 @@ import Icon from './icon.kay'
 
 const look = recipe({
   parts: {
-    root: 'kui-badge inline-flex items-center gap-1 border-solid bg-surface px-[var(--spacing-kui-badge-x,calc(var(--spacing)*1.5))] py-[var(--spacing-kui-badge-y,1px)] [font-size:var(--text-kui-badge,var(--text-xs))] [line-height:var(--text-kui-badge--line-height,var(--text-xs--line-height))] [letter-spacing:var(--tracking-kui-badge,var(--tracking-normal))] whitespace-nowrap [border-color:var(--_badge-color,var(--color-border))] [border-width:var(--kui-border-badge,var(--kui-border-width,var(--border-width)))] [color:var(--_badge-color,var(--color-muted))] [font-family:var(--kui-badge-font,inherit)] [text-transform:var(--kui-badge-case,none)] data-stamp:bg-[var(--color-kui-stamp-fill,var(--color-background))] data-stamp:px-2.5 data-stamp:py-1 data-stamp:font-mono data-stamp:text-[0.625rem]/[1.4] data-stamp:font-normal data-stamp:tracking-[0.14em] data-stamp:uppercase data-stamp:transition-colors data-stamp:duration-150 data-stamp:[border-color:var(--_badge-color,var(--color-kui-stamp,var(--color-foreground)))] data-stamp:[border-width:var(--kui-border-stamp,var(--kui-border-width,var(--border-width)))] data-stamp:[color:var(--_badge-color,var(--color-kui-stamp,var(--color-foreground)))] group-hover:data-stamp:bg-[var(--color-kui-stamp-fill-hover,var(--color-kui-fill-hover,var(--color-surface-strong)))] data-solid:[background-color:var(--_badge-color,var(--color-muted))] data-solid:[border-color:var(--_badge-color,var(--color-muted))] data-solid:[color:var(--kui-badge-solid-text,var(--color-accent-foreground))]',
+    root: 'kui-badge inline-flex items-center gap-1 border-solid bg-surface px-1.5 py-px text-xs tracking-normal whitespace-nowrap [border-color:var(--_badge-color,var(--color-border))] [border-width:var(--border-width)] [color:var(--_badge-color,var(--color-muted))] [font-family:inherit] [text-transform:none] data-stamp:bg-[var(--color-background)] data-stamp:px-2.5 data-stamp:py-1 data-stamp:font-mono data-stamp:text-[0.625rem]/[1.4] data-stamp:font-normal data-stamp:tracking-[0.14em] data-stamp:uppercase data-stamp:transition-colors data-stamp:duration-150 data-stamp:[border-color:var(--_badge-color,var(--color-foreground))] data-stamp:[border-width:var(--border-width)] data-stamp:[color:var(--_badge-color,var(--color-foreground))] group-hover:data-stamp:bg-[var(--color-surface-strong)] data-solid:[background-color:var(--_badge-color,var(--color-muted))] data-solid:[border-color:var(--_badge-color,var(--color-muted))] data-solid:[color:var(--color-accent-foreground)]',
     icon: 'size-3',
   },
   // A tone sets one variable that the base colours read, so no tone class has to beat a neutral colour of the base.
@@ -24,19 +24,15 @@ const look = recipe({
   defaults: { tone: 'neutral' },
 })
 
-const { tone = 'neutral', variant, icon, label, stamp = false, solid = false, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class'> & {
+const { tone = 'neutral', variant, icon, label, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class'> & {
   icon?: IconSlot | IconProps | undefined
   label?: string | number | undefined
   // `outline` is a hairline in the tone. `solid` is filled with the tone, its text in `--color-accent-foreground`. `stamp` is a rubber stamp: a hairline in its text colour, small spaced capitals, filled again while a `.group` holding it is hovered.
   variant?: 'outline' | 'solid' | 'stamp' | undefined
-  // Deprecated since 1.72, `variant="stamp"` is it.
-  stamp?: boolean | undefined
-  // Deprecated since 1.72, `variant="solid"` is it.
-  solid?: boolean | undefined
 }>()
 
-const stamped = () => variant === 'stamp' || (variant === undefined && stamp)
-const filled = () => variant === 'solid' || (variant === undefined && solid)
+const stamped = () => variant === 'stamp'
+const filled = () => variant === 'solid'
 ---
 // A label that does nothing: a count, a status, a tag.
 span({...rest} data-tone={tone} data-stamp={stamped() ? '' : undefined} data-solid={filled() && !stamped() ? '' : undefined})

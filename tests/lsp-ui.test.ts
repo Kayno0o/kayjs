@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { recipeParts, styleInfo, styleInfos, themeBlockTokens, themeTokens, tokensNamedBy } from '../src/build/ui-info'
 import { Connection } from '../src/lsp/rpc'
 import { templateContext } from '../src/lsp/template-completion'
-import { objectCursor, uiFileCursor, uiItems } from '../src/lsp/ui-completion'
+import { objectCursor, uiFileCursor } from '../src/lsp/ui-completion'
 import { spawnSuiteServer } from './listening'
 import { scratchDir } from './scratch'
 
@@ -83,7 +83,7 @@ describe('what a component offers src/ui.ts', () => {
     expect(info?.name).toBe('Card')
     expect(info?.recipe).toBe(true)
     expect(info?.parts.map(part => part.name).sort()).toEqual(['body', 'head', 'root', 'title'])
-    expect(info?.parts.find(part => part.name === 'body')?.classes).toBe('p-[var(--spacing-kui-card,calc(var(--spacing)*2.5*var(--density)))]')
+    expect(info?.parts.find(part => part.name === 'body')?.classes).toBe('p-[calc(var(--spacing)*2.5*var(--density))]')
   })
 
   it('reads a string parts as the root, and a template literal without holes', () => {
@@ -116,10 +116,8 @@ describe('what a component offers src/ui.ts', () => {
     const names = tokens.map(token => token.name)
 
     expect(names).toContain('--color-background')
-    expect(names).toContain('--color-kui-canvas')
     expect(names).toContain('--border-width')
     expect(tokensNamedBy('text-2xs border-(length:--border-width) bg-surface kui-card', tokens).map(token => token.name)).toEqual(expect.arrayContaining(['--border-width', '--color-surface', '--text-2xs']))
-    expect(tokensNamedBy('kui-card flex', tokens).map(token => token.name)).not.toContain('--radius-kui-card')
   })
 })
 
@@ -258,27 +256,15 @@ describe('the components found for completion', () => {
   --border-width: 1px;
   --radius-lg: 0.5rem;
 }
-@theme default inline reference {
-  --color-kui-canvas: var(--color-background);
-  --color-kui-accent: var(--color-accent);
-  --kui-border-width: var(--border-width);
+@theme default {
+  --color-border: var(--color-foreground);
 }
 .x { --not-a-token: 1; }`
 
-  it('reads token names from the @theme blocks and marks the reference block deprecated', () => {
+  it('reads token names from every @theme block, and none from a plain rule', () => {
     const tokens = themeBlockTokens(SPLIT_THEME)
 
-    expect(tokens.map(token => token.name)).toEqual(['--color-background', '--color-accent', '--color-chart-2', '--border-width', '--radius-lg', '--color-kui-canvas', '--color-kui-accent', '--kui-border-width'])
-    expect(tokens.filter(token => token.deprecated).map(token => token.name)).toEqual(['--color-kui-canvas', '--color-kui-accent', '--kui-border-width'])
-    expect(tokensNamedBy('bg-background text-accent/50 hover:bg-chart-2 rounded-lg p-2 border-(length:--border-width) bg-kui-canvas', tokens).map(token => token.name)).toEqual(['--color-background', '--color-accent', '--color-chart-2', '--border-width', '--radius-lg', '--color-kui-canvas'])
-    expect(themeBlockTokens('@theme default { --color-kui-canvas: red; }').map(token => token.name)).toEqual(['--color-kui-canvas'])
-  })
-
-  it('hides deprecated tokens from completion', () => {
-    const cursor = { path: [], at: 'string' as const, key: 'root', word: '--' }
-    const labels = uiItems(cursor, 'Card', { components: [], tokens: themeBlockTokens(SPLIT_THEME) }).map(item => item.label)
-
-    expect(labels).toContain('--color-background')
-    expect(labels).not.toContain('--color-kui-canvas')
+    expect(tokens.map(token => token.name)).toEqual(['--color-background', '--color-accent', '--color-chart-2', '--border-width', '--radius-lg', '--color-border'])
+    expect(tokensNamedBy('bg-background text-accent/50 hover:bg-chart-2 rounded-lg p-2 border-(length:--border-width)', tokens).map(token => token.name)).toEqual(['--color-background', '--color-accent', '--color-chart-2', '--border-width', '--radius-lg'])
   })
 })

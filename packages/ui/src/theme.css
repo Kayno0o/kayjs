@@ -3,7 +3,7 @@
  * Tokens are `@theme default`, so the app's own `@theme` overrides them wherever it sits, and components write no utility of their own except the recipes of those that hold their look (Card, Badge, Notice, Avatar, Stat, PageHeader, PageSection, EmptyState, CardRow, Widget, Meter, Progress and Skeleton), only the classes below: a rule of the app's on one of them restyles every instance, and a utility through `class` restyles one.
  */
 
-/* A keyline is a length: a registered property keeps a skin's `2px solid red`, which is no length, from making every keyline invalid. The old --kui-border-width stays unregistered, so a frame reads it first and falls back to --border-width, and a subtree that sets it is followed. */
+/* A keyline is a length: a registered property keeps a skin's `2px solid red`, which is no length, from making every keyline invalid. */
 @property --border-width {
   syntax: '<length>';
   inherits: true;
@@ -31,134 +31,63 @@
   inherits: false;
 }
 
-/* The app's own theme names. Each reads the name kayjs-ui used before 1.72 first, so an app that still sets the old one keeps its look until 1.75, and falls back to the default below. */
+/* The app's own theme names, each with the default an app that sets nothing gets. */
 @theme default {
   /* Each colour is light-dark(light, dark), following the color-scheme set below. Eight are seeds a skin sets alone: background, foreground, accent, success, warning, info, danger and input. The others derive from them with color-mix, and each stays overridable on its own. background, foreground and danger fall back to the --color-base, --color-text and --color-error an app built from the template already sets. */
-  --color-background: var(--color-kui-canvas, var(--color-base, light-dark(#faf8f4, #111111)));
-  --color-foreground: var(--color-kui-text, var(--color-text, light-dark(#1f1c18, #e0dcd4)));
-  --color-accent: var(--color-kui-accent, light-dark(#ab433a, #ec9086));
-  --color-success: var(--color-kui-success, light-dark(#4f6b2e, #b4c79b));
-  --color-warning: var(--color-kui-warning, light-dark(#8a5a12, #d8b27a));
-  --color-info: var(--color-kui-info, light-dark(#2f6496, #8fb8de));
-  --color-danger: var(--color-kui-error, var(--color-error, light-dark(#ab433a, #ec9086)));
-  --color-input: var(--color-kui-field-border, light-dark(#8a8379, #6e6a63));
+  --color-background: var(--color-base, light-dark(#faf8f4, #111111));
+  --color-foreground: var(--color-text, light-dark(#1f1c18, #e0dcd4));
+  --color-accent: light-dark(#ab433a, #ec9086);
+  --color-success: light-dark(#4f6b2e, #b4c79b);
+  --color-warning: light-dark(#8a5a12, #d8b27a);
+  --color-info: light-dark(#2f6496, #8fb8de);
+  --color-danger: var(--color-error, light-dark(#ab433a, #ec9086));
+  --color-input: light-dark(#8a8379, #6e6a63);
 
   /* Surfaces from the deepest to the one cards sit on, then the text grey. border and border-strong are the hairlines, the text at an alpha so a line holds on any surface. */
-  --color-popover: var(--color-kui-mantle, color-mix(in oklab, var(--color-background), black 4%));
-  --color-surface: var(--color-kui-surface0, color-mix(in oklab, var(--color-background), var(--color-foreground) 3%));
-  --color-surface-strong: var(--color-kui-surface1, color-mix(in oklab, var(--color-background), var(--color-foreground) 7%));
-  --color-border: var(--color-kui-surface2, color-mix(in srgb, var(--color-foreground) 10%, transparent));
-  --color-border-strong: var(--color-kui-overlay0, color-mix(in srgb, var(--color-foreground) 22%, transparent));
-  --color-muted: var(--color-kui-muted, var(--color-kui-subtext0, color-mix(in oklab, var(--color-foreground), var(--color-background) 30%)));
+  --color-popover: color-mix(in oklab, var(--color-background), black 4%);
+  --color-surface: color-mix(in oklab, var(--color-background), var(--color-foreground) 3%);
+  --color-surface-strong: color-mix(in oklab, var(--color-background), var(--color-foreground) 7%);
+  --color-border: color-mix(in srgb, var(--color-foreground) 10%, transparent);
+  --color-border-strong: color-mix(in srgb, var(--color-foreground) 22%, transparent);
+  --color-muted: color-mix(in oklab, var(--color-foreground), var(--color-background) 30%);
 
   /* The accent's hover, the text on it, the hover of a row and the focus ring. */
-  --color-accent-hover: var(--color-kui-accent-hi, light-dark(color-mix(in oklab, var(--color-accent), black 24%), color-mix(in oklab, var(--color-accent), white 38%)));
-  --color-accent-foreground: var(--color-kui-on-accent, var(--color-background));
-  --color-hover: var(--color-kui-row-hover, color-mix(in srgb, var(--color-foreground) 4.5%, transparent));
-  --color-ring: var(--color-kui-field-focus, var(--color-accent));
+  --color-accent-hover: light-dark(color-mix(in oklab, var(--color-accent), black 24%), color-mix(in oklab, var(--color-accent), white 38%));
+  --color-accent-foreground: var(--color-background);
+  --color-hover: color-mix(in srgb, var(--color-foreground) 4.5%, transparent);
+  --color-ring: var(--color-accent);
 
-  /* Tailwind's own radius steps and mono stack, the value an app that sets nothing gets, each reading the old name first until 1.75. kayjs-ui reads --radius-md for what is pressed, --radius-lg for boxes and --radius-sm for a thumb or a badge. */
-  --radius-sm: var(--radius-kui-sm, 0.25rem);
-  --radius-md: var(--radius-kui-md, var(--radius-kui-card, 0.375rem));
-  --radius-lg: var(--radius-kui-card, 0.5rem);
-  --font-mono: var(--font-kui-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace);
+  /* Tailwind's own radius steps and mono stack, the value an app that sets nothing gets. kayjs-ui reads --radius-md for what is pressed, --radius-lg for boxes and --radius-sm for a thumb or a badge. */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 
-  --text-2xs: var(--text-kui-2xs, 0.6rem);
-  --text-2xs--line-height: var(--text-kui-2xs--line-height, 1.4);
-  --tracking-label: var(--tracking-kui-label, 0.15em);
+  --text-2xs: 0.6rem;
+  --text-2xs--line-height: 1.4;
+  --tracking-label: 0.15em;
   /* Density scales the card, inline and section gaps and the field insets: 1 by default, 0.75 packs them tighter and 1.25 looser. */
-  --density: var(--kui-density, 1);
+  --density: 1;
   /* The keyline of every framed box, a length: buttons, cards, card rows, widgets, notices, avatars, toasts, dialogs, side panels, tooltips, tables, boxed sections, save bars, segmented controls, file drops, pagination steps, the site nav, chart tooltips, chips, the icon grid, the scatter plot, the crop stage, toggles, the table's filter and selection bars and sort buttons, the palette and popovers. A value that is no length, such as a `2px solid red` shorthand, leaves it at 1px. */
-  --border-width: var(--kui-border-width, var(--kui-border-card));
+  --border-width: 1px;
 
   /* The case of labels, headings and table heads: uppercase unless a skin sets none. --font-label sets their font, the text's own unless set. */
-  --label-case: var(--kui-label-case, uppercase);
-  --font-label: var(--kui-label-font);
+  --label-case: uppercase;
 
   /* Offset shadows and a press-down, none unless a skin sets them: raised under cards, card rows, widgets and toasts, press under framed buttons, which move down by the travel and drop it while pressed. */
-  --shadow-raised: var(--kui-shadow-raised, none);
-  --shadow-press: var(--kui-shadow-press, none);
-  --press-travel: var(--kui-press-travel, 0px);
+  --shadow-raised: none;
+  --shadow-press: none;
+  --press-travel: 0px;
 }
 
 /* The colours a chart series takes when it names none, in order. */
 @theme default {
-  --color-chart-1: var(--color-kui-chart-1, var(--color-accent));
-  --color-chart-2: var(--color-kui-chart-2, var(--color-success));
-  --color-chart-3: var(--color-kui-chart-3, var(--color-info));
-  --color-chart-4: var(--color-kui-chart-4, var(--color-warning));
-  --color-chart-5: var(--color-kui-chart-5, light-dark(#6b4fa3, #b9a3de));
-  --color-chart-6: var(--color-kui-chart-6, light-dark(#2a7d6c, #7fc8b8));
-}
-
-/* The names kayjs-ui used before 1.72, kept until 1.75 so an old utility still builds: each reads the new name and is never written to the page, so it forms no cycle with the new name reading it. */
-@theme default inline reference {
-  --color-kui-canvas: var(--color-background);
-  --color-kui-text: var(--color-foreground);
-  --color-kui-accent: var(--color-accent);
-  --color-kui-success: var(--color-success);
-  --color-kui-warning: var(--color-warning);
-  --color-kui-info: var(--color-info);
-  --color-kui-error: var(--color-danger);
-  --color-kui-field-border: var(--color-input);
-  --color-kui-mantle: var(--color-popover);
-  --color-kui-surface0: var(--color-surface);
-  --color-kui-surface1: var(--color-surface-strong);
-  --color-kui-surface2: var(--color-border);
-  --color-kui-overlay0: var(--color-border-strong);
-  --color-kui-muted: var(--color-muted);
-  --color-kui-subtext0: var(--color-muted);
-  --color-kui-accent-hi: var(--color-accent-hover);
-  --color-kui-on-accent: var(--color-accent-foreground);
-  --color-kui-row-hover: var(--color-hover);
-  --color-kui-field-focus: var(--color-ring);
-  --color-kui-chart-1: var(--color-chart-1);
-  --color-kui-chart-2: var(--color-chart-2);
-  --color-kui-chart-3: var(--color-chart-3);
-  --color-kui-chart-4: var(--color-chart-4);
-  --color-kui-chart-5: var(--color-chart-5);
-  --color-kui-chart-6: var(--color-chart-6);
-  --text-kui-2xs: var(--text-2xs);
-  --text-kui-2xs--line-height: var(--text-2xs--line-height);
-  --tracking-kui-label: var(--tracking-label);
-  --kui-density: var(--density);
-  --kui-label-case: var(--label-case);
-  --kui-label-font: var(--font-label);
-  --kui-shadow-raised: var(--shadow-raised);
-  --kui-shadow-press: var(--shadow-press);
-  --kui-press-travel: var(--press-travel);
-  --color-kui-overlay1: var(--color-muted);
-  --color-kui-fill-hover: var(--color-surface-strong);
-  --color-kui-stamp: var(--color-foreground);
-  --color-kui-stamp-fill: var(--color-background);
-  --color-kui-stamp-fill-hover: var(--color-surface-strong);
-  --color-kui-avatar-ring: var(--color-border);
-  --color-kui-fill-danger: color-mix(in oklab, var(--color-danger) 10%, transparent);
-  --text-kui-micro: var(--text-2xs);
-  --text-kui-micro--line-height: var(--text-2xs--line-height);
-  --text-kui-badge: var(--text-xs);
-  --text-kui-badge--line-height: var(--text-xs--line-height);
-  --font-weight-kui-heading: var(--font-weight-semibold);
-  --font-weight-kui-label: var(--font-weight-normal);
-  --font-weight-kui-notice: var(--font-weight-normal);
-  --font-weight-kui-avatar: var(--font-weight-semibold);
-  --tracking-kui-section: var(--tracking-label);
-  --tracking-kui-action: var(--tracking-label);
-  --tracking-kui-badge: var(--tracking-normal);
-  --font-kui-mono: var(--font-mono);
-  --font-kui-body: inherit;
-  --spacing-kui-card: calc(var(--spacing) * 2.5 * var(--density));
-  --spacing-kui-inline: calc(var(--spacing) * 1.25 * var(--density));
-  --spacing-kui-section: calc(var(--spacing) * 3.5 * var(--density));
-  --spacing-kui-field-x: calc(var(--spacing) * 2.25 * var(--density));
-  --spacing-kui-field-y: calc(var(--spacing) * var(--density));
-  --spacing-kui-field-height: calc(2 * var(--border-width) + 2 * var(--spacing) * var(--density) + var(--text-sm) * var(--text-sm--line-height));
-  --spacing-kui-badge-x: calc(var(--spacing) * 1.5);
-  --spacing-kui-badge-y: 1px;
-  --radius-kui-card: var(--radius-lg);
-  --radius-kui-sm: var(--radius-sm);
-  --radius-kui-md: var(--radius-md);
-  --radius-kui-full: calc(infinity * 1px);
+  --color-chart-1: var(--color-accent);
+  --color-chart-2: var(--color-success);
+  --color-chart-3: var(--color-info);
+  --color-chart-4: var(--color-warning);
+  --color-chart-5: light-dark(#6b4fa3, #b9a3de);
+  --color-chart-6: light-dark(#2a7d6c, #7fc8b8);
 }
 
 /* Dark unless the visitor's system asks for light; `data-theme="light"` or `"dark"`, on the root or on any element, wins over both for what it holds. */
@@ -225,7 +154,7 @@
     content: '';
     position: absolute;
     inset: 0;
-    border: var(--kui-border-width,var(--border-width)) solid var(--_shell-line);
+    border: var(--border-width) solid var(--_shell-line);
     border-radius: inherit;
     pointer-events: none;
   }
@@ -239,7 +168,7 @@
   :where(button, a, [role='button'], summary).kui-shell:hover,
   .kui-btn:hover {
     --_shell-line: var(--color-muted);
-    --_shell-fill: var(--color-kui-fill-hover, var(--color-surface-strong));
+    --_shell-fill: var(--color-surface-strong);
   }
 
   :where(button, a, [role='button'], summary).kui-shell:focus-visible,
@@ -251,7 +180,7 @@
 
   .kui-shell-danger:hover {
     --_shell-line: var(--color-danger);
-    --_shell-fill: var(--color-kui-fill-danger, color-mix(in oklab, var(--color-danger) 10%, transparent));
+    --_shell-fill: color-mix(in oklab, var(--color-danger) 10%, transparent);
   }
 
   .kui-btn,
@@ -270,17 +199,17 @@
   }
 
   .kui-heading-section {
-    @apply text-2xs [font-weight:var(--font-weight-kui-label,var(--font-weight-normal))] [letter-spacing:var(--tracking-kui-section,var(--tracking-label))] text-muted [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
+    @apply text-2xs [font-weight:var(--font-weight-normal)] [letter-spacing:var(--tracking-label)] text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)];
   }
 
   .kui-label-text {
-    @apply text-xs [font-weight:var(--font-weight-kui-label,var(--font-weight-normal))] tracking-label text-muted [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
+    @apply text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)];
   }
 
   .kui-btn {
     --_shell-line: var(--color-input);
     --_shell-fill: var(--color-background);
-    @apply inline-flex cursor-pointer items-center justify-center gap-[var(--spacing-kui-inline,calc(var(--spacing)*1.25*var(--density)))] border-0 px-3 py-1 text-xs whitespace-nowrap [font-weight:var(--font-weight-kui-label,var(--font-weight-normal))] [letter-spacing:var(--tracking-kui-action,var(--tracking-label))] text-foreground [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)] transition-[color,translate,box-shadow] duration-150;
+    @apply inline-flex cursor-pointer items-center justify-center gap-[calc(var(--spacing)*1.25*var(--density))] border-0 px-3 py-1 text-xs whitespace-nowrap [font-weight:var(--font-weight-normal)] [letter-spacing:var(--tracking-label)] text-foreground [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)] transition-[color,translate,box-shadow] duration-150;
   }
 
   /* A submit button while its form's onSubmit is pending: a spinner drawn in CSS, the button being static markup. A Button given `busy` draws its own and is left alone. */
@@ -325,7 +254,7 @@
 
     &:hover {
       --_shell-line: var(--color-danger);
-      --_shell-fill: var(--color-kui-fill-danger, color-mix(in oklab, var(--color-danger) 10%, transparent));
+      --_shell-fill: color-mix(in oklab, var(--color-danger) 10%, transparent);
     }
   }
 
@@ -371,7 +300,7 @@
   .kui-field-input,
   .kui-form-field select,
   .kui-btn {
-    --_field-height: var(--spacing-kui-field-height, calc(2 * var(--kui-border-input, var(--kui-border-width, var(--border-width))) + 2 * var(--spacing-kui-field-y, calc(var(--spacing) * var(--density))) + var(--text-sm) * var(--text-sm--line-height)));
+    --_field-height: calc(2 * var(--border-width) + 2 * var(--spacing) * var(--density) + var(--text-sm) * var(--text-sm--line-height));
   }
 
   /* A medium button in a row of compact fields or bare single-line field controls (a Textarea not), an island's slot wrapper between the row and the field included is as tall as they are at any density; a rule here rather than a utility, so no other button carries the selector. */
@@ -392,18 +321,18 @@
       select,
       textarea
     ) {
-    @apply rounded-md bg-surface px-[var(--spacing-kui-field-x,calc(var(--spacing)*2.25*var(--density)))] py-[var(--spacing-kui-field-y,calc(var(--spacing)*var(--density)))] text-sm text-foreground outline-none [font-family:var(--font-kui-body,inherit)];
-    border: var(--kui-border-input,var(--kui-border-width,var(--border-width))) solid var(--color-input);
+    @apply rounded-md bg-surface px-[calc(var(--spacing)*2.25*var(--density))] py-[calc(var(--spacing)*var(--density))] text-sm text-foreground outline-none [font-family:inherit];
+    border: var(--border-width) solid var(--color-input);
 
     &::placeholder {
-      @apply text-[var(--color-kui-overlay1,var(--color-muted))];
+      @apply text-[var(--color-muted)];
     }
 
     /* The outline doubles the accent border, so focus reads by more than a colour change. */
     &:focus {
       @apply border-ring;
       outline: 1px solid var(--color-ring);
-      box-shadow: var(--kui-field-focus-shadow, none);
+      box-shadow: none;
     }
 
     &:disabled {
@@ -412,7 +341,7 @@
   }
 
   .kui-stat-badge {
-    @apply inline-flex items-center gap-[var(--spacing-kui-inline,calc(var(--spacing)*1.25*var(--density)))] px-2.25 py-0.75 text-xs;
+    @apply inline-flex items-center gap-[calc(var(--spacing)*1.25*var(--density))] px-2.25 py-0.75 text-xs;
   }
 
   /* An inline SVG drawing in currentColor, sized here rather than by the 1em its import gives it. */
@@ -448,7 +377,7 @@
     }
 
     &:where([data-variant='inline']) {
-      @apply text-[var(--color-kui-overlay1,var(--color-muted))];
+      @apply text-[var(--color-muted)];
     }
 
     &:where([data-tone='accent']) {
@@ -469,7 +398,7 @@
   }
 
   .kui-bar-list-empty {
-    @apply text-xs text-[var(--color-kui-overlay1,var(--color-muted))];
+    @apply text-xs text-[var(--color-muted)];
   }
 
   .kui-collapsible-section {
@@ -477,7 +406,7 @@
 
     /* Boxed, the summary is the card's header band and the body the card's padding, so a run of sections reads as separate blocks rather than as headings in one column. */
     &:where([data-boxed]) {
-      @apply border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border bg-surface;
+      @apply border-solid border-[length:var(--border-width)] border-border bg-surface;
     }
   }
 
@@ -491,7 +420,7 @@
 
   /* The band and the body take the card's own padding, so a boxed section and a card side by side line their titles up. */
   :where(.kui-collapsible-section[data-boxed]) > .kui-collapsible-section-summary {
-    @apply px-[var(--spacing-kui-card,calc(var(--spacing)*2.5*var(--density)))] py-1.5;
+    @apply px-[calc(var(--spacing)*2.5*var(--density))] py-1.5;
   }
 
   :where(.kui-collapsible-section[data-boxed][open]) > .kui-collapsible-section-summary {
@@ -519,7 +448,7 @@
   }
 
   :where(.kui-collapsible-section[data-boxed]) > .kui-collapsible-section-body {
-    @apply gap-4 p-[var(--spacing-kui-card,calc(var(--spacing)*2.5*var(--density)))];
+    @apply gap-4 p-[calc(var(--spacing)*2.5*var(--density))];
   }
 
   /* Boxed sections stacked in an accordion share their borders. */
@@ -527,7 +456,7 @@
     @apply flex flex-col;
 
     & > :where(.kui-collapsible-section[data-boxed] + .kui-collapsible-section[data-boxed]) {
-      @apply -mt-[length:var(--kui-border-width,var(--border-width))];
+      @apply -mt-[length:var(--border-width)];
     }
   }
 
@@ -580,7 +509,7 @@
   }
 
   .kui-save-bar {
-    @apply sticky bottom-0 z-10 flex flex-wrap items-center gap-2 border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border bg-background px-3 py-2;
+    @apply sticky bottom-0 z-10 flex flex-wrap items-center gap-2 border-solid border-[length:var(--border-width)] border-border bg-background px-3 py-2;
     padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
   }
 
@@ -597,7 +526,7 @@
   }
 
   .kui-icon-grid {
-    @apply grid max-h-48 grid-cols-8 gap-1 overflow-y-auto border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border bg-popover p-2;
+    @apply grid max-h-48 grid-cols-8 gap-1 overflow-y-auto border-solid border-[length:var(--border-width)] border-border bg-popover p-2;
   }
 
   .kui-icon-grid-option {
@@ -633,7 +562,7 @@
   }
 
   .kui-icon-grid-clear {
-    @apply text-[var(--color-kui-overlay1,var(--color-muted))] hover:text-foreground;
+    @apply text-[var(--color-muted)] hover:text-foreground;
   }
 
   .kui-icon-grid-more {
@@ -660,7 +589,7 @@
   }
 
   .kui-line-chart-plot {
-    height: var(--chart-height, var(--kui-line-chart-height, 9rem));
+    height: var(--chart-height, 9rem);
 
     & :where(.ct-grid) {
       @apply stroke-border;
@@ -668,7 +597,7 @@
       stroke-dasharray: 4px;
     }
     & :where(.ct-label) {
-      @apply flex fill-[var(--color-kui-overlay1,var(--color-muted))] text-2xs leading-none text-[var(--color-kui-overlay1,var(--color-muted))];
+      @apply flex fill-[var(--color-muted)] text-2xs leading-none text-[var(--color-muted)];
     }
     & :where(.ct-label.ct-vertical.ct-start) {
       @apply items-end justify-end whitespace-nowrap text-right;
@@ -740,7 +669,7 @@
   }
 
   .kui-markdown-preview {
-    @apply max-h-[70dvh] min-h-[12lh] overflow-auto border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border bg-popover p-3 text-sm;
+    @apply max-h-[70dvh] min-h-[12lh] overflow-auto border-solid border-[length:var(--border-width)] border-border bg-popover p-3 text-sm;
 
     grid-area: view;
   }
@@ -976,7 +905,7 @@
 
   /* A tile fills its grid cell: the figure large above its label. */
   .kui-stat-badge:where([data-variant='tile']) {
-    @apply flex flex-col items-start gap-1 px-[var(--spacing-kui-field-x,calc(var(--spacing)*2.25*var(--density)))] py-3;
+    @apply flex flex-col items-start gap-1 px-[calc(var(--spacing)*2.25*var(--density))] py-3;
   }
 
   /* Below lg the links fold behind the toggle, a popover its popovertarget opens; from lg they sit in a row, the popover's frame undone and the toggle hidden. A browser without popovers shows the links as they are and hides the toggle. */
@@ -994,7 +923,7 @@
   :where(.kui-site-nav > [data-part='list']:popover-open) {
     position-area: block-end span-inline-end;
     position-try-fallbacks: flip-inline;
-    @apply m-0 mt-2 flex min-w-56 flex-col items-stretch border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border bg-popover p-2 text-foreground;
+    @apply m-0 mt-2 flex min-w-56 flex-col items-stretch border-solid border-[length:var(--border-width)] border-border bg-popover p-2 text-foreground;
     inset: auto;
   }
 
@@ -1028,7 +957,7 @@
   .kui-breadcrumb [data-part='list'] > [data-part='item'] + [data-part='more']::before,
   .kui-breadcrumb [data-part='list'] > [data-part='more'] + [data-part='item']::before {
     content: '/' / '';
-    @apply mr-2 text-[var(--color-kui-overlay1,var(--color-muted))];
+    @apply mr-2 text-[var(--color-muted)];
   }
 
   .kui-tab-nav {
@@ -1046,7 +975,7 @@
   }
 
   .kui-table-wrap {
-    @apply w-full overflow-x-auto border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border bg-surface;
+    @apply w-full overflow-x-auto border-solid border-[length:var(--border-width)] border-border bg-surface;
 
     &:where([data-narrow='stack']) {
       container: kui-table / inline-size;
@@ -1056,7 +985,7 @@
   /* A virtual table scrolls in its own box, its headers kept on top. */
   .kui-table-wrap:where([data-virtual]) {
     @apply overflow-y-auto;
-    max-height: var(--table-height, var(--kui-table-height, 70vh));
+    max-height: var(--table-height, 70vh);
     overflow-anchor: none;
 
     &:focus-visible {
@@ -1134,7 +1063,7 @@
   .kui-btn[aria-disabled='true'] {
     --_shell-line: var(--color-border);
     --_shell-fill: var(--color-background);
-    color: var(--color-kui-overlay1, var(--color-muted));
+    color: var(--color-muted);
     cursor: not-allowed;
     box-shadow: none;
     translate: none;

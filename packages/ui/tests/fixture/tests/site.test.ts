@@ -222,10 +222,10 @@ describe('layout', () => {
     expect((await find('/layout', '#app-switcher #family [data-part="initial"]')).map(found => found.text)).toEqual(['H', 'R'])
   })
 
-  test('SiteNav takes the URL as current, and Select marks itself busy by busy or by its old loading', async () => {
+  test('SiteNav takes the URL as current, and Select marks itself busy by busy', async () => {
     expect(await attributes('/layout', '#url-links [data-part="link"]', ['aria-current'])).toEqual([{ 'aria-current': null }, { 'aria-current': 'page' }])
-    expect(await attributes('/layout', '#busy-select select', ['id', 'aria-busy'])).toEqual([{ 'id': 'busy-new', 'aria-busy': 'false' }, { 'id': 'busy-new-plain', 'aria-busy': 'true' }, { 'id': 'busy-old', 'aria-busy': 'true' }, { 'id': 'idle', 'aria-busy': null }])
-    expect((await find('/layout', '#busy-select option[disabled]')).length).toBe(3)
+    expect(await attributes('/layout', '#busy-select select', ['id', 'aria-busy'])).toEqual([{ 'id': 'busy-new', 'aria-busy': 'false' }, { 'id': 'busy-new-plain', 'aria-busy': 'true' }, { 'id': 'idle', 'aria-busy': null }])
+    expect((await find('/layout', '#busy-select option[disabled]')).length).toBe(2)
   })
 
   test('AppHeader marks the current link and draws a link\'s icon beside its escaped label', async () => {
@@ -337,7 +337,7 @@ describe('the display components whose recipe holds their look, under Tailwind',
   test('the shape of a Skeleton replaces the height and the width of the text bars', async () => {
     expect(await classes('#skeleton')).toContain('w-(--_skeleton-width,2.5rem)')
     expect(await classes('#skeleton')).not.toContain('w-(--_skeleton-width,100%)')
-    expect(await classes('#skeleton [data-part=block]')).toEqual(expect.arrayContaining(['aspect-square', 'h-auto', 'rounded-[var(--radius-kui-full,calc(infinity*1px))]']))
+    expect(await classes('#skeleton [data-part=block]')).toEqual(expect.arrayContaining(['aspect-square', 'h-auto', 'rounded-[calc(infinity*1px)]']))
     expect(await classes('#skeleton [data-part=block]')).not.toContain('h-(--_skeleton-height,1em)')
   })
 })
@@ -398,12 +398,8 @@ describe('content', () => {
     expect((await find('/content', '#solid')).map(found => found.text)).toEqual(['<b>Done</b>'])
   })
 
-  test('the old props of Badge, Notice, FormField, FileDrop and QrCode still draw as they did, and variant beats the booleans', async () => {
-    expect(await attributes('/content', '#legacy-stamp, #legacy-solid, #variant-wins', ['data-stamp', 'data-solid'])).toEqual([{ 'data-stamp': '', 'data-solid': null }, { 'data-stamp': null, 'data-solid': '' }, { 'data-stamp': null, 'data-solid': null }])
-    expect(await attributes('/content', '#legacy-compact, #legacy-field [data-compact], #legacy-drop [data-compact]', ['data-compact'])).toEqual([{ 'data-compact': '' }, { 'data-compact': '' }, { 'data-compact': '' }])
-    expect(await attributes('/content', '#solid-variant-stamp', ['data-stamp', 'data-solid'])).toEqual([{ 'data-stamp': null, 'data-solid': '' }])
-    expect(await attributes('/content', '#md-compact, #md-field [data-compact], #md-drop [data-compact]', ['data-compact'])).toEqual([{ 'data-compact': '' }, { 'data-compact': '' }, { 'data-compact': '' }])
-    expect(await attributes('/content', '#legacy-qr', ['width', 'height'])).toEqual([{ width: '90', height: '90' }])
+  test('QrCode sets its width and height from pixels', async () => {
+    expect(await attributes('/content', '#qr', ['width', 'height'])).toEqual([{ width: '90', height: '90' }])
   })
 
   test('EmptyState holds an @actions block below its description, and none without one', async () => {
@@ -631,9 +627,9 @@ describe('charts', () => {
   // The exact-markup tests match a part's classes with `[^"]*`, so this one holds the utilities that draw each part.
   test.each([
     ['scatter', 'grid', ['absolute', 'bg-border', 'data-[axis=x]:inset-y-0', 'data-[axis=y]:h-px']],
-    ['scatter', 'tick', ['absolute', 'whitespace-nowrap', 'tabular-nums', 'text-[var(--color-kui-overlay1,var(--color-muted))]', 'data-[axis=x]:top-full']],
+    ['scatter', 'tick', ['absolute', 'whitespace-nowrap', 'tabular-nums', 'text-[var(--color-muted)]', 'data-[axis=x]:top-full']],
     ['scatter', 'guide', ['absolute', 'bg-border-strong', 'data-[axis=x]:w-px']],
-    ['scatter', 'corner', ['pointer-events-none', 'absolute', 'text-[var(--color-kui-overlay1,var(--color-muted))]']],
+    ['scatter', 'corner', ['pointer-events-none', 'absolute', 'text-[var(--color-muted)]']],
     ['bars', 'plot', ['relative', 'ml-10', 'border-border']],
     ['bars', 'column', ['flex', 'items-end', 'data-stacked:flex-col-reverse']],
     ['bars', 'bar', ['min-h-px', 'flex-1', 'rounded-t-sm']],

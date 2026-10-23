@@ -5,7 +5,7 @@ import type { JSX, Snippet } from 'kay'
 // The actions are dimmed until the row is hovered or holds focus, which the row's `group/row` tells them.
 const look = recipe({
   parts: {
-    root: 'kui-card-row group/row flex items-center gap-3 rounded-lg border-[length:var(--kui-border-width,var(--border-width))] border-solid border-border bg-surface p-4 [box-shadow:var(--shadow-raised)]',
+    root: 'kui-card-row group/row flex items-center gap-3 rounded-lg border-[length:var(--border-width)] border-solid border-border bg-surface p-4 [box-shadow:var(--shadow-raised)]',
     body: 'min-w-0 flex-1',
     actions: 'flex shrink-0 items-center gap-2 opacity-60 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100',
   },

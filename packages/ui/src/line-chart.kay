@@ -16,12 +16,12 @@ const look = recipe({
     root: 'kui-line-chart flex flex-col gap-2',
     frame: 'relative',
     // chartist draws the plot, and the rules it needs from its own stylesheet stay on this class in theme.css.
-    plot: 'kui-line-chart-plot h-[var(--chart-height,var(--kui-line-chart-height,9rem))]',
+    plot: 'kui-line-chart-plot h-[var(--chart-height,9rem)]',
     cursor: 'pointer-events-none absolute w-px bg-border-strong',
     dot: 'pointer-events-none absolute size-2 -translate-1/2 border border-background',
     band: 'pointer-events-none absolute border-x border-accent bg-accent/10',
     overlay: 'absolute inset-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent data-range:cursor-crosshair data-range:touch-pan-y data-range:select-none',
-    tooltip: 'pointer-events-none fixed top-0 left-0 z-50 flex w-max max-w-full flex-col gap-0.5 border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-surface-strong px-3 py-2 text-xs',
+    tooltip: 'pointer-events-none fixed top-0 left-0 z-50 flex w-max max-w-full flex-col gap-0.5 border-solid border-[length:var(--border-width)] border-border-strong bg-surface-strong px-3 py-2 text-xs',
     tooltipLabel: 'mb-1 text-foreground',
     // The total sits under the series with no swatch, its name lined up with theirs.
     tooltipRow: 'flex items-center gap-1.5 text-muted data-total:mt-0.5 data-total:border-t data-total:border-solid data-total:border-border-strong data-total:pt-1 data-total:pl-3.5 data-total:text-foreground',

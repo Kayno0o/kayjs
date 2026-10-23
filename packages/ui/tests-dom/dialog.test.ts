@@ -294,7 +294,7 @@ describe('ConfirmDelete', () => {
     expect(confirm().disabled).toBe(false)
   })
 
-  test('reports its open state to onOpenChange as a Dialog does, once for each change, with the old onOpen still running on opening', async () => {
+  test('reports its open state to onOpenChange as a Dialog does, once for each change', async () => {
     const root = await dialogs()
     const states = () => root.querySelector('#states')!.textContent
 
@@ -303,12 +303,12 @@ describe('ConfirmDelete', () => {
 
     const shown = [...root.querySelectorAll('dialog')].find(each => each.textContent?.includes('Watch it?'))!
 
-    expect(states()).toBe('open,onOpen')
+    expect(states()).toBe('open')
 
     click([...shown.querySelectorAll('button')].find(button => button.textContent === 'Cancel') ?? null)
     await settle()
 
-    expect(states()).toBe('open,onOpen,closed')
+    expect(states()).toBe('open,closed')
   })
 
   test('reports an inline ask arming and settling to onOpenChange', async () => {

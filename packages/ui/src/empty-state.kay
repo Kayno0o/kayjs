@@ -5,8 +5,8 @@ import type { JSX, Snippet } from 'kay'
 const look = recipe({
   parts: {
     root: 'kui-empty-state flex flex-col items-center gap-3 py-16',
-    title: 'text-xs [font-weight:var(--font-weight-kui-heading,var(--font-weight-semibold))] tracking-label text-accent [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)]',
-    description: 'text-xs text-[var(--color-kui-overlay1,var(--color-muted))]',
+    title: 'text-xs [font-weight:var(--font-weight-semibold)] tracking-label text-accent [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
+    description: 'text-xs text-[var(--color-muted)]',
     actions: 'flex flex-wrap items-center justify-center gap-2',
   },
 })

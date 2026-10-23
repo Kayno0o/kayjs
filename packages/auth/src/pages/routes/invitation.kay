@@ -77,7 +77,7 @@ Panel(title={wording('auth.invitation.title', 'Invitation')})
     Message(text={wording('auth.invitation.invalid', 'This invitation is invalid, expired or already used.')})
   else
     p {wording('auth.invitation.intro', 'You are invited to join {organization}.', { organization: invitation.organization.name })}
-    p.text-kui-muted {wording('auth.invitation.sentTo', 'Sent to {email}.', { email: invitation.email })}
+    p.text-muted {wording('auth.invitation.sentTo', 'Sent to {email}.', { email: invitation.email })}
     if refused
       Message(text={failure(refused)})
     if mine

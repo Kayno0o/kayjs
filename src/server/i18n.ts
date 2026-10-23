@@ -18,7 +18,6 @@ import { routerPath } from './base'
 import { importModule } from './bundle'
 import { cookieName, prefixedNames } from './cookie-names'
 import { requestCookies } from './cookies'
-import { renamedMessageKey } from './legacy-keys'
 import { compiledLinks, forgetLinks } from './links'
 import { overHttps, requestUrl } from './request-url'
 import { projectSource } from './source'
@@ -327,15 +326,8 @@ async function mergedCatalogs(catalogs: string[]): Promise<Map<string, Message>>
 
     const flat = flattenMessages(tree as MessageTree)
 
-    for (const [key, message] of flat) {
-      // A `ui.*` or `cms.*` key an app still words under its pre-1.72 `Label` name keeps winning over the library's, unless the catalog words the new key too.
-      const renamed = renamedMessageKey(key)
-
-      if (renamed !== undefined && !flat.has(renamed))
-        messages.set(renamed, message)
-
+    for (const [key, message] of flat)
       messages.set(key, message)
-    }
   }
 
   return messages

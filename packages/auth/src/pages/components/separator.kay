@@ -1,4 +1,4 @@
 ---
 import { wording } from 'kay/words'
 ---
-p.text-center.text-kui-muted {wording('auth.or', 'or')}
+p.text-center.text-muted {wording('auth.or', 'or')}

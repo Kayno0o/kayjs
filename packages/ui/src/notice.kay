@@ -3,7 +3,7 @@ import type { JSX } from 'kay'
 import { recipe } from 'kay'
 
 const look = recipe({
-  parts: { root: 'kui-notice rounded-lg border-solid px-4 py-3 text-sm [font-weight:var(--font-weight-kui-notice,var(--font-weight-normal))] [background-color:var(--_notice-ground,var(--color-surface-strong))] [border-color:var(--_notice-tone,var(--color-border-strong))] [border-width:var(--kui-border-notice,var(--kui-border-width,var(--border-width)))] [color:var(--_notice-tone,var(--color-foreground))] data-compact:border-0 data-compact:bg-transparent data-compact:p-0' },
+  parts: { root: 'kui-notice rounded-lg border-solid px-4 py-3 text-sm [font-weight:var(--font-weight-normal)] [background-color:var(--_notice-ground,var(--color-surface-strong))] [border-color:var(--_notice-tone,var(--color-border-strong))] [border-width:var(--border-width)] [color:var(--_notice-tone,var(--color-foreground))] data-compact:border-0 data-compact:bg-transparent data-compact:p-0' },
   variants: {
     // A danger is an alert, read out at once; the other tones are a status, read once the reader is idle.
     tone: { info: '', success: '[--_notice-tone:var(--color-success)]', warning: '[--_notice-tone:var(--color-warning)]', danger: '[--_notice-ground:var(--color-background)] [--_notice-tone:var(--color-danger)]' },
@@ -11,15 +11,13 @@ const look = recipe({
   defaults: { tone: 'info' },
 })
 
-const { tone = 'info', label, size = 'md', compact = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'role'> & {
+const { tone = 'info', label, size = 'md', ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'role'> & {
   label?: string | undefined
   // `sm` is a line of text without the box, such as under a form's fields.
   size?: 'sm' | 'md' | undefined
-  // Deprecated since 1.72, `size="sm"` is it.
-  compact?: boolean | undefined
 }>()
 ---
 // A form's outcome or a refusal, in place: what a toast says in passing, said where the page stays.
-div({...rest} role={tone === 'danger' ? 'alert' : 'status'} data-tone={tone} data-compact={size === 'sm' || compact ? '' : undefined})
+div({...rest} role={tone === 'danger' ? 'alert' : 'status'} data-tone={tone} data-compact={size === 'sm' ? '' : undefined})
   | {label}
   slot

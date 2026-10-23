@@ -40,7 +40,7 @@ PageSection(title={wording('auth.admin.nav.users', 'Users')})
     FormField(label={wording('auth.admin.users.searchLabel', 'Email, username or id')})
       input(type="search" name="q" value={search} maxlength={String(SEARCH_MAX)})
     Button(type="submit" label={wording('auth.admin.users.search', 'Search')})
-  p.text-kui-muted {wording('auth.admin.users.total', total === 1 ? '{count} user' : '{count} users', { count: total })}
+  p.text-muted {wording('auth.admin.users.total', total === 1 ? '{count} user' : '{count} users', { count: total })}
   .flex.flex-col.gap-2
     for user of users key={user.id}
       CardRow(data-user={user.id})
@@ -53,7 +53,7 @@ PageSection(title={wording('auth.admin.nav.users', 'Users')})
               Badge(label={wording('auth.admin.users.guest', 'Guest')})
             for role of user.roles key={role}
               Badge(label={role} tone="accent")
-          span.text-kui-muted
+          span.text-muted
             | {[user.username ? user.email : undefined, wording('auth.admin.users.joined', 'Joined {date}', { date: date(user.createdAt) })].filter(Boolean).join(' · ')}
     else
       EmptyState(title={wording('auth.admin.users.none', 'No user found.')})

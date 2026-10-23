@@ -42,9 +42,9 @@ PageSection(title={wording('auth.account.sessions.title', 'Where you are signed 
           span.flex.flex-wrap.items-center.gap-2
             strong {describe(session)}
             if session.device.mobile
-              span.text-kui-muted {wording('auth.account.sessions.mobile', 'mobile')}
+              span.text-muted {wording('auth.account.sessions.mobile', 'mobile')}
             if session.current
               Badge(label={wording('auth.account.sessions.current', 'This device')} tone="accent")
-          span.text-kui-muted
+          span.text-muted
             | {[session.place, session.ip].filter(Boolean).join(' · ')}
-          span.text-kui-muted {wording('auth.account.sessions.lastSeen', 'Last seen {date}', { date: formatRelativeTime(session.lastSeenAt) })}
+          span.text-muted {wording('auth.account.sessions.lastSeen', 'Last seen {date}', { date: formatRelativeTime(session.lastSeenAt) })}

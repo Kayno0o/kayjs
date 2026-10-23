@@ -4,8 +4,6 @@ import Badge from '@kaynooo/kayjs-ui/badge.kay'
 import Card from '@kaynooo/kayjs-ui/card.kay'
 import Carousel from '@kaynooo/kayjs-ui/carousel.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
-import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import QrCode from '@kaynooo/kayjs-ui/qr-code.kay'
 import Select from '@kaynooo/kayjs-ui/select.kay'
@@ -29,38 +27,8 @@ main
   Badge#badge Draft
   Badge#solid(tone="success" variant="solid" label="<b>Done</b>")
   a.group#solid-stamp(href="/data")
-    // kay-allow deprecated-ui-prop
-    Badge(stamp solid label="Winner")
-  // kay-allow deprecated-ui-prop
-  Badge#legacy-stamp(stamp label="Old")
-  // kay-allow deprecated-ui-prop
-  Badge#legacy-solid(solid label="Old")
-  // kay-allow deprecated-ui-prop
-  Badge#variant-wins(variant="outline" stamp solid label="New")
-  // kay-allow deprecated-ui-prop
-  Notice#legacy-compact(compact label="Old")
-  #legacy-field
-    // kay-allow deprecated-ui-prop
-    FormField(label="Old" compact)
-  #legacy-drop
-    // kay-allow deprecated-ui-prop
-    FileDrop(compact onFiles={() => undefined})
-      @content(_zone)
-        span Drop
-  // kay-allow deprecated-ui-prop
-  Badge#solid-variant-stamp(variant="solid" stamp label="New")
-  // kay-allow deprecated-ui-prop
-  Notice#md-compact(size="md" compact label="Old")
-  #md-field
-    // kay-allow deprecated-ui-prop
-    FormField(label="Old" size="md" compact)
-  #md-drop
-    // kay-allow deprecated-ui-prop
-    FileDrop(size="md" compact onFiles={() => undefined})
-      @content(_zone)
-        span Drop
-  // kay-allow deprecated-ui-prop
-  QrCode#legacy-qr(value="https://kaynooo.fr" size={90})
+    Badge(variant="stamp" label="Winner")
+  QrCode#qr(value="https://kaynooo.fr" pixels={90})
   a.group#stamped(href="/data")
     Badge(variant="stamp" label="Winner")
   EmptyState#empty(title="No moons" description="Add one to start")

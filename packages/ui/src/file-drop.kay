@@ -6,12 +6,12 @@ import { acceptsFile } from './accept'
 // 'kui-file-drop' stays as the component's name for an app's CSS and the skins; the border colour reads --_control-line, which a skin sets.
 const look = recipe({
   parts: {
-    root: 'kui-file-drop flex flex-col items-center justify-center gap-3 border-dashed border-[length:var(--kui-border-width,var(--border-width))] p-6 text-center transition-colors [border-color:var(--_control-line,var(--color-border))] data-compact:flex-row data-compact:justify-start data-compact:p-3 data-compact:text-left aria-disabled:opacity-50 data-dragging:border-accent data-dragging:bg-accent/10',
+    root: 'kui-file-drop flex flex-col items-center justify-center gap-3 border-dashed border-[length:var(--border-width)] p-6 text-center transition-colors [border-color:var(--_control-line,var(--color-border))] data-compact:flex-row data-compact:justify-start data-compact:p-3 data-compact:text-left aria-disabled:opacity-50 data-dragging:border-accent data-dragging:bg-accent/10',
     input: 'hidden',
   },
 })
 
-const { accept, multiple = false, paste = false, disabled = false, size = 'md', compact = false, onFiles, onReject, content, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
+const { accept, multiple = false, paste = false, disabled = false, size = 'md', onFiles, onReject, content, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
   // The files the zone takes, as an `accept` attribute: the picker filters on it, and dropped or pasted files that miss it are ignored.
   accept?: string | undefined
   multiple?: boolean | undefined
@@ -20,8 +20,6 @@ const { accept, multiple = false, paste = false, disabled = false, size = 'md', 
   disabled?: boolean | undefined
   // `sm` is a slim row, its content from the left, to sit inline beside other fields rather than as a large target of its own.
   size?: 'sm' | 'md' | undefined
-  // Deprecated since 1.72, `size="sm"` is it.
-  compact?: boolean | undefined
   // The files picked, dropped or pasted: one unless `multiple`, and never an empty list.
   onFiles: (files: File[]) => unknown
   // The files dropped or picked that were left out, those missing `accept` and, without `multiple`, the matching ones beyond the first, so the page can say why; never called for pasted files, which may be anything on the clipboard.
@@ -109,6 +107,6 @@ function pasted(event: ClipboardEvent) {
 
 listen(() => paste ? window : undefined, 'paste', pasted)
 ---
-div(part="root" {...rest} role="group" data-compact={size === 'sm' || compact || undefined} data-dragging={dragging() || undefined} aria-disabled={disabled ? 'true' : undefined} onDragOver={dragOver} onDragLeave={dragLeave} onDrop={drop})
+div(part="root" {...rest} role="group" data-compact={size === 'sm' || undefined} data-dragging={dragging() || undefined} aria-disabled={disabled ? 'true' : undefined} onDragOver={dragOver} onDragLeave={dragLeave} onDrop={drop})
   input(part="input" ref={element => input = element} type="file" tabindex="-1" aria-hidden="true" accept={accept} multiple={multiple} disabled={disabled} onChange={picked})
   | {content(zone)}

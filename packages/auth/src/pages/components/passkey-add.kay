@@ -37,12 +37,12 @@ async function add(event: SubmitEvent) {
 ---
 // A passkey needs script, so the form shows once the browser proves it can make one.
 if supported() === false
-  p.text-kui-muted {unsupported}
+  p.text-muted {unsupported}
 else if supported()
   form.flex.flex-col.gap-3(onSubmit={add} novalidate)
     FormField(label={nameLabel})
       input(name="name" bind:value={name})
     Proof(user={user} secondFactor passwordLabel={passwordLabel} codeLabel={codeLabel})
     if error()
-      p.kauth-error.text-kui-error(role="alert") {error()}
+      p.kauth-error.text-danger(role="alert") {error()}
     Button(type="submit" label={label} busy={passkeyOptions.pending() || addPasskey.pending()})

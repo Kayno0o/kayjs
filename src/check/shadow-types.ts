@@ -31,7 +31,6 @@ import { htmlFallbacks, publicFiles } from '../server/public'
 import { redirectProblems } from '../server/redirects'
 import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes, servedPaths } from '../server/routes'
 import { readRuntimeRedirects } from '../server/runtime-redirects'
-import { deprecatedUiTokens } from './deprecated-ui-tokens'
 import { ownFile } from './diagnose'
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
@@ -39,13 +38,11 @@ import { unguardedRoutes, unguardedTools } from './guards'
 import { islandOnlyComponents } from './island-only'
 import { largePublicImages } from './large-images'
 import { mcpRoutes } from './mcp-routes'
-import { renamedMessageKeys } from './message-keys'
 import { unreadOpenSettings } from './open-settings'
 import { compileShadow, layoutQueries, matcherSource, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowPath } from './shadow'
 import { untypedSockets } from './socket-routes'
 import { stepDraftMaxAge } from './step-draft-max-age'
 import { typingOptions } from './tsgo'
-import { renamedUiProps } from './ui-props'
 import { uiTypes } from './ui-types'
 
 // Imports each page of the extensions kay check reports as the app's own, so TypeScript checks them.
@@ -131,7 +128,7 @@ async function writeShadows(projectRoot: string, options: CheckOptions): Promise
 
   // A types-only write discards the problems, so none of their checks run.
   if (options.typesOnly !== true)
-    problems.push(...redirectChecks(root, options, served), ...await unguardedRoutes(options, served), ...await unreadOpenSettings(served), ...await unguardedTools(options, served), ...await mcpRoutes(options, served), ...await largePublicImages(options, root, served), ...await untypedSockets(options, served), ...await renamedUiProps(root, options), ...await deprecatedUiTokens(root, options), ...await renamedMessageKeys(root, options), ...await stepDraftMaxAge(root, options))
+    problems.push(...redirectChecks(root, options, served), ...await unguardedRoutes(options, served), ...await unreadOpenSettings(served), ...await unguardedTools(options, served), ...await mcpRoutes(options, served), ...await largePublicImages(options, root, served), ...await untypedSockets(options, served), ...await stepDraftMaxAge(root, options))
 
   // A script rather than a module, which is what lets it declare a wildcard module.
   await tree.write('kay-assets.d.ts', ASSET_TYPES)

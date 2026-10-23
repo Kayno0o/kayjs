@@ -9,9 +9,9 @@ import { wording } from 'kay/words'
 const look = recipe({
   parts: {
     root: 'kui-pagination flex flex-wrap items-center gap-1 text-sm',
-    step: 'min-w-9 border-solid border-[length:var(--kui-border-width,var(--border-width))] px-3 py-1.5 text-center text-muted transition-colors hover:text-foreground [border-color:var(--_control-line,var(--color-border))] [&:is(span)]:opacity-50 [&:is(span)]:hover:text-muted',
-    gap: 'px-2 text-[var(--color-kui-overlay1,var(--color-muted))]',
-    page: 'min-w-9 border-solid border-[length:var(--kui-border-width,var(--border-width))] px-3 py-1.5 text-center text-muted transition-colors hover:text-foreground aria-[current=page]:border-accent aria-[current=page]:text-accent border-border',
+    step: 'min-w-9 border-solid border-[length:var(--border-width)] px-3 py-1.5 text-center text-muted transition-colors hover:text-foreground [border-color:var(--_control-line,var(--color-border))] [&:is(span)]:opacity-50 [&:is(span)]:hover:text-muted',
+    gap: 'px-2 text-[var(--color-muted)]',
+    page: 'min-w-9 border-solid border-[length:var(--border-width)] px-3 py-1.5 text-center text-muted transition-colors hover:text-foreground aria-[current=page]:border-accent aria-[current=page]:text-accent border-border',
   },
 })
 

@@ -119,10 +119,10 @@ PageSection(title={user.username ?? user.email ?? user.id})
       for role of user.roles key={role}
         Badge(label={role} tone="accent")
       if user.roles.length === 0
-        span.text-kui-muted {wording('auth.admin.user.noRoles', 'No role.')}
+        span.text-muted {wording('auth.admin.user.noRoles', 'No role.')}
       if user.guest
         Badge(label={wording('auth.admin.users.guest', 'Guest')})
-    span.text-kui-muted {wording('auth.admin.users.joined', 'Joined {date}', { date: date(user.createdAt) })}
+    span.text-muted {wording('auth.admin.users.joined', 'Joined {date}', { date: date(user.createdAt) })}
     if refused
       Message(text={failure(refused)})
       if refused === 'stale'
@@ -150,7 +150,7 @@ if !own && (!found.admin || user.ban)
     if user.ban
       p {user.ban.until ? wording('auth.admin.user.bannedUntil', 'Suspended until {date}.', { date: date(user.ban.until) }) : wording('auth.admin.user.banned', 'Suspended since {date}.', { date: date(user.ban.at) })}
       if user.ban.reason
-        p.text-kui-muted {user.ban.reason}
+        p.text-muted {user.ban.reason}
       form(action={unban})
         Button(type="submit" label={wording('auth.admin.user.unban', 'Lift the suspension')})
     else if !found.admin
@@ -177,4 +177,4 @@ if entries.length > 0
       for entry of entries key={entry.id}
         CardRow
           span {describeAuditEntry(entry, { locale })}
-          span.text-kui-muted  {dateTime(entry.at)}
+          span.text-muted  {dateTime(entry.at)}

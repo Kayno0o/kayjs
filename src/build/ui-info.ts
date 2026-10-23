@@ -14,8 +14,6 @@ import { classesOf, keyOf } from './ui'
 export interface Token {
   name: string
   value: string
-  // An old name kept as an alias: declared in a `@theme ... reference` block, so completion hides it.
-  deprecated?: boolean
 }
 
 export interface StyleInfo {
@@ -31,12 +29,10 @@ export interface StyleInfo {
 const THEME = '@kaynooo/kayjs-ui/theme.css'
 const DECLARATION = /^\s*(--[\w-]+)\s*:([^;]+);/gm
 const COMMENT = /\/\*[\s\S]*?\*\//g
-const THEME_BLOCK = /@theme\b([^{;]*)\{([^{}]*)\}/g
+const THEME_BLOCK = /@theme\b[^{;]*\{([^{}]*)\}/g
 const WORDS = /\S+/g
 const VARIABLE = /--[\w-]+/g
-const UTILITY = /(?<=-)kui-([\w-]+)/g
 const RECIPE_CALL = /\brecipe\s*\(/
-const UTILITY_TRIM = /^-+|-+$/g
 
 const themes = new Map<string, { stamp: string, tokens: Token[] }>()
 
@@ -49,18 +45,13 @@ function realOf(file: string): string {
   }
 }
 
-// The tokens the `@theme` blocks of a stylesheet declare, so a name needs no particular prefix. A block with the `reference` modifier holds the old names kept as aliases, which a name declared there alone is marked deprecated by.
+// The tokens the `@theme` blocks of a stylesheet declare, so a name needs no particular prefix.
 export function themeBlockTokens(css: string): Token[] {
   const seen = new Map<string, Token>()
 
-  for (const [, head, body] of css.replace(COMMENT, '').matchAll(THEME_BLOCK)) {
-    const deprecated = head!.match(WORDS)?.includes('reference') === true
-
-    for (const [, name, value] of body!.matchAll(DECLARATION)) {
-      const kept = seen.get(name!)
-
-      seen.set(name!, { name: name!, value: value!.trim(), ...deprecated && (kept === undefined || kept.deprecated === true) ? { deprecated: true } : {} })
-    }
+  for (const [, body] of css.replace(COMMENT, '').matchAll(THEME_BLOCK)) {
+    for (const [, name, value] of body!.matchAll(DECLARATION))
+      seen.set(name!, { name: name!, value: value!.trim() })
   }
 
   return [...seen.values()]
@@ -118,18 +109,9 @@ const OPACITY = /\/\d+$/
 const DASH = /-/g
 const VARIANTS = /^(?:[^:[\]]|\[[^\]]*\])*:/
 
-// The tokens a string of classes names: a `var(--x)` or `(length:--x)` it writes, or the utility of a theme token such as `bg-surface` for `--color-surface` or `bg-kui-surface0` for `--color-kui-surface0`.
+// The tokens a string of classes names: a `var(--x)` or `(length:--x)` it writes or the utility of a theme token such as `bg-surface` for `--color-surface`.
 export function tokensNamedBy(classes: string, tokens: Token[]): Token[] {
   const names = new Set(classes.match(VARIABLE))
-
-  for (const [, utility] of classes.matchAll(UTILITY)) {
-    const suffix = `-kui-${utility!.replace(UTILITY_TRIM, '')}`
-
-    for (const token of tokens) {
-      if (token.name.endsWith(suffix))
-        names.add(token.name)
-    }
-  }
 
   for (const word of classes.match(WORDS) ?? []) {
     const utility = word.replace(VARIANTS, '').replace(LEADING_MARKS, '').replace(OPACITY, '')

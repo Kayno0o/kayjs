@@ -372,7 +372,7 @@ describe('theme.css', () => {
   test('fills a solid badge with its tone, its text read from the accent\'s foreground', () => {
     const badge = sourceOf('badge')
 
-    expect(badge).toMatch(/data-solid:\[background-color:var\(--_badge-color,[^\]]*\] data-solid:\[border-color:[^\]]*\] data-solid:\[color:var\(--kui-badge-solid-text,var\(--color-accent-foreground\)\)\]/)
+    expect(badge).toMatch(/data-solid:\[background-color:var\(--_badge-color,[^\]]*\] data-solid:\[border-color:[^\]]*\] data-solid:\[color:var\(--color-accent-foreground\)\]/)
 
     for (const tone of ['accent', 'success', 'warning', 'danger', 'info'])
       expect(badge, tone).toContain(`${tone}: '[--_badge-color:var(--color-${tone})]'`)
@@ -502,9 +502,8 @@ describe('theme.css', () => {
   test('draws no offset shadow nor press-down unless a skin sets their tokens alone', async () => {
     const build = async (skin: string) => [...(await built(skin)).matchAll(PRESS_TOKEN)].map(([, token, value]) => `${token} ${value}`)
 
-    expect(await build('')).toEqual(['--shadow-raised var(--kui-shadow-raised, none)', '--shadow-press var(--kui-shadow-press, none)', '--press-travel var(--kui-press-travel, 0px)'])
+    expect(await build('')).toEqual(['--shadow-raised none', '--shadow-press none', '--press-travel 0px'])
     expect(await build('@theme { --shadow-raised: 4px 4px 0 black; --shadow-press: 3px 3px 0 black; --press-travel: 3px; }')).toEqual(['--shadow-raised 4px 4px 0 black', '--shadow-press 3px 3px 0 black', '--press-travel 3px'])
-    expect(await build('@theme { --kui-shadow-raised: 4px 4px 0 black; --kui-shadow-press: 3px 3px 0 black; --kui-press-travel: 3px; }')).toContain('--shadow-raised var(--kui-shadow-raised, none)')
     expect(blockOf(theme, '.kui-toast')).toContain('box-shadow: var(--shadow-raised);')
 
     for (const name of ['card', 'card-row', 'widget'])
@@ -530,54 +529,51 @@ describe('theme.css', () => {
 
     expect(css).toContain('--radius-md: 4px')
     expect(css).toContain('--radius-lg: 1rem')
-    // An app that sets nothing gets Tailwind\'s steps, and one that still sets the old name keeps its look until 1.75.
-    expect(theme).toContain('--radius-lg: var(--radius-kui-card, 0.5rem);')
-    expect(await built('@theme { --radius-kui-card: 0px; } .recipe { @apply rounded-lg; }')).toContain('--radius-kui-card: 0px')
+    // An app that sets nothing gets Tailwind\'s steps.
+    expect(theme).toContain('--radius-lg: 0.5rem;')
     // The hairline drawn over a shell follows its corners.
     expect(blockOf(theme, ':is(.kui-shell, .kui-btn, .kui-stat-badge)::before')).toContain('border-radius: inherit;')
   })
 
-  test('steps the radius of what sits inside a box by --radius-sm and -md, and a round avatar by rounded-full, the old --radius-kui-full first', async () => {
+  test('steps the radius of what sits inside a box by --radius-sm and -md, and a round avatar by rounded-full', async () => {
     const css = await built('@theme { --radius-sm: 2px; --radius-md: 6px; }')
 
-    expect(theme).toContain('--radius-sm: var(--radius-kui-sm, 0.25rem);')
-    expect(theme).toContain('--radius-md: var(--radius-kui-md, var(--radius-kui-card, 0.375rem));')
+    expect(theme).toContain('--radius-sm: 0.25rem;')
+    expect(theme).toContain('--radius-md: 0.375rem;')
     expect(css).toMatch(/--radius-sm: 2px/)
     expect(css).toMatch(/--radius-md: 6px/)
     expect(sourceOf('chip-group')).toContain('rounded-md')
     expect(sourceOf('toggle')).toContain('rounded-md')
     expect(blockOf(theme, ':where(.kui-badge)')).toContain('rounded-sm')
-    expect(await Bun.file(`${ROOT}src/avatar.kay`).text()).toContain('rounded-[var(--radius-kui-full,calc(infinity*1px))]')
+    expect(await Bun.file(`${ROOT}src/avatar.kay`).text()).toContain('rounded-[calc(infinity*1px)]')
   })
 
-  test('reads the monospace from --font-mono, the old --font-kui-mono first, and the text font of labels and fields as inherit', async () => {
-    const css = await built('@theme { --font-kui-mono: Menlo; }')
+  test('reads the monospace from --font-mono, and the text font of labels and fields as inherit', async () => {
+    const css = await built('@theme { --font-mono: Menlo; }')
 
-    expect(theme).toContain('--font-mono: var(--font-kui-mono, ui-monospace,')
+    expect(theme).toContain('--font-mono: ui-monospace,')
     expect(css).toContain('font-family: var(--font-mono)')
-    expect(css).toContain('--font-kui-mono: Menlo')
-    expect(theme).toContain('[font-family:var(--font-label,var(--font-kui-body,inherit))]')
+    expect(css).toContain('--font-mono: Menlo')
+    expect(theme).toContain('[font-family:var(--font-label,inherit)]')
   })
 
   test('scales the card, inline and section gaps and the field insets by --density, 1 unless set', async () => {
     const css = await built('@theme { --density: 0.75; }')
 
-    expect(theme).toContain('--density: var(--kui-density, 1);')
+    expect(theme).toContain('--density: 1;')
     expect(css).toContain('--density: 0.75')
-    expect(await built('@theme { --kui-density: 0.75; }')).toContain('--kui-density: 0.75')
-    expect(theme).toContain('px-[var(--spacing-kui-field-x,calc(var(--spacing)*2.25*var(--density)))]')
-    expect(theme).toContain('py-[var(--spacing-kui-field-y,calc(var(--spacing)*var(--density)))]')
+    expect(theme).toContain('px-[calc(var(--spacing)*2.25*var(--density))]')
+    expect(theme).toContain('py-[calc(var(--spacing)*var(--density))]')
   })
 
   test('sets the case and font of labels, headings and table heads by --label-case and --font-label, uppercase unless a skin sets them', async () => {
     const css = await built('@theme { --label-case: none; --font-label: var(--font-mono); }')
 
-    expect(theme).toContain('--label-case: var(--kui-label-case, uppercase);')
+    expect(theme).toContain('--label-case: uppercase;')
     expect(blockOf(css, '.kui-btn')).toContain('text-transform: var(--label-case)')
-    expect(blockOf(css, '.kui-btn')).toContain('font-family: var(--font-label,var(--font-kui-body,inherit))')
+    expect(blockOf(css, '.kui-btn')).toContain('font-family: var(--font-label,inherit)')
     expect(css).toContain('--label-case: none')
-    expect(await built('@theme { --kui-label-case: none; }')).toContain('--kui-label-case: none')
-    // Only the stamp badge, which has --kui-badge-case, keeps its own case.
+    // Only the stamp badge keeps its own case.
     expect(theme.match(/@apply [^\n]* uppercase/g)).toBeNull()
     expect(sourceOf('badge')).toContain('data-stamp:uppercase')
   })
@@ -652,8 +648,8 @@ describe('theme.css', () => {
     expect(skin).toContain(`.kui-multi-select [data-part='checkbox']`)
   })
 
-  test('sizes the keyline of every framed box by --border-width, a length the old --kui-border-width still sets', () => {
-    const KEYLINE = /border(?:-[bl])?-\[length:var\(--kui-border-width,var\(--border-width\)\)\]/
+  test('sizes the keyline of every framed box by --border-width, a length', () => {
+    const KEYLINE = /border(?:-[bl])?-\[length:var\(--border-width\)\]/
 
     for (const selector of ['.kui-table-wrap', '.kui-collapsible-section', '.kui-save-bar', ':where(.kui-site-nav > [data-part=\'list\']:popover-open)'])
       expect(blockOf(theme, selector), selector).toMatch(KEYLINE)
@@ -661,8 +657,7 @@ describe('theme.css', () => {
     for (const name of ['card', 'card-row', 'widget', 'segmented', 'file-drop', 'toaster', 'dialog', 'command-palette', 'popover', 'side-panel', 'tooltip-host', 'pagination', 'line-chart'])
       expect(sourceOf(name), name).toMatch(KEYLINE)
 
-    expect(theme).toContain('--border-width: var(--kui-border-width, var(--kui-border-card));')
-    expect(theme).not.toMatch(/@property --kui-border-width/)
+    expect(theme).toContain('--border-width: 1px;')
   })
 
   test('draws the info toast in the info colour, the danger and success toasts in theirs', () => {
@@ -711,74 +706,11 @@ describe('theme.css', () => {
     expect(css).toMatch(/position-anchor: ?--tooltip-anchor/)
     // A tone sets a variable the colours of the base and of the stamp read, so it beats neither by the order of the classes.
     expect(css).toContain('--_badge-color')
-    expect(css).toMatch(/\[data-stamp\]\s*\{[^}]*border-color: var\(--_badge-color,var\(--color-kui-stamp,var\(--color-foreground\)\)\)/)
+    expect(css).toMatch(/\[data-stamp\]\s*\{[^}]*border-color: var\(--_badge-color,var\(--color-foreground\)\)/)
   })
 })
 
-// Every knob that folded into a recipe or a Tailwind step in 1.72, with a value of its own for an app to set.
-const FOLDED_KNOBS: Record<string, string> = {
-  '--kui-border-card': '3px',
-  '--kui-border-input': '3px',
-  '--kui-border-badge': '3px',
-  '--kui-border-notice': '3px',
-  '--kui-border-avatar': '3px',
-  '--kui-border-stamp': '3px',
-  '--kui-border-width': '3px',
-  '--spacing-kui-card': '9px',
-  '--spacing-kui-inline': '9px',
-  '--spacing-kui-section': '9px',
-  '--spacing-kui-field-x': '9px',
-  '--spacing-kui-field-y': '9px',
-  '--spacing-kui-field-height': '9px',
-  '--spacing-kui-badge-x': '9px',
-  '--spacing-kui-badge-y': '9px',
-  '--text-kui-badge': '9px',
-  '--text-kui-badge--line-height': '2',
-  '--text-kui-micro': '9px',
-  '--text-kui-micro--line-height': '2',
-  '--tracking-kui-badge': '0.3em',
-  '--tracking-kui-section': '0.3em',
-  '--tracking-kui-action': '0.3em',
-  '--font-weight-kui-heading': '800',
-  '--font-weight-kui-label': '800',
-  '--font-weight-kui-notice': '800',
-  '--font-weight-kui-avatar': '800',
-  '--font-kui-body': 'Georgia',
-  '--color-kui-stamp': 'red',
-  '--color-kui-stamp-fill': 'red',
-  '--color-kui-stamp-fill-hover': 'red',
-  '--color-kui-avatar-ring': 'red',
-  '--kui-field-focus-shadow': '0 0 0 3px red',
-  '--color-kui-overlay1': 'red',
-  '--color-kui-fill-hover': 'red',
-  '--color-kui-fill-danger': 'red',
-  '--radius-kui-full': '3px',
-  '--kui-badge-solid-text': 'red',
-}
-
-describe('the knobs folded in 1.72', () => {
-  const sources = [theme, ...components.map(component => component.source), ...scripts].join('\n')
-
-  test.each(Object.entries(FOLDED_KNOBS))('%s is still read as the first fallback of the look that replaced it', async (knob, value) => {
-    // The class strings of the recipes that read the knob, which Tailwind builds beside the theme's own rules.
-    const candidates = [...new Set([...sources.matchAll(new RegExp(`[^\\s'"\`]*var\\(${knob.replaceAll('-', '\\-')}[,)][^\\s'"\`]*`, 'g'))].map(([found = '']) => found))].filter(found => !found.startsWith('--') && !found.endsWith(';'))
-    const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
-    const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${theme}\n@tailwind utilities;\n@theme { ${knob}: ${value}; }`, { base: ROOT, loadStylesheet: async (_, base) => ({ path: tailwind, base, content: await Bun.file(tailwind).text() }) })
-    const css = compiler.build(candidates)
-
-    // Read somewhere with its replacement as the fallback, and written to the page where the app sets it.
-    expect(css, `${knob} is read`).toMatch(new RegExp(`var\\(${knob.replaceAll('-', '\\-')}[,)]`))
-    expect(css, `${knob} reaches the page`).toContain(`${knob}: ${value}`)
-  })
-
-  test('has no knob of the list read without a fallback that gives the look it had', () => {
-    // The width of a frame reads the card border as the fallback of the old width: the one place it is read alone.
-    for (const knob of Object.keys(FOLDED_KNOBS).filter(name => name !== '--kui-border-card')) {
-      for (const [, found = ''] of sources.matchAll(new RegExp(`var\\(${knob.replaceAll('-', '\\-')}\\)`, 'g')))
-        expect(found, `${knob} is read bare`).toBe('')
-    }
-  })
-
+describe('the properties of the recipes', () => {
   test('writes the height of a field once, in a private property the select recipe and the button row read', async () => {
     const select = await Bun.file(`${ROOT}src/select.kay`).text()
     const property = select.match(/min-h-\((--_[\w-]+)\)/)?.[1] ?? ''
@@ -787,7 +719,7 @@ describe('the knobs folded in 1.72', () => {
 
     expect(property).not.toBe('')
     // One definition, on the field, select and button selectors, none of them wrapped in :where() that pruning would skip.
-    expect(css.match(new RegExp(`${escaped}: var\\(`, 'g'))).toHaveLength(1)
+    expect(css.match(new RegExp(`${escaped}: calc\\(`, 'g'))).toHaveLength(1)
     expect(css).toMatch(new RegExp(`\\.kui-field-input,\\s*\\.kui-form-field select,\\s*\\.kui-btn \\{\\s*${escaped}: `))
     // The select recipe and the button row read it.
     expect(css).toMatch(new RegExp(`min-height: var\\(${escaped}\\)`))

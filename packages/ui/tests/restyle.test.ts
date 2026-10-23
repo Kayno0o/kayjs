@@ -210,10 +210,10 @@ describe('the buttons and fields whose recipe holds their look', () => {
 
   test.each([
     ['plain', undefined, 'inline-flex', 'bg-red-600'],
-    ['busy', undefined, 'gap-[var(--spacing-kui-inline,calc(var(--spacing)*1.25*var(--density)))]', 'tracking-wide'],
-    ['text', undefined, 'px-[var(--spacing-kui-field-x,calc(var(--spacing)*2.25*var(--density)))]', 'h-12'],
-    ['area', undefined, 'px-[var(--spacing-kui-field-x,calc(var(--spacing)*2.25*var(--density)))]', 'min-h-32'],
-    ['select', undefined, 'pl-[var(--spacing-kui-field-x,calc(var(--spacing)*2.25*var(--density)))]', 'pr-8'],
+    ['busy', undefined, 'gap-[calc(var(--spacing)*1.25*var(--density))]', 'tracking-wide'],
+    ['text', undefined, 'px-[calc(var(--spacing)*2.25*var(--density))]', 'h-12'],
+    ['area', undefined, 'px-[calc(var(--spacing)*2.25*var(--density))]', 'min-h-32'],
+    ['select', undefined, 'pl-[calc(var(--spacing)*2.25*var(--density))]', 'pr-8'],
     ['field', 'hint', 'text-muted', 'text-xs'],
     ['field', 'label', 'contents', 'gap-1'],
     ['field', 'head', 'order-first', undefined],
@@ -337,7 +337,7 @@ describe('a component whose recipe holds its look', () => {
   test('sets no kui class on its other parts, which carry data-part to select them by', () => {
     expect(html).toMatch(/<div class="[^"]*\bp-6" data-part="head">/)
     expect(html).toMatch(/<h3 class="[^"]*\bitalic" data-part="title">/)
-    expect(html).toMatch(/<div class="p-\[var\(--spacing-kui-card,calc\(var\(--spacing\)\*2\.5\*var\(--density\)\)\)\] p-9" data-part="body">/)
+    expect(html).toMatch(/<div class="p-\[calc\(var\(--spacing\)\*2\.5\*var\(--density\)\)\] p-9" data-part="body">/)
     expect(html).not.toMatch(/kui-card-(?:head|title|body)|kui-badge-icon/)
   })
 })
@@ -354,7 +354,7 @@ describe('the remaining field and button components whose recipe holds their loo
   test.each([
     ['root', 'kui-date-input', 'gap-2'],
     ['separator', 'text-muted', 'mx-1'],
-    ['trigger', 'data-empty:text-[var(--color-kui-overlay1,var(--color-muted))]', 'min-w-40'],
+    ['trigger', 'data-empty:text-[var(--color-muted)]', 'min-w-40'],
     ['option', 'has-[[data-part=checkbox]:disabled]:opacity-50', 'py-2'],
     ['action', 'hover:text-foreground', 'underline'],
     ['option', 'group-aria-busy/segmented:cursor-progress', 'px-5'],
@@ -363,7 +363,7 @@ describe('the remaining field and button components whose recipe holds their loo
     ['root', 'kui-file-drop', 'border-dotted'],
     ['root', 'kui-copy-btn', 'ring-2'],
     ['text', 'after:content-[attr(data-other)]', 'font-mono'],
-    ['label', '[font-family:var(--font-label,var(--font-kui-body,inherit))]', 'font-medium'],
+    ['label', '[font-family:var(--font-label,inherit)]', 'font-medium'],
     ['value', 'text-foreground', 'tabular-nums'],
     ['label', 'text-xs', 'font-medium'],
     ['chip', 'group-aria-busy/chips:cursor-progress', 'rounded-full'],
@@ -411,15 +411,15 @@ describe('the display components whose recipe holds their look', () => {
   }
 
   test.each([
-    ['avatar', undefined, 'rounded-[var(--radius-kui-full,calc(infinity*1px))]', undefined],
-    ['avatar', 'initial', '[font-weight:var(--font-weight-kui-avatar,var(--font-weight-semibold))]', 'font-bold'],
+    ['avatar', undefined, 'rounded-[calc(infinity*1px)]', undefined],
+    ['avatar', 'initial', '[font-weight:var(--font-weight-semibold)]', 'font-bold'],
     ['stat', undefined, 'rounded-lg', undefined],
     ['stat', 'value', 'font-semibold', 'tabular-nums'],
     ['header', undefined, 'gap-2', undefined],
     ['header', 'title', 'text-xl', 'tracking-tight'],
     ['section', 'head', 'flex', 'mb-4'],
     ['empty', undefined, 'py-16', undefined],
-    ['empty', 'description', 'text-[var(--color-kui-overlay1,var(--color-muted))]', 'italic'],
+    ['empty', 'description', 'text-[var(--color-muted)]', 'italic'],
     ['row', undefined, 'group/row', undefined],
     ['row', 'body', 'min-w-0', 'px-4'],
     ['widget', undefined, 'p-4', undefined],
@@ -481,7 +481,7 @@ describe('the tables and navigation whose recipe holds their look', () => {
     ['appheader', 'end', 'min-w-0', 'ml-auto'],
     ['pager', 'step', 'min-w-9', 'px-4'],
     ['pager', 'page', 'border-border', 'min-w-10'],
-    ['pager', 'gap', 'text-[var(--color-kui-overlay1,var(--color-muted))]', 'opacity-50'],
+    ['pager', 'gap', 'text-[var(--color-muted)]', 'opacity-50'],
     ['breadcrumb', 'list', 'flex-wrap', 'gap-4'],
     ['breadcrumb', 'link', 'hover:underline', 'underline'],
     ['breadcrumb', 'text', 'aria-[current=page]:text-foreground', 'font-bold'],

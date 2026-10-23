@@ -6,7 +6,7 @@ import { qrCodeDataUri, qrCodeSvg } from '@kaynooo/utils/tools/QrCode'
 
 const look = recipe({ parts: { root: 'kui-qr-code block h-auto max-w-full [&>svg]:block [&>svg]:h-auto [&>svg]:w-full' } })
 
-const { value, label, pixels, size, options, inline = false, style, ...rest } = props<Omit<JSX.IntrinsicElements['div'] & JSX.IntrinsicElements['img'], 'class' | 'src' | 'alt' | 'width' | 'height' | 'children' | 'innerHTML' | 'style'> & {
+const { value, label, pixels, options, inline = false, style, ...rest } = props<Omit<JSX.IntrinsicElements['div'] & JSX.IntrinsicElements['img'], 'class' | 'src' | 'alt' | 'width' | 'height' | 'children' | 'innerHTML' | 'style'> & {
   // Written after the component's own declarations, so it wins.
   style?: string | undefined
   // What the code holds, such as a URL.
@@ -15,19 +15,16 @@ const { value, label, pixels, size, options, inline = false, style, ...rest } = 
   label?: string | undefined
   // Its width and height in pixels; without it the image takes the width CSS gives it.
   pixels?: number | undefined
-  // Deprecated since 1.72, `pixels` is it, as `size` is a step from `xs` to `lg` in the other components.
-  size?: number | undefined
   // How the code is drawn, as `qrCodeSvg` from @kaynooo/utils takes it: `ecc`, `moduleShape`, `eyeColor`, `foreground`, `background`, `margin` and the rest.
   options?: Omit<QrCodeSvgOptions, 'size' | 'title' | 'ariaLabel'> | undefined
   // Draws the SVG in the page rather than as an image, so `foreground`, `eyeColor` and `background` may be CSS colours: `currentColor`, `var(--color-accent)`.
   inline?: boolean | undefined
 }>()
 
-const side = () => pixels ?? size
-const divStyle = () => [side() === undefined ? undefined : `width: ${side()}px; height: ${side()}px`, style].filter(Boolean).join('; ') || undefined
+const divStyle = () => [pixels === undefined ? undefined : `width: ${pixels}px; height: ${pixels}px`, style].filter(Boolean).join('; ') || undefined
 ---
 // An SVG drawn when the page renders, on the server for a static page: dark modules on a light ground with a quiet zone, which every scanner reads. An image by default, which cannot read the page's CSS; inline, the SVG sits in the page and can.
 if inline
   div(part="root" {...rest} role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : 'true'} style={divStyle()} innerHTML={trustHtml(qrCodeSvg(value, options))})
 else
-  img(part="root" {...rest} src={qrCodeDataUri(value, options)} style={style} alt={label ?? ''} aria-hidden={label ? undefined : 'true'} width={side()} height={side()})
+  img(part="root" {...rest} src={qrCodeDataUri(value, options)} style={style} alt={label ?? ''} aria-hidden={label ? undefined : 'true'} width={pixels} height={pixels})

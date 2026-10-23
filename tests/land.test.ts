@@ -436,9 +436,9 @@ describe('tests scanning the sources as files', () => {
   it('run the tests reading the theme of the UI library for a change to it, and no browser one', () => {
     const tests = readersOf('packages/ui/src/theme.css')
 
-    expect(tests).toContain('tests/ui-tokens.test.ts')
+    expect(tests).toContain('tests/apply-theme.test.ts')
     expect(tests.filter(test => (/browser|docs-contrast/).test(test))).toEqual([])
-    expect(readersOf('packages/ui/src/button.kay')).not.toContain('tests/ui-tokens.test.ts')
+    expect(readersOf('packages/ui/src/button.kay')).not.toContain('tests/apply-theme.test.ts')
   })
 
   it('are reached by a source of kay or of a library, and by nothing else', () => {

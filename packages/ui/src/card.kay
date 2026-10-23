@@ -5,11 +5,11 @@ import { recipe } from 'kay'
 // 'kui-card' stays as the component's name for an app's CSS and tests.
 const look = recipe({
   parts: {
-    root: 'kui-card flex flex-col rounded-lg border-[length:var(--kui-border-width,var(--border-width))] border-solid border-border bg-surface [box-shadow:var(--shadow-raised)]',
-    head: 'flex items-center gap-3 border-b-[length:var(--kui-border-width,var(--border-width))] border-solid border-border px-3 py-2',
+    root: 'kui-card flex flex-col rounded-lg border-[length:var(--border-width)] border-solid border-border bg-surface [box-shadow:var(--shadow-raised)]',
+    head: 'flex items-center gap-3 border-b-[length:var(--border-width)] border-solid border-border px-3 py-2',
     // mr-auto rather than ml-auto on what follows: a head that is all control and no title reads from the left, like the body under it.
-    title: 'mr-auto text-2xs [font-weight:var(--font-weight-kui-label,var(--font-weight-normal))] [letter-spacing:var(--tracking-kui-section,var(--tracking-label))] text-muted [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)]',
-    body: 'p-[var(--spacing-kui-card,calc(var(--spacing)*2.5*var(--density)))]',
+    title: 'mr-auto text-2xs [font-weight:var(--font-weight-normal)] [letter-spacing:var(--tracking-label)] text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
+    body: 'p-[calc(var(--spacing)*2.5*var(--density))]',
   },
 })
 

@@ -36,7 +36,7 @@ PageSection(title={wording('auth.admin.audit.title', 'Audit log')})
     for entry of entries key={entry.id}
       CardRow
         span {describeAuditEntry(entry, { locale })}
-        span.text-kui-muted {dateTime(entry.at)}
+        span.text-muted {dateTime(entry.at)}
     else
       EmptyState(title={features.audit ? wording('auth.admin.audit.none', 'No entry.') : wording('auth.admin.audit.off', 'The audit log is off: set the audit option to keep one.')})
   if older

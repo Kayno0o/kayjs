@@ -4,7 +4,7 @@ import type { JSX, Snippet } from 'kay'
 
 const look = recipe({
   parts: {
-    root: 'kui-page-section flex flex-col gap-[var(--spacing-kui-section,calc(var(--spacing)*3.5*var(--density)))]',
+    root: 'kui-page-section flex flex-col gap-[calc(var(--spacing)*3.5*var(--density))]',
     head: 'flex items-center gap-3 data-sticky:sticky data-sticky:top-[var(--kui-sticky-top,0px)] data-sticky:z-[1] data-sticky:border-b data-sticky:border-border data-sticky:bg-surface data-sticky:px-4 data-sticky:py-3',
     title: 'min-w-0 flex-1 data-sticky:truncate',
     heading: 'min-w-0 flex-1',

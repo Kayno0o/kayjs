@@ -1,0 +1,11 @@
+---
+import Card from '@kaynooo/kayjs-ui/card.kay'
+import '../app.css'
+---
+//- A Card inside a subtree and one outside it, to see which a `--border-width` set on the subtree reaches.
+main
+  div#scope
+    Card#scoped-card(title="Scoped")
+      p inside
+  Card#card(title="Moons")
+    p body

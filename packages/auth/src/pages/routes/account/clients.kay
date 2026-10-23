@@ -25,8 +25,8 @@ PageSection(title={wording('auth.account.clients.title', 'Connected apps')})
             Button(type="submit" tone="danger" label={wording('auth.account.clients.revoke', 'Revoke')} aria-label={`${wording('auth.account.clients.revoke', 'Revoke')}: ${client.name}`})
         .flex.flex-col
           strong {client.name}
-          span.text-kui-muted {client.scopes === null ? wording('auth.account.clients.allScopes', 'Everything') : client.scopes.length === 0 ? wording('auth.consent.noScopes', 'Identify you, with no access to the features that need a permission') : client.scopes.map(scopeLabel).join(', ')}
-          span.text-kui-muted
+          span.text-muted {client.scopes === null ? wording('auth.account.clients.allScopes', 'Everything') : client.scopes.length === 0 ? wording('auth.consent.noScopes', 'Identify you, with no access to the features that need a permission') : client.scopes.map(scopeLabel).join(', ')}
+          span.text-muted
             | {wording('auth.account.clients.approved', 'Approved {date}', { date: date(client.createdAt) })} · {client.lastUsedAt ? wording('auth.account.clients.lastUsed', 'Last used {date}', { date: date(client.lastUsedAt) }) : wording('auth.account.clients.neverUsed', 'Never used')}
     else
       EmptyState(title={wording('auth.account.clients.none', 'No app is connected.')})

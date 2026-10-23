@@ -11,7 +11,7 @@ import Icon from './icon.kay'
 // The layout and the label type are utilities; padding and size stay in theme.css, as a utility would beat its per-size rules; the shell (fill, hairline, hover, focus, press, disabled and the colours of a tone) stays in theme.css, which a skin restyles as one. 'kui-btn' and the tone classes are names for an app's CSS and for the skins.
 const look = recipe({
   parts: {
-    root: 'kui-btn inline-flex enabled:not-aria-busy:cursor-pointer items-center justify-center gap-[var(--spacing-kui-inline,calc(var(--spacing)*1.25*var(--density)))] rounded-md border-0 [font-weight:var(--font-weight-kui-label,var(--font-weight-normal))] [letter-spacing:var(--tracking-kui-action,var(--tracking-label))] whitespace-nowrap [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)]',
+    root: 'kui-btn inline-flex enabled:not-aria-busy:cursor-pointer items-center justify-center gap-[calc(var(--spacing)*1.25*var(--density))] rounded-md border-0 [font-weight:var(--font-weight-normal)] [letter-spacing:var(--tracking-label)] whitespace-nowrap [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
     spinner: 'animate-spin motion-reduce:animate-none',
   },
   variants: {

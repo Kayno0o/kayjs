@@ -15,8 +15,8 @@ const REFERENCE = '@reference \'@kaynooo/kayjs-ui/theme.css\';'
 const PIXEL = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
 const roots: string[] = []
 
-// An app styling `.card` by `@apply` of a kui utility; `head` is what its stylesheet starts with.
-async function app(head: string, rule = '.card { @apply border border-kui-surface2 bg-kui-mantle text-kui-text; }'): Promise<string> {
+// An app styling `.card` by `@apply` of a theme utility; `head` is what its stylesheet starts with.
+async function app(head: string, rule = '.card { @apply border border-border bg-popover text-foreground; }'): Promise<string> {
   const root = await scratchDir('apply-theme-')
 
   roots.push(root)
@@ -56,7 +56,7 @@ afterAll(async () => {
   await Promise.all(roots.map(async root => rm(root, { recursive: true, force: true })))
 })
 
-describe('the dev class check of an app applying a kui utility with no @reference', () => {
+describe('the dev class check of an app applying a theme utility with no @reference', () => {
   it('compiles the stylesheet with the references it is given, and tells a class from a word', async () => {
     const root = await app('')
     const css = join(root, 'src/app.css')
@@ -65,12 +65,12 @@ describe('the dev class check of an app applying a kui utility with no @referenc
     expect(check).toBeDefined()
     // A compiler keeps the words it was asked, so the negative asks a fresh one.
     expect((await tailwindClasses(root, [css], referencesOf([ui()])))!(['frobnicate'], 'frobnicate')).toBe(false)
-    expect(check!(['bg-kui-mantle'], 'bg-kui-mantle')).toBe(true)
+    expect(check!(['bg-popover'], 'bg-popover')).toBe(true)
     expect(await tailwindClasses(root, [css], [])).toBeUndefined()
   }, 120_000)
 })
 
-describe('@apply of a kui utility in the app\'s stylesheet with ui() alone', () => {
+describe('@apply of a theme utility in the app\'s stylesheet with ui() alone', () => {
   for (const dev of [false, true]) {
     for (const base of ['', '/play']) {
       it(`builds with no @reference, ${dev ? 'dev' : 'production'}, base ${base || 'unset'}`, async () => {
@@ -89,19 +89,19 @@ describe('@apply of a kui utility in the app\'s stylesheet with ui() alone', () 
     expect(mantleDeclarations(await stylesheet(await app(REFERENCE), { hot: false }))).toBe(alone)
   }, 120_000)
 
-  it('takes the app\'s own @theme override of a kui colour', async () => {
-    const css = await stylesheet(await app('@theme {\n  --color-kui-mantle: #123456;\n}'), { hot: false })
+  it('takes the app\'s own @theme override of a theme colour', async () => {
+    const css = await stylesheet(await app('@theme {\n  --color-popover: #123456;\n}'), { hot: false })
 
-    expect(css).toContain('--color-kui-mantle: #123456')
-    expect(css).toMatch(/\.card\s*\{[^}]*background-color: var\(--color-kui-mantle[,)]/)
+    expect(css).toContain('--color-popover: #123456')
+    expect(css).toMatch(/\.card\s*\{[^}]*background-color: var\(--color-popover[,)]/)
   }, 120_000)
 
   it('refuses a utility the theme does not have, naming it', async () => {
-    expect(await failure(await app('', '.card { @apply bg-kui-nonesuch; }'))).toContain('bg-kui-nonesuch')
+    expect(await failure(await app('', '.card { @apply bg-nonesuch; }'))).toContain('bg-nonesuch')
   }, 120_000)
 
   it('keeps a relative url() of the app\'s stylesheet resolving beside it', async () => {
-    const root = await app('', '.card { @apply bg-kui-mantle; background-image: url(./img/dot.png); }')
+    const root = await app('', '.card { @apply bg-popover; background-image: url(./img/dot.png); }')
 
     await Bun.write(join(root, 'src/img/dot.png'), Buffer.from(PIXEL, 'base64'))
 
@@ -111,13 +111,13 @@ describe('@apply of a kui utility in the app\'s stylesheet with ui() alone', () 
   it('builds an @apply of a partial the app\'s stylesheet imports', async () => {
     const root = await app('@import \'./parts.css\';', '')
 
-    await Bun.write(join(root, 'src/parts.css'), '.card { @apply bg-kui-mantle; }\n')
+    await Bun.write(join(root, 'src/parts.css'), '.card { @apply bg-popover; }\n')
 
     expect(await stylesheet(root, { hot: false })).toMatch(/\.card\s*\{[^}]*background-color: var\(--color-popover[,)]/)
   }, 120_000)
 
   it('leaves an app without ui() to the reference it writes', async () => {
-    expect(await failure(await app(''), [])).toContain('border-kui-surface2')
+    expect(await failure(await app(''), [])).toContain('border-border')
     expect(await failure(await app(REFERENCE), [])).toBe('')
   }, 120_000)
 })

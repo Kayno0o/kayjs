@@ -11,7 +11,7 @@ afterAll(async () => {
   await GlobalRegistrator.unregister()
 })
 
-const view = { name: 'Panel', key: 'Panel', recipe: true, exists: true, parts: [{ name: 'root', classes: 'p-2' }, { name: 'body', classes: 'text-sm', set: 'p-9' }], variants: { size: ['sm', 'lg'] }, tokens: [{ name: '--kui-border-width', value: '1px' }] }
+const view = { name: 'Panel', key: 'Panel', recipe: true, exists: true, parts: [{ name: 'root', classes: 'p-2' }, { name: 'body', classes: 'text-sm', set: 'p-9' }], variants: { size: ['sm', 'lg'] }, tokens: [{ name: '--border-width', value: '1px' }] }
 
 describe('the Styles tab', () => {
   let tool: DevTool | undefined
@@ -62,7 +62,7 @@ describe('the Styles tab', () => {
     expect([...panel.querySelectorAll('.row .pill')].map(pill => pill.textContent)).toEqual(['root', 'body'])
     expect(panel.querySelectorAll<HTMLTextAreaElement>('.row textarea')[1]!.value).toBe('p-9')
     expect(panel.textContent).toContain('size:')
-    expect(panel.textContent).toContain('--kui-border-width: 1px')
+    expect(panel.textContent).toContain('--border-width: 1px')
     done()
   })
 

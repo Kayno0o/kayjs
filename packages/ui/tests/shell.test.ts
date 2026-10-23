@@ -77,25 +77,4 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the ui ext
 
     expect(await page.evaluate(() => getComputedStyle(document.querySelector('#plain')!).backgroundColor)).toBe('rgb(18, 52, 86)')
   }, 60_000)
-
-  it('restyles a Button from the old --color-kui-accent, which the app\'s accent reads first', async () => {
-    const page = await site.open('/buttons')
-    const fill = async () => page.evaluate(() => getComputedStyle(document.querySelector('#accent')!).backgroundColor)
-    const before = await fill()
-
-    await page.evaluate(() => document.documentElement.style.setProperty('--color-kui-accent', '#654321'))
-
-    expect(await fill()).toBe('rgb(101, 67, 33)')
-
-    await page.evaluate(() => document.documentElement.style.setProperty('--color-accent', '#123456'))
-
-    expect(await fill()).toBe('rgb(18, 52, 86)')
-
-    await page.evaluate(() => {
-      document.documentElement.style.removeProperty('--color-kui-accent')
-      document.documentElement.style.removeProperty('--color-accent')
-    })
-
-    expect(await fill()).toBe(before)
-  }, 60_000)
 })

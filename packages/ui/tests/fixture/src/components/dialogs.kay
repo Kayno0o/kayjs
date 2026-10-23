@@ -48,8 +48,7 @@ ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} tone="neu
 ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} trigger="button" variant="ghost" class="n-button")
 ConfirmDelete(message="Release it?" failure="Could not release" onConfirm={removeByApi} label="Release" refused={(data: { reason: string }) => data.reason.toUpperCase()} class="release")
 p#states {states().join(',')}
-// kay-allow deprecated-ui-callback: the old name stays covered until it is dropped
-ConfirmDelete(message="Watch it?" failure="Could not" onConfirm={onDelete} onOpenChange={open => states.set([...states(), open ? 'open' : 'closed'])} onOpen={() => states.set([...states(), 'onOpen'])} label="Watched" class="watched")
+ConfirmDelete(message="Watch it?" failure="Could not" onConfirm={onDelete} onOpenChange={open => states.set([...states(), open ? 'open' : 'closed'])} label="Watched" class="watched")
 ConfirmDelete(message="Watch it inline?" failure="Could not" onConfirm={onDelete} ask="inline" onOpenChange={open => states.set([...states(), open ? 'inline-open' : 'inline-closed'])} label="Watched inline" class="watched-inline")
 Toaster
 button#open-bare(onClick={() => bareOpen.set(true)}) Open bare

@@ -625,7 +625,7 @@ inBrowser('FormField in an island', () => {
       return Object.fromEntries(['mantle', 'surface0', 'surface1', 'subtext0', 'accent-hi', 'surface2'].map((name) => {
         const probe = document.createElement('i')
 
-        probe.style.color = `var(${NAMES[name] ?? `--color-kui-${name}`})`
+        probe.style.color = `var(${NAMES[name]})`
         document.body.append(probe)
 
         // Chromium reports a mix as oklab(...), which a canvas turns back into the pixel it paints.
@@ -658,7 +658,7 @@ inBrowser('FormField in an island', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 
-  test('draws the keyline of every framed box at --border-width, the old --kui-border-width still setting it, and 1px when --border-width gets no length', async () => {
+  test('draws the keyline of every framed box at --border-width, and 1px when --border-width gets no length', async () => {
     const site = await shared()
 
     await using page = await site.open('/borders')
@@ -713,146 +713,23 @@ inBrowser('FormField in an island', () => {
 
     expect(await widths('')).toEqual(all(1))
     expect(await widths('--border-width: 2px')).toEqual(all(2))
-    expect(await widths('--kui-border-width: 3px')).toEqual(all(3))
     expect(await widths('--border-width: 2px solid red')).toEqual(all(1))
     expect(page.errors).toEqual([])
   }, 120_000)
 
-  test('keeps every old kayjs-ui knob an app sets on the page changing the look that replaced it, a scoped width included', async () => {
+  test('follows a --border-width set on a subtree in what it holds and in nothing else', async () => {
     const site = await shared()
 
-    await using page = await site.open('/knobs')
+    await using page = await site.open('/border-scope')
 
-    // Each probe is an element and the computed property one old knob sets.
-    const probes: Record<string, [selector: string, property: string]> = {
-      cardBorder: ['#card', 'borderTopWidth'],
-      scopedBorder: ['#scoped-card', 'borderTopWidth'],
-      inputBorder: ['#text', 'borderTopWidth'],
-      badgeBorder: ['#badge', 'borderTopWidth'],
-      stampBorder: ['#stamp', 'borderTopWidth'],
-      noticeBorder: ['#notice', 'borderTopWidth'],
-      avatarBorder: ['#avatar', 'borderTopWidth'],
-      avatarRing: ['#avatar', 'borderTopColor'],
-      cardPadding: ['#card [data-part=body]', 'paddingTop'],
-      buttonGap: ['#button', 'columnGap'],
-      sectionGap: ['#section', 'rowGap'],
-      fieldX: ['#text', 'paddingLeft'],
-      fieldY: ['#text', 'paddingTop'],
-      fieldHeight: ['#select', 'minHeight'],
-      badgeX: ['#badge', 'paddingLeft'],
-      badgeY: ['#badge', 'paddingTop'],
-      badgeSize: ['#badge', 'fontSize'],
-      badgeLine: ['#badge', 'lineHeight'],
-      badgeTracking: ['#badge', 'letterSpacing'],
-      microSize: ['#stat [data-part=label]', 'fontSize'],
-      microLine: ['#stat [data-part=label]', 'lineHeight'],
-      headingWeight: ['#header [data-part=title]', 'fontWeight'],
-      labelWeight: ['#color + [data-part=label]', 'fontWeight'],
-      noticeWeight: ['#notice', 'fontWeight'],
-      avatarWeight: ['#avatar [data-part=initial]', 'fontWeight'],
-      sectionTracking: ['#card [data-part=title]', 'letterSpacing'],
-      actionTracking: ['#button', 'letterSpacing'],
-      bodyFont: ['#text', 'fontFamily'],
-      stampInk: ['#stamp', 'color'],
-      stampGround: ['#stamp', 'backgroundColor'],
-      solidText: ['#solid', 'color'],
-      focusShadow: ['#text', 'boxShadow'],
-      placeholder: ['#text::placeholder', 'color'],
-      avatarRadius: ['#avatar', 'borderTopLeftRadius'],
-    }
+    const read = async (style: string): Promise<Record<string, string>> => page.evaluate((css: string) => {
+      document.querySelector('#scope')!.setAttribute('style', css)
 
-    const read = async (target: string, style: string): Promise<Record<string, string>> => page.evaluate((where: string, css: string, spec: typeof probes) => {
-      // The stamp eases its colours, which a read right after a change would catch halfway.
-      if (!document.querySelector('#still'))
-        document.head.insertAdjacentHTML('beforeend', '<style id="still">* { transition: none !important; }</style>')
+      return { scoped: getComputedStyle(document.querySelector('#scoped-card')!).borderTopWidth, outside: getComputedStyle(document.querySelector('#card')!).borderTopWidth }
+    }, style)
 
-      document.documentElement.removeAttribute('style')
-      document.querySelector('#scope')!.removeAttribute('style')
-      document.querySelector(where)!.setAttribute('style', css)
-      document.querySelector<HTMLElement>('#text')!.focus()
-
-      const find = (selector: string): Element => {
-        const found = document.querySelector(selector)
-
-        if (!found)
-          throw new Error(`no ${selector}`)
-
-        return found
-      }
-
-      return Object.fromEntries(Object.entries(spec).map(([name, [selector, property]]) => [name, String((getComputedStyle(find(selector.replace(/::.*/, '')), selector.includes('::') ? selector.slice(selector.indexOf('::')) : null) as unknown as Record<string, unknown>)[property])]))
-    }, target, style, probes)
-
-    const base = await read('html', '')
-    const RED = 'rgb(255, 0, 0)'
-
-    // The knob, its value, and what it sets: the probes it changes, and the value each takes.
-    const cases: [knob: string, value: string, expected: Record<string, string>][] = [
-      ['--kui-border-card', '3px', { cardBorder: '3px' }],
-      ['--kui-border-width', '3px', { cardBorder: '3px', scopedBorder: '3px' }],
-      ['--kui-border-input', '3px', { inputBorder: '3px' }],
-      ['--kui-border-badge', '3px', { badgeBorder: '3px' }],
-      ['--kui-border-stamp', '3px', { stampBorder: '3px' }],
-      ['--kui-border-notice', '3px', { noticeBorder: '3px' }],
-      ['--kui-border-avatar', '3px', { avatarBorder: '3px' }],
-      ['--color-kui-avatar-ring', 'red', { avatarRing: RED }],
-      ['--spacing-kui-card', '9px', { cardPadding: '9px' }],
-      ['--spacing-kui-inline', '9px', { buttonGap: '9px' }],
-      ['--spacing-kui-section', '9px', { sectionGap: '9px' }],
-      ['--spacing-kui-field-x', '9px', { fieldX: '9px' }],
-      ['--spacing-kui-field-y', '9px', { fieldY: '9px' }],
-      ['--spacing-kui-field-height', '9px', { fieldHeight: '9px' }],
-      ['--spacing-kui-badge-x', '9px', { badgeX: '9px' }],
-      ['--spacing-kui-badge-y', '9px', { badgeY: '9px' }],
-      ['--text-kui-badge', '9px', { badgeSize: '9px' }],
-      ['--text-kui-badge--line-height', '2', { badgeLine: '24px' }],
-      ['--tracking-kui-badge', '3px', { badgeTracking: '3px' }],
-      ['--text-kui-micro', '9px', { microSize: '9px' }],
-      ['--text-kui-micro--line-height', '2', { microLine: '19.2px' }],
-      ['--font-weight-kui-heading', '800', { headingWeight: '800' }],
-      ['--font-weight-kui-label', '800', { labelWeight: '800' }],
-      ['--font-weight-kui-notice', '800', { noticeWeight: '800' }],
-      ['--font-weight-kui-avatar', '800', { avatarWeight: '800' }],
-      ['--tracking-kui-section', '3px', { sectionTracking: '3px' }],
-      ['--tracking-kui-action', '3px', { actionTracking: '3px' }],
-      ['--color-kui-stamp', 'red', { stampInk: RED }],
-      ['--color-kui-stamp-fill', 'red', { stampGround: RED }],
-      ['--kui-badge-solid-text', 'red', { solidText: RED }],
-      ['--color-kui-overlay1', 'red', { placeholder: RED }],
-      ['--radius-kui-full', '3px', { avatarRadius: '3px' }],
-      ['--kui-field-focus-shadow', '0 0 0 3px red', { focusShadow: 'rgb(255, 0, 0) 0px 0px 0px 3px' }],
-    ]
-
-    // A field's height follows its padding, and a line follows the size it is a multiple of.
-    const FOLLOWS: Record<string, string[]> = { '--spacing-kui-field-y': ['fieldHeight'], '--text-kui-badge': ['badgeLine'], '--text-kui-micro': ['microLine'] }
-
-    for (const [knob, value, expected] of cases) {
-      const set = await read('html', `${knob}: ${value}`)
-
-      for (const [probe, wanted] of Object.entries(expected))
-        expect(set[probe], `${knob} sets ${probe}`).toBe(wanted)
-
-      // Nothing else moves but the probes the knob shares a look with.
-      for (const [probe, was] of Object.entries(base)) {
-        if (!(probe in expected) && !knob.startsWith('--kui-border-') && !FOLLOWS[knob]?.includes(probe))
-          expect(set[probe], `${knob} leaves ${probe}`).toBe(was)
-      }
-    }
-
-    // The fills drawn on hover.
-    for (const [knob, selector] of [['--color-kui-fill-hover', '#button'], ['--color-kui-fill-danger', '#danger']] as const) {
-      await read('html', `${knob}: red`)
-      await page.hover(selector)
-      expect(await page.evaluate((target: string) => getComputedStyle(document.querySelector(target)!).backgroundColor, selector), `${knob} fills ${selector}`).toBe(RED)
-      await page.hover('#header')
-    }
-
-    expect((await read('html', '--font-kui-body: Georgia')).bodyFont).toContain('Georgia')
-    expect(base.bodyFont).not.toContain('Georgia')
-
-    // A width set on a subtree is followed by what it holds and by nothing else, the old name and the new one alike.
-    expect(await read('#scope', '--kui-border-width: 3px')).toMatchObject({ scopedBorder: '3px', cardBorder: '1px' })
-    expect(await read('#scope', '--border-width: 2px')).toMatchObject({ scopedBorder: '2px', cardBorder: '1px' })
+    expect(await read('--border-width: 3px')).toEqual({ scoped: '3px', outside: '1px' })
+    expect(await read('')).toEqual({ scoped: '1px', outside: '1px' })
     expect(page.errors).toEqual([])
   }, 120_000)
 

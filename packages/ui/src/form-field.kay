@@ -12,7 +12,7 @@ const look = recipe({
     root: 'kui-form-field flex w-full flex-wrap items-center gap-1 [:where(&)>*]:basis-full',
     label: 'contents [:where(&)>*]:basis-full',
     head: 'float-left order-first flex flex-1 basis-auto flex-wrap items-center gap-2 p-0',
-    text: 'kui-label-text text-xs [font-weight:var(--font-weight-kui-label,var(--font-weight-normal))] tracking-label text-muted [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)]',
+    text: 'kui-label-text text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
     required: 'ml-0.5 text-danger',
     action: 'order-first ml-auto flex basis-auto flex-wrap items-center justify-end gap-1.5',
     hint: FIELD_MESSAGE.hint,
@@ -22,12 +22,10 @@ const look = recipe({
   variants: {
     // `sm` is sized by its control rather than the row, for a filter bar of fields side by side; it holds no message unless given a `name` or an `issue`.
     size: { sm: 'w-auto', md: '' },
-    // Deprecated since 1.72, `size="sm"` is it.
-    compact: { true: 'w-auto', false: '' },
   },
 })
 
-const { label, name, issue, hint, required = false, group = false, size = 'md', compact = false, action } = props<{
+const { label, name, issue, hint, required = false, group = false, size = 'md', action } = props<{
   label: string
   // The field the control posts as: inside a FormDialog, the message its call was refused with for that field shows here.
   name?: string | undefined
@@ -42,7 +40,7 @@ const { label, name, issue, hint, required = false, group = false, size = 'md', 
   action?: Snippet
 }>()
 
-const small = () => size === 'sm' || compact
+const small = () => size === 'sm'
 const refused = formIssues.use()
 const reports = () => !small() || name !== undefined || issue !== undefined
 const messages = () => [name === undefined ? undefined : refused?.()[name], issue].filter(message => message !== undefined)

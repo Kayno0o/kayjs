@@ -55,8 +55,8 @@ PageSection(title={wording('auth.account.tokens.title', 'Access tokens')})
             strong {token.label}
             if token.expired
               Badge(label={wording('auth.account.tokens.expired', 'Expired')} tone="warning")
-          span.text-kui-muted {token.scopes ? token.scopes.map(scopeLabel).join(', ') : wording('auth.account.tokens.allScopes', 'Everything')}
-          span.text-kui-muted
+          span.text-muted {token.scopes ? token.scopes.map(scopeLabel).join(', ') : wording('auth.account.tokens.allScopes', 'Everything')}
+          span.text-muted
             | {token.lastUsedAt ? wording('auth.account.tokens.lastUsed', 'Last used {date}', { date: date(token.lastUsedAt) }) : wording('auth.account.tokens.neverUsed', 'Never used')}
             if token.expiresAt && !token.expired
               | · {wording('auth.account.tokens.expires', 'Expires {date}', { date: date(token.expiresAt) })}

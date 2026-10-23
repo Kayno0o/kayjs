@@ -142,7 +142,7 @@ if features.passkeys
             FormField(label={wording('auth.account.passkeys.name', 'Name')})
               input(name="name" value={passkey.name} required)
             Button(type="submit" label={wording('auth.account.passkeys.rename', 'Rename')} aria-label={`${wording('auth.account.passkeys.rename', 'Rename')}: ${passkey.name}`})
-          p.text-kui-muted
+          p.text-muted
             | {wording('auth.account.passkeys.created', 'Added {date}', { date: formatDate(passkey.createdAt, { dateStyle: 'medium' }) })}
           form.flex.flex-wrap.items-end.gap-2(action={removePasskey})
             input(type="hidden" name="id" value={passkey.id})

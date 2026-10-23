@@ -199,7 +199,7 @@ body {
 .kcms-entry-name {
   margin: 0;
   font-size: 1.5rem;
-  font-weight: var(--font-weight-kui-heading);
+  font-weight: var(--font-weight-semibold);
   line-height: 1.2;
   overflow-wrap: anywhere;
   color: var(--color-foreground);

@@ -8,11 +8,11 @@ import { wording } from 'kay/words'
 // A dialog shown with show(), beside the page, is positioned absolute and sits in the page, so it is fixed to the edge and above the page.
 const look = recipe({
   parts: {
-    root: 'kui-side-panel inset-y-0 right-0 left-auto m-0 flex h-dvh max-h-dvh w-full max-w-[min(42rem,100vw)] flex-col overflow-hidden border-0 border-solid border-l-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-surface p-0 text-foreground [transition:translate_0.2s_ease-out,overlay_0.2s_allow-discrete,display_0.2s_allow-discrete] open:starting:[translate:100%_0] [&:not([open])]:[translate:100%_0] backdrop:bg-black/50 data-[modal=false]:fixed data-[modal=false]:z-30 data-dock:overflow-visible data-dock:[transition:none] data-dock:open:starting:[translate:none] data-dock:[&:not([open])]:[translate:none]',
+    root: 'kui-side-panel inset-y-0 right-0 left-auto m-0 flex h-dvh max-h-dvh w-full max-w-[min(42rem,100vw)] flex-col overflow-hidden border-0 border-solid border-l-[length:var(--border-width)] border-border-strong bg-surface p-0 text-foreground [transition:translate_0.2s_ease-out,overlay_0.2s_allow-discrete,display_0.2s_allow-discrete] open:starting:[translate:100%_0] [&:not([open])]:[translate:100%_0] backdrop:bg-black/50 data-[modal=false]:fixed data-[modal=false]:z-30 data-dock:overflow-visible data-dock:[transition:none] data-dock:open:starting:[translate:none] data-dock:[&:not([open])]:[translate:none]',
     grip: 'group/grip absolute z-[2] touch-none focus-visible:outline-2 focus-visible:outline-accent data-[dock=right]:inset-y-0 data-[dock=right]:-left-3 data-[dock=right]:w-6 data-[dock=right]:cursor-ew-resize data-[dock=bottom]:inset-x-0 data-[dock=bottom]:-top-3 data-[dock=bottom]:h-6 data-[dock=bottom]:cursor-ns-resize',
     line: 'pointer-events-none absolute bg-accent opacity-0 shadow-[0_0_0_1px_var(--color-popover)] group-[&:hover]/grip:opacity-100 group-focus-visible/grip:opacity-100 data-[dock=right]:inset-y-0 data-[dock=right]:left-[calc(50%-1px)] data-[dock=right]:w-0.5 data-[dock=bottom]:inset-x-0 data-[dock=bottom]:top-[calc(50%-1px)] data-[dock=bottom]:h-0.5',
     head: 'flex shrink-0 items-center gap-2 border-b border-border px-5 py-3',
-    title: 'min-w-0 flex-1 truncate text-lg [font-weight:var(--font-weight-kui-heading,var(--font-weight-semibold))] tracking-label text-foreground [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)]',
+    title: 'min-w-0 flex-1 truncate text-lg [font-weight:var(--font-weight-semibold)] tracking-label text-foreground [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
     body: 'min-h-0 flex-1 overflow-y-auto px-5 py-4',
     footer: 'flex shrink-0 flex-wrap justify-end gap-2 border-t border-border px-5 py-4',
     // The button a closed docked panel leaves in the corner, off the dev tool's docked drawer.
@@ -179,7 +179,7 @@ function panelStyle() {
   const inset = 'right: var(--kay-dev-inset-right, 0px); bottom: var(--kay-dev-inset-bottom, 0px); max-width: none; max-height: none'
   const edge = dock === 'right'
     ? `top: var(--kui-dock-top, 0px); ${inset}; left: auto; width: ${shownSize()}px; height: auto`
-    : `top: auto; ${inset}; left: 0; width: auto; height: ${shownSize()}px; border-left-width: 0; border-top-width: var(--kui-border-width, var(--border-width))`
+    : `top: auto; ${inset}; left: 0; width: auto; height: ${shownSize()}px; border-left-width: 0; border-top-width: var(--border-width)`
 
   return [edge, style].filter(Boolean).join('; ')
 }
