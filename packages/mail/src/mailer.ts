@@ -116,7 +116,13 @@ export type Mailer = Elysia & {
 // A mail given up keeps 7 days, its body and links dropped: who it was for and why it failed is what an app needs to see.
 const FAILED_KEPT = '7d'
 
-function withoutBody(mail: Mail): Mail {
+// The mailers of this process by the id their queued mails carry, since mailers sharing a queue name share its jobs and any of their workers may claim one: it is delivered by the mailer that queued it.
+const MAILERS = new Map<string, WeakRef<(mail: Mail) => Promise<Delivery>>>()
+
+// A queued mail, with the id of the mailer that queued it.
+type Queued = Mail & { via?: string | undefined }
+
+function withoutBody(mail: Queued): Queued {
   return { ...mail, html: undefined, text: '', headers: {}, attachments: [] }
 }
 
@@ -470,11 +476,21 @@ export function mailer(options: MailerOptions = {}): Mailer {
   }
 
   const { name = 'mail', onFailed, ...queueOptions } = options.queue ?? {}
-  const jobs = queue<Mail>(name, deliver, {
+  const via = crypto.randomUUID()
+
+  MAILERS.set(via, new WeakRef(deliver))
+
+  // The id is dropped before delivery; a mail queued by a mailer this process no longer has (a restart) goes out by whichever worker claims it.
+  const deliverQueued = async ({ via: queuedBy, ...mail }: Queued): Promise<Delivery> => {
+    const owner = queuedBy === undefined || queuedBy === via ? deliver : MAILERS.get(queuedBy)?.deref() ?? deliver
+
+    return owner(mail)
+  }
+  const jobs = queue<Queued>(name, deliverQueued, {
     ...queueOptions,
     keepFailed: queueOptions.keepFailed ?? FAILED_KEPT,
     redact: queueOptions.redact ?? withoutBody,
-    onFailed: async ({ payload: mail, error }) => {
+    onFailed: async ({ payload: { via: _via, ...mail }, error }) => {
       log.error(`${described(mail)} to ${whom(recipientsOf(mail))} is given up after its last attempt`, error)
 
       if (onFailed)
@@ -540,7 +556,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     enqueue: async <P extends object>(message: MailMessage<P>, enqueueOptions?: EnqueueOptions) => inFlightWork(async () => {
       ready(message)
 
-      return jobs.enqueue(await render(message), enqueueOptions)
+      return jobs.enqueue({ ...await render(message), via }, enqueueOptions)
     }),
     render,
     list: (listName = 'default', listOptions?: ListOptions) => lists.list(listName, listOptions),
@@ -562,7 +578,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     },
   })
 
-  lists.connect({ enqueueMail: async mail => jobs.enqueue(mail), enqueueRun: async (run, key) => listJobs.enqueue(run, { key }), activate: () => listJobs.activate() })
+  lists.connect({ enqueueMail: async mail => jobs.enqueue({ ...mail, via }), enqueueRun: async (run, key) => listJobs.enqueue(run, { key }), activate: () => listJobs.activate() })
 
   // A getter, since `kay build` leaves a missing variable to throw where it is read.
   return Object.defineProperty(sending, 'configured', { get: () => (configured?.missing() ?? []).length === 0 && !senderless() }) as Mailer

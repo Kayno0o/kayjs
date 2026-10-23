@@ -5,7 +5,7 @@ import { delivery } from '../counter'
 const unconfigured = mailer({ from: 'Fixture <hello@fixture.test>', optional: true })
 const down = mailer({ from: 'Fixture <hello@fixture.test>', transport: { send: () => Promise.reject(new Error('connection refused')) } })
 
-const slow = mailer({ from: 'Fixture <hello@fixture.test>', transport: { send: async () => { await Bun.sleep(1000); delivery.sent = true } } })
+const slow = mailer({ from: 'Fixture <hello@fixture.test>', transport: { send: async () => { await Bun.sleep(1000); delivery.sent = true; return { messageId: 'slow', accepted: ['team@fixture.test'], rejected: [] } } } })
 
 export const noRecipient = action(...contactForm(unconfigured, { reach: 'hello@fixture.test' }))
 export const serverDown = action(...contactForm(down, { to: 'team@fixture.test' }))

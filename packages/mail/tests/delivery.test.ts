@@ -262,3 +262,18 @@ describe('the templates', () => {
     expect(outbox.mails).toEqual([])
   })
 })
+
+describe('mailers sharing a queue name', () => {
+  it('deliver a mail by the mailer that queued it, whichever worker claims it', async () => {
+    const sentBy: string[] = []
+    const transport = (name: string, fail = false) => ({ send: async () => fail ? Promise.reject(new Error('refused')) : (sentBy.push(name), { messageId: name, accepted: ['ada@example.com'], rejected: [] }) })
+    const working = mailer({ from: 'a@example.com', transport: transport('working') })
+    const refusing = mailer({ from: 'b@example.com', transport: transport('refusing', true) })
+
+    await working.enqueue({ to: 'ada@example.com', subject: 'Hi', text: 'Hello' })
+    await refusing.drain()
+    await working.drain()
+
+    expect(sentBy).toEqual(['working'])
+  })
+})

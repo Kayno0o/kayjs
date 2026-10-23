@@ -30,6 +30,10 @@ test('the library\'s own modules type-check under the fixture\'s registered mess
 }, 60_000)
 
 test('an action enqueues a mail, which the queue sends to the outbox once run', async () => {
+  // Mails other files of the same process left queued are not this test's.
+  await site.runJobs()
+  outbox.clear()
+
   const page = await site.submit(signUp, { name: 'Ada', email: 'ada@example.com' }, { from: '/' })
 
   expect(page.status).toBe(200)

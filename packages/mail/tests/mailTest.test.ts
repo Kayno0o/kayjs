@@ -17,6 +17,7 @@ describe('mailTest', () => {
     expect(mail.mails).toHaveLength(0)
 
     await site.call(contact, fields)
+    await site.runJobs()
 
     expect(mail.last()?.subject).toBe('Message from Ada Lovelace')
     expect(mail.to('team@fixture.test')).toHaveLength(1)
@@ -28,6 +29,7 @@ describe('mailTest', () => {
     expect(mail.last()).toBeUndefined()
 
     await site.call(contact, fields)
+    await site.runJobs()
 
     expect(mail.mails).toHaveLength(1)
   })
