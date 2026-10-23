@@ -7,7 +7,7 @@ import { recipe } from 'kay'
 
 const look = recipe({ parts: { root: 'kui-steps', list: 'kui-steps-list', item: 'kui-steps-item', link: 'kui-steps-link', marker: 'kui-steps-marker', label: 'kui-steps-label', state: 'kui-steps-state' } })
 
-const { steps, current, url, done = [], param = 'step', label, doneLabel = wording('ui.steps.doneLabel', 'completed'), ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & {
+const { steps, current, url, done = [], param = 'step', label, doneLabel = wording('ui.steps.done', 'completed'), ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & {
   steps: readonly StepItem[]
   // The key of the step on screen, which `currentStep(ctx.url, keys, done)` reads off the URL.
   current: string

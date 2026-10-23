@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-ui and kayjs-cms message keys drop their `Label` suffix (`ui.table.filter`, not `ui.table.filterLabel`), an old key in an app's catalog keeps winning until 1.75 and `deprecated-message-key` renames it ([Texts and languages](../packages/ui/llms/words.md))
 - A library names its extension's `context` module in package.json, `"kay": { "context": ... }`, and its components read those `ctx` keys typed in any app ([Component libraries](component-libraries.md))
 - The dev tool's Styles tab lists the parts, variants and theme tokens of the component under the pointer and writes a part's classes to `src/ui.ts`, and the language server completes parts, variants and tokens in `class={{ }}` and `src/ui.ts` ([Dev tool](dev-tool.md))
 - A tree-sitter grammar for `.kay` files colours them in Neovim, Helix and Zed, and a Zed extension starts the language server ([Check and tools](check-and-tools.md))

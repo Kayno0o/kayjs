@@ -11,7 +11,7 @@ const look = recipe({
   parts: { root: 'kui-field-input min-h-kui-field-height rounded-kui-card bg-kui-surface0 pl-kui-field-x py-kui-field-y text-sm text-kui-text outline-none [font-family:var(--font-kui-body,inherit)] [border:var(--kui-border-input)_solid_var(--color-kui-field-border)] placeholder:text-kui-overlay1 focus:border-kui-field-focus focus:[outline:1px_solid_var(--color-kui-field-focus)] focus:[box-shadow:var(--kui-field-focus-shadow)] disabled:cursor-default disabled:opacity-50' },
 })
 
-const { value, options, onChange, submit = false, emptyOption, busy = false, loading = false, loadingLabel = wording('ui.select.loadingLabel', 'Loading…'), onBlur, onKeyDown, onPointerDown, ...rest } = props<Omit<JSX.IntrinsicElements['select'], 'value' | 'options' | 'class' | 'children' | 'onChange'> & {
+const { value, options, onChange, submit = false, emptyOption, busy = false, loading = false, loadingLabel = wording('ui.select.loading', 'Loading…'), onBlur, onKeyDown, onPointerDown, ...rest } = props<Omit<JSX.IntrinsicElements['select'], 'value' | 'options' | 'class' | 'children' | 'onChange'> & {
   // One of the options' values, or the empty string once there is an `emptyOption`.
   value: Value | (Empty extends string | true ? '' : never)
   // `disabled` keeps that option from being picked. A native option draws no icon, so it has none.

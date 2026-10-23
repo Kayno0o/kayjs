@@ -772,7 +772,7 @@ describe('ContactForm', () => {
 
     const french = (await site.visit('/fr/contact-words')).html
 
-    // `ui.contactForm.submitLabel` wins over kayjs-mail's `mail.contact.form.submit`, which still words the other labels.
+    // `ui.contactForm.submit` wins over kayjs-mail's `mail.contact.form.submit`, which still words the other labels.
     expect(french).toContain('Expédier')
     expect(french).not.toContain('Envoyer')
     expect(french).toContain('Nom')
@@ -937,7 +937,7 @@ describe('the texts a component shows by default, in the app\'s catalogs', () =>
     try {
       const payload = (/<script type="application\/json" data-kay-i18n>(.*?)<\/script>/).exec((await built.visit('/fr/table')).html)?.[1]
 
-      expect(Object.keys((JSON.parse(payload!) as { messages: object }).messages)).toEqual(expect.arrayContaining(['ui.table.rowCount', 'ui.table.filterLabel']))
+      expect(Object.keys((JSON.parse(payload!) as { messages: object }).messages)).toEqual(expect.arrayContaining(['ui.table.rowCount', 'ui.table.filter']))
     }
     finally {
       await built.close()

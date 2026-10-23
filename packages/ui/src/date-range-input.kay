@@ -50,6 +50,6 @@ function commit(from: string, to: string) {
 }
 ---
 div({...rest} role="group" aria-label={label})
-  DateInput(name={fromName} min={min} max={max} firstDay={firstDay} disabled={disabled} aria-label={fromLabel ?? wording('ui.dateRangeInput.fromLabel', '{label} from', { label })} value={pair()[0] ?? ''} onChange={next => commit(next, pair()[1] ?? '')})
+  DateInput(name={fromName} min={min} max={max} firstDay={firstDay} disabled={disabled} aria-label={fromLabel ?? wording('ui.dateRangeInput.from', '{label} from', { label })} value={pair()[0] ?? ''} onChange={next => commit(next, pair()[1] ?? '')})
   span(part="separator" aria-hidden="true") -
-  DateInput(name={toName} min={min} max={max} firstDay={firstDay} disabled={disabled} aria-label={toLabel ?? wording('ui.dateRangeInput.toLabel', '{label} to', { label })} value={pair()[1] ?? ''} onChange={next => commit(pair()[0] ?? '', next)})
+  DateInput(name={toName} min={min} max={max} firstDay={firstDay} disabled={disabled} aria-label={toLabel ?? wording('ui.dateRangeInput.to', '{label} to', { label })} value={pair()[1] ?? ''} onChange={next => commit(pair()[0] ?? '', next)})

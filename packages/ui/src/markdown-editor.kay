@@ -328,7 +328,7 @@ div(part="wrap")
   div(part="grid" data-preview={previewing() ? '' : undefined})
     textarea.kui-field-input(part="root" {...rest} ref={ref} value={untrack(() => value)} placeholder={placeholder} aria-description={keysHint} aria-busy={uploading() > 0 ? 'true' : 'false'} onInput={event => { heard(event.currentTarget.value); text.set(event.currentTarget.value); onInput?.(event.currentTarget.value) }} onKeyDown={keyDown} onPaste={paste} onDrop={drop})
     if actions().length > 0 || preview
-      div(part="bar" role="toolbar" aria-label={wording('ui.markdownEditor.toolbarLabel', 'Formatting')})
+      div(part="bar" role="toolbar" aria-label={wording('ui.markdownEditor.toolbar', 'Formatting')})
         if toolbarFailed()
           span(part="barFailed" role="alert") {wording('ui.markdownEditor.toolbarFailure', 'The toolbar could not be loaded')}
         for View of toolbarView() key={View}

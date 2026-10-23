@@ -172,7 +172,7 @@ function pick(path: string, event: Event): void {
       IconButton(icon="close" label={wording('cms.file.clear', 'Clear')} variant="ghost" size="sm" disabled={sent() !== undefined} onClick={clear})
   if image && alt && value !== '' && !many
     label.kcms-file-alt
-      span.kcms-file-alt-label {wording('cms.file.altLabel', 'Alt text')}
+      span.kcms-file-alt-label {wording('cms.file.alt', 'Alt text')}
       TextInput(id={alt.id} value={alt.value} placeholder={wording('cms.file.altHint', 'What the image shows, for people who cannot see it')} aria-required={alt.required ? 'true' : undefined} aria-invalid={alt.issue === undefined ? undefined : 'true'} onInput={text => onAlt?.(text)})
     if alt.issue
       p.kcms-file-error(role="alert") {alt.issue}
@@ -208,5 +208,5 @@ function pick(path: string, event: Event): void {
   // Uploading is how a path is usually set, so typing one waits behind a disclosure, which an upload the CMS stored does not need.
   if !many && !stays()
     details.kcms-file-path
-      summary {wording('cms.file.pathLabel', 'Path')}
-      TextInput(value={value} placeholder={wording('cms.file.pathHint', 'Or a path the site serves')} aria-label={wording('cms.file.pathLabel', 'Path')} onInput={text => onChange(text)})
+      summary {wording('cms.file.path', 'Path')}
+      TextInput(value={value} placeholder={wording('cms.file.pathHint', 'Or a path the site serves')} aria-label={wording('cms.file.path', 'Path')} onInput={text => onChange(text)})

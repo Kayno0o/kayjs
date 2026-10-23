@@ -34,7 +34,7 @@ test('the French catalog the library ships words every key the components look u
   expect(worded.toSorted()).toEqual(keys.toSorted())
 
   // A count's plural forms, as the English writes `{count}` in both of its texts.
-  for (const [component, prop] of [['table', 'rowCount'], ['commandPalette', 'resultsLabel'], ['commandPalette', 'siteSearchMore'], ['multiSelect', 'selectedLabel'], ['table', 'selectedLabel']] as const) {
+  for (const [component, prop] of [['table', 'rowCount'], ['commandPalette', 'results'], ['commandPalette', 'siteSearchMore'], ['multiSelect', 'selected'], ['table', 'selected']] as const) {
     const message = french.ui[component]![prop] as { one: string, other: string }
 
     expect(message.one).toContain('{count}')

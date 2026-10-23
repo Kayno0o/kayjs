@@ -4314,6 +4314,34 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports a ui or cms message key ending in Label and --fix renames it, leaving a key the catalog words twice and keys of the app\'s own', async () => {
+    const messages = [
+      'export default {',
+      '  title: { pageLabel: \'a\' },',
+      '  ui: {',
+      '    table: { filterLabel: \'Filtrer\', rowCount: \'x\' },',
+      '    pagination: { label: \'Pagination\', nextLabel: \'Suivant\', next: \'Après\' },',
+      '    markdownEditor: { previewLabel: \'Aperçu\' },',
+      '  },',
+      '  cms: { table: { \'moveUpLabel\': \'Monter\' } },',
+      '}',
+      '',
+    ].join('\n')
+    const root = await scratchProject({ 'src/routes/index.kay': 'p hi\n', 'src/messages/fr.ts': messages, 'kay.config.ts': 'export default { i18n: { locales: [\'fr\'], defaultLocale: \'fr\' } }\n' })
+
+    try {
+      const { output } = await runCheck(root)
+
+      expect(output.match(/warning\[deprecated-message-key\]/g)).toHaveLength(4)
+      expect(output).toContain('`cms.table.moveUpLabel` is `cms.table.moveUpAria` since 1.72')
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/messages/fr.ts')).text()).toBe(messages.replace('filterLabel', 'filter').replace('previewLabel', 'preview').replace('moveUpLabel', 'moveUpAria'))
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports the lifetimes renamed to maxAge and --fix writes the new form, leaving a call that gives both', async () => {
     const config = [
       'import { createAuth } from \'@kaynooo/kayjs-auth\'',

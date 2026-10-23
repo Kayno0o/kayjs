@@ -17,6 +17,7 @@ import { acceptedLocales, LOCALE_TAG, matchLocale } from './accept-language'
 import { routerPath } from './base'
 import { importModule } from './bundle'
 import { requestCookies } from './cookies'
+import { renamedMessageKey } from './legacy-keys'
 import { compiledLinks, forgetLinks } from './links'
 import { requestUrl } from './request-url'
 import { projectSource } from './source'
@@ -323,8 +324,17 @@ async function mergedCatalogs(catalogs: string[]): Promise<Map<string, Message>>
     if (typeof tree !== 'object' || tree === null)
       throw new KayError('locales-invalid', `kay: ${relative(process.cwd(), catalog)} must export its messages by default: export default defineMessages({ ... })`)
 
-    for (const [key, message] of flattenMessages(tree as MessageTree))
+    const flat = flattenMessages(tree as MessageTree)
+
+    for (const [key, message] of flat) {
+      // A `ui.*` or `cms.*` key an app still words under its pre-1.72 `Label` name keeps winning over the library's, unless the catalog words the new key too.
+      const renamed = renamedMessageKey(key)
+
+      if (renamed !== undefined && !flat.has(renamed))
+        messages.set(renamed, message)
+
       messages.set(key, message)
+    }
   }
 
   return messages

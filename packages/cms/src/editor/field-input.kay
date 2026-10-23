@@ -431,11 +431,11 @@ function leaveJson(): void {
             .kcms-list-tools
               if !atMax()
                 if current.blocks
-                  Select(value="" options={blockOptions()} emptyOption={wording('cms.blocks.addFirst', 'Add at the top…')} aria-label={wording('cms.blocks.addFirstLabel', 'Add a block at the top of {list}', { list: current.label })} data-kcms-block-menu onChange={(type) => { if (type !== '') { prepend(type); resetMenu('[data-kcms-block-menu]') } }})
+                  Select(value="" options={blockOptions()} emptyOption={wording('cms.blocks.addFirst', 'Add at the top…')} aria-label={wording('cms.blocks.addFirstAria', 'Add a block at the top of {list}', { list: current.label })} data-kcms-block-menu onChange={(type) => { if (type !== '') { prepend(type); resetMenu('[data-kcms-block-menu]') } }})
                 else
                   Button(label={wording('cms.list.addFirst', 'Add at the top')} icon="plus" variant="ghost" size="sm" onClick={() => prepend()})
               if count() >= JUMP_FROM
-                Select(value="" options={titles()} emptyOption={wording('cms.list.jump', 'Go to item…')} data-kcms-jump aria-label={wording('cms.list.jumpLabel', 'Go to an item of {list}', { list: current.label })} onChange={(at) => { if (at !== '') jump(at) }})
+                Select(value="" options={titles()} emptyOption={wording('cms.list.jump', 'Go to item…')} data-kcms-jump aria-label={wording('cms.list.jumpAria', 'Go to an item of {list}', { list: current.label })} onChange={(at) => { if (at !== '') jump(at) }})
           .kcms-list-items(ref={element => rows = element})
             for item, i of items() key={i}
               .kcms-list-item(data-kcms-row data-compact={isCompact(current) ? '' : undefined} onKeyDown={event => itemKey(event, i)})

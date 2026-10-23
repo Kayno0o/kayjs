@@ -218,7 +218,7 @@ async function localeCatalog(root: string, config: I18nConfig, extensions: KayEx
 }
 
 const LIBRARIES = new Map([['ui', 'kayjs-ui'], ['cms', 'kayjs-cms'], ['auth', 'kayjs-auth'], ['mail', 'kayjs-mail'], ['ai', 'kayjs-ai']])
-// `wording('ui.table.filterLabel', 'Filter'` in a library's source, the key and the English it falls back to; a key written at run time, or an English put together from parts, is not compared.
+// `wording('ui.table.filter', 'Filter'` in a library's source, the key and the English it falls back to; a key written at run time, or an English put together from parts, is not compared.
 const WORDING = /\bwording\(\s*(['"])([a-z]+\.[\w.]+)\1\s*,\s*(?:'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)")/g
 const sourcesRead = new Map<string, Promise<Map<string, string>>>()
 

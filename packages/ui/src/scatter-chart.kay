@@ -33,7 +33,7 @@ const cornerEntries = () => Object.entries(corners ?? {}).filter(([, text]) => t
 ---
 if points.length === 0
   // The app's id and class stay on whichever element shows.
-  p.kui-scatter-chart-empty(part="root" id={rest.id}) {emptyLabel ?? wording('ui.scatterChart.emptyLabel', 'No data yet.')}
+  p.kui-scatter-chart-empty(part="root" id={rest.id}) {emptyLabel ?? wording('ui.scatterChart.empty', 'No data yet.')}
 else
   figure(part="root" {...rest} aria-label={label})
     if y.label

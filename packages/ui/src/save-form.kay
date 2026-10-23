@@ -9,7 +9,7 @@ import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: 'kui-save-form', grid: 'kui-form-grid', bar: 'kui-save-bar', status: 'kui-save-bar-status', actions: 'kui-save-bar-actions' } })
 
-const { action, refused, saved, onSaved, onDiscard, dirty, onSave, status, failure = wording('ui.saveForm.failure', 'Could not save.'), dirtyLabel = wording('ui.saveForm.dirtyLabel', 'Unsaved changes.'), cleanLabel = wording('ui.saveForm.cleanLabel', 'No unsaved change.'), savingLabel = wording('ui.saveForm.savingLabel', 'Saving…'), saveLabel = wording('ui.saveForm.saveLabel', 'Save'), discardLabel = wording('ui.saveForm.discardLabel', 'Discard'), shortcut: saveKeys = 'mod+s' } = props<{
+const { action, refused, saved, onSaved, onDiscard, dirty, onSave, status, failure = wording('ui.saveForm.failure', 'Could not save.'), dirtyLabel = wording('ui.saveForm.dirty', 'Unsaved changes.'), cleanLabel = wording('ui.saveForm.clean', 'No unsaved change.'), savingLabel = wording('ui.saveForm.saving', 'Saving…'), saveLabel = wording('ui.saveForm.save', 'Save'), discardLabel = wording('ui.saveForm.discard', 'Discard'), shortcut: saveKeys = 'mod+s' } = props<{
   // The page's action the form calls with its fields, as FormDialog does. An editor whose state is signals gives `dirty` and `onSave` instead.
   action?: Action<never, Output> | undefined
   // Toasted when the call fails other than on a field, or when `onSave` rejects.

@@ -120,3 +120,30 @@ describe('a library\'s message catalog, declared in its package.json', () => {
     expect(lookup(translations.get('fr-CA')!, 'lib.title')).toBeUndefined()
   })
 })
+
+describe('a ui.* or cms.* key an app words under its pre-1.72 Label name', () => {
+  const config = { locales: ['fr'], defaultLocale: 'fr' }
+
+  test('wins over the library\'s catalog under the new key, and the Aria and preview renames follow the table', async () => {
+    const root = await project('export default {}\n', {
+      'node_modules/kay-lib/messages/fr.ts': MESSAGES('{ ui: { table: { filter: \'Filtre\', export: \'Exporter\' } } }'),
+      'src/messages/fr.ts': MESSAGES('{ ui: { table: { filterLabel: \'Filtrer\' }, markdownEditor: { previewLabel: \'Aperçu\' } }, cms: { table: { moveUpLabel: \'Monter\' } } }'),
+    })
+    const { translations } = await loadI18n(root, config, (await loadConfig(root)).extensions)
+    const fr = translations.get('fr')!
+
+    expect(lookup(fr, 'ui.table.filter')).toBe('Filtrer')
+    expect(lookup(fr, 'ui.table.export')).toBe('Exporter')
+    expect(lookup(fr, 'ui.markdownEditor.preview')).toBe('Aperçu')
+    expect(lookup(fr, 'cms.table.moveUpAria')).toBe('Monter')
+  })
+
+  test('yields to the new key when the same catalog words both, and leaves other keys ending in Label alone', async () => {
+    const root = await project('export default {}\n', { 'src/messages/fr.ts': MESSAGES('{ ui: { table: { filterLabel: \'Vieux\', filter: \'Neuf\' } }, mine: { titleLabel: \'T\' } }') })
+    const { translations } = await loadI18n(root, config, (await loadConfig(root)).extensions)
+    const fr = translations.get('fr')!
+
+    expect(lookup(fr, 'ui.table.filter')).toBe('Neuf')
+    expect(lookup(fr, 'mine.title')).toBeUndefined()
+  })
+})

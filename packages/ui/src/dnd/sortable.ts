@@ -69,7 +69,7 @@ function nameHandle(el: HTMLElement, item?: HTMLElement): void {
 
   const what = itemName(item)
 
-  el.setAttribute('aria-label', what === '' ? wording('ui.dnd.handleLabel', 'Reorder') : wording('ui.dnd.handleItemLabel', 'Reorder {item}', { item: what }))
+  el.setAttribute('aria-label', what === '' ? wording('ui.dnd.handle', 'Reorder') : wording('ui.dnd.handleItem', 'Reorder {item}', { item: what }))
   named.add(el)
 
   if (!item || watchers.get(el)?.item === item)

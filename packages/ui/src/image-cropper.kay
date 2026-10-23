@@ -15,7 +15,7 @@ const DIRECTIONS: Partial<Record<string, [number, number]>> = { ArrowLeft: [-1, 
 
 const look = recipe({ parts: { root: 'kui-image-cropper', stage: 'kui-image-cropper-stage', image: 'kui-image-cropper-image', crop: 'kui-image-cropper-crop', gridCols: 'kui-image-cropper-grid-cols', gridRows: 'kui-image-cropper-grid-rows', handle: 'kui-image-cropper-handle' } })
 
-const { src, ratio = 1, minSize = 32, grid = false, alt = '', cropLabel = wording('ui.imageCropper.cropLabel', 'Crop area: arrows move it, Shift and the arrows resize it'), cropText = wording('ui.imageCropper.cropText', '{w} by {h} pixels at {x}, {y}'), onCrop, onLoad, footer, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+const { src, ratio = 1, minSize = 32, grid = false, alt = '', cropLabel = wording('ui.imageCropper.crop', 'Crop area: arrows move it, Shift and the arrows resize it'), cropText = wording('ui.imageCropper.cropText', '{w} by {h} pixels at {x}, {y}'), onCrop, onLoad, footer, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   src: string
   // Width over height the crop is locked to; a change centres the crop again.
   ratio?: number | undefined

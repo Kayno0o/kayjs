@@ -48,7 +48,7 @@ Table.kcms-missing.kcms-redirects(columns={columns} rows={redirects} rowKey={row
   @cell(row, column)
     if column.key === 'actions'
       AddRedirect(path={row.from} editing to={row.to} status={row.status} onAdd={save})
-      Button(label={wording('cms.redirects.remove', 'Remove')} aria-label={wording('cms.redirects.removeLabel', 'Remove the redirect from {path}', { path: row.from })} size="sm" variant="ghost" onClick={async () => { await remove([row.from]) }})
+      Button(label={wording('cms.redirects.remove', 'Remove')} aria-label={wording('cms.redirects.removeAria', 'Remove the redirect from {path}', { path: row.from })} size="sm" variant="ghost" onClick={async () => { await remove([row.from]) }})
     else if column.key === 'to' && row.status === 410
       small {wording('cms.redirects.gone', 'Gone, no target')}
     else

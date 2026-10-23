@@ -33,4 +33,4 @@ else
           span
             | {wording('cms.trash.deleted', 'Deleted')} 
             EntryEdited(at={row.at} moment author={row.author})
-          ConfirmDelete(tone="neutral" trigger="button" label={wording('cms.history.restoreLabel', 'Restore')} message={wording('cms.trash.restoreMessage', 'Restore {title}? It comes back under its slug.', { title: row.title })} failure={wording('cms.history.restoreFailure', 'Could not restore')} onConfirm={async () => { await restore(row.id) }})
+          ConfirmDelete(tone="neutral" trigger="button" label={wording('cms.history.restoreButton', 'Restore')} message={wording('cms.trash.restoreMessage', 'Restore {title}? It comes back under its slug.', { title: row.title })} failure={wording('cms.history.restoreFailure', 'Could not restore')} onConfirm={async () => { await restore(row.id) }})

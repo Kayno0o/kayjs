@@ -196,7 +196,7 @@ For another language, or a different French word, use your messages. The words a
 // src/messages/fr.ts
 export default defineMessages({
   ui: {
-    sidePanel: { closeLabel: 'Fermer' },
+    sidePanel: { close: 'Fermer' },
     pagination: { previousLabel: 'Précédent', nextLabel: 'Suivant' },
     table: { rowCount: { one: '{count} ligne', other: '{count} lignes' } },
   },

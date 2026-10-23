@@ -31,7 +31,7 @@ const look = recipe({
   },
 })
 
-const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, empty, filter, filterLabel = wording('ui.table.filterLabel', 'Filter'), filterPlaceholder, filterParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelect, bulk, selectAllLabel = wording('ui.table.selectAllLabel', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.exportLabel', 'Export CSV'), exportName = 'table.csv', virtual = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
+const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, empty, filter, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelect, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', virtual = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
   columns: Column<Row>[]
   rows: Row[]
   rowKey: Key
@@ -106,7 +106,7 @@ const chosenSet = memo(() => new Set(chosen()))
 const visible = memo(() => kept().map(row => rowKeyOf(row, rowKey)))
 const allChosen = memo(() => visible().length > 0 && visible().every(key => chosenSet().has(key)))
 const someChosen = memo(() => visible().some(key => chosenSet().has(key)))
-const countChosen = selectedLabel ?? ((count: number) => wording('ui.table.selectedLabel', '{count} selected', { count }))
+const countChosen = selectedLabel ?? ((count: number) => wording('ui.table.selected', '{count} selected', { count }))
 
 // A row that left `rows` leaves the selection for good, so it is not picked again if it comes back.
 effect(() => {
@@ -219,7 +219,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
           if selectable
             td.kui-table-select-cell(part="cell")
               div(part="cellBody")
-                Checkbox(checked={chosenSet().has(rowKeyOf(row, rowKey))} aria-label={(selectRowLabel ?? (item => wording('ui.table.selectRowLabel', 'Select {row}', { row: rowLabel(item, columns(), rowKey) })))(row)} onChange={on => pick(rowKeyOf(row, rowKey), on)})
+                Checkbox(checked={chosenSet().has(rowKeyOf(row, rowKey))} aria-label={(selectRowLabel ?? (item => wording('ui.table.selectRow', 'Select {row}', { row: rowLabel(item, columns(), rowKey) })))(row)} onChange={on => pick(rowKeyOf(row, rowKey), on)})
           for column of columns() key={column.key}
             td(part="cell" data-align={column.align ?? 'start'} data-numeric={column.numeric ? '' : undefined})
               if narrow === 'stack' && column.header

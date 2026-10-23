@@ -10,13 +10,14 @@ Put the message under its `ui.<component>.<prop>` key in the locale's file:
 
 ```ts
 // src/messages/fr.ts
-ui: { sidePanel: { closeLabel: 'Fermer' } }
+ui: { sidePanel: { close: 'Fermer' } }
 ```
 
 ## Reference
 
-- Word a text once for the whole site, in the locale's file: `ui: { sidePanel: { closeLabel: 'Fermer' }, pagination: { previousLabel: 'Précédent', nextLabel: 'Suivant' } }`. Every instance of the component reads it, an island's included.
-- The key is the component's name in camel case, then the prop that sets the text: `SidePanel`'s `closeLabel` is `ui.sidePanel.closeLabel`. A prop given to the component replaces the message and the English both.
+- Word a text once for the whole site, in the locale's file: `ui: { sidePanel: { close: 'Fermer' }, pagination: { previous: 'Précédent', next: 'Suivant' } }`. Every instance of the component reads it, an island's included.
+- The key is the component's name in camel case, then the prop that sets the text: `SidePanel`'s `closeLabel` is `ui.sidePanel.close`. A prop given to the component replaces the message and the English both.
+- Keys carry no `Label` suffix since 1.72 (`ui.table.filter`, not `ui.table.filterLabel`), though the props keep their names; a catalog still wording the old key wins until 1.75, and `kay check --fix` renames it (`deprecated-message-key`). Where a visible text had the name, the accessible one ends in `Aria` (`cms.table.moveUpAria`).
 - A message may hold the placeholders its English shows, `{n}` or `{count}`, and a count may be written as plural forms: `rowCount: { one: '{count} ligne', other: '{count} lignes' }`.
 - The French lives in `src/messages/fr.ts` of the package, declared by `"kay": { "messages": "./src/messages" }` in its package.json; an app overrides any key in its own `src/messages/fr.ts`, which lays over it key by key.
 - `kay check` leaves `ui.*` keys out of its comparison between locales, so a French block needs no English twin; a key a locale lacks reads the English.
@@ -25,41 +26,41 @@ ui: { sidePanel: { closeLabel: 'Fermer' } }
 - Rating's `{value}` and `{max}` and RangeInput's and DateRangeInput's `{label}` fill the messages of the same name.
 - ContactForm's labels read `ui.contactForm.*`, then kayjs-mail's `mail.contact.form.*` messages (English and French) before the English, and MarkdownEditor's `Uploading name…` marker, a placeholder in the text until the upload ends, stays English.
 - Texts the app's data owns, a `failure`, a `message` or a `label` it passes, are the app's to word.
-- Messages about the app's data are its own, passed as props (`failure`, `message`, `label`). The library's own words (`Close`, `Cancel`, `Loading…`...) are looked up in the app's catalogs under `ui.<component>.<prop>` keys, `ui.sidePanel.closeLabel`, before their English, and a prop given to the component replaces both. The French of every key ships with the library and is read on a French page with no setup.
+- Messages about the app's data are its own, passed as props (`failure`, `message`, `label`). The library's own words (`Close`, `Cancel`, `Loading…`...) are looked up in the app's catalogs under `ui.<component>.<prop>` keys, `ui.sidePanel.close`, before their English, and a prop given to the component replaces both. The French of every key ships with the library and is read on a French page with no setup.
 
 ### The keys
 
-- `ui.barChart.*`: `emptyLabel` (`No data yet.`), `total` (`Total`)
-- `ui.barList.*`: `emptyLabel` (`No data yet.`)
-- `ui.bell.*`: `emptyLabel` (`No notifications`), `label` (`Notifications`), `markAllLabel` (`Mark all as read`), `unreadLabel` (`{label}, {count} unread`, `{label}, 1 unread` for one), `unreadMark` (`(unread)`, read by screen readers beside an unread item)
-- `ui.carousel.*`: `dotLabel` (`Go to slide {n}`), `label` (`Carousel`), `nextLabel` (`Next slide`), `pauseLabel` (`Pause`), `playLabel` (`Play`), `previousLabel` (`Previous slide`), `slideLabel` (`Slide {n} of {count}`)
-- `ui.combobox.*`: `createLabel` (`Create "{text}"`), `emptyLabel` (`No match`), `failureLabel` (`Could not load the options`), `loadingLabel` (`Loading…`), `resultsLabel` (`{count} results`, `1 result` for one)
-- `ui.commandPalette.*`: `emptyLabel` (`No results`), `label` (`Search`), `placeholder` (`Search`), `recentLabel` (`Recent`), `resultsLabel` (`{count} results, `1 result` for one`), `siteSearchError` (`The pages could not be searched`), `siteSearchLabel` (`In the pages`), `siteSearchMore` (`{count} more matches`, `1 more match` for one)
-- `ui.confirmDelete.*`: `cancelLabel` (`Cancel`), `confirmLabel` (`Confirm`), `deleteLabel` (`Delete`), `pendingLabel` (`Deleting…`), `title` (`Confirm Deletion`)
-- `ui.contactForm.*`: `consentLabel` (`I agree that my details are used to answer my message.`), `emailLabel` (`Email`), `messageLabel` (`Message`), `nameLabel` (`Name`), `privacyLabel` (`Privacy policy`), `sentLabel` (`Thank you, your message has been sent.`), `submitLabel` (`Send`)
+- `ui.barChart.*`: `empty` (`No data yet.`), `total` (`Total`)
+- `ui.barList.*`: `empty` (`No data yet.`)
+- `ui.bell.*`: `empty` (`No notifications`), `label` (`Notifications`), `markAll` (`Mark all as read`), `unread` (`{label}, {count} unread`, `{label}, 1 unread` for one), `unreadMark` (`(unread)`, read by screen readers beside an unread item)
+- `ui.carousel.*`: `dot` (`Go to slide {n}`), `label` (`Carousel`), `next` (`Next slide`), `pause` (`Pause`), `play` (`Play`), `previous` (`Previous slide`), `slide` (`Slide {n} of {count}`)
+- `ui.combobox.*`: `create` (`Create "{text}"`), `empty` (`No match`), `failure` (`Could not load the options`), `loading` (`Loading…`), `results` (`{count} results`, `1 result` for one)
+- `ui.commandPalette.*`: `empty` (`No results`), `label` (`Search`), `placeholder` (`Search`), `recent` (`Recent`), `results` (`{count} results, `1 result` for one`), `siteSearchError` (`The pages could not be searched`), `siteSearch` (`In the pages`), `siteSearchMore` (`{count} more matches`, `1 more match` for one)
+- `ui.confirmDelete.*`: `cancel` (`Cancel`), `confirm` (`Confirm`), `delete` (`Delete`), `pending` (`Deleting…`), `title` (`Confirm Deletion`)
+- `ui.contactForm.*`: `consent` (`I agree that my details are used to answer my message.`), `email` (`Email`), `message` (`Message`), `name` (`Name`), `privacy` (`Privacy policy`), `sent` (`Thank you, your message has been sent.`), `submit` (`Send`)
 - `ui.contributionGraph.*`: `label` (`Contributions`)
-- `ui.copyButton.*`: `copiedLabel` (`Copied!`), `failure` (`Could not copy to the clipboard`)
-- `ui.dateInput.*`: `nextLabel` (`Next month`), `openLabel` (`Choose a date`), `previousLabel` (`Previous month`), `todayLabel` (`Today`)
-- `ui.dateRangeInput.*`: `fromLabel` (`{label} from`), `toLabel` (`{label} to`)
-- `ui.dnd.*`: `handleItemLabel` (`Reorder {item}`), `handleLabel` (`Reorder`), `moved` (`Moved to {position} of {count}`)
-- `ui.formDialog.*`: `cancelLabel` (`Cancel`), `savingLabel` (`Saving…`)
-- `ui.iconPicker.*`: `clearLabel` (`Clear icon selection`), `emptyLabel` (`No icons found.`), `errorLabel` (`The icons could not be loaded.`), `gridLabel` (`Icons`), `moreLabel` (`Show more`), `placeholder` (`Search icons…`), `searchLabel` (`Search icons`), `searchingLabel` (`Searching…`)
-- `ui.imageCropper.*`: `cropLabel` (`Crop area: arrows move it, Shift and the arrows resize it`), `cropText` (`{w} by {h} pixels at {x}, {y}`)
+- `ui.copyButton.*`: `copied` (`Copied!`), `failure` (`Could not copy to the clipboard`)
+- `ui.dateInput.*`: `next` (`Next month`), `open` (`Choose a date`), `previous` (`Previous month`), `today` (`Today`)
+- `ui.dateRangeInput.*`: `from` (`{label} from`), `to` (`{label} to`)
+- `ui.dnd.*`: `handleItem` (`Reorder {item}`), `handle` (`Reorder`), `moved` (`Moved to {position} of {count}`)
+- `ui.formDialog.*`: `cancel` (`Cancel`), `saving` (`Saving…`)
+- `ui.iconPicker.*`: `clear` (`Clear icon selection`), `empty` (`No icons found.`), `error` (`The icons could not be loaded.`), `grid` (`Icons`), `more` (`Show more`), `placeholder` (`Search icons…`), `search` (`Search icons`), `searching` (`Searching…`)
+- `ui.imageCropper.*`: `crop` (`Crop area: arrows move it, Shift and the arrows resize it`), `cropText` (`{w} by {h} pixels at {x}, {y}`)
 - `ui.lineChart.*`: `rangeHint` (`Shift with the arrow keys picks a span, Enter applies it, Escape drops it`), `total` (`Total`)
-- `ui.loadMore.*`: `failureLabel` (`Could not load more.`), `loadingLabel` (`Loading more…`), `retryLabel` (`Try again`)
-- `ui.markdownEditor.*`: `bold` (`Bold`), `bulletList` (`Bulleted list`), `heading` (`Heading`), `image` (`Image`), `italic` (`Italic`), `keysHint` (`Tab indents a list item; Escape then Tab leaves the field.`), `link` (`Link`), `numberedList` (`Numbered list`), `placeholder` (`Write markdown…`), `preview` (`Preview`), `previewFailure` (`The preview could not be shown`), `previewLabel` (`Preview`), `toolbarFailure` (`The toolbar could not be loaded`), `toolbarLabel` (`Formatting`), `uploadFailure` (`Could not upload the image`)
-- `ui.mediaGallery.*`: `closeLabel` (`Close`), `emptyLabel` (`No media.`), `itemLabel` (`Media {n}`), `nextLabel` (`Next`), `openLabel` (`Open full size`), `previousLabel` (`Previous`)
-- `ui.multiSelect.*`: `allLabel` (`All`), `emptyLabel` (`No match`), `noneLabel` (`None`), `placeholder` (`Any`), `searchLabel` (`Search`), `selectedLabel` (`{count} selected`)
-- `ui.pagination.*`: `label` (`Pagination`), `nextLabel` (`Next`), `previousLabel` (`Previous`)
-- `ui.rangeInput.*`: `fromLabel` (`{label} from`), `toLabel` (`{label} to`)
+- `ui.loadMore.*`: `failure` (`Could not load more.`), `loading` (`Loading more…`), `retry` (`Try again`)
+- `ui.markdownEditor.*`: `bold` (`Bold`), `bulletList` (`Bulleted list`), `heading` (`Heading`), `image` (`Image`), `italic` (`Italic`), `keysHint` (`Tab indents a list item; Escape then Tab leaves the field.`), `link` (`Link`), `numberedList` (`Numbered list`), `placeholder` (`Write markdown…`), `preview` (`Preview`), `previewFailure` (`The preview could not be shown`), `toolbarFailure` (`The toolbar could not be loaded`), `toolbar` (`Formatting`), `uploadFailure` (`Could not upload the image`)
+- `ui.mediaGallery.*`: `close` (`Close`), `empty` (`No media.`), `item` (`Media {n}`), `next` (`Next`), `open` (`Open full size`), `previous` (`Previous`)
+- `ui.multiSelect.*`: `all` (`All`), `empty` (`No match`), `none` (`None`), `placeholder` (`Any`), `search` (`Search`), `selected` (`{count} selected`)
+- `ui.pagination.*`: `label` (`Pagination`), `next` (`Next`), `previous` (`Previous`)
+- `ui.rangeInput.*`: `from` (`{label} from`), `to` (`{label} to`)
 - `ui.rating.*`: `label` (`{value} out of {max}`)
-- `ui.saveForm.*`: `cleanLabel` (`No unsaved change.`), `dirtyLabel` (`Unsaved changes.`), `discardLabel` (`Discard`), `failure` (`Could not save.`), `saveLabel` (`Save`), `savingLabel` (`Saving…`)
-- `ui.scatterChart.*`: `emptyLabel` (`No data yet.`)
-- `ui.select.*`: `loadingLabel` (`Loading…`)
-- `ui.sidePanel.*`: `closeLabel` (`Close`)
-- `ui.siteNav.*`: `menuLabel` (`Menu`)
-- `ui.splitLayout.*`: `backLabel` (`Back`), `resizeLabel` (`Resize list`)
-- `ui.steps.*`: `doneLabel` (`completed`)
-- `ui.table.*`: `exportLabel` (`Export CSV`), `filterLabel` (`Filter`), `rowCount` (`{count} rows, `1 row` for one`), `selectAllLabel` (`Select all`), `selectRowLabel` (`Select {row}`), `selectedLabel` (`{count} selected`)
-- `ui.toaster.*`: `dismissLabel` (`Dismiss notification`)
-- `ui.zoomPane.*`: `fitLabel` (`Fit`), `zoomInLabel` (`Zoom in`), `zoomOutLabel` (`Zoom out`)
+- `ui.saveForm.*`: `clean` (`No unsaved change.`), `dirty` (`Unsaved changes.`), `discard` (`Discard`), `failure` (`Could not save.`), `save` (`Save`), `saving` (`Saving…`)
+- `ui.scatterChart.*`: `empty` (`No data yet.`)
+- `ui.select.*`: `loading` (`Loading…`)
+- `ui.sidePanel.*`: `close` (`Close`)
+- `ui.siteNav.*`: `menu` (`Menu`)
+- `ui.splitLayout.*`: `back` (`Back`), `resize` (`Resize list`)
+- `ui.steps.*`: `done` (`completed`)
+- `ui.table.*`: `export` (`Export CSV`), `filter` (`Filter`), `rowCount` (`{count} rows, `1 row` for one`), `selectAll` (`Select all`), `selectRow` (`Select {row}`), `selected` (`{count} selected`)
+- `ui.toaster.*`: `dismiss` (`Dismiss notification`)
+- `ui.zoomPane.*`: `fit` (`Fit`), `zoomIn` (`Zoom in`), `zoomOut` (`Zoom out`)

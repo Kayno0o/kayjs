@@ -8,7 +8,7 @@ const WIDTH = { default: 260, min: 180, max: 560, step: 20 }
 
 const look = recipe({ parts: { root: 'kui-split-layout', sidebar: 'kui-split-layout-sidebar', sidebarHead: 'kui-split-layout-sidebar-head', sidebarTitle: 'kui-split-layout-sidebar-title', sidebarBody: 'kui-split-layout-sidebar-body', list: 'kui-split-layout-list', listHead: 'kui-split-layout-list-head', resizer: 'kui-split-layout-resizer', detail: 'kui-split-layout-detail', detailHead: 'kui-split-layout-detail-head' } })
 
-const { list, detail, listHead, detailHead, sidebar, sidebarTitle = '', detailOpen = false, sidebarOpen = false, onSidebarClose, resizableList = false, listWidthKey, resizeLabel = wording('ui.splitLayout.resizeLabel', 'Resize list'), backLabel = wording('ui.splitLayout.backLabel', 'Back'), style, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'style' | 'children'> & {
+const { list, detail, listHead, detailHead, sidebar, sidebarTitle = '', detailOpen = false, sidebarOpen = false, onSidebarClose, resizableList = false, listWidthKey, resizeLabel = wording('ui.splitLayout.resize', 'Resize list'), backLabel = wording('ui.splitLayout.back', 'Back'), style, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'style' | 'children'> & {
   list: Snippet
   detail: Snippet
   listHead?: Snippet

@@ -15,7 +15,7 @@ const look = recipe({
   variants: { tone: { neutral: '', accent: 'kui-btn-accent', success: 'kui-btn-success', danger: 'kui-btn-danger' } },
 })
 
-const { text, label, html, variant = 'solid', size = 'md', copiedFor = '2s', copiedLabel = wording('ui.copyButton.copiedLabel', 'Copied!'), failure = wording('ui.copyButton.failure', 'Could not copy to the clipboard'), ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'onClick' | 'type'> & {
+const { text, label, html, variant = 'solid', size = 'md', copiedFor = '2s', copiedLabel = wording('ui.copyButton.copied', 'Copied!'), failure = wording('ui.copyButton.failure', 'Could not copy to the clipboard'), ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'onClick' | 'type'> & {
   text: string
   label: string
   // A rendered version copied alongside `text`, which rich editors paste instead.

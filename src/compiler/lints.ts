@@ -710,6 +710,15 @@ export const LINTS = {
     wrong: '.kui-card-head { padding: 1rem; }',
     right: '.kui-card > [data-part=\'head\'] { padding: 1rem; }',
   },
+  'deprecated-message-key': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.72',
+    site: true,
+    summary: 'A `ui.*` or `cms.*` message of the project worded under a key ending in `Label`, the form before 1.72: kayjs-ui and kayjs-cms keys carry no suffix, as kayjs-ai\'s do, so `ui.table.filterLabel` is `ui.table.filter`, and the few that met a text of the same name end in `Aria` (`cms.table.moveUpAria`). The old key keeps winning over the library\'s until 1.75. Found in the project\'s message catalogs, `src/messages/<locale>.ts`. The fix renames the key, unless the catalog words the new one too.',
+    wrong: 'ui: { table: { filterLabel: \'Filtrer\' } }',
+    right: 'ui: { table: { filter: \'Filtrer\' } }',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS

@@ -8,7 +8,7 @@ import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: 'kui-carousel', viewport: 'kui-carousel-viewport', slide: 'kui-carousel-slide', image: 'kui-carousel-image', controls: 'kui-carousel-controls', step: 'kui-carousel-step', dot: 'kui-carousel-dot', pause: 'kui-carousel-pause' } })
 
-const { slides, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = wording('ui.carousel.label', 'Carousel'), previousLabel = wording('ui.carousel.previousLabel', 'Previous slide'), nextLabel = wording('ui.carousel.nextLabel', 'Next slide'), pauseLabel = wording('ui.carousel.pauseLabel', 'Pause'), playLabel = wording('ui.carousel.playLabel', 'Play'), slideLabel = wording('ui.carousel.slideLabel', 'Slide {n} of {count}'), dotLabel = wording('ui.carousel.dotLabel', 'Go to slide {n}'), ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'children'> & {
+const { slides, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = wording('ui.carousel.label', 'Carousel'), previousLabel = wording('ui.carousel.previous', 'Previous slide'), nextLabel = wording('ui.carousel.next', 'Next slide'), pauseLabel = wording('ui.carousel.pause', 'Pause'), playLabel = wording('ui.carousel.play', 'Play'), slideLabel = wording('ui.carousel.slide', 'Slide {n} of {count}'), dotLabel = wording('ui.carousel.dot', 'Go to slide {n}'), ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'children'> & {
   slides: readonly { src: string, alt: string }[]
   // The slide shown first; a carousel whose parent passes another follows it.
   index?: number | undefined

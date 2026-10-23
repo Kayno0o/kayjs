@@ -136,7 +136,7 @@ describe('kay check on the catalogs', () => {
     await write('fr', `{
   title: 'Mots',
   kay: { action: { bodyLimit: 'Trop gros', serverError: 'Erreur {code}' }, invalid: { tooShort: 'Au moins {min}', tooLong: 'Au plus {min}' } },
-  ui: { table: { selectedLabel: { one: 'une', other: '{count} choisies' }, filterLabel: 'Filtre {x}', selectAllLabel: 'Tout' } },
+  ui: { table: { selected: { one: 'une', other: '{count} choisies' }, filter: 'Filtre {x}', selectAll: 'Tout' } },
   cms: { table: { deleteMessage: 'Supprimer {title} ?' } },
   auth: { scopes: { read: 'Lire' }, other: 'Autre' },
   mail: { contact: { sent: 'Envoyé' } },
@@ -150,7 +150,7 @@ describe('kay check on the catalogs', () => {
       'gives kay.action.serverError a {code}, which its English has not, so nothing fills it',
       'gives kay.invalid.tooLong a {min}, which its English has not, so nothing fills it',
       'gives kay.invalid.tooLong without {max}, which its English has',
-      'gives ui.table.filterLabel a {x}, which its English has not, so nothing fills it',
+      'gives ui.table.filter a {x}, which its English has not, so nothing fills it',
       'gives ai.chat.disclosure a {x}, which its English has not, so nothing fills it',
     ].toSorted())
   })

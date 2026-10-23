@@ -19,7 +19,7 @@ const frame = recipe({
   },
 })
 
-const { message, onConfirm, onOpen, failure, success, refused, tone = 'danger', trigger = 'icon', ask = 'dialog', disabled = false, label, title, confirmLabel, pendingLabel, cancelLabel = wording('ui.confirmDelete.cancelLabel', 'Cancel'), size, variant } = props<{
+const { message, onConfirm, onOpen, failure, success, refused, tone = 'danger', trigger = 'icon', ask = 'dialog', disabled = false, label, title, confirmLabel, pendingLabel, cancelLabel = wording('ui.confirmDelete.cancel', 'Cancel'), size, variant } = props<{
   // The dialog's question; asked inline, the armed pair's name for screen readers and the confirm button's tooltip.
   message: string
   // Deletes, or does what a neutral confirm asks. The dialog stays open, its buttons disabled, until a returned promise settles, and closes once it resolves.
@@ -53,10 +53,10 @@ const { message, onConfirm, onOpen, failure, success, refused, tone = 'danger', 
 }>()
 
 const danger = () => tone === 'danger'
-const triggerLabel = () => label ?? (danger() ? wording('ui.confirmDelete.deleteLabel', 'Delete') : wording('ui.confirmDelete.confirmLabel', 'Confirm'))
+const triggerLabel = () => label ?? (danger() ? wording('ui.confirmDelete.delete', 'Delete') : wording('ui.confirmDelete.confirm', 'Confirm'))
 const dialogTitle = () => title ?? (danger() ? wording('ui.confirmDelete.title', 'Confirm Deletion') : triggerLabel())
-const confirmText = () => confirmLabel ?? (danger() ? wording('ui.confirmDelete.deleteLabel', 'Delete') : triggerLabel())
-const pendingText = () => pendingLabel ?? (danger() ? wording('ui.confirmDelete.pendingLabel', 'Deleting…') : confirmText())
+const confirmText = () => confirmLabel ?? (danger() ? wording('ui.confirmDelete.delete', 'Delete') : triggerLabel())
+const pendingText = () => pendingLabel ?? (danger() ? wording('ui.confirmDelete.pending', 'Deleting…') : confirmText())
 const look = () => danger() ? 'danger' : 'accent'
 
 const open = signal(false)

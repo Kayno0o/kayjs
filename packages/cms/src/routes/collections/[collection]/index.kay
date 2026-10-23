@@ -43,7 +43,7 @@ PageSection(title={title} level={1})
   else
     .kcms-tools
       form.kcms-search(method="get" role="search")
-        input.kui-field-input(type="search" name="q" value={search} placeholder={wording('cms.admin.search', 'Search')} aria-label={wording('cms.admin.searchLabel', 'Search entries')})
+        input.kui-field-input(type="search" name="q" value={search} placeholder={wording('cms.admin.search', 'Search')} aria-label={wording('cms.admin.searchAria', 'Search entries')})
         if status
           input(type="hidden" name="status" value={status})
         if sort
@@ -52,7 +52,7 @@ PageSection(title={title} level={1})
         if search !== ''
           Button(href={viewHref(url, { q: undefined })} label={wording('cms.admin.clearSearch', 'Clear search')} variant="ghost")
       if collection.draftField !== undefined || collection.publishField !== undefined
-        nav.kcms-statuses(aria-label={wording('cms.admin.statusLabel', 'Filter by status')})
+        nav.kcms-statuses(aria-label={wording('cms.admin.status', 'Filter by status')})
           for option of statuses key={option.label}
             Button(href={viewHref(url, { status: option.value })} label={option.label} variant={status === option.value ? 'solid' : 'ghost'} aria-current={status === option.value ? 'true' : undefined})
     if narrowed

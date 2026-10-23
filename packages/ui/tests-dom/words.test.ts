@@ -14,8 +14,8 @@ test('wording reads the messages the page brought, fills them, picks a plural, a
     expect(wording('ui.pagination.label', 'Pagination')).toBe('Pages')
     expect(wording('ui.table.rowCount', '{count} rows', { count: 1 })).toBe('1 ligne')
     expect(wording('ui.table.rowCount', '{count} rows', { count: 3 })).toBe('3 lignes')
-    expect(wording('ui.table.filterLabel', 'Filter {n}', { n: 2 })).toBe('Filter 2')
-    expect(wording('ui.table.filterLabel', 'Go to {n}')).toBe('Go to {n}')
+    expect(wording('ui.table.filter', 'Filter {n}', { n: 2 })).toBe('Filter 2')
+    expect(wording('ui.table.filter', 'Go to {n}')).toBe('Go to {n}')
 
     const day = new Date(Date.UTC(2026, 9, 4, 12))
 

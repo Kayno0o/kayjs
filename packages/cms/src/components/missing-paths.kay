@@ -62,12 +62,12 @@ Table.kcms-missing(columns={columns} rows={rows} rowKey={row => row.path} sort={
           small {row.from}
     else if column.key === 'actions'
       AddRedirect(path={row.path} suggested={row.target} onAdd={add})
-      Button(label={wording('cms.missing.dismiss', 'Dismiss')} aria-label={wording('cms.missing.dismissLabel', 'Dismiss {path}', { path: row.path })} size="sm" variant="ghost" onClick={async () => { await dismiss([row.path]) }})
+      Button(label={wording('cms.missing.dismiss', 'Dismiss')} aria-label={wording('cms.missing.dismissAria', 'Dismiss {path}', { path: row.path })} size="sm" variant="ghost" onClick={async () => { await dismiss([row.path]) }})
     else if row.target as target
       .kcms-missing-target
         code.kcms-missing-path {target}
         small {row.reason}
         if row.line as line
-          CopyButton(text={line} label={wording('cms.missing.copy', 'Copy redirect')} aria-label={wording('cms.missing.copyLabel', 'Copy the redirect from {path}', { path: row.path })} size="sm" variant="ghost")
+          CopyButton(text={line} label={wording('cms.missing.copy', 'Copy redirect')} aria-label={wording('cms.missing.copyAria', 'Copy the redirect from {path}', { path: row.path })} size="sm" variant="ghost")
   @empty
     EmptyState(title={wording('cms.missing.empty', 'No missing page recorded')} description={hint})

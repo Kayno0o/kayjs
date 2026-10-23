@@ -41,13 +41,13 @@ const add = editing ? wording('cms.redirects.save', 'Save') : wording('cms.missi
 ---
 .kcms-missing-add
   if suggested as target
-    Checkbox(checked={permanent()} onChange={on => permanent = on} label={wording('cms.missing.permanent', 'Permanent')} aria-label={wording('cms.missing.permanentLabel', 'Make the redirect from {path} permanent (308)', { path })})
-    Button(label={add} aria-label={wording('cms.missing.addLabel', 'Redirect {path} to {target}', { path, target })} size="sm" variant="ghost" onClick={async () => { await onAdd(path, target, answer()) }})
+    Checkbox(checked={permanent()} onChange={on => permanent = on} label={wording('cms.missing.permanent', 'Permanent')} aria-label={wording('cms.missing.permanentAria', 'Make the redirect from {path} permanent (308)', { path })})
+    Button(label={add} aria-label={wording('cms.missing.addAria', 'Redirect {path} to {target}', { path, target })} size="sm" variant="ghost" onClick={async () => { await onAdd(path, target, answer()) }})
   else
     datalist(id={listId})
       for site of offered() key={site}
         option(value={site})
-    TextInput(value={typed()} onInput={(text) => { typed = text; void offer(text, TYPING_PAUSE_MS) }} onFocus={() => { void offer(typed()) }} placeholder="/" list={listId} aria-label={wording('cms.missing.targetLabel', 'Target of the redirect from {path}', { path })} size={20})
-    Checkbox(checked={permanent()} onChange={on => permanent = on} label={wording('cms.missing.permanent', 'Permanent')} aria-label={wording('cms.missing.permanentLabel', 'Make the redirect from {path} permanent (308)', { path })})
-    Button(label={add} aria-label={editing ? wording('cms.redirects.saveLabel', 'Save the redirect from {path} to {target}', { path, target: typed() }) : wording('cms.missing.addLabel', 'Redirect {path} to {target}', { path, target: typed() })} size="sm" variant="ghost" disabled={typed().trim() === ''} onClick={async () => { await onAdd(path, typed().trim(), answer()) }})
-  Button(label={wording('cms.missing.gone', 'Gone')} aria-label={wording('cms.missing.goneLabel', 'Answer 410 Gone for {path}', { path })} size="sm" variant="ghost" onClick={async () => { await onAdd(path, '', 410) }})
+    TextInput(value={typed()} onInput={(text) => { typed = text; void offer(text, TYPING_PAUSE_MS) }} onFocus={() => { void offer(typed()) }} placeholder="/" list={listId} aria-label={wording('cms.missing.target', 'Target of the redirect from {path}', { path })} size={20})
+    Checkbox(checked={permanent()} onChange={on => permanent = on} label={wording('cms.missing.permanent', 'Permanent')} aria-label={wording('cms.missing.permanentAria', 'Make the redirect from {path} permanent (308)', { path })})
+    Button(label={add} aria-label={editing ? wording('cms.redirects.saveAria', 'Save the redirect from {path} to {target}', { path, target: typed() }) : wording('cms.missing.addAria', 'Redirect {path} to {target}', { path, target: typed() })} size="sm" variant="ghost" disabled={typed().trim() === ''} onClick={async () => { await onAdd(path, typed().trim(), answer()) }})
+  Button(label={wording('cms.missing.gone', 'Gone')} aria-label={wording('cms.missing.goneAria', 'Answer 410 Gone for {path}', { path })} size="sm" variant="ghost" onClick={async () => { await onAdd(path, '', 410) }})

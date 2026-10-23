@@ -40,7 +40,7 @@ effect(() => {
   onCleanup(() => clearTimeout(timer))
 })
 ---
-div(part="root" role="region" aria-label={wording('ui.markdownEditor.previewLabel', 'Preview')} aria-busy={rendered() === undefined && !failed() ? 'true' : 'false'})
+div(part="root" role="region" aria-label={wording('ui.markdownEditor.preview', 'Preview')} aria-busy={rendered() === undefined && !failed() ? 'true' : 'false'})
   if failed()
     p(part="failed") {wording('ui.markdownEditor.previewFailure', 'The preview could not be shown')}
   else

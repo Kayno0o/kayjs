@@ -21,7 +21,7 @@ export default defineMessages({
     },
     entry: { loading: 'Chargement…', save: 'Enregistrer', reset: 'Annuler', draft: 'Brouillon' },
     field: { item: 'Élément {n}', removeItem: 'Retirer {item}', add: 'Ajouter' },
-    file: { upload: 'Téléverser', replace: 'Remplacer', drop: 'ou déposez un fichier ici', pathLabel: 'Chemin', rejected: '{name} est {type}, que les envois ici n\'acceptent pas : {accept}' },
+    file: { upload: 'Téléverser', replace: 'Remplacer', drop: 'ou déposez un fichier ici', path: 'Chemin', rejected: '{name} est {type}, que les envois ici n\'acceptent pas : {accept}' },
     upload: {
       tooLarge: '{name} pèse {size}, au-delà des {limit} permis par envoi',
       empty: '{name} est vide',

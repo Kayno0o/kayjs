@@ -16,7 +16,7 @@ const ICONS: Record<ToastType, IconSlot> = { error: 'alert', success: 'success',
 
 const look = recipe({ parts: { root: 'kui-toaster', live: 'kui-toaster-live', toast: 'kui-toast', icon: 'kui-toast-icon', message: 'kui-toast-message', dismiss: 'kui-toast-dismiss' } })
 
-const { dismissLabel = wording('ui.toaster.dismissLabel', 'Dismiss notification'), hotkey = 't' } = props<{
+const { dismissLabel = wording('ui.toaster.dismiss', 'Dismiss notification'), hotkey = 't' } = props<{
   // Names each toast's close button for screen readers.
   dismissLabel?: string | undefined
   // Alt and this key move focus to the toasts on screen, where Escape dismisses the focused one; `null` leaves it to the app.

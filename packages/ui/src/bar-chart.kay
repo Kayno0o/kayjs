@@ -78,7 +78,7 @@ function keyDown(event: KeyboardEvent) {
     target.focus()
 }
 
-const nothing = () => emptyLabel ?? wording('ui.barChart.emptyLabel', 'No data yet.')
+const nothing = () => emptyLabel ?? wording('ui.barChart.empty', 'No data yet.')
 ---
 if labels.length === 0
   // The app's id and class stay on whichever element shows.

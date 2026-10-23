@@ -52,10 +52,10 @@ async function send(id?: string) {
 span(part="root")
   Popover(placement={placement} part="menu")
     @trigger(attributes)
-      IconButton({...attributes} icon="bell" label={unread() > 0 ? wording('ui.bell.unreadLabel', '{label}, {count} unread', { label, count: unread() }) : label} variant="ghost" aria-haspopup="true")
+      IconButton({...attributes} icon="bell" label={unread() > 0 ? wording('ui.bell.unread', '{label}, {count} unread', { label, count: unread() }) : label} variant="ghost" aria-haspopup="true")
     div(part="list" aria-label={label})
       if items().length === 0
-        p(part="empty") {wording('ui.bell.emptyLabel', 'No notifications')}
+        p(part="empty") {wording('ui.bell.empty', 'No notifications')}
       for note of items() key={note.id}
         if linked(note.url) as url
           a(part="item" href={url} target={external(url) ? '_blank' : undefined} rel={external(url) ? 'noopener' : undefined} onClick={() => send(note.id)})
@@ -70,6 +70,6 @@ span(part="root")
             if !note.read
               span(part="unread") {wording('ui.bell.unreadMark', '(unread)')}
       if unread() > 0
-        button(part="all" type="button" onClick={() => send()}) {wording('ui.bell.markAllLabel', 'Mark all as read')}
+        button(part="all" type="button" onClick={() => send()}) {wording('ui.bell.markAll', 'Mark all as read')}
   if unread() > 0
     span(part="count" aria-hidden="true") {unread() > 99 ? '99+' : unread()}

@@ -26,7 +26,7 @@ const look = recipe({
   },
 })
 
-const { value, min, max, firstDay, openLabel = wording('ui.dateInput.openLabel', 'Choose a date'), previousLabel = wording('ui.dateInput.previousLabel', 'Previous month'), nextLabel = wording('ui.dateInput.nextLabel', 'Next month'), todayLabel = wording('ui.dateInput.todayLabel', 'Today'), onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'value' | 'type' | 'class' | 'children' | 'min' | 'max' | 'onInput' | 'onChange'> & {
+const { value, min, max, firstDay, openLabel = wording('ui.dateInput.open', 'Choose a date'), previousLabel = wording('ui.dateInput.previous', 'Previous month'), nextLabel = wording('ui.dateInput.next', 'Next month'), todayLabel = wording('ui.dateInput.today', 'Today'), onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'value' | 'type' | 'class' | 'children' | 'min' | 'max' | 'onInput' | 'onChange'> & {
   // The date as `YYYY-MM-DD`, or `''` for none. Without it, the box starts empty and keeps what is picked, for a form posting it by its `name`.
   value?: string | undefined
   // The earliest and latest date allowed, as `YYYY-MM-DD`; the calendar greys out the days outside them.

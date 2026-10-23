@@ -14,7 +14,7 @@ const { rows, onSelect, emptyLabel, ...rest } = props<Omit<JSX.IntrinsicElements
   emptyLabel?: string | undefined
 }>()
 
-const nothing = () => emptyLabel ?? wording('ui.barList.emptyLabel', 'No data yet.')
+const nothing = () => emptyLabel ?? wording('ui.barList.empty', 'No data yet.')
 
 const largest = memo(() => Math.max(0, ...rows.map(row => row.value)))
 

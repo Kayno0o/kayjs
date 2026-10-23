@@ -9,7 +9,7 @@ import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: 'kui-command-palette', search: 'kui-command-palette-search', input: 'kui-command-palette-input', list: 'kui-command-palette-list', heading: 'kui-command-palette-heading', option: 'kui-command-palette-option', text: 'kui-command-palette-text', label: 'kui-command-palette-label', snippet: 'kui-command-palette-snippet', more: 'kui-command-palette-more', group: 'kui-command-palette-group', empty: 'kui-command-palette-empty', count: 'kui-command-palette-count' } })
 
-const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentChange, hotkey = 'k', siteSearch = false, siteSearchLabel = wording('ui.commandPalette.siteSearchLabel', 'In the pages'), siteSearchError = wording('ui.commandPalette.siteSearchError', 'The pages could not be searched'), label = wording('ui.commandPalette.label', 'Search'), placeholder = wording('ui.commandPalette.placeholder', 'Search'), emptyLabel = wording('ui.commandPalette.emptyLabel', 'No results'), recentLabel = wording('ui.commandPalette.recentLabel', 'Recent'), resultsLabel, siteSearchMore } = props<{
+const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentChange, hotkey = 'k', siteSearch = false, siteSearchLabel = wording('ui.commandPalette.siteSearch', 'In the pages'), siteSearchError = wording('ui.commandPalette.siteSearchError', 'The pages could not be searched'), label = wording('ui.commandPalette.label', 'Search'), placeholder = wording('ui.commandPalette.placeholder', 'Search'), emptyLabel = wording('ui.commandPalette.empty', 'No results'), recentLabel = wording('ui.commandPalette.recent', 'Recent'), resultsLabel, siteSearchMore } = props<{
   // Shows the palette; the hotkey opens and closes it too, and `onOpenChange` reports every change for a parent driving it.
   open?: boolean | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
@@ -49,7 +49,7 @@ interface Row {
 // A link marked `external` opens in a new tab whatever it points at; one leaving the site does by itself, so no `target` is written for the others.
 const EXTERNAL = { target: '_blank', rel: 'noopener noreferrer' }
 const id = uid()
-const counted = resultsLabel ?? ((count: number) => wording('ui.commandPalette.resultsLabel', count === 1 ? '1 result' : '{count} results', { count }))
+const counted = resultsLabel ?? ((count: number) => wording('ui.commandPalette.results', count === 1 ? '1 result' : '{count} results', { count }))
 const countedMore = siteSearchMore ?? ((count: number) => wording('ui.commandPalette.siteSearchMore', count === 1 ? '1 more match' : '{count} more matches', { count }))
 const shown = signal(open)
 const followedRecently = signal<string[]>(recent)

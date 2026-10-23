@@ -13,7 +13,7 @@ const KEY_STEP = 40
 
 const look = recipe({ parts: { root: 'kui-zoom-pane', plate: 'kui-zoom-plate', tools: 'kui-zoom-tools' } })
 
-const { label, most = MOST, least = 1, onChange, tools = true, zoomInLabel = wording('ui.zoomPane.zoomInLabel', 'Zoom in'), zoomOutLabel = wording('ui.zoomPane.zoomOutLabel', 'Zoom out'), fitLabel = wording('ui.zoomPane.fitLabel', 'Fit'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'role' | 'tabindex' | 'onChange'> & {
+const { label, most = MOST, least = 1, onChange, tools = true, zoomInLabel = wording('ui.zoomPane.zoomIn', 'Zoom in'), zoomOutLabel = wording('ui.zoomPane.zoomOut', 'Zoom out'), fitLabel = wording('ui.zoomPane.fit', 'Fit'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'role' | 'tabindex' | 'onChange'> & {
   // Names the view for screen readers, since what it holds is a picture rather than words.
   label: string
   // How far in it may be taken, as a multiple of fitted.
