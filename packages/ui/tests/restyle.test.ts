@@ -380,7 +380,7 @@ describe('the remaining field and button components whose recipe holds their loo
   })
 
   test('keeps the kui class of a root, a chip and the combobox input as names, and no other part sets one', () => {
-    for (const name of ['kui-date-input', 'kui-segmented', 'kui-rating', 'kui-slider', 'kui-color-input', 'kui-chip-group', 'kui-chip', 'kui-file-drop', 'kui-copy-btn', 'kui-radio-group', 'kui-combobox', 'kui-multi-select', 'kui-date-range-input'])
+    for (const name of ['kui-date-input', 'kui-segmented', 'kui-rating', 'kui-slider', 'kui-color-input', 'kui-chip-group', 'kui-chip', 'kui-file-drop', 'kui-copy-btn', 'kui-radio-group', 'kui-combobox', 'kui-multi-select', 'kui-date-range-input', 'kui-contact-form'])
       expect(html, name).toMatch(new RegExp(`class="(?:[^"]* )?${name}[ "]`))
 
     expect(html).not.toMatch(REMOVED_CLASS)
