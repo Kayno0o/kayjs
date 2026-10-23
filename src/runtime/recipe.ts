@@ -19,11 +19,14 @@ export type RecipeProps<Recipe> = Recipe extends (values?: infer Values, part?: 
 
 type Without<Props, Names> = { [Key in keyof Props as Key extends Names ? never : Key]: Props[Key] }
 
+// The keys a type names, leaving out the `string` or `number` of an index signature, which would otherwise stand for every added variant.
+type KnownKeys<Props> = keyof { [Key in keyof Props as string extends Key ? never : number extends Key ? never : Key]: unknown }
+
 // A component's props with the values `src/ui.ts` adds, by variant: a variant the props declare gains them in its union, one they lack becomes a prop of its own.
 export type WidenedProps<Props, Added> = Props extends unknown
   ? Without<Props, keyof Added>
-  & { [Name in keyof Pick<Props, keyof Added & keyof Props>]: Pick<Props, keyof Added & keyof Props>[Name] | VariantValue<Record<Added[Name & keyof Added] & string, unknown>> }
-  & { [Name in Exclude<keyof Added, keyof Props>]?: VariantValue<Record<Added[Name] & string, unknown>> | undefined }
+  & { [Name in keyof Pick<Props, keyof Added & KnownKeys<Props>>]: Pick<Props, keyof Added & KnownKeys<Props>>[Name] | VariantValue<Record<Added[Name & keyof Added] & string, unknown>> }
+  & { [Name in Exclude<keyof Added, KnownKeys<Props>>]?: VariantValue<Record<Added[Name] & string, unknown>> | undefined }
   : never
 
 export interface Recipe<Variants extends VariantTable> {

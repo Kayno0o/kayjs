@@ -618,15 +618,21 @@ class ModuleShell {
   private widening(): string | undefined {
     const variants = this.options.uiAdded?.variants
 
-    if (variants === undefined || Object.keys(variants).length === 0 || this.partsType().type === undefined || this.genericComponent)
+    if (variants === undefined || Object.keys(variants).length === 0 || this.partsType().type === undefined)
       return undefined
 
     return `{ ${Object.entries(variants).map(([variant, values]) => `${JSON.stringify(variant)}: ${Object.keys(values).map(value => JSON.stringify(value)).join(' | ') || 'never'}`).join('; ')} }`
   }
 
-  // The call signature a widened component adds to its own type, beside the one it declares.
+  // The call signature a widened component adds to its own type, beside the one it declares: `of` is the type of the function it widens, `typeof name` or what an island wrapper returns. A generic component repeats its type parameters, so each call infers them.
   private widenedCall(of: string): string {
-    return ` & ((props: KayWidened<Parameters<typeof ${of}>[0], ${this.widening()}>) => ReturnType<typeof ${of}>)`
+    if (!this.genericComponent)
+      return ` & ((props: KayWidened<Parameters<${of}>[0], ${this.widening()}>) => ReturnType<${of}>)`
+
+    const parameters = this.text(this.file.typeParameters!)
+    const { name } = this.options
+
+    return ` & (<${parameters}>(props: KayWidened<Parameters<typeof ${name}<${typeParameterNames(parameters).join(', ')}>>[0]${this.kind === 'island' ? ' & KayIslandOptions' : ''}, ${this.widening()}>) => ReturnType<${of}>)`
   }
 
   // An island, or a static component with a hydratable twin, exports its function wrapped.
@@ -636,15 +642,15 @@ class ModuleShell {
     const widened = this.widening() !== undefined
 
     if (this.kind === 'promotable twin')
-      b.add(`\nexport default KayPromote(${JSON.stringify(this.options.promote)}, ${name} as never, KayHydrated as never${this.takesActions ? `, ${JSON.stringify(messageKeys(src))}, true` : islandMessages(src)}) as typeof ${name}${widened ? this.widenedCall(name) : ''}\n`)
+      b.add(`\nexport default KayPromote(${JSON.stringify(this.options.promote)}, ${name} as never, KayHydrated as never${this.takesActions ? `, ${JSON.stringify(messageKeys(src))}, true` : islandMessages(src)}) as typeof ${name}${widened ? this.widenedCall(`typeof ${name}`) : ''}\n`)
     else if (this.kind === 'twin')
-      b.add(`\nexport default ((props: never) => KayInsideIsland() ? KayHydrated(props) : ${name}(props)) as typeof ${name}${widened ? this.widenedCall(name) : ''}\n`)
-    else if (this.kind === 'island' && widened)
-      b.add(`\nconst KayExported = KayIsland(${JSON.stringify(this.options.island)}, ${name}${islandMessages(src, this.options.client, this.options.output === 'html' ? this.options.lives : undefined, this.options.output === 'html' && this.takesActions)})\nexport default KayExported as typeof KayExported${this.widenedCall('KayExported')}\n`)
+      b.add(`\nexport default ((props: never) => KayInsideIsland() ? KayHydrated(props) : ${name}(props)) as typeof ${name}${widened ? this.widenedCall(`typeof ${name}`) : ''}\n`)
+    else if (this.kind === 'island' && widened && !this.genericComponent)
+      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${islandMessages(src, this.options.client, this.options.output === 'html' ? this.options.lives : undefined, this.options.output === 'html' && this.takesActions)}) as unknown as ReturnType<typeof KayIsland<Parameters<typeof ${name}>[0]>>${this.widenedCall(`ReturnType<typeof KayIsland<Parameters<typeof ${name}>[0]>>`)}\n`)
     else if (widened && this.kind !== 'island')
-      b.add(`\nexport default ${name} as typeof ${name}${this.widenedCall(name)}\n`)
+      b.add(`\nexport default ${name} as typeof ${name}${this.widenedCall(`typeof ${name}`)}\n`)
     else if (this.kind === 'island')
-      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${this.genericComponent ? ' as never' : ''}${islandMessages(src, this.options.client, this.options.output === 'html' ? this.options.lives : undefined, this.options.output === 'html' && this.takesActions)})${this.genericIslandType()}\n`)
+      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${this.genericComponent ? ' as never' : ''}${islandMessages(src, this.options.client, this.options.output === 'html' ? this.options.lives : undefined, this.options.output === 'html' && this.takesActions)})${this.genericIslandType()}${widened ? this.widenedCall(`typeof ${name}`) : ''}\n`)
   }
 
   private get wrapped(): boolean {

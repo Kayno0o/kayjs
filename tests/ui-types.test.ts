@@ -28,7 +28,7 @@ const UNION = `---\nimport { recipe } from 'kay'\n\nconst union = recipe({ parts
 const BADGE = 'span(part="root") a\n'
 
 // A copy of the app fixture with three components and the given `src/ui.ts`; its `kay check` problems.
-async function problems(ui: string, use = 'Tile(title="t")\nUnion\n'): Promise<string[]> {
+async function problems(ui: string, use = 'Tile(title="t")\nUnion\n', extra: Record<string, string> = {}): Promise<string[]> {
   const root = resolve(await fixtureCopy('app'))
 
   try {
@@ -41,6 +41,7 @@ async function problems(ui: string, use = 'Tile(title="t")\nUnion\n'): Promise<s
       Bun.write(join(root, 'src/use.kay'), `---\nimport Tile from './components/tile.kay'\nimport Union from './union.kay'\n---\n${use}`),
       Bun.write(join(root, 'package.json'), JSON.stringify({ name: 'app', dependencies: { '@kaynooo/kayjs-ui': '*', 'kay': '*' } })),
       Bun.write(join(root, 'src/ui.ts'), ui),
+      ...Object.entries(extra).map(async ([file, text]) => Bun.write(join(root, file), text)),
     ])
 
     return (await check(root)).map(problem => problem.message)
@@ -108,6 +109,34 @@ describe('the props of a component src/ui.ts adds a value to', () => {
     const messages = await problems(ui('Tile: { parts: \'x\' }'), use)
 
     expect(messages.filter(message => message.includes('"brand"'))).toHaveLength(2)
+  })
+})
+
+// Components the widening must keep working: an index signature in the props, a generic one, an island and a script naming what the compiler once emitted.
+const INDEXED = `---\nimport { recipe } from 'kay'\n\nconst indexed = recipe({ parts: { root: 'i' }, variants: { tone: { plain: '', danger: '' } } })\nconst { tone = 'plain' } = props<{ tone?: 'plain' | 'danger', [key: string]: unknown }>()\n---\np(data-tone={tone}) a\n`
+const GENERIC = `--- <T extends string>\nimport { recipe } from 'kay'\n\nconst generic = recipe({ parts: { root: 'g' }, variants: { tone: { plain: '', danger: '' } } })\nconst { item } = props<{ item: T }>()\n---\np(part="root") {item}\n`
+const ISLAND = `---\nimport { recipe } from 'kay'\n\nconst island = recipe({ parts: { root: 'n' }, variants: { tone: { plain: '', danger: '' } } })\nconst count = signal(0)\n--- module\nconst KayExported = 'mine'\n---\nbutton(part="root" onClick={() => count++}) {KayExported}{count()}\n`
+
+describe('widening beside the shapes it must keep', () => {
+  const ui = (entry: string) => `import { defineUi } from 'kay'\n\nexport default defineUi({ ${entry} })\n`
+  const entry = ['Indexed', 'Generic', 'Island'].map(name => `${name}: { variants: { tone: { brand: 'x' }${name === 'Indexed' ? ', cols: { 2: \'grid-cols-2\' }' : ''} } }`).join(', ')
+  const files = { 'src/indexed.kay': INDEXED, 'src/generic.kay': GENERIC, 'src/island.kay': ISLAND }
+  const imports = '---\nimport Indexed from \'./indexed.kay\'\nimport Generic from \'./generic.kay\'\nimport Island from \'./island.kay\'\n---\n'
+  // Each component is called once, the one under test with the given call.
+  const run = async (name: string, call: string) => problems(ui(entry), undefined, { ...files, 'src/use2.kay': `${imports}${Object.entries({ Indexed: 'Indexed', Generic: 'Generic(item="a")', Island: 'Island' }).map(([key, plain]) => key === name ? call : plain).join('\n')}\n` })
+
+  it('takes an added value on a props type with an index signature and keeps the declared ones', async () => {
+    expect(await run('Indexed', 'Indexed(tone="brand" cols={2} other="x")')).toEqual([])
+    expect((await run('Indexed', 'Indexed(tone="nope")')).some(message => message.includes('"nope"'))).toBe(true)
+  })
+
+  it('takes an added value on a generic component, inferring its parameters', async () => {
+    expect(await run('Generic', 'Generic(item="a" tone="brand")')).toEqual([])
+    expect((await run('Generic', 'Generic(item="a" tone="nope")')).some(message => message.includes('"nope"'))).toBe(true)
+  })
+
+  it('takes an added value on an island whose script names KayExported', async () => {
+    expect(await run('Island', 'Island(tone="brand")')).toEqual([])
   })
 })
 
