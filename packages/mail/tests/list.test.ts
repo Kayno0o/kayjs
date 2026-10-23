@@ -527,7 +527,7 @@ describe('what the subscriber is told and what is kept', () => {
     expect(html).toContain('kmail-subscribe-notice')
     expect(html).toContain('We use your address to send you the mails of this site')
     expect(html).not.toContain('Privacy policy')
-    expect(html).not.toContain('name="wording"')
+    expect(html).toContain('name="wording" value="stock"')
   })
 
   it('shows a notice of its own with the privacy link and posts its wording id', async () => {
@@ -560,11 +560,11 @@ describe('what the subscriber is told and what is kept', () => {
     expect(sent.text).not.toContain('/privacy')
   })
 
-  it('keeps the page and the wording id of a confirmed subscription, the stock notice by its digest', async () => {
+  it('keeps the page and the wording id of a confirmed subscription', async () => {
     const [custom, stock] = [fresh(), fresh()]
 
     await site.call(subscribeNoticed, { email: custom, wording: 'spring-v1' }, { headers: { referer: 'https://fixture.test/notice?utm=1' } })
-    await site.call(subscribe, { email: stock }, { headers: { referer: 'https://fixture.test/subscribe' } })
+    await site.call(subscribe, { email: stock, wording: 'stock' }, { headers: { referer: 'https://fixture.test/subscribe' } })
 
     for (const email of [custom, stock])
       await confirmPost(confirmLink(tokenOf(await confirmationOf(email), '/confirm')))
@@ -572,7 +572,7 @@ describe('what the subscriber is told and what is kept', () => {
     const kept = async (list: ReturnType<typeof mail.list>, email: string) => (await list.subscribers()).find(row => row.email === email)
 
     expect(await kept(mail.list('spring'), custom)).toMatchObject({ source: '/notice', wording: 'spring-v1' })
-    expect(await kept(mail.list(), stock)).toMatchObject({ source: '/subscribe', wording: expect.stringMatching(/^mail\.list\.form\.notice:\w+$/) })
+    expect(await kept(mail.list(), stock)).toMatchObject({ source: '/subscribe', wording: 'stock' })
   })
 })
 

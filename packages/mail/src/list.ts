@@ -24,7 +24,6 @@ const PLACEHOLDER = 'https://unsubscribe.invalid/KAYUNSUBSCRIBE'
 const BODY_CLOSE = /<\/body>/i
 // A mail to nobody in particular, rendered once for the whole list.
 const LIST_RECIPIENT = 'list@kay.invalid'
-const STOCK_NOTICE = 'We use your address to send you the mails of this site, until you unsubscribe with the link in each one.'
 // The first sweep of the stores waits for the app to boot; the next ones follow at this pace.
 const FIRST_SWEEP_MS = 10_000
 const SWEEP_EVERY_MS = 3_600_000
@@ -147,11 +146,6 @@ function sourceOf(ctx: ActionContext): string {
   }
 }
 
-// The id of the stock notice in the page's language, for a form that posts none: its message key and a digest of its text, so a change of wording is told apart.
-function stockWording(): string {
-  return `mail.list.form.notice:${Bun.hash(wording('mail.list.form.notice', STOCK_NOTICE)).toString(36)}`
-}
-
 function randomId(): string {
   return Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString('base64url')
 }
@@ -256,6 +250,15 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
     if (options.store !== undefined)
       given.add(options.store)
 
+    if (options.privacy !== undefined) {
+      try {
+        void new URL(options.privacy, 'https://kay.invalid')
+      }
+      catch {
+        throw configError(`mail.list(${JSON.stringify(name)}): privacy is ${JSON.stringify(options.privacy)}, a path or a URL`)
+      }
+    }
+
     const honeypot = options.honeypot ?? 'website'
     const emailError = () => wording('mail.list.errors.email', 'Please write a valid email address.')
 
@@ -300,7 +303,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
 
           const locale = await renderLocale()
           const origin = siteOrigin()
-          const subscriber = await lists.get().ask(name, email, randomId(), locale, Date.now(), { source: sourceOf(ctx), wording: input.wording ?? stockWording() })
+          const subscriber = await lists.get().ask(name, email, randomId(), locale, Date.now(), { source: sourceOf(ctx), wording: input.wording })
 
           const url = `${origin}${LIST_PATH}/confirm?token=${signToken('confirm', { list: name, id: subscriber.id, locale })}`
           const site = new URL(origin).host

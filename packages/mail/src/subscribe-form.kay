@@ -12,13 +12,13 @@ const { action, noticeText, privacyLabel = wording('mail.list.form.privacy', 'Pr
   privacyLabel?: string | undefined
   // Where the privacy page is, such as `/privacy`: linked after the notice.
   privacy?: string | undefined
-  // Names the wording of `noticeText`, kept with the subscription as the proof of what was agreed to; left out, the stock notice is recorded by a digest of its text and a replaced one as `custom`.
+  // Names the wording of `noticeText`, kept with the subscription as the proof of what was agreed to; left out, the stock notice is recorded as `stock` and a replaced one as `custom`.
   wordingId?: string | undefined
   // Shown once the post went through, whether or not the address was already listed.
   sentLabel?: string | undefined
 }>()
 const notice = noticeText ?? wording('mail.list.form.notice', 'We use your address to send you the mails of this site, until you unsubscribe with the link in each one.')
-const shownWording = wordingId ?? (noticeText === undefined ? undefined : 'custom')
+const shownWording = wordingId ?? (noticeText === undefined ? 'stock' : 'custom')
 ---
 form(class="kmail-subscribe" action={action} novalidate)
   label(class="kmail-subscribe-field")
@@ -31,8 +31,7 @@ form(class="kmail-subscribe" action={action} novalidate)
     | {notice}{' '}
     if privacy
       a(href={privacy} target="_blank" rel="noopener") {privacyLabel}
-  if shownWording
-    input(type="hidden" name="wording" value={shownWording})
+  input(type="hidden" name="wording" value={shownWording})
   button(type="submit") {submitLabel}
   if action.succeeded()
     p(class="kmail-subscribe-sent" role="status") {sentLabel}
