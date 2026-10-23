@@ -1,0 +1,9 @@
+--- server
+import Bell from '@kaynooo/kayjs-ui/bell.kay'
+
+export const page = { guards: false }
+
+await ctx.locals.auth.signInAsGuest()
+---
+p Guest
+Bell
