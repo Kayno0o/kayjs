@@ -125,6 +125,13 @@ export default defineMessages({
     siteNav: { menu: 'Menu' },
     splitLayout: { back: 'Retour', resize: 'Redimensionner la liste' },
     steps: { done: 'terminée' },
+    subscribeForm: {
+      email: 'E-mail',
+      notice: 'Nous utilisons votre adresse pour vous envoyer les mails de ce site, jusqu\'à ce que vous vous désabonniez avec le lien de chacun.',
+      privacy: 'Politique de confidentialité',
+      sent: 'Presque fini : ouvrez le mail que nous venons de vous envoyer et confirmez votre adresse.',
+      submit: 'S\'abonner',
+    },
     table: {
       export: 'Exporter en CSV',
       filter: 'Filtrer',

@@ -19,6 +19,7 @@ const BROWSER_ADDED: Record<string, string | undefined> = {
 // What an effect adds to the browser's render while the server's holds none, by component.
 const EFFECT_ADDED: Record<string, string | undefined> = {
   'contact-form': 'aria-required',
+  'subscribe-form': 'aria-required',
 }
 
 // What the browser takes off once it runs while the server's markup holds it, by component: the native suggestion list a combobox hands over to its own.

@@ -882,6 +882,43 @@ describe('ContactForm', () => {
   })
 })
 
+describe('SubscribeForm', () => {
+  test('draws a required email field, the notice with the privacy link and the wording id the proof keeps', async () => {
+    const { html } = await site.visit('/subscribe')
+
+    expect(html).toContain('name="email"')
+    expect(html).toContain('aria-required="true"')
+    expect(html).toContain('We use your address to send you the mails of this site')
+    expect(html).toContain('<a href="/privacy" target="_blank" rel="noopener">Privacy policy</a>')
+    expect(html).toContain('name="wording" value="ui-v1"')
+    expect(html).toContain('name="website"')
+    expect(html).not.toContain('Almost done')
+  })
+
+  test('words its labels in the page\'s language with no props', async () => {
+    const french = (await site.visit('/fr/subscribe')).html
+
+    expect(french).toContain('S\'abonner')
+    expect(french).toContain('Nous utilisons votre adresse')
+    expect(french).toContain('Politique de confidentialité')
+  })
+
+  test('ties a refused email\'s message to its field and says once a post went through', async () => {
+    const { subscribe } = await import('../src/routes/subscribe.kay')
+    const refused = await site.submit(subscribe, { email: 'nope' }, { from: '/subscribe' })
+    const issues = refused.html.match(/id="([^"]+)"[^>]*data-part="issues"|data-part="issues"[^>]*id="([^"]+)"/)
+    const described = refused.html.match(/<input[^>]*name="email"[^>]*>/)?.[0] ?? ''
+
+    expect(refused.html).toContain('Please write a valid email address.')
+    expect(described).toContain('aria-invalid="true"')
+    expect(described).toContain(`aria-describedby="${issues?.[1] ?? issues?.[2]}"`)
+
+    const sent = await site.submit(subscribe, { email: 'ada@example.com' }, { from: '/subscribe' })
+
+    expect(sent.html).toContain('Almost done: open the mail we just sent you and confirm your address.')
+  })
+})
+
 // A script a page loads.
 const SCRIPT_PATH = /src="(\/[^"]+\.js)"/g
 // A script a module imports, statically or through `import()`.

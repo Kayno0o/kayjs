@@ -2,7 +2,7 @@
 import { contactForm } from '@kaynooo/kayjs-mail'
 import { s } from 'kay'
 
-export const contact = action(...contactForm({ send: async () => undefined as never }, { fields: { consent: s.Boolean() } }))
+export const contact = action(...contactForm({ enqueue: async () => undefined as never }, { fields: { consent: s.Boolean() } }))
 ---
 ---
 import ContactForm from '@kaynooo/kayjs-ui/contact-form.kay'

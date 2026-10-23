@@ -1,0 +1,46 @@
+---
+import { recipe } from 'kay'
+import type { Action } from 'kay'
+import { wording } from 'kay/words'
+import Button from './button.kay'
+import { FIELD_MESSAGE } from './field-look'
+import FormField from './form-field.kay'
+import Notice from './notice.kay'
+
+const look = recipe({ parts: { root: 'kui-subscribe-form', notice: FIELD_MESSAGE.hint } })
+
+const { action, noticeText, label = wording('ui.subscribeForm.email', wording('mail.list.form.email', 'Email')), submitLabel = wording('ui.subscribeForm.submit', wording('mail.list.form.submit', 'Subscribe')), sentLabel = wording('ui.subscribeForm.sent', wording('mail.list.form.sent', 'Almost done: open the mail we just sent you and confirm your address.')), privacyLabel = wording('ui.subscribeForm.privacy', wording('mail.list.form.privacy', 'Privacy policy')), privacy, wordingId } = props<{
+  // The action `mail.list().form()` from kayjs-mail gives, or any with an `email` field.
+  action: Action<never, unknown>
+  // The labels read the `ui.subscribeForm.*` messages, then kayjs-mail's `mail.list.form` ones in the page's language, English and French, which these replace.
+  label?: string | undefined
+  submitLabel?: string | undefined
+  // Shown once the post went through, whether or not the address was already listed.
+  sentLabel?: string | undefined
+  // The line saying what the address is used for, shown by default; replace it with the sender, the content and the frequency of your list.
+  noticeText?: string | undefined
+  privacyLabel?: string | undefined
+  // Where the privacy page is, such as `/privacy`: linked after the notice.
+  privacy?: string | undefined
+  // Names the wording of `noticeText`, kept with the subscription as the proof of what was agreed to; left out, the stock notice is recorded by a digest of its text and a replaced one as `custom`.
+  wordingId?: string | undefined
+}>()
+
+const notice = noticeText ?? wording('ui.subscribeForm.notice', wording('mail.list.form.notice', 'We use your address to send you the mails of this site, until you unsubscribe with the link in each one.'))
+const shownWording = wordingId ?? (noticeText === undefined ? undefined : 'custom')
+---
+// Posts without JavaScript; the honeypot, the time stamp and the refused email's message come from the action.
+form(part="root" action={action} novalidate)
+  FormField(label={label} required issue={action.error('email')})
+    input(field="email" type="email" autocomplete="email")
+  p(part="notice")
+    | {notice}{' '}
+    if privacy
+      a(href={privacy} target="_blank" rel="noopener") {privacyLabel}
+  if shownWording
+    input(type="hidden" name="wording" value={shownWording})
+  Button(type="submit" tone="accent" label={submitLabel})
+  if action.succeeded()
+    Notice(tone="success" size="sm") {sentLabel}
+  else if action.error() as message
+    Notice(tone="danger" size="sm") {message}

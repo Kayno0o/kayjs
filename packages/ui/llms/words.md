@@ -25,7 +25,7 @@ ui: { sidePanel: { close: 'Fermer' } }
 - CommandPalette's `recentLabel` names the heading the recently followed links sit under.
 - ContributionGraph's month names and the day and month a LineChart draws on its axis follow the page's locale; `en` keeps `5 Jan`.
 - Rating's `{value}` and `{max}` and RangeInput's and DateRangeInput's `{label}` fill the messages of the same name.
-- ContactForm's labels read `ui.contactForm.*`, then kayjs-mail's `mail.contact.form.*` messages (English and French) before the English, and MarkdownEditor's `Uploading name…` marker, a placeholder in the text until the upload ends, stays English.
+- ContactForm's labels read `ui.contactForm.*`, then kayjs-mail's `mail.contact.form.*` messages (English and French) before the English, SubscribeForm's `ui.subscribeForm.*`, then kayjs-mail's `mail.list.form.*`, and MarkdownEditor's `Uploading name…` marker, a placeholder in the text until the upload ends, stays English.
 - Texts the app's data owns, a `failure`, a `message` or a `label` it passes, are the app's to word.
 - Messages about the app's data are its own, passed as props (`failure`, `message`, `label`). The library's own words (`Close`, `Cancel`, `Loading…`...) are looked up in the app's catalogs under `ui.<component>.<prop>` keys, `ui.sidePanel.close`, before their English, and a prop given to the component replaces both. The French of every key ships with the library and is read on a French page with no setup.
 
@@ -62,6 +62,7 @@ ui: { sidePanel: { close: 'Fermer' } }
 - `ui.siteNav.*`: `menu` (`Menu`)
 - `ui.splitLayout.*`: `back` (`Back`), `resize` (`Resize list`)
 - `ui.steps.*`: `done` (`completed`)
+- `ui.subscribeForm.*`: `email` (`Email`), `notice` (`We use your address to send you the mails of this site, until you unsubscribe with the link in each one.`), `privacy` (`Privacy policy`), `sent` (`Almost done: open the mail we just sent you and confirm your address.`), `submit` (`Subscribe`)
 - `ui.table.*`: `export` (`Export CSV`), `filter` (`Filter`), `rowCount` (`{count} rows, `1 row` for one`), `selectAll` (`Select all`), `selectRow` (`Select {row}`), `selected` (`{count} selected`)
 - `ui.toaster.*`: `dismiss` (`Dismiss notification`)
 - `ui.zoomPane.*`: `fit` (`Fit`), `zoomIn` (`Zoom in`), `zoomOut` (`Zoom out`)

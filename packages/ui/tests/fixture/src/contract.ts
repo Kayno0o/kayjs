@@ -63,6 +63,7 @@ import Slider from '@kaynooo/kayjs-ui/slider.kay'
 import SplitLayout from '@kaynooo/kayjs-ui/split-layout.kay'
 import Stat from '@kaynooo/kayjs-ui/stat.kay'
 import Steps from '@kaynooo/kayjs-ui/steps.kay'
+import SubscribeForm from '@kaynooo/kayjs-ui/subscribe-form.kay'
 import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
 import Table from '@kaynooo/kayjs-ui/table.kay'
 import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
@@ -162,6 +163,7 @@ export const COMPONENTS = {
   'skeleton': Skeleton,
   'stat': Stat,
   'steps': Steps,
+  'subscribe-form': SubscribeForm,
   'tab-nav': TabNav,
   'table': Table,
   'tabs': Tabs,
@@ -244,6 +246,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'skeleton': { lines: 2, label: 'Loading' },
   'stat': { value: 12, label: 'moons', variant: 'tile', tone: 'danger' },
   'steps': { steps: [{ key: 'account', label: 'Account' }, { key: 'details', label: 'Details' }, { key: 'review', label: 'Review' }], current: 'details', url: '/signup?step=details', done: ['account'], label: 'Signup' },
+  'subscribe-form': { action, label: 'Email', submitLabel: 'Subscribe' },
   'tab-nav': { links: [{ href: '/', label: 'Home' }], current: '/', label: 'Sections' },
   'table': { columns, rows: planets, rowKey: 'name' },
   'tabs': { tabs: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], value: 'a', label: 'Tabs', panel: (value: string) => value },

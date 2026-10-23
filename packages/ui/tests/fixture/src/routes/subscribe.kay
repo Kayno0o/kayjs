@@ -1,0 +1,10 @@
+--- server
+import { mailer } from '@kaynooo/kayjs-mail'
+
+export const subscribe = action(...mailer({ from: 'Fixture <hello@fixture.test>' }).list('ui').form())
+---
+---
+import SubscribeForm from '@kaynooo/kayjs-ui/subscribe-form.kay'
+---
+main
+  SubscribeForm(action={subscribe} privacy="/privacy" wordingId="ui-v1")

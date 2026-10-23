@@ -23,7 +23,7 @@ const shownWording = wordingId ?? (noticeText === undefined ? undefined : 'custo
 form(class="kmail-subscribe" action={action} novalidate)
   label(class="kmail-subscribe-field")
     span(class="kmail-subscribe-label") {label}
-    input(field="email" type="email" autocomplete="email")
+    input(field="email" type="email" autocomplete="email" required)
   span(class="kmail-subscribe-issue" aria-live="polite")
     if action.error('email') as issue
       | {issue}

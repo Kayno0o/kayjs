@@ -872,6 +872,11 @@
     @apply flex flex-col items-start gap-4;
   }
 
+  /* SubscribeForm: the email, its notice and the button in a column. */
+  .kui-subscribe-form {
+    @apply flex flex-col items-start gap-3;
+  }
+
   .kui-contact-consent {
     @apply flex flex-col gap-1;
   }
