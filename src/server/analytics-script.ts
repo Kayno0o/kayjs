@@ -186,7 +186,9 @@ export const NOTICE_SCRIPT = `(() => {
       return
 
     const lang = document.documentElement.lang.split('-')[0].toLowerCase()
-    const words = (Object.hasOwn(texts, lang) ? texts[lang] : undefined) ?? (Object.hasOwn(shipped, lang) ? shipped[lang] : undefined) ?? texts[Object.keys(texts)[0]] ?? shipped.en
+    // The language of the words picked, which can differ from the page's: the notice carries it as its own lang.
+    const wordsLang = [lang, Object.keys(texts)[0], 'en'].find(key => key !== undefined && (Object.hasOwn(texts, key) || Object.hasOwn(shipped, key))) ?? 'en'
+    const words = (Object.hasOwn(texts, wordsLang) ? texts[wordsLang] : undefined) ?? shipped[wordsLang] ?? shipped.en
     const make = (tag, text) => Object.assign(document.createElement(tag), { textContent: text })
     const button = (text, value) => {
       const element = make('button', text)
@@ -199,6 +201,7 @@ export const NOTICE_SCRIPT = `(() => {
 
     banner = make('section', '')
     banner.setAttribute('aria-labelledby', 'kay-analytics-notice')
+    banner.lang = wordsLang
     banner.append(make('p', words.text ?? ''), button(words.agree ?? 'Agree', 'yes'), button(words.refuse ?? 'Refuse', 'no'))
     banner.firstChild.id = 'kay-analytics-notice'
     banner.firstChild.style.cssText = 'margin:0;flex:1 1 14rem'

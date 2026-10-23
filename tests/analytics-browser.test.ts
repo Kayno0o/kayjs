@@ -691,7 +691,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the notice
     await opened.click('#settings')
     await opened.waitFor(`${NOTICE} button`)
 
-    return opened.evaluate(() => ({ text: document.getElementById('kay-analytics-notice')!.textContent, buttons: [...document.querySelectorAll('section[aria-labelledby] button')].map(button => button.textContent) }))
+    return opened.evaluate(() => ({ text: document.getElementById('kay-analytics-notice')!.textContent, lang: document.querySelector<HTMLElement>('section[aria-labelledby]')!.lang, buttons: [...document.querySelectorAll('section[aria-labelledby] button')].map(button => button.textContent) }))
   }
   const close = async () => {
     await opened.click(`${NOTICE} button:first-of-type`)
@@ -720,13 +720,13 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the notice
   it('words the notice in French on a French page, its region included, and in English on any other', async () => {
     await opened.waitFor(`${NOTICE} button`)
 
-    expect(await noticeIn('en')).toEqual({ text: 'We count visits to improve this site with Plausible, without cookies that follow you. Do you agree?', buttons: ['Agree', 'Refuse'] })
+    expect(await noticeIn('en')).toEqual({ text: 'We count visits to improve this site with Plausible, without cookies that follow you. Do you agree?', lang: 'en', buttons: ['Agree', 'Refuse'] })
     await close()
-    expect(await noticeIn('fr')).toEqual({ text: 'Nous comptons les visites pour améliorer ce site avec Plausible, sans cookie qui vous suit. Êtes-vous d\'accord\u00A0?', buttons: ['Accepter', 'Refuser'] })
+    expect(await noticeIn('fr')).toEqual({ text: 'Nous comptons les visites pour améliorer ce site avec Plausible, sans cookie qui vous suit. Êtes-vous d\'accord\u00A0?', lang: 'fr', buttons: ['Accepter', 'Refuser'] })
     await close()
-    expect((await noticeIn('fr-CA')).buttons).toEqual(['Accepter', 'Refuser'])
+    expect(await noticeIn('fr-CA')).toMatchObject({ lang: 'fr', buttons: ['Accepter', 'Refuser'] })
     await close()
-    expect((await noticeIn('de')).buttons).toEqual(['Agree', 'Refuse'])
+    expect(await noticeIn('de')).toMatchObject({ lang: 'en', buttons: ['Agree', 'Refuse'] })
     expect(opened.errors).toEqual([])
   })
 })
