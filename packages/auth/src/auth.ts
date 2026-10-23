@@ -31,7 +31,7 @@ import type { TwoFactorResult, TwoFactorSetup } from './twoFactor'
 import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
 import { configError, nameUser, overHttps, READ_METHODS, requestOfContext, stoppers, underKayDev } from 'kay/library'
-import { clientAddress, crossSiteRefused, crossSiteResponse, rateKey } from 'kay/server'
+import { clientAddress, crossSiteRefused, crossSiteResponse, rateKey, toolCall } from 'kay/server'
 import { protectedResourceMetadata, rootIsFixed, rootUsable, siteRoot } from './authorize/metadata'
 import { serveOAuthServer } from './authorize/routes'
 import { bearerRequest, bearerToken } from './bearerHeader'
@@ -1205,7 +1205,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     }
 
     const token = bearerToken(this.request)
-    const owner = token === undefined ? undefined : await (await load.bearer()).tokenUser(this.core, token, this.request.url)
+    const owner = token === undefined ? undefined : await (await load.bearer()).tokenUser(this.core, token, toolCall(this.request)?.from ?? this.request.url)
 
     const live = owner && !banned(owner.record) ? owner : null
 
@@ -1491,9 +1491,9 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       return (await load.bearer()).issueToken(core, userId, label, tokenOptions)
     },
 
-    // The user a bearer token belongs to, for a websocket handshake sending one in its first message; null for a banned one.
-    async userFromToken(token: string): Promise<User | null> {
-      const owner = await (await load.bearer()).tokenUser(core, token)
+    // The user a bearer token belongs to, for a websocket handshake sending one in its first message; null for a banned one. A token bound to a resource (an OAuth token asked for one) is accepted only with `url`, the address of the handshake, under that resource.
+    async userFromToken(token: string, url?: string): Promise<User | null> {
+      const owner = await (await load.bearer()).tokenUser(core, token, url ?? null)
 
       return owner && !banned(owner.record) ? linkedUser(core, owner.record) : null
     },

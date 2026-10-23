@@ -731,7 +731,7 @@ Agents sign in with PKCE, never a client secret. An access token lasts an hour. 
 
 A whole sign-in ends 90 days after it began. One refresh token used twice ends it at once.
 
-An agent that names a `resource` when it asks to sign in gets tokens bound to it, and they work only on requests to that resource or under its path: a token asked for `/mcp` gets a 401 on `/api`. A token that asked for no resource works on every route within its scopes. At the token endpoint, and when it refreshes, it may name that resource again or leave it out, and any other answers `invalid_target`. Naming more than one `resource` is `invalid_target` at both ends.
+An agent that names a `resource` when it asks to sign in gets tokens bound to it, and they work only on requests to that resource or under its path: a token asked for `/mcp` gets a 401 on `/api`. A token that asked for no resource works on every route within its scopes. The calls kay's `/mcp` makes to your tools count as made to `/mcp`, and `userFromToken(token, url)` for a websocket takes the address of the handshake, refusing a bound token without it. At the token endpoint, and when it refreshes, it may name that resource again or leave it out, and any other answers `invalid_target`. Naming more than one `resource` is `invalid_target` at both ends.
 
 A refresh refused for its resource or scope keeps its token, so the agent can try again, and so does a code exchange refused for its resource or `redirect_uri`, within the code's 60 seconds.
 

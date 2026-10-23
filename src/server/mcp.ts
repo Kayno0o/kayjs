@@ -45,6 +45,7 @@ interface AppTool extends Omit<Tool, 'run'> {
 const AGENT = 'x-kay-agent'
 const CLIENT = 'x-kay-agent-client'
 const TOOL = 'x-kay-agent-tool'
+const FROM = 'x-kay-agent-from'
 const TOKEN = crypto.randomUUID()
 // What the caller's request carries on to the action or route it calls: who it is, how it is worded and which scheme it came by.
 const FORWARDED = ['authorization', 'cookie', 'accept-language', 'user-agent', 'x-forwarded-proto', 'x-forwarded-host']
@@ -202,6 +203,7 @@ async function dispatch(context: CallContext, url: string, init: RequestInit, ac
   headers.set(AGENT, TOKEN)
   headers.set(CLIENT, clientAddress(request, server))
   headers.set(TOOL, tool)
+  headers.set(FROM, request.url)
   // The in-process channel to the visit, independent of `requestIdHeader`, which only names the header on the wire.
   headers.set('x-request-id', requestId(request))
 
@@ -302,10 +304,11 @@ export interface McpOptions {
   path: string
 }
 
-// A tool call the endpoint dispatched: which tool it calls, and the address of the client that asked for it.
+// A tool call the endpoint dispatched: which tool it calls, the address of the client that asked for it and the URL of the MCP request it came in, which a token bound to the endpoint is checked against.
 export interface ToolCall {
   tool: string
   client: string
+  from: string
 }
 
 const toolCalls = new WeakMap<Request, ToolCall>()
@@ -320,7 +323,7 @@ export function toolCall(request: Request): ToolCall | undefined {
 
   const tool = request.headers.get(TOOL)
 
-  return request.headers.get(AGENT) === TOKEN && tool !== null ? { tool, client: request.headers.get(CLIENT) ?? '' } : undefined
+  return request.headers.get(AGENT) === TOKEN && tool !== null ? { tool, client: request.headers.get(CLIENT) ?? '', from: request.headers.get(FROM) ?? request.url } : undefined
 }
 
 // What serves an action a library calls as a tool when no server does, as under `app.handle()`: the app that received the request, so several apps built in one process each run their own calls; held weakly, so an app nothing reaches any more goes.
@@ -343,7 +346,7 @@ export function serveToolCallsThrough(app: Elysia): void {
 export function receiveDispatched(request: Request): void {
   const { headers } = request
 
-  if (!headers.has(AGENT) && !headers.has(CLIENT) && !headers.has(TOOL))
+  if (!headers.has(AGENT) && !headers.has(CLIENT) && !headers.has(TOOL) && !headers.has(FROM))
     return
 
   const marked = toolCall(request)
@@ -354,6 +357,7 @@ export function receiveDispatched(request: Request): void {
   headers.delete(AGENT)
   headers.delete(CLIENT)
   headers.delete(TOOL)
+  headers.delete(FROM)
 
   // A header an outside client sent is dropped with the rest, and counts for nothing.
   if (marked === undefined)

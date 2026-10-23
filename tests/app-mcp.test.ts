@@ -876,6 +876,8 @@ describe('a tool call an app can tell', () => {
     await site.mcp.call('get_seen', {}, { headers: KEY })
     expect(calls.map(call => call?.tool)).toEqual(['ping', 'get_seen'])
     expect(calls.every(call => typeof call?.client === 'string')).toBe(true)
+    // The address the agent called, which a token bound to the endpoint is checked against rather than the route each tool dispatches to.
+    expect(calls.map(call => call === undefined ? undefined : new URL(call.from).pathname)).toEqual(['/mcp', '/mcp'])
   })
 
   it('is seen from a kay guard, so a bearer key reaches the tools and nothing else', async () => {

@@ -687,9 +687,6 @@ describe('a token bound to a resource passes only under it', () => {
     ['http://localhost/mcp', '/', false],
     ['http://localhost/mcp?tenant=1', '/mcp/x', true],
     ['http://localhost/mcp?tenant=1', '/api', false],
-    ['http://localhost/app/mcp', '/app/mcp', true],
-    ['http://localhost/app/mcp', '/mcp', false],
-    ['http://localhost/app/mcp', '/app/api', false],
     ['http://localhost/', '/anything', true],
     ['http://localhost', '/anything', true],
     ['http://localhost/mcp', '/mcp/../api', false],
@@ -698,8 +695,21 @@ describe('a token bound to a resource passes only under it', () => {
     expect(underResource(resource, `http://localhost${path}`)).toBe(covered)
   })
 
-  async function bearerFor(resource: string | undefined) {
-    const app = server()
+  test.each([
+    ['/app/mcp', true],
+    ['/mcp', true],
+    ['/app/mcp/tools', true],
+    ['/mcp/tools', true],
+    ['/app/api', false],
+    ['/api', false],
+    ['/app', false],
+    ['/application/mcp', false],
+  ])('under the mount point /app, a request to %s covers http://localhost/app/mcp: %p', (path, covered) => {
+    expect(underResource('http://localhost/app/mcp', `http://localhost${path}`, '/app')).toBe(covered)
+  })
+
+  async function bearerFor(resource: string | undefined, url?: string) {
+    const app = server(url === undefined ? {} : { url })
     const { body } = await register(app)
     const ada = await signedIn(app)
     const answer = await ada.post('/call/oauthDecide', [params(body.client_id!, resource === undefined ? {} : { resource }), true]) as { ok: true, redirect: string }
@@ -709,13 +719,13 @@ describe('a token bound to a resource passes only under it', () => {
     return { app, authorization: `Bearer ${reply.body.access_token}` }
   }
 
-  async function statuses(resource: string | undefined) {
-    const { app, authorization } = await bearerFor(resource)
+  async function statuses(resource: string | undefined, url?: string, paths = ['/mcp', '/mcp/', '/mcp/tools', '/api/posts']) {
+    const { app, authorization } = await bearerFor(resource, url)
     const gated = new Elysia().use(app.auth.gate()).get('/mcp', () => 'ok', { scope: false }).get('/mcp/tools', () => 'ok', { scope: false }).get('/api/posts', () => 'ok', { scope: false })
     const device = browserOf(new Elysia().use(app.app).use(gated))
     const get = async (path: string) => (await device.fetch(path, { headers: { authorization } })).status
 
-    return [await get('/mcp'), await get('/mcp/'), await get('/mcp/tools'), await get('/api/posts')]
+    return Promise.all(paths.map(get))
   }
 
   test('works under the resource it was asked for and is a 401 elsewhere', async () => {
@@ -724,6 +734,23 @@ describe('a token bound to a resource passes only under it', () => {
 
   test('a resource with a query still binds to its path', async () => {
     expect(await statuses('http://localhost/mcp?tenant=1')).toEqual([200, 200, 200, 401])
+  })
+
+  test('under a base the resource names it and the request arrives with it taken off', async () => {
+    expect(await statuses('http://localhost/app/mcp', 'http://localhost/app', ['/mcp', '/mcp/tools', '/api/posts'])).toEqual([200, 200, 401])
+  })
+
+  test('a handshake reads a bound token only with an address under its resource', async () => {
+    const { app, authorization } = await bearerFor('http://localhost/mcp')
+    const raw = authorization.slice(7)
+
+    expect(await app.auth.userFromToken(raw)).toBeNull()
+    expect(await app.auth.userFromToken(raw, 'http://localhost/api/socket')).toBeNull()
+    expect(await app.auth.userFromToken(raw, 'http://localhost/mcp')).toMatchObject({ email: 'ada@example.com' })
+
+    const unbound = await bearerFor(undefined)
+
+    expect(await unbound.app.auth.userFromToken(unbound.authorization.slice(7))).toMatchObject({ email: 'ada@example.com' })
   })
 
   test('a token asked for no resource works everywhere', async () => {

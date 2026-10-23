@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.72.0
 
+### An OAuth token bound to a resource works only under it
+
+A token the OAuth server issued for a `resource` (the `/mcp` an MCP client asks for) now passes only on requests to that path or under it, within its scopes, and is a 401 on the rest of the app, where it used to pass. The calls kay's `/mcp` endpoint dispatches to your tools count as made to `/mcp`. A client that needs your API with the same token asks for a resource covering it, such as the site root. A token asked for no resource, and one stored before the binding, work everywhere as before. `userFromToken(token)` refuses a bound token unless given the handshake's address as a second argument.
+
 ### kayjs-ui props take enum values: `variant`, `size` and `pixels`
 
 `Badge`'s booleans are values of `variant` (`outline` by default, `solid`, `stamp`): `stamp` is `variant="stamp"` and `solid` is `variant="solid"`. `compact` of `FormField`, `FileDrop` and `Notice` is `size="sm"` (`md` by default), as `size` is a step in the other components. `QrCode`'s `size` in pixels is `pixels`, so `size` means a step everywhere. The old props work until 1.75, and `kay upgrade` rewrites them (the `deprecated-ui-prop` lint): `compact={flag}` becomes `size={flag ? 'sm' : 'md'}`, and a tag giving the new prop beside the old one, or both `stamp` and `solid`, is reported and left to you. An explicit `variant` beats `stamp` and `solid`, while `size="md"` beside `compact` still gives the compact look. Table's `onSelect` gets the picked rows after the keys and TreeView's the node after the id, so a handler taking one argument keeps working.
