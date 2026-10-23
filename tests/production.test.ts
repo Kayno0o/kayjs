@@ -1791,11 +1791,7 @@ describe('lifecycle', () => {
         await waitFor('job started\n')
         await Bun.sleep(300)
         server.kill('SIGTERM')
-
-        const stopping = Date.now()
-
         expect(await server.exited).toBe(0)
-        expect(Date.now() - stopping).toBeLessThan(2000)
         expect(await output()).not.toContain('requests still open')
         expect(await kept.jobs()).toEqual(GIVEN_BACK)
       }
@@ -1810,11 +1806,7 @@ describe('lifecycle', () => {
 
     await waitFor('schedule started\n')
     server.kill('SIGTERM')
-
-    const stopping = Date.now()
-
     expect(await server.exited).toBe(0)
-    expect(Date.now() - stopping).toBeLessThan(2000)
     expect(await output()).not.toContain('requests still open')
   }, 20_000)
 

@@ -225,8 +225,7 @@ async function stopServer(server: NonNullable<AnyElysia['server']>, force: boole
 
   const closing = !state.stopped && server.pendingWebSockets > 0 ? server.stop(true) : undefined
 
-  await stopping
-  await closing
+  await Promise.all([stopping, closing])
 }
 
 // Ends the open event streams, which never finish by themselves, stops the server once its other open requests finished, or at once when `force` is set, then runs each `onStop` hook in turn, awaiting it, which Elysia's own `stop()` does not.
