@@ -22,6 +22,7 @@ const SIZES_URL = '/_kay/dev/sizes'
 const FOOTPRINT_URL = '/_kay/dev/footprint'
 const NOT_FOUND_URL = '/_kay/dev/not-found'
 const STACK_URL = '/_kay/dev/stack'
+const DATA_TAB_URL = '/_kay/dev/tab/data.js'
 // A stack frame in a chunk of the browser build, which the server can point at its `.kay` line.
 const CHUNK_FRAME = /\/_kay\/[\w.-]+\.js:\d+:\d+/
 // The navigations the Network tab keeps: the page's load, then each swap.
@@ -283,6 +284,12 @@ td .copy { margin-left: 4px; }
 .island { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--canvas); }
 .island .top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .island .name { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--accent); }
+.grid { width: max-content; min-width: 100%; border-collapse: collapse; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.grid th { position: sticky; top: 0; text-align: left; padding: 3px 12px 3px 0; color: var(--sub); font-weight: 600; background: var(--mantle); white-space: nowrap; }
+.grid td { padding: 3px 12px 3px 0; border-top: 1px solid var(--line); vertical-align: top; max-width: 28rem; overflow-wrap: anywhere; white-space: pre-wrap; }
+.grid .null { color: var(--sub); font-style: italic; }
+.scroll { overflow: auto; max-height: 24rem; }
+textarea.query { width: 100%; min-height: 4.5rem; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--canvas); color: var(--text); font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; resize: vertical; }
 .signals { width: 100%; border-collapse: collapse; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .signals td { padding: 3px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
 .signals td:first-child { color: var(--sub); width: 2.5rem; }
@@ -316,6 +323,8 @@ const SVG = 'http://www.w3.org/2000/svg'
 const ICONS = {
   'circle-x': 'circle~cx~12~cy~12~r~10|path~d~m15 9-6 6|path~d~m9 9 6 6',
   'triangle-alert': 'path~d~m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3|path~d~M12 9v4|path~d~M12 17h.01',
+  'database': 'ellipse~cx~12~cy~5~rx~9~ry~3|path~d~M3 5V19A9 3 0 0 0 21 19V5|path~d~M3 12A9 3 0 0 0 21 12',
+  'list-checks': 'path~d~m3 17 2 2 4-4|path~d~m3 7 2 2 4-4|path~d~M13 6h8|path~d~M13 12h8|path~d~M13 18h8',
   'server': 'rect~width~20~height~8~x~2~y~2~rx~2~ry~2|rect~width~20~height~8~x~2~y~14~rx~2~ry~2|line~x1~6~x2~6.01~y1~6~y2~6|line~x1~6~x2~6.01~y1~18~y2~18',
   'list-ordered': 'path~d~M10 12h11|path~d~M10 18h11|path~d~M10 6h11|path~d~M4 10h2|path~d~M4 6h1v4|path~d~M6 18H4c0-1 2-2 2-3s-1-1.5-2-1',
   'scan-search': 'path~d~M3 7V5a2 2 0 0 1 2-2h2|path~d~M17 3h2a2 2 0 0 1 2 2v2|path~d~M21 17v2a2 2 0 0 1-2 2h-2|path~d~M7 21H5a2 2 0 0 1-2-2v-2|circle~cx~12~cy~12~r~3|path~d~m16 16-1.9-1.9',
@@ -406,7 +415,7 @@ function worstTone(bad: string[]): 'error' | 'warn' | undefined {
 }
 
 // The tabs kay makes itself; those a library adds sit under a line.
-const CORE_TABS = new Set(['problems', 'request', 'network', 'head', 'screen-reader', 'env', 'images', 'performance', 'routes', 'i18n', 'islands', 'not-found'])
+const CORE_TABS = new Set(['problems', 'request', 'network', 'head', 'screen-reader', 'env', 'images', 'performance', 'routes', 'i18n', 'islands', 'not-found', 'data'])
 
 // A small rounded label, tinted by what it counts or says, with an icon before it when given.
 function pill(tool: Pick<DevTool, 'make' | 'icon'>, text: string, tone?: 'error' | 'warn' | 'ok' | 'accent', icon?: DevIconName): HTMLElement {
@@ -1273,6 +1282,7 @@ export function startDevTool(doc: Document = document): DevTool {
   routesTab(doc, tool, listening.signal)
   i18nTab(doc, tool, missing, listening.signal)
   notFoundTab(doc, tool, listening.signal)
+  lazyTab(tool, { id: 'data', label: 'Data', icon: 'database' }, DATA_TAB_URL)
   doc.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('button[data-kay-open],button[data-kay-copy]') : null
 
@@ -3301,6 +3311,41 @@ function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     if (tab.panel.hidden === false)
       void list()
   }, { signal })
+}
+
+// What a lazy tab's module default-exports: it fills the panel and gives back what reads the tab again each time it shows.
+export type DevTabModule = (tool: DevTool, tab: DevTab) => (() => void) | void
+
+// A tab whose code is a module of its own, fetched the first time the tab opens so the tool carries none of it until then; a module that fails to load says so in the panel and is tried again at the next open.
+function lazyTab(tool: DevTool, options: Pick<DevTabOptions, 'id' | 'label' | 'icon'>, url: string): void {
+  let refresh: (() => void) | undefined
+  let loading = false
+  const tab: DevTab = tool.tab({
+    ...options,
+    shown: () => {
+      if (refresh !== undefined)
+        return refresh()
+
+      if (loading)
+        return
+
+      loading = true
+      void (async () => {
+        try {
+          const loaded = await import(url) as { default: DevTabModule }
+
+          refresh = loaded.default(tool, tab) ?? (() => undefined)
+          refresh()
+        }
+        catch (error) {
+          tab.panel.replaceChildren(tool.make('div', 'empty', `Could not load the ${options.label} tab: ${error instanceof Error ? error.message : String(error)}`))
+        }
+        finally {
+          loading = false
+        }
+      })()
+    },
+  })
 }
 
 const REFERRER_LIMIT = 3

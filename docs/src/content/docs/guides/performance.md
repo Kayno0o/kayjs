@@ -90,6 +90,16 @@ Under "Served by kay" come the sitemap, robots.txt, feeds, favicons, the service
 
 The tab lists only what the running server serves. The CSP reports route shows with `security.reports`, the preview and draft routes with `preview`, the analytics routes with `analytics()`, the search files once the site builds a search index, and so on. If one of your own files serves a path, the tab shows it as yours.
 
+## Data
+
+The Data tab shows the rows of your Postgres database. It reads the database `DATABASE_URL` points to, so an app on pg-orm needs no setup, and says so when the app has no Postgres database.
+
+Pick a table to read its rows, 50 at a time, in the order of its primary key. Long values are cut and a binary column shows its first bytes and its size, so a big table stays light in the browser. `NULL` is shown apart from the text "NULL".
+
+Below the rows, a box runs a query. It takes one `SELECT`, `WITH`, `VALUES` or `TABLE`, runs it in a read-only transaction that gives up after 5 seconds, and shows at most 500 rows. A write, a second statement after a `;` and `SET` are refused before they reach the database.
+
+The tab and what it asks of the server exist under `kay dev` only. A production server has no route for them.
+
 ## Images
 
 The Images tab lists each image of the page. It shows the variant kay served, its format and size, and the size it is drawn at.

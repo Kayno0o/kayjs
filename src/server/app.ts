@@ -40,7 +40,7 @@ import { serveCards } from './card'
 import { compressResponse, fixedTexts } from './compress'
 import { checkRequestIdHeader, healthTimeoutMs, remoteLimits } from './config-limits'
 import { corsRule } from './cors'
-import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_FOOTPRINT, DEV_HEAD, DEV_INSPECTOR, DEV_NOT_FOUND, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_SIZES, DEV_STACK, DEV_STYLES, DEV_TOOL, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devStack, devStyles, devTool, devToolFile, devToolFiles, followBuilds, hotSwap, openInEditor, recordResponses, refuseForeignHosts, rememberBoot, trackRunning } from './dev'
+import { DEV_A11Y, DEV_AXE, DEV_DATA, DEV_DATA_QUERY, DEV_DATA_ROWS, DEV_EVENTS, DEV_FOOTPRINT, DEV_HEAD, DEV_INSPECTOR, DEV_NOT_FOUND, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_SIZES, DEV_STACK, DEV_STYLES, DEV_TAB, DEV_TABS, DEV_TOOL, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devStack, devStyles, devTab, devTool, devToolFile, devToolFiles, followBuilds, hotSwap, openInEditor, recordResponses, refuseForeignHosts, rememberBoot, trackRunning } from './dev'
 import { clearDevErrorsOnAnswer } from './dev-errors'
 import { servedDictionary } from './dictionary'
 import { claimEndpoints } from './endpoint-claims'
@@ -223,6 +223,10 @@ function serveDevRoutes(app: App, root: string, client: ClientBuild, mode: Mode,
     app.get(url, async () => devToolFile(file))
 
   app.get(DEV_A11Y, () => devA11y())
+
+  for (const name of Object.keys(DEV_TABS))
+    app.get(`${DEV_TAB}${name}.js`, () => devTab(name))
+
   app.get(DEV_STYLES, () => devStyles())
   app.get(DEV_AXE, () => devAxe())
   recordResponses(app, base)
@@ -504,6 +508,11 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     const { devNotFound, devRedirect } = await import('./dev-not-found')
     const redirected = Object.keys(options.redirects ?? {})
 
+    const { devData, devQuery, devRows } = await import('./dev-data')
+
+    app.get(DEV_DATA, async ({ request }) => devData(request))
+    app.get(DEV_DATA_ROWS, async ({ request }) => devRows(request))
+    app.post(DEV_DATA_QUERY, async ({ request }) => devQuery(request))
     app.get(DEV_NOT_FOUND, () => Response.json(devNotFound(root, redirected)))
     app.post(DEV_NOT_FOUND, async ({ request }) => devRedirect(root, request, redirected))
     app.get(DEV_ROUTES, () => {

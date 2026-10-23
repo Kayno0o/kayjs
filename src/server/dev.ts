@@ -51,6 +51,10 @@ export const DEV_REQUEST = '/_kay/dev/request'
 export const DEV_SIZES = '/_kay/dev/sizes'
 export const DEV_FOOTPRINT = '/_kay/dev/footprint'
 export const DEV_NOT_FOUND = '/_kay/dev/not-found'
+export const DEV_DATA = '/_kay/dev/data'
+export const DEV_DATA_ROWS = '/_kay/dev/data/rows'
+export const DEV_DATA_QUERY = '/_kay/dev/data/query'
+export const DEV_TAB = '/_kay/dev/tab/'
 
 // Reloads a page kay does not render, such as a library's own, once `kay dev` restarts the server for a changed file: its stream names the server it comes from first.
 export const RESTART_RELOAD = `let b;new EventSource(${JSON.stringify(DEV_EVENTS)}).addEventListener('boot',e=>{const i=e.data.split(' ')[0];if(b&&i!==b)location.reload();b=i})`
@@ -59,6 +63,9 @@ const TOOL_SOURCE = resolve(import.meta.dir, '../runtime/dev-tool.ts')
 const INSPECTOR_SOURCE = resolve(import.meta.dir, '../runtime/dev-inspector.ts')
 const A11Y_SOURCE = resolve(import.meta.dir, '../runtime/dev-a11y.ts')
 const STYLES_SOURCE = resolve(import.meta.dir, '../runtime/dev-styles.ts')
+
+// The tabs whose code the dev tool fetches when the tab first opens, served from `DEV_TAB`.
+export const DEV_TABS: Record<string, string> = { data: resolve(import.meta.dir, '../runtime/dev-tab-data.ts') }
 // What the inspector sends, which a page of another site cannot without a preflight nothing answers.
 const OPEN_HEADER = 'x-kay-dev'
 const MAX_STACK_BYTES = 16 * 1024
@@ -216,6 +223,12 @@ export async function devToolFile(file: string): Promise<Response> {
 
     return new Response(null, { status: 404 })
   }
+}
+
+export function devTab(name: string): Response {
+  const source = DEV_TABS[name]
+
+  return source === undefined ? new Response(null, { status: 404 }) : devModule(source)
 }
 
 // Joins the dev tool, unless it failed to start, whose error the console already shows.
