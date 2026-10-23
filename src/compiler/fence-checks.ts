@@ -532,7 +532,7 @@ function constantsOf(fence: ParsedFence): Map<string, t.Node[]> {
 }
 
 const REQUEST_CONTEXT = new Set(['query', 'params', 'body', 'request', 'url', 'input', 'headers', 'cookies', 'form'])
-// What a visitor posts, which a call result built from it (a sign-in checking a form) is not followed back to.
+// What a visitor posts, bare or by member: a call result built from it (a sign-in checking a form) is not followed back to it, which a direct `redirect(input.next)` still is.
 const POSTED = new Set(['input', 'body', 'form', 'formData'])
 const REQUEST_ROOTS = new Set(['query', 'params', 'body', 'input', 'request', 'searchParams', 'formData'])
 
