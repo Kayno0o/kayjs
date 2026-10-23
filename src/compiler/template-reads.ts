@@ -2,6 +2,7 @@ import type * as t from '@babel/types'
 import type { Attribute, KayFile, Node, Span } from './ast'
 import { parseExpression } from '@babel/parser'
 import { childBlocks, nodeExpressions, visitNodes } from './ast'
+import { patternNames } from './pattern-names'
 import { codeOf, KAY_NAME } from './script'
 
 const WORD = /[\w$]+/g
@@ -72,42 +73,14 @@ function parameters(code: string): Set<string> | undefined {
 
 // The names a pattern or a parameter list (`{ a: b }, [c], ...d` or `x: typeof y`) binds: a key or a type it holds binds none. Every word of it when it does not parse.
 export function bindingNames(pattern: string): string[] {
-  const names: string[] = []
-  let expression: t.Expression
-
   try {
-    expression = parseExpression(`(${pattern}\n) => 0`, { plugins: ['typescript'] })
+    const expression = parseExpression(`(${pattern}\n) => 0`, { plugins: ['typescript'] })
+
+    return expression.type === 'ArrowFunctionExpression' ? expression.params.flatMap(param => patternNames(param)) : []
   }
   catch {
     return pattern.match(WORD) ?? []
   }
-
-  const walk = (node: t.Node | null | undefined): void => {
-    if (node?.type === 'Identifier') {
-      names.push(node.name)
-    }
-    else if (node?.type === 'ObjectPattern') {
-      for (const property of node.properties)
-        walk(property.type === 'RestElement' ? property : property.value)
-    }
-    else if (node?.type === 'ArrayPattern') {
-      for (const element of node.elements)
-        walk(element)
-    }
-    else if (node?.type === 'AssignmentPattern') {
-      walk(node.left)
-    }
-    else if (node?.type === 'RestElement') {
-      walk(node.argument)
-    }
-  }
-
-  if (expression.type === 'ArrowFunctionExpression') {
-    for (const param of expression.params)
-      walk(param)
-  }
-
-  return names
 }
 
 const reads = new WeakMap<KayFile, string[]>()

@@ -2,6 +2,7 @@ import type { Expression, Node, ObjectExpression } from '@babel/types'
 import { existsSync, statSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { parseExpression } from '@babel/parser'
+import { patternNames } from '../compiler/pattern-names'
 import { readSource, SCRIPT_FILE } from './files'
 
 // A place where a source sets a class from a value the build cannot read: no page carries the rule of a class it ends up naming, unless the app lists it with `@source inline`.
@@ -336,37 +337,16 @@ function callVerdict(fns: FunctionNode[], scope: Scope, depth: number): Verdict 
     const returns = returnsOf(fn)
     const params = new Set<string>()
 
-    for (const param of fn.params)
-      parameterNames(param, params)
+    for (const param of fn.params) {
+      for (const name of patternNames(param))
+        params.add(name)
+    }
 
     // A parameter is the caller's to give, whatever a prop of the same name is.
     const inner: Scope = { ...scope, props: new Set([...scope.props].filter(name => !params.has(name))) }
 
     return returns === undefined ? OPEN : merged(returns.map(value => verdictOf(value, inner, depth + 1)))
   }))
-}
-
-// The names a parameter binds, destructuring and defaults included.
-function parameterNames(node: Node, into: Set<string>): void {
-  if (node.type === 'Identifier') {
-    into.add(node.name)
-  }
-  else if (node.type === 'AssignmentPattern') {
-    parameterNames(node.left, into)
-  }
-  else if (node.type === 'RestElement') {
-    parameterNames(node.argument, into)
-  }
-  else if (node.type === 'ObjectPattern') {
-    for (const property of node.properties) {
-      parameterNames(property.type === 'RestElement' ? property : property.value, into)
-    }
-  }
-  else if (node.type === 'ArrayPattern') {
-    for (const element of node.elements) {
-      element && parameterNames(element, into)
-    }
-  }
 }
 
 // What an expression is made of: string literals and the quasis of a template are its parts, a ternary, a logical, a concatenation or an array is all of its branches, a prop is its parent's to name, a `const` is what it was given, and anything else is open.
