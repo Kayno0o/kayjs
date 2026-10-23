@@ -2,7 +2,7 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 
 // Checks that each base image `kay new` pins by digest in src/templates.ts still resolves for its tag through the registry API, and prints the refresh for one that moved: `bun scripts/image-digests.ts`.
-// A moved digest is not a failure of the pin, which keeps building the bytes reviewed; it only means the tag now has newer ones, with the fixes of its base. It reads the registry and changes nothing.
+// A moved digest does not break the pin, which keeps building the bytes reviewed; it means the tag now has newer ones, with the fixes of its base, so the script exits 1 for it as for an unresolved tag. It reads the registry and changes nothing.
 const TEMPLATES = join(resolve(import.meta.dir, '..'), 'src/templates.ts')
 const PINNED = /^const (\w+_IMAGE) = '([^'@:]+):([^'@]+)@(sha256:[0-9a-f]{64})'$/gm
 const REGISTRY = 'https://registry-1.docker.io'

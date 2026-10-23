@@ -145,11 +145,28 @@ describe('large-public-image', () => {
     expect(at(problems)).toEqual(['post.md:17', 'post.md:21', 'post.md:23'])
   })
 
+  it('skips a fence nested in a list item or a blockquote, code after a heading or a fence, and an HTML comment', async () => {
+    const problems = await bare({
+      'src/routes/post.md': ['- item', '', '    ```', '    ![a](/big.jpg)', '    ```', '', '> ```', '> ![b](/big.jpg)', '> ```', '', '1. one', '   - two', '', '     ~~~', '     ![c](/big.jpg)', '     ~~~', '', '# Heading', '    ![d](/big.jpg)', '', '```', 'x', '```', '    ![e](/big.jpg)', '', '<!-- ![f](/big.jpg) -->', '', '![g](/big.jpg)', ''].join('\n'),
+      'src/routes/doc.mdx': 'Text\n\n    ![h](/big.jpg)\n',
+    })
+
+    expect(at(problems)).toEqual(['doc.mdx:3', 'post.md:28'])
+  })
+
+  it('reads an HTML img by its own attributes, a nested bracket alt and the first reference definition', async () => {
+    const problems = await bare({
+      'src/routes/post.md': ['<img data-src="/big.jpg" src="/missing.jpg">', '<img alt="a > b src=/missing.jpg" src="/big.jpg">', '![a [b] c](/big.jpg)', '![ref][Two  Words]', '', '[two words]: /big.jpg', '[two words]: /missing.jpg', ''].join('\n'),
+    })
+
+    expect(at(problems)).toEqual(['post.md:2', 'post.md:3', 'post.md:4'])
+  })
+
   it('blanks a CSS comment in a Markdown style block and keeps /* inside a url()', async () => {
     const problems = await bare({
-      'src/routes/post.md': ['<style>', '/* .a { background: url(/big.jpg) } */', '.b { background: url(/a/*.jpg), url(/big.jpg) }', '</style>', '', 'A /* ![x](/big.jpg) */ prose.', ''].join('\n'),
-      'src/styles.css': '.a { background: url(/a/*.jpg), url(/big.jpg) }\n',
-      'src/routes/index.kay': ['div(style="/* url(/big.jpg) */")', 'div(style="background: url(/a/*.jpg), url(/big.jpg)")', ''].join('\n'),
+      'src/routes/post.md': ['<style>', '/* .a { background: url(/big.jpg) } */', '.b { background: url(/a/*.jpg), url(/big.jpg) /* c */ }', '</style>', '', 'A /* ![x](/big.jpg) */ prose.', ''].join('\n'),
+      'src/styles.css': '.a { background: url(/a/*.jpg), url(/big.jpg) /* c */ }\n',
+      'src/routes/index.kay': ['div(style="/* url(/big.jpg) */")', 'div(style="background: url(/a/*.jpg), url(/big.jpg) /* c */")', ''].join('\n'),
     })
 
     expect(at(problems)).toEqual(['index.kay:2', 'post.md:3', 'post.md:6', 'styles.css:1'])

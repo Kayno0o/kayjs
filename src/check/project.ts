@@ -6,7 +6,7 @@ import type { CollectionFeed, CollectionRoute } from '../content/claims'
 import type { ComponentUse } from '../content/server'
 import type { ContentProblem } from '../content/validate'
 import type { ServedProject, ShadowTypes } from './shadow-types'
-import { existsSync, readFileSync, realpathSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -19,7 +19,7 @@ import { CONFIG_FILE } from '../config'
 import { EXTENSIONS_MARKER, FEEDS_MARKER, PROBLEMS_MARKER, ROUTES_MARKER, USES_MARKER } from '../content/claims'
 import { projectPaths } from '../project'
 import { bootProblems } from './boot'
-import { configLocator } from './config-keys'
+import { configLocator, readConfigSource } from './config-keys'
 import { CONTENT_CHECK, contentPropsCheck } from './generated'
 import { browserModules } from './island-modules'
 import { FILES_MARKER, stampOf } from './loaded'
@@ -78,15 +78,6 @@ export async function contentChecks(root: string, options: CheckOptions, memory?
   })
 
   return { problems, feeds: content.feeds, routes: content.routes, props: props.lines }
-}
-
-function readConfigSource(root: string): string | undefined {
-  try {
-    return readFileSync(join(root, CONFIG_FILE), 'utf8')
-  }
-  catch {
-    return undefined
-  }
 }
 
 // What the shadow tree's write and the config tell, reported ahead of the type errors.

@@ -1,7 +1,6 @@
 import type { CheckDiagnostic, CheckOptions } from '.'
 import type { NamedAttribute } from '../compiler/ast'
 import type { ServedProject } from './shadow-types'
-import { readFileSync } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { findKayFiles, findProjectFiles } from '../build/files'
@@ -10,9 +9,9 @@ import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
 import { parseKay } from '../compiler/parser'
 import { CONFIG_FILE } from '../config'
-import { splitFrontmatter } from '../content/markdown'
+import { INDENTED, splitFrontmatter } from '../content/markdown'
 import { localizedTexts } from '../runtime/localized'
-import { configLocator } from './config-keys'
+import { configLocator, readConfigSource } from './config-keys'
 
 // Past this a raster is worth resizing: the image route serves the same picture as WebP at the width a page shows it, at most 2560 pixels, and a variant at 1280 pixels is seldom above 150 KiB.
 export const LARGE_IMAGE_BYTES = 256 * 1024
@@ -22,24 +21,27 @@ const TRAILING_SLASHES = /\/+$/
 const SOCIAL_IMAGE = /^(?:og|twitter):image(?::url)?$/i
 const STYLE_OR_MARKDOWN = /\.(?:css|md|mdx)$/i
 // A `url()` is matched first so a `/*` inside one (`url(/a/*.jpg)`) does not start a comment.
-const CSS_COMMENT_OR_URL = /url\((?:"[^"\n]*"|'[^'\n]*'|[^)\n]*)\)|\/\*[\s\S]*?\*\//gi
+const CSS_COMMENT_OR_URL = /url\((?:"[^"\n]{0,2000}"|'[^'\n]{0,2000}'|[^)\n]{0,2000})\)|\/\*[\s\S]*?(?:\*\/|$)/gi
 const MARKDOWN_STYLE = /<style\b[\s\S]*?<\/style>/gi
 const INLINE_CODE = /`[^`\n]*`/g
-const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})/
-const INDENTED = /^(?: {4}|\t)/
+// A fence opens or closes after any indentation, blockquote marker or list marker, so one nested in a list item or a quote is still code.
+const FENCE_LINE = /^[ \t]*(?:>[ \t]*)*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)?(`{3,}(?!`)|~{3,}(?!~))(.*)$/
+const HEADING = /^ {0,3}#{1,6}(?:[ \t]|$)/
+const DEEP_INDENT = /^(?: {8}|\t\t| {4}\t)/
+const HTML_COMMENT = /<!--[\s\S]*?(?:-->|$)/g
+const ATTRIBUTE = /\s([\w:-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>"']+)))?/g
 const LIST_ITEM = /^ {0,3}(?:[-*+]|\d{1,9}[.)])[ \t]/
 const NOT_NEWLINE = /[^\n]/g
 const CSS_NEEDLE = /url\(|image-set\(/i
-const CSS_URL = /url\(\s*(?:"([^"]+)"|'([^']+)'|([^"')\s]+))\s*\)/gi
+const CSS_URL = /url\(\s*(?:"([^"\n]+)"|'([^'\n]+)'|([^"')\s]+))\s*\)/gi
 const IMAGE_SET = /(?:-webkit-)?image-set\((?:[^()]|\([^)]*\))*\)/gi
 const IMAGE_SET_STRING = /(?<!url)[(,]\s*(?:"([^"]+)"|'([^']+)')/g
-const MARKDOWN_IMAGE = /!\[([^\]]*)\](?:\[([^\]]*)\])?(?!\()|!\[[^\]]*\]\(\s*<?([^)\s>]+)/g
+const MARKDOWN_IMAGE = /!\[((?:[^\][\n]|\[[^\]\n]*\])*)\](?:\[([^\]\n]*)\])?(?!\()|!\[(?:[^\][\n]|\[[^\]\n]*\])*\]\(\s*<?([^)\s>]+)/g
 const MARKDOWN_DEFINITION = /^ {0,3}\[([^\]]+)\]:[ \t]*<?([^\s>]+)/gm
-const HTML_IMG = /<img\b[^>]*>/gi
-const HTML_SRC = /\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>"']+))/i
-const SRCSET = /\bsrcset\s*=/i
-const FRONTMATTER_IMAGE = /^image:[ \t]*(?:"([^"]+)"|'([^']+)'|([^\s#]+))/m
-const SHARE_HELP = 'move it into `src/` and import it, `import hero from \'./hero.jpg\'` then `img(src={hero})`, so kay serves it resized as WebP at the width the page shows it'
+const HTML_IMG = /<img\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi
+const WHITESPACE = /\s+/g
+const FRONTMATTER_IMAGE = /^image:[ \t]*(?:"([^"\n]+)"|'([^'\n]+)'|([^\s#]+))/m
+const MOVE_HELP = 'move it into `src/` and import it, `import hero from \'./hero.jpg\'` then `img(src={hero})`, so kay serves it resized as WebP at the width the page shows it'
 
 interface Found {
   url: string
@@ -66,29 +68,30 @@ function blankCssComments(text: string): string {
   return text.replace(CSS_COMMENT_OR_URL, span => span.startsWith('/*') ? span.replaceAll(NOT_NEWLINE, ' ') : span)
 }
 
-// The fenced blocks (``` and ~~~), indented code blocks and inline code of a Markdown body. An indented line is code after a blank line or another code line, unless it continues a list item.
-function blankMarkdownCode(text: string): string {
+// The fenced blocks (``` and ~~~), indented code blocks, inline code and HTML comments of a Markdown body. An indented line is code after a blank line, a heading, a fence or another code line, not in the middle of a paragraph; in a list item it takes two levels. MDX has no indented code.
+function blankMarkdownCode(text: string, indentedCode: boolean): string {
   const out: string[] = []
-  let fence: string | undefined
+  let fence: { char: string, length: number } | undefined
   let codeAllowed = true
   let inList = false
 
   for (const line of text.split('\n')) {
     const blanked = line.replaceAll(NOT_NEWLINE, ' ')
+    const marker = FENCE_LINE.exec(line)
 
     if (fence !== undefined) {
       out.push(blanked)
 
-      if (line.trimStart().startsWith(fence[0]!.repeat(fence.length)) && line.trim().replaceAll(fence[0]!, '') === '')
+      if (marker && marker[1]![0] === fence.char && marker[1]!.length >= fence.length && marker[2]!.trim() === '') {
         fence = undefined
+        codeAllowed = true
+      }
 
       continue
     }
 
-    const opening = FENCE_OPEN.exec(line)
-
-    if (opening && !(opening[1]![0] === '`' && line.slice(opening[0].length).includes('`'))) {
-      fence = opening[1]
+    if (marker && !(marker[1]![0] === '`' && marker[2]!.includes('`'))) {
+      fence = { char: marker[1]![0]!, length: marker[1]!.length }
       out.push(blanked)
 
       continue
@@ -101,7 +104,7 @@ function blankMarkdownCode(text: string): string {
       continue
     }
 
-    if (INDENTED.test(line) && codeAllowed && !inList) {
+    if (indentedCode && codeAllowed && (inList ? DEEP_INDENT : INDENTED).test(line)) {
       out.push(blanked)
 
       continue
@@ -112,11 +115,11 @@ function blankMarkdownCode(text: string): string {
     else if (!INDENTED.test(line))
       inList = false
 
-    codeAllowed = false
+    codeAllowed = HEADING.test(line)
     out.push(line)
   }
 
-  return blank(out.join('\n'), INLINE_CODE)
+  return blank(blank(out.join('\n'), INLINE_CODE), HTML_COMMENT)
 }
 
 function* cssUrls(text: string): Generator<Found> {
@@ -130,14 +133,19 @@ function* cssUrls(text: string): Generator<Found> {
   }
 }
 
+// A reference label as Markdown compares it: case and runs of whitespace do not count.
+function label(text: string): string {
+  return text.trim().replaceAll(WHITESPACE, ' ').toLowerCase()
+}
+
 function* markdownUrls(text: string): Generator<Found> {
   const definitions = new Map<string, string>()
 
   for (const match of text.matchAll(MARKDOWN_DEFINITION))
-    definitions.set(match[1]!.trim().toLowerCase(), match[2]!)
+    definitions.set(label(match[1]!), definitions.get(label(match[1]!)) ?? match[2]!)
 
   for (const match of text.matchAll(MARKDOWN_IMAGE)) {
-    const url = match[3] ?? definitions.get((match[2] === undefined || match[2] === '' ? match[1]! : match[2]).trim().toLowerCase())
+    const url = match[3] ?? definitions.get(label(match[2] === undefined || match[2] === '' ? match[1]! : match[2]))
 
     if (url !== undefined)
       yield { url, index: match.index, length: match[0].length }
@@ -145,22 +153,22 @@ function* markdownUrls(text: string): Generator<Found> {
 
   // An `img` with its own `srcset` is left alone, as in a template.
   for (const tag of text.matchAll(HTML_IMG)) {
-    const src = SRCSET.test(tag[0]) ? undefined : HTML_SRC.exec(tag[0])
+    const attributes = [...tag[0].matchAll(ATTRIBUTE)]
+    const src = attributes.find(attribute => attribute[1]!.toLowerCase() === 'src')
 
-    if (src)
-      yield { url: src[1] ?? src[2] ?? src[3] ?? '', index: tag.index + src.index, length: src[0].length }
+    if (src && !attributes.some(attribute => attribute[1]!.toLowerCase() === 'srcset'))
+      yield { url: src[2] ?? src[3] ?? src[4] ?? '', index: tag.index + src.index + 1, length: src[0].length - 1 }
   }
 
   yield* cssUrls(text)
 }
 
 // The `image:` of a Markdown file's frontmatter, which a layout reads for the page's share image.
-function* frontmatterImage(source: string): Generator<Found> {
-  const { frontmatter } = splitFrontmatter(source)
-  const match = frontmatter === undefined ? null : FRONTMATTER_IMAGE.exec(frontmatter)
+function* frontmatterImage(head: string): Generator<Found> {
+  const match = FRONTMATTER_IMAGE.exec(head)
 
   if (match)
-    yield { url: match[1] ?? match[2] ?? match[3] ?? '', index: source.indexOf(frontmatter!) + match.index, length: match[0].length }
+    yield { url: match[1] ?? match[2] ?? match[3] ?? '', index: match.index, length: match[0].length }
 }
 
 // A url as the server compares it, percent-escapes decoded; a malformed escape is left as written.
@@ -203,15 +211,14 @@ export async function largePublicImages(options: CheckOptions, root: string, { p
   const bySrcPath = (url: string) => large.get(decoded(url)) ?? (base !== '' && url.startsWith(`${base}/`) ? large.get(decoded(url.slice(base.length))) : undefined)
   const bySrc = (written: string) => bySrcPath(origin !== undefined && written.startsWith(`${origin}/`) ? written.slice(origin.length) : written)
 
-  const report = (file: string, source: string, start: number, end: number, url: string, size: number) => found.push({
-    file,
-    ...positionAt(source, start),
-    end,
+  const described = (url: string, size: number) => ({
     message: `\`${url}\` is ${Math.round(size / 1024)} KiB and public files are sent as they are, so every visitor downloads it whole`,
-    help: SHARE_HELP,
+    help: MOVE_HELP,
     code: 'large-public-image',
-    severity: level === 'warn' ? 'warning' : 'error',
+    severity: level === 'warn' ? 'warning' as const : 'error' as const,
   })
+
+  const report = (file: string, source: string, start: number, end: number, url: string, size: number) => found.push({ file, ...positionAt(source, start), end, ...described(url, size) })
 
   // The files that name a raster outside an `img`: a CSS `url()` in a stylesheet, a `style` block or attribute, and a Markdown image.
   const scanText = (file: string, urls: Iterable<Found>, shown: string) => {
@@ -229,21 +236,14 @@ export async function largePublicImages(options: CheckOptions, root: string, { p
   const images = localizedTexts(options.seo?.image)
 
   if (images.length > 0) {
-    let configSource: string | undefined
-
-    try {
-      configSource = readFileSync(configFile, 'utf8')
-    }
-    catch {}
-
-    const place = configLocator(configSource)(['seo', 'image'])
+    const place = configLocator(readConfigSource(root))(['seo', 'image'])
 
     for (const written of images) {
       const url = written.replace(QUERY_OR_HASH, '')
       const size = bySrc(url)
 
       if (size !== undefined)
-        found.push({ file: configFile, ...place, message: `\`${url}\` is ${Math.round(size / 1024)} KiB and public files are sent as they are, so every visitor downloads it whole`, help: SHARE_HELP, code: 'large-public-image', severity: level === 'warn' ? 'warning' : 'error' })
+        found.push({ file: configFile, ...place, ...described(url, size) })
     }
   }
 
@@ -293,9 +293,9 @@ export async function largePublicImages(options: CheckOptions, root: string, { p
 
     // The frontmatter is read for its `image` apart from the body.
     const head = source.length - splitFrontmatter(source).body.length
-    const text = blankMarkdownCode(source.slice(0, head).replaceAll(NOT_NEWLINE, ' ') + source.slice(head)).replace(MARKDOWN_STYLE, blankCssComments)
+    const text = blankMarkdownCode(source.slice(0, head).replaceAll(NOT_NEWLINE, ' ') + source.slice(head), !file.endsWith('.mdx')).replace(MARKDOWN_STYLE, blankCssComments)
 
-    scanText(file, [...frontmatterImage(source), ...markdownUrls(text)], source)
+    scanText(file, [...frontmatterImage(source.slice(0, head)), ...markdownUrls(text)], source)
   }
 
   return found

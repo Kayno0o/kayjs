@@ -1,6 +1,9 @@
 import type * as t from '@babel/types'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { parse } from '@babel/parser'
 import { constBindings, exportedDefault, keyName, objectOf, unwrapped } from '../compiler/object-literal'
+import { CONFIG_FILE } from '../config'
 
 export interface ConfigPosition {
   line: number
@@ -11,6 +14,15 @@ const START: ConfigPosition = { line: 1, column: 1 }
 
 function positionOf(node: t.Node): ConfigPosition {
   return node.loc ? { line: node.loc.start.line, column: node.loc.start.column + 1 } : START
+}
+
+export function readConfigSource(root: string): string | undefined {
+  try {
+    return readFileSync(join(root, CONFIG_FILE), 'utf8')
+  }
+  catch {
+    return undefined
+  }
 }
 
 // Where a key sits in kay.config.ts's source: the key itself when it is set, whatever its value, else the deepest key above it that is, else the `defineConfig` call or the default export. A source that cannot be read or has no such export puts everything at line 1.
