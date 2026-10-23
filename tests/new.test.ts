@@ -940,6 +940,10 @@ describe('kay new', () => {
         if (variant.has('server') && variant.has('docker'))
           expect({ features, proxy: contents['kay.config.ts']!.includes('\n  proxy: true,'), lan: contents['kay.config.ts']!.includes('private-range peers') }).toEqual({ features, proxy: true, lan: true })
 
+        // Production needs the public origin for HSTS and the canonical URLs, so the compose requires it and .env.example lists it.
+        if (variant.has('server') && variant.has('docker'))
+          expect({ features, site: contents['compose.prod.yaml']!.includes('SITE_URL: ${SITE_URL:?set SITE_URL}'), example: contents['.env.example']!.split('\n').includes('SITE_URL=') }).toEqual({ features, site: true, example: true })
+
         if (variant.has('auth')) {
           const dockerfile = contents.Dockerfile
           const compose = contents['compose.prod.yaml']

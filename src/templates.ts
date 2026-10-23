@@ -650,7 +650,11 @@ CMD ["./server"]
     # This machine alone: the reverse proxy in front serves the site over HTTPS.
     ports:
       - 127.0.0.1:3000:3000
+    environment:
+      # The public origin of the site: https sends HSTS, and the canonical URLs and the sitemap start from it.
+      SITE_URL: \${SITE_URL:?set SITE_URL}
 `,
+    ...!has('auth') && { '.env.example': '# What production sets, for compose.prod.yaml.\nSITE_URL=\n' },
   }
 }
 
