@@ -51,11 +51,16 @@ export async function withMissingIndexes(db: SQL, indexes: readonly PgIndex[]): 
     await createMissingIndexes(db, indexes)
   }
   catch (error) {
-    if ((error as { errno?: string }).errno !== INSUFFICIENT_PRIVILEGE)
+    if (!privilegeRefused(error))
       throw error
   }
 
   return db
+}
+
+// Whether a failed statement was refused for the role's privileges (Postgres 42501), as a CREATE TABLE is by a role that may not create tables.
+export function privilegeRefused(error: unknown): boolean {
+  return (error as { errno?: string }).errno === INSUFFICIENT_PRIVILEGE
 }
 
 // Whether one of these relations does not exist.
@@ -275,7 +280,7 @@ export function pgJobs(source: PgJobsSource): JobStore {
       await createJobTables(db)
     }
     catch (error) {
-      if ((error as { errno?: string }).errno === INSUFFICIENT_PRIVILEGE)
+      if (privilegeRefused(error))
         throw new Error('kay: pgJobs needs the tables kay_jobs and kay_locks, and its role may not create them: list `jobTables` from kay/pg-orm in the Database\'s tables so a migration creates them, or run `await createJobTables(db)` from kay/server as the database\'s owner', { cause: error })
 
       throw error

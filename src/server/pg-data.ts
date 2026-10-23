@@ -3,7 +3,7 @@ import type { AppStore } from './app-store'
 import type { PgIndex, PgJobsSource } from './pg-jobs'
 import type { SessionStore } from './session'
 import { pgCache } from './pg-cache'
-import { connectionOf, createJobTables, createMissingIndexes, indexStatement, jobTables, pgJobs, relationsMissing, withMissingIndexes } from './pg-jobs'
+import { connectionOf, createJobTables, createMissingIndexes, indexStatement, jobTables, pgJobs, privilegeRefused, relationsMissing, withMissingIndexes } from './pg-jobs'
 import { pgLive } from './pg-live'
 import { pgRooms } from './pg-rooms'
 import { pgNotifications, pgRates, pgSessions, pgVitals } from './pg-stores'
@@ -11,7 +11,6 @@ import { onReload } from './reload'
 
 // What replicas starting together take turns on while one creates the tables.
 const MIGRATION_LOCK = 'kay_data'
-const INSUFFICIENT_PRIVILEGE = '42501'
 
 // The tables `pgData` creates besides the jobs' ones.
 const OWN_TABLES = ['kay_sessions', 'kay_cache', 'kay_events', 'kay_rates', 'kay_meta', 'kay_vitals', 'kay_room_members', 'kay_room_processes', 'kay_room_messages', 'kay_room_state', 'kay_live', 'kay_live_events', 'kay_notifications'] as const
@@ -89,7 +88,7 @@ export function pgHandle(db: SQL): PgHandle {
       await createDataTables(db)
     }
     catch (error) {
-      if ((error as { errno?: string }).errno === INSUFFICIENT_PRIVILEGE)
+      if (privilegeRefused(error))
         throw new Error('kay: pgData needs its kay_* tables, and its role may not create them: run `await createDataTables(db)` from kay/server as the database\'s owner, and list `dataTables` from kay/server in pg-orm\'s `ignoreTables`', { cause: error })
 
       throw error

@@ -105,6 +105,14 @@ An extension may set these fields. Only `name` is required.
 
 Type the result `KayExtension<typeof plugin>` when it has a `server` of its own, so the plugin's locals reach the app's types.
 
+## Tables in the app's Postgres
+
+A library that keeps its own tables in the app's Postgres reads the connection and the schema the way kay's `pgData` does. All three helpers come from `kay/library`, with the `PgJobsSource` type.
+
+- `connectionOf(source)` gives the Bun `SQL` of a `SQL`, a pg-orm `Database` or a connection URL.
+- `relationsMissing(db, names)` tells whether one of the tables does not exist.
+- `privilegeRefused(error)` tells that a statement was refused because the role may not create tables, so the library can say who should.
+
 ## A tab in the dev tool
 
 Every page under `kay dev` carries a dev tool. An extension adds a tab with `devTool`:

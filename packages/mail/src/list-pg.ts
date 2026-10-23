@@ -1,6 +1,7 @@
 import type { SQL } from 'bun'
-import type { PgJobsSource } from 'kay/server'
+import type { PgJobsSource } from 'kay/library'
 import type { Broadcast, BroadcastProgress, DeliveryState, ListStore, Subscriber } from './list-store'
+import { connectionOf, privilegeRefused, relationsMissing } from 'kay/library'
 import { DELIVERY_TRIES } from './list-store'
 
 // The tables the Postgres store keeps its data in, for a pg-orm `ignoreTables` of an app that creates them with `createMailListTables`.
@@ -11,7 +12,6 @@ const PENDING_KEPT_MS = 7 * 24 * 3_600_000
 const BROADCAST_KEPT_MS = 30 * 24 * 3_600_000
 // What replicas starting together take turns on while one creates the tables.
 const MIGRATION_LOCK = 'kay_mail_lists'
-const INSUFFICIENT_PRIVILEGE = '42501'
 
 interface SubscriberRow { id: string, list: string, email: string, status: 'pending' | 'confirmed', locale: string, created_at: string, confirmed_at: string | null }
 interface BroadcastRow { id: string, list: string, created_at: string, finished_at: string | null, message: string }
@@ -24,21 +24,8 @@ function broadcastOf(row: BroadcastRow): Broadcast {
   return { id: row.id, list: row.list, createdAt: Number(row.created_at), finishedAt: row.finished_at === null ? undefined : Number(row.finished_at), message: row.message }
 }
 
-function connectionOf(source: PgJobsSource): SQL {
-  if (typeof source === 'string')
-    return new Bun.SQL(source)
-
-  return 'sql' in source ? source.sql : source
-}
-
 async function rows<Row>(db: SQL, text: string, params: unknown[] = []): Promise<Row[]> {
   return db.unsafe<Row[]>(text, params)
-}
-
-async function missing(db: SQL): Promise<boolean> {
-  const [found] = await rows<{ missing: boolean }>(db, `SELECT ${mailListTables.map(name => `to_regclass('${name}') IS NULL`).join(' OR ')} AS missing`)
-
-  return found?.missing === true
 }
 
 // Creates the three tables and their indexes unless they exist, for an app whose role creates nothing: run it as the database's owner, in a boot script. `pgLists` creates them itself when its role may. Replicas running it together take turns.
@@ -46,7 +33,7 @@ export async function createMailListTables(source: PgJobsSource): Promise<void> 
   const db = connectionOf(source)
 
   try {
-    if (!await missing(db))
+    if (!await relationsMissing(db, mailListTables))
       return
 
     await db.begin(async (tx) => {
@@ -73,14 +60,14 @@ export function pgLists(source: PgJobsSource): ListStore & { close: () => Promis
   let ready: Promise<SQL> | undefined
 
   const create = async (): Promise<SQL> => {
-    if (!await missing(db))
+    if (!await relationsMissing(db, mailListTables))
       return db
 
     try {
       await createMailListTables(db)
     }
     catch (error) {
-      if ((error as { errno?: string }).errno === INSUFFICIENT_PRIVILEGE)
+      if (privilegeRefused(error))
         throw new Error('kayjs-mail: pgLists needs its kay_mail_* tables, and its role may not create them: run `await createMailListTables(db)` from kayjs-mail as the database\'s owner, and list `mailListTables` in pg-orm\'s `ignoreTables`', { cause: error })
 
       throw error
