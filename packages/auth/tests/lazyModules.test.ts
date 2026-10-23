@@ -5,7 +5,7 @@ interface Loaded {
   modules: string[]
 }
 
-// // Not listed, as they cannot load later: captcha, breached, mail, gate, memoryStore and the OAuth client, providers and refresher are exported from `index.ts` as values, and the authorize mount modules are small and read by sync `Auth` methods. Each loads no package of its own.
+// Not listed: captcha, breached, mail, gate, memoryStore and the OAuth client, providers and refresher are exported from `index.ts` as values and cost about 1.4 MB of 60 together, with no measurable load time (#2070), so they stay eager. The authorize mount modules are small and read by sync `Auth` methods.
 // What each feature reads: its own modules, and the packages only it needs.
 const FEATURES = {
   password: { modules: ['password.ts'], packages: [] },
