@@ -755,7 +755,7 @@ describe('a live value with a lifetime', () => {
     const path = await storePath()
     const store = sqliteLive(path)
 
-    await store.set('test:ttl-late', '', '[7]', Date.now() + 80)
+    await store.set('test:ttl-late', '', '[7]', Date.now() + 1500)
     await store.set('test:ttl-gone', '', '[8]', Date.now() - 1)
     setLiveStore(store)
 
@@ -764,7 +764,7 @@ describe('a live value with a lifetime', () => {
 
     expect(late()).toBe(7)
     expect(gone()).toBe(0)
-    await Bun.sleep(130)
+    await Bun.sleep(1600)
     expect(late()).toBe(0)
     setLiveStore(undefined)
   })

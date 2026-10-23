@@ -84,7 +84,7 @@ describe('the Postgres job store when its session is killed', () => {
     const outcome = Promise.allSettled([stuck])
 
     await Bun.sleep(300)
-    await admin.unsafe(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE query LIKE 'UPDATE kay_jobs%' AND state = 'active' AND pid != pg_backend_pid()`)
+    await admin.unsafe(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND query LIKE 'UPDATE kay_jobs%' AND state = 'active' AND pid != pg_backend_pid()`)
 
     const [settled] = await outcome
 
@@ -201,8 +201,8 @@ describe('a queue worker on Postgres when its session is killed', () => {
       app = new Elysia().use(jobs).listen(0)
 
       // The worker's purge of failed jobs waits behind the lock first and is given up on, then its claim waits.
-      await until(async () => ((await admin.unsafe(`SELECT 1 FROM pg_stat_activity WHERE query LIKE 'UPDATE kay_jobs%' AND state = 'active'`)) as unknown[]).length > 0, STORE_TIMEOUT_MS + 5000)
-      await admin.unsafe(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE query LIKE 'UPDATE kay_jobs%' AND state = 'active' AND pid != pg_backend_pid()`)
+      await until(async () => ((await admin.unsafe(`SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND query LIKE 'UPDATE kay_jobs%' AND state = 'active'`)) as unknown[]).length > 0, STORE_TIMEOUT_MS + 5000)
+      await admin.unsafe(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND query LIKE 'UPDATE kay_jobs%' AND state = 'active' AND pid != pg_backend_pid()`)
       await until(() => ran.length > 0 || performance.now() - started > STORE_TIMEOUT_MS + 3000, STORE_TIMEOUT_MS + 5000)
 
       // The database answers again: the worker has backed off and now claims the job.
