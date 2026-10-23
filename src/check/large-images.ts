@@ -38,7 +38,7 @@ const IMAGE_SET = /(?:-webkit-)?image-set\((?:[^()]|\([^)]*\))*\)/gi
 const IMAGE_SET_STRING = /(?<!url)[(,]\s*(?:"([^"]+)"|'([^']+)')/g
 const MARKDOWN_IMAGE = /!\[((?:[^\][\n]|\[[^\]\n]*\])*)\](?:\[([^\]\n]*)\])?(?!\()|!\[(?:[^\][\n]|\[[^\]\n]*\])*\]\(\s*<?([^)\s>]+)/g
 const MARKDOWN_DEFINITION = /^ {0,3}\[([^\]]+)\]:[ \t]*<?([^\s>]+)/gm
-const HTML_IMG = /<img\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi
+const HTML_IMG = /<img\b(?:"[^"]*"|[^>"])*>/gi
 const WHITESPACE = /\s+/g
 const FRONTMATTER_IMAGE = /^image:[ \t]*(?:"([^"\n]+)"|'([^'\n]+)'|([^\s#]+))/m
 const MOVE_HELP = 'move it into `src/` and import it, `import hero from \'./hero.jpg\'` then `img(src={hero})`, so kay serves it resized as WebP at the width the page shows it'
@@ -87,6 +87,12 @@ function blankMarkdownCode(text: string, indentedCode: boolean): string {
         codeAllowed = true
       }
 
+      continue
+    }
+
+    // A fence-looking line inside an indented code block is code.
+    if (indentedCode && codeAllowed && !inList && INDENTED.test(line)) {
+      out.push(blanked)
       continue
     }
 
