@@ -7,6 +7,7 @@ import type { ServerFacts } from './layout-facts'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { KAY_FILE, TS_FILE } from '../build/files'
+import { packageContextModule } from '../build/manifests'
 import { importedSignals } from '../build/signals'
 import { uiEntryOf } from '../build/ui'
 import { compileKay } from '../compiler'
@@ -114,11 +115,23 @@ export function compileShadow(root: string, file: string, source: string, { rout
     return relative(shadowDir, target)
   }
   const queries = layoutQueries(file, source, routesDir, mounts)
-  const { tsx, map, bodyLines, moduleLines, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), outerQueries: moved ? layoutQueries(file, source, routesDir, mounts, { dir: shadowDir, of: shadowOf }) : queries, check: true, page: route !== undefined, typesOnly, insideIsland, relocateImport, lints, importedSignals: signals, ui: uiEntryOf(root, file) })
+  const { tsx, map, bodyLines, moduleLines, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), outerQueries: moved ? layoutQueries(file, source, routesDir, mounts, { dir: shadowDir, of: shadowOf }) : queries, check: true, page: route !== undefined, typesOnly, insideIsland, relocateImport, lints, importedSignals: signals, ui: uiEntryOf(root, file), contextModule: contextSpecifier(file, shadowDir) })
   // Reported as the server reports it, rather than as a type error in the shadow file.
   const unknown = Object.values(route?.matchers ?? {}).filter(matcher => matcherSource(routesDir, matcher) === undefined)
 
   return { shadow: { source, file, tsx, map, bodyLines, moduleLines }, queries, diagnostics: [...diagnostics, ...unknown.map(matcher => ({ start: 0, end: 0, message: `names the matcher ${matcher}, which is neither ${relative(root, matcherFile(routesDir, matcher))} nor one kay ships: ${Object.keys(builtInMatchers).join(', ')}` }))] }
+}
+
+// Where the shadow in `shadowDir` imports the context module of the package `file` belongs to, if it declares one.
+function contextSpecifier(file: string, shadowDir: string): string | undefined {
+  const module = packageContextModule(file)
+
+  if (module === undefined)
+    return undefined
+
+  const path = relative(shadowDir, module).replace(TS_FILE, '')
+
+  return path.startsWith('.') ? path : `./${path}`
 }
 
 // The `query` types of the layouts above a page or a layout, which its shadow depends on besides its own source.

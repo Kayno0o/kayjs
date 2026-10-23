@@ -35,6 +35,18 @@ Every app that installs your library reads those texts with no line in `kay.conf
 
 A language you ship no catalog for shows your texts in the app's default language, and `kay check` does not ask the app to translate them.
 
+## Request values your components read
+
+If your extension gives templates `ctx` keys through a `context` module, name that module in `package.json`:
+
+```json
+{
+  "kay": { "context": "./src/context.ts" }
+}
+```
+
+Your components then read `ctx.<key>` typed, even in an app that does not call your extension. A key no extension declares is still a type error, and a plain `ctx.<key>` read keeps the page loading only that key.
+
 ## Settings the app can replace
 
 Put what an app may change, such as theme classes, in one module. Name it under `"kay": { "settings" }` in `package.json`. It default-exports the settings, and your components import it.

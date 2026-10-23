@@ -77,6 +77,8 @@ export interface GenerateOptions {
   hydratable?: boolean | undefined
   // Points a relative import elsewhere, or keeps it when it returns undefined: a shadow file sits deeper than its source.
   relocateImport?: ((specifier: string) => string | undefined) | undefined
+  // Type checking only: the specifier of the context module `ctx` is also typed by.
+  contextModule?: string | undefined
   // What `src/ui.ts` sets for the component, which its parts take after its recipe and before the caller's `class`.
   ui?: UiEntry | undefined
   // Type checking's counterpart of `ui`: the variants and values `src/ui.ts` adds to the component's props.
@@ -361,8 +363,15 @@ class ModuleShell {
     const imported = new Set([...script.imports, ...fence?.imports ?? []].map(binding => binding.local))
     const implicit = [...script.implicit, ...fence?.implicit ?? []].filter(name => !imported.has(name))
 
-    if (implicit.length > 0)
-      b.add(`import { ${[...new Set(implicit)].join(', ')} } from 'kay'\n`)
+    // `ctx` typed with the keys of the package's own context module as well, on one line so the shadow keeps the source's line numbers.
+    const typed = this.options.contextModule !== undefined && implicit.includes('ctx')
+    const names = [...new Set(implicit)].filter(name => !typed || name !== 'ctx')
+
+    if (names.length > 0)
+      b.add(`import { ${names.join(', ')} } from 'kay'\n`)
+
+    if (typed)
+      b.add(`import { ctx as KayCtx } from 'kay'; import type { ContextOfModule } from 'kay'; const ctx = KayCtx as typeof KayCtx & ContextOfModule<typeof import(${JSON.stringify(this.options.contextModule)})>\n`)
 
     if (this.options.translates === true && !imported.has('t'))
       b.add('import { t } from \'kay/i18n\'\n')

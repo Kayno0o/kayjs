@@ -1,6 +1,6 @@
 import type { KayExtension } from '../config'
 import { existsSync, readFileSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 
 // What config loading reads of the packages an app installs, kept apart from libraries.ts so the server never loads the compiler that one imports.
 export interface Manifest {
@@ -10,7 +10,7 @@ export interface Manifest {
   peerDependencies?: Record<string, string>
   optionalDependencies?: Record<string, string>
   exports?: unknown
-  kay?: { settings?: string, messages?: string }
+  kay?: { settings?: string, messages?: string, context?: string }
 }
 
 export const APP_DEPENDENCIES: (keyof Manifest)[] = ['dependencies', 'devDependencies', 'optionalDependencies']
@@ -53,5 +53,19 @@ export function readManifest(dir: string): Manifest | undefined {
   }
   catch {
     return undefined
+  }
+}
+
+// The `context` module the package holding `file` declares as `"kay": { "context": "./src/context.ts" }`, by its absolute path: its components read the extension's `ctx` keys in any app that imports them, whether or not the app calls the extension.
+export function packageContextModule(file: string): string | undefined {
+  for (let dir = dirname(file); ; dir = dirname(dir)) {
+    if (existsSync(join(dir, 'package.json'))) {
+      const declared = readManifest(dir)?.kay?.context
+
+      return typeof declared === 'string' ? resolve(dir, declared) : undefined
+    }
+
+    if (dir === dirname(dir))
+      return undefined
   }
 }

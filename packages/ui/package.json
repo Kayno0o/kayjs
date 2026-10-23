@@ -19,7 +19,8 @@
   "sideEffects": false,
   "kay": {
     "settings": "./src/settings.ts",
-    "messages": "./src/messages"
+    "messages": "./src/messages",
+    "context": "./src/context.ts"
   },
   "exports": {
     "./*.kay": "./src/*.kay",
