@@ -332,6 +332,8 @@ A module without `cors` refuses every other origin. The module's rule is the onl
 
 A URL bound to an `href`, `src`, `action`, `formaction`, `xlink:href`, `poster` or `data` keeps its scheme only when it is `http`, `https`, `mailto`, `tel`, `sms` or `blob`, a `data:` image, audio or video that is not SVG, or a `data:` plain text, CSV, PDF or JSON file, or has none, as a path does. Any other, `javascript:` first, goes out as `unsafe:javascript:...`, which a browser does nothing with, on the server and in islands alike.
 
+An SVG `data:` image passes on `src` and `poster` only, where the browser draws it as a picture and runs none of its scripts.
+
 ## Answer only to your own host
 
 A page of another site can point its own domain at your server's address and have a visitor's browser talk to it (DNS rebinding). In production, `security.hosts` refuses a request whose `Host` is not yours with a 421.
