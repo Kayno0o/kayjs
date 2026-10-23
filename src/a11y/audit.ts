@@ -36,7 +36,8 @@ export interface Audit {
 }
 
 // A page gets this long to answer, to load and to hydrate.
-const ANSWER_MS = 15_000
+const ANSWER_MS = 30_000
+const ATTEMPTS = 2
 const PAGE_MS = `${ANSWER_MS / 1000}s`
 const REDIRECTS = new Set([301, 302, 303, 307, 308])
 
@@ -83,43 +84,56 @@ export async function auditSite(root: string, config: KayConfig, progress: (path
         continue
       }
 
-      try {
-        // Each page as a first visit: the locale cookie of the one before would send this one to another.
-        if (page === undefined) {
-          page = await browse(url, { timeout: PAGE_MS, strict: false, lenient: true })
-          // The dev server's live reload keeps an event stream open per page, and Chrome opens six connections to a server: a few pages later none is left to load one.
-          await page.initScript(() => {
-            Reflect.set(window, 'EventSource', class {
-              addEventListener = () => undefined
+      let failure: unknown
 
-              close = () => undefined
+      // A tab that fails on a loaded machine gets a second, fresh try before the page is reported.
+      for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+        failure = undefined
+
+        try {
+          // Each page as a first visit: the locale cookie of the one before would send this one to another.
+          if (page === undefined) {
+            page = await browse(url, { timeout: PAGE_MS, strict: false, lenient: true })
+            // The dev server's live reload keeps an event stream open per page, and Chrome opens six connections to a server: a few pages later none is left to load one.
+            await page.initScript(() => {
+              Reflect.set(window, 'EventSource', class {
+                addEventListener = () => undefined
+
+                close = () => undefined
+              })
             })
-          })
+          }
+          else {
+            await page.cdp('Network.clearBrowserCookies')
+            await page.goto(url)
+          }
+
+          const landed = await page.path()
+
+          if (landed !== new URL(url).pathname) {
+            skipped.push({ path: target.path, route: target.route, file: target.file, why: `it lands on ${landed}`, whyFr: `elle redirige vers ${landed}`, failed: false })
+
+            break
+          }
+
+          const violations = await check(page, target)
+
+          result.audited.push({ path: target.path, route: target.route, file: target.file, locale: target.locale })
+          result.violations.push(...violations)
+
+          break
         }
-        else {
-          await page.cdp('Network.clearBrowserCookies')
-          await page.goto(url)
+        catch (error) {
+          failure = error
+          page?.close()
+          page = undefined
         }
-
-        const landed = await page.path()
-
-        if (landed !== new URL(url).pathname) {
-          skipped.push({ path: target.path, route: target.route, file: target.file, why: `it lands on ${landed}`, whyFr: `elle redirige vers ${landed}`, failed: false })
-
-          continue
-        }
-
-        const violations = await check(page, target)
-
-        result.audited.push({ path: target.path, route: target.route, file: target.file, locale: target.locale })
-        result.violations.push(...violations)
       }
-      catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
+
+      if (failure !== undefined) {
+        const message = failure instanceof Error ? failure.message : String(failure)
 
         skipped.push({ path: target.path, route: target.route, file: target.file, why: `the browser could not check it: ${message}`, whyFr: `le navigateur n'a pas pu la vérifier : ${message}`, failed: true })
-        page?.close()
-        page = undefined
       }
     }
   }
