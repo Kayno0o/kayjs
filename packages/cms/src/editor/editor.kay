@@ -756,7 +756,10 @@ async function saveEverything(): Promise<void> {
 
 // Asks before the page, a link or a reload drops edits not saved.
 guardLeave(() => drafts.anyChanged(entries))
-onCleanup(forgetOpened)
+onCleanup(() => {
+  waiting += 1
+  forgetOpened()
+})
 
 // Renders the page again as visitors see it, once kay forgot the edit mode.
 async function stopEditing(): Promise<void> {
