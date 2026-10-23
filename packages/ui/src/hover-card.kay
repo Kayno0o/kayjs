@@ -3,7 +3,7 @@ import type { JSX } from 'kay'
 import type { HoverCardPlacement } from './hover-card'
 import { effect, onCleanup, recipe, uid } from 'kay'
 
-// 'kui-hover-card' stays as the component's name for an app's CSS and the always-hidden guard; theme.css still has its old rule until 1.74.
+// 'kui-hover-card' stays as the component's name for an app's CSS and the always-hidden guard.
 // It never takes the pointer, so it cannot flicker the hover that shows it.
 const look = recipe({
   parts: {

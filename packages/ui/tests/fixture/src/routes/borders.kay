@@ -1,4 +1,5 @@
 ---
+import Card from '@kaynooo/kayjs-ui/card.kay'
 import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
 import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
 import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
@@ -10,15 +11,12 @@ const choices = [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }]
 ---
 //- One of each box the keyline token sizes, the components drawn by their own recipe and the rest written with their class whole so its rules ship.
 main
-  div#card.kui-card
-    div#card-head.kui-card-head head
+  Card#card(title="Card")
   div#row.kui-card-row row
   div#widget.kui-widget widget
   div#notice.kui-notice notice
   span#avatar.kui-avatar A
   button#button.kui-btn(type="button") button
-  div#side-panel.kui-side-panel panel
-  div#tooltip.kui-tooltip tip
   div#table-wrap.kui-table-wrap table
   div#section.kui-collapsible-section(data-boxed) section
   div#save-bar.kui-save-bar bar
@@ -26,23 +24,7 @@ main
   FileDrop#file-drop(onFiles={() => undefined})
     @content(zone)
       | drop {zone.dragging()}
-  div#step.kui-pagination-step step
-  div#chart-tooltip.kui-line-chart-tooltip chart
   ChipGroup#chips(label="Chips" options={choices} value={['a']})
   ul#icon-grid.kui-icon-grid
-  div#scatter-plot.kui-scatter-chart-plot plot
-  div#cropper-stage.kui-image-cropper-stage stage
-  span#toggle.kui-toggle-track
-  div#table-filter.kui-table-filter filter
-  div#table-selection.kui-table-selection selected
-  div#narrow-table.kui-table-wrap(data-narrow="stack" style="width: 15rem")
-    table.kui-table
-      thead
-        tr#narrow-head
-          th.kui-table-head-cell
-            button#sort-btn.kui-table-sort-btn(type="button") sort
   Pagination#pager(page={2} pages={3} url="/borders")
   SiteNav(id="recipe-list" links={[{ href: '/', label: 'Home' }]} current="/" label="Recipe")
-  nav.kui-site-nav
-    ul#site-nav-list.kui-site-nav-list(popover)
-      li.kui-site-nav-link link

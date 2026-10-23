@@ -8,7 +8,7 @@ import { OUTSIDE } from './outside'
 import { isPaletteLink, paletteHits, paletteMatches, paletteSections, splitMatches, withRecent } from './palette'
 import { wording } from 'kay/words'
 
-// 'kui-command-palette' stays as the component's name for an app's CSS and the always-hidden guard; theme.css still has its old rule until 1.74.
+// 'kui-command-palette' stays as the component's name for an app's CSS and the always-hidden guard.
 const look = recipe({
   parts: {
     root: 'kui-command-palette mx-auto mt-[10vh] mb-auto flex max-h-[min(70dvh,40rem)] w-full max-w-[min(36rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-lg border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-surface p-0 text-foreground',

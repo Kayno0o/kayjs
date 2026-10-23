@@ -194,7 +194,6 @@
 
 /* The same for a site nav's links, a popover below lg whatever a list rule of the app's, such as a prose style, gives its `ul`. */
 @media (width < theme(--breakpoint-lg)) {
-  .kui-site-nav-list:not(:popover-open),
   .kui-site-nav > [data-part='list']:not(:popover-open) {
     display: none;
   }
@@ -236,7 +235,7 @@
     @apply rounded-md;
   }
 
-  :is(.kui-card, .kui-card-row, .kui-widget, .kui-notice, .kui-toast, .kui-dialog, .kui-command-palette, .kui-popover, .kui-hover-card) {
+  :is(.kui-card-row, .kui-widget, .kui-notice) {
     @apply rounded-lg;
   }
 
@@ -269,7 +268,7 @@
     }
   }
 
-  /* Stays after 1.74 for the toast, whose shadow a skin replaces by its selector, which a utility on the toast would beat. */
+  /* For the toast, whose shadow a skin replaces by its selector, which a utility on the toast would beat. */
   :is(.kui-card, .kui-card-row, .kui-widget, .kui-toast) {
     box-shadow: var(--shadow-raised);
   }
@@ -425,10 +424,6 @@
     @apply inline-block size-5 shrink-0;
   }
 
-  .kui-spinner {
-    @apply animate-spin motion-reduce:animate-none;
-  }
-
   .kui-icon-btn {
     @apply inline-flex shrink-0 items-center justify-center p-0 transition disabled:pointer-events-none disabled:opacity-40;
 
@@ -477,50 +472,12 @@
     @apply flex flex-col gap-2;
   }
 
-  /* Label and value on one line, the bar spanning both under them, so a long label never squeezes the bar. */
-  .kui-bar-list-row {
-    @apply grid w-full grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-1 text-left text-sm;
-
-    &:where([data-interactive]) {
-      @apply cursor-pointer hover:text-accent;
-    }
-  }
-
-  .kui-bar-list-label {
-    @apply truncate text-foreground;
-  }
-
-  .kui-bar-list-value {
-    @apply text-xs text-muted tabular-nums;
-  }
-
-  .kui-bar-list-track {
-    @apply col-span-2 block h-1.5 overflow-hidden bg-surface-strong;
-  }
-
-  .kui-bar-list-fill {
-    @apply block h-full bg-accent;
-  }
-
   .kui-bar-list-empty {
     @apply text-xs text-[var(--color-kui-overlay1,var(--color-muted))];
   }
 
   .kui-card-row {
     @apply flex items-center gap-3 border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border bg-surface p-4;
-  }
-
-  .kui-card-row-body {
-    @apply min-w-0 flex-1;
-  }
-
-  /* Dimmed until the row is hovered or holds focus. */
-  .kui-card-row-actions {
-    @apply flex shrink-0 items-center gap-2 opacity-60 transition-opacity;
-  }
-
-  :where(.kui-card-row:hover, .kui-card-row:focus-within) .kui-card-row-actions {
-    @apply opacity-100;
   }
 
   .kui-collapsible-section {
@@ -582,155 +539,12 @@
     }
   }
 
-  .kui-command-palette {
-    @apply mx-auto mt-[10vh] mb-auto flex max-h-[min(70dvh,40rem)] w-full max-w-[min(36rem,calc(100vw-2rem))] flex-col overflow-hidden border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-surface p-0 text-foreground;
-  }
-
-  .kui-command-palette-search {
-    @apply flex shrink-0 items-center gap-2 border-b border-border px-4;
-  }
-
-  .kui-command-palette-search :where(.kui-icon) {
-    @apply size-5 shrink-0 text-[var(--color-kui-overlay1,var(--color-muted))];
-  }
-
-  .kui-command-palette-input {
-    @apply h-11 min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-[var(--color-kui-overlay1,var(--color-muted))];
-
-    &:focus-visible {
-      outline: 2px solid var(--color-accent);
-      outline-offset: -2px;
-    }
-  }
-
-  .kui-command-palette-list {
-    @apply min-h-0 flex-1 overflow-y-auto py-1;
-  }
-
-  .kui-command-palette-heading {
-    @apply px-4 pt-2 pb-1;
-  }
-
-  .kui-command-palette-option {
-    @apply flex h-11 w-full cursor-pointer items-center gap-3 px-4 text-left text-sm text-foreground no-underline outline-none;
-
-    /* The tint alone is too faint to find, so an accent bar marks the option Enter opens; forced colours drop both and paint the transparent outline instead. */
-    &:where([aria-selected='true']) {
-      @apply bg-hover;
-      box-shadow: inset 2px 0 0 var(--color-accent);
-      outline: 2px solid transparent;
-      outline-offset: -2px;
-    }
-  }
-
-  .kui-command-palette-option :where(.kui-icon) {
-    @apply size-5 shrink-0 text-[var(--color-kui-overlay1,var(--color-muted))];
-  }
-
-  .kui-command-palette-label {
-    @apply min-w-0 flex-1 truncate;
-  }
-
-  .kui-command-palette-group {
-    @apply max-w-[40%] shrink-0 truncate text-xs text-muted;
-  }
-
-  /* A section the site search found: its heading over the line it was found in, the words searched for in the accent colour in both. */
-  .kui-command-palette-option:has(.kui-command-palette-text) {
-    @apply h-auto py-2;
-  }
-
-  .kui-command-palette-text {
-    @apply flex min-w-0 flex-1 flex-col;
-  }
-
-  .kui-command-palette-snippet {
-    @apply line-clamp-2 text-xs text-muted;
-  }
-
-  .kui-command-palette-more {
-    @apply text-xs text-muted;
-  }
-
-  .kui-command-palette-text :where(mark) {
-    @apply bg-transparent font-semibold text-accent;
-  }
-
-  .kui-command-palette-empty {
-    @apply px-4 py-6 text-center text-sm text-muted;
-  }
-
-  .kui-command-palette-count {
-    @apply sr-only;
-  }
-
   .kui-checkbox {
     @apply inline-flex cursor-pointer items-center gap-2;
-
-    &:where(:has(.kui-checkbox-input:disabled)) {
-      @apply cursor-not-allowed opacity-50;
-    }
-
-    &:where(:has(.kui-checkbox-input[aria-busy='true'])) {
-      @apply cursor-progress;
-    }
-  }
-
-  .kui-checkbox-input {
-    @apply m-0 size-4 shrink-0 cursor-[inherit];
-    accent-color: var(--color-accent);
-
-    &:focus-visible {
-      outline: 2px solid var(--color-accent);
-      outline-offset: 2px;
-    }
-  }
-
-  .kui-checkbox-label {
-    @apply text-sm text-foreground;
-  }
-
-  .kui-checkbox-hint {
-    @apply text-xs text-muted;
   }
 
   .kui-radio-group {
     @apply flex flex-col gap-2;
-  }
-
-  .kui-radio {
-    @apply flex flex-col;
-  }
-
-  .kui-radio-choice {
-    @apply inline-flex cursor-pointer items-center gap-2 self-start;
-
-    &:where(:has(.kui-radio-input:disabled)) {
-      @apply cursor-not-allowed opacity-50;
-    }
-  }
-
-  /* On the choices, whose own pointer cursor would cover the group's. */
-  .kui-radio-group:where([aria-busy='true']) .kui-radio-choice {
-    @apply cursor-progress;
-  }
-
-  .kui-radio-input {
-    @apply m-0 size-4 shrink-0 cursor-[inherit];
-    accent-color: var(--color-accent);
-
-    &:focus-visible {
-      outline: 2px solid var(--color-accent);
-      outline-offset: 2px;
-    }
-  }
-
-  .kui-radio-label {
-    @apply text-sm text-foreground;
-  }
-
-  .kui-radio-description {
-    @apply pl-6 text-xs text-muted;
   }
 
   .kui-chip-group {
@@ -744,132 +558,22 @@
 
   .kui-chip {
     @apply relative cursor-pointer;
-
-    &:where(:has(.kui-chip-input:disabled)) {
-      @apply cursor-not-allowed opacity-50;
-    }
-  }
-
-  .kui-chip-input {
-    @apply absolute size-0 opacity-0;
-  }
-
-  .kui-chip-label {
-    @apply inline-flex items-center gap-1 border-solid rounded-md border-[length:var(--kui-border-width,var(--border-width))] border-border bg-surface px-2.5 py-1 text-xs text-muted transition-colors hover:text-foreground;
-  }
-
-  :where(.kui-chip-input:checked) + .kui-chip-label {
-    @apply border-accent bg-accent text-accent-foreground hover:text-accent-foreground;
-  }
-
-  :where(.kui-chip-input:focus-visible) + .kui-chip-label {
-    outline: 2px solid var(--color-accent);
-    outline-offset: 2px;
-  }
-
-  .kui-chip-icon {
-    @apply size-3.5 shrink-0;
-  }
-
-  .kui-confirm-delete-armed {
-    @apply inline-flex items-center gap-1;
   }
 
   .kui-confirm-delete-link {
     @apply cursor-pointer text-xs text-muted underline transition-colors hover:text-foreground disabled:cursor-default disabled:opacity-40;
   }
 
-  .kui-confirm-delete-message {
-    @apply text-muted;
-  }
-
   .kui-contribution-graph {
     @apply grid w-fit grid-flow-col grid-rows-7 gap-[3px];
-  }
-
-  /* Cells are placed by hand under a row of month labels, and fixed-width columns let a label run past its own week. */
-  .kui-contribution-graph-months {
-    @apply grid-flow-row auto-cols-[0.75rem] grid-rows-[auto_repeat(7,0.75rem)];
-  }
-
-  .kui-contribution-month {
-    @apply row-start-1 w-0 text-2xs leading-none whitespace-nowrap text-muted;
-  }
-
-  .kui-contribution-cell {
-    @apply size-3 rounded-[3px] bg-surface transition-transform hover:scale-125;
-
-    &[data-today] {
-      @apply ring-1 ring-accent ring-offset-1 ring-offset-surface;
-    }
   }
 
   .kui-copy-btn {
     @apply px-1.5 py-0.5;
   }
 
-  .kui-copy-btn-text {
-    @apply inline-flex flex-col items-center;
-
-    &::after {
-      content: attr(data-other);
-      height: 0;
-      overflow: hidden;
-      visibility: hidden;
-    }
-  }
-
-  .kui-copy-btn-live {
-    @apply sr-only;
-  }
-
-  .kui-dialog {
-    @apply m-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-[min(42rem,calc(100vw-2rem))] flex-col overflow-hidden border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-surface p-0;
-  }
-
-  /* The width, `md` being the base above; `full` fills the viewport minus the margin on both axes, `lg` being the widest that still reads as a dialog. */
-  .kui-dialog:where([data-size='sm']) {
-    @apply max-w-[min(28rem,calc(100vw-2rem))];
-  }
-
-  .kui-dialog:where([data-size='lg']) {
-    @apply max-w-[min(72rem,calc(100vw-2rem))];
-  }
-
-  .kui-dialog:where([data-size='full']) {
-    @apply h-[calc(100dvh-2rem)] max-w-[calc(100vw-2rem)];
-  }
-
-  .kui-dialog-title {
-    @apply shrink-0 border-b border-border px-5 py-4 text-lg [font-weight:var(--font-weight-kui-heading,var(--font-weight-semibold))] tracking-label text-foreground [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
-  }
-
-  .kui-dialog-body {
-    @apply min-h-0 flex-1 overflow-y-auto px-5 py-4;
-  }
-
-  .kui-dialog:where([data-bare]) .kui-dialog-body {
-    @apply overflow-hidden p-0;
-  }
-
-  .kui-dialog-footer {
-    @apply flex shrink-0 flex-wrap justify-end gap-2 border-t border-border px-5 py-4;
-  }
-
   .kui-empty-state {
     @apply flex flex-col items-center gap-3 py-16;
-  }
-
-  .kui-empty-state-title {
-    @apply text-xs [font-weight:var(--font-weight-kui-heading,var(--font-weight-semibold))] tracking-label text-accent [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
-  }
-
-  .kui-empty-state-description {
-    @apply text-xs text-muted;
-  }
-
-  .kui-empty-state-actions {
-    @apply flex flex-wrap items-center justify-center gap-2;
   }
 
   .kui-file-drop {
@@ -888,10 +592,6 @@
     }
   }
 
-  .kui-file-drop-input {
-    @apply hidden;
-  }
-
   .kui-form-grid {
     @apply grid grid-cols-1 gap-3 sm:grid-cols-2;
   }
@@ -903,10 +603,6 @@
     &:where([data-compact]) {
       @apply w-auto;
     }
-  }
-
-  .kui-form-field-label {
-    @apply contents;
   }
 
   /* ContactForm: its fields and the button in a column. */
@@ -925,10 +621,6 @@
 
   .kui-contact-privacy {
     @apply text-xs;
-  }
-
-  :where(.kui-form-field, .kui-form-field-label) > * {
-    @apply basis-full;
   }
 
   .kui-form-field
@@ -954,40 +646,6 @@
   /* A control made of several inputs is a fieldset, its label the legend: neither draws a frame of its own. */
   .kui-form-field-group {
     @apply m-0 min-w-0 border-0 p-0;
-  }
-
-  /* A floated legend is no longer the fieldset's rendered legend, so it sits in the row like the label's head; the float itself does nothing in a flex row. Its padding is zeroed so an app's own `legend` styles do not indent it. */
-  .kui-form-field-head {
-    @apply float-left order-first p-0 flex flex-1 basis-auto flex-wrap items-center gap-2;
-  }
-
-  /* Held on the label's line, outside the label, and moved under it when the line is too short for both. */
-  .kui-form-field-action {
-    @apply order-first ml-auto flex basis-auto flex-wrap items-center justify-end gap-1.5;
-  }
-
-  .kui-form-field-required {
-    @apply ml-0.5 text-danger;
-  }
-
-  .kui-form-field-hint {
-    @apply text-xs text-muted;
-  }
-
-  .kui-form-field-issues {
-    @apply flex flex-col;
-  }
-
-  .kui-form-field-issue {
-    @apply text-xs text-danger;
-  }
-
-  .kui-form-dialog-footer {
-    @apply flex w-full flex-wrap items-center gap-2;
-  }
-
-  .kui-form-dialog-actions {
-    @apply ml-auto flex flex-wrap justify-end gap-2;
   }
 
   /* Sticks to the bottom of the screen while the form is taller than it, clear of a phone's home bar; the buttons wrap under the text when the line is short. */
@@ -1060,58 +718,9 @@
     @apply flex flex-col gap-3;
   }
 
-  .kui-carousel-viewport {
-    @apply relative w-full overflow-hidden bg-surface;
-  }
-
-  /* Every slide sits over the viewport, moved a width aside per place it stands from the one shown. */
-  .kui-carousel-slide {
-    @apply absolute inset-0 transition-transform duration-700 ease-in-out motion-reduce:transition-none;
-  }
-
-  .kui-carousel-image {
-    @apply size-full object-cover;
-  }
-
-  .kui-carousel-controls {
-    @apply flex items-center justify-center gap-4;
-  }
-
-  .kui-carousel-step {
-    &:where([data-side='previous']) {
-      @apply rotate-90;
-    }
-
-    &:where([data-side='next']) {
-      @apply -rotate-90;
-    }
-  }
-
-  /* Apart from the slides' own controls, as it stops the carousel rather than moving it. */
-  .kui-carousel-pause {
-    @apply ms-2;
-  }
-
-  /* The dot is drawn small, and pressed through a margin around it wide enough for a finger. */
-  .kui-carousel-dot {
-    @apply relative h-2 w-2 bg-input transition-all after:absolute after:-inset-2 after:content-[''] hover:bg-muted;
-
-    &[aria-current='true'] {
-      @apply w-6 bg-accent;
-    }
-  }
-
   /* The empty stars, with a copy of them over the top cut to the rating's share. */
   .kui-rating {
     @apply relative inline-flex text-input;
-  }
-
-  .kui-rating-stars {
-    @apply flex w-max gap-0.5;
-  }
-
-  .kui-rating-fill {
-    @apply absolute inset-y-0 left-0 overflow-hidden text-warning;
   }
 
   .kui-icon-picker {
@@ -1127,10 +736,6 @@
   /* chartist draws the plot; only the rules a line chart needs from its own stylesheet are here, so the app imports none. */
   .kui-line-chart {
     @apply flex flex-col gap-2;
-  }
-
-  .kui-line-chart-frame {
-    @apply relative;
   }
 
   .kui-line-chart-plot {
@@ -1163,79 +768,6 @@
       stroke: none;
       fill-opacity: 0.08;
     }
-  }
-
-  .kui-line-chart-overlay {
-    @apply absolute inset-0;
-
-    &[data-range] {
-      @apply cursor-crosshair touch-pan-y select-none;
-    }
-
-    &:focus-visible {
-      outline: 2px solid var(--color-accent);
-      outline-offset: 2px;
-    }
-  }
-
-  /* What screen readers read in place of the drawing: every value, and how to pick a span from the keyboard. */
-  .kui-line-chart-data,
-  .kui-line-chart-hint {
-    @apply sr-only;
-  }
-
-  .kui-line-chart-band {
-    @apply pointer-events-none absolute border-x border-accent bg-accent/10;
-  }
-
-  .kui-line-chart-cursor {
-    @apply pointer-events-none absolute w-px bg-border-strong;
-  }
-
-  .kui-line-chart-dot {
-    @apply pointer-events-none absolute size-2 -translate-1/2 border border-background;
-  }
-
-  .kui-line-chart-tooltip {
-    @apply pointer-events-none fixed top-0 left-0 z-50 flex w-max max-w-full flex-col gap-0.5 border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-surface-strong px-3 py-2 text-xs;
-  }
-
-  .kui-line-chart-tooltip-label {
-    @apply mb-1 text-foreground;
-  }
-
-  .kui-line-chart-tooltip-row {
-    @apply flex items-center gap-1.5 text-muted;
-  }
-
-  /* The total sits under the series with no swatch, its name lined up with theirs. */
-  .kui-line-chart-tooltip-total {
-    @apply mt-0.5 border-t border-solid border-border-strong pt-1 pl-3.5 text-foreground;
-  }
-
-  .kui-line-chart-tooltip-name {
-    @apply truncate;
-  }
-
-  .kui-line-chart-tooltip-value {
-    @apply ml-auto pl-3 font-mono text-foreground tabular-nums;
-  }
-
-  .kui-line-chart-swatch {
-    @apply size-2 shrink-0;
-  }
-
-  /* A sample of the series' line, dashed as it draws. */
-  .kui-line-chart-key {
-    @apply h-0.5 w-4 shrink-0;
-  }
-
-  .kui-line-chart-legend {
-    @apply flex flex-wrap gap-4 pl-1;
-  }
-
-  .kui-line-chart-legend-item {
-    @apply flex items-center gap-1.5 text-xs text-muted;
   }
 
   /* Takes field-input's look beside its own class, so a text box and the editor stay one style. Grows with its text between about 12 lines and most of the screen, where browsers size a field by its content. */
@@ -1416,111 +948,8 @@
     @apply flex flex-col gap-2 outline-none;
   }
 
-  .kui-media-gallery-stage {
-    @apply relative w-full touch-pan-y overflow-hidden bg-black;
-  }
-
-  .kui-media-gallery-zoom {
-    @apply block size-full cursor-zoom-in;
-  }
-
-  .kui-media-gallery-frame {
-    @apply size-full object-contain;
-  }
-
-  .kui-media-gallery-step {
-    @apply absolute top-1/2 -translate-y-1/2 bg-black/50 text-white hover:bg-black/80;
-
-    &:where([data-side='previous']) {
-      @apply left-2 rotate-90;
-    }
-
-    &:where([data-side='next']) {
-      @apply right-2 -rotate-90;
-    }
-  }
-
-  .kui-media-gallery-counter {
-    @apply pointer-events-none absolute top-2 left-2 bg-black/60 px-2 py-0.5 text-2xs text-white tabular-nums;
-  }
-
-  .kui-media-gallery-caption {
-    @apply pointer-events-none absolute inset-x-0 bottom-0 truncate bg-linear-to-t from-black/70 to-transparent px-3 pt-6 pb-2 text-xs text-white;
-  }
-
-  .kui-media-gallery-strip {
-    @apply flex gap-1.5 overflow-x-auto pb-1;
-  }
-
-  .kui-media-gallery-thumb {
-    @apply relative aspect-video h-12 shrink-0 overflow-hidden border-2 border-transparent opacity-60 transition hover:opacity-100;
-
-    &:where([aria-current='true']) {
-      @apply border-accent opacity-100;
-    }
-  }
-
-  .kui-media-gallery-thumb-image {
-    @apply size-full bg-black object-cover;
-  }
-
-  .kui-media-gallery-play {
-    @apply absolute inset-0 m-auto size-5 text-white;
-  }
-
-  .kui-media-gallery-lightbox {
-    @apply m-auto max-h-dvh max-w-dvw overflow-visible border-0 bg-transparent p-0;
-
-    &::backdrop {
-      @apply bg-black/80;
-    }
-  }
-
-  .kui-media-gallery-full {
-    @apply max-h-[96dvh] max-w-[96vw] object-contain;
-  }
-
-  .kui-media-gallery-close {
-    @apply absolute top-2 right-2 bg-black/60 text-white hover:bg-black/80;
-  }
-
   .kui-media-gallery-empty {
     @apply text-xs text-muted;
-  }
-
-  .kui-menu {
-    @apply min-w-48;
-  }
-
-  .kui-menu-list {
-    @apply flex flex-col gap-px p-1 outline-none;
-  }
-
-  .kui-menu-item {
-    @apply flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text-left text-sm text-foreground outline-none hover:bg-hover focus:bg-hover;
-
-    /* The tint alone is too faint to find, so an accent bar marks the item the keyboard stands on; forced colours drop both and paint the transparent outline instead. */
-    &:focus-visible {
-      box-shadow: inset 2px 0 0 var(--color-accent);
-      outline: 2px solid transparent;
-      outline-offset: -2px;
-    }
-
-    &:where([data-danger]) {
-      @apply text-danger;
-    }
-
-    &:disabled {
-      @apply cursor-default opacity-50;
-    }
-  }
-
-  .kui-menu-item :where(.kui-icon) {
-    @apply size-4 shrink-0;
-  }
-
-  .kui-menu-separator {
-    @apply my-1 border-0 border-t border-border;
   }
 
   /* Combobox: the listbox opens under the input without taking focus, the row the arrows stand on marked by aria-selected. */
@@ -1528,132 +957,13 @@
     @apply relative inline-flex min-w-0 flex-col;
   }
 
-  .kui-combobox-list {
-    @apply absolute inset-x-0 top-full z-20 m-0 mt-1 max-h-64 list-none overflow-y-auto border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-popover p-1 text-sm text-foreground;
-
-    &:where([hidden]) {
-      @apply hidden;
-    }
-  }
-
-  .kui-combobox-option {
-    @apply cursor-pointer px-2 py-1.5 hover:bg-hover;
-
-    &:where([aria-selected='true']) {
-      @apply bg-hover;
-      box-shadow: inset 2px 0 0 var(--color-accent);
-      outline: 2px solid transparent;
-      outline-offset: -2px;
-    }
-
-    &:where([data-picked]) {
-      @apply font-medium text-accent;
-    }
-
-    &:where([data-create]) {
-      @apply italic;
-    }
-
-    &:where([aria-disabled='true']) {
-      @apply cursor-not-allowed opacity-50;
-    }
-  }
-
-  .kui-combobox-status {
-    @apply sr-only;
-  }
-
   .kui-multi-select {
     @apply inline-flex min-w-0;
-  }
-
-  .kui-multi-select-trigger {
-    @apply flex w-full min-w-0 cursor-pointer items-center gap-2 text-left;
-
-    &:where([data-empty]) {
-      @apply text-[var(--color-kui-overlay1,var(--color-muted))];
-    }
-  }
-
-  .kui-multi-select-summary {
-    @apply min-w-0 flex-1 truncate;
-  }
-
-  .kui-multi-select-chevron {
-    @apply size-4 shrink-0 text-muted;
-  }
-
-  .kui-multi-select-panel {
-    @apply flex max-h-80 w-64 flex-col;
-    min-inline-size: anchor-size(width);
-  }
-
-  .kui-multi-select-search {
-    @apply m-2 mb-0;
-  }
-
-  .kui-multi-select-bar {
-    @apply flex gap-3 border-b border-border px-3 py-1.5;
-  }
-
-  .kui-multi-select-action {
-    @apply cursor-pointer text-2xs tracking-label text-muted [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)] hover:text-foreground disabled:cursor-default disabled:opacity-40;
-
-    &:focus-visible {
-      outline: 2px solid var(--color-accent);
-      outline-offset: 2px;
-    }
-  }
-
-  .kui-multi-select-options {
-    @apply min-h-0 flex-1 overflow-y-auto p-1;
-  }
-
-  .kui-multi-select-option {
-    @apply flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm text-foreground hover:bg-hover;
-
-    /* The checkbox's own ring is too small to find, so the row the keyboard stands on takes the menu's tint and accent bar; forced colours paint the transparent outline instead. */
-    &:has(.kui-multi-select-checkbox:focus-visible) {
-      @apply bg-hover;
-      box-shadow: inset 2px 0 0 var(--color-accent);
-      outline: 2px solid transparent;
-      outline-offset: -2px;
-    }
-  }
-
-  .kui-multi-select-option:where(:has(.kui-multi-select-checkbox:disabled)) {
-    @apply cursor-not-allowed bg-transparent opacity-50;
-  }
-
-  .kui-multi-select-icon {
-    @apply size-3.5 shrink-0;
-  }
-
-  .kui-multi-select-checkbox {
-    @apply size-3.5 shrink-0 accent-accent;
-  }
-
-  .kui-multi-select-label {
-    @apply min-w-0 truncate;
-  }
-
-  .kui-multi-select-empty {
-    @apply px-2 py-3 text-center text-xs text-muted;
-
-    /* Kept in the page while empty, so a screen reader hears it fill. */
-    &:empty {
-      @apply p-0;
-    }
   }
 
   .kui-meter,
   .kui-progress {
     @apply h-2 w-full overflow-hidden bg-surface;
-  }
-
-  .kui-meter-fill,
-  .kui-progress-fill {
-    @apply h-full bg-accent transition-[width] motion-reduce:transition-none;
   }
 
   .kui-skeleton {
@@ -1664,138 +974,12 @@
     }
   }
 
-  .kui-skeleton-block {
-    @apply block h-(--_skeleton-height,1em) w-full animate-pulse motion-reduce:animate-none bg-surface-strong;
-
-    &:where([data-last]) {
-      @apply w-3/5;
-    }
-  }
-
-  :where(.kui-skeleton[data-shape='avatar']) > .kui-skeleton-block {
-    @apply aspect-square h-auto rounded-[var(--radius-kui-full,calc(infinity*1px))];
-  }
-
-  :where(.kui-skeleton[data-shape='card']) > .kui-skeleton-block {
-    @apply h-(--_skeleton-height,8rem);
-  }
-
-  .kui-skeleton-label {
-    @apply sr-only;
-  }
-
-  /* Indeterminate: a bar sliding across the track, held still and part-filled under reduced motion. */
-  :where(.kui-progress[data-indeterminate]) > .kui-progress-fill {
-    @apply w-2/5 animate-[kui-progress-slide_1.4s_ease-in-out_infinite] motion-reduce:animate-none;
-  }
-
   .kui-page-header {
     @apply flex flex-col gap-2;
   }
 
-  .kui-page-header-head {
-    @apply flex flex-wrap items-center gap-4;
-  }
-
-  .kui-page-header-title {
-    @apply m-0 text-xl [font-weight:var(--font-weight-kui-heading,var(--font-weight-semibold))] tracking-label text-foreground [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
-  }
-
-  .kui-page-header-meta {
-    @apply flex flex-wrap items-center gap-2 text-sm text-muted;
-  }
-
-  .kui-page-header-actions {
-    @apply flex flex-wrap items-center gap-2 border-l border-border pl-4;
-  }
-
-  .kui-page-header-description {
-    @apply m-0 text-sm text-muted;
-  }
-
   .kui-page-section {
     @apply flex flex-col gap-[var(--spacing-kui-section,calc(var(--spacing)*3.5*var(--density)))];
-  }
-
-  .kui-page-section-head {
-    @apply flex items-center gap-3;
-  }
-
-  .kui-page-section-title {
-    @apply min-w-0 flex-1;
-  }
-
-  /* A native popover, anchored to its trigger through CSS anchor positioning and flipped by the browser when it would overflow. */
-  .kui-popover {
-    @apply border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-popover p-0 text-foreground;
-    inset: auto;
-    margin: 0.25rem 0;
-    position-try-fallbacks: flip-block, flip-inline;
-
-    &:where([data-placement='bottom-start']) {
-      position-area: block-end span-inline-end;
-    }
-
-    &:where([data-placement='bottom-end']) {
-      position-area: block-end span-inline-start;
-    }
-
-    &:where([data-placement='top-start']) {
-      position-area: block-start span-inline-end;
-    }
-
-    &:where([data-placement='top-end']) {
-      position-area: block-start span-inline-start;
-    }
-  }
-
-  /* A card anchored to an element the page picks at run time, placed beside it through CSS anchor positioning and flipped by the browser when it would overflow. It never takes the pointer, so it cannot flicker the hover that shows it. */
-  .kui-hover-card {
-    @apply border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-popover p-0 text-foreground;
-    inset: auto;
-    margin: 0.25rem;
-    pointer-events: none;
-    position-try-fallbacks: flip-block, flip-inline;
-
-    &:where([data-placement=top]) {
-      position-area: block-start;
-    }
-
-    &:where([data-placement=bottom]) {
-      position-area: block-end;
-    }
-
-    &:where([data-placement=left]) {
-      position-area: inline-start;
-    }
-
-    &:where([data-placement=right]) {
-      position-area: inline-end;
-    }
-
-    &:where([data-placement=bottom-start]) {
-      position-area: block-end span-inline-end;
-    }
-
-    &:where([data-placement=bottom-end]) {
-      position-area: block-end span-inline-start;
-    }
-
-    &:where([data-placement=top-start]) {
-      position-area: block-start span-inline-end;
-    }
-
-    &:where([data-placement=top-end]) {
-      position-area: block-start span-inline-start;
-    }
-  }
-
-  /* Stands in for an SVG shape a hover card is anchored to, which the browser cannot anchor to itself: a box laid over the shape, never seen or hit. */
-  .kui-hover-card-stand {
-    @apply pointer-events-none invisible fixed size-0 border-0 p-0;
-    inset: auto;
-    margin: 0;
-    overflow: visible;
   }
 
   .kui-range-input {
@@ -1815,178 +999,12 @@
     @apply inline-flex min-w-0 items-center gap-1;
   }
 
-  .kui-date-input-box {
-    @apply min-w-0 flex-1 tabular-nums;
-  }
-
-  .kui-date-input-trigger {
-    @apply inline-flex shrink-0 cursor-pointer items-center justify-center rounded-md p-1 text-muted hover:text-foreground disabled:cursor-default disabled:opacity-40;
-
-    &:focus-visible {
-      outline: 2px solid var(--color-accent);
-      outline-offset: 2px;
-    }
-  }
-
-  .kui-date-input-panel {
-    @apply w-64 p-2;
-  }
-
-  .kui-date-input-head {
-    @apply mb-1 flex items-center justify-between gap-2;
-  }
-
-  .kui-date-input-title {
-    @apply text-sm font-medium capitalize;
-  }
-
-  .kui-date-input-step {
-    @apply inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-muted hover:bg-hover hover:text-foreground disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent;
-
-    &:focus-visible {
-      outline: 2px solid var(--color-accent);
-      outline-offset: 2px;
-    }
-  }
-
-  /* The browser's own picker button gives way to the calendar's once it is drawn. */
-  .kui-date-input:has(.kui-date-input-trigger) .kui-date-input-box::-webkit-calendar-picker-indicator {
-    @apply hidden;
-  }
-
-  .kui-date-input-step:where([data-direction='previous']) .kui-icon {
-    @apply rotate-90 rtl:-rotate-90;
-  }
-
-  .kui-date-input-step:where([data-direction='next']) .kui-icon {
-    @apply -rotate-90 rtl:rotate-90;
-  }
-
-  .kui-date-input-grid {
-    @apply w-full table-fixed border-collapse text-center text-sm;
-  }
-
-  .kui-date-input-weekday {
-    @apply py-1 text-2xs font-normal text-muted [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
-  }
-
-  .kui-date-input-day {
-    @apply h-8 w-full cursor-pointer rounded-md tabular-nums hover:bg-hover disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent;
-
-    &:where([data-outside]) {
-      @apply text-muted;
-    }
-
-    &:where([aria-current='date']) {
-      @apply font-semibold text-accent;
-    }
-
-    :where([aria-selected='true']) > & {
-      @apply bg-accent text-accent-foreground hover:bg-accent;
-    }
-
-    &:focus-visible {
-      outline: 2px solid var(--color-accent);
-      outline-offset: 2px;
-    }
-  }
-
-  .kui-date-input-today {
-    @apply mt-1 w-full cursor-pointer rounded-md py-1 text-center text-2xs tracking-label text-muted [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)] hover:text-foreground disabled:cursor-default disabled:opacity-40;
-
-    &:focus-visible {
-      outline: 2px solid var(--color-accent);
-      outline-offset: 2px;
-    }
-  }
-
   .kui-date-range-input {
     @apply inline-flex items-center gap-1.5;
   }
 
-  .kui-date-range-input-separator {
-    @apply text-xs text-muted;
-  }
-
   .kui-scatter-chart {
     @apply m-0 grid grid-cols-[auto_minmax(0,1fr)] grid-rows-[minmax(0,1fr)_auto] gap-2;
-  }
-
-  .kui-scatter-chart-axis-label {
-    @apply text-center text-2xs text-muted;
-
-    &:where([data-axis='y']) {
-      @apply row-start-1 rotate-180 self-center [writing-mode:vertical-rl];
-    }
-
-    &:where([data-axis='x']) {
-      @apply col-start-2;
-    }
-  }
-
-  /* Tick labels hang outside the plot, into the margin it keeps for them. */
-  .kui-scatter-chart-plot {
-    @apply relative col-start-2 mb-5 ml-8 border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border;
-    height: var(--chart-height, var(--kui-scatter-chart-height, 18rem));
-  }
-
-  .kui-scatter-chart-grid,
-  .kui-scatter-chart-guide {
-    @apply absolute bg-border;
-
-    &:where([data-axis='y']) {
-      @apply inset-x-0 h-px;
-    }
-
-    &:where([data-axis='x']) {
-      @apply inset-y-0 w-px;
-    }
-  }
-
-  .kui-scatter-chart-guide {
-    @apply bg-border-strong;
-  }
-
-  .kui-scatter-chart-tick {
-    @apply absolute text-2xs whitespace-nowrap text-[var(--color-kui-overlay1,var(--color-muted))] tabular-nums;
-  }
-
-  :where(.kui-scatter-chart-grid[data-axis='y']) .kui-scatter-chart-tick {
-    @apply right-full mr-2 -translate-y-1/2;
-  }
-
-  :where(.kui-scatter-chart-grid[data-axis='x']) .kui-scatter-chart-tick {
-    @apply top-full mt-1 -translate-x-1/2;
-  }
-
-  .kui-scatter-chart-corner {
-    @apply pointer-events-none absolute text-2xs text-[var(--color-kui-overlay1,var(--color-muted))];
-
-    &:where([data-corner='topLeft']) {
-      @apply top-1.5 left-2;
-    }
-
-    &:where([data-corner='topRight']) {
-      @apply top-1.5 right-2;
-    }
-
-    &:where([data-corner='bottomLeft']) {
-      @apply bottom-1.5 left-2;
-    }
-
-    &:where([data-corner='bottomRight']) {
-      @apply right-2 bottom-1.5;
-    }
-  }
-
-  .kui-scatter-chart-dot {
-    @apply absolute -translate-x-1/2 translate-y-1/2 rounded-full bg-accent opacity-70 transition-opacity hover:z-10 hover:opacity-100;
-    width: var(--_dot-size);
-    height: var(--_dot-size);
-
-    &:where([data-interactive]) {
-      @apply cursor-pointer focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-foreground;
-    }
   }
 
   .kui-scatter-chart-empty {
@@ -1996,64 +1014,6 @@
   /* The plot leaves its left margin for the value labels, which hang outside it as ScatterChart's do. */
   .kui-bar-chart {
     @apply m-0 flex flex-col gap-2 pt-2 pr-3;
-  }
-
-  .kui-bar-chart-plot {
-    @apply relative ml-10 border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border border-t-transparent border-r-transparent border-l-transparent;
-    height: var(--chart-height, var(--kui-bar-chart-height, 12rem));
-  }
-
-  .kui-bar-chart-grid {
-    @apply absolute inset-x-0 h-px bg-border;
-  }
-
-  .kui-bar-chart-tick {
-    @apply absolute right-full mr-2 -translate-y-1/2 text-2xs whitespace-nowrap text-[var(--color-kui-overlay1,var(--color-muted))] tabular-nums;
-  }
-
-  .kui-bar-chart-columns {
-    @apply absolute inset-0 flex gap-1;
-  }
-
-  .kui-bar-chart-column {
-    @apply flex min-w-0 flex-1 items-end gap-px outline-none hover:bg-surface focus-visible:outline-2 focus-visible:outline-foreground;
-
-    &:where([data-stacked]) {
-      @apply flex-col-reverse items-stretch justify-start gap-0;
-    }
-  }
-
-  .kui-bar-chart-bar {
-    @apply min-h-px min-w-px flex-1 rounded-t-sm;
-  }
-
-  /* The mark a column keeps where its series gives it a colour or a note but no height. */
-  .kui-bar-chart-bar:where([data-stub]) {
-    @apply h-1;
-  }
-
-  .kui-bar-chart-column:where([data-stacked]) .kui-bar-chart-bar {
-    @apply flex-none rounded-none;
-  }
-
-  .kui-bar-chart-axis {
-    @apply ml-10 flex gap-1;
-  }
-
-  .kui-bar-chart-axis-label {
-    @apply flex min-w-0 flex-1 justify-center text-2xs whitespace-nowrap text-[var(--color-kui-overlay1,var(--color-muted))];
-  }
-
-  .kui-bar-chart-legend {
-    @apply m-0 flex list-none flex-wrap gap-4 p-0 pl-1;
-  }
-
-  .kui-bar-chart-legend-item {
-    @apply flex items-center gap-1.5 text-xs text-muted;
-  }
-
-  .kui-bar-chart-key {
-    @apply size-2 shrink-0;
   }
 
   .kui-bar-chart-empty {
@@ -2068,226 +1028,25 @@
     @apply flex-col;
   }
 
-  /* On the options, whose own pointer cursor would cover the group's. */
-  .kui-segmented:where([aria-busy='true']) .kui-segmented-option {
-    @apply cursor-progress;
-  }
-
-  .kui-segmented-option {
-    @apply relative cursor-pointer;
-
-    &:where(:has(.kui-segmented-input:disabled)) {
-      @apply cursor-not-allowed opacity-50;
-    }
-  }
-
-  .kui-segmented-input {
-    @apply absolute size-0 opacity-0;
-  }
-
-  .kui-segmented-icon,
-  .kui-tabs-icon {
-    @apply size-3.5 shrink-0;
-  }
-
-  .kui-segmented-label {
-    @apply flex items-center gap-1 px-3 py-1.5 text-xs text-muted transition-colors hover:text-foreground;
-  }
-
-  :where(.kui-segmented-input:checked) + .kui-segmented-label {
-    @apply bg-accent text-accent-foreground hover:text-accent-foreground;
-  }
-
-  :where(.kui-segmented-input:focus-visible) + .kui-segmented-label {
-    outline: 2px solid var(--color-accent);
-    outline-offset: -2px;
-  }
-
   .kui-slider {
     @apply grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1;
-  }
-
-  .kui-slider-label {
-    @apply text-xs [font-weight:var(--font-weight-kui-label,var(--font-weight-normal))] tracking-label text-muted [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
-  }
-
-  .kui-slider-value {
-    @apply text-xs text-foreground tabular-nums;
-  }
-
-  /* The track and the thumb of both engines, drawn from the field and accent tokens. */
-  .kui-slider-input {
-    @apply col-span-2 h-4 w-full cursor-pointer appearance-none bg-transparent;
-
-    &::-webkit-slider-runnable-track {
-      @apply h-1 bg-input;
-    }
-
-    &::-moz-range-track {
-      @apply h-1 bg-input;
-    }
-
-    &::-webkit-slider-thumb {
-      @apply -mt-1.5 size-4 appearance-none rounded-sm border-0 bg-accent;
-    }
-
-    &::-moz-range-thumb {
-      @apply size-4 rounded-sm border-0 bg-accent;
-    }
-
-    &:focus-visible {
-      outline: 2px solid var(--color-accent);
-      outline-offset: 2px;
-    }
-
-    &:disabled {
-      @apply cursor-default opacity-50;
-    }
   }
 
   .kui-color-input {
     @apply inline-flex items-center gap-2;
   }
 
-  .kui-color-input-label {
-    @apply text-xs [font-weight:var(--font-weight-kui-label,var(--font-weight-normal))] tracking-label text-muted [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
-  }
-
-  .kui-color-input-value {
-    @apply text-xs text-foreground tabular-nums;
-  }
-
-  /* The swatch of both engines, with no native chrome around it, in the keyline and radius of the fields. */
-  .kui-color-input-input {
-    @apply size-8 shrink-0 cursor-pointer appearance-none rounded-md border-solid border-[length:var(--kui-border-width,var(--border-width))] border-input bg-transparent p-0.5;
-
-    &::-webkit-color-swatch-wrapper {
-      @apply p-0;
-    }
-
-    &::-webkit-color-swatch {
-      @apply rounded-md border-0;
-    }
-
-    &::-moz-color-swatch {
-      @apply rounded-md border-0;
-    }
-
-    &:focus-visible {
-      outline: 2px solid var(--color-accent);
-      outline-offset: 2px;
-    }
-
-    &:disabled {
-      @apply cursor-default opacity-50;
-    }
-  }
-
   .kui-image-cropper {
     @apply flex flex-col gap-2;
   }
 
-  .kui-image-cropper-stage {
-    @apply relative cursor-crosshair touch-none overflow-hidden border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border select-none;
-  }
-
-  .kui-image-cropper-image {
-    @apply block h-auto w-full;
-  }
-
-  .kui-image-cropper-crop {
-    @apply absolute cursor-move border-2 border-dashed border-white bg-no-repeat shadow-[0_0_0_9999px_rgba(0,0,0,0.55)] outline-none;
-
-    &:focus-visible {
-      @apply border-solid border-accent;
-    }
-  }
-
-  .kui-image-cropper-grid-cols {
-    @apply pointer-events-none absolute inset-y-0 right-1/3 left-1/3 border-x border-white/70;
-  }
-
-  .kui-image-cropper-grid-rows {
-    @apply pointer-events-none absolute inset-x-0 top-1/3 bottom-1/3 border-y border-white/70;
-  }
-
-  /* A 16px dot inside a 40px hit area, so a finger can grab a corner. */
-  .kui-image-cropper-handle {
-    @apply absolute size-10 before:absolute before:inset-3 before:rounded-full before:border-2 before:border-white before:bg-accent before:content-[""];
-
-    &:where([data-handle='nw']) {
-      @apply -top-5 -left-5 cursor-nw-resize;
-    }
-    &:where([data-handle='ne']) {
-      @apply -top-5 -right-5 cursor-ne-resize;
-    }
-    &:where([data-handle='sw']) {
-      @apply -bottom-5 -left-5 cursor-sw-resize;
-    }
-    &:where([data-handle='se']) {
-      @apply -right-5 -bottom-5 cursor-se-resize;
-    }
-  }
-
-  /* A dialog along the right edge, modal unless `modal` is false, sliding in when it opens. */
-  .kui-side-panel {
-    @apply inset-y-0 right-0 left-auto m-0 flex h-dvh max-h-dvh w-full max-w-[min(42rem,100vw)] flex-col overflow-hidden border-0 border-solid border-l-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-surface p-0 text-foreground;
-    transition:
-      translate 0.2s ease-out,
-      overlay 0.2s allow-discrete,
-      display 0.2s allow-discrete;
-
-    &:where([open]) {
-      @starting-style {
-        translate: 100% 0;
-      }
-    }
-
-    &:where(:not([open])) {
-      translate: 100% 0;
-    }
-
-    /* Shown with show(), beside the page: a dialog not shown as a modal is positioned absolute and sits in the page, so it is fixed to the edge and above the page. */
-    &:where([data-modal='false']) {
-      @apply fixed z-30;
-    }
-
-    &::backdrop {
-      @apply bg-black/50;
-    }
-  }
-
-  /* Stays after 1.74: a shadow a skin replaces by this selector, which a utility on the panel would beat. */
+  /* A shadow a skin replaces by this selector, which a utility on the panel would beat. */
   .kui-side-panel:where([data-modal='false']) {
     box-shadow: var(--shadow-raised);
   }
 
-  .kui-side-panel-head {
-    @apply flex shrink-0 items-center gap-2 border-b border-border px-5 py-3;
-  }
-
-  .kui-side-panel-title {
-    @apply min-w-0 flex-1 truncate text-lg [font-weight:var(--font-weight-kui-heading,var(--font-weight-semibold))] tracking-label text-foreground [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
-  }
-
-  .kui-side-panel-body {
-    @apply min-h-0 flex-1 overflow-y-auto px-5 py-4;
-  }
-
-  .kui-side-panel-footer {
-    @apply flex shrink-0 flex-wrap justify-end gap-2 border-t border-border px-5 py-4;
-  }
-
   .kui-site-favicon {
     @apply inline-flex size-5 shrink-0 items-center justify-center overflow-hidden;
-  }
-
-  .kui-site-favicon-img {
-    @apply size-full object-contain;
-  }
-
-  .kui-site-favicon-icon {
-    @apply size-full;
   }
 
   /* One pane at a time below md, the detail replacing the list once open and the sidebar covering both; side by side from md up. */
@@ -2348,46 +1107,9 @@
     @apply size-4 shrink-0;
   }
 
-  .kui-stat-value {
-    @apply font-semibold text-foreground;
-  }
-
-  .kui-stat-label {
-    @apply text-muted;
-  }
-
   /* A tile fills its grid cell: the figure large above its label. */
   .kui-stat-badge:where([data-variant='tile']) {
     @apply flex flex-col items-start gap-1 px-[var(--spacing-kui-field-x,calc(var(--spacing)*2.25*var(--density)))] py-3;
-
-    & .kui-stat-value {
-      @apply text-2xl/none;
-    }
-
-    & .kui-stat-label {
-      @apply [font-size:var(--text-kui-micro,var(--text-2xs))] [line-height:var(--text-kui-micro--line-height,var(--text-2xs--line-height))] [font-weight:var(--font-weight-kui-label,var(--font-weight-normal))] tracking-label [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
-    }
-  }
-
-  /* The figure alone takes the tone, so the label keeps its text colour. */
-  .kui-stat-badge:where([data-tone='accent']) .kui-stat-value {
-    @apply text-accent;
-  }
-
-  .kui-stat-badge:where([data-tone='success']) .kui-stat-value {
-    @apply text-success;
-  }
-
-  .kui-stat-badge:where([data-tone='warning']) .kui-stat-value {
-    @apply text-warning;
-  }
-
-  .kui-stat-badge:where([data-tone='danger']) .kui-stat-value {
-    @apply text-danger;
-  }
-
-  .kui-stat-badge:where([data-tone='info']) .kui-stat-value {
-    @apply text-info;
   }
 
   /* Below lg the links fold behind the toggle, a popover its popovertarget opens; from lg they sit in a row, the popover's frame undone and the toggle hidden. A browser without popovers shows the links as they are and hides the toggle. */
@@ -2395,55 +1117,18 @@
     @apply flex items-center;
   }
 
-  .kui-site-nav-toggle {
-    @apply lg:hidden;
-  }
-
-  .kui-site-nav-toggle-close {
-    @apply hidden;
-  }
-
-  :where(.kui-site-nav:has(.kui-site-nav-list:popover-open)) .kui-site-nav-toggle-menu {
-    @apply hidden;
-  }
-
-  :where(.kui-site-nav:has(.kui-site-nav-list:popover-open)) .kui-site-nav-toggle-close {
-    @apply inline-block;
-  }
-
   @supports not selector(:popover-open) {
-    .kui-site-nav-toggle,
     .kui-site-nav > [data-part='toggle'] {
       @apply hidden;
     }
   }
 
-  .kui-site-nav-list {
-    @apply gap-1 lg:static lg:m-0 lg:flex lg:min-w-0 lg:flex-row lg:items-center lg:overflow-visible lg:border-0 lg:bg-transparent lg:p-0 lg:text-inherit;
-  }
-
   /* Anchored under the toggle wherever it sits in the header, and flipped by the browser when it would run off the screen. */
-  :where(.kui-site-nav-list:popover-open, .kui-site-nav > [data-part='list']:popover-open) {
+  :where(.kui-site-nav > [data-part='list']:popover-open) {
     position-area: block-end span-inline-end;
     position-try-fallbacks: flip-inline;
     @apply m-0 mt-2 flex min-w-56 flex-col items-stretch border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border bg-popover p-2 text-foreground;
     inset: auto;
-  }
-
-  .kui-site-nav-link {
-    @apply block px-3 py-2 text-sm text-muted transition-colors hover:text-foreground;
-
-    &:where([aria-current]) {
-      @apply text-accent;
-    }
-  }
-
-  .kui-site-nav-link:where(:has(.kui-site-nav-icon)) {
-    @apply flex items-center gap-2;
-  }
-
-  .kui-site-nav-icon {
-    @apply size-4 shrink-0;
   }
 
   .kui-app-header {
@@ -2454,40 +1139,8 @@
     }
   }
 
-  /* A long brand or end area wraps inside its box rather than push the bar past the screen. */
-  .kui-app-header-brand {
-    @apply flex min-w-0 items-center gap-2 [font-weight:var(--font-weight-kui-heading,var(--font-weight-semibold))] text-foreground [overflow-wrap:anywhere];
-  }
-
-  /* After the brand in the tab order and on screen, so the menu button comes before the end area; with no end area it takes the far end. */
-  .kui-app-header-nav:where(:last-child) {
-    @apply ml-auto lg:ml-0;
-  }
-
-  .kui-app-header-end {
-    @apply ml-auto flex min-w-0 items-center gap-2 [overflow-wrap:anywhere];
-  }
-
   .kui-pagination {
     @apply flex flex-wrap items-center gap-1 text-sm;
-  }
-
-  .kui-pagination-page,
-  .kui-pagination-step {
-    @apply min-w-9 border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border px-3 py-1.5 text-center text-muted transition-colors hover:text-foreground;
-
-    &:where([aria-current='page']) {
-      @apply border-accent text-accent;
-    }
-
-    /* Previous or Next at an end, drawn as text rather than a link. */
-    &:where(span) {
-      @apply opacity-50 hover:text-muted;
-    }
-  }
-
-  .kui-pagination-gap {
-    @apply px-2 text-[var(--color-kui-overlay1,var(--color-muted))];
   }
 
   /* The code keeps its own light ground and dark modules, which scanners need, whatever the theme. */
@@ -2503,14 +1156,7 @@
     @apply block;
   }
 
-  .kui-breadcrumb-list {
-    @apply m-0 flex list-none flex-wrap items-center gap-x-2 gap-y-1 p-0 text-sm text-muted;
-  }
-
   /* The separator is drawn here, with an empty alternative text, so a screen reader hears the list alone. */
-  .kui-breadcrumb-item + .kui-breadcrumb-item::before,
-  .kui-breadcrumb-item + .kui-breadcrumb-more::before,
-  .kui-breadcrumb-more + .kui-breadcrumb-item::before,
   .kui-breadcrumb [data-part='list'] > [data-part='item'] + [data-part='item']::before,
   .kui-breadcrumb [data-part='list'] > [data-part='item'] + [data-part='more']::before,
   .kui-breadcrumb [data-part='list'] > [data-part='more'] + [data-part='item']::before {
@@ -2518,44 +1164,8 @@
     @apply mr-2 text-[var(--color-kui-overlay1,var(--color-muted))];
   }
 
-  .kui-breadcrumb-link {
-    @apply text-muted underline-offset-2 hover:text-foreground hover:underline;
-
-    &:focus-visible {
-      outline: 2px solid var(--color-accent);
-      outline-offset: 2px;
-    }
-  }
-
-  .kui-breadcrumb-text:where([aria-current='page']) {
-    @apply text-foreground;
-  }
-
-  .kui-breadcrumb-more {
-    @apply hidden;
-  }
-
-  /* On a phone the middle of a long trail gives way to an ellipsis. */
-  @media (width < theme(--breakpoint-sm)) {
-    .kui-breadcrumb-item[data-middle] {
-      @apply hidden;
-    }
-
-    .kui-breadcrumb-more {
-      @apply list-item;
-    }
-  }
-
   .kui-tab-nav {
     @apply flex gap-1 overflow-x-auto border-b border-border pb-px;
-  }
-
-  .kui-tab-nav-link {
-    @apply -mb-px shrink-0 border-b-2 border-transparent px-4 py-2 text-sm text-muted transition-colors hover:text-foreground;
-
-    &:where([aria-current='page']) {
-      @apply border-accent text-accent;
-    }
   }
 
   /* Steps: a numbered row, the current step marked by aria-current and the ones behind it links. */
@@ -2563,75 +1173,9 @@
     @apply block;
   }
 
-  .kui-steps-list {
-    @apply m-0 flex list-none flex-wrap gap-x-6 gap-y-2 p-0;
-  }
-
-  .kui-steps-item {
-    @apply flex items-center text-sm text-muted;
-
-    &:where([data-step='current']) {
-      @apply font-medium text-foreground;
-    }
-  }
-
-  .kui-steps-link {
-    @apply flex items-center gap-2 rounded-md no-underline;
-
-    &:where(a) {
-      @apply text-foreground hover:text-accent;
-    }
-  }
-
-  .kui-steps-marker {
-    @apply flex size-6 shrink-0 items-center justify-center rounded-full border border-border-strong text-xs;
-
-    :where([data-step='current']) & {
-      @apply border-accent bg-accent text-accent-foreground;
-    }
-
-    :where([data-step='done']) & {
-      @apply border-accent text-accent;
-    }
-  }
-
-  .kui-steps-label {
-    @apply min-w-0;
-  }
-
-  .kui-steps-state {
-    @apply sr-only;
-  }
-
   /* In-page tabs look like TabNav's, the shown one marked by aria-selected rather than aria-current. */
   .kui-tabs {
     @apply flex flex-col;
-  }
-
-  .kui-tabs-list {
-    @apply flex gap-1 overflow-x-auto border-b border-border pb-px;
-  }
-
-  .kui-tabs-tab {
-    @apply -mb-px inline-flex shrink-0 items-center gap-1 border-b-2 border-transparent px-4 py-2 text-sm text-muted transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-muted;
-
-    &:where([aria-selected='true']) {
-      @apply border-accent text-accent;
-    }
-  }
-
-  /* A hidden panel is hidden until found, which keeps its box with its content skipped: it takes no room. */
-  .kui-tabs-panel {
-    @apply pt-4 outline-none;
-
-    &:focus-visible {
-      outline: 2px solid var(--color-accent);
-      outline-offset: 2px;
-    }
-
-    &:where([hidden]) {
-      @apply p-0;
-    }
   }
 
   .kui-table-wrap {
@@ -2652,224 +1196,6 @@
       outline: 2px solid var(--color-accent);
       outline-offset: -2px;
     }
-
-    & .kui-table-head-cell {
-      @apply sticky top-0 bg-surface;
-    }
-  }
-
-  /* Sticky, so it stays in view while a wide table scrolls under it. */
-  .kui-table-filter {
-    @apply sticky left-0 flex items-center gap-2 border-solid border-b-[length:var(--kui-border-width,var(--border-width))] border-border px-3 py-2;
-  }
-
-  .kui-table-filter-input {
-    @apply w-56 max-w-full;
-  }
-
-  .kui-table-count {
-    @apply sr-only;
-  }
-
-  /* Sticky like the filter; the bulk actions sit beside the count. */
-  .kui-table-selection {
-    @apply sticky left-0 flex flex-wrap items-center gap-3 border-solid border-b-[length:var(--kui-border-width,var(--border-width))] border-border px-3 py-2 text-sm;
-  }
-
-  /* The box is 1rem, so its label grows to the 1.5rem a finger needs. */
-  .kui-table-selection .kui-checkbox,
-  .kui-table-select-cell .kui-checkbox {
-    @apply min-h-6 min-w-6;
-  }
-
-  .kui-table-select-cell .kui-checkbox {
-    @apply justify-center;
-  }
-
-  .kui-table-bulk {
-    @apply flex flex-wrap items-center gap-2;
-  }
-
-  /* Just wide enough for its box. */
-  .kui-table-select-cell {
-    @apply w-0;
-  }
-
-  .kui-table-selected {
-    @apply m-0;
-  }
-
-  .kui-table-select-text {
-    @apply sr-only;
-  }
-
-  .kui-table {
-    @apply w-full border-collapse text-sm;
-  }
-
-  .kui-table-head-cell {
-    @apply border-b border-border px-3 py-2 text-left text-xs [font-weight:var(--font-weight-kui-label,var(--font-weight-normal))] tracking-label text-muted [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
-
-    &:where([data-align='center']) {
-      @apply text-center;
-    }
-
-    &:where([data-align='end']) {
-      @apply text-right;
-    }
-
-    &:where([aria-sort='ascending'], [aria-sort='descending']) {
-      @apply text-accent;
-    }
-  }
-
-  .kui-table-sort-btn {
-    @apply inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-inherit [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
-  }
-
-  .kui-table-sort-icon {
-    @apply size-3.5;
-  }
-
-  :where(.kui-table-sort-btn[data-direction='asc']) .kui-table-sort-icon {
-    @apply rotate-180;
-  }
-
-  .kui-table-row {
-    @apply border-b border-border;
-
-    &:hover,
-    &:where([aria-selected='true']) {
-      @apply bg-hover;
-    }
-  }
-
-  .kui-table-cell {
-    @apply px-3 py-1.5 text-foreground;
-
-    &:where([data-numeric]) {
-      @apply tabular-nums;
-    }
-
-    &:where([data-align='center']) {
-      @apply text-center;
-    }
-
-    &:where([data-align='end']) {
-      @apply text-right;
-    }
-  }
-
-  .kui-table-empty-cell {
-    @apply px-3 py-8 text-center text-xs text-muted;
-  }
-
-  /* Outside a narrow table, a cell holds its content alone: the label is the column header's job. */
-  .kui-table-cell-label {
-    @apply hidden;
-  }
-
-  .kui-table-cell-body {
-    @apply contents;
-  }
-
-  /* A narrow table stacks each row as a card, a line per cell with its header beside it, the labels as wide as the longest up to 40%, and keeps only its sortable headers, as sort buttons tall enough to tap. */
-  @container kui-table (width < 30rem) {
-    /* The headers are one row of sort buttons in a block of their own, which is what stays on top. */
-    .kui-table-wrap:where([data-virtual]) .kui-table thead {
-      @apply sticky top-0 z-1 bg-surface;
-    }
-
-    .kui-table,
-    .kui-table :where(thead, tbody, tr),
-    .kui-table-empty-cell {
-      @apply block;
-    }
-
-    .kui-table :where(thead tr) {
-      @apply flex flex-wrap gap-2 border-solid border-b-[length:var(--kui-border-width,var(--border-width))] border-border px-3 py-2;
-    }
-
-    .kui-table :where(thead:not(:has(.kui-table-sort-btn))) {
-      @apply hidden;
-    }
-
-    .kui-table-head-cell {
-      @apply border-0 p-0;
-
-      &:where(:not(:has(.kui-table-sort-btn))) {
-        @apply hidden;
-      }
-    }
-
-    .kui-table-sort-btn {
-      @apply min-h-8 border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border px-2 py-0.5;
-    }
-
-    .kui-table-row {
-      @apply grid grid-cols-[fit-content(40%)_minmax(0,1fr)] gap-x-4 px-3 py-2;
-    }
-
-    /* Every value starts after its label, whatever its column aligns to in a wide table. */
-    .kui-table-cell {
-      @apply col-span-full grid grid-cols-subgrid items-baseline px-0 py-1 text-left;
-    }
-
-    .kui-table-select-cell {
-      @apply w-auto;
-    }
-
-    .kui-table-cell-label {
-      @apply block text-left [font-size:var(--text-kui-micro,var(--text-2xs))] [line-height:var(--text-kui-micro--line-height,var(--text-2xs--line-height))] [font-weight:var(--font-weight-kui-label,var(--font-weight-normal))] tracking-label text-muted [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
-    }
-
-    /* A long value with no space, such as a file path, breaks inside the card rather than widening it. */
-    .kui-table-cell-body {
-      @apply block min-w-0 [overflow-wrap:anywhere];
-
-      &:where(:first-child) {
-        @apply col-span-full;
-      }
-    }
-  }
-
-  .kui-toaster-live {
-    @apply sr-only;
-  }
-
-  .kui-toaster {
-    @apply pointer-events-none fixed inset-auto right-4 bottom-4 z-100 m-0 flex w-[calc(100%-2rem)] max-w-sm flex-col gap-2 overflow-visible border-0 bg-transparent p-0;
-  }
-
-  /* --_toast-tone is the colour of the toast's tone, which its icon takes. */
-  .kui-toast {
-    --_toast-tone: var(--color-accent);
-    @apply pointer-events-auto flex items-start gap-2 border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-surface px-3 py-2;
-
-    &:where([data-tone='danger']) {
-      --_toast-tone: var(--color-danger);
-    }
-
-    &:where([data-tone='success']) {
-      --_toast-tone: var(--color-success);
-    }
-
-    &:where([data-tone='info']) {
-      --_toast-tone: var(--color-info);
-    }
-  }
-
-  .kui-toast-icon {
-    @apply mt-0.5 size-4 shrink-0;
-    color: var(--_toast-tone);
-  }
-
-  .kui-toast-message {
-    @apply min-w-0 flex-1 text-xs/snug text-foreground;
-  }
-
-  .kui-toast-dismiss {
-    @apply shrink-0 text-[var(--color-kui-overlay1,var(--color-muted))] hover:text-foreground;
   }
 
   .kui-tree-view {
@@ -2911,63 +1237,10 @@
 
   .kui-toggle {
     @apply relative inline-flex cursor-pointer items-center gap-2;
-
-    &:where(:has(.kui-toggle-input:disabled)) {
-      @apply cursor-not-allowed opacity-50;
-    }
-
-    &:where(:has(.kui-toggle-input[aria-busy='true'])) {
-      @apply cursor-progress;
-    }
-  }
-
-  .kui-toggle-input {
-    @apply absolute size-0 opacity-0;
-  }
-
-  .kui-toggle-track {
-    @apply relative inline-flex h-5 w-9 shrink-0 items-center rounded-md border-solid border-[length:var(--kui-border-width,var(--border-width))] border-input bg-surface transition-colors;
-
-    &::before {
-      content: '';
-      @apply block size-3.5 translate-x-0.5 rounded-sm bg-muted transition-transform;
-    }
-  }
-
-  :where(.kui-toggle-input:checked) ~ .kui-toggle-track {
-    @apply border-accent bg-accent;
-
-    &::before {
-      @apply translate-x-4 bg-accent-foreground;
-    }
-  }
-
-  :where(.kui-toggle-input:focus-visible) ~ .kui-toggle-track {
-    outline: 2px solid var(--color-accent);
-    outline-offset: 2px;
-  }
-
-  .kui-toggle-label {
-    @apply text-sm text-foreground;
-  }
-
-  /* Anchored to whichever element TooltipHost names --tooltip-anchor. */
-  .kui-tooltip {
-    @apply inset-auto m-1.5 max-w-xs overflow-visible border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-surface-strong px-2 py-1 text-2xs text-foreground;
-    position-anchor: --tooltip-anchor;
-    position-try-fallbacks: flip-block, flip-inline;
   }
 
   .kui-widget {
     @apply flex w-full flex-col gap-3 border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border bg-surface p-4;
-  }
-
-  .kui-widget-head {
-    @apply flex items-center gap-2;
-  }
-
-  .kui-widget-title {
-    @apply min-w-0 flex-1;
   }
 
   /* The window a plate is looked at through: it clips whatever runs past its edge, and the plate inside it carries the transform. */
@@ -2993,10 +1266,6 @@
   .kui-zoom-plate {
     @apply size-full;
     transform-origin: 0 0;
-  }
-
-  .kui-zoom-tools {
-    @apply absolute top-1 right-1 flex gap-1;
   }
 
   /* Last, so a disabled button keeps its muted look under the pointer whatever its variant's hover says, flat and still whatever a skin's press says. */
@@ -3065,10 +1334,6 @@
     @apply bg-[var(--color-kui-stamp-fill-hover,var(--color-kui-fill-hover,var(--color-surface-strong)))];
   }
 
-  .kui-badge-icon {
-    @apply size-3;
-  }
-
   .kui-notice {
     @apply border-solid border-border-strong bg-surface-strong px-4 py-3 text-sm [font-weight:var(--font-weight-kui-notice,var(--font-weight-normal))] text-foreground;
     border-width: var(--kui-border-notice, var(--kui-border-width, var(--border-width)));
@@ -3106,36 +1371,6 @@
     &:where([data-size='lg']) {
       @apply size-12;
     }
-  }
-
-  .kui-avatar-image {
-    @apply size-full object-cover;
-  }
-
-  /* Its colours are set inline, seeded by the name. */
-  .kui-avatar-initial {
-    @apply grid size-full place-items-center text-xs [font-weight:var(--font-weight-kui-avatar,var(--font-weight-semibold))] uppercase;
-  }
-
-  :where(.kui-avatar[data-size='lg']) .kui-avatar-initial {
-    @apply text-base;
-  }
-
-  .kui-card {
-    @apply flex flex-col border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border bg-surface;
-  }
-
-  .kui-card-head {
-    @apply flex items-center gap-3 border-solid border-b-[length:var(--kui-border-width,var(--border-width))] border-border px-3 py-2;
-  }
-
-  /* mr-auto rather than ml-auto on what follows: a head that is all control and no title reads from the left, like the body under it. */
-  .kui-card-title {
-    @apply mr-auto text-2xs [font-weight:var(--font-weight-kui-label,var(--font-weight-normal))] [letter-spacing:var(--tracking-kui-section,var(--tracking-label))] text-muted [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
-  }
-
-  .kui-card-body {
-    @apply p-[var(--spacing-kui-card,calc(var(--spacing)*2.5*var(--density)))];
   }
 }
 

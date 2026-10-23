@@ -43,12 +43,12 @@
 
 @layer components {
   /* The framed boxes have no line, so the controls that need one draw it again: buttons, fields, notices and avatars among them. */
-  :is(.kui-btn, .kui-shell, .kui-segmented, .kui-pagination-step, .kui-pagination [data-part='step'], .kui-toggle-track, .kui-toggle [data-part='track'], .kui-chip, .kui-file-drop, .kui-badge, .kui-notice, .kui-avatar, .kui-field-input, .kui-form-field :is(input, select, textarea)) {
+  :is(.kui-btn, .kui-shell, .kui-segmented, .kui-pagination [data-part='step'], .kui-toggle [data-part='track'], .kui-chip, .kui-file-drop, .kui-badge, .kui-notice, .kui-avatar, .kui-field-input, .kui-form-field :is(input, select, textarea)) {
     --border-width: 1px;
   }
 
   /* A checked chip and a file drop being dragged over keep the accent line the theme gives them. */
-  :is(.kui-segmented, .kui-pagination-step, .kui-chip-input:not(:checked) + .kui-chip-label, .kui-file-drop:not([data-dragging])) {
+  :is(.kui-segmented, .kui-file-drop:not([data-dragging])) {
     border-color: var(--color-input);
   }
 
@@ -58,7 +58,7 @@
   }
 
   /* Overlays lose their line to a shadow that lifts them off the page. */
-  :is(.kui-dialog, .kui-command-palette, .kui-popover, .kui-hover-card, .kui-toast, .kui-tooltip, .kui-combobox-list, .kui-combobox [data-part='list'], .kui-side-panel, .kui-line-chart-tooltip, .kui-line-chart [data-part='tooltip'], .kui-site-nav-list:popover-open, .kui-site-nav > [data-part='list']:popover-open) {
+  :is(.kui-dialog, .kui-command-palette, .kui-popover, .kui-hover-card, .kui-toast, .kui-tooltip, .kui-combobox [data-part='list'], .kui-side-panel, .kui-line-chart [data-part='tooltip'], .kui-site-nav > [data-part='list']:popover-open) {
     box-shadow: 0 1rem 3rem -0.75rem rgb(0 0 0 / 0.8);
   }
 
@@ -122,7 +122,7 @@
   }
 
   /* A drawn checkbox: a square in the field's line that fills with the accent and shows a tick once checked. */
-  :is(.kui-checkbox-input, .kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select-checkbox, .kui-multi-select [data-part='checkbox']) {
+  :is(.kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select [data-part='checkbox']) {
     display: inline-grid;
     place-content: center;
     appearance: none;
@@ -158,12 +158,12 @@
   }
 
   @media (forced-colors: active) {
-    :is(.kui-checkbox-input, .kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select-checkbox, .kui-multi-select [data-part='checkbox'])::before {
+    :is(.kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select [data-part='checkbox'])::before {
       background: HighlightText;
     }
 
-    :is(.kui-checkbox-input, .kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select-checkbox, .kui-multi-select [data-part='checkbox']):checked,
-    :is(.kui-checkbox-input, .kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select-checkbox, .kui-multi-select [data-part='checkbox']):indeterminate {
+    :is(.kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select [data-part='checkbox']):checked,
+    :is(.kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select [data-part='checkbox']):indeterminate {
       background: Highlight;
     }
   }

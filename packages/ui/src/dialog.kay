@@ -2,7 +2,7 @@
 import type { JSX, Snippet } from 'kay'
 import { effect, recipe, signal } from 'kay'
 
-// 'kui-dialog' stays as the component's name for an app's CSS and the always-hidden guard; theme.css still has its old rule until 1.74.
+// 'kui-dialog' stays as the component's name for an app's CSS and the always-hidden guard.
 const look = recipe({
   parts: {
     root: 'kui-dialog m-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-[min(42rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-lg border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-surface p-0',

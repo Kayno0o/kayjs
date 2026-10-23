@@ -4,7 +4,7 @@ import { effect, listen, onCleanup, recipe, signal } from 'kay'
 import IconButton from './icon-button.kay'
 import { wording } from 'kay/words'
 
-// 'kui-side-panel' stays as the component's name for an app's CSS and the always-hidden guard; theme.css still has its old rule until 1.74, and keeps the docked panel's shadow for good.
+// 'kui-side-panel' stays as the component's name for an app's CSS and the always-hidden guard; theme.css keeps the docked panel's shadow.
 // A dialog shown with show(), beside the page, is positioned absolute and sits in the page, so it is fixed to the edge and above the page.
 const look = recipe({
   parts: {

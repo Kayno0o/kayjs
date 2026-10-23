@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { compileKay } from 'kay/compiler'
 import { compile } from 'tailwindcss'
-import { REMOVED_UI_CLASSES } from '../../../src/check/ui-classes'
 import { MENU_FOOTER, MENU_ITEM } from '../src/menu-look'
 
 const ROOT = new URL('..', import.meta.url).pathname
@@ -55,7 +54,13 @@ const scripts = await Promise.all((await Array.fromAsync(new Bun.Glob('src/**/*.
 const tokens = new Set([...theme.matchAll(DEFINED_TOKEN)].map(([, token]) => token))
 const classes = new Set([...theme.matchAll(DEFINED_CLASS)].map(([, name = '']) => name))
 
-// The components whose look is a recipe of utilities (#1885), each with its part classes in REMOVED_UI_CLASSES; theme.css keeps their old rules until 1.74.
+// Classes a component writes that no rule of the theme selects any more: rule-free names for an app's CSS and skins.
+const HOOKS = new Set(['kui-menu', 'kui-toaster', 'kui-tooltip'])
+
+// The source of a component of the library.
+const sourceOf = (name: string): string => components.find(component => component.path === `src/${name}.kay`)!.source
+
+// The components whose look is a recipe of utilities (#1885), each with its part classes in REMOVED_UI_CLASSES; theme.css has no rule for their part classes.
 const RECIPE_COMPONENTS = new Set(['src/card.kay', 'src/badge.kay', 'src/notice.kay', 'src/avatar.kay', 'src/stat.kay', 'src/page-header.kay', 'src/page-section.kay', 'src/empty-state.kay', 'src/card-row.kay', 'src/widget.kay', 'src/meter.kay', 'src/progress.kay', 'src/skeleton.kay', 'src/button.kay', 'src/form-field.kay', 'src/checkbox.kay', 'src/toggle.kay', 'src/text-input.kay', 'src/textarea.kay', 'src/select.kay', 'src/contact-form.kay', 'src/radio-group.kay', 'src/segmented.kay', 'src/rating.kay', 'src/slider.kay', 'src/color-input.kay', 'src/date-input.kay', 'src/date-range-input.kay', 'src/combobox.kay', 'src/multi-select.kay', 'src/chip-group.kay', 'src/file-drop.kay', 'src/copy-button.kay', 'src/confirm-delete.kay', 'src/dialog.kay', 'src/form-dialog.kay', 'src/menu.kay', 'src/popover.kay', 'src/hover-card.kay', 'src/side-panel.kay', 'src/command-palette.kay', 'src/toaster.kay', 'src/tooltip-host.kay', 'src/toolbar.kay'])
 
 // Tables and navigation (slice 5 of #1885).
@@ -374,8 +379,11 @@ describe('theme.css', () => {
   })
 
   test('draws the controls a hairline would leave under 3:1 with the field border', () => {
-    for (const selector of ['.kui-carousel-dot', '.kui-rating', '.kui-toggle-track', '.kui-btn'])
+    for (const selector of ['.kui-rating', '.kui-btn'])
       expect(blockOf(theme, selector), selector).toMatch(/\b(?:bg|border|text)-input\b|color-input/)
+
+    for (const name of ['carousel', 'toggle'])
+      expect(sourceOf(name), name).toMatch(/\b(?:bg|border|text)-input\b|color-input/)
   })
 
   test('defines every colour its classes paint with', () => {
@@ -394,7 +402,7 @@ describe('theme.css', () => {
     const written = new Set(components.flatMap(({ path, source }) => writtenClasses(path, source)))
 
     expect(written.size).toBeGreaterThan(0)
-    expect([...written].filter(name => !classes.has(name))).toEqual([])
+    expect([...written].filter(name => !classes.has(name) && !HOOKS.has(name))).toEqual([])
   })
 
   test('defines no class that nothing writes', async () => {
@@ -403,7 +411,7 @@ describe('theme.css', () => {
     const written = new Set([...components.flatMap(({ path, source }) => writtenClasses(path, source)), ...fieldLook])
     const quoted = new Set([...components.map(({ source }) => source), ...scripts].flatMap(source => [...source.matchAll(QUOTED)].map(([, name]) => name)))
 
-    expect([...classes].filter(name => !written.has(name) && !quoted.has(name) && !THIRD_PARTY.test(name) && !Object.hasOwn(REMOVED_UI_CLASSES, name))).toEqual([])
+    expect([...classes].filter(name => !written.has(name) && !quoted.has(name) && !THIRD_PARTY.test(name))).toEqual([])
   })
 
   // kay leaves out the rules of the classes no file writes whole, so a class put together at runtime would lose its own.
@@ -489,7 +497,7 @@ describe('theme.css', () => {
   })
 
   test('zeroes the padding of a grouped field\'s legend, which an app\'s own `legend` styles would indent', () => {
-    expect(blockOf(theme, '.kui-form-field-head')).toMatch(/@apply [^;]*\bp-0\b/)
+    expect(sourceOf('form-field')).toMatch(/^ {4}head: '[^']*\bp-0\b/m)
   })
 
   test('draws no offset shadow nor press-down unless a skin sets their tokens alone', async () => {
@@ -513,8 +521,12 @@ describe('theme.css', () => {
     for (const name of ['kui-btn', 'kui-shell', 'kui-stat-badge'])
       expect(roundedBy('--radius-md'), name).toContain(`.${name}`)
 
-    for (const name of ['kui-card', 'kui-card-row', 'kui-widget', 'kui-notice', 'kui-toast', 'kui-dialog', 'kui-command-palette', 'kui-popover'])
+    for (const name of ['kui-card-row', 'kui-widget', 'kui-notice'])
       expect(roundedBy('--radius-lg'), name).toContain(`.${name}`)
+
+    // The cards and overlays whose recipe draws their look round themselves by the same step.
+    for (const name of ['card', 'toaster', 'dialog', 'command-palette', 'popover', 'hover-card'])
+      expect(sourceOf(name), name).toContain('rounded-lg')
 
     expect(css).toContain('--radius-md: 4px')
     expect(css).toContain('--radius-lg: 1rem')
@@ -532,8 +544,8 @@ describe('theme.css', () => {
     expect(theme).toContain('--radius-md: var(--radius-kui-md, var(--radius-kui-card, 0.375rem));')
     expect(css).toMatch(/--radius-sm: 2px/)
     expect(css).toMatch(/--radius-md: 6px/)
-    expect(blockOf(theme, '.kui-chip-label')).toContain('rounded-md')
-    expect(blockOf(theme, '.kui-toggle-track')).toContain('rounded-md')
+    expect(sourceOf('chip-group')).toContain('rounded-md')
+    expect(sourceOf('toggle')).toContain('rounded-md')
     expect(blockOf(theme, ':where(.kui-badge)')).toContain('rounded-sm')
     expect(await Bun.file(`${ROOT}src/avatar.kay`).text()).toContain('rounded-[var(--radius-kui-full,calc(infinity*1px))]')
   })
@@ -565,8 +577,8 @@ describe('theme.css', () => {
     expect(blockOf(css, '.kui-btn')).toContain('font-family: var(--font-label,var(--font-kui-body,inherit))')
     expect(css).toContain('--label-case: none')
     expect(await built('@theme { --kui-label-case: none; }')).toContain('--kui-label-case: none')
-    // Only the stamp badge, which has --kui-badge-case, and an avatar's initial keep their own case.
-    expect(theme.match(/@apply [^\n]* uppercase/g)).toHaveLength(2)
+    // Only the stamp badge, which has --kui-badge-case, keeps its own case.
+    expect(theme.match(/@apply [^\n]* uppercase/g)).toHaveLength(1)
   })
 
   test('ships skins that read at 4.5:1 for text and 3:1 for lines, and compile over the theme', async () => {
@@ -613,7 +625,7 @@ describe('theme.css', () => {
     expect(css).toMatch(/--border-width: 0px/)
     // Every class its selectors name exists in the theme, and the mantle is a step under the canvas so boxes on it keep an edge.
     for (const [, name = ''] of skin.matchAll(/\.(kui-[\w-]+)/g))
-      expect(classes, name).toContain(name)
+      expect(classes.has(name) || HOOKS.has(name), name).toBe(true)
 
     expect(skin).toMatch(/--color-popover: color-mix\(in oklab, var\(--color-background\), black/)
     expect(css).toContain('@media (forced-colors: active)')
@@ -640,19 +652,24 @@ describe('theme.css', () => {
   })
 
   test('sizes the keyline of every framed box by --border-width, a length the old --kui-border-width still sets', () => {
-    for (const selector of ['.kui-card', '.kui-card-head', '.kui-card-row', '.kui-widget', '.kui-toast', '.kui-dialog', '.kui-command-palette', '.kui-popover', '.kui-side-panel', '.kui-tooltip', '.kui-table-wrap', '.kui-collapsible-section', '.kui-save-bar', '.kui-segmented', '.kui-file-drop', '.kui-pagination-step', ':where(.kui-site-nav-list:popover-open, .kui-site-nav > [data-part=\'list\']:popover-open)', '.kui-line-chart-tooltip'])
-      expect(blockOf(theme, selector), selector).toMatch(/border(?:-[bl])?-\[length:var\(--kui-border-width,var\(--border-width\)\)\]/)
+    const KEYLINE = /border(?:-[bl])?-\[length:var\(--kui-border-width,var\(--border-width\)\)\]/
+
+    for (const selector of ['.kui-card-row', '.kui-widget', '.kui-table-wrap', '.kui-collapsible-section', '.kui-save-bar', '.kui-segmented', '.kui-file-drop', ':where(.kui-site-nav > [data-part=\'list\']:popover-open)'])
+      expect(blockOf(theme, selector), selector).toMatch(KEYLINE)
+
+    for (const name of ['card', 'toaster', 'dialog', 'command-palette', 'popover', 'side-panel', 'tooltip-host', 'pagination', 'line-chart'])
+      expect(sourceOf(name), name).toMatch(KEYLINE)
 
     expect(theme).toContain('--border-width: var(--kui-border-width, var(--kui-border-card));')
     expect(theme).not.toMatch(/@property --kui-border-width/)
   })
 
   test('draws the info toast in the info colour, the danger and success toasts in theirs', () => {
-    const toast = blockOf(theme, '.kui-toast') ?? ''
+    const toast = sourceOf('toaster')
 
-    expect(blockOf(toast, '&:where([data-tone=\'info\'])')).toContain('--_toast-tone: var(--color-info);')
-    expect(blockOf(toast, '&:where([data-tone=\'danger\'])')).toContain('--_toast-tone: var(--color-danger);')
-    expect(blockOf(toast, '&:where([data-tone=\'success\'])')).toContain('--_toast-tone: var(--color-success);')
+    expect(toast).toContain('data-[tone=info]:[--_toast-tone:var(--color-info)]')
+    expect(toast).toContain('data-[tone=danger]:[--_toast-tone:var(--color-danger)]')
+    expect(toast).toContain('data-[tone=success]:[--_toast-tone:var(--color-success)]')
   })
 
   // The recipes read these as a tone of their own element: inherited, a Badge or a Notice inside a toned one would take its colours, and a theme rule setting one would hide the recipe's neutral fallback.

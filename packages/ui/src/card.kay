@@ -2,7 +2,7 @@
 import type { JSX, Snippet } from 'kay'
 import { recipe } from 'kay'
 
-// 'kui-card' stays as the component's name for an app's CSS and tests; theme.css still has its old rule until 1.74.
+// 'kui-card' stays as the component's name for an app's CSS and tests.
 const look = recipe({
   parts: {
     root: 'kui-card flex flex-col rounded-lg border-[length:var(--kui-border-width,var(--border-width))] border-solid border-border bg-surface [box-shadow:var(--shadow-raised)]',

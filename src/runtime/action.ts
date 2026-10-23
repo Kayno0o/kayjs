@@ -171,14 +171,6 @@ export interface ActionProtection<Field extends string = never> {
   maxSize?: ByteSize | undefined
   // What the visitor reads when one of these refuses a post, in place of kay's English, as a schema's `error` is for a field.
   messages?: ProtectionMessages | undefined
-  /** @deprecated The old place of `protect.rateLimit`, kept three minors. */
-  rateLimit?: ActionRateLimit | ActionRateLimit[] | undefined
-  /** @deprecated The old place of `protect.honeypot`, kept three minors. */
-  honeypot?: Field | HoneypotOptions<Field> | undefined
-  /** @deprecated The old place of `protect.minTime`, kept three minors. */
-  minTime?: Duration | MinTimeOptions | undefined
-  /** @deprecated The old place of `protect.proofOfWork`, kept three minors. */
-  proofOfWork?: boolean | number | ProofOfWorkOptions | undefined
 }
 
 // An action's options once `protect` is read, the checks on a level with the rest: what the server reads.
@@ -402,24 +394,14 @@ export function action(first: unknown, second?: unknown, third?: ActionProtectio
   return declare(first as TSchema, second as (input: unknown, ctx: ActionContext) => unknown, third)
 }
 
-// The options with `protect` read: its checks on a level with the rest, which the old flat form (`{ honeypot, rateLimit }`, read until 1.74) already is, `protect` winning where both set one.
+// The options with `protect` read: its checks on a level with the rest, what the server reads.
 export function resolveProtection(options: ActionProtection<string> | undefined): ResolvedProtection | undefined {
   if (options === undefined)
     return undefined
 
-  const { protect, ...rest } = options
+  const { protect, tool, maxSize, bodyLimit, messages } = options
 
-  if (protect == null)
-    return rest
-
-  const grouped: ResolvedProtection = { ...rest }
-
-  for (const [key, value] of Object.entries(protect)) {
-    if (value !== undefined)
-      (grouped as Record<string, unknown>)[key] = value
-  }
-
-  return grouped
+  return Object.fromEntries(Object.entries({ tool, maxSize, bodyLimit, messages, ...protect }).filter(([, value]) => value !== undefined))
 }
 
 function declare(schema: TSchema, handler: (input: unknown, ctx: ActionContext) => unknown, options: ActionProtection<string> | undefined): ServerAction<TSchema, unknown> {

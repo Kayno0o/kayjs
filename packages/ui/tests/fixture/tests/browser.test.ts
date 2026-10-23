@@ -664,7 +664,7 @@ inBrowser('FormField in an island', () => {
     await using page = await site.open('/borders')
     await page.evaluate(() => {
       // A manual popover stays open beside the other, where an auto one would close it.
-      for (const list of document.querySelectorAll<HTMLElement>('#site-nav-list, #recipe-list')) {
+      for (const list of document.querySelectorAll<HTMLElement>('#recipe-list')) {
         list.popover = 'manual'
         list.showPopover()
       }
@@ -673,33 +673,20 @@ inBrowser('FormField in an island', () => {
     // Each box with the sides it draws, in the order top, right, bottom, left; the others stay 0. A button draws its keyline in ::before.
     const boxes: Record<string, [selector: string, sides: string]> = {
       card: ['#card', 'trbl'],
-      head: ['#card-head', 'b'],
       row: ['#row', 'trbl'],
       widget: ['#widget', 'trbl'],
       notice: ['#notice', 'trbl'],
       avatar: ['#avatar', 'trbl'],
       button: ['#button::before', 'trbl'],
-      sidePanel: ['#side-panel', 'l'],
-      tooltip: ['#tooltip', 'trbl'],
       tableWrap: ['#table-wrap', 'trbl'],
       section: ['#section', 'trbl'],
       saveBar: ['#save-bar', 'trbl'],
       segmented: ['#segmented', 'trbl'],
       fileDrop: ['#file-drop', 'trbl'],
-      step: ['#step', 'trbl'],
       stepPart: ['#pager [data-part=step]', 'trbl'],
-      chartTooltip: ['#chart-tooltip', 'trbl'],
       chipLabel: ['#chips [data-part=label]', 'trbl'],
       iconGrid: ['#icon-grid', 'trbl'],
-      scatterPlot: ['#scatter-plot', 'trbl'],
-      cropperStage: ['#cropper-stage', 'trbl'],
-      toggle: ['#toggle', 'trbl'],
-      tableFilter: ['#table-filter', 'b'],
-      tableSelection: ['#table-selection', 'b'],
-      narrowHead: ['#narrow-head', 'b'],
-      sortButton: ['#sort-btn', 'trbl'],
       // The page is narrower than the desktop breakpoint, where the open list is a box of its own.
-      siteNavList: ['#site-nav-list', 'trbl'],
       siteNavListPart: ['#recipe-list[data-part=list]:popover-open', 'trbl'],
     }
 
@@ -932,7 +919,7 @@ inBrowser('FormField in an island', () => {
 
       await page.evaluate(() => document.head.append(Object.assign(document.createElement('style'), { textContent: 'ul { display: flex }' })))
 
-      const shown = await page.evaluate(() => getComputedStyle(document.querySelector('#site-nav-list')!).display)
+      const shown = await page.evaluate(() => getComputedStyle(document.querySelector('#recipe-list')!).display)
 
       return shown
     }

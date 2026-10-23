@@ -3592,29 +3592,13 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
-  it('reports the checks of an action set outside protect and --fix groups them, leaving a protect, a spread or a comment unfixed', async () => {
+  it('reports the flat checks of an action as a type error, now that they are gone', async () => {
     const root = await scratchProject({
-      'src/routes/index.kay': '--- server\nexport const a = action(s.Object({ m: s.String() }), send, { rateLimit: { max: 5, window: \'1m\' }, honeypot: \'website\', minTime: \'3s\', messages: { honeypot: \'No\' } })\nexport const b = action(send, { tool: true, proofOfWork: true })\nexport const c = action(send, { protect: { minTime: \'3s\' }, honeypot: \'x\' })\nexport const d = action(send, { ...shared, rateLimit: { max: 1, window: \'1m\' } })\nexport const e = action(send, {\n  rateLimit: { max: 5, window: \'1m\' }, // five a minute\n  tool: true,\n})\nexport const f = action(send, { protect: { rateLimit: { max: 5, window: \'1m\' } }, maxSize: \'1mb\' })\nexport const g = other(send, { honeypot: \'x\' })\n---\np\n',
-      'src/local.ts': 'function action(a: unknown, b: unknown, c: unknown) { return [a, b, c] }\nexport const x = action(1, 2, { minTime: \'3s\' })\n',
-      'src/actions.ts': 'import { action } from \'kay\'\n\nexport const h = action(send, {\n  rateLimit: { max: 5, window: \'1m\' },\n  tool: true,\n  proofOfWork: 1000,\n})\n',
+      'src/actions.ts': 'import { action } from \'kay\'\n\nexport const a = action(async () => 1, { rateLimit: { max: 5, window: \'1m\' } })\nexport const b = action(async () => 1, { protect: { rateLimit: { max: 5, window: \'1m\' } } })\n',
     })
 
     try {
-      const { output } = await runCheck(root)
-
-      expect(output.match(/deprecated-action-options/g)).toHaveLength(6)
-      await runCheck(root, '--fix')
-      expect(await Bun.file(join(root, 'src/actions.ts')).text()).toBe('import { action } from \'kay\'\n\nexport const h = action(send, {\n  protect: { rateLimit: { max: 5, window: \'1m\' }, proofOfWork: 1000 },\n  tool: true,\n})\n')
-
-      const page = await Bun.file(join(root, 'src/routes/index.kay')).text()
-
-      expect(page).toContain('export const a = action(s.Object({ m: s.String() }), send, { protect: { rateLimit: { max: 5, window: \'1m\' }, honeypot: \'website\', minTime: \'3s\' }, messages: { honeypot: \'No\' } })')
-      expect(page).toContain('export const b = action(send, { tool: true, protect: { proofOfWork: true } })')
-      expect(page).toContain('export const c = action(send, { protect: { minTime: \'3s\' }, honeypot: \'x\' })')
-      expect(page).toContain('export const d = action(send, { ...shared, rateLimit: { max: 1, window: \'1m\' } })')
-      expect(page).toContain('  rateLimit: { max: 5, window: \'1m\' }, // five a minute\n  tool: true,')
-      expect(await Bun.file(join(root, 'src/local.ts')).text()).toContain('{ minTime: \'3s\' }')
-      expect(page).toContain('export const g = other(send, { honeypot: \'x\' })')
+      expect((await check(root)).map(d => [d.file, d.line, d.code])).toEqual([[join(root, 'src/actions.ts'), 3, 'TS2769']])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -3765,39 +3749,6 @@ describe.concurrent('kay check, unused code', () => {
 
       expect(after.slice(9, 20)).toEqual(fixed)
       expect(after.slice(20)).toEqual(['// kay-allow deprecated-ui-prop', 'Badge(label="h" stamp)', 'Other(stamp compact size={1})', ''])
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
-  it('reports a stylesheet selecting a part class kayjs-ui components no longer set, with no fix, leaving their roots and comments', async () => {
-    const css = [
-      '.kui-card { margin: 0; }',
-      '/* .kui-card-title in a comment */',
-      '.kui-card-head, .panel .kui-card-body:hover { padding: 1rem; }',
-      '.kui-badge .kui-badge-icon { width: 1rem; }',
-      '.kui-card-row-body { padding: 0; }',
-      '.kui-btn-danger { color: red; }',
-      '.kui-form-field-hint { color: gray; }',
-      '.kui-toggle .kui-toggle-track { width: 3rem; }',
-      '',
-    ].join('\n')
-    const root = await scratchProject({ 'src/routes/index.kay': 'p hi\n', 'src/app.css': css })
-
-    try {
-      const { output } = await runCheck(root)
-
-      expect(output.match(/deprecated-ui-class/g)).toHaveLength(6)
-      expect(output).toContain('.kui-card-head')
-      expect(output).toContain('.kui-card-row-body')
-      expect(output).toContain('since 1.72')
-      expect(output).not.toContain('`.kui-btn-danger` is no longer')
-      expect(output).toContain('`.kui-form-field-hint` is no longer set on the `hint` of `FormField`')
-      expect(output).toContain('`.kui-toggle-track` is no longer set on the `track` of `Toggle`')
-      expect(output).toContain('select `[data-part=\'icon\']` under the component\'s root')
-      await runCheck(root, '--fix')
-      expect(await Bun.file(join(root, 'src/app.css')).text()).toBe(css)
     }
     finally {
       await rm(root, { recursive: true, force: true })

@@ -2,6 +2,18 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.74.0
+
+### The forms deprecated in 1.71 are gone
+
+An action's `rateLimit`, `honeypot`, `minTime` and `proofOfWork` on the third argument itself are no longer read, and `kay check` reports them as a type error: put them under `protect: { ... }` ([Protecting actions](action-protection.md#protecting-an-action)). `deprecated-action-options` is gone with the form it moved.
+
+kayjs-ui's `theme.css` has no rule left for the part classes its components stopped setting (`kui-card-head`, `kui-stat-value`, `kui-dialog-title` and the rest listed under 1.71.0 and 1.72.0), nor for the old rule of the roots of Card, Dialog, Menu, Popover, HoverCard, SidePanel, CommandPalette, Toaster and TooltipHost, whose recipes draw the look: markup of yours written by hand with one of those classes is no longer styled, so give it utilities or select `[data-part]` on the component. `deprecated-ui-class` is gone, and a stylesheet selecting a removed class matches nothing.
+
+kayjs-cms answers on `/_kay/cms` alone: the `/api/cms` path of 1.70 and before is no longer served, so point a webhook or a script at the new one.
+
+kayjs-auth's `auth_*` tables are no longer `renamedFrom` their old names. A database still on `auth_*` tables must take 1.71 to 1.73 first, apply the migration `db.sync()` or `bunx pg-orm generate` writes there, and only then move to 1.74: from 1.74 the generator no longer renames them, so it would create the `kay_*` tables beside the old ones, empty.
+
 ## 1.73.0
 
 ### kayjs-cms: the editor panel is kayjs-ui's docked `SidePanel`

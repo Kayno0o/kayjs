@@ -11,7 +11,7 @@ import { MENU_ITEM, MENU_LIST } from './menu-look'
 import Popover from './popover.kay'
 
 // The class given to a Menu goes to its trigger, as it always did: `root` is the trigger and the popover is `menu`.
-// 'kui-menu' stays on the popover as the component's name for an app's CSS; theme.css still has its old rule until 1.74.
+// 'kui-menu' stays on the popover as the component's name for an app's CSS.
 const look = recipe({
   parts: {
     root: '',

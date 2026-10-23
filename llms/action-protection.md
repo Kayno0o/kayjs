@@ -41,7 +41,7 @@ See [Rate limits](rate-limits.md#limit-attempts-in-a-guard-or-an-api-route).
 ### Protecting an action
 
 - A third argument protects an action from scripts: `action(schema, handler, { protect: { rateLimit: { max: 5, window: '1m' }, honeypot: 'website' } })`.
-- Its options are grouped by concern: `protect` holds `rateLimit`, `honeypot`, `minTime` and `proofOfWork`, beside `messages`, `tool` and `maxSize`. Before 1.71 the four sat on the third argument itself, which works until 1.74 and which `deprecated-action-options` moves under `protect`.
+- Its options are grouped by concern: `protect` holds `rateLimit`, `honeypot`, `minTime` and `proofOfWork`, beside `messages`, `tool` and `maxSize`. The four on the third argument itself, the form before 1.71, are no longer read since 1.74, and `kay check` reports them as a type error.
 - None of these reaches the handler.
 
 #### Rate limits
