@@ -42,13 +42,13 @@ export async function stepDraftMaxAge(root: string, options: CheckOptions): Prom
         continue
       }
 
-      const local = importedStepDraft(ast)
+      const locals = importedStepDraft(ast)
 
-      if (local === undefined)
+      if (locals.size === 0)
         continue
 
       walk(ast, (node) => {
-        if (node.type !== 'CallExpression' || node.callee.type !== 'Identifier' || node.callee.name !== local)
+        if (node.type !== 'CallExpression' || node.callee.type !== 'Identifier' || !locals.has(node.callee.name))
           return
 
         const argument = node.arguments[2]
@@ -74,7 +74,7 @@ export async function stepDraftMaxAge(root: string, options: CheckOptions): Prom
             ...positionAt(source, at(value.start!)),
             end: at(value.end!),
             message: '`maxAge` of `stepDraft` takes a duration since 1.73, not a number of seconds',
-            help: `write \`'${durationText(seconds)}'\``,
+            help: seconds > 0 ? `write \`'${durationText(seconds)}'\`` : 'write a positive duration such as `\'1h\'`',
             code: 'deprecated-step-draft-max-age',
             severity: level === 'warn' ? 'warning' : 'error',
             ...Number.isInteger(seconds) && seconds > 0 && { fixes: [{ title: 'Write maxAge as a duration', edits: [{ start: at(value.start!), end: at(value.end!), text: `'${durationText(seconds)}'` }], safe: true }] },
@@ -96,17 +96,19 @@ function durationText(seconds: number): string {
   return `${seconds}s`
 }
 
-// The local name `stepDraft` is imported under from kayjs-ui, if it is.
-function importedStepDraft(ast: t.File): string | undefined {
+// The local names `stepDraft` is imported under from kayjs-ui.
+function importedStepDraft(ast: t.File): Set<string> {
+  const names = new Set<string>()
+
   for (const statement of ast.program.body) {
-    if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type' || !statement.source.value.startsWith(UI_PACKAGE))
+    if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type' || !(statement.source.value === UI_PACKAGE || statement.source.value.startsWith(`${UI_PACKAGE}/`)))
       continue
 
     for (const specifier of statement.specifiers) {
       if (specifier.type === 'ImportSpecifier' && specifier.importKind !== 'type' && importedName(specifier) === 'stepDraft')
-        return specifier.local.name
+        names.add(specifier.local.name)
     }
   }
 
-  return undefined
+  return names
 }

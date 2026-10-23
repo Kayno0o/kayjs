@@ -1,6 +1,7 @@
 // The step a URL names, and the draft a multi-step form keeps between its posts.
 
 import type { Duration } from 'kay'
+import { durationMs } from 'kay'
 
 export interface StepItem<Key extends string = string> {
   key: Key
@@ -16,18 +17,14 @@ export interface StepCookies {
 
 const STEP_PARAM = 'step'
 
-const DURATION = /^(\d+(?:\.\d+)?)(ms|[smhdw])$/
-const UNIT_SECONDS = { ms: 0.001, s: 1, m: 60, h: 3600, d: 86_400, w: 604_800 }
+// The whole seconds a positive duration stands for, rounded up.
+function cookieSeconds(value: Duration): number {
+  const ms = durationMs(value)
 
-// The whole seconds a positive duration stands for, rounded up. Not kay's own parser, which the browser build of this package cannot import.
-function cookieSeconds(value: string): number {
-  const text = DURATION.exec(value)
-  const seconds = text ? Math.ceil(Number(text[1]) * UNIT_SECONDS[text[2] as keyof typeof UNIT_SECONDS]) : Number.NaN
-
-  if (!(seconds > 0))
+  if (!(ms > 0))
     throw new Error(`kay: stepDraft maxAge is '${value}'; it takes a positive duration such as '30m' or '7d'`)
 
-  return seconds
+  return Math.ceil(ms / 1000)
 }
 
 // The first proxy's `X-Forwarded-Proto` saying the browser came over https.
