@@ -81,7 +81,10 @@ function defaultCatalog(program: t.Program): t.ObjectExpression | undefined {
 
 // A nested group may be wrapped too (`{ ... } as const`), but a call there is a message value, not a group.
 function unwrapped(node: t.Node): t.ObjectExpression | undefined {
-  return WRAPPERS.has(node.type) ? unwrapped((node as t.TSAsExpression).expression) : node.type === 'ObjectExpression' ? node : undefined
+  if (WRAPPERS.has(node.type))
+    return unwrapped((node as t.TSAsExpression).expression)
+
+  return node.type === 'ObjectExpression' ? node : undefined
 }
 
 function objectOf(node: t.Node | null | undefined, bindings: Map<string, t.Expression>, seen: Set<string>): t.ObjectExpression | undefined {
