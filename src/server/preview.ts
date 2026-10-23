@@ -291,9 +291,13 @@ export function editSessionOf(request: Request): string | undefined {
 // Whether a guard of the app let the request's edit cookie through, by the cookie it set beside it with `admitEditSession`: an edit link's holder has the edit cookie alone. False outside edit mode.
 export function editSessionAdmitted(request: Request): boolean {
   const cookie = editCookie(request)
-  const given = settings === undefined ? undefined : requestCookies(request).get(cookieName(ADMITTED_COOKIE, overHttps(request), settings.base)) ?? undefined
 
-  return cookie !== undefined && given !== undefined && signed(settings!, admittedText(cookie), given)
+  if (!settings || cookie === undefined)
+    return false
+
+  const given = requestCookies(request).get(cookieName(ADMITTED_COOKIE, overHttps(request), settings.base))
+
+  return given !== null && given !== undefined && signed(settings, admittedText(cookie), given)
 }
 
 // Marks an edit cookie as one the app's guard let through, from that guard or a page after it: the edit cookie of the request, or the one just given to it by `enterPreview`. A request in edit mode already marked is left as it is.

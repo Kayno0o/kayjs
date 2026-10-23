@@ -171,7 +171,7 @@ function startTicker(): void {
   ticker.unref()
 }
 
-// What an extension holding names in a room tells the server about who may read them: the members of `room` as `request` is sent them (a stream's, or the render of a page or of a streamed block, `undefined` when none is known), joined as `member`; the members given when it may read them all. It runs at each read, so a verdict that changes is sent at the next recheck.
+// What an extension holding names in a room tells the server about who may read them: the members of `room` as `request` is sent them (a stream's, or the render of a page or of a streamed block, `undefined` when none is known), joined as `member`; the members given when it may read them all. It runs at each read, so a verdict that changes is sent at the next recheck, a stream judging by the request that opened it.
 export type PresenceView = (request: Request | undefined, room: string, members: string[], member: string) => string[]
 
 const views = new Set<PresenceView>()
