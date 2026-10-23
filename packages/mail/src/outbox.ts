@@ -37,8 +37,9 @@ export interface WaitOptions {
 }
 
 export interface Outbox extends Transport {
-  // Keeps the mail, noting how the switch delivered it when `relayed` is given; it never waits, so the signal of a transport's send is unused.
-  send: (mail: Mail, signal?: AbortSignal, relayed?: Relayed) => Promise<Delivery>
+  // A transport's send keeps the mail without waiting, so its signal is unused; `keep` also notes how the dev switch delivered it.
+  send: (mail: Mail, signal?: AbortSignal) => Promise<Delivery>
+  keep: (mail: Mail, relayed?: Relayed) => Promise<Delivery>
   // Oldest first.
   readonly mails: readonly SentMail[]
   last: () => SentMail | undefined
@@ -153,8 +154,9 @@ export function createOutbox(file?: string): Outbox {
 
   const kept: Outbox = {
     mails,
+    send: async mail => kept.keep(mail),
     // eslint-disable-next-line ts/require-await -- the interface returns a promise
-    send: async (mail, _signal, relayed): Promise<Delivery> => {
+    keep: async (mail, relayed): Promise<Delivery> => {
       const id = crypto.randomUUID()
       const sent: SentMail = { ...mail, id, sentAt: new Date(), ...relayed === undefined ? {} : { relayed } }
 

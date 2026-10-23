@@ -140,10 +140,9 @@ function agreeOnQueue(name: string, store: object | undefined, settings: Record<
   if (store === undefined)
     return
 
-  const key = store
-  const known = SETTINGS.get(key) ?? new Map<string, { settings: Record<string, unknown>, owner: WeakRef<Owner> }>()
+  const known = SETTINGS.get(store) ?? new Map<string, { settings: Record<string, unknown>, owner: WeakRef<Owner> }>()
 
-  SETTINGS.set(key, known)
+  SETTINGS.set(store, known)
 
   const other = known.get(name)
   const differing = other?.owner.deref() === undefined ? [] : Object.keys(settings).filter(setting => settings[setting] !== undefined && other.settings[setting] !== undefined && JSON.stringify(settings[setting]) !== JSON.stringify(other.settings[setting]))
@@ -494,7 +493,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
   // `signal` is the queue's, aborted when it gives up on the run.
   const deliver = async (mail: Mail, signal?: AbortSignal): Promise<Delivery> => {
     if (transport === outbox) {
-      const delivery = await outbox.send(mail, signal, await relayed(mail))
+      const delivery = await outbox.keep(mail, await relayed(mail))
 
       if (underKayDev())
         log.info(`${quoted(mail.subject)} to ${recipientsOf(mail).join(', ')} kept in the outbox, shown at /_kay/mail`)

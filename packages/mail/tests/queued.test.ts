@@ -93,11 +93,25 @@ describe('mailers sharing a queue', () => {
   it('refuse retry and keep options that differ, as a queue has one set of them', () => {
     const queue = shared()
 
-    const first = mailer({ from: 'a@example.com', queue: { ...queue, keepFailed: '7d' } })
+    mailer({ from: 'a@example.com', queue: { ...queue, keepFailed: '7d' } })
 
     expect(() => mailer({ from: 'b@example.com', queue: { ...queue, attempts: 3 } })).toThrow(/attempts/)
     expect(() => mailer({ from: 'b@example.com', queue: { ...queue, keepFailed: '30d' } })).toThrow(/keepFailed/)
-    expect(first).toBeDefined()
+  })
+
+  it('skip an option one of them leaves unset', () => {
+    const queue = shared()
+
+    mailer({ from: 'a@example.com', queue })
+    expect(() => mailer({ from: 'b@example.com', queue: { ...queue, keepFailed: '30d' } })).not.toThrow()
+    expect(() => mailer({ from: 'c@example.com', queue: { ...queue, keepFailed: '30d' } })).not.toThrow()
+  })
+
+  it('without a store skip the check, as each uses the app\'s', () => {
+    const name = `shared${names++}`
+
+    mailer({ from: 'a@example.com', queue: { name, attempts: 1 } })
+    expect(() => mailer({ from: 'b@example.com', queue: { name, attempts: 3 } })).not.toThrow()
   })
 
   it('may differ in everything a job carries along', () => {
@@ -167,6 +181,44 @@ describe('a queued delivery the queue aborts', () => {
       expect(await Promise.race([settled, new Promise<string>(resolve => setTimeout(resolve, 2000, 'still waiting'))])).toBe('AbortError')
     }
     finally {
+      server.stop()
+    }
+  })
+
+  it('reaches the SMTP transport built from the environment', async () => {
+    silenced()
+
+    const server = startSmtp(0, { stall: true })
+    const mode = process.env.NODE_ENV
+
+    process.env.NODE_ENV = 'production'
+    Object.assign(process.env, { MAIL_URL: `smtp://127.0.0.1:${server.port}`, MAIL_INSECURE: 'true' })
+
+    try {
+      const app = mailer({ from: 'a@example.com', queue: { ...shared(), lostAfter: '1s' } })
+
+      await app.enqueue({ to: 'ada@example.com', subject: 'Hi', text: 'Hello' })
+      await app.drain()
+
+      expect(server.received).toHaveLength(1)
+
+      // The abort dropped the pool, so its connection closes as the server answers, well before the one second a pool left idle waits.
+      server.release()
+
+      for (let look = 0; look < 20 && server.connections.closed === 0; look++)
+        await Bun.sleep(25)
+
+      expect(server.connections.closed).toBe(1)
+    }
+    finally {
+      for (const name of ['MAIL_URL', 'MAIL_INSECURE'])
+        delete process.env[name]
+
+      if (mode === undefined)
+        delete process.env.NODE_ENV
+      else
+        process.env.NODE_ENV = mode
+
       server.stop()
     }
   })

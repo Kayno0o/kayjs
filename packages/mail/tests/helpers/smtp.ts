@@ -12,11 +12,12 @@ interface Session {
   reading: boolean
 }
 
-// An SMTP server answering just enough of the protocol for a client to hand it one message per transaction (`stall` never answers the end of the message), kept in `received`, the names clients greeted it with in `greetings`, and how many connections opened and closed.
-export function startSmtp(port = 0, options: { stall?: boolean } = {}): { received: Received[], greetings: string[], connections: { opened: number, closed: number }, port: number, stop: () => void } {
+// An SMTP server answering just enough of the protocol for a client to hand it one message per transaction (`stall` never answers the end of the message until `release()` does), kept in `received`, the names clients greeted it with in `greetings`, and how many connections opened and closed.
+export function startSmtp(port = 0, options: { stall?: boolean } = {}): { received: Received[], greetings: string[], connections: { opened: number, closed: number }, port: number, release: () => void, stop: () => void } {
   const received: Received[] = []
   const greetings: string[] = []
   const connections = { opened: 0, closed: 0 }
+  const stalled: Socket<Session>[] = []
   const listener: TCPSocketListener<Session> = Bun.listen<Session>({
     hostname: '127.0.0.1',
     port,
@@ -33,7 +34,7 @@ export function startSmtp(port = 0, options: { stall?: boolean } = {}): { receiv
           const line = socket.data.buffer.slice(0, end)
 
           socket.data.buffer = socket.data.buffer.slice(end + 2)
-          answer(socket, line, received, greetings, options.stall === true)
+          answer(socket, line, received, greetings, options.stall === true ? stalled : undefined)
         }
       },
       close: () => {
@@ -42,10 +43,20 @@ export function startSmtp(port = 0, options: { stall?: boolean } = {}): { receiv
     },
   })
 
-  return { received, greetings, connections, port: listener.port, stop: () => listener.stop(true) }
+  return {
+    received,
+    greetings,
+    connections,
+    port: listener.port,
+    release: () => {
+      for (const socket of stalled.splice(0))
+        socket.write('250 queued\r\n')
+    },
+    stop: () => listener.stop(true),
+  }
 }
 
-function answer(socket: Socket<Session>, line: string, received: Received[], greetings: string[], stall: boolean): void {
+function answer(socket: Socket<Session>, line: string, received: Received[], greetings: string[], stalled: Socket<Session>[] | undefined): void {
   const session = socket.data
 
   if (session.reading) {
@@ -54,8 +65,10 @@ function answer(socket: Socket<Session>, line: string, received: Received[], gre
       received.push(session.mail!)
       session.mail = undefined
 
-      if (!stall)
+      if (stalled === undefined)
         socket.write('250 queued\r\n')
+      else
+        stalled.push(socket)
     }
     else {
       session.mail!.data += `${line.startsWith('..') ? line.slice(1) : line}\n`
