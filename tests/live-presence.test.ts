@@ -117,7 +117,7 @@ describe('presence on the server', () => {
   })
 
   it('sends a stream the members as the view of an extension gives them for its request, and every other stream whole', async () => {
-    viewPresenceWith((request, _room, members) => request?.headers.has('x-hide') ? members.map(() => '{"name":""}') : members)
+    const unview = viewPresenceWith((request, _room, members) => request?.headers.has('x-hide') ? members.map(() => '{"name":""}') : members)
 
     try {
       const ann = await enter(site, 'Ann', 'ann-tab')
@@ -134,8 +134,50 @@ describe('presence on the server', () => {
       await leaves(rooms, ROOM, 0)
     }
     finally {
-      viewPresenceWith(undefined)
+      unview()
     }
+  })
+
+  it('hands the view the request a streamed block renders for, after its answer was made', async () => {
+    const asked: (string | undefined)[] = []
+    const unview = viewPresenceWith((request, _room, members) => {
+      asked.push(request?.url)
+
+      return members
+    })
+
+    try {
+      const { html } = await site.visit('/streamed/1')
+
+      expect(html).toContain('class="others"')
+      expect(asked.length).toBeGreaterThan(0)
+      expect(asked.every(url => url?.endsWith('/streamed/1'))).toBe(true)
+    }
+    finally {
+      unview()
+    }
+  })
+
+  it('applies several views one after the other, each removable on its own', async () => {
+    const ann = await enter(site, 'Ann', 'ann-tab')
+
+    await ann.next()
+
+    const first = viewPresenceWith((_request, _room, members) => members.map(text => text.replace('Ann', 'A')))
+    const second = viewPresenceWith((_request, _room, members) => members.map(text => text.replace('A', 'B')))
+
+    try {
+      expect((await visit(site, '/entry/1', 'Bob')).html).toContain('<p class="names">B</p>')
+      first()
+      expect((await visit(site, '/entry/1', 'Bob')).html).toContain('<p class="names">Bnn</p>')
+    }
+    finally {
+      first()
+      second()
+    }
+
+    await ann.close()
+    await leaves(rooms, ROOM, 0)
   })
 
   it('writes the members a page renders for into the page, the visitor not among them yet', async () => {

@@ -146,7 +146,7 @@ export default guard(async (ctx) => {
     return ctx.deny(403, refusal(editing, READ_METHODS.has(method)))
 
   await admits(ctx)
-  admitEditor(ctx.request)
+  admitEditor(ctx)
 
   if (settings().roles !== undefined) {
     // Read now so the route that tells what the person may do has it; every other route reads it only when it needs it.

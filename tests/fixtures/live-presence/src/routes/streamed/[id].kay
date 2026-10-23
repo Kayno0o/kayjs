@@ -1,0 +1,10 @@
+---
+import Who from '../../components/who.kay'
+--- server
+const { id } = ctx.params
+const later = Bun.sleep(20).then(() => id)
+---
+await later
+  p Waiting
+then room
+  Who(room={`entry:${room}`} member={{ name: 'Streamed' }})

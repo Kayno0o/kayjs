@@ -27,6 +27,8 @@ import { markInternal, visitAs } from './visit'
 // Where a preview link enters preview mode, or `?exit` leaves it.
 export const PREVIEW_ROUTE = '/_kay/preview'
 export const PREVIEW_COOKIE = 'kay_preview'
+// The cookie a guard sets beside an edit cookie it let in, signing that cookie's value: it is what tells a person the app signed in from the holder of an edit link, in any process and after a restart.
+const ADMITTED_COOKIE = 'kay_preview_admitted'
 const EDIT = 'edit'
 
 // The query param of a share link, `until.entry.sig`.
@@ -206,19 +208,20 @@ function isDraft(value: unknown): boolean {
   return typeof collection === 'string' && typeof slug === 'string' && (locale === undefined || typeof locale === 'string') && (body === undefined || typeof body === 'string')
 }
 
-// The mode the request's preview cookie, signed by this site and not expired yet, puts it in: `until.sig`, or `until.edit.sig` for edit mode.
+// The mode the request's preview cookie, signed by this site and not expired yet, puts it in: `until.sig`, or `until.edit.nonce.sig` for edit mode (`until.edit.sig`, from before the nonce, still counts).
 export function previewRequested(request: Request): PreviewMode | undefined {
   if (!settings)
     return undefined
 
   const [until, ...rest] = previewCookie(request, settings)?.split('.') ?? []
-  const edit = rest.length === 2 && rest[0] === EDIT
+  const edit = rest[0] === EDIT && (rest.length === 2 || rest.length === 3)
   const sig = rest.at(-1)
+  const nonce = edit && rest.length === 3 ? rest[1] : undefined
 
   if (until === undefined || sig === undefined || (rest.length !== 1 && !edit) || !(Number(until) > Date.now() / 1000))
     return undefined
 
-  if (!signed(settings, cookieText(until, edit), sig))
+  if (!signed(settings, cookieText(until, edit, nonce), sig))
     return undefined
 
   return edit ? 'edit' : 'preview'
@@ -285,6 +288,27 @@ export function editSessionOf(request: Request): string | undefined {
   return editCookie(request)
 }
 
+// Whether a guard of the app let the request's edit cookie through, by the cookie it set beside it with `admitEditSession`: an edit link's holder has the edit cookie alone. False outside edit mode.
+export function editSessionAdmitted(request: Request): boolean {
+  const cookie = editCookie(request)
+  const given = settings === undefined ? undefined : requestCookies(request).get(cookieName(ADMITTED_COOKIE, overHttps(request), settings.base)) ?? undefined
+
+  return cookie !== undefined && given !== undefined && signed(settings!, admittedText(cookie), given)
+}
+
+// Marks an edit cookie as one the app's guard let through, from that guard or a page after it: the edit cookie of the request, or the one just given to it by `enterPreview`. A request in edit mode already marked is left as it is.
+export function admitEditSession(ctx: { cookies: CookieMap, request: Request }, given?: string): void {
+  if (!settings || (given === undefined && editSessionAdmitted(ctx.request)))
+    return
+
+  const cookie = given ?? editCookie(ctx.request)
+
+  if (cookie === undefined)
+    return
+
+  ctx.cookies.set(cookieName(ADMITTED_COOKIE, overHttps(ctx.request), settings.base), sign(settings, admittedText(cookie)), { httpOnly: true, sameSite: 'lax', secure: overHttps(ctx.request), path: settings.base || '/', maxAge: settings.maxAge })
+}
+
 // Whether the request is in edit mode, for a CMS's API module or guard to let in the editor alone outside a page's render, where `editing()` tells.
 export function editRequested(request: Request): boolean {
   return previewRequested(request) === 'edit'
@@ -295,7 +319,9 @@ export function enterPreview(ctx: { cookies: CookieMap, request: Request }, opti
   const current = settingsFor('enterPreview()')
   const until = String(Math.floor(Date.now() / 1000) + current.maxAge)
   const edit = options.edit === true
-  const value = [until, ...edit ? [EDIT] : [], sign(current, cookieText(until, edit))].join('.')
+  // A nonce of its own makes two edit cookies given in the same second differ, so what is known of one is no knowledge of the other.
+  const nonce = edit ? crypto.randomUUID().replaceAll('-', '') : undefined
+  const value = [until, ...edit ? [EDIT, nonce] : [], sign(current, cookieText(until, edit, nonce))].join('.')
 
   ctx.cookies.set(cookieName(PREVIEW_COOKIE, overHttps(ctx.request), current.base), value, { httpOnly: true, sameSite: 'lax', secure: overHttps(ctx.request), path: current.base || '/', maxAge: current.maxAge })
 
@@ -377,7 +403,7 @@ export function exitPreview(ctx: { cookies: CookieMap }): void {
   const path = settingsFor('exitPreview()').base || '/'
 
   // The cookie is read under the name of the scheme it came over, so every name it may have is cleared.
-  for (const name of [PREVIEW_COOKIE, ...prefixedNames(PREVIEW_COOKIE)])
+  for (const name of [PREVIEW_COOKIE, ADMITTED_COOKIE, ...prefixedNames(PREVIEW_COOKIE), ...prefixedNames(ADMITTED_COOKIE)])
     ctx.cookies.delete({ name, path })
 }
 
@@ -472,8 +498,12 @@ function validLink(current: PreviewSettings, path: string, edit: boolean, until:
 }
 
 // What a cookie and a link sign: edit mode is signed apart, so a preview link cannot be turned into an edit one.
-function cookieText(until: string, edit: boolean): string {
-  return `cookie\n${until}${edit ? `\n${EDIT}` : ''}`
+function cookieText(until: string, edit: boolean, nonce?: string): string {
+  return `cookie\n${until}${edit ? `\n${EDIT}` : ''}${nonce === undefined ? '' : `\n${nonce}`}`
+}
+
+function admittedText(cookie: string): string {
+  return `admitted\n${cookie}`
 }
 
 function shareText(until: string, entry: string, path: string): string {

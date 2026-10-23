@@ -22,7 +22,7 @@ export default guard(async (ctx) => {
   }
 
   // The edit cookie this browser holds is an editor's from here on, so the on-page editor is told the names too.
-  admitEditor(ctx.request)
+  admitEditor(ctx)
 
   // An editor the guard let in is marked for the pages they read next, which show them the link into edit mode.
   if (pageLink)

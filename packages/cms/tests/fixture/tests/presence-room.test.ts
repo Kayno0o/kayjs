@@ -92,3 +92,24 @@ test('an edit link\'s holder receives the editors only as a count, while a signe
   expect(named.keys.some(key => key.includes('"cms:posts:hello"'))).toBe(true)
   expect(namesIn(named)).toContain('Ann')
 }, 30_000)
+
+test('a person who entered edit mode through an edit link and was let in by the guard since is told the names, with no state kept by the process', async () => {
+  const screen = await testSite({ root: ROOT })
+
+  await receives(screen, '/admin/collections/posts/hello?as=Ann', 'ann-screen')
+
+  const person = await testSite({ root: ROOT })
+
+  await person.visit(previewUrl('/blog/hello', { edit: true }))
+  expect(namesIn(await receives(person, '/blog/hello', 'before-guard'))).not.toContain('Ann')
+
+  // The guard lets the same browser in: its edit cookie is marked by a cookie of its own, which any process can check.
+  await person.visit('/admin/collections/posts/hello?as=Bob')
+  expect(namesIn(await receives(person, '/blog/hello', 'after-guard'))).toContain('Ann')
+
+  // Another holder, entering in the same second, shares nothing with that browser.
+  const other = await testSite({ root: ROOT })
+
+  await other.visit(previewUrl('/blog/hello', { edit: true }))
+  expect(namesIn(await receives(other, '/blog/hello', 'other-holder'))).not.toContain('Ann')
+}, 30_000)

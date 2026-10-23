@@ -1333,7 +1333,7 @@ describe('preview mode', () => {
 
     const left = await app.handle(new Request('http://localhost/_kay/preview?exit&path=/news', { headers: https }))
 
-    expect(left.headers.getSetCookie().map(header => header.slice(0, header.indexOf('=')))).toEqual(['kay_preview', '__Host-kay_preview', '__Secure-kay_preview'])
+    expect(left.headers.getSetCookie().map(header => header.slice(0, header.indexOf('=')))).toEqual(['kay_preview', 'kay_preview_admitted', '__Host-kay_preview', '__Secure-kay_preview', '__Host-kay_preview_admitted', '__Secure-kay_preview_admitted'])
   })
 
   it('lets in a signed link, and refuses any other, one carrying the secret itself included', async () => {
@@ -1375,7 +1375,8 @@ describe('preview mode', () => {
 
     enterPreview({ cookies, request: new Request('http://localhost/') }, { edit: true })
 
-    expect(byLink).toMatch(/^kay_preview=\d+\.edit\.[\w-]+$/)
+    expect(byLink).toMatch(/^kay_preview=\d+\.edit\.\w{32}\.[\w-]+$/)
+    expect(await previewCookie(link)).not.toBe(await previewCookie(link))
     expect(mode(byLink)).toBe('edit')
     expect(link).toContain('&edit=&sig=')
     expect(mode(await previewCookie(link))).toBe('edit')
