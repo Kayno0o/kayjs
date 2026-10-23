@@ -112,10 +112,17 @@ export function pgLists(source: PgJobsSource): ListStore & { close: () => Promis
 
   const confirmedExists = 'EXISTS (SELECT 1 FROM kay_mail_subscribers WHERE id = $2 AND status = \'confirmed\' FOR SHARE)'
 
+  let closed = false
+
   return {
     close: async () => {
-      if (typeof source === 'string')
+      if (typeof source === 'string') {
+        closed = true
         await db.close()
+      }
+    },
+    get closed() {
+      return closed
     },
     async sweep(now = Date.now()): Promise<void> {
       const connection = await connected()

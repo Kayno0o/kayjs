@@ -37,6 +37,8 @@ type Maybe<T> = T | Promise<T>
 
 // What the mailing lists keep their data in; `openLists` is the SQLite one, `pgLists` the Postgres one, both with the same semantics: a delivery is claimed before its mail goes, and removing or erasing a subscriber takes its deliveries with it.
 export interface ListStore {
+  // Whether the store was closed, which the sweep then leaves alone.
+  readonly closed?: boolean
   // The address's row on the list, made pending when it has none, with the proof of the post that made it.
   ask: (list: string, email: string, id: string, locale: string, now?: number, proof?: Proof) => Maybe<Subscriber>
   // Forgets the confirmations nobody clicked in 7 days and the broadcasts finished 30 days ago with their deliveries, which the lists run when a store opens and every hour.
@@ -161,8 +163,16 @@ export function openLists(path: string) {
   sweepPending.run(Date.now() - PENDING_KEPT_MS)
   sweepBroadcasts.immediate(Date.now() - BROADCAST_KEPT_MS)
 
+  let closed = false
+
   return {
-    close: () => db.close(),
+    close: () => {
+      closed = true
+      db.close()
+    },
+    get closed() {
+      return closed
+    },
     sweep(now = Date.now()): void {
       sweepPending.run(now - PENDING_KEPT_MS)
       sweepBroadcasts.immediate(now - BROADCAST_KEPT_MS)

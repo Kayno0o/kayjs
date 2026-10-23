@@ -419,6 +419,9 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
   // Forgets what the lists keep past its time, in every store this process knows: the unclicked confirmations and the old broadcasts. It runs once the app has booted and every hour, off any subscribe post.
   const sweep = async (now?: number): Promise<void> => {
     for (const store of new Set([...entries.values()].map(entry => entry.opened()))) {
+      if (store?.closed)
+        continue
+
       try {
         await store?.sweep(now)
       }

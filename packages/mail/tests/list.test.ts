@@ -680,6 +680,27 @@ describe('the sweep of the lists', () => {
     store.close()
   })
 
+  it('leaves a closed store out of the sweep, with no warning', async () => {
+    const file = join(await scratchDir('list-'), 'closed.sqlite')
+    const store = openLists(file)
+    const lists = createLists(host)
+    const warnings: string[] = []
+    const warn = console.warn
+
+    lists.list('closed', { store })
+    store.close()
+    console.warn = (...args: unknown[]) => void warnings.push(args.join(' '))
+
+    try {
+      await lists.sweep()
+    }
+    finally {
+      console.warn = warn
+    }
+
+    expect(warnings).toEqual([])
+  })
+
   it('creates no file for a list nobody used', async () => {
     const file = join(await scratchDir('list-'), 'never.sqlite')
     const lists = createLists(host)
