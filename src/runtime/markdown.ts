@@ -5,7 +5,7 @@ import { vouch } from './safe-html'
 import { sanitizeHtml } from './sanitize'
 
 // What a user's Markdown keeps besides formatted text: tables, images and the task lists' checkboxes, which `sanitizeHtml` would drop as inputs.
-const KEPT: SanitizeOptions = { tags: ['img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'], attributes: { img: ['src', 'alt', 'title'], th: ['align'], td: ['align'] } }
+export const MARKDOWN_KEPT: SanitizeOptions = { tags: ['img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'], attributes: { img: ['src', 'alt', 'title'], th: ['align'], td: ['align'] } }
 const TASK = /<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled( checked)?>/g
 const MARKS = /[\uE000\uE001]/g
 const MARKED_TASK = /<li>([\uE000\uE001])/g
@@ -24,8 +24,8 @@ function openLeavingLinks(html: string, leaves: (href: string) => boolean): stri
 }
 
 // Markdown's HTML through `sanitizeHtml`, a task's checkbox held as a private character the user's own text cannot hold, and the links leaving the site opening in a new tab, each checkbox named by its item's text.
-export function sanitizedMarkdown(html: string, leaves: (href: string) => boolean): SafeHtml {
+export function sanitizedMarkdown(html: string, leaves: (href: string) => boolean, kept: SanitizeOptions = MARKDOWN_KEPT): SafeHtml {
   const held = html.replace(MARKS, mark => `&#${mark.codePointAt(0)};`).replace(TASK, (_, checked: string | undefined) => checked !== undefined ? '<li>\uE001' : '<li>\uE000')
 
-  return vouch(labelTasks(openLeavingLinks(sanitizeHtml(held, KEPT), leaves).replace(ODD_ALIGN, '').replace(MARKED_TASK, (_, mark: string) => `<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled${mark === '\uE001' ? ' checked' : ''}>`)))
+  return vouch(labelTasks(openLeavingLinks(sanitizeHtml(held, kept), leaves).replace(ODD_ALIGN, '').replace(MARKED_TASK, (_, mark: string) => `<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled${mark === '\uE001' ? ' checked' : ''}>`)))
 }

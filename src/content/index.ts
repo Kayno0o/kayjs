@@ -23,7 +23,7 @@ import { entryPath } from './entry-route'
 import { sizedImages } from './images'
 import { contentKey } from './key'
 import { contentMode, loadEntries, markdownOf, translationKey } from './load'
-import { compileMarkdown, countWords, MarkdownError } from './markdown'
+import { compileMarkdown, countWords, MarkdownError, sanitizedHtml } from './markdown'
 import { hasSteps, migrateEntries, migrateLoaded, withMigrationHint, writeBack } from './migrate'
 import { ContentError, decodeEntries, isBlockItem, validEntries } from './validate'
 
@@ -133,6 +133,8 @@ export interface CollectionOptions<Schema extends TSchema, Routed extends boolea
   migrations?: Migration[] | undefined
   // The kay components a Markdown entry may use, by the name it writes them with: `<Callout type="warn">`.
   components?: Record<string, Component<never>> | undefined
+  // Keeps the HTML of a loader's entries as it is, raw tags, scripts and `javascript:` links included, for a loader returning content its author wrote. Without it a loaded `body` and `html` are sanitized as a user's Markdown is: formatted text, links, images and tables, nothing that runs, loads another document or styles the page. A folder's files are always the author's own.
+  trusted?: boolean | undefined
   // Highlights code blocks when the entries compile, at build time, such as with Shiki; `kay.config.ts`'s `markdown.highlight` unless set here.
   highlight?: Highlighter | undefined
   // Whether a heading links to itself, `kay.config.ts`'s `markdown.headingLinks` unless set here; on by default.
@@ -538,8 +540,9 @@ async function compileLoaded(loader: ContentLoader, preview: boolean, markdown: 
     slugs.add(slug)
 
     try {
-      const fromHtml = typeof html === 'string' ? { segments: [html], headings: [], words: countWords(html) } : undefined
-      const compiled = typeof body === 'string' ? await compileMarkdown(body, 1, markdown.highlight, markdown.headingLinks) : fromHtml
+      const sanitize = options.trusted !== true
+      const fromHtml = typeof html === 'string' ? { segments: [sanitize ? sanitizedHtml(html) : html], headings: [], words: countWords(html) } : undefined
+      const compiled = typeof body === 'string' ? await compileMarkdown(body, 1, markdown.highlight, markdown.headingLinks, sanitize) : fromHtml
 
       entries.push({ slug, file, data, lines: {}, segments: compiled?.segments, headings: compiled?.headings, words: compiled?.words })
     }

@@ -1,8 +1,9 @@
 // Markdown entries compiled once into what renders them: the HTML around the kay components they use, plus their headings.
 import type { SafeHtml } from '../runtime/checks'
+import type { SanitizeOptions } from '../runtime/sanitize'
 import { escape, escapeAttribute } from '../runtime/escape'
 import { outsideLinks } from '../runtime/html'
-import { MARKDOWN_OPTIONS } from '../runtime/markdown'
+import { MARKDOWN_KEPT, MARKDOWN_OPTIONS, sanitizedMarkdown } from '../runtime/markdown'
 import { labelTasks } from '../runtime/markdown-task'
 import { vouch } from '../runtime/safe-html'
 
@@ -42,7 +43,7 @@ export type Highlighter = (code: string, language: string | undefined) => string
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/
 // Where a heading and a code block open, each closed by the first `</a></hN>` or `</code></pre>` after it.
-const HEADING_OPEN = /<h([1-6]) id="([^"]*)"><a href="#\2">/g
+const HEADING_OPEN = /<h([1-6]) id="([^"]*)"><a href="#\2"(?: rel="nofollow ugc")?>/g
 const CODE_OPEN = /<pre><code(?: class="language-([^"]*)")?>/g
 const CODE_CLOSE = '</code></pre>'
 // Where a tag naming a component opens: capitalized, as kay components are; lowercase tags stay HTML.
@@ -62,6 +63,11 @@ const INDENTED = /^(?: {4}|\t)/
 const BLANK = /^\s*$/
 const ATTRIBUTE_NAME = /^[A-Z_][\w:-]*/i
 const TAGS = /<[^>]*>/g
+// What a loader's Markdown keeps beyond a user's: a heading's id for its anchor and a code block's language class, which the headings and the highlighter read.
+const LOADED: SanitizeOptions = { tags: MARKDOWN_KEPT.tags, attributes: { ...MARKDOWN_KEPT.attributes, h1: ['id'], h2: ['id'], h3: ['id'], h4: ['id'], h5: ['id'], h6: ['id'], code: ['class'] } }
+// The private characters standing for a component's placeholder while the sanitizer, which reads no tag name with a hyphen, goes over the rest.
+const HELD_PLACEHOLDER = /\uE010(\d+)\uE011|\uE012(\d+)\uE011|\uE013/g
+const PRIVATE_CHARS = /[\uE010-\uE013]/g
 const SPACE = /\s/
 const ENTITY = /&(?:amp|lt|gt|quot|#39|#x27);/g
 const DECODED: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': '\'', '&#x27;': '\'' }
@@ -99,9 +105,9 @@ export function splitFrontmatter(source: string): { frontmatter: string | undefi
 
 // The body as HTML split around its components, headings anchored, and code highlighted when a highlighter is given.
 // Component tags are swapped for placeholder elements first, so Markdown passes them through whatever their attributes hold, and code never holds one.
-export async function compileMarkdown(body: string, bodyLine: number, highlight?: Highlighter, headingLinks = true): Promise<CompiledMarkdown> {
+export async function compileMarkdown(body: string, bodyLine: number, highlight?: Highlighter, headingLinks = true, sanitize = false): Promise<CompiledMarkdown> {
   const { text, components } = extractComponents(body, bodyLine)
-  const { html, headings } = await renderedMarkdown(text, { highlight, headingLinks })
+  const { html, headings } = await renderedMarkdown(text, { highlight, headingLinks, sanitize })
 
   return { segments: componentSegments(html, components), headings, words: countWords(html) }
 }
@@ -115,6 +121,33 @@ export function countWords(html: string): number {
     words += isWordLike ? 1 : 0
 
   return words
+}
+
+// Markdown's HTML through the sanitizer a user's Markdown goes through, the component placeholders and the heading anchors kept: raw tags, handlers and unsafe links are gone.
+// Links leaving the site are written later, as each page renders.
+function sanitizedComponents(html: string): string {
+  const held = html.replace(PRIVATE_CHARS, char => `&#${char.codePointAt(0)};`).replace(PLACEHOLDER_TAG, (_, selfClosing: string | undefined, opening: string | undefined) => heldPlaceholder(selfClosing, opening))
+
+  return sanitizedMarkdown(held, () => false, LOADED).replace(HELD_PLACEHOLDER, (_, selfClosing: string | undefined, opening: string | undefined) => restoredPlaceholder(selfClosing, opening))
+}
+
+function heldPlaceholder(selfClosing: string | undefined, opening: string | undefined): string {
+  if (selfClosing !== undefined)
+    return `\uE010${selfClosing}\uE011`
+
+  return opening !== undefined ? `\uE012${opening}\uE011` : '\uE013'
+}
+
+function restoredPlaceholder(selfClosing: string | undefined, opening: string | undefined): string {
+  if (selfClosing !== undefined)
+    return `<${PLACEHOLDER} n="${selfClosing}" />`
+
+  return opening !== undefined ? `<${PLACEHOLDER} n="${opening}">` : `</${PLACEHOLDER}>`
+}
+
+// An HTML body a loader gave, as a user's markup goes through the sanitizer.
+export function sanitizedHtml(html: string): string {
+  return sanitizedMarkdown(html, () => false, LOADED)
 }
 
 // The HTML an entry's Markdown body puts on the page, each component standing as a `<kay-component>` element around what it wraps, so a CMS can check what an editor wrote before saving it; throws a MarkdownError for components kay cannot read.
@@ -143,10 +176,11 @@ export async function renderMarkdown(markdown: string, options: { highlight?: Hi
 }
 
 // The HTML of `renderMarkdown` before its links leaving the site are written: an entry's body compiles once, and its links are written as each page renders against its site.
-async function renderedMarkdown(markdown: string, options: { highlight?: Highlighter | undefined, headingLinks?: boolean | undefined } = {}): Promise<RenderedMarkdown> {
+async function renderedMarkdown(markdown: string, options: { highlight?: Highlighter | undefined, headingLinks?: boolean | undefined, sanitize?: boolean | undefined } = {}): Promise<RenderedMarkdown> {
   const links = options.headingLinks !== false
   // Always rendered with anchors, which tell Markdown's headings from raw `<h2 id>` tags; they are taken off after when `headingLinks` is false.
-  let html = labelTasks(withImageDefaults(Bun.markdown.html(markdown, { ...MARKDOWN_OPTIONS, headings: { ids: true, autolink: true } })))
+  const rendered = Bun.markdown.html(markdown, { ...MARKDOWN_OPTIONS, headings: { ids: true, autolink: true } })
+  let html = labelTasks(withImageDefaults(options.sanitize === true ? sanitizedComponents(rendered) : rendered))
   const headings: Heading[] = []
   let plain = ''
   let last = 0

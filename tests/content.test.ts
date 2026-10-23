@@ -771,3 +771,65 @@ describe('a loaded collection\'s save', () => {
     expect(saved).toEqual([])
   })
 })
+
+describe('a loader\'s bodies', () => {
+  const hostile = '# Title\n\n<script>alert(1)</script><img src=x onerror=alert(2)><style>p{display:none}</style><!-- c -->\n\n[go](javascript:alert(3)) [ok](https://example.com/a?b=1&c=2)\n\n<iframe src="https://evil.example"></iframe><b onclick="x()">bold</b>\n'
+  const schema = t.Object({})
+  let made = 0
+  const rendered = async (options: object, entry: { body?: string, html?: string }) => {
+    const found = collection({ name: `sanitized-${made++}`, load: () => [{ slug: 'a', data: {}, ...entry }] }, { schema, ...options })
+    const [first] = await found.all()
+
+    return { html: (first!.Content({}) as unknown as { t: string }).t, entry: first! }
+  }
+
+  it('are sanitized by default: no script, handler, style, comment, iframe or javascript: link reaches the page', async () => {
+    const { html, entry } = await rendered({}, { body: hostile })
+
+    expect(html).not.toMatch(/<script|onerror|onclick|<style|<!--|<iframe|javascript:/i)
+    expect(html).toContain('<b>bold</b>')
+    expect(html).toContain('href="https://example.com/a?b=1&amp;c=2"')
+    expect(html).toContain('<h1 id="title"><a href="#title"')
+    expect(entry.headings).toEqual([{ depth: 1, id: 'title', text: 'Title' }])
+  })
+
+  it('sanitize an html field the same way', async () => {
+    const { html } = await rendered({}, { html: '<p onclick="x()">hi</p><script>alert(1)</script><a href="javascript:alert(2)">a</a><a href="/ok">b</a>' })
+
+    expect(html).not.toMatch(/<script|onclick|javascript:/i)
+    expect(html).toContain('<p>hi</p>')
+    expect(html).toContain('href="/ok"')
+  })
+
+  it('keep the collection\'s components, their props and the code blocks the highlighter reads', async () => {
+    const callout = (props: { title?: string, children?: unknown }) => html(`<aside data-title="${props.title}">${(props.children as { t?: string } | undefined)?.t ?? ''}</aside>`)
+    const shout = (code: string, language: string | undefined) => `<pre class="shout">${language}:${code.toUpperCase()}</pre>`
+    const { html: page } = await rendered({ components: { Callout: callout }, highlight: shout }, { body: '<Callout title="T">In <b>it</b> <script>x</script></Callout>\n\n<Callout title="U" />\n\n```ts\nconst a = 1\n```\n' })
+
+    expect(page).toContain('<aside data-title="T">In <b>it</b> </aside>')
+    expect(page).toContain('<aside data-title="U"></aside>')
+    expect(page).toContain('<pre class="shout">ts:CONST A = 1\n</pre>')
+    expect(page).not.toContain('<script')
+  })
+
+  it('keep the characters standing for a placeholder from becoming a component', async () => {
+    const { html: page } = await rendered({ components: { Callout: () => html('<aside></aside>') } }, { body: '<Callout />\n\na \uE0100\uE011 \uE013 b' })
+
+    expect(page.split('<aside').length).toBe(2)
+  })
+
+  it('keep raw HTML with trusted: true', async () => {
+    const { html: page } = await rendered({ trusted: true }, { body: hostile })
+    const { html: fromHtml } = await rendered({ trusted: true }, { html: '<script>alert(1)</script><p onclick="x()">hi</p>' })
+
+    expect(page).toContain('<script>alert(1)</script>')
+    expect(page).toContain('onerror=alert(2)')
+    expect(fromHtml).toBe('<script>alert(1)</script><p onclick="x()">hi</p>')
+  })
+
+  it('leave a folder\'s files as the author wrote them', async () => {
+    const compiled = await compileMarkdown('<script>alert(1)</script>\n', 1)
+
+    expect(compiled.segments.join('')).toContain('<script>alert(1)</script>')
+  })
+})

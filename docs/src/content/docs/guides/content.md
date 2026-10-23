@@ -336,7 +336,7 @@ The loader takes more than `load`.
 
 | Option | Does |
 | --- | --- |
-| `load({ preview })` | Gives the entries as `{ slug, data, body }` or `{ slug, data, html }`. `body` is Markdown, `html` is rendered as it is. `preview` is true in preview mode and in development |
+| `load({ preview })` | Gives the entries as `{ slug, data, body }` or `{ slug, data, html }`. `body` is Markdown, `html` is HTML. Both are sanitized unless the collection is `trusted: true`. `preview` is true in preview mode and in development |
 | `ttl` | How long the entries are served before the next read refreshes them in the background. Without it they are kept until `invalidate()` or a restart |
 | `store` | A `sqliteCache(path)` that keeps them across restarts and lets `invalidate()` reach every process sharing it |
 | `save(entry)`, `remove(entry)` | Write an entry back to the CMS, for a CMS editing the collections. The `data` of `save` is typed from the collection's `schema`, with defaults filled in and dates as text, so it needs no cast |
@@ -369,6 +369,8 @@ An entry that changed is given to the loader's `save` once, so the next read fin
 To keep two entries from sharing a value, such as a code, wrap the field in `unique()` from `kay/content`: a save that repeats another entry's value is refused with an issue on that field.
 
 `news.invalidate()` refreshes it, and every prerendered page that read it. Call it from a webhook in an API route. That one line is the whole webhook.
+
+A loader often reads content its author did not write, so a loaded `body` and `html` are sanitized as a user's Markdown is: formatted text, links, images and tables stay, and scripts, handlers, styles, iframes and `javascript:` links are dropped. A folder's files are the author's own and keep their raw HTML. Pass `trusted: true` in the collection's options when the loader returns content written by people you trust, such as your own CMS editors, to keep its HTML as it is.
 
 `kay build` does not keep a page over a loader on its own, since a loader may read a database and `ttl` refreshes the entries without telling the page. Add `prerender: true` to the page to prerender it anyway. The webhook then refreshes it.
 

@@ -58,7 +58,7 @@ export const news = collection({
 })
 ```
 
-- `load` gives an array of `{ slug, data, body }` or `{ slug, data, html }`: `data` is read against the schema, defaults filled in and dates decoded; `body` is Markdown, compiled as a file's body, headings listed, code highlighted and the collection's components usable; `html` is rendered as it is, trusted as a file entry's is.
+- `load` gives an array of `{ slug, data, body }` or `{ slug, data, html }`: `data` is read against the schema, defaults filled in and dates decoded; `body` is Markdown, compiled as a file's body, headings listed, code highlighted and the collection's components usable; `html` is HTML. Both are sanitized as a user's Markdown is (formatted text, links, images and tables kept; scripts, handlers, styles, iframes, comments and `javascript:` links dropped; heading anchors, code languages and components kept), since a loader often reads content its author did not write. `trusted: true` in the collection's options keeps both as they are, raw HTML included, as a folder's files always are.
 - `count({ preview })` gives how many entries `load` would, `body: false` says they hold `html` rather than a Markdown `body` (true when left out), and `get(place, { preview })` gives the one entry at a place, its slug with the locale before it in a localized collection, `fr/launch`, or undefined: a CMS (`collections()`, `collectionInfo()` and `entries(name, { slug })` from `kay/content`) asks them in place of running `load` for every entry.
 - An entry's `file` is the collection's name and its slug, `news/launch`.
 - One with no slug or with another entry's, or a load giving anything but an array, fails the read with every problem named, and the next read loads again.

@@ -1217,7 +1217,7 @@ function draftOf(collection: Collection<unknown>, entry: Omit<SourceEntry, 'draf
 async function compiledBody(collection: Collection<unknown>, body: string, report: (message: string) => void): Promise<CompiledMarkdown | undefined> {
   try {
     const { highlight, headingLinks } = markdownOf(collection.options)
-    const compiled = await compileMarkdown(body, 1, highlight, headingLinks)
+    const compiled = await compileMarkdown(body, 1, highlight, headingLinks, collection.loader !== undefined && collection.options.trusted !== true)
 
     for (const { component, line } of unknownComponents(compiled.segments, collection.components))
       report(`uses <${component}> on line ${line}, which the collection's components do not name`)
