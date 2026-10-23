@@ -25,7 +25,7 @@ const CSS_COMMENT_OR_URL = /url\((?:"[^"\n]{0,2000}"|'[^'\n]{0,2000}'|[^)\n]{0,2
 const MARKDOWN_STYLE = /<style\b[\s\S]*?<\/style>/gi
 const INLINE_CODE = /`[^`\n]*`/g
 // A fence opens after any indentation, blockquote marker or list marker, so one nested in a list item or a quote is still code; it closes only under the same blockquote depth and without a list marker, and its container ending ends it too.
-const FENCE_LINE = /^([ \t]*(?:>[ \t]*)*)((?:[-*+]|\d{1,9}[.)])[ \t]+)?(`{3,}(?!`)|~{3,}(?!~))(.*)$/
+const FENCE_LINE = /^([ \t]*(?:>[ \t]*)*)(?:((?:[-*+]|\d{1,9}[.)])[ \t]+)((?:>[ \t]*)*))?(`{3,}(?!`)|~{3,}(?!~))(.*)$/
 const CONTAINER_PREFIX = /^[ \t]*(?:>[ \t]*)*/
 const HEADING = /^ {0,3}#{1,6}(?:[ \t]|$)/
 const DEEP_INDENT = /^(?: {8}|\t\t| {4}\t)/
@@ -73,25 +73,43 @@ function quoteDepth(prefix: string): number {
   return prefix.split('>').length - 1
 }
 
+// The width of a prefix, a tab running to the next multiple of 4.
 function columns(text: string): number {
-  return text.replaceAll('\t', '    ').length
+  let width = 0
+
+  for (const char of text)
+    width = char === '\t' ? width + 4 - width % 4 : width + 1
+
+  return width
+}
+
+// The prefix up to its n-th blockquote marker, where a list item's content starts when the item holds a quote.
+function beforeQuote(prefix: string, n: number): string {
+  let seen = 0
+
+  for (let i = 0; i < prefix.length; i++) {
+    if (prefix[i] === '>' && seen++ === n)
+      return prefix.slice(0, i)
+  }
+
+  return prefix
 }
 
 // A blockquote ends a fence by a non-blank line with fewer markers, a list item by a non-blank line indented less than its content.
-function containerEnded(line: string, fence: { quotes: number, listColumn: number }): boolean {
+function containerEnded(line: string, fence: { quotes: number, outerQuotes: number, listColumn: number }): boolean {
   if (line.trim() === '')
     return false
 
   const prefix = CONTAINER_PREFIX.exec(line)![0]
   const depth = quoteDepth(prefix)
 
-  return depth < fence.quotes || (fence.listColumn > 0 && depth === fence.quotes && columns(prefix) < fence.listColumn)
+  return depth < fence.quotes || (fence.listColumn > 0 && depth === fence.quotes && columns(beforeQuote(prefix, fence.outerQuotes)) < fence.listColumn)
 }
 
 // The fenced blocks (``` and ~~~), indented code blocks, inline code and HTML comments of a Markdown body. An indented line is code after a blank line, a heading, a fence or another code line, not in the middle of a paragraph; in a list item it takes two levels. MDX has no indented code.
 function blankMarkdownCode(text: string, indentedCode: boolean): string {
   const out: string[] = []
-  let fence: { char: string, length: number, quotes: number, listColumn: number } | undefined
+  let fence: { char: string, length: number, quotes: number, outerQuotes: number, listColumn: number } | undefined
   let codeAllowed = true
   let inList = false
 
@@ -105,7 +123,7 @@ function blankMarkdownCode(text: string, indentedCode: boolean): string {
     if (fence !== undefined) {
       out.push(blanked)
 
-      if (marker && marker[2] === undefined && quoteDepth(marker[1]!) === fence.quotes && marker[3]![0] === fence.char && marker[3]!.length >= fence.length && marker[4]!.trim() === '') {
+      if (marker && marker[2] === undefined && quoteDepth(marker[1]!) === fence.quotes && marker[4]![0] === fence.char && marker[4]!.length >= fence.length && marker[5]!.trim() === '') {
         fence = undefined
         codeAllowed = true
       }
@@ -120,8 +138,8 @@ function blankMarkdownCode(text: string, indentedCode: boolean): string {
       continue
     }
 
-    if (marker && !(marker[3]![0] === '`' && marker[4]!.includes('`'))) {
-      fence = { char: marker[3]![0]!, length: marker[3]!.length, quotes: quoteDepth(marker[1]!), listColumn: marker[2] === undefined ? 0 : columns(marker[1]! + marker[2]) }
+    if (marker && !(marker[4]![0] === '`' && marker[5]!.includes('`'))) {
+      fence = { char: marker[4]![0]!, length: marker[4]!.length, quotes: quoteDepth(marker[1]! + (marker[3] ?? '')), outerQuotes: quoteDepth(marker[1]!), listColumn: marker[2] === undefined ? 0 : columns(marker[1]! + marker[2]) }
       out.push(blanked)
 
       continue
