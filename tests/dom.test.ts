@@ -5,7 +5,9 @@ import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { kay } from '../src/build/plugin'
 import { compileKay } from '../src/compiler'
 import { patch } from '../src/runtime/dev-patch'
+import { element } from '../src/runtime/html'
 import { cappedSizes, setImageWidths } from '../src/runtime/image'
+import { trustHtml } from '../src/runtime/sanitize'
 import { shortcut } from '../src/runtime/shortcut'
 import { liveReload } from '../src/server/dev'
 import { settle } from '../src/test'
@@ -182,7 +184,11 @@ describe('a vouched innerHTML in the browser', () => {
     try {
       const markup = '<p>a</p><!-- c --><style>b{}</style><script>if (a < b) x()</script>'
 
-      expect(root.querySelector('.body')!.innerHTML).toBe(markup)
+      const server = element('div', [{ innerHTML: trustHtml(markup) }]).t
+
+      // The server writes what the island sets.
+      expect(server).toBe(`<div>${markup}</div>`)
+      expect(root.querySelector('.body')!.innerHTML).toBe(server.slice(5, -6))
       expect(root.querySelector('.direct')!.innerHTML).toBe(markup)
     }
     finally {

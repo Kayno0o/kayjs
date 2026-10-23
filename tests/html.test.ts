@@ -250,3 +250,19 @@ describe('trustHtml', () => {
     expect(code).not.toContain('blockquote')
   })
 })
+
+describe('sanitizeHtml with relativeUrls', () => {
+  const keep = { relativeUrls: true, tags: ['img'], attributes: { img: ['src'] } }
+  const clean = (markup: string) => String(sanitizeHtml(markup, keep))
+
+  it('keeps a URL with no scheme and drops what has one, a host, or a character a browser strips', () => {
+    expect(clean('<a href="./a">1</a><a href="a/b?c=d:e#f">2</a><a href="?q=1">3</a><a href="#h">4</a><img src="pic.png">')).toBe('<a href="./a" rel="nofollow ugc">1</a><a href="a/b?c=d:e#f" rel="nofollow ugc">2</a><a href="?q=1" rel="nofollow ugc">3</a><a href="#h" rel="nofollow ugc">4</a><img src="pic.png">')
+
+    for (const href of ['javascript:alert(1)', 'JaVa&#x73;cript:alert(1)', 'java&colon;script:alert(1)', 'ja\tvascript:alert(1)', '\x01javascript:alert(1)', ' javascript:alert(1)', '//evil.example', '\\\\evil.example', 'data:text/html,x', 'vbscript:x', 'a:b'])
+      expect(clean(`<a href="${href}">x</a>`)).toBe('<a>x</a>')
+  })
+
+  it('stays strict without the option', () => {
+    expect(String(sanitizeHtml('<a href="./a">x</a>'))).toBe('<a>x</a>')
+  })
+})

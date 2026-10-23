@@ -370,7 +370,11 @@ To keep two entries from sharing a value, such as a code, wrap the field in `uni
 
 `news.invalidate()` refreshes it, and every prerendered page that read it. Call it from a webhook in an API route. That one line is the whole webhook.
 
-A loader often reads content its author did not write, so a loaded `body` and `html` are sanitized as a user's Markdown is: formatted text, links, images and tables stay, and scripts, handlers, styles, iframes and `javascript:` links are dropped. A folder's files are the author's own and keep their raw HTML. Pass `trusted: true` in the collection's options when the loader returns content written by people you trust, such as your own CMS editors, to keep its HTML as it is.
+A loader often reads content its author did not write, so a loaded `body` and `html` are sanitized as a user's Markdown is: formatted text, links, relative URLs, images and tables stay, and scripts, handlers, styles, iframes and `javascript:` links are dropped. Only a link leaving the site gets `rel="nofollow ugc"`.
+
+A folder's files are the author's own and keep their raw HTML, and `kay check` reports `trusted` on a folder collection.
+
+Pass `trusted: true` in the collection's options when the loader returns content written by people you trust, such as your own CMS editors, to keep its HTML as it is.
 
 `kay build` does not keep a page over a loader on its own, since a loader may read a database and `ttl` refreshes the entries without telling the page. Add `prerender: true` to the page to prerender it anyway. The webhook then refreshes it.
 

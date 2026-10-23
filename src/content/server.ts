@@ -164,6 +164,9 @@ export async function contentProblems(root: string, config?: string, site = true
     if (collection.options.feed && !site)
       problems.push({ file: relative(root, projectPaths(root, { content: config }).content), line: 1, message: feedNeedsSite(collection).message })
 
+    if (collection.options.trusted !== undefined && collection.loader === undefined)
+      problems.push({ file: relative(root, projectPaths(root, { content: config }).content), line: 1, message: `the collection ${collection.name} sets \`trusted\`, which only a loader's collection reads: a folder's files always keep their raw HTML`, code: 'trusted-folder' })
+
     if (collection.dir === undefined)
       continue
 

@@ -86,6 +86,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `promoted-island` | warn | islands | A static component that renders as an island for the function it passes one, unless `// kay-island` says it is meant |
 | `secret-prop` | warn | security | A value handed to an island with a field named like a secret, such as `passwordHash` or `token`, which lands in the page source |
 | `draft-message` | warn | i18n | A message marked `// draft`, which no one has checked yet |
+| `trusted-folder` | warn | code | A folder collection with `trusted`, which only a loader's collection reads |
 | `draft-entry` | warn | i18n | An entry marked `# draft`, which no one has checked yet |
 | `hidden-tool` | warn | code | With `mcp`, an API route that sets `hide` and `tool` |
 | `untyped-socket` | warn | code | A `.ws()` route with a `body` and no `response`, so an island's `socket()` gets `unknown` messages |

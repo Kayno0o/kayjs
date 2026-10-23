@@ -43,7 +43,7 @@ export type Highlighter = (code: string, language: string | undefined) => string
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/
 // Where a heading and a code block open, each closed by the first `</a></hN>` or `</code></pre>` after it.
-const HEADING_OPEN = /<h([1-6]) id="([^"]*)"><a href="#\2"(?: rel="nofollow ugc")?>/g
+const HEADING_OPEN = /<h([1-6]) id="([^"]*)"><a href="#\2">/g
 const CODE_OPEN = /<pre><code(?: class="language-([^"]*)")?>/g
 const CODE_CLOSE = '</code></pre>'
 // Where a tag naming a component opens: capitalized, as kay components are; lowercase tags stay HTML.
@@ -64,8 +64,11 @@ const BLANK = /^\s*$/
 const ATTRIBUTE_NAME = /^[A-Z_][\w:-]*/i
 const TAGS = /<[^>]*>/g
 // What a loader's Markdown keeps beyond a user's: a heading's id for its anchor and a code block's language class, which the headings and the highlighter read.
-const LOADED: SanitizeOptions = { tags: MARKDOWN_KEPT.tags, attributes: { ...MARKDOWN_KEPT.attributes, h1: ['id'], h2: ['id'], h3: ['id'], h4: ['id'], h5: ['id'], h6: ['id'], code: ['class'] } }
+const LOADED_HTML: SanitizeOptions = { ...MARKDOWN_KEPT, relativeUrls: true }
+const LOADED: SanitizeOptions = { ...LOADED_HTML, attributes: { ...MARKDOWN_KEPT.attributes, h1: ['id'], h2: ['id'], h3: ['id'], h4: ['id'], h5: ['id'], h6: ['id'], code: ['class'] } }
 // The only class and id kept on a code block and a heading: the language Markdown writes, and a slug in its shape, so a loader's text cannot pick a utility class or a camelCase global name.
+// A link the sanitizer wrote that stays on the site: its `href` names no http(s) URL.
+const OWN_LINK = /<a href="((?!https?:\/\/)[^"]*)" rel="nofollow ugc">/gi
 const CODE_CLASS = /<code class="(?!language-[\w+#.-]+")[^"]*">/g
 const HEADING_ID = /<(h[1-6]) id="(?![\p{Ll}\p{N}][\p{Ll}\p{N}_-]*")[^"]*"/gu
 // The private characters standing for a component's placeholder while the sanitizer, which reads no tag name with a hyphen, goes over the rest.
@@ -131,7 +134,12 @@ export function countWords(html: string): number {
 function sanitizedComponents(html: string): string {
   const held = html.replace(PRIVATE_CHARS, char => `&#${char.codePointAt(0)};`).replace(PLACEHOLDER_TAG, (_, selfClosing: string | undefined, opening: string | undefined) => heldPlaceholder(selfClosing, opening))
 
-  return sanitizedMarkdown(held, () => false, LOADED).replace(CODE_CLASS, '<code>').replace(HEADING_ID, '<$1').replace(HELD_PLACEHOLDER, (_, selfClosing: string | undefined, opening: string | undefined) => restoredPlaceholder(selfClosing, opening))
+  return withoutInnerRel(sanitizedMarkdown(held, () => false, LOADED).replace(CODE_CLASS, '<code>').replace(HEADING_ID, '<$1').replace(HELD_PLACEHOLDER, (_, selfClosing: string | undefined, opening: string | undefined) => restoredPlaceholder(selfClosing, opening)))
+}
+
+// The sanitizer marks every link as a user's; a link to the site or to a heading is the entry's own, so only one leaving the site keeps its `rel`.
+function withoutInnerRel(html: string): string {
+  return html.replace(OWN_LINK, '<a href="$1">')
 }
 
 function heldPlaceholder(selfClosing: string | undefined, opening: string | undefined): string {
@@ -150,7 +158,7 @@ function restoredPlaceholder(selfClosing: string | undefined, opening: string | 
 
 // An HTML body a loader gave, as a user's markup goes through the sanitizer.
 export function sanitizedHtml(html: string): string {
-  return sanitizedMarkdown(html, () => false)
+  return withoutInnerRel(sanitizedMarkdown(html, () => false, LOADED_HTML))
 }
 
 // The HTML an entry's Markdown body puts on the page, each component standing as a `<kay-component>` element around what it wraps, so a CMS can check what an editor wrote before saving it; throws a MarkdownError for components kay cannot read.

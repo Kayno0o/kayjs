@@ -8,6 +8,8 @@ export interface SanitizeOptions {
   // Attributes kept per tag, besides a link's `href`: `{ img: ['src', 'alt', 'width', 'height'] }`. A URL, such as an `href`, a `src` or each of a `srcset`'s, is kept when it is an http(s), `mailto:` or site URL.
   // Read once per options object, so they are best declared once, outside the function calling `sanitizeHtml`.
   attributes?: Record<string, string[]> | undefined
+  // Keeps a relative URL, `./a.png` or `page?x=1`, which carries no scheme and so no script, beside the web, mail and site URLs.
+  relativeUrls?: boolean | undefined
 }
 
 // What `sanitizeHtml` keeps, written back without attributes but a link's `href`: formatted text, such as a comment or rendered Markdown, and nothing that loads, runs, styles or covers the page.
@@ -28,6 +30,7 @@ const LINK_ATTRIBUTES = ['href']
 interface Allowed {
   tags: ReadonlySet<string>
   attributes: Record<string, readonly string[]>
+  relative?: boolean | undefined
 }
 
 // Made on first use, so an island build reaching `trustHtml` alone leaves it out.
@@ -39,22 +42,26 @@ const TAG = /<(\/?)([a-z][a-z\d]*)(\s[^<>]*|\/)?>/gi
 // A web or mail link, or a path of the site, with no character that could close the attribute and no entity but `&amp;`.
 const SAFE_URL = /^(?:https?:\/\/|mailto:|\/(?![/\\])|#)[^\s"'<>`\\&]*$/i
 const AMPERSAND = /&amp;/g
+// No scheme before the first slash, query or fragment, no `//` host and no character a browser strips or an attribute ends on.
+const RELATIVE_URL = /^(?![^/?#]*:)(?!\/\/)[^\0-\x20\x7F"'<>`\\&]+$/
 const TEXT = /&(?!#\d{1,7};|#x[\da-f]{1,6};|[a-z][a-z\d]{1,31};)|</gi
 
 function text(markup: string): string {
   return markup.replace(TEXT, char => char === '<' ? '&lt;' : '&amp;')
 }
 
-function isSafeUrl(value: string): boolean {
-  return SAFE_URL.test(value.replace(AMPERSAND, ''))
+function isSafeUrl(value: string, relative?: boolean): boolean {
+  const plain = value.replace(AMPERSAND, '')
+
+  return SAFE_URL.test(plain) || (relative === true && RELATIVE_URL.test(plain))
 }
 
 // Whether an attribute's value is fine to write back: a URL safe, and every URL of a `srcset`. `data` is a URL on an `object` only, a tag never kept, so on any other it is a plain value.
-function safeValue(attribute: string, value: string): boolean {
+function safeValue(attribute: string, value: string, relative?: boolean): boolean {
   if (attribute === 'srcset')
-    return value.trim().split(SRCSET_CANDIDATE).every(candidate => isSafeUrl(candidate.replace(DESCRIPTOR, '')))
+    return value.trim().split(SRCSET_CANDIDATE).every(candidate => isSafeUrl(candidate.replace(DESCRIPTOR, ''), relative))
 
-  return attribute === 'data' || !isUrlAttribute(attribute) || isSafeUrl(value)
+  return attribute === 'data' || !isUrlAttribute(attribute) || isSafeUrl(value, relative)
 }
 
 // Whether an attribute of a user's markup holds a URL, its name lowercased: a function rather than a set, so a build reaching `trustHtml` alone leaves it out.
@@ -63,7 +70,7 @@ export function isUrlAttribute(name: string): boolean {
 }
 
 // The opening tag with the attributes kept for it, a URL only when safe, and a link marked as the user's.
-function openingTag(tag: string, attributes: string | undefined, kept: readonly string[] | undefined): string {
+function openingTag(tag: string, attributes: string | undefined, kept: readonly string[] | undefined, relative?: boolean): string {
   const written = new Map<string, string>()
 
   if (attributes !== undefined && kept !== undefined) {
@@ -71,7 +78,7 @@ function openingTag(tag: string, attributes: string | undefined, kept: readonly 
       const attribute = name!.toLowerCase()
       const value = double ?? single ?? bare ?? ''
 
-      if (kept.includes(attribute) && !written.has(attribute) && safeValue(attribute, value))
+      if (kept.includes(attribute) && !written.has(attribute) && safeValue(attribute, value, relative))
         written.set(attribute, text(value).replaceAll('"', '&quot;'))
     }
   }
@@ -114,7 +121,7 @@ function allowed(options: SanitizeOptions | undefined): Allowed {
     attributes[tag.toLowerCase()] = [...attributes[tag.toLowerCase()] ?? [], ...names.map(name => name.toLowerCase())]
   }
 
-  resolved.set(options, found = { tags, attributes })
+  resolved.set(options, found = { tags, attributes, relative: options.relativeUrls })
 
   return found
 }
@@ -163,7 +170,7 @@ function withoutDropped(markup: string): string {
 
 // Markup from a user, made fit for `innerHTML`: the elements above are kept and balanced, other tags dropped with their text kept, and the result is the same on the server and in an island.
 export function sanitizeHtml(markup: string, options?: SanitizeOptions): SafeHtml {
-  const { tags, attributes: keptAttributes } = allowed(options)
+  const { tags, attributes: keptAttributes, relative } = allowed(options)
   const source = withoutDropped(markup)
   const open: string[] = []
   let result = ''
@@ -181,13 +188,13 @@ export function sanitizeHtml(markup: string, options?: SanitizeOptions): SafeHtm
 
     if (VOID.has(tag)) {
       if (closing === '')
-        result += openingTag(tag, attributes, keptAttributes[tag])
+        result += openingTag(tag, attributes, keptAttributes[tag], relative)
 
       continue
     }
 
     if (closing === '') {
-      result += openingTag(tag, attributes, keptAttributes[tag])
+      result += openingTag(tag, attributes, keptAttributes[tag], relative)
       open.push(tag)
 
       continue

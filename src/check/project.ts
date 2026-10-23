@@ -64,7 +64,11 @@ export async function contentChecks(root: string, options: CheckOptions, memory?
   await writeIfChanged(join(projectPaths(root).types, CONTENT_CHECK), props.code)
 
   const drafts = lintLevel('draft-entry', options.lints)
+  const folders = lintLevel('trusted-folder', options.lints)
   const problems = content.problems.flatMap((problem) => {
+    if (problem.code === 'trusted-folder')
+      return folders === 'allow' ? [] : [{ ...problem, severity: folders === 'warn' ? 'warning' : 'error', help: 'remove `trusted`, or give the collection a loader' } satisfies CheckDiagnostic]
+
     if (problem.code !== 'draft-entry')
       return [problem]
 
