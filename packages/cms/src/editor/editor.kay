@@ -458,6 +458,13 @@ function toggleMarking(): void {
 }
 
 
+// The open question as a list of at most one, so the menu is keyed by it.
+function asked() {
+  const question = choosing()
+
+  return question ? [question] : []
+}
+
 // Asks next to (`x`, `y`), or under the element a key reached, in a menu the browser keeps inside the window.
 function ask(label: string, choices: Choice[], x: number, y: number): void {
   choosing = { label, choices, x, y }
@@ -811,8 +818,8 @@ SidePanel.kcms-editor(open={open()} modal={false} dock={dock() === 'bottom' ? 'b
   else
     p.kcms-editor-empty {wording('cms.editor.empty', 'Nothing on this page comes from a collection.')}
 // Keyed by the question, so a choice that asks another one mounts a menu that opens afresh.
-for question of [choosing()].filter(Boolean) key={question}
-  Menu(id={MARKER_MENU} label={question.label} at={{ x: question.x, y: question.y }} open items={question.choices.map(choice => ({ label: choice.label, onSelect: choice.run }))} onOpenChange={shown => !shown && choosing === question && (choosing = undefined)})
+for question of asked() key={question}
+  Menu(id={MARKER_MENU} label={question.label} at={{ x: question.x, y: question.y }} open items={question.choices.map(choice => ({ label: choice.label, onSelect: choice.run }))} onOpenChange={shown => !shown && choosing() === question && (choosing = undefined)})
 PageListTools(bars={settling() ? [] : bars()} onMove={(bar, direction) => moveOne(bar.target, bar.index!, direction)} onAdd={(bar, event) => addTo(bar.target, bar.index === undefined ? 0 : bar.index + 1, { event })} onRemove={bar => removeOne(bar.target, bar.index!)})
 Toaster
 TooltipHost

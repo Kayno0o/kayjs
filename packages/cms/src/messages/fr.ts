@@ -95,7 +95,6 @@ export default defineMessages({
       draftFailure: 'La page n\'a pas pu afficher vos modifications : {failure}',
       empty: 'Rien sur cette page ne vient d\'une collection.',
       hide: 'Masquer l\'éditeur',
-      label: 'Éditeur de contenu',
       leaveFailure: 'Impossible de quitter le mode édition',
       browseOff: 'Modifier de nouveau la page',
       browseOn: 'Parcourir la page : les liens et les menus fonctionnent',

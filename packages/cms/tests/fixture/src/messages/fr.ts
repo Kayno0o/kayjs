@@ -12,7 +12,6 @@ export default defineMessages({
       search: 'Chercher',
     },
     editor: {
-      label: 'Éditeur de contenu',
       title: 'Modifier cette page',
       stop: 'Arrêter de modifier',
       // The only HTML-looking value: a catalog's text is text.

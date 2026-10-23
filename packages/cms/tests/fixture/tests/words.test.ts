@@ -45,7 +45,7 @@ test('the editor server-renders its texts in the locale, a value holding HTML st
   const page = await site.visit('/fr/admin/page?path=/fr/blog/hello')
   const editor = page.find('dialog.kcms-editor')[0]
 
-  expect(editor?.attributes['aria-label']).toBe('Éditeur de contenu')
+  expect(editor?.attributes['aria-label']).toBe('Modifier cette page')
   expect(page.find('.kcms-editor [data-part=title]')[0]?.text).toBe('Modifier cette page')
   expect(page.find('.kcms-editor [data-part=head] button').map(button => button.text)).toContain('Arrêter de modifier')
   expect(page.find('.kcms-entry-loading')[0]?.text).toBe('Chargement…')
