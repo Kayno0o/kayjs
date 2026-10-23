@@ -418,11 +418,11 @@ function leaveJson(): void {
   match current.kind
     when 'boolean'
       Toggle(label={current.label} checked={value() === true} aria-describedby={noteId} aria-invalid={issue() === undefined ? undefined : 'true'} onChange={set})
-      .kui-form-field-issues(id={noteId} aria-live="polite")
+      .flex.flex-col(data-part="issues" id={noteId} aria-live="polite")
         if current.hint
-          span.kui-form-field-hint {current.hint}
+          span.text-xs.text-kui-subtext0(data-part="hint") {current.hint}
         if issue()
-          span.kui-form-field-issue {issue()}
+          span.text-xs.text-kui-error(data-part="issue") {issue()}
     when 'list'
       FormField(label={current.label} hint={[current.hint, boundsText()].filter(Boolean).join(' ') || undefined} issue={issue()} required={starred()} group action={countText()})
         .kcms-list(ref={element => box = element})

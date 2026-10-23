@@ -874,7 +874,7 @@ test('a new list item under a minLength is not flagged before it is touched', as
   const { root, click } = await openField(field, ['abcd'])
 
   await click('[data-kcms-add]')
-  expect(root.querySelectorAll('.kui-form-field-issue').length).toBe(0)
+  expect(root.querySelectorAll('[data-part="issue"]').length).toBe(0)
 
   // The same item flags the limit once it is touched, so the zero above is the touch rule and not a limit nothing checks.
   const added = root.querySelectorAll<HTMLInputElement>('[data-kcms-row] input')[1]!
@@ -883,7 +883,7 @@ test('a new list item under a minLength is not flagged before it is touched', as
   added.dispatchEvent(new Event('input', { bubbles: true }))
   added.dispatchEvent(new Event('blur'))
   await settle()
-  expect(root.querySelectorAll('.kui-form-field-issue').length).toBe(1)
+  expect(root.querySelectorAll('[data-part="issue"]').length).toBe(1)
 })
 
 const text = (key: string, label: string): Field => ({ key, label, hint: undefined, required: false, kind: 'text' })

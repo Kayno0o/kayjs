@@ -109,7 +109,7 @@ test('Button is a button that submits nothing unless asked, a link with an href,
   }
 
   // A busy button swaps its icon for a spinner rather than adding one.
-  expect((await find('/buttons', '#busy svg')).map(icon => icon.attributes.class)).toEqual(['kui-icon kui-spinner'])
+  expect((await find('/buttons', '#busy svg')).map(icon => icon.attributes.class)).toEqual(['kui-icon animate-spin motion-reduce:animate-none'])
 })
 
 test('IconButton names its action for screen readers and as its tooltip', async () => {
@@ -401,11 +401,11 @@ describe('content', () => {
 describe('FormField', () => {
   test('labels its control with what it takes, and shows the message a plain form post was refused with', async () => {
     const field = (await visit('/form'))
-    const [hint] = field.find('#field .kui-form-field-hint')
+    const [hint] = field.find('#field [data-part="hint"]')
     const [input] = field.find('#field input')
 
     expect(field.find('#field label').map(label => label.text)).toEqual(['Name*'])
-    expect(field.find('#field .kui-form-field-required').map(star => star.attributes['aria-hidden'])).toEqual(['true'])
+    expect(field.find('#field [data-part="required"]').map(star => star.attributes['aria-hidden'])).toEqual(['true'])
     // Static on a page of its own, the server links the control to its hint; the message region takes an id once it holds one.
     expect(input!.attributes['aria-describedby']).toBe(hint!.attributes.id)
     // The star is hidden from a screen reader, so the control says it is required itself.
@@ -415,17 +415,17 @@ describe('FormField', () => {
     const { rename } = await import('../src/routes/form.kay')
     const refused = await site.submit(rename, { name: 'A' }, { from: '/form' })
 
-    expect(refused.find('#field .kui-form-field-issue').map(issue => issue.text)).toEqual(['Two letters at least'])
+    expect(refused.find('#field [data-part="issue"]').map(issue => issue.text)).toEqual(['Two letters at least'])
 
-    const [hinted] = refused.find('#field .kui-form-field-hint').map(found => found.attributes.id)
-    const [issues] = refused.find('#field .kui-form-field-issues').map(found => found.attributes.id)
+    const [hinted] = refused.find('#field [data-part="hint"]').map(found => found.attributes.id)
+    const [issues] = refused.find('#field [data-part="issues"]').map(found => found.attributes.id)
 
     expect(refused.find('#field input').map(control => control.attributes['aria-describedby'])).toEqual([`${hinted} ${issues}`])
   })
 
   test('sizes itself by its control when compact, holding no message region without a name or an issue', async () => {
     expect(await attributes('/form', '#compact .kui-form-field', ['data-compact'])).toEqual([{ 'data-compact': '' }])
-    expect(await find('/form', '#compact .kui-form-field-issues')).toEqual([])
+    expect(await find('/form', '#compact [data-part="issues"]')).toEqual([])
     expect((await find('/form', '#compact label')).map(label => label.text)).toEqual(['Period'])
   })
 })
@@ -780,7 +780,7 @@ describe('ContactForm', () => {
 
     const refused = await site.submit(contact, { name: 'Ada', email: 'nope', message: 'Bonjour' }, { from: '/fr/contact-words' })
 
-    expect(refused.html).toContain('<span class="kui-form-field-issue" data-part="issue">Merci d\'écrire une adresse e-mail valide.</span>')
+    expect(refused.html).toContain('<span class="text-xs text-kui-error" data-part="issue">Merci d\'écrire une adresse e-mail valide.</span>')
   })
 
   test('draws the consent checkbox of an action asking for one, with the privacy link and the renamed honeypot, and no box without', async () => {
@@ -797,7 +797,7 @@ describe('ContactForm', () => {
 
     const refused = await site.submit(contact, { name: 'Ada', email: 'ada@example.com', message: 'Hi', consent: false } as never, { from: '/contact-consent' })
 
-    expect(refused.html).toContain('class="kui-form-field-issue" data-part="issue">Please tick the box to send your message.</span>')
+    expect(refused.html).toContain('class="text-xs text-kui-error" data-part="issue">Please tick the box to send your message.</span>')
   })
 
   test('draws no consent box for an app\'s own consent field, which only consent: true marks', async () => {
@@ -813,9 +813,9 @@ describe('ContactForm', () => {
     const { contact } = await import('../src/routes/contact.kay')
     const refused = await site.submit(contact, { name: 'A', email: 'nope', topic: 'quote', message: 'Hi' }, { from: '/contact' })
 
-    expect(refused.html).toContain('<span class="kui-form-field-issue" data-part="issue">Tell us your name</span>')
-    expect(refused.html).toContain('<span class="kui-form-field-issue" data-part="issue">Not an email address</span>')
-    expect(refused.html).toContain('<span class="kui-form-field-issue" data-part="issue">A few words at least</span>')
+    expect(refused.html).toContain('<span class="text-xs text-kui-error" data-part="issue">Tell us your name</span>')
+    expect(refused.html).toContain('<span class="text-xs text-kui-error" data-part="issue">Not an email address</span>')
+    expect(refused.html).toContain('<span class="text-xs text-kui-error" data-part="issue">A few words at least</span>')
 
     const sent = await site.submit(contact, { name: 'Ada', email: 'ada@example.com', topic: 'quote', message: 'Hello there' }, { from: '/contact' })
 
@@ -959,7 +959,7 @@ describe('variant names the form and tone the meaning', () => {
   const shown = async (id: string) => {
     const found = await one('/buttons', `#${id}`)
 
-    return [attr(found, 'class'), attr(found, 'data-variant'), attr(found, 'data-size'), attr(found, 'data-tone')]
+    return [attr(found, 'class')!.split(' ').filter(name => name.startsWith('kui-')).join(' '), attr(found, 'data-variant'), attr(found, 'data-size'), attr(found, 'data-tone')]
   }
 
   test('Button draws a variant and a size, accent and danger being tones', async () => {

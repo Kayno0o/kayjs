@@ -56,7 +56,7 @@ const tokens = new Set([...theme.matchAll(DEFINED_TOKEN)].map(([, token]) => tok
 const classes = new Set([...theme.matchAll(DEFINED_CLASS)].map(([, name = '']) => name))
 
 // The components whose look is a recipe of utilities (#1885), each with its part classes in REMOVED_UI_CLASSES; theme.css keeps their old rules until 1.74.
-const RECIPE_COMPONENTS = new Set(['src/card.kay', 'src/badge.kay', 'src/notice.kay', 'src/avatar.kay', 'src/stat.kay', 'src/page-header.kay', 'src/page-section.kay', 'src/empty-state.kay', 'src/card-row.kay', 'src/widget.kay', 'src/meter.kay', 'src/progress.kay', 'src/skeleton.kay'])
+const RECIPE_COMPONENTS = new Set(['src/card.kay', 'src/badge.kay', 'src/notice.kay', 'src/avatar.kay', 'src/stat.kay', 'src/page-header.kay', 'src/page-section.kay', 'src/empty-state.kay', 'src/card-row.kay', 'src/widget.kay', 'src/meter.kay', 'src/progress.kay', 'src/skeleton.kay', 'src/button.kay', 'src/bare-icon-button.kay', 'src/form-field.kay', 'src/checkbox.kay', 'src/toggle.kay', 'src/text-input.kay', 'src/textarea.kay', 'src/select.kay', 'src/contact-form.kay'])
 
 // Every class a component writes: the `.class` shorthand, plain `class` attributes, and the names a `class` expression holds.
 function writtenClasses(path: string, source: string): string[] {
@@ -600,7 +600,7 @@ describe('theme.css', () => {
       const start = source.indexOf('recipe({')
       const recipe = source.slice(start, Math.min(...['defaults:', '\n})', '\n\nconst', '\n---'].map(end => source.indexOf(end, start)).filter(end => end !== -1)))
 
-      for (const name of new Set([...recipe.replaceAll('\'\'', '').matchAll(RECIPE_STRING)].flatMap(([, value = '']) => value.split(WHITESPACE)).filter(name => name !== '' && !name.startsWith('kui-') && !name.startsWith('group/')))) {
+      for (const name of new Set([...recipe.replaceAll('\'\'', '').matchAll(RECIPE_STRING)].flatMap(([, value = '']) => value.split(WHITESPACE)).filter(name => name !== '' && !name.startsWith('kui-') && !name.startsWith('group/') && !name.startsWith('peer/')))) {
         const next = compiler.build([name])
 
         if (next.length === css.length && !seen.has(name))

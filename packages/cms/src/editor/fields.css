@@ -60,7 +60,7 @@
 }
 
 /* A compact row repeats no label: the list's own names the group, and the control keeps its label for a screen reader. */
-.kcms-list-item[data-compact] > .kcms-field > .kui-form-field > .kui-form-field-label > .kui-form-field-head {
+.kcms-list-item[data-compact] > .kcms-field > .kui-form-field > [data-part='label'] > [data-part='head'] {
   position: absolute;
   width: 1px;
   height: 1px;

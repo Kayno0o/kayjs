@@ -53,7 +53,7 @@ test('tells onChange the option\'s own number, and a reset goes back to the star
 test('a FormField around it shows the message and marks each radio invalid', async () => {
   const { root, radios } = await open()
 
-  expect(root.querySelector('.kui-form-field-issue')?.textContent).toBe('Pick a plan')
+  expect(root.querySelector('[data-part="issue"]')?.textContent).toBe('Pick a plan')
   expect(radios().map(radio => radio.getAttribute('aria-invalid'))).toEqual(['true', 'true', 'true'])
 })
 

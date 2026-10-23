@@ -151,7 +151,7 @@ describe('SaveForm', () => {
     root.querySelector('form')!.requestSubmit()
     await settle()
 
-    expect(root.querySelector('.kui-form-field-issue')?.textContent).toBe('Taken')
+    expect(root.querySelector('[data-part="issue"]')?.textContent).toBe('Taken')
     expect(document.activeElement).toBe(root.querySelector('#name'))
     expect(status(root)).toBe('Unsaved changes.')
     expect(saved).toEqual([])
@@ -187,7 +187,7 @@ describe('SaveForm', () => {
 
     expect(root.querySelector<HTMLInputElement>('#name')!.value).toBe('Ada')
     expect(root.querySelector<HTMLTextAreaElement>('#notes')!.value).toBe('')
-    expect(root.querySelector('.kui-form-field-issue')).toBeNull()
+    expect(root.querySelector('[data-part="issue"]')).toBeNull()
     expect(status(root)).toBe('No unsaved change.')
     expect(discarded).toBe(1)
   })

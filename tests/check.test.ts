@@ -4289,6 +4289,8 @@ describe.concurrent('kay check, unused code', () => {
       '.kui-badge .kui-badge-icon { width: 1rem; }',
       '.kui-card-row-body { padding: 0; }',
       '.kui-btn-danger { color: red; }',
+      '.kui-form-field-hint { color: gray; }',
+      '.kui-toggle .kui-toggle-track { width: 3rem; }',
       '',
     ].join('\n')
     const root = await scratchProject({ 'src/routes/index.kay': 'p hi\n', 'src/app.css': css })
@@ -4296,11 +4298,13 @@ describe.concurrent('kay check, unused code', () => {
     try {
       const { output } = await runCheck(root)
 
-      expect(output.match(/deprecated-ui-class/g)).toHaveLength(4)
+      expect(output.match(/deprecated-ui-class/g)).toHaveLength(6)
       expect(output).toContain('.kui-card-head')
       expect(output).toContain('.kui-card-row-body')
       expect(output).toContain('since 1.72')
-      expect(output).not.toContain('.kui-btn-danger')
+      expect(output).not.toContain('`.kui-btn-danger` is no longer')
+      expect(output).toContain('`.kui-form-field-hint` is no longer set on the `hint` of `FormField`')
+      expect(output).toContain('`.kui-toggle-track` is no longer set on the `track` of `Toggle`')
       expect(output).toContain('select `[data-part=\'icon\']` under the component\'s root')
       await runCheck(root, '--fix')
       expect(await Bun.file(join(root, 'src/app.css')).text()).toBe(css)

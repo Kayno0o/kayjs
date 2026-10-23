@@ -6,7 +6,7 @@ import { browserPath, testSite } from 'kay/test'
 const ROOT = join(import.meta.dir, '..')
 const path = browserPath()
 // The server's control, described by its own note and the hint it renders after it.
-const SERVED = /aria-describedby="name-note (k[\w-]+)">.*class="kui-form-field-hint" data-part="hint" id="\1"/
+const SERVED = /aria-describedby="name-note (k[\w-]+)">.*class="text-xs text-kui-subtext0" data-part="hint" id="\1"/
 // What the controls of the form-reset page hold when it loads.
 const START = { agree: true, power: false, free: false, decks: ['films'], size: 'm', sort: null, level: 'b', tags: ['x', 'y'], title: 'Ada', bio: 'Hello', notes: '# Notes', range: [2, 8], icon: 'star', bare: 'star', heard: 'b', refd: true, form: 'x' }
 // One site and one browser for every test of the file; each test opens and closes its own page.
@@ -719,7 +719,7 @@ inBrowser('FormField in an island', () => {
     const read = async () => page.evaluate(() => {
       const input = document.querySelector('#name')!
 
-      return { described: input.getAttribute('aria-describedby'), invalid: input.getAttribute('aria-invalid'), hint: document.querySelector('.kui-form-field-hint')!.id, issues: document.querySelector('.kui-form-field-issues')!.getAttribute('id') }
+      return { described: input.getAttribute('aria-describedby'), invalid: input.getAttribute('aria-invalid'), hint: document.querySelector('[data-part=hint]')!.id, issues: document.querySelector('[data-part=issues]')!.getAttribute('id') }
     })
     const hydrated = await read()
 
@@ -743,7 +743,7 @@ inBrowser('FormField in an island', () => {
     const read = async () => page.evaluate(() => {
       const input = document.querySelector('#claim input[name="handle"]')!
 
-      return { described: input.getAttribute('aria-describedby'), hint: document.querySelector('.kui-form-field-hint')!.id }
+      return { described: input.getAttribute('aria-describedby'), hint: document.querySelector('[data-part=hint]')!.id }
     })
 
     await page.fill('#claim input[name="handle"]', 'ab')
@@ -776,7 +776,7 @@ inBrowser('FormField in an island', () => {
     // Presses a button, then waits for the action's message and the FormField's to show as asked, answering the marks of the field and of the group's.
     const press = async (button: string, refused: boolean, issue: boolean) => {
       await page.click(button)
-      await page.waitUntil((refused, issue) => (document.querySelector('#claim-handle-error') !== null) === refused && (document.querySelector('.kui-form-field-issue') !== null) === issue, {}, refused, issue)
+      await page.waitUntil((refused, issue) => (document.querySelector('#claim-handle-error') !== null) === refused && (document.querySelector('[data-part=issue]') !== null) === issue, {}, refused, issue)
 
       return page.evaluate(() => ['#claim', '#grouped'].map(form => document.querySelector(`${form} input[name="handle"]`)!.getAttribute('aria-invalid')))
     }

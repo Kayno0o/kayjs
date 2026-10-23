@@ -205,12 +205,12 @@ describe('the prebuilt pages', () => {
     const refused = await stranger.submit(register, { email: 'taken@example.com', password: 'short' }, { from: await stranger.visit('/auth/register') })
 
     expect(refused.status).toBe(400)
-    expect(refused.find('.kui-form-field-issue').map(issue => issue.text)).toEqual(['An account already uses this address.', 'Use at least 10 characters.'])
+    expect(refused.find('[data-part="issue"]').map(issue => issue.text)).toEqual(['An account already uses this address.', 'Use at least 10 characters.'])
 
     // With no script, the server links each control to its hint and its message.
     const ids = (selector: string) => refused.find(selector).map(found => found.attributes.id)
-    const [hint] = ids('.kui-form-field-hint')
-    const [email, password] = ids('.kui-form-field-issues')
+    const [hint] = ids('[data-part="hint"]')
+    const [email, password] = ids('[data-part="issues"]')
 
     expect(refused.find('input[name="email"], input[name="password"]').map(input => input.attributes['aria-describedby'])).toEqual([email, `${hint} ${password}`])
   })
@@ -340,7 +340,7 @@ describe('the prebuilt pages', () => {
     const form = await visitor.visit(link.pathname + link.search)
 
     expect(text(form, 'h1')).toBe('Choose a new password')
-    expect(text(await visitor.submit(reset, { token: link.searchParams.get('token')!, password: 'short' }, { from: form }), '.kui-form-field-issue')).toBe('Use at least 10 characters.')
+    expect(text(await visitor.submit(reset, { token: link.searchParams.get('token')!, password: 'short' }, { from: form }), '[data-part="issue"]')).toBe('Use at least 10 characters.')
     expect(await visitor.submit(reset, { token: link.searchParams.get('token')!, password: 'a brand new passphrase' }, { from: link.pathname + link.search })).toMatchObject({ url: '/' })
     expect(text(await visitor.visit('/'), '#who')).toBe('Signed in as reset@example.com')
   })

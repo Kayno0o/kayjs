@@ -1,7 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
-import { click } from './dom'
+import { click, kuiClasses } from './dom'
 
 let mounted: Mounted | undefined
 
@@ -142,7 +142,7 @@ test('spinner={false} keeps the label and icon while the button is still busy an
   click(quiet)
   await settle()
 
-  expect([state(root, 'quiet'), quiet.querySelector('.kui-spinner'), quiet.textContent.trim(), quiet.getAttribute('data-spinner'), save.settles.length]).toEqual([['true', true], null, 'Quiet', 'off', 1])
+  expect([state(root, 'quiet'), quiet.querySelector('[data-part="spinner"]'), quiet.textContent.trim(), quiet.getAttribute('data-spinner'), save.settles.length]).toEqual([['true', true], null, 'Quiet', 'off', 1])
 
   save.settles[0]!()
   await settle()
@@ -169,7 +169,7 @@ test('pressed writes aria-pressed on a toggle button, true or false, and leaves 
 test('tone success draws the success button', async () => {
   mounted = await mountComponent('src/components/buttons.kay', { onSave: () => undefined, onSubmit: () => undefined })
 
-  expect(mounted.root.querySelector('#success')!.className).toBe('kui-btn kui-btn-success')
+  expect(kuiClasses(mounted.root.querySelector('#success'))).toBe('kui-btn kui-btn-success')
 })
 
 test('a Button used as a part of another component keeps the part name its caller hands it, busy or not', async () => {

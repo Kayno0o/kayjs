@@ -60,7 +60,7 @@ async function open(data: Record<string, unknown> = { title: 'hello', count: 3 }
       await settle()
     }
   }
-  const issueOf = (name: string) => root.querySelector(`[data-kcms-path="${name}"] .kui-form-field-issue`)?.textContent?.trim()
+  const issueOf = (name: string) => root.querySelector(`[data-kcms-path="${name}"] [data-part="issue"]`)?.textContent?.trim()
 
   return { root, box, type, leave, submit, issueOf }
 }
@@ -197,7 +197,7 @@ test('a slug taken marks the slug field, which the summary links to, and typing 
 
   const slug = root.querySelector<HTMLInputElement>('.kcms-field[id$="-s"] input')!
 
-  expect(root.querySelector('.kcms-field[id$="-s"] .kui-form-field-issue')?.textContent).toContain('already exists')
+  expect(root.querySelector('.kcms-field[id$="-s"] [data-part="issue"]')?.textContent).toContain('already exists')
   expect(slug.getAttribute('aria-invalid')).toBe('true')
   expect(document.activeElement).toBe(slug)
   expect(root.querySelector('.kcms-summary a')?.getAttribute('href')).toBe(`#${slug.closest('.kcms-field')!.id}`)
@@ -207,7 +207,7 @@ test('a slug taken marks the slug field, which the summary links to, and typing 
   slug.dispatchEvent(new Event('input', { bubbles: true }))
   await settle()
 
-  expect(root.querySelector('.kcms-field[id$="-s"] .kui-form-field-issue')).toBeNull()
+  expect(root.querySelector('.kcms-field[id$="-s"] [data-part="issue"]')).toBeNull()
   expect(root.querySelector('.kcms-summary')).toBeNull()
 })
 
@@ -271,8 +271,8 @@ test('a refused locale marks the locale field on its own and takes the focus', a
 
   const locale = root.querySelector<HTMLSelectElement>('.kcms-field[id$="-l"] select')!
 
-  expect(root.querySelector('.kcms-field[id$="-l"] .kui-form-field-issue')?.textContent).toBe('This locale is not offered')
-  expect(root.querySelector('.kcms-field[id$="-s"] .kui-form-field-issue')).toBeNull()
+  expect(root.querySelector('.kcms-field[id$="-l"] [data-part="issue"]')?.textContent).toBe('This locale is not offered')
+  expect(root.querySelector('.kcms-field[id$="-s"] [data-part="issue"]')).toBeNull()
   expect(locale.getAttribute('aria-invalid')).toBe('true')
   expect(document.activeElement).toBe(locale)
   expect(root.querySelector('.kcms-summary a')?.getAttribute('href')).toBe(`#${locale.closest('.kcms-field')!.id}`)
@@ -318,5 +318,5 @@ test('the summary does not announce what each field\'s own message already does'
   await submit()
 
   expect(root.querySelector('.kcms-summary')?.hasAttribute('role')).toBe(false)
-  expect(root.querySelectorAll('[data-kcms-path] .kui-form-field-issues[aria-live="polite"] .kui-form-field-issue').length).toBe(2)
+  expect(root.querySelectorAll('[data-kcms-path] [data-part="issues"][aria-live="polite"] [data-part="issue"]').length).toBe(2)
 })

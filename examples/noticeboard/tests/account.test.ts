@@ -32,7 +32,7 @@ it('words what kayjs-auth refuses a new member for', async () => {
   const page = await site.submit(register, { email: 'not an address', password: 'short' }, { from: await site.visit('/auth/register') })
 
   expect(page.status).toBe(400)
-  expect(page.find('.kui-form-field-issue').map(issue => issue.text)).toEqual(['Type a valid address.', 'Use at least 10 characters.'])
+  expect(page.find('[data-part="issue"]').map(issue => issue.text)).toEqual(['Type a valid address.', 'Use at least 10 characters.'])
 })
 
 it('keeps the account section for members, and comes back to it after signing in', async () => {

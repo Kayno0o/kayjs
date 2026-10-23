@@ -1,7 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, jest, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
-import { click } from './dom'
+import { click, kuiClasses } from './dom'
 
 let mounted: Mounted | undefined
 let closes = 0
@@ -168,7 +168,7 @@ describe('ConfirmDelete', () => {
     expect(look('n-plain')).toEqual(['solid', 'neutral'])
     expect(look('n-solid')).toEqual(['solid', 'neutral'])
     expect(look('n-ghost')).toEqual(['ghost', 'neutral'])
-    expect(root.querySelector('.n-button')?.className).toBe('kui-btn kui-btn-danger n-button')
+    expect(kuiClasses(root.querySelector('.n-button'))).toBe('kui-btn kui-btn-danger n-button')
   })
 
   // A trigger of each kind, the dialog it opens (by its place among the page's) and the confirm button it carries.
@@ -182,7 +182,7 @@ describe('ConfirmDelete', () => {
     const root = await dialogs()
     const opener = root.querySelector(trigger)!
 
-    expect([opener.tagName, opener.className, opener.textContent]).toEqual(shown)
+    expect([opener.tagName, kuiClasses(opener), opener.textContent]).toEqual(shown)
 
     click(opener)
     await settle()
@@ -190,7 +190,7 @@ describe('ConfirmDelete', () => {
     const dialog = root.querySelectorAll<HTMLDialogElement>('dialog')[place]!
     const button = dialog.querySelector<HTMLButtonElement>('.kui-dialog-footer button:last-child')!
 
-    expect([dialog.open, dialog.querySelector('.kui-dialog-title')?.textContent, button.className, button.textContent]).toEqual([true, title, ...confirm])
+    expect([dialog.open, dialog.querySelector('.kui-dialog-title')?.textContent, kuiClasses(button), button.textContent]).toEqual([true, title, ...confirm])
 
     click(button)
     await settle()

@@ -6,7 +6,7 @@ import Button from './button.kay'
 import FormField from './form-field.kay'
 import Notice from './notice.kay'
 
-const look = recipe({ parts: { root: 'kui-contact-form', consent: 'kui-contact-consent', box: 'kui-checkbox', boxInput: 'kui-checkbox-input', boxLabel: 'kui-checkbox-label', issues: 'kui-form-field-issues', issue: 'kui-form-field-issue' } })
+const look = recipe({ parts: { root: 'kui-contact-form', consent: 'kui-contact-consent', box: 'kui-checkbox inline-flex cursor-pointer items-center gap-2', boxInput: 'm-0 size-4 shrink-0 cursor-[inherit] accent-kui-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kui-accent', boxLabel: 'text-sm text-kui-text', issues: 'flex flex-col', issue: 'text-xs text-kui-error' } })
 
 const { action, nameLabel = wording('ui.contactForm.nameLabel', wording('mail.contact.form.name', 'Name')), emailLabel = wording('ui.contactForm.emailLabel', wording('mail.contact.form.email', 'Email')), messageLabel = wording('ui.contactForm.messageLabel', wording('mail.contact.form.message', 'Message')), submitLabel = wording('ui.contactForm.submitLabel', wording('mail.contact.form.submit', 'Send')), sentLabel = wording('ui.contactForm.sentLabel', wording('mail.contact.form.sent', 'Thank you, your message has been sent.')), consentLabel = wording('ui.contactForm.consentLabel', wording('mail.contact.form.consent', 'I agree that my details are used to answer my message.')), privacyLabel = wording('ui.contactForm.privacyLabel', wording('mail.contact.form.privacy', 'Privacy policy')), privacy, consent, rows = 6 } = props<{
   // The action `contactForm(mail)` from kayjs-mail gives, or any with a `name`, an `email` and a `message` field.

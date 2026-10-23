@@ -55,14 +55,14 @@ describe('FormDialog', () => {
     await settle()
 
     const input = root.querySelector<HTMLInputElement>('#name')!
-    const hint = root.querySelector('.kui-form-field-hint')!.id
-    const issues = root.querySelector('.kui-form-field-issues')!.id
+    const hint = root.querySelector('[data-part="hint"]')!.id
+    const issues = root.querySelector('[data-part="issues"]')!.id
 
     expect(input.getAttribute('aria-invalid')).toBe('true')
     expect(input.getAttribute('aria-describedby')).toBe(`name-note ${hint} ${issues}`)
     expect(document.activeElement).toBe(input)
 
-    expect(root.querySelector('.kui-form-field-issue')?.textContent).toBe('Taken')
+    expect(root.querySelector('[data-part="issue"]')?.textContent).toBe('Taken')
     expect(root.querySelector<HTMLDialogElement>('dialog')?.open).toBe(true)
     expect(root.querySelector('.kui-toast')).toBeNull()
 
@@ -76,9 +76,9 @@ describe('FormDialog', () => {
     await settle()
 
     expect(root.querySelector('.kui-form-field')).not.toBeNull()
-    expect(root.querySelector('.kui-form-field-issue')).toBeNull()
+    expect(root.querySelector('[data-part="issue"]')).toBeNull()
     expect(root.querySelector('#name')?.getAttribute('aria-invalid')).toBeNull()
-    expect(root.querySelector('#name')?.getAttribute('aria-describedby')).toBe(`name-note ${root.querySelector('.kui-form-field-hint')!.id}`)
+    expect(root.querySelector('#name')?.getAttribute('aria-describedby')).toBe(`name-note ${root.querySelector('[data-part="hint"]')!.id}`)
   })
 
   test('marks every field of a group refused through its name, focusing the first, and clears them once refused for another field', async () => {
@@ -93,10 +93,10 @@ describe('FormDialog', () => {
     submit(root)
     await settle()
 
-    const issues = root.querySelector('fieldset > .kui-form-field-issues')!.id
+    const issues = root.querySelector('fieldset > [data-part="issues"]')!.id
 
     expect(marks()).toEqual([['true', issues], ['true', issues]])
-    expect(root.querySelector('fieldset .kui-form-field-issue')?.textContent).toBe('Pick one')
+    expect(root.querySelector('fieldset [data-part="issue"]')?.textContent).toBe('Pick one')
     expect(document.activeElement).toBe(root.querySelector('#login'))
     expect(root.querySelector('.kui-toast')).toBeNull()
 
@@ -113,7 +113,7 @@ describe('FormDialog', () => {
     submit(root)
     await settle()
 
-    expect(root.querySelector('.kui-form-field-issue')?.textContent).toBe('Taken')
+    expect(root.querySelector('[data-part="issue"]')?.textContent).toBe('Taken')
     expect([...root.querySelectorAll('.kui-toast-message')].map(toast => toast.textContent).slice(-2)).toEqual(['Too long', 'Slow down'])
 
     click(root.querySelector('#hide'))
@@ -122,7 +122,7 @@ describe('FormDialog', () => {
     await settle()
 
     expect(root.querySelector('.kui-form-field')).not.toBeNull()
-    expect(root.querySelector('.kui-form-field-issue')).toBeNull()
+    expect(root.querySelector('[data-part="issue"]')).toBeNull()
   })
 
   test('shows what the handler refused with through refused: a field\'s message on its FormField, the whole form\'s toasted, an empty message leaving failure', async () => {
@@ -135,14 +135,14 @@ describe('FormDialog', () => {
     submit(root)
     await settle()
 
-    expect(root.querySelector('.kui-form-field-issue')?.textContent).toBe('You already filed that slug')
+    expect(root.querySelector('[data-part="issue"]')?.textContent).toBe('You already filed that slug')
     expect(toasts()).toBe(before)
 
     answer = { fail: { error: 'Too many short links' } }
     submit(root)
     await settle()
 
-    expect(root.querySelector('.kui-form-field-issue')).toBeNull()
+    expect(root.querySelector('[data-part="issue"]')).toBeNull()
     expect([...root.querySelectorAll('.kui-toast-message')].at(-1)?.textContent).toBe('Too many short links')
 
     answer = { fail: { error: '' } }
@@ -159,7 +159,7 @@ describe('FormDialog', () => {
     submit(root)
     await settle()
 
-    expect(root.querySelector('.kui-form-field-issue')).toBeNull()
+    expect(root.querySelector('[data-part="issue"]')).toBeNull()
     expect([...root.querySelectorAll('.kui-toast-message')].at(-1)?.textContent).toBe('Could not rename')
   })
 

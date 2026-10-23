@@ -47,7 +47,7 @@
 
 @layer components {
   /* The framed boxes have no line, so the controls that need one draw it again. */
-  :is(.kui-btn, .kui-shell, .kui-segmented, .kui-pagination-step, .kui-toggle-track, .kui-chip, .kui-file-drop) {
+  :is(.kui-btn, .kui-shell, .kui-segmented, .kui-pagination-step, .kui-toggle-track, .kui-toggle [data-part='track'], .kui-chip, .kui-file-drop) {
     --kui-border-width: 1px;
   }
 
@@ -121,7 +121,7 @@
   }
 
   /* A drawn checkbox: a square in the field's line that fills with the accent and shows a tick once checked. */
-  :is(.kui-checkbox-input, .kui-multi-select-checkbox) {
+  :is(.kui-checkbox-input, .kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select-checkbox) {
     display: inline-grid;
     place-content: center;
     appearance: none;
@@ -157,12 +157,12 @@
   }
 
   @media (forced-colors: active) {
-    :is(.kui-checkbox-input, .kui-multi-select-checkbox)::before {
+    :is(.kui-checkbox-input, .kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select-checkbox)::before {
       background: HighlightText;
     }
 
-    :is(.kui-checkbox-input, .kui-multi-select-checkbox):checked,
-    :is(.kui-checkbox-input, .kui-multi-select-checkbox):indeterminate {
+    :is(.kui-checkbox-input, .kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select-checkbox):checked,
+    :is(.kui-checkbox-input, .kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select-checkbox):indeterminate {
       background: Highlight;
     }
   }

@@ -142,7 +142,7 @@ test('focusInvalid reaches a FormField group with an issue, showing its tab and 
   click(root.querySelector('#refuse'))
   await settle()
 
-  const issues = group.querySelector('.kui-form-field-issues')!.id
+  const issues = group.querySelector('[data-part="issues"]')!.id
 
   expect(marks()).toEqual([['true', issues], ['true', issues]])
   expect(await focusInvalid(root)).toBe(true)

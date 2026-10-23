@@ -54,7 +54,7 @@ let leaving = false
 
 // Inside a form field's label, the buttons and the preview would be read as part of the field's name: the label's own text names it instead.
 function nameByLabel(element: HTMLTextAreaElement): void {
-  const label = element.closest('.kui-form-field-label')?.querySelector('.kui-label-text')
+  const label = element.closest('label')?.querySelector('.kui-label-text')
 
   if (!label || element.hasAttribute('aria-labelledby') || element.hasAttribute('aria-label'))
     return

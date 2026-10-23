@@ -31,6 +31,20 @@ export const REMOVED_UI_CLASSES: Record<string, { component: string, part: strin
   'kui-progress-fill': { component: 'Progress', part: 'fill', since: '1.72' },
   'kui-skeleton-block': { component: 'Skeleton', part: 'block', since: '1.72' },
   'kui-skeleton-label': { component: 'Skeleton', part: 'label', since: '1.72' },
+  'kui-spinner': { component: 'Button', part: 'spinner', since: '1.72' },
+  'kui-form-field-head': { component: 'FormField', part: 'head', since: '1.72' },
+  'kui-form-field-label': { component: 'FormField', part: 'label', since: '1.72' },
+  'kui-form-field-action': { component: 'FormField', part: 'action', since: '1.72' },
+  'kui-form-field-required': { component: 'FormField', part: 'required', since: '1.72' },
+  'kui-form-field-hint': { component: 'FormField', part: 'hint', since: '1.72' },
+  'kui-form-field-issues': { component: 'FormField', part: 'issues', since: '1.72' },
+  'kui-form-field-issue': { component: 'FormField', part: 'issue', since: '1.72' },
+  'kui-checkbox-input': { component: 'Checkbox', part: 'input', since: '1.72' },
+  'kui-checkbox-label': { component: 'Checkbox', part: 'label', since: '1.72' },
+  'kui-checkbox-hint': { component: 'Checkbox', part: 'hint', since: '1.72' },
+  'kui-toggle-input': { component: 'Toggle', part: 'input', since: '1.72' },
+  'kui-toggle-track': { component: 'Toggle', part: 'track', since: '1.72' },
+  'kui-toggle-label': { component: 'Toggle', part: 'label', since: '1.72' },
 }
 
 const KUI_CLASS = /\.(kui-[\w-]+)/g

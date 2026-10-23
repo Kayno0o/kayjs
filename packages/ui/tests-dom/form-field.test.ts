@@ -28,7 +28,7 @@ test('a group\'s message leaves aria-invalid on a field the page marked once it 
   click(root.querySelector('#refuse'))
   await settle()
 
-  const issues = root.querySelector('fieldset > .kui-form-field-issues')!.id
+  const issues = root.querySelector('fieldset > [data-part="issues"]')!.id
 
   expect([marks('marked'), marks('plain')]).toEqual([['true', `marked-note ${issues}`], ['true', issues]])
 
@@ -59,7 +59,7 @@ test('a required field\'s control is announced as required, the star beside its 
   const required = (id: string) => mounted!.root.querySelector(`#${id}`)!.getAttribute('aria-required')
 
   expect([required('title'), required('subtitle'), required('slug')]).toEqual(['true', null, 'false'])
-  expect(mounted.root.querySelector('.kui-form-field-required')?.getAttribute('aria-hidden')).toBe('true')
+  expect(mounted.root.querySelector('[data-part="required"]')?.getAttribute('aria-hidden')).toBe('true')
 })
 
 test('each field of a required group is announced as required, a FormField nested in it left alone', async () => {

@@ -75,15 +75,15 @@ test('flags a taken slug as it is typed, marking the field invalid', async () =>
   const root = await open()
 
   await type(root, 'Slug', 'hello')
-  expect(root.querySelector('.kui-form-field-issue')?.textContent).toBe('An entry with this slug already exists: pick another slug')
+  expect(root.querySelector('[data-part="issue"]')?.textContent).toBe('An entry with this slug already exists: pick another slug')
   expect(slugBox(root).getAttribute('aria-invalid')).toBe('true')
   await type(root, 'Slug', 'hello-2')
-  expect(root.querySelector('.kui-form-field-issue')).toBeNull()
+  expect(root.querySelector('[data-part="issue"]')).toBeNull()
 })
 
 test('says which folder a slug lands in, which it creates, and the existing one a typo looks like', async () => {
   const root = await open()
-  const hint = () => root.querySelector('.kui-form-field-hint')?.textContent
+  const hint = () => root.querySelector('[data-part="hint"]')?.textContent
 
   await type(root, 'Slug', 'guides/2024/other')
   expect(hint()).toBe('In the folder guides/2024')
@@ -102,7 +102,7 @@ test('keeps a loaded collection\'s slug as typed, with no suggestion and no fold
   expect(slugBox(root).value).toBe('')
   await type(root, 'Slug', 'Some Id/7')
   expect(slugBox(root).value).toBe('Some Id/7')
-  expect(root.querySelector('.kui-form-field-hint')).toBeNull()
+  expect(root.querySelector('[data-part="hint"]')).toBeNull()
   expect([...root.querySelectorAll('label')].some(label => label.textContent?.includes('from the title'))).toBe(false)
 })
 
@@ -111,16 +111,16 @@ test('leaves the form working when the slugs cannot be read', async () => {
   mounted = await mountComponent('../../src/components/entry-editor.kay', { prefix: '/admin', collection: notes })
   await settle()
   await type(mounted.root, 'Slug', 'hello')
-  expect(mounted.root.querySelector('.kui-form-field-issue')).toBeNull()
+  expect(mounted.root.querySelector('[data-part="issue"]')).toBeNull()
 })
 
 test('a slug is taken in its own locale only', async () => {
   const root = await open({ ...notes, localized: true, locales: ['fr', 'en'] }, [{ slug: 'hello', locale: 'fr' }, { slug: 'only-en', locale: 'en' }])
 
   await type(root, 'Slug', 'hello')
-  expect(root.querySelector('.kui-form-field-issue')?.textContent).toContain('already exists')
+  expect(root.querySelector('[data-part="issue"]')?.textContent).toContain('already exists')
   await type(root, 'Slug', 'only-en')
-  expect(root.querySelector('.kui-form-field-issue')).toBeNull()
+  expect(root.querySelector('[data-part="issue"]')).toBeNull()
 })
 
 test('writes the slug from a Cyrillic title, and says why when the title has no letter or digit', async () => {

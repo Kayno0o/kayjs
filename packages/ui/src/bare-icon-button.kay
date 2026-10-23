@@ -2,7 +2,16 @@
 import type { JSX } from 'kay'
 import { recipe } from 'kay'
 
-const look = recipe({ parts: { root: 'kui-icon-btn' } })
+// 'kui-icon-btn' is the component's name for an app's CSS and the skins; the framed form's shell stays in theme.css.
+const look = recipe({
+  parts: { root: 'kui-icon-btn inline-flex shrink-0 items-center justify-center p-0 transition disabled:pointer-events-none disabled:opacity-40' },
+  variants: {
+    size: { xs: 'size-5', sm: 'size-6', md: 'size-7', lg: 'size-8' },
+    variant: { solid: 'text-kui-text', ghost: 'text-kui-subtext0 hover:bg-kui-surface0 hover:text-kui-text', inline: 'text-kui-subtext0' },
+    tone: { neutral: '', accent: 'text-kui-accent', danger: 'text-kui-error' },
+  },
+  defaults: { size: 'md', variant: 'solid', tone: 'neutral' },
+})
 
 // IconButton without the icon lookup: what is nested inside draws the icon, so an island drawing its own svg ships none of the default icons Icon brings.
 const { label, href, size = 'md', variant = 'solid', tone = 'neutral', type = 'button', ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'type' | 'class' | 'children'> & {

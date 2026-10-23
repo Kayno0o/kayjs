@@ -37,7 +37,7 @@ if (process.env.FIXTURE_RULES) {
   const refused = await site.submit(register, { email: 'rules@example.com', password: 'twelve chars!' }, { from: page })
   const short = await site.submit(register, { email: 'rules@example.com', password: 'only11chars' }, { from: await site.visit(`${PAGES_AT}/register`) })
 
-  console.log(JSON.stringify({ hint: page.find('.kui-form-field-hint').map(hint => hint.text), minlength: page.find('input[name="password"]')[0]?.attributes.minlength, check: refused.find('.kui-form-field-issue').map(issue => issue.text), short: short.find('.kui-form-field-issue').map(issue => issue.text) }))
+  console.log(JSON.stringify({ hint: page.find('[data-part="hint"]').map(hint => hint.text), minlength: page.find('input[name="password"]')[0]?.attributes.minlength, check: refused.find('[data-part="issue"]').map(issue => issue.text), short: short.find('[data-part="issue"]').map(issue => issue.text) }))
   process.exit(0)
 }
 

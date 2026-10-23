@@ -28,14 +28,14 @@ test('the body is labelled Body with every button, until the collection words it
   const plain = await body()
 
   expect(plain.querySelector('.kui-label-text')?.textContent).toBe('Body')
-  expect(plain.querySelector('.kui-form-field-hint')).toBeNull()
+  expect(plain.querySelector('[data-part="hint"]')).toBeNull()
   expect(buttons(plain)).toEqual(['Bold', 'Italic', 'Heading', 'Bulleted list', 'Numbered list', 'Link', 'Image', 'Preview'])
   mounted?.unmount()
 
   const worded = await body({ body: { label: 'Article', hint: 'Plain text, no HTML' }, toolbar: ['bold', 'link'] })
 
   expect(worded.querySelector('.kui-label-text')?.textContent).toBe('Article')
-  expect(worded.querySelector('.kui-form-field-hint')?.textContent).toBe('Plain text, no HTML')
+  expect(worded.querySelector('[data-part="hint"]')?.textContent).toBe('Plain text, no HTML')
   expect(buttons(worded)).toEqual(['Bold', 'Link', 'Preview'])
   mounted?.unmount()
 

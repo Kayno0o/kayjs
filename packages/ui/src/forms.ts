@@ -45,7 +45,7 @@ export function fieldLinks(group: boolean, hint: boolean, messages: () => readon
   effect(() => {
     const ours = links.described()
     const invalid = messages().length > 0
-    const control = document.querySelector(`[data-kui-field="${links.frame}"] .kui-form-field-label`)?.querySelector<HTMLElement>(CONTROL)
+    const control = document.querySelector(`[data-kui-field="${links.frame}"] > label`)?.querySelector<HTMLElement>(CONTROL)
 
     if (!control)
       return

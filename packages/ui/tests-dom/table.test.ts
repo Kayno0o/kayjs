@@ -145,8 +145,8 @@ describe('Table with a filter', () => {
 
 describe('Table with a selection', () => {
   const MOONS = [{ id: 1, name: 'Io', radius: 1822 }, { id: 2, name: 'Europa', radius: 1561 }, { id: 3, name: 'Amalthea', radius: 84 }]
-  const boxes = (root: HTMLElement) => [...root.querySelectorAll<HTMLInputElement>('tbody .kui-checkbox-input')]
-  const all = (root: HTMLElement) => root.querySelector<HTMLInputElement>('.kui-table-selection .kui-checkbox-input')!
+  const boxes = (root: HTMLElement) => [...root.querySelectorAll<HTMLInputElement>('tbody .kui-checkbox [data-part="input"]')]
+  const all = (root: HTMLElement) => root.querySelector<HTMLInputElement>('.kui-table-selection .kui-checkbox [data-part="input"]')!
   const toolbar = (root: HTMLElement) => root.querySelector('.kui-table-selection')!.textContent
   const ticked = (root: HTMLElement) => boxes(root).map(box => box.checked)
 

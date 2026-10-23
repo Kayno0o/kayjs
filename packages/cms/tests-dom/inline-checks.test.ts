@@ -35,7 +35,7 @@ async function open(data: Record<string, unknown>) {
 
   const root = mounted.root
   const box = (name: string) => root.querySelector<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(`[data-kcms-path="${name}"] :is(input, textarea, select)`)!
-  const issueOf = (name: string) => root.querySelector(`[data-kcms-path="${name}"] .kui-form-field-issue`)?.textContent?.trim()
+  const issueOf = (name: string) => root.querySelector(`[data-kcms-path="${name}"] [data-part="issue"]`)?.textContent?.trim()
   const change = async (name: string, text: string, type = 'input') => {
     box(name).value = text
     box(name).dispatchEvent(new Event(type, { bubbles: true }))

@@ -250,7 +250,7 @@
   }
 
   /* A submit button while its form's onSubmit is pending: a spinner drawn in CSS, the button being static markup. A Button given `busy` draws its own and is left alone. */
-  .kui-btn:where([type='submit'][aria-busy='true']:not(:has(.kui-spinner))) {
+  .kui-btn:where([type='submit'][aria-busy='true']:not(:has([data-part='spinner']))) {
     @apply cursor-progress;
     pointer-events: none;
 

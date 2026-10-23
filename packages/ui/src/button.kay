@@ -8,12 +8,21 @@ import BusyButton from './internal/busy-button.kay'
 import { buttonOf, linkOf } from './button-props'
 import Icon from './icon.kay'
 
+// The box and the type are utilities; the shell (fill, hairline, hover, focus, press, disabled and the colours of a tone) stays in theme.css, which a skin restyles as one. 'kui-btn' and the tone classes are names for an app's CSS and for the skins.
 const look = recipe({
-  parts: { root: 'kui-btn', spinner: 'kui-spinner' },
+  parts: {
+    root: 'kui-btn inline-flex cursor-pointer items-center justify-center gap-kui-inline rounded-kui-card border-0 px-3 py-1 text-xs font-kui-label tracking-kui-action whitespace-nowrap [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)]',
+    spinner: 'animate-spin motion-reduce:animate-none',
+  },
   variants: {
-    variant: { solid: '', ghost: '', inline: '' },
+    variant: { solid: '', ghost: '', inline: 'p-0 underline underline-offset-4' },
     tone: { neutral: '', accent: 'kui-btn-accent', success: 'kui-btn-success', danger: 'kui-btn-danger' },
-    size: { xs: '', sm: '', md: '', lg: '' },
+    size: {
+      xs: 'not-data-[variant=inline]:px-2 not-data-[variant=inline]:py-0.5 not-data-[variant=inline]:text-kui-2xs',
+      sm: 'not-data-[variant=inline]:px-2.5 not-data-[variant=inline]:py-0.5',
+      md: '',
+      lg: 'not-data-[variant=inline]:px-4 not-data-[variant=inline]:py-1.5 not-data-[variant=inline]:text-sm',
+    },
   },
   defaults: { variant: 'solid', tone: 'neutral', size: 'md' },
 })

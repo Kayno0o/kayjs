@@ -101,7 +101,7 @@ test('a field the schema refused shows although its `when` sibling is empty, so 
   await submit()
 
   expect(field('shade').hidden).toBe(false)
-  expect(field('shade').querySelector('.kui-form-field-issue')?.textContent).toBe('Shade is not valid')
+  expect(field('shade').querySelector('[data-part="issue"]')?.textContent).toBe('Shade is not valid')
 
   await type('shade', 'light')
   expect(field('shade').hidden).toBe(false)
@@ -155,7 +155,7 @@ test('a toggle shows the issue a refused save left on it', async () => {
   server([{ path: 'featured', message: 'Featured is not valid' }])
   await submit()
 
-  expect(field('featured').querySelector('.kui-form-field-issue')?.textContent).toBe('Featured is not valid')
+  expect(field('featured').querySelector('[data-part="issue"]')?.textContent).toBe('Featured is not valid')
   expect(field('featured').querySelector('input')!.getAttribute('aria-invalid')).toBe('true')
 })
 

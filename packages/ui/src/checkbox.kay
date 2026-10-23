@@ -3,7 +3,14 @@ import type { JSX } from 'kay'
 import { effect, recipe, untrack } from 'kay'
 import { controlledCheckbox } from './controlled-checkbox'
 
-const look = recipe({ parts: { root: 'kui-checkbox', input: 'kui-checkbox-input', label: 'kui-checkbox-label', hint: 'kui-checkbox-hint' } })
+const look = recipe({
+  parts: {
+    root: 'kui-checkbox inline-flex cursor-pointer items-center gap-2 has-[input:disabled]:cursor-not-allowed has-[input:disabled]:opacity-50 has-[input[aria-busy=true]]:cursor-progress',
+    input: 'm-0 size-4 shrink-0 cursor-[inherit] accent-kui-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kui-accent',
+    label: 'text-sm text-kui-text',
+    hint: 'text-xs text-kui-subtext0',
+  },
+})
 
 const { checked = false, indeterminate = false, label, hint, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'type' | 'checked' | 'class' | 'children' | 'onChange' | 'ref'> & {
   // Whether it starts ticked; a box whose parent passes another value follows it.

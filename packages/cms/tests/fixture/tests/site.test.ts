@@ -363,7 +363,7 @@ test('the on-page editor shows each issue of a refused save beside its field and
 
   const count = async (selector: string) => page.evaluate((query: string) => [...document.querySelectorAll(`.kcms-editor ${query}`)].filter(node => node.textContent?.includes('would run as the site')).length, selector)
 
-  expect([await count('.kui-form-field-issue'), await count('.kcms-summary a'), await count('p.kcms-entry-failure')]).toEqual([1, 1, 0])
+  expect([await count('[data-part="issue"]'), await count('.kcms-summary a'), await count('p.kcms-entry-failure')]).toEqual([1, 1, 0])
   expect(saved).toEqual([])
   expect(page.errors).toEqual([])
 }, 60_000)

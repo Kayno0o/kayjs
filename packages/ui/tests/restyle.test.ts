@@ -43,13 +43,12 @@ beforeAll(async () => {
 
 afterAll(async () => rm(OUT, { recursive: true, force: true }))
 
+// The classes of the first tag holding the text.
+const classesOfTag = (text: string, tag = '[a-z0-9]+') => (html.match(new RegExp(`<${tag}[^>]*${text}[^>]*>`))?.[0].match(/ class="([^"]*)"/)?.[1] ?? '').split(' ')
+
 describe('restyling a component of kayjs-ui from src/ui.ts', () => {
   // Each part keeps the kui class theme.css styles, then takes what the app's src/ui.ts sets on it, and the caller's class object comes last.
   const restyled = [
-    'kui-btn kui-btn-danger bg-red-600',
-    'kui-btn tracking-wide',
-    'kui-field-input h-12',
-    'kui-field-input min-h-32',
     'kui-dialog-title text-xl',
     'kui-dialog-footer justify-end',
     'kui-table-wrap gap-3',
@@ -61,15 +60,7 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     'kui-table-head-cell uppercase',
     'kui-table-cell py-4',
     'kui-date-input gap-2',
-    'kui-field-input h-12 kui-date-input-box w-44',
     'kui-date-range-input-separator mx-1',
-    'kui-field-input h-12 kui-time-input w-32',
-    'kui-form-field-hint text-xs',
-    'kui-form-field-label gap-1',
-    'kui-checkbox-input size-5',
-    'kui-checkbox-hint opacity-70',
-    'kui-toggle-track w-12',
-    'kui-field-input pr-8',
     'kui-field-input kui-multi-select-trigger min-w-40',
     'kui-multi-select-option py-2',
     'kui-multi-select-action underline',
@@ -126,7 +117,6 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     'kui-contribution-month font-medium',
     'kui-carousel-viewport rounded-3xl',
     'kui-carousel-dot size-4',
-    'kui-icon-btn rounded-full kui-carousel-step size-12',
     'kui-masonry p-3',
     'kui-media-gallery-stage rounded-3xl',
     'kui-media-gallery-thumb opacity-80',
@@ -183,21 +173,27 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
   })
 
   test('a button with an onClick takes the restyle of Button once, not twice', () => {
-    expect(html).toMatch(/<button[^>]* id="busy"[^>]* class="kui-btn tracking-wide">/)
+    const classes = classesOfTag('id="busy"')
+
+    expect(classes.filter(name => name === 'kui-btn')).toHaveLength(1)
+    expect(classes.filter(name => name === 'tracking-wide')).toHaveLength(1)
+    expect(classes.at(-1)).toBe('tracking-wide')
   })
 
   test('a busy button, a busy link and a busy button with an onClick draw the spinner part restyled', () => {
-    expect(html.match(/class="kui-icon kui-spinner size-5"/g)).toHaveLength(3)
-    expect(html.match(/class="kui-icon kui-spinner"/g)).toBeNull()
+    expect(html.match(/class="kui-icon animate-spin motion-reduce:animate-none size-5"/g)).toHaveLength(3)
+    expect(html.match(/class="kui-icon animate-spin motion-reduce:animate-none"/g)).toBeNull()
   })
 
   test('an IconButton and the trigger of a Menu take the restyle, a Menu class string going to the trigger', () => {
-    expect(html).toMatch(/<button[^>]* id="icon-button"[^>]* class="kui-shell kui-icon-btn rounded-full">/)
-    expect(html).toMatch(/aria-haspopup="menu"[^>]* class="kui-icon-btn rounded-full menu-trigger">/)
+    expect(classesOfTag('id="icon-button"')).toEqual(expect.arrayContaining(['kui-shell', 'kui-icon-btn', 'size-7']))
+    expect(classesOfTag('id="icon-button"').at(-1)).toBe('rounded-full')
+    expect(classesOfTag('aria-haspopup="menu"').slice(-2)).toEqual(['rounded-full', 'menu-trigger'])
   })
 
   test('a class string on a button with an onClick joins the restyle', () => {
-    expect(html).toMatch(/<button[^>]* id="single"[^>]* class="kui-btn rounded-none">/)
+    expect(classesOfTag('id="single"').filter(name => name === 'kui-btn')).toHaveLength(1)
+    expect(classesOfTag('id="single"').at(-1)).toBe('rounded-none')
   })
 
   test('the browser build of an island puts the restyled classes after the kui class of their part', () => {
@@ -221,7 +217,8 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
 
   test('a component used as a part of another keeps the part name its caller hands it', () => {
     expect(html).toMatch(/<svg[^>]*data-part="spinner"/)
-    expect(html).toMatch(/<button[^>]*data-part="step"[^>]*class="kui-icon-btn rounded-full kui-carousel-step size-12"/)
+    expect(classesOfTag('data-part="step"', 'button').filter(name => name === 'kui-icon-btn')).toHaveLength(1)
+    expect(classesOfTag('data-part="step"', 'button').slice(-3)).toEqual(['rounded-full', 'kui-carousel-step', 'size-12'])
     expect(html).toMatch(/<svg[^>]*data-part="sortIcon"/)
   })
 
@@ -240,6 +237,52 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
   test('a part nothing restyles keeps its kui class alone', () => {
     expect(html).toContain('class="kui-dialog-body"')
     expect(html).toContain('class="kui-table-row"')
+  })
+})
+
+describe('the buttons and fields whose recipe holds their look', () => {
+  // The classes of the element an id or a data-part under it selects, in the order they are written.
+  // A FormField takes no id, so its parts are the first after the TimeInput written before it.
+  const classesOfPart = (id: string, part?: string) => {
+    const root = id === 'field' ? html.indexOf('id="time"') : html.indexOf(`id="${id}"`)
+    const start = part === undefined ? root : html.indexOf(`data-part="${part}"`, root)
+    const tag = html.slice(html.lastIndexOf('<', start), html.indexOf('>', start))
+
+    return (tag.match(/ class="([^"]*)"/)?.[1] ?? '').split(' ')
+  }
+
+  test.each([
+    ['plain', undefined, 'inline-flex', 'bg-red-600'],
+    ['busy', undefined, 'gap-kui-inline', 'tracking-wide'],
+    ['text', undefined, 'px-kui-field-x', 'h-12'],
+    ['area', undefined, 'px-kui-field-x', 'min-h-32'],
+    ['select', undefined, 'pl-kui-field-x', 'pr-8'],
+    ['field', 'hint', 'text-kui-subtext0', 'text-xs'],
+    ['field', 'label', 'contents', 'gap-1'],
+    ['field', 'head', 'order-first', undefined],
+    ['checkbox', 'input', 'accent-kui-accent', 'size-5'],
+    ['checkbox', 'hint', 'text-kui-subtext0', 'opacity-70'],
+    ['toggle', 'track', 'bg-kui-surface0', 'w-12'],
+    ['icon-button', undefined, 'size-7', 'rounded-full'],
+  ] as const)('%s %s draws its base, then what src/ui.ts sets after it', (id, part, base, restyle) => {
+    const classes = classesOfPart(id, part)
+
+    expect(classes).toContain(base)
+
+    if (restyle !== undefined)
+      expect(classes.at(-1)).toBe(restyle)
+  })
+
+  test('only a root keeps a kui class, and the label type FormField shares with Table', () => {
+    for (const [id, part] of [['field', 'hint'], ['field', 'label'], ['field', 'head'], ['field', 'required'], ['checkbox', 'input'], ['checkbox', 'hint'], ['toggle', 'input'], ['toggle', 'track']] as const)
+      expect(classesOfPart(id, part).filter(name => name.startsWith('kui-')), `${id} ${part}`).toEqual([])
+
+    expect(classesOfPart('field', 'text')[0]).toBe('kui-label-text')
+  })
+
+  test('a text field, a textarea and a select keep kui-field-input as the name of their rule', () => {
+    for (const id of ['text', 'area', 'select'])
+      expect(classesOfPart(id)[0], id).toBe('kui-field-input')
   })
 })
 
