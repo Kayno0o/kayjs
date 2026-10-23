@@ -12,6 +12,7 @@ import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { appStore } from './app-store'
 import { MAX_TIMER_MS } from './config-limits'
+import { onDrain } from './drain'
 import { onReload } from './reload'
 import { reportBackgroundError } from './report'
 
@@ -945,6 +946,7 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
 
   // Unnamed, so Elysia never takes two queues for one plugin.
   let serving = false
+  let forgetDrain: (() => void) | undefined
   let activated = options.lazy !== true
   const startWorkers = () => {
     if (controller || !serving || !activated)
@@ -958,9 +960,11 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
   const plugin = new Elysia()
     .onStart(() => {
       serving = true
+      forgetDrain = onDrain(() => controller?.abort())
       startWorkers()
     })
     .onStop(async () => {
+      forgetDrain?.()
       serving = false
       controller?.abort()
       await Promise.all(workers)

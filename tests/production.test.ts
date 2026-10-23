@@ -1664,6 +1664,19 @@ describe('lifecycle', () => {
     expect(await output()).not.toContain('requests still open')
   }, 20_000)
 
+  it('on SIGTERM ends a stream whose handler answers after the stop began', async () => {
+    const { server, url, waitFor, output } = await startServer()
+    const response = fetch(`${url}/late`)
+
+    await waitFor('late started\n')
+    server.kill('SIGTERM')
+
+    // The stream opens past the sweep and ends at once, so the stop is not held to the forced exit.
+    expect((await response).status).toBe(200)
+    expect(await server.exited).toBe(0)
+    expect(await output()).not.toContain('requests still open')
+  }, 20_000)
+
   it('on SIGTERM gives back the job of a handler ignoring its signal and takes the replica out of the rooms', async () => {
     const dir = await scratchDir('stop-')
     const jobsPath = join(dir, 'jobs.sqlite')
@@ -1676,9 +1689,14 @@ describe('lifecycle', () => {
       await stream.body!.getReader().read()
       expect(await (await fetch(`${url}/join`)).text()).toBe('joined')
       await waitFor('job started\n')
+      await Bun.sleep(300)
       server.kill('SIGTERM')
 
+      const stopping = Date.now()
+
       expect(await server.exited).toBe(0)
+      // Two queues ignoring their signal wait out their grace together, not one after the other.
+      expect(Date.now() - stopping).toBeLessThan(5000)
       expect(await output()).toContain('jobs stopped')
 
       const jobs = new Database(jobsPath, { readonly: true })
@@ -1686,7 +1704,7 @@ describe('lifecycle', () => {
 
       try {
         // Given back untouched: free, and its attempt not counted.
-        expect(jobs.query('SELECT held_until, attempts, failed FROM kay_jobs').all()).toEqual([{ held_until: null, attempts: 0, failed: 0 }])
+        expect(jobs.query('SELECT held_until, attempts, failed FROM kay_jobs').all()).toEqual([{ held_until: null, attempts: 0, failed: 0 }, { held_until: null, attempts: 0, failed: 0 }])
         expect(rooms.query('SELECT * FROM kay_room_members').all()).toEqual([])
       }
       finally {

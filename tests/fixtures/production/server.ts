@@ -20,6 +20,16 @@ const app = new Elysia()
       await new Promise(() => undefined)
     })
   })
+  // A stream whose handler answers once the stop began, as one waiting on a session check does.
+  .get('/late', async () => {
+    console.log('late started')
+    await Bun.sleep(300)
+
+    return eventStream(async function* () {
+      yield 1
+      await new Promise(() => undefined)
+    })
+  })
   .onStop(async () => {
     await Bun.sleep(50)
     console.log('jobs stopped')
@@ -28,16 +38,20 @@ const app = new Elysia()
 // The files stand for a stopped server's jobs and rooms, which the test reads back.
 if (process.env.JOBS_PATH && process.env.ROOMS_PATH) {
   const rooms = sqliteRooms(process.env.ROOMS_PATH)
-  const jobs = queue('stuck', async () => {
+  const store = sqliteJobs(process.env.JOBS_PATH)
+  // Ignores its signal.
+  const handler = async () => {
     console.log('job started')
-    // Ignores its signal.
     await new Promise(() => undefined)
-  }, { store: sqliteJobs(process.env.JOBS_PATH) })
+  }
+  const jobs = queue('stuck', handler, { store })
+  const others = queue('stuck-too', handler, { store })
 
   setupStore({ rooms })
-  app.use(jobs).get('/join', () => {
+  app.use(jobs).use(others).get('/join', () => {
     rooms.add('lobby', 'tab-1', 'visitor')
     void jobs.enqueue({})
+    void others.enqueue({})
 
     return 'joined'
   })

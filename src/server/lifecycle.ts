@@ -6,7 +6,8 @@ import { kayLog } from '../runtime/log'
 import { appStore } from './app-store'
 import { wholeResponse } from './compress'
 import { healthTimeoutMs, shutdownSeconds } from './config-limits'
-import { endEventStreams } from './event-stream'
+import { beginDrain } from './drain'
+import { endEventStreams, stopEventStreams } from './event-stream'
 import { logMessage } from './log'
 import { START_COMMAND, START_PARENT } from './parent'
 import { reportBackgroundError } from './report'
@@ -88,7 +89,7 @@ async function runCheck(check: NonNullable<HealthConfig['check']>, timeoutMs: nu
   }
 }
 
-// On SIGTERM, SIGINT or SIGHUP, or once the `kay start` or `kay render` running it is gone, the server stops taking connections, lets the open requests and streams finish, runs the app's `onStop` hooks, then the process exits.
+// On SIGTERM, SIGINT or SIGHUP, or once the `kay start` or `kay render` running it is gone, the server stops taking connections, ends the open event streams and lets the other open requests finish, runs the app's `onStop` hooks, then the process exits.
 // Past `wait` whatever is still open is closed and the process exits with 1.
 export function stopOnSignal(app: Elysia, lifecycle: Lifecycle, wait: Duration = DEFAULT_SHUTDOWN_TIMEOUT): void {
   const timeout = shutdownSeconds(wait)
@@ -115,6 +116,9 @@ export function stopOnSignal(app: Elysia, lifecycle: Lifecycle, wait: Duration =
         process.exit(1)
       }, timeout * 1000)
 
+      // Streams first, as they hold the server open, and the queues and schedules start their grace beside the open requests.
+      stopEventStreams()
+      beginDrain()
       await shutdown(root)
       await closeRooms()
       clearTimeout(forced)
@@ -204,7 +208,10 @@ export async function shutdown(app: AnyElysia, force = false): Promise<void> {
   if (!server)
     return
 
-  endEventStreams()
+  // A forced stop closes every connection by itself, and ending streams is not this app's to do for the others in the process.
+  if (!force)
+    endEventStreams()
+
   await server.stop(force)
   app.server = null
 

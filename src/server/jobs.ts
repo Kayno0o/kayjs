@@ -8,6 +8,7 @@ import { countJobRun } from '../runtime/counters'
 import { DURATION_TEXT, durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { MAX_TIMER_MS } from './config-limits'
+import { onDrain } from './drain'
 import { defaultJobStore } from './queue'
 import { reportBackgroundError } from './report'
 
@@ -112,6 +113,7 @@ function scheduleCron(cron: string, job: Job, options: ScheduleOptions, auto: Au
     throw new KayError('config-invalid', `kay: the schedule ${cron} never comes`)
 
   let handle: Bun.CronJob | undefined
+  let forgetDrain: (() => void) | undefined
   let running: Promise<void> | undefined
   const run = scheduledRun(cron, SLOT_MS, job, options, auto)
 
@@ -122,6 +124,7 @@ function scheduleCron(cron: string, job: Job, options: ScheduleOptions, auto: Au
         return
 
       auto?.take()
+      forgetDrain = onDrain(() => run.abort())
 
       // The boot run is the first, which the first scheduled run waits for: runs never overlap.
       if (options.boot === true)
@@ -133,6 +136,7 @@ function scheduleCron(cron: string, job: Job, options: ScheduleOptions, auto: Au
       }, zone)
     })
     .onStop(async () => {
+      forgetDrain?.()
       handle?.stop()
       handle = undefined
       run.abort()
@@ -149,6 +153,7 @@ function scheduleEvery(every: Duration, job: Job, options: ScheduleOptions, auto
     throw new KayError('config-invalid', `kay: the schedule ${String(every)} takes no tz, it runs every ${String(every)} from the epoch`)
 
   let timer: Timer | undefined
+  let forgetDrain: (() => void) | undefined
   let running: Promise<void> | undefined
   const run = scheduledRun(`every ${String(every)}`, ms, job, options, auto)
 
@@ -170,12 +175,14 @@ function scheduleEvery(every: Duration, job: Job, options: ScheduleOptions, auto
         return
 
       auto?.take()
+      forgetDrain = onDrain(() => run.abort())
       plan()
 
       if (options.boot === true)
         running = run(true)
     })
     .onStop(async () => {
+      forgetDrain?.()
       clearTimeout(timer)
       timer = undefined
       run.abort()

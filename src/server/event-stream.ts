@@ -11,6 +11,15 @@ const HEARTBEAT = new TextEncoder().encode(':\n\n')
 // The streams being read, each with what ends it cleanly: a stop ends them all first, as one that never ends would keep the server from stopping.
 const draining = new Set<() => void>()
 
+// Set once the process is stopping for good, so a stream that begins after the sweep ends at once rather than hold the server open.
+let stopped = false
+
+// Ends the open event streams and every one opened from then on, for a process that is going to exit.
+export function stopEventStreams(): void {
+  stopped = true
+  endEventStreams()
+}
+
 // Ends every open event stream with no end or error event, which a browser takes as a drop and opens again after its backoff, on the next instance.
 export function endEventStreams(): void {
   for (const end of draining)
@@ -97,6 +106,13 @@ export function eventBody<T>(source: Source<T>, report: (error: unknown) => void
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
       heartbeat ??= setInterval(() => controller.enqueue(HEARTBEAT), HEARTBEAT_MS)
+
+      if (stopped) {
+        clearInterval(heartbeat)
+        controller.close()
+
+        return
+      }
 
       if (!drain) {
         drain = () => {
