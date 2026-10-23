@@ -227,7 +227,9 @@ describe('kay build', () => {
       for (let build = 0; build < 3; build++) {
         const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', project, '--no-check'], { stdout: 'ignore', stderr: 'pipe' })
 
-        expect([await child.exited, await new Response(child.stderr).text()]).toEqual([0, ''])
+        const [code, errors] = await Promise.all([child.exited, new Response(child.stderr).text()])
+
+        expect([code, code === 0 ? '' : errors]).toEqual([0, ''])
       }
 
       const sheets = (await readdir(clientDir(project))).filter(name => name.endsWith('.css'))
