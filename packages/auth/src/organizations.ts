@@ -1,7 +1,7 @@
 import type { Core } from './core'
 import type { OrganizationsCore } from './organizationsCore'
 import type { RequestState } from './state'
-import type { AuthStore, InvitationRecord, MemberRecord, OrganizationRecord, UserRecord } from './store'
+import type { AuthStore, InvitationRecord, MaybePromise, MemberRecord, OrganizationRecord, UserRecord } from './store'
 import { configError } from 'kay/library'
 import { publicUser } from './core'
 import { impersonatorOf, report } from './events'
@@ -566,16 +566,30 @@ async function live(store: Stores, invitationId: string): Promise<InvitationReco
   return invitation && invitation.expiresAt.getTime() > Date.now() ? invitation : undefined
 }
 
-// Whether whoever sent the invitation still may grant what it gives: a member of the organization who manages it and holds its roles. One whose sender is gone, their account deleted included, is dead.
-async function senderMay(config: OrganizationsCore, store: Stores, invitation: InvitationRecord): Promise<boolean> {
-  const sender = invitation.invitedBy === null ? undefined : await store.members.get(invitation.organizationId, invitation.invitedBy)
-
-  return sender !== undefined && config.isGranted(config.manage, sender.roles) && reaches(config, sender.roles, invitation.roles)
+// Whether a sender, as the member they are of the organization, still may grant the roles: they manage it and hold them.
+function mayGrant(config: OrganizationsCore, sender: MemberRecord | undefined, roles: string[]): boolean {
+  return sender !== undefined && config.isGranted(config.manage, sender.roles) && reaches(config, sender.roles, roles)
 }
 
-// The invitations whose sender still may grant them.
+// Whether whoever sent the invitation still may grant what it gives. One whose sender is gone, their account deleted included, is dead.
+async function senderMay(config: OrganizationsCore, store: Stores, invitation: InvitationRecord): Promise<boolean> {
+  return mayGrant(config, invitation.invitedBy === null ? undefined : await store.members.get(invitation.organizationId, invitation.invitedBy), invitation.roles)
+}
+
+// The invitations whose sender still may grant them, each sender of an organization looked up once.
 async function standing(config: OrganizationsCore, store: Stores, invitations: InvitationRecord[]): Promise<InvitationRecord[]> {
-  const may = await Promise.all(invitations.map(async invitation => senderMay(config, store, invitation)))
+  const senders = new Map<string, MaybePromise<MemberRecord | undefined>>()
+  const may = await Promise.all(invitations.map(async (invitation) => {
+    if (invitation.invitedBy === null)
+      return false
+
+    const key = `${invitation.organizationId}\0${invitation.invitedBy}`
+    const sender = senders.get(key) ?? store.members.get(invitation.organizationId, invitation.invitedBy)
+
+    senders.set(key, sender)
+
+    return mayGrant(config, await sender, invitation.roles)
+  }))
 
   return invitations.filter((_invitation, index) => may[index])
 }

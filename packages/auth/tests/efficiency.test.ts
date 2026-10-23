@@ -161,10 +161,12 @@ describe('lists', () => {
 
     const orgId = first.membership.organization.id
 
+    const sender = (await owner.callOk('members', orgId)).members[0]?.user.id ?? ''
+
     for (const email of ['b@example.com', 'c@example.com', 'd@example.com']) {
       await store.users.create(userRecord({ id: email, email }))
       await store.members!.add({ organizationId: orgId, userId: email, roles: ['member'], createdAt: new Date() })
-      await store.invitations!.create({ id: `i-${email}`, organizationId: orgId, email, roles: ['member'], invitedBy: null, createdAt: new Date(), expiresAt: new Date(Date.now() + HOUR_MS) })
+      await store.invitations!.create({ id: `i-${email}`, organizationId: orgId, email, roles: ['member'], invitedBy: sender, createdAt: new Date(), expiresAt: new Date(Date.now() + HOUR_MS) })
     }
 
     log.reset()
