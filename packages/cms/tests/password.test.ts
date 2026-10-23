@@ -60,6 +60,14 @@ describe('the password guard\'s sign-in cookie', () => {
     expect(await statusOf(context(`editor.${expires}.${signature}.more`))).toBe(401)
   })
 
+  test('does not read the kcms_session cookie of 1.69, even carrying a valid sign-in', async () => {
+    const valid = passwords.issue('editor', false).value
+
+    expect(await statusOf(context(valid))).toBe(200)
+    expect(await statusOf(context(valid, 'kcms_session'))).toBe(401)
+    expect(sessionCookieOf(new Bun.CookieMap(`kcms_session=${valid}`))).toBeUndefined()
+  })
+
   test('refuses roles that are object keys of the language, not of the app', async () => {
     for (const role of ['__proto__', 'constructor', 'toString', 'hasOwnProperty'])
       expect(passwords.read(`${role}.9999999999999.x`)).toBeUndefined()

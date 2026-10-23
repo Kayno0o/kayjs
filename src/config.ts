@@ -456,7 +456,7 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   // The server plugin named by the module that exports it, `{ path: './src/auth', export: 'auth' }` for `export const auth` (`default` by default): imported only as `pages()` builds the app, and baked into an executable `kay build --compile` makes, which a path built at run time inside a library could not be. The export is the plugin, a function building it, or an object carrying it as `plugin`, as a library's `createAuth` result does. `kay check` types the locals off the module itself, and off the extension's `Server` argument when it has one; used beside `server`, the module wins. A path is relative to the project root. `prepare` runs with the export before the plugin is taken from it, for a library to hand the app's module what the extension was given; a throw stops the server.
   serverModule?: { path: string, export?: string | undefined, prepare?: ((exported: unknown) => void | Promise<void>) | undefined } | undefined
   // Config laid under the app's `kay.config.ts`: objects merged key by key, arrays joined with the extension's items first, any other value the app sets winning. Bun plugins the library's files need go in its `plugins`.
-  config?: Omit<KayConfig, 'extensions'> | undefined
+  config?: Omit<KayConfig, 'extensions' | 'publicEnv'> | undefined
   // A directory of `.kay` pages, layouts and guards laid over the app's routes under `prefix`, the root by default: a file of the app at the same path replaces the library's.
   // Its directories are absolute, as a library gives them from `import.meta.dir`, or relative to the project root.
   routes?: { dir: string, prefix?: string | undefined } | undefined
@@ -635,7 +635,7 @@ export function pageHooks(extensions: KayExtension[] | undefined): PageHook[] {
 export const CONFIG_FILE = 'kay.config.ts'
 
 // Gives the config back as written, so `kay check` reads the types of what it declares off it.
-export function defineConfig<Config extends KayConfig>(config: Config): Config {
+export function defineConfig<Config extends KayConfig>(config: Config & { publicEnv?: never }): Config {
   return config
 }
 
@@ -727,17 +727,17 @@ async function importConfig(root: string, fresh = false): Promise<KayConfig> {
 }
 
 // The keys `kay check` and `kay env` read in their own way, refused when they are not the shape they take.
-function checkedConfig({ checks, env, publicEnv }: KayConfig): void {
+function checkedConfig({ checks, env, publicEnv }: KayConfig, where = CONFIG_FILE): void {
   if (publicEnv !== undefined)
-    throw new KayError('config-invalid', `kay: \`publicEnv\` in ${CONFIG_FILE} is gone: mark the fields an island reads \`s.Public\` in \`defineEnv\` instead`)
+    throw new KayError('config-invalid', `kay: \`publicEnv\` in ${where} is gone: mark the fields an island reads \`s.Public\` in \`defineEnv\` instead`)
 
   if (checks !== undefined && !Array.isArray(checks))
-    throw new KayError('config-invalid', `kay: \`checks\` in ${CONFIG_FILE} is a list of functions, not ${typeof checks}`)
+    throw new KayError('config-invalid', `kay: \`checks\` in ${where} is a list of functions, not ${typeof checks}`)
 
   const notFunction = (checks ?? []).findIndex(check => typeof check !== 'function')
 
   if (notFunction >= 0)
-    throw new KayError('config-invalid', `kay: \`checks[${notFunction}]\` in ${CONFIG_FILE} is not a function`)
+    throw new KayError('config-invalid', `kay: \`checks[${notFunction}]\` in ${where} is not a function`)
 
   if (env === undefined || env === false)
     return
@@ -746,7 +746,7 @@ function checkedConfig({ checks, env, publicEnv }: KayConfig): void {
   const files = Array.isArray(compose) ? compose : [compose]
 
   if (typeof env !== 'object' || env === null || Array.isArray(env) || files.some(file => file !== undefined && typeof file !== 'string') || (example !== undefined && typeof example !== 'string'))
-    throw new KayError('config-invalid', `kay: \`env\` in ${CONFIG_FILE} is \`{ compose, example }\`, each a file name (\`compose\` may be a list of them), or \`false\``)
+    throw new KayError('config-invalid', `kay: \`env\` in ${where} is \`{ compose, example }\`, each a file name (\`compose\` may be a list of them), or \`false\``)
 }
 
 // The config with the catalogs of the libraries the app installs listed before its own extensions, so those and the app's messages win key by key; one an extension of the same name already brings is left alone.
@@ -759,7 +759,14 @@ function withLibraryMessages(root: string, config: KayConfig): KayConfig {
 
 // The config with each extension's own laid under it, a later extension's over an earlier one's.
 function withExtensions<Config extends KayConfig>(config: Config): Config {
-  const layers = (config.extensions ?? []).flatMap(extension => extension.config === undefined ? [] : [extension.config])
+  const layers = (config.extensions ?? []).flatMap((extension) => {
+    if (extension.config === undefined)
+      return []
+
+    checkedConfig(extension.config, `the config of the extension ${extension.name}`)
+
+    return [extension.config]
+  })
 
   if (layers.length === 0)
     return config

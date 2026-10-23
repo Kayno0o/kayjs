@@ -167,7 +167,7 @@ describe('the libraries\' dev tool tabs', () => {
   })
 
   it('names the SMTP variables the switch lacks, and draws no switch where the route is not there', async () => {
-    let answer: () => Response = () => Response.json({ on: false, missing: ['SMTP_HOST', 'SMTP_FROM'] })
+    let answer: () => Response = () => Response.json({ on: false, missing: ['MAIL_URL', 'MAIL_FROM'] })
     const fetching = answering({
       'GET /_kay/mail.json': () => Response.json([]),
       'GET /_kay/mail/delivery': () => answer(),
@@ -178,7 +178,7 @@ describe('the libraries\' dev tool tabs', () => {
     await Bun.sleep(5)
     shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-mail')!.click()
     await Bun.sleep(5)
-    expect(panel('mail').textContent).toContain('Set SMTP_HOST and SMTP_FROM to deliver mails over SMTP')
+    expect(panel('mail').textContent).toContain('Set MAIL_URL and MAIL_FROM to deliver mails over SMTP')
     expect(panel('mail').querySelector('input')).toBeNull()
 
     answer = () => new Response(null, { status: 404 })

@@ -519,6 +519,24 @@ describe('configuration', () => {
     expect(mailer({ optional: true, queue: { name: 'optional-set' } }).configured).toBe(true)
   })
 
+  it('reads no SMTP_* variable: the old names configure nothing and the mailer still lacks MAIL_URL and MAIL_FROM', async () => {
+    process.env.NODE_ENV = 'production'
+    delete process.env.MAIL_URL
+    delete process.env.MAIL_FROM
+    Object.assign(process.env, { SMTP_HOST: 'smtp.example.com', SMTP_PORT: '587', SMTP_USER: 'ada', SMTP_PASS: 'secret', SMTP_FROM: 'site@example.com' })
+
+    try {
+      const old = mailer({ optional: true, queue: { name: 'old-smtp-names' } })
+
+      expect(old.configured).toBe(false)
+      await expect(old.send({ to: 'a@example.com', subject: 'S', text: 'T' })).rejects.toThrow('MAIL_URL and MAIL_FROM must be set to send mail')
+    }
+    finally {
+      for (const name of ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM'])
+        delete process.env[name]
+    }
+  })
+
   it('sends a mail naming no recipient to the mailer\'s own, `to` or else MAIL_TO, and throws MailNotConfiguredError naming MAIL_TO without one', async () => {
     delete process.env.MAIL_TO
 

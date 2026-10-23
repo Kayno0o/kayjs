@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it, setDefaultTimeout } from 'bun:test'
 import { t } from 'elysia'
-import { loadConfig } from '../src/config'
+import { defineConfig, loadConfig } from '../src/config'
 import { s } from '../src/runtime/schema'
 import { defineEnv } from '../src/server'
 import { publicEnvFiles } from '../src/server/env-state'
@@ -593,6 +593,15 @@ describe('kay env against compose and .env.example', () => {
     expect((await bad('export default { checks: 42 }\n')).stderr).toContain('`checks` in kay.config.ts is a list of functions')
     expect((await bad('export default { env: { compose: 42 } }\n')).stderr).toContain('`env` in kay.config.ts is `{ compose, example }`')
     expect((await bad('export default { env: \'x\' }\n')).stderr).toContain('`env` in kay.config.ts is `{ compose, example }`')
+  })
+
+  it('refuses publicEnv in the config, written in kay.config.ts or brought by an extension, and types it out of defineConfig', async () => {
+    const bad = async (config: string) => kay(['check', await project({ ...files, 'kay.config.ts': config })], process.cwd())
+
+    expect((await bad('export default { publicEnv: true }\n')).stderr).toContain('`publicEnv` in kay.config.ts is gone')
+    expect((await bad('export default { extensions: [{ name: \'lib\', config: { publicEnv: true } }] }\n')).stderr).toContain('`publicEnv` in the config of the extension lib is gone')
+    // @ts-expect-error the marker is kay's own, a field marked s.Public sets it
+    expect(defineConfig({ publicEnv: true })).toBeDefined()
   })
 
   it('prints the findings as text and exits 1 on an error', async () => {
