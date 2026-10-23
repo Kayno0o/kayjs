@@ -94,15 +94,6 @@ export function pgLive(pg: PgHandle): LiveStore {
     }
   }
 
-  // Drops the rows past their end, at most once an hour, apart from the write that triggers it and under a time limit of its own, so a slow or refused purge never costs a write.
-  const purge = (): void => {
-    if (closed || Date.now() - purged <= PURGE_STALE_MS)
-      return
-
-    purged = Date.now()
-    void purging()
-  }
-
   const purging = async (): Promise<void> => {
     try {
       await timeLimited(async () => query(await pg.db(), `DELETE FROM kay_live WHERE expires_at < ${NOW}`), DB_TIMEOUT_MS, 'the purge')
@@ -110,6 +101,15 @@ export function pgLive(pg: PgHandle): LiveStore {
     catch (error) {
       kayLog('warn', 'dropping the live values past their ttl failed; trying again in an hour', error)
     }
+  }
+
+  // Drops the rows past their end, at most once an hour, apart from the write that triggers it and under a time limit of its own, so a slow or refused purge never costs a write.
+  const purge = (): void => {
+    if (closed || Date.now() - purged <= PURGE_STALE_MS)
+      return
+
+    purged = Date.now()
+    void purging()
   }
 
   // Where the events stand: the ones in the overlap are noted as known, so they are not heard again.
@@ -234,6 +234,10 @@ export function pgLive(pg: PgHandle): LiveStore {
 
       purge()
     },
+    // Only where the row has no end: a text another replica set meanwhile is kept.
+    end: async (id, key, expiresAt) => write('dating', id, key, async (tx) => {
+      await query(tx, `UPDATE kay_live SET expires_at = ${NOW} + $3::bigint WHERE id = $1 AND key = $2 AND expires_at IS NULL`, [escaped(id), escaped(key), Math.max(0, Math.round(expiresAt - Date.now()))])
+    }),
     delete: async (id, key) => write('deleting', id, key, async tx => query(tx, 'DELETE FROM kay_live WHERE id = $1 AND key = $2', [escaped(id), escaped(key)])),
     subscribe(listener) {
       listeners.add(listener)

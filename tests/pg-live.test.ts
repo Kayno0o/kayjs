@@ -341,6 +341,26 @@ pgDescribe('pgData live values', () => {
     store.stop?.()
   })
 
+  pgIt('dates a row with no end without writing its text again, and leaves one that has an end', async () => {
+    const sql = await fresh()
+    const [store] = twoReplicas()
+
+    await store.set('app:dated', 'a', '[1]')
+    await store.set('app:dated', 'b', '[2]', Date.now() + 60_000)
+    await sql.unsafe('UPDATE kay_live SET value = \'[9]\' WHERE key = \'a\'')
+    await store.end!('app:dated', 'a', Date.now() + 120_000)
+    await store.end!('app:dated', 'b', Date.now() + 120_000)
+
+    const rows = await store.entries()
+    const a = rows.find(row => row[1] === 'a')
+    const b = rows.find(row => row[1] === 'b')
+
+    expect(a?.[2]).toBe('[9]')
+    expect(Math.abs((a?.[3] as number) - Date.now() - 120_000)).toBeLessThan(5000)
+    expect(Math.abs((b?.[3] as number) - Date.now() - 60_000)).toBeLessThan(5000)
+    store.stop?.()
+  })
+
   pgIt('purges apart from the write, so a purge stuck on a locked row costs the write nothing', async () => {
     const sql = await fresh()
     const [store] = twoReplicas()
@@ -366,7 +386,7 @@ pgDescribe('pgData live values', () => {
 
     expect((await sql.unsafe<{ key: string }[]>('SELECT key FROM kay_live ORDER BY key')).map(row => row.key)).toContain('new')
     await holder.unsafe('COMMIT')
-    holder.release()
+    await holder.release()
     await waitFor(async () => (await sql.unsafe<{ key: string }[]>('SELECT key FROM kay_live ORDER BY key')).map(row => row.key).join() === 'new', 'the purge to drop the row once unlocked')
     store.stop?.()
   })

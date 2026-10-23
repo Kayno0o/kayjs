@@ -36,6 +36,7 @@ function openLive(path: string) {
   const insertEvent = db.query('INSERT INTO kay_live_events (origin, id, key, at) VALUES (?, ?, ?, ?)')
   const pruneEvents = db.query('DELETE FROM kay_live_events WHERE at < ?')
   const upsert = db.query('INSERT INTO kay_live (id, key, value, expires_at) VALUES (?, ?, ?, ?) ON CONFLICT (id, key) DO UPDATE SET value = excluded.value, expires_at = excluded.expires_at')
+  const dateRow = db.query('UPDATE kay_live SET expires_at = ? WHERE id = ? AND key = ? AND expires_at IS NULL')
   const remove = db.query('DELETE FROM kay_live WHERE id = ? AND key = ?')
   // The row and its message go together, so a process that heard the message finds the row.
   const write = db.transaction((run: () => void, id: string, key: string) => {
@@ -51,6 +52,7 @@ function openLive(path: string) {
     select: db.query<{ value: string, expires_at: number | null }, [string, string, number]>('SELECT value, expires_at FROM kay_live WHERE id = ? AND key = ? AND (expires_at IS NULL OR expires_at > ?)'),
     purge: db.query('DELETE FROM kay_live WHERE expires_at < ?'),
     set: (id: string, key: string, text: string, expiresAt: number | undefined) => write(() => upsert.run(id, key, text, expiresAt ?? null), id, key),
+    end: (id: string, key: string, expiresAt: number) => write(() => dateRow.run(expiresAt, id, key), id, key),
     remove: (id: string, key: string) => write(() => remove.run(id, key), id, key),
     lastEvent: db.query<{ seq: number | null }, []>('SELECT max(seq) AS seq FROM kay_live_events'),
     eventsAfter: db.query<{ seq: number, id: string, key: string }, [number, string]>('SELECT seq, id, key FROM kay_live_events WHERE seq > ? AND origin != ? ORDER BY seq'),
@@ -122,6 +124,11 @@ export function sqliteLive(path: string): LiveStore {
       }
 
       return live.set(id, key, text, expiresAt)
+    },
+    end(id, key, expiresAt) {
+      wake()
+
+      return open(false)?.end(id, key, expiresAt)
     },
     delete(id, key) {
       wake()

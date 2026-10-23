@@ -423,6 +423,24 @@ describe('a live value with a lifetime', () => {
     expect(yielded).toBeLessThan(20_000 + 300)
   })
 
+  it('does not drop a key a watcher renewed while told of another that ended with it', async () => {
+    let hear: ((id: string, key: string, text: string | undefined, expiresAt?: number) => void) | undefined
+
+    setLiveStore({ entries: () => [], set: () => undefined, delete: () => undefined, subscribe: (listener) => {
+      hear = listener
+    } })
+
+    const room = declareKeyedTtl(() => 0, { ttl: '60s' }, 'test:ttl-renewed-by-watcher', 'ttlRenewedByWatcher')
+    const ends = Date.now() + 100
+
+    hear!('test:ttl-renewed-by-watcher', 'a', '[1]', ends)
+    hear!('test:ttl-renewed-by-watcher', 'b', '[2]', ends)
+    watchSlot(liveSlot('test:ttl-renewed-by-watcher')!, 'a', () => room.set('b', 7))
+    await Bun.sleep(250)
+    expect([room('a'), room('b')]).toEqual([0, 7])
+    setLiveStore(undefined)
+  })
+
   it('drops an end heard out of order on time', async () => {
     let hear: ((id: string, key: string, text: string | undefined, expiresAt?: number) => void) | undefined
 
@@ -486,6 +504,37 @@ describe('a live value with a lifetime', () => {
 
     expect(row?.[3]).toBeGreaterThan(Date.now() + 50_000)
     store.stop?.()
+  })
+
+  it('dates the row without writing its text again, so a value set meanwhile survives', async () => {
+    const path = await storePath()
+    const first = sqliteLive(path)
+    const other = sqliteLive(path)
+
+    await first.set('test:ttl-race', '', '[1]')
+    setLiveStore(first)
+
+    // Another process sets the row after this one read it and before the end is written.
+    const entries = first.entries.bind(first)
+
+    first.entries = async () => {
+      const rows = entries()
+
+      void other.set('test:ttl-race', '', '[2]')
+
+      return rows
+    }
+
+    setLiveStore(undefined)
+    setLiveStore(first)
+    declareTtl(0, { ttl: '60s' }, 'test:ttl-race', 'ttlRace')
+
+    const row = (sqliteLive(path).entries() as LiveEntry[]).find(entry => entry[0] === 'test:ttl-race')
+
+    expect(row?.[2]).toBe('[2]')
+    setLiveStore(undefined)
+    first.stop?.()
+    other.stop?.()
   })
 
   it('goes on when the store refuses to keep the end', () => {

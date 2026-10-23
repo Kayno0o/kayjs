@@ -52,6 +52,8 @@ export interface LiveStore {
   entries: () => Entries | Promise<Entries>
   // Keeps a value and tells the other processes sharing the store, which hear it through `subscribe`. `expiresAt` is when a value declared with a `ttl` is forgotten: the store gives it back with the rows, leaves it out of them once past and drops it.
   set: (id: string, key: string, text: string, expiresAt?: number) => void | Promise<void>
+  // Gives a value held with no end the end, leaving its text and any end it has; optional, a store without it has the value written again with the end, which can overwrite a text another process set meanwhile.
+  end?: (id: string, key: string, expiresAt: number) => void | Promise<void>
   // Drops a key and tells the other processes.
   delete: (id: string, key: string) => void | Promise<void>
   // Calls `listener` with the text now held for a key another process set, and when it ends if it has a `ttl`, or undefined once it deleted it; never for this process's own.
@@ -222,7 +224,8 @@ function dropExpired(slot: ServerSlot): void {
 
   // After the map is settled, as a watcher may write a value of the slot.
   for (const key of gone) {
-    if (slot.values.delete(key))
+    // A watcher told of an earlier key may have written this one again.
+    if (!slot.expires.has(key) && slot.values.delete(key))
       notify(slot, key)
   }
 }
@@ -556,7 +559,7 @@ function hear(id: string, key: string, text: string | undefined, atStart = false
   notify(slot, key)
 }
 
-// The end of a value the store holds without one, though its declaration has a `ttl` now (it was stored before): the lifetime counts from the first time this process reads it, and the store keeps that end so a restart does not renew it. Only rows read at the start, or heard before their declaration, are given one, so a store that ignores the end cannot make processes rewrite a row at each other. The write-back is the text read, so a value another replica sets in that instant is overwritten: a window open only on the first deploy giving the value a `ttl`.
+// The end of a value the store holds without one, though its declaration has a `ttl` now (it was stored before): the lifetime counts from the first time this process reads it, and the store keeps that end so a restart does not renew it. Only rows read at the start, or heard before their declaration, are given one, so a store that ignores the end cannot make processes rewrite a row at each other. The store only sets the end where none is, so a value another replica sets meanwhile is kept.
 function stamped(slot: ServerSlot, key: string, text: string): number | undefined {
   if (slot.ttl === undefined)
     return undefined
@@ -565,7 +568,7 @@ function stamped(slot: ServerSlot, key: string, text: string): number | undefine
 
   if (shared(slot)) {
     try {
-      sendToStore(slot.id, key, (store): void | Promise<void> => store.set(slot.id, key, text, expiresAt))
+      sendToStore(slot.id, key, (store): void | Promise<void> => store.end === undefined ? store.set(slot.id, key, text, expiresAt) : store.end(slot.id, key, expiresAt))
     }
     catch (error) {
       // A store may refuse a write; the end stays local, and the next start tries again.
