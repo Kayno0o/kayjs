@@ -171,7 +171,7 @@ function fenceTokens(fence: ParsedFence, known: Categories, handed: Categories |
     const binding = path.scope.getBinding(path.node.name)
 
     // Babel gives a destructured `catch` parameter no binding.
-    if (binding === undefined && path.isBindingIdentifier())
+    if (binding === undefined && inCatchParameter(path))
       return undefined
 
     if (binding === undefined)
@@ -192,6 +192,11 @@ function fenceTokens(fence: ParsedFence, known: Categories, handed: Categories |
     })
   }
   catch {}
+}
+
+// Whether the identifier is declared by a `catch` parameter pattern, which Babel gives no binding when destructured.
+function inCatchParameter(identifier: NodePath<t.Identifier>): boolean {
+  return identifier.find(path => path.key === 'param' && path.parentPath?.isCatchClause() === true) !== null
 }
 
 // Whether the identifier is a use of the name: a declaration, a read or the left of an assignment, not a property key, a member or a type.
@@ -261,7 +266,7 @@ function expressionTokens(source: string, span: Span, known: Categories, hidden:
   loadTraverse()(file, {
     Identifier(path) {
       // What the expression itself declares, a destructured `catch` parameter included, is never the file's.
-      const category = hidden.has(path.node.name) || path.isBindingIdentifier() || path.scope.getBinding(path.node.name) ? undefined : known.get(path.node.name)
+      const category = hidden.has(path.node.name) || inCatchParameter(path) || path.scope.getBinding(path.node.name) ? undefined : known.get(path.node.name)
 
       if (category && isNameSite(path))
         add({ start: span.start + path.node.start! - 1, end: span.start + path.node.end! - 1 }, category)

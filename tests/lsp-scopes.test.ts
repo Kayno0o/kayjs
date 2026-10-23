@@ -46,6 +46,10 @@ describe('semantic tokens in template expressions', () => {
     expect(tokens(page(...head, 'p {(() => { try { run() } catch ([count]) { return count } })()}'))).toEqual(['1:6 count variable declaration,signal'])
   })
 
+  it('still tokens a write to the file\'s name', () => {
+    expect(tokens(page(...head, 'button(onClick={() => count = 5}) x', 'button(onClick={() => count++}) y', 'button(onClick={() => [count] = [1]}) z'))).toEqual(['1:6 count variable declaration,signal', '3:22 count variable signal', '4:22 count variable signal', '5:23 count variable signal'])
+  })
+
   it('treats a nested function declaration and its parameters as binders', () => {
     expect(tokens(page(...head, 'p {[1].map(function count(count) { return count })}'))).toEqual(['1:6 count variable declaration,signal'])
   })
