@@ -1,5 +1,5 @@
 ---
-import { effect, recipe, signal } from 'kay'
+import { effect, recipe, signal, untrack } from 'kay'
 import type { InfiniteList } from './infinite-list'
 import Button from './button.kay'
 import WhenVisible from './when-visible.kay'
@@ -24,16 +24,22 @@ const { list, margin, loadingLabel = wording('ui.loadMore.loading', 'Loading mor
 
 // Rows added by the last page, told to screen readers beside the visible status.
 const added = signal(0)
+// Flips with each page, so two pages of one size still change the text a screen reader watches.
+const flip = signal(false)
 let seen = list.rows().length
 
 effect(() => {
   const total = list.rows().length
 
-  added.set(total - seen)
+  if (total > seen) {
+    added.set(total - seen)
+    flip.set(!untrack(flip))
+  }
+
   seen = total
 })
 
-const loaded = () => added() > 0 ? (loadedLabel?.(added()) ?? wording('ui.loadMore.loaded', '{count} more loaded', { count: added() })) : ''
+const loaded = () => added() > 0 ? (loadedLabel?.(added()) ?? wording('ui.loadMore.loaded', '{count} more loaded', { count: added() })) + (flip() ? '\u200B' : '') : ''
 ---
 // The end of an infinite list: the sentinel, or a button under `button`, while there are more rows, a status while a page loads, and an alert with a retry once a page failed, which loads no other until it is pressed.
 div(part="root")

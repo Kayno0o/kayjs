@@ -488,12 +488,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
 
     return owner(mail)
   }
-  const jobs = queue<Queued>(name, async (mail, signal) => {
-    // A run the queue gave up on (stopped, or past lostAfter) sends nothing, so the retry is the only one to.
-    signal.throwIfAborted()
-
-    return deliverQueued(mail)
-  }, {
+  const jobs = queue<Queued>(name, deliverQueued, {
     ...queueOptions,
     keepFailed: queueOptions.keepFailed ?? FAILED_KEPT,
     redact: queueOptions.redact ?? withoutBody,

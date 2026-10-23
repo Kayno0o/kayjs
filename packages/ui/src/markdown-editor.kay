@@ -6,7 +6,7 @@ import { effect, onMount, recipe, signal, uid, untrack } from 'kay'
 import { wording } from 'kay/words'
 import { controlledValue } from './controlled-value'
 import { startRef } from './form-reset'
-import { enterEdit, headingEdit, imageEdit, indentEdit, linkEdit, listEdit, TOOLBAR_ACTIONS, wrapEdit } from './markdown-edit'
+import { enterEdit, escaped, headingEdit, imageEdit, indentEdit, linkEdit, listEdit, TOOLBAR_ACTIONS, wrapEdit } from './markdown-edit'
 import { attempt } from './toast'
 
 const SHORTCUT_MARKERS: Partial<Record<string, string>> = { b: '**', i: '*' }
@@ -237,10 +237,6 @@ function swap(placeholder: string, replacement: string): boolean {
 
   return true
 }
-
-// What ends or breaks a Markdown link destination, written as the escape a browser reads back to the same address.
-const BREAKING = /[\s()<>]/g
-const escaped = (url: string) => url.replace(BREAKING, character => `%${character.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`)
 
 // Embeds each image behind a placeholder right away, so writing goes on while it uploads.
 async function upload(files: File[]): Promise<void> {

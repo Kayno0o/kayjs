@@ -100,7 +100,27 @@ describe('LoadMore', () => {
     release[0]!([{ id: 3 }, { id: 4 }, { id: 5 }])
     await settle()
 
-    expect(announced()?.textContent).toBe('2 more loaded')
+    expect(announced()?.textContent).toContain('2 more loaded')
+  })
+
+  test('changes the announcement for a second page of the same size', async () => {
+    const root = await list({ button: true })
+    const announced = () => root.querySelector('.kui-load-more [data-part="announced"]')!.textContent
+    const more = () => root.querySelector('.kui-load-more button') as HTMLElement
+
+    click(more())
+    release[0]!([{ id: 4 }, { id: 5 }, { id: 6 }])
+    await settle()
+
+    const first = announced()
+
+    click(more())
+    release[1]!([{ id: 7 }, { id: 8 }, { id: 9 }])
+    await settle()
+
+    expect(first).toContain('3 more loaded')
+    expect(announced()).toContain('3 more loaded')
+    expect(announced()).not.toBe(first)
   })
 
   test('loads the next page from a button under button, with no sentinel', async () => {

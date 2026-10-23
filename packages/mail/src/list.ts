@@ -190,7 +190,7 @@ function personalise(message: StoredMessage, subscriber: Subscriber, list: strin
     subject: message.subject,
     html: message.html === undefined ? undefined : withFooter(message.html, html),
     text: `${message.text}\n\n-- \n${text}\n`,
-    headers: { ...Object.fromEntries(Object.entries(message.headers).filter(([name]) => !name.toLowerCase().startsWith('list-unsubscribe'))), 'List-Unsubscribe': `<${url}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
+    headers: { ...Object.fromEntries(Object.entries(message.headers).filter(([name]) => !name.toLowerCase().startsWith('list-unsubscribe') && name.toLowerCase() !== 'message-id')), 'List-Unsubscribe': `<${url}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
     attachments: [],
   }
 }

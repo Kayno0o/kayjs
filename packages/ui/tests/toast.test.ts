@@ -100,6 +100,14 @@ describe('a toast\'s time', () => {
     expect(shown()).toEqual([])
   })
 
+  test('shows an error already open once, answering the id of the shown one', () => {
+    const first = toast.error('Offline')
+
+    expect(toast.error('Offline')).toBe(first)
+    toast.error('Other')
+    expect(shown().map(item => item.message)).toEqual(['Offline', 'Other'])
+  })
+
   test('stays until dismissed with an infinite duration, holds and releases included, and answers its id', () => {
     const sticky = toast.error('Stuck', { duration: false })
 
@@ -176,7 +184,8 @@ describe('attempt', () => {
     // An empty refusal says nothing, so `failure` goes in its place.
     await attempt(reject(new ActionError(400, '', { '': '' }, { error: '' })), 'Could not delete', refused)
 
-    expect(shown().map(({ message }) => message)).toEqual(['Still referenced', 'Could not delete', 'Too many tries', 'Could not delete', 'Could not delete', 'Could not delete', 'Could not delete'])
+    expect(shown().map(({ message }) => message)).toEqual(['Still referenced', 'Could not delete', 'Too many tries'])
+    // The same error open is shown once.
   })
 
   test('stays quiet when the call goes through, and hands back what it returned', async () => {

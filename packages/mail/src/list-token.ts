@@ -4,7 +4,7 @@ export type TokenPurpose = 'confirm' | 'unsubscribe'
 
 export interface TokenClaims {
   list: string
-  // The subscriber's random id, never their address.
+  // The subscriber's id, never their address.
   id: string
   locale?: string | undefined
 }

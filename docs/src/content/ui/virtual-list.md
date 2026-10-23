@@ -4,7 +4,7 @@ description: A long list drawing only the rows in view, however tall each one is
 
 <Demo name="virtual-list/basic" />
 
-`VirtualList(items={rows})` with an `@item(row, index)` block draws the rows in view and, above and below them, room standing for the others, so a list of ten thousand rows costs what a screenful does. It scrolls in a box of its own, 70vh tall unless the app gives `.kui-virtual-list` another height. For a table, use `Table`'s `virtual`.
+`VirtualList(items={rows} label="Rows")` with an `@item(row, index)` block draws the rows in view and, above and below them, room standing for the others, so a list of ten thousand rows costs what a screenful does. It scrolls in a box of its own, 70vh tall unless the app gives `.kui-virtual-list` another height. For a table, use `Table`'s `virtual`.
 
 ## Heights
 

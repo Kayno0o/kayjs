@@ -1,5 +1,5 @@
 ---
-description: Short messages shown above the page and gone after a few seconds.
+description: Short messages shown above the page and gone after a few seconds, an error staying until dismissed.
 ---
 
 <Demo name="toaster/basic" />

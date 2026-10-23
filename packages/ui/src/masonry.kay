@@ -1,6 +1,6 @@
 --- <Item>
 import type { JSX, Snippet } from 'kay'
-import { elementSize, memo, onCleanup, onMount, recipe, signal } from 'kay'
+import { effect, elementSize, memo, onCleanup, onMount, recipe, signal, untrack } from 'kay'
 import { laneCount, masonryLayout } from './masonry'
 
 type Key = string | number
@@ -36,6 +36,15 @@ let observer: ResizeObserver | undefined
 const lanes = memo(() => laneCount(rootSize.width(), minWidth, gap))
 // Until the width is known, as on the server, the tiles stay in a plain grid of the same lanes.
 const layout = memo(() => rootSize.width() > 0 ? masonryLayout(items.map(item => heights().get(key(item))), lanes(), gap) : null)
+
+// The height of a tile whose item left goes with it, whether or not another tile resizes.
+effect(() => {
+  const present = new Set(items.map(key))
+  const known = untrack(heights)
+
+  if ([...known.keys()].some(name => !present.has(name)))
+    heights.set(new Map([...known].filter(([name]) => present.has(name))))
+})
 
 const place = (index: number) => layout()?.places[index]
 

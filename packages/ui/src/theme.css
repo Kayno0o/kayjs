@@ -2115,7 +2115,7 @@
   }
 
   .kui-slider-label {
-    @apply text-kui-micro font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
+    @apply text-xs font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
   }
 
   .kui-slider-value {
@@ -2157,7 +2157,7 @@
   }
 
   .kui-color-input-label {
-    @apply text-kui-micro font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)];
+    @apply text-xs font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)];
   }
 
   .kui-color-input-value {

@@ -101,7 +101,7 @@ export class Sortable {
     this.#onReorder = options.onReorder
   }
 
-  // An element a list no longer renders is left out wherever the items are read, rather than unregistered.
+  // An element a list no longer renders is dropped the next time the items are read.
   item = (id: Id) => (el: HTMLElement): void => {
     this.#items.set(id, el)
 

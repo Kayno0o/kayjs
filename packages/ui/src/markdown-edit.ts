@@ -189,3 +189,9 @@ export function imageEdit(value: string, start: number, end: number): TextEdit {
 
   return { start, end, text: `![${label}](url)`, selectionStart: url, selectionEnd: url + 3 }
 }
+
+// What ends or breaks a Markdown link destination.
+const BREAKING = /[\s()<>]/g
+
+// The URL with those written as the escape a browser reads back to the same address.
+export const escaped = (url: string): string => url.replace(BREAKING, character => `%${character.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`)

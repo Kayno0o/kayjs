@@ -203,7 +203,7 @@ function explained(error: unknown, settings: SmtpSettings, outcome = 'nothing wa
   if ((error as { code?: unknown }).code !== 'ETLS')
     return error
 
-  return new Error(`kayjs-mail: ${settings.host}:${settings.port ?? DEFAULT_PORT} did not upgrade to TLS with STARTTLS, which kayjs-mail requires on every port but 465, so ${outcome}; a relay taking mail in clear, as on a private network, needs MAIL_INSECURE=true (smtp({ insecure: true })), which is ignored while a password is set, as a password never goes in clear`, { cause: error })
+  return new Error(`kayjs-mail: ${settings.host}:${settings.port ?? DEFAULT_PORT} did not upgrade to TLS with STARTTLS, which kayjs-mail requires unless the connection is TLS from the start (port 465, or secure: true), so ${outcome}; a relay taking mail in clear, as on a private network, needs MAIL_INSECURE=true (smtp({ insecure: true })), which is ignored while a password is set, as a password never goes in clear`, { cause: error })
 }
 
 async function closeOpened(pending: Promise<Awaited<ReturnType<typeof open>>>): Promise<void> {

@@ -53,7 +53,7 @@ describe('smtp', () => {
     const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: server.port }) })
     const before = server.received.length
 
-    await expect(mail.send({ to: 'ada@example.com', subject: 'S', text: 'T' })).rejects.toThrow(`kayjs-mail: 127.0.0.1:${server.port} did not upgrade to TLS with STARTTLS, which kayjs-mail requires on every port but 465, so nothing was sent; a relay taking mail in clear, as on a private network, needs MAIL_INSECURE=true`)
+    await expect(mail.send({ to: 'ada@example.com', subject: 'S', text: 'T' })).rejects.toThrow(`kayjs-mail: 127.0.0.1:${server.port} did not upgrade to TLS with STARTTLS, which kayjs-mail requires unless the connection is TLS from the start (port 465, or secure: true), so nothing was sent; a relay taking mail in clear, as on a private network, needs MAIL_INSECURE=true`)
     expect(server.received).toHaveLength(before)
   })
 

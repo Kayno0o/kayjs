@@ -85,6 +85,8 @@ describe('a broadcast', () => {
       expect(others).toHaveLength(0)
       expect(mail!.to).toEqual([email])
       links.add(mail!.headers['List-Unsubscribe']!)
+      // A shared id would make the copies one message to a client, so each is left for the transport to give its own.
+      expect(mail!.headers['Message-ID']).toBeUndefined()
     }
 
     expect(links.size).toBe(5)

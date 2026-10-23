@@ -92,6 +92,12 @@ function askedMs(duration: Duration | false | undefined): number | undefined {
 
 // Untracked: an effect toasting a settled task would otherwise read the list, and toast again on every toast it adds.
 function push(message: string, type: ToastType, duration: Duration | false | undefined): number {
+  // An error already open with the same words is not stacked again, so a failing poll cannot cover the page.
+  const open = type === 'error' ? untrack(toasts).find(shown => shown.type === 'error' && shown.message === message) : undefined
+
+  if (open !== undefined)
+    return open.id
+
   const id = nextId++
   const asked = askedMs(duration)
   const wanted = asked === undefined || Number.isNaN(asked) || asked < 0 ? undefined : asked

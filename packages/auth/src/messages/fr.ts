@@ -142,6 +142,7 @@ export default defineMessages({
       members: 'Membres',
       remove: 'Retirer',
       saveRoles: 'Enregistrer les rôles',
+      rolesOf: 'Rôles de {name}',
       invitations: 'Invitations',
       noInvitations: 'Aucune invitation en cours.',
       revoke: 'Annuler',
