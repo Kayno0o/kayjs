@@ -17,7 +17,7 @@ isolateEnv()
 const { registerLoader } = await import('../server/loader')
 const { lazyNativePlugins } = await import('./lazy-plugins')
 
-lazyNativePlugins(testRoot())
+lazyNativePlugins()
 
 await registerLoader(testRoot())
 

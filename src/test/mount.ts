@@ -152,7 +152,7 @@ async function bundle(root: string, file: string): Promise<string> {
   try {
     await Bun.write(join(work, 'entry.ts'), entry(file))
 
-    lazyNativePlugins(root)
+    lazyNativePlugins()
 
     const loaded = await loadConfig(root)
     const trees = apiTrees(root, loaded)
