@@ -220,8 +220,8 @@ const LOCK_PID = /-(\d+)$/
 const STAT_PARENT = /^\) \S (\d+)/
 const EXIT_WAIT_MS = 5000
 // Two animation frames: the first paint has happened.
-const PAINTED = 'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))'
-const PAINT_WAIT_MS = 1000
+// The wait ends in the page itself after a second, as a tab that paints no frame would leave the call pending.
+const PAINTED = 'new Promise(resolve => { setTimeout(resolve, 1000); requestAnimationFrame(() => requestAnimationFrame(resolve)) })'
 // How long the browser outlives its last page, for the next test's and for a pause between a file's tests (a server booting in a beforeAll). Past it, a run that closes nothing after each file does not keep an idle Chrome to its end.
 const IDLE_MS = 5 * 60_000
 // How many pages a browser opens before the next one, once none is open, starts another: Chrome keeps the renderer of a page it closed for as long as it runs, from 80 MB for a light page to 800 MB for an admin screen, so a file opening a page per test holds them all, and a page that failed to load as well.
@@ -841,7 +841,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 
       // A browser just started has painted no frame by then, and a layout shift or a paint before the first one is not counted by the page's observers.
       if (options.javaScript !== false)
-        await within(painted(), PAINT_WAIT_MS)
+        await painted()
     }
     catch (error) {
       if (options.lenient !== true || !(error instanceof Error) || !error.message.startsWith(UNSETTLED))
