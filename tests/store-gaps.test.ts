@@ -74,6 +74,10 @@ describe('overLimit with a rates store that hangs', () => {
       jest.advanceTimersByTime(8_000)
       expect(await second).toBeGreaterThan(0)
       expect(log.mock.calls.filter(call => String(call[0]).includes('gaps-hanging'))).toHaveLength(1)
+
+      // The store is left alone for a while, so this request is not held at all.
+      expect(await overLimit('gaps-hanging', '10.0.0.6', 1, 60_000)).toBeUndefined()
+      expect(await overLimit('gaps-hanging', '10.0.0.6', 1, 60_000)).toBeGreaterThan(0)
     }
     finally {
       jest.useRealTimers()

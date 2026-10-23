@@ -16,7 +16,6 @@ import { appStore } from './app-store'
 import { nodeNet } from './builtins'
 import { checkRequestIdHeader } from './config-limits'
 import { STORE_TIMEOUT_MS } from './pg-limit'
-import { timeLimited } from './pg-poll'
 import { onReload } from './reload'
 import { rewrittenAddress } from './rewrite'
 import { sharedKey, stampTime } from './stamp'
@@ -550,21 +549,47 @@ function filledIn(value: unknown): boolean {
 // The routes whose rates store failure was logged and has not answered since.
 const failing = new Set<string>()
 
-// Seconds until the client may try again under `name`, in the app's `store.rates` else this process's memory, or undefined while it is under the limit: for kay's own routes. A rates store that fails or takes longer than the store time limit counts in memory instead, logged once per route until it answers again, so a route is never refused for it and a hanging store holds a request for at most that limit. Postgres rates are already under the same limit, which guards a custom store.
+// How long a rates store that timed out is left alone, so a hanging one holds one request instead of every one.
+const SKIP_MS = 10_000
+
+// Until when each rates store is skipped.
+const skipped = new WeakMap<RateStore, number>()
+
+class RatesTimeout extends Error {}
+
+async function withinLimit<Result>(work: Promise<Result>): Promise<Result> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+
+  try {
+    return await Promise.race([work, new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new RatesTimeout(`the rates store took more than ${STORE_TIMEOUT_MS / 1000} seconds`)), STORE_TIMEOUT_MS)
+      timer.unref()
+    })])
+  }
+  finally {
+    clearTimeout(timer)
+  }
+}
+
+// Seconds until the client may try again under `name`, in the app's `store.rates` else this process's memory, or undefined while it is under the limit: for kay's own routes. A rates store that fails counts in memory instead, logged once per route until it answers again, so a route is never refused for it. One that takes longer than the store time limit is also left alone for ten seconds, so a hanging store holds one request, not every one.
 export async function overLimit(name: string, client: string, max: number, windowMs: number): Promise<number | undefined> {
   const key = limitKey(name, client)
   const window = `${windowMs}ms` as const
   const shared = appStore()?.rates
 
-  if (shared) {
+  if (shared && (skipped.get(shared) ?? 0) <= Date.now()) {
     try {
-      const hit = await timeLimited(async () => shared.hit(key, window), STORE_TIMEOUT_MS, `the rates store counting ${name}`)
+      const hit = await withinLimit((async () => shared.hit(key, window))())
 
       failing.delete(name)
+      skipped.delete(shared)
 
       return waitFor(hit, max)
     }
     catch (error) {
+      if (error instanceof RatesTimeout)
+        skipped.set(shared, Date.now() + SKIP_MS)
+
       if (!failing.has(name)) {
         failing.add(name)
         kayLog('warn', `the rates store failed counting ${name}, so this process's memory counts instead`, error)
