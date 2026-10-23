@@ -6,7 +6,7 @@ import { refused } from './reply'
 
 // RFC 7009: ends the session of the client that holds the token, access or refresh, with the rest of its family. It answers 200 for a token that is unknown, expired or another client's, so it tells nothing about tokens.
 export async function revokeEndpoint(core: Core, address: string, form: URLSearchParams): Promise<TokenReply> {
-  if (await spend(core.store, `oauth-token:${address}`, core.limits.oauthToken))
+  if (await spend(core.store, `oauth-revoke:${address}`, core.limits.oauthToken))
     return refused('invalid_request', 'Too many requests', 429)
 
   const presented = form.get('token')
@@ -26,7 +26,7 @@ export async function revokeEndpoint(core: Core, address: string, form: URLSearc
     return { status: 200, body: {} }
   }
 
-  // Looked at without spending it where the store can, so a token of another client is left as it was.
+  // Looked at without spending it where the store can; a store without `get` can only spend it, which a holder of the token could do at the token endpoint too.
   const refresh = oauth!.refresh.get ? await oauth!.refresh.get(key) : (await oauth!.refresh.use(key, new Date()))?.token
 
   if (refresh?.clientId === clientId)

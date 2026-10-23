@@ -276,12 +276,22 @@ describe('organizations', () => {
       expect(await grace.browser.call('acceptInvitation', invitation.id)).toEqual({ ok: false, error: 'not-found' })
     })
 
-    test('stands when the sender is unknown, as after their account was deleted', async () => {
-      const { bob, grace, invitation, store } = await sentByBob()
+    test('is dead once the sender\'s account is deleted, even after they were removed first', async () => {
+      const { ada, bob, grace, invitation, org, store } = await sentByBob()
 
+      expect(await ada.browser.call('deleteMember', org, bob.id)).toEqual({ ok: true })
       expect(await bob.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
       expect((await store.invitations?.get(invitation.id))?.invitedBy).toBeNull()
-      expect(await grace.browser.call('acceptInvitation', invitation.id)).toMatchObject({ ok: true })
+      expect(await grace.browser.call('acceptInvitation', invitation.id)).toEqual({ ok: false, error: 'not-found' })
+    })
+
+    test('is dead when its sender deletes their account while a member, and listed to managers only while it stands', async () => {
+      const { ada, bob, grace, invitation, org } = await sentByBob()
+
+      expect((await ada.browser.callOk('invitations', org)).invitations).toHaveLength(1)
+      expect(await bob.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+      expect((await ada.browser.callOk('invitations', org)).invitations).toEqual([])
+      expect(await grace.browser.call('acceptInvitation', invitation.id)).toEqual({ ok: false, error: 'not-found' })
     })
   })
 

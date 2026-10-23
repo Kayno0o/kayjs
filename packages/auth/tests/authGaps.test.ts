@@ -96,6 +96,17 @@ describe('the revocation endpoint (RFC 7009)', () => {
     expect(await who(app, access)).toMatchObject({ email: 'ada@example.com' })
   })
 
+  test('counts its own budget, apart from the token endpoint', async () => {
+    const app = testApp({ url: 'http://localhost', pages: authPages(), scopes: ['posts:read'], rateLimit: { oauthToken: { max: 2, window: 900 } } } as never)
+    const statuses = []
+
+    for (let attempt = 0; attempt < 3; attempt++)
+      statuses.push((await post(app, 'revoke', { token: 'x', client_id: 'kc_x' })).status)
+
+    expect(statuses).toEqual([200, 200, 429])
+    expect((await post(app, 'token', { grant_type: 'password' })).status).toBe(400)
+  })
+
   test('needs the token and the client', async () => {
     const app = server()
 
