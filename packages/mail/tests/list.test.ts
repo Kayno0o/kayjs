@@ -399,6 +399,14 @@ describe('a test send', () => {
 })
 
 describe('erasing a person', () => {
+  it('lists what the address is on first, pending rows included, whatever its case', async () => {
+    const { email } = await subscribed()
+    const found = await mail.subscriptions(email.toUpperCase())
+
+    expect(found).toMatchObject([{ list: expect.any(String), status: 'confirmed', askedAt: expect.any(Date), confirmedAt: expect.any(Date) }])
+    expect(await mail.subscriptions('nobody@example.com')).toEqual([])
+  })
+
   it('takes the address off every list and removes the mails queued for it', async () => {
     const { email } = await subscribed()
 

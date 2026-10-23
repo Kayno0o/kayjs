@@ -529,7 +529,7 @@ if (found.ok) {
 - `listUsers({ search, offset, limit })` gives the users newest first, with `total`. `getUser(id)` gives one, with `admin` telling whether they meet the `admin` option. `adminRoles()` lists the roles an admin may give.
 - `grantRole(id, role)` and `revokeRole(id, role)` take a role your `roles` option declares. If two admins revoke each other's role at the same moment, at least one stays an admin, and a revoke that would have left none is undone and answers `last-admin`. Two admins deleting their own accounts at the same moment are held to the same rule, which needs an `admin` option that reads the user's roles.
 - `banUser(id, { reason, until })` bars the user from signing in and signs them out everywhere. `until` leaves it for good when left out. `unbanUser(id)` lifts it. An admin cannot ban themselves or another admin.
-- `deleteUser(id)` deletes the user as `deleteAccount` does, notifications and mailing lists included. An organization the user solely owns with other members passes to its longest-standing member, who is told by mail and by an `organization-handed-over` event, so an abandoned account can always be removed.
+- `deleteUser(id)` deletes the user as `deleteAccount` does, notifications and mailing lists included (for a verified address). An organization the user solely owns with other members passes to its longest-standing member, who is told by mail and by an `organization-handed-over` event, so an abandoned account can always be removed.
 - `impersonate(id)` signs the admin in as the user, within ten minutes of their own sign-in or re-proof; later it answers `stale`. `impersonator()` gives the admin, to show a banner, and `stopImpersonating()` signs back in as themselves.
 - `listAdminAuditLog({ userId, before, limit })` reads everyone's audit log, or one user's.
 
@@ -727,6 +727,8 @@ The consent page lists what the agent asks for by the labels your messages give,
 
 Nothing is set up. The documents an agent reads, `/.well-known/oauth-authorization-server` and `/.well-known/oauth-protected-resource`, and the endpoints under `/auth/oauth/` are served for you, under your `base` if you have one.
 
+A client that registered itself and that nobody approved within 24 hours is deleted, and registers again.
+
 Agents sign in with PKCE, never a client secret. An access token lasts an hour. A refresh token is replaced each time it is used, and expires after 30 days unused.
 
 A whole sign-in ends 90 days after it began. One refresh token used twice ends it at once.
@@ -737,7 +739,7 @@ A bound token works only on requests to that resource or under its path: a token
 
 The calls kay's `/mcp` makes to your tools count as made to `/mcp`. `userFromToken(token, url)` for a websocket takes the address of the handshake, and refuses a bound token without it.
 
-An agent can end its own sign-in at `/auth/oauth/revoke` (RFC 7009), sending `token` and `client_id`; the metadata lists it as `revocation_endpoint`. A client that registered and that nobody approved within 24 hours is deleted, and registers again.
+An agent can end its own sign-in at `/auth/oauth/revoke` (RFC 7009), sending `token` and `client_id`; the metadata lists it as `revocation_endpoint`.
 
 A refresh refused for its resource or scope keeps its token, so the agent can try again, and so does a code exchange refused for its resource or `redirect_uri`, within the code's 60 seconds.
 

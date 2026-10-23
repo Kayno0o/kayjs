@@ -430,11 +430,34 @@ describe('the types of auth() with no module', () => {
 
 describe('the mailer auth() picks', () => {
   const send = () => undefined
+  const erase = () => undefined
+  const subscriptions = async () => []
+  const withLists = (extensions: string[]) => ({ root, extensions, modules: { mail: { mail: { send, erase, subscriptions } } } })
+
   const app = (extensions: string[]) => ({ root, extensions, modules: { mail: { mail: { send } } } })
 
   test('sends kayjs-auth\'s own mails through the app\'s mailer unless kayjs-mail is among the extensions', async () => {
     expect((await emailOf(undefined, app([])))?.mailer?.send).toBe(send)
     expect((await emailOf(undefined, app(['other'])))?.mailer?.send).toBe(send)
     expect((await emailOf(undefined, app([MAIL_EXTENSION])))?.mailer?.send).not.toBe(send)
+  })
+
+  test.each([[[]], [[MAIL_EXTENSION]]])('erases an address and lists its subscriptions through the mail module, however the app wrote email (extensions %p)', async (extensions) => {
+    const site = withLists(extensions)
+    const own = { send: () => undefined }
+    const kept = { send: () => undefined, erase: () => 1 }
+
+    expect(await emailOf(undefined, site)).toMatchObject({ mailer: { erase: expect.any(Function), subscriptions: expect.any(Function) } })
+    expect(await emailOf({ mailer: own, links: { 'magic-link': '/m' } }, site)).toMatchObject({ links: { 'magic-link': '/m' }, mailer: { erase: expect.any(Function), subscriptions: expect.any(Function) } })
+    expect((await emailOf({ mailer: own }, site))?.mailer.send).toBe(own.send)
+    // The mailer's own erase is kept.
+    expect((await emailOf({ mailer: kept }, site))?.mailer.erase).toBe(kept.erase)
+    expect(await emailOf(false, site)).toBeUndefined()
+  })
+
+  test('leaves a mailer alone when the mail module has nothing to erase with', async () => {
+    const own = { mailer: { send } }
+
+    expect(await emailOf(own, app([]))).toBe(own)
   })
 })

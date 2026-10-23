@@ -39,6 +39,7 @@ async function setup() {
   const ada = app.browser()
   const { user } = await ada.callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
 
+  await app.store.users.update(user.id, { emailVerifiedAt: new Date() })
   await notify(user.id, { title: 'Welcome' })
 
   return { ...app, ...mail, ada, user }
@@ -65,18 +66,36 @@ describe('erasing a user takes their notifications and mailing list rows', () =>
     expect(erased).toEqual(['ada@example.com'])
   })
 
-  test('by the prune of a guest, whose notifications go and whose unproved address is left on its lists', async () => {
-    const { browser, store, erased } = await setup()
+  // Visiting a day and an hour on runs the prune of stale guests in the background.
+  async function pruned(guest: { id: string, email: string, verified: boolean }) {
+    const context = await setup()
     const start = Date.now()
 
-    await store.users.create(userRecord({ id: 'stale', guest: true, email: 'guest@example.com', createdAt: new Date(start - 1000) }))
-    await notify('stale', { title: 'Hello guest' })
+    await context.store.users.create(userRecord({ id: guest.id, guest: true, email: guest.email, emailVerifiedAt: guest.verified ? new Date() : null, createdAt: new Date(start - 1000) }))
+    await notify(guest.id, { title: 'Hello guest' })
     setSystemTime(start + DAY_MS + PRUNE_EVERY_MS)
-    await browser().json('/me')
+    await context.browser().json('/me')
     await new Promise(resolve => setTimeout(resolve, 30))
+    expect(await context.store.users.get(guest.id)).toBeUndefined()
+    expect(await notifications.list(guest.id)).toEqual([])
 
-    expect(await store.users.get('stale')).toBeUndefined()
-    expect(await notifications.list('stale')).toEqual([])
+    return context.erased
+  }
+
+  test('by the prune of a guest, whose unproved address is left on the lists', async () => {
+    expect(await pruned({ id: 'stale', email: 'guest@example.com', verified: false })).toEqual([])
+  })
+
+  test('by the prune of a guest with a verified address, which leaves the lists', async () => {
+    expect(await pruned({ id: 'stale', email: 'guest@example.com', verified: true })).toEqual(['guest@example.com'])
+  })
+
+  test('by themselves with an address nobody proved, which stays on the lists', async () => {
+    const { ada, user, store, erased } = await setup()
+
+    await store.users.update(user.id, { emailVerifiedAt: null })
+    expect(await ada.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await notifications.list(user.id)).toEqual([])
     expect(erased).toEqual([])
   })
 

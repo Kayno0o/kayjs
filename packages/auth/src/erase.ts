@@ -94,7 +94,7 @@ async function eraseThen(core: Core, record: UserRecord, handOver: boolean, afte
   }
 
   // Before the account goes, so a store that cannot strip the audit log or reach the lists fails the erase with the account still there to delete again.
-  await eraseAside(core, record, afterDelete !== undefined)
+  await eraseAside(core, record)
   await forget(core, record, pseudonym)
   await store.users.delete(record.id)
 
@@ -134,14 +134,12 @@ async function eraseThen(core: Core, record: UserRecord, handOver: boolean, afte
   return { ok: true }
 }
 
-// What other parts of the app keep about the user: their notifications, and their address on the mailer's lists. An account nobody leaves (`leaving` false) with an address nobody proved leaves the lists alone, as the address may be someone else's.
-async function eraseAside(core: Core, record: UserRecord, leaving: boolean): Promise<void> {
+// What other parts of the app keep about the user: their notifications, and their address on the mailer's lists and in its queue. An address nobody proved is left there, as it may be someone else's.
+async function eraseAside(core: Core, record: UserRecord): Promise<void> {
   await notifications.erase(record.id)
 
-  const erase = core.email?.mailer.erase
-
-  if (erase && record.email !== null && record.email !== '' && (leaving || record.emailVerifiedAt !== null))
-    await erase.call(core.email!.mailer, record.email)
+  if (record.email !== null && record.email !== '' && record.emailVerifiedAt !== null)
+    await core.email?.mailer.erase?.(record.email)
 }
 
 async function forget(core: Core, record: UserRecord, pseudonym: string): Promise<void> {

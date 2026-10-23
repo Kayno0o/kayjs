@@ -198,22 +198,29 @@ function conventionalHooks(loaded: Record<string, unknown> | undefined): AuthHoo
   return loaded?.hooks as AuthHooks | undefined
 }
 
-// The mailer's erase and export of an address, bound so an erased account takes its mailing lists with it.
-function privacyOf(mail: Pick<AuthMailer, 'erase' | 'subscriptions'> | undefined): Pick<AuthMailer, 'erase' | 'subscriptions'> {
-  return {
-    ...typeof mail?.erase === 'function' && { erase: mail.erase },
-    ...typeof mail?.subscriptions === 'function' && { subscriptions: mail.subscriptions },
-  }
+interface MailModule { enqueue?: (message: never) => unknown, send?: (message: never) => unknown, erase?: AuthMailer['erase'], subscriptions?: AuthMailer['subscriptions'] }
+
+// `email` with the mail module's erase and export of an address on its mailer, unless the mailer has its own, so an erased account takes its mailing lists with it whichever way the app wrote `email`.
+function withPrivacy(email: EmailOptions, mail: MailModule | undefined): EmailOptions {
+  const erase = email.mailer.erase === undefined && typeof mail?.erase === 'function' ? mail.erase.bind(mail) : undefined
+  const subscriptions = email.mailer.subscriptions === undefined && typeof mail?.subscriptions === 'function' ? mail.subscriptions.bind(mail) : undefined
+
+  if (erase === undefined && subscriptions === undefined)
+    return email
+
+  // The app's mailer stays the prototype, so a method of it reading `this` still works.
+  return { ...email, mailer: Object.create(email.mailer, { ...erase && { erase: { value: erase, enumerable: true } }, ...subscriptions && { subscriptions: { value: subscriptions, enumerable: true } } }) as AuthMailer }
 }
 
 export async function emailOf(email: OwnOptions['email'], app: ExtensionApp): Promise<EmailOptions | undefined> {
   if (email === false)
     return undefined
 
-  if (email !== undefined)
-    return email
+  const mail = app.modules.mail?.mail as MailModule | undefined
 
-  const mail = app.modules.mail?.mail as { enqueue?: (message: never) => unknown, send?: (message: never) => unknown, erase?: AuthMailer['erase'], subscriptions?: AuthMailer['subscriptions'] } | undefined
+  if (email !== undefined)
+    return withPrivacy(email, mail)
+
   const send = mail?.enqueue ?? mail?.send
 
   if (send === undefined)
@@ -221,15 +228,15 @@ export async function emailOf(email: OwnOptions['email'], app: ExtensionApp): Pr
 
   // kayjs-mail registered in kay.config.ts brings its wording, views and theme to the mails, as `kay add auth` writes it.
   if (!app.extensions.includes(MAIL_EXTENSION))
-    return { mailer: { send: send as never, ...privacyOf(mail) } }
+    return withPrivacy({ mailer: { send: send as never } }, mail)
 
   try {
     const { authMailer } = await import('@kaynooo/kayjs-mail')
 
-    return { mailer: { ...authMailer(send as never), ...privacyOf(mail) } }
+    return withPrivacy({ mailer: authMailer(send as never) }, mail)
   }
   catch {
-    return { mailer: { send: send as never, ...privacyOf(mail) } }
+    return withPrivacy({ mailer: { send: send as never } }, mail)
   }
 }
 
