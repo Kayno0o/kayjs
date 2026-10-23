@@ -55,7 +55,7 @@ const tokens = new Set([...theme.matchAll(DEFINED_TOKEN)].map(([, token]) => tok
 const classes = new Set([...theme.matchAll(DEFINED_CLASS)].map(([, name = '']) => name))
 
 // Classes a component writes that no rule of the theme selects any more: rule-free names for an app's CSS and skins.
-const HOOKS = new Set(['kui-menu', 'kui-toaster', 'kui-tooltip'])
+const HOOKS = new Set(['kui-menu', 'kui-toaster', 'kui-tooltip', 'kui-card', 'kui-card-row', 'kui-widget', 'kui-notice', 'kui-avatar', 'kui-checkbox', 'kui-radio-group', 'kui-chip', 'kui-chip-group', 'kui-copy-btn', 'kui-empty-state', 'kui-file-drop', 'kui-meter', 'kui-progress', 'kui-skeleton', 'kui-page-header', 'kui-page-section', 'kui-date-input', 'kui-date-range-input', 'kui-segmented', 'kui-slider', 'kui-color-input', 'kui-combobox', 'kui-rating', 'kui-toggle'])
 
 // The source of a component of the library.
 const sourceOf = (name: string): string => components.find(component => component.path === `src/${name}.kay`)!.source
@@ -370,19 +370,18 @@ describe('theme.css', () => {
   })
 
   test('fills a solid badge with its tone, its text read from the accent\'s foreground', () => {
-    const solid = theme.slice(theme.indexOf(':where([data-solid])'))
+    const badge = sourceOf('badge')
 
-    expect(solid.slice(0, solid.indexOf('}'))).toMatch(/background-color: var\(--_badge-tone\);[^}]*color: var\(--color-accent-foreground\)/)
+    expect(badge).toMatch(/data-solid:\[background-color:var\(--_badge-color,[^\]]*\] data-solid:\[border-color:[^\]]*\] data-solid:\[color:var\(--kui-badge-solid-text,var\(--color-accent-foreground\)\)\]/)
 
     for (const tone of ['accent', 'success', 'warning', 'danger', 'info'])
-      expect(theme, tone).toContain(`[data-tone='${tone}']) {\n      --_badge-tone: var(--color-${tone});`)
+      expect(badge, tone).toContain(`${tone}: '[--_badge-color:var(--color-${tone})]'`)
   })
 
   test('draws the controls a hairline would leave under 3:1 with the field border', () => {
-    for (const selector of ['.kui-rating', '.kui-btn'])
-      expect(blockOf(theme, selector), selector).toMatch(/\b(?:bg|border|text)-input\b|color-input/)
+    expect(blockOf(theme, '.kui-btn')).toMatch(/\b(?:bg|border|text)-input\b|color-input/)
 
-    for (const name of ['carousel', 'toggle'])
+    for (const name of ['carousel', 'toggle', 'rating'])
       expect(sourceOf(name), name).toMatch(/\b(?:bg|border|text)-input\b|color-input/)
   })
 
@@ -506,7 +505,10 @@ describe('theme.css', () => {
     expect(await build('')).toEqual(['--shadow-raised var(--kui-shadow-raised, none)', '--shadow-press var(--kui-shadow-press, none)', '--press-travel var(--kui-press-travel, 0px)'])
     expect(await build('@theme { --shadow-raised: 4px 4px 0 black; --shadow-press: 3px 3px 0 black; --press-travel: 3px; }')).toEqual(['--shadow-raised 4px 4px 0 black', '--shadow-press 3px 3px 0 black', '--press-travel 3px'])
     expect(await build('@theme { --kui-shadow-raised: 4px 4px 0 black; --kui-shadow-press: 3px 3px 0 black; --kui-press-travel: 3px; }')).toContain('--shadow-raised var(--kui-shadow-raised, none)')
-    expect(blockOf(theme, ':is(.kui-card, .kui-card-row, .kui-widget, .kui-toast)')).toContain('box-shadow: var(--shadow-raised);')
+    expect(blockOf(theme, '.kui-toast')).toContain('box-shadow: var(--shadow-raised);')
+
+    for (const name of ['card', 'card-row', 'widget'])
+      expect(sourceOf(name), name).toContain('[box-shadow:var(--shadow-raised)]')
 
     const press = blockOf(theme, '.kui-icon-btn:where(.kui-shell)')
 
@@ -515,24 +517,22 @@ describe('theme.css', () => {
   })
 
   test('rounds buttons by --radius-md and cards and overlays by --radius-lg, Tailwind\'s own steps unless the app sets them', async () => {
-    const css = await built('@theme { --radius-md: 4px; --radius-lg: 1rem; }')
+    // The recipes are not scanned here, so a rule applies the step for the theme to emit it.
+    const css = await built('@theme { --radius-md: 4px; --radius-lg: 1rem; } .recipe { @apply rounded-lg; }')
     const roundedBy = (token: string) => [...css.matchAll(new RegExp(String.raw`([^{}]+)\{[^{}]*border-radius: var\(${token}\)[^{}]*\}`, 'g'))].map(([, selectors]) => selectors).join(',')
 
     for (const name of ['kui-btn', 'kui-shell', 'kui-stat-badge'])
       expect(roundedBy('--radius-md'), name).toContain(`.${name}`)
 
-    for (const name of ['kui-card-row', 'kui-widget', 'kui-notice'])
-      expect(roundedBy('--radius-lg'), name).toContain(`.${name}`)
-
     // The cards and overlays whose recipe draws their look round themselves by the same step.
-    for (const name of ['card', 'toaster', 'dialog', 'command-palette', 'popover', 'hover-card'])
+    for (const name of ['card', 'card-row', 'widget', 'notice', 'toaster', 'dialog', 'command-palette', 'popover', 'hover-card'])
       expect(sourceOf(name), name).toContain('rounded-lg')
 
     expect(css).toContain('--radius-md: 4px')
     expect(css).toContain('--radius-lg: 1rem')
     // An app that sets nothing gets Tailwind\'s steps, and one that still sets the old name keeps its look until 1.75.
     expect(theme).toContain('--radius-lg: var(--radius-kui-card, 0.5rem);')
-    expect(await built('@theme { --radius-kui-card: 0px; }')).toContain('--radius-kui-card: 0px')
+    expect(await built('@theme { --radius-kui-card: 0px; } .recipe { @apply rounded-lg; }')).toContain('--radius-kui-card: 0px')
     // The hairline drawn over a shell follows its corners.
     expect(blockOf(theme, ':is(.kui-shell, .kui-btn, .kui-stat-badge)::before')).toContain('border-radius: inherit;')
   })
@@ -578,7 +578,8 @@ describe('theme.css', () => {
     expect(css).toContain('--label-case: none')
     expect(await built('@theme { --kui-label-case: none; }')).toContain('--kui-label-case: none')
     // Only the stamp badge, which has --kui-badge-case, keeps its own case.
-    expect(theme.match(/@apply [^\n]* uppercase/g)).toHaveLength(1)
+    expect(theme.match(/@apply [^\n]* uppercase/g)).toBeNull()
+    expect(sourceOf('badge')).toContain('data-stamp:uppercase')
   })
 
   test('ships skins that read at 4.5:1 for text and 3:1 for lines, and compile over the theme', async () => {
@@ -654,10 +655,10 @@ describe('theme.css', () => {
   test('sizes the keyline of every framed box by --border-width, a length the old --kui-border-width still sets', () => {
     const KEYLINE = /border(?:-[bl])?-\[length:var\(--kui-border-width,var\(--border-width\)\)\]/
 
-    for (const selector of ['.kui-card-row', '.kui-widget', '.kui-table-wrap', '.kui-collapsible-section', '.kui-save-bar', '.kui-segmented', '.kui-file-drop', ':where(.kui-site-nav > [data-part=\'list\']:popover-open)'])
+    for (const selector of ['.kui-table-wrap', '.kui-collapsible-section', '.kui-save-bar', ':where(.kui-site-nav > [data-part=\'list\']:popover-open)'])
       expect(blockOf(theme, selector), selector).toMatch(KEYLINE)
 
-    for (const name of ['card', 'toaster', 'dialog', 'command-palette', 'popover', 'side-panel', 'tooltip-host', 'pagination', 'line-chart'])
+    for (const name of ['card', 'card-row', 'widget', 'segmented', 'file-drop', 'toaster', 'dialog', 'command-palette', 'popover', 'side-panel', 'tooltip-host', 'pagination', 'line-chart'])
       expect(sourceOf(name), name).toMatch(KEYLINE)
 
     expect(theme).toContain('--border-width: var(--kui-border-width, var(--kui-border-card));')

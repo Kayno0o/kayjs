@@ -230,13 +230,9 @@
     pointer-events: none;
   }
 
-  /* The app's radius scale: --radius-md for what is pressed, --radius-lg for the boxes the library frames and the overlays over the page. A docked side panel stays square. */
+  /* The app's radius scale: --radius-md for what is pressed, which --radius-lg frames in the recipes of the boxes and overlays. A docked side panel stays square. */
   :is(.kui-shell, .kui-btn, .kui-stat-badge) {
     @apply rounded-md;
-  }
-
-  :is(.kui-card-row, .kui-widget, .kui-notice) {
-    @apply rounded-lg;
   }
 
   /* :where() keeps these at one class, so the variants below still win. */
@@ -269,7 +265,7 @@
   }
 
   /* For the toast, whose shadow a skin replaces by its selector, which a utility on the toast would beat. */
-  :is(.kui-card, .kui-card-row, .kui-widget, .kui-toast) {
+  .kui-toast {
     box-shadow: var(--shadow-raised);
   }
 
@@ -476,10 +472,6 @@
     @apply text-xs text-[var(--color-kui-overlay1,var(--color-muted))];
   }
 
-  .kui-card-row {
-    @apply flex items-center gap-3 border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border bg-surface p-4;
-  }
-
   .kui-collapsible-section {
     @apply flex flex-col;
 
@@ -539,27 +531,7 @@
     }
   }
 
-  .kui-checkbox {
-    @apply inline-flex cursor-pointer items-center gap-2;
-  }
-
-  .kui-radio-group {
-    @apply flex flex-col gap-2;
-  }
-
-  .kui-chip-group {
-    @apply flex flex-wrap gap-2;
-  }
-
-  /* On the chips, whose own pointer cursor would cover the group's. */
-  .kui-chip-group:where([aria-busy='true']) .kui-chip {
-    @apply cursor-progress;
-  }
-
-  .kui-chip {
-    @apply relative cursor-pointer;
-  }
-
+  /* The trigger is a bare link, which ConfirmDelete's recipe does not style. */
   .kui-confirm-delete-link {
     @apply cursor-pointer text-xs text-muted underline transition-colors hover:text-foreground disabled:cursor-default disabled:opacity-40;
   }
@@ -568,51 +540,13 @@
     @apply grid w-fit grid-flow-col grid-rows-7 gap-[3px];
   }
 
-  .kui-copy-btn {
-    @apply px-1.5 py-0.5;
-  }
-
-  .kui-empty-state {
-    @apply flex flex-col items-center gap-3 py-16;
-  }
-
-  .kui-file-drop {
-    @apply flex flex-col items-center justify-center gap-3 border-dashed border-[length:var(--kui-border-width,var(--border-width))] border-border p-6 text-center transition-colors;
-
-    &:where([data-dragging]) {
-      @apply border-accent bg-accent/10;
-    }
-
-    &:where([aria-disabled='true']) {
-      @apply opacity-50;
-    }
-
-    &:where([data-compact]) {
-      @apply flex-row justify-start p-3 text-left;
-    }
-  }
-
   .kui-form-grid {
     @apply grid grid-cols-1 gap-3 sm:grid-cols-2;
   }
 
-  /* One wrapping row, the label taking no box of its own: the head and the action share the first line, the action wrapping under the head rather than over the control, and the rest take a line each. */
-  .kui-form-field {
-    @apply flex w-full flex-wrap items-center gap-1;
-
-    &:where([data-compact]) {
-      @apply w-auto;
-    }
-  }
-
-  /* ContactForm: its fields and the button in a column. */
+  /* ContactForm: its fields and the button in a column, which its recipe names only. */
   .kui-contact-form {
     @apply flex flex-col items-start gap-4;
-  }
-
-  /* SubscribeForm: the email, its notice and the button in a column. */
-  .kui-subscribe-form {
-    @apply flex flex-col items-start gap-3;
   }
 
   .kui-contact-consent {
@@ -621,6 +555,11 @@
 
   .kui-contact-privacy {
     @apply text-xs;
+  }
+
+  /* SubscribeForm: the email, its notice and the button in a column. */
+  .kui-subscribe-form {
+    @apply flex flex-col items-start gap-3;
   }
 
   .kui-form-field
@@ -716,11 +655,6 @@
 
   .kui-carousel {
     @apply flex flex-col gap-3;
-  }
-
-  /* The empty stars, with a copy of them over the top cut to the rating's share. */
-  .kui-rating {
-    @apply relative inline-flex text-input;
   }
 
   .kui-icon-picker {
@@ -952,36 +886,6 @@
     @apply text-xs text-muted;
   }
 
-  /* Combobox: the listbox opens under the input without taking focus, the row the arrows stand on marked by aria-selected. */
-  .kui-combobox {
-    @apply relative inline-flex min-w-0 flex-col;
-  }
-
-  .kui-multi-select {
-    @apply inline-flex min-w-0;
-  }
-
-  .kui-meter,
-  .kui-progress {
-    @apply h-2 w-full overflow-hidden bg-surface;
-  }
-
-  .kui-skeleton {
-    @apply flex w-(--_skeleton-width,100%) flex-col gap-2;
-
-    &:where([data-shape='avatar']) {
-      @apply w-(--_skeleton-width,2.5rem);
-    }
-  }
-
-  .kui-page-header {
-    @apply flex flex-col gap-2;
-  }
-
-  .kui-page-section {
-    @apply flex flex-col gap-[var(--spacing-kui-section,calc(var(--spacing)*3.5*var(--density)))];
-  }
-
   .kui-range-input {
     @apply inline-flex items-center gap-1.5;
   }
@@ -993,14 +897,6 @@
   .kui-range-input-separator,
   .kui-range-input-unit {
     @apply text-xs text-muted;
-  }
-
-  .kui-date-input {
-    @apply inline-flex min-w-0 items-center gap-1;
-  }
-
-  .kui-date-range-input {
-    @apply inline-flex items-center gap-1.5;
   }
 
   .kui-scatter-chart {
@@ -1018,22 +914,6 @@
 
   .kui-bar-chart-empty {
     @apply text-xs text-muted;
-  }
-
-  .kui-segmented {
-    @apply inline-flex border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border bg-surface;
-  }
-
-  .kui-segmented:where([data-orientation='vertical']) {
-    @apply flex-col;
-  }
-
-  .kui-slider {
-    @apply grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1;
-  }
-
-  .kui-color-input {
-    @apply inline-flex items-center gap-2;
   }
 
   .kui-image-cropper {
@@ -1235,14 +1115,6 @@
     @apply min-w-0 truncate;
   }
 
-  .kui-toggle {
-    @apply relative inline-flex cursor-pointer items-center gap-2;
-  }
-
-  .kui-widget {
-    @apply flex w-full flex-col gap-3 border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border bg-surface p-4;
-  }
-
   /* The window a plate is looked at through: it clips whatever runs past its edge, and the plate inside it carries the transform. */
   .kui-zoom-pane {
     @apply relative overflow-hidden select-none;
@@ -1281,97 +1153,11 @@
     translate: none;
   }
 
-  .kui-badge {
-    @apply inline-flex items-center gap-1 border-solid border-border bg-surface px-[var(--spacing-kui-badge-x,calc(var(--spacing)*1.5))] py-[var(--spacing-kui-badge-y,1px)] [font-size:var(--text-kui-badge,var(--text-xs))] [line-height:var(--text-kui-badge--line-height,var(--text-xs--line-height))] [letter-spacing:var(--tracking-kui-badge,var(--tracking-normal))] whitespace-nowrap text-muted;
-    border-width: var(--kui-border-badge, var(--kui-border-width, var(--border-width)));
-    --_badge-tone: var(--color-muted);
-    font-family: var(--kui-badge-font, inherit);
-    text-transform: var(--kui-badge-case, none);
-
-    &:where([data-stamp]) {
-      @apply border-[var(--color-kui-stamp,var(--color-foreground))] bg-[var(--color-kui-stamp-fill,var(--color-background))] px-2.5 py-1 font-mono text-[0.625rem]/[1.4] font-normal tracking-[0.14em] text-[var(--color-kui-stamp,var(--color-foreground))] uppercase transition-colors duration-150;
-      border-width: var(--kui-border-stamp, var(--kui-border-width, var(--border-width)));
-    }
-
-    &:where([data-tone='accent']) {
-      --_badge-tone: var(--color-accent);
-      @apply border-accent text-accent;
-    }
-
-    &:where([data-tone='success']) {
-      --_badge-tone: var(--color-success);
-      @apply border-success text-success;
-    }
-
-    &:where([data-tone='warning']) {
-      --_badge-tone: var(--color-warning);
-      @apply border-warning text-warning;
-    }
-
-    &:where([data-tone='danger']) {
-      --_badge-tone: var(--color-danger);
-      @apply border-danger text-danger;
-    }
-
-    &:where([data-tone='info']) {
-      --_badge-tone: var(--color-info);
-      @apply border-info text-info;
-    }
-
-    /* Filled with its tone, the text in --color-accent-foreground, which a skin can set. */
-    &:where([data-solid]) {
-      border-color: var(--_badge-tone);
-      background-color: var(--_badge-tone);
-      color: var(--color-accent-foreground);
-    }
-  }
-
+  /* The one look of a badge its recipe leaves out: at no weight, so a skin or an app sets the radius over it. */
   :where(.kui-badge) {
     @apply rounded-sm;
   }
 
-  :where(.group:hover) .kui-badge:where([data-stamp]) {
-    @apply bg-[var(--color-kui-stamp-fill-hover,var(--color-kui-fill-hover,var(--color-surface-strong)))];
-  }
-
-  .kui-notice {
-    @apply border-solid border-border-strong bg-surface-strong px-4 py-3 text-sm [font-weight:var(--font-weight-kui-notice,var(--font-weight-normal))] text-foreground;
-    border-width: var(--kui-border-notice, var(--kui-border-width, var(--border-width)));
-
-    &:where([data-tone='success']) {
-      @apply border-success text-success;
-    }
-
-    &:where([data-tone='warning']) {
-      @apply border-warning text-warning;
-    }
-
-    /* `error` is the old name of `danger`, still written by markup that sets `data-tone` on a `.kui-notice` itself. */
-    &:where([data-tone='danger'], [data-tone='error']) {
-      @apply border-danger bg-background text-danger;
-    }
-
-    &:where([data-compact]) {
-      @apply border-0 bg-transparent p-0;
-    }
-  }
-
-  .kui-avatar {
-    @apply inline-grid size-8 shrink-0 place-items-center overflow-hidden rounded-[var(--radius-kui-full,calc(infinity*1px))] border-solid border-[var(--color-kui-avatar-ring,var(--color-border))] bg-surface-strong;
-    border-width: var(--kui-border-avatar, var(--kui-border-width, var(--border-width)));
-
-    &:where([data-size='xs']) {
-      @apply size-5;
-    }
-
-    &:where([data-size='sm']) {
-      @apply size-6;
-    }
-
-    &:where([data-size='lg']) {
-      @apply size-12;
-    }
-  }
 }
 
 /* Outside the layers, so a site's own unlayered `body` margin does not beat it: a docked SidePanel gives the page room for itself, its size being on `html`. */

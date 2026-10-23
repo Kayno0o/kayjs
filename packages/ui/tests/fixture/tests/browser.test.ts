@@ -687,6 +687,11 @@ inBrowser('FormField in an island', () => {
       stepPart: ['#pager [data-part=step]', 'trbl'],
       chipLabel: ['#chips [data-part=label]', 'trbl'],
       iconGrid: ['#icon-grid', 'trbl'],
+      tableFilter: ['#table [data-part=filter]', 'b'],
+      tableSelection: ['#table [data-part=selection]', 'b'],
+      toggleTrack: ['#toggle + [data-part=track]', 'trbl'],
+      scatterPlot: ['#scatter [data-part=plot]', 'trbl'],
+      cropperStage: ['#cropper [data-part=stage]', 'trbl'],
       // The page is narrower than the desktop breakpoint, where the open list is a box of its own.
       siteNavListPart: ['#recipe-list[data-part=list]:popover-open', 'trbl'],
     }
