@@ -13,6 +13,7 @@ import { OWN } from './own'
 // What the editor asks of an entry's form to type in a field on the page: its collection once loaded, and whether a save holds the fields still.
 export interface InlineSource {
   collection: () => ScreenCollection | undefined
+  failed: () => boolean
   busy: () => boolean
 }
 
@@ -290,6 +291,13 @@ export function fieldOfMarker(marker: FieldMarker, drafts: Drafts): Field | unde
 // Whether the entry's form has loaded, which the page's text of it needs to be typed in place.
 export function isLoaded(marker: FieldMarker): boolean {
   return sources.get(entryKey(marker))?.collection() !== undefined
+}
+
+// Whether the entry's read is over, loaded or failed, which a click waiting for it stops at.
+export function isSettled(marker: FieldMarker): boolean {
+  const source = sources.get(entryKey(marker))
+
+  return source !== undefined && (source.collection() !== undefined || source.failed())
 }
 
 // Whether a save holds the entry's fields still.

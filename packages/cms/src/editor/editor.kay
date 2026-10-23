@@ -24,7 +24,7 @@ import { call, guardLeave, listen, refresh, untrack } from 'kay'
 import { wording } from 'kay/words'
 import previewApi from '../api/preview'
 import { BODY, entryKey, fieldsAt, formatMarker, markersOf } from '../markers'
-import { blockTargetOf, inlineTargetOf, isBusy, isLoaded, isTypingInline, markedLabel, reachMarked, startInline } from './inline'
+import { blockTargetOf, inlineTargetOf, isBusy, isLoaded, isSettled, isTypingInline, markedLabel, reachMarked, startInline } from './inline'
 import { createMarks, readMarking, writeMarking } from './marks'
 import { MARKER_MENU, OWN } from './own'
 import { addItem, blockChoices, emptyListAt, focusItem, itemsAround, itemsOf, listFieldOf, movedWords, moveItem, removeItem, restoreItem, titleOf, watchLists } from './page-lists'
@@ -688,12 +688,12 @@ function act(event: Event, node: Node | undefined, at?: { x: number, y: number }
 
 let waiting = 0
 
-// Runs the edit once the field's entry has loaded, or after a few seconds, unless a later click has taken over.
+// Runs the edit once the field's entry has loaded or failed to, or after a few seconds. A later click, or the editor closing, ends the wait.
 async function editOnceLoaded(field: MarkedField, ticket: number, run: () => void): Promise<void> {
-  for (let tries = 0; tries < 50 && !isLoaded(field.marker); tries++)
+  for (let tries = 0; tries < 50 && !isSettled(field.marker) && ticket === waiting && open(); tries++)
     await new Promise(resolve => setTimeout(resolve, 100))
 
-  if (ticket === waiting)
+  if (ticket === waiting && open())
     run()
 }
 

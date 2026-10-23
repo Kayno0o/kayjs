@@ -26,7 +26,8 @@ afterEach(async () => {
 })
 
 // `slow` holds the answer of an entry's read back, so a test clicks while it loads.
-function server(slow = 0): void {
+// `fail` answers an entry's read with an error, `hang` never answers it.
+function server(slow = 0, mode?: 'fail' | 'hang'): void {
   asked = []
   spyOn(globalThis, 'fetch').mockImplementation((async (request: string | URL | Request) => {
     const path = String(request)
@@ -36,7 +37,13 @@ function server(slow = 0): void {
     if (path.includes('/can'))
       return Response.json({ denied: {}, prefix: '/admin' })
 
+    if (mode === 'hang')
+      await new Promise(() => {})
+
     await Bun.sleep(slow)
+
+    if (mode === 'fail')
+      return Response.json({ message: 'down' }, { status: 500 })
 
     return path.includes('/menu/')
       ? Response.json({ collection: MENU, entry: { slug: 'index', data: { label: 'Home' }, version: 'v1', url: '/' } })
@@ -164,4 +171,83 @@ test('a second click on a text of an entry still loading types in place too, the
 
   expect(root.contains(document.activeElement)).toBe(false)
   expect(reads()).toHaveLength(1)
+})
+
+// A click above the visible top, which a field brought up in the form scrolls into view after.
+function clickAbove(element: HTMLElement): void {
+  element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: 5, clientY: -50 }))
+}
+
+function addTitle(): HTMLElement {
+  const title = document.createElement('h1')
+
+  title.dataset.page = ''
+  title.setAttribute('data-kay-field', 'posts:hello:title')
+  title.textContent = 'Hello world'
+  document.body.append(title)
+
+  return title
+}
+
+test('a click on a text of an entry whose read failed brings up the side form at once, not after the wait', async () => {
+  server(0, 'fail')
+
+  const { root } = await open([NAV, HELLO])
+  const title = addTitle()
+  const measured = spyOn(title, 'getBoundingClientRect')
+
+  clickAbove(title)
+  await until(() => root.querySelector('.kcms-entry-failure') !== null)
+  await Bun.sleep(400)
+
+  expect(measured).toHaveBeenCalled()
+  expect(title.isContentEditable).toBe(false)
+})
+
+test('a click on a text of an entry that never loads falls back to the form once the wait is over', async () => {
+  server(0, 'hang')
+
+  const { root } = await open([NAV, HELLO])
+  const title = addTitle()
+
+  const measured = spyOn(title, 'getBoundingClientRect')
+
+  clickAbove(title)
+  await Bun.sleep(4000)
+  expect(measured).not.toHaveBeenCalled()
+  await Bun.sleep(1800)
+
+  expect(measured).toHaveBeenCalled()
+  expect(title.isContentEditable).toBe(false)
+  expect(root.querySelector('.kcms-entry-idle')).not.toBeNull()
+}, 15000)
+
+test('a click on a text of the page\'s only entry types in place once it has loaded', async () => {
+  server(150)
+
+  const { root } = await open([HELLO])
+  const title = addTitle()
+
+  title.click()
+  await until(() => title.isContentEditable)
+
+  expect(root.contains(document.activeElement)).toBe(false)
+  expect(reads()).toHaveLength(1)
+})
+
+test('closing the editor ends the wait of a click, which then edits nothing', async () => {
+  server(300)
+
+  const { root } = await open([NAV, HELLO])
+  const title = addTitle()
+
+  const measured = spyOn(title, 'getBoundingClientRect')
+
+  clickAbove(title)
+  await Bun.sleep(30)
+  root.querySelector<HTMLElement>('[aria-label="Hide the editor"]')!.click()
+  await Bun.sleep(700)
+
+  expect(measured).not.toHaveBeenCalled()
+  expect(title.isContentEditable).toBe(false)
 })

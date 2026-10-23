@@ -61,7 +61,7 @@ const lastSave = signal<SavedState>()
 const onSaved = savedHandler(() => source.value()?.entry.url, saved => lastSave.set(saved), rebuildFinished)
 onCleanup(onSaved.stop)
 // A click on the page types in the entry's text fields there while this form stands.
-onCleanup(registerInline(entryKey(entry), { collection: () => source.value()?.collection, busy: () => saving() || removed() }))
+onCleanup(registerInline(entryKey(entry), { collection: () => source.value()?.collection, failed: () => source.status() === 'failed', busy: () => saving() || removed() }))
 // What the signed-in person's role may not do, which locks the fields it covers once the server has said.
 const can = resource(editorApi, '/can')
 // One scope for as long as the answer stands, so the fields render in the one the notices ask which fields are shown.
