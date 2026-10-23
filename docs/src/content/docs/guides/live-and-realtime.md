@@ -53,7 +53,20 @@ const { id } = props<{ id: string }>()
 p {room(id).users} in {id}
 ```
 
-A key you set stays until you delete it. Read a keyed value in the template, not only after the page rendered, as the server cannot know the key before.
+A key you set stays until you delete it, or until its lifetime passes. Read a keyed value in the template, not only after the page rendered, as the server cannot know the key before.
+
+### Forgetting a value
+
+A value stays in the store until you change it. Give the declaration a `ttl` to forget it that long after its last write:
+
+```ts
+export const banner = live('', { ttl: '1h' })
+export const typing = live((room: string) => 0, { ttl: '10s' })
+```
+
+Once the time passes, every process reads what the declaration gives again, as after a `delete`, and the tabs showing the value are told. A `set` starts the time again, even with the value it already holds, and each key of a keyed value has its own. The memory, SQLite and Postgres stores all honour it. The options must be an object written in the declaration, so the build can name the value after it.
+
+A SQLite file or Postgres table made by an older version gains an `expires_at` column the first time the store opens it. When your Postgres role may not alter tables, run `createDataTables(db)` again as the owner.
 
 ### Limits
 

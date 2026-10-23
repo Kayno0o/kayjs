@@ -1,5 +1,5 @@
 import type { LiveStore } from '../src/runtime/live-value'
-import { afterEach, expect } from 'bun:test'
+import { afterEach, expect, setSystemTime } from 'bun:test'
 import { live, liveSlot, liveStoreReady, setLiveStore } from '../src/runtime/live-value'
 import { setupStore } from '../src/server/app-store'
 import { createDataTables, dataTables, pgData, pgHandle } from '../src/server/pg-data'
@@ -310,5 +310,87 @@ pgDescribe('pgData live values', () => {
     expect(racing()).toBe(2)
     await waitFor(async () => (await sql.unsafe<{ value: string }[]>('SELECT value FROM kay_live WHERE id = \'test:pg-live-racing\''))[0]?.value === '[2]', 'the local write to land')
     other.stop?.()
+  })
+
+  pgIt('keeps the time a value ends, leaves one past it out, and drops it from the table an hour after', async () => {
+    const sql = await fresh()
+    const [store] = twoReplicas()
+
+    await store.set('app:ttl', 'a', '[1]', Date.now() + 60_000)
+    await store.set('app:ttl', 'b', '[2]', Date.now() + 100)
+    await store.set('app:ttl', 'c', '[3]')
+
+    const rows = await store.entries()
+
+    expect(rows.map(row => row.slice(0, 3))).toEqual(expect.arrayContaining([['app:ttl', 'a', '[1]'], ['app:ttl', 'b', '[2]'], ['app:ttl', 'c', '[3]']]))
+    expect(rows.find(row => row[1] === 'a')?.[3]).toBeGreaterThan(Date.now())
+    expect(rows.find(row => row[1] === 'c')).toEqual(['app:ttl', 'c', '[3]'])
+    await Bun.sleep(150)
+    expect((await store.entries()).map(row => row[1]).sort()).toEqual(['a', 'c'])
+    expect((await sql.unsafe<{ n: string }[]>('SELECT count(*)::text AS n FROM kay_live'))[0]?.n).toBe('3')
+    setSystemTime(new Date(Date.now() + 2 * 3_600_000))
+
+    try {
+      await store.set('app:ttl', 'd', '[4]')
+    }
+    finally {
+      setSystemTime()
+    }
+
+    expect((await sql.unsafe<{ key: string }[]>('SELECT key FROM kay_live ORDER BY key')).map(row => row.key)).toEqual(['a', 'c', 'd'])
+    store.stop?.()
+  })
+
+  pgIt('tells the other replica when a value ends, and that it is gone once past', async () => {
+    await fresh()
+
+    const [first, second] = twoReplicas()
+    const heard: unknown[][] = []
+
+    await first.entries()
+    await second.entries()
+    second.subscribe((...args) => heard.push(args))
+    await first.set('app:ttl-heard', '', '[1]', 4_000_000_000_000)
+    await waitFor(() => heard.length === 1, 'the second replica to hear the set')
+    expect(heard[0]).toEqual(['app:ttl-heard', '', '[1]', 4_000_000_000_000])
+    first.stop?.()
+    second.stop?.()
+  })
+
+  pgIt('adds the column to tables made before it, and keeps their rows', async () => {
+    const sql = await fresh()
+
+    await createDataTables(sql)
+    await sql.unsafe('ALTER TABLE kay_live DROP COLUMN expires_at')
+    await sql.unsafe('INSERT INTO kay_live (id, key, value) VALUES (\'app:old\', \'\', \'[5]\')')
+
+    const store = pgLive(pgHandle(sql))
+
+    expect(await store.entries()).toEqual([['app:old', '', '[5]']])
+    await store.set('app:old', '', '[6]', Date.now() + 60_000)
+    expect((await store.entries()).map(row => row[2])).toEqual(['[6]'])
+
+    await sql.unsafe('ALTER TABLE kay_live DROP COLUMN expires_at')
+    await createDataTables(sql)
+    expect((await sql.unsafe<{ n: string }[]>('SELECT count(*)::text AS n FROM kay_live WHERE expires_at IS NULL'))[0]?.n).toBe('1')
+    store.stop?.()
+  })
+
+  pgIt('forgets a declared value after its ttl, here and in the table', async () => {
+    const sql = await fresh()
+    const mortal = (live as unknown as (initial: number, options: { ttl: string }, id: string, name: string) => { (): number, set: (next: number) => void })(0, { ttl: '100ms' }, 'test:pg-ttl', 'pgTtl')
+
+    setupStore(pgData(sql))
+    await liveStoreReady()
+    mortal.set(8)
+    expect(mortal()).toBe(8)
+    await waitFor(async () => (await sql.unsafe<{ expires_at: string }[]>('SELECT expires_at::text FROM kay_live WHERE id = \'test:pg-ttl\''))[0]?.expires_at !== undefined, 'the write to land')
+    await Bun.sleep(150)
+    expect(mortal()).toBe(0)
+
+    const reader = pgLive(pgHandle(sql))
+
+    expect(await reader.entries()).toEqual([])
+    reader.stop?.()
   })
 })

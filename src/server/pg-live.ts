@@ -1,7 +1,8 @@
 import type { SQL } from 'bun'
-import type { LiveStore } from '../runtime/live-value'
+import type { LiveEntry, LiveStore } from '../runtime/live-value'
 import type { PgHandle } from './pg-data'
 import type { Stop } from './pg-poll'
+import { PURGE_STALE_MS } from '../runtime/cache'
 import { kayLog } from '../runtime/log'
 import { DB_TIMEOUT_MS, EVENT_TTL_MS, eventWindow, OVERLAP, POLL_MS, pollerOf, timeLimited } from './pg-poll'
 import { escaped, NOW, query, unescaped } from './pg-sql'
@@ -9,7 +10,6 @@ import { onReload } from './reload'
 
 // Writes waiting behind a database that stopped answering: past this many a new one is dropped and logged, rather than held in memory.
 const MAX_QUEUED = 10_000
-
 
 type Listener = Parameters<LiveStore['subscribe']>[0]
 
@@ -25,6 +25,7 @@ export function pgLive(pg: PgHandle): LiveStore {
   let queued = 0
   let overflowing = false
   let closed = false
+  let purged = 0
   // The keys with a write of this process still to commit, and the ones heard meanwhile: their row is read once the write ends, so an older row never replaces the newer local value.
   const pending = new Map<string, number>()
   const deferred = new Map<string, [string, string]>()
@@ -102,7 +103,7 @@ export function pgLive(pg: PgHandle): LiveStore {
   }
 
   // The events of the other processes since the last poll, each value read once however many times it was set, all the rows in one query.
-  const hear = async (db: SQL, after: number): Promise<{ heard: [id: string, key: string, text: string | undefined][], fresh: number[], read: string[] }> => {
+  const hear = async (db: SQL, after: number): Promise<{ heard: [id: string, key: string, text: string | undefined, expiresAt: number | undefined][], fresh: number[], read: string[] }> => {
     // The events are noted as known only once their rows are read, so a failed read hears them again.
     const fresh: number[] = []
     const changed = new Map<string, [string, string]>()
@@ -131,17 +132,17 @@ export function pgLive(pg: PgHandle): LiveStore {
 
     const wanted = [...changed]
 
-    const values = new Map<string, string>()
+    const values = new Map<string, { value: string, expiresAt: number | undefined }>()
 
     if (wanted.length > 0) {
-      const rows = await query<{ id: string, key: string, value: string }>(db, 'SELECT id, key, value FROM kay_live WHERE (id, key) IN (SELECT * FROM unnest($1::text[], $2::text[]))', [wanted.map(([, [id]]) => id), wanted.map(([, [, key]]) => key)])
+      const rows = await query<{ id: string, key: string, value: string, expires_at: string | null }>(db, `SELECT id, key, value, expires_at::text AS expires_at FROM kay_live WHERE (id, key) IN (SELECT * FROM unnest($1::text[], $2::text[])) AND (expires_at IS NULL OR expires_at > ${NOW})`, [wanted.map(([, [id]]) => id), wanted.map(([, [, key]]) => key)])
 
       for (const row of rows)
-        values.set(`${row.id}\0${row.key}`, row.value)
+        values.set(`${row.id}\0${row.key}`, { value: row.value, expiresAt: row.expires_at === null ? undefined : Number(row.expires_at) })
     }
 
     return {
-      heard: wanted.map(([at, [id, key]]) => [unescaped(id), unescaped(key), values.get(at)]),
+      heard: wanted.map(([at, [id, key]]) => [unescaped(id), unescaped(key), values.get(at)?.value, values.get(at)?.expiresAt]),
       fresh,
       read: wanted.map(([at]) => at),
     }
@@ -160,10 +161,10 @@ export function pgLive(pg: PgHandle): LiveStore {
     for (const at of read.read)
       deferred.delete(at)
 
-    for (const [id, key, text] of read.heard) {
+    for (const [id, key, text, expiresAt] of read.heard) {
       for (const listener of listeners) {
         try {
-          listener(id, key, text)
+          listener(id, key, text, expiresAt)
         }
         catch (error) {
           kayLog('error', `a watcher of the live value ${id} threw`, error)
@@ -199,10 +200,20 @@ export function pgLive(pg: PgHandle): LiveStore {
         if (events.from() === undefined)
           await startAt(db)
 
-        return (await query<{ id: string, key: string, value: string }>(db, 'SELECT id, key, value FROM kay_live')).map(row => [unescaped(row.id), unescaped(row.key), row.value] as [string, string, string])
+        // A row past its end is left out, though it stays in the table until the next purge.
+        const rows = await query<{ id: string, key: string, value: string, expires_at: string | null }>(db, `SELECT id, key, value, expires_at::text AS expires_at FROM kay_live WHERE expires_at IS NULL OR expires_at > ${NOW}`)
+
+        return rows.map((row): LiveEntry => row.expires_at === null ? [unescaped(row.id), unescaped(row.key), row.value] : [unescaped(row.id), unescaped(row.key), row.value, Number(row.expires_at)])
       })
     },
-    set: async (id, key, text) => write('writing', id, key, async tx => query(tx, 'INSERT INTO kay_live (id, key, value) VALUES ($1, $2, $3) ON CONFLICT (id, key) DO UPDATE SET value = excluded.value', [escaped(id), escaped(key), text])),
+    set: async (id, key, text, expiresAt) => write('writing', id, key, async (tx) => {
+      if (Date.now() - purged > PURGE_STALE_MS) {
+        purged = Date.now()
+        await query(tx, `DELETE FROM kay_live WHERE expires_at < ${NOW}`)
+      }
+
+      await query(tx, 'INSERT INTO kay_live (id, key, value, expires_at) VALUES ($1, $2, $3, $4::bigint) ON CONFLICT (id, key) DO UPDATE SET value = excluded.value, expires_at = excluded.expires_at', [escaped(id), escaped(key), text, expiresAt === undefined ? null : Math.round(expiresAt)])
+    }),
     delete: async (id, key) => write('deleting', id, key, async tx => query(tx, 'DELETE FROM kay_live WHERE id = $1 AND key = $2', [escaped(id), escaped(key)])),
     subscribe(listener) {
       listeners.add(listener)

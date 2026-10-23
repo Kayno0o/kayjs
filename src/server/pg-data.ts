@@ -6,6 +6,7 @@ import { pgCache } from './pg-cache'
 import { connectionOf, createJobTables, createMissingIndexes, indexStatement, jobTables, pgJobs, privilegeRefused, relationsMissing, withMissingIndexes } from './pg-jobs'
 import { pgLive } from './pg-live'
 import { pgRooms } from './pg-rooms'
+import { query } from './pg-sql'
 import { pgNotifications, pgRates, pgSessions, pgVitals } from './pg-stores'
 import { onReload } from './reload'
 
@@ -44,6 +45,7 @@ export async function createDataTables(source: PgJobsSource): Promise<void> {
 
     // Tables already there are not locked again: a CREATE INDEX IF NOT EXISTS takes a share lock on its table, which would wait on, and deadlock with, a replica writing several tables. An index they lack is created on its own.
     if (!await relationsMissing(db, OWN_TABLES)) {
+      await addMissingColumns(db)
       await createMissingIndexes(db, OWN_INDEXES)
 
       return
@@ -61,7 +63,8 @@ export async function createDataTables(source: PgJobsSource): Promise<void> {
       await tx`CREATE TABLE IF NOT EXISTS kay_room_processes (process text PRIMARY KEY, seen bigint NOT NULL)`
       await tx`CREATE TABLE IF NOT EXISTS kay_room_messages (id bigserial PRIMARY KEY, room text NOT NULL, text text NOT NULL, process text NOT NULL, skipped text, recipient text, at bigint NOT NULL)`
       await tx`CREATE TABLE IF NOT EXISTS kay_room_state (room text PRIMARY KEY, state text NOT NULL)`
-      await tx`CREATE TABLE IF NOT EXISTS kay_live (id text NOT NULL, key text NOT NULL, value text NOT NULL, PRIMARY KEY (id, key))`
+      await tx`CREATE TABLE IF NOT EXISTS kay_live (id text NOT NULL, key text NOT NULL, value text NOT NULL, expires_at bigint, PRIMARY KEY (id, key))`
+      await tx`ALTER TABLE kay_live ADD COLUMN IF NOT EXISTS expires_at bigint`
       await tx`CREATE TABLE IF NOT EXISTS kay_live_events (seq bigserial PRIMARY KEY, origin text NOT NULL, id text NOT NULL, key text NOT NULL, at bigint NOT NULL)`
 
       await tx`CREATE TABLE IF NOT EXISTS kay_notifications (seq bigserial PRIMARY KEY, id text NOT NULL UNIQUE, user_id text NOT NULL, title text NOT NULL, url text, at bigint NOT NULL, expires bigint NOT NULL, read_at bigint)`
@@ -76,13 +79,37 @@ export async function createDataTables(source: PgJobsSource): Promise<void> {
   }
 }
 
+// A table made before a column existed gains it: `kay_live.expires_at`, for the `ttl` of a live value. Replicas starting together take turns, and a table that has it is not locked.
+async function addMissingColumns(db: SQL): Promise<void> {
+  const [found] = await query<{ found: number }>(db, 'SELECT 1 AS found FROM pg_attribute WHERE attrelid = to_regclass($1) AND attname = $2 AND NOT attisdropped', ['kay_live', 'expires_at'])
+
+  if (found !== undefined)
+    return
+
+  await db.begin(async (tx) => {
+    await tx`SELECT pg_advisory_xact_lock(hashtext(${MIGRATION_LOCK}))`
+    await tx`ALTER TABLE kay_live ADD COLUMN IF NOT EXISTS expires_at bigint`
+  })
+}
+
 // One connection and one table check for every store of a `pgData`.
 export function pgHandle(db: SQL): PgHandle {
   let ready: Promise<SQL> | undefined
 
   const create = async (): Promise<SQL> => {
-    if (!await relationsMissing(db, OWN_TABLES))
+    if (!await relationsMissing(db, OWN_TABLES)) {
+      try {
+        await addMissingColumns(db)
+      }
+      catch (error) {
+        if (privilegeRefused(error))
+          throw new Error('kay: pgData needs the expires_at column of kay_live, and its role may not alter tables: run `await createDataTables(db)` from kay/server as the database\'s owner', { cause: error })
+
+        throw error
+      }
+
       return withMissingIndexes(db, OWN_INDEXES)
+    }
 
     try {
       await createDataTables(db)

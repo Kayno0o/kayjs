@@ -1,5 +1,6 @@
 import type { LiveStore } from '../runtime/live-value'
 import { existsSync } from 'node:fs'
+import { PURGE_STALE_MS } from '../runtime/cache'
 import { kayLog } from '../runtime/log'
 import { pollLoop } from '../runtime/poll-backoff'
 import { openSqlite } from '../runtime/sqlite.server'
@@ -14,14 +15,27 @@ const PROCESS = crypto.randomUUID()
 function openLive(path: string) {
   const db = openSqlite(path)
 
-  db.run('CREATE TABLE IF NOT EXISTS kay_live (id TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (id, key))')
+  db.run('CREATE TABLE IF NOT EXISTS kay_live (id TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, expires_at INTEGER, PRIMARY KEY (id, key))')
+
+  // A file made before the `ttl` option gains its column.
+  if (!db.query<{ name: string }, []>('PRAGMA table_info(kay_live)').all().some(column => column.name === 'expires_at')) {
+    try {
+      db.run('ALTER TABLE kay_live ADD COLUMN expires_at INTEGER')
+    }
+    catch (error) {
+      // Another process opening the same old file added it between the look and here.
+      if (!(error instanceof Error && error.message.includes('duplicate column')))
+        throw error
+    }
+  }
+
   db.run('CREATE TABLE IF NOT EXISTS kay_live_events (seq INTEGER PRIMARY KEY AUTOINCREMENT, origin TEXT NOT NULL, id TEXT NOT NULL, key TEXT NOT NULL, at INTEGER NOT NULL)')
 
   db.run('CREATE INDEX IF NOT EXISTS kay_live_events_at ON kay_live_events (at)')
 
   const insertEvent = db.query('INSERT INTO kay_live_events (origin, id, key, at) VALUES (?, ?, ?, ?)')
   const pruneEvents = db.query('DELETE FROM kay_live_events WHERE at < ?')
-  const upsert = db.query('INSERT INTO kay_live (id, key, value) VALUES (?, ?, ?) ON CONFLICT (id, key) DO UPDATE SET value = excluded.value')
+  const upsert = db.query('INSERT INTO kay_live (id, key, value, expires_at) VALUES (?, ?, ?, ?) ON CONFLICT (id, key) DO UPDATE SET value = excluded.value, expires_at = excluded.expires_at')
   const remove = db.query('DELETE FROM kay_live WHERE id = ? AND key = ?')
   // The row and its message go together, so a process that heard the message finds the row.
   const write = db.transaction((run: () => void, id: string, key: string) => {
@@ -32,9 +46,11 @@ function openLive(path: string) {
 
   return {
     db,
-    all: db.query<{ id: string, key: string, value: string }, []>('SELECT id, key, value FROM kay_live'),
-    select: db.query<{ value: string }, [string, string]>('SELECT value FROM kay_live WHERE id = ? AND key = ?'),
-    set: (id: string, key: string, text: string) => write(() => upsert.run(id, key, text), id, key),
+    // A row past its end is left out, though it stays in the file until the next purge.
+    all: db.query<{ id: string, key: string, value: string, expires_at: number | null }, [number]>('SELECT id, key, value, expires_at FROM kay_live WHERE expires_at IS NULL OR expires_at > ?'),
+    select: db.query<{ value: string, expires_at: number | null }, [string, string, number]>('SELECT value, expires_at FROM kay_live WHERE id = ? AND key = ? AND (expires_at IS NULL OR expires_at > ?)'),
+    purge: db.query('DELETE FROM kay_live WHERE expires_at < ?'),
+    set: (id: string, key: string, text: string, expiresAt: number | undefined) => write(() => upsert.run(id, key, text, expiresAt ?? null), id, key),
     remove: (id: string, key: string) => write(() => remove.run(id, key), id, key),
     lastEvent: db.query<{ seq: number | null }, []>('SELECT max(seq) AS seq FROM kay_live_events'),
     eventsAfter: db.query<{ seq: number, id: string, key: string }, [number, string]>('SELECT seq, id, key FROM kay_live_events WHERE seq > ? AND origin != ? ORDER BY seq'),
@@ -46,6 +62,7 @@ function openLive(path: string) {
 export function sqliteLive(path: string): LiveStore {
   let opened: ReturnType<typeof openLive> | undefined
   let closed = false
+  let purged = 0
   // The last event before the rows were read, so a set between the two is heard.
   let before: number | undefined
   const polls: ReturnType<typeof pollLoop>[] = []
@@ -91,12 +108,20 @@ export function sqliteLive(path: string): LiveStore {
 
       before = live?.lastEvent.get()?.seq ?? 0
 
-      return live?.all.all().map(row => [row.id, row.key, row.value]) ?? []
+      return live?.all.all(Date.now()).map(row => row.expires_at === null ? [row.id, row.key, row.value] : [row.id, row.key, row.value, row.expires_at]) ?? []
     },
-    set(id, key, text) {
+    set(id, key, text, expiresAt) {
       wake()
 
-      return open(true)!.set(id, key, text)
+      const live = open(true)!
+      const now = Date.now()
+
+      if (now - purged > PURGE_STALE_MS) {
+        purged = now
+        live.purge.run(now)
+      }
+
+      return live.set(id, key, text, expiresAt)
     },
     delete(id, key) {
       wake()
@@ -108,7 +133,7 @@ export function sqliteLive(path: string): LiveStore {
       let seen = before ?? open(false)?.lastEvent.get()?.seq ?? 0
 
       const poll = pollLoop(POLL_MS, () => {
-        const heard: [id: string, key: string, text: string | undefined][] = []
+        const heard: [id: string, key: string, text: string | undefined, expiresAt: number | undefined][] = []
 
         try {
           const live = open(false)
@@ -117,7 +142,9 @@ export function sqliteLive(path: string): LiveStore {
           let last = seen
 
           for (const event of live?.eventsAfter.all(seen, PROCESS) ?? []) {
-            heard.push([event.id, event.key, live!.select.get(event.id, event.key)?.value])
+            const row = live!.select.get(event.id, event.key, Date.now())
+
+            heard.push([event.id, event.key, row?.value, row?.expires_at ?? undefined])
             last = event.seq
           }
 
@@ -129,9 +156,9 @@ export function sqliteLive(path: string): LiveStore {
           return false
         }
 
-        for (const [id, key, text] of heard) {
+        for (const [id, key, text, expiresAt] of heard) {
           try {
-            listener(id, key, text)
+            listener(id, key, text, expiresAt)
           }
           catch (error) {
             kayLog('error', `a watcher of the live value ${id} threw`, error)

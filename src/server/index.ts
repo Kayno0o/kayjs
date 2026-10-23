@@ -14,7 +14,7 @@ import { projectSource } from './source'
 
 export type { ExtensionApp, ExtensionProblem, KayConfig, KayExtension } from '../config'
 export { defineConfig } from '../config'
-export type { LiveStore } from '../runtime/live-value'
+export type { LiveEntry, LiveStore } from '../runtime/live-value'
 export type { PreviewScope } from '../runtime/preview'
 export { s } from '../runtime/schema'
 export { crossSiteRefused, crossSiteResponse } from './actions'

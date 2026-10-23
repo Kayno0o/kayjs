@@ -1,15 +1,19 @@
-import type { LiveStore } from '../src/runtime/live-value'
+import type { LiveEntry, LiveStore } from '../src/runtime/live-value'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
-import { afterAll, beforeEach, describe, expect, it, spyOn } from 'bun:test'
+import { Database } from 'bun:sqlite'
+import { afterAll, beforeEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { live, liveSlot, liveStoreReady, setLiveStore, watchSlot } from '../src/runtime/live-value'
 import { setupStore } from '../src/server/app-store'
 import { sqliteLive } from '../src/server/sqlite-live'
 
 // The build gives a declaration its id and name; a test passes them itself.
 const declare = live as unknown as (initial: number, id: string, name: string) => { (): number, set: (next: number) => void }
+// A value declared with a lifetime: the options come before the id and name the build adds.
+const declareTtl = live as unknown as (initial: number, options: { ttl: string }, id: string, name: string) => { (): number, set: (next: number) => void }
+const declareKeyedTtl = live as unknown as (initial: (key: string) => number, options: { ttl: string }, id: string, name: string) => { (key: string): number, set: (key: string, next: number) => void, delete: (key: string) => void }
 const dirs: string[] = []
 const VALUE = resolve('src/runtime/live-value.ts')
 const STORE = resolve('src/server/sqlite-live.ts')
@@ -36,15 +40,15 @@ async function output(child: ReturnType<typeof spawnProcess>): Promise<string> {
   return text.trim()
 }
 
+async function storePath(): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), 'kay-live-'))
+
+  dirs.push(dir)
+
+  return join(dir, 'live.sqlite')
+}
+
 describe('live values in a store', () => {
-  async function storePath(): Promise<string> {
-    const dir = await mkdtemp(join(tmpdir(), 'kay-live-'))
-
-    dirs.push(dir)
-
-    return join(dir, 'live.sqlite')
-  }
-
   it('reaches the watchers of another process, and a process starting reads what is held', async () => {
     const path = await storePath()
     const watcher = spawnProcess(path, `const heard = []
@@ -345,3 +349,162 @@ process.exit(0)`)
     setLiveStore(undefined)
   })
 })
+
+describe('a live value with a lifetime', () => {
+  it('goes back to what the declaration gives once its lifetime passed, and tells the watchers', async () => {
+    const mortal = declareTtl(0, { ttl: '80ms' }, 'test:ttl-memory', 'ttlMemory')
+    const heard: number[] = []
+
+    watchSlot(liveSlot('test:ttl-memory')!, '', () => heard.push(mortal()))
+    mortal.set(5)
+    expect(mortal()).toBe(5)
+    await Bun.sleep(40)
+    expect(mortal()).toBe(5)
+    await Bun.sleep(100)
+    expect(mortal()).toBe(0)
+    expect(heard).toEqual([5, 0])
+  })
+
+  it('is kept for the lifetime since its last write, even a write of the value it holds', async () => {
+    const mortal = declareTtl(0, { ttl: '80ms' }, 'test:ttl-renewed', 'ttlRenewed')
+
+    mortal.set(5)
+    await Bun.sleep(50)
+    mortal.set(5)
+    await Bun.sleep(50)
+    expect(mortal()).toBe(5)
+    await Bun.sleep(80)
+    expect(mortal()).toBe(0)
+  })
+
+  it('expires each key on its own', async () => {
+    const room = declareKeyedTtl(() => 0, { ttl: '80ms' }, 'test:ttl-keyed', 'ttlKeyed')
+
+    room.set('a', 1)
+    await Bun.sleep(50)
+    room.set('b', 2)
+    await Bun.sleep(50)
+    expect([room('a'), room('b')]).toEqual([0, 2])
+    await Bun.sleep(60)
+    expect([room('a'), room('b')]).toEqual([0, 0])
+  })
+
+  it('refuses a lifetime that is not a positive duration', () => {
+    expect(() => declareTtl(0, { ttl: '0s' }, 'test:ttl-bad', 'ttlBad')).toThrow(/ttl/)
+    expect(() => declareTtl(0, { ttl: 'soon' }, 'test:ttl-bad', 'ttlBad')).toThrow(/ttl/)
+  })
+
+  it('is written to a store with the time it ends, and is not read back once past', async () => {
+    const path = await storePath()
+    const store = sqliteLive(path)
+    const mortal = declareTtl(0, { ttl: '100ms' }, 'test:ttl-sqlite', 'ttlSqlite')
+    const forever = declare(0, 'test:ttl-none', 'ttlNone')
+    const before = Date.now()
+
+    setLiveStore(store)
+    mortal.set(3)
+    forever.set(4)
+
+    const rows = store.entries() as [string, string, string, number?][]
+
+    expect(rows.find(row => row[0] === 'test:ttl-none')).toEqual(['test:ttl-none', '', '[4]'])
+
+    const held = rows.find(row => row[0] === 'test:ttl-sqlite')
+
+    expect(held?.slice(0, 3)).toEqual(['test:ttl-sqlite', '', '[3]'])
+    expect(held?.[3]).toBeGreaterThanOrEqual(before + 100)
+    expect(held?.[3]).toBeLessThanOrEqual(Date.now() + 100)
+    await Bun.sleep(150)
+    expect((store.entries() as LiveEntry[]).map(row => row[0])).toEqual(['test:ttl-none'])
+    setLiveStore(undefined)
+  })
+
+  it('is dropped from the file by a write an hour after it expired', async () => {
+    const path = await storePath()
+    const store = sqliteLive(path)
+
+    await store.set('test:ttl-swept', '', '[1]', Date.now() + 10)
+    await Bun.sleep(30)
+
+    const count = () => new Database(path, { readonly: true }).query<{ n: number }, []>('SELECT count(*) AS n FROM kay_live').get()!.n
+
+    expect(count()).toBe(1)
+    setSystemTime(new Date(Date.now() + 2 * 3_600_000))
+
+    try {
+      await store.set('test:ttl-other', '', '[2]')
+    }
+    finally {
+      setSystemTime()
+    }
+
+    expect(count()).toBe(1)
+  })
+
+  it('reaches another process with the time it ends', async () => {
+    const path = await storePath()
+    const second = sqliteLive(path)
+    const heard: unknown[][] = []
+
+    await second.set('test:ttl-heard', '', '[1]', Date.now() + 60_000)
+    void second.entries()
+    second.subscribe((...args) => heard.push(args))
+
+    // Another process of the file: it shares this one's id inside a test, so its write is made by hand.
+    const other = new Database(path)
+
+    other.run('INSERT OR REPLACE INTO kay_live (id, key, value, expires_at) VALUES (\'test:ttl-heard\', \'\', \'[2]\', 4000000000000)')
+    other.run('INSERT INTO kay_live_events (origin, id, key, at) VALUES (\'another\', \'test:ttl-heard\', \'\', ?)', [Date.now()])
+    other.close()
+
+    for (let wait = 0; wait < 300 && heard.length < 1; wait++)
+      await Bun.sleep(10)
+
+    expect(heard).toEqual([['test:ttl-heard', '', '[2]', 4_000_000_000_000]])
+    second.stop?.()
+  })
+
+  it('expires from the time another process wrote it, and a value past it when read is left out', async () => {
+    const path = await storePath()
+    const store = sqliteLive(path)
+
+    await store.set('test:ttl-late', '', '[7]', Date.now() + 80)
+    await store.set('test:ttl-gone', '', '[8]', Date.now() - 1)
+    setLiveStore(store)
+
+    const late = declareTtl(0, { ttl: '60s' }, 'test:ttl-late', 'ttlLate')
+    const gone = declareTtl(0, { ttl: '60s' }, 'test:ttl-gone', 'ttlGone')
+
+    expect(late()).toBe(7)
+    expect(gone()).toBe(0)
+    await Bun.sleep(130)
+    expect(late()).toBe(0)
+    setLiveStore(undefined)
+  })
+
+  it('opens a file made before the option existed, and keeps its rows', async () => {
+    const path = await storePath()
+    const old = new Database(path)
+
+    old.run('CREATE TABLE kay_live (id TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (id, key))')
+    old.run('INSERT INTO kay_live VALUES (\'test:ttl-old\', \'\', \'[9]\')')
+    old.close()
+
+    const store = sqliteLive(path)
+
+    expect(store.entries()).toEqual([['test:ttl-old', '', '[9]']])
+    await store.set('test:ttl-old', '', '[10]', Date.now() + 60_000)
+    expect((store.entries() as LiveEntry[]).map(row => row[2])).toEqual(['[10]'])
+    store.stop?.()
+  })
+})
+
+// Checked by `kay check`, never run: the options type refuses what the runtime refuses.
+export function liveOptionTypes(): void {
+  live(0, { ttl: '1h' })
+  live((id: string) => id.length, { ttl: '5m' })
+  // @ts-expect-error a lifetime is a duration with its unit
+  live(0, { ttl: 'soon' })
+  // @ts-expect-error a lifetime is positive
+  live(0, { ttl: '0s' })
+}

@@ -1,6 +1,9 @@
+import type { PositiveDuration } from './checks'
+import type { Duration } from './duration'
 import type { Setter } from './index'
 import type { PlainValue, ServerScope } from './reactive'
 import { withBase } from './base'
+import { durationSeconds } from './duration'
 import { readEvents } from './live'
 import { kayLog } from './log'
 import { pageData } from './page-data'
@@ -31,19 +34,28 @@ export interface LiveByKey<K extends LiveKey, T> {
 // What both halves return for either shape; `live()` types the two apart for the app.
 type Handle = Live<unknown> & LiveByKey<LiveKey, unknown>
 
-type Entries = [id: string, key: string, text: string][]
+// A row may end with the time in milliseconds it is forgotten at, for a value declared with a `ttl`.
+export type LiveEntry = [id: string, key: string, text: string] | [id: string, key: string, text: string, expiresAt: number]
+
+type Entries = LiveEntry[]
+
+// What `live(initial, options)` takes.
+export interface LiveOptions<Ttl extends Duration = Duration> {
+  // How long a value is kept after its last write, such as '7d': then every process and store forgets it, and it reads what the declaration gives again, as after a delete. A write of the value it holds renews it; a keyed value expires per key.
+  ttl?: Ttl & PositiveDuration<Ttl>
+}
 
 // Where live values are kept beyond one process, `store.live` of kay.config.ts: `sqliteLive(path)` for the processes of a machine, `pgData(db).live` for replicas on Postgres. A value is its text, as `encodeValue` writes it.
 // A store over a network answers with promises: `entries` is awaited before the server serves, and `set` and `delete` are written behind, `live.set` staying synchronous, so a promise must not reject and the store keeps its writes in order. A store answering synchronously may throw to refuse a write, which leaves the value as it was.
 export interface LiveStore {
-  // Every value held, read when the server starts.
+  // Every value held and not past its end, read when the server starts.
   entries: () => Entries | Promise<Entries>
-  // Keeps a value and tells the other processes sharing the store, which hear it through `subscribe`.
-  set: (id: string, key: string, text: string) => void | Promise<void>
+  // Keeps a value and tells the other processes sharing the store, which hear it through `subscribe`. `expiresAt` is when a value declared with a `ttl` is forgotten: the store gives it back with the rows, leaves it out of them once past and drops it.
+  set: (id: string, key: string, text: string, expiresAt?: number) => void | Promise<void>
   // Drops a key and tells the other processes.
   delete: (id: string, key: string) => void | Promise<void>
-  // Calls `listener` with the text now held for a key another process set, or undefined once it deleted it; never for this process's own.
-  subscribe: (listener: (id: string, key: string, text: string | undefined) => void) => void
+  // Calls `listener` with the text now held for a key another process set, and when it ends if it has a `ttl`, or undefined once it deleted it; never for this process's own.
+  subscribe: (listener: (id: string, key: string, text: string | undefined, expiresAt?: number) => void) => void
   // Stops following the other processes, as when another store replaces this one; a later `subscribe` follows again.
   stop?: () => void
   // Told whether a page is watching a value: a store that slows its poll while nothing happens keeps its pace for as long as one is.
@@ -91,6 +103,11 @@ interface ServerSlot {
   keyed: boolean
   values: Map<string, unknown>
   listeners: Map<string, Set<() => void>>
+  // The lifetime of a value in milliseconds after its last write, from the declaration's `ttl`.
+  ttl: number | undefined
+  // When each value held with an end is forgotten, in milliseconds; a read past it gives what the declaration gives, and the timer drops it and tells the watchers.
+  expires: Map<string, number>
+  timer: { handle: ReturnType<typeof setTimeout>, at: number } | undefined
 }
 
 function slots(): Map<string, ServerSlot> {
@@ -111,7 +128,72 @@ function initialOf(slot: { keyed: boolean, initial: unknown }, key: string): unk
 
 // The current value of a slot's key.
 export function slotValue(slot: ServerSlot, key: string): unknown {
-  return slot.values.has(key) ? slot.values.get(key) : initialOf(slot, key)
+  return slot.values.has(key) && !expired(slot, key) ? slot.values.get(key) : initialOf(slot, key)
+}
+
+function expired(slot: ServerSlot, key: string): boolean {
+  const at = slot.expires.get(key)
+
+  return at !== undefined && at <= Date.now()
+}
+
+// The longest a timer waits in one go, as the platform caps it near 24.8 days: a longer lifetime waits again when it fires.
+const MAX_TIMER_MS = 2_000_000_000
+// The shortest, so a crowd of values ending a few milliseconds apart is dropped in few passes.
+const MIN_TIMER_MS = 25
+
+// Sets or clears when a key is forgotten, and makes sure a timer is due by then.
+function setExpiry(slot: ServerSlot, key: string, at: number | undefined): void {
+  if (at === undefined) {
+    slot.expires.delete(key)
+
+    return
+  }
+
+  slot.expires.set(key, at)
+
+  if (slot.timer !== undefined && at < slot.timer.at) {
+    clearTimeout(slot.timer.handle)
+    slot.timer = undefined
+  }
+
+  armExpiry(slot)
+}
+
+function armExpiry(slot: ServerSlot): void {
+  if (slot.timer !== undefined || slot.expires.size === 0)
+    return
+
+  let next = Number.POSITIVE_INFINITY
+
+  for (const at of slot.expires.values())
+    next = Math.min(next, at)
+
+  const handle = setTimeout(() => {
+    slot.timer = undefined
+    dropExpired(slot)
+  }, Math.min(Math.max(next - Date.now(), MIN_TIMER_MS), MAX_TIMER_MS))
+
+  // A timer must not keep a process alive.
+  ;(handle as { unref?: () => void }).unref?.()
+  slot.timer = { handle, at: next }
+}
+
+// Forgets the values past their end, only in this process: the store drops its own row, and each process ends the value itself.
+function dropExpired(slot: ServerSlot): void {
+  const now = Date.now()
+
+  for (const [key, at] of slot.expires) {
+    if (at > now)
+      continue
+
+    slot.expires.delete(key)
+
+    if (slot.values.delete(key))
+      notify(slot, key)
+  }
+
+  armExpiry(slot)
 }
 
 // Calls `listener` whenever the key changes; gives what stops it.
@@ -151,6 +233,8 @@ interface ServerState {
   undeclared: Map<string, Map<string, string>>
   // The rows of `undeclared` that count toward the cap: the ones heard after the start. What the store held at the start is bounded by the store and never dropped.
   undeclaredRows: number
+  // When the rows of `undeclared` end, by id and key as `writtenKey` joins them.
+  undeclaredExpiry: Map<string, number>
   // The ids with rows read at the start.
   startup: Set<string>
   checkWrite: ((label: string, value: unknown) => void) | undefined
@@ -171,7 +255,7 @@ const UNDECLARED_ROWS = 10_000
 function state(): ServerState {
   const holder = globalThis as Record<symbol, ServerState | undefined>
 
-  return holder[STATE] ??= { store: undefined, subscribed: new WeakSet(), undeclared: new Map(), undeclaredRows: 0, startup: new Set(), checkWrite: undefined, written: undefined, reading: undefined, idle: undefined, watchers: 0 }
+  return holder[STATE] ??= { store: undefined, subscribed: new WeakSet(), undeclared: new Map(), undeclaredRows: 0, undeclaredExpiry: new Map(), startup: new Set(), checkWrite: undefined, written: undefined, reading: undefined, idle: undefined, watchers: 0 }
 }
 
 // Installed by the server: refuses a value a browser could not be sent where it is set.
@@ -208,7 +292,7 @@ function shared(slot: ServerSlot): boolean {
 }
 
 // Keeps what the store holds for an id no module declared yet, or forgets it for a deleted key.
-function keepUndeclared(id: string, key: string, text: string | undefined, atStart: boolean): void {
+function keepUndeclared(id: string, key: string, text: string | undefined, atStart: boolean, expiresAt?: number): void {
   const kept = state()
   let held = kept.undeclared.get(id)
 
@@ -220,7 +304,14 @@ function keepUndeclared(id: string, key: string, text: string | undefined, atSta
 
   const counted = !kept.startup.has(id)
 
+  if (expiresAt === undefined)
+    kept.undeclaredExpiry.delete(writtenKey(id, key))
+  else if (text !== undefined)
+    kept.undeclaredExpiry.set(writtenKey(id, key), expiresAt)
+
   if (text === undefined) {
+    kept.undeclaredExpiry.delete(writtenKey(id, key))
+
     if (held?.delete(key) && counted)
       kept.undeclaredRows--
 
@@ -246,6 +337,10 @@ function keepUndeclared(id: string, key: string, text: string | undefined, atSta
 
     kayLog('warn', `the live value ${dropped[0]} was set by another process and no module here declares it: its ${dropped[1].size} stored rows are dropped`)
     kept.undeclared.delete(dropped[0])
+
+    for (const droppedKey of dropped[1].keys())
+      kept.undeclaredExpiry.delete(writtenKey(dropped[0], droppedKey))
+
     kept.undeclaredRows -= dropped[1].size
   }
 }
@@ -278,8 +373,8 @@ export function setLiveStore(store: LiveStore | undefined): void {
     return
   }
 
-  for (const [id, key, text] of held)
-    hear(id, key, text, true)
+  for (const [id, key, text, expiresAt] of held)
+    hear(id, key, text, true, expiresAt)
 
   follow(store)
 }
@@ -302,9 +397,9 @@ async function readLater(store: LiveStore, pending: Promise<Entries>): Promise<v
     if (kept.store !== store)
       return
 
-    for (const [id, key, text] of held) {
+    for (const [id, key, text, expiresAt] of held) {
       if (!written.has(writtenKey(id, key)))
-        hear(id, key, text, true)
+        hear(id, key, text, true, expiresAt)
     }
   }
   finally {
@@ -331,9 +426,9 @@ function follow(store: LiveStore): void {
 
   kept.subscribed.add(store)
   // A store replaced or removed since still delivers, which is ignored.
-  store.subscribe((id, key, text) => {
+  store.subscribe((id, key, text, expiresAt) => {
     if (kept.store === store)
-      hear(id, key, text)
+      hear(id, key, text, false, expiresAt)
   })
 
   if (kept.watchers > 0)
@@ -354,8 +449,8 @@ function followLate(store: LiveStore): void {
     return
   }
 
-  for (const [id, key, text] of rows)
-    hear(id, key, text, true)
+  for (const [id, key, text, expiresAt] of rows)
+    hear(id, key, text, true, expiresAt)
 
   follow(store)
 }
@@ -397,16 +492,21 @@ function decoded(text: string, id: string): { value: unknown } | undefined {
 }
 
 // A value the store holds, set here without telling the store: the watchers of a slot see it as any change.
-function hear(id: string, key: string, text: string | undefined, atStart = false): void {
+function hear(id: string, key: string, text: string | undefined, atStart = false, expiresAt?: number): void {
   const slot = slots().get(id)
 
+  // A row past its end is a key deleted.
+  const gone = text === undefined || (expiresAt !== undefined && expiresAt <= Date.now())
+
   if (slot === undefined) {
-    keepUndeclared(id, key, text, atStart)
+    keepUndeclared(id, key, gone ? undefined : text, atStart, expiresAt)
 
     return
   }
 
-  if (text === undefined) {
+  if (gone) {
+    slot.expires.delete(key)
+
     if (slot.values.delete(key))
       notify(slot, key)
 
@@ -415,23 +515,29 @@ function hear(id: string, key: string, text: string | undefined, atStart = false
 
   const read = decoded(text, id)
 
-  if (read === undefined || (slot.values.has(key) && encodeValue(slot.values.get(key)) === text))
+  if (read === undefined)
+    return
+
+  setExpiry(slot, key, expiresAt)
+
+  if (slot.values.has(key) && encodeValue(slot.values.get(key)) === text)
     return
 
   slot.values.set(key, read.value)
   notify(slot, key)
 }
 
-function serverLive(id: string, initial: unknown, name: string | undefined): Handle {
+function serverLive(id: string, initial: unknown, name: string | undefined, ttl: number | undefined): Handle {
   const keyed = typeof initial === 'function'
   const known = slots().get(id)
   // A dev reload evaluates the module again: the values and watchers stay, the declaration is the new one.
-  const slot: ServerSlot = known ?? { id, name, initial, keyed, values: new Map(), listeners: new Map() }
+  const slot: ServerSlot = known ?? { id, name, initial, keyed, values: new Map(), listeners: new Map(), ttl, expires: new Map(), timer: undefined }
 
   if (known) {
     known.initial = initial
     known.keyed = keyed
     known.name = name
+    known.ttl = ttl
   }
 
   slots().set(id, slot)
@@ -443,6 +549,7 @@ function serverLive(id: string, initial: unknown, name: string | undefined): Han
 
     if (idle !== undefined) {
       kept.undeclared.clear()
+      kept.undeclaredExpiry.clear()
       kept.startup.clear()
       kept.undeclaredRows = 0
     }
@@ -450,10 +557,19 @@ function serverLive(id: string, initial: unknown, name: string | undefined): Han
     const held = kept.undeclared.get(id)
 
     for (const [key, text] of held ?? []) {
+      const at = kept.undeclaredExpiry.get(writtenKey(id, key))
+
+      kept.undeclaredExpiry.delete(writtenKey(id, key))
+
+      if (at !== undefined && at <= Date.now())
+        continue
+
       const read = decoded(text, id)
 
-      if (read !== undefined)
+      if (read !== undefined) {
         slot.values.set(key, read.value)
+        setExpiry(slot, key, at)
+      }
     }
 
     if (held !== undefined) {
@@ -479,18 +595,28 @@ function serverLive(id: string, initial: unknown, name: string | undefined): Han
     const current = slotValue(slot, key)
     const value = typeof next === 'function' ? (next as (current: unknown) => unknown)(current) : next
 
-    // This process's copy can be up to half a second behind the store, so a value equal to it is skipped even when another process has set a newer one since.
-    if (Object.is(value, current))
+    const same = Object.is(value, current)
+
+    // This process's copy can be up to half a second behind the store, so a value equal to it is skipped even when another process has set a newer one since. With a `ttl` it is written again, to renew it.
+    if (same && slot.ttl === undefined)
       return
 
-    state().checkWrite?.(slot.name === undefined ? slot.id : `${slot.name} (${slot.id})`, value)
+    if (!same)
+      state().checkWrite?.(slot.name === undefined ? slot.id : `${slot.name} (${slot.id})`, value)
+
+    const expiresAt = slot.ttl === undefined ? undefined : Date.now() + slot.ttl
+    // A value past its end that no timer dropped yet is still shown to the watchers.
+    const shown = !same || expired(slot, key)
 
     // The store first, so a refusal leaves the value as it was.
     if (shared(slot))
-      sendToStore(slot.id, key, (store): void | Promise<void> => store.set(slot.id, key, encodeValue(value)))
+      sendToStore(slot.id, key, (store): void | Promise<void> => store.set(slot.id, key, encodeValue(value), expiresAt))
 
     slot.values.set(key, value)
-    notify(slot, key)
+    setExpiry(slot, key, expiresAt)
+
+    if (shown)
+      notify(slot, key)
   }
 
   const handle = keyed ? (key: LiveKey) => read(keyText(key)) : () => read('')
@@ -508,6 +634,7 @@ function serverLive(id: string, initial: unknown, name: string | undefined): Han
           sendToStore(slot.id, keyText(key), (store): void | Promise<void> => store.delete(slot.id, keyText(key)))
 
         slot.values.delete(keyText(key))
+        slot.expires.delete(keyText(key))
         notify(slot, keyText(key))
       },
     }
@@ -839,11 +966,21 @@ function browserLive(id: string, initial: unknown): Handle {
 // A value the server changes and every page showing it follows: `export const visitors = live(0)` in a module, read in a template as `{visitors()}`, written on the server with `visitors.set(n => n + 1)`.
 // Given a function of a key it is one value per key, `export const room = live((id: string) => ({ users: 0 }))`, read as `room(id)` and written as `room.set(id, ...)`.
 // The build gives each declaration its id, so it is written as `export const name = live(...)` at the top of a module.
-export function live<T>(initial: PlainValue<T>): Live<T>
-export function live<K extends LiveKey, T>(initial: (key: K) => PlainValue<T>): LiveByKey<K, T>
-export function live(initial: unknown, id?: string, name?: string): unknown {
+// `live(0, { ttl: '7d' })` forgets the value, in every store, that long after its last write.
+export function live<T, const Ttl extends Duration = Duration>(initial: PlainValue<T>, options?: LiveOptions<Ttl>): Live<T>
+export function live<K extends LiveKey, T, const Ttl extends Duration = Duration>(initial: (key: K) => PlainValue<T>, options?: LiveOptions<Ttl>): LiveByKey<K, T>
+// The build adds the id and the name after the declaration's own arguments, so they follow the options when there are some.
+export function live(initial: unknown, first?: unknown, second?: unknown, third?: unknown): unknown {
+  const options = typeof first === 'object' && first !== null ? first as LiveOptions : undefined
+  const id = (options ? second : first) as string | undefined
+  const name = (options ? third : second) as string | undefined
+
   if (id === undefined)
     throw new TypeError('kay: live() is declared as `export const name = live(...)` at the top of a module in the project, where the build names it')
 
-  return typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined' ? serverLive(id, initial, name) : browserLive(id, initial)
+  return typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined' ? serverLive(id, initial, name, lifetimeOf(options, name ?? id)) : browserLive(id, initial)
+}
+
+function lifetimeOf(options: LiveOptions | undefined, name: string): number | undefined {
+  return options?.ttl === undefined ? undefined : durationSeconds(options.ttl, `the ttl of live() ${name}`) * 1000
 }
