@@ -116,6 +116,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `redirect-chain` | warn | seo | A redirect whose target redirects again |
 | `deprecated-ui-prop` | warn | deprecated | `loading` of kayjs-ui's `Select`, now `busy`, and the other renamed props of its components: `QrCode` `size` to `pixels`, `Badge` `stamp` and `solid` to `variant`, `compact` to `size="sm"` |
 | `deprecated-ui-callback` | warn | deprecated | `onOpen` of kayjs-ui's `ConfirmDelete`, now `onOpenChange`, and `onSidebarClose` of `SplitLayout`, now `onSidebarOpenChange` |
+| `deprecated-step-draft-max-age` | warn | deprecated | A kayjs-ui `stepDraft` giving `maxAge` as a number of seconds, the form before 1.73 |
 | `deprecated-message-key` | warn | deprecated | A `ui.*` or `cms.*` message key of a catalog still ending in `Label`, now the bare name or ending in `Aria`; the old key works until 1.75 |
 | `deprecated-ui-token` | warn | deprecated | A kayjs-ui theme token under its old prefixed name, such as `--color-kui-canvas` or `bg-kui-surface2`, now the app's own theme name; the old name works until 1.75 |
 

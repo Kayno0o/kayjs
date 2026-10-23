@@ -43,6 +43,7 @@ import { renamedMessageKeys } from './message-keys'
 import { unreadOpenSettings } from './open-settings'
 import { compileShadow, layoutQueries, matcherSource, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowPath } from './shadow'
 import { untypedSockets } from './socket-routes'
+import { stepDraftMaxAge } from './step-draft-max-age'
 import { typingOptions } from './tsgo'
 import { renamedUiProps } from './ui-props'
 import { uiTypes } from './ui-types'
@@ -130,7 +131,7 @@ async function writeShadows(projectRoot: string, options: CheckOptions): Promise
 
   // A types-only write discards the problems, so none of their checks run.
   if (options.typesOnly !== true)
-    problems.push(...redirectChecks(root, options, served), ...await unguardedRoutes(options, served), ...await unreadOpenSettings(served), ...await unguardedTools(options, served), ...await mcpRoutes(options, served), ...await largePublicImages(options, root, served), ...await untypedSockets(options, served), ...await renamedUiProps(root, options), ...await deprecatedUiTokens(root, options), ...await renamedMessageKeys(root, options))
+    problems.push(...redirectChecks(root, options, served), ...await unguardedRoutes(options, served), ...await unreadOpenSettings(served), ...await unguardedTools(options, served), ...await mcpRoutes(options, served), ...await largePublicImages(options, root, served), ...await untypedSockets(options, served), ...await renamedUiProps(root, options), ...await deprecatedUiTokens(root, options), ...await renamedMessageKeys(root, options), ...await stepDraftMaxAge(root, options))
 
   // A script rather than a module, which is what lets it declare a wildcard module.
   await tree.write('kay-assets.d.ts', ASSET_TYPES)

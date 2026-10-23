@@ -1,5 +1,7 @@
 // The step a URL names, and the draft a multi-step form keeps between its posts.
 
+import type { Duration } from 'kay'
+
 export interface StepItem<Key extends string = string> {
   key: Key
   label: string
@@ -13,6 +15,20 @@ export interface StepCookies {
 }
 
 const STEP_PARAM = 'step'
+
+const DURATION = /^(\d+(?:\.\d+)?)(ms|[smhdw])$/
+const UNIT_SECONDS = { ms: 0.001, s: 1, m: 60, h: 3600, d: 86_400, w: 604_800 }
+
+// The whole seconds a positive duration stands for, rounded up. Not kay's own parser, which the browser build of this package cannot import.
+function cookieSeconds(value: string): number {
+  const text = DURATION.exec(value)
+  const seconds = text ? Math.ceil(Number(text[1]) * UNIT_SECONDS[text[2] as keyof typeof UNIT_SECONDS]) : Number.NaN
+
+  if (!(seconds > 0))
+    throw new Error(`kay: stepDraft maxAge is '${value}'; it takes a positive duration such as '30m' or '7d'`)
+
+  return seconds
+}
 
 // The first proxy's `X-Forwarded-Proto` saying the browser came over https.
 const FORWARDED_HTTPS = /^\s*https\s*(?:,|$)/i
@@ -64,8 +80,8 @@ export interface StepDraft {
 export interface StepDraftOptions {
   // Whether the values kept for `step` pass that step's schema, an `additionalProperties: false` one so no key slips in: the cookie is the visitor's to edit, so a step failing it is not done.
   check: (step: string, values: Values) => boolean
-  // Seconds the draft lives; an hour by default.
-  maxAge?: number | undefined
+  // How long the draft lives, such as `'30m'`; an hour by default. A number of seconds works until 1.76.
+  maxAge?: Duration | number | undefined
   // The path the cookie is sent to; the whole site by default, so a form living under one path narrows it.
   path?: string | undefined
   // The request being answered (`ctx.request`): the cookie is `secure` when it came over https, directly or through a proxy's `X-Forwarded-Proto`.
@@ -75,8 +91,9 @@ export interface StepDraftOptions {
 }
 
 // The values of a multi-step form kept in a cookie of their own between posts, read and written from `ctx.cookies` in an action.
-export function stepDraft(cookies: StepCookies, name: string, { check, maxAge = 3600, path = '/', request, secure = request !== undefined && overHttps(request) }: StepDraftOptions): StepDraft {
+export function stepDraft(cookies: StepCookies, name: string, { check, maxAge = '1h', path = '/', request, secure = request !== undefined && overHttps(request) }: StepDraftOptions): StepDraft {
   const cookie = `ksteps_${name}`
+  const seconds = typeof maxAge === 'number' ? maxAge : cookieSeconds(maxAge)
 
   function read(): Record<string, Values> {
     try {
@@ -101,7 +118,7 @@ export function stepDraft(cookies: StepCookies, name: string, { check, maxAge = 
       if (encodeURIComponent(text).length > DRAFT_LIMIT)
         throw new RangeError(`The draft of ${name} is over ${DRAFT_LIMIT} bytes once encoded, too much for a cookie`)
 
-      cookies.set(cookie, text, { path, httpOnly: true, sameSite: 'lax', secure, maxAge })
+      cookies.set(cookie, text, { path, httpOnly: true, sameSite: 'lax', secure, maxAge: seconds })
     },
     clear: () => cookies.delete(cookie, { path }),
   }

@@ -72,7 +72,7 @@ else
     button Create the account
 ```
 
-- The draft is a cookie of its own, `httpOnly`, `secure` when `request` came over https (or `secure` says so), sent with every request under `path` (the whole site by default) for an hour (`maxAge`). A browser drops a cookie past about 4 KB, so `save` throws a `RangeError` past 3,800 bytes once encoded, around 1,500 characters of text: give the schemas a `maxLength`, and send a file or a long text through its own upload.
+- The draft is a cookie of its own, `httpOnly`, `secure` when `request` came over https (or `secure` says so), sent with every request under `path` (the whole site by default) for an hour (`maxAge`, a duration such as `'30m'`). A browser drops a cookie past about 4 KB, so `save` throws a `RangeError` past 3,800 bytes once encoded, around 1,500 characters of text: give the schemas a `maxLength`, and send a file or a long text through its own upload.
 - Keep no password in it. The cookie is not tied to a session, so call `clear()` on sign-out, or the next visitor of a shared browser inherits the draft for the hour.
 - Back keeps what was typed, since the values come from the draft. A step posted again replaces its values.
 - `check` is required: `done()` lists only the steps whose values pass it, and `currentStep` sends the visitor back to the first one that does not, so a hand-edited cookie or URL skips nothing. The schemas say `additionalProperties: false`, so an edited cookie adds no key either.

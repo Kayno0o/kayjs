@@ -627,6 +627,15 @@ export const LINTS = {
     wrong: 'ui: { table: { filterLabel: \'Filtrer\' } }',
     right: 'ui: { table: { filter: \'Filtrer\' } }',
   },
+  'deprecated-step-draft-max-age': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.73',
+    site: true,
+    summary: 'A `stepDraft` of kayjs-ui whose options give `maxAge` as a number of seconds, the form before 1.73: it takes a duration with its unit, as every duration in kay does. The number works until 1.76. The call is found through the import of `stepDraft` from `@kaynooo/kayjs-ui`, the options as an object literal, in the project\'s TypeScript files and `.kay` fences. The fix writes the longest whole unit, `3600` as `\'1h\'`.',
+    wrong: 'stepDraft(ctx.cookies, \'signup\', { check, maxAge: 3600 })',
+    right: 'stepDraft(ctx.cookies, \'signup\', { check, maxAge: \'1h\' })',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS

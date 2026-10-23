@@ -107,7 +107,7 @@ export async function archive(scan: File) {
 - `kay_editor` (kayjs-cms): marks the browser as an editor's, readable by scripts, so the Edit this page link looks for an answer; necessary, 90 days slid forward each time the guard lets the editor through, ended at sign-out.
 - `kay_editor_who` (kayjs-cms): a digest naming which editor is signed in, readable by scripts, so the on-page editor keeps its drafts per person; necessary, 90 days, set when the guard lets the editor through, ended at sign-out.
 - `kay_editor_session` (kayjs-cms `passwordGuard`): the password sign-in, `<role>.<expires>.<signature>`, `httpOnly`; necessary, `maxAge`, `'14d'` by default.
-- `ksteps_<name>` (kayjs-ui `stepDraft`): the values of a multi-step form between its steps, `httpOnly`, up to 3,800 encoded bytes, what a visitor typed in; necessary for the form they are filling in, `maxAge`, an hour by default, ended by `clear()`.
+- `ksteps_<name>` (kayjs-ui `stepDraft`): the values of a multi-step form between its steps, `httpOnly`, up to 3,800 encoded bytes, what a visitor typed in; necessary for the form they are filling in, `maxAge` (a duration), an hour by default, ended by `clear()`.
 - Each `persisted(name, ...)` signal keeps its value in a cookie of that name for a year, or its `maxAge`, or in `localStorage` with `{ storage: 'local' }`; what it holds is the app's choice, so a preference is necessary and anything else waits for consent.
 
 ### Browser storage

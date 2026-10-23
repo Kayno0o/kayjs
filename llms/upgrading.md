@@ -38,6 +38,10 @@ A site's CSS written against the editor's own markup changes. `.kcms-editor-open
 
 An entry's head is a `PageSection` head: `.kcms-entry-head`, `.kcms-entry-title` and `.kcms-entry-collection` are gone for `.kcms-entry > [data-part='head']` with its `[data-part='title']` and `[data-part='subtitle']`. The buttons over a page list item are a floating `Toolbar` (`.kcms-list-bar`, `.kcms-list-start`), so `.kcms-list-caption` is `[data-part='caption']`. Stop editing's question over unsaved edits is a `Dialog`: `.kcms-editor-confirm` and `.kcms-editor-choice` are gone. A site CSS on one of them moves to the part, or to `--kui-sticky-top` for a header it must clear.
 
+### kayjs-ui: stepDraft's maxAge is a duration
+
+`stepDraft(ctx.cookies, name, { maxAge: 3600 })` is `maxAge: '1h'`, as every duration in kay is. A number of seconds works until 1.76, and `kay upgrade` (`deprecated-step-draft-max-age`) rewrites a numeric literal at the call.
+
 ### The forms deprecated in 1.69 and 1.70 are gone
 
 `deprecated-identity-key` and fourteen of the `since: '1.70'` lints go with the forms they reported: an app still on one gets a type error or an unknown option, bar a `JSX.Element` markup prop.

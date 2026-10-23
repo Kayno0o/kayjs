@@ -3600,6 +3600,52 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports a stepDraft maxAge in seconds and --fix writes the duration, leaving a computed number or another stepDraft alone', async () => {
+    const root = await scratchProject({
+      'src/actions.ts': 'import { stepDraft } from \'@kaynooo/kayjs-ui\'\n\nconst check = () => true\nconst cookies = new Bun.CookieMap()\n\nexport const a = stepDraft(cookies, \'a\', { check, maxAge: 3600 })\nexport const b = stepDraft(cookies, \'b\', { check, maxAge: 90 })\nexport const c = stepDraft(cookies, \'c\', { check, maxAge: 7 * 86_400 })\nexport const d = stepDraft(cookies, \'d\', { check, maxAge: \'30m\' })\n',
+      'src/local.ts': 'function stepDraft(a: unknown, b: unknown, c: unknown) { return [a, b, c] }\nexport const x = stepDraft(1, 2, { maxAge: 3600 })\n',
+    })
+
+    try {
+      const { output } = await runCheck(root)
+
+      expect(output.match(/deprecated-step-draft-max-age/g)).toHaveLength(2)
+      await runCheck(root, '--fix')
+
+      const actions = await Bun.file(join(root, 'src/actions.ts')).text()
+
+      expect(actions).toContain('maxAge: \'1h\' })')
+      expect(actions).toContain('maxAge: \'90s\' })')
+      expect(actions).toContain('maxAge: 7 * 86_400 })')
+      expect(actions).toContain('maxAge: \'30m\' })')
+      expect(await Bun.file(join(root, 'src/local.ts')).text()).toContain('maxAge: 3600')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('reports a form removed in 1.73 as a type error or an unknown option, never as a deprecation', async () => {
+    const root = await scratchProject({
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ bodyLimit: \'1mb\' })\n',
+      'src/routes/index.kay': '---\nimport { every } from \'kay\'\n\nevery(1000, () => {})\n---\np Hi\n',
+      'src/lib.ts': 'import { optionMs } from \'kay/library\'\n\nexport const wait = optionMs(3000, \'wait\')\n',
+    })
+
+    try {
+      const { code, output } = await runCheck(root)
+
+      expect(code).not.toBe(0)
+      expect(output).toMatch(/bodyLimit/)
+      expect(output).toMatch(/every|1000/)
+      expect(output).toMatch(/optionMs|3000/)
+      expect(output).not.toContain('deprecated-')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('shows the problems an extension\'s check finds in the config, without running its server', async () => {
     const root = await scratchProject({
       'kay.config.ts': 'const marker = new URL(\'./server-ran\', import.meta.url).pathname\nexport default {\n  extensions: [\n    { name: \'lib\', server: () => { require(\'node:fs\').writeFileSync(marker, \'\'); return new (require(\'elysia\').Elysia)() }, check: () => [{ message: \'posts: title has an x-kay hint to fix\' }, { message: \'posts: the layout names a field it lacks\', severity: \'error\', help: \'rename it\' }] },\n    { name: \'broken\', check: () => { throw new Error(\'boom\') } },\n  ],\n}\n',

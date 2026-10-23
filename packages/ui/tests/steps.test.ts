@@ -112,7 +112,7 @@ describe('stepDraft cookie flags', () => {
 
     stepDraft(cookies, 'signup', { ...ANY, ...options }).save('account', { email: 'a@b.fr' })
 
-    return cookies.options[0] as { secure?: boolean }
+    return cookies.options[0] as { secure?: boolean, maxAge?: number }
   }
 
   it('is secure when the request is https, directly or behind a proxy', () => {
@@ -125,6 +125,18 @@ describe('stepDraft cookie flags', () => {
     expect(saved({}).secure).toBe(false)
     expect(saved({ request: new Request('https://kaynooo.fr/signup'), secure: false }).secure).toBe(false)
     expect(saved({ secure: true }).secure).toBe(true)
+  })
+
+  it('lives an hour by default, and as long as a duration says', () => {
+    expect(saved({})).toMatchObject({ maxAge: 3600 })
+    expect(saved({ maxAge: '30m' })).toMatchObject({ maxAge: 1800 })
+    expect(saved({ maxAge: '1500ms' })).toMatchObject({ maxAge: 2 })
+  })
+
+  it('still takes a number of seconds until 1.76, and refuses a text that is no duration', () => {
+    expect(saved({ maxAge: 90 })).toMatchObject({ maxAge: 90 })
+    expect(() => saved({ maxAge: '30' })).toThrow('stepDraft maxAge')
+    expect(() => saved({ maxAge: '0s' })).toThrow('stepDraft maxAge')
   })
 
   it('clears the draft a sign-out leaves behind, under the path it was saved to', () => {

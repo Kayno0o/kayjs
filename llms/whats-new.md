@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## 1.73.0
 
+- kayjs-ui: `stepDraft`'s `maxAge` is a duration (`'1h'`); a number of seconds works until 1.76 ([Forms and steps](../packages/ui/llms/forms-and-steps.md)).
 - A link pressed while a view transition runs no longer reports an `AbortError` to `/_kay/error` when the transition is skipped before its animations start.
 - kayjs-ui: `Toolbar`, `PageSection` takes `subtitle` and `sticky`, and `SidePanel` takes `launcher` and `launcherLayer`; the cms editor's list bars, entry heads, collapsed button and Stop editing question are built on them ([Toolbar](../packages/ui/llms/page-layout-palette-and-trees.md)).
 - kayjs-ui: `SidePanel` takes `dock` to sit beside the page as a resizable tool panel, and `Menu` and `Popover` take `at` to open at a point with no trigger, and every `Menu` scrolls past the window height and has taller entries on touch ([SidePanel](../packages/ui/llms/page-layout-palette-and-trees.md), [Menu](../packages/ui/llms/forms.md)).
