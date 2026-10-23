@@ -1,0 +1,15 @@
+---
+import type { EntryRef } from '../src/kay/contract'
+import EntryForm from '../src/editor/entry-form.kay'
+import { saveAll } from '../src/editor/save-all'
+import { signal } from 'kay'
+
+// One entry's form and a button for Save all in one bundle, so both read the one registry of savers, and a button to take the form away.
+const { entry } = props<{ entry: EntryRef }>()
+
+const shown = signal(true)
+---
+button#hide(onClick={() => shown.set(false)}) Hide
+button#all(onClick={() => saveAll([entry])}) All
+if shown()
+  EntryForm(entry={entry})

@@ -75,15 +75,16 @@ async function until(done: () => unknown): Promise<void> {
   throw new Error('the page never reached the state the test waits for')
 }
 
-async function open(entries: object[] = [HELLO]) {
+// `at` is the locale a field's marker names, `@fr`.
+async function open(entries: object[] = [HELLO], at = '') {
   // The fields a visitor clicks on the page.
-  for (const marker of ['posts:hello:summary', 'posts:hello:title', 'posts:hello:tags', 'posts:hello:seo.description']) {
+  for (const marker of [`posts:hello${at}:summary`, `posts:hello${at}:title`, `posts:hello${at}:tags`, `posts:hello${at}:seo.description`]) {
     const element = document.createElement('p')
 
     element.dataset.page = ''
     element.setAttribute('data-kay-field', marker)
     // Styled text is not typed in place, which a plain one would be: summary is brought up in the form.
-    element.innerHTML = marker === 'posts:hello:summary' ? 'S<em>hort</em>' : marker
+    element.innerHTML = marker === `posts:hello${at}:summary` ? 'S<em>hort</em>' : marker
     document.body.append(element)
   }
 
@@ -362,4 +363,58 @@ test('Save all with one entry refused leaves it dirty with its message and the o
 
   expect([save(0).disabled, save(1).disabled]).toEqual([false, true])
   expect(root.querySelector('.kcms-entry [data-part="issue"]')?.textContent).toContain('Not valid')
+})
+
+test('a form for a locale of an entry collapses to the field clicked on the page and opens again, as the default one does', async () => {
+  server()
+
+  const { path, shown, anchor, button } = await open([{ ...HELLO, locale: 'fr' }], '@fr')
+
+  page('posts:hello@fr:summary').click()
+  await until(() => shown().length === 1)
+
+  expect(shown()).toEqual(['summary'])
+  expect(document.activeElement).toBe(path('summary'))
+  expect(anchor('Summary').getAttribute('aria-pressed')).toBe('true')
+
+  button('Show all fields')!.click()
+  await until(() => shown().length === 3)
+  expect(button('Show all fields')).toBeUndefined()
+
+  anchor('Title').click()
+  await until(() => shown().length === 1)
+  expect(shown()).toEqual(['title'])
+})
+
+test('the registry forgets the saver of an entry when its form unmounts, so Save all no longer reaches it', async () => {
+  const writes = server()
+
+  mounted = await mountComponent(join(import.meta.dir, 'with-save-all.kay'), { entry: HELLO })
+
+  const root = mounted.root
+  const title = () => root.querySelector<HTMLInputElement>('[data-kcms-path="title"] input')!
+  const press = async (id: string) => {
+    root.querySelector<HTMLButtonElement>(`#${id}`)!.click()
+    await settle()
+  }
+  const type = async (value: string) => {
+    title().value = value
+    title().dispatchEvent(new Event('input', { bubbles: true }))
+    await settle()
+  }
+
+  await until(() => root.querySelector('.kcms-entry') !== null && root.querySelector('.kcms-entry-loading') === null && asked.some(path => path.includes('/can')))
+
+  // The form is reached while it is there.
+  await type('Edited')
+  await press('all')
+  await until(() => writes.length === 1)
+
+  await type('Edited again')
+  await press('hide')
+  await press('all')
+  await Bun.sleep(50)
+
+  expect(root.querySelector('.kcms-entry')).toBeNull()
+  expect(writes).toHaveLength(1)
 })

@@ -275,3 +275,25 @@ test('typing the title collapses the form to its field, an anchor shows another,
   expect(await visible('[data-kcms-path="tags"]')).toBe(true)
   expect(await page.evaluate(() => document.activeElement?.closest('.kcms-entry-anchors') != null)).toBe(true)
 }, 60_000)
+
+test('a form collapsed to one field holds no tab stop on the hidden ones', async () => {
+  const page = await open()
+
+  await edit(page)
+  await page.waitUntil(() => document.querySelector('.kcms-entry-anchors button[aria-pressed="true"]') !== null)
+  await page.evaluate((selector: string) => document.querySelector<HTMLElement>(selector)!.focus(), FORM_TITLE)
+
+  const reached: string[] = []
+
+  for (let press = 0; press < 14; press++) {
+    await page.press('Tab')
+    reached.push(await page.evaluate(() => {
+      const active = document.activeElement
+
+      return active?.closest('.kcms-editor') === null ? 'page' : `${active?.closest('.kcms-item')?.hasAttribute('hidden') === true ? 'hidden' : 'shown'} ${active?.closest('.kcms-item') === null ? 'outside' : 'item'}`
+    }))
+  }
+
+  expect(reached).not.toContain('hidden item')
+  expect(await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('.kcms-item[hidden] :is(input, textarea, select, button, a[href], [tabindex])')].filter(each => each.checkVisibility() || each.getClientRects().length > 0).length)).toBe(0)
+}, 60_000)
