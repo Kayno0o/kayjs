@@ -1339,11 +1339,13 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       return redirect(typeof started === 'string' ? started : failed(started.error, text(query.redirect)), 303)
     })
     .get(`${core.prefix}/:provider/callback` as `${Prefix}/:provider/callback`, async ({ auth, params, query, redirect }) => {
-      // A provider the app lacks still spends a pending flow its state matches, so the flow is not left in the session and its redirect is kept; with none pending, nothing loads.
-      if (!core.oauth.has(params.provider) && await auth[STATE].session.get('authOAuth') === undefined)
+      // The flow is read once here and handed to `finishOAuth`. A provider the app lacks still spends a pending flow its state matches, so the flow is not left in the session and its redirect is kept; with none pending, nothing loads.
+      const flow = await auth[STATE].session.get('authOAuth')
+
+      if (!core.oauth.has(params.provider) && flow === undefined)
         return redirect(failed('oauth'), 303)
 
-      const outcome = await (await load.flow()).finishOAuth(auth[STATE], params.provider, { code: text(query.code), state: text(query.state), error: text(query.error), user: text(query.user) })
+      const outcome = await (await load.flow()).finishOAuth(auth[STATE], params.provider, { code: text(query.code), state: text(query.state), error: text(query.error), user: text(query.user) }, flow)
 
       return redirect('error' in outcome ? failed(outcome.error, outcome.redirect) : outcome.redirect, 303)
     })

@@ -110,11 +110,10 @@ async function leave(state: RequestState, provider: string, redirect: string | u
   return url
 }
 
-// Where to send the browser once the provider sent it back with `query`: the flow is spent by the callback carrying its `state`, so a callback URL replayed later finds none.
+// Where to send the browser once the provider sent it back with `query`, `flow` being the pending one the route read: the flow is spent by the callback carrying its `state`, so a callback URL replayed later finds none.
 // A callback whose `state` is wrong or missing leaves the flow in place, so a page on another site loading the callback URL cannot kill a sign-in in flight.
-export async function finishOAuth(state: RequestState, provider: string, query: Record<string, string | undefined>): Promise<{ redirect: string } | { error: OAuthFailure, redirect?: string }> {
+export async function finishOAuth(state: RequestState, provider: string, query: Record<string, string | undefined>, flow: OAuthFlow | undefined): Promise<{ redirect: string } | { error: OAuthFailure, redirect?: string }> {
   const { core } = state
-  const flow = await state.session.get('authOAuth')
 
   if (!flow || query.state === undefined || query.state === '' || !sameText(query.state, flow.state))
     return { error: 'oauth' }
