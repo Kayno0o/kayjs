@@ -16,14 +16,14 @@ HoverCard(id="card" anchor={null} style="color: red; position-anchor: --mine") D
 QrCode#qr-image(value="https://kay.dev" style="margin: 1px")
 QrCode#qr-inline(value="https://kay.dev" inline pixels={64} style="margin: 1px; width: 10px")
 QrCode#qr-bare(value="https://kay.dev" inline style="margin: 1px")
-Skeleton#skeleton(width="50%" style="margin: 2px; --kui-skeleton-width: 9px")
+Skeleton#skeleton(width="50%" style="margin: 2px; --_skeleton-width: 9px")
 Skeleton#skeleton-bare(style="margin: 2px")
 ZoomPane#zoom(label="Map" style="touch-action: auto")
   p Plate
-Masonry#masonry(items={[1]} key={item => item} style="--kui-masonry-gap: 1px")
+Masonry#masonry(items={[1]} key={item => item} style="--_masonry-gap: 1px")
   @tile(item)
     p {item}
-SplitLayout#split(style="--kui-split-list-width: 5px")
+SplitLayout#split(style="--_split-list-width: 5px")
   @list
     p List
   @detail

@@ -37,7 +37,7 @@ test('a QrCode, image or inline writes the style an app gives it after its own d
 test('a Skeleton writes the style an app gives it after its own declarations, so the app wins', async () => {
   const style = await styles()
 
-  expect(style('#skeleton')).toBe('--kui-skeleton-width: 50%; margin: 2px; --kui-skeleton-width: 9px')
+  expect(style('#skeleton')).toBe('--kui-skeleton-width: 50%; margin: 2px; --_skeleton-width: 9px')
   expect(style('#skeleton-bare')).toBe('margin: 2px')
 })
 
@@ -50,11 +50,11 @@ test('a ZoomPane writes the style an app gives it after its own declarations, so
 test('a Masonry writes the style an app gives it after its own declarations, so the app wins', async () => {
   const style = await styles()
 
-  expect(style('#masonry')).toMatch(/--kui-masonry-gap: 12px;.*--kui-masonry-gap: 1px$/)
+  expect(style('#masonry')).toMatch(/--kui-masonry-gap: 12px;.*--_masonry-gap: 1px$/)
 })
 
 test('a SplitLayout writes the style an app gives it after its own declarations, so the app wins', async () => {
   const style = await styles()
 
-  expect(style('#split')).toBe('--kui-split-list-width: 260px; --kui-split-list-width: 5px')
+  expect(style('#split')).toBe('--kui-split-list-width: 260px; --_split-list-width: 5px')
 })
