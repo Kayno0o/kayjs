@@ -4,14 +4,7 @@
 
 ### Let users run their organizations from the browser
 
-With the `organizations` option and the prebuilt pages, the account area gets an `Organizations` tab under the pages' prefix, `/auth/account/organizations` by default, with no other declaration. Invitation mails link to the pages' own `/auth/invitation` when `invitationPage` is not set:
-
-```ts
-createAuth({
-  // ...
-  organizations: { roles: { owner: ['admin'], admin: ['member'], member: [] }, owner: 'owner', manage: 'admin', defaultRoles: ['member'] },
-})
-```
+With the `organizations` option ([Organizations](admin-and-organizations.md#organizations)) and the prebuilt pages, the account area gets an `Organizations` tab under the pages' prefix, `/auth/account/organizations` by default, with no other declaration. Invitation mails link to the pages' own `/auth/invitation` when `invitationPage` is not set.
 
 - `/auth/account/organizations`: the user's organizations, the invitations open to their verified address (`Join` or `Decline`), and a form creating one (a name, an optional address).
 - `/auth/account/organizations/<org>`, `<org>` the slug or the id: the members with their roles, and for a manager (the `manage` role) the roles of each member below them, their removal, the open invitations with a form inviting an address (given roles, else `defaultRoles`) and a `Revoke` button, and the name and address of the organization. Every member can leave it behind a ticked box, and an owner can delete it behind a ticked box.

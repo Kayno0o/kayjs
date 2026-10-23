@@ -49,9 +49,11 @@ export default defineConfig({
 
 Every page, action and guard can now read `ctx.locals.auth`, typed. A file of yours at a page's path, such as `src/routes/auth/sign-in.kay`, replaces that page.
 
-`kay add auth` writes the one-line setup for a project with a server and Tailwind: `auth({ name })` in `kay.config.ts` with kayjs-ui's `ui()`, a `store` loading your pg-orm `Database` when the project has one (with `...authTables` added to its tables), a root `src/routes/_guard.ts` exporting `guard()`, and the session secret, `SITE_URL` and `KAYJS_AUTH_DATABASE_URL` in `.env.example`. There is no `src/auth.ts`, and the mailer is found by itself when `src/mail.ts` exists.
+`kay add auth` writes the one-line setup for a project with a server and Tailwind: `auth({ name })` in `kay.config.ts` with kayjs-ui's `ui()`, a `store` loading your pg-orm `Database` when the project has one (with `...authTables` added to its tables), a root `src/routes/_guard.ts` exporting `guard()`, and the session secret and `SITE_URL` in `.env.example` (`KAYJS_AUTH_DATABASE_URL` too without a project `Database`). There is no `src/auth.ts`.
 
-An app that keeps session data of its own, or wires its store by hand, writes the auth object itself. The rest of this section is that form.
+### The createAuth form
+
+An app that keeps session data of its own, or wires its store by hand, writes the auth object itself and loads it with `auth({ module })`. The registrations before 1.70, `authPages({ auth })` and `authExtension(...)`, are deprecated until 1.73: `kay check` reports them and `kay upgrade` rewrites them.
 
 `src/auth.ts` creates the auth object. `memoryAuthStore()` keeps users in the process, for trying it out.
 
@@ -89,6 +91,8 @@ export default defineConfig({
 Every page, action and guard can now read `ctx.locals.auth`, typed. A `prefix` or `home` given to `auth({ module })` reaches `createAuth({ pages: true })` too, so give them once. A `prefix` that differs from the one in `createAuth({ pages })` stops the server at start, and a differing `home` logs a warning naming both, `createAuth`'s winning. `pages: true` serves the prebuilt pages under `/auth`, such as `/auth/sign-in`, `/auth/register` and `/auth/account`.
 
 A file of yours at the same path, such as `src/routes/auth/sign-in.kay`, replaces that page.
+
+### Prebuilt pages
 
 `pages.home` is where a visitor lands when nothing asked for another page, `/` by default: after a password reset, a verified address, a changed one, a magic link, a code, registering, a passkey or a provider. On a site with locales it is read as written for the default locale, and the pages put it in the visitor's language.
 
