@@ -1,4 +1,3 @@
-import { readdir } from 'node:fs/promises'
 import process from 'node:process'
 import { renderMarkdown } from '../src/content/markdown'
 // The page listing what each release adds, which the docs site renders too, keeping what is not released yet under `## Unreleased`.
@@ -176,7 +175,7 @@ export function trimArchive(archive: string, limit = ARCHIVE_LIMIT, keepNewestRe
 // The heading ids of a Markdown text.
 const headingIds = async (markdown: string) => new Set((await renderMarkdown(markdown)).headings.map(heading => heading.id))
 
-// Points a link to an anchor a cap moved from `page` to its archive at the archive itself, without the anchor: the link check refuses an anchor into an archive, whose sections are dropped at a release. `texts` holds the pages by path from the repo root and the result only those it rewrote.
+// Points a link to an anchor a cap moved from `page` to its archive at the archive itself, without the anchor: the link check refuses an anchor into an archive, whose sections are dropped at a release. A link is the file as written from llms/, a library or another folder (`upgrading.md`, `./upgrading.md`, `../llms/upgrading.md`), or the page of the site (`/guides/upgrading`). `texts` holds the pages by path from the repo root and the result only those it rewrote.
 export async function relinkMoved(texts: ReadonlyMap<string, string>, page: string, before: string, after: string, archive: string): Promise<Map<string, string>> {
   const [wasThere, stays] = await Promise.all([headingIds(before), headingIds(after)])
   const moved = new Set([...wasThere].filter(id => !stays.has(id)))
@@ -185,11 +184,13 @@ export async function relinkMoved(texts: ReadonlyMap<string, string>, page: stri
   if (moved.size === 0)
     return rewritten
 
-  const name = page.slice(page.lastIndexOf('/') + 1)
-  const link = new RegExp(String.raw`\]\(((?:llms\/)?)${name.replace('.', '\\.')}#([\w-]+)\)`, 'g')
+  const file = page.slice(page.lastIndexOf('/') + 1)
+  const name = file.slice(0, -'.md'.length)
+  const archiveName = archive.slice(archive.lastIndexOf('/') + 1, -'.md'.length)
+  const link = new RegExp(String.raw`\]\(((?:\.{1,2}\/)*(?:llms\/)?${name}\.md|\/(?:guides|llms)\/${name})#([\w-]+)\)`, 'g')
 
   for (const [path, text] of texts) {
-    const next = text.replace(link, (whole, prefix: string, id: string) => moved.has(id) ? `](${prefix}${archive.slice(archive.lastIndexOf('/') + 1)})` : whole)
+    const next = text.replace(link, (whole, target: string, id: string) => moved.has(id) ? `](${target.replace(new RegExp(`${name}(\\.md)?$`), `${archiveName}$1`)})` : whole)
 
     if (next !== text)
       rewritten.set(path, next)
@@ -246,8 +247,8 @@ if (import.meta.main) {
     throw new Error('usage: bun scripts/whats-new.ts --cap [--check]')
 
   const changed: string[] = []
-  const names = (await readdir('llms')).filter(name => name.endsWith('.md')).map(name => `llms/${name}`)
-  const texts = new Map<string, string>(await Promise.all([...names, INDEX].map(async path => [path, await Bun.file(path).text()] as const)))
+  const paths = await Array.fromAsync(new Bun.Glob('{llms/*.md,llms.txt,packages/*/llms.txt,packages/*/llms/*.md,docs/src/content/docs/**/*.md}').scan('.'))
+  const texts = new Map<string, string>(await Promise.all(paths.map(async path => [path, await Bun.file(path).text()] as const)))
   const writes = new Map<string, string>()
 
   for (const [page, archive] of ARCHIVES) {

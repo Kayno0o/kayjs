@@ -198,12 +198,16 @@ describe('what\'s new', () => {
       ['llms/whats-new.md', '- [x](upgrading.md#moves) and [y](upgrading.md#stays)\n'],
       ['llms/whats-new-archive.md', '- [z](upgrading.md#moves)\n'],
       ['llms/islands.md', 'nothing\n'],
+      ['packages/ui/llms.txt', '[a](../../llms/upgrading.md#moves) [b](./upgrading.md#moves)\n'],
+      ['docs/src/content/docs/guides/x.md', '[a](/guides/upgrading#moves) [b](/guides/upgrading#stays) [c](/guides/upgrading)\n'],
     ])
     const rewritten = await relinkMoved(texts, 'llms/upgrading.md', before, after, 'llms/upgrading-archive.md')
 
     expect(rewritten.get('llms/whats-new.md')).toBe('- [x](upgrading-archive.md) and [y](upgrading.md#stays)\n')
     expect(rewritten.get('llms/whats-new-archive.md')).toBe('- [z](upgrading-archive.md)\n')
     expect(rewritten.has('llms/islands.md')).toBe(false)
+    expect(rewritten.get('packages/ui/llms.txt')).toBe('[a](../../llms/upgrading-archive.md) [b](./upgrading-archive.md)\n')
+    expect(rewritten.get('docs/src/content/docs/guides/x.md')).toBe('[a](/guides/upgrading-archive) [b](/guides/upgrading#stays) [c](/guides/upgrading)\n')
   })
 
   it('keeps a continued section of the newest release above the older releases moved beside it', () => {
