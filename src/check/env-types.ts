@@ -160,6 +160,8 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
 
   return [
     'import type { Action, ApiRoutesOf, BoundProp, BoundValue, CheckedHref, CheckedHtml, ContextOfModule, ExtensionServersOf, FieldName, FunctionProp, HandedSignal, HandsPart, IslandProp, PlainIslandProp, LocalsOf, PublicFieldsOfModule, ServerOfModule, Signal, Truthy, Unmatched, UnresolvedParameter } from \'kay\'',
+    // Imported so kay.config.ts is typed with the app, whatever else names it.
+    ...config === undefined ? [] : [`import type {} from ${importSpecifier(config)}`],
     ...content === undefined ? [] : ['import type { FeedPathsOf } from \'kay/content\''],
     ...(i18n?.messages.length ?? 0) > 1 ? ['import type { MergeMessages } from \'kay/i18n\''] : [],
     '',
