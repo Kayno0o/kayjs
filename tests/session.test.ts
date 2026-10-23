@@ -622,9 +622,9 @@ describe('sessions', () => {
 
     it(`refuses an object match ${name} that is empty or holds undefined, which would end every session or none`, async () => {
       await store.set('a', { userId: 1 }, '60s')
-      await expect((async () => store.deleteWhere({}))()).rejects.toThrow('deleteWhere takes')
-      await expect((async () => store.deleteWhere({ userId: undefined } as never))()).rejects.toThrow('deleteWhere takes')
-      await expect((async () => store.deleteWhere({ userId: new Date(0) } as never))()).rejects.toThrow('deleteWhere takes')
+      await expect(store.deleteWhere({})).rejects.toThrow('deleteWhere takes')
+      await expect(store.deleteWhere({ userId: undefined } as never)).rejects.toThrow('deleteWhere takes')
+      await expect(store.deleteWhere({ userId: new Date(0) } as never)).rejects.toThrow('deleteWhere takes')
       expect(await store.get('a')).toEqual({ userId: 1 })
     })
   }

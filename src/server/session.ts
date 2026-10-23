@@ -420,9 +420,14 @@ export function memoryStore(): DeletableSessionStore {
     delete(id) {
       sessions.delete(id)
     },
-    deleteWhere(match) {
+    async deleteWhere(match) {
       const now = Date.now()
-      const { test } = compileMatch(match)
+      const compiled = compileOrReject(match)
+
+      if (compiled instanceof Promise)
+        return compiled
+
+      const { test } = compiled
       let deleted = 0
 
       for (const [id, entry] of sessions) {
@@ -562,8 +567,13 @@ function openSqliteStore(path: string): { store: SqliteSessionStore, close: () =
     delete(id) {
       remove.run(id)
     },
-    deleteWhere(match) {
-      const { test, needles } = compileMatch(match)
+    async deleteWhere(match) {
+      const compiled = compileOrReject(match)
+
+      if (compiled instanceof Promise)
+        return compiled
+
+      const { test, needles } = compiled
       const page = db.query<{ id: string, data: string }, (string | number)[]>(`SELECT id, data FROM kay_sessions WHERE expires >= ? AND id > ?${' AND instr(data, ?) > 0'.repeat(needles.length)} ORDER BY id LIMIT ${DELETE_PAGE}`)
       let deleted = 0
       let after = ''
@@ -621,6 +631,16 @@ export function compileMatch(match: SessionMatch): { test: (data: SessionData) =
   }
 
   return { test: data => fields.every(([field, value]) => Object.hasOwn(data, field) && data[field] === value), needles }
+}
+
+// A refused match as a rejection, so every store reports it the way a Postgres one does.
+function compileOrReject(match: SessionMatch): ReturnType<typeof compileMatch> | Promise<never> {
+  try {
+    return compileMatch(match)
+  }
+  catch (error) {
+    return Promise.reject(error)
+  }
 }
 
 // Whether stored session data matches, a row that does not parse logged and skipped so the rest are still erased.

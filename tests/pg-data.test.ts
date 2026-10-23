@@ -395,7 +395,7 @@ pgDescribe('pgSessions', () => {
     expect(logged).toEqual(['warn: a stored session does not parse; deleteWhere skipped it'])
     expect(await store.get('b')).toEqual({ user: '1' })
     expect(await rows(sql, 'SELECT 1 FROM kay_sessions')).toHaveLength(2)
-    await expect((async () => store.deleteWhere({}))()).rejects.toThrow('deleteWhere takes')
+    await expect(store.deleteWhere({})).rejects.toThrow('deleteWhere takes')
   })
 
   pgIt('reads the live sessions a page at a time, so more than a page of them are all matched', async () => {
