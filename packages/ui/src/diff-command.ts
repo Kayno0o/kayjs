@@ -83,7 +83,7 @@ const command: KayCommand = {
       }
 
       changed++
-      console.log(`${file}: kayjs-ui changed it between ${version} and ${installed}\n\n${diffs.join('\n\n')}\n\nMerge into the copy by hand, or per file with git:\n${merges.join('\n')}`)
+      console.log(`${file}: kayjs-ui changed it between ${version} and ${installed}\n\n${diffs.join('\n\n')}\n\nMerge into the copy by hand, or per file with git (the copy's imports of the library were rewritten, so check them after):\n${merges.join('\n')}`)
     }
 
     return values.check === true && changed > 0 ? 1 : 0

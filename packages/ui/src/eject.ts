@@ -24,8 +24,6 @@ export interface Ejection {
   file: string
   // Every file copied, as paths under the library's `src/`: the component first.
   files: string[]
-  // The files the copy keeps importing from the library, as paths under its `src/`.
-  shared: string[]
   // The library's components that import the component, which keep the upstream one.
   users: string[]
 }
@@ -52,7 +50,7 @@ export function componentFile(name: string): string | undefined {
   return !file.includes('/') && existsSync(join(LIBRARY, file)) ? file : undefined
 }
 
-export function nameOf(file: string): string {
+function nameOf(file: string): string {
   return file.replace(KAY_SUFFIX, '').replace(DASHED, (_, letter: string) => letter.toUpperCase())
 }
 
@@ -154,10 +152,9 @@ export async function plan(file: string): Promise<Ejection> {
   }
 
   const files = [file, ...[...kept].filter(path => path !== file).toSorted()]
-  const shared = [...new Set(files.flatMap(path => imports.get(path) ?? []))].filter(path => !kept.has(path)).toSorted()
   const users = [...imports].filter(([importer, targets]) => !kept.has(importer) && importer.endsWith('.kay') && targets.includes(file)).map(([importer]) => importer).toSorted()
 
-  return { file, files, shared, users }
+  return { file, files, users }
 }
 
 // The specifier that reaches a library file from the app: its `.kay` through the package's own export, any other module through `lib/`.
@@ -165,15 +162,20 @@ function packageSpecifier(path: string): string {
   return path.endsWith('.kay') ? `${PACKAGE}/${path}` : `${PACKAGE}/lib/${path.replace(SOURCE_SUFFIX, '')}`
 }
 
-// A copy's text: the imports that leave the copied set point at the library.
-export function copyOf(from: string, text: string, ejection: Ejection): string {
+// A copy's text at `here`: the imports that leave the copied set point at the library, or at the copy of an earlier ejection, `earlier` by library path.
+function copyOf(from: string, here: string, text: string, ejection: Ejection, earlier: Map<string, string>): string {
   return rewritten(text, (specifier) => {
     if (!specifier.startsWith('.'))
       return undefined
 
     const target = resolved(from, specifier)
 
-    return target !== undefined && !ejection.files.includes(target) ? packageSpecifier(target) : undefined
+    if (target === undefined || ejection.files.includes(target))
+      return undefined
+
+    const copy = earlier.get(target)
+
+    return copy === undefined ? packageSpecifier(target) : relativeSpecifier(here, copy)
   })
 }
 
@@ -201,7 +203,7 @@ async function appSources(dir: string): Promise<string[]> {
   return found
 }
 
-// The end of the object literal opening at `from`, after its closing brace.
+// The end of the object literal opening at `from`, after its closing brace; comments and strings are skipped.
 function objectEnd(text: string, from: number): number | undefined {
   let depth = 0
   let quote = ''
@@ -209,7 +211,23 @@ function objectEnd(text: string, from: number): number | undefined {
   for (let index = from; index < text.length; index++) {
     const char = text[index]!
 
-    if (quote !== '') {
+    if (quote === '' && char === '/' && text[index + 1] === '/') {
+      const end = text.indexOf('\n', index)
+
+      if (end === -1)
+        return undefined
+
+      index = end
+    }
+    else if (quote === '' && char === '/' && text[index + 1] === '*') {
+      const end = text.indexOf('*/', index + 2)
+
+      if (end === -1)
+        return undefined
+
+      index = end + 1
+    }
+    else if (quote !== '') {
       if (char === '\\')
         index++
       else if (char === quote)
@@ -229,20 +247,34 @@ function objectEnd(text: string, from: number): number | undefined {
   return undefined
 }
 
-// The entry `src/ui.ts` has under the library's specifier, repeated under the copy's: the copy takes it, and the library's own components that use the component keep it.
+// The entry `src/ui.ts` has under the library's specifier or the component's name, repeated under the copy's path: the copy takes it, and the library's own components that use the component keep it. A name now names two components and reaches neither, so that key becomes the library's specifier.
 function withCopyKey(text: string, file: string, name: string, copy: string, notes: string[]): string {
-  const key = new RegExp(`(['"])${`${PACKAGE}/${file}`.replace(ESCAPE, '\\$&')}\\1\\s*:\\s*(?=\\{)`).exec(text)
+  const specifier = `${PACKAGE}/${file}`
+  const pattern = `(?:(['"])${specifier.replace(ESCAPE, '\\$&')}\\1|(?<![\\w$.])(['"]?)${name}\\2)\\s*:\\s*(?=\\{)`
+  const keys = [...text.matchAll(new RegExp(pattern, 'g'))]
+  const [key] = keys
 
-  if (new RegExp(`(?<![\\w$])${name}\\s*:`).test(text))
-    notes.push(`src/ui.ts keys ${name} by name, which now names two components and reaches neither: key it by '${copy}' and '${PACKAGE}/${file}'`)
-
-  if (key === null)
+  if (key === undefined || text.includes(`'${copy}'`))
     return text
+
+  if (keys.length > 1) {
+    notes.push(`src/ui.ts keys ${name} by name and by path, so the name now reaches neither component: merge both under '${specifier}' and '${copy}'`)
+
+    return text
+  }
 
   const start = key.index + key[0].length
   const end = objectEnd(text, start)
 
-  return end === undefined ? text : `${text.slice(0, end)},\n  '${copy}': ${text.slice(start, end)}${text.slice(end)}`
+  if (end === undefined) {
+    notes.push(`src/ui.ts has an entry for ${name} that could not be read: repeat it under '${copy}' by hand`)
+
+    return text
+  }
+
+  const named = key[0].includes(specifier) ? key[0] : `'${specifier}': `
+
+  return `${text.slice(0, key.index)}${named}${text.slice(start, end)},\n  '${copy}': ${text.slice(start, end)}${text.slice(end)}`
 }
 
 export interface Changes {
@@ -258,24 +290,34 @@ export interface Changes {
 export async function changesFor(root: string, ejection: Ejection): Promise<Changes | { exists: string[] }> {
   const src = join(root, 'src')
   const target = (path: string) => join(src, EJECTED_DIR, path)
-  const exists = ejection.files.map(target).filter(path => existsSync(path))
-
-  if (exists.length > 0)
-    return { exists }
-
-  const writes = new Map<string, string>()
-  const manifestPath = join(src, EJECTED_DIR, UPSTREAM_DIR, MANIFEST)
-  const manifest: Manifest = existsSync(manifestPath) ? JSON.parse(await readFile(manifestPath, 'utf8')) as Manifest : {}
+  const manifest = await readManifest(root)
+  const earlier = new Map(Object.values(manifest).flatMap(entry => entry?.files ?? []).map(path => [path, target(path)]))
+  const copyWrites = new Map<string, string>()
+  const baseWrites = new Map<string, string>()
 
   for (const path of ejection.files) {
     const text = await readFile(join(LIBRARY, path), 'utf8')
 
-    writes.set(target(path), copyOf(path, text, ejection))
-    writes.set(join(src, EJECTED_DIR, UPSTREAM_DIR, `${path}.base`), text)
+    copyWrites.set(target(path), copyOf(path, target(path), text, ejection, earlier))
+    baseWrites.set(upstreamPath(root, `${path}.base`), text)
   }
 
+  // A file already holding the copy is left from a run that stopped halfway, which this one finishes.
+  const exists: string[] = []
+
+  for (const [path, text] of copyWrites) {
+    if (existsSync(path) && await readFile(path, 'utf8') !== text)
+      exists.push(path)
+  }
+
+  if (exists.length > 0)
+    return { exists }
+
+  // The copies first and the record last, so a run that stops halfway leaves no record of a copy it did not finish.
+  const writes = new Map([...copyWrites, ...baseWrites])
+  const manifestPath = upstreamPath(root, MANIFEST)
+
   manifest[ejection.file] = { version: await libraryVersion(), files: ejection.files }
-  writes.set(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
 
   const copied = new Map(ejection.files.filter(path => path.endsWith('.kay')).map(path => [`${PACKAGE}/${path}`, target(path)]))
   const copies = new Set(ejection.files.map(target))
@@ -301,6 +343,8 @@ export async function changesFor(root: string, ejection: Ejection): Promise<Chan
       rewrittenFiles.push(relative(root, file))
     }
   }
+
+  writes.set(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
 
   return { writes, rewritten: rewrittenFiles, notes }
 }
@@ -330,6 +374,9 @@ const CONTEXT = 3
 
 // A unified diff of two texts by their lines, empty for equal texts.
 export function unifiedDiff(before: string, after: string, label: string): string {
+  if (before === after)
+    return ''
+
   const a = before.split('\n')
   const b = after.split('\n')
   const table = Array.from({ length: a.length + 1 }, () => Array.from<number>({ length: b.length + 1 }).fill(0))

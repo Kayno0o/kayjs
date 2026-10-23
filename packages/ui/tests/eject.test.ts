@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import { mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
-import { dirname, join, relative } from 'node:path'
+import { dirname, join } from 'node:path'
 import { afterAll, beforeEach, describe, expect, spyOn, test } from 'bun:test'
 import { kay } from '../../../src/build/plugin'
 import { child } from '../../../src/runtime/html'
@@ -158,17 +158,69 @@ describe('kay ui eject', () => {
 
     expect(refused.err).toContain('card.kay exists already')
     expect(await readFile(join(root, UI_DIR, 'card.kay'), 'utf8')).toBe('mine')
-    expect(relative(root, join(root, 'src/page.kay'))).toBe('src/page.kay')
     expect(await readFile(join(root, 'src/page.kay'), 'utf8')).toBe(PAGE)
   })
 
-  test('tells a src/ui.ts that keys the component by name, which now names two', async () => {
-    await writeFile(join(root, 'src/ui.ts'), 'export default {\n  Card: { parts: { head: "b" } },\n}\n')
+  test('turns a name key of src/ui.ts into the library\'s path key plus the copy\'s', async () => {
+    await writeFile(join(root, 'src/ui.ts'), 'export default {\n  \'Card\': { parts: { head: "b" } },\n}\n')
+
+    await run(eject, ['card'])
+
+    expect(await readFile(join(root, 'src/ui.ts'), 'utf8')).toBe('export default {\n  \'@kaynooo/kayjs-ui/card.kay\': { parts: { head: "b" } },\n  \'./components/ui/card.kay\': { parts: { head: "b" } },\n}\n')
+  })
+
+  test('reads an entry of src/ui.ts with comments and braces in strings', async () => {
+    await writeFile(join(root, 'src/ui.ts'), 'export default {\n  \'@kaynooo/kayjs-ui/card.kay\': {\n    // the card\'s look }\n    parts: { root: \'a [&>*]:{b} \' }, /* } */\n  },\n}\n')
 
     const { out } = await run(eject, ['card'])
+    const text = await readFile(join(root, 'src/ui.ts'), 'utf8')
 
-    expect(out).toContain('src/ui.ts keys Card by name, which now names two components')
-    expect(await readFile(join(root, 'src/ui.ts'), 'utf8')).toContain('Card: {')
+    expect(out).not.toContain('could not be read')
+    expect(text).toContain('\n  },\n  \'./components/ui/card.kay\': {\n    // the card\'s look }')
+    expect(text.endsWith('/* } */\n  },\n}\n')).toBe(true)
+    expect(text.match(/components\/ui\/card\.kay/g)).toHaveLength(1)
+  })
+
+  test('says so when an entry of src/ui.ts cannot be read', async () => {
+    await writeFile(join(root, 'src/ui.ts'), 'export default {\n  \'@kaynooo/kayjs-ui/card.kay\': { parts: { root: \'a\' } /* \n}\n')
+
+    expect((await run(eject, ['card'])).out).toContain('could not be read')
+  })
+
+  test('rewrites the imports of nested files, type imports and dynamic imports', async () => {
+    await mkdir(join(root, 'src/pages/deep'), { recursive: true })
+    await writeFile(join(root, 'src/pages/deep/x.ts'), 'import type Card from "@kaynooo/kayjs-ui/card.kay"\nconst load = () => import(\'@kaynooo/kayjs-ui/card.kay\')\nexport { Card, load }\n')
+
+    await run(eject, ['card'])
+
+    const text = await readFile(join(root, 'src/pages/deep/x.ts'), 'utf8')
+
+    expect(text).toContain('from "../../components/ui/card.kay"')
+    expect(text).toContain('import(\'../../components/ui/card.kay\')')
+  })
+
+  test('points a copy at the copy of a component ejected before it', async () => {
+    await run(eject, ['icon'])
+    await run(eject, ['button'])
+
+    expect(await readFile(join(root, UI_DIR, 'button.kay'), 'utf8')).toContain('from \'./icon.kay\'')
+  })
+
+  test('points the earlier copy at a component ejected after it', async () => {
+    await run(eject, ['button'])
+    await run(eject, ['icon'])
+
+    expect(await readFile(join(root, UI_DIR, 'button.kay'), 'utf8')).toContain('from \'./icon.kay\'')
+  })
+
+  test('finishes a run that stopped before it recorded the copy', async () => {
+    await run(eject, ['card'])
+    await rm(join(root, UI_DIR, '.upstream/ejected.json'))
+
+    const { code } = await run(eject, ['card'])
+
+    expect(code).toBe(0)
+    expect((await readFile(join(root, 'src/ui.ts'), 'utf8')).match(/components\/ui\/card\.kay/g)).toHaveLength(1)
   })
 })
 
