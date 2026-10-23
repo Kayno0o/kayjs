@@ -2475,6 +2475,25 @@ describe('the build report', () => {
     // And each kind keeps its own, so switching between them loses neither.
     expect((await build({ check: false })).built!.previous).toBeDefined()
   }, 120_000)
+
+  it('compresses what a page hook sized once, the compress stage finding the copies the hook read', async () => {
+    const root = await scratchProject({
+      'tsconfig.json': tsconfig,
+      'src/routes/index.kay': `--- server\nexport const page = { prerender: true }\n---\nhead\n  title Home\n  meta(name="description" content="Home")\np ${'A paragraph long enough to compress. '.repeat(20)}\n`,
+    })
+    // The hook sizes the page and changes nothing, so the stage meets the same bytes.
+    const hook = `{ name: 'sizes', async transformPage({ html, htmlSize }) { await htmlSize(html); return html } }`
+    const script = `import { buildProject } from ${JSON.stringify(join(import.meta.dir, '../src/build/pipeline'))}\n\nconsole.log(JSON.stringify(await buildProject(${JSON.stringify(root)}, { extensions: [${hook}] }, { check: false })))\n`
+    const child = Bun.spawn([process.execPath, '-e', script], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+    const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+    expect({ code, errors }).toEqual({ code: 0, errors: '' })
+
+    const copies = (JSON.parse(output.trim().split('\n').at(-1)!) as BuildResult).built!.summary.caches.find(cache => cache.name === 'compressed copies')!
+
+    // The page is found by the stage, not compressed a second time.
+    expect(copies.cached).toBeGreaterThanOrEqual(1)
+  }, 120_000)
 })
 
 describe('the runtime chunk', () => {

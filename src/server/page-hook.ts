@@ -19,7 +19,7 @@ export interface RenderedPage {
   html: string
   // The file serving a root-relative URL the page links, absolute: a built stylesheet, script, font or image variant, a public file or a favicon; undefined for any other, such as another site's.
   file: (url: string) => Promise<string | undefined>
-  // The bytes a browser downloads for the file a root-relative URL links, as `file` finds it: its brotli copy, or the file itself when it is not compressed or the copy saves too little; undefined when `file` finds none. A build reads it from the copy it keeps for the compress stage, so a file is compressed once.
+  // The bytes a browser downloads for the file a root-relative URL links, as `file` finds it: what `kay build` compresses it to with brotli, or the file itself when it is not compressed, is too small or the copy saves too little; undefined when `file` finds none. A build reads it from the copy it keeps for the compress stage, so a file is compressed once. A public file or a favicon is sized as `kay build` would compress it, not as a server compressing on the fly sends it.
   fileSize: (url: string) => Promise<number | undefined>
   // The same for HTML the hook holds, as the build would write and compress it: the page as it is returned, a variant of it to measure, or any other text.
   htmlSize: (html: string) => Promise<number>
@@ -50,8 +50,16 @@ export function pageSizes(file: RenderedPage['file'], copiesOf: StrongestCopies 
   const files = new Map<string, Promise<number>>()
   const encoder = new TextEncoder()
 
-  async function sizeOfFile(path: string): Promise<number> {
-    return servedSize(path, await Bun.file(path).bytes(), copiesOf)
+  // A file that could not be read is tried again by the next page rather than failing every one that links it.
+  async function sizeOfFile(path: string, key: string): Promise<number> {
+    try {
+      return await servedSize(path, await Bun.file(path).bytes(), copiesOf)
+    }
+    catch (error) {
+      files.delete(key)
+
+      throw error
+    }
   }
 
   return {
@@ -65,7 +73,7 @@ export function pageSizes(file: RenderedPage['file'], copiesOf: StrongestCopies 
       let size = files.get(key)
 
       if (size === undefined) {
-        size = sizeOfFile(path)
+        size = sizeOfFile(path, key)
         files.set(key, size)
       }
 
