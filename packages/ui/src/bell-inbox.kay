@@ -5,6 +5,7 @@ import { wording } from 'kay/words'
 import inboxApi from './api/inbox'
 import IconButton from './icon-button.kay'
 import { MENU_FOOTER, MENU_ITEM, MENU_LIST } from './menu-look'
+import { OUTSIDE } from './outside'
 import Popover from './popover.kay'
 
 const look = recipe({
@@ -77,7 +78,7 @@ span(part="root")
         p(part="empty") {wording('ui.bell.empty', 'No notifications')}
       for note of items() key={note.id}
         if linked(note.url) as url
-          a(part="item" href={url} target={external(url) ? '_blank' : undefined} rel={external(url) ? 'noopener' : undefined} onClick={() => send(note.id)})
+          a(part="item" href={url} {...external(url) ? OUTSIDE : {}} onClick={() => send(note.id)})
             span(part="dot" data-read={note.read ? '' : undefined} aria-hidden="true")
             span(part="title") {note.title}
             if !note.read

@@ -125,6 +125,18 @@ describe('MarkdownEditor', () => {
     expect(state.area.getAttribute('aria-busy')).toBe('false')
   })
 
+  test('writes an uploaded url with spaces and parentheses so the link holds', async () => {
+    const uploads: (() => void)[] = []
+    const state = await editor('', async () => new Promise(resolve => uploads.push(() => resolve('/images/my cat (1).png'))))
+
+    paste(state.area, [new File(['x'], 'cat.png', { type: 'image/png' })])
+    await settle()
+    uploads[0]!()
+    await settle()
+
+    expect(state.value).toBe('![](/images/my%20cat%20%281%29.png)\n')
+  })
+
   test('does not take focus back when an upload finishes after the user moved on', async () => {
     const uploads: (() => void)[] = []
     const state = await editor('', async file => new Promise(resolve => uploads.push(() => resolve(`/images/${file.name}`))))

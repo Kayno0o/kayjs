@@ -1,7 +1,7 @@
 // What `kay ui eject` and `kay ui diff` share: which files a component takes along, how the copy's and the app's imports are rewritten, and the record of the version a copy came from.
 import { existsSync } from 'node:fs'
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
-import { dirname, join, relative } from 'node:path'
+import { dirname, isAbsolute, join, relative, sep } from 'node:path'
 import { uiConfigEntries } from 'kay/library'
 
 const PACKAGE = '@kaynooo/kayjs-ui'
@@ -363,13 +363,18 @@ function recorded(root: string, path: string): string {
   return relative(root, upstreamPath(root, path))
 }
 
+// A path of the library the record names: relative, and still inside the library once joined, as `kay ui diff` reads and `--accept` copies from it into the app.
+function isLibraryPath(path: string): boolean {
+  return path !== '' && !path.includes('\0') && !isAbsolute(path) && join(LIBRARY, path).startsWith(LIBRARY + sep)
+}
+
 function isEjected(value: unknown): value is Ejected {
   if (typeof value !== 'object' || value === null)
     return false
 
   const { version, files, helpers } = value as Record<string, unknown>
 
-  return typeof version === 'string' && Array.isArray(files) && files.every(file => typeof file === 'string') && (helpers === undefined || (typeof helpers === 'object' && helpers !== null && !Array.isArray(helpers) && Object.values(helpers).every(hash => typeof hash === 'string')))
+  return typeof version === 'string' && Array.isArray(files) && files.every(file => typeof file === 'string' && isLibraryPath(file)) && (helpers === undefined || (typeof helpers === 'object' && helpers !== null && !Array.isArray(helpers) && Object.entries(helpers).every(([path, hash]) => typeof hash === 'string' && isLibraryPath(path))))
 }
 
 export async function readManifest(root: string): Promise<Manifest> {

@@ -355,6 +355,22 @@ describe('a damaged record', () => {
     expect((await run(diff, [])).err).toContain('is not a record of ejected components')
   })
 
+  test('refuses a path outside the library, as a file to copy or a helper to hash, for diff and --accept alike', async () => {
+    await run(eject, ['card'])
+
+    const manifest = join(root, UI_DIR, '.upstream/ejected.json')
+
+    for (const record of [
+      { 'card.kay': { version: '1.0.0', files: ['../../../../etc/hosts'] } },
+      { 'card.kay': { version: '1.0.0', files: ['/etc/hosts'] } },
+      { 'card.kay': { version: '1.0.0', files: ['card.kay'], helpers: { '../package.json': 'x' } } },
+    ]) {
+      await writeFile(manifest, JSON.stringify(record))
+      expect((await run(diff, [])).err).toContain('is not a record of ejected components')
+      expect((await run(diff, ['card', '--accept'])).err).toContain('is not a record of ejected components')
+    }
+  })
+
   test('names the base file that is missing, and --accept records it again', async () => {
     await run(eject, ['card'])
     await rm(join(root, UI_DIR, '.upstream/card.kay.base'))

@@ -27,7 +27,7 @@ const { items, key, minWidth = 256, gap = 12, tile, style, ...rest } = props<Omi
 }>()
 
 const rootSize = elementSize()
-// A height stays known once the tile leaves, so an item coming back is placed at once.
+// A height stays known while the item is in the list, and goes with it when the item leaves.
 const heights = signal<ReadonlyMap<Key, number>>(new Map())
 const keys = new WeakMap<Element, Key>()
 let root: HTMLElement | undefined
@@ -42,10 +42,13 @@ const place = (index: number) => layout()?.places[index]
 // One observer for every tile's height.
 onMount(() => {
   observer = new ResizeObserver((entries) => {
-    const next = new Map(heights())
+    const present = new Set(items.map(key))
+    const next = new Map([...heights()].filter(([name]) => present.has(name)))
 
     for (const entry of entries) {
-      next.set(keys.get(entry.target)!, entry.borderBoxSize?.[0]?.blockSize ?? (entry.target as HTMLElement).offsetHeight)
+      const name = keys.get(entry.target)!
+
+      if (present.has(name)) next.set(name, entry.borderBoxSize?.[0]?.blockSize ?? (entry.target as HTMLElement).offsetHeight)
     }
 
     heights.set(next)

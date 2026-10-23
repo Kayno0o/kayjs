@@ -238,6 +238,10 @@ function swap(placeholder: string, replacement: string): boolean {
   return true
 }
 
+// What ends or breaks a Markdown link destination, written as the escape a browser reads back to the same address.
+const BREAKING = /[\s()<>]/g
+const escaped = (url: string) => url.replace(BREAKING, character => `%${character.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`)
+
 // Embeds each image behind a placeholder right away, so writing goes on while it uploads.
 async function upload(files: File[]): Promise<void> {
   const send = onImage
@@ -261,7 +265,7 @@ async function upload(files: File[]): Promise<void> {
       if (url === undefined)
         swap(text, '') || swap(placeholder, '')
       else
-        swap(placeholder, `![](${url})`)
+        swap(placeholder, `![](${escaped(url)})`)
     }
     finally {
       uploading.set(count => count - 1)

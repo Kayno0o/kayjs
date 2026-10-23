@@ -123,6 +123,14 @@ export class Sortable {
 
   // The registered items still on the page, in the order it shows them.
   #ordered(): HTMLElement[] {
+    for (const [id, el] of this.#items) {
+      if (el.isConnected)
+        continue
+
+      this.#items.delete(id)
+      this.#handles.delete(id)
+    }
+
     return [...this.#items.values()].filter(el => el.isConnected).sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1))
   }
 

@@ -844,7 +844,7 @@ describe('ContactForm', () => {
     expect(html).toContain('name="consent"')
     expect(html).toContain('type="checkbox"')
     expect(html).toContain('I agree that my details are used to answer my message.')
-    expect(html).toContain('<a href="/privacy" target="_blank" rel="noopener">Privacy policy</a>')
+    expect(html).toContain('<a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy policy</a>')
     expect(html).toContain('name="nectar"')
     expect((await site.visit('/fr/contact-consent')).html).toContain('Politique de confidentialité')
     expect((await site.visit('/contact-words')).html).not.toContain('name="consent"')
@@ -852,6 +852,13 @@ describe('ContactForm', () => {
     const refused = await site.submit(contact, { name: 'Ada', email: 'ada@example.com', message: 'Hi', consent: false } as never, { from: '/contact-consent' })
 
     expect(refused.html).toContain('class="text-xs text-kui-error" data-part="issue">Please tick the box to send your message.</span>')
+  })
+
+  test('links the privacy page of a form without a consent box too, on its own line', async () => {
+    const { html } = await site.visit('/contact-privacy')
+
+    expect(html).not.toContain('name="consent"')
+    expect(html).toContain('<a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy policy</a>')
   })
 
   test('draws no consent box for an app\'s own consent field, which only consent: true marks', async () => {
