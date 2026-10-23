@@ -332,7 +332,7 @@ function looseDeclarations(source: string, region: Span, imported: ImportedSigna
   }
 }
 
-// A `/` after one of these starts a regex literal, after anything else (a name, a number, a closing bracket) it divides.
+// A `/` after one of these starts a regex literal, after anything else (a name, a number, a closing bracket) it divides. Known limit: a regex right after `)` or `}` (`if (x) /a,b/.test(y)`) reads as a division, as telling the two apart needs the statement the bracket closes, so its comma would split a props entry.
 const WHITESPACE = /\s/
 const REGEX_PRECEDERS = '(,=:[!&|?{};+-*%<>~^'
 
