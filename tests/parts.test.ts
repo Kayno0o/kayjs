@@ -121,6 +121,7 @@ describe('a component with parts, on the server', () => {
     expect(await render('link.kay', { attrs })).toBe('<a data-part="link" href="/x" target="_blank">go</a>')
     expect(await render('link.kay', { attrs, class: { link: 'mt-4' } })).toBe('<a data-part="link" href="/x" target="_blank" class="mt-4">go</a>')
     expect(await render('link.kay', { attrs: { class: 'brought' } })).toBe('<a data-part="link" href="/x" class="brought">go</a>')
+    expect(await render('link.kay', { attrs: { class: '', style: '' } })).toBe('<a data-part="link" href="/x">go</a>')
     expect(await render('link-class.kay', { attrs })).toBe('<a data-part="link" href="/x" target="_blank" class="p-2">go</a>')
     expect(await render('link-class.kay', { attrs: { class: 'brought' }, class: { link: 'mt-4' } })).toBe('<a data-part="link" href="/x" class="p-2 brought mt-4">go</a>')
   })

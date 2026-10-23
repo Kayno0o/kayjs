@@ -319,7 +319,7 @@ export function element(written: string, sources: readonly object[], content?: (
       if (name === 'class')
         markup += nonEmptyAttribute('class', className(value))
       else if (name === 'style')
-        markup += ` style="${style(value)}"`
+        markup += nonEmptyAttribute('style', style(value))
       else if (value === '')
         markup += ` ${name}`
       else if (tag === 'a' && name === 'href' && !sources.some(later => later != null && Object.hasOwn(later, 'hreflang')))

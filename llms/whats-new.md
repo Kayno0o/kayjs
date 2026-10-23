@@ -8,6 +8,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-cms: a signed-in editor is told editor names in the on-page editor after a restart, on another replica and in streamed blocks, and two edit-link holders never share an edit cookie ([Editor](../packages/cms/llms/editor.md)).
 - kayjs-cms: a signed-in editor is told editor names in the on-page editor after a restart, on another replica and in streamed blocks, and two edit-link holders never share an edit cookie, which an older replica of a rolling deploy does not read ([Editor](../packages/cms/llms/editor.md)).
 - An element with a `part` and an attribute spread that brings no `class` renders no empty `class=""` on the server.
+- An element with an attribute spread renders no empty `class=""` or `style=""` on the server, as in the browser.
 - kayjs-ui marks every styleable element with `data-part` and keeps a state in its ARIA attribute or a named `data-*`; Steps sets `data-step` ([Restyle a component](../packages/ui/llms/setup.md#restyle-a-component)).
 - kayjs-ui has an `AppSwitcher`, a grid of dots opening tiles that link sibling apps ([Navigation](../packages/ui/llms/tables-navigation-and-layout.md)).
 - A `store.rates` that hangs no longer holds kay's own routes (errors, live, analytics, vitals, MCP) past 8 seconds: they count in memory, logged once ([Queues](queues.md)).
