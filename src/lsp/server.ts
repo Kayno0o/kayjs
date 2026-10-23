@@ -124,6 +124,7 @@ const CAPITALIZED = /^[A-Z]/
 const MODULE_FILE = /\.(?:[cm]?[jt]s|[jt]sx)$/
 const FIX_ALL = 'source.fixAll.kay'
 const PARAMETER_HINT = 2
+const ROUTE_WORDS = /(?:href|action)=|navigate\(|redirect\(/
 const PLAIN_FORMAT = 1
 const SNIPPET_FORMAT = 2
 const PACKAGE_TYPES = join(SHADOW_DIR, 'kay-packages.d.ts')
@@ -994,7 +995,8 @@ export class KayLanguageServer {
       return target === undefined ? [] : [{ range: range(span), target: this.clientUri(target) }]
     })
     const project = this.projectAt(projectRootOf(document.file, this.root))
-    const routes = await this.routeTable(project)
+    // The route table is read from disk, so a text with no route path asks for none.
+    const routes = ROUTE_WORDS.test(document.source) ? await this.routeTable(project) : []
 
     return [...imports, ...routeLinks(document.source, routes, project.locales).map(link => ({ range: range(link), target: this.clientUri(link.file) }))]
   }

@@ -2,7 +2,7 @@ import type { Span } from '../compiler/ast'
 import type { Route } from '../server/routes'
 
 // A route path written as a string where kay reads one: a link, a form action or a navigation, never one built with `{}`.
-const ROUTE_PATH = /(?:\b(?:href|action)=|\b(?:navigate|redirect)\()\s*["'`](\/(?!\/)[^"'`{}$\s?#]*)/g
+const ROUTE_PATH = /(?<![\w-])(?:(?:href|action)=|(?:navigate|redirect)\()\s*["'`](\/(?!\/)[^"'`{}$\s?#]*)(?=[?#"'`])/g
 
 export interface RouteLink extends Span {
   file: string

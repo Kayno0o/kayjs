@@ -10,7 +10,6 @@ import { parseKay } from '../compiler/parser'
 import { loadTraverse } from '../compiler/rewrite'
 import { analyzeScript, analyzeServer } from '../compiler/script'
 import { bindingNames, scopedBlocks } from '../compiler/template-reads'
-import { toPosition } from './positions'
 
 // Standard types and modifiers, so a theme colours them without knowing kay; `signal`, `prop` and `server` are kay's own, which a theme or the user's `semanticTokenColorCustomizations` may style.
 export const TOKEN_TYPES = ['variable', 'property', 'function']
@@ -52,7 +51,7 @@ export function semanticTokens(source: string, imported: ImportedSignals = {}): 
     const fence = analyzeServer(source, file.server)?.fence
 
     if (fence)
-      fenceTokens(fence, new Map(), undefined, (span, category, declaration) => add(span, category, declaration), server)
+      fenceTokens(fence, new Map(), undefined, add, server)
   }
 
   const own: Categories = new Map()
@@ -77,8 +76,17 @@ export function semanticTokens(source: string, imported: ImportedSignals = {}): 
     }
   }
 
-  for (const { fence } of fences)
-    fenceTokens(fence, own, server, (span, category, declaration) => add(span, category, declaration), outer)
+  // The module fence goes first, so the script reads its signals.
+  for (const { fence } of fences) {
+    const declared: Categories = new Map()
+
+    fenceTokens(fence, own, server, add, declared)
+
+    for (const [name, category] of declared) {
+      own.set(name, category)
+      outer.set(name, category)
+    }
+  }
 
   const known = new Map([...server, ...outer, ...own])
 
@@ -106,7 +114,7 @@ function fenceTokens(fence: ParsedFence, known: Categories, handed: Categories |
       for (const declarator of declaration.declarations) {
         const init = declarator.init
         const callee = init?.type === 'CallExpression' && init.callee.type === 'Identifier' ? init.callee.name : undefined
-        const made = callee === undefined ? undefined : MADE[callee]
+        const made = callee !== undefined && Object.hasOwn(MADE, callee) ? MADE[callee] : undefined
         const names = declarator.id.type === 'Identifier' ? [declarator.id.name] : bindingIdentifiers(declarator.id)
         const callable = init?.type === 'ArrowFunctionExpression' || init?.type === 'FunctionExpression'
 
@@ -127,19 +135,23 @@ function fenceTokens(fence: ParsedFence, known: Categories, handed: Categories |
     const binding = path.scope.getBinding(path.node.name)
 
     if (binding === undefined)
-      return handed?.get(path.node.name)
+      return known.get(path.node.name) ?? handed?.get(path.node.name)
 
     return binding.scope.path.isProgram() ? own.get(path.node.name) ?? known.get(path.node.name) : undefined
   }
 
-  loadTraverse()(fence.ast, {
-    Identifier(path) {
-      const category = categoryOf(path)
+  // Babel refuses a name declared twice, as an import and a `const` of one name, which an edit passes through: the fence then has no tokens.
+  try {
+    loadTraverse()(fence.ast, {
+      Identifier(path) {
+        const category = categoryOf(path)
 
-      if (category && isNameSite(path))
-        add(fence.shift(path.node), category, path.isBindingIdentifier() && path.scope.getBinding(path.node.name)?.identifier === path.node)
-    },
-  })
+        if (category && isNameSite(path))
+          add(fence.shift(path.node), category, path.isBindingIdentifier() && path.scope.getBinding(path.node.name)?.identifier === path.node)
+      },
+    })
+  }
+  catch {}
 }
 
 // Whether the identifier is a use of the name: a declaration, a read or the left of an assignment, not a property key, a member or a type.
@@ -301,15 +313,22 @@ function declaredIn(body: t.Node): string[] {
 
 function encode(source: string, tokens: Token[]): number[] {
   const data: number[] = []
+  const lineStarts = [0]
+
+  for (let at = source.indexOf('\n'); at !== -1; at = source.indexOf('\n', at + 1))
+    lineStarts.push(at + 1)
+
   let line = 0
-  let character = 0
+  let previous = { line: 0, character: 0 }
 
   for (const token of tokens) {
-    const at = toPosition(source, token.start)
+    while (line + 1 < lineStarts.length && lineStarts[line + 1]! <= token.start)
+      line++
 
-    data.push(at.line - line, at.line === line ? at.character - character : at.character, token.end - token.start, token.type, token.modifiers)
-    line = at.line
-    character = at.character
+    const character = token.start - lineStarts[line]!
+
+    data.push(line - previous.line, line === previous.line ? character - previous.character : character, token.end - token.start, token.type, token.modifiers)
+    previous = { line, character }
   }
 
   return data

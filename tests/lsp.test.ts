@@ -1788,6 +1788,8 @@ const LINKS_PAGE = [
   'a(href={`/posts/${1}`}) Built',
   'a(title="😀é" href="/about?x=1#top") Unicode',
   'form(action="/docs/a/b")',
+  'a(data-href="/about") Data',
+  'button(onClick={() => navigate(`/posts/${1}`)}) Built',
   '',
 ].join('\n')
 
@@ -1847,6 +1849,8 @@ describe('kay lsp editor features of an app under a base', () => {
       expect(links.map(link => link.range.start.line)).not.toContain(4)
       expect(links.map(link => link.range.start.line)).not.toContain(5)
       expect(links.map(link => link.range.start.line)).not.toContain(6)
+      expect(links.map(link => link.range.start.line)).not.toContain(9)
+      expect(links.map(link => link.range.start.line)).not.toContain(10)
     })
 
     it('links a file with a syntax error and gives an empty file none', async () => {
@@ -1913,6 +1917,17 @@ describe('kay lsp editor features of an app under a base', () => {
         // A loop item named like a prop hides it; a member named like a signal is no signal.
         '15:14 count variable signal',
       ])
+    })
+
+    it('keeps the tokens of the other fences when a name is declared twice, and reads a module fence signals in the script', async () => {
+      const text = ['---', 'import { open } from \'../store\'', 'const open = 1', '---', 'p {open}', ''].join('\n')
+      const module = ['--- module', 'const shared = signal(1)', '---', '---', 'const next = shared + 1', '---', 'p {next} {shared}', ''].join('\n')
+
+      await editor.change('src/routes/tokens.kay', text, 3)
+      expect(await tokensOf('src/routes/tokens.kay', text)).toEqual(['4:3 open variable signal'])
+
+      await editor.change('src/routes/tokens.kay', module, 4)
+      expect(await tokensOf('src/routes/tokens.kay', module)).toEqual(['1:6 shared variable declaration,signal', '4:13 shared variable signal', '6:10 shared variable signal'])
     })
 
     it('follows an edit, and gives a file with a syntax error or no text no failure', async () => {
