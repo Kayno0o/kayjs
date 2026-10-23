@@ -37,7 +37,7 @@ An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never
 @source '../.kay/classes.txt';
 
 @theme {
-  --color-kui-accent: light-dark(#3b6fd4, #7aa2f7);
+  --color-accent: light-dark(#3b6fd4, #7aa2f7);
 }
 ```
 
@@ -53,7 +53,7 @@ The palette button in this site's header picks a theme, from Catppuccin to Tokyo
 
 <ThemeTokens />
 
-Colours are `--color-kui-<name>`, used as `bg-kui-<name>`, and hold `light-dark(light, dark)`. `--color-kui-field-border` is the solid line of text fields, buttons, toggles, carousel dots and empty stars, at 3:1 on every surface. A palette that changes the surfaces sets it to match.
+Colours are named as the app names them (`--color-accent`, `--color-background`, `--color-danger`), used as `bg-kui-<name>` with the old `kui-` name, and hold `light-dark(light, dark)`. `--color-kui-field-border` is the solid line of text fields, buttons, toggles, carousel dots and empty stars, at 3:1 on every surface. A palette that changes the surfaces sets it to match.
 
 Eight colours are seeds: `canvas`, `text`, `accent`, `success`, `warning`, `info`, `error` and `field-border`. Set those eight in your `@theme` and every other colour follows: the surfaces and greys are mixed from the canvas and the text, the hairlines are the text at an alpha, and the accent's hover is the accent shaded. A seed must read at 4.5:1 on `mantle` and `surface1`, the deepest surfaces, and `field-border` at 3:1.
 
@@ -61,7 +61,7 @@ Set them on `:root` or `html`, as `@theme` does: a seed set on one element does 
 
 `--kui-border-width` is the keyline of buttons, cards, rows, widgets, notices, avatars, toasts, dialogs, side panels, tooltips, tables, boxed sections, segmented controls, chips, toggles, chart plots and the other framed boxes. The dashed frame and the handles the image cropper draws around the crop keep their fixed borders, as they have to show over any photo. It is a length: `2px`, not `2px solid red`, which it ignores. The old name, `--kui-border-card`, works until 1.61.
 
-Labels, headings and table heads are uppercase unless `--kui-label-case` is `none`, and `--kui-label-font` sets their font. Three skins ship, `@kaynooo/kayjs-ui/skins/brutalist.css` (which sets the three shadow tokens below), `soft.css` and `space.css`, imported after `theme.css`; an app importing none keeps the default theme, and your own `@theme` after one wins.
+Labels, headings and table heads are uppercase unless `--label-case` is `none`, and `--font-label` sets their font. Three skins ship, `@kaynooo/kayjs-ui/skins/brutalist.css` (which sets the three shadow tokens below), `soft.css` and `space.css`, imported after `theme.css`; an app importing none keeps the default theme, and your own `@theme` after one wins.
 
 The space skin is dark only: a near-black canvas, a starlight accent, red kept for errors, and no lines around boxes, where the fill tells them apart. Buttons become hairline keys that light in the accent on hover, checkboxes are drawn, selects are themed, and the `starfield` class paints tiled dots behind a page or a section. It uses Space Grotesk, which you serve with `fonts: [{ fontsource: '@fontsource-variable/space-grotesk' }]` in `kay.config.ts`.
 
@@ -71,9 +71,9 @@ Add the one line to `src/app.css`, after the theme import (an app using `ui()` h
 @import '@kaynooo/kayjs-ui/skins/space.css';
 ```
 
-`--radius-kui-sm`, `--radius-kui-md` and `--radius-kui-full` round what sits inside a framed box (badges and toggle thumbs, chips and toggle tracks, avatars), square except `full`. `--font-kui-mono` is the monospace of the markdown editor, code and stamps, `--font-kui-body` sets the font of labels and text fields when an app wants one, and `--kui-density` (`1`) multiplies the card, inline and section gaps and the field insets.
+`--radius-kui-sm`, `--radius-kui-md` and `--radius-kui-full` round what sits inside a framed box (badges and toggle thumbs, chips and toggle tracks, avatars), square except `full`. `--font-kui-mono` is the monospace of the markdown editor, code and stamps, `--font-kui-body` sets the font of labels and text fields when an app wants one, and `--density` (`1`) multiplies the card, inline and section gaps and the field insets.
 
-A few tokens shape boxes rather than colour them. A brutalist skin sets `--kui-shadow-raised` (under cards, rows, widgets and toasts), `--kui-shadow-press` (under framed buttons) and `--kui-press-travel` (how far a pressed button moves down). All three draw nothing by default.
+A few tokens shape boxes rather than colour them. A brutalist skin sets `--shadow-raised` (under cards, rows, widgets and toasts), `--shadow-press` (under framed buttons) and `--press-travel` (how far a pressed button moves down). All three draw nothing by default.
 
 ### Light or dark
 

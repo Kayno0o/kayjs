@@ -22,7 +22,7 @@ Two peers are optional, installed only when used: `chartist` for `LineChart`, `h
 @source '../.kay/classes.txt';
 
 @theme {
-  --color-kui-accent: light-dark(#3b6fd4, #7aa2f7);
+  --color-accent: light-dark(#3b6fd4, #7aa2f7);
 }
 ```
 
@@ -30,7 +30,7 @@ kay leaves out the theme's rules for the `kui-` classes no file of the app or co
 
 `@apply` of a `kui-*` utility (`@apply bg-kui-mantle`) in a stylesheet of the app builds with `ui()` alone: kay adds an `@reference` of the theme after its Tailwind import for you, which brings the tokens and writes no rule, so the theme is not loaded twice. An `@reference '@kaynooo/kayjs-ui/theme.css';` the app already writes stays harmless. An app without `ui()` writes that line itself, or the build fails with `Cannot apply unknown utility class`.
 
-The theme's tokens are `@theme default`, so the app's `@theme` overrides any of them wherever it sits. Each colour is `--color-kui-<name>`, used as `bg-kui-<name>` and the like, and holds `light-dark(light, dark)`. Eight are seeds a skin sets alone: `canvas`, `text`, `accent`, `success`, `warning`, `info`, `error` and `field-border`; every other colour except `chart-5` and `chart-6` derives from them with `color-mix` (`surface0` is the canvas with 3% of the text, `subtext0` the text with 30% of the canvas, and so on), in both schemes, so `@theme { --color-kui-canvas: ...; --color-kui-text: ...; ... }` with those eight reskins everything. A derived colour stays overridable on its own, and wins over its derivation. A seed must read at 4.5:1 on `mantle` and `surface1`, the deepest grounds (`field-border` at 3:1); a skin with one scheme writes its seeds once and sets `color-scheme` on `:root` to it, as `accent-hi` shades by the scheme. Set the seeds where the theme is computed, `:root` or `html` (`[data-theme=x]` on `html` too): a seed scoped to a subtree does not re-derive the colours inside it. Setting some seeds only moves what derives from them: a skin that sets `canvas` and not `surface0` gets a `surface0` derived from its canvas.
+The theme's tokens are `@theme default`, so the app's `@theme` overrides any of them wherever it sits. Each colour has the app's own name (`--color-accent`, `--color-background`), used as `bg-kui-<name>` and the like with the old `kui-` name, and holds `light-dark(light, dark)`. Eight are seeds a skin sets alone: `canvas`, `text`, `accent`, `success`, `warning`, `info`, `error` and `field-border`; every other colour except `chart-5` and `chart-6` derives from them with `color-mix` (`surface0` is the canvas with 3% of the text, `subtext0` the text with 30% of the canvas, and so on), in both schemes, so `@theme { --color-background: ...; --color-foreground: ...; ... }` with those eight reskins everything. A derived colour stays overridable on its own, and wins over its derivation. A seed must read at 4.5:1 on `mantle` and `surface1`, the deepest grounds (`field-border` at 3:1); a skin with one scheme writes its seeds once and sets `color-scheme` on `:root` to it, as `accent-hi` shades by the scheme. Set the seeds where the theme is computed, `:root` or `html` (`[data-theme=x]` on `html` too): a seed scoped to a subtree does not re-derive the colours inside it. Setting some seeds only moves what derives from them: a skin that sets `canvas` and not `surface0` gets a `surface0` derived from its canvas.
 
 - Surfaces, deepest first: `mantle`, `canvas`, `surface0`, `surface1`.
 - Hairlines: `surface2` and `overlay0`.
@@ -43,18 +43,18 @@ The theme's tokens are `@theme default`, so the app's `@theme` overrides any of 
 
 A few components take tokens for their box and type, for a skin restyling them without redeclaring their selector:
 
-- Labels: `--kui-label-case`, `uppercase` by default, sets the case of buttons, section headings, table heads and the other label text (`none` for sentence case), and `--kui-label-font` their font, the text's own unless set, such as to `var(--font-mono)`. A Badge keeps `--kui-badge-case`, and an Avatar's initial stays uppercase.
+- Labels: `--label-case`, `uppercase` by default, sets the case of buttons, section headings, table heads and the other label text (`none` for sentence case), and `--font-label` their font, the text's own unless set, such as to `var(--font-mono)`. A Badge keeps `--kui-badge-case`, and an Avatar's initial stays uppercase.
 - Skins: `@import '@kaynooo/kayjs-ui/skins/brutalist.css';`, `soft.css` or `space.css` after `theme.css` sets a whole look (brutalist: black and white, 2px keylines, offset shadows, monospace capitals; soft: 0.5rem corners and smaller steps inside, sentence case, a faint shadow; space: dark only, near-black canvas, starlight accent, Space Grotesk, no keylines on boxes, buttons as hairline keys lit in the accent on hover, drawn checkboxes, themed selects, and a `starfield` background utility of tiled dots). The default theme stays for an app importing none. `space.css` names the family `Space Grotesk`: serve it with `fonts: [{ fontsource: '@fontsource-variable/space-grotesk' }]`. Your own `@theme` after the import wins, such as `--color-kui-accent`.
 - Keyline: `--kui-border-width`, `1px` by default, a length, sizes the border of Button, Card (and its head), CardRow, Widget, Notice, Avatar, toasts, Dialog, SidePanel, CommandPalette, popovers, tooltips, Table, a boxed CollapsibleSection, SaveForm's bar, Segmented, FileDrop, Pagination's steps, SiteNav's open list, chart tooltips, ChipGroup's chips, IconPicker's grid, the ScatterChart plot, ImageCropper's stage, Toggle's track and Table's filter and selection bars and narrow sort buttons. The crop frame and handles inside the stage keep their fixed borders, as they have to show over any photo. A value that is no length, such as the shorthand `2px solid red`, leaves it at 1px; text fields and Badge take `--kui-border-input` and `--kui-border-badge`. The old name `--kui-border-card` still sets it, until 1.61.
-- Badge: `--kui-border-badge`, `--spacing-kui-badge-x`, `--spacing-kui-badge-y`, `--text-kui-badge`, `--tracking-kui-badge`, `--kui-badge-case` (`none` or `uppercase`) and `--kui-badge-font`, the text's own unless set, such as to `var(--font-mono)`, and `--kui-badge-solid-text`, the text colour of a `solid` badge (`--color-kui-on-accent` unless set); `--kui-border-stamp` for a stamp.
-- Text fields, `kui-field-input` and a FormField's controls: `--spacing-kui-field-x` and `--spacing-kui-field-y` for the inset, `--kui-field-focus-shadow` for a shadow while focused, `none` by default, such as `3px 3px 0 var(--color-kui-accent)`.
+- Badge: `--kui-border-badge`, `--spacing-kui-badge-x`, `--spacing-kui-badge-y`, `--text-kui-badge`, `--tracking-kui-badge`, `--kui-badge-case` (`none` or `uppercase`) and `--kui-badge-font`, the text's own unless set, such as to `var(--font-mono)`, and `--kui-badge-solid-text`, the text colour of a `solid` badge (`--color-accent-foreground` unless set); `--kui-border-stamp` for a stamp.
+- Text fields, `kui-field-input` and a FormField's controls: `--spacing-kui-field-x` and `--spacing-kui-field-y` for the inset, `--kui-field-focus-shadow` for a shadow while focused, `none` by default, such as `3px 3px 0 var(--color-accent)`.
 - `--radius-kui-card`, `0px` by default, rounds the text fields and also Button, the framed IconButton, Card, CardRow, Widget, Notice, toasts, Dialog, CommandPalette and popovers, Menu included; a docked SidePanel stays square.
 - Radius steps for what sits inside a framed box, `0px` by default except `full`: `--radius-kui-sm` (Badge, a Toggle's thumb), `--radius-kui-md` (ChipGroup's chips, a Toggle's track) and `--radius-kui-full` (`9999px`, an Avatar and its skeleton; a skin squares it with `0px`).
 - Fonts: `--font-kui-mono` (`var(--font-mono)`), the monospace of the markdown editor, code and stamps, which the brutalist skin also gives the labels, and `--font-kui-body`, unset by default so labels and text fields keep the text's font, which an app sets to give them its own.
-- Density: `--kui-density`, `1` by default, multiplies `--spacing-kui-card`, `--spacing-kui-inline`, `--spacing-kui-section` and the field insets, so `0.75` packs a whole app tighter.
+- Density: `--density`, `1` by default, multiplies `--spacing-kui-card`, `--spacing-kui-inline`, `--spacing-kui-section` and the field insets, so `0.75` packs a whole app tighter.
 - Notice: `--kui-border-notice` and `--font-weight-kui-notice`, which a `size="sm"` one takes too.
 - Avatar: `--kui-border-avatar` and the colour `--color-kui-avatar-ring` for its ring, `--font-weight-kui-avatar` for the initial. The two borders follow `--kui-border-width` unless set.
-- Offset shadows and a press-down, `none` and `0px` by default: `--kui-shadow-raised` under a Card, CardRow, Widget and toast, `--kui-shadow-press` under a Button and a framed IconButton (solid or danger), which move down by `--kui-press-travel` and drop that shadow while pressed. A brutalist skin: `--kui-shadow-raised: 4px 4px 0 var(--color-kui-text)`, `--kui-shadow-press: 3px 3px 0 var(--color-kui-text)`, `--kui-press-travel: 3px`.
+- Offset shadows and a press-down, `none` and `0px` by default: `--shadow-raised` under a Card, CardRow, Widget and toast, `--shadow-press` under a Button and a framed IconButton (solid or danger), which move down by `--press-travel` and drop that shadow while pressed. A brutalist skin: `--shadow-raised: 4px 4px 0 var(--color-foreground)`, `--shadow-press: 3px 3px 0 var(--color-foreground)`, `--press-travel: 3px`.
 
 The theme is dark unless the visitor's system asks for light. `data-theme="light"` or `data-theme="dark"` on `html` wins over both, for a site with its own switch, and on any element it themes what that element holds. A colour the app overrides with a single value stays that value in both.
 
@@ -148,5 +148,24 @@ A page that uses the components renders them in `testSite()` like the app's own.
 ## Reference
 
 - Import each component by its `.kay` path: `import Button from '@kaynooo/kayjs-ui/button.kay'`. Types, `toast`, `attempt`, `messageOf`, `editing`, `infiniteList` and the defaults come from the package itself: `import { toast } from '@kaynooo/kayjs-ui'`, and the drag and drop controllers from `@kaynooo/kayjs-ui/dnd`.
-- Components write no Tailwind utility, only the classes of `theme.css`, every one prefixed `kui-` as its tokens are, so a site's own `btn`, `card` or `--color-accent` never meets them. A rule of the app's on one of those classes restyles every instance, and `--kui-border-width` sets the keyline of every framed box; utilities passed through a component's `class` prop restyle one, and `src/ui.ts` restyles the parts of a component with some, see [Restyle a component](#restyle-a-component).
+- The theme reads the app's own names since 1.72, and the old `kui-` names alias them until 1.75 (`kay check --fix` rewrites them, `deprecated-ui-token`):
+
+| Old | New |
+| --- | --- |
+| `--color-kui-canvas`, `text` | `--color-background`, `--color-foreground` |
+| `--color-kui-accent`, `success`, `warning`, `info` | `--color-accent`, `--color-success`, `--color-warning`, `--color-info` |
+| `--color-kui-error` | `--color-danger` |
+| `--color-kui-field-border`, `field-focus` | `--color-input`, `--color-ring` |
+| `--color-kui-mantle`, `surface0`, `surface1`, `surface2` | `--color-popover`, `--color-surface`, `--color-surface-strong`, `--color-border` |
+| `--color-kui-overlay0` | `--color-border-strong` |
+| `--color-kui-muted`, `subtext0` | `--color-muted` |
+| `--color-kui-accent-hi`, `on-accent`, `row-hover` | `--color-accent-hover`, `--color-accent-foreground`, `--color-hover` |
+| `--color-kui-chart-1` to `6` | `--color-chart-1` to `6` |
+| `--text-kui-2xs`, `--tracking-kui-label` | `--text-2xs`, `--tracking-label` |
+| `--kui-density`, `--kui-label-case`, `--kui-label-font` | `--density`, `--label-case`, `--font-label` |
+| `--kui-shadow-raised`, `--kui-shadow-press`, `--kui-press-travel` | `--shadow-raised`, `--shadow-press`, `--press-travel` |
+
+An old name an app sets in its `@theme` still works until 1.75, but a `var(--color-kui-*)` read in the app's own CSS, or an old name set on an element, no longer resolves. Names not in the table (`--kui-border-*`, `--radius-kui-*`, `--font-kui-*`, the badge, field and stamp tokens) keep their `kui-` form.
+
+Components write no Tailwind utility, only the classes of `theme.css`, every one prefixed `kui-` as its tokens are, so a site's own `btn` or `card` never meets them, while the theme's tokens carry the app's own names (`--color-accent`, `--color-background`), so one theme feeds the app and the library. A rule of the app's on one of those classes restyles every instance, and `--kui-border-width` sets the keyline of every framed box; utilities passed through a component's `class` prop restyle one, and `src/ui.ts` restyles the parts of a component with some, see [Restyle a component](#restyle-a-component).
 - `toast` only shows in the browser, called from an island. The server's toast list, shared by every request, stays empty. `ui()` in kay.config.ts (`kay add ui`) mounts one `Toaster`, one `TooltipHost` and the theme on every page. An extension may render its own: while one is mounted, a second renders nothing until the first unmounts.

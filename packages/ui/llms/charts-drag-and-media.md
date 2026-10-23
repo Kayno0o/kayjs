@@ -20,7 +20,7 @@
   - A point has a `key`, a `label`, `x` and `y`, a `weight` its dot's area follows, and a `tooltip`, the label by default.
   - An axis spans its `domain`, or else the points' own extent, along a `linear` or `log` `scale`, with `ticks` of `{ value, label }` and a `label`. `quadrant` draws guides through a point, and `corners` names the four regions they split.
   - `onSelect(point)` makes each dot a button, from an island; `emptyLabel` is what it reads with no points.
-- `ContributionGraph(days={days} color="var(--color-kui-accent)" today={today} months)`: a grid of weeks, each day's cell shaded towards `color` by its `intensity` from 0 to 1, with `description` as hover text before the date, which screen readers read too, or how full the day was (`50% · 2026-09-01`) without one. The grid is a group named by `label`. `days` starts on a Monday: map the dates `gridDays(weeks)` from `@kaynooo/utils/date` lists to `{ day, intensity }`, typed `ContributionDay`; `today` marks its cell, and `months` names each month over the week it starts in. It is static.
+- `ContributionGraph(days={days} color="var(--color-accent)" today={today} months)`: a grid of weeks, each day's cell shaded towards `color` by its `intensity` from 0 to 1, with `description` as hover text before the date, which screen readers read too, or how full the day was (`50% · 2026-09-01`) without one. The grid is a group named by `label`. `days` starts on a Monday: map the dates `gridDays(weeks)` from `@kaynooo/utils/date` lists to `{ day, intensity }`, typed `ContributionDay`; `today` marks its cell, and `months` names each month over the week it starts in. It is static.
 
 ### Drag and drop: Sortable, Board, DropTargets
 

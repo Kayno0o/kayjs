@@ -6,6 +6,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 - kayjs-ui roots write an app's `style` after their own declarations, so the app wins.
 - The Styles tab and LSP show a part's classes written as an imported constant.
+- kayjs-ui reads the app's own theme names (`--color-accent`, `--color-background`, `--density`), and the analytics consent banner now follows the app's `--color-accent`, `--color-surface`, `--color-foreground` and `--color-input` ([Setup](../packages/ui/llms/setup.md)).
 - kayjs-ui's `Checkbox` and `Slider` take a `ref` on their input as `Toggle` and `ColorInput` do, and the four share one busy, rollback and form-reset helper, so a parent echoing the value from `onChange` or `onInput` is treated alike by all ([Forms](../packages/ui/llms/forms.md)).
 - kayjs-ui's `Combobox` list is named by the FormField label as its input is, and `ZoomPane` takes `+ - = 0` and the arrows only when the pane itself has focus, so a field inside it keeps them ([Media](../packages/ui/llms/charts-drag-and-media.md)).
 - kayjs-ui's `SplitLayout` on a phone makes the list and detail `inert` under the open sidebar overlay, focuses a pane when it opens and gives focus back when it closes ([Page layout](../packages/ui/llms/page-layout-palette-and-trees.md)).
