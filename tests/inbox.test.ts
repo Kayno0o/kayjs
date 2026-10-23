@@ -19,6 +19,7 @@ interface Inbox {
 }
 
 const sites = new Map<string, Promise<TestSite>>()
+let slashed: Promise<TestSite> | undefined
 
 async function app(base: string) {
   let held = sites.get(base)
@@ -166,5 +167,30 @@ describe('the inbox route', () => {
   it('asks for the live proof so a tab hears of a change', async () => {
     await notify('ada', { title: 'one' })
     expect((await get('/_kay/ui/inbox', ADA)).headers.get('x-kay-live')).toBeTruthy()
+  })
+})
+
+describe('the Bell with trailingSlash always', () => {
+  it('draws for a signed-in visitor, and its routes answer in place rather than redirect', async () => {
+    slashed ??= testSite({ root: ROOT, extensions: [ui(), who()], plugins: [tailwind], islands: false, trailingSlash: 'always' })
+
+    const site = await slashed
+    const page = await site.fetch('/', { headers: ADA })
+
+    expect(await page.text()).toContain('kui-bell')
+
+    await notify('ada', { title: 'hello', url: '/plain' })
+
+    const list = await site.fetch('/_kay/ui/inbox', { headers: ADA, redirect: 'manual' })
+
+    expect(list.status).toBe(200)
+    expect(((await list.json()) as Inbox).items[0]?.title).toBe('hello')
+
+    const read = await site.fetch('/_kay/ui/inbox/read', { method: 'POST', headers: { 'content-type': 'application/json', ...ADA }, body: '{}', redirect: 'manual' })
+
+    expect(read.status).toBe(200)
+    expect(await notifications.unread('ada')).toBe(0)
+    await site.close()
+    slashed = undefined
   })
 })

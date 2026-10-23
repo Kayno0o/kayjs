@@ -56,9 +56,9 @@ export interface NotifyOptions {
 }
 
 export const MAX_TITLE = 200
-export const MAX_USER = 200
+const MAX_USER = 200
 // The most one person keeps; the oldest go first.
-export const MOST_PER_USER = 200
+const MOST_PER_USER = 200
 const DEFAULT_KEEP = '90d'
 const INBOX_SIZE = 20
 const PRUNE_EVERY_MS = 60 * 60 * 1000
@@ -69,7 +69,7 @@ const CONTROL = /[\u0000-\u001F\u007F]/
 const WEB_URL = /^https?:\/\//i
 
 // The cache key a person's inbox is read under, so an `invalidate` of it reaches every tab showing it.
-export function inboxKey(user: string): string {
+function inboxKey(user: string): string {
   return `kay:inbox:${user}`
 }
 
