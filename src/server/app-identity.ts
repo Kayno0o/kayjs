@@ -7,7 +7,6 @@ import { query } from './pg-sql'
 
 const IDENTITY = 'app'
 
-// The name of the app running: the package.json name of its project, read from the one `kay build --compile` embedded in an executable. Nothing when there is none to read, which leaves a database unclaimed.
 let root: string | undefined
 
 // Called by a server's setup with the project root it serves, which names the app where KAY_ROOT does not.
