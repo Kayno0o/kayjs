@@ -51,7 +51,7 @@ test('an edit link\'s holder receives the editors only as a count, while a signe
 
   expect(hello.keys.some(key => key.includes('"Ann"'))).toBe(true)
   expect(second.messages.join('')).not.toContain('Ann')
-  expect(second.messages.some(message => message.includes('page'))).toBe(true)
+  expect(second.messages.some(message => message.includes('"page":true') || message.includes('\\"page\\":true'))).toBe(true)
 
   // A signed-in editor on the screen is told Ann's name.
   const bob = await receives(screen, '/admin/collections/posts/hello?as=Bob', 'bob-hello')

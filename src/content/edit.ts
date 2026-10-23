@@ -882,7 +882,7 @@ export async function saveEntries(name: string, written: WrittenEntry[]): Promis
       }
     }
     catch (error) {
-      if (error instanceof ContentChanged)
+      if (error instanceof ContentChanged || (error instanceof Error && error.name === 'ContentChanged'))
         return { changed: true }
 
       throw error

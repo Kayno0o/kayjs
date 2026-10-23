@@ -51,9 +51,16 @@ export async function sweepHistory({ full = true }: { full?: boolean } = {}): Pr
     for (const name of await loadedNames()) {
       await purge(name)
 
-      if (cutoff !== undefined) {
+      if (cutoff === undefined)
+        continue
+
+      // A collection whose loader fails must not stop the others from being swept.
+      try {
         await pruneRevisions(name, cutoff, full ? undefined : await revisionPlaces(name))
         await pruneActivity(name, cutoff)
+      }
+      catch (error) {
+        log.error(`the history of ${name} could not be swept`, error)
       }
     }
   }
