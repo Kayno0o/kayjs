@@ -25,11 +25,10 @@ export default defineConfig({
 ```ts
 // src/auth.ts
 import type { AuthSessionData } from '@kaynooo/kayjs-auth'
-import { createAuth, discordProvider } from '@kaynooo/kayjs-auth'
+import { createAuth } from '@kaynooo/kayjs-auth'
 import { authTables, pgStore } from '@kaynooo/kayjs-auth/pg'
 import { Database } from '@kaynooo/pg-orm'
 import { session } from 'kay/server'
-import { mail } from './mail'
 import { Posts } from './tables'
 
 export const db = new Database({ url: process.env.DATABASE_URL!, tables: [...authTables, Posts] })
@@ -39,8 +38,6 @@ export const auth = createAuth({
   store: pgStore(db),
   name: 'Example',
   signInPage: '/login',
-  oauth: { discord: { provider: discordProvider(), clientId: process.env.DISCORD_CLIENT_ID!, clientSecret: process.env.DISCORD_CLIENT_SECRET! } },
-  email: { mailer: { send: mail.enqueue }, links: { /* see Mailed links */ } },
 })
 ```
 
@@ -81,7 +78,7 @@ A plain Elysia app, or one mounting the plugin by hand, gives `auth({ plugin: fa
 `createAuth` options (`auth()` takes them all but `sessions`):
 
 - `sessions`: the plugin kay's `session()` returns, its data type including `AuthSessionData`: the signed-in state lives in the app's kay session, and kayjs-auth sets no cookie of its own.
-- `secret`: derived from the session's secret ([The app secret](../../../llms/environment.md#the-app-secret)), so keep old session secrets in its list while TOTP secrets and provider tokens sealed under them exist. Pass one (32 characters or more; a list rotates, the first writes and every one reads) for a second secret, or when the session plugin is not kay's.
+- `secret`: derived from the session's secret ([The app secret](../../../llms/environment.md#the-app-secret)), so keep old session secrets in its list while sealed TOTP secrets and provider tokens exist. Pass one (32 characters or more; a list rotates) only when the session plugin is not kay's.
 - `store`: see Stores.
 - `site`: the site's public origin, for OAuth callbacks, mailed links and passkeys; kay's `site` (kay.config.ts, else `SITE_URL`) when left out; a plain Elysia app gives its own. With OAuth or mail configured and no origin anywhere, the server refuses to start and a request answers 500, naming `SITE_URL`; `kay dev` supplies `http://localhost:<port>`. `name`: the site's name in mails and authenticator apps, the origin's host by default. `url` and a `site` that is a name are the old forms of both, kept until 1.73 (`deprecated-site-name`).
 - `signInPage`: where a failed OAuth sign-in goes with `?error=`, `/` by default, and where `guard()` and `requireUser()` send an anonymous visitor opening a page when there are no `pages`. `failurePage`: where every failed OAuth sign-in goes instead, with no reason in the URL, so that whether an account may sign in does not leak through an `allow` list. `twoFactorPage`: where a sign-in goes to ask for the code, `/two-factor` by default. `pages`: see Prebuilt pages, which these then default to.

@@ -69,9 +69,11 @@ export const auth = createAuth({
 
 The site's public origin, which OAuth callbacks, mailed links and passkeys are built on, is the `site` of `kay.config.ts` (or `SITE_URL`): `createAuth` reads it, so it is set once. `site: 'https://example.com'` in `createAuth` overrides it. `name: 'Example'` is the name mails and authenticator apps show, the origin's host by default. Before 1.70 `url` was the origin and `site` the name; both still work until 1.73, and `kay check` reports them as `deprecated-site-name`.
 
-The session takes kay's `KAY_SECRET`, and kayjs-auth takes its key from the session's secret, so one secret serves all three ([The app secret](/guides/sessions-and-guards#the-app-secret)). Pass `secret` (at least 32 characters) only to keep a separate one for kayjs-auth.
+The session takes kay's `KAY_SECRET`, and kayjs-auth takes its key from the session's secret, so one secret serves all three ([The app secret](/guides/sessions-and-guards#the-app-secret)).
 
-With the default, the TOTP secrets and stored provider tokens are sealed with a key derived from the session secret. When you rotate it, keep the old session secrets in the list for as long as that data exists, or set `secret` separately. To move an app from `AUTH_SECRET` to the default, pass `secret: [...sessions.deriveSecret('kayjs-auth'), process.env.AUTH_SECRET!]` until nothing sealed under the old one is left.
+TOTP secrets and stored provider tokens are sealed with that key, so when you rotate the session secret, keep the old ones in the list for as long as that data exists.
+
+Pass `secret` (at least 32 characters) only to keep a separate one; moving from `AUTH_SECRET` takes `secret: [...sessions.deriveSecret('kayjs-auth'), process.env.AUTH_SECRET!]` until nothing sealed under the old one is left.
 
 Then declare it in `kay.config.ts` with `module`. The module loads only when the server starts, so the config never loads your database.
 
