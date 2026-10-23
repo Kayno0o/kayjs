@@ -617,7 +617,7 @@ describe('Tabs', () => {
 describe('charts', () => {
   const page = async (id: string) => (await one('/charts', `#${id}`)).html.replaceAll(/<!--[^>]*-->/g, '').replaceAll(/<\/?slot[^>]*>/g, '')
 
-  // The exact-markup tests below match the classes of a part with `[^"]*`, so this one holds the utilities the rules of theme.css used to draw: the look is a layout, a size and a token a skin recolours, and the browser tests read what they compute to.
+  // The exact-markup tests match a part's classes with `[^"]*`, so this one holds the utilities that draw each part.
   test.each([
     ['scatter', 'grid', ['absolute', 'bg-kui-surface2', 'data-[axis=x]:inset-y-0', 'data-[axis=y]:h-px']],
     ['scatter', 'tick', ['absolute', 'whitespace-nowrap', 'tabular-nums', 'text-kui-overlay1', 'data-[axis=x]:top-full']],
@@ -638,6 +638,28 @@ describe('charts', () => {
 
     for (const classes of found)
       expect(classes).toEqual(expect.arrayContaining([...utilities]))
+  })
+
+  // Parts named like another component's (row, fill, root) are found by the utilities that tell them apart, so one element of the page must hold them all.
+  test.each([
+    ['/data', 'root', ['kui-bar-list', 'flex', 'flex-col', 'gap-2']],
+    ['/data', 'row', ['grid', 'w-full', 'items-baseline', 'data-interactive:cursor-pointer', 'data-interactive:hover:text-kui-accent']],
+    ['/data', 'label', ['truncate', 'text-kui-text']],
+    ['/data', 'value', ['text-xs', 'text-kui-subtext0', 'tabular-nums']],
+    ['/data', 'track', ['col-span-2', 'overflow-hidden', 'bg-kui-surface1']],
+    ['/data', 'fill', ['block', 'h-full', 'bg-kui-accent']],
+    ['/data', 'root', ['kui-bar-list-empty', 'text-xs', 'text-kui-subtext0']],
+    ['/data', 'root', ['kui-media-gallery-empty', 'text-kui-subtext0', 'outline-none']],
+    ['/data', 'root', ['kui-site-favicon', 'inline-flex', 'size-5', 'shrink-0', 'overflow-hidden']],
+    ['/content', 'root', ['kui-carousel', 'flex', 'flex-col', 'gap-3']],
+    ['/content', 'viewport', ['relative', 'w-full', 'overflow-hidden', 'bg-kui-surface0']],
+    ['/content', 'slide', ['absolute', 'inset-0', 'transition-transform', 'motion-reduce:transition-none']],
+    ['/content', 'root', ['kui-qr-code', 'block', 'h-auto', 'max-w-full']],
+  ] as const)('%s draws its %s part with %j', async (path, part, utilities) => {
+    const tags = (await visit(path)).html.match(/<[a-z0-9](?:[^>"]|"[^"]*")*>/g) ?? []
+    const found = tags.filter(tag => tag.includes(`data-part="${part}"`)).map(tag => (tag.match(/ class="([^"]*)"/)?.[1] ?? '').split(' '))
+
+    expect(found.some(classes => utilities.every(name => classes.includes(name)))).toBe(true)
   })
 
   test('LineChart renders its frame, a table of its values for screen readers, a keyboard slider on the latest point and a legend dashing each line on the server, leaving the drawing to the browser', async () => {
