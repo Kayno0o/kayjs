@@ -775,6 +775,8 @@ describe('kay.config.ts', () => {
     expect(withoutPlugins(source)).toBe('import shared, { onError } from \'./shared\'\n\nexport default {  onError }\n')
     expect(withoutPlugins('export const plugins = []\nexport default { plugins }\n')).toBe('export const plugins = []\nexport default {  }\n')
     expect(withoutPlugins('export default { lang: \'en\' }\n')).toBeUndefined()
+    // A `let` holding the config is followed like a const.
+    expect(withoutPlugins('import tw from \'tw\'\nlet c = { lang: \'en\', plugins: [tw] }\nexport default c\n')).toBe('let c = { lang: \'en\',  }\nexport default c\n')
     // A destructuring stays while one of its names is used.
     expect(withoutPlugins('import { a } from \'x\'\nconst { p, q } = a()\nexport default { plugins: [p], onError: q }\n')).toBe('import { a } from \'x\'\nconst { p, q } = a()\nexport default {  onError: q }\n')
   })

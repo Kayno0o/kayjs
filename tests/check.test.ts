@@ -4376,12 +4376,13 @@ describe.concurrent('kay check, unused code', () => {
     ]
 
     for (const [form, count] of cases) {
-      const root = await scratchProject({ 'src/routes/index.kay': 'p hi\n', 'src/messages/fr.ts': `${form}\n`, 'kay.config.ts': 'export default { i18n: { locales: [\'fr\'], defaultLocale: \'fr\' } }\n' })
+      const root = await scratchProject({ 'src/routes/index.kay': 'p hi\n', 'src/messages/fr.ts': `${form}\n`, 'src/messages/en.ts': `${form}\n`, 'kay.config.ts': 'export default { i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\' } }\n' })
 
       try {
-        expect((await runCheck(root)).output.match(/warning\[deprecated-message-key\]/g)?.length ?? 0, form).toBe(count)
+        expect((await runCheck(root)).output.match(/warning\[deprecated-message-key\]/g)?.length ?? 0, form).toBe(count * 2)
         await runCheck(root, '--fix')
         expect(await Bun.file(join(root, 'src/messages/fr.ts')).text(), form).not.toContain('Label')
+        expect(await Bun.file(join(root, 'src/messages/en.ts')).text(), form).not.toContain('Label')
       }
       finally {
         await rm(root, { recursive: true, force: true })

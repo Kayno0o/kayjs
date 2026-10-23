@@ -6,13 +6,14 @@ const WRAPPERS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullE
 // The top-level `const` bindings of a module by name, which an identifier in the exported object may name.
 export type Bindings = Map<string, t.Expression>
 
-export function constBindings(program: t.Program): Bindings {
+// `any` follows `let` and `var` bindings too, for the config files that read an object a plain `let` holds.
+export function constBindings(program: t.Program, any = false): Bindings {
   const bindings: Bindings = new Map()
 
   for (const statement of program.body) {
     const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
 
-    if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'const')
+    if (declaration?.type !== 'VariableDeclaration' || (!any && declaration.kind !== 'const'))
       continue
 
     for (const declarator of declaration.declarations) {
@@ -54,7 +55,7 @@ export function exportedDefault(program: t.Program): t.Node | undefined {
   return exported
 }
 
-// The object literal `node` is or wraps, followed through top-level consts. With `calls`, a call handed one argument is transparent too (`defineMessages({ ... })`, `omit({ ... })`), which only the exported value is: inside it a call is a value.
+// The object literal `node` is or wraps, followed through top-level consts. With `calls`, a call handed one argument is transparent too (`defineMessages({ ... })`, `omit({ ... })`), which only the exported value is: inside it a call is a value, though a const bound to one is followed.
 export function objectOf(node: t.Node | null | undefined, bindings: Bindings, calls = false, seen: ReadonlySet<string> = new Set()): t.ObjectExpression | undefined {
   const value = node && unwrapped(node)
 
@@ -68,13 +69,13 @@ export function objectOf(node: t.Node | null | undefined, bindings: Bindings, ca
     return objectOf(value.arguments[0], bindings, calls, seen)
 
   if (value.type === 'Identifier' && !seen.has(value.name))
-    return objectOf(bindings.get(value.name), bindings, calls, new Set([...seen, value.name]))
+    return objectOf(bindings.get(value.name), bindings, true, new Set([...seen, value.name]))
 
   return undefined
 }
 
-export function exportedObject(program: t.Program): t.ObjectExpression | undefined {
-  return objectOf(exportedDefault(program), constBindings(program), true)
+export function exportedObject(program: t.Program, bindings: Bindings = constBindings(program)): t.ObjectExpression | undefined {
+  return objectOf(exportedDefault(program), bindings, true)
 }
 
 // The properties of an object with the spread of a const object replaced by that object's own, in order, so a key written by `{ ...base }` reads as written in place. A spread that is not a const object stays as it is.
@@ -84,7 +85,7 @@ export function propertiesOf(object: t.ObjectExpression, bindings: Bindings, see
       return [property]
 
     const name = unwrapped(property.argument)
-    const spread = name.type === 'Identifier' && !seen.has(name.name) ? objectOf(name, bindings, true) : undefined
+    const spread = name.type === 'Identifier' && !seen.has(name.name) ? objectOf(name, bindings) : undefined
 
     return spread ? propertiesOf(spread, bindings, new Set([...seen, (name as t.Identifier).name])) : [property]
   })

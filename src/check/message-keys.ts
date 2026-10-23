@@ -41,10 +41,11 @@ export async function renamedMessageKeys(root: string, options: CheckOptions): P
       continue
     }
 
-    const tree = exportedObject(ast.program)
+    const bindings = constBindings(ast.program)
+    const tree = exportedObject(ast.program, bindings)
 
     if (tree)
-      visit(tree, [], { file, source, level, found, bindings: constBindings(ast.program) })
+      visit(tree, [], { file, source, level, found, bindings })
   }
 
   return found
@@ -87,7 +88,7 @@ function visit(object: t.ObjectExpression, path: string[], context: Context): vo
       continue
 
     // A const group used twice is visited twice but renamed once.
-    if (found.some(diagnostic => diagnostic.end === property.key.end))
+    if (found.some(diagnostic => diagnostic.file === file && diagnostic.end === property.key.end))
       continue
 
     const replacement = renamed.slice(renamed.lastIndexOf('.') + 1)

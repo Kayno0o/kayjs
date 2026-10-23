@@ -205,13 +205,13 @@ function lineIndent(source: string, offset: number): string {
 // Every message the file's default export writes as a literal, with its `// draft` comment.
 function writtenMessages(source: string): WrittenMessage[] {
   const ast = parsed(source)
-  const object = ast && exportedObject(ast.program)
+  const bindings = ast && constBindings(ast.program)
+  const object = ast && bindings && exportedObject(ast.program, bindings)
 
-  if (!object)
+  if (!ast || !bindings || !object)
     return []
 
   const drafts = new Map((ast.comments ?? []).filter((comment): comment is t.CommentLine => comment.type === 'CommentLine' && DRAFT.test(comment.value)).map(comment => [comment.loc!.start.line, comment]))
-  const bindings = constBindings(ast.program)
   const found: WrittenMessage[] = []
   const walk = (node: t.ObjectExpression, prefix: string) => {
     for (const property of propertiesOf(node, bindings)) {
@@ -252,9 +252,10 @@ function writtenMessages(source: string): WrittenMessage[] {
 
 function messagesObject(source: string): { object: t.ObjectExpression, bindings: Bindings } | undefined {
   const ast = parsed(source)
-  const object = ast && exportedObject(ast.program)
+  const bindings = ast && constBindings(ast.program)
+  const object = ast && bindings && exportedObject(ast.program, bindings)
 
-  return ast && object ? { object, bindings: constBindings(ast.program) } : undefined
+  return bindings && object ? { object, bindings } : undefined
 }
 
 function parsed(source: string): t.File | undefined {

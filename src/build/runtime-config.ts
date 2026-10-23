@@ -3,7 +3,7 @@ import type * as t from '@babel/types'
 import { basename, dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { parse } from '@babel/parser'
-import { exportedObject } from '../compiler/object-literal'
+import { constBindings, exportedObject } from '../compiler/object-literal'
 import { loadTraverse } from '../compiler/rewrite'
 
 interface Range {
@@ -33,7 +33,7 @@ export function withoutPlugins(source: string): string | undefined {
     },
   })
 
-  const config = program && exportedObject(program.node)
+  const config = program && exportedObject(program.node, constBindings(program.node, true))
 
   // A spread may carry plugins of its own.
   if (!program || !config || config.properties.some(entry => entry.type === 'SpreadElement'))

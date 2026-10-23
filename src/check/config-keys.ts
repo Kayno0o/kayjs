@@ -37,7 +37,7 @@ export function configLocator(source: string | undefined): (path: string[]) => C
     return () => START
   }
 
-  const bindings = constBindings(ast.program)
+  const bindings = constBindings(ast.program, true)
   const exported = exportedDefault(ast.program)
   const root = exported && unwrapped(exported)
 
@@ -45,7 +45,7 @@ export function configLocator(source: string | undefined): (path: string[]) => C
     return () => START
 
   const anchor = positionOf(root)
-  const config = objectOf(root, bindings, true)
+  const config = root.type === 'CallExpression' ? objectOf(root.arguments[0], bindings) : objectOf(root, bindings)
 
   return (path) => {
     let found = anchor
