@@ -16,6 +16,7 @@ const look = recipe({
     dot: 'size-2 shrink-0 rounded-full bg-kui-accent data-read:bg-transparent',
     title: 'min-w-0 flex-1 truncate',
     empty: 'px-2 py-1.5 text-sm text-kui-subtext0',
+    unread: 'sr-only',
     all: 'kui-menu-item border-0 border-t border-solid border-kui-surface2 font-medium text-kui-accent',
   },
 })
@@ -61,13 +62,13 @@ span(part="root")
             span(part="dot" data-read={note.read ? '' : undefined} aria-hidden="true")
             span(part="title") {note.title}
             if !note.read
-              span.sr-only {wording('ui.bell.unreadMark', '(unread)')}
+              span(part="unread") {wording('ui.bell.unreadMark', '(unread)')}
         else
           button(part="item" type="button" onClick={() => send(note.id)})
             span(part="dot" data-read={note.read ? '' : undefined} aria-hidden="true")
             span(part="title") {note.title}
             if !note.read
-              span.sr-only {wording('ui.bell.unreadMark', '(unread)')}
+              span(part="unread") {wording('ui.bell.unreadMark', '(unread)')}
       if unread() > 0
         button(part="all" type="button" onClick={() => send()}) {wording('ui.bell.markAllLabel', 'Mark all as read')}
   if unread() > 0
