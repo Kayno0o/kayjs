@@ -2,7 +2,7 @@ import type { EntryRef } from '../kay/contract'
 import { s } from 'kay'
 import { api } from 'kay/server'
 import { wording } from 'kay/words'
-import { authors } from '../authors'
+import { testAddresses } from '../authors'
 import { settings } from '../settings'
 import { entryOf } from '../store'
 
@@ -41,10 +41,10 @@ export default api()
     return { ...await options.list.preview(message as never), subscribers: await options.list.count() }
   }, { query: locale })
   .post('/:collection/:slug/test', async ({ params, query, request }) => {
-    const to = authors.get(request)?.email
+    const to = testAddresses.get(request)
 
     if (to === undefined)
-      throw new Refused(400, wording('cms.newsletter.noAddress', 'A test send goes to your own address, which needs cms({ author })'))
+      throw new Refused(400, wording('cms.newsletter.noAddress', 'A test send goes to your own address, which the sign-in does not give: set testTo on the collection'))
 
     const { options, message } = await loaded({ collection: params.collection, slug: params.slug, locale: query.locale })
 

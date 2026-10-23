@@ -15,6 +15,8 @@ export interface Member {
   name: string
   // The names `cms({ roles })` lists that the person holds.
   held: string[]
+  // The signed-in person's email, when the guard knows it.
+  email?: string | undefined
 }
 
 // A refusal a guard threw (`ctx.deny`, `ctx.redirect`) rather than a fault, found by its status as kay does not export the classes.
@@ -64,7 +66,7 @@ async function readMember(ctx: GuardContext): Promise<Member | undefined> {
   if (member) {
     const given = await member(ctx)
 
-    return given && { name: given.name ?? '', held: [...roles?.keys() ?? []].filter(role => given.roles.includes(role)) }
+    return given && { name: given.name ?? '', email: given.email, held: [...roles?.keys() ?? []].filter(role => given.roles.includes(role)) }
   }
 
   const auth = authOf(ctx)
@@ -77,7 +79,7 @@ async function readMember(ctx: GuardContext): Promise<Member | undefined> {
   const held = [...roles?.keys() ?? []].filter(role => auth.isGranted ? auth.isGranted(role, user) : owned.includes(role))
   const name = [user.username, user.email, user.id].find(value => (typeof value === 'string' && value !== '') || typeof value === 'number')
 
-  return { name: String(name ?? ''), held }
+  return { name: String(name ?? ''), held, email: typeof user.email === 'string' && user.email !== '' ? user.email : undefined }
 }
 
 // The actions the signed-in person may not do, each with the reason a disabled control gives; empty when the app lists no roles.

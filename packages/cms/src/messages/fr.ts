@@ -349,7 +349,7 @@ export default defineMessages({
       draft: 'Publiez l\'entrée avant de l\'envoyer à la liste',
       frame: 'Le mail tel qu\'il sera envoyé',
       loading: 'Création du mail',
-      noAddress: 'Un envoi de test part à votre adresse, ce qui demande cms({ author })',
+      noAddress: 'Un envoi de test part à votre adresse, que la connexion ne donne pas : renseignez testTo sur la collection',
       none: 'Les entrées de {collection} ne sont pas envoyées à une liste',
       open: 'Newsletter',
       previewFailure: 'Impossible de créer le mail',

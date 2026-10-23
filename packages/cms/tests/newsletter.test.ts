@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test'
-import { authors } from '../src/authors'
+import { testAddresses } from '../src/authors'
 import { configure } from '../src/settings'
 
 let draft = false
@@ -33,11 +33,11 @@ const list = {
   count: async () => 3,
 }
 
-async function post(path: string, as?: { name: string, email: string }) {
+async function post(path: string, to?: string) {
   const request = new Request(`http://site.test${path}`, { method: 'POST' })
 
-  if (as)
-    authors.set(request, as)
+  if (to !== undefined)
+    testAddresses.set(request, to)
 
   const response = await newsletterApi.handle(request)
 
@@ -62,17 +62,17 @@ describe('sending an entry to a list', () => {
   })
 
   test('sends a test to the editor alone', async () => {
-    const { status } = await post('/posts/hello/test', { name: 'Ed', email: 'ed@example.com' })
+    const { status } = await post('/posts/hello/test', 'ed@example.com')
 
     expect(status).toBe(200)
     expect(calls).toEqual(['test Hello ed@example.com'])
   })
 
-  test('refuses a test when the guard names no editor address', async () => {
+  test('refuses a test when no address was found for the editor', async () => {
     const { status, body } = await post('/posts/hello/test')
 
     expect(status).toBe(400)
-    expect(body).toContain('cms({ author })')
+    expect(body).toContain('testTo')
     expect(calls).toEqual([])
   })
 
@@ -121,5 +121,6 @@ describe('sending an entry to a list', () => {
   test('rejects an option without a list or a message', () => {
     expect(() => configure({ newsletter: { posts: { list: {} as never, message: () => ({}) } } })).toThrow('newsletter')
     expect(() => configure({ newsletter: { posts: { list, message: undefined as never } } })).toThrow('newsletter')
+    expect(() => configure({ newsletter: { posts: { list, message: () => ({}), testTo: 3 as never } } })).toThrow('testTo')
   })
 })

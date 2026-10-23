@@ -5,7 +5,7 @@ import { READ_METHODS, underKayDev } from 'kay/library'
 import { editedEntry, editRequested } from 'kay/server'
 import { wording } from 'kay/words'
 import { forbidden, may, memberOf, routePath } from '../access'
-import { authors } from '../authors'
+import { authors, testAddresses } from '../authors'
 import { leavesPublication, restrain } from '../publishing'
 import { settings } from '../settings'
 import devApi from './dev'
@@ -45,6 +45,16 @@ function ownPath(path: string, root: string | undefined): string {
   return at < 0 ? '' : path.slice(at + root.length)
 }
 
+// A path segment as the route reads it, or as written when it is not valid.
+function decoded(segment: string): string {
+  try {
+    return decodeURIComponent(segment)
+  }
+  catch {
+    return segment
+  }
+}
+
 // Leaving edit mode writes nothing, so an edit link alone may do it; `/entries/preview/exit` is a save to a collection named preview.
 const LEAVING = /^\/preview\/exit$/
 
@@ -65,6 +75,8 @@ const EDITOR_CAN = /^\/editor\/can$/
 const PUBLISH = /^\/entries\/[^/]+\/[^/]+\/(?:publish|unpublish|share)$/
 // Mailing a list shows and sends what an editor wrote to everyone on it, so it is a publisher's, the preview and the test included.
 const NEWSLETTER = /^\/newsletter\/[^/]+\/[^/]+\/(?:preview|test|send)$/
+// The test send, whose collection tells where it goes.
+const NEWSLETTER_TEST = /^\/newsletter\/([^/]+)\/[^/]+\/test$/
 const ENTRY_RENAME = /^\/entries\/[^/]+\/[^/]+\/rename$/
 const REDIRECTS = /^\/redirects(?:\/|$)/
 const UPLOAD = /^\/files\/[^/]+$/
@@ -162,6 +174,16 @@ export default guard(async (ctx) => {
     // A save that flips the draft flag or a publish date is a publish as much as the route is.
     if (method === 'POST' && needed === undefined && !await may(ctx, 'publish') && !await leavesPublication(ctx.request, path))
       return forbidden(ctx, 'publish')
+  }
+
+  const [, testing] = method === 'POST' ? NEWSLETTER_TEST.exec(ownPath(routePath(ctx.url), root)) ?? [] : []
+
+  if (testing !== undefined) {
+    const testTo = settings().newsletter.get(decoded(testing))?.testTo
+    const to = (typeof testTo === 'function' ? await testTo(ctx) : testTo) ?? (await memberOf(ctx))?.email
+
+    if (to !== undefined && to !== '')
+      testAddresses.set(ctx.request, to)
   }
 
   const identity = await author?.(ctx)

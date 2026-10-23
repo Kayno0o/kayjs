@@ -23,6 +23,8 @@ export interface NewsletterList {
 export interface NewsletterOptions {
   list: NewsletterList
   message: (entry: StoredEntry) => object | Promise<object>
+  // Where Send me a test goes: an address, or a function of the request returning one. The signed-in person's email by default.
+  testTo?: string | ((ctx: GuardContext) => string | undefined | Promise<string | undefined>) | undefined
 }
 
 export interface UploadOptions {
@@ -47,6 +49,8 @@ export interface SaveEvent {
 // Who the guard let in, as `cms({ member })` reports them.
 export interface MemberInfo {
   name?: string | undefined
+  // Where a newsletter test send goes, when `testTo` names none.
+  email?: string | undefined
   roles: readonly string[]
 }
 
@@ -71,11 +75,11 @@ export interface CmsOptions {
   collections?: Record<string, GivenLayout> | undefined
   // `false` leaves out the hint cookie and the "Edit this page" link an editor's browser finds on every page, once the guard let it into the screens; a link of your own carries `data-kcms-edit-page` (`data-cms-edit-page` before 1.70 still works) and is shown in its place.
   pageLink?: false | undefined
-  // The collections whose entries an editor can send to a mailing list, by name: `{ posts: { list: mail.list('news'), message: entry => ({ subject: String(entry.data?.title), view: Post, props: { entry } }) } }`. The entry screen then offers a preview of the mail, a test send to the editor's own address (from `author`) and the send itself, which needs the `publish` action of `roles`.
+  // The collections whose entries an editor can send to a mailing list, by name: `{ posts: { list: mail.list('news'), message: entry => ({ subject: String(entry.data?.title), view: Post, props: { entry } }) } }`. The entry screen then offers a preview of the mail, a test send to the editor's own address (the signed-in person's email, or `testTo`) and the send itself, which needs the `publish` action of `roles`.
   newsletter?: Record<string, NewsletterOptions> | undefined
   // What each role may do beyond editing: `{ editor: [], publisher: ['publish'], admin: ['publish', 'delete', 'upload', 'redirects'] }`. A signed-in editor whose roles are not listed only edits. The roles are kayjs-auth's, else `passwordGuard()`'s; without this option everyone the guard admits may do all of it.
   roles?: Record<string, readonly Action[]> | undefined
-  // Who the guard let in, for a custom guard that is neither kayjs-auth nor `passwordGuard()`: `({ locals }) => ({ name: locals.user.email, roles: locals.user.roles })`. The admin header names `name`, and `roles` are matched against `roles`; without it such a guard holds no role.
+  // Who the guard let in, for a custom guard that is neither kayjs-auth nor `passwordGuard()`: `({ locals }) => ({ name: locals.user.email, roles: locals.user.roles })`. The admin header names `name`, `email` is where a newsletter test goes, and `roles` are matched against `roles`; without it such a guard holds no role.
   member?: ((ctx: GuardContext) => MemberInfo | undefined | Promise<MemberInfo | undefined>) | undefined
   // Who a save the guard let through is committed as, from the guard's context: `async ({ locals }) => ...` reading the signed-in user.
   author?: ((ctx: GuardContext) => Identity | undefined | Promise<Identity | undefined>) | undefined
@@ -207,12 +211,15 @@ function checkNewsletter(given: CmsOptions['newsletter']): ReadonlyMap<string, N
   const checked = new Map<string, NewsletterOptions>()
 
   for (const [name, options] of Object.entries(given ?? {})) {
-    const { list, message } = (options) ?? {}
+    const { list, message, testTo } = (options) ?? {}
 
     if (typeof message !== 'function' || typeof list?.send !== 'function' || typeof list.test !== 'function' || typeof list.preview !== 'function' || typeof list.count !== 'function')
       throw configError(`\`cms({ newsletter: { ${name} } })\``, options, 'an object with a `list` from kayjs-mail\'s `mail.list()` and a `message` function')
 
-    checked.set(name, { list, message })
+    if (testTo !== undefined && typeof testTo !== 'string' && typeof testTo !== 'function')
+      throw configError(`\`cms({ newsletter: { ${name} } })\``, options, 'a `testTo` that is an address or a function returning one')
+
+    checked.set(name, { list, message, testTo })
   }
 
   return checked

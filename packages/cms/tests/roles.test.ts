@@ -1,6 +1,7 @@
 import type { GuardContext } from 'kay'
 import { describe, expect, mock, test } from 'bun:test'
 import * as server from 'kay/server'
+import { testAddresses } from '../src/authors'
 import { passwordGuard, SESSION_COOKIE } from '../src/password'
 import { isRestrained } from '../src/publishing'
 import { configure } from '../src/settings'
@@ -398,4 +399,70 @@ describe('the members the screens read', () => {
     await statusOf(ask({ method: 'GET', path: '/editor/can' }))
     expect(looked).toBe(1)
   })
+})
+
+describe('where a newsletter test send goes', () => {
+  const list = { send: async () => ({ id: 'b1', recipients: 0 }), test: async () => undefined, preview: async () => ({ subject: '', html: undefined, text: '' }), count: async () => 0 }
+  const message = () => ({})
+  const testRequest = (user: Asks['user'] = { roles: ['editor'], email: 'ed@example.com' }) => ask({ path: '/newsletter/posts/hello/test', user })
+
+  test('is the signed-in person\'s email, whatever the commit identity says', async () => {
+    configure({ guard: () => undefined, author: () => ({ name: 'A pen name', email: 'pen@example.com' }), newsletter: { posts: { list, message } } })
+
+    const ctx = testRequest()
+
+    await apiGuard(ctx)
+    expect(testAddresses.get(ctx.request)).toBe('ed@example.com')
+  })
+
+  test('is the `testTo` of the collection when given, as an address or a function', async () => {
+    configure({ guard: () => undefined, newsletter: { posts: { list, message, testTo: 'news@example.com' } } })
+
+    const fixed = testRequest()
+
+    await apiGuard(fixed)
+    expect(testAddresses.get(fixed.request)).toBe('news@example.com')
+
+    configure({ guard: () => undefined, newsletter: { posts: { list, message, testTo: ctx => `${ctx.request.method}@example.com` } } })
+
+    const computed = testRequest()
+
+    await apiGuard(computed)
+    expect(testAddresses.get(computed.request)).toBe('POST@example.com')
+  })
+
+  test('falls back to the person when `testTo` returns nothing, and is `member`\'s email for a custom guard', async () => {
+    configure({ guard: () => undefined, newsletter: { posts: { list, message, testTo: () => undefined } } })
+
+    const fallback = testRequest()
+
+    await apiGuard(fallback)
+    expect(testAddresses.get(fallback.request)).toBe('ed@example.com')
+
+    configure({ guard: () => undefined, member: () => ({ email: 'm@example.com', roles: [] }), newsletter: { posts: { list, message } } })
+
+    const custom = testRequest()
+
+    await apiGuard(custom)
+    expect(testAddresses.get(custom.request)).toBe('m@example.com')
+  })
+
+  test('is none for a person without an email, and for another route', async () => {
+    configure({ guard: () => undefined, newsletter: { posts: { list, message } } })
+
+    const none = testRequest({ roles: ['editor'] })
+
+    await apiGuard(none)
+    expect(testAddresses.get(none.request)).toBeUndefined()
+
+    const other = ask({ path: '/newsletter/posts/hello/preview', user: { roles: ['editor'], email: 'ed@example.com' } })
+
+    await apiGuard(other)
+    expect(testAddresses.get(other.request)).toBeUndefined()
+  })
+})
+
+test('a test send with a malformed collection in its path is not a server error', async () => {
+  configure({ guard: () => undefined })
+  await apiGuard(ask({ path: '/newsletter/%E0%A4%A/hello/test', user: { roles: ['editor'], email: 'ed@example.com' } }))
 })
