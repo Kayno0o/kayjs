@@ -131,11 +131,12 @@ jobs:
           echo "BUN_CHROME_PATH=$(command -v chromium || command -v chromium-browser)" >> "$GITHUB_ENV"
 
       # The app template's own tests copy a database per test file, here on the cluster the runner image holds, started as pg-orm's CI starts it.
+      # The suite runs files side by side, each with its own pools, which outgrow the default 100 connections.
       - name: Start PostgreSQL
         run: |
           mkdir -p /run/postgresql
           chown postgres:postgres /run/postgresql
-          su postgres -c "pg_ctl -D /var/lib/postgresql/data -o '-c listen_addresses=127.0.0.1 -c unix_socket_directories=/run/postgresql' -w start"
+          su postgres -c "pg_ctl -D /var/lib/postgresql/data -o '-c listen_addresses=127.0.0.1 -c unix_socket_directories=/run/postgresql -c max_connections=300' -w start"
           su postgres -c "psql -c \"CREATE USER test WITH PASSWORD 'test' SUPERUSER;\""
           echo "TEST_DATABASE_URL=postgres://test:test@127.0.0.1:5432/kay_app_test" >> "$GITHUB_ENV"
           su postgres -c "createdb -O test kayjs_auth_test"
