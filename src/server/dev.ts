@@ -578,12 +578,12 @@ const DEV_PREFIX = '/_kay/dev/'
 const LOOPBACK = /^(?:127\.|::1$|::ffff:127\.)/
 
 // Every dev route but the tool's scripts and the reload stream answers a peer on this machine only, as `kay dev --host` would otherwise let the network read the database, rewrite files and open the editor; `KAY_DEV_REMOTE=1` lets any peer in.
-// It is mounted before the first dev route, so one added later is covered too. The peer is the socket's, so a proxy or tunnel on this machine passes as local.
+// It is mounted before the first dev route, so one added later is covered too, and as `onRequest` it joins no route's hook chain, which an API module's own hooks (cors, rate limits, guards) would otherwise share with it. The peer is the socket's, so a proxy or tunnel on this machine passes as local.
 export function refuseRemoteDevTools(app: Elysia): void {
   if (process.env.KAY_DEV_REMOTE === '1')
     return
 
-  app.onBeforeHandle(({ request, server }) => {
+  app.onRequest(({ request, server }) => {
     const path = new URL(request.url).pathname
 
     // Every dev route ending in `.js` serves a static script of the tool; a data route added later must not end in `.js`.
