@@ -404,7 +404,7 @@ async function typeInTitle(page: Awaited<ReturnType<typeof open>>, text: string)
   await page.type(text)
 }
 
-const status = (page: Awaited<ReturnType<typeof open>>) => page.evaluate(() => [...document.querySelectorAll('.kcms-editor-status p')].map(line => line.textContent))
+const status = (page: Awaited<ReturnType<typeof open>>) => page.evaluate(() => [...document.querySelectorAll('.kcms-editor-status > :is(p, [data-tone])')].map(line => line.textContent))
 
 test('the editor says the page is updating while an edit renders, and not once it has', async () => {
   const page = await open(1280, 800)
@@ -529,7 +529,7 @@ test('the edge draws a thin line on hover and focus in both docks, its hit zone 
   }
 })
 
-test('a single collection\'s entry shows no slug under its title in the editor', async () => {
+test('a single collection\'s entry shows no collection under its title in the editor', async () => {
   const page = await built.open('/admin/page?path=/welcome')
 
   opened.push(page)
@@ -540,7 +540,7 @@ test('a single collection\'s entry shows no slug under its title in the editor',
 
     w.slugSeen = false
     new MutationObserver(() => {
-      if (document.querySelector('.kcms-entry-slug'))
+      if (document.querySelector('.kcms-entry-collection'))
         w.slugSeen = true
     }).observe(document, { childList: true, subtree: true })
   })
@@ -548,6 +548,6 @@ test('a single collection\'s entry shows no slug under its title in the editor',
   await page.waitUntil(() => document.querySelector('.kcms-entry-title')?.textContent === 'Welcome page')
 
   expect(await page.evaluate(() => (window as unknown as { slugSeen: boolean }).slugSeen)).toBe(false)
-  expect(await page.evaluate(() => document.querySelector('.kcms-entry-slug'))).toBeNull()
+  expect(await page.evaluate(() => document.querySelector('.kcms-entry-collection'))).toBeNull()
   expect(page.errors).toEqual([])
 })

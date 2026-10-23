@@ -252,3 +252,23 @@ test('Escape after the text was emptied puts the text back', async () => {
 
   expect(await page.text(TITLE)).toBe(before)
 }, 60_000)
+
+test('typing the title collapses the form to its field, an anchor shows another, and Show all fields opens it again', async () => {
+  const page = await open()
+  const visible = (selector: string) => page.evaluate((each: string) => document.querySelector(each)!.getBoundingClientRect().height > 0, selector)
+
+  await edit(page)
+  await page.waitUntil(() => document.querySelector('.kcms-entry-anchors button[aria-pressed="true"]') !== null)
+  expect(await visible(FORM_TITLE)).toBe(true)
+  expect(await visible('[data-kcms-path="tags"]')).toBe(false)
+  // The caret stays in the page's title.
+  expect(await page.evaluate((selector: string) => document.activeElement === document.querySelector(selector), TITLE)).toBe(true)
+
+  await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('.kcms-entry-anchors button')].find(button => button.textContent?.trim() === 'Tags')!.click())
+  await page.waitUntil(() => document.querySelector('[data-kcms-path="tags"]')!.getBoundingClientRect().height > 0)
+  expect(await visible(FORM_TITLE)).toBe(false)
+
+  await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('.kcms-entry-anchors button')].find(button => button.textContent?.trim() === 'Show all fields')!.click())
+  await page.waitUntil((selector: string) => document.querySelector(selector)!.getBoundingClientRect().height > 0, undefined, FORM_TITLE)
+  expect(await visible('[data-kcms-path="tags"]')).toBe(true)
+}, 60_000)

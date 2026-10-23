@@ -1,23 +1,29 @@
 ---
 import type { FormScope } from '../form'
+import type { FormItem } from '../layout'
 import EntryBody from '../components/entry-body.kay'
 import EntryField from '../components/entry-field.kay'
 import EntryNotices from '../components/entry-notices.kay'
 import SessionEnded from '../components/session-ended.kay'
 import { fieldsOf } from '../fields'
-import { formRows } from '../layout'
+import { BODY_ID, formRows } from '../layout'
+import { covers } from './anchors'
 
 // An entry's form: a control per field of its collection's schema, then its Markdown body, arranged as the collection's layout says (`cms({ collections })`), and what went wrong above.
-const { form } = props<{ form: FormScope }>()
+// `only` is a path of the form (the body's is `#body`): the form then shows the item holding it and keeps the others hidden, still rendered, so what was typed in them stays.
+const { form, only } = props<{ form: FormScope, only?: string | undefined }>()
 
+const keyOf = (item: FormItem) => item === 'body' ? BODY_ID : item.at ?? String(item.key)
+const shown = (item: FormItem) => only === undefined || covers(keyOf(item), only)
 const rows = memo(() => formRows(fieldsOf(form.collection.schema), form.collection.body !== undefined, form.collection.layout?.form))
 ---
 SessionEnded
 EntryNotices(form={form})
 for row, i of rows() key={i}
-  .kcms-row
-    for item of row key={item === 'body' ? '#body' : item.at ?? item.key}
-      if item === 'body'
-        EntryBody(form={form})
-      else
-        EntryField(form={form} name={item.at ?? String(item.key)} field={item})
+  .kcms-row(hidden={!row.some(shown)})
+    for item of row key={keyOf(item)}
+      .kcms-item(hidden={!shown(item)})
+        if item === 'body'
+          EntryBody(form={form})
+        else
+          EntryField(form={form} name={item.at ?? String(item.key)} field={item})

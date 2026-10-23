@@ -8,6 +8,7 @@ import type { Choice, ListBar, ListTarget, Removed } from './page-lists'
 import type { Direction } from './reorder'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
 import { attempt } from '@kaynooo/kayjs-ui'
@@ -28,6 +29,7 @@ import type { PageListWatch } from './page-lists'
 import { BOTTOM, browserStorage, canSide, clampSize, dockOf, readLayout, revealBy, SIDE, sizeOf, writeLayout } from './dock'
 import { drafts } from './drafts'
 import { rebuilding, watchRebuild } from './rebuild'
+import { saveAll } from './save-all'
 import { shipWords } from './words'
 import EntryForm from './entry-form.kay'
 import PageListTools from './page-list-tools.kay'
@@ -53,7 +55,11 @@ shipWords()
 
 const open = signal(true)
 const focused = signal<FieldMarker>()
+// The field typed in on the page, which the form collapses to without taking the focus off it.
+const typing = signal<FieldMarker>()
 const leaving = signal(false)
+// Set while Save all goes through the entries holding edits.
+const savingAll = signal(false)
 // Set once Stop editing was asked with edits not saved, until the editor chooses between keeping them and dropping them.
 const confirming = signal(false)
 // Where the editor was left, read once mounted since the server has no storage: the page renders with the window's choice, then takes the kept one.
@@ -288,6 +294,13 @@ function reveal(element: Element, clickedAt?: number): void {
 // The field a click on the page asked for, when it belongs to that entry.
 function focusIn(entry: EntryRef): FieldPath | undefined {
   const marker = focused()
+
+  return marker && entryKey(marker) === entryKey(entry) ? marker.path : undefined
+}
+
+// The field typed in on the page, when it belongs to that entry.
+function typingIn(entry: EntryRef): FieldPath | undefined {
+  const marker = typing()
 
   return marker && entryKey(marker) === entryKey(entry) ? marker.path : undefined
 }
@@ -798,6 +811,7 @@ function edit(field: MarkedField, x?: number, y?: number, back?: HTMLElement): v
   const inline = inlineTargetOf([field], drafts)
 
   if (inline && !inline.busy()) {
+    typing = field.marker
     startInline(inline, drafts, back || x === undefined || y === undefined ? undefined : { x, y })
     reveal(inline.element, y)
 
@@ -814,6 +828,21 @@ async function askStop(): Promise<void> {
     return stopEditing()
 
   confirming = true
+}
+
+// Saves every entry of the page holding edits, each as its own Save would.
+async function saveEverything(): Promise<void> {
+  if (savingAll())
+    return
+
+  savingAll = true
+
+  try {
+    await saveAll(entries)
+  }
+  finally {
+    savingAll = false
+  }
 }
 
 // Asks before the page, a link or a reload drops edits not saved.
@@ -907,13 +936,16 @@ aside.kcms-editor(ref={element => panel = element} class={{ 'kcms-editor-open': 
         if drafts.rendering()
           p {wording('cms.editor.rendering', 'Updating the page…')}
         if drafts.stale().length > 0
-          p.kcms-editor-failure {wording('cms.editor.stale', 'The page shows the saved text of {entries} until your changes there are valid.', { entries: drafts.stale().map(entry => `${entry.collection}/${entry.slug}`).join(', ') })}
+          Notice.kcms-editor-failure(tone="warning" size="sm" label={wording('cms.editor.stale', 'The page shows the saved text of {entries} until your changes there are valid.', { entries: drafts.stale().map(entry => `${entry.collection}/${entry.slug}`).join(', ') })})
         if rebuilding()
           p {wording('cms.editor.rebuilding', 'Your last save is still reaching the live site, which shows the old content until it has rebuilt.')}
       if drafts.failure() as failure
-        p.kcms-editor-failure(role="alert") {wording('cms.editor.draftFailure', 'The page could not show your changes: {failure}', { failure })}
+        Notice.kcms-editor-failure(tone="danger" size="sm" label={wording('cms.editor.draftFailure', 'The page could not show your changes: {failure}', { failure })})
+      if entries.length > 1
+        .kcms-editor-all
+          Button(label={savingAll() ? wording('cms.entry.saving', 'Saving…') : wording('cms.editor.saveAll', 'Save all')} tone="accent" busy={savingAll()} disabled={savingAll() || !drafts.anyChanged(entries)} onClick={saveEverything})
       for entry of entries key={entryKey(entry)}
-        EntryForm(entry={entry} focus={focusIn(entry)} unclickable={unclickable.filter(field => entryKey(field) === entryKey(entry))})
+        EntryForm(entry={entry} focus={focusIn(entry)} typing={typingIn(entry)} unclickable={unclickable.filter(field => entryKey(field) === entryKey(entry))})
       else
         p.kcms-editor-empty {wording('cms.editor.empty', 'Nothing on this page comes from a collection.')}
 if choosing() as question

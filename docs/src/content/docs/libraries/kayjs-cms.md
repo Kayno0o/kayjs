@@ -119,6 +119,10 @@ If the sign-in ends while an editor is typing, the save says the session ended i
 
 In edit mode, kay renders the editor at the end of every page, with the entries the page read, in the order the page shows them, so the forms stay in place as you type. The "Edit on page" links on the screens put an editor the guard admitted in edit mode. The editor's "Stop editing" button leaves it. With changes not saved, it asks first: Keep editing, or Drop them and stop.
 
+Each entry in the editor is titled by the entry itself, with its collection under it. Clicking a field on the page, or typing in one, collapses that entry's form to the field, and a row of buttons under the head jumps to another field. Show all fields brings the whole form back. Hidden fields keep what you typed in them, and Save writes all of them.
+
+When the page reads several entries, Save all saves each one with changes, in the order the page shows them. An entry the server refuses stays unsaved with its message, and the others are saved.
+
 Each entry in the editor has Publish (or Unpublish, behind a confirmation) when its collection has a draft flag, and Delete unless the collection is a single one. Publish and Unpublish change only that flag, so with edits not saved they ask you to save first and write nothing. A role that may not publish or delete sees the button disabled, with the reason as its tooltip.
 
 Delete asks first, names the entries that refer to this one, and locks the form once the entry is gone. It then reads the page again. When the page you are on is the deleted entry's own, it opens the collection's screen in the admin instead, as that page no longer exists.

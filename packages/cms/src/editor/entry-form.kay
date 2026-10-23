@@ -3,19 +3,24 @@ import type { Unclickable } from 'kay/edit'
 import type { EntryRef } from '../kay/contract'
 import type { SavedState } from './live'
 import type { FieldPath } from '../markers'
+import { BODY_ID } from '../layout'
+import { fieldsOf } from '../fields'
 import Button from '@kaynooo/kayjs-ui/button.kay'
+import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import { call, navigate, refresh, resource, untrack } from 'kay'
 import { wording } from 'kay/words'
 import editorApi from '../api/editor'
 import entriesApi from '../api/entries'
 import { collectionPath, collectionTitle, entryTitle, SINGLE_SLUG } from '../listing'
-import { BODY, entryKey } from '../markers'
+import { entryKey } from '../markers'
 import { drafts } from './drafts'
 import { registerInline } from './inline'
 import { savedHandler } from './live'
 import { readReferrers } from './referrers'
 import { rebuildFinished, rebuildStarted } from './rebuild'
 import { unfoldAround } from './reorder'
+import { anchorsOf, covers, keyOfPath } from './anchors'
+import { registerSaver } from './save-all'
 import EntryFields from './entry-fields.kay'
 import { formScope } from '../form'
 import EntryPresence from '../components/entry-presence.kay'
@@ -27,7 +32,7 @@ import { changeField, deleteSaved, saveDraft, showRefusal } from './save'
 import { isShown } from './session'
 import { saveShortcut } from './shortcut'
 
-const { entry, focus, unclickable = [] } = props<{ entry: EntryRef, focus?: FieldPath | undefined, unclickable?: Unclickable[] }>()
+const { entry, focus, typing, unclickable = [] } = props<{ entry: EntryRef, focus?: FieldPath | undefined, typing?: FieldPath | undefined, unclickable?: Unclickable[] }>()
 
 // Named by what the page cannot mark: a value it transforms or shows in an island, and the fields of a frozen object.
 const named = (isFrozen: boolean) => unclickable.filter(field => (field.frozen === true) === isFrozen).map(field => field.path).join(', ')
@@ -40,7 +45,8 @@ const source = resource(entriesApi, '/:collection/:slug', {
 })
 // A single collection's entry is the collection: no slug under its title, its locale still shown. Until the collection is known its slug is taken for a single one's when it is `index`, the only slug a single entry has, so that slug never flashes.
 const isSingle = () => { const loaded = source.value(); return loaded === undefined ? entry.slug === SINGLE_SLUG : loaded.collection.single === true }
-const subtitle = memo(() => isSingle() ? entry.locale : entry.locale === undefined ? entry.slug : `${entry.slug} (${entry.locale})`)
+const collectionName = () => collectionTitle({ name: entry.collection, title: source.value()?.collection.title })
+const subtitle = memo(() => isSingle() ? entry.locale : entry.locale === undefined ? collectionName() : `${collectionName()} (${entry.locale})`)
 // The page editor asks no author and is listed with no name. The server strips the names of the room it joins for an edit link's holder, who is only counted, and sends them to an editor the app's guard let in.
 const room = entryRoom(entry.collection, entry, { name: '', page: true })
 const saving = signal(false)
@@ -72,23 +78,63 @@ effect(() => {
     drafts.open({ ...entry, data: answer.entry.data ?? {}, body: answer.entry.body }, answer.entry.version)
 })
 
-// A click on the page brings its field into view (the unfolding is untracked, or the effect would follow the list's data and folds) and puts the caret in it, once the form has loaded.
+// The path on the page the form is collapsed to, or all of it while none: a click on the page or an anchor collapses it, Show all fields or a refused save opens it again. A field keeps what was typed in it while hidden.
+const current = signal<string>()
+const anchors = memo(() => {
+  const answer = source.value()
+
+  return answer ? anchorsOf(fieldsOf(answer.collection.schema), answer.collection.body !== undefined, answer.collection.layout?.form) : []
+})
+
+// Shows the field of a path, brings it into view (the unfolding is untracked, or the effect would follow the list's data and folds) and puts the caret in it.
+function reveal(path: string): void {
+  untrack(() => {
+    current = path
+
+    if (!box)
+      return
+
+    // A group, such as a list item, has no control of its own: its first field stands for it.
+    const selector = path === BODY_ID ? '[data-kcms-body]' : `[data-kcms-path="${CSS.escape(path)}"], [data-kcms-path^="${CSS.escape(`${path}.`)}"]`
+    const field = box.querySelector(selector)
+
+    if (field)
+      unfoldAround(field)
+
+    field?.scrollIntoView({ block: 'nearest' })
+    field?.querySelector<HTMLElement>('input, textarea, select')?.focus()
+  })
+}
+
+// Typing in a field on the page collapses the form to it, which keeps the focus where it is.
+effect(() => {
+  const path = typing
+
+  if (path !== undefined && source.value())
+    untrack(() => current = keyOfPath(path))
+})
+
+// A click on the page reveals its field, once the form has loaded.
 effect(() => {
   const path = focus
 
-  if (path === undefined || !source.value() || !box)
+  if (path !== undefined && source.value() && box)
+    reveal(keyOfPath(path))
+})
+
+// A refused save opens the form again when a field it needs fixed is hidden, so the message and the field are in view.
+function openForIssues(): void {
+  const at = current()
+
+  if (at === undefined)
     return
 
-  // A group, such as a list item, has no control of its own: its first field stands for it.
-  const selector = path === BODY ? '[data-kcms-body]' : `[data-kcms-path="${CSS.escape(path)}"], [data-kcms-path^="${CSS.escape(`${path}.`)}"]`
-  const field = box.querySelector(selector)
+  const shown = anchors().filter(anchor => covers(anchor.key, at))
+  const stray = [...drafts.issues(entry).map(issue => issue.body === true ? BODY_ID : issue.path), ...drafts.blocked(entry).map(({ path }) => path)].filter(path => path !== '')
 
-  if (field)
-    untrack(() => unfoldAround(field))
-
-  field?.scrollIntoView({ block: 'nearest' })
-  field?.querySelector<HTMLElement>('input, textarea, select')?.focus()
-})
+  if (stray.some(path => !shown.some(anchor => covers(anchor.key, path))))
+    current = undefined
+}
 
 // A text that does not parse keeps Save and Reset enabled, so pressing Save says what to fix.
 const unsaved = () => drafts.changed(entry) || drafts.blocked(entry).length > 0
@@ -117,8 +163,10 @@ async function save(): Promise<boolean> {
   }
 
   // The fields are unlocked by now, so the focus can land in one.
-  if (!saved)
+  if (!saved) {
+    openForIssues()
     await showRefusal(drafts, entry)
+  }
 
   return saved
 }
@@ -175,13 +223,14 @@ async function remove(): Promise<void> {
 }
 
 saveShortcut(save)
+onCleanup(registerSaver(entry, { pending: () => unsaved() && !saving() && !removed(), save }))
 ---
 section.kcms-entry(aria-busy={saving()} ref={element => box = element})
   header.kcms-entry-head
     hgroup
-      h3.kcms-entry-title {collectionTitle({ name: entry.collection, title: source.value()?.collection.title })}
+      h3.kcms-entry-title {isSingle() ? collectionName() : title()}
       if subtitle() !== undefined
-        p.kcms-entry-slug {subtitle()}
+        p.kcms-entry-collection {subtitle()}
     .kcms-entry-actions
       EntrySaveState(changed={drafts.changed(entry)} saving={saving()} saved={lastSave()} url={source.value()?.entry.url})
       ResetButton(disabled={saving() || removed() || !unsaved()} onReset={() => drafts.reset(entry)})
@@ -197,15 +246,21 @@ section.kcms-entry(aria-busy={saving()} ref={element => box = element})
       p {wording('cms.entry.deleted', 'This entry is deleted.')}
       a(href={screen}) {wording('cms.entry.deletedLeave', 'Go to the collection')}
   else if source.status() === 'failed'
-    p.kcms-entry-failure {wording('cms.entry.loadFailure', 'Could not load this entry: {message}', { message: source.error()?.message ?? '' })}
+    Notice.kcms-entry-failure(tone="danger" size="sm" label={wording('cms.entry.loadFailure', 'Could not load this entry: {message}', { message: source.error()?.message ?? '' })})
   else if source.value() as answer
     if answer.entry.problem as problem
-      p.kcms-entry-failure(role="alert") {wording('cms.entry.problem', 'This entry\'s file does not parse: {problem}. Saving writes the form over it.', { problem })}
+      Notice.kcms-entry-failure(tone="danger" size="sm" label={wording('cms.entry.problem', 'This entry\'s file does not parse: {problem}. Saving writes the form over it.', { problem })})
     if unmarked() !== ''
-      p.kcms-entry-hint {wording('cms.entry.unclickable', 'A click on the page cannot reach {fields}, which it shows changed or not at all: edit it here.', { fields: unmarked() })}
+      Notice.kcms-entry-hint(size="sm" label={wording('cms.entry.unclickable', 'A click on the page cannot reach {fields}, which it shows changed or not at all: edit it here.', { fields: unmarked() })})
     if frozen() !== ''
-      p.kcms-entry-hint {wording('cms.entry.frozen', 'A click on the page cannot reach {fields}, held by a frozen object: edit it here.', { fields: frozen() })}
+      Notice.kcms-entry-hint(size="sm" label={wording('cms.entry.frozen', 'A click on the page cannot reach {fields}, held by a frozen object: edit it here.', { fields: frozen() })})
+    if anchors().length > 1
+      nav.kcms-entry-anchors(aria-label={wording('cms.entry.fields', 'Fields')})
+        for anchor of anchors() key={anchor.key}
+          Button(label={anchor.label} size="sm" variant="ghost" pressed={current() === undefined ? undefined : covers(anchor.key, current()!)} onClick={() => reveal(anchor.key)})
+        if current() !== undefined
+          Button(label={wording('cms.entry.showAll', 'Show all fields')} variant="inline" onClick={() => current = undefined})
     fieldset.kcms-entry-fields(disabled={saving() || removed()})
-      EntryFields(form={scope()!})
+      EntryFields(form={scope()!} only={current()})
   else
     p.kcms-entry-loading {wording('cms.entry.loading', 'Loading…')}
