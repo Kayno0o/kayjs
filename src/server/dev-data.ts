@@ -13,6 +13,7 @@ const POSTGRES_URL = /^postgres(?:ql)?:\/\//
 const QUERY_START = /^[\s(]*(?:select|with|values|table)\b/i
 const FIRST_WORD = /^[\s(]*(\w*)/
 const SET_CONFIG = /\bset_config\b/i
+const OUTSIDE_FUNCTION = /\b(pg_terminate_backend|pg_cancel_backend|pg_reload_conf)\b/i
 const IDENTIFIER_CHAR = /\w/
 const ESCAPE_PREFIX = /E/i
 const DOLLAR_TAG = /^\$(?:[A-Z_]\w*)?\$/i
@@ -302,6 +303,11 @@ export function refusedQuery(text: string): string | undefined {
     return first === 'SET' ? 'SET is not allowed: the box only reads' : `the box only reads: start with SELECT, WITH, VALUES or TABLE${first === undefined || first === '' ? '' : `, not ${first}`}`
   }
 
+  const outside = OUTSIDE_FUNCTION.exec(raw)?.[1]
+
+  if (outside !== undefined)
+    return `${outside} is not allowed: it acts outside the transaction`
+
   return SET_CONFIG.test(raw) ? 'set_config is not allowed: the box only reads' : undefined
 }
 
@@ -358,6 +364,8 @@ export async function devQuery(request: Request): Promise<Response> {
     reserved = await connection(url).reserve()
     await reserved.unsafe('BEGIN READ ONLY')
     await reserved.unsafe(`SET LOCAL statement_timeout = ${QUERY_TIMEOUT_MS}`)
+    // Postgres refuses to make a transaction read-write once a query has run in it, so no spelling of that switch gets through; the text checks above are only a first refusal.
+    await reserved.unsafe('SELECT 1')
     await reserved.unsafe(`DECLARE kay_dev_query NO SCROLL CURSOR FOR ${body.sql.replace(TRAILING_SEMICOLON, '')}\n`)
 
     const found = await reserved.unsafe<Record<string, unknown>[]>(`FETCH ${QUERY_ROWS + 1} FROM kay_dev_query`)

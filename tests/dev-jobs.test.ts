@@ -53,7 +53,12 @@ describe('the dev tool\'s jobs endpoints', () => {
 
     expect((await site.handle(new Request('http://localhost/_kay/dev/jobs'))).status).toBe(403)
     expect((await act(site, 'delete', 'q', 'x', {})).status).toBe(403)
-    expect((await act(site, 'retry', 'q', 'x', { ...HEADERS, 'sec-fetch-site': 'cross-site' })).status).toBe(403)
+    for (const action of ['retry', 'delete'] as const) {
+      expect((await act(site, action, 'q', 'x', { ...HEADERS, 'sec-fetch-site': 'cross-site' })).status).toBe(403)
+      expect((await act(site, action, 'q', 'x', { ...HEADERS, origin: 'https://evil.example' })).status).toBe(403)
+    }
+
+    expect((await site.handle(new Request('http://localhost/_kay/dev/jobs', { headers: { ...HEADERS, origin: 'https://evil.example' } }))).status).toBe(403)
   })
 
   it('serves the tab as browser code', async () => {

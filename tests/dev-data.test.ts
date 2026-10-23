@@ -91,6 +91,8 @@ describe('the dev tool\'s database endpoints', () => {
     expect((await query(site, 'select 1', {})).status).toBe(403)
     expect((await get(site, '/_kay/dev/data', { ...HEADERS, 'sec-fetch-site': 'cross-site' })).status).toBe(403)
     expect((await query(site, 'select 1', { ...HEADERS, origin: 'https://evil.example' })).status).toBe(403)
+    expect((await query(site, 'select 1', { ...HEADERS, 'sec-fetch-site': 'cross-site' })).status).toBe(403)
+    expect((await get(site, '/_kay/dev/data/rows?table=a.b', { ...HEADERS, origin: 'https://evil.example' })).status).toBe(403)
   })
 
   it('answers nothing in a production server, the tool and its tabs included', async () => {
@@ -244,6 +246,33 @@ describe('the dev tool\'s database endpoints', () => {
         expect((await query(site, sql)).status, sql).toBe(400)
 
       expect(await admin.unsafe(`select count(*)::int as n from ${SCHEMA}.users`)).toEqual(expect.arrayContaining([expect.objectContaining({ n: 2 })]))
+    })
+
+    it('stops every spelling of the switch to read-write in the database itself, a unicode-escaped function name included', async () => {
+      const switching = [
+        'select set_config(\'transaction_read_only\', \'off\', true)',
+        'select "set_config"(\'transaction_read_only\', \'off\', true)',
+        'select U&"set\\005fconfig"(\'transaction_read_only\', \'off\', true)',
+      ]
+
+      for (const sql of switching) {
+        const found = await query(site, sql)
+
+        expect(found.status, sql).toBe(400)
+      }
+
+      const unescaped = await (await query(site, switching[2]!)).json() as { error: string }
+
+      expect(unescaped.error).toContain('read-write')
+
+      for (const sql of ['set transaction_read_only = off', 'set transaction read write'])
+        expect((await query(site, sql)).status, sql).toBe(400)
+
+      const insert = await query(site, `insert into ${SCHEMA}.users (name) values ('Mallory')`)
+
+      expect(insert.status).toBe(400)
+      expect(await admin.unsafe(`select count(*)::int as n from ${SCHEMA}.users`)).toEqual(expect.arrayContaining([expect.objectContaining({ n: 2 })]))
+      expect((await query(site, 'select pg_terminate_backend(1)')).status).toBe(400)
     })
 
     it('gives up on a statement past the timeout and answers the next query', async () => {
