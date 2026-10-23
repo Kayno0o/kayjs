@@ -322,7 +322,7 @@ describe('security headers', () => {
     expect(enforced.get('style-src')).toEqual(['\'self\'', '\'unsafe-inline\''])
     expect(enforced.get('report-uri')).toEqual(['/docs/_kay/csp'])
     expect(enforced.get('report-to')).toEqual(['csp'])
-    expect(trial.get('style-src')).toEqual(['\'self\''])
+    expect(trial.get('style-src')).toEqual(['\'self\'', expect.stringMatching(/^'sha256-[A-Za-z0-9+/]+=*'$/)])
     expect(trial.get('script-src')).toEqual(['\'self\'', ...inlineScriptHashes({ base: '/docs' })])
     expect(trial.get('report-to')).toEqual(['csp'])
 

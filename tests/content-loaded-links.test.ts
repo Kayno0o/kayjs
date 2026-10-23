@@ -9,7 +9,7 @@ import { pages } from './shared-pages'
 
 const BODY = '[own](/about) [relative](./sibling) [file](page.html?x=1) [hash](#top) [away](https://other.example/a) [bad](javascript:alert(1)) [odd](java%0ascript:alert(2)) [slashes](//evil.example/x)\n\n![pic](./pic.png) ![hostile](data:text/html;base64,AAAA)\n\n# Title\n'
 const HTML = '<p><a href="/about">own</a> <a href="#top">hash</a> <a href="./sibling">relative</a> <a href="https://other.example/a">away</a> <a href="javascript:alert(1)">bad</a><script>alert(2)</script></p><img src="./pic.png" onerror="x()">'
-const OUT = ' rel="nofollow ugc" target="_blank"'
+const OUT = ' rel="nofollow ugc" target="_blank" data-new-tab'
 
 const CONFIG = `
 import { collection } from 'kay/content'

@@ -31,6 +31,8 @@ const OTHER_BULK = bulk(5000)
 const HALF = bulk(9000).split(' ').slice(0, 900).join(' ')
 const LISTENING = /port (\d+)/
 const STYLE = /<style>([\s\S]*?)<\/style>/g
+// The new-tab cue's own style block, which a page with islands or outside links carries whatever its stylesheets do.
+const NEW_TAB_CUE = /<style>a\[data-new-tab\]::after\{[^<]*<\/style>/
 const ROUTE_COPY = /\/_kay\/[^/]+\.r-[a-z0-9]+\.css$/
 const browserInstalled = browserPath() !== undefined
 
@@ -102,7 +104,7 @@ interface Head {
 
 async function head(app: App, path: string): Promise<Head> {
   const response = await app.handle(new Request(`http://localhost${path}`))
-  const html = await response.text()
+  const html = (await response.text()).replace(NEW_TAB_CUE, '')
 
   return {
     html,
@@ -803,7 +805,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('lateStyles,
     expect(await page.evaluate(() => {
       const children = [...document.head.children]
 
-      return children.findLastIndex(element => element.tagName === 'STYLE') < children.findIndex(element => element.matches('link[data-kay-rest]'))
+      return children.findLastIndex(element => element.tagName === 'STYLE' && !element.textContent?.startsWith('a[data-new-tab]')) < children.findIndex(element => element.matches('link[data-kay-rest]'))
     })).toBe(true)
     await page.close()
   })

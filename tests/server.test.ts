@@ -45,6 +45,8 @@ import { pages } from './shared-pages'
 const app = await pages({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public' })
 // No _404.kay nor _error.kay: failures answer in plain text.
 const bare = await pages({ routes: 'tests/fixtures/bare/src/routes', prebuilt: true })
+// Any page style block but the new-tab cue, which a page with islands carries whatever its stylesheets do.
+const PAGE_STYLE = /<style>(?!a\[data-new-tab\])/
 const INLINE_SCRIPT = /<script>([\s\S]*?)<\/script>/
 const ENTRY = /<script type="module" (?:async )?src="\/_kay\/([^"]+)"><\/script>/
 const BODY = /<body>([\s\S]*)<\/body>/
@@ -184,7 +186,7 @@ describe('pages', () => {
       const small = await pages({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public', prebuilt: true, base, security: { csp: { 'style-src': ['\'self\''] } } })
       const response = await small.handle(new Request('http://localhost/'))
       const html = await response.text()
-      const styles = [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(match => match[1]!)
+      const styles = [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(match => match[1]!).filter(style => !style.startsWith('a[data-new-tab]'))
 
       expect(html).not.toContain('rel="stylesheet"')
       expect(styles).toHaveLength(2)
@@ -192,7 +194,7 @@ describe('pages', () => {
       for (const style of styles)
         expect(response.headers.get('content-security-policy')).toContain(sourceHash(style))
     }
-    expect((await get('/', linked)).html).not.toContain('<style>')
+    expect((await get('/', linked)).html).not.toMatch(PAGE_STYLE)
   })
 
   it('links the stylesheets of a page whose together compress past the limit, and inlines those of a page below it', async () => {
@@ -213,7 +215,7 @@ describe('pages', () => {
         const long = await page('/')
         const short = await page('/about')
 
-        expect(long).not.toContain('<style>')
+        expect(long).not.toMatch(PAGE_STYLE)
         expect(long.match(/<link rel="stylesheet"/g)).toHaveLength(2)
         expect(short).not.toContain('rel="stylesheet"')
         expect(short).toContain('<style>')
@@ -270,7 +272,7 @@ describe('pages', () => {
         const served = await scratch.serve({ compress: false })
         const html = await (await served.handle(new Request('http://localhost/'))).text()
 
-        expect(html.includes('<style>'), `${INLINE_LIMIT + extra} bytes together`).toBe(inlined)
+        expect(PAGE_STYLE.test(html), `${INLINE_LIMIT + extra} bytes together`).toBe(inlined)
         expect(html.includes('rel="stylesheet"')).toBe(!inlined)
       }
     }
@@ -316,7 +318,7 @@ describe('pages', () => {
       const inline = await pages({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public', prebuilt: true, inlineStyles: true, base, security: { csp: { 'style-src': ['\'self\''] } } })
       const response = await inline.handle(new Request('http://localhost/'))
       const html = await response.text()
-      const styles = [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(match => match[1]!)
+      const styles = [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(match => match[1]!).filter(style => !style.startsWith('a[data-new-tab]'))
 
       expect(html).not.toContain('rel="stylesheet"')
       expect(styles).toHaveLength(2)
