@@ -550,7 +550,7 @@ function filledIn(value: unknown): boolean {
 // The routes whose rates store failure was logged and has not answered since.
 const failing = new Set<string>()
 
-// Seconds until the client may try again under `name`, in the app's `store.rates` else this process's memory, or undefined while it is under the limit: for kay's own routes. A rates store that fails or takes longer than the store time limit counts in memory instead, logged once per route until it answers again, so a route is never refused or held for it.
+// Seconds until the client may try again under `name`, in the app's `store.rates` else this process's memory, or undefined while it is under the limit: for kay's own routes. A rates store that fails or takes longer than the store time limit counts in memory instead, logged once per route until it answers again, so a route is never refused for it and a hanging store holds a request for at most that limit. Postgres rates are already under the same limit, which guards a custom store.
 export async function overLimit(name: string, client: string, max: number, windowMs: number): Promise<number | undefined> {
   const key = limitKey(name, client)
   const window = `${windowMs}ms` as const

@@ -82,6 +82,32 @@ describe('overLimit with a rates store that hangs', () => {
   })
 })
 
+describe('overLimit logging', () => {
+  it('logs again when the store failed after it answered', async () => {
+    const log = spyOn(console, 'warn').mockReturnValue()
+    let broken = true
+
+    try {
+      setupStore({ rates: { hit: async () => {
+        if (broken)
+          throw new Error('gone')
+
+        return { count: 1, resetAt: Date.now() + 60_000 }
+      } } })
+      await overLimit('gaps-relog', '10.0.0.5', 5, 60_000)
+      await overLimit('gaps-relog', '10.0.0.5', 5, 60_000)
+      broken = false
+      await overLimit('gaps-relog', '10.0.0.5', 5, 60_000)
+      broken = true
+      await overLimit('gaps-relog', '10.0.0.5', 5, 60_000)
+      expect(log.mock.calls.filter(call => String(call[0]).includes('gaps-relog'))).toHaveLength(2)
+    }
+    finally {
+      log.mockRestore()
+    }
+  })
+})
+
 describe('verifyWork', () => {
   it('records a solution in the app store\'s rates, so another replica refuses the replay', async () => {
     const rates = sharedRates()
