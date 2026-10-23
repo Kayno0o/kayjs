@@ -7,6 +7,7 @@ import process from 'node:process'
 import { describe, expect, it, setDefaultTimeout, spyOn } from 'bun:test'
 import { findKayFiles } from '../src/build/files'
 import { applySafeFixes, check as checkProject } from '../src/check'
+import { configLocator } from '../src/check/config-keys'
 import { islandOnlyComponents } from '../src/check/island-only'
 import { probe } from '../src/check/project'
 import { DESCRIPTION_LENGTH, pageSeoLints, TITLE_LENGTH } from '../src/check/seo'
@@ -4424,6 +4425,18 @@ describe.concurrent('kay check, unused code', () => {
         await rm(root, { recursive: true, force: true })
       }
     }
+  })
+
+  it('locates a config key through a let object and the first argument of a call with several', () => {
+    const letObject = configLocator('let config = {\n  site: { name: "x" },\n}\nexport default config\n')
+    const several = configLocator('export default defineConfig({\n  site: { name: "x" },\n}, other)\n')
+
+    for (const locate of [letObject, several]) {
+      expect(locate(['site'])).toEqual({ line: 2, column: 3 })
+      expect(locate(['site', 'name'])).toEqual({ line: 2, column: 11 })
+    }
+
+    expect(several(['missing'])).toEqual({ line: 1, column: 16 })
   })
 
   it('reports but does not fix a shorthand key, and reads no reassigned let or multi-argument call', async () => {
