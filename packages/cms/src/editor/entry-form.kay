@@ -191,7 +191,7 @@ section.kcms-entry(aria-busy={saving()} ref={element => box = element})
     if draftField() !== undefined || (!isSingle() && !answer.seeded)
       .kcms-entry-more
         EntryState(draftField={draftField()} draft={isDraft()} dirty={unsaved()} saving={saving() || removed()} denied={can.value()?.denied} title={title()} url={answer.entry.url} referrers={referrers()} deletable={!isSingle() && !answer.seeded} onPublish={() => setDraft(false)} onUnpublish={() => setDraft(true)} onRemove={remove} onAskReferrers={askReferrers})
-  EntryPresence(room={room.room} member={room.member} named={can.status() === 'ready'})
+  EntryPresence(room={room.room} member={room.member})
   if stranded() as screen
     .kcms-entry-failure(role="alert")
       p {wording('cms.entry.deleted', 'This entry is deleted.')}

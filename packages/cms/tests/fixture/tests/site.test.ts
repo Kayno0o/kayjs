@@ -72,14 +72,6 @@ test('a link from another site waits for the editor\'s click, and only a post fr
   expect((await arriving.fetch('/admin/page?path=/blog/hello', { headers: { 'sec-fetch-site': 'same-origin', 'sec-fetch-dest': 'document' }, redirect: 'manual' })).status).toBe(302)
 })
 
-test('an edit link\'s holder, whom the guard refuses, is told apart from a signed-in editor by the answer of /can', async () => {
-  const holder = await testSite({ root: ROOT })
-
-  await holder.visit('/admin/page?path=/blog/hello')
-  expect((await holder.fetch('/_kay/cms/editor/can')).status).toBe(200)
-  expect((await holder.fetch('/_kay/cms/editor/can', { headers: { 'x-deny': '1' } })).status).toBe(403)
-})
-
 test('stopping editing leaves edit mode, the page rendering no editor again', async () => {
   const leaving = await testSite({ root: ROOT })
 

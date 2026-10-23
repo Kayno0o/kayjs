@@ -6,7 +6,7 @@ Content edited where it renders: in edit mode kay marks each element showing an 
 
 ### Enter edit mode
 
-Edit mode is kay's preview mode, so the app sets `preview: {}` (its cookie is signed with a key derived from `KAY_SECRET`); a signed-in editor opens a page in it from `<prefix>/page?path=` or the Edit this page link, and leaves it with Stop editing. A link from another site (`Sec-Fetch-Site` neither `same-origin` nor `none`, or `Sec-Fetch-Dest` not `document`; a browser sending neither enters at once) lands on a button that posts to enter, so a browser that sends those headers cannot be put in edit mode by another site. The editor lists the editors with the page open by name only for a person the guard admits; an edit link's holder, whom `GET /_kay/cms/editor/can` refuses, sees how many (a browser-side choice: the live room still carries the names).
+Edit mode is kay's preview mode, so the app sets `preview: {}` (its cookie is signed with a key derived from `KAY_SECRET`); a signed-in editor opens a page in it from `<prefix>/page?path=` or the Edit this page link, and leaves it with Stop editing. A link from another site (`Sec-Fetch-Site` neither `same-origin` nor `none`, or `Sec-Fetch-Dest` not `document`; a browser sending neither enters at once) lands on a button that posts to enter, so a browser that sends those headers cannot be put in edit mode by another site. The editor tells how many other editors have the entry open and never their names, as its presence rooms hold none: the names are shown on the screens only.
 
 ```ts
 export default defineConfig({ preview: { secret: env.PREVIEW_SECRET }, extensions: [cms({ guard, files })] })
