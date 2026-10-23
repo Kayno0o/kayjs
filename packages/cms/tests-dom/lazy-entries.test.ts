@@ -126,3 +126,20 @@ test('edits kept from an earlier visit open their entry, with the edits', async 
   expect(reads()).toHaveLength(1)
   expect(root.querySelectorAll('.kcms-entry-idle')).toHaveLength(1)
 })
+
+test('the first click on a text of an entry still a row types in place once the entry has loaded', async () => {
+  server()
+
+  const { root } = await open([NAV, HELLO])
+  const title = document.createElement('h1')
+
+  title.dataset.page = ''
+  title.setAttribute('data-kay-field', 'posts:hello:title')
+  title.textContent = 'Hello world'
+  document.body.append(title)
+  title.click()
+  await until(() => title.hasAttribute('contenteditable') || title.isContentEditable)
+
+  expect(root.contains(document.activeElement)).toBe(false)
+  expect(reads()).toHaveLength(1)
+})

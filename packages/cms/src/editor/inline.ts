@@ -288,6 +288,11 @@ export function fieldOfMarker(marker: FieldMarker, drafts: Drafts): Field | unde
 }
 
 // Whether a save holds the entry's fields still.
+// Whether the entry's form has loaded, which the page's text of it needs to be typed in place.
+export function isLoaded(marker: FieldMarker): boolean {
+  return sources.get(entryKey(marker))?.collection() !== undefined
+}
+
 export function isBusy(marker: FieldMarker): boolean {
   return sources.get(entryKey(marker))?.busy() === true
 }
