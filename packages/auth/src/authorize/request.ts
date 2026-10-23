@@ -2,7 +2,6 @@ import type { Core } from '../core'
 import type { RequestState } from '../state'
 import type { OAuthGrantRecord, UserRecord } from '../store'
 import type { OAuthClient } from './clients'
-import { configuredSite } from 'kay/library'
 import { banned } from '../core'
 import { impersonatorOf, report } from '../events'
 import { digest, randomToken } from '../keys'
@@ -13,7 +12,6 @@ import { redirectUriRegistered, withParams } from './uris'
 export const CODE_LIFETIME = 60
 const PARAM_MAX_LENGTH = 2048
 const CHALLENGE = /^[\w-]{43}$/
-const TRAILING_SLASHES = /\/+$/
 const WHITESPACE = /\s+/
 // Asked by clients that want a refresh token, which every client is given.
 const IMPLIED_SCOPES = new Set(['offline_access'])
@@ -140,36 +138,6 @@ async function check(state: RequestState, params: AuthorizeParams, root: string)
 export function sameResource(a: string, b: string): boolean {
   try {
     return new URL(a).href === new URL(b).href
-  }
-  catch {
-    return false
-  }
-}
-
-// A path as the router reads it, whether or not the proxy took the mount point `base` off.
-function withoutBase(path: string, base: string): string {
-  return base !== '' && (path === base || path.startsWith(`${base}/`)) ? path.slice(base.length) || '/' : path
-}
-
-// The mount point of the app: the path of the `site` kay.config.ts sets, else the one of `createAuth`, '' at the root.
-export function siteBase(core: Core): string {
-  const fixed = configuredSite()?.origin ?? core.url
-
-  try {
-    return fixed === undefined ? '' : new URL(fixed).pathname.replace(TRAILING_SLASHES, '')
-  }
-  catch {
-    return ''
-  }
-}
-
-// Whether the request `url` is the resource or under its path (RFC 8707 audience), the query ignored, a trailing slash either way and the mount point `base` on both sides or neither.
-export function underResource(resource: string, url: string, base = ''): boolean {
-  try {
-    const bound = withoutBase(new URL(resource).pathname, base).replace(TRAILING_SLASHES, '')
-    const path = withoutBase(new URL(url).pathname, base)
-
-    return path === bound || path.startsWith(`${bound}/`)
   }
   catch {
     return false
