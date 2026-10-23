@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto'
+import { rm } from 'node:fs/promises'
+import { join } from 'node:path'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { Elysia } from 'elysia'
+import { pages } from 'kay/server'
+import { scratchDir } from 'kay/test'
 import { memoryAuthStore } from '../src/memoryStore'
 import { authPages } from '../src/pages'
 import { browser as browserOf, testApp } from './helpers/app'
@@ -99,6 +103,26 @@ describe('client registration', () => {
 
     expect((await app.browser().fetch('/auth/oauth/register', { method: 'POST', body: 'nope' })).status).toBe(400)
     expect((await app.browser().fetch('/auth/oauth/register', { method: 'POST', body: JSON.stringify({ redirect_uris: [REDIRECT], padding: 'x'.repeat(20000) }) })).status).toBe(400)
+  })
+
+  test('answers a body over the app-wide limit with a 413 that carries the open grant, so a client page reads it', async () => {
+    const root = await scratchDir('oauth-413-')
+
+    try {
+      await Bun.write(join(root, 'routes/index.kay'), 'h1 Home\n')
+
+      const site = await pages({ root, routes: 'routes', prebuilt: false, security: false, dev: false, extensions: [{ name: 'auth', server: server().auth.plugin as never }] })
+
+      for (const path of ['token', 'revoke', 'register']) {
+        const response = await site.handle(new Request(`http://localhost/auth/oauth/${path}`, { method: 'POST', headers: { 'origin': 'https://client.example', 'content-type': 'application/x-www-form-urlencoded' }, body: 'x'.repeat(2 * 1024 * 1024) }))
+
+        expect(response.status).toBe(413)
+        expect(response.headers.get('access-control-allow-origin')).toBe('*')
+      }
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 })
 

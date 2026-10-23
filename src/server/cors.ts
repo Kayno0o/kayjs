@@ -215,3 +215,21 @@ export function preflight(rule: CorsRule, methods: readonly string[], request: R
 
   return answer
 }
+
+const CROSS_ORIGIN = Symbol.for('kay.crossOrigin')
+
+// Tells kay which paths of an extension's plugin other sites' pages call from the browser, and under which rule, so the 413 it answers a body over the limit carries the grant the route's own answers do and the page reads it. The path and what is under it, as an extension's `maxSize` takes it.
+export function crossOriginPaths(plugin: object, paths: readonly string[], options: CorsOptions): void {
+  const rule = corsRule(options)
+  const known = (plugin as { [CROSS_ORIGIN]?: Map<string, CorsRule> })[CROSS_ORIGIN] ?? new Map<string, CorsRule>()
+
+  for (const path of paths)
+    known.set(path, rule)
+
+  Object.defineProperty(plugin, CROSS_ORIGIN, { value: known, configurable: true })
+}
+
+// What `crossOriginPaths` recorded on a plugin.
+export function crossOriginOf(plugin: unknown): Map<string, CorsRule> {
+  return (plugin as { [CROSS_ORIGIN]?: Map<string, CorsRule> } | null)?.[CROSS_ORIGIN] ?? new Map<string, CorsRule>()
+}

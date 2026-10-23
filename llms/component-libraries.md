@@ -93,6 +93,7 @@ export function auth({ prefix = '/auth' } = {}): KayExtension {
 - Tags every page carries go in `config.head`, a CSP source in `config.security.csp`.
 - `needsServer: true` marks an extension that does nothing without a running server, as a tracker posting to its own route: `kay build --static` warns of it.
 - `maxSize: { '/auth/upload': '8mb' }` raises, or lowers, the most a request to a route of the extension (and what is under it) may send; every other route of it with a body takes the app's `maxSize`, 1 MB by default.
+- `crossOriginPaths(plugin, ['/auth/oauth'], { origins: '*' })` from `kay/server`, called where the plugin is built, names the paths other sites' pages call from the browser, so the 413 for a body over the limit carries the same cors grant and the page reads it.
 - `staticFiles: { '/analytics.js': text }` names files a static export writes into the site, for what the extension's server would otherwise serve as a constant, as a script every page loads: `kay build --static` runs no server plugin.
 - `server` hands kay an Elysia plugin that `pages()` uses before the pages, actions and API modules, so the app's `src/server.ts` needs no `.use(...)` of its own and none at all works.
 - What the `server` plugin decorates, or derives `as: 'scoped'` or `'global'`, reaches their `ctx.locals`, and `kay check` types those locals and lets links point at its routes with no `Register` declaration of the app's, adding to the locals the app registers. A derive with no `as` reaches only the plugin's own routes.

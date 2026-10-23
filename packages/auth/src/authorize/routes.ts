@@ -1,6 +1,7 @@
 import type { Elysia } from 'elysia'
 import type { Core } from '../core'
 import type { RequestState } from '../state'
+import { crossOriginPaths } from 'kay/server'
 import { AUTHORIZATION_SERVER_PATH, authorizationServerMetadata, OPEN_HEADERS, OPENID_CONFIGURATION_PATH, rootIsFixed, siteRoot } from './metadata'
 import { refused } from './reply'
 
@@ -13,6 +14,9 @@ function preflight(): Response {
 
 // The documents and endpoints an MCP client signs in through, on kayjs-auth's own plugin: nothing the app declares.
 export function serveOAuthServer(plugin: Elysia, core: Core, stateOf: (ctx: unknown) => RequestState): void {
+  // Any site's client posts to these, so kay's own 413 for a body over the app's limit carries the same open grant.
+  crossOriginPaths(plugin, [`${core.prefix}/oauth`], { origins: '*' })
+
   for (const path of [AUTHORIZATION_SERVER_PATH, OPENID_CONFIGURATION_PATH]) {
     plugin
       .get(path, ({ request }) => new Response(JSON.stringify(authorizationServerMetadata(core, siteRoot(core, request))), { headers: { ...DOCUMENT_HEADERS, 'cache-control': rootIsFixed(core) ? 'public, max-age=300' : 'private, max-age=300' } }))

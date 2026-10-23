@@ -34,7 +34,7 @@ import { registerActionRoutes } from './actions'
 import { serveApi } from './api'
 import { apiPathOf, mcpPath, RESOURCE_METADATA, sharedGuards } from './api-modules'
 import { rebaseCss, rebaseRedirects } from './base'
-import { DEFAULT_BODY_LIMIT, extensionLimits, limitBodies } from './body'
+import { DEFAULT_BODY_LIMIT, limitBodies, mountLimits } from './body'
 import { serveBuildFiles } from './build-files'
 import { serveCards } from './card'
 import { compressResponse, fixedTexts } from './compress'
@@ -473,7 +473,11 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   // After kay's own hooks, so their routes are logged and compressed as the pages are, and before the pages, actions and API modules whose context they derive.
   const mountedByExtensions: OwnRoutes['extensions'] = []
 
+  const servers: unknown[] = []
+
   for (const { name, server } of await extensions) {
+    servers.push(server)
+
     if (!mode.dev) {
       app.use(server)
 
@@ -570,7 +574,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     }
   }
 
-  limitBodies(app, options.maxSize ?? options.bodyLimit ?? DEFAULT_BODY_LIMIT, new Map([...actionLimits, ...hasPreview ? [[DRAFT_ROUTE, DRAFT_BODY_LIMIT] as const] : [], ...mcpAt === undefined ? [] : [[mcpAt, mcpBodyLimit] as const]]), new Map([...api.limits, ...extensionLimits(options.extensions, options.maxSizes)]), api.routeLimits)
+  limitBodies(app, options.maxSize ?? options.bodyLimit ?? DEFAULT_BODY_LIMIT, new Map([...actionLimits, ...hasPreview ? [[DRAFT_ROUTE, DRAFT_BODY_LIMIT] as const] : [], ...mcpAt === undefined ? [] : [[mcpAt, mcpBodyLimit] as const]]), mountLimits(api.limits, options.extensions, options.maxSizes, servers), api.routeLimits)
 
   // The actions that opted in to being tools are in the document beside the routes, and the MCP endpoint reads its tools from it.
   const document = servesOpenApi || mcpAt !== undefined

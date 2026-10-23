@@ -3,6 +3,7 @@ import type { KayExtension } from '../src/config'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
+import { crossOriginPaths } from '../src/server/cors'
 import { memoryJobs } from '../src/server/queue'
 import { cleanUpAfterFile } from './job-stores'
 import { scratchDir } from './scratch'
@@ -160,5 +161,37 @@ describe('an extension\'s own limit', () => {
   it('stops the boot for a limit that is no size', async () => {
     await expect(app({ extension: { maxSize: { '/auth/token': 0 } } })).rejects.toThrow('maxSize')
     await expect(app({ extension: { maxSize: { 'auth/token': '1mb' } } })).rejects.toThrow('does not start with a slash')
+  })
+})
+
+describe('a cross-origin route of an extension', () => {
+  const ORIGIN = 'https://client.example'
+  const crossOrigin = (maxSize?: KayExtension['maxSize']) => {
+    const server = plugin()
+
+    crossOriginPaths(server, ['/auth'], { origins: '*' })
+
+    return { server, ...maxSize && { maxSize } }
+  }
+
+  const tooBig = async (site: Awaited<ReturnType<typeof app>>, path: string) => site.handle(new Request(`http://localhost${path}`, { method: 'POST', headers: { 'content-type': 'application/octet-stream', 'origin': ORIGIN }, body: big }))
+
+  it('answers a body over the limit with the grant its own answers carry, only for the paths it named', async () => {
+    const site = await app({ extension: crossOrigin() })
+    const refused = await tooBig(site, '/auth/token')
+
+    expect(refused.status).toBe(413)
+    expect(refused.headers.get('access-control-allow-origin')).toBe('*')
+    expect(await refused.text()).toBe('Payload Too Large')
+    expect((await tooBig(await app(), '/auth/token')).headers.get('access-control-allow-origin')).toBeNull()
+  })
+
+  it('keeps the grant on a limit of its own, the app\'s maxSizes or the extension\'s maxSize', async () => {
+    for (const options of [{ extension: crossOrigin({ '/auth/token': 100 }) }, { extension: crossOrigin(), maxSizes: { '/auth/token': 100 } }]) {
+      const refused = await tooBig(await app(options), '/auth/token')
+
+      expect(refused.status).toBe(413)
+      expect(refused.headers.get('access-control-allow-origin')).toBe('*')
+    }
   })
 })

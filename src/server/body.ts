@@ -2,8 +2,10 @@ import type { Elysia } from 'elysia'
 import type { Server } from 'elysia/universal'
 import type { KayExtension } from '../config'
 import type { ByteSize } from '../runtime/byte-size'
+import type { CorsRule } from './cors'
 import { KayError } from '../compiler/errors'
 import { byteSize } from '../runtime/byte-size'
+import { corsResponse, crossOriginOf } from './cors'
 import { requestUrl } from './request-url'
 import { withoutSlash } from './routes'
 
@@ -73,26 +75,65 @@ export function limitBodies(app: Elysia, size: ByteSize, actionSizes: Map<string
   })
 }
 
-// The limits the extensions and the app declare for their routes, answered with a plain 413 as the routes of no limit are.
-export function extensionLimits(extensions: KayExtension[] | undefined, own: Record<string, ByteSize> | undefined = undefined): Map<string, BodyLimit> {
+// The limits of every path no action covers, by the path a request is read at: the API modules', the extensions' and the app's `maxSizes`.
+// For one path the app's `maxSizes` wins over the module's own `maxSize`, which wins over an extension's; the answer is the module's (its cors grant included) or else the extension's cross-origin rule, else a plain 413.
+export function mountLimits(modules: Map<string, BodyLimit>, extensions: KayExtension[] | undefined, own: Record<string, ByteSize> | undefined = undefined, servers: unknown[] = []): Map<string, BodyLimit> {
   const limits = new Map<string, BodyLimit>()
-  const declared = [...(extensions ?? []).map(({ name, maxSize }) => ({ what: `the maxSize of the extension ${name}`, sizes: maxSize })), { what: 'maxSizes in kay.config.ts', sizes: own }]
+  const crossOrigin = new Map<string, CorsRule>()
 
-  // The app's own come last, so they win over an extension's for one path.
-  for (const { what, sizes } of declared) {
-    for (const [path, bytes] of Object.entries(sizes ?? {})) {
-      if (!path.startsWith('/'))
-        throw new KayError('config-invalid', `kay: ${what} names ${JSON.stringify(path)}, which does not start with a slash`)
+  for (const server of servers) {
+    for (const [path, rule] of crossOriginOf(server))
+      crossOrigin.set(withoutSlash(path), rule)
+  }
 
-      limits.set(withoutSlash(path), { bytes, refuse: refusePlainly })
+  // The rule of the longest cross-origin path that is the path or holds it.
+  const refusal = (path: string): BodyLimit['refuse'] => {
+    const [, rule] = [...crossOrigin].filter(([known]) => path === known || path.startsWith(`${known}/`)).sort(([a], [b]) => b.length - a.length)[0] ?? []
+
+    return rule ? request => corsResponse(rule, request, plainRefusal()) : refusePlainly
+  }
+
+  for (const path of crossOrigin.keys())
+    limits.set(path, { bytes: undefined, refuse: refusal(path) })
+
+  for (const { name, maxSize } of extensions ?? []) {
+    for (const [path, bytes] of Object.entries(maxSize ?? {})) {
+      const key = slashed(path, `the maxSize of the extension ${name}`)
+
+      limits.set(key, { bytes, refuse: limits.get(key)?.refuse ?? refusal(key) })
     }
+  }
+
+  for (const [path, module] of modules) {
+    const key = withoutSlash(path)
+    const before = limits.get(key)
+
+    limits.set(key, { bytes: module.bytes ?? before?.bytes, refuse: module.refuse })
+  }
+
+  for (const [path, bytes] of Object.entries(own ?? {})) {
+    const key = slashed(path, 'maxSizes in kay.config.ts')
+    const before = limits.get(key)
+
+    limits.set(key, { bytes, refuse: before?.refuse ?? refusal(key) })
   }
 
   return limits
 }
 
-function refusePlainly(): Response {
+function slashed(path: string, what: string): string {
+  if (!path.startsWith('/'))
+    throw new KayError('config-invalid', `kay: ${what} names ${JSON.stringify(path)}, which does not start with a slash`)
+
+  return withoutSlash(path)
+}
+
+function plainRefusal(): Response {
   return new Response('Payload Too Large', { status: 413, headers: { 'content-type': 'text/plain; charset=utf-8' } })
+}
+
+function refusePlainly(): Response {
+  return plainRefusal()
 }
 
 // `Content-Length` frames the body, so it is the size when sent; a body sent in chunks without it is counted on a copy, only up to the limit, leaving the request's own for Elysia to read.
