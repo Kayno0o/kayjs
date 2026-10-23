@@ -1,13 +1,14 @@
 import type { BunPlugin } from 'bun'
 import type { Project } from '../project'
 import type { Route, SpecialPages } from '../server/routes'
-import { existsSync, readFileSync, realpathSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import { buildFailure, KayError, raisedMark } from '../compiler/errors'
 import { CONFIG_FILE, extensionAppFiles, extensionContexts, extensionServerModules, pluginFiles, serverExtensions } from '../config'
 import { PAGES_ENTRY } from '../dev/sources'
 import { projectApi } from '../server/api-modules'
+import { packageName } from '../server/app-identity'
 import { AVIF_WORKER_SOURCE } from '../server/avif'
 import { DEFAULT_LANG, extensionMessageFiles, messagesFile } from '../server/i18n'
 import { matcherFile } from '../server/params'
@@ -67,18 +68,6 @@ function compressedWasm(): BunPlugin {
     setup(build) {
       build.onLoad({ filter: AVIF_WASM }, async ({ path }) => ({ contents: await Bun.zstdCompress(await Bun.file(path).bytes(), { level: 10 }), loader: 'file' }))
     },
-  }
-}
-
-// The package.json name of the project, which an executable carries as the app's identity.
-function projectName(root: string): string | undefined {
-  try {
-    const { name } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { name?: unknown }
-
-    return typeof name === 'string' && name !== '' ? name : undefined
-  }
-  catch {
-    return undefined
   }
 }
 
@@ -143,7 +132,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
     '',
     'registerBundle({',
     `  root: ${JSON.stringify(root)},`,
-    `  name: ${JSON.stringify(projectName(root))},`,
+    `  name: ${JSON.stringify(packageName(root))},`,
     `  routes: ${JSON.stringify(routes)},`,
     `  fallback: ${JSON.stringify(fallback)},`,
     `  api: ${JSON.stringify(api)},`,

@@ -60,7 +60,7 @@ pgDescribe('pgData live values', () => {
   pgIt('is a kind of pgData, filling every kind of the app store', async () => {
     const data = pgData(await fresh())
 
-    expect(Object.keys(data).sort()).toEqual(['cache', 'jobs', 'live', 'notifications', 'rates', 'ready', 'rooms', 'sessions', 'vitals'])
+    expect(Object.keys(data).sort()).toEqual(['cache', 'jobs', 'live', 'notifications', 'rates', 'rooms', 'sessions', 'vitals'])
   })
 
   pgIt('reaches the other replica, a set and a delete, and never the replica that made them', async () => {

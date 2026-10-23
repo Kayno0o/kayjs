@@ -210,21 +210,7 @@ pgDescribe('a pgData role that may not alter tables', () => {
       await Bun.write(join(first, 'package.json'), JSON.stringify({ name: 'shop' }))
       await Bun.write(join(second, 'package.json'), JSON.stringify({ name: 'blog' }))
 
-      const boot = async (root: string) => {
-        const before = process.env.KAY_ROOT
-
-        process.env.KAY_ROOT = root
-
-        try {
-          await pages({ root, routes: join(root, 'src/routes'), prebuilt: false, security: false, store: pgData(database) })
-        }
-        finally {
-          if (before === undefined)
-            delete process.env.KAY_ROOT
-          else
-            process.env.KAY_ROOT = before
-        }
-      }
+      const boot = async (root: string) => pages({ root, routes: join(root, 'src/routes'), prebuilt: false, security: false, store: pgData(database) })
 
       await boot(first)
       await boot(first)

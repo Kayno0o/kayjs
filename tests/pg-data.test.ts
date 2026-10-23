@@ -1,4 +1,5 @@
 import type { SQL } from 'bun'
+import type { Bundle } from '../src/server/bundle'
 import type { PgHandle } from '../src/server/pg-data'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -6,7 +7,9 @@ import { afterEach, expect } from 'bun:test'
 import { stringify } from 'devalue'
 import { cached } from '../src/runtime/cache'
 import { rateLimit, rooms } from '../src/server'
+import { appName } from '../src/server/app-identity'
 import { appStore, setupStore } from '../src/server/app-store'
+import { registerBundle } from '../src/server/bundle'
 import { createDataTables, dataTables, pgData, pgHandle } from '../src/server/pg-data'
 import { createMissingIndexes, indexStatement, pgJobs } from '../src/server/pg-jobs'
 import { pgRooms } from '../src/server/pg-rooms'
@@ -64,7 +67,7 @@ pgDescribe('pgData', () => {
   pgIt('gives each kind the SQLite one gives', async () => {
     const data = pgData(await fresh())
 
-    expect(Object.keys(data).sort()).toEqual(['cache', 'jobs', 'live', 'notifications', 'rates', 'ready', 'rooms', 'sessions', 'vitals'])
+    expect(Object.keys(data).sort()).toEqual(['cache', 'jobs', 'live', 'notifications', 'rates', 'rooms', 'sessions', 'vitals'])
   })
 
   pgIt('is the app store: what names no store of its own lands in Postgres', async () => {
@@ -974,17 +977,37 @@ pgDescribe('pgData app identity', () => {
   })
 })
 
-pgDescribe('pgData ready', () => {
-  pgIt('refuses a database owned by another app, and ignores one it cannot reach', async () => {
+pgDescribe('pgData app name', () => {
+  pgIt('an executable carries the name it was built with, and none claims nothing', async () => {
     const sql = await fresh()
 
-    await asApp('shop', async () => pgData(sql).sessions.get('a'))
-    await expect(asApp('blog', async () => pgData(sql).ready())).rejects.toThrow('belongs to the app "shop"')
-    await asApp('shop', async () => pgData(sql).ready())
+    try {
+      registerBundle({ name: 'compiled' } as unknown as Bundle)
+      expect(appName()).toBe('compiled')
+      await pgData(sql).sessions.get('a')
+      expect(await owner(sql)).toBe('compiled')
+      registerBundle({ name: undefined } as unknown as Bundle)
+      await pgData(sql).sessions.get('a')
+      expect(await owner(sql)).toBe('compiled')
+    }
+    finally {
+      registerBundle(undefined as unknown as Bundle)
+    }
+  })
 
-    const down = new Bun.SQL('postgres://nobody:none@127.0.0.1:1/none', { connectionTimeout: 1, max: 1 })
+  pgIt('two renamed apps adopting one database at once leave one refused', async () => {
+    const sql = await fresh()
 
-    await asApp('shop', async () => pgData(down).ready())
-    await down.close()
+    await asApp('old', async () => pgData(sql).sessions.get('a'))
+    process.env.KAY_ADOPT_DATABASE = 'old'
+
+    try {
+      const results = await Promise.allSettled([asApp('one', async () => pgData(sql).sessions.get('a')), asApp('two', async () => pgData(sql).sessions.get('a'))])
+
+      expect(results.map(result => result.status).sort()).toEqual(['fulfilled', 'rejected'])
+    }
+    finally {
+      delete process.env.KAY_ADOPT_DATABASE
+    }
   })
 })

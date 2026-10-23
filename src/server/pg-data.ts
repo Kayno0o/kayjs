@@ -2,7 +2,7 @@ import type { SQL } from 'bun'
 import type { AppStore } from './app-store'
 import type { PgIndex, PgJobsSource } from './pg-jobs'
 import type { DeletableSessionStore } from './session'
-import { appName, claimDatabase, DatabaseOwnedError } from './app-identity'
+import { appName, claimDatabase } from './app-identity'
 import { pgCache } from './pg-cache'
 import { connectionOf, createJobTables, createMissingIndexes, indexStatement, jobsAfter, jobTables, privilegeRefused, relationsMissing, withMissingIndexes } from './pg-jobs'
 import { pgLive } from './pg-live'
@@ -95,19 +95,8 @@ async function addMissingColumns(db: SQL): Promise<void> {
   })
 }
 
-// Opens the database for the boot, which fails only for a database owned by another app: one that is down is retried by the first call needing it.
-async function refuseOwned(handle: PgHandle): Promise<void> {
-  try {
-    await handle.db()
-  }
-  catch (error) {
-    if (error instanceof DatabaseOwnedError)
-      throw error
-  }
-}
-
 // One connection and one table check for every store of a `pgData`.
-export function pgHandle(db: SQL, name: () => string | undefined = appName): PgHandle {
+export function pgHandle(db: SQL): PgHandle {
   let ready: Promise<SQL> | undefined
 
   const tables = async (): Promise<SQL> => {
@@ -140,11 +129,11 @@ export function pgHandle(db: SQL, name: () => string | undefined = appName): PgH
 
   // The tables are in place before the database is claimed for the app, whose name is read at the first use as an executable registers its own after its config loads.
   const create = async (): Promise<SQL> => {
-    const ready = await tables()
+    const opened = await tables()
 
-    await claimDatabase(ready, name())
+    await claimDatabase(opened, appName())
 
-    return ready
+    return opened
   }
 
   // A failed creation is tried again by the next call rather than kept.
@@ -174,5 +163,5 @@ export function pgData(source: PgJobsSource) {
 
   const handle = pgHandle(db)
 
-  return { sessions: pgSessions(handle), cache: pgCache(handle), jobs: jobsAfter(db, async () => handle.db()), rates: pgRates(handle), rooms: pgRooms(handle), vitals: pgVitals(handle), live: pgLive(handle), ...typeof source === 'string' && { database: source }, notifications: pgNotifications(handle), ready: async () => refuseOwned(handle) } satisfies { [Kind in Exclude<keyof AppStore, 'database'>]-?: NonNullable<AppStore[Kind]> } & { sessions: DeletableSessionStore }
+  return { sessions: pgSessions(handle), cache: pgCache(handle), jobs: jobsAfter(db, async () => handle.db()), rates: pgRates(handle), rooms: pgRooms(handle), vitals: pgVitals(handle), live: pgLive(handle), ...typeof source === 'string' && { database: source }, notifications: pgNotifications(handle) } satisfies { [Kind in Exclude<keyof AppStore, 'database'>]-?: NonNullable<AppStore[Kind]> } & { sessions: DeletableSessionStore }
 }

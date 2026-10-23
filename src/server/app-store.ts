@@ -22,8 +22,6 @@ export interface AppStore {
   // The url of the database these stores keep their data in, `sqlite:///abs/path` for `sqliteData` and the url `pgData` was given, for a library keeping tables of its own there: kayjs-auth keeps its users in it. Left out for a store built by hand, and for `pgData` given a connection.
   database?: string | undefined
   notifications?: NotificationStore | undefined
-  // Called at a server's boot to refuse early what the stores would refuse on first use, such as `pgData` on a database another app owns. A store that cannot be reached is not its concern.
-  ready?: (() => Promise<void>) | undefined
 }
 
 let current: AppStore | undefined
