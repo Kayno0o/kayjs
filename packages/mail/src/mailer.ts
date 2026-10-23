@@ -132,32 +132,36 @@ const MAILERS = new Map<string, WeakRef<Owner>>()
 // Drops the id of a mailer that was collected, so a process making many mailers does not keep their dead refs.
 const FORGOTTEN = new FinalizationRegistry<string>(via => MAILERS.delete(via))
 
-// The queue settings of the live mailers by job store and queue name, each setting with the latest live mailer that set it: a queue has one set of retry and keep settings, whichever mailer's worker claims a job, so mailers sharing it must agree on them, whatever a mailer between them left unset.
-const SETTINGS = new WeakMap<object, Map<string, Map<string, { value: unknown, owner: WeakRef<Owner> }>>>()
+// The queue settings of the live mailers by job store and queue name, each setting with every live mailer that set it: a queue has one set of retry and keep settings, whichever mailer's worker claims a job, so mailers sharing it must agree on them, whatever a mailer between them left unset.
+type Setters = { value: unknown, owner: WeakRef<Owner> }[]
+
+const SETTINGS = new WeakMap<object, Map<string, Map<string, Setters>>>()
 
 function agreeOnQueue(name: string, store: object | undefined, settings: Record<string, unknown>, owner: Owner): void {
   // Mailers without a store each use the app's, which this cannot tell apart from another app's in the same process.
   if (store === undefined)
     return
 
-  const queues = SETTINGS.get(store) ?? new Map<string, Map<string, { value: unknown, owner: WeakRef<Owner> }>>()
+  const queues = SETTINGS.get(store) ?? new Map<string, Map<string, Setters>>()
 
   SETTINGS.set(store, queues)
 
-  const known = queues.get(name) ?? new Map<string, { value: unknown, owner: WeakRef<Owner> }>()
+  const known = queues.get(name) ?? new Map<string, Setters>()
 
   queues.set(name, known)
 
   const differing: string[] = []
-  const ref = new WeakRef(owner)
+  const live = new Map<string, Setters>()
 
   for (const [setting, value] of Object.entries(settings)) {
     if (value === undefined)
       continue
 
-    const other = known.get(setting)
+    const setters = (known.get(setting) ?? []).filter(setter => setter.owner.deref() !== undefined)
 
-    if (other?.owner.deref() !== undefined && JSON.stringify(value) !== JSON.stringify(other.value))
+    live.set(setting, setters)
+
+    if (setters.some(setter => JSON.stringify(value) !== JSON.stringify(setter.value)))
       differing.push(setting)
   }
 
@@ -165,11 +169,11 @@ function agreeOnQueue(name: string, store: object | undefined, settings: Record<
   if (differing.length > 0 && !underKayDev())
     throw configError(`mailer({ queue }) shares the queue "${name}" with another mailer that sets ${differing.join(', ')} differently; a queue has one set of retry and keep settings whichever mailer claims a job, so give each mailer its own queue \`name\` or the same settings`)
 
-  // A refused mailer is never made, so it records nothing.
-  for (const [setting, value] of Object.entries(settings)) {
-    if (value !== undefined)
-      known.set(setting, { value, owner: ref })
-  }
+  // A refused mailer is never made, so it records nothing; a reload replaces the old values.
+  const ref = new WeakRef(owner)
+
+  for (const [setting, setters] of live)
+    known.set(setting, [...setters.filter(setter => JSON.stringify(setter.value) === JSON.stringify(settings[setting])), { value: settings[setting], owner: ref }])
 }
 
 // A queued mail, with the id of the mailer that queued it.

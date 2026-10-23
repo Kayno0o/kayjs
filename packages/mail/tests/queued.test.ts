@@ -116,6 +116,20 @@ describe('mailers sharing a queue', () => {
     expect([first, middle]).toHaveLength(2)
   })
 
+  it('keep an earlier mailer in mind once a later one that agrees is gone', async () => {
+    const queue = shared()
+    const first = mailer({ from: 'a@example.com', queue: { ...queue, keepFailed: '7d' } })
+    let second: unknown = mailer({ from: 'b@example.com', queue: { ...queue, keepFailed: '7d' } })
+
+    second = undefined
+    Bun.gc(true)
+    await Bun.sleep(10)
+
+    expect(() => mailer({ from: 'c@example.com', queue: { ...queue, keepFailed: '30d' } })).toThrow(/keepFailed/)
+    expect(first).toBeDefined()
+    expect(second).toBeUndefined()
+  })
+
   it('without a store skip the check, as each uses the app\'s', () => {
     const name = `shared${names++}`
 
