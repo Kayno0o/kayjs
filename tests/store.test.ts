@@ -299,3 +299,68 @@ describe('store', () => {
     product.stop()
   })
 })
+
+describe('store edge cases', () => {
+  it('reads frozen data back as it is, nested stores included', () => {
+    const frozen = store({ inner: Object.freeze({ deep: { a: 1 } }), list: Object.freeze([{ a: 1 }]) })
+
+    expect(frozen.inner.deep.a).toBe(1)
+    expect(frozen.list[0]!.a).toBe(1)
+
+    const inner = store({ n: 1 })
+    const outer = store({ inner })
+
+    expect(outer.inner).toBe(inner)
+  })
+
+  it('snapshots an own __proto__ key as data, never as a prototype', () => {
+    const copy = snapshot(store(JSON.parse('{"__proto__":{"admin":true},"a":1}') as Record<string, unknown>))
+
+    expect(Object.getPrototypeOf(copy)).toBe(Object.prototype)
+    expect((copy as { admin?: boolean }).admin).toBeUndefined()
+    expect(Object.keys(copy).sort()).toEqual(['__proto__', 'a'])
+  })
+
+  it('notifies readers of the indices sort, reverse, shift and pop move', () => {
+    const list = store({ items: [3, 1, 2] })
+    const first = watching(() => list.items[0])
+    const last = watching(() => list.items[2])
+
+    list.items.sort()
+    flush()
+    expect(first.seen).toEqual([3, 1])
+    list.items.reverse()
+    flush()
+    expect(first.seen).toEqual([3, 1, 3])
+    list.items.pop()
+    flush()
+    expect(last.seen.at(-1)).toBeUndefined()
+    list.items.shift()
+    flush()
+    expect(first.seen.at(-1)).toBe(2)
+    first.stop()
+    last.stop()
+  })
+
+  it('shrinks a huge array without walking every index', () => {
+    const list = store({ items: [] as number[] })
+
+    list.items.length = 4_000_000_000
+    list.items.length = 0
+    expect(list.items).toHaveLength(0)
+  })
+
+  it('runs a setter on the store, so what it writes notifies', () => {
+    const box = store({ _v: 1, set v(next: number) {
+      this._v = next
+    }, get v() {
+      return this._v
+    } })
+    const seen = watching(() => box._v)
+
+    box.v = 5
+    flush()
+    expect(seen.seen).toEqual([1, 5])
+    seen.stop()
+  })
+})

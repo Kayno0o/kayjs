@@ -20,6 +20,7 @@ In a `.ts` file nothing is added. `kay/server` also exports `s`, so a server mod
 | Export | Is |
 | --- | --- |
 | `signal`, `memo`, `effect`, `batch`, `untrack`, `onMount`, `onCleanup` | Reactivity |
+| `store`, `snapshot` | State mutated in place, tracked per property, and its plain deep copy. See [State mutated in place](/essentials/components#state-mutated-in-place) |
 | `root` | An owner of its own, so effects created inside live until its `dispose` is called. See [Islands](/essentials/islands#effects-outside-a-component) |
 | `live` | A value the server changes and every page showing it follows. See [Live and realtime](/guides/live-and-realtime#values-the-server-changes) |
 | `presence` | Who else has a room or a page open, as `others()` and `count()` that follow joins and leaves. See [Live and realtime](/guides/live-and-realtime#who-else-is-here) |

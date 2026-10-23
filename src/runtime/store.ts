@@ -110,7 +110,13 @@ const handler: ProxyHandler<object> = {
 
     const value: unknown = Reflect.get(target, key, receiver)
 
-    return own && plain(value) ? wrap(value) : value
+    if (!own || !plain(value))
+      return value
+
+    // A frozen property must read back as it is, which a proxy could not.
+    const descriptor = Reflect.getOwnPropertyDescriptor(target, key)
+
+    return descriptor?.configurable === false && descriptor.writable === false ? value : wrap(unwrap(value))
   },
 
   has(target, key) {
@@ -126,17 +132,17 @@ const handler: ProxyHandler<object> = {
     return Reflect.ownKeys(target)
   },
 
-  set(target, key, value) {
+  set(target, key, value, receiver) {
     const next = unwrap(value)
 
     if (typeof key === 'symbol')
-      return Reflect.set(target, key, next)
+      return Reflect.set(target, key, next, receiver)
 
     const had = Object.hasOwn(target, key)
     const length = Array.isArray(target) ? target.length : 0
     const previous = (target as Record<string, unknown>)[key]
 
-    if (!Reflect.set(target, key, next))
+    if (!Reflect.set(target, key, next, receiver))
       return false
 
     if (had && Object.is(previous, next))
@@ -152,8 +158,12 @@ const handler: ProxyHandler<object> = {
       touchShape(target)
 
       // Shrinking drops the elements past the new end, which readers of them see go.
-      for (let index = target.length; index < length; index++)
-        touch(target, String(index))
+      for (const key of metas.get(target)?.keys.keys() ?? []) {
+        const index = Number(key)
+
+        if (Number.isInteger(index) && index >= target.length && index < length)
+          touch(target, key)
+      }
     }
 
     return true
@@ -222,7 +232,7 @@ function copy(value: unknown, seen: Map<object, unknown>): unknown {
   seen.set(source, object)
 
   for (const key of Object.keys(source))
-    object[key] = copy((source as Record<string, unknown>)[key], seen)
+    Object.defineProperty(object, key, { value: copy((source as Record<string, unknown>)[key], seen), writable: true, enumerable: true, configurable: true })
 
   return object
 }
