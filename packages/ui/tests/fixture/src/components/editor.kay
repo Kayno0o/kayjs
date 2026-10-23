@@ -5,14 +5,14 @@ import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 
 // What the test reads back: the text after each change.
-const { value, onInput, onImage, toolbar, preview, previewClass, labelled = false, plain = false, late = false } = props<{ value: string, onInput: (value: string) => void, onImage?: (file: File) => Promise<string>, toolbar?: boolean | readonly ('bold' | 'italic' | 'heading' | 'bulletList' | 'numberedList' | 'link' | 'image')[], preview?: (markdown: string) => Promise<string>, previewClass?: string, labelled?: boolean, plain?: boolean, late?: boolean }>()
+const { value, onInput, onImage, toolbar, preview, previewTrusted, previewClass, labelled = false, plain = false, late = false } = props<{ value: string, onInput: (value: string) => void, onImage?: (file: File) => Promise<string>, toolbar?: boolean | readonly ('bold' | 'italic' | 'heading' | 'bulletList' | 'numberedList' | 'link' | 'image')[], preview?: (markdown: string) => Promise<string>, previewTrusted?: boolean, previewClass?: string, labelled?: boolean, plain?: boolean, late?: boolean }>()
 
 // With `late`, the toolbar is off until the test's button turns it on, as a parent changing the prop after mount.
 const enabled = signal(false)
 ---
 if labelled
   FormField(label="Body")
-    MarkdownEditor#editor(value={value} onInput={onInput} onImage={onImage} toolbar={toolbar} preview={preview} previewClass={previewClass})
+    MarkdownEditor#editor(value={value} onInput={onInput} onImage={onImage} toolbar={toolbar} preview={preview} previewTrusted={previewTrusted} previewClass={previewClass})
 else if plain
   label
     span.kui-label-text Outer
@@ -20,7 +20,7 @@ else if plain
 else if late
   MarkdownEditor#editor(value={value} onInput={onInput} toolbar={enabled()})
 else
-  MarkdownEditor#editor(value={value} onInput={onInput} onImage={onImage} toolbar={toolbar} preview={preview} previewClass={previewClass})
+  MarkdownEditor#editor(value={value} onInput={onInput} onImage={onImage} toolbar={toolbar} preview={preview} previewTrusted={previewTrusted} previewClass={previewClass})
 input#title(aria-label="Title")
 Toaster
 if late

@@ -1,5 +1,5 @@
 ---
-import { effect, onCleanup, recipe, signal, trustHtml, untrack } from 'kay'
+import { effect, onCleanup, recipe, sanitizeHtml, signal, trustHtml, untrack } from 'kay'
 import { wording } from 'kay/words'
 
 const PREVIEW_DELAY = 250
@@ -7,8 +7,12 @@ const PREVIEW_DELAY = 250
 // The pane beside a MarkdownEditor's field, loaded the first time the preview is shown. It renders the text a pause after the last keystroke.
 const look = recipe({ parts: { root: 'kui-markdown-preview', failed: 'kui-markdown-preview-failed', body: 'kui-markdown-preview-body' } })
 
-const { text, render } = props<{
+// What rendered Markdown keeps besides formatted text, as the site's own Markdown does; scripts, handlers and unsafe URLs never survive.
+const KEPT = { tags: ['img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'], attributes: { img: ['src', 'alt', 'title'], th: ['align'], td: ['align'] } }
+
+const { text, render, trusted = false } = props<{
   text: string
+  trusted?: boolean
   render: (markdown: string) => Promise<string>
 }>()
 
@@ -44,4 +48,4 @@ div(part="root" role="region" aria-label={wording('ui.markdownEditor.preview', '
   if failed()
     p(part="failed") {wording('ui.markdownEditor.previewFailure', 'The preview could not be shown')}
   else
-    div(part="body" innerHTML={trustHtml(rendered() ?? '')})
+    div(part="body" innerHTML={trusted ? trustHtml(rendered() ?? '') : sanitizeHtml(rendered() ?? '', KEPT)})

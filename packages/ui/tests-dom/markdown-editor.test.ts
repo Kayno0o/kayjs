@@ -290,6 +290,42 @@ describe('MarkdownEditor preview', () => {
     expect(state.root.querySelector('.kui-markdown-preview-body')?.className).toContain('prose lg:prose-lg')
   })
 
+  test('sanitizes the preview: an onerror payload and a javascript link come out inert', async () => {
+    const html = '<p>hi</p><img src=x onerror="window.__ran = 1"><a href="javascript:window.__ran = 2">x</a><script>window.__ran = 3</script>'
+    const state = await editor('t', undefined, { preview: async () => html })
+
+    named(state.root, 'Preview').click()
+    await until(() => state.root.querySelector('.kui-markdown-preview-body')?.innerHTML.includes('hi') === true)
+
+    const body = state.root.querySelector('.kui-markdown-preview-body')!
+
+    expect(body.innerHTML).not.toContain('onerror')
+    expect(body.innerHTML).not.toContain('javascript:')
+    expect(body.querySelector('script')).toBeNull()
+    expect(body.querySelector('img')?.getAttribute('onerror')).toBeNull()
+    expect(body.textContent).toContain('hi')
+    expect((globalThis as { __ran?: number }).__ran).toBeUndefined()
+  })
+
+  test('keeps images and tables, and inserts the HTML as it comes with previewTrusted', async () => {
+    const html = '<p>a</p><img src="/x.png" alt="x"><table><tbody><tr><td>c</td></tr></tbody></table>'
+    const safe = await editor('t', undefined, { preview: async () => html })
+
+    named(safe.root, 'Preview').click()
+    await until(() => safe.root.querySelector('.kui-markdown-preview-body td') !== null)
+
+    expect(safe.root.querySelector('.kui-markdown-preview-body img')?.getAttribute('src')).toBe('/x.png')
+
+    mounted?.unmount()
+
+    const trusted = await editor('t', undefined, { preview: async () => '<p class="mine">a</p>', previewTrusted: true })
+
+    named(trusted.root, 'Preview').click()
+    await until(() => trusted.root.querySelector('.kui-markdown-preview-body .mine') !== null)
+
+    expect(trusted.root.querySelector('.kui-markdown-preview-body .mine')).not.toBeNull()
+  })
+
   test('shows the server HTML once asked, follows the text, and hides on a second press', async () => {
     const asked: string[] = []
     const state = await editor('one', undefined, { preview: async (markdown: string) => {

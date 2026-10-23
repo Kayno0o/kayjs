@@ -23,7 +23,7 @@ const EDITS: Record<ToolbarAction, (text: string, start: number, end: number) =>
 
 const look = recipe({ parts: { wrap: 'kui-markdown', grid: 'kui-markdown-grid', root: 'kui-markdown-editor', bar: 'kui-markdown-bar', barFailed: 'kui-markdown-bar-failed' } })
 
-const { value = '', onInput, onImage, toolbar = true, preview, previewClass, uploadFailure = wording('ui.markdownEditor.uploadFailure', 'Could not upload the image'), placeholder = wording('ui.markdownEditor.placeholder', 'Write markdown…'), keysHint = wording('ui.markdownEditor.keysHint', 'Tab indents a list item; Escape then Tab leaves the field.'), ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onKeyDown' | 'onPaste' | 'onDrop'> & {
+const { value = '', onInput, onImage, toolbar = true, preview, previewTrusted = false, previewClass, uploadFailure = wording('ui.markdownEditor.uploadFailure', 'Could not upload the image'), placeholder = wording('ui.markdownEditor.placeholder', 'Write markdown…'), keysHint = wording('ui.markdownEditor.keysHint', 'Tab indents a list item; Escape then Tab leaves the field.'), ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onKeyDown' | 'onPaste' | 'onDrop'> & {
   // The text to start with; an editor whose parent passes other text follows it.
   value?: string | undefined
   // The text after every change, typed or applied by a shortcut, a paste or an upload.
@@ -35,8 +35,10 @@ const { value = '', onInput, onImage, toolbar = true, preview, previewClass, upl
   // The buttons over the field, in order: `false` for none, else any of `bold`, `italic`, `heading`, `bulletList`, `numberedList`, `link` and `image`, all of them by default.
   // `image` opens the file picker when `onImage` is given, else writes an image to fill in.
   toolbar?: boolean | readonly ToolbarAction[] | undefined
-  // Renders the text as the page shows it, as HTML, on the server: given, a Preview button shows it beside the field, or in place of it on a narrow one. The HTML is trusted, so it must come from the app's own renderer.
+  // Renders the text as the page shows it, as HTML, on the server: given, a Preview button shows it beside the field, or in place of it on a narrow one. The HTML goes through `sanitizeHtml`, keeping images and tables, unless `previewTrusted` is set.
   preview?: ((markdown: string) => Promise<string>) | undefined
+  // Inserts the preview's HTML as it comes, for an app whose renderer already sanitizes the text it renders.
+  previewTrusted?: boolean | undefined
   // Classes for the HTML of the preview, so it takes the styles the page gives rendered Markdown, such as a prose class.
   previewClass?: string | undefined
   // Tells screen readers how to leave the field, since Tab on a list item indents it.
@@ -335,4 +337,4 @@ div(part="wrap")
           View(actions={actions()} hasPreview={preview !== undefined} previewing={previewing()} onAction={action => action === 'image' ? pickImage() : runAction(action)} onPreview={togglePreview})
     if previewing() && preview
       for View of previewView() key={View}
-        View(text={text()} render={preview} class={previewParts()})
+        View(text={text()} render={preview} trusted={previewTrusted} class={previewParts()})

@@ -490,7 +490,7 @@ function leaveJson(): void {
         Textarea(rows={current.rows ?? 4} placeholder={current.placeholder} ref={element => grow(element, current.rows)} value={text()} onInput={typed} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength})
     when 'markdown'
       FormField(label={current.label} hint={hinted()} issue={issue()} required={starred()} action={counter()})
-        MarkdownEditor(toolbar={markdown.toolbar} previewClass={markdown.previewClass} preview={source => previewMarkdown(source, entry)} value={text()} onInput={typed} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength} onImage={uploadRefused() === undefined ? async file => (await uploadFile(entry.collection, file)).path : undefined})
+        MarkdownEditor(toolbar={markdown.toolbar} previewClass={markdown.previewClass} preview={source => previewMarkdown(source, entry)} previewTrusted value={text()} onInput={typed} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength} onImage={uploadRefused() === undefined ? async file => (await uploadFile(entry.collection, file)).path : undefined})
     when 'number', 'integer'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
         Adorned(prefix={current.prefix} suffix={current.suffix})
