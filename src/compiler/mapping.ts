@@ -287,6 +287,23 @@ export class SourceMap {
     return exact && exact.generated + source - exact.source
   }
 
+  // The generated span from the first to the last of the code copied from a source span, where generated code may reorder it; undefined when none was.
+  generatedHull(start: number, end: number): Span | undefined {
+    let hull: Span | undefined
+
+    for (const mapping of this.bySource) {
+      if (mapping.source > end || mapping.source + mapping.length < start)
+        continue
+
+      const from = mapping.generated + Math.max(0, start - mapping.source)
+      const to = mapping.generated + Math.min(mapping.length, end - mapping.source)
+
+      hull = hull ? { start: Math.min(hull.start, from), end: Math.max(hull.end, to) } : { start: from, end: to }
+    }
+
+    return hull
+  }
+
   // Generated code may copy a name more than once, as a loop's item into its key function and its row; a run ending where the name starts is no copy of it.
   toGeneratedAll(source: number): number[] {
     return this.bySource.filter(mapping => mapping.source <= source && source < mapping.source + mapping.length).map(mapping => mapping.generated + source - mapping.source)

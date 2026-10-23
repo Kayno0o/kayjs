@@ -18,7 +18,7 @@ export function formatRange(source: string, range: Span, options: FormatOptions 
 
   // A range ending at the start of a line does not touch it.
   const last = range.end > range.start && source[range.end - 1] === '\n' ? range.end - 1 : range.end
-  const starts = file.template.map(node => source.lastIndexOf('\n', node.start - 1) + 1)
+  const starts = file.template.map((node, index) => index === 0 ? firstStart(source, node.start) : source.lastIndexOf('\n', node.start - 1) + 1)
   const crlf = source.includes('\r\n')
   const edits: RangeEdit[] = []
 
@@ -47,4 +47,11 @@ export function formatRange(source: string, range: Span, options: FormatOptions 
   }
 
   return edits
+}
+
+// The first block takes the blank lines before it, which a whole file drops: they run from the line after what precedes it, the closing line of a fence.
+function firstStart(source: string, at: number): number {
+  const before = source.slice(0, at).trimEnd()
+
+  return before === '' ? 0 : source.indexOf('\n', before.length - 1) + 1
 }

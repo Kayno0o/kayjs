@@ -39,7 +39,7 @@ import { documentSymbols, foldingRanges } from './outline'
 import { toOffset, toPosition } from './positions'
 import { formatRange } from './range-format'
 import { importEdits, importSpecifiers, moduleImportEdits } from './renames'
-import { routeLinks } from './route-links'
+import { mentionsRoute, routeLinks } from './route-links'
 import { Connection } from './rpc'
 import { semanticTokens, TOKEN_MODIFIERS, TOKEN_TYPES } from './semantic-tokens'
 import { templateContext, templateItems } from './template-completion'
@@ -124,7 +124,6 @@ const CAPITALIZED = /^[A-Z]/
 const MODULE_FILE = /\.(?:[cm]?[jt]s|[jt]sx)$/
 const FIX_ALL = 'source.fixAll.kay'
 const PARAMETER_HINT = 2
-const ROUTE_WORDS = /(?:href|action)=|navigate\(|redirect\(/
 const PLAIN_FORMAT = 1
 const SNIPPET_FORMAT = 2
 const PACKAGE_TYPES = join(SHADOW_DIR, 'kay-packages.d.ts')
@@ -996,7 +995,7 @@ export class KayLanguageServer {
     })
     const project = this.projectAt(projectRootOf(document.file, this.root))
     // The route table is read from disk, so a text with no route path asks for none.
-    const routes = ROUTE_WORDS.test(document.source) ? await this.routeTable(project) : []
+    const routes = mentionsRoute(document.source) ? await this.routeTable(project) : []
 
     return [...imports, ...routeLinks(document.source, routes, project.locales).map(link => ({ range: range(link), target: this.clientUri(link.file) }))]
   }
@@ -1018,9 +1017,15 @@ export class KayLanguageServer {
     if (!document)
       return []
 
-    const whole = { start: { line: 0, character: 0 }, end: toPosition(document.tsx, document.tsx.length) }
-    const found = await this.server.request<TsgoInlayHint[] | null>('textDocument/inlayHint', { textDocument: { uri: document.shadowUri }, range: whole })
     const wanted = { start: toOffset(document.source, params.range.start), end: toOffset(document.source, params.range.end) }
+    // The generated code of the range, a character further so a type following its last name is inside.
+    const generated = document.map.generatedHull(wanted.start, wanted.end)
+
+    if (!generated)
+      return []
+
+    const range = { start: toPosition(document.tsx, generated.start), end: toPosition(document.tsx, Math.min(generated.end + 1, document.tsx.length)) }
+    const found = await this.server.request<TsgoInlayHint[] | null>('textDocument/inlayHint', { textDocument: { uri: document.shadowUri }, range })
 
     return (found ?? []).flatMap((hint) => {
       const at = toOffset(document.tsx, hint.position)

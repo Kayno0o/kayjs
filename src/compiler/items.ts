@@ -1,9 +1,9 @@
-import type * as t from '@babel/types'
 import type { AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfNode, MatchNode, Node, PendingNode, SnippetNode, TextExpression, TryNode } from './ast'
 import type { CodeBuilder } from './mapping'
 import { parseExpression } from '@babel/parser'
 import { isHead, isSlot } from './ast'
 import { PROPS } from './names'
+import { patternNames } from './pattern-names'
 
 // The children of an element or a block as the markup holds them: runs of static text, plain elements, and dynamic parts.
 // Server markup and browser code both walk this list, so hydration finds a dynamic part where the browser expects it.
@@ -131,7 +131,7 @@ export function childItems(nodes: Node[]): Item[] {
 
 // A template `const` as a statement. `memo`, the helper's name in code that runs again as what it reads changes, makes each name a memo, read by calling it.
 export function constDeclaration(b: CodeBuilder, node: ConstNode, src: string, memo: string | undefined): void {
-  const names = memo === undefined ? [] : patternNames(src.slice(node.pattern.start, node.pattern.end))
+  const names = memo === undefined ? [] : parameterNames(src.slice(node.pattern.start, node.pattern.end))
 
   if (memo === undefined) {
     b.add('const ').addSource(node.pattern).add(' = (').addSource(node.value).add('); ')
@@ -153,39 +153,15 @@ export function constDeclaration(b: CodeBuilder, node: ConstNode, src: string, m
 }
 
 // The names a destructuring pattern or a parameter list declares, in order.
-export function patternNames(pattern: string): string[] {
-  const names: string[] = []
-  const visit = (node: t.Node | null) => {
-    if (node?.type === 'Identifier') {
-      names.push(node.name)
-    }
-    else if (node?.type === 'ObjectPattern') {
-      for (const property of node.properties)
-        visit(property.type === 'RestElement' ? property.argument : property.value)
-    }
-    else if (node?.type === 'ArrayPattern') {
-      for (const element of node.elements)
-        visit(element)
-    }
-    else if (node?.type === 'AssignmentPattern') {
-      visit(node.left)
-    }
-    else if (node?.type === 'RestElement') {
-      visit(node.argument)
-    }
-  }
-
+export function parameterNames(pattern: string): string[] {
   try {
     const fn = parseExpression(`(${pattern}) => 0`, { plugins: ['typescript'] })
 
-    if (fn.type === 'ArrowFunctionExpression') {
-      for (const param of fn.params)
-        visit(param)
-    }
+    return fn.type === 'ArrowFunctionExpression' ? fn.params.flatMap(param => patternNames(param)) : []
   }
-  catch {}
-
-  return names
+  catch {
+    return []
+  }
 }
 
 // What a `slot` renders: the component's children, or the block prop it names, called with its arguments when it has some.

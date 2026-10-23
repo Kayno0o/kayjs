@@ -1,8 +1,17 @@
 import type { Span } from '../compiler/ast'
 import type { Route } from '../server/routes'
+import * as builtIn from '../runtime/params'
+import { decodePath } from '../server/routes'
 
 // A route path written as a string where kay reads one: a link, a form action or a navigation, never one built with `{}`.
 const ROUTE_PATH = /(?<![\w-])(?:(?:href|action)=|(?:navigate|redirect)\()\s*["'`](\/(?!\/)[^"'`{}$\s?#]*)(?=[?#"'`])/g
+
+const ROUTE_WORDS = /(?:href|action)=|navigate\(|redirect\(/
+
+// Whether a text writes a place where a route path can be, so the route table is read from disk for no other.
+export function mentionsRoute(source: string): boolean {
+  return ROUTE_WORDS.test(source)
+}
 
 export interface RouteLink extends Span {
   file: string
@@ -13,7 +22,19 @@ function looseness(pattern: string): number {
   return pattern.split('/').filter(segment => segment.startsWith(':') || segment === '*').length
 }
 
-function matches(parts: string[], segments: string[]): boolean {
+// A param the route's matcher refuses is no match; the matchers kay ships are run, a project's own cannot be and take whatever reaches them.
+function accepts(route: Route, name: string, value: string): boolean {
+  const matcher = route.matchers?.[name]
+
+  if (matcher === undefined || !Object.hasOwn(builtIn, matcher))
+    return true
+
+  const decoded = decodePath(value)
+
+  return decoded !== undefined && (builtIn[matcher as keyof typeof builtIn] as (value: string) => unknown)(decoded) !== undefined
+}
+
+function matches(route: Route, parts: string[], segments: string[]): boolean {
   const [part, ...rest] = parts
 
   if (part === undefined)
@@ -23,9 +44,26 @@ function matches(parts: string[], segments: string[]): boolean {
     return segments.length > 0
 
   if (part.endsWith('?'))
-    return matches(rest, segments) || (segments.length > 0 && matches(rest, segments.slice(1)))
+    return matches(route, rest, segments) || (segments.length > 0 && accepts(route, part.slice(1, -1), segments[0]!) && matches(route, rest, segments.slice(1)))
 
-  return segments.length > 0 && (part.startsWith(':') || part === segments[0]) && matches(rest, segments.slice(1))
+  if (segments.length === 0)
+    return false
+
+  if (part.startsWith(':'))
+    return accepts(route, part.slice(1), segments[0]!) && matches(route, rest, segments.slice(1))
+
+  return part === segments[0] && matches(route, rest, segments.slice(1))
+}
+
+// The order the router tries routes serving one path in: fewest params, a param before a catch-all, a matched param before a plain one.
+function rank(route: Route): number[] {
+  return [looseness(route.pattern), route.pattern.includes('*') ? 1 : 0, route.matchers === undefined ? 1 : 0]
+}
+
+function byRank(a: Route, b: Route): number {
+  const right = rank(b)
+
+  return rank(a).reduce((difference, value, index) => difference || value - right[index]!, 0)
 }
 
 // The page serving a path: its static route before a param's, the locale prefix a path may carry left off.
@@ -34,7 +72,7 @@ export function routeAt(path: string, routes: Route[], locales: string[]): Route
   const prefixed = segments[0] !== undefined && locales.includes(segments[0])
 
   for (const candidate of prefixed ? [segments, segments.slice(1)] : [segments]) {
-    const found = routes.filter(route => matches(route.pattern.split('/').filter(Boolean), candidate)).toSorted((a, b) => looseness(a.pattern) - looseness(b.pattern))[0]
+    const found = routes.filter(route => matches(route, route.pattern.split('/').filter(Boolean), candidate)).toSorted(byRank)[0]
 
     if (found)
       return found

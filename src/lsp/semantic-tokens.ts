@@ -1,12 +1,13 @@
 import type { NodePath } from '@babel/traverse'
 import type * as t from '@babel/types'
 import type { Node, Span } from '../compiler/ast'
-import type { ImportedSignals } from '../compiler/module-signals'
+import type { ImportedSignals, SignalKind } from '../compiler/module-signals'
 import type { ParsedFence } from '../compiler/script'
-import { parseExpression } from '@babel/parser'
+import { parse } from '@babel/parser'
 import { nodeExpressions } from '../compiler/ast'
 import { MADE } from '../compiler/module-signals'
 import { parseKay } from '../compiler/parser'
+import { patternNames } from '../compiler/pattern-names'
 import { loadTraverse } from '../compiler/rewrite'
 import { analyzeScript, analyzeServer } from '../compiler/script'
 import { bindingNames, scopedBlocks } from '../compiler/template-reads'
@@ -37,6 +38,12 @@ interface Token extends Span {
 
 type Categories = Map<string, Category>
 
+const LOOSE_IMPORT = /\bimport\s*(?:type\s*)?\{([^}]*)\}\s*from\s*(["'])([^"']+)\2/g
+const LOOSE_SPECIFIER = /([\w$]+)(?:\s+as\s+([\w$]+))?/g
+const LOOSE_MADE = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*[(<]/g
+const LOOSE_PROPS = /\b(?:const|let|var)\s*\{([^}]*)\}\s*=\s*props\s*[(<]/g
+const LOOSE_PROP = /(?:^|,)\s*(?:[\w$]+\s*:\s*)?([A-Z_$][\w$]*)/gi
+
 const TYPE_PARENTS = new Set(['TSTypeReference', 'TSQualifiedName', 'TSTypeQuery'])
 
 // The tokens of a `.kay` file as the protocol encodes them: its signals, props and server values wherever they are declared, read or written, in the script, the module and the template.
@@ -51,23 +58,33 @@ export function semanticTokens(source: string, imported: ImportedSignals = {}): 
     const fence = analyzeServer(source, file.server)?.fence
 
     if (fence)
-      fenceTokens(fence, new Map(), undefined, add, server)
+      fenceTokens(fence, new Map(), undefined, add, server, new Map(), new Set())
   }
 
   const own: Categories = new Map()
-  const fences = [file.module, file.script].flatMap((span) => {
+  // What each name imported by a fence makes: a signal made through `kay`, whatever its alias, and no signal when another module's.
+  const made = new Map<string, SignalKind | undefined>()
+  const plain = new Set<string>()
+  const analyses = [file.module, file.script].flatMap((span) => {
     const analysis = span ? analyzeScript(source, span) : undefined
 
-    return span && analysis?.fence ? [{ analysis, fence: analysis.fence }] : []
+    return span && analysis ? [{ span, analysis, fence: analysis.fence }] : []
   })
+  const fences = analyses.flatMap(({ analysis, fence }) => fence ? [{ analysis, fence }] : [])
 
-  for (const { analysis } of fences) {
+  for (const { span, analysis, fence } of analyses) {
     for (const binding of analysis.imports) {
       const kind = imported[binding.source]?.[binding.imported]
+
+      made.set(binding.local, binding.source === 'kay' && Object.hasOwn(MADE, binding.imported) ? MADE[binding.imported] : undefined)
 
       if (kind)
         own.set(binding.local, signalCategory(kind))
     }
+
+    // What Babel could not parse is read as text, so the names it declares still reach the template.
+    for (const region of fence ? fence.broken : [span])
+      looseDeclarations(source, region, imported, made, own, add)
 
     for (const binding of analysis.props?.bindings ?? []) {
       const name = source.slice(binding.local.start, binding.local.end)
@@ -80,7 +97,7 @@ export function semanticTokens(source: string, imported: ImportedSignals = {}): 
   for (const { fence } of fences) {
     const declared: Categories = new Map()
 
-    fenceTokens(fence, own, server, add, declared)
+    fenceTokens(fence, own, server, add, declared, made, plain)
 
     for (const [name, category] of declared) {
       own.set(name, category)
@@ -88,11 +105,20 @@ export function semanticTokens(source: string, imported: ImportedSignals = {}): 
     }
   }
 
-  const known = new Map([...server, ...outer, ...own])
+  // A name the script declares itself is no longer the server fence's.
+  const known = new Map([...[...server].filter(([name]) => !plain.has(name)), ...outer, ...own])
 
   walkTemplate(source, file.template, known, new Set(), add)
 
   return encode(source, [...tokens.values()].toSorted((a, b) => a.start - b.start))
+}
+
+// What calling the name makes: by the `kay` import it comes from, else by its own name since a file may use `signal` with no import.
+function madeBy(callee: string, made: ReadonlyMap<string, SignalKind | undefined>): SignalKind | undefined {
+  if (made.has(callee))
+    return made.get(callee)
+
+  return Object.hasOwn(MADE, callee) ? MADE[callee] : undefined
 }
 
 function signalCategory(kind: 'signal' | 'memo' | 'live'): Category {
@@ -100,12 +126,20 @@ function signalCategory(kind: 'signal' | 'memo' | 'live'): Category {
 }
 
 // Marks the names a fence declares at its top level, and every read or write of them; `known` holds those of the module that the code reads without declaring, which the server fence hands the script. The categories of what the fence declares are put in `declared`.
-function fenceTokens(fence: ParsedFence, known: Categories, handed: Categories | undefined, add: (span: Span, category: Category, declaration: boolean) => void, declared: Categories): void {
+function fenceTokens(fence: ParsedFence, known: Categories, handed: Categories | undefined, add: (span: Span, category: Category, declaration: boolean) => void, declared: Categories, made: ReadonlyMap<string, SignalKind | undefined>, plain: Set<string>): void {
   const program = fence.ast.program
   const own = new Map<string, Category>()
 
   for (const statement of program.body) {
     const declaration = (statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement) ?? undefined
+
+    if (statement.type === 'ImportDeclaration') {
+      for (const specifier of statement.specifiers)
+        plain.add(specifier.local.name)
+    }
+
+    if ((declaration?.type === 'FunctionDeclaration' || declaration?.type === 'ClassDeclaration') && declaration.id)
+      plain.add(declaration.id.name)
 
     if (declaration?.type === 'FunctionDeclaration' && declaration.id) {
       own.set(declaration.id.name, { type: FUNCTION, modifiers: handed ? 0 : SERVER })
@@ -114,13 +148,15 @@ function fenceTokens(fence: ParsedFence, known: Categories, handed: Categories |
       for (const declarator of declaration.declarations) {
         const init = declarator.init
         const callee = init?.type === 'CallExpression' && init.callee.type === 'Identifier' ? init.callee.name : undefined
-        const made = callee !== undefined && Object.hasOwn(MADE, callee) ? MADE[callee] : undefined
-        const names = declarator.id.type === 'Identifier' ? [declarator.id.name] : bindingIdentifiers(declarator.id)
+        const kind = callee === undefined ? undefined : madeBy(callee, made)
+        const names = patternNames(declarator.id)
         const callable = init?.type === 'ArrowFunctionExpression' || init?.type === 'FunctionExpression'
 
         for (const name of callee === 'props' ? [] : names) {
-          if (made && handed)
-            own.set(name, signalCategory(made))
+          plain.add(name)
+
+          if (kind && handed)
+            own.set(name, signalCategory(kind))
           else if (!handed)
             own.set(name, { type: callable ? FUNCTION : VARIABLE, modifiers: SERVER | (declaration.kind === 'const' ? READONLY : 0) })
         }
@@ -168,23 +204,6 @@ function isNameSite(identifier: NodePath<t.Identifier>): boolean {
   return (parent.type === 'AssignmentExpression' || parent.type === 'AssignmentPattern') && parent.left === path.node
 }
 
-// The names a declaration pattern binds.
-function bindingIdentifiers(pattern: t.Node | null | undefined): string[] {
-  if (pattern?.type === 'Identifier')
-    return [pattern.name]
-
-  if (pattern?.type === 'ObjectPattern')
-    return pattern.properties.flatMap(property => bindingIdentifiers(property.type === 'RestElement' ? property : property.value))
-
-  if (pattern?.type === 'ArrayPattern')
-    return pattern.elements.flatMap(element => bindingIdentifiers(element))
-
-  if (pattern?.type === 'AssignmentPattern')
-    return bindingIdentifiers(pattern.left)
-
-  return pattern?.type === 'RestElement' ? bindingIdentifiers(pattern.argument) : []
-}
-
 // The template's expressions in scope order: what a loop, a snippet, a slot, an `if` alias or a `const` binds hides the name of the file inside its block.
 function walkTemplate(source: string, nodes: Node[], known: Categories, hidden: ReadonlySet<string>, add: (span: Span, category: Category) => void): void {
   let shadowed: ReadonlySet<string> = hidden
@@ -225,90 +244,63 @@ function binderSpans(node: Node): Span[] {
 }
 
 function expressionTokens(source: string, span: Span, known: Categories, hidden: ReadonlySet<string>, add: (span: Span, category: Category) => void): void {
-  let expression: t.Expression
+  let file: ReturnType<typeof parse>
 
+  // Parenthesized, so an object literal is the expression and not a block; the columns are one off.
   try {
-    expression = parseExpression(source.slice(span.start, span.end), { plugins: ['typescript'] })
+    file = parse(`(${source.slice(span.start, span.end)})`, { plugins: ['typescript'] })
   }
   catch {
     return
   }
 
-  const visit = (value: unknown, shadowed: ReadonlySet<string>, parent?: t.Node): void => {
-    if (Array.isArray(value)) {
-      for (const child of value)
-        visit(child, shadowed, parent)
+  loadTraverse()(file, {
+    Identifier(path) {
+      const category = hidden.has(path.node.name) || path.scope.getBinding(path.node.name) ? undefined : known.get(path.node.name)
 
-      return
-    }
-
-    if (typeof value !== 'object' || value === null || typeof (value as { type?: unknown }).type !== 'string')
-      return
-
-    const node = value as t.Node
-
-    if (node.type === 'Identifier') {
-      const category = shadowed.has(node.name) ? undefined : known.get(node.name)
-
-      if (category && node.start != null)
-        add({ start: span.start + node.start, end: span.start + node.start + node.name.length }, category)
-
-      return
-    }
-
-    if (node.type.startsWith('TS') && node.type !== 'TSAsExpression' && node.type !== 'TSNonNullExpression' && node.type !== 'TSSatisfiesExpression')
-      return
-
-    const inner = node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression' ? new Set([...shadowed, ...node.params.flatMap(param => bindingIdentifiers(param)), ...declaredIn(node.body)]) : shadowed
-
-    for (const [key, child] of Object.entries(node)) {
-      if (key === 'loc' || key === 'start' || key === 'end' || key === 'extra' || key === 'leadingComments' || key === 'trailingComments' || key === 'innerComments')
-        continue
-
-      if ((node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') && key === 'property' && !node.computed)
-        continue
-
-      if ((node.type === 'ObjectProperty' || node.type === 'ObjectMethod') && key === 'key' && !node.computed && !(node.type === 'ObjectProperty' && node.shorthand))
-        continue
-
-      if (key === 'params' || key === 'returnType' || key === 'typeParameters' || key === 'typeAnnotation')
-        continue
-
-      visit(child, inner, node)
-    }
-  }
-
-  visit(expression, hidden)
+      if (category && isNameSite(path))
+        add({ start: span.start + path.node.start! - 1, end: span.start + path.node.end! - 1 }, category)
+    },
+  })
 }
 
-// The names a function body declares with `const`, `let` or `var` at any depth, which hide a file's name for the whole function.
-function declaredIn(body: t.Node): string[] {
-  const names: string[] = []
-  const visit = (value: unknown): void => {
-    if (Array.isArray(value)) {
-      for (const child of value)
-        visit(child)
+// Declarations written in text Babel could not parse: a signal made by a call, a destructured `props` and the signals a fence imports. A name already known keeps its category.
+function looseDeclarations(source: string, region: Span, imported: ImportedSignals, made: Map<string, SignalKind | undefined>, own: Categories, add: (span: Span, category: Category, declaration: boolean) => void): void {
+  const text = source.slice(region.start, region.end)
+  const declare = (name: string, at: number, category: Category) => {
+    if (!own.has(name))
+      own.set(name, category)
 
-      return
-    }
+    add({ start: region.start + at, end: region.start + at + name.length }, category, true)
+  }
 
-    if (typeof value !== 'object' || value === null || typeof (value as { type?: unknown }).type !== 'string')
-      return
+  for (const match of text.matchAll(LOOSE_IMPORT)) {
+    for (const specifier of match[1]!.matchAll(LOOSE_SPECIFIER)) {
+      const local = specifier[2] ?? specifier[1]!
+      const kind = imported[match[3]!]?.[specifier[1]!]
 
-    const node = value as t.Node
+      if (match[3] === 'kay' && Object.hasOwn(MADE, specifier[1]!))
+        made.set(local, MADE[specifier[1]!])
 
-    if (node.type === 'VariableDeclarator')
-      names.push(...bindingIdentifiers(node.id))
-
-    for (const [key, child] of Object.entries(node)) {
-      if (key !== 'loc' && key !== 'extra')
-        visit(child)
+      if (kind)
+        declare(local, match.index + match[0].indexOf(match[1]!) + specifier.index + specifier[0].lastIndexOf(local), signalCategory(kind))
     }
   }
 
-  visit(body)
+  for (const match of text.matchAll(LOOSE_MADE)) {
+    const kind = madeBy(match[2]!, made)
 
-  return names
+    if (kind)
+      declare(match[1]!, match.index + match[0].indexOf(match[1]!), signalCategory(kind))
+  }
+
+  for (const match of text.matchAll(LOOSE_PROPS)) {
+    for (const entry of match[1]!.matchAll(LOOSE_PROP)) {
+      const name = entry[1]!
+
+      declare(name, match.index + match[0].indexOf('{') + 1 + entry.index + entry[0].lastIndexOf(name), { type: PROPERTY, modifiers: PROP })
+    }
+  }
 }
 
 function encode(source: string, tokens: Token[]): number[] {

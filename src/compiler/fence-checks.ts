@@ -7,6 +7,7 @@ import type { PageSettings, ParsedFence, SeparateSetting, ServerAnalysis } from 
 import { isSecret } from '../runtime/form'
 import { eachNode } from './each-node'
 import { PAGE } from './page-settings'
+import { patternNames } from './pattern-names'
 import { loadTraverse } from './rewrite'
 import { parseFence } from './script'
 
@@ -310,38 +311,17 @@ function candidates(node: t.Node): t.Node[] {
   return [node]
 }
 
-// The names a binding pattern declares.
-function patternNames(pattern: t.Node | null | undefined, into: Set<string>): void {
-  if (!pattern)
-    return
-
-  if (pattern.type === 'Identifier') {
-    into.add(pattern.name)
-  }
-  else if (pattern.type === 'AssignmentPattern') {
-    patternNames(pattern.left, into)
-  }
-  else if (pattern.type === 'RestElement') {
-    patternNames(pattern.argument, into)
-  }
-  else if (pattern.type === 'ArrayPattern') {
-    for (const element of pattern.elements) {
-      patternNames(element, into)
-    }
-  }
-  else if (pattern.type === 'ObjectPattern') {
-    for (const property of pattern.properties) {
-      patternNames(property.type === 'RestElement' ? property.argument : property.value, into)
-    }
-  }
-}
-
 interface Body {
   returned: t.Node[]
   awaits: boolean
   // The names the function declares itself, parameters included, and the `const` locals with their initializer.
   declared: Set<string>
   consts: Map<string, t.Node>
+}
+
+function declare(into: Set<string>, pattern: t.Node | null | undefined): void {
+  for (const name of patternNames(pattern))
+    into.add(name)
 }
 
 // What the function itself returns and whether it awaits, its inner functions left alone.
@@ -352,7 +332,7 @@ function returnsAndAwaits(fn: FunctionNode): Body {
   let awaits = false
 
   for (const param of fn.params)
-    patternNames(param, declared)
+    declare(declared, param)
 
   eachNode(fn.body, (node) => {
     if (isFunction(node)) {
@@ -369,10 +349,10 @@ function returnsAndAwaits(fn: FunctionNode): Body {
       awaits = true
     }
     else if (node.type === 'VariableDeclarator') {
-      patternNames(node.id, declared)
+      declare(declared, node.id)
     }
     else if (node.type === 'CatchClause') {
-      patternNames(node.param, declared)
+      declare(declared, node.param)
     }
     else if (node.type === 'ClassDeclaration' && node.id) {
       declared.add(node.id.name)
