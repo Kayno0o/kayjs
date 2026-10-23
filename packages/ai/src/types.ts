@@ -119,7 +119,8 @@ export interface AskOptions {
   // The provider requests the tool loop may make, 5 by default; a reply still wanting tools after the last ends with `finish` `steps`.
   maxSteps?: number | undefined
   // Asked before each tool call runs, with its name, arguments and the request: only `true` lets it run, anything else tells the model the visitor has not confirmed it so it asks them first, and a throw fails the call like a tool that throws. A write the visitor must agree to, such as a booking, is checked here; a read answers `true`.
-  confirm?: Confirm | undefined
+  // Left out, a tool not marked `tool: { readOnly: true }` is held until the visitor allows that very call (`Chat` draws an Allow button); `false` runs every tool unasked.
+  confirm?: Confirm | false | undefined
   // The most characters the messages may hold together, 50,000 by default (the system prompt is not counted); a conversation past it fails the reply with a `too-long` error, 413 in an action, before the provider is called. `Infinity` lifts it.
   maxInputChars?: number | undefined
   // Asks this provider instead of the one the environment names, such as `openai({ baseUrl })`.
@@ -139,6 +140,8 @@ export interface ToolCall {
   // The arguments the model gave, `{}` when it gave none that parse as an object.
   input: Record<string, unknown>
   status: 'running' | 'done' | 'failed'
+  // Set on a call held for the visitor's yes: the ticket a chat's Allow button posts back, which lets that very call run once on the next ask.
+  approval?: string | undefined
   // What the model was told of the outcome, the action's answer or why the call failed; absent while running.
   result?: string | undefined
 }

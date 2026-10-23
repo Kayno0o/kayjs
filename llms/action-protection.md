@@ -72,6 +72,7 @@ See [Rate limits](rate-limits.md#limit-attempts-in-a-guard-or-an-api-route).
 #### Offering an action to agents
 
 - `tool` on the third argument offers the action as an MCP tool when `mcp: true` is set in kay.config.ts: `tool: true`, `tool: 'Create a note'` (its description) or `tool: { name: 'create_note', description: 'Create a note' }`. Without it an action is never offered.
+- `tool: { readOnly: true }` says the action only reads, so kayjs-ai's `ask` runs it unasked while it holds every other tool for the visitor's yes ([Actions as tools](../packages/ai/llms/tools.md#allowing-a-write)).
 - The tool takes the action's schema as its input and runs the action as a call would, its guards, `rateLimit`, body limit and `ctx.locals` included; `honeypot`, `minTime` and `proofOfWork` are skipped. An action with a file in its schema is not offered.
 - `kay check` warns (`unguarded-tool`) of such an action with one of those three and no guard; a guard or a `rateLimit` keeps it in hand. See [API routes](api-routes.md#mcp).
 

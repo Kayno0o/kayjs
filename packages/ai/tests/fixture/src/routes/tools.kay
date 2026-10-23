@@ -34,18 +34,23 @@ export const upload = action(s.Object({ photo: s.File() }), () => 'stored')
 const tools = [addNote, refuses, sendsAway, breaks, slow, limited, wipe]
 
 export const converse = action(s.Object({ prompt: s.String({ maxLength: 200 }), maxSteps: s.Optional(s.Integer({ minimum: 1, maximum: 10 })), offer: s.Optional(s.Array(s.String({ maxLength: 40 }), { maxItems: 10 })) }), async ({ prompt, maxSteps, offer }) => {
-  const reply = ask(prompt, { tools: offer === undefined ? tools : tools.filter(tool => offer.includes(tool.url.slice(tool.url.lastIndexOf('/') + 1))), maxSteps, provider: testing.provider })
+  const reply = ask(prompt, { tools: offer === undefined ? tools : tools.filter(tool => offer.includes(tool.url.slice(tool.url.lastIndexOf('/') + 1))), maxSteps, confirm: false, provider: testing.provider })
 
   return { text: await reply, calls: await reply.calls, finish: await reply.finish, usage: await reply.usage }
 })
 
-export const watch = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), ({ prompt }) => ask(prompt, { tools: [addNote, slow], provider: testing.provider }).progress())
+export const watch = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), ({ prompt }) => ask(prompt, { tools: [addNote, slow], confirm: false, provider: testing.provider }).progress())
 
 // A tool loop whose every call the visitor has not confirmed.
 export const unconfirmed = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), ({ prompt }) => ask(prompt, { tools: [addNote], confirm: () => false, provider: testing.provider }).progress())
 
+export const lookup = action(s.Object({}), () => 'found', { tool: { description: 'Looks something up', readOnly: true } })
+
+// A chat whose tools are asked about by default: the write waits for the visitor's Allow, the read does not.
+export const approving = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }) }), { minItems: 1, maxItems: 50 }) }), ({ messages }) => ask(messages, { tools: [addNote, lookup], provider: testing.provider }).progress())
+
 // The chat's action when the model has tools: the stream carries the calls too.
-export const helper = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }) }), { minItems: 1, maxItems: 50 }) }), ({ messages }) => ask(messages, { tools: [addNote, breaks], provider: testing.provider }).progress())
+export const helper = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }) }), { minItems: 1, maxItems: 50 }) }), ({ messages }) => ask(messages, { tools: [addNote, breaks], confirm: false, provider: testing.provider }).progress())
 
 export const refusedTools = action(s.Object({ which: s.UnionEnum(['vetoed', 'upload']) }), ({ which }) => {
   ask('x', { tools: [which === 'vetoed' ? vetoed : upload] })

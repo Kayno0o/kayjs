@@ -246,9 +246,15 @@ A call that goes wrong is not an exception. The model is told what failed, such 
 
 A model can be talked into things by the text it reads, a visitor's message say. Offer only actions whose worst call you can accept from that visitor, and keep destructive ones out of `tools`.
 
-To make a call wait for the visitor's yes, pass `confirm`: `ask(messages, { tools, confirm: ({ name, input, request }) => ... })`. It runs before each call, and only `true` lets the call run. Otherwise the model is told the visitor has not confirmed it, and can ask them first.
+A tool that changes something does not run on the model's word. The model is told it needs the visitor's approval, and `Chat` shows Allow and Deny under the call. Allow sends the visitor's next message with a signed ticket for that exact call, which lets it run once; a ticket expires after 10 minutes and is read only from the visitor's last message, so text a tool returned cannot allow anything.
 
-You decide what counts as a yes, such as the last message of the visitor saying so (what `Chat` can send, as it posts only the messages), a token your page issued after a button, or a read tool answering `true` at once. `Chat` has no confirm button of its own.
+A tool that only reads says so, `tool: { description: 'Looks a note up', readOnly: true }`, and runs at once. Pass `confirm: false` to run every tool without asking, for an app that asks elsewhere.
+
+The ticket travels in the message, so leave room for it in the `content` your schema allows.
+
+To decide what counts as a yes yourself, pass `confirm`: `ask(messages, { tools, confirm: ({ name, input, request }) => ... })`. It runs before each call, and only `true` lets the call run. Otherwise the model is told the visitor has not confirmed it, and can ask them first.
+
+You decide what counts as a yes, such as the last message of the visitor saying so, a token your page issued after a button, or a read tool answering `true` at once. A `confirm` of yours replaces the Allow button for that ask.
 
 The visitor leaving stops the loop. A tool already running finishes, but nothing more is called.
 

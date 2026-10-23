@@ -1,7 +1,7 @@
 import type { ActionTool } from '../runtime/action'
 
 // What `tool` on an action or on a route's `detail` sets: undefined for none, else the name and description it gives.
-export function toolSettings(tool: boolean | string | ActionTool | undefined): { name?: string | undefined, description?: string | undefined } | undefined {
+export function toolSettings(tool: boolean | string | ActionTool | undefined): ActionTool | undefined {
   if (tool === undefined || tool === false)
     return undefined
 

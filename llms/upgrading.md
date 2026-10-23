@@ -24,6 +24,9 @@ A `.ws()` route of an `api()` module closes a socket sending a message over 1 MB
 ### Every route with a body is capped at `maxSize`
 
 A request over `maxSize` (1 MB by default) to a route of your own (`new Elysia().post()`), an extension or the jobs page now answers 413, where only Bun's 128 MB limited it; `kay check` cannot flag it, as no source says how large a request is. A route of your own taking more is named in `maxSizes: { '/upload': '50mb' }` in kay.config.ts, and an extension's route declares its own in the extension's `maxSize`.
+### kayjs-ai holds tool calls for the visitor's yes
+
+A tool offered to `ask` with no `confirm` no longer runs on the model's word: it waits for the visitor's Allow in `Chat`. Mark an action that only reads with `tool: { readOnly: true }` to run it unasked, or pass `confirm: false` to `ask` to keep every tool unasked. An app with its own `confirm` changes nothing; one that posts to its action without `Chat` posts the `[kai-approved ...]` line the chat adds, or sets `confirm` ([Actions as tools](../packages/ai/llms/tools.md#allowing-a-write)).
 
 ### kayjs-ui props take enum values: `variant`, `size` and `pixels`
 

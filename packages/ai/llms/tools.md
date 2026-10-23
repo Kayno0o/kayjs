@@ -18,9 +18,15 @@ export const assistant = action(s.Object({ messages: s.Array(s.Object({ role: s.
 p Assistant
 ```
 
-### Confirming a call
+### Allowing a write
 
-`ask(messages, { tools, confirm })` calls `confirm({ name, input, request })` before each call runs, `name` being the tool's (`book_slot`): only `true` lets it through. Anything else, such as `false`, runs nothing and tells the model `The visitor has not confirmed this call, so it did not run; ask them, then call it again`; a throw fails the call like a tool that throws. A read answers `true`, a write checks what the visitor agreed to, such as that their last message says yes (all `Chat` posts is the messages), or, from a page of your own, a token issued after a button. There is no confirm button in `Chat`: the app decides what confirmation is.
+A tool that changes something waits for the visitor by default. The call does not run: the model is told it needs the visitor's approval, the reply's `ToolCall` carries an `approval` ticket, and `Chat` draws Allow and Deny under the turn. Allow posts the visitor's next message, `Allowed: add_note {"title":"Milk"}` with the ticket on a last line the chat does not show, and the model calls the tool again: the ticket lets that very call run once, and no other tool, arguments or later message. Deny posts `Denied: add_note`. A ticket is signed with the app secret, expires after 10 minutes and counts only in the visitor's last message, so text a tool returned or the model wrote cannot allow anything.
+
+A tool that only reads says so and runs unasked: `action(schema, handler, { tool: { description: 'Looks a note up', readOnly: true } })`. `confirm: false` in `ask` runs every tool unasked, for an app asking elsewhere. The ticket line is part of the message the action receives, so a schema bounding `content` leaves room for the arguments (4,000 characters is plenty for a note, not for a long text argument).
+
+### Confirming a call yourself
+
+`ask(messages, { tools, confirm })` calls `confirm({ name, input, request })` before each call runs, `name` being the tool's (`book_slot`): only `true` lets it through. Anything else, such as `false`, runs nothing and tells the model `The visitor has not confirmed this call, so it did not run; ask them, then call it again`; a throw fails the call like a tool that throws. A read answers `true`, a write checks what the visitor agreed to, such as that their last message says yes (all `Chat` posts is the messages), or, from a page of your own, a token issued after a button. A `confirm` function replaces the Allow button for every tool of that ask.
 
 ```ts
 ask(messages, { tools: [findSlot, bookSlot], confirm: ({ name }) => name === 'find_slot' || lastSaysYes(messages) })
@@ -84,7 +90,7 @@ A result over 20,000 characters is cut. A success is the text kay's MCP tool cal
 
 ### What the model can be made to do
 
-A model reads text an attacker may have written (a page, an email, a visitor's message), and can be talked into calling any action in `tools`. Offer only actions whose worst call is acceptable for the visitor running it, and keep destructive ones out of `tools` or behind a guard that asks for more than a signed-in visitor.
+A model reads text an attacker may have written (a page, an email, a visitor's message), and can be talked into calling any action in `tools`. Offer only actions whose worst call is acceptable for the visitor running it, and keep destructive ones out of `tools` or behind a guard that asks for more than a signed-in visitor. A write is held for the visitor's Allow by default ([above](#allowing-a-write)), which a prompt injected through a page or a tool result cannot give.
 
 ### The calls shown
 

@@ -2,7 +2,7 @@ import { join } from 'node:path'
 import { fakeAi } from '@kaynooo/kayjs-ai'
 import { afterEach, beforeAll, describe, expect, test } from 'bun:test'
 import { browserPath, testSite } from 'kay/test'
-import { refusals } from '../src/testing'
+import { done, refusals } from '../src/testing'
 
 const ROOT = join(import.meta.dir, '..')
 const path = browserPath()
@@ -142,6 +142,49 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     // The block of the open fence and the hostile one stay inert: the open one stays plain, no element made from the code.
     expect(await page.count(`${turn} > pre:not(.hl)`)).toBe(1)
     expect(await page.count(`${turn} img`)).toBe(0)
+    expect(page.errors).toEqual([])
+  })
+
+  test('a write waits for Allow, which posts the ticket for that call and runs it, and Deny posts a refusal', async () => {
+    done.length = 0
+
+    const page = await site.open('/approving')
+    const turn = '.kai-chat-turn[data-role="assistant"]'
+
+    fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }] })
+    fakeAi.reply('May I add it?')
+    await page.fill('textarea', 'Add milk')
+    await page.press('Enter')
+    await page.waitFor('.kai-chat-approval')
+    await page.waitFor('[data-pending]', { gone: true })
+
+    expect(done).toEqual([])
+    expect(await page.text('.kai-chat-approval-text')).toContain('add_note')
+    expect(await page.text(`${turn} .kai-chat-call-status`)).toBe('Needs your approval')
+
+    fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }] })
+    fakeAi.reply('Added')
+    await page.click('.kai-chat-approval button:first-of-type')
+    await page.waitFor(`${turn}:nth-of-type(4) .kai-chat-text`, { text: 'Added' })
+    await page.waitFor('[data-pending]', { gone: true })
+
+    expect(done).toEqual(['addNote:Milk'])
+    expect(await page.text('.kai-chat-turn[data-role="user"]:nth-of-type(3)')).not.toContain('kai-approved')
+    expect(await page.count('.kai-chat-approval')).toBe(0)
+    expect(fakeAi.last()?.messages.find(message => message.role === 'user' && message.content.includes('[kai-approved '))).toBeDefined()
+
+    fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Bread' } }] })
+    fakeAi.reply('May I?')
+    await page.fill('textarea', 'And bread')
+    await page.press('Enter')
+    await page.waitFor('.kai-chat-approval')
+    await page.waitFor('[data-pending]', { gone: true })
+    fakeAi.reply('Fine, not adding it')
+    await page.click('.kai-chat-approval button:last-of-type')
+    await page.waitFor('[data-pending]', { gone: true })
+
+    expect(done).toEqual(['addNote:Milk'])
+    expect(fakeAi.last()?.messages.at(-1)?.content).toStartWith('Denied: add_note')
     expect(page.errors).toEqual([])
   })
 

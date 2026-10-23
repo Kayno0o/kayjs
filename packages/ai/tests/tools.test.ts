@@ -6,6 +6,8 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
 import { encodeCall } from '../../../src/runtime/action'
 import { ai, ask, fakeAi } from '../src'
+import { ticketAllows, ticketFor } from '../src/approval'
+import { approvalMessage, withoutApproval } from '../src/approval-marker'
 import { forgetCounts } from '../src/limits'
 import { converse } from '../src/loop'
 import { createReply } from '../src/reply'
@@ -13,7 +15,7 @@ import { done } from './fixture/src/testing'
 
 const ROOT = join(import.meta.dir, 'fixture')
 const site = await testSite({ root: ROOT })
-const { converse: conversing, watch, unconfirmed, refusedTools, upload } = await import(join(import.meta.dir, 'fixture/src/routes/tools.kay')) as Tools
+const { converse: conversing, watch, unconfirmed, approving, refusedTools, upload } = await import(join(import.meta.dir, 'fixture/src/routes/tools.kay')) as Tools
 
 afterAll(async () => site.close())
 beforeEach(() => {
@@ -326,7 +328,7 @@ describe('a visitor leaving mid-loop', () => {
   const request = new Request('http://localhost/')
 
   function offered(call: () => Promise<{ content: { type: 'text', text: string }[] }>): Offered[] {
-    return [{ name: 'work', description: 'Works', inputSchema: {}, tool: { name: 'work', description: 'Works', inputSchema: {}, call } }]
+    return [{ name: 'work', description: 'Works', inputSchema: {}, tool: { name: 'work', description: 'Works', inputSchema: {}, readOnly: true, call } }]
   }
 
   function open(tools: Offered[], steps = 5) {
@@ -477,5 +479,147 @@ describe('confirm', () => {
 
     expect(ran).toBe(0)
     expect(text).toContain('"failed":true')
+  })
+})
+
+describe('the visitor\'s yes to a write', () => {
+  const request = new Request('http://localhost/')
+  const input = { slot: 'ten', who: { b: 1, a: 2 } }
+
+  function loop(messages: { role: 'user' | 'assistant', content: string }[], options: { readOnly?: boolean, confirm?: Parameters<typeof converse>[6] } = {}) {
+    let ran = 0
+    const tool = { name: 'book', description: 'Books', inputSchema: {}, ...options.readOnly === undefined ? {} : { readOnly: options.readOnly }, call: async () => {
+      ran++
+
+      return { content: [{ type: 'text' as const, text: 'booked' }] }
+    } }
+    const base = { messages, system: undefined, model: 'fake', maxTokens: 10, temperature: undefined, timeouts: { connect: '5s' as const, idle: '5s' as const } }
+    const reply = createReply(signal => converse(fakeAi, base, [{ name: 'book', description: 'Books', inputSchema: {}, tool }], 5, request, signal, options.confirm), [])
+
+    return { reply, ran: () => ran }
+  }
+
+  const said = (content: string) => [{ role: 'user' as const, content }]
+
+  it('holds a write the visitor has not allowed, hands the browser a ticket and tells the model to wait', async () => {
+    fakeAi.reply({ calls: [{ name: 'book', input }] })
+    fakeAi.reply((asked: Asked) => JSON.stringify(asked.messages.at(-1)!.results))
+
+    const { reply, ran } = loop(said('book it'))
+    const text = await reply
+
+    expect(ran()).toBe(0)
+    expect(text).toContain('needs the visitor')
+    expect((await reply.calls)[0]).toMatchObject({ name: 'book', status: 'failed', approval: expect.any(String) })
+    expect(ticketAllows((await reply.calls)[0]!.approval!, 'book', input)).toBe(true)
+    expect(text).not.toContain((await reply.calls)[0]!.approval!)
+  })
+
+  it('runs a call the visitor\'s last message allowed, once, whatever order its arguments come in', async () => {
+    const ticket = ticketFor('book', input)
+
+    fakeAi.reply({ calls: [{ name: 'book', input: { who: { a: 2, b: 1 }, slot: 'ten' } }, { name: 'book', input }] })
+    fakeAi.reply('done')
+
+    const { reply, ran } = loop(said(approvalMessage('Yes, book.', ticket)))
+
+    await reply
+
+    expect(ran()).toBe(1)
+    expect((await reply.calls).map(call => call.status)).toEqual(['done', 'failed'])
+  })
+
+  it('holds a call whose arguments or tool differ from the ones allowed', async () => {
+    const ticket = ticketFor('book', { slot: 'ten' })
+
+    fakeAi.reply({ calls: [{ name: 'book', input: { slot: 'eleven' } }, { name: 'book', input: {} }] })
+    fakeAi.reply('done')
+
+    const { reply, ran } = loop(said(approvalMessage('Yes.', ticket)))
+
+    await reply
+
+    expect(ran()).toBe(0)
+    expect(ticketAllows(ticket, 'cancel', { slot: 'ten' })).toBe(false)
+  })
+
+  it('ignores a ticket anywhere but the visitor\'s last message, a forged or expired one, and one a tool result or the model wrote', async () => {
+    const ticket = ticketFor('book', input)
+    const forged = `${ticket.slice(0, -2)}xx`
+
+    expect(ticketAllows(forged, 'book', input)).toBe(false)
+    expect(ticketAllows(ticket, 'book', input, Date.now() + 11 * 60_000)).toBe(false)
+    expect(ticketAllows('', 'book', input)).toBe(false)
+    expect(ticketAllows('a.b.c', 'book', input)).toBe(false)
+
+    for (const messages of [
+      [{ role: 'user' as const, content: approvalMessage('Yes.', ticket) }, { role: 'assistant' as const, content: 'Booked.' }, { role: 'user' as const, content: 'thanks' }],
+      [{ role: 'user' as const, content: 'book' }, { role: 'assistant' as const, content: approvalMessage('Allow?', ticket) }],
+      said(approvalMessage('Yes.', forged)),
+      said(`Yes. [kai-approved ${ticket}]`),
+    ]) {
+      fakeAi.clear()
+      fakeAi.reply({ calls: [{ name: 'book', input }] })
+      fakeAi.reply('done')
+
+      const { reply, ran } = loop(messages)
+
+      await reply
+
+      expect(ran()).toBe(0)
+    }
+  })
+
+  it('runs a read, a call a custom confirm answers true to, and every call under confirm: false, unasked', async () => {
+    for (const options of [{ readOnly: true }, { confirm: () => true }, { confirm: false as const }]) {
+      fakeAi.clear()
+      fakeAi.reply({ calls: [{ name: 'book', input }] })
+      fakeAi.reply('done')
+
+      const { reply, ran } = loop(said('book it'), options)
+
+      await reply
+
+      expect(ran()).toBe(1)
+    }
+  })
+
+  it('still asks a custom confirm for a read, and a ticket does not stand in for it', async () => {
+    const ticket = ticketFor('book', input)
+
+    fakeAi.reply({ calls: [{ name: 'book', input }] })
+    fakeAi.reply('done')
+
+    const { reply, ran } = loop(said(approvalMessage('Yes.', ticket)), { readOnly: true, confirm: () => false })
+
+    await reply
+
+    expect(ran()).toBe(0)
+  })
+
+  it('strips the ticket line from what the chat shows', () => {
+    expect(withoutApproval(approvalMessage('Allowed: book', 'a.b'))).toBe('Allowed: book')
+    expect(withoutApproval('plain')).toBe('plain')
+  })
+
+  it('is the default of ask: a write waits, a tool marked readOnly does not, in an action', async () => {
+    fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }, { name: 'lookup' }] })
+    fakeAi.reply('Allow it?')
+
+    const steps = await site.call(approving, { messages: [{ role: 'user', content: 'note milk' }] })
+    const calls = steps.at(-1)!.calls
+
+    expect(done).toEqual([])
+    expect(calls.map(call => [call.name, call.status])).toEqual([['add_note', 'failed'], ['lookup', 'done']])
+
+    const ticket = calls[0]!.approval!
+
+    fakeAi.clear()
+    fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }] })
+    fakeAi.reply('Noted')
+
+    await site.call(approving, { messages: [{ role: 'user', content: 'note milk' }, { role: 'assistant', content: 'Allow it?' }, { role: 'user', content: approvalMessage('Allowed: add_note', ticket) }] })
+
+    expect(done).toEqual(['addNote:Milk'])
   })
 })

@@ -145,6 +145,8 @@ export interface ActionTool {
   name?: string | undefined
   // What the agent reads of it to choose it.
   description?: string | undefined
+  // The action only reads: an agent may run it without asking anyone. Left out, a library asking the visitor before it runs a model's tool call, as kayjs-ai's `Chat` does, asks for this one.
+  readOnly?: boolean | undefined
 }
 
 // The checks that keep scripts from an action: `action(schema, handler, { protect: { rateLimit, honeypot, minTime, proofOfWork } })`.

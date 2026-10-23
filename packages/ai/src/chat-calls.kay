@@ -4,7 +4,7 @@ import { recipe } from 'kay'
 
 const look = recipe({ parts: { root: 'kai-chat-calls', summary: 'kai-chat-calls-summary', list: 'kai-chat-calls-list', call: 'kai-chat-call', name: 'kai-chat-call-name', status: 'kai-chat-call-status', title: 'kai-chat-call-title', code: 'kai-chat-call-code' } })
 
-const { calls, labels, details, runningLabel, doneLabel, failedLabel, argumentsLabel, resultLabel } = props<{
+const { calls, labels, details, runningLabel, doneLabel, failedLabel, argumentsLabel, resultLabel, approvalLabel } = props<{
   calls: ToolCall[]
   // The phrase for a tool by its name, in the folded line.
   labels: Record<string, string>
@@ -15,12 +15,14 @@ const { calls, labels, details, runningLabel, doneLabel, failedLabel, argumentsL
   failedLabel: string
   argumentsLabel: string
   resultLabel: string
+  // Said of a call held for the visitor's yes, in place of failed.
+  approvalLabel: string
 }>()
 
 const LABELS = { running: runningLabel, done: doneLabel, failed: failedLabel }
 
 function status(call: ToolCall) {
-  return LABELS[call.status]
+  return call.approval === undefined ? LABELS[call.status] : approvalLabel
 }
 
 // The calls in one line, each tool once with its count: `Searched the docs x2, read_page`, ended by the status of what is not done.
@@ -31,19 +33,23 @@ function summary() {
     counts.set(call.name, (counts.get(call.name) ?? 0) + 1)
 
   const line = [...counts].map(([name, count]) => `${labels[name] ?? name}${count > 1 ? ` x${count}` : ''}`).join(', ')
-  const failed = calls.some(call => call.status === 'failed')
+  const failed = calls.some(call => call.status === 'failed' && call.approval === undefined)
+  const held = calls.some(call => call.approval !== undefined)
 
   if (calls.some(call => call.status === 'running'))
     return `${line} (${LABELS.running})`
 
-  return failed ? `${line} (${LABELS.failed})` : line
+  if (failed)
+    return `${line} (${LABELS.failed})`
+
+  return held ? `${line} (${approvalLabel})` : line
 }
 ---
 details(part="root")
   summary(part="summary") {summary()}
   ul(part="list")
     for call of calls key={call.id}
-      li(part="call" data-status={call.status})
+      li(part="call" data-status={call.status} data-held={call.approval === undefined ? undefined : ''})
         if details
           details
             summary

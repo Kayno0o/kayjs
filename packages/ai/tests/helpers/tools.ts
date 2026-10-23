@@ -20,4 +20,5 @@ export interface Tools {
   upload: ToolAction
   watch: Action<{ prompt: string }, Step[]>
   unconfirmed: Action<{ prompt: string }, Step[]>
+  approving: Action<{ messages: { role: 'user' | 'assistant', content: string }[] }, Step[]>
 }

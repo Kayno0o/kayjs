@@ -1,6 +1,8 @@
 import type { LibraryTool } from 'kay/library'
 import type { Confirm, Piece, Provider, ProviderMessage, ProviderRequest, ToolCall, ToolOutcome, ToolUse, Usage } from './types'
 import { logFrom } from 'kay'
+import { ticketAllows, ticketFor } from './approval'
+import { ticketsIn } from './approval-marker'
 import { MAX_ARGUMENTS, MAX_CALLS_PER_STEP, MAX_STREAMED_CALLS } from './tool-limits'
 
 const log = logFrom('kayjs-ai')
@@ -17,6 +19,7 @@ export interface Offered {
 interface Ran {
   status: 'done' | 'failed'
   result: string
+  approval?: string
 }
 
 function failed(result: string): Ran {
@@ -58,15 +61,32 @@ function textOf(result: Awaited<ReturnType<LibraryTool['call']>>): string {
   return clip(JSON.stringify(result.structuredContent), MAX_RESULT)
 }
 
-async function run(tools: Map<string, LibraryTool>, use: ToolUse, input: Record<string, unknown>, request: Request, confirm: Confirm | undefined): Promise<Ran> {
+// The tickets the visitor's last message carries, each allowing one call once.
+function allowed(messages: ProviderMessage[]): Set<string> {
+  const last = messages.at(-1)
+
+  return new Set(last?.role === 'user' && last.results === undefined ? ticketsIn(last.content) : [])
+}
+
+async function run(tools: Map<string, LibraryTool>, use: ToolUse, input: Record<string, unknown>, request: Request, confirm: Confirm | false | undefined, tickets: Set<string>): Promise<Ran> {
   const tool = tools.get(use.name)
 
   if (!tool)
     return failed(`There is no tool named ${JSON.stringify(clip(use.name, MAX_NAME))}; the tools are ${[...tools.keys()].join(', ')}`)
 
   try {
-    if (confirm && await confirm({ name: use.name, input, request }) !== true)
-      return failed('The visitor has not confirmed this call, so it did not run; ask them, then call it again')
+    if (typeof confirm === 'function') {
+      if (await confirm({ name: use.name, input, request }) !== true)
+        return failed('The visitor has not confirmed this call, so it did not run; ask them, then call it again')
+    }
+    else if (confirm === undefined && tool.readOnly !== true) {
+      const ticket = [...tickets].find(given => ticketAllows(given, use.name, input))
+
+      if (ticket === undefined)
+        return { ...failed('This call changes something and needs the visitor\'s approval, so it did not run. The chat shows them an Allow button for it: say in a sentence what it will do and wait; their approval arrives as their next message, then call it again with the same arguments'), approval: ticketFor(use.name, input) }
+
+      tickets.delete(ticket)
+    }
 
     const result = await tool.call(input, request)
 
@@ -84,10 +104,11 @@ const USAGE_FIELDS = ['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWr
 
 // Asks the provider, answers the tools the model calls as the visitor, and asks again with their results until the model answers in text or `maxSteps` requests were made.
 // Text of one step is separated from the next by a blank line, and the token counts are the sum of the steps.
-export async function* converse(provider: Provider, base: ProviderRequest, offered: Offered[], maxSteps: number, request: Request, signal: AbortSignal, confirm?: Confirm): AsyncGenerator<Piece> {
+export async function* converse(provider: Provider, base: ProviderRequest, offered: Offered[], maxSteps: number, request: Request, signal: AbortSignal, confirm?: Confirm | false): AsyncGenerator<Piece> {
   const tools = new Map(offered.map(({ name, tool }) => [name, tool]))
   const specs = offered.map(({ name, description, inputSchema }) => ({ name, description, inputSchema }))
   const messages: ProviderMessage[] = [...base.messages]
+  const tickets = allowed(base.messages)
   const total: Partial<Usage> = {}
   let spoke = false
   // A call is told apart by its id for the whole loop, so one a model reuses or leaves out gets a new one, which is the id it is answered under.
@@ -187,7 +208,7 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
       else if ('problem' in parsed)
         ran = failed(parsed.problem)
       else
-        ran = await run(tools, use, parsed.input, request, confirm)
+        ran = await run(tools, use, parsed.input, request, confirm, tickets)
 
       // A visitor who left while the action ran gets no further call and no further request.
       if (signal.aborted)

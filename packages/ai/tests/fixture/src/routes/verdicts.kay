@@ -7,10 +7,10 @@ import { addNote } from './tools.kay'
 
 export const summarize = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), ({ prompt }) => ask(prompt, { schema: verdict, provider: testing.provider }))
 
-export const triage = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), ({ prompt }) => ask(prompt, { schema: verdict, tools: [addNote], provider: testing.provider }))
+export const triage = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), ({ prompt }) => ask(prompt, { schema: verdict, tools: [addNote], confirm: false, provider: testing.provider }))
 
 export const outcome = action(s.Object({ prompt: s.String({ maxLength: 200 }), maxSteps: s.Optional(s.Integer({ minimum: 1, maximum: 10 })) }), async ({ prompt, maxSteps }) => {
-  const reply = ask(prompt, { schema: verdict, tools: [addNote], maxSteps, provider: testing.provider })
+  const reply = ask(prompt, { schema: verdict, tools: [addNote], maxSteps, confirm: false, provider: testing.provider })
 
   return { value: await reply, calls: await reply.calls, finish: await reply.finish, usage: await reply.usage }
 })

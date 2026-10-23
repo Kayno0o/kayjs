@@ -4,9 +4,14 @@ import { defineMessages } from 'kay/i18n'
 export default defineMessages({
   ai: {
     chat: {
+      allow: 'Autoriser',
+      allowed: 'Autorisé :',
+      approval: 'Votre accord est nécessaire',
       arguments: 'Arguments',
       close: 'Fermer le chat',
       collapse: 'Réduire le chat',
+      deny: 'Refuser',
+      denied: 'Refusé :',
       disclosure: 'Vous discutez avec une IA. Vos messages sont envoyés à son fournisseur pour y répondre.',
       done: 'Terminé',
       error: 'La réponse a échoué.',
