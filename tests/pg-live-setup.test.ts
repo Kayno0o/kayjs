@@ -5,7 +5,6 @@ import process from 'node:process'
 import { SQL } from 'bun'
 import { afterAll, afterEach, describe, expect, it } from 'bun:test'
 import { setLiveStore } from '../src/runtime/live-value'
-import { pollClock } from '../src/runtime/poll-backoff'
 import { createDataTables, pages, pgData } from '../src/server'
 import { setupStore } from '../src/server/app-store'
 import { pgHandle } from '../src/server/pg-data'
@@ -266,38 +265,57 @@ pgDescribe('closing a pgData store', () => {
     expect(await others(sql)).toBe(expected)
   }
 
-  pgIt('stops its polling and frees the pool it opened from a URL', async () => {
+  // The reads of kay_events in this database, which only the polling of its cache makes; the server flushes its counters about a second after a read.
+  const reads = async (sql: SQL) => {
+    await Bun.sleep(1500)
+
+    const [row] = await sql.unsafe<{ reads: string }[]>(`SELECT coalesce(sum(coalesce(seq_scan, 0) + coalesce(idx_scan, 0)), 0)::text AS reads FROM pg_stat_user_tables WHERE relname = 'kay_events'`)
+
+    return Number(row!.reads)
+  }
+
+  pgIt('stops its polling', async () => {
+    await withDatabase(async (database) => {
+      const sql = new SQL(database, { max: 2 })
+
+      try {
+        const store = pgData(sql)
+
+        store.cache.subscribe?.(() => undefined)
+        await store.cache.get('key')
+
+        const first = await reads(sql)
+
+        expect(await reads(sql)).toBeGreaterThan(first)
+        await store.close()
+        // A read in flight at the close is counted a moment later.
+        await reads(sql)
+
+        const closed = await reads(sql)
+
+        expect(await reads(sql)).toBe(closed)
+      }
+      finally {
+        await sql.close()
+      }
+    })
+  }, 60_000)
+
+  pgIt('frees the pool it opened from a URL', async () => {
     await withDatabase(async (database) => {
       const sql = new SQL(database, { max: 1 })
-      const real = { ...pollClock }
       const base = await others(sql)
-      let timers = 0
-
-      pollClock.setTimeout = (run, ms) => {
-        timers++
-
-        return real.setTimeout(run, ms)
-      }
 
       try {
         const store = pgData(database)
 
-        store.cache.subscribe?.(() => undefined)
         await store.cache.get('key')
-        await Bun.sleep(700)
-        expect(timers).toBeGreaterThan(0)
         expect(await others(sql)).toBeGreaterThan(base)
         await store.close()
         await store.close()
-        // A poll running while the store closes may arm one last timer.
-        await Bun.sleep(100)
-        timers = 0
-        await Bun.sleep(1200)
-        expect(timers).toBe(0)
         await settled(sql, base)
       }
       finally {
-        Object.assign(pollClock, real)
         await sql.close()
       }
     })
