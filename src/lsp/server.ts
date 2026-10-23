@@ -9,6 +9,7 @@ import type { Route, RouteMount } from '../server/routes'
 import type { ComponentInterface } from './component-props'
 import type { CodeAction, CodeActionParams, CodeLens, CompletionItem, CompletionList, Diagnostic, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, DocumentLink, DocumentSymbol, FileEvent, FoldingRange, Hover, InitializeParams, InlayHint, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, TsgoInlayHint, WorkspaceEdit } from './protocol'
 import type { TemplateData, Wanted } from './template-completion'
+import type { UiData } from './ui-completion'
 import { existsSync } from 'node:fs'
 import { readdir } from 'node:fs/promises'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
@@ -18,6 +19,7 @@ import { KAY_DIR } from '../build/assets'
 import { findKayFiles, findProjectFiles, inWalkScope, realPath, resolveFrom } from '../build/files'
 import { throughNodeModules } from '../build/libraries'
 import { importedSignals } from '../build/signals'
+import { styleInfo, styleInfos, themeTokens } from '../build/ui-info'
 import { configCheckOptions, configProblems, contentChecks, generatedChecks, generatedProblem, projectProblems, stopProbes, writeShadowTypes } from '../check'
 import { diagnoseShadow, reportsTypeErrors, servedByTheApp, servedLocales } from '../check/diagnose'
 import { messageKeys } from '../check/messages'
@@ -44,6 +46,7 @@ import { mentionsRoute, routeLinks } from './route-links'
 import { Connection } from './rpc'
 import { semanticTokens, TOKEN_MODIFIERS, TOKEN_TYPES } from './semantic-tokens'
 import { templateContext, templateItems } from './template-completion'
+import { typedLength, uiFileCursor, uiItems } from './ui-completion'
 
 // Where a file tsgo names is for the editor: its .kay source for a shadow file, the file itself outside the shadow tree.
 interface Target {
@@ -92,6 +95,8 @@ interface Document extends ShadowFile {
 
 const LAYOUT_SHADOW_SUFFIX = '/_layout.kay.tsx'
 const KAY_FILE = /^file:.*\.kay$/
+// The one TypeScript file the server completes besides the components: where an app restyles them.
+const UI_FILE = /^file:.*\/src\/ui\.ts$/
 // The module of an import or a re-export in a component's text, fence or template.
 const IMPORT_SOURCE = /\b(?:from|import)\s*['"]([^'"]+)['"]/g
 const EXTENSION = /\.\w+$/
@@ -122,6 +127,7 @@ const PROJECT_CHECKS_DELAY = 300
 const SAVE_EVENTS_DELAY = 25
 const QUICK_FIX = 'quickfix'
 const CAPITALIZED = /^[A-Z]/
+const WORD_AFTER = /^[\w-]*/
 const MODULE_FILE = /\.(?:[cm]?[jt]s|[jt]sx)$/
 const FIX_ALL = 'source.fixAll.kay'
 const PARAMETER_HINT = 2
@@ -152,6 +158,8 @@ export class KayLanguageServer {
   private readonly projects = new Map<string, Project>()
   private tsgo?: { connection: Connection, process: Subprocess<'pipe', 'pipe', 'ignore'> }
   private readonly documents = new Map<string, Document>()
+  // The open `src/ui.ts` documents by uri; TypeScript's server types them, kay adds the parts, variants and tokens.
+  private readonly uiFiles = new Map<string, string>()
   // Numbers the probe documents, so two asked at once never share one.
   private probeCount = 0
   // The quiet spell since the last change, and whether another came during it, which publishes again once it ends.
@@ -300,6 +308,9 @@ export class KayLanguageServer {
   }
 
   private open(item: TextDocumentItem) {
+    if (UI_FILE.test(item.uri))
+      this.uiFiles.set(item.uri, item.text)
+
     if (!KAY_FILE.test(item.uri))
       return
 
@@ -310,6 +321,14 @@ export class KayLanguageServer {
   }
 
   private change({ textDocument, contentChanges }: DidChangeTextDocumentParams) {
+    const ui = this.uiFiles.get(textDocument.uri)
+
+    if (ui !== undefined) {
+      this.uiFiles.set(textDocument.uri, contentChanges.reduce((source, change) => 'range' in change ? applyEdit(source, change.range, change.text) : change.text, ui))
+
+      return
+    }
+
     const previous = this.documents.get(textDocument.uri)
 
     if (!previous)
@@ -324,6 +343,8 @@ export class KayLanguageServer {
   }
 
   private close(uri: string) {
+    this.uiFiles.delete(uri)
+
     const document = this.documents.get(uri)
 
     if (!document)
@@ -775,6 +796,11 @@ export class KayLanguageServer {
   }
 
   private async completion(params: TextDocumentPositionParams & { context?: unknown }): Promise<CompletionList | null> {
+    const ui = this.uiFiles.get(params.textDocument.uri)
+
+    if (ui !== undefined)
+      return this.uiFileCompletion(ui, params)
+
     const own = await this.templateCompletion(params)
 
     if (own)
@@ -816,14 +842,49 @@ export class KayLanguageServer {
     const range = { start: toPosition(document.source, context.replace.start), end: toPosition(document.source, context.replace.end) }
     const items = templateItems(context.wanted, await this.templateData(document, context.wanted), (label, text, snippet) => ({ textEdit: { range, newText: text }, filterText: label, insertTextFormat: snippet ? SNIPPET_FORMAT : PLAIN_FORMAT }))
 
-    return items.length > 0 ? { isIncomplete: false, items } : undefined
+    // A class object with nothing to offer stays empty rather than fall to TypeScript, which would list every global there.
+    return items.length > 0 || context.wanted.kind === 'ui' ? { isIncomplete: false, items } : undefined
+  }
+
+  // The parts, variants and tokens src/ui.ts and a `class={{ }}` complete from, read from the component files and the theme.
+  private async uiData(project: Project, document?: Document, tag?: string): Promise<UiData> {
+    const tokens = themeTokens(project.root)
+
+    if (document === undefined || tag === undefined)
+      return { components: await styleInfos(project.root, project.libraries), tokens }
+
+    const parsed = parseKay(document.source)
+    const { imports } = analyzeScript(document.source, parsed.script, [], [], parsed.module)
+    const binding = imports.find(candidate => candidate.local === tag && !candidate.typeOnly)
+    const file = binding && resolveFrom(binding.source, document.file)
+    const info = file === undefined ? undefined : styleInfo(realPath(file))
+
+    return { components: info === undefined ? [] : [{ ...info, name: tag }], tokens }
+  }
+
+  private async uiFileCompletion(source: string, { textDocument, position }: TextDocumentPositionParams): Promise<CompletionList | null> {
+    const offset = toOffset(source, position)
+    const cursor = uiFileCursor(source, offset)
+
+    if (cursor === undefined)
+      return null
+
+    const length = typedLength(cursor)
+    const range = { start: toPosition(source, offset - length), end: toPosition(source, offset + WORD_AFTER.exec(source.slice(offset))![0].length) }
+    const project = this.projectAt(projectRootOf(fileURLToPath(textDocument.uri), this.root))
+    const items = uiItems(cursor, undefined, await this.uiData(project)).map(item => ({ ...item, textEdit: { range, newText: item.label }, filterText: item.label }))
+
+    return items.length > 0 ? { isIncomplete: false, items } : null
   }
 
   private async templateData(document: Document, wanted: Wanted): Promise<TemplateData> {
     const project = this.projectAt(projectRootOf(document.file, this.root))
     const data: TemplateData = { lints: [], paths: [], messages: [], components: [], elements: [] }
 
-    if (wanted.kind === 'lint') {
+    if (wanted.kind === 'ui') {
+      data.ui = await this.uiData(project, document, wanted.tag)
+    }
+    else if (wanted.kind === 'lint') {
       data.lints = Object.entries(LINTS).filter(([, lint]) => !('site' in lint)).map(([name]) => name)
     }
     else if (wanted.kind === 'path') {

@@ -62,7 +62,7 @@ function span(node: t.Node): Span {
   return { start: node.start ?? 0, end: node.end ?? 0 }
 }
 
-function unwrapped(node: t.Node): t.Node {
+export function unwrapped(node: t.Node): t.Node {
   let found = node
 
   while (OBJECT_WRAPPERS.has(found.type))
@@ -71,7 +71,7 @@ function unwrapped(node: t.Node): t.Node {
   return found
 }
 
-function keyOf(property: t.ObjectProperty): string | undefined {
+export function keyOf(property: t.ObjectProperty): string | undefined {
   if (property.computed)
     return undefined
 
@@ -85,7 +85,7 @@ function keyOf(property: t.ObjectProperty): string | undefined {
 }
 
 // The classes a literal gives: a string, or a template with nothing interpolated.
-function classesOf(node: t.Node): string | undefined {
+export function classesOf(node: t.Node): string | undefined {
   const value = unwrapped(node)
 
   if (value.type === 'StringLiteral')
@@ -199,7 +199,7 @@ function entryOf(node: t.Node, component: UiComponent, problems: UiProblem[]): v
 }
 
 // The default export of the file: `export default defineUi({ ... })`, or the object itself.
-function exported(ast: t.File): t.Node | undefined {
+export function exported(ast: t.File): t.Node | undefined {
   const statement = ast.program.body.find((item): item is t.ExportDefaultDeclaration => item.type === 'ExportDefaultDeclaration')
 
   if (statement === undefined)

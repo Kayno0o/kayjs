@@ -1,0 +1,8 @@
+---
+import { recipe } from 'kay'
+
+const look = recipe({ parts: { root: 'p-2', body: 'text-sm' }, variants: { size: { sm: 'text-sm', lg: 'text-lg' } } })
+---
+section(part="root")
+  div(part="body")
+    slot

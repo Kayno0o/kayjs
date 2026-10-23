@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - A library names its extension's `context` module in package.json, `"kay": { "context": ... }`, and its components read those `ctx` keys typed in any app ([Component libraries](component-libraries.md))
+- The dev tool's Styles tab lists the parts, variants and theme tokens of the component under the pointer and writes a part's classes to `src/ui.ts`, and the language server completes parts, variants and tokens in `class={{ }}` and `src/ui.ts` ([Dev tool](dev-tool.md))
 - A tree-sitter grammar for `.kay` files colours them in Neovim, Helix and Zed, and a Zed extension starts the language server ([Check and tools](check-and-tools.md))
 - kayjs-mail runs a mailing list with `mail.list()`: a subscribe form with double opt-in, signed one-click unsubscribe links and headers, paced sending through the queue that resumes after a restart, and `mail.erase(address)` ([A mailing list](../packages/mail/llms/mailing-list.md)).
 - `mailer({ listStore: pgLists(db) })` keeps kayjs-mail lists in Postgres, a subscribe form no longer answers faster for a new address than a listed one, and `queue(name, fn, { lazy: true })` starts its worker with the first `activate()` or `enqueue` ([Mailing list](../packages/mail/llms/mailing-list.md)).

@@ -132,7 +132,7 @@ async function start(root: string, cli: string, several: boolean): Promise<void>
   const run = { command: config.get<string>('bun.path', 'bun') || 'bun', args: [cli, 'lsp', '--stdio'], options: { cwd: root } }
   const server: ServerOptions = { run, debug: run }
   const options: LanguageClientOptions = {
-    documentSelector: [{ scheme: 'file', language: 'kay', pattern: { baseUri: Uri.file(root).toString(), pattern: '**' } }],
+    documentSelector: [{ scheme: 'file', language: 'kay', pattern: { baseUri: Uri.file(root).toString(), pattern: '**' } }, { scheme: 'file', pattern: { baseUri: Uri.file(root).toString(), pattern: '**/src/ui.ts' } }],
     // The project's own root, which the server takes as its root: the enclosing workspace folder would give two apps of a monorepo the same one.
     workspaceFolder: { uri: Uri.file(root), name: basename(root), index: 0 },
     middleware: ownedBy(root, () => serving),

@@ -1,5 +1,7 @@
 import type { Span } from '../compiler/ast'
 import type { CompletionItem } from './protocol'
+import type { ObjectCursor, UiData } from './ui-completion'
+import { objectCursor, typedLength, uiItems } from './ui-completion'
 
 // What the cursor is at in a `.kay` file, outside every TypeScript expression: the part of the file kay completes itself, since TypeScript sees nothing there.
 export type Wanted
@@ -10,6 +12,8 @@ export type Wanted
     | { kind: 'attribute', tag: string, taken: Set<string> }
     // A line start: block keywords and element names, or after `@` the blocks of the component the line is under.
     | { kind: 'line', slotOf?: string | undefined }
+    // The key or the string the cursor is in inside the `class={{ }}` object of a component call.
+    | { kind: 'ui', tag: string, cursor: ObjectCursor }
 
 export interface TemplateContext {
   wanted: Wanted
@@ -34,6 +38,7 @@ const ATTRIBUTE_NAME = /(?:^|[\s,])([\w:-]+)(?:[|=\s,]|$)/g
 const QUOTED = /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`/g
 // How many lines above the cursor an attribute list opened on may start.
 const MAX_ATTRIBUTE_LINES = 40
+const CLASS_OBJECT = /\bclass=\{\{/g
 const COMPONENT_LINE = /^\s*([A-Z][\w$]*)/
 
 // `templateStart` is where the template begins, past the fences: line starts and attributes mean something there only. Strings and comments are found anywhere.
@@ -60,6 +65,11 @@ export function templateContext(source: string, offset: number, templateStart: n
 
   if (offset < templateStart)
     return undefined
+
+  const styled = classObject(source, offset, after)
+
+  if (styled)
+    return styled
 
   const here = openParenthesis(prefix)
   const open = here ?? earlierParenthesis(source, lineStart, prefix)
@@ -91,6 +101,35 @@ export function templateContext(source: string, offset: number, templateStart: n
   const word = line[3]!
 
   return { wanted: { kind: 'line', slotOf: line[2] === '@' ? parentComponent(source, lineStart, line[1]!.length) : undefined }, replace: reaching(offset - word.length) }
+}
+
+// The `class={{ }}` object of a component call the cursor is in: its keys are the component's parts.
+function classObject(source: string, offset: number, after: number): TemplateContext | undefined {
+  let from = source.lastIndexOf('\n', offset - 1) + 1
+
+  for (let step = 0; step < MAX_ATTRIBUTE_LINES && from > 1; step++)
+    from = source.lastIndexOf('\n', from - 2) + 1
+
+  const opening = [...source.slice(from, offset).matchAll(CLASS_OBJECT)].at(-1)
+
+  if (opening === undefined)
+    return undefined
+
+  const start = from + opening.index
+  const cursor = objectCursor(source.slice(start + opening[0].length, offset))
+
+  if (cursor === undefined)
+    return undefined
+
+  const lineStart = source.lastIndexOf('\n', start - 1) + 1
+  const text = source.slice(lineStart, start)
+  const open = openParenthesis(text) ?? earlierParenthesis(source, lineStart, text)
+  const found = open && TAG_BEFORE_PAREN.exec(open.text.slice(0, open.index))
+
+  if (!found || !CAPITALIZED.test(found[1]!) || !BEFORE_ELEMENT.test(open.text.slice(open.text.lastIndexOf('\n', found.index - 1) + 1, found.index)))
+    return undefined
+
+  return { wanted: { kind: 'ui', tag: found[1]!, cursor }, replace: { start: offset - typedLength(cursor), end: offset + after } }
 }
 
 // The `(` the cursor is inside, when it is among the attributes: not in a quote or in a `{...}` expression, where the value is TypeScript's or a string's.
@@ -227,6 +266,8 @@ export interface TemplateData {
   // The component names the file imports, and for a local `.kay` one its props and the blocks it renders.
   components: { name: string, from: string, props: { name: string, optional: boolean }[], blocks: string[] }[]
   elements: string[]
+  // The parts, variants and tokens of the components a `class={{ }}` or `src/ui.ts` is completed from.
+  ui?: UiData | undefined
 }
 
 export function templateItems(wanted: Wanted, data: TemplateData, edit: (label: string, text: string, snippet: boolean) => Partial<CompletionItem>): CompletionItem[] {
@@ -248,6 +289,8 @@ export function templateItems(wanted: Wanted, data: TemplateData, edit: (label: 
 
       return [...names, ...events].filter(candidate => !wanted.taken.has(candidate.label))
     }
+    case 'ui':
+      return uiItems(wanted.cursor, wanted.tag, data.ui ?? { components: [], tokens: [] }).map(found => ({ ...found, ...edit(found.label, found.label, false) }))
     case 'line': {
       if (wanted.slotOf !== undefined)
         return (data.components.find(candidate => candidate.name === wanted.slotOf)?.blocks ?? []).map(name => item(name, KIND_FIELD, `block of ${wanted.slotOf}`))

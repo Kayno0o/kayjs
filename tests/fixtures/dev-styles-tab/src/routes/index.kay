@@ -1,0 +1,7 @@
+---
+import Panel from '../components/panel.kay'
+---
+main
+  h1 Styles tab
+  Panel
+    p#inside Inside the panel

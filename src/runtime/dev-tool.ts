@@ -24,6 +24,7 @@ const NOT_FOUND_URL = '/_kay/dev/not-found'
 const STACK_URL = '/_kay/dev/stack'
 const DATA_TAB_URL = '/_kay/dev/tab/data.js'
 const JOBS_TAB_URL = '/_kay/dev/tab/jobs.js'
+const STYLES_TAB_URL = '/_kay/dev/tab/styles.js'
 // A stack frame in a chunk of the browser build, which the server can point at its `.kay` line.
 const CHUNK_FRAME = /\/_kay\/[\w.-]+\.js:\d+:\d+/
 // The navigations the Network tab keeps: the page's load, then each swap.
@@ -353,6 +354,7 @@ const ICONS = {
   'user-round': 'circle~cx~12~cy~8~r~5|path~d~M20 21a8 8 0 0 0-16 0',
   'pencil': 'path~d~M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z|path~d~m15 5 4 4',
   'ear': 'path~d~M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 6-6 10a3.5 3.5 0 1 1-7 0|path~d~M15 8.5a2.5 2.5 0 0 0-5 0v1a2 2 0 1 1 0 4',
+  'palette': 'circle~cx~13.5~cy~6.5~r~.5~fill~currentColor|circle~cx~17.5~cy~10.5~r~.5~fill~currentColor|circle~cx~8.5~cy~7.5~r~.5~fill~currentColor|circle~cx~6.5~cy~12.5~r~.5~fill~currentColor|path~d~M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z',
   'puzzle': 'path~d~M15.39 4.39a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682a2.414 2.414 0 0 1 0 3.414L19.61 15.39a1 1 0 0 1-1.68-.474 2.5 2.5 0 1 0-3.014 3.015 1 1 0 0 1 .474 1.68l-1.683 1.682a2.414 2.414 0 0 1-3.414 0L8.61 19.61a1 1 0 0 0-1.68.474 2.5 2.5 0 1 1-3.014-3.015 1 1 0 0 0 .474-1.68l-1.683-1.682a2.414 2.414 0 0 1 0-3.414L4.39 8.61a1 1 0 0 1 1.68.474 2.5 2.5 0 1 0 3.014-3.015 1 1 0 0 1-.474-1.68l1.683-1.682a2.414 2.414 0 0 1 3.414 0z',
 } as const
 
@@ -416,7 +418,7 @@ function worstTone(bad: string[]): 'error' | 'warn' | undefined {
 }
 
 // The tabs kay makes itself; those a library adds sit under a line.
-const CORE_TABS = new Set(['problems', 'request', 'network', 'head', 'screen-reader', 'env', 'images', 'performance', 'routes', 'i18n', 'islands', 'not-found', 'data', 'jobs'])
+const CORE_TABS = new Set(['problems', 'request', 'network', 'head', 'screen-reader', 'env', 'images', 'performance', 'routes', 'i18n', 'islands', 'not-found', 'data', 'jobs', 'styles'])
 
 // A small rounded label, tinted by what it counts or says, with an icon before it when given.
 function pill(tool: Pick<DevTool, 'make' | 'icon'>, text: string, tone?: 'error' | 'warn' | 'ok' | 'accent', icon?: DevIconName): HTMLElement {
@@ -1285,6 +1287,7 @@ export function startDevTool(doc: Document = document): DevTool {
   notFoundTab(doc, tool, listening.signal)
   lazyTab(tool, { id: 'data', label: 'Data', icon: 'database' }, DATA_TAB_URL)
   lazyTab(tool, { id: 'jobs', label: 'Jobs', icon: 'list-checks' }, JOBS_TAB_URL)
+  lazyTab(tool, { id: 'styles', label: 'Styles', icon: 'palette' }, STYLES_TAB_URL)
   doc.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('button[data-kay-open],button[data-kay-copy]') : null
 

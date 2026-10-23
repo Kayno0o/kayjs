@@ -40,7 +40,7 @@ import { serveCards } from './card'
 import { compressResponse, fixedTexts } from './compress'
 import { checkRequestIdHeader, healthTimeoutMs, remoteLimits } from './config-limits'
 import { corsRule } from './cors'
-import { DEV_A11Y, DEV_AXE, DEV_DATA, DEV_DATA_QUERY, DEV_DATA_ROWS, DEV_EVENTS, DEV_FOOTPRINT, DEV_HEAD, DEV_INSPECTOR, DEV_JOBS, DEV_JOBS_DELETE, DEV_JOBS_RETRY, DEV_NOT_FOUND, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_SIZES, DEV_STACK, DEV_STYLES, DEV_TAB, DEV_TABS, DEV_TOOL, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devStack, devStyles, devTab, devTool, devToolFile, devToolFiles, followBuilds, hotSwap, openInEditor, recordResponses, refuseForeignHosts, rememberBoot, trackRunning } from './dev'
+import { DEV_A11Y, DEV_AXE, DEV_DATA, DEV_DATA_QUERY, DEV_DATA_ROWS, DEV_EVENTS, DEV_FOOTPRINT, DEV_HEAD, DEV_INSPECTOR, DEV_JOBS, DEV_JOBS_DELETE, DEV_JOBS_RETRY, DEV_NOT_FOUND, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_SIZES, DEV_STACK, DEV_STYLES, DEV_TAB, DEV_TABS, DEV_TOOL, DEV_UI, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devStack, devStyles, devTab, devTool, devToolFile, devToolFiles, followBuilds, hotSwap, openInEditor, recordResponses, refuseForeignHosts, rememberBoot, trackRunning } from './dev'
 import { clearDevErrorsOnAnswer } from './dev-errors'
 import { servedDictionary } from './dictionary'
 import { claimEndpoints } from './endpoint-claims'
@@ -521,6 +521,10 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
     const { devData, devQuery, devRows } = await import('./dev-data')
 
+    const { devUi, devUiWrite } = await import('./dev-ui')
+
+    app.get(DEV_UI, async ({ request }) => devUi(root, request))
+    app.post(DEV_UI, async ({ request }) => devUiWrite(root, request))
     const { devJobAction, devJobs } = await import('./dev-jobs')
 
     app.get(DEV_JOBS, async ({ request }) => devJobs(request))

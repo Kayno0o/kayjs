@@ -54,7 +54,7 @@ bun run start   # kay start: the production server, after a build (server preset
 
 The `.kay` extension for VS Code highlights `.kay` files and runs `kay lsp`. You get errors, hover, completion with auto-import, go-to-definition, references, rename, quick fixes, formatting a file or a selection, an outline, folding, links from imports and route paths, and imports updated when you rename or move a `.kay` file.
 
-Highlighting tells signals, props and server values apart, and inlay hints show inferred types and parameter names. Completion also offers element, attribute, prop and block names, route paths in `href`, `action` and `navigate()`, `t()` message keys and lint names after `// kay-allow`.
+Highlighting tells signals, props and server values apart, and inlay hints show inferred types and parameter names. Completion also offers element, attribute, prop and block names, route paths in `href`, `action` and `navigate()`, `t()` message keys and lint names after `// kay-allow`. Inside `class={{ }}` on a component it offers the component's parts, and in `src/ui.ts` the components, parts, variants and theme tokens you can set.
 
 Install **Kay** (`kaynooo.kay`) from the VS Code Marketplace, or from Open VSX in VSCodium and other builds. Each release also attaches its `kay-<version>.vsix`, which `code --install-extension` installs. A project made by `kay new` recommends it in `.vscode/extensions.json`, so VS Code offers it when the folder opens, and formats `.kay` files on save with it.
 

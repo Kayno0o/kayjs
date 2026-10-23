@@ -41,6 +41,7 @@ Each tab answers one question about the page in view. A tab with a red or amber 
 | Performance | The Web Vitals of the load and the weight of the page |
 | i18n | The page's locale, its copies and the message keys no locale has |
 | Islands | Each island, its props size, how long it took to hydrate and the values its signals hold now |
+| Styles | The parts, variants and theme tokens of the component under the pointer, and a box per part that writes its classes to `src/ui.ts` |
 
 A library can add a tab of its own, with nothing to declare in the app. kayjs-auth shows who is signed in, kayjs-mail lists the mails sent to the outbox, and kayjs-cms toggles edit mode.
 
@@ -107,6 +108,14 @@ The tab and what it asks of the server exist under `kay dev` only. A production 
 The Jobs tab lists the queues of your app ([Queues](/guides/background-jobs/#queues)) and the jobs in each: running, waiting and failed. A job shows how many attempts it has used out of the queue's `attempts`, its payload, and for a failed job the error of its last run. The count on the tab is the number of failed jobs.
 
 Retry puts a failed job back in its queue to run again from its first attempt. Delete removes a waiting or failed job. A job that is running is left to finish. Retry needs a store that can put a failed job back, which `sqliteJobs`, `memoryJobs` and `pgJobs` all can.
+
+Like the Data tab, it exists under `kay dev` only.
+
+## Styles
+
+The Styles tab shows what `src/ui.ts` can restyle in the component under your pointer. Open the tab, then move over the page. It lists the component's parts with the classes its recipe gives them, its variants and their values, and the theme tokens those classes use.
+
+Type classes in the box of a part and press Write. kay sets that part in `src/ui.ts` ([Restyle a component](/essentials/styling-and-assets/#restyle-a-component-from-srcuits)) and the page reloads with it. If the app has no `src/ui.ts`, the tab creates it. If the file holds something the tab cannot edit in place, such as a part written as a variable, it says why and leaves the file alone.
 
 Like the Data tab, it exists under `kay dev` only.
 
