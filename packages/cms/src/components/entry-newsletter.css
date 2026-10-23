@@ -1,0 +1,12 @@
+.kcms-newsletter-preview {
+  width: 100%;
+  min-height: 24rem;
+  border: 1px solid var(--color-kui-surface1);
+  border-radius: 0.375rem;
+  background: white;
+}
+
+.kcms-newsletter-subject {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}

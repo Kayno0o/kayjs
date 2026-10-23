@@ -6,6 +6,7 @@ import { wording } from 'kay/words'
 import type { Denials } from '../access'
 import { shareDraft } from '../editor/save'
 import { collectionPath, historyPath, onPagePath } from '../listing'
+import EntryNewsletter from './entry-newsletter.kay'
 import EntryRename from './entry-rename.kay'
 import Refused from './refused.kay'
 import EntryState from './entry-state.kay'
@@ -51,6 +52,8 @@ else if form.ends() as at
         Button(label={wording('cms.share.label', 'Share preview')} disabled={form.saving()} onClick={async () => { await shareDraft({ collection: form.collection.name, slug: entry.slug, locale: entry.locale }) }})
     if form.collection.history
       Button(href={historyPath(form.prefix, { collection: form.collection.name, slug: entry.slug, locale: entry.locale })} label={wording('cms.history.open', 'History')})
+    if form.collection.newsletter
+      EntryNewsletter(form={form} denied={denied})
     if !form.collection.single
       EntryRename(form={form} denied={denied})
     EntryState(draftField={form.collection.draftField} draft={form.isDraft()} dirty={form.dirty()} saving={form.saving()} denied={denied} title={form.name} url={entry.url} referrers={form.referrers()} deletable={!form.collection.single} onPublish={form.publish} onUnpublish={form.unpublish} onRemove={form.remove} onAskReferrers={form.askReferrers})

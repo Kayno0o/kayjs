@@ -44,9 +44,10 @@ export async function findCollection(name: string): Promise<ScreenCollection | u
   const kept = found?.kind === 'loaded'
   const history = kept && hiddenOf(name, 'history') !== undefined ? { history: true as const } : {}
   const trash = kept && hiddenOf(name, 'trash') !== undefined ? { trash: true as const } : {}
+  const newsletter = settings().newsletter.has(name) ? { newsletter: true as const } : {}
 
   // Without the icon, which the content list draws on the server and the editor's islands would otherwise carry with each page.
-  return found && { ...found, ...given && { layout: { group: given.group, order: given.order, form: given.form, list: given.list } }, ...history, ...trash }
+  return found && { ...found, ...given && { layout: { group: given.group, order: given.order, form: given.form, list: given.list } }, ...history, ...trash, ...newsletter }
 }
 
 // The collection with no `body`, `count` or `problem`, which a loaded one's loader is run to tell: for a save, a delete or an upload, which need its kind and its folder alone.

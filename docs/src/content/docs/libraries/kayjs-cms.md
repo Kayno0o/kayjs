@@ -579,6 +579,20 @@ A draft with a page has a Share preview button. It copies a link that shows that
 
 The link works for a week and ends if you rename the entry. It needs `preview: { secret }` in `kay.config.ts`, and with `roles` it is a publisher's action. Save your edits first, as the link shows the saved draft.
 
+### Sending an entry to a mailing list
+
+With a [kayjs-mail mailing list](/libraries/kayjs-mail), an editor can mail an entry to its subscribers from the entry screen. Name the collection in `cms({ newsletter })` with the list and a function that turns the saved entry into the mail.
+
+```ts
+newsletter: {
+  posts: { list: mail.list('news'), message: entry => ({ subject: String(entry.data.title), view: Post, props: { entry } }) },
+},
+```
+
+The Newsletter button opens a preview of the mail. Send me a test mails it to the signed-in editor, which needs `author`. Send to the list asks twice, then queues the mail for every subscriber. With `roles` all of it is a publisher's action. A draft can be previewed and tested but not sent.
+
+<ReadMore href="/llms/kayjs-cms-newsletter">The routes, the errors and the texts of the newsletter button.</ReadMore>
+
 ### After a save
 
 `cms({ onSave })` runs after every save, publish, duplicate, move and delete that went through. It gets the collection, the slug, the locale, what was done (`add`, `update`, `publish`, `unpublish`, `move`, `duplicate`, `rename` or `delete`), the author and, for a folder entry, the commit. A `rename` gives the new slug, and `from` is the old one.
@@ -795,4 +809,5 @@ Topics of the kayjs-cms reference the sections above do not link:
 - [Edit this page link](/llms/kayjs-cms-page-links)
 - [Field kinds and entering a field](/llms/kayjs-cms-fields)
 - [Form fields and drafts](/llms/kayjs-cms-api)
+- [Sending an entry to a mailing list](/llms/kayjs-cms-newsletter)
 - [Renaming an entry's slug](/llms/kayjs-cms-rename)

@@ -63,6 +63,8 @@ const EDITOR_CAN = /^\/editor\/can$/
 // What a role may be limited from, by the route: publishing, deleting, uploading and the redirects, which a rename makes.
 // Sharing a draft shows what is not published, so it is a publisher's.
 const PUBLISH = /^\/entries\/[^/]+\/[^/]+\/(?:publish|unpublish|share)$/
+// Mailing a list shows and sends what an editor wrote to everyone on it, so it is a publisher's, the preview and the test included.
+const NEWSLETTER = /^\/newsletter\/[^/]+\/[^/]+\/(?:preview|test|send)$/
 const ENTRY_RENAME = /^\/entries\/[^/]+\/[^/]+\/rename$/
 const REDIRECTS = /^\/redirects(?:\/|$)/
 const UPLOAD = /^\/files\/[^/]+$/
@@ -78,7 +80,7 @@ function actionOf(method: string, path: string): Action | undefined {
   if ((method === 'DELETE' && ENTRY.test(path)) || UNUSED_UPLOADS.test(path))
     return 'delete'
 
-  if (method === 'POST' && PUBLISH.test(path))
+  if (method === 'POST' && (PUBLISH.test(path) || NEWSLETTER.test(path)))
     return 'publish'
 
   return method === 'POST' && (UPLOAD.test(path) || MEDIA_RENAME.test(path)) ? 'upload' : undefined

@@ -1,0 +1,81 @@
+---
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
+import { effect, signal, trustHtml, untrack } from 'kay'
+import { wording } from 'kay/words'
+import type { Denials } from '../access'
+import type { MailPreview } from '../editor/newsletter'
+import type { EntryForm } from '../form'
+import { previewNewsletter, sendNewsletter, testNewsletter } from '../editor/newsletter'
+import Refused from './refused.kay'
+import './entry-newsletter.css'
+
+// The Newsletter button of a saved entry in a collection `cms({ newsletter })` names, and its dialog: the mail as it would go out, a test send to the editor and the send to the list, asked twice.
+// The frame has no permissions (`sandbox=""`), so the mail's own markup cannot run or reach the editor's page.
+// The mail is made from the entry as saved, so edits not saved yet disable the button; a draft can be previewed and tested but not sent.
+const { form, denied = {} } = props<{ form: EntryForm, denied?: Denials }>()
+
+const open = signal(false)
+const preview = signal<MailPreview>()
+const busy = signal(false)
+const confirming = signal(false)
+const entry = form.stored
+const ref = () => ({ collection: form.collection.name, slug: entry?.slug ?? '', locale: entry?.locale })
+const dirtyReason = () => form.dirty() ? wording('cms.share.dirty', 'Save or reset your edits first') : undefined
+
+async function render(): Promise<void> {
+  preview = await previewNewsletter(ref())
+}
+
+effect(() => {
+  if (!open)
+    return
+
+  untrack(() => {
+    preview = undefined
+    confirming = false
+    void render()
+  })
+})
+
+async function run(task: () => Promise<boolean>): Promise<boolean> {
+  busy = true
+
+  try {
+    return await task()
+  }
+  finally {
+    busy = false
+  }
+}
+
+async function send(): Promise<void> {
+  if (!confirming()) {
+    confirming = true
+
+    return
+  }
+
+  if (await run(async () => sendNewsletter(ref())))
+    open = false
+  else
+    confirming = false
+}
+---
+if denied.publish !== undefined || dirtyReason() !== undefined
+  Refused(label={wording('cms.newsletter.open', 'Newsletter')} reason={denied.publish ?? dirtyReason()})
+else
+  Button(label={wording('cms.newsletter.open', 'Newsletter')} disabled={form.saving()} onClick={() => { open = true }})
+Dialog(open={open()} title={wording('cms.newsletter.title', 'Send to the mailing list')} size="lg" dirty={busy()} onOpenChange={shown => { open = shown }})
+  @footer
+    Button(label={wording('cms.entry.cancel', 'Cancel')} disabled={busy()} onClick={() => { open = false }})
+    Button(label={wording('cms.newsletter.test', 'Send me a test')} disabled={busy() || preview() === undefined} onClick={async () => { await run(async () => testNewsletter(ref())) }})
+    if form.isDraft()
+      Refused(label={wording('cms.newsletter.send', 'Send to the list')} reason={wording('cms.newsletter.draft', 'Publish the entry before sending it to the list')} tone="accent")
+    else
+      Button(label={confirming() ? wording('cms.newsletter.confirm', 'Yes, send to {count} subscribers', { count: preview()?.subscribers ?? 0 }) : wording('cms.newsletter.send', 'Send to the list')} tone="accent" busy={busy()} disabled={busy() || preview() === undefined} onClick={send})
+  if preview() as made
+    p.kcms-newsletter-subject {made.subject}
+    iframe.kcms-newsletter-preview(sandbox="" title={wording('cms.newsletter.frame', 'The mail as it will be sent')} srcdoc={trustHtml(made.html ?? `<pre>${made.text.replaceAll('&', '&amp;').replaceAll('<', '&lt;')}</pre>`)})
+  else
+    p {wording('cms.newsletter.loading', 'Rendering the mail')}

@@ -1,7 +1,7 @@
 import type { Duration, Guard, GuardContext } from 'kay'
 import type { ByteSize, LazyGuard, Logo } from 'kay/library'
 import type { Commit, FileSaver, Identity } from './files'
-import type { GivenLayout } from './kay/contract'
+import type { GivenLayout, StoredEntry } from './kay/contract'
 import type { Action } from './roles'
 import { asConfigError, byteSize, configError, lazily, optionMs } from 'kay/library'
 import { roleGuard } from './auth-like'
@@ -10,6 +10,20 @@ import { checkLayouts } from './layout'
 import { PAGE_SIZE } from './listing'
 import { trackPasswords } from './password'
 import { checkRoles } from './roles'
+
+// A mailing list as kayjs-mail's `mail.list()` gives it, which the cms uses through these methods alone.
+export interface NewsletterList {
+  send: (message: never) => Promise<{ id: string, recipients: number }>
+  test: (message: never, to: string) => Promise<void>
+  preview: (message: never) => Promise<{ subject: string, html: string | undefined, text: string }>
+  count: () => Promise<number>
+}
+
+// A collection whose entries an editor can send to a list: `message` turns the saved entry into the list mail, `{ subject, view, props }` as `mail.list().send` takes it.
+export interface NewsletterOptions {
+  list: NewsletterList
+  message: (entry: StoredEntry) => object | Promise<object>
+}
 
 export interface UploadOptions {
   types?: string[] | undefined
@@ -57,6 +71,8 @@ export interface CmsOptions {
   collections?: Record<string, GivenLayout> | undefined
   // `false` leaves out the hint cookie and the "Edit this page" link an editor's browser finds on every page, once the guard let it into the screens; a link of your own carries `data-kcms-edit-page` (`data-cms-edit-page` before 1.70 still works) and is shown in its place.
   pageLink?: false | undefined
+  // The collections whose entries an editor can send to a mailing list, by name: `{ posts: { list: mail.list('news'), message: entry => ({ subject: String(entry.data.title), view: Post, props: { entry } }) } }`. The entry screen then offers a preview of the mail, a test send to the editor's own address (from `author`) and the send itself, which needs the `publish` action of `roles`.
+  newsletter?: Record<string, NewsletterOptions> | undefined
   // What each role may do beyond editing: `{ editor: [], publisher: ['publish'], admin: ['publish', 'delete', 'upload', 'redirects'] }`. A signed-in editor whose roles are not listed only edits. The roles are kayjs-auth's, else `passwordGuard()`'s; without this option everyone the guard admits may do all of it.
   roles?: Record<string, readonly Action[]> | undefined
   // Who the guard let in, for a custom guard that is neither kayjs-auth nor `passwordGuard()`: `({ locals }) => ({ name: locals.user.email, roles: locals.user.roles })`. The admin header names `name`, and `roles` are matched against `roles`; without it such a guard holds no role.
@@ -95,6 +111,7 @@ export interface CmsSettings {
   roles: ReadonlyMap<string, ReadonlySet<Action>> | undefined
   layouts: ReadonlyMap<string, GivenLayout>
   history: HistorySettings | undefined
+  newsletter: ReadonlyMap<string, NewsletterOptions>
 }
 
 const DEFAULT_REVISIONS = 50
@@ -118,7 +135,7 @@ const LOGO = /^(?:\/(?![/\\])\S*|https:\/\/\S+)$/
 
 let current: CmsSettings | undefined
 
-export function configure({ prefix = '/admin', logo, guard: own, role, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, member, onSave, collections, pageLink, roles, history }: CmsOptions): CmsSettings {
+export function configure({ prefix = '/admin', logo, guard: own, role, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, member, onSave, collections, pageLink, roles, history, newsletter }: CmsOptions): CmsSettings {
   if (!Number.isInteger(pageSize) || pageSize < 1)
     throw configError('`cms({ pageSize })`', pageSize, 'a positive whole number of entries')
 
@@ -135,7 +152,7 @@ export function configure({ prefix = '/admin', logo, guard: own, role, files = w
   const guard = own ?? (role === undefined ? undefined : roleGuard(role))
   const tracked = trackPasswords(guard)
 
-  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', logo: given, guard: tracked === undefined ? undefined : lazily(tracked), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, member, onSave, pageLink: pageLink !== false, roles: asConfigError(() => checkRoles(roles, guard !== undefined)), layouts: asConfigError(() => checkLayouts(collections)), history: checkHistory(history) }
+  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', logo: given, guard: tracked === undefined ? undefined : lazily(tracked), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, member, onSave, pageLink: pageLink !== false, roles: asConfigError(() => checkRoles(roles, guard !== undefined)), layouts: asConfigError(() => checkLayouts(collections)), history: checkHistory(history), newsletter: checkNewsletter(newsletter) }
 
   return current
 }
@@ -184,6 +201,21 @@ function uploadSize(maxSize: ByteSize | undefined): number {
     throw configError(`\`cms({ uploads: { maxSize } })\` is ${JSON.stringify(maxSize)}, which is ${bytes} bytes; it takes at most ${LARGEST_MAX_SIZE} bytes, 128 MB less the multipart envelope, as Bun refuses a request body over 128 MB before the upload route sees it`)
 
   return bytes
+}
+
+function checkNewsletter(given: CmsOptions['newsletter']): ReadonlyMap<string, NewsletterOptions> {
+  const checked = new Map<string, NewsletterOptions>()
+
+  for (const [name, options] of Object.entries(given ?? {})) {
+    const { list, message } = (options) ?? {}
+
+    if (typeof message !== 'function' || typeof list?.send !== 'function' || typeof list.test !== 'function' || typeof list.preview !== 'function' || typeof list.count !== 'function')
+      throw configError(`\`cms({ newsletter: { ${name} } })\``, options, 'an object with a `list` from kayjs-mail\'s `mail.list()` and a `message` function')
+
+    checked.set(name, { list, message })
+  }
+
+  return checked
 }
 
 // What `cms()` in kay.config.ts was given.
