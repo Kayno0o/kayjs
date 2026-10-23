@@ -43,7 +43,7 @@ const LOOSE_SPECIFIER = /([\w$]+)(?:\s+as\s+([\w$]+))?/g
 const LOOSE_MADE = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*[(<]/g
 const LOOSE_PROPS = /\b(?:const|let|var)\s*\{/g
 const LOOSE_PROPS_TAIL = /^\s*=\s*props\s*[(<]/
-const LOOSE_PROP = /^\s*(?:[\w$]+\s*:\s*)?([A-Z_$][\w$]*)\s*(?:=|$)/i
+const LOOSE_PROP = /^(?:\s|\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)*(?:[\w$]+\s*:\s*)?([A-Z_$][\w$]*)\s*(?:=|$)/i
 const OPENERS = '([{'
 const CLOSERS = ')]}'
 
@@ -332,22 +332,62 @@ function looseDeclarations(source: string, region: Span, imported: ImportedSigna
   }
 }
 
-// The offset of the bracket closing the one at `open`, past nested brackets and strings; undefined when it never closes.
+// The offset of the last character of the string, template, or comment starting at `at`, `at` itself when none starts there, and -1 when it never ends. A backslash escapes the next character, and a template substitution is scanned as code.
+function skipLiteral(text: string, at: number): number {
+  const char = text[at]!
+
+  if (char === '"' || char === '\'' || char === '`') {
+    for (let i = at + 1; i < text.length; i++) {
+      if (text[i] === '\\') {
+        i++
+      }
+      else if (text[i] === char) {
+        return i
+      }
+      else if (char === '`' && text[i] === '$' && text[i + 1] === '{') {
+        const end = closing(text, i + 1)
+
+        if (end === undefined)
+          return -1
+
+        i = end
+      }
+    }
+
+    return -1
+  }
+
+  if (char === '/' && text[at + 1] === '/') {
+    const end = text.indexOf('\n', at)
+
+    return end === -1 ? text.length : end
+  }
+
+  if (char === '/' && text[at + 1] === '*') {
+    const end = text.indexOf('*/', at + 2)
+
+    return end === -1 ? -1 : end + 1
+  }
+
+  return at
+}
+
+// The offset of the bracket closing the one at `open`, past nested brackets, strings and comments; undefined when it never closes.
 function closing(text: string, open: number): number | undefined {
   let depth = 0
 
   for (let at = open; at < text.length; at++) {
-    const char = text[at]!
-
-    if (char === '"' || char === '\'' || char === '`')
-      at = text.indexOf(char, at + 1)
-    else if (OPENERS.includes(char))
-      depth++
-    else if (CLOSERS.includes(char) && --depth === 0)
-      return at
+    at = skipLiteral(text, at)
 
     if (at === -1)
       return undefined
+
+    const char = text[at]!
+
+    if (OPENERS.includes(char))
+      depth++
+    else if (CLOSERS.includes(char) && --depth === 0)
+      return at
   }
 
   return undefined
@@ -360,12 +400,14 @@ function splitEntries(text: string, start: number, end: number): [number, number
   let depth = 0
 
   for (let at = start; at < end; at++) {
+    at = skipLiteral(text, at)
+
+    if (at === -1)
+      return entries
+
     const char = text[at]!
 
-    if (char === '"' || char === '\'' || char === '`') {
-      at = text.indexOf(char, at + 1)
-    }
-    else if (OPENERS.includes(char)) {
+    if (OPENERS.includes(char)) {
       depth++
     }
     else if (CLOSERS.includes(char)) {
@@ -375,9 +417,6 @@ function splitEntries(text: string, start: number, end: number): [number, number
       entries.push([from, at])
       from = at + 1
     }
-
-    if (at === -1)
-      return entries
   }
 
   entries.push([from, end])

@@ -105,6 +105,30 @@ describe('semantic tokens of a broken import and of props read as text', () => {
     expect(tokens(text)).toEqual(['1:8 a property declaration,prop', '1:31 d property declaration,prop', '1:37 renamed property declaration,prop', '4:3 a property prop', '4:7 d property prop', '4:11 renamed property prop'])
   })
 
+  it('keeps the props list past an escaped quote in a string default', () => {
+    const text = page('---', 'const { a = \'it\\\'s, ok\', d } = props<{ a?: string }>()', 'const view = <b>{a}</b>', '---', 'p {a} {d}')
+
+    expect(tokens(text)).toEqual(['1:8 a property declaration,prop', '1:25 d property declaration,prop', '4:3 a property prop', '4:7 d property prop'])
+  })
+
+  it('keeps the props list past a comma or a brace in a line comment', () => {
+    const text = page('---', 'const { a = 1, // a, } \' comment\n d } = props<{ a?: number }>()', 'const view = <b>{a}</b>', '---', 'p {a} {d}')
+
+    expect(tokens(text)).toEqual(['1:8 a property declaration,prop', '2:1 d property declaration,prop', '5:3 a property prop', '5:7 d property prop'])
+  })
+
+  it('keeps the props list past a comma or a brace in a block comment', () => {
+    const text = page('---', 'const { a = 1, /* b, } \' */ d } = props<{ a?: number }>()', 'const view = <b>{a}</b>', '---', 'p {a} {d}')
+
+    expect(tokens(text)).toEqual(['1:8 a property declaration,prop', '1:28 d property declaration,prop', '4:3 a property prop', '4:7 d property prop'])
+  })
+
+  it('keeps the props list past a template literal and its substitution', () => {
+    const text = page('---', 'const { a = `x, ${`}, `} }`, d } = props<{ a?: string }>()', 'const view = <b>{a}</b>', '---', 'p {a} {d}')
+
+    expect(tokens(text)).toEqual(['1:8 a property declaration,prop', '1:29 d property declaration,prop', '4:3 a property prop', '4:7 d property prop'])
+  })
+
   it('knows the signals the script fence imports in a module fence it cannot parse', () => {
     const text = page('--- module', 'const shared = signal(0)', 'const view = <b>{shared}</b>', '---', '---', 'import { signal } from \'kay\'', '---', 'p {shared}')
 
