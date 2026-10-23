@@ -773,12 +773,12 @@ describe('the knobs folded in 1.72', () => {
     expect(select).not.toContain(line)
   })
 
-  test('writes the chart series colours whatever the page uses, as script reads them and no utility names them', async () => {
-    const css = await built('')
+  test('keeps the chart series colours in the build, an own override of one included', async () => {
+    for (const css of [await built(''), await built('@theme { --color-chart-1: red; }')]) {
+      for (const index of [2, 3, 4, 5, 6])
+        expect(css, `chart-${index}`).toMatch(new RegExp(`--color-chart-${index}: `))
+    }
 
-    for (const index of [1, 2, 3, 4, 5, 6])
-      expect(css, `chart-${index}`).toMatch(new RegExp(`--color-chart-${index}: `))
-
-    expect(theme).not.toContain('--_chart-palette')
+    expect(await built('@theme { --color-chart-1: red; }')).toContain('--color-chart-1: red')
   })
 })

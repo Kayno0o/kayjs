@@ -81,8 +81,8 @@
   --press-travel: var(--kui-press-travel, 0px);
 }
 
-/* The colours a chart series takes when it names none, in order. Static, as script reads them and Tailwind would otherwise write only the ones a utility names. */
-@theme default static {
+/* The colours a chart series takes when it names none, in order. */
+@theme default {
   --color-chart-1: var(--color-kui-chart-1, var(--color-accent));
   --color-chart-2: var(--color-kui-chart-2, var(--color-success));
   --color-chart-3: var(--color-kui-chart-3, var(--color-info));
@@ -1116,6 +1116,11 @@
     @apply flex flex-col gap-2;
   }
 
+
+  /* Tailwind writes a theme variable only where CSS reads it, and a series colour is read from script, so the charts name the palette here: an app's own --color-chart-* then survives its build. */
+  :where(.kui-line-chart, .kui-bar-chart) {
+    --_chart-palette: var(--color-chart-1) var(--color-chart-2) var(--color-chart-3) var(--color-chart-4) var(--color-chart-5) var(--color-chart-6);
+  }
 
   /* chartist draws the plot; only the rules a line chart needs from its own stylesheet are here, so the app imports none. */
   .kui-line-chart {
