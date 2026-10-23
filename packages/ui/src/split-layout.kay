@@ -6,7 +6,7 @@ import { wording } from 'kay/words'
 
 // Where the layout stops being side by side, `md` in Tailwind.
 const NARROW = '(width < 48rem)'
-const FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+const FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 const WIDTH = { default: 260, min: 180, max: 560, step: 20 }
 
 const look = recipe({ parts: { root: 'kui-split-layout', sidebar: 'kui-split-layout-sidebar', sidebarHead: 'kui-split-layout-sidebar-head', sidebarTitle: 'kui-split-layout-sidebar-title', sidebarBody: 'kui-split-layout-sidebar-body', list: 'kui-split-layout-list', listHead: 'kui-split-layout-list-head', resizer: 'kui-split-layout-resizer', detail: 'kui-split-layout-detail', detailHead: 'kui-split-layout-detail-head' } })
@@ -64,8 +64,11 @@ function followFocus(open: () => boolean, pane: () => HTMLElement | undefined) {
 
     was = now
 
-    if (!small)
+    if (!small) {
+      opener = null
+
       return
+    }
 
     if (now) {
       opener = document.activeElement
@@ -178,7 +181,7 @@ div(part="root" {...rest} style={`--kui-split-list-width: ${listWidth()}px;${sty
     if resizableList
       // A focusable separator is a widget, moved with the arrow keys as well as dragged.
       div(part="resizer" role="separator" tabindex="0" aria-label={resizeLabel} aria-orientation="vertical" aria-valuenow={listWidth()} aria-valuemin={WIDTH.min} aria-valuemax={WIDTH.max} onPointerDown={startResize} onKeyDown={resizeByKey})
-  section(part="detail" tabindex="-1" inert={narrow() && sidebarOpen} ref={element => detailPane = element})
+  section(part="detail" tabindex={narrow() ? '-1' : undefined} inert={narrow() && sidebarOpen} ref={element => detailPane = element})
     if detailHead
       div(part="detailHead")
         | {detailHead}

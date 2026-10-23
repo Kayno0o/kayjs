@@ -121,7 +121,18 @@ describe('SidePanel with modal={false}', () => {
 async function whenNarrow(run: () => Promise<void>) {
   const media = window.matchMedia.bind(window)
 
-  window.matchMedia = (query: string) => ({ ...media(query), matches: query.includes('width <') })
+  window.matchMedia = (query: string) => {
+    const list = media(query)
+
+    return new Proxy(list, { get: (target, name) => {
+      if (name === 'matches')
+        return query.includes('width <')
+
+      const found = Reflect.get(target, name) as unknown
+
+      return typeof found === 'function' ? (found as (...args: unknown[]) => unknown).bind(target) : found
+    } })
+  }
 
   try {
     await run()

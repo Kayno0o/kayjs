@@ -1159,7 +1159,7 @@ inBrowser('a non-modal SidePanel and the space skin on a served page', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 
-  test('SplitLayout on a phone keeps Tab inside the open sidebar overlay, focuses it when it opens and returns focus to its opener when it closes', async () => {
+  test('SplitLayout on a phone keeps Tab off the panes the open sidebar overlay covers, focuses it when it opens and returns focus to its opener when it closes', async () => {
     const site = await shared()
 
     await using page = await site.open('/split-phone', { viewport: 'phone' })

@@ -14,6 +14,6 @@ The `@list` and `@detail` blocks fill the two panes. Below the `md` breakpoint o
 
 ## Narrow screens
 
-Below `md`, `sidebarOpen` says whether the sidebar covers the layout. Its back button calls `onSidebarOpenChange(false)` (`onSidebarClose` works until 1.75), for the parent to set it back to false. `sidebarTitle` heads it.
+Below `md`, `sidebarOpen` says whether the sidebar covers the layout. Its back button calls `onSidebarOpenChange(false)` (`onSidebarClose` works until 1.75), for the parent to set it back to false. While it covers the layout the list and detail are `inert`, and a pane that opens takes focus on its first control and gives it back when it closes. `sidebarTitle` heads it.
 
 `resizeLabel` names the list's handle and `backLabel` the back button, `Resize list` and `Back` by default. `style` is added to the layout's own box.
