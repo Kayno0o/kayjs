@@ -6,7 +6,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### `auth()` keeps its users in the app's database
 
-A bare `auth()` now keeps its users in the database of the app's `store` in kay.config.ts (`sqliteData(path)`, `pgData(url)`) instead of `data/auth.db`, creating its `kay_*` tables there and leaving the others alone. An app with such a `store` whose users are in `data/auth.db` sees none until it sets `KAYJS_AUTH_DATABASE_URL=sqlite://data/auth.db` (which wins over the app's store, as does `auth({ store })`) or moves them. No `kay check` lint can tell which database an app meant.
+A bare `auth()` on a new app keeps its users in the database of the app's `store` in kay.config.ts (`sqliteData(path)`, `pgData(url)`) instead of `data/auth.db`, creating its `kay_*` tables there and leaving the others alone. An app whose `data/auth.db` exists keeps using it and logs once; nothing is lost, and moving the users into the app's database and setting `KAYJS_AUTH_DATABASE_URL` to it is optional. `KAYJS_AUTH_DATABASE_URL` and `auth({ store })` win over the app's store. A static export keeps users in memory and touches no database. No `kay check` lint can tell which database an app meant.
 
 ### kay needs Bun 1.4.4
 

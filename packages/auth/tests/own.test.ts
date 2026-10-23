@@ -38,8 +38,8 @@ afterEach(() => {
 type Options = OwnOptions<string, string>
 
 // What kay's `pages()` hands the server function: the root, and the app files the extension named.
-async function boot(extension: KayExtension, at = root, extensions: string[] = [], database?: string): Promise<AnyElysia> {
-  return (extension.server as (app: unknown) => Promise<AnyElysia>)({ root: at, modules: await appModules(at, extension), extensions, database })
+async function boot(extension: KayExtension, at = root, extensions: string[] = [], database?: string, exporting?: boolean): Promise<AnyElysia> {
+  return (extension.server as (app: unknown) => Promise<AnyElysia>)({ root: at, modules: await appModules(at, extension), extensions, database, exporting })
 }
 
 // The app an `auth()` with no module serves, the way kay's `pages()` mounts its server.
@@ -331,6 +331,32 @@ describe('the store', () => {
       expect(existsSync(join(root, 'data/own.db'))).toBe(true)
       expect(existsSync(join(root, 'data/other.db'))).toBe(true)
       expect(tables().names).not.toContain('kay_users')
+    })
+
+    test('keeps using data/auth.db when it exists, so an upgrade loses no user', async () => {
+      await withAppTable()
+      mkdirSync(join(root, 'data'), { recursive: true })
+      writeFileSync(join(root, 'data/auth.db'), '')
+      await inDevelopment(async () => registerOn({}, `sqlite://${shared()}`))
+
+      expect(tables().names).not.toContain('kay_users')
+
+      const own = new Database(join(root, 'data/auth.db'), { readonly: true })
+
+      expect(own.query('SELECT email FROM kay_users').all()).toEqual([{ email: 'ada@example.com' }])
+      own.close()
+    })
+
+    test('creates or migrates nothing in a database while a static export starts the server', async () => {
+      await withAppTable()
+      await inDevelopment(async () => {
+        const plugin = await boot(auth({ captcha: false }), root, [], `sqlite://${shared()}`, true)
+
+        await new Elysia().use(plugin).handle(new Request('http://localhost/auth/sign-in'))
+      })
+
+      expect(tables().names).not.toContain('kay_users')
+      expect(existsSync(join(root, 'data/auth.db'))).toBe(false)
     })
 
     test('stays in memory under test, so a test never writes into the app\'s database', async () => {

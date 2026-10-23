@@ -422,6 +422,8 @@ export interface ExtensionApp {
   testCookies?: Bun.CookieMap | undefined
   // The database the app's `store` keeps its data in (`AppStore.database`), for an extension keeping tables of its own there.
   database?: string | undefined
+  // Set while a static export starts the server to render the pages: an extension keeps its data in memory then, and creates or migrates nothing in a database.
+  exporting?: boolean | undefined
   modules: Record<string, Record<string, unknown> | undefined>
 }
 
@@ -495,7 +497,7 @@ export async function buildingTestSite<T>(cookies: Bun.CookieMap, build: () => P
 }
 
 // The server plugins the extensions carry, in their order, those given as a function built now.
-export async function extensionServers(extensions: KayExtension[] | undefined, root: string): Promise<{ name: string, server: AnyElysia }[]> {
+export async function extensionServers(extensions: KayExtension[] | undefined, root: string, exporting = false): Promise<{ name: string, server: AnyElysia }[]> {
   // An extension carrying only a catalog of messages is what an installed library's `kay.messages` adds to every app, not something the config lists.
   const testCookies = testSites.getStore()
   const names = (extensions ?? []).filter(extension => Object.keys(extension).some(key => key !== 'name' && key !== 'messages')).map(extension => extension.name)
@@ -506,7 +508,7 @@ export async function extensionServers(extensions: KayExtension[] | undefined, r
     if (serverModule !== undefined)
       return [(async () => ({ name, server: await serverFromModule(name, serverModule, root) }))()]
 
-    return server === undefined ? [] : [(async () => ({ name, server: typeof server === 'function' ? await server({ root: bundled() ? process.cwd() : root, modules: await appModules(root, extension), extensions: names, testCookies, database: appStore()?.database }) : server }))()]
+    return server === undefined ? [] : [(async () => ({ name, server: typeof server === 'function' ? await server({ root: bundled() ? process.cwd() : root, modules: await appModules(root, extension), extensions: names, testCookies, database: appStore()?.database, exporting }) : server }))()]
   }))
 }
 

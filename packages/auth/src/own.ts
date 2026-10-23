@@ -7,6 +7,7 @@ import type { ProviderOptions } from './oauth/providers'
 import type { AuthPagesConfig, AuthPagesOptions, UserMaker } from './pages'
 import type { AuthStore } from './store'
 import type { OwnTest } from './test'
+import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { s } from 'kay'
@@ -132,7 +133,10 @@ function foreignTables(names: readonly string[]): RegExp {
   return new RegExp(`^(?!(?:${names.join('|')})$)`)
 }
 
-async function storeOf(store: StoreOption | undefined, root: string, shared: string | undefined): Promise<AuthStore> {
+const OWN_FILE = 'data/auth.db'
+const warned = new Set<string>()
+
+async function storeOf(store: StoreOption | undefined, root: string, shared: string | undefined, exporting: boolean | undefined): Promise<AuthStore> {
   if (typeof store === 'function')
     return store()
 
@@ -142,12 +146,19 @@ async function storeOf(store: StoreOption | undefined, root: string, shared: str
   // An empty value, as .env.example lists it, is not a url.
   const given = store?.url ?? filled(process.env.KAYJS_AUTH_DATABASE_URL)
 
-  // Tests start from no users each run, as a file kept between them would not.
-  if (given === undefined && process.env.NODE_ENV === 'test')
+  // Tests start from no users each run, as a file kept between them would not, and a static export reads none and creates or migrates no table.
+  if (exporting || (given === undefined && process.env.NODE_ENV === 'test'))
     return memoryAuthStore()
 
   // The database of the app's own `store` when it names one, so `sqliteData` or `pgData(url)` in kay.config.ts is the only place to say where the data lives.
-  const url = given ?? shared
+  // An app whose users are already in `data/auth.db` keeps them there, so an upgrade loses no one.
+  const kept = given === undefined && shared !== undefined && existsSync(resolve(root, OWN_FILE))
+  const url = kept ? undefined : given ?? shared
+
+  if (kept && !warned.has(root)) {
+    warned.add(root)
+    log.warn(`auth() keeps its users in ${OWN_FILE}, which exists, though the app's store names a database: to use that database, move the users into it and set KAYJS_AUTH_DATABASE_URL to its url (or delete the file when it holds none)`)
+  }
 
   let orm: typeof import('@kaynooo/pg-orm')
   let pg: typeof import('./pg')
@@ -162,7 +173,7 @@ async function storeOf(store: StoreOption | undefined, root: string, shared: str
 
   const db = new orm.Database({ url: underRoot(url ?? 'sqlite://data/auth.db', root), tables: [...pg.authTables] })
 
-  await db.sync(url !== undefined && url === shared ? { ignoreTables: [foreignTables(pg.authTables.map(table => table.name))] } : undefined)
+  await db.sync(!kept && url !== undefined && url === shared ? { ignoreTables: [foreignTables(pg.authTables.map(table => table.name))] } : undefined)
 
   return pg.pgStore(db)
 }
@@ -226,7 +237,7 @@ export async function buildOwn(options: OwnOptions, app: ExtensionApp): Promise<
     ...rest,
     ...prefix !== undefined && { prefix },
     sessions: session<AuthSessionData>(),
-    store: await storeOf(store, app.root, app.database),
+    store: await storeOf(store, app.root, app.database, app.exporting),
     ...oauth && { oauth: Object.fromEntries(Object.entries(oauth).map(([name, app]) => [name, appOf(name, app)])) },
     ...mailer && { email: mailer },
     pages: pages === false ? undefined : { prefix: prefix ?? '/auth', home: home ?? '/', ...typeof pages === 'object' && pages },

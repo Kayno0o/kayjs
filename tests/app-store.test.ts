@@ -82,6 +82,19 @@ describe('the app-wide store', () => {
     expect(given).toBe(`sqlite://${path}`)
   })
 
+  it('tells an extension server a static export is starting it', async () => {
+    const seen: (boolean | undefined)[] = []
+    const probe = { name: 'probe', server: (app: { exporting?: boolean | undefined }) => {
+      seen.push(app.exporting)
+
+      return new Elysia()
+    } }
+
+    await extensionServers([probe], process.cwd(), true)
+    await extensionServers([probe], process.cwd())
+    expect(seen).toEqual([true, false])
+  })
+
   it('creates no file until sqliteData is used', async () => {
     const path = join(await scratchDir('app-store'), 'app.sqlite')
     const data = sqliteData(path)
