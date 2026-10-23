@@ -118,8 +118,10 @@ describe('the production jobs page', () => {
     expect(await (await get(site, '/_kay/jobs')).text()).not.toContain(id)
 
     const second = await failedJob('act-delete')
+    const baseDelete = await post(site, '/_kay/jobs/delete', { queue: second.name, id: second.id })
 
-    expect((await post(site, '/_kay/jobs/delete', { queue: second.name, id: second.id })).status).toBe(303)
+    expect(baseDelete.status).toBe(303)
+    expect(baseDelete.headers.get('location')).toBe('/shop/_kay/jobs')
     expect(await (await get(site, '/_kay/jobs')).text()).not.toContain(second.id)
   })
 

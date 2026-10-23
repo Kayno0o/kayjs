@@ -9,7 +9,14 @@ const label = (table: Pick<DevTable, 'schema' | 'name'>) => table.schema === 'pu
 
 async function ask<Answer>(url: string, init?: RequestInit): Promise<Answer> {
   const response = await fetch(url, { cache: 'no-store', ...init, headers: { ...HEADERS, ...init?.headers } })
-  const answer = await response.json() as Answer & { error?: string }
+  let answer = {} as Answer & { error?: string }
+
+  try {
+    answer = await response.json() as typeof answer
+  }
+  catch {
+    // An empty or non-JSON body: the status below says what happened.
+  }
 
   if (!response.ok)
     throw new Error(answer.error ?? `the server answered ${response.status}`)

@@ -1,7 +1,6 @@
 import process from 'node:process'
 import { SQL } from 'bun'
 import { isCrossSite } from './actions'
-import { onReload } from './reload'
 
 const HEADER = 'x-kay-dev'
 const PAGE_ROWS = 50
@@ -58,14 +57,13 @@ export interface DevQueryResult {
 
 let client: { url: string, sql: SQL } | undefined
 
-// One connection of the dev tool's own, opened on the first request and closed when `kay dev` reloads the app or the database URL changes.
+// One connection of the dev tool's own, opened on the first request, closed when the database URL changes and by its idle timeout.
 function connection(url: string): SQL {
   if (client !== undefined && client.url !== url)
     void closeDevData()
 
   if (client === undefined) {
     client = { url, sql: new SQL(url, { max: 1, idleTimeout: 30, connectionTimeout: 5 }) }
-    onReload(closeDevData, 'direct')
   }
 
   return client.sql
@@ -188,7 +186,7 @@ export async function devRows(request: Request): Promise<Response> {
       return refused(`${wanted} is not a table of the database`, 404)
 
     const keys = table.columns.filter(column => column.primary).map(column => `source.${identifier(column.name)}`)
-    const found = await sql.unsafe<Record<string, string | null>[]>(`SELECT ${table.columns.map(cell).join(', ')} FROM ${identifier(table.schema)}.${identifier(table.name)} AS source${keys.length === 0 ? '' : ` ORDER BY ${keys.join(', ')}`} LIMIT ${PAGE_ROWS + 1} OFFSET ${page * PAGE_ROWS}`)
+    const found = await sql.unsafe<Record<string, string | null>[]>(`SELECT ${table.columns.map(cell).join(', ')} FROM ${identifier(table.schema)}.${identifier(table.name)} AS source ORDER BY ${keys.length === 0 ? 'source.ctid' : keys.join(', ')} LIMIT ${PAGE_ROWS + 1} OFFSET ${page * PAGE_ROWS}`)
     const columns = table.columns.map(({ name }) => name)
 
     return Response.json({ columns, rows: found.slice(0, PAGE_ROWS).map(row => columns.map(name => row[name] ?? null)), page, pageSize: PAGE_ROWS, hasMore: found.length > PAGE_ROWS } satisfies DevRows)
@@ -289,12 +287,14 @@ export function refusedQuery(text: string): string | undefined {
     return 'the statement has a string, a quoted name or a comment that never ends'
 
   const statement = code.replace(TRAILING_SEMICOLON, '')
+  const raw = text.replace(TRAILING_SEMICOLON, '')
 
   if (statement.trim() === '')
     return 'the query is empty'
 
-  if (statement.includes(';'))
-    return 'one statement at a time: a `;` chains a second one'
+  // On the raw text, as a lexer of our own disagrees with Postgres' on some inputs: a `;` inside a string is refused too.
+  if (raw.includes(';'))
+    return 'one statement at a time: a `;` chains a second one, even inside a string'
 
   if (!QUERY_START.test(statement)) {
     const first = FIRST_WORD.exec(statement)?.[1]?.toUpperCase()
@@ -302,7 +302,7 @@ export function refusedQuery(text: string): string | undefined {
     return first === 'SET' ? 'SET is not allowed: the box only reads' : `the box only reads: start with SELECT, WITH, VALUES or TABLE${first === undefined || first === '' ? '' : `, not ${first}`}`
   }
 
-  return SET_CONFIG.test(statement) ? 'set_config is not allowed: the box only reads' : undefined
+  return SET_CONFIG.test(raw) ? 'set_config is not allowed: the box only reads' : undefined
 }
 
 function shown(value: unknown): string | null {
@@ -352,9 +352,10 @@ export async function devQuery(request: Request): Promise<Response> {
   if (why !== undefined)
     return refused(why)
 
-  const reserved = await connection(url).reserve()
+  let reserved: Awaited<ReturnType<SQL['reserve']>> | undefined
 
   try {
+    reserved = await connection(url).reserve()
     await reserved.unsafe('BEGIN READ ONLY')
     await reserved.unsafe(`SET LOCAL statement_timeout = ${QUERY_TIMEOUT_MS}`)
     await reserved.unsafe(`DECLARE kay_dev_query NO SCROLL CURSOR FOR ${body.sql.replace(TRAILING_SEMICOLON, '')}\n`)
@@ -369,10 +370,13 @@ export async function devQuery(request: Request): Promise<Response> {
   }
   finally {
     try {
-      await reserved.unsafe('ROLLBACK')
+      await reserved?.unsafe('ROLLBACK')
+    }
+    catch {
+      // The connection died with the query: releasing it is all that is left.
     }
     finally {
-      reserved.release()
+      reserved?.release()
     }
   }
 }

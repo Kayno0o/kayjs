@@ -8,7 +8,14 @@ const failure = (error: unknown) => error instanceof Error ? error.message : Str
 
 async function ask<Answer>(url: string, init?: RequestInit): Promise<Answer> {
   const response = await fetch(url, { cache: 'no-store', headers: HEADERS, ...init })
-  const answer = await response.json() as Answer & { error?: string }
+  let answer = {} as Answer & { error?: string }
+
+  try {
+    answer = await response.json() as typeof answer
+  }
+  catch {
+    // An empty or non-JSON body: the status below says what happened.
+  }
 
   if (!response.ok)
     throw new Error(answer.error ?? `the server answered ${response.status}`)
