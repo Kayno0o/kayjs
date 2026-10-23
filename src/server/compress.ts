@@ -80,6 +80,14 @@ export async function compressPaths(paths: string[], copiesOf: StrongestCopies =
   }))
 }
 
+// The bytes a browser downloads for a file of the build: its brotli copy as `kay build` writes it, or the file itself when it is not compressed, is too small or the copy saves too little. `name` only tells the kind of file by its extension.
+export async function servedSize(name: string, bytes: Uint8Array<ArrayBuffer>, copiesOf: StrongestCopies = strongestCopies): Promise<number> {
+  if (!COMPRESSIBLE.test(name) || bytes.length < MIN_SIZE)
+    return bytes.length
+
+  return (await copiesOf(bytes)).br?.length ?? bytes.length
+}
+
 // The copies `kay build` writes, for text rendered while serving but off any request's path, as a stale page rendered again.
 export async function compressTextStrongest(text: string): Promise<Partial<Record<StoredEncoding, Uint8Array<ArrayBuffer>>>> {
   const bytes = new TextEncoder().encode(text)

@@ -1,10 +1,13 @@
 import type { PrerenderedPage } from '../src/server/client'
-import { mkdtemp, rm } from 'node:fs/promises'
+import type { RenderedPage } from '../src/server/page-hook'
+import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { outputDir } from '../src/build/assets'
+import { cachedCopies } from '../src/build/compressed'
 import { PRERENDERED_DIR, readManifest, writeManifest } from '../src/server/client'
+import { strongestCopies } from '../src/server/compress'
 import { applyPageHooks, assetFiles, hookPrerendered } from '../src/server/page-hook'
 import { pageEtag } from '../src/server/prerendered'
 
@@ -14,6 +17,7 @@ const publicDir = join(scratch, 'public')
 
 await Promise.all([
   Bun.write(join(clientDir, 'page-1a2b.css'), 'p{}'),
+  Bun.write(join(clientDir, 'big-3c4d.css'), '.card { color: red; margin: 0 }\n'.repeat(200)),
   Bun.write(join(clientDir, 'images/hero-640w.webp'), 'webp'),
   Bun.write(join(outputDir(scratch), 'favicon/icon-192.png'), 'png'),
   Bun.write(join(publicDir, 'post script.js'), 'console.log(1)'),
@@ -23,6 +27,19 @@ await Promise.all([
 afterAll(async () => {
   await rm(scratch, { recursive: true, force: true })
 })
+
+// The sizes a hook is handed, through the hook that reads them.
+async function sizesOf(dirs: Parameters<typeof assetFiles>[0]) {
+  let sizes!: Pick<RenderedPage, 'fileSize' | 'htmlSize'>
+
+  await applyPageHooks([({ fileSize, htmlSize, html }) => {
+    sizes = { fileSize, htmlSize }
+
+    return html
+  }], '/', 'en', '', assetFiles(dirs))
+
+  return sizes
+}
 
 describe('page hooks', () => {
   it('finds the file behind each root-relative URL a page links, under the base', async () => {
@@ -92,5 +109,56 @@ describe('page hooks', () => {
       expect(html).toBe(`<p>${path} hooked ${path} ${path === '/page-3' ? 'fr' : 'en'}</p>`)
       expect(written[path]!.etag).toBe(pageEtag(html))
     }
+  })
+
+  describe('sizes', () => {
+    const big = '.card { color: red; margin: 0 }\n'.repeat(200)
+
+    it('gives the brotli size of a compressible file, the file\'s own for a small one or one that is not compressed, and nothing for a URL no file serves', async () => {
+      const { fileSize } = await sizesOf({ clientDir, publicDir, base: '' })
+
+      expect(await fileSize('/_kay/big-3c4d.css')).toBe((await strongestCopies(new TextEncoder().encode(big)) as { br: Uint8Array }).br.length)
+      expect(await fileSize('/_kay/page-1a2b.css')).toBe(3)
+      expect(await fileSize('/_kay/images/hero-640w.webp')).toBe(4)
+      expect(await fileSize('https://cdn.example/a.css')).toBeUndefined()
+    })
+
+    it('measures a file once however many pages link it, and a page as the build would compress it', async () => {
+      const made: number[] = []
+      const { fileSize, htmlSize } = await sizesOf({ clientDir, publicDir, base: '', copiesOf: async (bytes) => {
+        made.push(bytes.length)
+
+        return strongestCopies(bytes)
+      } })
+      const sizes = await Promise.all([fileSize('/_kay/big-3c4d.css'), fileSize('/_kay/big-3c4d.css')])
+
+      expect(sizes[0]).toBe(sizes[1])
+      expect(made).toEqual([big.length])
+      expect(await htmlSize(`<p>${big}</p>`)).toBeLessThan(big.length / 10)
+      expect(await htmlSize('<p>short</p>')).toBe(12)
+    })
+
+    it('reads the copies a build keeps, so the compress stage finds them', async () => {
+      const cache = join(scratch, 'compressed-cache')
+      const { fileSize } = await sizesOf({ clientDir, publicDir, base: '', copiesOf: cachedCopies(cache) })
+      const size = await fileSize('/_kay/big-3c4d.css')
+      const kept = (await readdir(cache)).find(name => name.endsWith('.br'))!
+
+      expect(size).toBe((await Bun.file(join(cache, kept)).bytes()).length)
+    })
+
+    it('hands every hook the sizes, in a build and in a page rendered afresh', async () => {
+      const seen: (number | undefined)[] = []
+      const hook = async ({ fileSize }: { fileSize: (url: string) => Promise<number | undefined> }) => {
+        seen.push(await fileSize('/_kay/page-1a2b.css'))
+
+        return '<p></p>'
+      }
+
+      await applyPageHooks([hook], '/', 'en', '<p></p>', assetFiles({ clientDir, publicDir, base: '' }))
+      await applyPageHooks([hook], '/', 'en', '<p></p>', async () => join(clientDir, 'page-1a2b.css'))
+
+      expect(seen).toEqual([3, 3])
+    })
   })
 })

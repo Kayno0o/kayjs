@@ -1,7 +1,9 @@
+import type { StrongestCopies } from './compress'
 import { join, normalize, resolve, sep } from 'node:path'
 import { ASSET_PREFIX, outputDir } from '../build/assets'
 import { IMAGE_ROUTE } from '../runtime/image'
 import { PRERENDERED_DIR, readManifest, writeManifest } from './client'
+import { servedSize, strongestCopies } from './compress'
 import { FAVICON_DIR, FAVICON_PATHS } from './favicon'
 import { builtVariant } from './image'
 import { limiter } from './limit'
@@ -17,6 +19,10 @@ export interface RenderedPage {
   html: string
   // The file serving a root-relative URL the page links, absolute: a built stylesheet, script, font or image variant, a public file or a favicon; undefined for any other, such as another site's.
   file: (url: string) => Promise<string | undefined>
+  // The bytes a browser downloads for the file a root-relative URL links, as `file` finds it: its brotli copy, or the file itself when it is not compressed or the copy saves too little; undefined when `file` finds none. A build reads it from the copy it keeps for the compress stage, so a file is compressed once.
+  fileSize: (url: string) => Promise<number | undefined>
+  // The same for HTML the hook holds, as the build would write and compress it: the page as it is returned, a variant of it to measure, or any other text.
+  htmlSize: (html: string) => Promise<number>
 }
 
 // Returns the HTML to write in place of the page's.
@@ -27,6 +33,48 @@ export interface AssetDirs {
   publicDir: string
   base: string
   aspects?: readonly string[] | undefined
+  // Makes the copies the sizes read, which a build backs with its cache so that the compress stage finds them; compressed afresh without.
+  copiesOf?: StrongestCopies | undefined
+}
+
+export interface PageSizes {
+  fileSize: RenderedPage['fileSize']
+  htmlSize: RenderedPage['htmlSize']
+}
+
+// The sizes of the files each `file` function finds, kept for as long as it is.
+const sizesOf = new WeakMap<RenderedPage['file'], PageSizes>()
+
+// A file is compressed once per version of it, however many pages link it.
+export function pageSizes(file: RenderedPage['file'], copiesOf: StrongestCopies = strongestCopies): PageSizes {
+  const files = new Map<string, Promise<number>>()
+  const encoder = new TextEncoder()
+
+  async function sizeOfFile(path: string): Promise<number> {
+    return servedSize(path, await Bun.file(path).bytes(), copiesOf)
+  }
+
+  return {
+    async fileSize(url) {
+      const path = await file(url)
+
+      if (path === undefined)
+        return undefined
+
+      const key = `${path}:${Bun.file(path).lastModified}`
+      let size = files.get(key)
+
+      if (size === undefined) {
+        size = sizeOfFile(path)
+        files.set(key, size)
+      }
+
+      return size
+    },
+    async htmlSize(html) {
+      return servedSize('page.html', encoder.encode(html), copiesOf)
+    },
+  }
 }
 
 const ORIGIN = 'http://localhost'
@@ -37,7 +85,7 @@ const PAGES_AT_ONCE = 8
 export function assetFiles(dirs: AssetDirs): RenderedPage['file'] {
   const favicons = join(dirs.clientDir, '..', FAVICON_DIR)
 
-  return async (link) => {
+  const file: RenderedPage['file'] = async (link) => {
     if (!link.startsWith('/') || link.startsWith('//'))
       return undefined
 
@@ -57,6 +105,10 @@ export function assetFiles(dirs: AssetDirs): RenderedPage['file'] {
 
     return FAVICON_PATHS.includes(path) ? await fileWithin(favicons, path.slice(1)) ?? fileWithin(dirs.publicDir, path.slice(1)) : fileWithin(dirs.publicDir, path.slice(1))
   }
+
+  sizesOf.set(file, pageSizes(file, dirs.copiesOf))
+
+  return file
 }
 
 async function fileWithin(dir: string, encoded: string): Promise<string | undefined> {
@@ -68,9 +120,10 @@ async function fileWithin(dir: string, encoded: string): Promise<string | undefi
 
 export async function applyPageHooks(hooks: PageHook[], path: string, locale: string, html: string, file: RenderedPage['file']): Promise<string> {
   let result = html
+  const sizes = sizesOf.get(file) ?? pageSizes(file)
 
   for (const hook of hooks)
-    result = await hook({ path, locale, html: result, file })
+    result = await hook({ path, locale, html: result, file, ...sizes })
 
   return result
 }

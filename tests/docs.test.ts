@@ -1,6 +1,6 @@
 import type { RenderedPage } from 'kay/server'
 import { readFileSync } from 'node:fs'
-import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises'
+import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { brotliCompressSync } from 'node:zlib'
@@ -18,6 +18,7 @@ import { compileKay, formatDiagnostic } from '../src/compiler'
 import { LINTS } from '../src/compiler/lints'
 import { formatKay } from '../src/format'
 import { sendValue } from '../src/runtime/send'
+import { pageSizes } from '../src/server/page-hook'
 import { scratchDir } from './scratch'
 
 const root = join(import.meta.dir, '..')
@@ -363,8 +364,8 @@ describe('the documentation\'s colours', () => {
   })
 })
 
-const FILES: Record<string, string> = { '/app.css': 'a { color: red }', '/logo.svg': '<svg></svg>', '/favicon.ico': 'icon'.repeat(500), '/favicon.svg': '<svg viewBox="0 0 32 32"/>', '/entry.js': 'export {}', '/apple-touch-icon.png': 'touch' }
-const PAGE_WEIGHT_CACHE = join(import.meta.dir, '..', 'docs', '.kay', 'cache', 'page-weight')
+// Text under 256 bytes is served as it is, so the files a first visit sizes as brotli are longer.
+const FILES: Record<string, string> = { '/app.css': 'a { color: red }\n'.repeat(60), '/logo.svg': '<svg><path d="M0 0h10v10z"/></svg>'.repeat(20), '/favicon.ico': 'icon'.repeat(500), '/favicon.svg': '<svg viewBox="0 0 32 32"><path d="M0 0h32v32z"/></svg>'.repeat(10), '/entry.js': 'export const run = () => {}\n'.repeat(30), '/small.js': 'export {}', '/apple-touch-icon.png': 'touch' }
 const WEIGHT = /This page: ([\d.]+) KB\./
 let dir: string
 
@@ -380,7 +381,9 @@ const brotli = (text: string) => brotliCompressSync(text).length
 const markup = (head: string, body = '') => `<html><head><link rel="stylesheet" href="/app.css"><link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">${head}</head><body>${body}<footer><span data-page-weight></span></footer></body></html>`
 
 async function transform(head: string, body = ''): Promise<string> {
-  return pageWeight.transformPage!({ path: '/', locale: 'en', html: markup(head, body), file: async url => url in FILES ? join(dir, url) : undefined })
+  const file = async (url: string) => url in FILES ? join(dir, url) : undefined
+
+  return pageWeight.transformPage!({ path: '/', locale: 'en', html: markup(head, body), file, ...pageSizes(file) })
 }
 
 describe('the docs footer\'s page weight', () => {
@@ -398,36 +401,16 @@ describe('the docs footer\'s page weight', () => {
     expect(Number(WEIGHT.exec(html)?.[1])).toBe(Number(((brotli(html) + linked) / 1024).toFixed(1)))
   })
 
-  it('keeps the size it measured for a page between builds, and measures it again when the kept one is unreadable', async () => {
-    const body = `<p>${Array.from({ length: 300 }, () => crypto.randomUUID()).join(' ')}</p>`
-    const html = markup('', body)
-    const first = await transform('', body)
-    // Named by the page it measured, which the random body makes this test's own.
-    const prefix = `page-${Bun.hash(html)}-${html.length}-`
-    const entry = join(PAGE_WEIGHT_CACHE, (await readdir(PAGE_WEIGHT_CACHE, { recursive: true })).find(name => name.includes(prefix))!)
+  it('counts a file kay serves as it is, being too small to compress, by its own length', async () => {
+    const html = await transform('<script type="module" src="/small.js"></script>')
+    const linked = brotli(FILES['/app.css']!) + FILES['/small.js']!.length + FILES['/favicon.ico']!.length
 
-    await Bun.write(entry, '1')
-
-    const small = Number(WEIGHT.exec(await transform('', body))?.[1])
-
-    expect(small).toBeLessThan(Number(WEIGHT.exec(first)?.[1]))
-
-    await Bun.write(entry, 'not a size')
-
-    expect(await transform('', body)).toBe(first)
-    expect(Number.isSafeInteger(Number(await Bun.file(entry).text()))).toBe(true)
-
-    // A directory where the size should be cannot be read, and the page is measured again all the same.
-    await rm(entry)
-    await mkdir(entry)
-
-    expect(await transform('', body)).toBe(first)
-
-    await rm(entry, { recursive: true })
+    expect(Number(WEIGHT.exec(html)?.[1])).toBe(Number(((brotli(html) + linked) / 1024).toFixed(1)))
   })
 
   it('leaves a page without the footer as it is', async () => {
-    const page: RenderedPage = { path: '/404', locale: 'en', html: '<p>Nothing here</p>', file: async () => undefined }
+    const file = async () => undefined
+    const page: RenderedPage = { path: '/404', locale: 'en', html: '<p>Nothing here</p>', file, ...pageSizes(file) }
 
     expect(await pageWeight.transformPage!(page)).toBe(page.html)
   })

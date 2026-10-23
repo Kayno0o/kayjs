@@ -137,18 +137,14 @@ An extension listed in `extensions` in kay.config.ts can carry `transformPage`, 
 
 ```ts
 import type { KayExtension } from 'kay/server'
-import { promisify } from 'node:util'
-import { brotliCompress } from 'node:zlib'
 
 const LINK = /(?:href|src)="([^"]+)"/g
-const brotli = promisify(brotliCompress)
 
 export const pageWeight: KayExtension = {
   name: 'page-weight',
-  async transformPage({ html, file }) {
-    const files = await Promise.all([...html.matchAll(LINK)].map(async ([, url]) => file(url!)))
-    const linked = await Promise.all(files.filter(found => found !== undefined).map(async found => (await brotli(await Bun.file(found).bytes())).length))
-    const bytes = (await brotli(html)).length + linked.reduce((sum, size) => sum + size, 0)
+  async transformPage({ html, fileSize, htmlSize }) {
+    const linked = await Promise.all([...html.matchAll(LINK)].map(async ([, url]) => fileSize(url!)))
+    const bytes = await htmlSize(html) + linked.reduce<number>((sum, size) => sum + (size ?? 0), 0)
 
     return html.replace('<!--weight-->', `${Math.round(bytes / 1024)} KB`)
   },
@@ -164,6 +160,8 @@ export const pageWeight: KayExtension = {
 - `file(url)` gives the absolute path of the file serving a root-relative URL the page links, under the base and as an attribute holds it, `&amp;` included: a stylesheet, script or font of the build, an image variant, a public file or a favicon.
 - It gives `undefined` for any other, such as another site's or one only the server answers, as the public environment.
 - An image route URL in a server build gives the WebP variant the build wrote, where a browser taking AVIF gets the AVIF one.
+- `fileSize(url)` gives the bytes a browser downloads for the file `file` finds, or `undefined` when it finds none: the brotli copy `kay build` keeps for the file, or the file's own length when it is not compressed, under 256 bytes or saved little by the copy. `htmlSize(html)` gives the same for HTML in hand, as the build would write it: the page as returned, or a variant of it to measure.
+- The sizes come from the copies the compress stage writes, found again there, so a hook never compresses what kay does: a file is compressed once per version of it however many pages link it, and a rebuild reads the copies of what did not change. A hook measuring a page that holds its own size compresses the page once more for it, as the page changes with the number.
 
 #### Server islands
 

@@ -158,7 +158,7 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
 
   // Rendered here rather than prerendered, so it goes through the page hooks as it is written.
   if (missing.status === 404 && missing.headers.get('content-type')?.startsWith('text/html')) {
-    const files = assetFiles({ clientDir: client.dir, publicDir, base: basePath(config.base), aspects: config.images?.aspects })
+    const files = assetFiles({ clientDir: client.dir, publicDir, base: basePath(config.base), aspects: config.images?.aspects, copiesOf: cachedCopies(cacheDir(root, 'compressed')) })
 
     await Bun.write(join(out, '404.html'), await applyPageHooks(pageHooks(config.extensions), '/404.html', pages.locale, await missing.text(), files))
     written.push(join(out, '404.html'))

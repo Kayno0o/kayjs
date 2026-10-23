@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## 1.75.0
 
+- A page hook is given `fileSize(url)` and `htmlSize(html)`, the compressed sizes a browser downloads, read from the copies the compress stage keeps so that a hook measuring page weight compresses no file twice ([Page hooks](prerendering.md#page-hooks)).
 - A rebuild no longer gets a new stylesheet when the app's CSS has `@source '../.kay/classes.txt'`: `.kay` holds a `.gitignore` of everything but the `kay/test` scratch projects, so Tailwind reads that one file and not the build's own output ([Styles and assets](styles-and-assets.md)).
 
 ## 1.74.0

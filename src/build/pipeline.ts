@@ -487,14 +487,15 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   await Bun.write(join(client.dir, NOTICES_FILE), thirdPartyNotices(shippedPackages(project, client)))
 
   const hooks = pageHooks(config.extensions)
+  // The hooks' size reads and the compress stage share these copies, so a file a hook measured is compressed once.
+  const copies = cachedCopies(cacheDir(root, 'compressed'))
 
   if (hooks.length > 0)
     report({ step: 'running page hooks' })
 
-  await hookPrerendered(root, hooks, { clientDir: client.dir, publicDir: paths.public, base: basePath(config.base), aspects: config.images?.aspects }, paths.output)
+  await hookPrerendered(root, hooks, { clientDir: client.dir, publicDir: paths.public, base: basePath(config.base), aspects: config.images?.aspects, copiesOf: copies }, paths.output)
   lap('page hooks')
   report({ step: 'compressing' })
-  const copies = cachedCopies(cacheDir(root, 'compressed'))
 
   await Promise.all([compressFiles(client.dir, copies), compressFiles(join(paths.output, PRERENDERED_DIR), copies)])
   await writeDictionaryCopies(join(paths.output, PRERENDERED_DIR), client)
