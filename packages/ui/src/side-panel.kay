@@ -128,11 +128,13 @@ function startResize(event: PointerEvent) {
     handle.removeEventListener('pointermove', move)
     handle.removeEventListener('pointerup', end)
     handle.removeEventListener('pointercancel', end)
+    const kept = shownSize()
+
     dragging.set(false)
 
     // A bare click on the grip settles nothing.
     if (moved)
-      resizeTo(shownSize(), true)
+      resizeTo(kept, true)
   }
 
   event.preventDefault()
