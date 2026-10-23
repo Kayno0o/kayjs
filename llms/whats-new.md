@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.72.0
 
 - kayjs-mail: a list store that was closed leaves the sweep, so a later app of the process logs no "could not be swept" warning for it.
 - A cms rename whose old address the full redirect set refuses toasts the editor why it will not redirect ([Rename](../packages/cms/llms/rename.md)).
@@ -45,10 +45,6 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui's `SplitLayout` on a phone makes the list and detail `inert` under the open sidebar overlay, focuses a pane when it opens and gives focus back when it closes ([Page layout](../packages/ui/llms/page-layout-palette-and-trees.md)).
 - kayjs-ui's `MarkdownEditor` preview puts the HTML it is given through `sanitizeHtml`, so a script, handler or `javascript:` link in the text never runs; `previewTrusted` keeps the old insert-as-is for a renderer that sanitizes already ([Forms](../packages/ui/llms/forms.md)).
 - kayjs-auth's OAuth server serves and advertises an RFC 7009 revocation endpoint (`/auth/oauth/revoke`), an `oauthServer` with no `scopes` warns at boot, and an organization invitation stops working once its sender can no longer grant it ([OAuth server](../packages/auth/llms/oauth-server-and-tokens.md), [Organizations](../packages/auth/llms/admin-and-organizations.md)).
-- kayjs-auth erases a deleted user's kay notifications and, with kayjs-mail, their address from its mailing lists, and `exportData` lists both; kayjs-mail gains `mail.subscriptions(address)` ([Account](../packages/auth/llms/oauth-passkeys-two-factor.md), [Mailing lists](../packages/mail/llms/mailing-list.md)).
-- kayjs-auth: an OAuth token asked for one `resource` passes only on requests to that resource or under its path, and gets a 401 elsewhere ([OAuth server](../packages/auth/llms/oauth-server-and-tokens.md)).
-- kayjs-ui has a `SubscribeForm` for kayjs-mail's list action, as ContactForm is for the contact one: a required email tied to its message by `aria-describedby`, a notice saying what the address is used for with a `privacy` link, and the proof of consent the list keeps ([Forms and Steps](../packages/ui/llms/forms-and-steps.md)); kayjs-mail's own `SubscribeForm` and confirmation mail say the same, and `mail.list(name, { title, privacy })` names the list and its policy ([A mailing list](../packages/mail/llms/mailing-list.md)).
-- kayjs-mail's `contactForm` queues the mail instead of sending it in the request, so a slow or absent relay no longer holds the visitor up or loses the message; it takes a mailer's `enqueue` rather than `send`, and a test waits for the mail with `outbox.waitFor(address, { site })` ([The contact form](../packages/mail/llms/contact-form-and-testing.md)).
 
 The rest of this release is in [What's new, older releases](whats-new-archive.md).
 

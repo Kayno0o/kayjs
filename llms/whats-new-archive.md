@@ -2,7 +2,7 @@
 
 What each release before 1.72 added, and the end of a newest release that was cut short (`(continued)`), newest first, each feature with where it is documented. The newer releases are in [What's new](whats-new.md); what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased (continued)
+## 1.72.0 (continued)
 
 - kayjs-cms drops its trash and, past `history.maxAge` (a year by default), its old revisions and activity on an hourly sweep, erases one entry from the trash, the revisions and the activity log with an Erase for good button (`delete` role), and `forgetEditor(name)` rewrites an editor's name there ([Personal data](../packages/cms/llms/history.md#personal-data)).
 - kayjs-cms's unused-upload cleanup keeps the uploads a revision or a trashed entry still mentions ([Clean up unused uploads](../packages/cms/llms/uploads.md#clean-up-unused-uploads)).
@@ -62,3 +62,9 @@ What each release before 1.72 added, and the end of a newest release that was cu
 - kayjs-auth serves organization pages in the account area (members, roles, invitations) and an invitation page that invitation mails open by default, with no declaration beyond `organizations` ([Organization pages](../packages/auth/llms/organization-pages.md)).
 
 Releases before 1.72 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
+
+- kayjs-auth erases a deleted user's kay notifications and, with kayjs-mail, their address from its mailing lists, and `exportData` lists both; kayjs-mail gains `mail.subscriptions(address)` ([Account](../packages/auth/llms/oauth-passkeys-two-factor.md), [Mailing lists](../packages/mail/llms/mailing-list.md)).
+- kayjs-auth: an OAuth token asked for one `resource` passes only on requests to that resource or under its path, and gets a 401 elsewhere ([OAuth server](../packages/auth/llms/oauth-server-and-tokens.md)).
+- kayjs-ui has a `SubscribeForm` for kayjs-mail's list action, as ContactForm is for the contact one: a required email tied to its message by `aria-describedby`, a notice saying what the address is used for with a `privacy` link, and the proof of consent the list keeps ([Forms and Steps](../packages/ui/llms/forms-and-steps.md)); kayjs-mail's own `SubscribeForm` and confirmation mail say the same, and `mail.list(name, { title, privacy })` names the list and its policy ([A mailing list](../packages/mail/llms/mailing-list.md)).
+- kayjs-mail's `contactForm` queues the mail instead of sending it in the request, so a slow or absent relay no longer holds the visitor up or loses the message; it takes a mailer's `enqueue` rather than `send`, and a test waits for the mail with `outbox.waitFor(address, { site })` ([The contact form](../packages/mail/llms/contact-form-and-testing.md)).
+
