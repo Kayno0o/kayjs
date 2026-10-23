@@ -108,8 +108,9 @@ See [Rate limits](rate-limits.md#limit-attempts-in-a-guard-or-an-api-route).
 
 ### Body limit
 
-- A request to an action or an API route sends at most `maxSize`, 1 MB unless kay.config.ts sets another: `maxSize: '4mb'`, a size as `budget` takes it (`'800b'`, `'512kb'`, `'1.5mb'`) or a number of bytes.
+- A request with a body to any route, a library's, an extension's or the jobs page included, sends at most `maxSize`, 1 MB unless kay.config.ts sets another: `maxSize: '4mb'`, a size as `budget` takes it (`'800b'`, `'512kb'`, `'1.5mb'`) or a number of bytes.
 - An action raises or lowers it for itself, `action(schema, handler, { maxSize: '20mb' })`, and an API module for its routes, `api({ maxSize })`, a size or a function kay reads when it mounts the module (a library reading its own settings).
 - A bigger request is refused before anything reads it, from its `Content-Length`, or, sent in chunks without one, as soon as it passes the limit.
 - A plain form post goes back to its page with `errors['']` saying the most it may send, an island's call throws `ActionError` with status 413 and that error, and an API route answers 413.
-- Bun's own cap, 128 MB unless `new Elysia({ serve: { maxRequestBodySize } })` sets another, holds whatever `maxSize` says, and it alone limits the app's own routes.
+- A route of an extension raises its own through the extension's `maxSize` ([Component libraries](component-libraries.md)); a route you add with `new Elysia().post()` has the app's, raised only by `maxSize` in kay.config.ts.
+- Bun's own cap, 128 MB unless `new Elysia({ serve: { maxRequestBodySize } })` sets another, still holds over any `maxSize`.

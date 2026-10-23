@@ -246,7 +246,7 @@ Both take a `difficulty`, 100,000 by default, and `workChallenge` takes a `maxAg
 
 ## The request body limit
 
-An action or an API route accepts 1 MB at most. A limit is a size, `'4mb'`, `'512kb'` or `'800b'`, or a number of bytes. A larger request is refused before anything reads it.
+Any route that takes a body accepts 1 MB at most, an action, an API route, a library's or one you add yourself. A limit is a size, `'4mb'`, `'512kb'` or `'800b'`, or a number of bytes. A larger request is refused before anything reads it.
 
 ```ts
 export default defineConfig({
@@ -256,7 +256,7 @@ export default defineConfig({
 
 Raise it for one action in its third argument, `{ maxSize: '20mb' }`, for an API module with `api({ maxSize })`, or for one route with `detail: { maxSize }`. A form that takes files usually needs this.
 
-A form post goes back to its page with a message, an island's call throws an `ActionError` with status 413, and an API route answers 413. Bun's own cap of 128 MB still holds over any `maxSize`.
+A form post goes back to its page with a message, an island's call throws an `ActionError` with status 413, and an API route answers 413. A library that needs more for one route declares it itself. Bun's own cap of 128 MB still holds over any `maxSize`.
 
 <ReadMore href="/llms/action-protection#body-limit">The refusal message in your own words, and the cap on routes that are not actions or API routes.</ReadMore>
 

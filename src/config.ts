@@ -73,7 +73,7 @@ export interface KayConfig {
   security?: SecurityConfig | false | undefined
   // The proxies in front of the server, `true` for one and a number for that many, which the client's address that rate limits count is read through. Without it, or with `false`, the address the server was reached from is the client, so behind a proxy every visitor counts as that proxy.
   proxy?: ProxyConfig | number | boolean | undefined
-  // The most a request to an action or an API route may send (`maxSize`), bytes or a size such as `'4mb'`, 1 MB by default; an action or an `api()` module raises or lowers it for itself. A bigger one answers 413 before it is read.
+  // The most a request with a body to any route may send (`maxSize`), bytes or a size such as `'4mb'`, 1 MB by default; an action or an `api()` module raises or lowers it for itself. A bigger one answers 413 before it is read.
   maxSize?: ByteSize | undefined
   /** @deprecated The old name of `maxSize`, kept three minors. */
   bodyLimit?: ByteSize | undefined
@@ -441,6 +441,8 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   needsServer?: boolean | undefined
   // Set when the extension counts visitors only after their yes on the `kay_analytics` cookie, so another extension measuring visitors, such as `vitals()`, waits for the same yes.
   asksConsent?: boolean | undefined
+  // The most a request to the extension's routes may send, by path: the route itself and what is under it, bytes or a size such as '8mb', in place of the app's `maxSize` that every other route with a body has.
+  maxSize?: Record<string, ByteSize> | undefined
   // Files a static export writes into the site, by their path, for what the extension's server would otherwise serve as a constant, such as a script every page loads: `kay build --static` runs no server plugin.
   staticFiles?: Record<string, string> | undefined
   // An Elysia plugin `pages()` uses before the pages, actions and API modules, so its derives reach their `ctx.locals` and `kay check` types them; scoped or global hooks reach them, local ones only the plugin's own routes.

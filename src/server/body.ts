@@ -1,5 +1,6 @@
 import type { Elysia } from 'elysia'
 import type { Server } from 'elysia/universal'
+import type { KayExtension } from '../config'
 import type { ByteSize } from '../runtime/byte-size'
 import { KayError } from '../compiler/errors'
 import { byteSize } from '../runtime/byte-size'
@@ -45,7 +46,8 @@ function specificity(path: string): number {
   return path.split('/').filter(segment => segment.startsWith(':') || segment === '*').length
 }
 
-// Refuses a request to an action or an API route sending more than its limit, before Elysia reads the body: actions by their path, API modules by the path they are mounted at, and the routes of a module that set their own by their pattern.
+// Refuses a request sending more than its limit, before Elysia reads the body: actions by their path, API modules by the path they are mounted at, and the routes of a module that set their own by their pattern.
+// Any other route with a body (a library's, an extension's, the jobs page) has the app-wide limit.
 export function limitBodies(app: Elysia, size: ByteSize, actionSizes: Map<string, BodyLimit>, mountSizes: Map<string, BodyLimit>, routeSizes: RouteBodyLimit[] = []): void {
   const bytes = checkLimit(size, 'maxSize')
   const inBytes = ({ bytes: own, refuse }: BodyLimit, name: string) => ({ bytes: own === undefined ? undefined : checkLimit(own, name), refuse })
@@ -67,8 +69,28 @@ export function limitBodies(app: Elysia, size: ByteSize, actionSizes: Map<string
     const limit = own?.limit ?? actions.get(path) ?? prefixes.find(([mount]) => path === mount || path.startsWith(`${mount}/`))?.[1]
     const allowed = limit?.bytes ?? bytes
 
-    return limit && await exceeds(request, allowed) ? limit.refuse(request, allowed, server) : undefined
+    return await exceeds(request, allowed) ? (limit ?? { refuse: refusePlainly }).refuse(request, allowed, server) : undefined
   })
+}
+
+// The limits the extensions declare for their routes, answered with a plain 413 as the routes of no limit are.
+export function extensionLimits(extensions: KayExtension[] | undefined): Map<string, BodyLimit> {
+  const limits = new Map<string, BodyLimit>()
+
+  for (const { name, maxSize } of extensions ?? []) {
+    for (const [path, bytes] of Object.entries(maxSize ?? {})) {
+      if (!path.startsWith('/'))
+        throw new KayError('config-invalid', `kay: the maxSize of the extension ${name} names ${JSON.stringify(path)}, which does not start with a slash`)
+
+      limits.set(withoutSlash(path), { bytes, refuse: refusePlainly })
+    }
+  }
+
+  return limits
+}
+
+function refusePlainly(): Response {
+  return new Response('Payload Too Large', { status: 413, headers: { 'content-type': 'text/plain; charset=utf-8' } })
 }
 
 // `Content-Length` frames the body, so it is the size when sent; a body sent in chunks without it is counted on a copy, only up to the limit, leaving the request's own for Elysia to read.

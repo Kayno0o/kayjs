@@ -17,6 +17,9 @@ A token the OAuth server issued for a `resource` (the `/mcp` an MCP client asks 
 ### kayjs-cms drops revisions and activity older than a year
 
 A cms server now sweeps every hour: revisions and activity events older than `history.maxAge` (`'365d'` by default) go, the newest revision of each entry excepted, and the trash goes at `history.trash`. An app that keeps its history longer sets `history: { maxAge: false }`; see [History](../packages/cms/llms/history.md).
+### Every route with a body is capped at `maxSize`
+
+A request over `maxSize` (1 MB by default) to a route of your own (`new Elysia().post()`), an extension or the jobs page now answers 413, where only Bun's 128 MB limited it. A route taking more raises `maxSize` in kay.config.ts, and an extension's route declares its own in the extension's `maxSize`.
 
 ### kayjs-ui props take enum values: `variant`, `size` and `pixels`
 
