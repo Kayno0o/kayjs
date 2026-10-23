@@ -8,7 +8,7 @@ export const USAGES = {
   'start': 'start [dir] [--entry <file>] [--port <port>] [--quiet]',
   'render': 'render <url> [dir] [--entry <file>] [--method <method>] [--body <text>] [--header <name: value>]... [--cookie <name=value>]... [-i|--include] [--quiet]',
   'screenshot': 'screenshot <path> [dir] [--width <px>]... [--height <px>] [--scheme light|dark] [--full-page] [--cookie <name=value>]... [--format text|json]',
-  'a11y': 'a11y [dir] [--standard rgaa|wcag] [--declaration <file>] [--format text|json] [--quiet]',
+  'a11y': 'a11y [dir] [--standard rgaa|wcag] [--declaration <file>] [--dry-run] [--format text|json] [--quiet]',
   'check': 'check [dir] [paths...] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix] [--dry-run] [--only <group>] [--since <minor>] [--format text|github|json] [--watch] [--quiet]',
   'upgrade': 'upgrade [dir] [--dry-run] [--quiet]',
   'routes': 'routes [dir] [--format text|json] [--quiet]',

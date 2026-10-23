@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { mkdir, readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -108,7 +109,7 @@ describe('what a scan decides', () => {
   })
 
   it('fails the run for a finding or a page the site got wrong, not for a page left out', () => {
-    const page = { path: '/admin', route: '/admin', file: 'src/routes/admin.kay', why: 'it answers 401' }
+    const page = { path: '/admin', route: '/admin', file: 'src/routes/admin.kay', why: 'it answers 401', whyFr: 'elle répond 401' }
 
     expect(failed({ audited: audit.audited, violations: [], skipped: [{ ...page, failed: false }] })).toBe(false)
     expect(failed({ audited: audit.audited, violations: [], skipped: [{ ...page, failed: true }] })).toBe(true)
@@ -195,6 +196,7 @@ describe.skipIf(skipBrowser)('kay a11y on a site', () => {
 
     expect(drafted).toContain('Déclaration d\'accessibilité')
     expect(drafted).toContain('/boom')
+    expect(drafted).toContain('elle répond 500')
   }, 180_000)
 
   it('exits 0 for a site with nothing to report, and drafts its statement where it is asked', async () => {
@@ -205,5 +207,15 @@ describe.skipIf(skipBrowser)('kay a11y on a site', () => {
     expect(stdout).toContain('1 page audited, 0 not audited, 0 findings')
     expect(stdout).toContain('WCAG:')
     expect(await readFile(file, 'utf8')).toContain('Accessibility statement')
+  }, 120_000)
+
+  it('audits and prints with --dry-run, and writes no draft', async () => {
+    const file = join(clean, 'out', 'dry.md')
+    const { code, stdout } = await run(clean, ['.', '--declaration', file, '--dry-run'])
+
+    expect(code).toBe(0)
+    expect(stdout).toContain('Draft statement, not written')
+    expect(existsSync(file)).toBe(false)
+    expect(existsSync(join(clean, '.kay', 'a11y', 'declaration.md'))).toBe(false)
   }, 120_000)
 })

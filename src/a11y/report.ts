@@ -133,7 +133,7 @@ export function declaration(report: A11yReport, date = new Date().toISOString().
   const out: string[] = [`# ${words.title}`, '', `> ${words.note(date, report.audited.length, counts, report.criteria.length)}`, '', `## ${words.state}`, '', words.stateText, '', `## ${words.audited}`, '']
 
   out.push(...report.audited.length === 0 ? [words.none] : report.audited.map(page => `- \`${page.path}\` (${page.file})`), '', `## ${words.skipped}`, '')
-  out.push(...report.skipped.length === 0 ? [words.none] : report.skipped.map(page => `- \`${page.path}\` (${page.file}): ${page.why}`), '', `## ${words.results}`, '')
+  out.push(...report.skipped.length === 0 ? [words.none] : report.skipped.map(page => `- \`${page.path}\` (${page.file}): ${report.standard === 'rgaa' ? page.whyFr : page.why}`), '', `## ${words.results}`, '')
 
   if (report.standard === 'rgaa') {
     for (const [index, theme] of RGAA_THEMES.entries()) {

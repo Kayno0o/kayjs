@@ -41,7 +41,7 @@ kay screenshot /account --cookie kay_session=abc123
 
 ### Audit a site's accessibility
 
-`kay a11y [dir] [--standard rgaa|wcag] [--declaration <file>] [--format text|json] [--quiet]` boots the project's server as `kay dev` does, opens every page the build knows in one headless Chrome (`BUN_CHROME_PATH`, else the PATH) and runs axe-core on it; it needs no config:
+`kay a11y [dir] [--standard rgaa|wcag] [--declaration <file>] [--dry-run] [--format text|json] [--quiet]` boots the project's server as `kay dev` does, opens every page the build knows in one headless Chrome (`BUN_CHROME_PATH`, else the PATH) and runs axe-core on it; it needs no config:
 
 ```sh
 kay a11y

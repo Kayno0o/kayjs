@@ -78,7 +78,7 @@ export async function auditSite(root: string, config: KayConfig, progress: (path
       const why = await refusal(url)
 
       if (why !== undefined) {
-        skipped.push({ path: target.path, route: target.route, file: target.file, why: why.why, failed: why.failed })
+        skipped.push({ path: target.path, route: target.route, file: target.file, ...why })
 
         continue
       }
@@ -104,7 +104,7 @@ export async function auditSite(root: string, config: KayConfig, progress: (path
         const landed = await page.path()
 
         if (landed !== new URL(url).pathname) {
-          skipped.push({ path: target.path, route: target.route, file: target.file, why: `it lands on ${landed}`, failed: false })
+          skipped.push({ path: target.path, route: target.route, file: target.file, why: `it lands on ${landed}`, whyFr: `elle redirige vers ${landed}`, failed: false })
 
           continue
         }
@@ -115,7 +115,9 @@ export async function auditSite(root: string, config: KayConfig, progress: (path
         result.violations.push(...violations)
       }
       catch (error) {
-        skipped.push({ path: target.path, route: target.route, file: target.file, why: `the browser could not check it: ${error instanceof Error ? error.message : String(error)}`, failed: true })
+        const message = error instanceof Error ? error.message : String(error)
+
+        skipped.push({ path: target.path, route: target.route, file: target.file, why: `the browser could not check it: ${message}`, whyFr: `le navigateur n'a pas pu la vérifier : ${message}`, failed: true })
         page?.close()
         page = undefined
       }
@@ -131,14 +133,16 @@ export async function auditSite(root: string, config: KayConfig, progress: (path
 }
 
 // What the server answers a page with before the browser opens it: only a 200 is audited, as a redirect lands on another page and a refusal is a sign-in the audit has none for.
-async function refusal(url: string): Promise<{ why: string, failed: boolean } | undefined> {
+async function refusal(url: string): Promise<Pick<Skipped, 'why' | 'whyFr' | 'failed'> | undefined> {
   let response: Response
 
   try {
     response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(ANSWER_MS) })
   }
   catch (error) {
-    return { why: `the server did not answer: ${error instanceof Error ? error.message : String(error)}`, failed: true }
+    const message = error instanceof Error ? error.message : String(error)
+
+    return { why: `the server did not answer: ${message}`, whyFr: `le serveur n'a pas répondu : ${message}`, failed: true }
   }
 
   await response.body?.cancel()
@@ -147,12 +151,12 @@ async function refusal(url: string): Promise<{ why: string, failed: boolean } | 
     return undefined
 
   if (REDIRECTS.has(response.status))
-    return { why: `it redirects to ${response.headers.get('location') ?? 'another page'}`, failed: false }
+    return { why: `it redirects to ${response.headers.get('location') ?? 'another page'}`, whyFr: `elle redirige vers ${response.headers.get('location') ?? 'une autre page'}`, failed: false }
 
   if (response.status === 401 || response.status === 403)
-    return { why: `it answers ${response.status}: it needs a signed-in user`, failed: false }
+    return { why: `it answers ${response.status}: it needs a signed-in user`, whyFr: `elle répond ${response.status} : elle demande un utilisateur connecté`, failed: false }
 
-  return { why: `it answers ${response.status}`, failed: response.status >= 500 }
+  return { why: `it answers ${response.status}`, whyFr: `elle répond ${response.status}`, failed: response.status >= 500 }
 }
 
 async function check(page: TestPage, target: Target): Promise<Violation[]> {

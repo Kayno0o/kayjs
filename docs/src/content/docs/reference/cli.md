@@ -393,6 +393,7 @@ A criterion is verified only when axe-core fully decides it and every page was a
 | Option | Effect |
 | --- | --- |
 | `--standard rgaa\|wcag` | The criteria the draft lists, RGAA by default for a French site |
+| `--dry-run` | Audits and prints, and writes no draft |
 | `--declaration <file>` | Where the draft is written |
 | `--format text\|json` | One JSON document with the pages, the findings and the criteria |
 | `--quiet` | Do not print each page as it is opened |
@@ -737,6 +738,7 @@ Colour only goes to a terminal, and not under `NO_COLOR` or `TERM=dumb`. `FORCE_
 | `kay generate` | `{ kind, name, written, dryRun }` |
 | `kay new` | `{ dir, features, files, dryRun }` |
 | `kay types` | `{ files, dir }` |
+| `kay a11y` | `{ audited, skipped, violations, standard, criteria, unfiled, declaration, dryRun }`, the audited and skipped pages with their `path`, `route` and `file`, each violation with its `rule`, `route` and `nodes` |
 
 A command that cannot run, such as on a directory that does not exist, prints `{ errors: 1, warnings: 0, problems: [{ severity, code: null, message }] }`. Paths are relative to the current directory.
 

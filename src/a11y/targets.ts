@@ -22,6 +22,8 @@ export interface Skipped {
   route: string
   file: string
   why: string
+  // The same reason in French, for the RGAA draft.
+  whyFr: string
   failed: boolean
 }
 
@@ -37,14 +39,14 @@ export async function pagesToAudit(root: string, config: KayConfig): Promise<{ t
 
   for (const route of pages) {
     const file = relative(root, route.file)
-    const left = (why: string, failed: boolean, path = route.pattern) => skipped.push({ path, route: route.pattern, file, why, failed })
+    const left = (why: string, whyFr: string, failed: boolean, path = route.pattern) => skipped.push({ path, route: route.pattern, file, why, whyFr, failed })
 
     try {
       const module = await import(route.file) as object
       const name = (['sitemap', 'prerender'] as const).find(each => pageSetting(module, each) !== undefined)
 
       if (route.params.length > 0 && name === undefined) {
-        left(`it takes ${route.params.join(', ')} and lists no values: add \`prerender\` or \`sitemap\` to its \`page\` export`, false)
+        left(`it takes ${route.params.join(', ')} and lists no values: add \`prerender\` or \`sitemap\` to its \`page\` export`, `elle prend ${route.params.join(', ')} sans en lister les valeurs : ajouter \`prerender\` ou \`sitemap\` à son export \`page\``, false)
 
         continue
       }
@@ -58,12 +60,14 @@ export async function pagesToAudit(root: string, config: KayConfig): Promise<{ t
           if (copy.host === undefined)
             targets.push({ path, route: route.pattern, file, locale: copy.locale })
           else
-            left(`its ${copy.locale} copy is served on ${copy.host}, which a browser here cannot reach by name`, false, path)
+            left(`its ${copy.locale} copy is served on ${copy.host}, which a browser here cannot reach by name`, `sa copie ${copy.locale} est servie sur ${copy.host}, qu'un navigateur d'ici ne peut pas joindre par son nom`, false, path)
         }
       }
     }
     catch (error) {
-      left(`it cannot be listed: ${error instanceof Error ? error.message : String(error)}`, true)
+      const message = error instanceof Error ? error.message : String(error)
+
+      left(`it cannot be listed: ${message}`, `elle ne peut pas être listée : ${message}`, true)
     }
   }
 
