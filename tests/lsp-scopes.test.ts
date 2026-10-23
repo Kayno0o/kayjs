@@ -145,6 +145,7 @@ describe('semantic tokens of a broken import and of props read as text', () => {
     expect(splitEntries('a, "b, c', 0, 5)).toEqual([[0, 1], [2, 5]])
     expect(splitEntries('a, /* b, c', 0, 5)).toEqual([[0, 1], [2, 5]])
     expect(splitEntries('a, // x, y', 0, 6)).toEqual([[0, 1], [2, 6]])
+    expect(splitEntries('a, // x\n, y', 0, 6)).toEqual([[0, 1], [2, 6]])
   })
 
   it('knows the signals the script fence imports in a module fence it cannot parse', () => {
