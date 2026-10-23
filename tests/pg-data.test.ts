@@ -146,13 +146,20 @@ pgDescribe('pgData', () => {
     const held = new Promise<void>((resolve) => {
       release = resolve
     })
+    let snapshotTaken!: () => void
+    const snapshot = new Promise<void>((resolve) => {
+      snapshotTaken = resolve
+    })
     const holding = holder.begin('ISOLATION LEVEL REPEATABLE READ', async (tx) => {
       // Its snapshot makes the build wait for it, so the index stays invalid while the second replica starts.
       await tx.unsafe('SELECT count(*) FROM kay_jobs')
+      snapshotTaken()
       await held
     })
     const building = async (): Promise<boolean> => (await rows<{ found: boolean }>(sql, 'SELECT EXISTS (SELECT 1 FROM pg_stat_progress_create_index WHERE index_relid = to_regclass(\'kay_jobs_due\')) AS found'))[0]!.found
     const build = (async (): Promise<void> => {
+      await snapshot
+
       try {
         await first.unsafe(indexStatement({ name: 'kay_jobs_due', on: 'kay_jobs (queue, failed, run_at)' }, true))
       }
@@ -202,12 +209,20 @@ pgDescribe('pgData', () => {
     const held = new Promise<void>((resolve) => {
       release = resolve
     })
+    let snapshotTaken!: () => void
+    const snapshot = new Promise<void>((resolve) => {
+      snapshotTaken = resolve
+    })
     const holding = holder.begin('ISOLATION LEVEL REPEATABLE READ', async (tx) => {
       await tx.unsafe('SELECT count(*) FROM kay_jobs')
+      snapshotTaken()
       await held
     })
     const building = async (): Promise<boolean> => (await rows<{ found: boolean }>(sql, 'SELECT EXISTS (SELECT 1 FROM pg_stat_progress_create_index WHERE index_relid = to_regclass(\'kay_jobs_key\')) AS found'))[0]!.found
-    const build = createDataTables(first)
+    const build = (async (): Promise<void> => {
+      await snapshot
+      await createDataTables(first)
+    })()
     const job = (id: string): Parameters<ReturnType<typeof pgJobs>['add']>[0] => ({ id, queue: 'q', payload: '{}', attempts: 0, runAt: 0, key: 'same' })
     const store = pgJobs(second)
     let added = 0

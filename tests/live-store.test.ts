@@ -350,16 +350,26 @@ process.exit(0)`)
   })
 })
 
+// A sleep overshoots on a loaded runner, so a value is only expected alive while the clock has not passed its end after the read.
+function expectAliveBefore<T>(endsAt: number, read: () => T, expected: T): void {
+  const value = read()
+
+  if (Date.now() < endsAt)
+    expect(value).toEqual(expected)
+}
+
 describe('a live value with a lifetime', () => {
   it('goes back to what the declaration gives once its lifetime passed, and tells the watchers', async () => {
     const mortal = declareTtl(0, 'test:ttl-memory', 'ttlMemory', { ttl: '300ms' })
     const heard: number[] = []
 
     watchSlot(liveSlot('test:ttl-memory')!, '', () => heard.push(mortal()))
+    const endsAt = Date.now() + 300
+
     mortal.set(5)
     expect(mortal()).toBe(5)
     await Bun.sleep(100)
-    expect(mortal()).toBe(5)
+    expectAliveBefore(endsAt, mortal, 5)
     await Bun.sleep(400)
     expect(mortal()).toBe(0)
     expect(heard).toEqual([5, 0])
@@ -370,9 +380,12 @@ describe('a live value with a lifetime', () => {
 
     mortal.set(5)
     await Bun.sleep(200)
+
+    const endsAt = Date.now() + 300
+
     mortal.set(5)
     await Bun.sleep(200)
-    expect(mortal()).toBe(5)
+    expectAliveBefore(endsAt, mortal, 5)
     await Bun.sleep(300)
     expect(mortal()).toBe(0)
   })
@@ -380,11 +393,22 @@ describe('a live value with a lifetime', () => {
   it('expires each key on its own', async () => {
     const room = declareKeyedTtl(() => 0, 'test:ttl-keyed', 'ttlKeyed', { ttl: '300ms' })
 
+    const aEnds = Date.now() + 300
+
     room.set('a', 1)
     await Bun.sleep(200)
+
+    const bEnds = Date.now() + 300
+
     room.set('b', 2)
     await Bun.sleep(150)
-    expect([room('a'), room('b')]).toEqual([0, 2])
+
+    const [a, b] = [room('a'), room('b')]
+    const read = Date.now()
+
+    if (read >= aEnds && read < bEnds)
+      expect([a, b]).toEqual([0, 2])
+
     await Bun.sleep(250)
     expect([room('a'), room('b')]).toEqual([0, 0])
   })
@@ -454,12 +478,30 @@ describe('a live value with a lifetime', () => {
     hear!('test:ttl-unordered', 'late', '[1]', now + 400)
     hear!('test:ttl-unordered', 'soon', '[2]', now + 100)
     hear!('test:ttl-unordered', 'middle', '[3]', now + 250)
-    await Bun.sleep(180)
-    expect([room('late'), room('soon'), room('middle')]).toEqual([1, 0, 3])
-    await Bun.sleep(120)
-    expect([room('late'), room('middle')]).toEqual([1, 0])
-    await Bun.sleep(200)
-    expect(room('late')).toBe(0)
+
+    // The time each key is first seen gone must not precede its end and must keep the order of the ends, whatever the sleeps overshoot by.
+    const ends = { soon: now + 100, middle: now + 250, late: now + 400 }
+    const gone: Record<string, number> = {}
+    const deadline = now + 5000
+
+    while (Object.keys(gone).length < 3 && Date.now() < deadline) {
+      const values = { soon: room('soon'), middle: room('middle'), late: room('late') }
+      const read = Date.now()
+
+      for (const [key, value] of Object.entries(values)) {
+        if (value === 0)
+          gone[key] ??= read
+      }
+
+      await Bun.sleep(10)
+    }
+
+    expect(Object.keys(gone)).toEqual(['soon', 'middle', 'late'])
+    expect(gone.soon!).toBeLessThanOrEqual(gone.middle!)
+    expect(gone.middle!).toBeLessThanOrEqual(gone.late!)
+    expect(gone.soon!).toBeGreaterThanOrEqual(ends.soon)
+    expect(gone.middle!).toBeGreaterThanOrEqual(ends.middle)
+    expect(gone.late!).toBeGreaterThanOrEqual(ends.late)
     setLiveStore(undefined)
   })
 
@@ -480,7 +522,7 @@ describe('a live value with a lifetime', () => {
       expect(Math.abs((row[2] ?? 0) - Date.now() - 300)).toBeLessThan(200)
 
     await Bun.sleep(150)
-    expect([early(), late()]).toEqual([5, 4])
+    expectAliveBefore(Math.min(...written.map(row => row[2] ?? 0)), () => [early(), late()], [5, 4])
     await Bun.sleep(300)
     expect([early(), late()]).toEqual([0, 0])
     setLiveStore(undefined)
