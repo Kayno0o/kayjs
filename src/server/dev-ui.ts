@@ -120,8 +120,9 @@ function appendProperty(source: string, object: t.ObjectExpression, property: st
   if (last === undefined && inline) {
     // A block comment in the braces stays, the property goes after it.
     const kept = source.slice(start + 1, object.end! - 1).trim()
+    const lead = kept === '' ? '' : `${kept} `
 
-    return { at: start, remove: object.end! - start, text: `{ ${kept === '' ? '' : `${kept} `}${property} }` }
+    return { at: start, remove: object.end! - start, text: `{ ${lead}${property} }` }
   }
 
   if (last === undefined) {
