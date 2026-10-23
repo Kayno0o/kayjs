@@ -6,6 +6,7 @@ import { sqliteCache } from '../src/runtime/cache.server'
 import { solveWork } from '../src/runtime/work'
 import { setupStore } from '../src/server/app-store'
 import { countWrites } from '../src/server/kept-pages'
+import { TimeoutError } from '../src/server/pg-poll'
 import { memoryRates, overLimit } from '../src/server/protection'
 import { sqliteRooms } from '../src/server/rooms'
 import { verifyWork, workChallenge } from '../src/server/work-scope'
@@ -81,6 +82,27 @@ describe('overLimit with a rates store that hangs', () => {
     }
     finally {
       jest.useRealTimers()
+      log.mockRestore()
+    }
+  })
+})
+
+describe('overLimit after a store gave up by itself', () => {
+  it('leaves a store that threw a TimeoutError alone for a while', async () => {
+    const log = spyOn(console, 'warn').mockReturnValue()
+    let calls = 0
+
+    try {
+      setupStore({ rates: { hit: async () => {
+        calls++
+
+        throw new TimeoutError('too slow')
+      } } })
+      await overLimit('gaps-gave-up', '10.0.0.7', 5, 60_000)
+      await overLimit('gaps-gave-up', '10.0.0.7', 5, 60_000)
+      expect(calls).toBe(1)
+    }
+    finally {
       log.mockRestore()
     }
   })

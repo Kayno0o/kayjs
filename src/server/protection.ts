@@ -16,6 +16,7 @@ import { appStore } from './app-store'
 import { nodeNet } from './builtins'
 import { checkRequestIdHeader } from './config-limits'
 import { STORE_TIMEOUT_MS } from './pg-limit'
+import { TimeoutError } from './pg-poll'
 import { onReload } from './reload'
 import { rewrittenAddress } from './rewrite'
 import { sharedKey, stampTime } from './stamp'
@@ -587,7 +588,8 @@ export async function overLimit(name: string, client: string, max: number, windo
       return waitFor(hit, max)
     }
     catch (error) {
-      if (error instanceof RatesTimeout)
+      // A Postgres rates store is under the same limit already, and gives up first with a TimeoutError.
+      if (error instanceof RatesTimeout || error instanceof TimeoutError)
         skipped.set(shared, Date.now() + SKIP_MS)
 
       if (!failing.has(name)) {
