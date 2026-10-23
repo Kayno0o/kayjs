@@ -93,6 +93,7 @@ function blankMarkdownCode(text: string, indentedCode: boolean): string {
     // A fence-looking line inside an indented code block is code.
     if (indentedCode && codeAllowed && !inList && INDENTED.test(line)) {
       out.push(blanked)
+
       continue
     }
 
