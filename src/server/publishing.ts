@@ -119,8 +119,14 @@ export async function watchPublishing(collections: Collection<unknown>[]): Promi
 
       since = now
 
-      for (const listener of listeners)
-        listener()
+      for (const listener of listeners) {
+        try {
+          listener()
+        }
+        catch (error) {
+          kayLog('error', 'a listener of the publication dates threw', error)
+        }
+      }
 
       // Refreshing told this watcher of the change, which armed it again.
       if (mine !== generation)

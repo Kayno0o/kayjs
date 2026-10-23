@@ -189,7 +189,6 @@ describe('a listener that throws', () => {
     const path = join(await scratchDir('cache-listener'), 'cache.sqlite')
     const store = sqliteCache(path)
     const heard: string[] = []
-
     const sink = logSink()
 
     setLogSink(() => undefined)
@@ -205,10 +204,14 @@ describe('a listener that throws', () => {
     other.run('INSERT INTO kay_events (origin, message, at) VALUES (\'other\', ?, ?)', ['{"keys":[]}', Date.now()])
     other.close()
 
-    for (let wait = 0; heard.length === 0 && wait < 100; wait++)
-      await Bun.sleep(25)
+    try {
+      for (let wait = 0; heard.length === 0 && wait < 100; wait++)
+        await Bun.sleep(25)
+    }
+    finally {
+      setLogSink(sink)
+    }
 
-    setLogSink(sink)
     expect(heard).toEqual(['{"keys":[]}'])
   })
 

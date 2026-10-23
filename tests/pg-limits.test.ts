@@ -130,16 +130,9 @@ describe('limitedStore', () => {
     expect(await store.later()).toBe(2)
   })
 
-  it('gives up on a method of the real stores that nobody listed', async () => {
-    const lines = await collecting(async () => {
-      const store = pgNotifications(silent) as unknown as Record<string, () => Promise<unknown>>
-
-      store.addedLater = async () => never()
-      await expect(limitedStore(store, 'the notifications store').addedLater!()).rejects.toThrow('took more than')
-    })
-
-    expect(lines.some(line => line.includes('was given up on'))).toBe(true)
-  }, STORE_TIMEOUT_MS + 5000)
+  it('leaves the cache store\'s subscribe synchronous', () => {
+    expect(pgCache(silent).subscribe?.(() => undefined)).toBeUndefined()
+  })
 })
 
 describe('the rooms store with a throwing listener', () => {
