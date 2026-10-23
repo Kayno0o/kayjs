@@ -714,6 +714,45 @@ console.log(JSON.stringify(store.hit('ada@example.com', '60000ms').count))
     }
   })
 
+  it.each([
+    ['text', 'not an address'],
+    ['an injected line', '203.0.113.7\nx'],
+    ['a script', '<script>alert(1)</script>'],
+    ['an address with a path', '203.0.113.7/24'],
+    ['a port past the range', '203.0.113.7:999999x'],
+    ['an empty entry', ' '],
+  ])('counts the peer when the proxy forwards %s', (_name, forwarded) => {
+    const request = new Request('http://localhost/', { headers: { 'x-forwarded-for': forwarded.replaceAll('\n', ' '), 'cf-connecting-ip': forwarded.replaceAll('\n', ' ') } })
+
+    expect(clientAddress(request, socket('10.0.0.2'), { hops: 1 })).toBe('10.0.0.2')
+    expect(clientAddress(request, socket('10.0.0.2'), { header: 'cf-connecting-ip' })).toBe('10.0.0.2')
+  })
+
+  it('takes a forwarded address with its port dropped, IPv6 included', () => {
+    const read = (value: string) => clientAddress(new Request('http://localhost/', { headers: { 'x-forwarded-for': value } }), socket('10.0.0.2'), { hops: 1 })
+
+    expect(read('203.0.113.7:51234')).toBe('203.0.113.7')
+    expect(read('[2001:db8::1]:443')).toBe('2001:db8::1')
+    expect(read('[2001:db8::1]')).toBe('2001:db8::1')
+    expect(read('2001:db8::1')).toBe('2001:db8::1')
+  })
+
+  it('trusts the ranges proxy.trusted lists alone with trustPrivate: false, not this machine or a private network', () => {
+    const request = new Request('http://localhost/', { headers: { 'cf-connecting-ip': '203.0.113.7' } })
+    const proxy = { header: 'cf-connecting-ip', trusted: ['173.245.48.0/20'], trustPrivate: false as const }
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      expect(clientAddress(request, socket('173.245.50.1'), proxy)).toBe('203.0.113.7')
+      expect(clientAddress(request, socket('10.0.0.2'), proxy)).toBe('10.0.0.2')
+      expect(clientAddress(request, socket('127.0.0.1'), proxy)).toBe('127.0.0.1')
+      expect(clientAddress(request, socket('10.0.0.2'), { ...proxy, trustPrivate: undefined })).toBe('203.0.113.7')
+    }
+    finally {
+      warn.mockRestore()
+    }
+  })
+
   it('counts the socket as the client without a proxy setting, warning once when requests come through one', () => {
     const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
     const forged = new Request('http://localhost/', { headers: { 'x-forwarded-for': '203.0.113.7' } })
@@ -757,6 +796,8 @@ console.log(JSON.stringify(store.hit('ada@example.com', '60000ms').count))
     [{ hops: 1, trusted: ['a CDN'] }],
     [{ hops: 1, trusted: ['10.0.0.0/33'] }],
     [{ hops: 1, trusted: ['::/129'] }],
+    [{ hops: 1, trustPrivate: false as const }],
+    [{ hops: 1, trusted: [], trustPrivate: false as const }],
   ])('refuses the proxy setting %p where it is read', (proxy) => {
     expect(() => trustProxy(new Elysia(), proxy)).toThrow('kay: proxy')
   })

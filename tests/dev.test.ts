@@ -1938,7 +1938,10 @@ describe.concurrent('kay dev', () => {
       // A stylesheet the dev tool names, the editor still failing.
       expect(await (await open('src/app.css:1:1')).json()).toEqual({ opened: false, failed: true })
       // A page of another site that renamed itself to this machine's address sends its own name as the Host.
-      expect((await fetch(url, { headers: { host: 'rebound.example' } })).status).toBe(421)
+      const rebound = await fetch(url, { headers: { host: 'rebound.example' } })
+
+      expect(rebound.status).toBe(421)
+      expect(rebound.headers.get('x-content-type-options')).toBe('nosniff')
       expect((await fetch(url, { headers: { host: 'app.localhost' } })).status).toBe(200)
       expect((await fetch(url, { headers: { host: '127.0.0.1' } })).status).toBe(200)
     }

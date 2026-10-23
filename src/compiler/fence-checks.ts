@@ -14,6 +14,8 @@ import { parseFence } from './script'
 // A line break before a line with text: a blank line moving into `page` stays blank.
 const LINE_WITH_TEXT = /\n(?=[^\n])/g
 const NON_SPACE_OR_NEWLINE = /\S|\n/
+// A path of the site: one slash then anything but a second slash or a backslash.
+const SITE_PATH = /^\/(?![/\\])/
 
 // Settings exported under their own names, with a fix moving every one it can into `page` at once: each diagnostic carries the same fix, applied once.
 export function separatePageSettings(source: string, server: ServerAnalysis): Diagnostic[] {
@@ -429,10 +431,59 @@ export function asyncReplies(fence: ParsedFence): Diagnostic[] {
   return diagnostics
 }
 
+// Whether a redirect target is written as a path of this site: a literal starting with one slash, a template or a concatenation starting with one, or `localPath(...)`.
+function isSitePath(node: t.Node): boolean {
+  if (node.type === 'StringLiteral')
+    return SITE_PATH.test(node.value)
+
+  if (node.type === 'TemplateLiteral')
+    return SITE_PATH.test(node.quasis[0]!.value.cooked ?? '')
+
+  if (node.type === 'BinaryExpression' && node.operator === '+')
+    return isSitePath(node.left)
+
+  if (node.type === 'ConditionalExpression')
+    return isSitePath(node.consequent) && isSitePath(node.alternate)
+
+  if (node.type === 'TSAsExpression' || node.type === 'TSNonNullExpression' || node.type === 'ParenthesizedExpression')
+    return isSitePath(node.expression)
+
+  return node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.callee.name === 'localPath'
+}
+
+// A `redirect()` or `ctx.redirect()` whose target is not written as a path of the site: a value read from the request or a store may be any URL, an open redirect for a phishing link.
+export function openRedirects(fence: ParsedFence): Diagnostic[] {
+  if (!fence.code.includes('redirect('))
+    return []
+
+  const diagnostics: Diagnostic[] = []
+
+  eachNode(fence.ast.program, (node) => {
+    if (node.type !== 'CallExpression' || !node.arguments[0] || node.arguments[0].type === 'SpreadElement')
+      return
+
+    const callee = node.callee
+    const redirects = callee.type === 'Identifier' ? callee.name === 'redirect' : callee.type === 'MemberExpression' && !callee.computed && callee.object.type === 'Identifier' && callee.object.name === 'ctx' && callee.property.type === 'Identifier' && callee.property.name === 'redirect'
+
+    if (!redirects || isSitePath(node.arguments[0]))
+      return
+
+    diagnostics.push({
+      ...fence.shift(node.arguments[0]),
+      code: 'external-redirect',
+      message: 'This redirect goes where its value says, which may be any site',
+      note: 'a target read from the request, a store or a variable is an open redirect when it is a full URL: a link on your domain sends a visitor to a phishing page',
+      help: 'wrap a `?next=` value in `localPath(value, fallback)`, or write `// kay-allow external-redirect` for a URL you chose',
+    })
+  })
+
+  return diagnostics
+}
+
 // The checks a plain module takes, parsed only when one of them may find something.
 // A module the browser bundle reaches (`browser`) is checked for the names the browser's entries lack as well.
 export function moduleChecks(source: string, browser = false): Diagnostic[] {
-  if (!CSS_BINDING.test(source) && !(browser && source.includes('kay/cache')) && !(source.includes(AI_PACKAGE) && source.includes('async')))
+  if (!CSS_BINDING.test(source) && !(browser && source.includes('kay/cache')) && !(source.includes(AI_PACKAGE) && source.includes('async')) && !source.includes('redirect('))
     return []
 
   const whole = { start: 0, end: source.length }
@@ -451,5 +502,5 @@ export function moduleChecks(source: string, browser = false): Diagnostic[] {
 }
 
 function checksOf(module: ParsedFence, browser: boolean): Diagnostic[] {
-  return [...cssImportsWithoutText(module), ...asyncReplies(module), ...browser ? serverOnlyImports(module) : []]
+  return [...cssImportsWithoutText(module), ...asyncReplies(module), ...openRedirects(module), ...browser ? serverOnlyImports(module) : []]
 }

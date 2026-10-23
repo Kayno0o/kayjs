@@ -208,7 +208,7 @@ describe('metrics', () => {
     expect(liveConnections()).toBe(0)
   })
 
-  it('warns at boot of a proxy without a token, and of nothing else', async () => {
+  it('warns at boot of metrics without a token, and of nothing else', async () => {
     const logged = spyOn(console, 'warn').mockImplementation(() => undefined)
     const warnings = () => logged.mock.calls.flat().filter(line => String(line).includes('metrics is read by any request')).length
     const proxy = { key: 'x-upstream-key' }
@@ -216,15 +216,15 @@ describe('metrics', () => {
 
     try {
       await listening({ metrics: true }, env)
-      expect(warnings()).toBe(0)
+      expect(warnings()).toBe(1)
       // A page at the path keeps it, so kay serves no metrics there.
       await listening({ metrics: { path: '/contact' }, proxy }, env)
-      expect(warnings()).toBe(0)
+      expect(warnings()).toBe(1)
       await listening({ metrics: true, proxy }, { ...env, KAY_METRICS_TOKEN: TOKEN })
-      expect(warnings()).toBe(0)
+      expect(warnings()).toBe(1)
       delete process.env.KAY_METRICS_TOKEN
       await listening({ metrics: true, proxy }, env)
-      expect(warnings()).toBe(1)
+      expect(warnings()).toBe(2)
     }
     finally {
       logged.mockRestore()

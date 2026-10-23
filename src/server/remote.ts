@@ -6,6 +6,7 @@ import { JSON_FILE, writeAtomically } from '../build/files'
 import { ipVersion, isPublicAddress, pinnedLookup, PrivateAddressError, resolveHost } from './address'
 import { FETCH_TIMEOUT_MS, MAX_REMOTE_BYTES } from './config-limits'
 import { overLimit } from './protection'
+import { isPublicSuffix } from './public-suffix'
 
 export type { Resolver } from './address'
 
@@ -17,6 +18,11 @@ export interface RemotePattern {
   path: string
   // An entry naming one address (`http://10.0.0.5:9000`) or `localhost` is the app saying that host is its own, so it may be private; every other host must resolve to public addresses only.
   private: boolean
+}
+
+// What a remote original or an image variant is named after: a truncated SHA-256 of what identifies it, so a visitor cannot choose two addresses with one name.
+export function cacheKey(text: string): string {
+  return new Bun.CryptoHasher('sha256').update(text).digest('hex').slice(0, 32)
 }
 
 // A remote original kept on disk, with the key its variants are named after, or why the route answers without one.
@@ -35,71 +41,6 @@ interface Stored {
 const PATTERN = /^(https?:)\/\/(\*\.)?([^/*?#@]+)(\/[^*?#]*)?$/i
 const MAX_AGE = /(?:^|,)\s*max-age=(\d+)/i
 const NO_CACHE = /(?:^|,)\s*(?:no-cache|no-store)\b/i
-
-// Suffixes of more than one label under which anyone registers or deploys a subdomain, which a `*.` wildcard must not cover. A single label (`com`, `uk`) is refused already; this is the list of the common ones, not the whole Public Suffix List.
-const PUBLIC_SUFFIXES = new Set([
-  'co.uk',
-  'org.uk',
-  'me.uk',
-  'ac.uk',
-  'gov.uk',
-  'com.au',
-  'net.au',
-  'org.au',
-  'co.nz',
-  'co.jp',
-  'ne.jp',
-  'or.jp',
-  'co.kr',
-  'co.in',
-  'co.il',
-  'co.za',
-  'com.br',
-  'com.cn',
-  'com.mx',
-  'com.ar',
-  'com.tr',
-  'com.sg',
-  'com.hk',
-  'com.tw',
-  'github.io',
-  'gitlab.io',
-  'vercel.app',
-  'now.sh',
-  'netlify.app',
-  'pages.dev',
-  'workers.dev',
-  'web.app',
-  'firebaseapp.com',
-  'appspot.com',
-  'herokuapp.com',
-  'onrender.com',
-  'fly.dev',
-  'railway.app',
-  'surge.sh',
-  'ngrok.io',
-  'ngrok-free.app',
-  'glitch.me',
-  'repl.co',
-  'replit.app',
-  'azurewebsites.net',
-  'azurestaticapps.net',
-  'cloudfront.net',
-  'amazonaws.com',
-  'elasticbeanstalk.com',
-  'blogspot.com',
-  'wordpress.com',
-  'myshopify.com',
-  'github.dev',
-  'githubusercontent.com',
-  'netlify.com',
-  'ondigitalocean.app',
-  'deno.dev',
-  'pythonanywhere.com',
-  'weebly.com',
-  'wixsite.com',
-  'carrd.co',
-])
 
 const BRACKETS = /^\[|\]$/g
 const TRAILING_DOT = /\.$/
@@ -135,7 +76,7 @@ export function remotePatterns(entries: readonly string[] = []): RemotePattern[]
     // `*.com` would let any site of a whole top-level domain have the server download from it, and so would `*.co.uk` or `*.vercel.app`, whose subdomains belong to anyone.
     const base = url.hostname.slice(2).replace(TRAILING_DOT, '')
 
-    if (wildcard && (!base.includes('.') || PUBLIC_SUFFIXES.has(base)))
+    if (wildcard && (!base.includes('.') || isPublicSuffix(base)))
       throw new Error(`images.remote holds ${entry}: a *. wildcard covers the subdomains of one domain, never a whole public suffix such as *.com, *.co.uk or *.vercel.app`)
 
     return { protocol: url.protocol, host: wildcard ? url.host.slice(2) : url.host, wildcard, path: url.pathname, private: !wildcard && (ipVersion(url.hostname.replace(BRACKETS, '')) !== 0 || url.hostname === 'localhost') }
@@ -245,7 +186,7 @@ export function remoteImages(dir: string, patterns: readonly RemotePattern[], va
     if (!remoteAllowed(src, patterns))
       return { status: 403, message: 'The image is on a host images.remote in kay.config.ts does not list' }
 
-    const key = Bun.hash(src).toString(36)
+    const key = cacheKey(src)
     let loading = pending.get(key)
 
     // Requests for an original being fetched wait for that one fetch.

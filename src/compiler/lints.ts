@@ -352,6 +352,13 @@ export const LINTS = {
     wrong: '// kay.config.ts sets mcp: true\nexport const subscribe = action(s.Object({ email: s.String() }), save, { tool: true, protect: { honeypot: \'website\' } })',
     right: '// src/routes/_guard.ts covers it, or the action keeps tool and drops the honeypot\nexport const subscribe = action(s.Object({ email: s.String() }), save, { tool: true, protect: { rateLimit: { max: 5, window: \'1m\' } } })',
   },
+  'external-redirect': {
+    level: 'warn',
+    group: 'security',
+    summary: 'A `redirect()` or `ctx.redirect()` whose target is not written as a path of the site, a literal, a template or a concatenation starting with one slash, or `localPath(...)`: a value from the request, a store or a variable may be a full URL, which makes the page an open redirect for a phishing link. Wrap a `?next=` value in `localPath(value, fallback)`; a URL you chose is allowed with `// kay-allow external-redirect`. Found in `.kay` fences and `.ts` modules alike.',
+    wrong: '--- server\nredirect(ctx.query.next)\n---\np x',
+    right: '--- server\nredirect(localPath(ctx.query.next, \'/account\'))\n---\np x',
+  },
   'secret-prop': {
     level: 'warn',
     group: 'security',

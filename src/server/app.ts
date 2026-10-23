@@ -32,7 +32,7 @@ import { kayLog } from '../runtime/log'
 import { BUILD_HEADER, DRAFT_ROUTE } from '../runtime/swap'
 import { registerActionRoutes } from './actions'
 import { serveApi } from './api'
-import { apiPathOf, mcpPath, RESOURCE_METADATA, sharedGuards } from './api-modules'
+import { apiPathOf, mcpPath, mcpRateLimit, RESOURCE_METADATA, sharedGuards } from './api-modules'
 import { rebaseCss, rebaseRedirects } from './base'
 import { DEFAULT_BODY_LIMIT, limitBodies, mountLimits } from './body'
 import { serveBuildFiles } from './build-files'
@@ -52,6 +52,7 @@ import { browserStackMapper, devStackMapper } from './error-maps'
 import { serveErrorReports } from './errors'
 import { FAVICON_DIR, faviconSource, MANIFEST, manifestJson, serveFavicons } from './favicon'
 import { loadGuard, loadGuards, requiredGuards } from './guards'
+import { refuseUnknownHosts } from './host-allowlist'
 import { refuseLocaleClashes } from './i18n'
 import { avifQuality, serveImages, webpQuality } from './image'
 import { jobsPageOf, serveJobsPage } from './jobs-page'
@@ -399,8 +400,11 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   app.onRequest(({ request }) => {
     receiveInternal(request)
   })
-  requireProxyKey(app, checkProxy(options.proxy), { dev: mode.dev, exported, base, health: options.health === false ? undefined : options.health?.path ?? HEALTH_PATH, metrics: () => metrics && served.holds(metrics) ? metrics.path : undefined, logRefused: requestRefusalLogger(log) })
-  refuseForeignHosts(app, site)
+  requireProxyKey(app, checkProxy(options.proxy), { dev: mode.dev, exported, base, health: options.health === false ? undefined : options.health?.path ?? HEALTH_PATH, metrics: () => metrics && served.holds(metrics) ? metrics.path : undefined, logRefused: requestRefusalLogger(log), security })
+  refuseForeignHosts(app, site, security)
+
+  if (typeof options.security === 'object' && options.security.hosts !== undefined && !mode.dev && !exported)
+    refuseUnknownHosts(app, { site, hosts: options.security.hosts, localeHosts: Object.values(i18n?.settings.hosts ?? {}), security })
 
   if (security)
     sendSecurityHeaders(app, security, filePaths)
@@ -578,7 +582,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   // The actions that opted in to being tools are in the document beside the routes, and the MCP endpoint reads its tools from it.
   const document = servesOpenApi || mcpAt !== undefined
-    ? openApiDocument(api.mounted, { title: openapi?.title ?? localizedText(options.seo?.name, undefined, locales.settings.defaultLocale) ?? 'API', version: openapi?.version ?? '1.0.0', base, root, apiPath: apiAt }, toolActions)
+    ? openApiDocument(api.mounted, { title: openapi?.title ?? localizedText(options.seo?.name, undefined, locales.settings.defaultLocale) ?? 'API', version: openapi?.version ?? '1.0.0', base, apiPath: apiAt }, toolActions)
     : undefined
 
   // On a site requiring guards, the document and the tool list are refused unless a guard covers every module not setting `guards: false`, or every module is open with no guard of its own, a library's guarded one counting as guarded.
@@ -589,7 +593,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     serveOpenApi(app, document, openapi, await covering(false), actionOptions, apiAt)
 
   if (mcpAt !== undefined && document)
-    serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base, guards: await covering(true), actions: actionOptions, metadataPaths, path: mcpAt })
+    serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base, guards: await covering(true), actions: actionOptions, metadataPaths, path: mcpAt, perMinute: mcpRateLimit(options.mcp) })
 
   const mapStack = mode.dev ? devStackMapper(client.dir) : browserStackMapper(join(client.dir, '..', MAPS_DIR))
 

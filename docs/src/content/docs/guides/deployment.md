@@ -195,7 +195,7 @@ Their lines start with their name, `kayjs-mail: ...`, and carry it as `from` in 
 
 `metrics: true` in `kay.config.ts` serves `/metrics` in the Prometheus text format, for Prometheus or any compatible collector. It counts requests by method, route and status with their durations, scheduled runs, cache reads and open live connections. `metrics: { path }` moves it.
 
-Metrics are never public by default. Only a request that reached the server from this machine or a private network, such as a collector in the same Docker network, and that no proxy forwarded is answered. Every other gets 403. Do not forward `/metrics` from your reverse proxy: one that sets no `X-Forwarded-For` cannot be told from a collector. To scrape across networks, set `KAY_METRICS_TOKEN` and send it as `Authorization: Bearer <token>`; it is then the only way in.
+Metrics are never public by default. Only a request that reached the server from this machine or a private network, such as a collector in the same Docker network, and that no proxy forwarded is answered. Every other gets 403. Do not forward `/metrics` from your reverse proxy: one that sets no `X-Forwarded-For` cannot be told from a collector. To scrape across networks, set `KAY_METRICS_TOKEN` and send it as `Authorization: Bearer <token>`; it is then the only way in. Without the token, the boot logs a warning that anyone on a private network can read the metrics.
 
 `kay dev` and a static export serve no metrics.
 

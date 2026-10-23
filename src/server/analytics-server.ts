@@ -6,7 +6,7 @@ import process from 'node:process'
 import { Elysia } from 'elysia'
 import { kayLog } from '../runtime/log'
 import { isCrossSite } from './actions'
-import { ANALYTICS_PATH, ANALYTICS_SCRIPT_PATH, CUSTOM_COLLECT_PATH, CUSTOM_SCRIPT_PATH, isGated, NOTICE_SCRIPT_PATH } from './analytics'
+import { ANALYTICS_PATH, ANALYTICS_SCRIPT_PATH, CUSTOM_COLLECT_PATH, CUSTOM_SCRIPT_PATH, INTEGRITY, isGated, NOTICE_SCRIPT_PATH } from './analytics'
 import { ANALYTICS_SCRIPT, NOTICE_SCRIPT } from './analytics-script'
 import { BASE_PATH, routerPath } from './base'
 import { declined } from './consent-cookie'
@@ -268,10 +268,13 @@ function customServer(options: Extract<AnalyticsOptions, { provider: 'custom' }>
   // One fetch in flight at a time, so concurrent requests on an empty cache share it.
   let fetching: Promise<string | undefined> | undefined
 
+  if (options.integrity === undefined)
+    kayLog('warn', `analytics: the custom provider serves the script at ${options.script} from your domain without an integrity hash, so a change on the tracker's side runs on every page; set integrity: 'sha256-...' to pin it`)
+
   return new Elysia({ name: 'kay-analytics-custom' })
     .get(CUSTOM_SCRIPT_PATH, async ({ request, query }) => {
       if (script === undefined || Date.now() - script.at > SCRIPT_TTL_MS) {
-        fetching ??= fetchScript(options.script).finally(() => {
+        fetching ??= fetchScript(options.script, options.integrity).finally(() => {
           fetching = undefined
         })
 
@@ -331,13 +334,26 @@ function customServer(options: Extract<AnalyticsOptions, { provider: 'custom' }>
     }, { parse: 'none' })
 }
 
-async function fetchScript(url: string): Promise<string | undefined> {
+// The digest of `text` as a script tag's `integrity` writes it.
+function integrityOf(text: string, algorithm: string): string {
+  return new Bun.CryptoHasher(algorithm as 'sha256').update(text).digest('base64')
+}
+
+async function fetchScript(url: string, integrity?: string): Promise<string | undefined> {
   try {
     const answer = await fetch(url, { signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS) })
     const text = answer.ok ? await readCapped(new Request('http://nowhere.invalid', { method: 'POST', body: answer.body }), MAX_SCRIPT_BYTES) : undefined
 
     if (text === undefined)
       warn('script', `analytics: the tracker script at ${url} could not be fetched, answering ${answer.status} or too large`)
+
+    const [, bits] = integrity === undefined ? [] : INTEGRITY.exec(integrity) ?? []
+
+    if (text !== undefined && integrity !== undefined && bits !== undefined && integrityOf(text, `sha${bits}`) !== integrity.slice(integrity.indexOf('-') + 1)) {
+      warn('script', `analytics: the tracker script at ${url} does not match its integrity hash, so it is not served`)
+
+      return undefined
+    }
 
     return text
   }

@@ -44,7 +44,7 @@ function isOpen(path: string, open: readonly string[]): boolean {
 
 // Refuses with 403 every request that does not carry the proxy's shared key in the header `proxy.key` names, so a process or a container reaching the port directly skips nothing the proxy does.
 // Off under `kay dev`, in a static export, and outside production while no key is given; a production server with `key` and no key to compare with does not boot.
-export function requireProxyKey(app: Elysia, proxy: ProxyConfig | undefined, options: { dev: boolean, exported: boolean, base: string, health: string | undefined, metrics?: (() => string | undefined) | undefined, logRefused?: ((request: Request, status: number) => void) | undefined }): void {
+export function requireProxyKey(app: Elysia, proxy: ProxyConfig | undefined, options: { dev: boolean, exported: boolean, base: string, health: string | undefined, metrics?: (() => string | undefined) | undefined, logRefused?: ((request: Request, status: number) => void) | undefined, security?: Record<string, string> | undefined }): void {
   const header = proxy?.key
 
   if (header === undefined || options.dev || options.exported)
@@ -80,6 +80,6 @@ export function requireProxyKey(app: Elysia, proxy: ProxyConfig | undefined, opt
     // This hook runs before the request id and request log hooks, which a response made here skips.
     options.logRefused?.(request, 403)
 
-    return new Response('Forbidden\n', { status: 403, headers: { 'content-type': 'text/plain; charset=utf-8', [requestIdHeader()]: requestId(request) } })
+    return new Response('Forbidden\n', { status: 403, headers: { ...options.security, 'content-type': 'text/plain; charset=utf-8', [requestIdHeader()]: requestId(request) } })
   })
 }

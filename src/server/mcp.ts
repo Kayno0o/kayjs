@@ -16,7 +16,7 @@ import { boundToPage, isCrossSite, postedFrom, unadmittedCrossSite } from './act
 import { RESOURCE_METADATA } from './api-modules'
 import { answeredAsPage, currentRequest } from './log'
 import { actionOperation, guardRefusal, toolName } from './openapi'
-import { clientAddress, keepRequestId, markAgentCall, requestId, requestServer, wasChallenged } from './protection'
+import { clientAddress, keepRequestId, markAgentCall, overLimit, requestId, requestServer, wasChallenged } from './protection'
 import { requestUrl } from './request-url'
 import { sendFrom } from './rewrite'
 import { toolSettings } from './tool-settings'
@@ -290,6 +290,9 @@ function json(value: unknown): string {
   })
 }
 
+const RATE_NAME = 'kay:mcp'
+const MINUTE_MS = 60_000
+
 export interface McpOptions {
   title: string
   version: string
@@ -302,6 +305,8 @@ export interface McpOptions {
   metadataPaths: string[]
   // Where the endpoint is served, `/mcp` by default.
   path: string
+  // The requests a client may send it a minute, or undefined for no limit.
+  perMinute: number | undefined
 }
 
 // A tool call the endpoint dispatched: which tool it calls, the address of the client that asked for it and the URL of the MCP request it came in, which a token bound to the endpoint is checked against.
@@ -464,6 +469,11 @@ export function serveMcp(app: Elysia, document: Schema, options: McpOptions): vo
     // A browser page of another site posting here would act with the visitor's cookies.
     if (isCrossSite(request))
       return new Response('Cross-site request refused', { status: 403 })
+
+    const wait = options.perMinute === undefined ? undefined : overLimit(RATE_NAME, clientAddress(request, server), options.perMinute, MINUTE_MS)
+
+    if (wait !== undefined)
+      return new Response('Too many requests', { status: 429, headers: { 'retry-after': String(wait) } })
 
     const text = await request.text()
     const message = parseJson(text)

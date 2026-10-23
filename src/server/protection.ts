@@ -47,6 +47,8 @@ const ZONE = /%.*$/
 const HEADER_NAME = /^[\w!#$%&'*+.^`|~-]+$/
 const LEADING_ZEROS = /^0+(?=.)/
 // Loopback, private, shared (CGNAT, Tailscale) and link-local ranges, IPv4 ones mapped into IPv6 included: where a proxy in front of the server connects from.
+const BRACKETED_PORT = /^\[([^\]]+)\](:\d{1,5})?$/
+const V4_PORT = /^([\d.]+):\d{1,5}$/
 const LOOPBACK_OR_PRIVATE = /^(?:(?:::ffff:)?(?:127\.|10\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.|100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|169\.254\.)|::1$|f[cd]|fe[89ab])/i
 // The proxy settings of the app each request reached, set as it arrives; `null` for an app setting none.
 const proxies = new WeakMap<Request, ProxyConfig | null>()
@@ -639,6 +641,9 @@ export function checkProxy(setting: ProxyConfig | number | boolean | undefined):
   if (header !== undefined && header.trim() === '')
     throw new KayError('config-invalid', 'kay: proxy.header names the header a proxy sets to the client\'s address, such as cf-connecting-ip')
 
+  if (proxy.trustPrivate !== undefined && (proxy.trustPrivate !== false || proxy.trusted === undefined || proxy.trusted.length === 0))
+    throw new KayError('config-invalid', 'kay: proxy.trustPrivate is false to trust the ranges proxy.trusted lists alone, so it goes with a non-empty proxy.trusted')
+
   rangesOf(proxy)
 
   return key === undefined || hops !== undefined || header !== undefined ? proxy : { ...proxy, hops: 1 }
@@ -684,14 +689,34 @@ export function clientAddress(request: Request, server: Server<unknown> | null |
 // Each proxy appends the address it was reached from to `X-Forwarded-For`, so the client is `hops` entries from the end; with fewer, the request skipped an outer proxy and the first entry is who reached the inner one.
 function forwardedAddress(request: Request, { hops = 1, header }: ProxyConfig): string | undefined {
   if (header !== undefined) {
-    const value = request.headers.get(header)?.trim()
-
-    return value === '' ? undefined : value
+    return addressOf(request.headers.get(header))
   }
 
   const entries = request.headers.get('x-forwarded-for')?.split(',').map(entry => entry.trim()).filter(entry => entry !== '') ?? []
 
-  return entries[Math.max(0, entries.length - hops)]
+  return addressOf(entries[Math.max(0, entries.length - hops)])
+}
+
+// The address a forwarded entry names, its port dropped, or undefined for anything else, so a header carrying text never becomes a rate-limit key or a log line.
+function addressOf(value: string | null | undefined): string | undefined {
+  const entry = value?.trim()
+
+  if (entry === undefined || entry === '')
+    return undefined
+
+  const net = nodeNet()
+
+  if (net.isIP(entry) !== 0)
+    return entry
+
+  const [, bracketed] = BRACKETED_PORT.exec(entry) ?? []
+
+  if (bracketed !== undefined && net.isIPv6(bracketed))
+    return bracketed
+
+  const [, v4] = V4_PORT.exec(entry) ?? []
+
+  return v4 !== undefined && net.isIPv4(v4) ? v4 : undefined
 }
 
 // The id of a request, on its log lines and its `X-Request-Id` header: the one a proxy the app's `proxy` setting trusts passed on, else one made for it, time-ordered.
@@ -729,7 +754,7 @@ export function fromPrivateNetwork(address: string): boolean {
 
 // This machine, a private network, or a range the setting trusts.
 function fromTrusted(address: string, proxy: ProxyConfig | null | undefined): boolean {
-  if (LOOPBACK_OR_PRIVATE.test(address))
+  if (proxy?.trustPrivate !== false && LOOPBACK_OR_PRIVATE.test(address))
     return true
 
   const ranges = proxy ? rangesOf(proxy) : undefined

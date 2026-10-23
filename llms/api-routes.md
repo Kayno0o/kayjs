@@ -187,7 +187,7 @@ export default api()
 - Path params are written in braces; `params`, `query` and `headers` are parameters; `body` is JSON, or multipart when it holds an `s.File()`; `response` is one schema or one per status.
 - A route's `detail` gives its `summary`, `description`, `tags`, the module's path by default, and `deprecated`.
 - `detail: { hide: true }` leaves a route out; websockets are left out.
-- A route behind guards lists them in `x-kay-guards`, by where they sit in the API directory, `private/_guard.ts`.
+- A route behind guards is marked `x-kay-guarded: true`, with no guard file named. A document that no `_guard.ts` of the API directory protects leaves the guarded routes out, as it is open to anyone; behind a guard it lists them all.
 - Behind a guard, or after reading the session, an answer goes out `Cache-Control: private, no-cache` with `Vary: cookie`, a refusal included, unless the route sets its own `cache-control`.
 - The document is served behind the guards every module runs, the API directory's own `_guard.ts`, a module setting `guards: false` aside, which get the context a module's guard gets, the app's session in `ctx.locals` included, so a private API keeps its spec private.
 - `{ title, version }` set its `info`, the site's `seo.name` (the default locale's when it takes one text per locale, as the document is one for every locale) and `1.0.0` by default.
@@ -200,11 +200,12 @@ export default api()
 - `openapi: { path: '/spec.json', referencePath: '/docs/api' }` moves the document and the reference page; a path is absolute, of plain segments, without a trailing slash and outside `/_kay`, and the two differ.
 - A module, page or file serving the document's path, or the reference page's with the page on, stops the server.
 - Every operation has an `operationId`: the route's `detail.operationId` as written (`users.list` stays so), else its method and path, `get_notes_id`; a clash gets `_2`. A route answering every method, `.all()`, gets its id with the method as a suffix, `echo_get`, `echo_post`.
-- An action that sets `tool` is a `POST` operation at its URL under the tag `actions`, `x-kay-action` set, its guards in `x-kay-guards`, as the document and the MCP tools say the same. It is called as `action()` calls are, its input encoded as kay writes it, not as a plain JSON body.
+- An action that sets `tool` is a `POST` operation at its URL under the tag `actions`, `x-kay-action` set, marked `x-kay-guarded` when guards cover it, as the document and the MCP tools say the same. It is called as `action()` calls are, its input encoded as kay writes it, not as a plain JSON body.
 
 ### MCP
 
 - `mcp: true` serves Streamable HTTP at `/mcp`, or at `mcp: { path: '/tools' }` under the same rules as the OpenAPI paths, its sign-in metadata then at `/.well-known/oauth-protected-resource/tools`: one JSON-RPC message per `POST`, answered with JSON, `initialize`, `ping`, `tools/list` and `tools/call` only, no resources or prompts. `GET` and `DELETE` answer 405, a notification 202.
+- `mcp: { rateLimit: 60 }` caps the requests one client may send the endpoint a minute, 120 by default, `false` for none; one past it answers 429 with `Retry-After`. A call also meets the limits of the action or route it runs.
 - A message that is no JSON-RPC request answers 400, a body over `maxSize` 413, a request from another site (`Origin`, `Sec-Fetch-Site`) 403.
 - A tool per action that sets `tool` and per API route whose `detail` sets `tool`, even with `openapi` off; a route that does not is in the OpenAPI document and no tool: absent from `tools/list`, and a `tools/call` naming it is refused as any unknown name is. Before 1.51 every route not hidden was a tool.
 - A route's `detail.tool` is `true`, a description, or `{ name, description }`, as an action's. Its tool is named by `tool.name` else its `operationId` (a route setting only `tool.name` takes it as its `operationId`), made a safe name (`users.list` is `users_list`, a clash `_2`), described by `tool`'s description else its `summary` and `description`, its input one JSON Schema of the path params, query and JSON body, merged by name.

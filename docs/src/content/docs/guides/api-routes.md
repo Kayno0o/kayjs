@@ -137,7 +137,7 @@ export default defineConfig({
 
 Give a route `detail: { summary, tags }` to describe it, or `detail: { hide: true }` to leave it out. `reference: true` adds a page listing the routes at `/api/reference`. `dev: true` keeps both to `kay dev`. `path` and `referencePath` move them, such as `openapi: { path: '/spec.json' }`.
 
-The document sits behind `src/api/_guard.ts` when there is one, and lists the guards each route runs. Its title is `openapi.title`, else the site's `seo.name`.
+The document sits behind `src/api/_guard.ts` when there is one, and marks the routes that run a guard. Without that guard the document is open to anyone, so it leaves the guarded routes out. Its title is `openapi.title`, else the site's `seo.name`.
 
 Each operation has an `operationId`. It is the one you set in `detail.operationId`, else one built from the method and path, such as `get_notes_id`. A route that answers every method with `.all()` has one operation per method, and the method ends its id, as `echo_get`.
 
@@ -147,7 +147,7 @@ Actions that set `tool` are listed too, as `POST` operations.
 
 ## Letting an agent call the app over MCP
 
-Set `mcp: true` in kay.config.ts to let an AI agent use your app. Kay serves an MCP endpoint at `/mcp`, or at the path of `mcp: { path: '/tools' }`, and an agent pointed at it can list and call your tools. You write no MCP server.
+Set `mcp: true` in kay.config.ts to let an AI agent use your app. Kay serves an MCP endpoint at `/mcp`, or at the path of `mcp: { path: '/tools' }`, and an agent pointed at it can list and call your tools. You write no MCP server. A client may send the endpoint 120 requests a minute; `mcp: { rateLimit: 60 }` changes that and `false` removes it.
 
 ### Routes as tools
 

@@ -3,7 +3,8 @@ import { createServer } from 'node:net'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { isPublicAddress, pinnedLookup, PrivateAddressError } from '../src/server/address'
-import { remoteAllowed, remoteImages, remotePatterns } from '../src/server/remote'
+import { isPublicSuffix } from '../src/server/public-suffix'
+import { cacheKey, remoteAllowed, remoteImages, remotePatterns } from '../src/server/remote'
 import { scratchDir } from './scratch'
 
 const HERO = join(import.meta.dir, 'fixtures/images/src/hero.png')
@@ -200,7 +201,7 @@ describe('remote images and private addresses', () => {
   })
 
   it('refuses a wildcard on a public suffix, and reads which entries are the app\'s own hosts', () => {
-    for (const entry of ['https://*.co.uk', 'https://*.vercel.app', 'https://*.github.io', 'https://*.amazonaws.com', 'https://*.com'])
+    for (const entry of ['https://*.co.uk', 'https://*.vercel.app', 'https://*.github.io', 'https://*.com'])
       expect(() => remotePatterns([entry])).toThrow(`images.remote holds ${entry}`)
 
     expect(() => remotePatterns(['https://*.example.co.uk', 'https://*.cdn.vercel.app'])).not.toThrow()
@@ -248,6 +249,30 @@ describe('remote images and private addresses', () => {
       raw.close()
       await gzip.stop(true)
     }
+  })
+
+  it('reads the whole Public Suffix List, not a short sample', () => {
+    for (const suffix of ['com', 'co.uk', 'vercel.app', 'github.io', 'myshopify.com', 'cloudfront.net', 'ck', 'azurewebsites.net', 'com.es', 'xn--55qx5d.cn', 'pages.dev', 'r2.dev', 'ondigitalocean.app', 'web.app', 'ac.jp'])
+      expect(isPublicSuffix(suffix)).toBe(true)
+
+    // A wildcard rule makes every name under it a suffix, bar its exceptions.
+    expect(isPublicSuffix('anything.ck')).toBe(true)
+    expect(isPublicSuffix('www.ck')).toBe(false)
+    expect(isPublicSuffix('example.com')).toBe(false)
+    expect(isPublicSuffix('cdn.vercel.app')).toBe(false)
+    expect(isPublicSuffix('EXAMPLE.CO.UK')).toBe(false)
+    expect(isPublicSuffix('CO.UK')).toBe(true)
+
+    for (const entry of ['https://*.myshopify.com', 'https://*.r2.dev', 'https://*.ac.jp', 'https://*.com.es', 'https://*.azurewebsites.net', 'https://*.anything.ck'])
+      expect(() => remotePatterns([entry])).toThrow(`images.remote holds ${entry}`)
+
+    expect(() => remotePatterns(['https://*.www.ck', 'https://*.example.ac.jp'])).not.toThrow()
+  })
+
+  it('names a downloaded original after a truncated SHA-256, 32 hex digits, so addresses cannot be made to share one', () => {
+    expect(cacheKey('https://img.example/a.png')).toMatch(/^[\da-f]{32}$/)
+    expect(cacheKey('https://img.example/a.png')).toBe(new Bun.CryptoHasher('sha256').update('https://img.example/a.png').digest('hex').slice(0, 32))
+    expect(cacheKey('https://img.example/a.png')).not.toBe(cacheKey('https://img.example/a.png?'))
   })
 
   it('refuses a wildcard on a public suffix written with a trailing dot', () => {

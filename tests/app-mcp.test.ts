@@ -17,6 +17,8 @@ const locals = (request: Request) => ({ key: request.headers.get('authorization'
 
 const site = await testSite({ routes, api, mcp: true, islands: false, locals })
 const off = await testSite({ routes, api, islands: false })
+const throttled = await testSite({ routes, api, mcp: { rateLimit: 3 }, islands: false })
+const unthrottled = await testSite({ routes, api, mcp: { rateLimit: false }, islands: false })
 const mounted = await testSite({ routes, api, mcp: true, islands: false, base: '/shop', trailingSlash: 'always', locals })
 const openapi = await testSite({ routes, api, mcp: true, openapi: true, islands: false, locals })
 const guardedApi = 'tests/fixtures/mcp-guarded/src/api'
@@ -43,7 +45,7 @@ delete process.env.KAY_PROXY_KEY
 const localized = await testSite({ routes, api, mcp: true, islands: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' } })
 
 afterAll(async () => {
-  await Promise.all([site.close(), keyed.close(), keyedRewritten.close(), off.close(), mounted.close(), localized.close(), openapi.close(), guarded.close(), guardedMounted.close(), strict.close(), uncovered.close(), noApi.close(), documentOnly.close(), limited.close(), names.close()])
+  await Promise.all([throttled.close(), unthrottled.close(), site.close(), keyed.close(), keyedRewritten.close(), off.close(), mounted.close(), localized.close(), openapi.close(), guarded.close(), guardedMounted.close(), strict.close(), uncovered.close(), noApi.close(), documentOnly.close(), limited.close(), names.close()])
 })
 
 async function post(target: typeof site, body: unknown, headers: Record<string, string> = {}) {
@@ -57,6 +59,26 @@ async function rpc(target: typeof site, method: string, params: object = {}, hea
 }
 
 describe('the endpoint', () => {
+  it('answers 429 with Retry-After to a client past mcp.rateLimit a minute, and to every kind of message', async () => {
+    for (let n = 0; n < 3; n++)
+      expect((await rpc(throttled, 'ping')).response.status).toBe(200)
+
+    for (const body of [{ jsonrpc: '2.0', id: 1, method: 'ping' }, 'not json', { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'no_such_tool' } }]) {
+      const refused = await post(throttled, body)
+
+      expect(refused.status).toBe(429)
+      expect(Number(refused.headers.get('retry-after'))).toBeGreaterThan(0)
+    }
+  })
+
+  it('has no limit with rateLimit: false, and refuses a limit that is no count', async () => {
+    for (let n = 0; n < 130; n++)
+      expect((await rpc(unthrottled, 'ping')).response.status).toBe(200)
+
+    for (const rateLimit of [0, -1, 1.5, Number.NaN])
+      await expect(testSite({ routes, api, mcp: { rateLimit }, islands: false })).rejects.toThrow('mcp.rateLimit')
+  })
+
   it('is not served without mcp', async () => {
     expect((await post(off, { jsonrpc: '2.0', id: 1, method: 'ping' })).status).toBe(404)
   })
@@ -548,7 +570,7 @@ describe('calling an API route', () => {
 
 describe('the OpenAPI document', () => {
   it('gives every operation an id, and lists the actions that are tools as POST operations', async () => {
-    const document = await (await openapi.fetch('/api/openapi.json', { headers: BEARER })).json() as { paths: Record<string, Record<string, { 'operationId': string, 'tags': string[], 'summary'?: string, 'x-kay-action'?: boolean, 'x-kay-guards'?: string[] }>> }
+    const document = await (await openapi.fetch('/api/openapi.json', { headers: BEARER })).json() as { paths: Record<string, Record<string, { 'operationId': string, 'tags': string[], 'summary'?: string, 'x-kay-action'?: boolean, 'x-kay-guarded'?: boolean }>> }
     const operations = Object.values(document.paths).flatMap(methods => Object.values(methods))
     const ids = operations.map(operation => operation.operationId)
 
@@ -557,7 +579,7 @@ describe('the OpenAPI document', () => {
     expect(ids).toContain('get_notes_id')
     expect(document.paths['/_kay/action/tests/fixtures/mcp/src/routes/index.kay/signup']!.post).toMatchObject({ 'operationId': 'signup', 'summary': 'Sign up', 'tags': ['actions'], 'x-kay-action': true })
     expect(document.paths['/_kay/action/tests/fixtures/mcp/src/routes/index.kay/hidden']).toBeUndefined()
-    expect(document.paths['/_kay/action/tests/fixtures/mcp/src/routes/admin/index.kay/wipe']!.post!['x-kay-guards']).toEqual(['tests/fixtures/mcp/src/routes/admin/_guard.ts'])
+    expect(document.paths['/_kay/action/tests/fixtures/mcp/src/routes/admin/index.kay/wipe']).toBeUndefined()
   })
 
   it('lists them without mcp too, as the document and the tools say the same', async () => {

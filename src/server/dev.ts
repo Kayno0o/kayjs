@@ -549,7 +549,7 @@ function broadcast(event: string): void {
 
 // Under `kay dev`, a request naming a host other than localhost, an IP address or the site is refused, as a page of another site renaming itself to this machine's address (DNS rebinding) would send it.
 // `KAY_DEV_HOSTS` lists other names the server answers to, comma-separated, such as a tunnel's; `kay dev --host` adds this machine's own names, as a phone on the network reaches it by.
-export function refuseForeignHosts(app: Elysia, site: string | undefined): void {
+export function refuseForeignHosts(app: Elysia, site: string | undefined, security?: Record<string, string>): void {
   if (!underKayDev())
     return
 
@@ -570,7 +570,7 @@ export function refuseForeignHosts(app: Elysia, site: string | undefined): void 
     if (host === null || (name !== undefined && (LOCAL_NAME.test(name) || nodeNet().isIP(name.replace(BRACKETS, '')) !== 0 || allowed.has(name))))
       return
 
-    return new Response(`kay dev answers to localhost, an IP address or the site, and ${host} is none of them; list it in KAY_DEV_HOSTS to reach the server by that name\n`, { status: 421, headers: { 'content-type': 'text/plain; charset=utf-8' } })
+    return new Response(`kay dev answers to localhost, an IP address or the site, and ${host} is none of them; list it in KAY_DEV_HOSTS to reach the server by that name\n`, { status: 421, headers: { ...security, 'content-type': 'text/plain; charset=utf-8' } })
   })
 }
 

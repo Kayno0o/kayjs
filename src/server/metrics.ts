@@ -174,10 +174,10 @@ export function serveMetrics(app: Elysia, options: { path: string, base: string,
   })
 }
 
-// A proxy in front and no token: a proxy on this host that forwards the path without a mark of its own reads as a collector.
+// No token: any peer on a private network reads the metrics, and a proxy on this host that forwards the path without a mark of its own reads as a collector.
 function warnMetricsOpen(proxy: ProxyConfig | undefined): void {
-  if (proxy !== undefined && metricsToken() === undefined)
-    kayLog('warn', `metrics is read by any request from this machine or a private network that carries no proxy mark, and a proxy is set: do not forward its path, or set ${TOKEN_VARIABLE} so only a request with the token is answered`)
+  if (metricsToken() === undefined)
+    kayLog('warn', `metrics is read by any request from this machine or a private network that carries no proxy mark${proxy === undefined ? '' : ', and a proxy is set: do not forward its path'}; set ${TOKEN_VARIABLE} so only a request with the token is answered`)
 }
 
 export function metricsOf(setting: boolean | MetricsConfig | undefined): MetricsConfig | undefined {

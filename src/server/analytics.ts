@@ -142,12 +142,16 @@ export interface CustomOptions extends Common {
   endpoint: string
   // Passes the visitor's address on in `X-Forwarded-For`, for a tracker that tells visitors apart by it; off by default.
   address?: boolean | undefined
+  // The hash the script must have, `sha256-` then its base64 digest (`sha384-` and `sha512-` too) as a `script` tag's `integrity` is written: kay serves that script from the app, so one that changed on the tracker's side is refused with 502 rather than run on every page. Without it the boot warns.
+  integrity?: string | undefined
 }
 
 export type AnalyticsOptions = PlausibleOptions | UmamiOptions | SimpleAnalyticsOptions | MatomoOptions | Ga4Options | FathomOptions | CloudflareOptions | CustomOptions
 
 // The providers that take visits from the app's server.
 export type VisitOptions = Exclude<AnalyticsOptions, FathomOptions | CloudflareOptions | CustomOptions>
+
+export const INTEGRITY = /^sha(256|384|512)-[\w+/]+={0,2}$/
 
 export const ANALYTICS_PATH = '/_kay/analytics'
 export const ANALYTICS_SCRIPT_PATH = `${ANALYTICS_PATH}.js`
@@ -365,5 +369,8 @@ function checked(options: AnalyticsOptions): void {
   if (options.provider === 'custom') {
     address('script', options.script, false)
     address('endpoint', options.endpoint, false)
+
+    if (options.integrity !== undefined && !INTEGRITY.test(options.integrity))
+      refuse('takes an integrity such as sha256-<base64 digest>, as a script tag writes it')
   }
 }

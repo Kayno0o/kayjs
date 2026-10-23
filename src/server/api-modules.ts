@@ -46,6 +46,24 @@ const SERVED_PATH = /^\/[\w.~-]+(?:\/[\w.~-]+)*$/
 export interface McpConfig {
   // Where the endpoint is served, `/mcp` by default.
   path?: string | undefined
+  // The most requests one client may send the endpoint a minute, 120 by default, or `false` for no limit; a tool call also meets the limits of the action or route it calls.
+  rateLimit?: number | false | undefined
+}
+
+// The requests a client may send the MCP endpoint a minute unless `mcp.rateLimit` says otherwise.
+export const MCP_PER_MINUTE = 120
+
+// The endpoint's limit per client and minute, or undefined for none.
+export function mcpRateLimit(value: boolean | McpConfig | undefined): number | undefined {
+  const limit = typeof value === 'object' ? value.rateLimit : undefined
+
+  if (limit === false)
+    return undefined
+
+  if (limit !== undefined && (!Number.isInteger(limit) || limit < 1))
+    throw new KayError('config-invalid', `kay: mcp.rateLimit is the requests a client may send a minute, a whole number from 1, or false for no limit; got ${String(limit)}`)
+
+  return limit ?? MCP_PER_MINUTE
 }
 
 // The path an MCP endpoint is served at, or undefined while `mcp` is off.

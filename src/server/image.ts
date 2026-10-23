@@ -23,7 +23,7 @@ import { decodable, drawing, imageHeader, MAX_UPLOAD_PIXELS } from './image-form
 import { limiter } from './limit'
 import { clientAddress } from './protection'
 import { revalidated } from './public'
-import { remoteAllowed, remotePatterns, remoteVariants } from './remote'
+import { cacheKey, remoteAllowed, remotePatterns, remoteVariants } from './remote'
 import { requestUrl } from './request-url'
 import { decodePath } from './routes'
 import { savesData } from './save-data'
@@ -364,7 +364,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
       if (source.immutable)
         return remembered(key, original, immutable, set)
 
-      return answer(revalidated(request, `W/"${Bun.hash(`${path}\n${stats!.size}\n${stats!.mtimeMs}`).toString(36)}"`, () => original, ownHeaders(set, revalidatedAs)))
+      return answer(revalidated(request, `W/"${cacheKey(`${path}\n${stats!.size}\n${stats!.mtimeMs}`)}"`, () => original, ownHeaders(set, revalidatedAs)))
     }
 
     // An animated GIF goes as it is at every width, a variant flattening it to its first frame; its card is still drawn from that frame.
@@ -379,7 +379,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     const varied = lightens && variant !== 'card'
     const headers = immutables(negotiated, varied)
     // An imported image is named after its content; a runtime one may change in place, so its size and time, read above since its size is never kept, go in the name, after the prefix of a remote or stored one, whose variants go when its original does.
-    const name = source.immutable ? variantName(path, variant, format) : inFormat(`${source.prefix ?? ''}${Bun.hash(`${path}\n${stats!.size}\n${stats!.mtimeMs}`).toString(36)}${variantSuffix(variant)}`, format)
+    const name = source.immutable ? variantName(path, variant, format) : inFormat(`${source.prefix ?? ''}${cacheKey(`${path}\n${stats!.size}\n${stats!.mtimeMs}`)}${variantSuffix(variant)}`, format)
     const found = source.immutable ? importedVariants.get(name) : undefined
 
     if (found)

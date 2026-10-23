@@ -929,6 +929,35 @@ describe('a custom provider', () => {
     expect(await (await (await site(custom({ info: false }))).handle(new Request('http://localhost/'))).text()).toContain('src="/_kay/analytics/script.js"')
   })
 
+  it('serves a script that matches its integrity hash, refuses one that does not, and warns at the boot of an unpinned one', async () => {
+    const text = await (await fetch(`http://localhost:${provider.port}/script.js`)).text()
+    const digest = (algorithm: 'sha256' | 'sha384') => `${algorithm}-${new Bun.CryptoHasher(algorithm).update(text).digest('base64')}`
+    const logged = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const unpinned = () => logged.mock.calls.flat().filter(line => String(line).includes('without an integrity hash')).length
+
+    try {
+      for (const integrity of [digest('sha256'), digest('sha384')])
+        expect((await (await site(custom({ integrity }))).handle(new Request('http://localhost/_kay/analytics/script.js'))).status).toBe(200)
+
+      expect(unpinned()).toBe(0)
+      warningsReset()
+
+      for (const integrity of [`sha256-${Buffer.from('another script').toString('base64')}`, digest('sha384').replace('sha384', 'sha256')])
+        expect((await (await site(custom({ integrity }))).handle(new Request('http://localhost/_kay/analytics/script.js'))).status).toBe(502)
+
+      sites.delete(JSON.stringify(custom()))
+      await site(custom())
+      expect(unpinned()).toBe(1)
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
+
+  it.each(['md5-abc', 'sha256', 'sha256-', 'sha256-a b', ''])('refuses the integrity %p', (integrity) => {
+    expect(() => analytics(custom({ integrity }))).toThrow('integrity')
+  })
+
   it('loads through kay\'s script with the opt-out line unless info is false, and forwards unless the visitor opted out', async () => {
     const lined = await (await (await site(custom())).handle(new Request('http://localhost/'))).text()
     const direct = await (await (await site(custom({ info: false }))).handle(new Request('http://localhost/'))).text()

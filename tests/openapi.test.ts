@@ -95,10 +95,13 @@ describe('the OpenAPI document', () => {
     expect(code).toBe(0)
   })
 
-  it('names the guards a route runs, by where they sit in the API directory', async () => {
+  it('says a route is guarded without naming the guard files', async () => {
     const { paths } = await documented()
 
-    expect(paths['/api/private']!.get!['x-kay-guards']).toEqual(['_guard.ts', 'private/_guard.ts'])
+    expect(paths['/api/private']!.get!['x-kay-guarded']).toBe(true)
+    expect(paths['/api/private']!.get!['x-kay-guards']).toBeUndefined()
+    expect(paths['/api/items/{id}']!.get!['x-kay-guarded']).toBe(true)
+    expect(JSON.stringify(paths)).not.toContain('_guard')
   })
 
   it('is served behind the API directory\'s own guard, and nothing below it', async () => {
@@ -117,7 +120,7 @@ describe('the OpenAPI document', () => {
 
     expect(page.headers.get('content-type')).toContain('text/html')
     expect(html).toContain('<h2><code>GET /api/items/{id}</code></h2><p>One item</p>')
-    expect(html).toContain('<p>Guarded by <code>_guard.ts</code>, <code>private/_guard.ts</code></p>')
+    expect(html).toContain('<p>Guarded</p>')
     expect(html).not.toContain('<script')
   })
 

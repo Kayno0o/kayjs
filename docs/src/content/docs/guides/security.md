@@ -126,6 +126,10 @@ Two defaults surprise apps. `Cross-Origin-Opener-Policy: same-origin` cuts a pag
 
 A site that needs a feature `Permissions-Policy` refuses, such as geolocation for a map, sends its own `'permissions-policy': 'geolocation=(self)'`. It replaces kay's.
 
+## Redirect only to your own pages
+
+A `redirect()` that takes its target from the request, such as a `?next=` value, sends visitors wherever a crafted link says. `kay check` reports a target that is not written as a path of the site (`external-redirect`). Wrap the value in `localPath(value, fallback)`, which gives the fallback for anything that is not a path of this site: `redirect(localPath(ctx.query.next, '/account'))`. For a URL you chose, allow it with a `// kay-allow external-redirect` comment.
+
 ## Rate limits
 
 A rate limit answers 429 once a client has posted too often. Set it under `protect` in an action's third argument.
@@ -284,7 +288,9 @@ export default defineConfig({
 })
 ```
 
-Each entry is an IPv4 or IPv6 range or a single address. Cloudflare publishes the full list.
+Each entry is an IPv4 or IPv6 range or a single address. Cloudflare publishes the full list. Add `trustPrivate: false` to trust those ranges alone, when the private network holds machines that are not your proxies.
+
+A forwarded value that is not an IP address is ignored, and the visitor counts by the address that reached the server.
 
 Pass `X-Forwarded-Proto` from the proxy on every location, websockets included. kay's cookies are `Secure`, and the session is named `__Host-kay_session` over https, so a request that says `http` reads no session.
 
@@ -323,6 +329,19 @@ A module without `cors` refuses every other origin. The module's rule is the onl
 ## Links built from data
 
 A URL bound to an `href`, `src`, `action`, `formaction`, `xlink:href`, `poster` or `data` keeps its scheme only when it is `http`, `https`, `mailto`, `tel`, `sms` or `blob`, a `data:` image, audio or video that is not SVG, or a `data:` plain text, CSV, PDF or JSON file, or has none, as a path does. Any other, `javascript:` first, goes out as `unsafe:javascript:...`, which a browser does nothing with, on the server and in islands alike.
+
+## Answer only to your own host
+
+A page of another site can point its own domain at your server's address and have a visitor's browser talk to it (DNS rebinding). In production, `security.hosts` refuses a request whose `Host` is not yours with a 421.
+
+```ts
+export default defineConfig({
+  site: 'https://www.example.com',
+  security: { hosts: true },
+})
+```
+
+`true` allows the host of `site` and the hosts of `i18n` alone. List more names in an array: `hosts: ['example.com']`. Localhost and IP addresses always pass, so a health check or a collector reaching the server by address works.
 
 ## A post from another site
 

@@ -17,7 +17,7 @@ import { avifQuality, pruneVariants, serveImages, VARIANT_KEEP_MS, variantLevel,
 import { drawing } from '../src/server/image-format'
 import { stripImageMetadata } from '../src/server/image-metadata'
 import { decodePng, encodePng } from '../src/server/png'
-import { remoteAllowed, remoteImages, remotePatterns } from '../src/server/remote'
+import { cacheKey, remoteAllowed, remoteImages, remotePatterns } from '../src/server/remote'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
@@ -970,7 +970,7 @@ describe('remote images', () => {
     photo = Bun.file(HERO)
     setSystemTime(new Date(Date.now() + 10 * 60_000))
 
-    const key = (n: number) => Bun.hash(`${origin}/photos/hero.png?n=${n}`).toString(36)
+    const key = (n: number) => cacheKey(`${origin}/photos/hero.png?n=${n}`)
 
     for (let n = 1; n <= 5; n++)
       expect((await at(`/photos/hero.png?n=${n}`)).status).toBe(200)

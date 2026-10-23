@@ -247,6 +247,39 @@ describe('async-reply', () => {
   })
 })
 
+describe('external-redirect', () => {
+  const server = (body: string) => `--- server\n${body}\n---\np x`
+  const found = (body: string) => lints(server(body)).filter(d => d.code === 'external-redirect').map(d => d.at)
+
+  it('reports a redirect whose target is a value, whatever it holds', () => {
+    expect(found('redirect(ctx.query.next)')).toEqual(['ctx.query.next'])
+    expect(found('const to = ctx.query.next\nctx.redirect(to)')).toEqual(['to'])
+    expect(found('redirect(`${ctx.query.next}`)')).toEqual(['`${ctx.query.next}`'])
+    expect(found('redirect(ctx.query.next + "/a")')).toHaveLength(1)
+    expect(found('redirect(a ? "/a" : ctx.query.next)')).toHaveLength(1)
+    expect(found('redirect("//evil.example")')).toHaveLength(1)
+    expect(found('redirect("/\\\\evil.example")')).toHaveLength(1)
+    expect(found('redirect("https://example.com/")')).toHaveLength(1)
+  })
+
+  it('leaves a path of the site and localPath() alone', () => {
+    expect(found('redirect("/login")')).toEqual([])
+    expect(found('redirect(`/posts/${ctx.params.id}`)')).toEqual([])
+    expect(found('redirect("/posts/" + ctx.params.id)')).toEqual([])
+    expect(found('redirect(a ? "/a" : "/b")')).toEqual([])
+    expect(found('ctx.redirect(localPath(ctx.query.next, "/account"))')).toEqual([])
+    expect(found('other.redirect(ctx.query.next)')).toEqual([])
+    expect(found('// kay-allow external-redirect\nredirect(url)')).toEqual([])
+  })
+
+  it('reads a plain module too', () => {
+    const guard = 'export default guard(({ redirect, query }) => redirect(query.next))\n'
+
+    expect(moduleChecks(guard).map(d => d.code)).toEqual(['external-redirect'])
+    expect(moduleChecks(guard.replace('query.next', '\'/login\''))).toEqual([])
+  })
+})
+
 describe('the checks that read a module', () => {
   it('leaves a fence or module declaring a name twice to the type check, which reports it', () => {
     const twice = 'import theme from \'./theme.css\'\nconst a = 1\nconst a = 2\n'

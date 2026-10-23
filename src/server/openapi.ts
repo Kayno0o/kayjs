@@ -4,7 +4,7 @@ import type { ActionOptions } from './actions'
 import type { ApiGuard } from './api-modules'
 import type { LoadedGuard } from './guards'
 import type { ServedPaths } from './served-paths'
-import { basename, posix, relative } from 'node:path'
+import { posix } from 'node:path'
 import { NON_ROOT_TRAILING_SLASH } from '../runtime/base'
 import { escape } from '../runtime/escape'
 import { inLocale, passGuards } from './actions'
@@ -46,7 +46,7 @@ export interface DocumentedAction {
   schema: unknown
   // What `tool` on the action sets, by itself or beside its description.
   tool: { name?: string | undefined, description?: string | undefined }
-  // The files of the guards covering it, shown relative to `root`.
+  // The files of the guards covering it.
   guards: string[]
 }
 
@@ -71,7 +71,8 @@ export interface Operation {
   'parameters'?: Parameter[]
   'requestBody'?: RequestBody
   'responses': Record<string, Schema>
-  'x-kay-guards'?: string[]
+  // Set on a route behind a guard, which the file names of are not shared.
+  'x-kay-guarded'?: true
   // Set on a route that opted in to being an MCP tool, with what its `detail.tool` sets: the name and description the tool takes in place of the operation's.
   'x-kay-tool'?: { name?: string | undefined, description?: string | undefined }
   // Called as kay's `action()` calls are, which an MCP tool does, rather than as a plain JSON `POST`.
@@ -182,9 +183,9 @@ function belowRoot(path: string, apiRoot: string): string {
   return path.startsWith(apiRoot) ? path.slice(apiRoot.length) : path
 }
 
-// An OpenAPI 3.1 document of every route the modules serve, read from the schemas their routes declare, and of the actions that opted in to being tools; a route behind a guard names it, as `x-kay-guards`.
+// An OpenAPI 3.1 document of every route the modules serve, read from the schemas their routes declare, and of the actions that opted in to being tools; a route behind a guard says so, as `x-kay-guarded`, without the guard's path.
 // Each operation has an `operationId`, the route's own `detail.operationId` as written or its method and path: `get_items_id` for `GET /api/items/{id}`. The MCP tools are named after them, made safe as names.
-export function openApiDocument(modules: MountedApi[], options: { title: string, version: string, base: string, root?: string, apiPath?: string }, actions: DocumentedAction[] = []): Schema {
+export function openApiDocument(modules: MountedApi[], options: { title: string, version: string, base: string, apiPath?: string }, actions: DocumentedAction[] = []): Schema {
   const paths: Record<string, Record<string, Operation>> = {}
   const apiRoot = options.apiPath ?? API_PREFIX
   // Routes for every method, which give way to a route for one method wherever it was declared.
@@ -209,7 +210,7 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
           ...parameters(path, hooks),
           ...hooks.body !== undefined && { requestBody: { required: true, content: content(hooks.body, holdsFile(hooks.body) ? 'multipart/form-data' : 'application/json') } },
           responses: responses(hooks.response),
-          ...module.guards.length > 0 && { 'x-kay-guards': module.guards.map(guard => guard.path) },
+          ...module.guards.length > 0 && { 'x-kay-guarded': true },
           ...tool && { 'x-kay-tool': tool },
         }
 
@@ -276,7 +277,7 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
   }
 
   for (const action of actions) {
-    const post = actionOperation(action, tools, options.root)
+    const post = actionOperation(action, tools)
 
     if (post)
       paths[action.url] = { post }
@@ -286,11 +287,9 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
 }
 
 // The operation an action is as a tool, named free of `taken`; none for one taking a file, which does not go as an argument.
-export function actionOperation(action: DocumentedAction, taken: Set<string>, root?: string): Operation | undefined {
+export function actionOperation(action: DocumentedAction, taken: Set<string>): Operation | undefined {
   if (holdsFile(action.schema))
     return undefined
-
-  const guards = action.guards.map(file => root === undefined ? basename(file) : relative(root, file))
 
   return {
     'operationId': toolName(action.tool.name ?? snakeCase(action.name), taken),
@@ -298,7 +297,7 @@ export function actionOperation(action: DocumentedAction, taken: Set<string>, ro
     ...action.tool.description !== undefined && { summary: action.tool.description },
     'requestBody': { required: true, content: content(action.schema, 'application/json') },
     'responses': { 200: { description: 'OK' } },
-    ...guards.length > 0 && { 'x-kay-guards': guards },
+    ...action.guards.length > 0 && { 'x-kay-guarded': true },
     'x-kay-action': true,
   }
 }
@@ -423,7 +422,9 @@ export async function guardRefusal(guards: LoadedGuard[], context: { request: Re
 }
 
 // The document at `/api/openapi.json` (under the API path), and the reference page when asked for, behind the guard of the API directory itself when it has one.
-export function serveOpenApi(app: Elysia, document: Schema, config: OpenApiConfig, guards: LoadedGuard[], options: ActionOptions, apiPath?: string): void {
+export function serveOpenApi(app: Elysia, full: Schema, config: OpenApiConfig, guards: LoadedGuard[], options: ActionOptions, apiPath?: string): void {
+  // With no guard on the API directory the document is open to anyone, so the routes behind a guard of their own are left out of it.
+  const document = guards.length > 0 ? full : withoutGuarded(full)
   const json = JSON.stringify(document)
   const admitted = async (context: { request: Request }, answer: () => Response) => {
     const response = (await guardRefusal(guards, context, options)) ?? answer()
@@ -446,6 +447,19 @@ export function serveOpenApi(app: Elysia, document: Schema, config: OpenApiConfi
   }
 }
 
+function withoutGuarded(document: Schema): Schema {
+  const paths: Record<string, Record<string, Operation>> = {}
+
+  for (const [path, methods] of Object.entries(document.paths as Record<string, Record<string, Operation>>)) {
+    const open = Object.entries(methods).filter(([, operation]) => operation['x-kay-guarded'] !== true)
+
+    if (open.length > 0)
+      paths[path] = Object.fromEntries(open)
+  }
+
+  return { ...document, paths }
+}
+
 // A body or an answer: its type and schema.
 function schemaBlock(described: object): string {
   const [type, { schema }] = Object.entries((described as RequestBody).content)[0]!
@@ -461,7 +475,7 @@ function referencePage(document: Schema, href: string): string {
       `<h2><code>${method.toUpperCase()} ${escape(path)}</code></h2>`,
       operation.summary === undefined ? '' : `<p>${escape(operation.summary)}</p>`,
       operation.description === undefined ? '' : `<p>${escape(operation.description)}</p>`,
-      operation['x-kay-guards'] ? `<p>Guarded by ${operation['x-kay-guards'].map(file => `<code>${escape(file)}</code>`).join(', ')}</p>` : '',
+      operation['x-kay-guarded'] ? '<p>Guarded</p>' : '',
       operation.parameters ? `<h3>Parameters</h3><ul>${operation.parameters.map(parameter => `<li><code>${escape(String(parameter.name))}</code> in ${String(parameter.in)}${parameter.required === true ? ', required' : ''}: <code>${escape(JSON.stringify(parameter.schema))}</code></li>`).join('')}</ul>` : '',
       operation.requestBody ? `<h3>Body</h3>${schemaBlock(operation.requestBody)}` : '',
       `<h3>Responses</h3><dl>${Object.entries(operation.responses).map(([status, response]) => `<dt>${status}</dt><dd>${response.content !== undefined ? schemaBlock(response) : escape(String(response.description))}</dd>`).join('')}</dl>`,

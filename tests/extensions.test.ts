@@ -304,7 +304,7 @@ async function checkIn(root: string): Promise<{ code: number, stdout: string, st
 function expectServed({ code, stdout, stderr }: { code: number, stdout: string, stderr: string }) {
   expect(stderr).not.toContain('error')
   expect(code).toBe(0)
-  const served = JSON.parse(stdout.slice(stdout.indexOf('{'))) as { login: string, fr: string, action: string, posted: unknown, style: string, register: string, home: string, who: unknown, ping: string, account: unknown, session: unknown, me: unknown, denied: number, admin: number, staff: number, count: unknown, openapi: { paths: Record<string, { get: { 'x-kay-guards'?: string[] } }> }, csp: string, old: [number, string] }
+  const served = JSON.parse(stdout.slice(stdout.indexOf('{'))) as { login: string, fr: string, action: string, posted: unknown, style: string, register: string, home: string, who: unknown, ping: string, account: unknown, session: unknown, me: unknown, denied: number, admin: number, staff: number, count: unknown, openapi: { paths: Record<string, { get: { 'x-kay-guarded'?: boolean } }> }, csp: string, old: [number, string] }
   const hash = (text: string) => `'sha256-${new Bun.CryptoHasher('sha256').update(text).digest('base64')}'`
 
   // The server plugin built from a function is built once.
@@ -342,8 +342,8 @@ function expectServed({ code, stdout, stderr }: { code: number, stdout: string, 
   // The app's guard at the same level replaces the library's.
   expect(served.staff).toBe(200)
   expect(served.count).toEqual({ count: 1 })
-  expect(served.openapi.paths['/api/auth/session']?.get['x-kay-guards']).toEqual(['_guard.ts'])
-  expect(served.openapi.paths['/api/auth/admin/stats']?.get['x-kay-guards']).toEqual(['_guard.ts', 'auth/admin/_guard.ts'])
+  expect(served.openapi.paths['/api/auth/session']?.get['x-kay-guarded']).toBe(true)
+  expect(served.openapi.paths['/api/auth/admin/stats']?.get['x-kay-guarded']).toBe(true)
 
   // Config: the app's `seo.name` wins, the library's `description` fills in, and both heads are carried.
   expect(served.home).toContain('<title>App</title>')

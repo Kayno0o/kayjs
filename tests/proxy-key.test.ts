@@ -60,6 +60,15 @@ async function status(app: Awaited<ReturnType<typeof pages>>, path: string, head
 }
 
 describe('proxy.key', () => {
+  it('sends the security headers with its 403', async () => {
+    const app = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: HEADER } })
+    const refused = await app.handle(new Request('http://localhost/'))
+
+    expect(refused.status).toBe(403)
+    expect(refused.headers.get('x-content-type-options')).toBe('nosniff')
+    expect(refused.headers.get('content-security-policy')).toContain('default-src')
+  })
+
   it('refuses a request without the key, or with another, and serves the right one', async () => {
     const app = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: HEADER } })
 
