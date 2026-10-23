@@ -197,9 +197,11 @@ export function pgData(source: PgJobsSource) {
 
   const handle = pgHandle(db)
   let closing: Promise<void> | undefined
+  let forget: (() => void) | undefined
 
   // Ends the polling and timers of every store and the room membership this process held, then the pool when the store opened it from a URL; a connection the app handed in stays open, as it is the app's. Closing twice is the same as once.
   const close = async () => {
+    forget?.()
     closing ??= (async () => {
       await handle.close()
 
@@ -211,7 +213,7 @@ export function pgData(source: PgJobsSource) {
   }
 
   // A `kay dev` reload closes the store of the module that opened it, which then runs again and opens its own.
-  onReload(close)
+  forget = onReload(close)
 
   const stores = { sessions: pgSessions(handle), cache: pgCache(handle), jobs: jobsAfter(db, async () => handle.db()), rates: pgRates(handle), rooms: pgRooms(handle), vitals: pgVitals(handle), live: pgLive(handle), ...typeof source === 'string' && { database: source }, notifications: pgNotifications(handle) } satisfies { [Kind in Exclude<keyof AppStore, 'database'>]-?: NonNullable<AppStore[Kind]> } & { sessions: DeletableSessionStore }
 
