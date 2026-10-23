@@ -100,6 +100,6 @@ effect(() => {
 
 onCleanup(unmark)
 ---
-div(part="root" {...rest} ref={element => panel = element} id={panelId} popover="manual" data-placement={placement} style={`${style ? `${style}; ` : ''}position-anchor: ${name}`})
+div(part="root" {...rest} ref={element => panel = element} id={panelId} popover="manual" data-placement={placement} style={[style, `position-anchor: ${name}`].filter(Boolean).join('; ')})
   slot
 span(part="stand" ref={element => stand = element} popover="manual" aria-hidden="true")

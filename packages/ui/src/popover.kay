@@ -48,5 +48,5 @@ function toggled(event: ToggleEvent) {
 }
 ---
 | {trigger({ 'popovertarget': panelId, 'aria-expanded': shown() ? 'true' : 'false', 'style': `anchor-name: ${anchor}` })}
-div(part="root" {...rest} ref={element => panel = element} id={panelId} popover="auto" data-placement={placement} style={`${style ? `${style}; ` : ''}position-anchor: ${anchor}`} onToggle={toggled})
+div(part="root" {...rest} ref={element => panel = element} id={panelId} popover="auto" data-placement={placement} style={[style, `position-anchor: ${anchor}`].filter(Boolean).join('; ')} onToggle={toggled})
   slot
