@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, mock, setSystemTime, test } from 'bun:te
 import { files, memoryFiles } from 'kay/server'
 import { scratchDir } from 'kay/test'
 import { encodePng } from '../../../src/server/png'
+import { cacheKey } from '../../../src/server/remote'
 import { setupStorage } from '../../../src/server/storage'
 import { configure } from '../src/settings'
 
@@ -113,8 +114,8 @@ test('shows the variants an unused upload has, read from the variants directory 
   const other = await upload('posts')
 
   try {
-    await writeFile(join(variants, `stored-${Bun.hash(stray).toString(36)}-abc-640.webp`), 'x')
-    await writeFile(join(variants, `stored-${Bun.hash(stray).toString(36)}-card-def.jpg`), 'x')
+    await writeFile(join(variants, `stored-${cacheKey(stray)}-abc-640.webp`), 'x')
+    await writeFile(join(variants, `stored-${cacheKey(stray)}-card-def.jpg`), 'x')
     aged()
 
     const scan = await unusedUploads()

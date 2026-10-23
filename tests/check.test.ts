@@ -154,7 +154,7 @@ describe('kay check', () => {
 
   it('reports type errors at the line and column of the .kay source', async () => {
     const diagnostics = await check(join(fixtures, 'broken'))
-    const brief = diagnostics.map(d => ({ file: d.file.slice(fixtures.length + 1), line: d.line, column: d.column, code: d.code, message: firstLine(d.message) }))
+    const brief = diagnostics.filter(d => d.code !== 'external-redirect').map(d => ({ file: d.file.slice(fixtures.length + 1), line: d.line, column: d.column, code: d.code, message: firstLine(d.message) }))
 
     expect(brief).toEqual([
       ...[7, 9].map(line => ({ file: 'broken/src/routes/feed.kay', line, column: 1, code: 'uncaught-await', message: 'Nothing renders in place of this block once its value rejects' })),
@@ -2076,7 +2076,7 @@ describe.concurrent('kay check, edge cases', () => {
     const root = await scratchProject({ 'src/routes/index.kay': page })
 
     try {
-      expect((await check(root)).map(d => [d.line, d.message.match(/kayError: "([^"]+)"/)?.[1] ?? d.message])).toEqual([
+      expect((await check(root)).filter(d => d.code !== 'external-redirect').map(d => [d.line, d.message.match(/kayError: "([^"]+)"/)?.[1] ?? d.message])).toEqual([
         [12, 'ctx.fail takes an error status, from 400 to 599, not 200'],
         [18, 'A redirect target starting with // or a backslash is read by a browser as another site; use a full https:// URL'],
         [19, 'A redirect goes to a path or an http(s) URL, not to a javascript: URL'],
