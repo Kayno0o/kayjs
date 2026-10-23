@@ -8,7 +8,7 @@ import type { AuthPagesConfig, AuthPagesOptions, UserMaker } from './pages'
 import type { AuthStore } from './store'
 import type { OwnTest } from './test'
 import { existsSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { normalize, resolve } from 'node:path'
 import process from 'node:process'
 import { s } from 'kay'
 import { configError } from 'kay/library'
@@ -128,6 +128,15 @@ function underRoot(url: string, root: string): string {
   return file === undefined ? url : `sqlite://${resolve(root, file)}`
 }
 
+const ABSOLUTE_SQLITE = /^sqlite:\/\/(\/.*)$/
+
+// The same database written two ways (a relative path, or an absolute one) is the same url once resolved under the root.
+function sameDatabase(a: string, b: string, root: string): boolean {
+  const resolved = (url: string) => underRoot(url, root).replace(ABSOLUTE_SQLITE, (_, file: string) => `sqlite://${normalize(file)}`)
+
+  return resolved(a) === resolved(b)
+}
+
 // Every table of the database that is not kayjs-auth's own, which sharing the app's database must leave alone: pg-orm's sync would drop them.
 function foreignTables(names: readonly string[]): RegExp {
   return new RegExp(`^(?!(?:${names.join('|')})$)`)
@@ -173,7 +182,7 @@ async function storeOf(store: StoreOption | undefined, root: string, shared: str
 
   const db = new orm.Database({ url: underRoot(url ?? 'sqlite://data/auth.db', root), tables: [...pg.authTables] })
 
-  await db.sync(!kept && url !== undefined && url === shared ? { ignoreTables: [foreignTables(pg.authTables.map(table => table.name))] } : undefined)
+  await db.sync(!kept && url !== undefined && shared !== undefined && sameDatabase(url, shared, root) ? { ignoreTables: [foreignTables(pg.authTables.map(table => table.name))] } : undefined)
 
   return pg.pgStore(db)
 }

@@ -7,7 +7,7 @@ import { session } from 'kay/server'
 import { createAuth } from '../src/auth'
 import { createUserCommand, readFromTerminal, typedSecret } from '../src/createUserCommand'
 import { memoryAuthStore } from '../src/memoryStore'
-import { authExtension, auth as authFrom, authPages } from '../src/pages'
+import { authExtension, auth as authFrom, authPages, LOAD_AUTH } from '../src/pages'
 import { SECRET } from './helpers/app'
 
 const FIXTURE = `${import.meta.dir}/fixture`
@@ -64,6 +64,21 @@ describe('the command is reached from the extension', () => {
     const [symbol] = Object.getOwnPropertySymbols(lone)
 
     await expect((lone as unknown as Record<symbol, () => Promise<unknown>>)[symbol!]!()).rejects.toThrow('the `server` of auth() is not the `plugin`')
+  })
+})
+
+describe('kay auth create-user over the app\'s store', () => {
+  test('loads the app\'s auth with the database of the config store', async () => {
+    const seen: (string | undefined)[] = []
+    const extension = Object.assign({ name: 'probe' }, { [LOAD_AUTH]: async (_root: string, _extensions: string[], database?: string) => {
+      seen.push(database)
+
+      return auth
+    } })
+    const config = { extensions: [extension], store: { database: 'sqlite:///data/app.sqlite' } } as KayConfig
+
+    expect((await run(['shared@example.com'], PASSWORD, config)).code).toBe(0)
+    expect(seen).toEqual(['sqlite:///data/app.sqlite'])
   })
 })
 

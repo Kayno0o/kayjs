@@ -347,6 +347,32 @@ describe('the store', () => {
       own.close()
     })
 
+    test('shares the database of the app\'s store when KAYJS_AUTH_DATABASE_URL writes the same file another way', async () => {
+      await withAppTable()
+      process.env.KAYJS_AUTH_DATABASE_URL = 'sqlite://data/app.sqlite'
+      await inDevelopment(async () => registerOn({}, `sqlite://${shared()}`))
+      process.env.KAYJS_AUTH_DATABASE_URL = `sqlite://${root}/data/../data/app.sqlite`
+      await inDevelopment(async () => registerOn({}, `sqlite://${shared()}`))
+
+      expect(tables().names).toContain('kay_users')
+      expect(tables().things).toEqual([{ id: 'kept' }])
+    })
+
+    test('builds its auth again only for another database of the app\'s store', async () => {
+      const first = await boot(auth({ captcha: false }), root, [], `sqlite://${shared()}`)
+
+      expect(await boot(auth({ captcha: false }), root, [], `sqlite://${shared()}`)).toBeDefined()
+
+      const extension = auth({ captcha: false })
+      const a = await boot(extension, root, [], `sqlite://${shared()}`)
+      const b = await boot(extension, root, [], `sqlite://${shared()}`)
+      const c = await boot(extension, root, [], `sqlite://${join(root, 'data/other.sqlite')}`)
+
+      expect(first).toBeDefined()
+      expect(b).toBe(a)
+      expect(c).not.toBe(a)
+    })
+
     test('creates or migrates nothing in a database while a static export starts the server', async () => {
       await withAppTable()
       await inDevelopment(async () => {
