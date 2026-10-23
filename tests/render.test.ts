@@ -102,6 +102,13 @@ describe('a script with a computed type', () => {
     expect(html).toContain('\\u003c!--')
     expect(html).not.toContain('<\\!--')
   })
+
+  it('reads a global its type holds outside a declaration of the same name among its children', async () => {
+    const html = await renderKay('---\nconst { json } = props<{ json: string }>()\n---\nscript(type={String("application/ld+json")})\n  const String = () => "module"\n  | {json}{String("x")}', props)
+
+    expect(html).toContain('\\u003c!--')
+    expect(html).not.toContain('<\\!--')
+  })
 })
 
 describe('describeField', () => {
