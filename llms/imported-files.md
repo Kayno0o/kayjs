@@ -34,7 +34,7 @@ img(src={logo} alt="Logo")
 - A package starting itself as its threads' worker, as an emscripten build does, gets a bundle of its own.
 - One building its worker in memory from a blob, as qr-scanner does, works as it is.
 - Only a relative path written as a string, naming a file, is shipped: a directory, a template with a part, an absolute path or a call inside a comment is left as written.
-- A worker bundles as an island does, its stylesheets dropped, its API imports as stubs and `publicEnv` external, but without the config's `plugins`.
+- A worker bundles as an island does, its stylesheets dropped, its API imports as stubs and the public env module external, but without the config's `plugins`.
 - A worker that fails to build fails the build, each error at its `file:line:column`.
 - When an island or its worker compiles wasm, kay's `content-security-policy` adds `'wasm-unsafe-eval'` to `script-src`, and `worker-src 'self' blob:` when one starts a worker from a blob.
 - They join a `csp` setting its own `script-src` or `worker-src` too, unless it sets that directive to `false` or `'none'`.

@@ -399,9 +399,7 @@ describe('the naming conventions', () => {
       ...[...text.matchAll(/defineTable\(\s*['"`]([^'"`]+)['"`]/g)].map(([, table]) => table!).filter(table => !table.startsWith('kay_')),
     ]
 
-    expect(drift(find, [
-      { library: 'cms', match: /^.kcms_session.$/, issue: '#1691, the name before 1.70 kept three minors' },
-    ])).toEqual([])
+    expect(drift(find, [])).toEqual([])
   })
 
   it('end the name of an error class a library exports with Error', () => {

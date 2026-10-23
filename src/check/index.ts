@@ -5,7 +5,6 @@ import type { LintLevels } from '../compiler/lints'
 import type { FaviconConfig, HealthConfig, I18nConfig, ImagesConfig, KayConfig, KayExtension, LiveConfig, ManifestConfig, SeoConfig } from '../config'
 import type { Duration } from '../runtime/duration'
 import type { McpConfig } from '../server/api-modules'
-import type { EnvSchema } from '../server/env'
 import type { OpenApiConfig } from '../server/openapi'
 import type { Redirects } from '../server/redirects'
 import type { TypeScope } from './diagnose'
@@ -77,7 +76,7 @@ export interface CheckOptions {
   manifest?: ManifestConfig | undefined
   // Where `images.card.logo` is checked as the boot draws it.
   images?: ImagesConfig | undefined
-  publicEnv?: EnvSchema | undefined
+  publicEnv?: boolean | undefined
   // Reports each route of the app no guard covers, which the server refuses.
   requireGuards?: boolean | undefined
   // Reports the actions offered as tools that bot protection alone stands before.

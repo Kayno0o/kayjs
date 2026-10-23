@@ -281,6 +281,6 @@ export const env = defineEnv(s.Object({
 
 Nothing else of the environment reaches the browser. The server refuses to boot when an `s.Public` field names a variable that looks secret, such as `DATABASE_URL`, `API_KEY`, `SIGNING_KEY` or `SENTRY_DSN`, or one with `SECRET`, `PASSWORD`, `PRIVATE`, `TOKEN`, `JWT` or `CREDENTIAL` in its name. Every visitor reads those, so keep them in `defineEnv` without `s.Public`.
 
-A value that is an address with a username and password in it is refused too. A key meant for the browser, such as `MAP_KEY` or `STRIPE_PUBLISHABLE_KEY`, passes. The `publicEnv` key of `kay.config.ts` still works until 1.73; move its fields to `defineEnv`.
+A value that is an address with a username and password in it is refused too. A key meant for the browser, such as `MAP_KEY` or `STRIPE_PUBLISHABLE_KEY`, passes.
 
 <ReadMore href="/llms/environment#environment">Required-in-production fields, empty variables, `kay env` and how a prerendered page sees public variables are in the full server reference.</ReadMore>

@@ -5,7 +5,7 @@ import { localPath } from 'kay'
 import { keyedDigest, READ_METHODS } from 'kay/library'
 import { wording } from 'kay/words'
 import { authOf } from './auth-like'
-import { activePasswords, HOST_SESSION_COOKIE, LEGACY_SESSION_COOKIE, SESSION_COOKIE, sessionCookiesOf, signedInBy } from './password'
+import { activePasswords, HOST_SESSION_COOKIE, SESSION_COOKIE, sessionCookiesOf, signedInBy } from './password'
 import { screenPath } from './paths'
 import { ACTIONS } from './roles'
 import { settings } from './settings'
@@ -170,7 +170,6 @@ export async function signOutOf(ctx: GuardContext): Promise<void> {
 
   ctx.cookies.delete({ name: HOST_SESSION_COOKIE, path: '/' })
   ctx.cookies.delete({ name: SESSION_COOKIE, path: '/' })
-  ctx.cookies.delete({ name: LEGACY_SESSION_COOKIE, path: '/' })
   await authOf(ctx)?.signOut?.()
 }
 

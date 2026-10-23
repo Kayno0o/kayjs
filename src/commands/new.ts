@@ -8,7 +8,7 @@ import { USAGES } from './usages'
 
 export const scaffold: Command = {
   usage: USAGES.new,
-  options: { 'kay': { type: 'string' }, 'template': { type: 'string' }, 'with': { type: 'string' }, 'forge': { type: 'string' }, 'host': { type: 'string' }, 'runner': { type: 'string' }, 'without': { type: 'string' }, 'yes': { type: 'boolean', short: 'y' }, 'dry-run': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
+  options: { 'kay': { type: 'string' }, 'template': { type: 'string' }, 'with': { type: 'string' }, 'forge': { type: 'string' }, 'runner': { type: 'string' }, 'without': { type: 'string' }, 'yes': { type: 'boolean', short: 'y' }, 'dry-run': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals: [dir] }, refuse) => {
     const format = formatOption('new', values.format)
@@ -29,14 +29,10 @@ export const scaffold: Command = {
         return 1
       }
 
-      // `--host` named the forge before `kay dev --host` named an address: it still works, saying so.
-      if (values.host !== undefined && values.forge === undefined && values.quiet !== true)
-        console.error('kay new: --host is now --forge (kay dev --host is an address); --host still works until 1.73')
-
-      const forge = values.forge ?? values.host
+      const { forge } = values
 
       if (forge !== undefined && !HOSTS.includes(forge as Host)) {
-        reportFailure(`kay new: --${values.forge === undefined ? 'host' : 'forge'} is ${String(forge)}, which is none of ${HOSTS.join(', ')}`, format)
+        reportFailure(`kay new: --forge is ${String(forge)}, which is none of ${HOSTS.join(', ')}`, format)
 
         return 1
       }

@@ -6,7 +6,7 @@ import { apiUrl } from 'kay'
 import { configError } from 'kay/library'
 import entriesApi from './api/entries'
 import { HINT_COOKIE } from './page-link'
-import { activePasswords, HOST_SESSION_COOKIE, LEGACY_SESSION_COOKIE, SESSION_COOKIE, sessionCookiesOf } from './password'
+import { activePasswords, HOST_SESSION_COOKIE, SESSION_COOKIE, sessionCookiesOf } from './password'
 import { settings } from './settings'
 
 // The route file is imported by path, which the checker cannot follow into a .kay module.
@@ -60,7 +60,6 @@ export function cmsSignOut(site: CookieSite): void {
 
   site.cookies.delete(HOST_SESSION_COOKIE)
   site.cookies.delete(SESSION_COOKIE)
-  site.cookies.delete(LEGACY_SESSION_COOKIE)
   site.cookies.delete(HINT_COOKIE)
 }
 

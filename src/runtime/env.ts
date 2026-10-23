@@ -4,9 +4,6 @@ import type { Register } from './checks'
 // Where the server, as it boots, and the island entry, as it loads, keep the values `publicEnv` reads.
 export const PUBLIC_ENV = /* @__PURE__ */ Symbol.for('kay.publicEnv')
 
-// What a config's `publicEnv` holds once read.
-export type PublicEnvOf<Config> = Config extends { publicEnv: infer Schema extends TSchema } ? Static<Schema> : Record<never, never>
-
 // Type only: the fields of a `defineEnv` schema marked `s.Public`, which its result carries so `kay check` can type `publicEnv` from the modules declaring them.
 declare const PUBLIC_FIELDS: unique symbol
 
@@ -21,14 +18,14 @@ type Intersection<Union> = (Union extends unknown ? (value: Union) => void : nev
 // The `s.Public` fields of every `defineEnv` result a module exports.
 export type PublicFieldsOfModule<Module> = Intersection<{ [Name in keyof Module]: Module[Name] extends { readonly [PUBLIC_FIELDS]: infer Fields } ? Fields : never }[keyof Module]>
 
-// What `publicEnv` in kay.config.ts declares, typed through `Register` by `kay check`.
+// The `s.Public` fields, typed through `Register` by `kay check`.
 export type PublicEnv = Register extends { publicEnv: infer Values extends object } ? Readonly<Values> : Readonly<Record<never, never>>
 
 function values(): Record<string, unknown> {
   const held = (globalThis as { [PUBLIC_ENV]?: Record<string, unknown> })[PUBLIC_ENV]
 
   if (!held)
-    throw new Error('kay: the app declares no public environment variable, in kay.config.ts or with s.Public in defineEnv')
+    throw new Error('kay: the app declares no public environment variable, with s.Public in defineEnv')
 
   return held
 }

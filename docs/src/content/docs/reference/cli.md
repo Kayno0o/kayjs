@@ -54,7 +54,7 @@ kay new my-app --template app --without docker
 | `--template blank\|server\|site\|app` | The preset: one bare static page, an Elysia server (the default), a static site, or a server with kayjs-auth sign-in and a websocket island |
 | `--with <features>` | Adds comma-separated [features](#features) to the preset, such as `tailwind,tests` |
 | `--without <features>` | Drops features from the preset |
-| `--forge forgejo\|github` | Where the repository lives, which decides the CI workflow. `--host` still works until 1.73, with a warning |
+| `--forge forgejo\|github` | Where the repository lives, which decides the CI workflow. |
 | `--runner <label>` | The runner label the CI jobs run on: `debian` on Forgejo and `ubuntu-latest` on GitHub by default |
 | `--kay <dependency>` | The `kay` dependency the project installs, such as a path to a packed copy. By default the minor of the kay running the command |
 | `-y` | Takes the `server` preset without asking |
@@ -519,7 +519,7 @@ kay env
 
 `kay env` lists the environment variables the project declares, without running the server entry. Each has its source, its type, whether it is required (`always`, `production` or `optional`) and its default.
 
-It reads the `defineEnv` schemas in the modules under `src`, `publicEnv`, each library in `extensions`, and kay's own `PORT`, `HOST`, `SITE_URL`, `KAY_SECRET` and the deprecated `ORIGIN`, plus `KAY_PROXY_KEY` and `KAY_PROXY_KEY_FILE` while `proxy.key` is set. A module that does not load is named as not read. See [Environment variables](/essentials/data-loading#environment-variables).
+It reads the `defineEnv` schemas in the modules under `src`, each library in `extensions`, and kay's own `PORT`, `HOST`, `SITE_URL` and `KAY_SECRET`, plus `KAY_PROXY_KEY` and `KAY_PROXY_KEY_FILE` while `proxy.key` is set. A module that does not load is named as not read. See [Environment variables](/essentials/data-loading#environment-variables).
 
 The modules under `src` are imported, so their top-level code runs.
 
@@ -654,7 +654,7 @@ kay migrate astro . --outdir ../kay-site
 | Option | Effect |
 | --- | --- |
 | `[dir]` | The Astro project, the current directory by default |
-| `--outdir <dir>` | Writes there instead of next to the `.astro` files. A directory with no `package.json` gets a whole kay project. `--out` is the older spelling and still works until 1.73, with a warning |
+| `--outdir <dir>` | Writes there instead of next to the `.astro` files. A directory with no `package.json` gets a whole kay project. |
 | `--dry-run` | Lists what it would write, and writes none |
 
 The [Astro guide](/migrating/from-astro) shows what it translates and how to finish what it lists.

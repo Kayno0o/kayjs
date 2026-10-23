@@ -2,6 +2,7 @@ import { readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
+import { loadConfig } from '../src/config'
 import { publicEnvFiles } from '../src/server/env-state'
 import { scratchDir } from './scratch'
 
@@ -48,6 +49,14 @@ describe('s.Public with no publicEnv in the config', () => {
 
     expect(entries.some(text => text.includes(`${base}/_kay/env.js`))).toBe(true)
   }, 60_000)
+})
+
+describe('publicEnv in kay.config.ts', () => {
+  it('is refused, naming s.Public in its place', async () => {
+    const root = await project({}, 'export default { publicEnv: {} }\n')
+
+    await expect(loadConfig(root)).rejects.toThrow('mark the fields an island reads `s.Public`')
+  })
 })
 
 describe('the scan for s.Public', () => {

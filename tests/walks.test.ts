@@ -85,7 +85,7 @@ describe('boot problems of a scanned project', () => {
       Bun.write(join(root, 'public/_kay/env.js'), ''),
     ])
 
-    const options = { publicEnv: {} as never }
+    const options = { publicEnv: true }
     const feeds = [{ collection: 'posts', path: '/rss.xml', localized: false }]
     const clashing = await bootProblems(root, options, feeds, (await writeShadowTypes(root, options)).served)
 

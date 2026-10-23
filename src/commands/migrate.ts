@@ -9,10 +9,10 @@ import { buildingWithoutEnv } from '../server/env-state'
 import { count, done, formatOption, printDocument, printFailure, shellQuote } from './command'
 import { USAGES } from './usages'
 
-// `kay migrate astro` translates an Astro project's `.astro` files and content config, in place or into `--outdir` (`--out` as before), a directory with no package.json getting the kay project around them, and lists what is left to do by hand; `kay migrate content` rewrites the entry files of the folder collections whose `migrations` carried them to the schema's shape.
+// `kay migrate astro` translates an Astro project's `.astro` files and content config, in place or into `--outdir`, a directory with no package.json getting the kay project around them, and lists what is left to do by hand; `kay migrate content` rewrites the entry files of the folder collections whose `migrations` carried them to the schema's shape.
 export const migrate: Command = {
   usage: USAGES.migrate,
-  options: { 'outdir': { type: 'string' }, 'out': { type: 'string' }, 'dry-run': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
+  options: { 'outdir': { type: 'string' }, 'dry-run': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: 2,
   run: async ({ values, positionals }) => {
     const [from, dir = '.'] = positionals
@@ -34,8 +34,8 @@ export const migrate: Command = {
     }
 
     if (from === 'content') {
-      if (values.outdir !== undefined || values.out !== undefined) {
-        printFailure('migrate', 'kay migrate content rewrites the entry files in place and takes no --outdir or --out', format)
+      if (values.outdir !== undefined) {
+        printFailure('migrate', 'kay migrate content rewrites the entry files in place and takes no --outdir', format)
 
         return 1
       }
@@ -43,16 +43,7 @@ export const migrate: Command = {
       return migrateContent(resolve(dir), format, values.quiet === true, values['dry-run'] === true)
     }
 
-    if (typeof values.out === 'string' && typeof values.outdir === 'string' && resolve(values.out) !== resolve(values.outdir)) {
-      printFailure('migrate', '--out is the older spelling of --outdir, and the two name different directories; keep --outdir', format)
-
-      return 1
-    }
-
-    if (typeof values.out === 'string' && values.outdir === undefined && values.quiet !== true)
-      console.error('kay migrate: --out is now --outdir; --out still works until 1.73')
-
-    const outdir = values.outdir ?? values.out
+    const { outdir } = values
     const dryRun = values['dry-run'] === true
     const out = typeof outdir === 'string' ? resolve(outdir) : resolve(dir)
     let migrated: Awaited<ReturnType<typeof migrateAstroProject>>

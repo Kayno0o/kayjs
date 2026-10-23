@@ -191,10 +191,9 @@ describe('a paginated list', () => {
 })
 
 describe('paginate, the size of a page', () => {
-  it('names it pageSize, and keeps size as its old name', () => {
+  it('names it pageSize', () => {
     const list = paginate([1, 2, 3], 2)
 
     expect(list.pageSize).toBe(2)
-    expect(list.size).toBe(2)
   })
 })

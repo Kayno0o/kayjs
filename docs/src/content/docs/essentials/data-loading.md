@@ -183,7 +183,7 @@ export const env = defineEnv(s.Object({
 
 `kay env` lists every variable the project declares, for a deploy script to compare with a compose file or an env file. It does not read the server's environment or run the server entry.
 
-It finds the `defineEnv` schemas in the modules under `src`, `publicEnv`, the variables of each library in `extensions` (kayjs-mail's `MAIL_*` ones and kayjs-ai's provider keys, with nothing wired in the app), and kay's own `PORT`, `HOST`, `SITE_URL`, `KAY_SECRET` and the deprecated `ORIGIN`.
+It finds the `defineEnv` schemas in the modules under `src`, the variables of each library in `extensions` (kayjs-mail's `MAIL_*` ones and kayjs-ai's provider keys, with nothing wired in the app), and kay's own `PORT`, `HOST`, `SITE_URL`, and `KAY_SECRET`.
 
 ```sh
 kay env

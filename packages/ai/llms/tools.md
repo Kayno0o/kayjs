@@ -73,7 +73,7 @@ const outcome = await site.call(assistant, { messages })
 
 ### What the model is told when a call goes wrong
 
-Every failure is a result with `ok` false (`failed` is still set until 1.73), in words the model can correct from, never an exception, so the loop goes on:
+Every failure is a result with `ok` false, in words the model can correct from, never an exception, so the loop goes on:
 
 | case | result |
 | --- | --- |

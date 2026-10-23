@@ -5,7 +5,7 @@ import { basename, dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { parse } from 'devalue'
-import { Elysia, t } from 'elysia'
+import { Elysia } from 'elysia'
 import { treeEntries } from '../src/build/files'
 import { servedByTheApp, servedLocales } from '../src/check/diagnose'
 import { readShadowSettings } from '../src/check/shadow'
@@ -855,11 +855,9 @@ describe('an extension\'s config', () => {
     expect(config.security).toEqual({ csp: { 'img-src': ['https://one.example', 'https://app.example'], 'font-src': ['https://fonts.example'] } })
   })
 
-  it('keeps a schema whole, and follows the extensions options given in code name', () => {
-    const schema = t.Object({ MAP_KEY: t.String() })
-    const config = mergeConfig({ publicEnv: schema, extensions: [{ name: 'file', config: { lang: 'de' } }] }, { extensions: [{ name: 'code', config: { lang: 'it', publicEnv: t.Object({ OTHER: t.String() }) } }] })
+  it('follows the extensions options given in code name', () => {
+    const config = mergeConfig({ extensions: [{ name: 'file', config: { lang: 'de' } }] }, { extensions: [{ name: 'code', config: { lang: 'it' } }] })
 
-    expect(config.publicEnv).toBe(schema)
     expect(config.lang).toBe('it')
   })
 })

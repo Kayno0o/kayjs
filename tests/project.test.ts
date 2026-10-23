@@ -2,7 +2,6 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
-import { s } from 'kay'
 import { clientDir, outputDir, testWorker } from '../src/build/assets'
 import { setContentMode } from '../src/content/load'
 import { clientOptionsOf, modeOf, offlineOf, PRODUCTION, projectPaths, projectRootOf, renderOptionsOf, resolveProject } from '../src/project'
@@ -85,7 +84,7 @@ describe('clientOptionsOf', () => {
   it('minifies kay build\'s browser build unless the config says not to, and maps and swaps islands in development', () => {
     expect(clientOptionsOf({ base: '/docs/' }, { dev: false, underKayDev: false }, { exported: true })).toMatchObject({ minify: true, base: '/docs', sourcemap: false, hot: false, inspect: false, exported: true })
     expect(clientOptionsOf({ minify: false }, { dev: false, underKayDev: false }, {})).toMatchObject({ minify: false, sourcemap: 'external' })
-    expect(clientOptionsOf({ publicEnv: s.Object({ API: s.String() }) }, { dev: true, underKayDev: true })).toMatchObject({ minify: false, publicEnv: true, sourcemap: true, hot: true, inspect: true })
+    expect(clientOptionsOf({ publicEnv: true }, { dev: true, underKayDev: true })).toMatchObject({ minify: false, publicEnv: true, sourcemap: true, hot: true, inspect: true })
   })
 })
 

@@ -163,7 +163,7 @@ describe('the tools', () => {
 
     const [result] = fakeAi.asked[1]!.messages.at(-1)!.results!
 
-    expect(result!.failed).toBe(true)
+    expect(result!.ok).toBe(false)
     expect(result!.content).toContain(`only ${parts} parts`)
     expect(result!.content).toContain(`no part ${parts + 8}`)
   })
@@ -210,7 +210,7 @@ describe('the chat action', () => {
 
     const results = fakeAi.asked[1]!.messages.at(-1)!.results!
 
-    expect(results.map(result => result.failed)).toEqual([true, true])
+    expect(results.map(result => result.ok)).toEqual([false, false])
     expect(results[1]!.content).toContain('There is no tool named')
   })
 

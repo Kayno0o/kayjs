@@ -1,10 +1,10 @@
 import type { DevTool } from '../src/runtime/dev-tool'
 import type { DevHead, DevResponse } from '../src/server/dev'
+import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test'
-import { t } from 'elysia'
 import { figuresOf } from '../src/build/footprint-models'
 import { startDevTool } from '../src/runtime/dev-tool'
 import { PUBLIC_ENV } from '../src/runtime/env'
@@ -1260,11 +1260,12 @@ describe('the dev tool', () => {
     await Bun.write(join(dir, 'routes/index.kay'), 'p Home\n')
     Object.assign(process.env, given)
 
-    const publicEnv = t.Object({ KAY_TEST_ZOOM: t.Numeric(), KAY_TEST_MAP_KEY: t.String(), KAY_TEST_SESSION: t.String(), KAY_TEST_FEED: t.String(), KAY_TEST_REGION: t.String(), KAY_TEST_HEX: t.String(), KAY_TEST_AWS: t.String(), KAY_TEST_PUBLISHABLE_KEY: t.String() })
+    await Bun.write(join(dir, 'src/env.ts'), 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({ KAY_TEST_ZOOM: s.Public(s.Numeric()), KAY_TEST_MAP_KEY: s.Public(s.String()), KAY_TEST_SESSION: s.Public(s.String()), KAY_TEST_FEED: s.Public(s.String()), KAY_TEST_REGION: s.Public(s.String()), KAY_TEST_HEX: s.Public(s.String()), KAY_TEST_AWS: s.Public(s.String()), KAY_TEST_PUBLISHABLE_KEY: s.Public(s.String()) }))\n')
+
     const { happyDOM } = window as unknown as { happyDOM: { setURL: (url: string) => void } }
     const { href } = location
     const asked: string[] = []
-    let app = await pages({ root: dir, routes, dev: true, publicEnv })
+    let app = await pages({ root: dir, routes, dev: true, publicEnv: true })
     const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string) => {
       asked.push(url)
 
@@ -1313,7 +1314,8 @@ describe('the dev tool', () => {
 
       typeFilter('#kay-dev-env', '')
 
-      // No `publicEnv`: nothing reaches the browser, and the tab says so after the restart.
+      // No public field: nothing reaches the browser, and the tab says so after the restart.
+      await rm(join(dir, 'src/env.ts'))
       app = await pages({ root: dir, routes, dev: true })
       window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ changed: 'kay.config.ts', ms: 1 }) }))
       await Bun.sleep(20)

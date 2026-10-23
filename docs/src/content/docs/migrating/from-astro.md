@@ -107,7 +107,7 @@ In the `.kay` file, the code an item concerns is commented out under a `// kay m
 - **Tailwind 3**: kay builds with Tailwind 4, so upgrade the stylesheets with `bunx @tailwindcss/upgrade`.
 - **Attributes on `<body>`**: kay writes `body` itself, so move them to an element inside it.
 - **`Astro.self`**: a component rendering itself imports its own `.kay` file under a name and renders that.
-- **`import.meta.env`**: declare the variable in a `defineEnv` schema from `kay/server` and read it from there, or in `publicEnv` for an island (see [Data loading](/essentials/data-loading)).
+- **`import.meta.env`**: declare the variable in a `defineEnv` schema from `kay/server` and read it from there, or as an `s.Public` field for an island (see [Data loading](/essentials/data-loading)).
 - **A script from another host**: kay's Content-Security-Policy blocks it until `security: { csp: { 'script-src': ['https://unpkg.com'] } }` in `kay.config.ts` allows it.
 - **UnoCSS**: kay has no plugin for it, so its packages are left out and a class only UnoCSS knows (a variant group, a shortcut, a custom variant, a theme colour) passes through unstyled; port them to Tailwind 4.
 - **A `@kaynooo/*` range** carried over: the registry may hold no version in it, which fails `bun install`.

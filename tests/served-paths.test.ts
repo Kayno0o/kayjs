@@ -2,7 +2,6 @@ import { readdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
-import { t } from 'elysia'
 import { bootProblems } from '../src/check/boot'
 import { ServedPaths } from '../src/server/served-paths'
 import { scratchDir } from './scratch'
@@ -99,7 +98,7 @@ describe('served paths', () => {
       Bun.write(join(root, 'public/rss.xml'), ''),
     ])
 
-    const messages = (await bootProblems(root, { publicEnv: t.Object({}) }, [{ collection: 'posts', path: '/rss.xml', localized: false }])).map(problem => problem.message)
+    const messages = (await bootProblems(root, { publicEnv: true }, [{ collection: 'posts', path: '/rss.xml', localized: false }])).map(problem => problem.message)
 
     expect(messages).toEqual([expect.stringMatching(/^kay: `publicEnv` and \S+\/public\/_kay\/env\.js both serve \/_kay\/env\.js$/), expect.stringMatching(/^kay: \S+\/public\/rss\.xml and the feed of the collection posts both serve \/rss\.xml$/)])
   })

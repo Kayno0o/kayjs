@@ -2,7 +2,6 @@ import type { PagesOptions } from '../src/server/app'
 import type { ClientBuild } from '../src/server/client'
 import { rm } from 'node:fs/promises'
 import { describe, expect, it } from 'bun:test'
-import { t } from 'elysia'
 import { resolveProject } from '../src/project'
 import { servePages } from '../src/server/app'
 import { MANIFEST } from '../src/server/favicon'
@@ -88,7 +87,7 @@ describe('a refused config naming files of the project', () => {
     await Bun.write(`${dir}/public/_kay/env.js`, '')
     await Bun.write(`${dir}/public/llms.txt`, 'plain')
 
-    const env = await refusal({ publicDir: `${dir}/public`, publicEnv: t.Object({}) })
+    const env = await refusal({ publicDir: `${dir}/public`, publicEnv: true })
 
     expect(env.message).toContain('`publicEnv` and')
     expect(env.message).toContain('both serve /_kay/env.js')
@@ -116,7 +115,7 @@ describe('a refused config naming files of the project', () => {
     await Bun.write(`${dir}/src/env.ts`, env('STRIPE_SECRET'))
     await Bun.write(`${dir}/routes/index.kay`, 'h1 Home\n')
 
-    const secret = await refusal({ routes: `${dir}/routes`, publicEnv: { type: 'object', properties: {} } as never }, dir)
+    const secret = await refusal({ routes: `${dir}/routes`, publicEnv: true }, dir)
 
     expect(secret.message).toContain('s.Public declares STRIPE_SECRET')
     expect(secret.builds).toBe(0)
@@ -124,7 +123,7 @@ describe('a refused config naming files of the project', () => {
     await rm(`${dir}/src/env.ts`)
     await Bun.write(`${dir}/src/map.kay`, '---\nimport { s } from \'kay\'\nconst field = s.Public(s.String())\n---\nh1 Map\n')
 
-    const fence = await refusal({ routes: `${dir}/routes`, publicEnv: { type: 'object', properties: {} } as never }, dir)
+    const fence = await refusal({ routes: `${dir}/routes`, publicEnv: true }, dir)
 
     expect(fence.message).toContain('src/map.kay declares an s.Public field')
     expect(fence.builds).toBe(0)

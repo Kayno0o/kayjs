@@ -470,7 +470,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   }
 
   if (options.publicEnv)
-    servePublicEnv(app, options.publicEnv, publicModules)
+    servePublicEnv(app, publicModules)
 
   // `kay dev` restarts the process on every change, so it has nothing to wait for.
   if (mode.devRoutes) {

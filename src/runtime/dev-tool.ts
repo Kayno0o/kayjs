@@ -2353,7 +2353,7 @@ function envTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     try {
       const response = await ownFetch(win, ENV_URL, { cache: 'no-store' })
 
-      // The route is there only when `publicEnv` is declared; any other answer is a failure to read it.
+      // The route is there only when a field is `s.Public`; any other answer is a failure to read it.
       if (response.status !== 404) {
         if (!response.ok)
           throw new Error(`the server answered ${response.status}`)
@@ -2384,7 +2384,7 @@ function envTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
 
     if (values === undefined) {
       tab.count(0)
-      content.replaceChildren(tool.make('div', 'empty', 'This app sends no public env to the browser: no `defineEnv` field is `s.Public` and kay.config.ts declares no `publicEnv`.'))
+      content.replaceChildren(tool.make('div', 'empty', 'This app sends no public env to the browser: no `defineEnv` field is `s.Public`.'))
 
       return
     }

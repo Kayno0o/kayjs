@@ -1,7 +1,7 @@
 import type { GuardContext } from 'kay'
 import { describe, expect, test } from 'bun:test'
 import { memoryRates } from 'kay/library'
-import { HOST_SESSION_COOKIE, LEGACY_SESSION_COOKIE, passwordGuard, Passwords, SESSION_COOKIE, sessionCookieOf, signedInBy } from '../src/password'
+import { HOST_SESSION_COOKIE, passwordGuard, Passwords, SESSION_COOKIE, sessionCookieOf, signedInBy } from '../src/password'
 
 class Denied {
   constructor(readonly status: number, readonly message?: string) {}
@@ -45,13 +45,6 @@ describe('the password guard\'s sign-in cookie', () => {
     expect(signedInBy.get(ctx.request)).toEqual({ name: 'admin', roles: ['admin'] })
     expect(cookie.httpOnly).toBe(true)
     expect(cookie.sameSite).toBe('lax')
-  })
-
-  test('still signs in a cookie under the name from before 1.70, and sets the new name', async () => {
-    const cookie = passwords.issue('admin', false)
-
-    expect(cookie.name).toBe(SESSION_COOKIE)
-    expect(await statusOf(context(cookie.value, LEGACY_SESSION_COOKIE))).toBe(200)
   })
 
   test('refuses a visitor with no cookie or a forged one with a 401', async () => {
@@ -148,7 +141,7 @@ describe('the secret and the lazily loaded guard', () => {
 })
 
 describe('signing out', () => {
-  test('signing out ends a cookie under the name from before 1.70 and deletes every name', async () => {
+  test('signing out ends the cookie and deletes both names', async () => {
     const { configure } = await import('../src/settings')
     const { signOutOf } = await import('../src/access')
     const { activePasswords } = await import('../src/password')
@@ -157,14 +150,14 @@ describe('signing out', () => {
     configure({ guard })
 
     const cookie = activePasswords()!.issue('editor', false).value
-    const ctx = context(cookie, LEGACY_SESSION_COOKIE)
+    const ctx = context(cookie)
     const deleted: string[] = []
 
     ctx.cookies.delete = ((options: { name: string }) => void deleted.push(options.name)) as typeof ctx.cookies.delete
 
     await signOutOf(ctx)
-    expect(deleted).toEqual([HOST_SESSION_COOKIE, SESSION_COOKIE, LEGACY_SESSION_COOKIE])
-    expect(await statusOf(context(cookie, LEGACY_SESSION_COOKIE), guard)).toBe(401)
+    expect(deleted).toEqual([HOST_SESSION_COOKIE, SESSION_COOKIE])
+    expect(await statusOf(context(cookie), guard)).toBe(401)
   })
 
   test('ends a copy of the cookie, which the guard then refuses with a 401', async () => {

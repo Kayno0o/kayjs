@@ -87,14 +87,6 @@ describe('--dry-run', () => {
     expect(await Bun.file(join(root, 'src/routes/index.kay')).exists()).toBe(false)
   })
 
-  it('migrate warns on --out, which stays until 1.73', async () => {
-    const root = await project({ 'src/pages/index.astro': '---\n---\n<h1>Hi</h1>\n' })
-    const { stderr, code } = await kay(['migrate', 'astro', '--out', 'out', '--dry-run'], root)
-
-    expect(code).toBe(0)
-    expect(stderr).toContain('--out is now --outdir; --out still works until 1.73')
-  })
-
   it('migrate content lists the files it would rewrite and rewrites none', async () => {
     const entry = '{"name":"Old"}'
     const root = await project({
@@ -152,11 +144,5 @@ describe('--format json', () => {
       expect(code).toBe(1)
       expect(JSON.parse(stdout)).toMatchObject({ errors: 1, warnings: 0 })
     }
-  })
-
-  it('new warns that --host stays until 1.73', async () => {
-    const { stderr } = await kay(['new', 'app', '--template', 'blank', '--host', 'github', '--dry-run'], await project({}))
-
-    expect(stderr).toContain('until 1.73')
   })
 })

@@ -10,13 +10,10 @@ import { log } from './log'
 export const SESSION_COOKIE = 'kay_editor_session'
 // Its name over https: a browser takes the `__Host-` prefix only from the site itself, secure, on the whole site and with no domain, so a subdomain cannot replace it. The plain names are still read, for a sign-in made before.
 export const HOST_SESSION_COOKIE = `__Host-${SESSION_COOKIE}`
-// The name before 1.70, still read so no editor is signed out by the rename; it is never set again.
-export const LEGACY_SESSION_COOKIE = 'kcms_session'
 
-// The sign-in cookie a request holds, under its name or the one before 1.70.
 // Both names, as a browser holding the two must have each copy ended.
 export function sessionCookiesOf(cookies: { get: (name: string) => string | null }): string[] {
-  return [cookies.get(HOST_SESSION_COOKIE), cookies.get(SESSION_COOKIE), cookies.get(LEGACY_SESSION_COOKIE)].filter(value => value != null)
+  return [cookies.get(HOST_SESSION_COOKIE), cookies.get(SESSION_COOKIE)].filter(value => value != null)
 }
 
 export function sessionCookieOf(cookies: { get: (name: string) => string | null }): string | undefined {

@@ -163,13 +163,13 @@ describe('s.Secret and a required-in-production string with no default', () => {
 
 describe('kay env', () => {
   const files = {
-    'kay.config.ts': 'import { Elysia, t } from \'elysia\'\n\nconst lib = { name: \'lib\', env: t.Object({ LIB_KEY: t.String({ description: \'the library\\\'s key\', requiredInProduction: true }), LIB_MODE: t.String({ default: \'fast\' }) }) }\n\nexport default { favicon: false, extensions: [lib], publicEnv: t.Object({ MAP_KEY: t.Numeric({ default: 1 }), SITE: t.Optional(t.String({ format: \'uri\' })) }) }\n',
+    'kay.config.ts': 'import { Elysia, t } from \'elysia\'\n\nconst lib = { name: \'lib\', env: t.Object({ LIB_KEY: t.String({ description: \'the library\\\'s key\', requiredInProduction: true }), LIB_MODE: t.String({ default: \'fast\' }) }) }\n\nexport default { favicon: false, extensions: [lib] }\n',
     'src/server.ts': 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nthrow new Error(\'the entry must not run\')\nexport const env = defineEnv(s.Object({ ENTRY_ONLY: s.String() }))\n',
     'src/env.ts': 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nconsole.log(\'loading the env\')\n\nexport const env = defineEnv(s.Object({\n  DATABASE_URL: s.String(),\n  SESSION_SECRET: s.String({ default: \'dev\', requiredInProduction: true }),\n  PORT: s.Integer({ default: 8080 }),\n  DEBUG: s.Optional(s.Boolean()),\n}))\n',
     'src/broken.ts': 'import { defineEnv } from \'kay/server\'\nimport \'./missing\'\n\nexport const env = defineEnv({} as never)\n',
   }
 
-  it('lists an s.Public field as public, and sends the browser an environment with no publicEnv in the config', async () => {
+  it('lists an s.Public field as public, and sends the browser an environment', async () => {
     const root = await project({
       'kay.config.ts': 'export default { favicon: false }\n',
       'src/env.ts': 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({ MAP_KEY: s.Public(s.String()), DATABASE_URL: s.String() }))\n',
@@ -228,10 +228,8 @@ describe('kay env', () => {
     expect(row('DEBUG')).toEqual({ name: 'DEBUG', source: 'src/env.ts', type: 'boolean', required: false })
     expect(row('LIB_KEY')).toEqual({ name: 'LIB_KEY', source: 'the extension lib', type: 'string', required: 'production', description: 'the library\'s key' })
     expect(row('LIB_MODE')).toEqual({ name: 'LIB_MODE', source: 'the extension lib', type: 'string', required: false, default: 'fast' })
-    expect(row('MAP_KEY')).toEqual({ name: 'MAP_KEY', source: 'publicEnv in kay.config.ts', type: 'number', required: false, default: 1 })
-    expect(row('SITE')).toEqual({ name: 'SITE', source: 'publicEnv in kay.config.ts', type: 'string (uri)', required: false })
     expect(row('ENTRY_ONLY')).toBeUndefined()
-    expect(listed.variables.filter(variable => variable.source === 'kay').map(variable => variable.name)).toEqual(['PORT', 'HOST', 'SITE_URL', 'ORIGIN', 'KAY_SECRET'])
+    expect(listed.variables.filter(variable => variable.source === 'kay').map(variable => variable.name)).toEqual(['PORT', 'HOST', 'SITE_URL', 'KAY_SECRET'])
     expect(listed.unread.map(({ file }) => file)).toEqual(['src/broken.ts'])
     expect(listed.unread[0]!.error).toContain('missing')
   })
@@ -532,7 +530,6 @@ describe('kay env against compose and .env.example', () => {
     expect(text).toContain('# required in production\nDISCORD_ID=\n')
     expect(text).toContain('# MODE=fast\n')
     expect(text).toContain('# KAY_SECRET=\n')
-    expect(text).not.toContain('ORIGIN')
 
     expect((await kay(['env', '--write'], root)).stderr).toContain('.env.example already lists every variable')
     expect(await Bun.file(join(root, '.env.example')).text()).toBe(text)

@@ -389,7 +389,7 @@ describe('kay command line', () => {
     }
   })
 
-  it('writes a GitHub Actions workflow with annotations for --host github, and none for Forgejo', async () => {
+  it('writes a GitHub Actions workflow with annotations for --forge github, and none for Forgejo', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-new-'))
 
     try {
@@ -427,7 +427,7 @@ describe('kay command line', () => {
     }
   })
 
-  it('runs the CI on the runner --runner names, the host\'s own image otherwise, and keeps --host working as --forge with a warning', async () => {
+  it('runs the CI on the runner --runner names, the host\'s own image otherwise', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-new-'))
 
     try {
@@ -442,14 +442,10 @@ describe('kay command line', () => {
       expect(await Bun.file(join(root, 'plain/.forgejo/workflows/test.yml')).text()).toContain('runs-on: debian\n')
       await expect(createProject(join(root, 'bad'), { kay: '^1.0.0', runner: 'a b\nc' })).rejects.toThrow('kay new: --runner is "a b\\nc"')
 
-      const old = await kay(['new', 'old', '--kay', '^1.0.0', '--template', 'server', '--host', 'github', '--runner', 'mine'], root)
+      const named = await kay(['new', 'named', '--kay', '^1.0.0', '--template', 'server', '--forge', 'github', '--runner', 'mine'], root)
 
-      expect(old).toMatchObject({ code: 0, stderr: expect.stringContaining('--host is now --forge') })
-
-      const quiet = await kay(['new', 'quiet', '--kay', '^1.0.0', '--template', 'server', '--host', 'github', '--quiet'], root)
-
-      expect(quiet).toMatchObject({ code: 0, stderr: '' })
-      expect(await Bun.file(join(root, 'old/.github/workflows/test.yml')).text()).toContain('runs-on: mine')
+      expect(named.code).toBe(0)
+      expect(await Bun.file(join(root, 'named/.github/workflows/test.yml')).text()).toContain('runs-on: mine')
 
       const renamed = await kay(['new', 'renamed', '--kay', '^1.0.0', '--template', 'server', '--forge', 'github', '--quiet'], root)
 
@@ -477,7 +473,6 @@ describe('kay command line', () => {
       expect(await detectHost(await remote('https://github.com/me/site', 'https'))).toBe('github')
       expect(await detectHost(await remote('git@git.example.com:me/github.com.git', 'other'))).toBe('forgejo')
       expect(await detectHost(join(root, 'no-remote'))).toBe('forgejo')
-      expect(await kay(['new', 'app', '--host', 'gitlab'], root)).toMatchObject({ stdout: '', stderr: expect.stringContaining('kay new: --host is gitlab, which is none of forgejo, github\n'), code: 1 })
       expect(await kay(['new', 'app', '--forge', 'gitlab'], root)).toEqual({ stdout: '', stderr: 'kay new: --forge is gitlab, which is none of forgejo, github\n', code: 1 })
     }
     finally {

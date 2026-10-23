@@ -28,7 +28,6 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'nod
 import process from 'node:process'
 import { libraryMessageExtensions } from './build/manifests'
 import { KayError } from './compiler/errors'
-import { kayLog } from './runtime/log'
 import { appStore } from './server/app-store'
 import { bundled, importModule } from './server/bundle'
 import { publicEnvFiles } from './server/env-state'
@@ -47,7 +46,7 @@ export interface KayConfig {
   publicCache?: Record<string, Duration> | undefined
   minify?: boolean | undefined
   lang?: string | undefined
-  // The origin the site is public at, `https://example.com`: canonical links, social URLs and the sitemap are built from it. `SITE_URL` when left out, so one build serves each host it is deployed to; a `site` written here wins over `SITE_URL`. `ORIGIN` is read when both are unset, deprecated.
+  // The origin the site is public at, `https://example.com`: canonical links, social URLs and the sitemap are built from it. `SITE_URL` when left out, so one build serves each host it is deployed to; a `site` written here wins over `SITE_URL`.
   site?: string | undefined
   seo?: SeoConfig | undefined
   // What `/robots.txt` says besides pointing at the sitemap, or `false` to serve none: `{ disallow: ['/admin'] }`. Needs `site`, as the sitemap does.
@@ -141,8 +140,8 @@ export interface KayConfig {
   plugins?: BunPlugin[] | undefined
   // The app's own module for a kay library's settings, by the library's name: `{ '@kaynooo/kayjs-ui': './src/ui-settings.ts' }`. It replaces the module the library's package.json names as `"kay": { "settings" }`, on the server and in islands alike.
   settings?: Record<string, string> | undefined
-  /** Variables an island may read, as `publicEnv` from `kay`: `s.Object({ MAP_KEY: s.String() })`, read from the environment as the server boots, as `defineEnv` reads its own; no other variable reaches the browser. @deprecated Since 1.70, dropped in 1.73: mark the field `s.Public` in `defineEnv` instead. */
-  publicEnv?: EnvSchema | undefined
+  // Set by kay itself when `src` holds an `s.Public` field, which sends the browser its environment; kay.config.ts refuses it.
+  publicEnv?: boolean | undefined
   // The level of each lint `kay check`, `kay build`, `kay dev` and the editor report, or of each lint in a group, over its default: `{ 'positional-key': 'deny', 'seo': 'deny', 'unread-name': 'warn' }`. `kay explain` lists them.
   lints?: LintLevels | undefined
   // The app's one secret, at least 32 random characters: it seals `session()`'s cookie, signs form stamps, links to private files and the flash cookie, and gives `preview` its key, each under a key derived for its use. `KAY_SECRET` alone does the same, so this is for a secret kept elsewhere than the environment. A list, or commas in `KAY_SECRET`, rotates it: the first seals and signs, every one opens and verifies: sessions, kayjs-auth's sealed data, stamps, private-file links, the flash cookie and preview links, so a rotation breaks none of them. A `session()` called as a module loads reads `KAY_SECRET` only, as the config is not read yet, so a secret meant for sessions goes in `KAY_SECRET`. Development and tests derive one for the checkout; production without any refuses to boot a `session()`, and a production server using none refuses to start, as it would sign with a key of the process, which a restart changes and other replicas do not share; `KAY_EPHEMERAL_SECRET=1` starts it anyway, for a single throwaway server.
@@ -635,7 +634,7 @@ export function pageHooks(extensions: KayExtension[] | undefined): PageHook[] {
 
 export const CONFIG_FILE = 'kay.config.ts'
 
-// Gives the config back as written, so `kay check` reads the type of its `publicEnv` off it.
+// Gives the config back as written, so `kay check` reads the types of what it declares off it.
 export function defineConfig<Config extends KayConfig>(config: Config): Config {
   return config
 }
@@ -728,7 +727,10 @@ async function importConfig(root: string, fresh = false): Promise<KayConfig> {
 }
 
 // The keys `kay check` and `kay env` read in their own way, refused when they are not the shape they take.
-function checkedConfig({ checks, env }: KayConfig): void {
+function checkedConfig({ checks, env, publicEnv }: KayConfig): void {
+  if (publicEnv !== undefined)
+    throw new KayError('config-invalid', `kay: \`publicEnv\` in ${CONFIG_FILE} is gone: mark the fields an island reads \`s.Public\` in \`defineEnv\` instead`)
+
   if (checks !== undefined && !Array.isArray(checks))
     throw new KayError('config-invalid', `kay: \`checks\` in ${CONFIG_FILE} is a list of functions, not ${typeof checks}`)
 
@@ -784,7 +786,7 @@ function underlay(under: unknown, over: unknown): unknown {
   return merged
 }
 
-// A schema such as `publicEnv`'s carries symbol keys a merge would drop, so it stays whole like any value built by a class.
+// A value built by a class, such as a schema with symbol keys, stays whole: a merge would drop them.
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Object.getOwnPropertySymbols(value).length > 0)
     return false
@@ -794,35 +796,16 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return prototype === Object.prototype || prototype === null
 }
 
-let warnedOrigin = false
-
-// The site's URL the environment gives: `SITE_URL`, which the app set for kay and so fails loudly when wrong, else the deprecated `ORIGIN`, which SvelteKit's adapter-node reads and kay read before `SITE_URL`.
-// `ORIGIN` is generic and other tooling sets it, so one that is no bare http(s) origin is skipped, and one that is used is told once.
+// The site's URL the environment gives: `SITE_URL`, which the app set for kay and so fails loudly when wrong.
 export function siteFromEnv(): string | undefined {
-  const { SITE_URL, ORIGIN } = process.env
+  const { SITE_URL } = process.env
 
-  if (SITE_URL !== undefined && SITE_URL !== '')
-    return SITE_URL
-
-  const url = ORIGIN === undefined ? undefined : URL.parse(ORIGIN)
-
-  if (url === null || url === undefined || (url.protocol !== 'https:' && url.protocol !== 'http:') || url.pathname !== '/' || url.search !== '' || url.hash !== '')
-    return undefined
-
-  if (!warnedOrigin) {
-    warnedOrigin = true
-    kayLog('warn', 'the site is public at the origin ORIGIN holds, which kay reads until 1.73 only: set SITE_URL to it instead')
-  }
-
-  return ORIGIN
+  return SITE_URL !== undefined && SITE_URL !== '' ? SITE_URL : undefined
 }
 
-// A project with a `s.Public` field in `src` sends the browser an environment as one with `publicEnv` does: an empty schema stands for it, as the fields themselves register as `defineEnv` reads them.
+// A project with a `s.Public` field in `src` sends the browser an environment: `publicEnv` stands for it, as the fields themselves register as `defineEnv` reads them.
 function withPublicFields<Config extends KayConfig>(root: string, config: Config): Config {
-  if (config.publicEnv !== undefined || typeof Bun === 'undefined' || publicEnvFiles(root).length === 0)
-    return config
-
-  return { ...config, publicEnv: { type: 'object', properties: {} } as unknown as EnvSchema }
+  return typeof Bun === 'undefined' || publicEnvFiles(root).length === 0 ? config : { ...config, publicEnv: true }
 }
 
 function withSiteUrl<Config extends KayConfig>(config: Config): Config {

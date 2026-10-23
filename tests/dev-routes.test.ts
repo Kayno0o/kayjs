@@ -3,7 +3,6 @@ import type { PlumbingServed } from '../src/server/plumbing'
 import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
-import { t } from 'elysia'
 import { analytics, vitals } from '../src/server/analytics'
 import { DEV_ROUTES } from '../src/server/dev'
 import { plumbing } from '../src/server/plumbing'
@@ -102,7 +101,7 @@ describe('kay\'s plumbing in the dev tool\'s routes', () => {
       ...paths,
       security: { reports: true },
       preview: { secret: 'a'.repeat(32) },
-      publicEnv: t.Object({ KAY_TEST_MAP_KEY: t.String() }),
+      publicEnv: true,
       extensions: [analytics({ provider: 'plausible', domain: 'example.com' }), vitals()],
     }).finally(() => {
       delete process.env.KAY_TEST_MAP_KEY

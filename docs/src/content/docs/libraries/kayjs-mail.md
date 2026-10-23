@@ -59,8 +59,6 @@ In production the mailer reads its settings from the environment. `MAIL_URL` is 
 
 `smtps://` instead of `smtp://` speaks TLS from the start on any port. On a port other than 465 with `smtp://` a server not offering STARTTLS is refused, at the first mail and in a warning when the server starts. Set `MAIL_INSECURE=true` for a local Mailpit. A password in `MAIL_URL` overrides it, so a password never goes in clear.
 
-The names kayjs-mail read before 1.70, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_INSECURE`, `SMTP_DKIM_*`, `SMTP_FROM` and `SMTP_RATE_LIMIT`, still work until 1.73, with a warning naming the new one.
-
 Each mail sent is logged with how many recipients it went to at which domains, and not its subject, which can hold a visitor's name. Set `mailer({ logSubjects: true })` to log it, and `mailer({ logRecipients: true })` to name the recipients in full.
 
 What the environment has no variable for goes in `mailer({ smtp })`, merged over the SMTP it builds: `name` (the name the client greets the server with, the sender's domain by default), `timeout` (a string such as `'30s'`, 10 seconds by default), `maxConnections` (5 by default) and `rateLimit` (the most mails in a window, `{ max: 5, window: '1s' }`, unlimited by default). An option left out keeps the default.

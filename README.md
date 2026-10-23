@@ -53,7 +53,7 @@ In production the server serves what `kay build` wrote and bundles nothing at bo
 | `kay fmt [paths...] [--check]` | format `.kay` files |
 | `kay types [dir]` | write the types the editor's ESLint reads for `.kay` files, without checking |
 | `kay lint [keslint arguments]...` | write the types the lint of `.kay` files reads, then run the project's `keslint` on the arguments, with no `kay check` needed first |
-| `kay migrate astro [dir] [--out <dir>]` | translate an Astro project into `.kay` files, listing what is left by hand |
+| `kay migrate astro [dir] [--outdir <dir>]` | translate an Astro project into `.kay` files, listing what is left by hand |
 | `kay lsp --stdio` | language server for the editor extension in `editors/vscode` |
 
 ## Upgrading

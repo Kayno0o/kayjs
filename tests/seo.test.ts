@@ -192,64 +192,39 @@ describe('seo head', () => {
     expect(() => siteOrigin('example.com')).toThrow('kay: site is the origin')
   })
 
-  it('skips an ORIGIN that is no origin, which other tooling sets, and keeps a trailing slash, while a SITE_URL that is none still fails', async () => {
-    const before = { SITE_URL: process.env.SITE_URL, ORIGIN: process.env.ORIGIN }
+  it('reads a SITE_URL that is no origin as it is, and fails where the origin is needed', async () => {
+    const before = process.env.SITE_URL
 
-    delete process.env.SITE_URL
+    process.env.SITE_URL = '/x'
 
     try {
-      for (const origin of ['/x', 'null', 'http://localhost:4701/app', 'localhost:4701', 'ftp://example.com', 'http://localhost:4701?a=1']) {
-        process.env.ORIGIN = origin
-
-        expect((await loadConfig('tests/fixtures/seo')).site).toBeUndefined()
-        await pages({ root: 'tests/fixtures/seo', prebuilt: false })
-
-        expect(() => currentSiteOrigin()).toThrow('nor SITE_URL')
-      }
-
-      process.env.ORIGIN = 'http://localhost:4701/'
-
-      expect((await loadConfig('tests/fixtures/seo')).site).toBe('http://localhost:4701/')
-      await pages({ root: 'tests/fixtures/seo', prebuilt: false })
-
-      expect(currentSiteOrigin()).toBe('http://localhost:4701')
-
-      process.env.SITE_URL = '/x'
-
       expect((await loadConfig('tests/fixtures/seo')).site).toBe('/x')
     }
     finally {
-      for (const name of ['SITE_URL', 'ORIGIN'] as const) {
-        if (before[name] === undefined)
-          delete process.env[name]
-        else
-          process.env[name] = before[name]
-      }
+      if (before === undefined)
+        delete process.env.SITE_URL
+      else
+        process.env.SITE_URL = before
     }
   })
 
-  it('reads the site from ORIGIN when SITE_URL is unset, SITE_URL winning and the config before both, the cross-site check following it', async () => {
-    const before = { SITE_URL: process.env.SITE_URL, ORIGIN: process.env.ORIGIN }
-    const set = (env: { SITE_URL?: string | undefined, ORIGIN?: string | undefined }) => {
-      for (const name of ['SITE_URL', 'ORIGIN'] as const) {
-        if (env[name] === undefined)
-          delete process.env[name]
-        else
-          process.env[name] = env[name]
-      }
+  it('reads the site from SITE_URL, the config before it, the cross-site check following it', async () => {
+    const before = process.env.SITE_URL
+    const set = (url: string | undefined) => {
+      if (url === undefined)
+        delete process.env.SITE_URL
+      else
+        process.env.SITE_URL = url
     }
     const post = new Request('http://127.0.0.1:4701/contact', { method: 'POST', headers: { origin: 'http://localhost:4701' } })
 
     try {
-      for (const [env, expected] of [
-        [{ SITE_URL: 'https://a.example' }, 'https://a.example'],
-        [{ ORIGIN: 'http://localhost:4701' }, 'http://localhost:4701'],
-        [{ SITE_URL: 'https://a.example', ORIGIN: 'http://localhost:4701' }, 'https://a.example'],
-        [{ SITE_URL: '', ORIGIN: 'http://localhost:4701' }, 'http://localhost:4701'],
-        [{ ORIGIN: '' }, undefined],
-        [{}, undefined],
+      for (const [url, expected] of [
+        ['https://a.example', 'https://a.example'],
+        ['', undefined],
+        [undefined, undefined],
       ] as const) {
-        set(env)
+        set(url)
         await pages({ root: 'tests/fixtures/seo', prebuilt: false, base: '/kay' })
 
         if (expected === undefined)
@@ -258,7 +233,7 @@ describe('seo head', () => {
           expect(currentSiteOrigin()).toBe(expected)
       }
 
-      set({ ORIGIN: 'http://localhost:4701' })
+      set('http://localhost:4701')
       const app = await pages({ root: 'tests/fixtures/seo', prebuilt: false, base: '/kay' })
 
       expect(siteUrl('/contact')).toBe('http://localhost:4701/kay/contact')

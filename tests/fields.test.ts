@@ -1,5 +1,4 @@
 import type { FieldSchema } from '../src/runtime/form'
-import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { Elysia, t } from 'elysia'
 import { PUBLIC_ENV } from '../src/runtime/env'
@@ -98,27 +97,9 @@ describe('defineEnv', () => {
   })
 })
 
-describe('servePublicEnv', () => {
-  it('stops the boot naming a public variable missing, and serves only the declared ones', async () => {
-    expect(() => servePublicEnv(new Elysia(), t.Object({ KAY_TEST_MISSING: t.String() }))).toThrow('KAY_TEST_MISSING')
+describe('publicEnvModule', () => {
+  it('escapes what could close the script', () => {
     expect(publicEnvModule({ MAP_KEY: 'a</script>', ZOOM: 3 })).toBe('export default {"MAP_KEY":"a\\u003c/script>","ZOOM":3}\n')
-  })
-
-  it('refuses to boot with a variable named as a secret, a token, an API key or a database address', () => {
-    const names = ['KAY_TEST_STRIPE_SECRET', 'KAY_TEST_ACCESS_TOKEN', 'KAY_TEST_TOKEN_HASH', 'KAY_TEST_API_KEY', 'KAY_TEST_STRIPE_API_KEY', 'API_KEY', 'KAY_TEST_APIKEY', 'KAY_TEST_DATABASE_URL', 'KAY_TEST_SIGNING_KEY', 'KAY_TEST_ENCRYPTION_KEY', 'KAY_TEST_KEY', 'KAY_TEST_SENTRY_DSN', 'KAY_TEST_JWT', 'KAY_TEST_AUTH_JWT_SIGNER', 'KAY_TEST_AWS_CREDENTIALS', 'KAY_TEST_CREDENTIAL']
-
-    Object.assign(process.env, { KAY_TEST_MAP_KEY: 'pk', ...Object.fromEntries(names.map(name => [name, 'sk'])) })
-
-    try {
-      expect(() => servePublicEnv(new Elysia(), t.Object({ KAY_TEST_MAP_KEY: t.String() }))).not.toThrow()
-
-      for (const name of names)
-        expect(() => servePublicEnv(new Elysia(), t.Object({ KAY_TEST_MAP_KEY: t.String(), [name]: t.String() })), name).toThrow(`kay: publicEnv declares ${name}, which every visitor reads`)
-    }
-    finally {
-      for (const name of ['KAY_TEST_MAP_KEY', ...names])
-        delete process.env[name]
-    }
   })
 })
 
@@ -168,9 +149,9 @@ describe('s.Public', () => {
     const own = new Elysia()
     const other = new Elysia()
 
-    servePublicEnv(own, t.Object({}), [import.meta.path])
+    servePublicEnv(own, [import.meta.path])
     expect({ ...(globalThis as Record<symbol, object>)[PUBLIC_ENV] }).toMatchObject({ KAY_TEST_BOOT_ONE: 'one' })
-    servePublicEnv(other, t.Object({}), ['/elsewhere/src/env.ts'])
+    servePublicEnv(other, ['/elsewhere/src/env.ts'])
     expect({ ...(globalThis as Record<symbol, object>)[PUBLIC_ENV] }).toEqual({})
     expect(await (await other.handle(new Request('http://localhost/_kay/env.js'))).text()).toBe('export default {}\n')
     expect(await (await own.handle(new Request('http://localhost/_kay/env.js'))).text()).toContain('"KAY_TEST_BOOT_ONE":"one"')
@@ -197,8 +178,8 @@ describe('s.Public', () => {
     const own = new Elysia()
     const other = new Elysia()
 
-    servePublicEnv(own, t.Object({}), [import.meta.path])
-    servePublicEnv(other, t.Object({}), [])
+    servePublicEnv(own, [import.meta.path])
+    servePublicEnv(other, [])
     expect((await own.handle(new Request('http://localhost/_kay/env.js'))).status).toBe(500)
     expect((await other.handle(new Request('http://localhost/_kay/env.js'))).status).toBe(200)
   })
@@ -221,7 +202,7 @@ describe('s.Public', () => {
 function servePublicApp(): Elysia {
   const app = new Elysia()
 
-  servePublicEnv(app, t.Object({}), [import.meta.path])
+  servePublicEnv(app, [import.meta.path])
 
   return app
 }

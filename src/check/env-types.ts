@@ -151,7 +151,7 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
   const locales = i18n ? `, locales: ${i18n.locales.map(locale => JSON.stringify(locale)).join(' | ')}, messages: ${messages}` : ''
   const pageNames = named.length > 0 ? `, patterns: ${named.map(pattern => JSON.stringify(pattern)).join(' | ')}` : ''
   const modules = api.length > 0 ? `, api: ${apiTree(api)}` : ''
-  const publicTypes = [...config === undefined ? [] : [`PublicEnvOf<typeof import(${importSpecifier(config)}).default>`], ...publicModules.map(file => `PublicFieldsOfModule<typeof import(${importSpecifier(file)})>`)]
+  const publicTypes = publicModules.map(file => `PublicFieldsOfModule<typeof import(${importSpecifier(file)})>`)
   const publicEnv = publicTypes.length === 0 ? '' : `, publicEnv: ${publicTypes.join(' & ')}`
   const inferred = [
     ...app === undefined ? [] : [`app: typeof import(${importSpecifier(app)}).app`, `locals: LocalsOf<typeof import(${importSpecifier(app)}).app>`],
@@ -159,7 +159,7 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
   ]
 
   return [
-    'import type { Action, ApiRoutesOf, BoundProp, BoundValue, CheckedHref, CheckedHtml, ContextOfModule, ExtensionServersOf, FieldName, FunctionProp, HandedSignal, HandsPart, IslandProp, PlainIslandProp, LocalsOf, PublicEnvOf, PublicFieldsOfModule, ServerOfModule, Signal, Truthy, Unmatched, UnresolvedParameter } from \'kay\'',
+    'import type { Action, ApiRoutesOf, BoundProp, BoundValue, CheckedHref, CheckedHtml, ContextOfModule, ExtensionServersOf, FieldName, FunctionProp, HandedSignal, HandsPart, IslandProp, PlainIslandProp, LocalsOf, PublicFieldsOfModule, ServerOfModule, Signal, Truthy, Unmatched, UnresolvedParameter } from \'kay\'',
     ...content === undefined ? [] : ['import type { FeedPathsOf } from \'kay/content\''],
     ...(i18n?.messages.length ?? 0) > 1 ? ['import type { MergeMessages } from \'kay/i18n\''] : [],
     '',

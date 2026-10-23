@@ -18,12 +18,13 @@ describe('kay routes', () => {
       'import { Elysia } from \'elysia\'\n',
       'const lib = { name: \'lib\', api: { dir: \'lib/api\', prefix: \'lib\' }, server: new Elysia().get(\'/hooked\', () => 1) }',
       'const built = { name: \'built\', server: () => new Elysia() }\n',
-      'export default { requireGuards: true, publicEnv: {}, extensions: [lib, built, { name: \'modular\', serverModule: { path: \'./plugin\' } }], i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\', paths: { \'/about\': { fr: \'/a-propos\' } } }, redirects: { \'/old\': \'/\', \'/tmp\': { to: \'/\', permanent: false }, \'/gone\': { to: \'/\', status: 301 } } }\n',
+      'export default { requireGuards: true, extensions: [lib, built, { name: \'modular\', serverModule: { path: \'./plugin\' } }], i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\', paths: { \'/about\': { fr: \'/a-propos\' } } }, redirects: { \'/old\': \'/\', \'/tmp\': { to: \'/\', permanent: false }, \'/gone\': { to: \'/\', status: 301 } } }\n',
     ]
 
     await Promise.all([
       Bun.write(join(root, 'kay.config.ts'), config.join('\n')),
       Bun.write(join(root, 'src/server.ts'), 'export {}\n'),
+      Bun.write(join(root, 'src/env.ts'), 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({ MAP_KEY: s.Public(s.String({ default: \'x\' })) }))\n'),
       Bun.write(join(root, 'src/routes/about.kay'), '--- server\nexport const page = { guards: false }\n---\nh1 About\n'),
       Bun.write(join(root, 'src/routes/items/[id=integer].kay'), '--- server\nconst ids = [{ id: 1 }]\n\nexport const page = { guards: false, prerender: ids }\n---\nh1 Item\n'),
       Bun.write(join(root, 'src/api/chat.ts'), 'import { Elysia } from \'elysia\'\n\nconsole.log(\'connecting\')\nconsole.debug(\'debugging\')\nconsole.dir({ ok: 1 })\nprocess.stdout.write(\'written\\n\')\n\nexport default new Elysia().ws(\'/\', { message() {} }).options(\'/\', () => \'\')\n'),

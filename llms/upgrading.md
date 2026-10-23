@@ -12,6 +12,16 @@ kayjs-ui's `theme.css` has no rule left for the part classes its components stop
 
 kayjs-cms answers on `/_kay/cms` alone: the `/api/cms` path of 1.70 and before is no longer served, so point a webhook or a script at the new one.
 
+### The 1.70 names that were read for three minors are gone
+
+- kayjs-mail reads `MAIL_URL`, `MAIL_INSECURE`, `MAIL_DKIM_SELECTOR`, `MAIL_DKIM_PRIVATE_KEY`, `MAIL_DKIM_DOMAIN`, `MAIL_FROM` and `MAIL_RATE_LIMIT` alone: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER` and `SMTP_PASS` (now the login and server of `MAIL_URL`, such as `smtp://user:pass@mail.example.com:465`), `SMTP_INSECURE`, `SMTP_DKIM_*`, `SMTP_FROM` and `SMTP_RATE_LIMIT` are no longer read, so rename them in the deploy's environment.
+- `publicEnv` in kay.config.ts is refused at boot: mark the fields `s.Public` in `defineEnv` instead. The `publicEnv` an island imports from `kay` stays.
+- The `ORIGIN` env is no longer read for the site's URL: set `SITE_URL`. `kay env` stops listing it.
+- `kay migrate astro --out` is `--outdir`, and `kay new --host` is `--forge`; the old flags are unknown options.
+- kayjs-ai: the `failed` field of a `ToolOutcome` (`results` of a `ProviderMessage`) is gone, read `ok`; a provider written against `failed` reads `!ok`.
+- kayjs-cms: `cms({ logo })` is gone, a type error: give `logo: { src, alt }` in the cms settings module. The `kcms_session` cookie is no longer read, so an editor signed in with the 1.69 cookie signs in again.
+- `paginate()`'s result drops `size`, the old name of `pageSize`.
+
 kayjs-auth's `auth_*` tables are no longer `renamedFrom` their old names. A database still on `auth_*` tables must take 1.71 to 1.73 first, apply the migration `db.sync()` or `bunx pg-orm generate` writes there, and only then move to 1.74: from 1.74 the generator no longer renames them, so it would create the `kay_*` tables beside the old ones, empty.
 
 ### Props typed `Signal<T>` or `Memo<T>` are plain values

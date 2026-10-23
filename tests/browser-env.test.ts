@@ -1,17 +1,16 @@
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
-import { t } from 'elysia'
 import { browserPath, testSite } from '../src/test'
 
 const path = browserPath()
 
 // CI installs Chromium for these: there, a missing browser fails rather than skipping.
-describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('publicEnv', () => {
-  it('reads the variables the config declares public from the server\'s environment, on the server and in the browser', async () => {
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('s.Public', () => {
+  it('reads the variables defineEnv marks public from the server\'s environment, on the server and in the browser', async () => {
     process.env.KAY_TEST_MAP_KEY = 'pk-123'
     process.env.KAY_TEST_SERVER_ONLY = 'hidden'
 
-    const env = await testSite({ root: 'tests/fixtures/env', browser: { path }, publicEnv: t.Object({ KAY_TEST_MAP_KEY: t.String() }) })
+    const env = await testSite({ root: 'tests/fixtures/env', browser: { path } })
 
     try {
       const shown = await env.open('/')

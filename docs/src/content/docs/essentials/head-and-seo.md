@@ -108,7 +108,7 @@ The web manifest follows the locale. A locale with its own `name` or `descriptio
 
 Without `site` in the config, kay reads it from `SITE_URL`. A `site` written in the config wins over it. One build then serves each host it is deployed to.
 
-Set it once: kayjs-auth builds its OAuth redirects and mailed links on it, and kayjs-mail the sender's domain, so neither takes a URL of its own. Server code reads it as `siteUrl()` and `siteOrigin()` from `kay/seo`. `ORIGIN`, which kay read before `SITE_URL`, still works until 1.73, with a warning.
+Set it once: kayjs-auth builds its OAuth redirects and mailed links on it, and kayjs-mail the sender's domain, so neither takes a URL of its own. Server code reads it as `siteUrl()` and `siteOrigin()` from `kay/seo`.
 
 </Callout>
 

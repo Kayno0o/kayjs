@@ -20,18 +20,25 @@ async function adminSite(options: Parameters<typeof cms>[0], site: Parameters<ty
 const crumbs = (page: Awaited<ReturnType<Awaited<ReturnType<typeof adminSite>>['visit']>>) => page.find('.kcms-entry-crumb').map(link => [link.text, link.attributes.href])
 
 test('shows the logo before the name in the header, the name staying the link\'s text', async () => {
-  const page = await (await adminSite({ logo: '/logo.svg' })).visit('/admin')
+  branding.logo = { src: '/logo.svg', alt: '' }
 
-  expect(page.find('.kcms-admin-logo').map(logo => [logo.attributes.src, logo.attributes.alt])).toEqual([['/logo.svg', '']])
-  expect(page.find('.kcms-admin-home')[0]?.text).toBe('Content admin')
-  expect(page.find('.kcms-admin-home')[0]?.attributes.href).toBe('/admin')
+  try {
+    const page = await (await adminSite({})).visit('/admin')
+
+    expect(page.find('.kcms-admin-logo').map(logo => [logo.attributes.src, logo.attributes.alt])).toEqual([['/logo.svg', '']])
+    expect(page.find('.kcms-admin-home')[0]?.text).toBe('Content admin')
+    expect(page.find('.kcms-admin-home')[0]?.attributes.href).toBe('/admin')
+  }
+  finally {
+    branding.logo = undefined
+  }
 })
 
-test('draws the logo of the settings module with its alt and size, over the one cms({ logo }) gives', async () => {
+test('draws the logo of the settings module with its alt and size', async () => {
   branding.logo = { src: '/brand.svg', alt: 'Acme', width: 40, height: 24 }
 
   try {
-    const page = await (await adminSite({ logo: '/logo.svg' })).visit('/admin')
+    const page = await (await adminSite({})).visit('/admin')
 
     expect(page.find('.kcms-admin-logo').map(logo => [logo.attributes.src, logo.attributes.alt, logo.attributes.width, logo.attributes.height])).toEqual([['/brand.svg', 'Acme', '40', '24']])
   }
@@ -67,10 +74,17 @@ test('an entry screen\'s crumbs run from the content list through its collection
 })
 
 test('under a base and a trailing slash, the logo and the links carry the base, as kay writes links', async () => {
-  const site = await adminSite({ logo: '/logo.svg' }, { base: '/cms', trailingSlash: 'always' })
-  const page = await site.visit('/admin/collections/posts/hello/')
+  branding.logo = { src: '/logo.svg', alt: '' }
 
-  expect(crumbs(page)).toEqual([['Content', '/cms/admin'], ['Posts', '/cms/admin/collections/posts']])
-  expect(page.find('.kcms-admin-home')[0]?.attributes.href).toBe('/cms/admin')
-  expect(page.find('.kcms-admin-logo')[0]?.attributes.src).toBe('/cms/logo.svg')
+  try {
+    const site = await adminSite({}, { base: '/cms', trailingSlash: 'always' })
+    const page = await site.visit('/admin/collections/posts/hello/')
+
+    expect(crumbs(page)).toEqual([['Content', '/cms/admin'], ['Posts', '/cms/admin/collections/posts']])
+    expect(page.find('.kcms-admin-home')[0]?.attributes.href).toBe('/cms/admin')
+    expect(page.find('.kcms-admin-logo')[0]?.attributes.src).toBe('/cms/logo.svg')
+  }
+  finally {
+    branding.logo = undefined
+  }
 })

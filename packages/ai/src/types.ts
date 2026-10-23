@@ -35,9 +35,6 @@ export interface ToolOutcome {
   id: string
   content: string
   ok: boolean
-  // `!ok`, still set until 1.73 for a provider written against the old field.
-  /** @deprecated read `ok` */
-  failed: boolean
 }
 
 // A message as a provider is sent it: the assistant's turn that called tools carries `calls`, and the turn answering them, from the user's side, `results`.

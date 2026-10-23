@@ -21,7 +21,7 @@ This page lists what each feature keeps, for a site's privacy notice and for the
 | `kay_user` | kayjs-auth, while a person is signed in | the sign-in's `maxAge` or the browser session, ended at sign-out |
 | `kay_editor` | kayjs-cms, for an editor | 90 days, slid forward each visit, ended at sign-out |
 | `kay_editor_who` | kayjs-cms, a digest naming the signed-in editor so drafts are kept per person | 90 days, ended at sign-out |
-| `kay_editor_session` | kayjs-cms `passwordGuard` | 14 days by default, or its `maxAge`; `kcms_session` before 1.70, still read |
+| `kay_editor_session` | kayjs-cms `passwordGuard` | 14 days by default, or its `maxAge` |
 | `ksteps_<name>` | kayjs-ui `stepDraft`, the values of a multi-step form | an hour by default, ended by `clear()` |
 | the name given to `persisted()` | a persisted signal | a year, or its `maxAge` |
 

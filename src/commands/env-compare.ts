@@ -257,13 +257,10 @@ export async function defaultEnvFiles(root: string): Promise<EnvFiles | undefine
 
 const TRAILING_BREAKS = /\n*$/
 
-// Never written to the example: a deprecated name only keeps old deploys working.
-const NOT_EXAMPLED = new Set(['ORIGIN'])
-
 // `text` with every declared variable it does not mention appended, a required one as `NAME=`, an optional one commented out beside its default. What the file already holds is kept as it is.
 export function withDeclaredVariables(text: string, variables: Listed[]): { text: string, added: string[] } {
   const mentioned = new Set([...text.matchAll(/^\s*(?:#\s*)?(?:export\s+)?([a-z_]\w*)\s*=/gim)].map(match => match[1]!))
-  const added = variables.filter(({ name }) => !mentioned.has(name) && !NOT_EXAMPLED.has(name))
+  const added = variables.filter(({ name }) => !mentioned.has(name))
   const blocks = added.map((variable) => {
     const needed = variable.required === 'production' ? 'required in production' : 'required'
     const note = [variable.description, variable.required === false ? undefined : needed].filter(part => part !== undefined)

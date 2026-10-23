@@ -16,7 +16,7 @@ test('serves its routes under /_kay/cms whatever the apiPath', async () => {
 
     expect(back.status).toBe(302)
     expect(new URL(back.headers.get('location')!, 'http://site.test').pathname).toBe('/admin/sign-in')
-    // The former path under apiPath, answered through 1.73, is not served any more.
+    // The former path under apiPath is not served any more.
     expect((await site.fetch('/v1/cms/sign-in?redirect=%2Fadmin')).status).toBe(404)
     expect((await site.fetch('/api/cms/sign-in?redirect=%2Fadmin')).status).toBe(404)
 

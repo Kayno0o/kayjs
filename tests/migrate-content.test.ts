@@ -90,19 +90,17 @@ describe('kay migrate content', () => {
     }
   }, 30_000)
 
-  it('refuses --outdir and --out, which it would ignore, and names a rewritten file from the working directory', async () => {
+  it('refuses --outdir, which it would ignore, and names a rewritten file from the working directory', async () => {
     const root = await project()
 
     try {
       await Bun.write(join(root, 'src/content/packs/old.json'), '{"name":"Old","price":"1"}')
 
-      for (const flag of ['--outdir', '--out']) {
-        const refused = await migrate(root, flag, join(root, 'x'))
+      const refused = await migrate(root, '--outdir', join(root, 'x'))
 
-        expect(refused.code).toBe(1)
-        expect(refused.err).toContain('takes no --outdir or --out')
-        expect(await Bun.file(join(root, 'src/content/packs/old.json')).json()).toEqual({ name: 'Old', price: '1' })
-      }
+      expect(refused.code).toBe(1)
+      expect(refused.err).toContain('takes no --outdir')
+      expect(await Bun.file(join(root, 'src/content/packs/old.json')).json()).toEqual({ name: 'Old', price: '1' })
 
       const { out } = await migrate(root)
 

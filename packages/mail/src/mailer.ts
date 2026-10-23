@@ -13,7 +13,7 @@ import { configError, escapeHtml as escape, inFlightWork, underKayDev } from 'ka
 import { defineEnv, queue, renderLocale, renderToString } from 'kay/server'
 import parseAddresses from 'nodemailer/lib/addressparser'
 import { attempt, deliveryAddress, messageOf } from './delivery'
-import { adoptLegacyEnv, defaultSender, parseMailUrl } from './env'
+import { defaultSender, parseMailUrl } from './env'
 import { createLists, mountListRoutes } from './list'
 import { log } from './log'
 import { addressOf, outbox, PREVIEW_ROUTES } from './outbox'
@@ -380,8 +380,6 @@ export function mail(options: MailExtensionOptions): KayExtension<Mailer> {
 
 // Sends mails written as `.kay` components, html or text: over SMTP in production, to the outbox in development and tests. Using it in the server runs the queue `enqueue` fills, and under `kay dev` lists the outbox at `/_kay/mail`.
 export function mailer(options: MailerOptions = {}): Mailer {
-  adoptLegacyEnv()
-
   if (options.smtp !== undefined) {
     if (options.transport !== undefined)
       throw configError('mailer() takes `smtp` or `transport`, not both: `smtp` adjusts the SMTP built from the environment, which a `transport` replaces; give the options to smtp() instead')
