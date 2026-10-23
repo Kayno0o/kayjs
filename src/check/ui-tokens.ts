@@ -34,11 +34,11 @@ function folded(old: string, to: string): [string, UiToken] {
 
 // A border width the one `--border-width` replaced.
 function border(old: string): [string, UiToken] {
-  return [`--kui-border-${old}`, { kind: 'var', to: '--border-width' }]
+  return [`--kui-border-${old}`, { kind: 'var', to: '--border-width', help: 'one `--border-width` draws every frame now, set once in your `@theme`; one component\'s frame is a `border-*` utility on its part in src/ui.ts' }]
 }
 
-function renamed(old: string, to: string, kind: UiToken['kind'] = 'var'): [string, UiToken] {
-  return [old, { kind, to, declares: true }]
+function renamed(old: string, to: string, kind: UiToken['kind'] = 'var', utility?: string): [string, UiToken] {
+  return [old, { kind, to, declares: true, ...utility === undefined ? {} : { utility } }]
 }
 
 export const UI_TOKENS: Readonly<Record<string, UiToken>> = Object.fromEntries([
@@ -61,7 +61,7 @@ export const UI_TOKENS: Readonly<Record<string, UiToken>> = Object.fromEntries([
   colour('row-hover', 'hover'),
   colour('field-focus', 'ring'),
   ...[1, 2, 3, 4, 5, 6].map(n => colour(`chart-${n}`, `chart-${n}`)),
-  folded('overlay1', 'muted'),
+  [`${COLOR}overlay1`, { kind: 'color', to: '--color-muted', utility: 'muted', help: 'placeholders and quiet text share `--color-muted` now; set it in your `@theme`, or one component\'s text from its part in src/ui.ts' }],
   folded('subtext0', 'muted'),
   folded('fill-hover', 'surface-strong'),
   folded('stamp', 'foreground'),
@@ -71,7 +71,7 @@ export const UI_TOKENS: Readonly<Record<string, UiToken>> = Object.fromEntries([
   [`${COLOR}fill-danger`, { kind: 'color', utility: 'danger/10', value: 'color-mix(in oklab, var(--color-danger) 10%, transparent)' }],
   ...[1, 2, 3, 4, 5, 6].map((n): [string, UiToken] => [`--kui-chart-${n}`, { kind: 'var', to: `--color-chart-${n}` }]),
 
-  renamed('--text-kui-2xs', '--text-2xs', 'text'),
+  renamed('--text-kui-2xs', '--text-2xs', 'text', '2xs'),
   renamed('--text-kui-2xs--line-height', '--text-2xs--line-height'),
   ['--text-kui-micro', { kind: 'text', to: '--text-2xs', utility: '2xs' }],
   ['--text-kui-micro--line-height', { kind: 'var', to: '--text-2xs--line-height' }],
@@ -81,12 +81,12 @@ export const UI_TOKENS: Readonly<Record<string, UiToken>> = Object.fromEntries([
   ['--font-weight-kui-label', { kind: 'weight', utility: 'normal', value: 'var(--font-weight-normal)', help: 'use `font-normal`' }],
   ['--font-weight-kui-notice', { kind: 'weight', utility: 'normal', value: 'var(--font-weight-normal)', help: recipe('notice', 'root', 'font-normal') }],
   ['--font-weight-kui-avatar', { kind: 'weight', utility: 'semibold', value: 'var(--font-weight-semibold)', help: recipe('avatar', 'root', 'font-semibold') }],
-  renamed('--tracking-kui-label', '--tracking-label', 'tracking'),
+  renamed('--tracking-kui-label', '--tracking-label', 'tracking', 'label'),
   ['--tracking-kui-section', { kind: 'tracking', to: '--tracking-label', utility: 'label' }],
   ['--tracking-kui-action', { kind: 'tracking', to: '--tracking-label', utility: 'label' }],
   ['--tracking-kui-badge', { kind: 'tracking', utility: 'normal', value: 'var(--tracking-normal)', help: recipe('badge', 'root', 'tracking-normal') }],
   ['--font-kui-mono', { kind: 'family', to: '--font-mono', declares: true, utility: 'mono' }],
-  ['--font-kui-body', { kind: 'family', utility: '[family-name:inherit]', value: 'inherit', help: 'use `font-[inherit]`, fields already inherit the font' }],
+  ['--font-kui-body', { kind: 'family', utility: '[family-name:inherit]', value: 'inherit', help: 'fields inherit the font already; write `font-[family-name:inherit]` where a class needs it' }],
 
   ['--spacing-kui-card', { kind: 'spacing', utility: '[calc(var(--spacing)*2.5*var(--density))]', value: 'calc(var(--spacing) * 2.5 * var(--density))' }],
   ['--spacing-kui-inline', { kind: 'spacing', utility: '[calc(var(--spacing)*1.25*var(--density))]', value: 'calc(var(--spacing) * 1.25 * var(--density))' }],
@@ -98,8 +98,8 @@ export const UI_TOKENS: Readonly<Record<string, UiToken>> = Object.fromEntries([
   ['--spacing-kui-badge-y', { kind: 'spacing', utility: 'px', value: '1px', help: recipe('badge', 'root', 'py-px') }],
 
   ['--radius-kui-card', { kind: 'radius', utility: 'lg', value: 'var(--radius-lg)', help: 'a box takes `--radius-lg` now, and a button or a field `--radius-md`; set the ones you mean in your `@theme`' }],
-  renamed('--radius-kui-sm', '--radius-sm', 'radius'),
-  renamed('--radius-kui-md', '--radius-md', 'radius'),
+  renamed('--radius-kui-sm', '--radius-sm', 'radius', 'sm'),
+  renamed('--radius-kui-md', '--radius-md', 'radius', 'md'),
   ['--radius-kui-full', { kind: 'radius', utility: 'full', value: 'calc(infinity * 1px)' }],
 
   renamed('--kui-density', '--density'),
@@ -129,12 +129,12 @@ export const UI_TOKENS: Readonly<Record<string, UiToken>> = Object.fromEntries([
 
 // The utility prefixes that read each namespace, as a pattern.
 const UTILITY_PREFIXES: Record<Exclude<UiToken['kind'], 'var'>, string> = {
-  color: 'bg|text|border(?:-[xytrblse])?|ring(?:-offset)?|inset-ring|outline|divide|from|via|to|fill|stroke|decoration|accent|caret|shadow|inset-shadow|placeholder',
+  color: 'bg|text|border(?:-[xytrblse])?|ring(?:-offset)?|inset-ring|outline|divide|from|via|to|fill|stroke|decoration|accent|caret|shadow|drop-shadow|inset-shadow|placeholder',
   text: 'text',
   weight: 'font',
   family: 'font',
   tracking: 'tracking',
-  spacing: 'p[xytrblse]?|m[xytrblse]?|gap(?:-[xy])?|space-[xy]|w|h|size|min-[wh]|max-[wh]|inset(?:-[xy])?|top|right|bottom|left|start|end|basis|translate-[xy]|scroll-[pm][xytrblse]?|indent',
+  spacing: 'p[xytrblse]?|m[xytrblse]?|gap(?:-[xy])?|space-[xy]|w|h|size|min-[wh]|max-[wh]|inset(?:-[xy])?|top|right|bottom|left|start|end|basis|translate-[xy]|scroll-[pm][xytrblse]?|indent|leading',
   radius: 'rounded(?:-(?:[tblrse]|tl|tr|br|bl|ss|se|es|ee))?',
 }
 

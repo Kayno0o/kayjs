@@ -26,6 +26,10 @@ interface Scan {
   css: boolean
   level: (offset: number) => LintLevel
   found: CheckDiagnostic[]
+  // The tokens a declaration of stays as written, so what reads them is left alone too: rewriting it would drop the app's own value.
+  kept: Set<UiToken>
+  // What each report is about and whether it reads the token or declares it, to drop the fixes of the kept ones once every file is read.
+  reports: { diagnostic: CheckDiagnostic, token: UiToken, declaration: boolean }[]
   // The blocks a declaration was renamed in, by the block and the new name, so two old names never become one.
   renamed: Set<string>
 }
@@ -36,6 +40,8 @@ export async function deprecatedUiTokens(root: string, options: CheckOptions): P
     return []
 
   const found: CheckDiagnostic[] = []
+  const kept = new Set<UiToken>()
+  const reports: Scan['reports'] = []
   const ui = join(root, 'src/ui.ts')
   const files = [...await findProjectFiles(root, CSS_FILE, { project: true, ownOnly: true }), ...await findProjectFiles(root, KAY_FILE, { project: true, ownOnly: true }), ...existsSync(ui) ? [ui] : []]
 
@@ -50,7 +56,13 @@ export async function deprecatedUiTokens(root: string, options: CheckOptions): P
     const code = css ? source.replace(COMMENT, comment => comment.replace(/[^\n]/g, ' ')) : source
     const levelAt = lintLevels(source, options.lints)
 
-    scanNames({ file, source, code, css, level: offset => levelAt('deprecated-ui-token', offset), found, renamed: new Set() })
+    scanNames({ file, source, code, css, level: offset => levelAt('deprecated-ui-token', offset), found, kept, reports, renamed: new Set() })
+  }
+
+  // A name the app declares and keeps is read as the app set it, so a reference to it is reported only.
+  for (const { diagnostic, token, declaration } of reports) {
+    if (!declaration && kept.has(token))
+      delete diagnostic.fixes
   }
 
   return found
@@ -71,13 +83,16 @@ function scanNames(scan: Scan): void {
     scanUtilities(scan, segment[0], segment.index)
 }
 
-function push(scan: Scan, start: number, end: number, message: string, help: string | undefined, edits?: { start: number, end: number, text: string }[]): void {
+function push(scan: Scan, token: UiToken, declaration: boolean, start: number, end: number, message: string, help: string | undefined, edits?: { start: number, end: number, text: string }[]): void {
   const level = scan.level(start)
 
   if (level === 'allow')
     return
 
-  scan.found.push({
+  if (declaration && !edits)
+    scan.kept.add(token)
+
+  const diagnostic: CheckDiagnostic = {
     file: scan.file,
     ...positionAt(scan.source, start),
     end,
@@ -86,7 +101,10 @@ function push(scan: Scan, start: number, end: number, message: string, help: str
     code: 'deprecated-ui-token',
     severity: level === 'warn' ? 'warning' : 'error',
     ...edits && { fixes: [{ title: edits.length === 1 ? `Write \`${edits[0]!.text}\`` : 'Rewrite it', edits, safe: true }] },
-  })
+  }
+
+  scan.found.push(diagnostic)
+  scan.reports.push({ diagnostic, token, declaration })
 }
 
 const SINCE = 'since 1.72, when kayjs-ui started reading the app\'s own theme names, and the old one works until 1.75'
@@ -103,7 +121,7 @@ function reportName(scan: Scan, name: string, start: number, token: UiToken): vo
   if ((css ? CSS_DECLARED_AFTER : DECLARED_AFTER).test(after) && !before.endsWith('(')) {
     const safe = token.declares === true && token.to !== undefined && !declaredNearby(scan, start, token.to)
 
-    push(scan, start, end, message, help ?? 'restyle it from your `@theme` with the new name', safe ? [{ start, end, text: token.to! }] : undefined)
+    push(scan, token, true, start, end, message, help ?? 'restyle it from your `@theme` with the new name', safe ? [{ start, end, text: token.to! }] : undefined)
 
     return
   }
@@ -115,20 +133,20 @@ function reportName(scan: Scan, name: string, start: number, token: UiToken): vo
 
     // The new name keeps a fallback the app wrote; a name that folded into a value takes the value, fallback and all.
     if (token.to !== undefined) {
-      push(scan, start, end, message, help, [{ start, end, text: token.to }])
+      push(scan, token, false, start, end, message, help, [{ start, end, text: token.to }])
 
       return
     }
 
     const close = token.value === undefined ? -1 : closing(code, from + 3)
 
-    push(scan, start, end, message, help, close < 0 ? undefined : [{ start: from, end: close + 1, text: token.value! }])
+    push(scan, token, false, start, end, message, help, close < 0 ? undefined : [{ start: from, end: close + 1, text: token.value! }])
 
     return
   }
 
   if (THEME_BEFORE.test(before) || (SHORTHAND_BEFORE.test(before) && SHORTHAND_AFTER.test(after))) {
-    push(scan, start, end, message, help, token.to === undefined ? undefined : [{ start, end, text: token.to }])
+    push(scan, token, false, start, end, message, help, token.to === undefined ? undefined : [{ start, end, text: token.to }])
   }
 }
 
@@ -149,10 +167,11 @@ function closing(code: string, open: number): number {
 // Whether the declaration at `start` sits where its new name is already set: in the same braces of a stylesheet, on the same line anywhere else. Two old names becoming one new name count too.
 function declaredNearby(scan: Scan, start: number, to: string): boolean {
   const { code, css } = scan
-  const here = css ? blockAround(code, start) : lineAround(code, start)
+  // Outside a stylesheet there are no braces to scope by, so the whole file counts.
+  const here = css ? blockAround(code, start) : { from: 0, to: code.length }
   const key = `${here.from}:${to}`
 
-  if (scan.renamed.has(key) || new RegExp(`(?<![\\w-])${to}\\s*:`).test(code.slice(here.from, here.to)))
+  if (scan.renamed.has(key) || declaration(to).test(code.slice(here.from, here.to)))
     return true
 
   scan.renamed.add(key)
@@ -160,11 +179,15 @@ function declaredNearby(scan: Scan, start: number, to: string): boolean {
   return false
 }
 
-function lineAround(code: string, at: number): { from: number, to: number } {
-  const from = code.lastIndexOf('\n', at) + 1
-  const to = code.indexOf('\n', at)
+const declarations = new Map<string, RegExp>()
 
-  return { from, to: to < 0 ? code.length : to }
+function declaration(name: string): RegExp {
+  let found = declarations.get(name)
+
+  if (!found)
+    declarations.set(name, found = new RegExp(`(?<![\\w-])${name}['"\`]?\\s*:`))
+
+  return found
 }
 
 // The text between the braces holding `at`, the whole file when it is at the top.
@@ -211,7 +234,7 @@ function scanUtilities(scan: Scan, text: string, base: number): void {
       const old = `${negative}${prefix}-kui-${name}`
       const replacement = token.utility === undefined || (modified && token.utility.includes('/')) ? undefined : `${negative}${prefix}-${token.utility}`
 
-      push(scan, start, end, `\`${old}\` is ${replacement === undefined ? 'no longer a utility' : `\`${replacement}\``} ${SINCE}`, token.help ?? (replacement === undefined ? undefined : `write \`${replacement}\``), replacement === undefined ? undefined : [{ start, end, text: replacement }])
+      push(scan, token, false, start, end, `\`${old}\` is ${replacement === undefined ? 'no longer a utility' : `\`${replacement}\``} ${SINCE}`, token.help ?? (replacement === undefined ? undefined : `write \`${replacement}\``), replacement === undefined ? undefined : [{ start, end, text: replacement }])
     }
   }
 }

@@ -106,7 +106,7 @@ describe('deprecated-ui-token', () => {
         '',
       ].join('\n'))
       expect(await after('src/ui.ts')).toBe('export default { \'@kaynooo/kayjs-ui/card.kay\': { parts: { root: \'bg-popover border-border-strong text-muted\' } } }\n')
-      expect(found.filter(problem => problem.fixes === undefined).map(problem => /^`[^`]+`/.exec(problem.message)?.[0])).toEqual(['`bg-kui-fill-danger`', '`w-kui-field-height`'])
+      expect(found.filter(problem => problem.fixes === undefined).map(problem => (/^`[^`]+`/).exec(problem.message)?.[0])).toEqual(['`bg-kui-fill-danger`', '`w-kui-field-height`'])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -140,9 +140,44 @@ describe('deprecated-ui-token', () => {
     }
   })
 
+  it('rewrites the utilities of names that kept their namespace, and nested fallbacks over two runs', async () => {
+    const css = '.a { @apply rounded-kui-sm rounded-t-kui-md tracking-kui-label text-kui-2xs font-kui-mono; color: var(--color-kui-text, var(--color-kui-muted)); }\n'
+    const { root, after } = await fixed({ 'src/app.css': css })
+
+    try {
+      expect(await after('src/app.css')).toBe('.a { @apply rounded-sm rounded-t-md tracking-label text-2xs font-mono; color: var(--color-foreground, var(--color-muted)); }\n')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('reports what reads a name the app declares and keeps, instead of dropping its value', async () => {
+    const css = '@theme { --spacing-kui-card: 1rem; --color-kui-accent: red; --color-accent: blue; }\n.a { padding: var(--spacing-kui-card); color: var(--color-kui-accent); @apply p-kui-card bg-kui-accent; }\n'
+    const page = 'p(class="[--color-kui-accent:red]\n [--color-accent:blue] text-kui-accent") hi\n'
+    const { root, after } = await fixed({ 'src/app.css': css, 'src/routes/index.kay': page })
+
+    try {
+      expect(await after('src/app.css')).toBe(css)
+      expect(await after('src/routes/index.kay')).toBe(page)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('has a row for every kui name theme.css declares or reads', async () => {
+    const theme = await Bun.file(join(import.meta.dir, '../packages/ui/src/theme.css')).text()
+    const dynamic = new Set(['--color-kui-chart-', '--kui-hover-card-', '--kui-popover-', '--kui-site-nav-'])
+    const missing = [...new Set(theme.match(/--[\w-]*kui-[\w-]+/g))].filter(name => UI_TOKENS[name] === undefined && !dynamic.has(name))
+
+    expect(missing).toEqual([])
+  })
+
   it('has a utility pattern for every name a utility can read', () => {
     const names = UI_TOKEN_UTILITIES.flatMap(({ tokens }) => [...tokens.keys()])
 
+    expect(Object.entries(UI_TOKENS).filter(([, token]) => token.kind !== 'var' && token.utility === undefined && token.help === undefined).map(([name]) => name)).toEqual([])
     expect(names).toContain('canvas')
     expect(names).toContain('card')
     expect(names).toContain('heading')
