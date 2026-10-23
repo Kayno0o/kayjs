@@ -1135,7 +1135,7 @@ describe('kay build --compile', () => {
     await Bun.write(join(elsewhere, 'uploads/photo.png'), Bun.file(join(repo, 'tests/fixtures/images/src/hero.png')))
 
     // The temp directory the runtime images' variants go to is the run's.
-    const server = Bun.spawn([join(dir, 'server')], { cwd: elsewhere, env: { PATH: process.env.PATH, PORT: '0', TMPDIR: tmpdir() }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
+    const server = Bun.spawn([join(dir, 'server')], { cwd: elsewhere, env: { PATH: process.env.PATH, PORT: '0', TMPDIR: tmpdir(), KAY_EPHEMERAL_SECRET: '1' }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
 
     try {
       const port = await listeningPort(server, 'the executable', LISTENING)
