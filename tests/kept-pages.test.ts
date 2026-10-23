@@ -2,9 +2,12 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
+import { Elysia } from 'elysia'
 import { outputDir } from '../src/build/assets'
 import { formatRouteTable } from '../src/build/report'
 import { compileKay } from '../src/compiler'
+import { countWrites } from '../src/server/kept-pages'
+import { ownPostPaths } from '../src/server/plumbing'
 import { CONTENT_EXPORTS, KAY_EXPORTS, keptScan } from '../src/server/pure-page'
 import { kayBuild } from './check-helper'
 import { scratchDir } from './scratch'
@@ -1450,4 +1453,42 @@ describe('a layout reading ctx.locals', () => {
     roots.push(root)
     expect(await built(root)).toEqual([])
   }, 60_000)
+})
+
+describe('the requests that count as writes', () => {
+  it('leaves out every POST route kay lists as its own', async () => {
+    const paths = ownPostPaths()
+    const app = new Elysia()
+    const writes = countWrites(app)
+
+    for (const path of paths)
+      app.post(path, () => 'ok')
+    app.post('/app-form', () => 'ok')
+
+    expect(paths).toEqual(expect.arrayContaining(['/_kay/vitals', '/_kay/draft', '/_kay/live', '/_kay/error', '/_kay/analytics']))
+
+    for (const path of paths)
+      expect((await app.handle(new Request(`http://localhost${path}`, { method: 'POST' }))).status).toBe(200)
+
+    expect(writes.count).toBe(0)
+    await app.handle(new Request('http://localhost/app-form', { method: 'POST' }))
+    expect(writes.count).toBe(2)
+  })
+
+  it('knows every POST path the server registers by a constant', async () => {
+    const known = (await Bun.file(join(import.meta.dir, '../src/server/plumbing.ts')).text())
+    const files = new Bun.Glob('src/server/*.ts').scan({ cwd: join(import.meta.dir, '..') })
+    const missing: string[] = []
+
+    for await (const file of files) {
+      const source = await Bun.file(join(import.meta.dir, '..', file)).text()
+
+      for (const [, name] of source.matchAll(/\.post\(([A-Z][A-Z_]+),/g)) {
+        if (!name!.startsWith('DEV_') && !known.includes(name!))
+          missing.push(`${file}: ${name}`)
+      }
+    }
+
+    expect(missing).toEqual([])
+  })
 })
