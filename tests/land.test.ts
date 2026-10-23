@@ -5,7 +5,7 @@ import process from 'node:process'
 import { $ } from 'bun'
 import { describe, expect, it } from 'bun:test'
 import { addedMarkers } from '../scripts/merge-markers'
-import { readersOf, SOURCE_CHANGE, SOURCE_FILE_READ, SOURCE_READERS, SOURCE_SCAN, UI_THEME_USE, WHOLE_SUITE } from '../scripts/source-readers'
+import { READERS, readersOf, SOURCE_CHANGE, SOURCE_FILE_READ, SOURCE_FILE_READERS, SOURCE_READERS, SOURCE_SCAN, sourcesRead, UI_THEME_USE, WHOLE_SUITE } from '../scripts/source-readers'
 import { subprocessTests } from '../scripts/subprocess-tests'
 import { scratchDir } from './scratch'
 
@@ -375,6 +375,8 @@ describe('tests running kay in a subprocess', () => {
   })
 })
 
+const THEME = 'packages/ui/src/theme.css'
+
 describe('tests scanning the sources as files', () => {
   it('are all listed, so a landing changing a source runs them', async () => {
     const scanning: string[] = []
@@ -392,8 +394,11 @@ describe('tests scanning the sources as files', () => {
 
     for await (const test of new Bun.Glob('tests/*.test.ts').scan(ROOT)) {
       for (const [, path] of (await Bun.file(join(ROOT, test)).text()).matchAll(SOURCE_FILE_READ)) {
-        // A path built from a variable stands for every file it can name.
-        const sources = path!.includes('${') ? await Array.fromAsync(new Bun.Glob(path!.replace(/^(?:\.\.\/)+/, '').replaceAll(/\$\{[^}]*\}/g, '*')).scan(ROOT)) : [path!.replace(/^(?:\.\.\/)+/, '')]
+        const sources = await sourcesRead(path!, ROOT)
+
+        // A built path matching no file would pass unchecked, as a renamed folder would leave it.
+        if (sources.length === 0)
+          unreached.push(`${test} reads ${path} which matches no file`)
 
         for (const source of sources) {
           // A kay source other than a `.ts` already runs the whole suite.
@@ -406,6 +411,12 @@ describe('tests scanning the sources as files', () => {
     expect(unreached.toSorted()).toEqual([])
   })
 
+  it('read a built path as every file it can name, none when it names no file', async () => {
+    expect(await sourcesRead('../packages/ui/src/${name}.kay', ROOT)).toContain('packages/ui/src/bell.kay')
+    expect(await sourcesRead('../packages/ui/src/bell.kay', ROOT)).toEqual(['packages/ui/src/bell.kay'])
+    expect(await sourcesRead('../packages/ui/nope/${name}.kay', ROOT)).toEqual([])
+  })
+
   it('list for the theme of the UI library the tests reading it or loading the UI extension, no more and no less', async () => {
     const using: string[] = []
 
@@ -414,7 +425,12 @@ describe('tests scanning the sources as files', () => {
         using.push(test)
     }
 
-    expect(readersOf('packages/ui/src/theme.css').filter(test => !SOURCE_READERS.includes(test) && !(/^tests\/(?:llms|packages|docs|examples|library|new|public-repo)\.test\.ts$/).test(test)).toSorted()).toEqual(using.toSorted())
+    // The broad entries (a folder of tests, every file) are left out: they run these tests for any change, whether or not they use the theme.
+    const specific = SOURCE_FILE_READERS.flatMap(([folder, tests]) => folder.test(THEME) ? tests : [])
+    const broad = new Set(READERS.filter(entry => !SOURCE_FILE_READERS.includes(entry)).flatMap(([folder, tests]) => folder.test(THEME) ? tests : []))
+    const expected = using.filter(test => !broad.has(test))
+
+    expect({ missing: expected.filter(test => !specific.includes(test)).toSorted(), extra: specific.filter(test => !using.includes(test)).toSorted() }).toEqual({ missing: [], extra: [] })
   })
 
   it('run the tests reading the theme of the UI library for a change to it, and no browser one', () => {

@@ -51,3 +51,13 @@ export const READERS: [RegExp, string[]][] = [
 export function readersOf(path: string) {
   return READERS.flatMap(([folder, tests]) => folder.test(path) ? tests : [])
 }
+
+const PARENT_STEPS = /^(?:\.\.\/)+/
+const BUILT_PART = /\$\{[^}]*\}/g
+
+// The files a path read by a test names: a path built from a variable (`${...}`) stands for every file it can name, none when no file matches.
+export async function sourcesRead(path: string, root: string) {
+  const fromRoot = path.replace(PARENT_STEPS, '')
+
+  return path.includes('${') ? Array.fromAsync(new Bun.Glob(fromRoot.replaceAll(BUILT_PART, '*')).scan(root)) : [fromRoot]
+}
