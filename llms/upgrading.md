@@ -26,7 +26,7 @@ kayjs-auth's `auth_*` tables are no longer `renamedFrom` their old names. A data
 
 ### Props typed `Signal<T>` or `Memo<T>` are plain values
 
-A prop typed `Signal<T>` or `Memo<T>` is a plain value of that type now, no longer read by calling it or assigned: type a prop the child writes `Bindable<T>`, read and assign it as `open`, and bind it with `bind:open={open}`; a `Memo<T>` prop is a `T`, passed as `value={memo()}`.
+A prop typed `Signal<T>` or `Memo<T>` is a plain value of that type now, no longer read by calling it or assigned: type a prop the child writes `Bindable<T>`, read and assign it as `open`, and bind it with `bind:open={open}`; a `Memo<T>` prop is a `T`, passed as `value={memo()}`. `kay check` reports a prop still typed `Signal<T>` or `Memo<T>` from `kay`.
 ### kayjs-ui: stepDraft's maxAge is a duration
 
 `stepDraft(ctx.cookies, name, { maxAge: 3600 })` is `maxAge: '1h'`, as every duration in kay is. A number of seconds works until 1.77, and `kay upgrade` (`deprecated-step-draft-max-age`) rewrites a numeric literal at the call.

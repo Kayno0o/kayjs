@@ -22,6 +22,7 @@ const STATIC_EXPORTS = new Set(['uid', 'describeField', 'sanitizeHtml', 'trustHt
 // What `kay/i18n` exports that makes a component an island; the rest of it reads the locale alike on both sides.
 const REACTIVE_I18N = new Set(['relativeTime'])
 const BINDABLE_TYPE = 'Bindable'
+const REMOVED_PROP_TYPES = new Set(['Signal', 'Memo'])
 
 // What a component script, and a server fence, use from `kay` with no import, as they use `props<T>()`: the compiler imports them.
 // Each name written as a name of its own, not a member or part of a longer one.
@@ -1623,6 +1624,9 @@ function propsDeclaration(statement: t.Statement, body: t.Statement[], shift: (n
 
   const typeArgument = declarator.init.typeParameters?.params[0]
   const bindable = bindableProps(typeArgument, body)
+
+  reportSignalProps(typeArgument, body, shift, diagnostics)
+
   const declaration: PropsDeclaration = { statement: shift(statement), type: typeArgument && shift(typeArgument), bindings: [], bindable: [...bindable] }
 
   if (declarator.init.arguments.length > 0)
@@ -1672,10 +1676,8 @@ function propsDeclaration(statement: t.Statement, body: t.Statement[], shift: (n
   return declaration
 }
 
-// The props a props type writes as `Bindable<T>` from `kay`, inline or through an interface or a type alias of the script: read as values, and written by assigning.
-function bindableProps(type: t.TSType | undefined, body: t.Statement[]): Set<string> {
-  const bindable = new Set<string>()
-  const bindableNames = new Set<string>()
+function kayImports(body: t.Statement[], wanted: Set<string>): Map<string, string> {
+  const local = new Map<string, string>()
 
   for (const statement of body) {
     if (statement.type !== 'ImportDeclaration' || statement.source.value !== 'kay')
@@ -1685,29 +1687,70 @@ function bindableProps(type: t.TSType | undefined, body: t.Statement[]): Set<str
       const imported = specifier.type === 'ImportSpecifier' ? specifier.imported : undefined
       const name = imported?.type === 'Identifier' ? imported.name : imported?.value
 
-      if (name === BINDABLE_TYPE)
-        bindableNames.add(specifier.local.name)
+      if (name !== undefined && wanted.has(name))
+        local.set(specifier.local.name, name)
     }
   }
 
+  return local
+}
+
+interface PropType { key: string, options: (t.TSType | undefined)[] }
+
+// The props of a props type, written inline or through an interface or a type alias of the script, each with the types it is written as (a union split into its members).
+function propTypes(type: t.TSType | undefined, body: t.Statement[]): PropType[] {
   const named = type?.type === 'TSTypeReference' && type.typeName.type === 'Identifier' && !type.typeParameters ? type.typeName.name : undefined
   const declared = named === undefined ? undefined : body.map(typeDeclaration).find(declaration => declaration?.id.name === named)
   const literal = declared?.type === 'TSTypeAliasDeclaration' ? declared.typeAnnotation : type
   const literalMembers = literal?.type === 'TSTypeLiteral' ? literal.members : []
   const members = declared?.type === 'TSInterfaceDeclaration' ? declared.body.body : literalMembers
+  const found: PropType[] = []
 
   for (const member of members) {
-    const written = member.type === 'TSPropertySignature' && !member.computed ? member.typeAnnotation?.typeAnnotation : undefined
-    const key = member.type === 'TSPropertySignature' ? keyName(member.key) : undefined
+    if (member.type !== 'TSPropertySignature' || member.computed)
+      continue
 
-    // `Bindable<T> | undefined` is as bindable as `Bindable<T>`.
-    const options = written?.type === 'TSUnionType' ? written.types : [written]
+    const key = keyName(member.key)
+    const written = member.typeAnnotation?.typeAnnotation
 
-    if (key !== undefined && options.some(option => option?.type === 'TSTypeReference' && option.typeName.type === 'Identifier' && bindableNames.has(option.typeName.name)))
-      bindable.add(key)
+    if (key !== undefined)
+      found.push({ key, options: written?.type === 'TSUnionType' ? written.types : [written] })
   }
 
-  return bindable
+  return found
+}
+
+function namedBy(option: t.TSType | undefined, names: Map<string, string>): option is t.TSTypeReference {
+  return option?.type === 'TSTypeReference' && option.typeName.type === 'Identifier' && names.has(option.typeName.name)
+}
+
+// The props a props type writes as `Bindable<T>` from `kay`: read as values, and written by assigning. `Bindable<T> | undefined` is as bindable as `Bindable<T>`.
+function bindableProps(type: t.TSType | undefined, body: t.Statement[]): Set<string> {
+  const names = kayImports(body, new Set([BINDABLE_TYPE]))
+
+  return new Set(propTypes(type, body).filter(({ options }) => options.some(option => namedBy(option, names))).map(({ key }) => key))
+}
+
+// A prop typed `Signal<T>` or `Memo<T>` of `kay` is a plain value since 1.74, so it compiles and silently stops working as a getter.
+function reportSignalProps(type: t.TSType | undefined, body: t.Statement[], shift: (node: t.Node) => Span, diagnostics: Diagnostic[]) {
+  const names = kayImports(body, REMOVED_PROP_TYPES)
+
+  if (names.size === 0)
+    return
+
+  for (const { key, options } of propTypes(type, body)) {
+    for (const option of options) {
+      if (!namedBy(option, names))
+        continue
+
+      const name = names.get((option.typeName as t.Identifier).name)
+      const help = name === 'Signal'
+        ? `type it \`Bindable<T>\` and pass it as \`bind:${key}={...}\` when the component writes it, or a plain \`T\` when it only reads it`
+        : `type it a plain \`T\` and pass the value, \`${key}={memo()}\``
+
+      diagnostics.push({ ...shift(option), message: `prop \`${key}\` is typed \`${name}\`, but a prop is a plain value since 1.74`, help })
+    }
+  }
 }
 
 function reportMisplacedProps(ast: t.File, analysis: ScriptAnalysis, shift: (node: t.Node) => Span) {

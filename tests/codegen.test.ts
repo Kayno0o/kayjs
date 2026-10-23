@@ -300,6 +300,17 @@ describe('elements', () => {
     expect(errors('p(class="a" class="b")')).toEqual([expect.stringContaining('one `class`')])
   })
 
+  it('reports a prop typed Signal or Memo of kay, inline, through an alias or an interface, or in a union, and leaves Bindable and a local Signal alone', () => {
+    const page = (body: string) => `---\nimport { Signal, Memo, Bindable } from 'kay'\n${body}\n---\np x`
+
+    expect(errors(page('const { open } = props<{ open: Signal<boolean> }>()'))).toEqual([expect.stringContaining('prop `open` is typed `Signal`')])
+    expect(errors(page('type Props = { n?: Memo<number> | undefined }\nconst { n } = props<Props>()'))).toEqual([expect.stringContaining('prop `n` is typed `Memo`')])
+    expect(errors(page('interface Props { open: Signal<boolean>, count: Memo<number> }\nconst { open } = props<Props>()'))).toHaveLength(2)
+    expect(errors('---\nimport { Signal as S } from \'kay\'\nconst { open } = props<{ open: S<boolean> }>()\n---\np x')).toEqual([expect.stringContaining('typed `Signal`')])
+    expect(errors(page('const { open } = props<{ open: Bindable<boolean> }>()'))).toEqual([])
+    expect(errors('---\ntype Signal<T> = T\nconst { open } = props<{ open: Signal<boolean> }>()\n---\np x')).toEqual([])
+  })
+
   it('refuses bind: on a component that names no signal, and on an element that already handles the event', () => {
     expect(errors('Field(bind:value={v + 1})')).toEqual([expect.stringContaining('needs a signal or a `Bindable` prop')])
     expect(errors('input(bind:value={v} onInput={f})')).toEqual([expect.stringContaining('already handles')])
@@ -1193,7 +1204,7 @@ describe('signal writes', () => {
 
     expect(compiled.tsx).not.toContain('open.set(')
     expect(compiled.tsx).not.toContain('__values.open')
-    expect(compiled.diagnostics.map(d => d.message)).toEqual(['`open` is a prop, and props are read-only'])
+    expect(compiled.diagnostics.map(d => d.message)).toEqual([expect.stringContaining('typed `Signal`'), '`open` is a prop, and props are read-only'])
   })
 
   it('reject a write to a memo, a signal written by destructuring and a constant plainly holding no signal', () => {
