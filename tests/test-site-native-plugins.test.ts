@@ -106,9 +106,9 @@ process.exit(0)
 it('a check build\'s empty stylesheets keep the class names of a stylesheet module', async () => {
   const dir = await scratchDir('native-module-')
 
-  await Bun.write(join(dir, 's.module.css'), '/* .gone */ .card { background: url(a.png) } .card-title, .x_y > .z:hover { margin: 0.5em; content: ".quoted" } .default, .new { color: red }\n')
+  await Bun.write(join(dir, 's.module.css'), '/* .gone */ .card { background: url(a.png) } .card-title, .x_y > .z:hover { margin: 0.5em; content: ".quoted" } .default, .new { color: red } .__proto__ {}\n')
   await Bun.write(join(dir, 'plain.css'), '@import "tailwindcss" source("..");\n')
-  await Bun.write(join(dir, 'entry.ts'), `import styles, { card, x_y, new as fresh } from './s.module.css'\nimport './plain.css'\nglobalThis.seen = JSON.stringify({ ...styles, card, x_y, fresh })\n`)
+  await Bun.write(join(dir, 'entry.ts'), `import styles, { card, x_y, new as fresh } from './s.module.css'\nimport './plain.css'\nglobalThis.seen = JSON.stringify({ own: Object.getOwnPropertyNames(styles), card, x_y, fresh })\n`)
 
   const result = await run(`import { checkOnly } from ${JSON.stringify(resolve('src/test/lazy-plugins'))}
 
@@ -123,6 +123,10 @@ console.log(JSON.stringify({ success: build.success, logs: build.logs.map(String
   expect({ success, logs }).toEqual({ success: true, logs: [] })
   expect(['card-title', 'z', 'new', 'x_y'].filter(name => !code.includes(`"${name}"`))).toEqual([])
   expect(code).not.toMatch(/gone|quoted|a\.png|"png"/)
+
+  await Bun.write(join(dir, 'out.js'), code)
+  await import(join(dir, 'out.js'))
+  expect((JSON.parse((globalThis as { seen?: string }).seen!) as { own: string[] }).own).toContain('__proto__')
 }, 60_000)
 
 it('the class names of a stylesheet are read past hostile and unusual input', () => {
@@ -132,6 +136,10 @@ it('the class names of a stylesheet are read past hostile and unusual input', ()
   expect(classNameList('.sm\\:flex, .w-1\\/2, .\\31 0, .\\1F600 x, .a\\.b { }')).toEqual(['sm:flex', 'w-1/2', '10', '😀x', 'a.b'])
   expect(classNameList('.a { content: \'x } \n.b {}')).toEqual(['a', 'b'])
   expect(classNameList('/* .gone */ .x::after { content: ".q" } @media (min-width: .5em) {}')).toEqual(['x'])
+  expect(classNameList('.- { } .-a { } .-- { } .a\\\n.b { }')).toEqual(['-a', '--', 'a', 'b'])
+  expect(classNameList('.\\110000 a, .\\D800 b, .\\0 c { }')).toEqual(['\uFFFDa', '\uFFFDb', '\uFFFDc'])
+  expect(classNameList('@layer framework.layout, base; @layer a.b { .x { background: image-set(local(x.woff)) } } @import url(a.css) layer(a.b); .y { src: local(x.woff) } .z:is(.w, .v):not(.u) {}')).toEqual(['x', 'y', 'z', 'w', 'v', 'u'])
+  expect(classNameList('@scope (.card) to (.body) { .t {} } @media (min-width: 40em) { .m {} }')).toEqual(['card', 'body', 't', 'm'])
 })
 
 it('the shim lists the exports of the real plugin once per file, string names included, and refuses an export *', async () => {

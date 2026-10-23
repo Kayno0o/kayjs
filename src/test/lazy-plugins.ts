@@ -61,6 +61,11 @@ export function lazyNativePlugins(): void {
 }
 
 const START_NOT_IDENTIFIER = /^(?:\d|-\d)/
+const WORD_BEFORE = /[\w-]$/
+const NEWLINE = /[\n\r\f]/
+const PSEUDO_BEFORE = /:[\w-]+$/
+const SELECTOR_AT_RULES = new Set(['scope', 'custom-selector'])
+const AT_NAME = /^@[\w-]+/
 const NAME_CHAR = /[\w-]/
 const URL_BEFORE = /url$/i
 const HEX = /^[\da-f]{1,6}/i
@@ -93,7 +98,60 @@ function urlEnd(css: string, open: number): number {
   return index + 1
 }
 
-// The class name starting right after a dot, with escapes decoded and non-ASCII characters kept, and where it ends. A name starting with a digit, or a dash and a digit, is no identifier (`0.5em`).
+// The end of a parenthesised group opened at `start`, past nested ones, strings, comments and escapes.
+function parenEnd(css: string, start: number): number {
+  let depth = 0
+  let index = start
+
+  while (index < css.length) {
+    const char = css[index]!
+
+    if (char === '"' || char === '\'') {
+      index = stringEnd(css, index)
+
+      continue
+    }
+
+    if (char === '/' && css[index + 1] === '*') {
+      const end = css.indexOf('*/', index + 2)
+
+      index = end < 0 ? css.length : end + 2
+
+      continue
+    }
+
+    index += char === '\\' ? 2 : 1
+
+    if (char === '(')
+      depth++
+    else if (char === ')' && --depth === 0)
+      return index
+  }
+
+  return css.length
+}
+
+// The end of an at-rule prelude, at its `;` or `{`, which are left to the caller.
+function preludeEnd(css: string, start: number): number {
+  let index = start
+
+  while (index < css.length && css[index] !== ';' && css[index] !== '{') {
+    const char = css[index]!
+
+    if (char === '"' || char === '\'')
+      index = stringEnd(css, index)
+    else if (char === '(')
+      index = parenEnd(css, index)
+    else if (char === '/' && css[index + 1] === '*')
+      index = !css.includes('*/', index + 2) ? css.length : css.indexOf('*/', index + 2) + 2
+    else
+      index += char === '\\' ? 2 : 1
+  }
+
+  return index
+}
+
+// The class name starting right after a dot, with escapes decoded and non-ASCII characters kept, and where it ends. Following the CSS Syntax identifier rules: a name starting with a digit, a dash and a digit (unescaped), or a lone dash is none (`0.5em`).
 function identifier(css: string, start: number): { name: string, end: number } | undefined {
   let index = start
   let name = ''
@@ -105,7 +163,7 @@ function identifier(css: string, start: number): { name: string, end: number } |
       const hex = HEX.exec(css.slice(index + 1, index + 7))?.[0]
 
       if (hex === undefined) {
-        if (index + 1 >= css.length)
+        if (index + 1 >= css.length || NEWLINE.test(css[index + 1]!))
           break
 
         const next = String.fromCodePoint(css.codePointAt(index + 1)!)
@@ -116,7 +174,9 @@ function identifier(css: string, start: number): { name: string, end: number } |
         continue
       }
 
-      name += String.fromCodePoint(Math.min(Number.parseInt(hex, 16), 0x10FFFF) || 0xFFFD)
+      const code = Number.parseInt(hex, 16)
+
+      name += String.fromCodePoint(code === 0 || code > 0x10FFFF || (code >= 0xD800 && code <= 0xDFFF) ? 0xFFFD : code)
       index += 1 + hex.length
 
       if (css.startsWith('\r\n', index))
@@ -134,7 +194,7 @@ function identifier(css: string, start: number): { name: string, end: number } |
     index++
   }
 
-  return name === '' || START_NOT_IDENTIFIER.test(css.slice(start, start + 2)) ? undefined : { name, end: index }
+  return name === '' || name === '-' || START_NOT_IDENTIFIER.test(css.slice(start, start + 2)) ? undefined : { name, end: index }
 }
 
 // Every class name the selectors of a stylesheet mention, found by one pass that skips comments, strings and `url()` arguments.
@@ -153,8 +213,19 @@ export function classNameList(css: string): string[] {
     else if (char === '"' || char === '\'') {
       index = stringEnd(css, index)
     }
+    else if (char === '@') {
+      const name = AT_NAME.exec(css.slice(index, index + 64))?.[0]
+
+      index += name?.length ?? 1
+
+      if (name !== undefined && !SELECTOR_AT_RULES.has(name.slice(1).toLowerCase()))
+        index = preludeEnd(css, index)
+    }
     else if (char === '(' && URL_BEFORE.test(css.slice(Math.max(0, index - 3), index))) {
       index = urlEnd(css, index)
+    }
+    else if (char === '(' && WORD_BEFORE.test(css.slice(Math.max(0, index - 1), index)) && !PSEUDO_BEFORE.test(css.slice(Math.max(0, index - 64), index))) {
+      index = parenEnd(css, index)
     }
     else if (char === '.') {
       const found = identifier(css, index + 1)
@@ -177,7 +248,7 @@ function classNames(css: string): string {
   const names = classNameList(css)
   const named = names.filter(name => name !== 'default').map((name, index) => `const v${index} = ${JSON.stringify(name)}; export { v${index} as ${JSON.stringify(name)} }`)
 
-  return `export default { ${names.map(name => `${JSON.stringify(name)}: ${JSON.stringify(name)}`).join(', ')} }\n${named.join('\n')}\n`
+  return `export default Object.fromEntries([${names.map(name => `[${JSON.stringify(name)}, ${JSON.stringify(name)}]`).join(', ')}])\n${named.join('\n')}\n`
 }
 
 // The options of a build only run as a check, whose stylesheets nothing reads: a native plugin is swapped for one answering every stylesheet with an empty one, so no addon loads and Bun's own CSS parser, which fails on Tailwind's `source(...)`, never sees them.
