@@ -54,6 +54,8 @@ export interface LiveStore {
   set: (id: string, key: string, text: string, expiresAt?: number) => void | Promise<void>
   // Gives a value held with no end the end, leaving its text and any end it has; optional, a store without it has the value written again with the end, which can overwrite a text another process set meanwhile.
   end?: (id: string, key: string, expiresAt: number) => void | Promise<void>
+  // Gives every value of an id held with no end the end of now plus `ttl` milliseconds, in one write and one event; optional, a store without it has `end` called for each value, and one that only keeps `set` has each written again.
+  endAll?: (id: string, ttl: number) => void | Promise<void>
   // Drops a key and tells the other processes.
   delete: (id: string, key: string) => void | Promise<void>
   // Calls `listener` with the text now held for a key another process set, and when it ends if it has a `ttl`, or undefined once it deleted it; never for this process's own.
@@ -274,6 +276,8 @@ interface ServerState {
   checkWrite: ((label: string, value: unknown) => void) | undefined
   // The keys set or deleted here while the store is still being read, which an older stored row must not overwrite.
   written: Set<string> | undefined
+  // The ids whose rows read in this pass without an end are dated by one write of the store, sent once the pass ends.
+  dating: Set<string>
   // The read of a store that answers late.
   reading: Promise<void> | undefined
   // The store read at the start and not followed yet, as no module declared a value of the app.
@@ -289,7 +293,7 @@ const UNDECLARED_ROWS = 10_000
 function state(): ServerState {
   const holder = globalThis as Record<symbol, ServerState | undefined>
 
-  return holder[STATE] ??= { store: undefined, subscribed: new WeakSet(), undeclared: new Map(), undeclaredRows: 0, undeclaredExpiry: new Map(), startup: new Set(), checkWrite: undefined, written: undefined, reading: undefined, idle: undefined, watchers: 0 }
+  return holder[STATE] ??= { store: undefined, subscribed: new WeakSet(), undeclared: new Map(), undeclaredRows: 0, undeclaredExpiry: new Map(), startup: new Set(), checkWrite: undefined, written: undefined, dating: new Set(), reading: undefined, idle: undefined, watchers: 0 }
 }
 
 // Installed by the server: refuses a value a browser could not be sent where it is set.
@@ -566,7 +570,10 @@ function stamped(slot: ServerSlot, key: string, text: string): number | undefine
 
   const expiresAt = Date.now() + slot.ttl
 
-  if (shared(slot)) {
+  if (shared(slot) && state().store?.endAll !== undefined) {
+    datedTogether(slot.id)
+  }
+  else if (shared(slot)) {
     try {
       sendToStore(slot.id, key, (store): void | Promise<void> => store.end === undefined ? store.set(slot.id, key, text, expiresAt) : store.end(slot.id, key, expiresAt))
     }
@@ -577,6 +584,39 @@ function stamped(slot: ServerSlot, key: string, text: string): number | undefine
   }
 
   return expiresAt
+}
+
+// Dates all the rows of an id with one statement of the store, once the rows being read are all heard: the rows are many, and a write for each would queue one transaction and one event apiece.
+function datedTogether(id: string): void {
+  const kept = state()
+
+  if (kept.dating.size === 0) {
+    queueMicrotask(() => {
+      const ids = [...kept.dating]
+      const store = kept.store
+
+      kept.dating.clear()
+
+      for (const dated of ids) {
+        const ttl = slots().get(dated)?.ttl
+
+        if (ttl === undefined || store?.endAll === undefined)
+          continue
+
+        try {
+          const sent = store.endAll(dated, ttl)
+
+          if (sent !== undefined)
+            void logged(sent, dated)
+        }
+        catch (error) {
+          kayLog('error', `the end of the live value ${dated} could not be written to the store`, error)
+        }
+      }
+    })
+  }
+
+  kept.dating.add(id)
 }
 
 function serverLive(id: string, initial: unknown, name: string | undefined, ttl: number | undefined): Handle {

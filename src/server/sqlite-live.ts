@@ -11,6 +11,8 @@ const POLL_MS = 500
 const EVENT_TTL_MS = 60_000
 // Tells this process's own messages apart from the others'.
 const PROCESS = crypto.randomUUID()
+// The key of an event about every row of an id: a blob, which no key (text) is.
+const WHOLE_ID = new Uint8Array([0])
 
 function openLive(path: string) {
   const db = openSqlite(path)
@@ -37,9 +39,10 @@ function openLive(path: string) {
   const pruneEvents = db.query('DELETE FROM kay_live_events WHERE at < ?')
   const upsert = db.query('INSERT INTO kay_live (id, key, value, expires_at) VALUES (?, ?, ?, ?) ON CONFLICT (id, key) DO UPDATE SET value = excluded.value, expires_at = excluded.expires_at')
   const dateRow = db.query('UPDATE kay_live SET expires_at = ? WHERE id = ? AND key = ? AND expires_at IS NULL')
+  const dateRows = db.query('UPDATE kay_live SET expires_at = ? WHERE id = ? AND expires_at IS NULL')
   const remove = db.query('DELETE FROM kay_live WHERE id = ? AND key = ?')
   // The row and its message go together, so a process that heard the message finds the row.
-  const write = db.transaction((run: () => void, id: string, key: string) => {
+  const write = db.transaction((run: () => void, id: string, key: string | Uint8Array) => {
     run()
     insertEvent.run(PROCESS, id, key, Date.now())
     pruneEvents.run(Date.now() - EVENT_TTL_MS)
@@ -53,9 +56,11 @@ function openLive(path: string) {
     purge: db.query('DELETE FROM kay_live WHERE expires_at < ?'),
     set: (id: string, key: string, text: string, expiresAt: number | undefined) => write(() => upsert.run(id, key, text, expiresAt ?? null), id, key),
     end: (id: string, key: string, expiresAt: number) => write(() => dateRow.run(expiresAt, id, key), id, key),
+    endAll: (id: string, expiresAt: number) => write(() => dateRows.run(expiresAt, id), id, WHOLE_ID),
+    dated: db.query<{ key: string, value: string, expires_at: number }, [string, number]>('SELECT key, value, expires_at FROM kay_live WHERE id = ? AND expires_at > ?'),
     remove: (id: string, key: string) => write(() => remove.run(id, key), id, key),
     lastEvent: db.query<{ seq: number | null }, []>('SELECT max(seq) AS seq FROM kay_live_events'),
-    eventsAfter: db.query<{ seq: number, id: string, key: string }, [number, string]>('SELECT seq, id, key FROM kay_live_events WHERE seq > ? AND origin != ? ORDER BY seq'),
+    eventsAfter: db.query<{ seq: number, id: string, key: string | Uint8Array }, [number, string]>('SELECT seq, id, key FROM kay_live_events WHERE seq > ? AND origin != ? ORDER BY seq'),
   }
 }
 
@@ -130,6 +135,11 @@ export function sqliteLive(path: string): LiveStore {
 
       return open(false)?.end(id, key, expiresAt)
     },
+    endAll(id, ttl) {
+      wake()
+
+      return open(false)?.endAll(id, Date.now() + ttl)
+    },
     delete(id, key) {
       wake()
 
@@ -149,9 +159,16 @@ export function sqliteLive(path: string): LiveStore {
           let last = seen
 
           for (const event of live?.eventsAfter.all(seen, PROCESS) ?? []) {
-            const row = live!.select.get(event.id, event.key, Date.now())
+            if (typeof event.key === 'string') {
+              const row = live!.select.get(event.id, event.key, Date.now())
 
-            heard.push([event.id, event.key, row?.value, row?.expires_at ?? undefined])
+              heard.push([event.id, event.key, row?.value, row?.expires_at ?? undefined])
+            }
+            else {
+              for (const row of live!.dated.all(event.id, Date.now()))
+                heard.push([event.id, row.key, row.value, row.expires_at])
+            }
+
             last = event.seq
           }
 

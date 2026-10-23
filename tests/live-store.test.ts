@@ -509,7 +509,6 @@ describe('a live value with a lifetime', () => {
   it('dates the row without writing its text again, so a value set meanwhile survives', async () => {
     const path = await storePath()
     const first = sqliteLive(path)
-    const other = sqliteLive(path)
 
     await first.set('test:ttl-race', '', '[1]')
     setLiveStore(first)
@@ -535,6 +534,65 @@ describe('a live value with a lifetime', () => {
     setLiveStore(undefined)
     first.stop?.()
     other.stop?.()
+  })
+
+  it('dates more rows than a queue holds with one statement and one event', async () => {
+    const path = await storePath()
+    const old = sqliteLive(path)
+    const ROWS = 10_500
+
+    await old.set('test:ttl-many', 'seed', '[0]')
+    old.stop?.()
+
+    const db = new Database(path)
+
+    db.transaction(() => {
+      const insert = db.query('INSERT INTO kay_live (id, key, value) VALUES (?, ?, ?)')
+
+      for (let row = 0; row < ROWS; row++)
+        insert.run('test:ttl-many', `k${row}`, '[1]')
+    })()
+
+    const before = (db.query('SELECT count(*) AS count FROM kay_live_events').get() as { count: number }).count
+    const store = sqliteLive(path)
+    // Another process, which hears the ends through the one event.
+    const script = `import { sqliteLive } from ${JSON.stringify(STORE)}\nconst store = sqliteLive(${JSON.stringify(path)})\nconst heard = []\nstore.subscribe((id, key, text, expiresAt) => id === 'test:ttl-many' && heard.push(expiresAt))\nconsole.log('ready')\nfor (let wait = 0; wait < 400 && heard.length < ${ROWS + 1}; wait++)\n  await Bun.sleep(25)\nconsole.log(JSON.stringify({ heard: heard.length, dated: heard.every(at => at > Date.now() + 50000) }))\nprocess.exit(0)`
+    const child = Bun.spawn([process.execPath, '-e', script], { stdout: 'pipe', stderr: 'inherit' })
+    const lines = child.stdout.pipeThrough(new TextDecoderStream()).getReader()
+
+    expect((await lines.read()).value).toContain('ready')
+    setLiveStore(store)
+    declareKeyedTtl(() => 0, { ttl: '60s' }, 'test:ttl-many', 'ttlMany')
+
+    const heard = JSON.parse(((await lines.read()).value as string).trim()) as { heard: number, dated: boolean }
+
+    await child.exited
+    setLiveStore(undefined)
+
+    const after = db.query('SELECT count(*) AS count, count(expires_at) AS dated FROM kay_live WHERE id = ?').get('test:ttl-many') as { count: number, dated: number }
+
+    expect(after.dated).toBe(after.count)
+    expect(after.count).toBe(ROWS + 1)
+    expect((db.query('SELECT count(*) AS count FROM kay_live_events').get() as { count: number }).count - before).toBe(1)
+    expect(heard).toEqual({ heard: ROWS + 1, dated: true })
+    db.close()
+    store.stop?.()
+  })
+
+  it('asks a store offering endAll once for the rows of an id, and keeps them with a local end', async () => {
+    const calls: [string, number][] = []
+    const store: LiveStore = { entries: () => [['test:ttl-all', 'a', '[1]'], ['test:ttl-all', 'b', '[2]']], set: () => undefined, endAll: (id, ttl) => void calls.push([id, ttl]), delete: () => undefined, subscribe: () => undefined }
+
+    setLiveStore(store)
+
+    const keyed = declareKeyedTtl(() => 0, { ttl: '300ms' }, 'test:ttl-all', 'ttlAll')
+
+    expect([keyed('a'), keyed('b')]).toEqual([1, 2])
+    await Bun.sleep(10)
+    expect(calls).toEqual([['test:ttl-all', 300]])
+    await Bun.sleep(400)
+    expect([keyed('a'), keyed('b')]).toEqual([0, 0])
+    setLiveStore(undefined)
   })
 
   it('goes on when the store refuses to keep the end', () => {

@@ -8,6 +8,7 @@ import { cleanUpAfterFile, pgDescribe, pgIt, postgres, replicas } from './job-st
 
 cleanUpAfterFile()
 
+const declareKeyedTtl = live as unknown as (initial: (key: string) => number, options: { ttl: string }, id: string, name: string) => (key: string) => number
 const declare = live as unknown as (initial: number, id: string, name: string) => { (): number, set: (next: number) => void }
 
 async function waitFor(check: () => boolean | Promise<boolean>, what: string, ms = 4000): Promise<void> {
@@ -359,6 +360,32 @@ pgDescribe('pgData live values', () => {
     expect(Math.abs((a?.[3] as number) - Date.now() - 120_000)).toBeLessThan(5000)
     expect(Math.abs((b?.[3] as number) - Date.now() - 60_000)).toBeLessThan(5000)
     store.stop?.()
+  })
+
+  pgIt('dates more rows than the queue holds with one statement and one event, heard by the other replica', async () => {
+    const sql = await fresh()
+    const [store, other] = twoReplicas()
+    const ROWS = 10_500
+
+    await store.set('app:many', 'seed', '[0]')
+    await sql.unsafe(`INSERT INTO kay_live (id, key, value) SELECT 'app:many', 'k' || n, '[1]' FROM generate_series(1, ${ROWS}) AS n`)
+    await other.entries()
+
+    const heard: [string, number | undefined][] = []
+    const events = async (): Promise<number> => Number((await sql.unsafe<{ count: string }[]>('SELECT count(*)::text AS count FROM kay_live_events'))[0]!.count)
+    const before = await events()
+
+    other.subscribe((id, key, _text, expiresAt) => id === 'app:many' && heard.push([key, expiresAt]))
+    setLiveStore(store)
+    declareKeyedTtl(() => 0, { ttl: '60s' }, 'app:many', 'many')
+    await liveStoreReady()
+    await waitFor(async () => (await sql.unsafe<{ count: string }[]>('SELECT count(*)::text AS count FROM kay_live WHERE expires_at IS NULL'))[0]!.count === '0', 'the rows to be dated', 10_000)
+    await waitFor(() => heard.length === ROWS + 1, 'the other replica to hear the ends', 10_000)
+
+    expect(await events() - before).toBe(1)
+    expect(heard.every(([, expiresAt]) => (expiresAt ?? 0) > Date.now() + 50_000)).toBe(true)
+    store.stop?.()
+    other.stop?.()
   })
 
   pgIt('purges apart from the write, so a purge stuck on a locked row costs the write nothing', async () => {
