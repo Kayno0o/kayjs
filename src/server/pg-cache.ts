@@ -2,7 +2,7 @@ import type { SQL } from 'bun'
 import type { CacheStore } from '../runtime/cache'
 import type { PgHandle } from './pg-data'
 import type { Stop } from './pg-poll'
-import { DEPS_PREFIX, PURGE_STALE_MS, readsOf, STALE_KEPT_MS, untrackStore } from '../runtime/cache'
+import { DEPS_PREFIX, PURGE_STALE_MS, readsOf, STALE_KEPT_MS, trackStore, untrackStore } from '../runtime/cache'
 import { kayLog } from '../runtime/log'
 import { rowsOf } from './pg-jobs'
 import { EVENT_TTL_MS, eventWindow, POLL_MS, pollerOf } from './pg-poll'
@@ -22,6 +22,8 @@ export function pgCache(pg: PgHandle): CacheStore {
   const events = eventWindow()
   let closed = false
   let purged = 0
+  let self: CacheStore | undefined
+  let tracked = false
 
   const write = async <Result>(work: Promise<Result>): Promise<Result> => {
     writing.add(work)
@@ -75,6 +77,12 @@ export function pgCache(pg: PgHandle): CacheStore {
   const start = () => {
     if (closed)
       return
+
+    // A store named only by a call is told of invalidations from its first use on; tracking it adds the listener, which comes back here.
+    if (!tracked && self !== undefined) {
+      tracked = true
+      trackStore(self)
+    }
 
     if (polling !== undefined) {
       polling.wake()
@@ -159,6 +167,8 @@ export function pgCache(pg: PgHandle): CacheStore {
       start()
     },
   }
+
+  self = store
 
   // A reload ends the polling for the module that named the store; the module running again names a store of its own.
   onReload(() => {

@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { Database } from 'bun:sqlite'
-import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { afterAll, afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
+import { invalidate } from '../src/runtime/cache'
 import { sqliteCache } from '../src/runtime/cache.server'
 import { live, liveSlot, setLiveStore, watchSlot } from '../src/runtime/live-value'
 import { delayAfter, MAX_IDLE_MS, pollClock, QUIET_POLLS } from '../src/runtime/poll-backoff'
@@ -403,6 +404,21 @@ pgDescribe('idle Postgres stores', () => {
     expect(changes).toEqual(['app:idle:[1]', 'app:idle:[2]'])
     firstLive.stop?.()
     secondLive.stop?.()
+  })
+
+  pgIt('tell a cache named only by a call of an invalidation, from its first use', async () => {
+    await freshTables()
+
+    const [sql] = replicas(1)
+    const store = pgCache(pgHandle(sql!))
+
+    const publish = spyOn(store, 'publish')
+
+    invalidate('named-only')
+    expect(publish).not.toHaveBeenCalled()
+    await store.get('x')
+    invalidate('named-only')
+    expect(publish).toHaveBeenCalledTimes(1)
   })
 
   pgIt('end their polling when closed while backed off', async () => {
