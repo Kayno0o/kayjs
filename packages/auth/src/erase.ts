@@ -1,5 +1,6 @@
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
+import { notifications } from 'kay/server'
 import { linkedUser } from './core'
 import { reportFrom } from './events'
 import { log } from './log'
@@ -48,7 +49,7 @@ export async function soleOwned(core: Core, record: UserRecord): Promise<SoleOwn
   return owned
 }
 
-// Deletes the user with everything kayjs-auth keeps for them. The app's records go first, so an `onDelete` that throws leaves the account in place, to delete again. The audit log keeps what happened under a new random name, without the addresses, browsers and details that lead back to the user, and the provider tokens held are revoked upstream.
+// Deletes the user with everything kayjs-auth keeps for them, and their notifications and mailing list rows. The app's records go first, so an `onDelete` that throws leaves the account in place, to delete again. The audit log keeps what happened under a new random name, without the addresses, browsers and details that lead back to the user, and the provider tokens held are revoked upstream.
 // For an account nobody leaves, as an unverified one a registration replaces or a guest past `guests.maxAge`: the address's invitations stay for whoever proves it, and no mail goes out to them, only to the new owner of an organization handed over.
 // An organization it solely owned with other members passes to its longest-standing member, as it cannot be refused.
 export async function eraseUser(core: Core, record: UserRecord): Promise<void> {
@@ -92,7 +93,8 @@ async function eraseThen(core: Core, record: UserRecord, handOver: boolean, afte
     await Promise.all(identities.map(async identity => revokeUpstream(core, identity)))
   }
 
-  // Before the account goes, so a store that cannot strip the audit log fails the erase with the account still there to delete again.
+  // Before the account goes, so a store that cannot strip the audit log or reach the lists fails the erase with the account still there to delete again.
+  await eraseAside(core, record, afterDelete !== undefined)
   await forget(core, record, pseudonym)
   await store.users.delete(record.id)
 
@@ -130,6 +132,16 @@ async function eraseThen(core: Core, record: UserRecord, handOver: boolean, afte
     throw failure.error
 
   return { ok: true }
+}
+
+// What other parts of the app keep about the user: their notifications, and their address on the mailer's lists. An account nobody leaves (`leaving` false) with an address nobody proved leaves the lists alone, as the address may be someone else's.
+async function eraseAside(core: Core, record: UserRecord, leaving: boolean): Promise<void> {
+  await notifications.erase(record.id)
+
+  const erase = core.email?.mailer.erase
+
+  if (erase && record.email !== null && record.email !== '' && (leaving || record.emailVerifiedAt !== null))
+    await erase.call(core.email!.mailer, record.email)
 }
 
 async function forget(core: Core, record: UserRecord, pseudonym: string): Promise<void> {

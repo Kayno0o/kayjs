@@ -337,7 +337,7 @@ If your database role cannot create tables, the owner runs `createMailListTables
 
 With `listStore` on the mailer, a link in a mail and `mail.erase` reach the store without any list being declared. Moving a site from SQLite to Postgres means copying the three tables over, or the links in mails already sent will not work.
 
-To erase a person, call `mail.erase(address)`. It removes the address from every list and the mails still queued for it.
+To erase a person, call `mail.erase(address)`. It removes the address from every list and the mails still queued for it. `mail.subscriptions(address)` lists what the address is on, pending rows included, for a person asking for their data. With kayjs-auth, deleting an account and exporting its data call both for you.
 
 ## Previewing
 

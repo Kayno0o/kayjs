@@ -1,5 +1,5 @@
 import type { EnqueueOptions, FailedJob, KayExtension, QueueOptions } from 'kay/server'
-import type { ListOptions, ListRun, MailingList } from './list'
+import type { ListOptions, ListRun, MailingList, Subscription } from './list'
 import type { ListStore } from './list-store'
 import type { Relayed } from './outbox'
 import type { Relay } from './preview'
@@ -116,6 +116,8 @@ export type Mailer = Elysia & {
   list: (name?: string, options?: ListOptions) => MailingList
   // Erases a person: the address leaves every list and the mails queued for it are removed. Resolves with how many subscriptions and queued mails went.
   erase: (address: string) => Promise<number>
+  // What an address is on, for the export of a person's data: each list with its state and dates, pending rows included.
+  subscriptions: (address: string) => Promise<Subscription[]>
 }
 
 // A mail given up keeps 7 days, its body and links dropped: who it was for and why it failed is what an app needs to see.
@@ -553,6 +555,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     }),
     render,
     list: (listName = 'default', listOptions?: ListOptions) => lists.list(listName, listOptions),
+    subscriptions: async (address: string) => lists.subscriptions(address),
     erase: async (address: string) => await lists.erase(address) + await sending.remove({ recipient: address }),
     drain: async () => {
       const mails = await jobs.drain()

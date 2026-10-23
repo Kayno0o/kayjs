@@ -37,9 +37,21 @@ export interface AuthMailMessage extends MailContent {
   expires?: { link?: number, code?: number } | undefined
 }
 
+// One address on one mailing list, as kayjs-mail's `subscriptions` answers it.
+export interface MailingSubscription {
+  list: string
+  status: 'pending' | 'confirmed'
+  askedAt: Date
+  confirmedAt: Date | null
+}
+
 export interface AuthMailer {
   // Awaited, its result ignored, so a queue's enqueue fits as it is.
   send: (mail: AuthMailMessage) => unknown
+  // Takes an address off the mailing lists and out of the queue when an account is erased: kayjs-mail's `mail.erase`, which `auth()` hands over when kayjs-mail is in the app.
+  erase?: ((address: string) => unknown) | undefined
+  // What an address is on, for the export of a user's data: kayjs-mail's `mail.subscriptions`.
+  subscriptions?: ((address: string) => Promise<MailingSubscription[]>) | undefined
 }
 
 /** @deprecated Renamed `AuthMailMessage` in 1.70, as kayjs-mail has a `Mail` of its own; the old name goes in 1.73. */

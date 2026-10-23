@@ -3,6 +3,7 @@ import type { ExtensionApp } from 'kay/server'
 import type { AuthOptions, createAuth as CreateAuth } from './auth'
 import type { AuthSessionData, OAuthApp } from './core'
 import type { EmailOptions } from './email'
+import type { AuthMailer } from './mail'
 import type { ProviderOptions } from './oauth/providers'
 import type { AuthPagesConfig, AuthPagesOptions, UserMaker } from './pages'
 import type { AuthStore } from './store'
@@ -197,6 +198,14 @@ function conventionalHooks(loaded: Record<string, unknown> | undefined): AuthHoo
   return loaded?.hooks as AuthHooks | undefined
 }
 
+// The mailer's erase and export of an address, bound so an erased account takes its mailing lists with it.
+function privacyOf(mail: Pick<AuthMailer, 'erase' | 'subscriptions'> | undefined): Pick<AuthMailer, 'erase' | 'subscriptions'> {
+  return {
+    ...typeof mail?.erase === 'function' && { erase: mail.erase },
+    ...typeof mail?.subscriptions === 'function' && { subscriptions: mail.subscriptions },
+  }
+}
+
 export async function emailOf(email: OwnOptions['email'], app: ExtensionApp): Promise<EmailOptions | undefined> {
   if (email === false)
     return undefined
@@ -204,7 +213,7 @@ export async function emailOf(email: OwnOptions['email'], app: ExtensionApp): Pr
   if (email !== undefined)
     return email
 
-  const mail = app.modules.mail?.mail as { enqueue?: (message: never) => unknown, send?: (message: never) => unknown } | undefined
+  const mail = app.modules.mail?.mail as { enqueue?: (message: never) => unknown, send?: (message: never) => unknown, erase?: AuthMailer['erase'], subscriptions?: AuthMailer['subscriptions'] } | undefined
   const send = mail?.enqueue ?? mail?.send
 
   if (send === undefined)
@@ -212,15 +221,15 @@ export async function emailOf(email: OwnOptions['email'], app: ExtensionApp): Pr
 
   // kayjs-mail registered in kay.config.ts brings its wording, views and theme to the mails, as `kay add auth` writes it.
   if (!app.extensions.includes(MAIL_EXTENSION))
-    return { mailer: { send: send as never } }
+    return { mailer: { send: send as never, ...privacyOf(mail) } }
 
   try {
     const { authMailer } = await import('@kaynooo/kayjs-mail')
 
-    return { mailer: authMailer(send as never) }
+    return { mailer: { ...authMailer(send as never), ...privacyOf(mail) } }
   }
   catch {
-    return { mailer: { send: send as never } }
+    return { mailer: { send: send as never, ...privacyOf(mail) } }
   }
 }
 

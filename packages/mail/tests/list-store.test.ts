@@ -180,6 +180,18 @@ for (const [kind, open, enabled] of stores) {
       expect((await store.ask(list, email('bob'), 'other', 'en')).id).toBe('bob')
     })
 
+    it('lists every row of an address, pending ones too', async () => {
+      const store = open()
+      const { list, email } = names()
+      const other = `${list}x`
+
+      await confirmed(store, list, email('ada'))
+      await store.ask(other, email('ada'), 'pending-two', 'en', 3000)
+      await confirmed(store, list, email('bob'))
+      expect((await store.forEmail(email('ada'))).map(row => [row.list, row.status])).toEqual([[list, 'confirmed'], [other, 'pending']])
+      expect(await store.forEmail(email('nobody'))).toEqual([])
+    })
+
     it('finishes a broadcast once', async () => {
       const store = open()
       const { list } = names()
@@ -243,6 +255,8 @@ describe.skipIf(url === '')('a list on Postgres', () => {
 
       expect(await app.erase(addresses[0]!.toUpperCase())).toBe(1)
       expect((await news.subscribers()).map(row => row.email)).toEqual(addresses.slice(1))
+      expect(await app.subscriptions(addresses[0]!)).toEqual([])
+      expect(await app.subscriptions(addresses[1]!.toUpperCase())).toMatchObject([{ list: expect.any(String), status: 'confirmed', confirmedAt: expect.any(Date) }])
       expect(await news.unsubscribe(addresses[1]!)).toBe(true)
       expect(await news.count()).toBe(1)
     }

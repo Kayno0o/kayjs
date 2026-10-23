@@ -36,6 +36,8 @@ export interface ListStore {
   removeEmail: (list: string, email: string) => Maybe<boolean>
   // Takes the address off every list of the store, with its deliveries; how many rows went.
   erase: (email: string) => Maybe<number>
+  // Every row of the address, whatever its list and state, oldest first.
+  forEmail: (email: string) => Maybe<Subscriber[]>
   subscribers: (list: string) => Maybe<Subscriber[]>
   count: (list: string) => Maybe<number>
   addBroadcast: (id: string, list: string, message: string, now?: number) => Maybe<void>
@@ -98,6 +100,7 @@ export function openLists(path: string) {
   const deleteSubscriber = db.query('DELETE FROM kay_mail_subscribers WHERE list = ?1 AND id = ?2')
   const byEmailId = db.query<{ id: string }, [string, string]>('SELECT id FROM kay_mail_subscribers WHERE list = ?1 AND email = ?2')
   const idsOfEmail = db.query<{ id: string }, [string]>('SELECT id FROM kay_mail_subscribers WHERE email = ?1')
+  const rowsOfEmail = db.query<SubscriberRow, [string]>('SELECT * FROM kay_mail_subscribers WHERE email = ?1 ORDER BY created_at, id')
   const deleteEmail = db.query('DELETE FROM kay_mail_subscribers WHERE email = ?1')
   const sweepPending = db.query('DELETE FROM kay_mail_subscribers WHERE status = \'pending\' AND created_at < ?1')
   const confirmed = db.query<SubscriberRow, [string]>('SELECT * FROM kay_mail_subscribers WHERE list = ?1 AND status = \'confirmed\' ORDER BY confirmed_at, id')
@@ -174,6 +177,7 @@ export function openLists(path: string) {
     // Immediate, as these read before they write and two processes may share the file.
     removeEmail: removeEmail.immediate,
     erase: erase.immediate,
+    forEmail: (email: string): Subscriber[] => rowsOfEmail.all(email).map(subscriberOf),
     subscribers: (list: string): Subscriber[] => confirmed.all(list).map(subscriberOf),
     count: (list: string): number => count.get(list)!.total,
     addBroadcast(id: string, list: string, message: string, now = Date.now()): void {

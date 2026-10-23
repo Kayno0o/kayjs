@@ -57,6 +57,14 @@ export interface BroadcastStatus extends BroadcastProgress {
 
 type SubscribeSchema = TSchema & { static: { email: string } }
 
+// One address on one list, as a person asking for their data is shown it.
+export interface Subscription {
+  list: string
+  status: 'pending' | 'confirmed'
+  askedAt: Date
+  confirmedAt: Date | null
+}
+
 export interface MailingList {
   readonly name: string
   // The arguments of `action` for the subscribe form, for a page to spread: `export const subscribe = action(...mail.list().form())`. A post lists the address as pending and mails a confirmation link; the answer is the same whatever the address is, listed or not.
@@ -442,6 +450,24 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
         total += await lists.erase(email)
 
       return total
+    },
+    // What the address is on, in every file this process opened and the default file when it exists, pending rows included.
+    async subscriptions(address: string): Promise<Subscription[]> {
+      const email = normalizeAddress(address)
+
+      if (email === undefined)
+        return []
+
+      defaultFile()
+
+      const found: Subscription[] = []
+
+      for (const lists of new Set([...files.values(), ...given])) {
+        for (const row of await lists.forEmail(email))
+          found.push({ list: row.list, status: row.status, askedAt: new Date(row.createdAt), confirmedAt: row.confirmedAt === undefined ? null : new Date(row.confirmedAt) })
+      }
+
+      return found
     },
     // The route handlers.
     async confirm(token: unknown): Promise<{ kind: 'confirmed' | 'invalid' | 'expired' | 'unavailable', locale?: string | undefined }> {

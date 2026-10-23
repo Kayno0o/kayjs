@@ -529,7 +529,7 @@ if (found.ok) {
 - `listUsers({ search, offset, limit })` gives the users newest first, with `total`. `getUser(id)` gives one, with `admin` telling whether they meet the `admin` option. `adminRoles()` lists the roles an admin may give.
 - `grantRole(id, role)` and `revokeRole(id, role)` take a role your `roles` option declares. If two admins revoke each other's role at the same moment, at least one stays an admin, and a revoke that would have left none is undone and answers `last-admin`. Two admins deleting their own accounts at the same moment are held to the same rule, which needs an `admin` option that reads the user's roles.
 - `banUser(id, { reason, until })` bars the user from signing in and signs them out everywhere. `until` leaves it for good when left out. `unbanUser(id)` lifts it. An admin cannot ban themselves or another admin.
-- `deleteUser(id)` deletes the user as `deleteAccount` does. An organization the user solely owns with other members passes to its longest-standing member, who is told by mail and by an `organization-handed-over` event, so an abandoned account can always be removed.
+- `deleteUser(id)` deletes the user as `deleteAccount` does, notifications and mailing lists included. An organization the user solely owns with other members passes to its longest-standing member, who is told by mail and by an `organization-handed-over` event, so an abandoned account can always be removed.
 - `impersonate(id)` signs the admin in as the user, within ten minutes of their own sign-in or re-proof; later it answers `stale`. `impersonator()` gives the admin, to show a banner, and `stopImpersonating()` signs back in as themselves.
 - `listAdminAuditLog({ userId, before, limit })` reads everyone's audit log, or one user's.
 
@@ -731,7 +731,11 @@ Agents sign in with PKCE, never a client secret. An access token lasts an hour. 
 
 A whole sign-in ends 90 days after it began. One refresh token used twice ends it at once.
 
-An agent that names a `resource` when it asks to sign in gets tokens bound to it, and they work only on requests to that resource or under its path: a token asked for `/mcp` gets a 401 on `/api`. A token that asked for no resource works on every route within its scopes. The calls kay's `/mcp` makes to your tools count as made to `/mcp`, and `userFromToken(token, url)` for a websocket takes the address of the handshake, refusing a bound token without it. At the token endpoint, and when it refreshes, it may name that resource again or leave it out, and any other answers `invalid_target`. Naming more than one `resource` is `invalid_target` at both ends.
+An agent that names a `resource` when it asks to sign in gets tokens bound to it. At the token endpoint, and when it refreshes, it may name that resource again or leave it out, and any other answers `invalid_target`. Naming more than one `resource` is `invalid_target` at both ends.
+
+A bound token works only on requests to that resource or under its path: a token asked for `/mcp` gets a 401 on `/api`. A token that asked for no resource works on every route within its scopes.
+
+The calls kay's `/mcp` makes to your tools count as made to `/mcp`. `userFromToken(token, url)` for a websocket takes the address of the handshake, and refuses a bound token without it.
 
 A refresh refused for its resource or scope keeps its token, so the agent can try again, and so does a code exchange refused for its resource or `redirect_uri`, within the code's 60 seconds.
 

@@ -148,6 +148,9 @@ export function pgLists(source: PgJobsSource): ListStore & { close: () => Promis
     async erase(email): Promise<number> {
       return removeWhere('email = $1', [email])
     },
+    async forEmail(email): Promise<Subscriber[]> {
+      return (await query<SubscriberRow>('SELECT * FROM kay_mail_subscribers WHERE email = $1 ORDER BY created_at, id', [email])).map(subscriberOf)
+    },
     async subscribers(list): Promise<Subscriber[]> {
       return (await query<SubscriberRow>('SELECT * FROM kay_mail_subscribers WHERE list = $1 AND status = \'confirmed\' ORDER BY confirmed_at, id', [list])).map(subscriberOf)
     },
