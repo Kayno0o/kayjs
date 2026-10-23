@@ -946,6 +946,28 @@ inBrowser('a Segmented busy with a change on a served page', () => {
   }, 120_000)
 })
 
+inBrowser('a busy RadioGroup, Segmented and ChipGroup with a disabled option', () => {
+  test('shows not-allowed on the disabled option while idle and progress while the group is busy', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/busy-groups')
+    const cursors = async () => page.evaluate(() => Object.fromEntries(['segmented', 'radios', 'chips'].map(id => [id, getComputedStyle(document.querySelector(`#${id} input[value="x"]`)!.closest('[data-part=option], [data-part=choice], [data-part=chip]')!).cursor])))
+
+    expect(await cursors()).toEqual({ segmented: 'not-allowed', radios: 'not-allowed', chips: 'not-allowed' })
+
+    for (const id of ['segmented', 'radios', 'chips'])
+      await page.evaluate((target: string) => document.querySelector<HTMLInputElement>(`#${target} input[value="m"]`)!.click(), id)
+
+    await page.waitUntil(() => document.querySelectorAll('[aria-busy="true"]').length === 3)
+    expect(await cursors()).toEqual({ segmented: 'progress', radios: 'progress', chips: 'progress' })
+
+    await page.click('#release')
+    await page.waitUntil(() => document.querySelectorAll('[aria-busy="true"]').length === 0)
+    expect(await cursors()).toEqual({ segmented: 'not-allowed', radios: 'not-allowed', chips: 'not-allowed' })
+    expect(page.errors).toEqual([])
+  }, 120_000)
+})
+
 inBrowser('a SaveForm passed an action by a page with a server fence', () => {
   test('calls the action as if the island had imported it, toasting what the page said and what the schema refused', async () => {
     const site = await shared()

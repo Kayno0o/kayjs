@@ -1,0 +1,6 @@
+---
+import BusyGroups from '../components/busy-groups.kay'
+import '../app.css'
+---
+main
+  BusyGroups

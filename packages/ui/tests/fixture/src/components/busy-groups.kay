@@ -1,0 +1,20 @@
+---
+import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
+import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
+import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+
+// Three groups with a disabled option, whose change stays busy until the test releases it, to see which cursor the disabled option shows.
+const sizes = [{ value: 's', label: 'S' }, { value: 'm', label: 'M' }, { value: 'x', label: 'X', disabled: true }] as const
+const releases: (() => void)[] = []
+
+function hold() {
+  return new Promise<boolean>((resolve) => {
+    releases.push(() => resolve(false))
+  })
+}
+---
+div
+  Segmented#segmented(label="Segmented" name="segmented" options={sizes} value="s" onChange={hold})
+  RadioGroup#radios(label="Radios" name="radios" options={sizes} value="s" onChange={hold})
+  ChipGroup#chips(label="Chips" name="chips" options={sizes} value={['s']} onChange={hold})
+  button#release(type="button" onClick={() => { for (const release of releases) release() }}) Release

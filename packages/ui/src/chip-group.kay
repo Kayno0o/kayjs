@@ -11,7 +11,7 @@ import Icon from './icon.kay'
 const look = recipe({
   parts: {
     root: 'kui-chip-group group/chips flex flex-wrap gap-2',
-    chip: 'kui-chip relative cursor-pointer has-[input:disabled]:cursor-not-allowed has-[input:disabled]:opacity-50 group-aria-busy/chips:cursor-progress',
+    chip: 'kui-chip relative cursor-pointer has-[input:disabled]:opacity-50 group-aria-busy/chips:cursor-progress group-not-aria-busy/chips:has-[input:disabled]:cursor-not-allowed',
     input: 'peer/chip absolute size-0 opacity-0',
     label: 'inline-flex items-center gap-1 rounded-kui-md border-solid border-(length:--kui-border-width) bg-kui-surface0 px-2.5 py-1 text-xs text-kui-subtext0 transition-colors [border-color:var(--kui-control-line,var(--color-kui-surface2))] hover:text-kui-text peer-checked/chip:border-kui-accent peer-checked/chip:bg-kui-accent peer-checked/chip:text-kui-on-accent peer-checked/chip:hover:text-kui-on-accent peer-focus-visible/chip:outline-2 peer-focus-visible/chip:outline-offset-2 peer-focus-visible/chip:outline-kui-accent',
     icon: 'size-3.5 shrink-0',
