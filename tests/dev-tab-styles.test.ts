@@ -48,7 +48,7 @@ describe('the Styles tab', () => {
   }
 
   const page = () => {
-    document.body.innerHTML = '<main data-kay-src="src/routes/index.kay:1:1"><div id="panel" data-kay-src="src/components/panel.kay:5:1"><div id="body" data-part="body" data-kay-src="src/components/panel.kay:6:3"><p id="text" data-kay-src="src/routes/index.kay:3:5">hi</p></div></div></main>'
+    document.body.innerHTML = '<main id="main" data-kay-src="src/routes/index.kay:1:1"><div id="panel" data-kay-src="src/components/panel.kay:5:1"><div id="body" data-part="body" data-kay-src="src/components/panel.kay:6:3"><p id="text" data-kay-src="src/routes/index.kay:3:5">hi</p></div></div></main>'
   }
 
   it('shows the parts, variants and tokens of the nearest component with parts under the pointer', async () => {
@@ -109,6 +109,29 @@ describe('the Styles tab', () => {
     await hover(document.getElementById('panel')!)
     expect(panel.querySelector<HTMLTextAreaElement>('.row textarea')).toBe(box)
     expect(box.value).toBe('typed')
+    done()
+  })
+
+  it('keeps a focused box while the pointer shows another component, and shows it once the box is left', async () => {
+    page()
+
+    const { panel, done } = open(url => Response.json(url.includes('panel.kay') ? view : { ...view, name: 'Page' }))
+
+    await hover(document.getElementById('panel')!)
+
+    const box = panel.querySelector<HTMLTextAreaElement>('.row textarea')!
+
+    box.focus()
+    box.value = 'typed'
+    panel.hidden = false
+    await hover(document.getElementById('main')!)
+    expect(panel.querySelector<HTMLTextAreaElement>('.row textarea')).toBe(box)
+    expect(box.value).toBe('typed')
+
+    box.blur()
+    panel.hidden = false
+    await hover(document.getElementById('main')!)
+    expect(panel.querySelector<HTMLTextAreaElement>('.row textarea')).not.toBe(box)
     done()
   })
 

@@ -101,14 +101,28 @@ function appendProperty(source: string, object: t.ObjectExpression, property: st
   if (last === undefined && inline)
     return { at: start, remove: object.end! - start, text: `{ ${property} }` }
 
-  if (last === undefined)
+  if (last === undefined) {
+    const kept = source.slice(start + 1, object.end! - 1).trimEnd()
+
+    // A comment inside the braces stays, the property goes below it.
+    if (kept.trim() !== '')
+      return { at: start + 1 + kept.length, remove: 0, text: `\n${indentOf(source, start)}  ${property},` }
+
     return { at: start, remove: object.end! - start, text: `{\n${indentOf(source, start)}  ${property},\n${indentOf(source, start)}}` }
+  }
 
   const indent = indentOf(source, object.properties[0]!.start!)
   const trailing = TRAILING_COMMA.exec(source.slice(last.end!))
 
   if (inline)
     return trailing === null ? { at: last.end!, remove: 0, text: `, ${property}` } : { at: last.end! + trailing[0].length, remove: 0, text: ` ${property},` }
+
+  const tail = source.slice(last.end!, object.end! - 1).trimEnd()
+  const comment = tail.replace(TRAILING_COMMA, '').trim() !== ''
+
+  // Comments after the last property stay where they are, the new one goes below them.
+  if (comment)
+    return trailing === null ? { at: last.end!, remove: tail.length, text: `,${tail}\n${indent}${property}` } : { at: last.end! + tail.length, remove: 0, text: `\n${indent}${property},` }
 
   return trailing === null ? { at: last.end!, remove: 0, text: `,\n${indent}${property}` } : { at: last.end! + trailing[0].length, remove: 0, text: `\n${indent}${property},` }
 }

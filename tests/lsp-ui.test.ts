@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { recipeParts, styleInfo, themeTokens, tokensNamedBy } from '../src/build/ui-info'
+import { recipeParts, styleInfo, styleInfos, themeTokens, tokensNamedBy } from '../src/build/ui-info'
 import { Connection } from '../src/lsp/rpc'
 import { templateContext } from '../src/lsp/template-completion'
 import { objectCursor, uiFileCursor } from '../src/lsp/ui-completion'
@@ -215,5 +215,15 @@ describe('completion through the language server', () => {
     expect(await send('  Card: { parts: { head: \'gap-2 --kui-border|\' } },', 7)).toContain('--kui-border-width')
     expect(await send('  Nothing: { parts: { | } },', 8)).toEqual([])
     expect(await send('  Plain: { | },', 9)).toEqual([])
+  })
+})
+
+describe('the components found for completion', () => {
+  it('are read again after a read that failed, not kept as the failure', async () => {
+    const root = await scratchDir('ui-infos-')
+
+    await expect(styleInfos(root, [])).rejects.toThrow('ENOENT')
+    await mkdir(join(root, 'src'))
+    expect(await styleInfos(root, [])).toEqual([])
   })
 })

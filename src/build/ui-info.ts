@@ -198,7 +198,16 @@ export async function styleInfos(root: string, libraries: KayLibrary[]): Promise
 
   infosKept.set(root, { at: Date.now(), infos })
 
-  return infos
+  try {
+    return await infos
+  }
+  catch (error) {
+    // A failed read is not kept, so the next keystroke reads again.
+    if (infosKept.get(root)?.infos === infos)
+      infosKept.delete(root)
+
+    throw error
+  }
 }
 
 async function readInfos(root: string, libraries: KayLibrary[]): Promise<Infos> {

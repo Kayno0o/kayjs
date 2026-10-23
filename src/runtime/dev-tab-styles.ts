@@ -129,10 +129,11 @@ export default function stylesTab(tool: DevTool, tab: DevTab): () => void {
         if (file !== undefined && view !== undefined) {
           const part = start.closest('[data-part]')?.getAttribute('data-part') ?? undefined
 
-          // A box being typed in stays as it is until the pointer shows another component or part.
+          // The same component and part is never drawn again, so a box keeps what was typed in it.
           if (shown === file && shownPart === part)
             return
 
+          // A focused box also holds against another component or part, as crossing the page on the way to its Write button would otherwise drop the text.
           if (tool.root.activeElement !== null && body.contains(tool.root.activeElement))
             return
 

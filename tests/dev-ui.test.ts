@@ -94,6 +94,22 @@ describe('the Styles tab\'s endpoints', () => {
     expect(await ui()).toContain('\'./components/panel.kay\': { parts: { body: \'x\', root: \'p-2\', }, }')
   })
 
+  it('keeps a comment inside an empty object, and adds the property after a trailing comment', async () => {
+    const head = 'import { defineUi } from \'kay\'\n\nexport default defineUi({\n'
+
+    await put('src/ui.ts', `${head}  // Kept.\n})\n`)
+    await write({ file: PANEL_FILE, part: 'body', classes: 'p-4' })
+    expect(await ui()).toBe(`${head}  // Kept.\n  Panel: { parts: { body: 'p-4' } },\n})\n`)
+
+    await put('src/ui.ts', `${head}  Badge: { parts: 'a' }, // after\n  // own line\n})\n`)
+    await write({ file: PANEL_FILE, part: 'body', classes: 'p-4' })
+    expect(await ui()).toBe(`${head}  Badge: { parts: 'a' }, // after\n  // own line\n  Panel: { parts: { body: 'p-4' } },\n})\n`)
+
+    await put('src/ui.ts', `${head}  Badge: { parts: 'a' } // after\n})\n`)
+    await write({ file: PANEL_FILE, part: 'body', classes: 'p-4' })
+    expect(await ui()).toBe(`${head}  Badge: { parts: 'a' }, // after\n  Panel: { parts: { body: 'p-4' } }\n})\n`)
+  })
+
   it('refuses to guess at a file it cannot edit in place, and leaves it as it is', async () => {
     const dynamic = 'import { defineUi } from \'kay\'\n\nconst body = \'p-1\'\n\nexport default defineUi({\n  Panel: { parts: { body } },\n})\n'
 
