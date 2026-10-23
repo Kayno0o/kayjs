@@ -401,7 +401,8 @@ export function mailer(options: MailerOptions = {}): Mailer {
     const chosen = message.locale ?? message.lang ?? options.locale ?? options.lang
     const rendered = message.view ? await renderLocale(chosen) : chosen ?? await renderLocale()
     const markup = message.view ? await renderToString(message.view, ...[message.props, chosen === undefined ? undefined : { locale: chosen }] as never) : message.html
-    const html = markup === undefined ? undefined : asDocument(markup, message.subject, rendered)
+    // A mail has no page stylesheet to read the mark kay puts on a link it opens in a new tab, so it goes without.
+    const html = markup === undefined ? undefined : asDocument(markup.replaceAll(' data-new-tab', ''), message.subject, rendered)
 
     return {
       from: from ?? sender(),
