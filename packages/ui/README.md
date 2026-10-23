@@ -25,7 +25,6 @@ The stylesheet the root layout imports brings the theme in right after Tailwind.
 /* src/app.css */
 @import 'tailwindcss';
 @import '@kaynooo/kayjs-ui/theme.css';
-@source '../.kay/classes.txt';
 
 @theme {
   --color-accent: light-dark(#3b6fd4, #7aa2f7);

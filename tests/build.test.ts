@@ -224,8 +224,11 @@ describe('kay build', () => {
 
     try {
       // Tailwind reads `.kay` as a source once an @source names a file in it, unless kay's output tells it not to: the class then comes back escaped once more from each build's output, and the stylesheet is a new file each time.
-      for (let build = 0; build < 3; build++)
-        expect(await Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', project, '--no-check'], { stdout: 'ignore', stderr: 'ignore' }).exited).toBe(0)
+      for (let build = 0; build < 3; build++) {
+        const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', project, '--no-check'], { stdout: 'ignore', stderr: 'pipe' })
+
+        expect([await child.exited, await new Response(child.stderr).text()]).toEqual([0, ''])
+      }
 
       const sheets = (await readdir(clientDir(project))).filter(name => name.endsWith('.css'))
 

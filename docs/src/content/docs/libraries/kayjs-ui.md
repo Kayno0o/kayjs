@@ -34,7 +34,6 @@ An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never
 ```css
 @import 'tailwindcss';
 @import '@kaynooo/kayjs-ui/theme.css';
-@source '../.kay/classes.txt';
 
 @theme {
   --color-accent: light-dark(#3b6fd4, #7aa2f7);

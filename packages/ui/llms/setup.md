@@ -19,7 +19,6 @@ Two peers are optional, installed only when used: `chartist` for `LineChart`, `h
 ```css
 @import 'tailwindcss';
 @import '@kaynooo/kayjs-ui/theme.css';
-@source '../.kay/classes.txt';
 
 @theme {
   --color-accent: light-dark(#3b6fd4, #7aa2f7);
