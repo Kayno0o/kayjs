@@ -11,7 +11,7 @@ import { onReload } from './reload'
 // Writes waiting behind a database that stopped answering: past this many a new one is dropped and logged, rather than held in memory.
 const MAX_QUEUED = 10_000
 
-// The key of an event about every row of an id, which no escaped key is: a backslash is always doubled or followed by 0.
+// The event about every row of an id carries the id behind this prefix, which no escaped id starts with (a backslash is always doubled or followed by 0), and no key. A build that predates it hears an id no module declares and does nothing.
 const WHOLE_ID = '\\*'
 
 type Listener = Parameters<LiveStore['subscribe']>[0]
@@ -55,7 +55,7 @@ export function pgLive(pg: PgHandle): LiveStore {
   }
 
   // The row and its message go together, so a process that heard the message finds the row.
-  const write = async (what: string, id: string, eventKey: string, change: (tx: SQL) => Promise<unknown>): Promise<void> => {
+  const write = async (what: string, id: string, eventKey: string, change: (tx: SQL) => Promise<unknown>, eventId = escaped(id)): Promise<void> => {
     if (queued >= MAX_QUEUED) {
       if (!overflowing)
         kayLog('error', `${what} the live value ${id} failed: ${MAX_QUEUED} writes wait for the database, the ones after are dropped until it answers`)
@@ -65,7 +65,7 @@ export function pgLive(pg: PgHandle): LiveStore {
       return
     }
 
-    const at = `${escaped(id)}\0${eventKey}`
+    const at = `${eventId}\0${eventKey}`
 
     queued++
     polling?.wake()
@@ -78,7 +78,7 @@ export function pgLive(pg: PgHandle): LiveStore {
 
         await db.begin(async (tx) => {
           await change(tx)
-          await query(tx, `INSERT INTO kay_live_events (origin, id, key, at) VALUES ($1, $2, $3, ${NOW})`, [self, escaped(id), eventKey])
+          await query(tx, `INSERT INTO kay_live_events (origin, id, key, at) VALUES ($1, $2, $3, ${NOW})`, [self, eventId, eventKey])
           await query(tx, `DELETE FROM kay_live_events WHERE at < ${NOW} - ${EVENT_TTL_MS}`)
         })
       }, DB_TIMEOUT_MS, 'the write'))
@@ -144,8 +144,8 @@ export function pgLive(pg: PgHandle): LiveStore {
 
       fresh.push(seq)
 
-      if (event.key === WHOLE_ID) {
-        whole.add(event.id)
+      if (event.id.startsWith(WHOLE_ID)) {
+        whole.add(event.id.slice(WHOLE_ID.length))
 
         continue
       }
@@ -267,9 +267,9 @@ export function pgLive(pg: PgHandle): LiveStore {
       await query(tx, `UPDATE kay_live SET expires_at = ${NOW} + $3::bigint WHERE id = $1 AND key = $2 AND expires_at IS NULL`, [escaped(id), escaped(key), Math.max(0, Math.round(expiresAt - Date.now()))])
     }),
     // One statement and one event for every row of the id still without an end.
-    endAll: async (id, ttl) => write('dating', id, WHOLE_ID, async (tx) => {
+    endAll: async (id, ttl) => write('dating', id, '', async (tx) => {
       await query(tx, `UPDATE kay_live SET expires_at = ${NOW} + $2::bigint WHERE id = $1 AND expires_at IS NULL`, [escaped(id), Math.max(0, Math.round(ttl))])
-    }),
+    }, WHOLE_ID + escaped(id)),
     delete: async (id, key) => write('deleting', id, escaped(key), async tx => query(tx, 'DELETE FROM kay_live WHERE id = $1 AND key = $2', [escaped(id), escaped(key)])),
     subscribe(listener) {
       listeners.add(listener)

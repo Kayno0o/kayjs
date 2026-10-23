@@ -4,6 +4,7 @@ import { live, liveSlot, liveStoreReady, setLiveStore } from '../src/runtime/liv
 import { setupStore } from '../src/server/app-store'
 import { createDataTables, dataTables, pgData, pgHandle } from '../src/server/pg-data'
 import { pgLive } from '../src/server/pg-live'
+import { unescaped } from '../src/server/pg-sql'
 import { cleanUpAfterFile, pgDescribe, pgIt, postgres, replicas } from './job-stores'
 
 cleanUpAfterFile()
@@ -404,6 +405,84 @@ pgDescribe('pgData live values', () => {
 
     expect(heard.sort()).toEqual([['*', '[1]'], ['\\*', '[2]']])
     expect(Number((await sql.unsafe<{ count: string }[]>('SELECT count(expires_at)::text AS count FROM kay_live'))[0]!.count)).toBe(2)
+    store.stop?.()
+    other.stop?.()
+  })
+
+  pgIt('writes the event of a whole id under an id no module declares, which a build before it hears as nothing', async () => {
+    const sql = await fresh()
+    const [store] = twoReplicas()
+
+    await store.set('app:legacy', '*', '[1]', Date.now() + 60_000)
+    await store.endAll!('app:legacy', 60_000)
+
+    const [event] = await sql.unsafe<{ id: string, key: string }[]>('SELECT id, key FROM kay_live_events ORDER BY kay_live_events.seq DESC LIMIT 1')
+    // What the build before it did with an event: read the row of its id and key.
+    const rows = await sql.unsafe<{ id: string }[]>('SELECT id FROM kay_live WHERE id = $1 AND key = $2', [event!.id, event!.key])
+
+    expect(unescaped(event!.id)).not.toBe('app:legacy')
+    expect(rows).toEqual([])
+    store.stop?.()
+  })
+
+  pgIt('keeps the text of a key written here while the end of its id is read', async () => {
+    const sql = await fresh()
+    const [first, second] = replicas(2)
+    const holder = await sql.reserve()
+    let release: (() => Promise<void>) | undefined
+    // The read of the dated rows, held after its rows are read until the local write of K has committed.
+    const slow = new Proxy(first!, {
+      get(target, property) {
+        if (property !== 'unsafe') {
+          const member = Reflect.get(target, property, target) as unknown
+
+          return typeof member === 'function' ? member.bind(target) as unknown : member
+        }
+
+        return async (text: string, values?: string[][]): Promise<unknown> => {
+          const rows = await target.unsafe(text, values)
+
+          if (text.includes('ANY($1::text[])'))
+            await release?.()
+
+          return rows
+        }
+      },
+    })
+    const handle = pgHandle(first!)
+    const store = pgLive({ db: async () => {
+      await handle.db()
+
+      return slow
+    } })
+    const other = pgLive(pgHandle(second!))
+
+    await store.set('app:race', 'J', '[1]')
+    await store.set('app:race', 'K', '[1]', Date.now() + 60_000)
+    await store.entries()
+
+    const heard: [string, string | undefined][] = []
+
+    store.subscribe((_id, key, text) => heard.push([key, text]))
+    await holder.unsafe('BEGIN')
+    await holder.unsafe('SELECT 1 FROM kay_live WHERE key = \'K\' FOR UPDATE')
+
+    // Blocked on the row K the holder locks, so its write is still to commit when the end is heard.
+    const writing = Promise.resolve(store.set('app:race', 'K', '[2]', Date.now() + 60_000))
+
+    release = async () => {
+      release = undefined
+      await holder.unsafe('COMMIT')
+      await writing
+    }
+
+    await Bun.sleep(100)
+    await other.endAll!('app:race', 60_000)
+    await waitFor(() => heard.some(([key]) => key === 'J'), 'the end of J to be heard')
+    await waitFor(() => heard.some(([key, text]) => key === 'K' && text === '[2]'), 'the new text of K')
+    await holder.release()
+
+    expect(heard.filter(([key]) => key === 'K').map(([, text]) => text)).toEqual(['[2]'])
     store.stop?.()
     other.stop?.()
   })
