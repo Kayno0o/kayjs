@@ -2,7 +2,7 @@
 
 What kay keeps about visitors, where and for how long, and what an app calls to erase a person who asks, as the GDPR has it.
 
-kay sets no cookie and stores nothing of a visitor until the app uses a feature that does, and none of what it keeps tracks a visitor across sites; the Reference lists each cookie and what the server keeps, for the app to decide what its notice and consent need. Counting visits and Web Vitals is in [Analytics and Web Vitals](analytics.md).
+kay sets no cookie and stores nothing of a visitor until the app uses a feature that does, and none of what it keeps tracks a visitor across sites; the Reference lists each cookie, each storage key and what the server keeps, for the app to decide what its notice and consent need. Counting visits and Web Vitals is in [Analytics and Web Vitals](analytics.md).
 
 ## Common tasks
 
@@ -102,10 +102,23 @@ export async function archive(scan: File) {
 - Under a `base`, `kay_flash` and `kay_locale` are set for that path alone, as `kay_preview` is.
 - `kay_analytics`: the visitor's answer to the notice `analytics({ consent })` shows or to the information line of a counter that asks no one, `yes` or `no` (`no` is the opt-out); necessary to remember the choice, 180 days by default (`consent.maxAge`).
 - `kay_preview`: preview mode for an editor, set only by `enterPreview`; necessary, `preview.maxAge`, an hour by default.
+- `kay_user` (kayjs-auth, also read by kayjs-cms): a random value, readable by scripts, set while a person is signed in so a library's script asks the server only for a browser that may get an answer; necessary, for the sign-in's `maxAge` or the browser session, ended at sign-out.
+- `kay_editor` (kayjs-cms): marks the browser as an editor's, readable by scripts, so the Edit this page link looks for an answer; necessary, 90 days slid forward each time the guard lets the editor through, ended at sign-out.
+- `kay_editor_session` (kayjs-cms `passwordGuard`): the password sign-in, `<role>.<expires>.<signature>`, `httpOnly`; necessary, `maxAge`, `'14d'` by default. Named `kcms_session` before 1.70, which is still read.
+- `ksteps_<name>` (kayjs-ui `stepDraft`): the values of a multi-step form between its steps, `httpOnly`, up to 3,800 encoded bytes, what a visitor typed in; necessary for the form they are filling in, `maxAge`, an hour by default, ended by `clear()`.
 - Each `persisted(name, ...)` signal keeps its value in a cookie of that name for a year, or its `maxAge`, or in `localStorage` with `{ storage: 'local' }`; what it holds is the app's choice, so a preference is necessary and anything else waits for consent.
+
+### Browser storage
+
+- `sessionStorage` `kay-reloaded`: the time of the last reload kay made for a page of an older build, so it never reloads twice within a minute; necessary, the tab's life, nothing personal.
+- `sessionStorage` `kay_editor-refused` (kayjs-cms): the sign-in value the editor check refused, so a signed-in visitor who is no editor costs one request per tab; necessary, the tab's life.
+- `localStorage` `kcms:draft:<entry>` (kayjs-cms): an editor's unsaved draft of an entry, whatever they typed; necessary for the editor who asked to keep it, a week, dropped once saved.
+- `localStorage` under the name of a `persisted(name, ..., { storage: 'local' })` signal, as the cookies above.
+- With `offline`, the service worker and its Cache Storage `kay-w<version>`: public pages and files that answered 200 without `private` or `no-store`, kept until the next build replaces the worker; necessary for the offline use the app turned on, and holding nothing of a visitor.
 
 ### What the server keeps
 
+- A `live()` value is the app's own data, kept in `store.live` for every visitor (the app must not put a person in it), and a presence `member` is whatever the page's server fence gave, a name say, kept in `store.rooms` while the tab is open and about 10 seconds after a crash.
 - Request logs carry the method, the path without its query string, the status, the duration and the request id: no address, no user agent, no cookie.
 - `onError` gets `{ error, request }`, the request whole, or `undefined` for an error met outside one; an error tracker is sent its path and id, not `request.url`, whose query may hold an address or a token.
 - Sessions with a store live in it until they expire or `destroy()`; `sqliteStore` drops expired ones every hour and every 1000 writes, `memoryStore` every 1000 writes.

@@ -17,11 +17,29 @@ This page lists what each feature keeps, for a site's privacy notice and for the
 | `kay_locale` | a visitor picking a locale | a year |
 | `kay_analytics` | the consent notice or information line of `analytics()` | 180 days, or the `maxAge` you set |
 | `kay_preview` | `enterPreview()`, for an editor | an hour by default |
+| `kay_user` | kayjs-auth, while a person is signed in | the sign-in's `maxAge` or the browser session, ended at sign-out |
+| `kay_editor` | kayjs-cms, for an editor | 90 days, slid forward each visit, ended at sign-out |
+| `kay_editor_session` | kayjs-cms `passwordGuard` | 14 days by default, or its `maxAge`; `kcms_session` before 1.70, still read |
+| `ksteps_<name>` | kayjs-ui `stepDraft`, the values of a multi-step form | an hour by default, ended by `clear()` |
 | the name given to `persisted()` | a persisted signal | a year, or its `maxAge` |
 
-The first four, and `kay_analytics`, which only remembers the visitor's answer, are necessary for what the visitor asked, so they need no consent. A persisted signal holds what the app puts in it. A theme or a language is necessary, and anything else waits for consent.
+Every cookie above but the persisted one, including `kay_analytics`, which only remembers the visitor's answer, is necessary for what the visitor asked, so they need no consent. A persisted signal holds what the app puts in it. A theme or a language is necessary, and anything else waits for consent.
+
+`kay_user` only tells a script of the site that a person is signed in, and `kay_editor` that the browser is an editor's. `kay_editor_session` is `httpOnly`, and so is a `ksteps_<name>` draft, which holds what the visitor typed in the steps so far.
 
 Under a `base`, `kay_flash`, `kay_locale` and `kay_preview` are set for that path alone. Before 1.52 the locale cookie was `kay-locale`; kay still reads it.
+
+## Browser storage
+
+| Key | Set by | Kept |
+| --- | --- | --- |
+| `sessionStorage` `kay-reloaded` | a page of an older build, reloaded once | the tab's life, only a time |
+| `sessionStorage` `kay_editor-refused` | kayjs-cms, for a signed-in visitor who is no editor | the tab's life |
+| `localStorage` `kcms:draft:<entry>` | kayjs-cms, an editor's unsaved draft | a week, dropped once saved |
+| `localStorage` under a name | a `persisted()` signal with `storage: 'local'` | until the app clears it |
+| Cache Storage `kay-w<version>` | the service worker, when `offline` is on | until the next build replaces it |
+
+The first three are necessary for what the visitor or editor asked, so need no consent. The offline cache keeps only public pages and files, never one marked `private` or `no-store`, so nothing of a visitor.
 
 ## What the server keeps
 
@@ -30,6 +48,7 @@ Under a `base`, `kay_flash`, `kay_locale` and `kay_preview` are set for that pat
 - **Rate limits**: counted by address in memory, or in `sqliteRates(path)` pseudonymised: each key is hashed under the app's secret once one is set, else under a random key kay keeps in a `.key` file beside the store, never in the store itself, so a copy of the store alone cannot be checked against a guessed address (a backup of the whole folder holds both, so set a secret to keep the key off the disk, and keep the `.key` file out of git). Windows are dropped once their window closes.
 - **Jobs**: a waiting job's payload until it runs, a failed one's for 30 days from when its last attempt was due, or what the queue's `keepFailed` says (7 days for kayjs-mail, without the body).
 - **Mailing lists** (kayjs-mail): a subscriber's address, language, the date of their confirmation and the proof of it (the page of the form and which notice it showed), in `data/mail-list.sqlite`, until they unsubscribe or you call `mail.erase`; an address nobody confirmed is dropped after 7 days. A broadcast and who it was sent to (by a random id, not the address) are kept 30 days after it finished.
+- **Live values and presence**: a `live()` value is the app's own data, shared by every visitor, so keep no person in it. A presence member is whatever your page gave, a name say, kept while the tab is open and about 10 seconds after a crash.
 - **Rooms**: a message 30 seconds in `sqliteRooms`.
 - **Notifications**: the title, link and read state of each, 90 days by default or what `keep` says, the newest 200 per user. See [Notifications](/guides/live-and-realtime#notifications).
 - **Uploads**: until the app deletes them, without the metadata a camera writes in a JPEG, PNG, WebP, AVIF or HEIC.
