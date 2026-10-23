@@ -5,7 +5,7 @@ import process from 'node:process'
 import { $ } from 'bun'
 import { describe, expect, it } from 'bun:test'
 import { addedMarkers } from '../scripts/merge-markers'
-import { SOURCE_CHANGE, SOURCE_READERS, SOURCE_SCAN } from '../scripts/source-readers'
+import { readersOf, SOURCE_CHANGE, SOURCE_FILE_READ, SOURCE_READERS, SOURCE_SCAN, WHOLE_SUITE } from '../scripts/source-readers'
 import { subprocessTests } from '../scripts/subprocess-tests'
 import { scratchDir } from './scratch'
 
@@ -385,6 +385,30 @@ describe('tests scanning the sources as files', () => {
     }
 
     expect(scanning.toSorted()).toEqual([...SOURCE_READERS].toSorted())
+  })
+
+  it('are run for a source file another test reads through a fixed path', async () => {
+    const unreached: string[] = []
+
+    for await (const test of new Bun.Glob('tests/*.test.ts').scan(ROOT)) {
+      for (const [, path] of (await Bun.file(join(ROOT, test)).text()).matchAll(SOURCE_FILE_READ)) {
+        const source = path!.replace(/^(?:\.\.\/)+/, '')
+
+        // A kay source other than a `.ts` already runs the whole suite.
+        if (!WHOLE_SUITE.test(source) && !readersOf(source).includes(test))
+          unreached.push(`${test} reads ${path}`)
+      }
+    }
+
+    expect(unreached.toSorted()).toEqual([])
+  })
+
+  it('run the tests reading the theme of the UI library for a change to it, and no browser one', () => {
+    const tests = readersOf('packages/ui/src/theme.css')
+
+    expect(tests).toContain('tests/ui-tokens.test.ts')
+    expect(tests.filter(test => (/browser|docs-contrast/).test(test))).toEqual([])
+    expect(readersOf('packages/ui/src/button.kay')).not.toContain('tests/ui-tokens.test.ts')
   })
 
   it('are reached by a source of kay or of a library, and by nothing else', () => {

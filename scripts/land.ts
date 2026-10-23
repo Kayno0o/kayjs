@@ -4,7 +4,7 @@ import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { $, Glob } from 'bun'
 import { addedMarkers } from './merge-markers'
-import { SOURCE_CHANGE, SOURCE_READERS } from './source-readers'
+import { readersOf, WHOLE_SUITE } from './source-readers'
 import { subprocessTests } from './subprocess-tests'
 import { failedTests } from './test-failures'
 
@@ -20,20 +20,6 @@ const TAIL = 30
 const SUMMARY = 8
 const FIXTURE = /^tests\/fixtures\/([^/]+)\//
 const PACKAGE = /^packages\/([^/]+)\//
-// Read by every test file or by kay itself rather than imported, so `bun test --changed` cannot follow them.
-const WHOLE_SUITE = /^(?:package\.json|bun\.lock|bunfig\.toml|tsconfig[^/]*\.json|eslint\.(?:config|base|slices)\.ts|src\/(?:.*\/)?[^/]+(?<!\.ts))$/
-// Tests reading these folders as files, which an import graph does not show.
-const READERS: [RegExp, string[]][] = [
-  [/^(?:llms\/|llms\.txt$)/, ['tests/llms.test.ts', 'tests/docs.test.ts', 'tests/docs-chat.test.ts', 'tests/errors.test.ts', 'tests/kay-words.test.ts', 'tests/release-links.test.ts', 'tests/bun.test.ts', 'tests/browsers.test.ts', 'tests/dev-tool.test.ts', 'tests/dev-routes.test.ts']],
-  [/^docs\//, ['tests/docs.test.ts', 'tests/examples.test.ts']],
-  [/^examples\//, ['tests/examples.test.ts', 'tests/new.test.ts', 'tests/docs.test.ts']],
-  [/^packages\//, ['tests/llms.test.ts', 'tests/packages.test.ts', 'tests/docs.test.ts', 'tests/examples.test.ts', 'tests/library.test.ts', 'tests/new.test.ts']],
-  // Tests globbing the kay and library sources.
-  [SOURCE_CHANGE, SOURCE_READERS],
-  [/^tests\/fixtures\//, ['tests/format.test.ts']],
-  // Greps every tracked file for the private forge domain.
-  [/^/, ['tests/public-repo.test.ts']],
-]
 // Half the host's cores, as CI runs them, so a landing leaves the machine to the rest; fewer with KAY_LAND_WORKERS, for a session short of memory beside other test runs.
 const WORKERS = `--parallel=${Number(process.env.KAY_LAND_WORKERS) || 6}`
 // How long a step may run before it counts as hung and is killed with every process it started: the whole suite takes minutes, a test stuck on a killed browser or child took hours.
@@ -224,7 +210,7 @@ async function verify(): Promise<string> {
   else {
     await step('tests the changes reach', [BUN, 'run', 'test', `--changed=${base}`, WORKERS])
 
-    const readers = new Set(READERS.flatMap(([folder, tests]) => changed.some(path => folder.test(path)) ? tests : []))
+    const readers = new Set(changed.flatMap(readersOf))
 
     // A change under src/ also reaches the tests running kay in a subprocess or loading it by path, which the import graph does not show.
     for (const test of await subprocessTests(process.cwd(), changed))

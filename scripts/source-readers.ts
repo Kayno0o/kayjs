@@ -1,3 +1,6 @@
+// Read by every test file or by kay itself rather than imported, so `bun test --changed` cannot follow them.
+export const WHOLE_SUITE = /^(?:package\.json|bun\.lock|bunfig\.toml|tsconfig[^/]*\.json|eslint\.(?:config|base|slices)\.ts|src\/(?:.*\/)?[^/]+(?<!\.ts))$/
+
 // A change to a `.ts` or `.kay` file under `src/` or a library's `src/`.
 export const SOURCE_CHANGE = /^(?:src|packages\/[^/]+\/src)\/.*\.(?:ts|kay)$/
 
@@ -17,3 +20,31 @@ export const SOURCE_READERS = [
 
 // What marks a test as scanning sources: a quoted glob of `src/` or `packages/<library>/src/`, or a scan of the `SRC` folder.
 export const SOURCE_SCAN = /[`'"]\{?(?:src\/|packages\/[^`'"]*\/src\/)[^`'"]*\*[*.]|\.scan(?:Sync)?\(SRC\)/
+
+// Tests reading one source file through a fixed path, which neither an import graph nor `SOURCE_READERS` shows: a stylesheet or a component read as text, or loaded by a library's extension. Each runs only for a change to its file, as the slow and browser tests stay out.
+export const SOURCE_FILE_READERS: [RegExp, string[]][] = [
+  [/^packages\/ui\/src\/theme\.css$/, ['tests/ui-tokens.test.ts', 'tests/apply-theme.test.ts', 'tests/format-tailwind.test.ts', 'tests/prune-styles.test.ts', 'tests/inbox.test.ts']],
+  [/^packages\/ui\/src\/bell\.kay$/, ['tests/library-context-check.test.ts']],
+]
+
+// What marks a test as reading one source file other than a `.ts`: a quoted path of a file in `src/` or `packages/<library>/src/` from the repo root (`../`, `packages/` or `resolve('src/`), on a line reading it.
+export const SOURCE_FILE_READ = /(?:Bun\.file|readFile(?:Sync)?)\([^\n]*?[`'"]((?:(?:\.\.\/)+src|(?:\.\.\/)*packages\/[\w-]+\/src|(?<=resolve\([`'"])src)\/[\w./-]*?\.(?!ts\b)[a-z]+)[`'"]/g
+
+// Tests reading these folders as files, which an import graph does not show.
+export const READERS: [RegExp, string[]][] = [
+  [/^(?:llms\/|llms\.txt$)/, ['tests/llms.test.ts', 'tests/docs.test.ts', 'tests/docs-chat.test.ts', 'tests/errors.test.ts', 'tests/kay-words.test.ts', 'tests/release-links.test.ts', 'tests/bun.test.ts', 'tests/browsers.test.ts', 'tests/dev-tool.test.ts', 'tests/dev-routes.test.ts']],
+  [/^docs\//, ['tests/docs.test.ts', 'tests/examples.test.ts']],
+  [/^examples\//, ['tests/examples.test.ts', 'tests/new.test.ts', 'tests/docs.test.ts']],
+  [/^packages\//, ['tests/llms.test.ts', 'tests/packages.test.ts', 'tests/docs.test.ts', 'tests/examples.test.ts', 'tests/library.test.ts', 'tests/new.test.ts']],
+  // Tests globbing the kay and library sources.
+  [SOURCE_CHANGE, SOURCE_READERS],
+  ...SOURCE_FILE_READERS,
+  [/^tests\/fixtures\//, ['tests/format.test.ts']],
+  // Greps every tracked file for the private forge domain.
+  [/^/, ['tests/public-repo.test.ts']],
+]
+
+// The tests reading `path` as a file.
+export function readersOf(path: string) {
+  return READERS.flatMap(([folder, tests]) => folder.test(path) ? tests : [])
+}
