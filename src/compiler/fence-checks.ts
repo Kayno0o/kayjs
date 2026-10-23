@@ -433,24 +433,174 @@ export function asyncReplies(fence: ParsedFence): Diagnostic[] {
   return diagnostics
 }
 
-// Whether a redirect target is written as a path of this site: a literal starting with one slash, a template or a concatenation whose text before the first value is `/` and a name (`/posts/`), or `localPath(...)`.
-function isSitePath(node: t.Node): boolean {
+// The checkers that turn any value into a path of this site: kay's `localPath` and the auth library's `safeRedirect`.
+const SITE_CHECKERS = new Set(['localPath', 'safeRedirect'])
+
+// Whether a redirect target is written as a path of this site: a literal starting with one slash, a template or a concatenation whose text before the first value is `/` and a name (`/posts/`) or whose first value is itself a site path, a call to a checker, `localize(...)` of a site path, or a `const` holding one.
+function isSitePath(node: t.Node, constants: ReadonlyMap<string, t.Node[]>, seen = new Set<string>()): boolean {
+  const site = (inner: t.Node) => isSitePath(inner, constants, seen)
+
   if (node.type === 'StringLiteral')
     return SITE_PATH.test(node.value)
 
-  if (node.type === 'TemplateLiteral')
-    return (node.expressions.length === 0 ? SITE_PATH : BUILT_PATH).test(node.quasis[0]!.value.cooked ?? '')
+  if (node.type === 'TemplateLiteral') {
+    const first = node.quasis[0]!.value.cooked ?? ''
+
+    if (node.expressions.length === 0)
+      return SITE_PATH.test(first)
+
+    return first === '' ? site(node.expressions[0]!) : BUILT_PATH.test(first)
+  }
 
   if (node.type === 'BinaryExpression' && node.operator === '+')
-    return node.left.type === 'StringLiteral' ? BUILT_PATH.test(node.left.value) : isSitePath(node.left) && node.left.type === 'BinaryExpression'
+    return node.left.type === 'StringLiteral' ? BUILT_PATH.test(node.left.value) : site(node.left) && (node.left.type === 'BinaryExpression' || node.left.type === 'CallExpression' || node.left.type === 'Identifier')
 
   if (node.type === 'ConditionalExpression')
-    return isSitePath(node.consequent) && isSitePath(node.alternate)
+    return site(node.consequent) && site(node.alternate)
+
+  if (node.type === 'LogicalExpression')
+    return site(node.left) && site(node.right)
 
   if (node.type === 'TSAsExpression' || node.type === 'TSNonNullExpression' || node.type === 'ParenthesizedExpression')
-    return isSitePath(node.expression)
+    return site(node.expression)
 
-  return node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.callee.name === 'localPath'
+  if (node.type === 'Identifier') {
+    const inits = constants.get(node.name)
+
+    if (!inits || seen.has(node.name))
+      return false
+
+    seen.add(node.name)
+
+    return inits.every(site)
+  }
+
+  if (node.type !== 'CallExpression' || node.callee.type !== 'Identifier')
+    return false
+
+  if (SITE_CHECKERS.has(node.callee.name))
+    return true
+
+  const [first] = node.arguments
+
+  return node.callee.name === 'localize' && first !== undefined && first.type !== 'SpreadElement' && site(first)
+}
+
+// The initialisers of every variable name in the fence; a name that is assigned, a parameter or declared without a value holds nothing known.
+function constantsOf(fence: ParsedFence): Map<string, t.Node[]> {
+  const constants = new Map<string, t.Node[]>()
+  const unknown = new Set<string>()
+
+  eachNode(fence.ast.program, (node) => {
+    if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier') {
+      if (node.init)
+        constants.set(node.id.name, [...constants.get(node.id.name) ?? [], node.init])
+      else
+        unknown.add(node.id.name)
+    }
+    else if (node.type === 'AssignmentExpression' && node.left.type === 'Identifier') {
+      unknown.add(node.left.name)
+    }
+    else if (isFunction(node)) {
+      for (const param of node.params) {
+        if (param.type === 'Identifier')
+          unknown.add(param.name)
+      }
+    }
+  })
+
+  for (const name of unknown)
+    constants.delete(name)
+
+  return constants
+}
+
+const REQUEST_CONTEXT = new Set(['query', 'params', 'body', 'request', 'url', 'input', 'headers', 'cookies', 'form'])
+const REQUEST_ROOTS = new Set(['query', 'params', 'body', 'input', 'request', 'searchParams', 'formData'])
+
+// A call result is a value the callee made, which is not followed back to what it was given.
+function isCall(node: t.Node): boolean {
+  return node.type === 'AwaitExpression' ? isCall(node.argument) : node.type === 'CallExpression'
+}
+
+// Whether a node reads the request: \`ctx.query...\`, \`ctx.url...\`, a destructured \`query\` or a \`const\` holding one.
+function readsRequest(node: t.Node, constants: ReadonlyMap<string, t.Node[]>, seen: Set<string>): boolean {
+  let found = false
+
+  eachNode(node, (inner) => {
+    if (found)
+      return false
+
+    if (inner.type === 'MemberExpression' || inner.type === 'OptionalMemberExpression') {
+      let base: t.Node = inner
+      let first: t.Node = inner
+
+      while ((base.type === 'MemberExpression' || base.type === 'OptionalMemberExpression')) {
+        first = base
+        base = base.object
+      }
+
+      if (base.type === 'Identifier' && 'property' in first && first.property.type === 'Identifier')
+        found = base.name === 'ctx' ? REQUEST_CONTEXT.has(first.property.name) : REQUEST_ROOTS.has(base.name)
+    }
+    else if (inner.type === 'Identifier' && REQUEST_ROOTS.has(inner.name)) {
+      found = true
+    }
+    else if (inner.type === 'Identifier' && constants.has(inner.name) && !seen.has(inner.name)) {
+      seen.add(inner.name)
+      found = constants.get(inner.name)!.some(init => !isCall(init) && readsRequest(init, constants, seen))
+    }
+
+    return !found
+  })
+
+  return found
+}
+
+// Whether a target that is not written as a site path may be any URL: a literal or text that is not a path, an unknown name, a member of the request, or a call fed the request.
+// A value a helper builds from the app's own values (\`organizationPage(features, org)\`, \`result.redirect\`) is left alone, as it does not come from the visitor.
+function leaks(node: t.Node, constants: ReadonlyMap<string, t.Node[]>, seen = new Set<string>()): boolean {
+  const next = (inner: t.Node) => leaks(inner, constants, seen)
+
+  if (isSitePath(node, constants))
+    return false
+
+  if (node.type === 'TemplateLiteral') {
+    const first = node.quasis[0]!.value.cooked ?? ''
+
+    return first === '' ? next(node.expressions[0]!) : !BUILT_PATH.test(first)
+  }
+
+  if (node.type === 'BinaryExpression' && node.operator === '+')
+    return node.left.type === 'StringLiteral' ? !BUILT_PATH.test(node.left.value) : next(node.left)
+
+  if (node.type === 'ConditionalExpression')
+    return next(node.consequent) || next(node.alternate)
+
+  if (node.type === 'LogicalExpression')
+    return next(node.left) || next(node.right)
+
+  if (node.type === 'TSAsExpression' || node.type === 'TSNonNullExpression' || node.type === 'ParenthesizedExpression' || node.type === 'AwaitExpression')
+    return next('expression' in node ? node.expression : node.argument)
+
+  if (node.type === 'NullLiteral' || (node.type === 'Identifier' && node.name === 'undefined'))
+    return false
+
+  if (node.type === 'Identifier') {
+    const inits = constants.get(node.name)
+
+    if (!inits || seen.has(node.name))
+      return true
+
+    seen.add(node.name)
+
+    return inits.some(next)
+  }
+
+  if (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression' || node.type === 'CallExpression' || node.type === 'OptionalCallExpression')
+    return readsRequest(node, constants, new Set())
+
+  return true
 }
 
 // A `redirect()` or `ctx.redirect()` whose target is not written as a path of the site: a value read from the request or a store may be any URL, an open redirect for a phishing link.
@@ -459,6 +609,7 @@ export function openRedirects(fence: ParsedFence): Diagnostic[] {
     return []
 
   const diagnostics: Diagnostic[] = []
+  const constants = constantsOf(fence)
 
   eachNode(fence.ast.program, (node) => {
     if (node.type !== 'CallExpression' || !node.arguments[0] || node.arguments[0].type === 'SpreadElement')
@@ -467,7 +618,7 @@ export function openRedirects(fence: ParsedFence): Diagnostic[] {
     const callee = node.callee
     const redirects = callee.type === 'Identifier' ? callee.name === 'redirect' : callee.type === 'MemberExpression' && !callee.computed && callee.object.type === 'Identifier' && callee.object.name === 'ctx' && callee.property.type === 'Identifier' && callee.property.name === 'redirect'
 
-    if (!redirects || isSitePath(node.arguments[0]))
+    if (!redirects || !leaks(node.arguments[0], constants))
       return
 
     diagnostics.push({

@@ -278,6 +278,25 @@ describe('external-redirect', () => {
     expect(found('// kay-allow external-redirect\nredirect(url)')).toEqual([])
   })
 
+  it('leaves alone a target a checker or a helper made, and a const holding one', () => {
+    expect(found('redirect(safeRedirect(ctx.query.next, "/"))')).toEqual([])
+    expect(found('const to = localPath(ctx.query.next, "/a")\nredirect(to)')).toEqual([])
+    expect(found('const to = localPath(ctx.query.next, "/a")\nredirect(`${to}#top`)')).toEqual([])
+    expect(found('redirect(localize(localPath(ctx.query.next, "/a")))')).toEqual([])
+    expect(found('redirect(organizationPage(features, organization))')).toEqual([])
+    expect(found('const result = await signIn(input)\nredirect(localize(result.redirect))')).toEqual([])
+    expect(found('redirect(a ? "/a" : undefined)')).toEqual([])
+  })
+
+  it('reports a helper or a localize() fed the request, and a const that is reassigned', () => {
+    expect(found('redirect(localize(ctx.query.next))')).toHaveLength(1)
+    expect(found('redirect(build(ctx.url.pathname))')).toHaveLength(1)
+    expect(found('redirect(build(query.next))')).toHaveLength(1)
+    expect(found('const to = pick(ctx.query)\nredirect(to)')).toHaveLength(1)
+    expect(found('let to = localPath(a, "/a")\nto = ctx.query.next\nredirect(to)')).toHaveLength(1)
+    expect(found('redirect(`${ctx.query.next}/a`)')).toHaveLength(1)
+  })
+
   it('reads a plain module too', () => {
     const guard = 'export default guard(({ redirect, query }) => redirect(query.next))\n'
 

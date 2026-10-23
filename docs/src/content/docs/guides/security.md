@@ -128,7 +128,9 @@ A site that needs a feature `Permissions-Policy` refuses, such as geolocation fo
 
 ## Redirect only to your own pages
 
-A `redirect()` that takes its target from the request, such as a `?next=` value, sends visitors wherever a crafted link says. `kay check` reports a target that is not written as a path of the site (`external-redirect`). Wrap the value in `localPath(value, fallback)`, which gives the fallback for anything that is not a path of this site: `redirect(localPath(ctx.query.next, '/account'))`. For a URL you chose, allow it with a `// kay-allow external-redirect` comment.
+A `redirect()` that takes its target from the request, such as a `?next=` value, sends visitors wherever a crafted link says. `kay check` reports a target that is not written as a path of the site (`external-redirect`). Wrap the value in `localPath(value, fallback)`, which gives the fallback for anything that is not a path of this site: `redirect(localPath(ctx.query.next, '/account'))`.
+
+Only a target the request can reach is reported: a value a helper builds from your own settings is left alone. For a URL you chose, allow it with a `// kay-allow external-redirect` comment.
 
 ## Rate limits
 
