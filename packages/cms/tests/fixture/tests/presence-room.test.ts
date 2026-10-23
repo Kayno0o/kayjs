@@ -138,3 +138,37 @@ test('a person the guard lets in who only reads the page is told the names once 
   expect(refused.headers.getSetCookie().join()).not.toContain('kay_preview_admitted')
   expect(namesIn(await receives(holder, '/blog/hello', 'refused-holder'))).not.toContain('Ann')
 }, 30_000)
+
+test('a stream open before its member is admitted switches from a count to the names without reconnecting', async () => {
+  const screen = await testSite({ root: ROOT })
+
+  await receives(screen, '/admin/collections/posts/hello?as=Ann', 'ann-screen')
+
+  const reader = await testSite({ root: ROOT })
+
+  await reader.visit(previewUrl('/blog/hello', { edit: true }))
+
+  const { html } = await reader.visit('/blog/hello')
+  const pages = pagesOf(html)
+  const keys = pages.flatMap(page => page.values.filter(([id]) => id === PRESENCE).map(([, key]) => key))
+  const feed = new Feed(await reader.fetch('/_kay/live', { ...JSON_POST, body: JSON.stringify({ proofs: proofsOf(pages), watch: keys.map(key => [PRESENCE, key]), tab: 'open-stream' } satisfies LiveRequest) }))
+
+  feeds.push(feed)
+
+  const first: string[] = []
+
+  while (first.length < keys.length)
+    first.push(...(await feed.next()).map(update => JSON.stringify(update)))
+
+  expect(first.join('')).not.toContain('Ann')
+
+  // The guard lets the reader in on a read of the entry; the stream, open since before, is sent the names at its next recheck.
+  expect((await reader.fetch('/_kay/cms/entries/posts/hello')).status).toBe(200)
+
+  let seen = ''
+
+  while (!seen.includes('Ann'))
+    seen += JSON.stringify(await feed.next())
+
+  expect(seen).toContain('Ann')
+}, 30_000)

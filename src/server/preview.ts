@@ -72,6 +72,8 @@ let settings: PreviewSettings | undefined
 const editSessions = new Map<string, EditSession>()
 // The edit cookies a guard let through in this process, each against its expiry: a stream open when the cookie was marked reads its request from before, and this tells it.
 const admittedHere = new Map<string, number>()
+// Edit cookies the process remembers as admitted at once, the oldest going first.
+const MAX_ADMITTED = 1000
 const store = new AsyncLocalStorage<PreviewState>()
 const probes = new Map<string, EntryRef[]>()
 // Set while a page renders for a probe, where a CMS screen asking for pages must not start another.
@@ -296,9 +298,10 @@ export function editSessionOf(request: Request): string | undefined {
 
 // Whether a guard of the app let the request's edit cookie through, by the cookie it set beside it with `admitEditSession`, or by this process having seen it do so, which tells a stream opened before the cookie was set. An edit link's holder has the edit cookie alone, and a cookie from before the nonce is never admitted, as two of them issued in one second are the same. False outside edit mode.
 export function editSessionAdmitted(request: Request): boolean {
-  const cookie = editCookie(request)
+  const cookie = settings === undefined ? undefined : previewCookie(request, settings)
+  const valid = settings === undefined ? undefined : modeOf(settings, cookie)
 
-  if (!settings || cookie === undefined || modeOf(settings, cookie)?.nonce === undefined)
+  if (cookie === undefined || valid?.mode !== 'edit' || valid.nonce === undefined)
     return false
 
   return admittedHere.has(cookie) || markedBy(request, cookie)
@@ -315,7 +318,7 @@ function rememberAdmitted(cookie: string, until: number): void {
   const now = Date.now() / 1000
 
   for (const [key, each] of admittedHere) {
-    if (each > now && admittedHere.size < MAX_EDIT_SESSIONS)
+    if (each > now && admittedHere.size < MAX_ADMITTED)
       break
 
     admittedHere.delete(key)

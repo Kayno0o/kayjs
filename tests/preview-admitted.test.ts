@@ -78,3 +78,30 @@ test('a request that carries the edit cookie alone is told once this process has
   admitEditSession({ cookies: new Bun.CookieMap(), request: new Request('http://localhost/') }, holder.edit)
   expect(editSessionAdmitted(request)).toBe(true)
 })
+
+test('the process remembers the admitted cookies it was told, 1000 at most, and forgets them all when preview is set up again', () => {
+  const first = enter('http://localhost/', false)
+  const request = (edit: string) => asked(`kay_preview=${edit}`)
+
+  admitEditSession({ cookies: new Bun.CookieMap(), request: new Request('http://localhost/') }, first.edit)
+  expect(editSessionAdmitted(request(first.edit))).toBe(true)
+
+  for (let at = 0; at < 1000; at++) {
+    const each = enter('http://localhost/', false)
+
+    admitEditSession({ cookies: new Bun.CookieMap(), request: new Request('http://localhost/') }, each.edit)
+
+    if (at === 999)
+      expect(editSessionAdmitted(request(each.edit))).toBe(true)
+  }
+
+  // The oldest went to make room, which only costs a stream its names until it reconnects: the admitted cookie still tells.
+  expect(editSessionAdmitted(request(first.edit))).toBe(false)
+
+  const last = enter('http://localhost/', false)
+
+  admitEditSession({ cookies: new Bun.CookieMap(), request: new Request('http://localhost/') }, last.edit)
+  expect(editSessionAdmitted(request(last.edit))).toBe(true)
+  setupPreview({ secret: SECRET }, '')
+  expect(editSessionAdmitted(request(last.edit))).toBe(false)
+})
