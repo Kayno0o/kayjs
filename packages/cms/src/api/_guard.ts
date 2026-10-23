@@ -180,7 +180,8 @@ export default guard(async (ctx) => {
 
   if (testing !== undefined) {
     const testTo = settings().newsletter.get(decoded(testing))?.testTo
-    const to = (typeof testTo === 'function' ? await testTo(ctx) : testTo) ?? (await memberOf(ctx))?.email
+    const given = typeof testTo === 'function' ? await testTo(ctx) : testTo
+    const to = given !== undefined && given !== '' ? given : (await memberOf(ctx))?.email
 
     if (to !== undefined && to !== '')
       testAddresses.set(ctx.request, to)

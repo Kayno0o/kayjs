@@ -432,7 +432,7 @@ describe('where a newsletter test send goes', () => {
   })
 
   test('falls back to the person when `testTo` returns nothing, and is `member`\'s email for a custom guard', async () => {
-    configure({ guard: () => undefined, newsletter: { posts: { list, message, testTo: () => undefined } } })
+    configure({ guard: () => undefined, newsletter: { posts: { list, message, testTo: () => '' } } })
 
     const fallback = testRequest()
 
@@ -464,5 +464,5 @@ describe('where a newsletter test send goes', () => {
 
 test('a test send with a malformed collection in its path is not a server error', async () => {
   configure({ guard: () => undefined })
-  await apiGuard(ask({ path: '/newsletter/%E0%A4%A/hello/test', user: { roles: ['editor'], email: 'ed@example.com' } }))
+  await expect(apiGuard(ask({ path: '/newsletter/%E0%A4%A/hello/test', user: { roles: ['editor'], email: 'ed@example.com' } }))).resolves.toBeUndefined()
 })
