@@ -9,6 +9,7 @@ import { REMOVED_UI_CLASSES } from '../../../src/check/ui-classes'
 import { installClassTable } from '../../../src/runtime/class-table'
 import { child } from '../../../src/runtime/html'
 import { scratchDir } from '../../../tests/scratch'
+import { CHECKBOX, FIELD_MESSAGE } from '../src/field-look'
 
 // An app of its own, as `src/ui.ts` restyles every instance of a component in the app: the library's fixture app renders the same components untouched, and its contract tests compare them. Built apart from testSite, which serves one project per test process.
 const ROOT = join(import.meta.dir, 'restyle-app')
@@ -318,6 +319,12 @@ describe('the buttons and fields whose recipe holds their look', () => {
       expect(classesOf('checkbox', 'input').at(-1)).toBe('size-5')
       expect(classesOf('toggle', 'track')).not.toContain('w-9')
       expect(classesOf('toggle', 'track').at(-1)).toBe('w-12')
+
+      const compact = (merged.match(/<div class="(kui-form-field [^"]*)" data-part="root" data-kui-field="[^"]*" data-compact/)?.[1] ?? '').split(' ')
+
+      expect(compact).not.toContain('w-auto')
+      expect(compact).not.toContain('w-full')
+      expect(compact.at(-1)).toBe('w-48')
     }
     finally {
       installClassTable(undefined)
@@ -330,6 +337,30 @@ describe('the buttons and fields whose recipe holds their look', () => {
       expect(classesOfPart(id, part).filter(name => name.startsWith('kui-')), `${id} ${part}`).toEqual([])
 
     expect(classesOfPart('field', 'text')[0]).toBe('kui-label-text')
+  })
+
+  test('a compact FormField is auto-wide by a recipe variant, so a class on it replaces the width and a plain one stays full-width', () => {
+    const compact = (html.match(/<div class="(kui-form-field [^"]*)" data-part="root" data-kui-field="[^"]*" data-compact/)?.[1] ?? '').split(' ')
+
+    expect(compact).toContain('w-auto')
+    expect(compact).not.toContain('data-compact:w-auto')
+    expect(compact.at(-1)).toBe('w-48')
+    const plain = (html.match(/<div class="(kui-form-field [^"]*)" data-part="root" data-kui-field="[^"]*">/)?.[1] ?? '').split(' ')
+
+    expect(plain).toContain('w-full')
+    expect(plain).not.toContain('w-auto')
+  })
+
+  test('the consent box of a ContactForm draws the Checkbox look and its messages the FormField ones, from the same utilities', () => {
+    const start = html.indexOf('data-part="consent"')
+    const consent = html.slice(start, html.indexOf('data-part="issues"', start))
+    const classOf = (part: string) => consent.match(new RegExp(`class="([^"]*)" data-part="${part}"`))?.[1]
+
+    expect(classOf('box')).toBe(CHECKBOX.root)
+    expect(classOf('boxInput')).toBe(CHECKBOX.input)
+    expect(classOf('boxLabel')).toBe(CHECKBOX.label)
+    expect(classOf('box')).toContain('has-[input:disabled]:opacity-50')
+    expect(html).toContain(`class="${FIELD_MESSAGE.issues}" data-part="issues"`)
   })
 
   test('a text field, a textarea and a select keep kui-field-input as the name of their rule', () => {

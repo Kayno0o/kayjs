@@ -3,6 +3,7 @@ import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
 import Select from '@kaynooo/kayjs-ui/select.kay'
+import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
 import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import '../app.css'
@@ -34,3 +35,6 @@ main
   div.flex.items-end.gap-3
     MultiSelect#tags(label="Tags" options={[{ value: 'a', label: 'A' }]})
     Button#beside-tags(type="submit" label="Filter")
+  div.flex.items-end.gap-3
+    Toggle(label="On" onChange={() => undefined})
+    Button#beside-toggle(type="submit" label="Filter")

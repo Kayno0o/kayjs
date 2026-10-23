@@ -11,11 +11,9 @@ export function library(name: string): string {
   return `node_modules/@kaynooo/kayjs-ui/src/${name}.kay`
 }
 
-const BUTTON_BOX = / inline-flex[\s\S]*?\[text-transform:var\(--kui-label-case\)\]/
-
-// The classes of an element without the box and type utilities a Button's recipe writes, which a test of its kui names and an app's own would not list.
+// The kui names of an element, which stay when its recipe moves the look into utilities; an app's own class is read with classList.
 export function kuiClasses(element: Element | null | undefined): string | undefined {
-  return element?.className.replace(BUTTON_BOX, '')
+  return element === null || element === undefined ? undefined : [...element.classList].filter(name => name.startsWith('kui-')).join(' ')
 }
 
 export function click(element: Element | null): void {

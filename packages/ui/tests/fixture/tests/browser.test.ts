@@ -6,7 +6,7 @@ import { browserPath, testSite } from 'kay/test'
 const ROOT = join(import.meta.dir, '..')
 const path = browserPath()
 // The server's control, described by its own note and the hint it renders after it.
-const SERVED = /aria-describedby="name-note (k[\w-]+)">.*class="text-xs text-kui-subtext0" data-part="hint" id="\1"/
+const SERVED = /aria-describedby="name-note (k[\w-]+)">.*data-part="hint" id="\1"/
 // What the controls of the form-reset page hold when it loads.
 const START = { agree: true, power: false, free: false, decks: ['films'], size: 'm', sort: null, level: 'b', tags: ['x', 'y'], title: 'Ada', bio: 'Hello', notes: '# Notes', range: [2, 8], icon: 'star', bare: 'star', heard: 'b', refd: true, form: 'x' }
 // One site and one browser for every test of the file; each test opens and closes its own page.
@@ -63,7 +63,7 @@ inBrowser('in the browser', () => {
 
       const height = (selector: string) => document.querySelector(selector)!.getBoundingClientRect().height
 
-      return { plainSearch: height('#plain-search'), besidePlain: height('#beside-plain'), wrapped: height('#wrapped'), wrappedSearch: height('#wrapped-search'), note: height('#note'), besideNote: height('#beside-note'), tags: height('.kui-multi-select-trigger'), besideTags: height('#beside-tags'), search: height('#search'), status: height('#status'), filter: height('#filter'), xs: height('#filter-xs'), inline: height('#filter-inline'), alone: height('#alone') }
+      return { plainSearch: height('#plain-search'), besidePlain: height('#beside-plain'), wrapped: height('#wrapped'), wrappedSearch: height('#wrapped-search'), note: height('#note'), besideNote: height('#beside-note'), tags: height('.kui-multi-select-trigger'), besideTags: height('#beside-tags'), besideToggle: height('#beside-toggle'), search: height('#search'), status: height('#status'), filter: height('#filter'), xs: height('#filter-xs'), inline: height('#filter-inline'), alone: height('#alone') }
     }, density)
 
     for (const density of ['0.5', '1', '1.5', '2']) {
@@ -75,11 +75,12 @@ inBrowser('in the browser', () => {
       expect(found.xs, density).toBeLessThan(found.filter)
       expect(found.inline, density).toBeLessThan(found.filter)
       expect(found.alone, density).toBeCloseTo(24, 0)
-      // A Button beside a non-compact FormField, in a wrapper of its own or beside a Textarea keeps its height; beside a MultiSelect, whose trigger is no direct child of the row, too.
+      // A Button beside a non-compact FormField, in a wrapper of its own or beside a Textarea keeps its height, and so does one beside an island holding no field; beside a MultiSelect, an island whose trigger is no direct child of the row, it follows the field.
       expect(found.besidePlain, density).toBeCloseTo(24, 0)
       expect(found.wrapped, density).toBeCloseTo(24, 0)
       expect(found.besideNote, density).toBeCloseTo(24, 0)
-      expect(found.besideTags, density).toBeCloseTo(24, 0)
+      expect(found.besideToggle, density).toBeCloseTo(24, 0)
+      expect(found.besideTags, density).toBeCloseTo(found.tags, 0)
     }
 
     expect(page.errors).toEqual([])

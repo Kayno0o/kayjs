@@ -266,6 +266,12 @@ describe('MarkdownEditor toolbar', () => {
     expect(label.control).toBe(state.area)
     expect(naming?.textContent).toBe('Body')
   })
+
+  test('is not named by a label of the page that is no form field\'s, whose text shares the label class', async () => {
+    const state = await editor('', undefined, { plain: true })
+
+    expect(state.area.hasAttribute('aria-labelledby')).toBe(false)
+  })
 })
 
 describe('MarkdownEditor preview', () => {

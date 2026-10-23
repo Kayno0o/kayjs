@@ -29,6 +29,7 @@
     "./add": "./src/add.ts",
     "./announce": "./src/announce.ts",
     "./dnd": "./src/dnd.ts",
+    "./field-look": "./src/field-look.ts",
     ".": "./src/index.ts"
   },
   "files": [

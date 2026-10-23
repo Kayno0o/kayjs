@@ -168,14 +168,14 @@ describe('ConfirmDelete', () => {
     expect(look('n-plain')).toEqual(['solid', 'neutral'])
     expect(look('n-solid')).toEqual(['solid', 'neutral'])
     expect(look('n-ghost')).toEqual(['ghost', 'neutral'])
-    expect(kuiClasses(root.querySelector('.n-button'))).toBe('kui-btn kui-btn-danger n-button')
+    expect(kuiClasses(root.querySelector('.n-button'))).toBe('kui-btn kui-btn-danger')
   })
 
   // A trigger of each kind, the dialog it opens (by its place among the page's) and the confirm button it carries.
   const TRIGGERS = [
-    { name: 'a labelled danger button, for a delete known by another name', trigger: '.revoke', dialog: 3, shown: ['BUTTON', 'kui-btn kui-btn-danger revoke', 'Revoke link'], title: 'Confirm Deletion', confirm: ['kui-btn kui-btn-danger', 'Delete'] },
-    { name: 'a plain text link, its dialog a title and confirm labels of its own', trigger: '.rotate', dialog: 4, shown: ['BUTTON', 'kui-confirm-delete-link rotate', 'Rotate link'], title: 'Rotate link', confirm: ['kui-btn kui-btn-danger', 'Rotate'] },
-    { name: 'a confirm that is not a deletion, which reads neutrally and toasts its success once', trigger: '.save', dialog: 5, shown: ['BUTTON', 'kui-btn kui-btn-accent save', 'Save'], title: 'Save', confirm: ['kui-btn kui-btn-accent', 'Save'], toast: 'Saved' },
+    { name: 'a labelled danger button, for a delete known by another name', trigger: '.revoke', dialog: 3, shown: ['BUTTON', 'kui-btn kui-btn-danger', 'Revoke link'], title: 'Confirm Deletion', confirm: ['kui-btn kui-btn-danger', 'Delete'] },
+    { name: 'a plain text link, its dialog a title and confirm labels of its own', trigger: '.rotate', dialog: 4, shown: ['BUTTON', 'kui-confirm-delete-link', 'Rotate link'], title: 'Rotate link', confirm: ['kui-btn kui-btn-danger', 'Rotate'] },
+    { name: 'a confirm that is not a deletion, which reads neutrally and toasts its success once', trigger: '.save', dialog: 5, shown: ['BUTTON', 'kui-btn kui-btn-accent', 'Save'], title: 'Save', confirm: ['kui-btn kui-btn-accent', 'Save'], toast: 'Saved' },
   ]
 
   test.each(TRIGGERS)('takes $name as its trigger', async ({ trigger, dialog: place, shown, title, confirm, toast }) => {

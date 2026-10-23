@@ -15,6 +15,7 @@ import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
 import copy from '~icons/tabler/copy'
 import { guardLeave, uid } from 'kay'
 import { announce } from '@kaynooo/kayjs-ui/announce'
+import { FIELD_MESSAGE } from '@kaynooo/kayjs-ui/field-look'
 import { wording } from 'kay/words'
 import { today } from '../datetime'
 import { blockOf, checkField, emptyBlock, emptyValue, htmlPattern, isCompact, itemAt, itemTitle } from '../fields'
@@ -418,11 +419,11 @@ function leaveJson(): void {
   match current.kind
     when 'boolean'
       Toggle(label={current.label} checked={value() === true} aria-describedby={noteId} aria-invalid={issue() === undefined ? undefined : 'true'} onChange={set})
-      .flex.flex-col(data-part="issues" id={noteId} aria-live="polite")
+      div(data-part="issues" class={FIELD_MESSAGE.issues} id={noteId} aria-live="polite")
         if current.hint
-          span.text-xs.text-kui-subtext0(data-part="hint") {current.hint}
+          span(data-part="hint" class={FIELD_MESSAGE.hint}) {current.hint}
         if issue()
-          span.text-xs.text-kui-error(data-part="issue") {issue()}
+          span(data-part="issue" class={FIELD_MESSAGE.issue}) {issue()}
     when 'list'
       FormField(label={current.label} hint={[current.hint, boundsText()].filter(Boolean).join(' ') || undefined} issue={issue()} required={starred()} group action={countText()})
         .kcms-list(ref={element => box = element})

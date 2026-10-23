@@ -1,6 +1,7 @@
 ---
 import type { Snippet } from 'kay'
 import { recipe } from 'kay'
+import { FIELD_MESSAGE } from './field-look'
 import { fieldLinks, formIssues } from './forms'
 
 // One wrapping row, the label taking no box of its own: the head and the action share the first line, the action wrapping under the head rather than over the control, and the rest take a line each.
@@ -8,16 +9,17 @@ import { fieldLinks, formIssues } from './forms'
 // ':where(&)>*' keeps the full-line basis at no weight, so the head and the action's own basis win. 'kui-label-text' is the label type Table shares.
 const look = recipe({
   parts: {
-    root: 'kui-form-field flex w-full flex-wrap items-center gap-1 data-compact:w-auto [:where(&)>*]:basis-full',
+    root: 'kui-form-field flex w-full flex-wrap items-center gap-1 [:where(&)>*]:basis-full',
     label: 'contents [:where(&)>*]:basis-full',
     head: 'float-left order-first flex flex-1 basis-auto flex-wrap items-center gap-2 p-0',
     text: 'kui-label-text text-kui-micro font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)]',
     required: 'ml-0.5 text-kui-error',
     action: 'order-first ml-auto flex basis-auto flex-wrap items-center justify-end gap-1.5',
-    hint: 'text-xs text-kui-subtext0',
-    issues: 'flex flex-col',
-    issue: 'text-xs text-kui-error',
+    hint: FIELD_MESSAGE.hint,
+    issues: FIELD_MESSAGE.issues,
+    issue: FIELD_MESSAGE.issue,
   },
+  variants: { compact: { true: 'w-auto', false: '' } },
 })
 
 const { label, name, issue, hint, required = false, group = false, compact = false, action } = props<{
