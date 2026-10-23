@@ -43,16 +43,16 @@ test('a message with parameters and a plural reads the locale\'s form, a key the
 
 test('the editor server-renders its texts in the locale, a value holding HTML staying text', async () => {
   const page = await site.visit('/fr/admin/page?path=/fr/blog/hello')
-  const editor = page.find('aside.kcms-editor')[0]
+  const editor = page.find('dialog.kcms-editor')[0]
 
   expect(editor?.attributes['aria-label']).toBe('Éditeur de contenu')
-  expect(page.find('.kcms-editor-title')[0]?.text).toBe('Modifier cette page')
-  expect(page.find('.kcms-editor-head button').map(button => button.text)).toContain('Arrêter de modifier')
+  expect(page.find('.kcms-editor [data-part=title]')[0]?.text).toBe('Modifier cette page')
+  expect(page.find('.kcms-editor [data-part=head] button').map(button => button.text)).toContain('Arrêter de modifier')
   expect(page.find('.kcms-entry-loading')[0]?.text).toBe('Chargement…')
   expect(page.html).toContain('aria-label="&lt;b>Masquer&lt;/b> l\'éditeur"')
   expect(page.html).not.toContain('<b>Masquer</b>')
   expect((await site.visit('/fr/admin/page?path=/fr/empty')).find('.kcms-editor-empty')[0]?.text).toBe('Rien sur cette page ne vient d\'une collection.')
-  expect((await site.visit('/admin/page?path=/blog/hello')).find('.kcms-editor-title')[0]?.text).toBe('Edit this page')
+  expect((await site.visit('/admin/page?path=/blog/hello')).find('.kcms-editor [data-part=title]')[0]?.text).toBe('Edit this page')
 })
 
 test('the built editor sends the browser the messages it only reads after the page loaded', async () => {
@@ -102,7 +102,7 @@ test('a swap from a French page to an English one in edit mode shows the editor 
 
   try {
     const page = await built.open('/fr/admin/page?path=/fr/blog/hello')
-    const title = () => document.querySelector('.kcms-editor-title')?.textContent
+    const title = () => document.querySelector('.kcms-editor [data-part=title]')?.textContent
     const follow = (href: string) => {
       const link = document.createElement('a')
 
@@ -112,24 +112,24 @@ test('a swap from a French page to an English one in edit mode shows the editor 
       document.body.prepend(link)
     }
 
-    await page.waitUntil(() => document.querySelector('.kcms-editor-title')?.textContent === 'Modifier cette page')
+    await page.waitUntil(() => document.querySelector('.kcms-editor [data-part=title]')?.textContent === 'Modifier cette page')
     await page.evaluate(() => {
       (window as unknown as Record<string, boolean>).sameDocument = true
     })
     await page.evaluate(follow, '/blog/hello')
     await page.click('#swap')
     await page.waitUntil(() => location.pathname === '/blog/hello')
-    await page.waitUntil(() => document.querySelector('.kcms-editor-title')?.textContent === 'Edit this page')
+    await page.waitUntil(() => document.querySelector('.kcms-editor [data-part=title]')?.textContent === 'Edit this page')
     // Another locale loads the page afresh, which is what keeps the first locale's texts out of the editor.
     expect(await page.evaluate(() => 'sameDocument' in window)).toBe(false)
     expect(await page.evaluate(title)).toBe('Edit this page')
-    expect(await page.evaluate(() => document.querySelector('.kcms-editor-head button')?.textContent)).toBe('Stop editing')
+    expect(await page.evaluate(() => document.querySelector('.kcms-editor [data-part=head] button')?.textContent)).toBe('Stop editing')
 
     await page.evaluate(follow, '/fr/blog/hello')
     await page.click('#swap')
     await page.waitUntil(() => location.pathname === '/fr/blog/hello')
-    await page.waitUntil(() => document.querySelector('.kcms-editor-title')?.textContent === 'Modifier cette page')
-    expect(await page.evaluate(() => document.querySelector('.kcms-editor-head button')?.textContent)).toBe('Arrêter de modifier')
+    await page.waitUntil(() => document.querySelector('.kcms-editor [data-part=title]')?.textContent === 'Modifier cette page')
+    expect(await page.evaluate(() => document.querySelector('.kcms-editor [data-part=head] button')?.textContent)).toBe('Arrêter de modifier')
     expect(page.errors).toEqual([])
   }
   finally {

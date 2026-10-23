@@ -1,6 +1,7 @@
 ---
 // kay-island
 import type { MenuEntry } from '@kaynooo/kayjs-ui'
+import { signal } from 'kay'
 import Menu from '@kaynooo/kayjs-ui/menu.kay'
 
 // Entries and triggers by `tone`, and the `danger` flag an entry still takes.
@@ -10,7 +11,14 @@ const items: MenuEntry[] = [
   { label: 'Wins', tone: 'neutral', danger: true, onSelect: () => undefined },
   { label: 'Plain', onSelect: () => undefined },
 ]
+const at = signal({ x: 0, y: 0 })
+const pointOpen = signal(false)
+const picked = signal('')
 ---
 Menu(id="by-tone" items={items} label="By tone" icon="plus" tone="danger")
 Menu(id="icons" items={[{ label: 'Add', icon: 'plus', onSelect: () => undefined }, { label: 'Bare', onSelect: () => undefined }]} label="Icons" icon="plus")
 Menu(id="plain" items={items} label="Plain" icon="plus")
+
+Menu(id="at-point" items={[{ label: 'First', onSelect: () => picked.set('First') }, 'separator', { label: 'Second', onSelect: () => picked.set('Second') }]} label="At a point" at={at()} open={pointOpen()} onOpenChange={open => pointOpen.set(open)})
+button#ask(onClick={() => { at.set({ x: 40, y: 60 }); pointOpen.set(true) }}) Ask
+p#picked {picked()}

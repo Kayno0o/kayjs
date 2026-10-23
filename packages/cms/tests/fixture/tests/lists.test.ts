@@ -6,7 +6,7 @@ const ROOT = join(import.meta.dir, '..')
 const built = await testSite({ root: ROOT, browser: true })
 const PATH = '/admin/page?path=/guide'
 const BAR = '.kcms-list-bar'
-const MENU = '.kcms-marker-menu'
+const MENU = '#kcms-marker-menu'
 const DOWN = `${BAR} button:nth-child(2)`
 const ADD = `${BAR} button:nth-child(3)`
 const REMOVE = `${BAR} button:nth-child(4)`
@@ -35,7 +35,7 @@ async function open(path = PATH) {
     localStorage.setItem('kcms-marks', 'off')
   })
   await page.reload()
-  await page.waitUntil(() => document.querySelector('.kcms-editor-open') !== null && document.querySelector('[data-kcms-path="steps"] input') !== null && document.querySelector('ol.steps li[tabindex]') !== null)
+  await page.waitUntil(() => document.querySelector('.kcms-editor[open]') !== null && document.querySelector('[data-kcms-path="steps"] input') !== null && document.querySelector('ol.steps li[tabindex]') !== null)
 
   return page
 }
@@ -364,7 +364,7 @@ test('the bar sits inside the window\'s scrollbars and above the docked editor',
 
   // The item lies under the editor: the bar stays above its edge.
   await page.evaluate(() => {
-    const panel = document.querySelector('.kcms-editor-open')!.getBoundingClientRect()
+    const panel = document.querySelector('.kcms-editor[open]')!.getBoundingClientRect()
     const element = document.querySelector('ul.limited li')!
 
     window.scrollBy({ top: element.getBoundingClientRect().top - (panel.top + 8) })
@@ -378,7 +378,7 @@ test('the bar sits inside the window\'s scrollbars and above the docked editor',
 
     const bars = document.querySelectorAll('.kcms-list-bar')
 
-    return bars.length === 1 && bars[0]!.getBoundingClientRect().bottom <= document.querySelector('.kcms-editor-open')!.getBoundingClientRect().top + 0.5
+    return bars.length === 1 && bars[0]!.getBoundingClientRect().bottom <= document.querySelector('.kcms-editor[open]')!.getBoundingClientRect().top + 0.5
   })
 }, 60_000)
 
@@ -673,8 +673,8 @@ test('an item taken out cannot be put back once its entry left the page', async 
   await page.waitUntil(() => document.querySelector('.kcms-editor-undo') !== null)
   // Unsaved edits hold the page, so they are reset first: the notice stays, as only a change of entry takes it away.
   await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('.kcms-editor button')].find(button => button.textContent === 'Reset')!.click())
-  await page.waitUntil(() => document.querySelector('dialog[open] .kui-btn-accent') !== null)
-  await page.evaluate(() => document.querySelector<HTMLElement>('dialog[open] .kui-btn-accent')!.click())
+  await page.waitUntil(() => document.querySelector('dialog[open]:not(.kcms-editor) .kui-btn-accent') !== null)
+  await page.evaluate(() => document.querySelector<HTMLElement>('dialog[open]:not(.kcms-editor) .kui-btn-accent')!.click())
   await page.waitUntil(() => document.querySelectorAll('ol.steps li').length === 2)
   expect(await page.evaluate(() => document.querySelector('.kcms-editor-undo') !== null)).toBe(true)
   await page.evaluate(() => document.querySelector<HTMLElement>('a.out')!.click())

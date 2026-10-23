@@ -59,7 +59,7 @@ ui: { sidePanel: { close: 'Fermer' } }
 - `ui.saveForm.*`: `clean` (`No unsaved change.`), `dirty` (`Unsaved changes.`), `discard` (`Discard`), `failure` (`Could not save.`), `save` (`Save`), `saving` (`Saving…`)
 - `ui.scatterChart.*`: `empty` (`No data yet.`)
 - `ui.select.*`: `loading` (`Loading…`)
-- `ui.sidePanel.*`: `close` (`Close`)
+- `ui.sidePanel.*`: `close` (`Close`), `resize` (`Resize`)
 - `ui.siteNav.*`: `menu` (`Menu`)
 - `ui.splitLayout.*`: `back` (`Back`), `resize` (`Resize list`)
 - `ui.steps.*`: `done` (`completed`)

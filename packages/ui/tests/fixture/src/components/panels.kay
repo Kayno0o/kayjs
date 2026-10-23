@@ -4,12 +4,15 @@ import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
 import SplitLayout from '@kaynooo/kayjs-ui/split-layout.kay'
 
 // What the test reads back: how often the panel closed.
-const { onClose, listWidthKey } = props<{ onClose: () => void, listWidthKey?: string }>()
+const { onClose, listWidthKey, onSettled } = props<{ onClose: () => void, listWidthKey?: string, onSettled?: (size: number) => void }>()
 
 const open = signal(false)
 const beside = signal(false)
 const sidebarOpen = signal(true)
 const detailOpen = signal(true)
+const dockOpen = signal(true)
+const dockEdge = signal<'right' | 'bottom'>('right')
+const dockSize = signal<number | undefined>(undefined)
 ---
 button#open(onClick={() => open.set(true)}) Open
 button#open-beside(onClick={() => beside.set(true)}) Open beside
@@ -34,3 +37,7 @@ SplitLayout#split(sidebarOpen={sidebarOpen()} onSidebarOpenChange={() => sidebar
   @detail
     p#detail Mars
     button#edit Edit
+SidePanel#docked(open={dockOpen()} modal={false} dock={dockEdge()} size={dockSize()} onSizeChange={(size, settled) => { dockSize.set(size); if (settled) onSettled?.(size) }} title="Jupiter" onOpenChange={() => dockOpen.set(false)})
+  p#docked-body Fifth planet
+button#open-docked(onClick={() => dockOpen.set(true)}) Open docked
+button#dock-bottom(onClick={() => dockEdge.set('bottom')}) Dock bottom

@@ -117,6 +117,144 @@ describe('SidePanel with modal={false}', () => {
   })
 })
 
+describe('SidePanel with a dock', () => {
+  const html = document.documentElement
+  const dock = (root: Element) => root.querySelector<HTMLDialogElement>('#docked')!
+  const grip = (root: Element) => dock(root).querySelector<HTMLElement>('[role=separator]')!
+
+  afterEach(() => {
+    for (const name of ['--kay-panel-right', '--kay-panel-bottom', '--kui-dock-right', '--kui-dock-bottom'])
+      html.style.removeProperty(name)
+
+    html.removeAttribute('data-kui-dock')
+  })
+
+  test('sits beside the page, ignores Escape, and publishes what it holds on the page', async () => {
+    const root = await panels()
+    const panel = dock(root)
+
+    await settle()
+
+    expect(panel.open).toBe(true)
+    expect(panel.dataset.dock).toBe('right')
+    expect(panel.getAttribute('closedby')).toBe('none')
+    expect(html.dataset.kuiDock).toBe('right')
+    expect(html.style.getPropertyValue('--kay-panel-right')).toBe('384px')
+    expect(html.style.getPropertyValue('--kui-dock-right')).toBe('384px')
+
+    key(document.body, 'Escape')
+    await settle()
+
+    expect(panel.open).toBe(true)
+    expect(closes).toBe(0)
+  })
+
+  test('resizes by the arrow keys within its bounds and tells the parent when a size settles', async () => {
+    const settled: number[] = []
+
+    mounted = await mountComponent('src/components/panels.kay', { onClose: () => closes++, onSettled: (size: number) => settled.push(size) })
+
+    const root = mounted.root
+    const read = () => [grip(root).getAttribute('aria-valuenow'), grip(root).getAttribute('aria-valuemin'), grip(root).getAttribute('aria-orientation')]
+
+    expect(read()).toEqual(['384', '280', 'vertical'])
+
+    key(grip(root), 'ArrowLeft')
+    await settle()
+
+    expect(read()[0]).toBe('408')
+    expect(html.style.getPropertyValue('--kay-panel-right')).toBe('408px')
+
+    grip(root).dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', shiftKey: true, bubbles: true }))
+    await settle()
+
+    expect(read()[0]).toBe('312')
+
+    for (let press = 0; press < 30; press++)
+      key(grip(root), 'ArrowRight')
+    await settle()
+
+    expect(read()[0]).toBe('280')
+    expect(settled.at(-1)).toBe(280)
+  })
+
+  test('resizes by dragging its grip, a cancelled drag keeping the size it reached', async () => {
+    const settled: number[] = []
+
+    mounted = await mountComponent('src/components/panels.kay', { onClose: () => closes++, onSettled: (size: number) => settled.push(size) })
+
+    const root = mounted.root
+    const pointer = (type: string, x: number) => grip(root).dispatchEvent(new PointerEvent(type, { clientX: x, pointerId: 1, button: 0, bubbles: true, cancelable: true }))
+
+    pointer('pointerdown', 500)
+    pointer('pointermove', 460)
+    await settle()
+
+    expect(grip(root).getAttribute('aria-valuenow')).not.toBe('384')
+
+    const reached = grip(root).getAttribute('aria-valuenow')
+
+    pointer('pointercancel', 460)
+    pointer('pointermove', 100)
+    await settle()
+
+    expect(grip(root).getAttribute('aria-valuenow')).toBe(reached)
+    expect(settled.at(-1)).toBe(Number(reached))
+  })
+
+  test('moves to the bottom edge, where the grip resizes the height with the vertical arrows', async () => {
+    const root = await panels()
+
+    click(root.querySelector('#dock-bottom'))
+    await settle()
+
+    expect(dock(root).dataset.dock).toBe('bottom')
+    expect(html.dataset.kuiDock).toBe('bottom')
+    expect(html.style.getPropertyValue('--kay-panel-right')).toBe('')
+    expect(grip(root).getAttribute('aria-orientation')).toBe('horizontal')
+    expect(grip(root).getAttribute('aria-valuemin')).toBe('160')
+
+    const before = Number(grip(root).getAttribute('aria-valuenow'))
+
+    key(grip(root), 'ArrowUp')
+    await settle()
+
+    expect(Number(grip(root).getAttribute('aria-valuenow'))).toBe(before + 24)
+  })
+
+  test('keeps the page its share of the window beside the dev tool\'s docked drawer, and sits beside it', async () => {
+    html.style.setProperty('--kay-dev-inset-right', '300px')
+
+    try {
+      const root = await panels()
+
+      await settle()
+
+      expect(grip(root).getAttribute('aria-valuemax')).toBe(String(window.innerWidth - 300 - 352))
+      expect(dock(root).getAttribute('style')).toContain('right: var(--kay-dev-inset-right, 0px)')
+    }
+    finally {
+      html.style.removeProperty('--kay-dev-inset-right')
+    }
+  })
+
+  test('publishes nothing once closed', async () => {
+    const root = await panels()
+
+    click(dock(root).querySelector('.kui-icon-btn[aria-label="Close"]'))
+    await settle()
+
+    expect(dock(root).open).toBe(false)
+    expect(html.hasAttribute('data-kui-dock')).toBe(false)
+    expect(html.style.getPropertyValue('--kay-panel-right')).toBe('')
+
+    click(root.querySelector('#open-docked'))
+    await settle()
+
+    expect(html.style.getPropertyValue('--kay-panel-right')).toBe('384px')
+  })
+})
+
 // Runs `run` with the viewport below `md`, whatever the test window's width.
 async function whenNarrow(run: () => Promise<void>) {
   const media = window.matchMedia.bind(window)

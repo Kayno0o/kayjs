@@ -2262,6 +2262,15 @@
     box-shadow: var(--shadow-raised);
   }
 
+  /* A docked SidePanel makes room for itself: its size is on `html`, where the page's own body is padded by it. */
+  html[data-kui-dock='right'] body {
+    margin-right: var(--kui-dock-right);
+  }
+
+  html[data-kui-dock='bottom'] body {
+    padding-bottom: var(--kui-dock-bottom);
+  }
+
   .kui-side-panel-head {
     @apply flex shrink-0 items-center gap-2 border-b border-border px-5 py-3;
   }

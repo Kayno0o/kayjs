@@ -8,7 +8,7 @@ const PATH = '/admin/page?path=/blog/hello'
 const TITLE = 'h1[data-kay-field]'
 const OUTLINE_ALL = 'button[aria-label="Outline every field of the page"]'
 const BROWSE = 'button[aria-label^="Browse the page"]'
-const MENU = '.kcms-marker-menu'
+const MENU = '#kcms-marker-menu'
 
 const opened: { close: () => void }[] = []
 
@@ -33,7 +33,7 @@ async function open(marks: 'on' | 'off' | 'unset' = 'off') {
       localStorage.setItem('kcms-marks', value)
   }, marks)
   await page.reload()
-  await page.waitUntil(() => document.querySelector('.kcms-editor-open') !== null && document.querySelector('[data-kcms-path="title"] input') !== null && document.querySelector('h1[tabindex]') !== null)
+  await page.waitUntil(() => document.querySelector('.kcms-editor[open]') !== null && document.querySelector('[data-kcms-path="title"] input') !== null && document.querySelector('h1[tabindex]') !== null)
 
   return page
 }
@@ -162,7 +162,7 @@ test('an element with several fields asks which one, by click and by key', async
   await page.press('Enter')
   await page.waitUntil((selector: string) => document.activeElement === document.querySelector(`${selector} button`), undefined, MENU)
   await page.press('Enter')
-  await page.waitUntil((selector: string) => document.querySelector(selector)!.getAttribute('contenteditable') === 'plaintext-only' && document.querySelector('.kcms-marker-menu') === null, undefined, TITLE)
+  await page.waitUntil((selector: string) => document.querySelector(selector)!.getAttribute('contenteditable') === 'plaintext-only' && document.querySelector('#kcms-marker-menu') === null, undefined, TITLE)
 }, 60_000)
 
 test('the choice closes on a click elsewhere, and a field chosen with the second item opens in the form', async () => {
@@ -199,7 +199,7 @@ test('browsing lets a link work and takes the outlines, tab stops and clicks off
   await page.click('#jump')
   await page.waitUntil(() => location.hash === '#after')
   await page.click(TITLE)
-  expect(await page.evaluate(() => [document.querySelector('h1')!.hasAttribute('contenteditable'), document.querySelector('.kcms-marker-menu') === null])).toEqual([false, true])
+  expect(await page.evaluate(() => [document.querySelector('h1')!.hasAttribute('contenteditable'), document.querySelector('#kcms-marker-menu') === null])).toEqual([false, true])
 
   await page.click('button[aria-label="Edit the page again"]')
   await page.waitUntil(() => document.querySelector('h1')!.getAttribute('tabindex') === '0' && document.querySelectorAll('.kcms-mark').length >= 2)
@@ -265,7 +265,7 @@ test('a menu taller than its estimate still fits the window', async () => {
 
   await page.evaluate((selector: string) => {
     document.querySelector(selector)!.setAttribute('data-kay-field-title', 'posts:hello:title')
-    document.head.insertAdjacentHTML('beforeend', '<style>.kcms-marker-item { min-height: 6rem !important }</style>')
+    document.head.insertAdjacentHTML('beforeend', '<style>#kcms-marker-menu [data-part=item] { min-height: 6rem !important }</style>')
   }, TITLE)
   await page.evaluate((selector: string) => {
     const box = document.querySelector(selector)!.getBoundingClientRect()
@@ -358,7 +358,7 @@ test('a choice taller than the window scrolls instead of clipping its last field
 
   await page.evaluate((selector: string) => {
     document.querySelector(selector)!.setAttribute('data-kay-field-title', 'posts:hello:title')
-    document.head.insertAdjacentHTML('beforeend', '<style>.kcms-marker-item { min-height: 40rem !important }</style>')
+    document.head.insertAdjacentHTML('beforeend', '<style>#kcms-marker-menu [data-part=item] { min-height: 40rem !important }</style>')
   }, TITLE)
   await page.click(TITLE)
   await page.waitUntil((selector: string) => document.querySelector(selector) !== null, undefined, MENU)

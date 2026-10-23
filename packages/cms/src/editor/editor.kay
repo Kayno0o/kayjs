@@ -8,7 +8,9 @@ import type { Choice, ListBar, ListTarget, Removed } from './page-lists'
 import type { Direction } from './reorder'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+import Menu from '@kaynooo/kayjs-ui/menu.kay'
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
+import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
 import { attempt } from '@kaynooo/kayjs-ui'
@@ -23,10 +25,10 @@ import previewApi from '../api/preview'
 import { BODY, entryKey, fieldsAt, formatMarker, markersOf } from '../markers'
 import { inlineTargetOf, isBusy, isTypingInline, markedLabel, reachMarked, startInline } from './inline'
 import { createMarks, readMarking, writeMarking } from './marks'
-import { OWN } from './own'
+import { MARKER_MENU, OWN } from './own'
 import { addItem, blockChoices, emptyListAt, focusItem, itemsAround, itemsOf, listFieldOf, movedWords, moveItem, removeItem, restoreItem, titleOf, watchLists } from './page-lists'
 import type { PageListWatch } from './page-lists'
-import { BOTTOM, browserStorage, canSide, clampSize, dockOf, readLayout, revealBy, SIDE, sizeOf, writeLayout } from './dock'
+import { browserStorage, canSide, dockOf, readLayout, revealBy, writeLayout } from './dock'
 import { drafts } from './drafts'
 import { rebuilding, watchRebuild } from './rebuild'
 import { saveAll } from './save-all'
@@ -40,10 +42,6 @@ const PROBES = [0.25, 0.5, 0.75]
 const PINNED = new Set(['fixed', 'sticky'])
 // The collapsed button's distance from the window's right edge, which what keeps off it counts too.
 const COLLAPSED_GAP = 16
-// The widest the choice of field is, which a click near the window's right edge keeps inside it.
-const MENU_WIDTH = 256
-// What a one-line item of that choice takes of the height, which a tap near the bottom of the window keeps inside it. The placement reserves one item more for the menu's padding and border, and the menu is measured once shown, so an item that wraps still fits.
-const MENU_ITEM = 44
 // How long a change of a list waits for the page to show it before the editor takes new ones again.
 const SETTLE_LIMIT = 4000
 
@@ -72,43 +70,35 @@ const browsing = signal(false)
 // Whether every marked field is outlined, else only the one under the pointer.
 const marking = signal(false)
 // What the editor asks the person to choose among next to a click or under an element a key reached: the fields of an element holding several, the block types of a list, the actions on a list item.
-const choosing = signal<{ label: string, choices: Choice[], x: number, y: number, back?: HTMLElement }>()
+const choosing = signal<{ label: string, choices: Choice[], x: number, y: number }>()
 // The bars of the list items and empty lists on the page, the item taken out last (which Undo puts back), and whether a change of a list waits for the page to show it.
 const bars = signal<ListBar[]>([])
 const removed = signal<Removed>()
 const settling = signal(false)
+// The button that opens the hidden editor.
+const toggle = signal<HTMLElement>()
 const room = signal({ width: 0, height: 0 })
-// What the dev tool's docked drawer holds along the right and bottom edges, and how far down a fixed header holds the top of the window.
-const held = signal({ right: 0, bottom: 0 })
+// How far down a fixed header holds the top of the window.
 const clear = signal(0)
 // The page the edits were last shown on: a render of the drafts swaps the page as well, which leaves its path as it was.
 let shownPath = ''
-let panel: HTMLElement | undefined
-let menu: HTMLElement | undefined
 let marks: Marks | undefined
 let lists: PageListWatch | undefined
 // Where the focus goes once the page shows the list changed, and whether a render has begun since.
 let pending: { target: ListTarget, index: number, form: boolean } | undefined
 let rendered = false
 let settleId = 0
-// While an edge is dragged the layout is only kept when the drag ends, not on every move.
+// While the grip is dragged the layout is only kept when the drag ends, not on every move.
 let dragging = 0
 let frame = 0
 
 const layout = (): Layout => ({ open: open(), dock: chosen(), side: side(), bottom: bottom() })
 // None until the window is measured, which the server cannot do.
 const dock = memo(() => room().width === 0 ? undefined : dockOf(layout(), room().width))
-const taken = (at: Dock) => at === 'side' ? held().right : held().bottom
-const size = (at: Dock) => sizeOf(layout(), at, room(), taken(at))
-
-// What another tool already holds along the edges, as the dev tool's docked drawer publishes it.
-function measureHeld(): void {
-  const style = getComputedStyle(document.documentElement)
-  const next = { right: Number.parseFloat(style.getPropertyValue('--kay-dev-inset-right')) || 0, bottom: Number.parseFloat(style.getPropertyValue('--kay-dev-inset-bottom')) || 0 }
-
-  if (next.right !== held().right || next.bottom !== held().bottom)
-    held = next
-}
+// The editor's own parts, the panel, its collapsed button and the choice of field: a click or a hover on them is no business of the page's fields.
+const OWN_PARTS = `.kcms-editor, .kcms-editor-toggle, #${MARKER_MENU}`
+const isOwn = (node: Node | null | undefined) => (node instanceof Element ? node : node?.parentElement)?.closest(OWN_PARTS) != null
+const panelBox = () => document.querySelector('.kcms-editor[open]')?.getBoundingClientRect()
 
 // How far down the page's own header, fixed or sticky at the top of the window, reaches, so the side dock sits under it and a reveal keeps clear of it.
 function measureClear(): void {
@@ -116,7 +106,7 @@ function measureClear(): void {
 
   for (const x of PROBES) {
     for (const hit of document.elementsFromPoint(window.innerWidth * x, 1)) {
-      if (panel?.contains(hit))
+      if (isOwn(hit))
         continue
 
       for (let element: Element | null = hit; element && element !== document.body; element = element.parentElement) {
@@ -139,7 +129,6 @@ function measure(): void {
   if (window.innerWidth !== room().width || window.innerHeight !== room().height)
     room = { width: window.innerWidth, height: window.innerHeight }
 
-  measureHeld()
   measureClear()
 }
 
@@ -167,18 +156,6 @@ onMount(() => {
 
   shownPath = location.pathname + location.search
   watchRebuild()
-
-  // A docked dev tool pads the page, which the root's content shows at the side and its border box at the bottom.
-  const content = new ResizeObserver(measureSoon)
-  const border = new ResizeObserver(measureSoon)
-
-  content.observe(document.documentElement)
-  border.observe(document.documentElement, { box: 'border-box' })
-  onCleanup(() => {
-    content.disconnect()
-    border.disconnect()
-    cancelAnimationFrame(frame)
-  })
 })
 
 // Another page replaced the one the edits were shown on, so they are shown on it too.
@@ -207,78 +184,22 @@ effect(() => {
     writeLayout(browserStorage(), value)
 })
 
-function resizeTo(next: number): void {
-  const at = dock()
-
-  if (!at)
-    return
-
-  const kept = clampSize(at, next, room(), taken(at))
-
-  if (at === 'side')
-    side = kept
+// The grip of the panel reports each size it reached; the layout is kept once a drag ends or a key moved it.
+function resized(next: number, settled: boolean): void {
+  if (dock() === 'side')
+    side = next
   else
-    bottom = kept
-}
+    bottom = next
 
-// Dragging the edge toward the page grows the editor.
-function startResize(event: PointerEvent): void {
-  const at = dock()
+  dragging = settled ? 0 : 1
 
-  if (!at || !panel)
-    return
-
-  const handle = event.currentTarget as HTMLElement
-  const box = panel.getBoundingClientRect()
-  const from = at === 'side' ? { point: event.clientX, size: box.width } : { point: event.clientY, size: box.height }
-  const move = (next: PointerEvent) => resizeTo(from.size + from.point - (at === 'side' ? next.clientX : next.clientY))
-
-  event.preventDefault()
-  dragging++
-  handle.setPointerCapture(event.pointerId)
-  handle.addEventListener('pointermove', move)
-
-  // A cancelled drag, as when the browser takes a touch over, ends it too, keeping the size it reached.
-  let ended = false
-  const end = () => {
-    if (ended)
-      return
-
-    ended = true
-    dragging--
+  if (settled)
     writeLayout(browserStorage(), layout())
-    handle.removeEventListener('lostpointercapture', end)
-    handle.removeEventListener('pointermove', move)
-    handle.removeEventListener('pointerup', end)
-    handle.removeEventListener('pointercancel', end)
-  }
-
-  handle.addEventListener('lostpointercapture', end)
-  handle.addEventListener('pointerup', end)
-  handle.addEventListener('pointercancel', end)
-}
-
-function resizeByKey(event: KeyboardEvent): void {
-  const at = dock()
-
-  if (!at)
-    return
-
-  const step = (at === 'side' ? SIDE : BOTTOM).step * (event.shiftKey ? 4 : 1)
-  const grow = at === 'side' ? 'ArrowLeft' : 'ArrowUp'
-  const shrink = at === 'side' ? 'ArrowRight' : 'ArrowDown'
-  const delta = event.key === grow ? step : event.key === shrink ? -step : 0
-
-  if (delta === 0)
-    return
-
-  event.preventDefault()
-  resizeTo(size(at) + delta)
 }
 
 // Scrolls the page so a clicked element lies above the bottom sheet, not under it; a click already in the visible part leaves the page, whatever the size of the element around it.
 function reveal(element: Element, clickedAt?: number): void {
-  const covered = (open() && dock() === 'bottom' && panel ? panel.getBoundingClientRect().top : window.innerHeight) - 16
+  const covered = (open() && dock() === 'bottom' ? panelBox()?.top ?? window.innerHeight : window.innerHeight) - 16
 
   measureClear()
 
@@ -317,9 +238,6 @@ function clickedNode(event: MouseEvent): Node | undefined {
 listen(() => document, 'click', (event) => {
   const node = open() && !browsing() ? clickedNode(event) : undefined
 
-  if (choosing() && !(node && menu?.contains(node)))
-    choosing = undefined
-
   act(event, node, { x: event.clientX, y: event.clientY })
 }, { capture: true })
 
@@ -344,7 +262,7 @@ function inBars(node: Node | undefined): boolean {
 listen(() => document, 'pointerdown', (event) => {
   const node = event.target instanceof Node ? event.target : undefined
 
-  if (event.pointerType !== 'mouse' && open() && !browsing() && node && !inBars(node) && !panel?.contains(node) && !menu?.contains(node))
+  if (event.pointerType !== 'mouse' && open() && !browsing() && node && !inBars(node) && !isOwn(node))
     lists?.hover(node, { x: event.clientX, y: event.clientY })
 }, { passive: true, capture: true })
 
@@ -358,7 +276,7 @@ listen(() => document, 'pointermove', (event) => {
     hoverFrame = 0
 
     const node = pointer && open() && !browsing() ? clickedNode(pointer) : undefined
-    const own = node !== undefined && (panel?.contains(node) === true || menu?.contains(node) === true)
+    const own = isOwn(node)
 
     marks?.hover(node && !own ? fieldsAt(node) : undefined)
 
@@ -373,7 +291,7 @@ onCleanup(stopHover)
 // The element the keyboard reached is outlined as the pointer's is.
 function focusedFields(): MarkedField[] | undefined {
   const element = document.activeElement
-  const found = element && element !== document.body && !panel?.contains(element) && !menu?.contains(element) ? markersOf(element) : []
+  const found = element && element !== document.body && !isOwn(element) ? markersOf(element) : []
 
   return found.length > 0 ? found : undefined
 }
@@ -382,7 +300,7 @@ function focusedFields(): MarkedField[] | undefined {
 function focusedElement(): Element | undefined {
   const element = document.activeElement
 
-  return element && element !== document.body && !panel?.contains(element) && !menu?.contains(element) && !inBars(element) ? element : undefined
+  return element && element !== document.body && !isOwn(element) && !inBars(element) ? element : undefined
 }
 
 // The bar of the focused item keeps the item while the focus is on it.
@@ -533,74 +451,16 @@ effect(() => {
   }
 })
 
-// The first field of the menu takes the focus, so the keyboard answers at once.
-effect(() => {
-  if (!choosing())
-    return
-
-  const frame = requestAnimationFrame(() => {
-    // The placement counted one-line items, so a menu that came out taller is moved up to fit.
-    const box = menu?.getBoundingClientRect()
-
-    if (menu && box && box.bottom > window.innerHeight)
-      menu.style.top = `${Math.max(0, box.top - (box.bottom - window.innerHeight))}px`
-
-    menu?.querySelector('button')?.focus()
-  })
-
-  onCleanup(() => cancelAnimationFrame(frame))
-})
-
 // Only a choice of the editor is kept, not the default a screen without hover starts with.
 function toggleMarking(): void {
   marking = !marking()
   writeMarking(browserStorage(), marking())
 }
 
-function closeMenu(): void {
-  const back = choosing()?.back
 
-  if (back?.isConnected)
-    back.focus()
-
-  choosing = undefined
-}
-
-// Asks next to (`x`, `y`), or under the element a key reached when it is `back`, with the placement keeping the menu inside the window.
-function ask(label: string, choices: Choice[], x: number, y: number, back?: HTMLElement): void {
-  choosing = { label, choices, x: Math.max(0, Math.min(x, window.innerWidth - MENU_WIDTH)), y: Math.max(0, Math.min(y, window.innerHeight - choices.length * MENU_ITEM - MENU_ITEM)), back }
-}
-
-function menuKey(event: KeyboardEvent): void {
-  if (event.key === 'Escape') {
-    event.preventDefault()
-    event.stopPropagation()
-    closeMenu()
-
-    return
-  }
-
-  const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
-
-  if (step === 0 || !menu)
-    return
-
-  const items = [...menu.querySelectorAll('button')]
-  const next = items[(items.indexOf(document.activeElement as HTMLButtonElement) + step + items.length) % items.length]
-
-  event.preventDefault()
-  next?.focus()
-}
-
-// Tab out of the menu closes the question, as the focus no longer answers it. A focus going nowhere (`relatedTarget` null) does not: Safari and macOS Firefox give a button no focus on a click, so a click on an item must still choose, and a click elsewhere closes the menu on its own.
-function leaveMenu(event: FocusEvent): void {
-  if (event.relatedTarget instanceof Node && !menu?.contains(event.relatedTarget))
-    choosing = undefined
-}
-
-function choose(choice: Choice): void {
-  choosing = undefined
-  choice.run()
+// Asks next to (`x`, `y`), or under the element a key reached, in a menu the browser keeps inside the window.
+function ask(label: string, choices: Choice[], x: number, y: number): void {
+  choosing = { label, choices, x, y }
 }
 
 // Where a menu for a list opens: under the button or element it was asked from.
@@ -682,9 +542,9 @@ function addTo(target: ListTarget, at: number, from: { element?: HTMLElement, ev
     return
   }
 
-  const { x, y, back } = below(from)
+  const { x, y } = below(from)
 
-  ask(wording('cms.blocks.add', 'Add a block to {list}', { list: listFieldOf(target, drafts)?.label ?? '' }), blocks.map(block => ({ key: block.type, label: block.label, run: () => addOne(target, at, block.type) })), x, y, back)
+  ask(wording('cms.blocks.add', 'Add a block to {list}', { list: listFieldOf(target, drafts)?.label ?? '' }), blocks.map(block => ({ key: block.type, label: block.label, run: () => addOne(target, at, block.type) })), x, y)
 }
 
 function addOne(target: ListTarget, at: number, type?: string): void {
@@ -771,7 +631,7 @@ function itemMenu(target: ListTarget, index: number, from: { element?: HTMLEleme
     choices.push({ key: 'remove', label: wording('cms.field.removeItem', 'Remove {item}', { item }), run: () => removeOne(target, index) })
 
   if (choices.length > 0)
-    ask(wording('cms.pageList.actions', 'What to do with {item}?', { item }), choices, x, y, back)
+    ask(wording('cms.pageList.actions', 'What to do with {item}?', { item }), choices, x, y)
 }
 
 // What a click, or an Enter on a field reached by the keyboard, does at `node`.
@@ -784,7 +644,7 @@ function act(event: Event, node: Node | undefined, at?: { x: number, y: number }
     return
   }
 
-  const found = node && !panel?.contains(node) && !menu?.contains(node) ? fieldsAt(node) : []
+  const found = node && !isOwn(node) ? fieldsAt(node) : []
   const [field] = found
 
   if (!field)
@@ -798,7 +658,7 @@ function act(event: Event, node: Node | undefined, at?: { x: number, y: number }
     const box = field.element.getBoundingClientRect()
     const back = at ? undefined : field.element as HTMLElement
 
-    ask(wording('cms.marker.choose', 'Edit which field?'), found.map(each => ({ key: formatMarker(each.marker) + (each.attribute ?? ''), label: describe(each), run: () => edit(each, at?.x, at?.y, back) })), at?.x ?? box.left, at?.y ?? box.bottom, back)
+    ask(wording('cms.marker.choose', 'Edit which field?'), found.map(each => ({ key: formatMarker(each.marker) + (each.attribute ?? ''), label: describe(each), run: () => edit(each, at?.x, at?.y, back) })), at?.x ?? box.left, at?.y ?? box.bottom)
 
     return
   }
@@ -876,11 +736,13 @@ effect(() => {
 
 // The collapsed button is a panel too, so the dev tool's bar and a floating drawer at the bottom right keep off it.
 effect(() => {
-  if (!ready() || open() || !panel)
+  const button = toggle()
+
+  if (!ready() || open() || !button)
     return
 
   const root = document.documentElement
-  const width = panel.offsetWidth
+  const width = button.offsetWidth
 
   if (width > 0)
     root.style.setProperty('--kay-panel-right', `${width + COLLAPSED_GAP}px`)
@@ -888,7 +750,7 @@ effect(() => {
   onCleanup(() => root.style.removeProperty('--kay-panel-right'))
 })
 
-// The page's own styles read the dock and the sizes from its root, where the editor's room is made.
+// The page's own styles read the dock from its root, where the panel makes the room, and the panel clears a fixed header at the top.
 effect(() => {
   const root = document.documentElement
   const at = dock()
@@ -896,65 +758,60 @@ effect(() => {
   root.classList.toggle('kcms-dock-side', at === 'side')
   root.classList.toggle('kcms-dock-bottom', at === 'bottom')
 
-  if (at) {
-    root.style.setProperty('--kcms-side', `${size('side')}px`)
-    root.style.setProperty('--kcms-bottom', `${size('bottom')}px`)
-    root.style.setProperty('--kcms-top', `${clear()}px`)
-  }
+  if (at)
+    root.style.setProperty('--kui-dock-top', `${clear()}px`)
 
   onCleanup(() => {
     root.classList.remove('kcms-dock-side', 'kcms-dock-bottom')
-    root.style.removeProperty('--kcms-side')
-    root.style.removeProperty('--kcms-bottom')
-    root.style.removeProperty('--kcms-top')
+    root.style.removeProperty('--kui-dock-top')
   })
 })
+
+// A question to answer asks Stop editing's two buttons to be seen, wherever the form is scrolled to.
+let confirmBox: HTMLElement | undefined
+
+effect(() => {
+  if (confirming() && confirmBox)
+    confirmBox.scrollIntoView({ block: 'nearest' })
+})
 ---
-aside.kcms-editor(ref={element => panel = element} class={{ 'kcms-editor-open': open(), 'kcms-editor-pending': !ready() }} aria-label={wording('cms.editor.label', 'Content editor')})
-  header.kcms-editor-head
-    if open()
-      h2.kcms-editor-title {wording('cms.editor.title', 'Edit this page')}
-      Button(label={leaving() ? wording('cms.editor.leaving', 'Leaving…') : wording('cms.editor.stop', 'Stop editing')} busy={leaving()} onClick={askStop})
-    if open() && dock() && canSide(room().width)
+if !open()
+  IconButton.kcms-editor-toggle(ref={element => toggle = element} icon="menu" label={wording('cms.editor.open', 'Edit this page')} variant="ghost" onClick={() => open = true})
+SidePanel.kcms-editor(open={open()} modal={false} dock={dock() === 'bottom' ? 'bottom' : 'right'} size={dock() === 'side' ? side() : bottom()} onSizeChange={resized} resizeLabel={wording('cms.editor.resize', 'Resize the editor')} closeLabel={wording('cms.editor.hide', 'Hide the editor')} title={wording('cms.editor.title', 'Edit this page')} style={`z-index: 2147483000${ready() && open() ? '' : '; visibility: hidden'}`} onOpenChange={shown => open = shown})
+  @actions
+    Button(label={leaving() ? wording('cms.editor.leaving', 'Leaving…') : wording('cms.editor.stop', 'Stop editing')} busy={leaving()} onClick={askStop})
+    if dock() && canSide(room().width)
       IconButton(icon={dock() === 'side' ? layoutBottom : layoutSide} label={dock() === 'side' ? wording('cms.editor.dockBottom', 'Dock the editor to the bottom') : wording('cms.editor.dockSide', 'Dock the editor to the side')} variant="ghost" onClick={() => chosen = dock() === 'side' ? 'bottom' : 'side'})
-    if open()
-      IconButton(icon={outline} label={marking() ? wording('cms.editor.markingOff', 'Stop outlining every field') : wording('cms.editor.markingOn', 'Outline every field of the page')} variant={marking() ? 'solid' : 'ghost'} aria-pressed={marking()} onClick={toggleMarking})
-      IconButton(icon={browse} label={browsing() ? wording('cms.editor.browseOff', 'Edit the page again') : wording('cms.editor.browseOn', 'Browse the page: links and menus work')} variant={browsing() ? 'solid' : 'ghost'} aria-pressed={browsing()} onClick={() => browsing = !browsing()})
-    IconButton(icon={open() ? 'close' : 'menu'} label={open() ? wording('cms.editor.hide', 'Hide the editor') : wording('cms.editor.open', 'Edit this page')} variant="ghost" onClick={() => open = !open()})
-  if open() && dock() as at
-    .kcms-editor-grip(role="separator" tabindex="0" aria-label={wording('cms.editor.resize', 'Resize the editor')} aria-orientation={at === 'side' ? 'vertical' : 'horizontal'} aria-valuenow={size(at)} aria-valuemin={at === 'side' ? SIDE.min : BOTTOM.min} aria-valuemax={clampSize(at, Number.MAX_SAFE_INTEGER, room(), taken(at))} onPointerDown={startResize} onKeyDown={resizeByKey})
-  if open() && confirming()
-    .kcms-editor-confirm(role="alert")
+    IconButton(icon={outline} label={marking() ? wording('cms.editor.markingOff', 'Stop outlining every field') : wording('cms.editor.markingOn', 'Outline every field of the page')} variant={marking() ? 'solid' : 'ghost'} aria-pressed={marking()} onClick={toggleMarking})
+    IconButton(icon={browse} label={browsing() ? wording('cms.editor.browseOff', 'Edit the page again') : wording('cms.editor.browseOn', 'Browse the page: links and menus work')} variant={browsing() ? 'solid' : 'ghost'} aria-pressed={browsing()} onClick={() => browsing = !browsing()})
+  if confirming()
+    .kcms-editor-confirm(role="alert" ref={element => confirmBox = element})
       p {wording('cms.editor.discardAsk', 'You have changes that are not saved. Stopping drops them.')}
       .kcms-editor-choice
         Button(label={wording('cms.editor.keepEditing', 'Keep editing')} onClick={() => confirming = false})
         Button(label={wording('cms.editor.discard', 'Drop them and stop')} tone="danger" onClick={stopEditing})
-  if open()
-    .kcms-editor-body
-      .kcms-editor-status(role="status" aria-live="polite")
-        if removed() as gone
-          .kcms-editor-undo
-            span {wording('cms.list.removed', '{item} removed', { item: gone.title })}
-            Button(label={wording('cms.list.undo', 'Undo')} variant="inline" disabled={unsettled()} onClick={undoRemoval})
-        if drafts.rendering()
-          p {wording('cms.editor.rendering', 'Updating the page…')}
-        if drafts.stale().length > 0
-          Notice.kcms-editor-failure(tone="warning" size="sm" label={wording('cms.editor.stale', 'The page shows the saved text of {entries} until your changes there are valid.', { entries: drafts.stale().map(entry => `${entry.collection}/${entry.slug}`).join(', ') })})
-        if rebuilding()
-          p {wording('cms.editor.rebuilding', 'Your last save is still reaching the live site, which shows the old content until it has rebuilt.')}
-      if drafts.failure() as failure
-        Notice.kcms-editor-failure(tone="danger" size="sm" label={wording('cms.editor.draftFailure', 'The page could not show your changes: {failure}', { failure })})
-      if entries.length > 1
-        .kcms-editor-all
-          Button(label={savingAll() ? wording('cms.entry.saving', 'Saving…') : wording('cms.editor.saveAll', 'Save all')} tone="accent" busy={savingAll()} disabled={savingAll() || !hasEdits()} onClick={saveEverything})
-      for entry of entries key={entryKey(entry)}
-        EntryForm(entry={entry} focus={focusIn(entry)} typing={typingIn(entry)} unclickable={unclickable.filter(field => entryKey(field) === entryKey(entry))})
-      else
-        p.kcms-editor-empty {wording('cms.editor.empty', 'Nothing on this page comes from a collection.')}
+  .kcms-editor-status(role="status" aria-live="polite")
+    if removed() as gone
+      .kcms-editor-undo
+        span {wording('cms.list.removed', '{item} removed', { item: gone.title })}
+        Button(label={wording('cms.list.undo', 'Undo')} variant="inline" disabled={unsettled()} onClick={undoRemoval})
+    if drafts.rendering()
+      p {wording('cms.editor.rendering', 'Updating the page…')}
+    if drafts.stale().length > 0
+      Notice.kcms-editor-failure(tone="warning" size="sm" label={wording('cms.editor.stale', 'The page shows the saved text of {entries} until your changes there are valid.', { entries: drafts.stale().map(entry => `${entry.collection}/${entry.slug}`).join(', ') })})
+    if rebuilding()
+      p {wording('cms.editor.rebuilding', 'Your last save is still reaching the live site, which shows the old content until it has rebuilt.')}
+  if drafts.failure() as failure
+    Notice.kcms-editor-failure(tone="danger" size="sm" label={wording('cms.editor.draftFailure', 'The page could not show your changes: {failure}', { failure })})
+  if entries.length > 1
+    .kcms-editor-all
+      Button(label={savingAll() ? wording('cms.entry.saving', 'Saving…') : wording('cms.editor.saveAll', 'Save all')} tone="accent" busy={savingAll()} disabled={savingAll() || !hasEdits()} onClick={saveEverything})
+  for entry of entries key={entryKey(entry)}
+    EntryForm(entry={entry} focus={focusIn(entry)} typing={typingIn(entry)} unclickable={unclickable.filter(field => entryKey(field) === entryKey(entry))})
+  else
+    p.kcms-editor-empty {wording('cms.editor.empty', 'Nothing on this page comes from a collection.')}
 if choosing() as question
-  .kcms-marker-menu(role="menu" ref={element => menu = element} aria-label={question.label} style={`left: ${question.x}px; top: ${question.y}px`} onKeyDown={menuKey} onFocusOut={leaveMenu})
-    for choice of question.choices key={choice.key}
-      button.kcms-marker-item(type="button" role="menuitem" onClick={() => choose(choice)}) {choice.label}
+  Menu(id={MARKER_MENU} label={question.label} at={{ x: question.x, y: question.y }} open items={question.choices.map(choice => ({ label: choice.label, onSelect: choice.run }))} onOpenChange={shown => !shown && (choosing = undefined)})
 PageListTools(bars={settling() ? [] : bars()} onMove={(bar, direction) => moveOne(bar.target, bar.index!, direction)} onAdd={(bar, event) => addTo(bar.target, bar.index === undefined ? 0 : bar.index + 1, { event })} onRemove={bar => removeOne(bar.target, bar.index!)})
 Toaster
 TooltipHost

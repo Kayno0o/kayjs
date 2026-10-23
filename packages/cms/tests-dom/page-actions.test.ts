@@ -134,7 +134,7 @@ function leaving() {
 }
 
 // The confirm button of the dialog that is open.
-const openConfirmation = () => [...document.querySelectorAll<HTMLButtonElement>('dialog[open] button')].find(each => each.textContent?.trim() === 'Delete')
+const openConfirmation = () => [...document.querySelectorAll<HTMLButtonElement>('dialog[open]:not(.kcms-editor) button')].find(each => each.textContent?.trim() === 'Delete')
 const confirmation = (label: string) => [...document.querySelectorAll('button')].filter(each => each.textContent?.trim() === label).at(-1)!
 
 test('a draft entry offers Publish, which saves it published and turns the button into Unpublish', async () => {

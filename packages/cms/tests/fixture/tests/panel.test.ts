@@ -33,7 +33,7 @@ async function open(width: number, height: number) {
   await page.cdp('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false })
   await page.evaluate(() => localStorage.clear())
   await page.reload()
-  await page.waitUntil(() => document.querySelector('.kcms-editor-open') !== null && document.documentElement.classList.contains('kcms-dock-side') !== document.documentElement.classList.contains('kcms-dock-bottom'))
+  await page.waitUntil(() => document.querySelector('.kcms-editor[open]') !== null && document.documentElement.classList.contains('kcms-dock-side') !== document.documentElement.classList.contains('kcms-dock-bottom'))
   await page.evaluate(() => {
     const header = document.createElement('header')
 
@@ -57,7 +57,7 @@ async function open(width: number, height: number) {
 
 async function measure(page: Awaited<ReturnType<typeof open>>): Promise<Sized> {
   return page.evaluate(() => {
-    const panel = document.querySelector('.kcms-editor')!.getBoundingClientRect()
+    const panel = (document.querySelector('.kcms-editor[open]') ?? document.querySelector('.kcms-editor-toggle'))!.getBoundingClientRect()
     const body = document.body.getBoundingClientRect()
 
     return {
@@ -92,7 +92,7 @@ test('a header fixed across the window stays visible over the side dock, which s
 test('a drag of the edge resizes the editor and keeps the layout once, when the drag ends', async () => {
   const page = await open(1280, 800)
   const grip = await page.evaluate(() => {
-    const box = document.querySelector('.kcms-editor-grip')!.getBoundingClientRect()
+    const box = document.querySelector('.kcms-editor [role=separator]')!.getBoundingClientRect()
 
     return { x: box.left + box.width / 2, y: box.top + 300 }
   })
@@ -127,7 +127,7 @@ test('a drag of the edge resizes the editor and keeps the layout once, when the 
 test('the values of the resize separator account for what a docked dev tool holds', async () => {
   const page = await open(1280, 800)
   const values = () => page.evaluate(() => {
-    const grip = document.querySelector('.kcms-editor-grip')!
+    const grip = document.querySelector('.kcms-editor [role=separator]')!
 
     return [grip.getAttribute('aria-valuenow'), grip.getAttribute('aria-valuemax')]
   })
@@ -137,31 +137,31 @@ test('the values of the resize separator account for what a docked dev tool hold
     document.documentElement.style.setProperty('--kay-dev-inset-right', '600px')
     document.documentElement.style.paddingRight = '600px'
   })
-  await page.waitUntil(() => document.querySelector('.kcms-editor-grip')!.getAttribute('aria-valuemax') === '328')
+  await page.waitUntil(() => document.querySelector('.kcms-editor [role=separator]')!.getAttribute('aria-valuemax') === '328')
   expect(await values()).toEqual(['328', '328'])
 })
 
 test('the values of the bottom separator account for a bottom-docked dev tool, which pads the root without changing its content', async () => {
   const page = await open(390, 800)
-  const grip = () => page.evaluate(() => [document.querySelector('.kcms-editor-grip')!.getAttribute('aria-valuenow'), document.querySelector('.kcms-editor-grip')!.getAttribute('aria-valuemax')])
+  const grip = () => page.evaluate(() => [document.querySelector('.kcms-editor [role=separator]')!.getAttribute('aria-valuenow'), document.querySelector('.kcms-editor [role=separator]')!.getAttribute('aria-valuemax')])
 
   expect(await grip()).toEqual(['400', '640'])
   await page.evaluate(() => {
     document.documentElement.style.setProperty('--kay-dev-inset-bottom', '400px')
     document.documentElement.style.paddingBottom = '400px'
   })
-  await page.waitUntil(() => document.querySelector('.kcms-editor-grip')!.getAttribute('aria-valuemax') === '240')
+  await page.waitUntil(() => document.querySelector('.kcms-editor [role=separator]')!.getAttribute('aria-valuemax') === '240')
   expect(await grip()).toEqual(['240', '240'])
 })
 
 test('an editor left collapsed never shows open while the page loads', async () => {
   const page = await open(390, 800)
 
-  await page.click('.kcms-editor-head button[aria-label="Hide the editor"]')
-  await page.waitUntil(() => document.querySelector('.kcms-editor-open') === null)
+  await page.click('.kcms-editor [data-part=head] button[aria-label="Hide the editor"]')
+  await page.waitUntil(() => document.querySelector('.kcms-editor-toggle') !== null)
   await page.cdp('Page.addScriptToEvaluateOnNewDocument', {
     source: `(function watch() {
-      const panel = document.querySelector('.kcms-editor-open')
+      const panel = document.querySelector('.kcms-editor[open]')
 
       if (panel && getComputedStyle(panel).visibility !== 'hidden')
         window.flashed = true
@@ -175,19 +175,19 @@ test('an editor left collapsed never shows open while the page loads', async () 
   expect(await page.evaluate(() => (window as unknown as { flashed?: boolean }).flashed)).toBeUndefined()
 })
 
-test('the collapsed button is published as a panel at the right, so the dev tool keeps off it, and the open editor takes the variable back', async () => {
+test('the collapsed button is published as a panel at the right, so the dev tool keeps off it, and the open editor publishes its own width instead', async () => {
   const page = await open(1280, 800)
   const held = () => page.evaluate(() => document.documentElement.style.getPropertyValue('--kay-panel-right'))
 
-  expect(await held()).toBe('')
-  await page.click('.kcms-editor-head button[aria-label="Hide the editor"]')
-  await page.waitUntil(() => document.querySelector('.kcms-editor-open') === null && document.documentElement.style.getPropertyValue('--kay-panel-right') !== '')
+  expect(Number.parseFloat(await held())).toBeGreaterThan(0)
+  await page.click('.kcms-editor [data-part=head] button[aria-label="Hide the editor"]')
+  await page.waitUntil(() => document.querySelector('.kcms-editor-toggle') !== null && document.documentElement.style.getPropertyValue('--kay-panel-right') !== '')
 
-  const button = await page.evaluate(() => document.querySelector('.kcms-editor')!.getBoundingClientRect().width)
+  const button = await page.evaluate(() => document.querySelector('.kcms-editor-toggle')!.getBoundingClientRect().width)
 
   expect(Number.parseFloat(await held())).toBe(button + 16)
-  await page.click('.kcms-editor-head button[aria-label="Edit this page"]')
-  await page.waitUntil(() => document.querySelector('.kcms-editor-open') !== null && document.documentElement.style.getPropertyValue('--kay-panel-right') === '')
+  await page.click('.kcms-editor-toggle')
+  await page.waitUntil(() => Number.parseFloat(document.documentElement.style.getPropertyValue('--kay-panel-right')) === document.querySelector('.kcms-editor[open]')?.getBoundingClientRect().width)
 })
 
 test('a click that lies under a fixed header at the top scrolls the element clear of it', async () => {
@@ -223,42 +223,42 @@ test('on a phone the sheet can be resized by the keyboard, the size remembered, 
 
   expect(before).toBe(400)
 
-  await page.evaluate(() => document.querySelector<HTMLElement>('.kcms-editor-grip')!.focus())
+  await page.evaluate(() => document.querySelector<HTMLElement>('.kcms-editor [role=separator]')!.focus())
   expect(await page.evaluate(() => document.activeElement?.getAttribute('role'))).toBe('separator')
   await page.press('ArrowUp')
   await page.waitUntil(() => document.querySelector('.kcms-editor')!.getBoundingClientRect().height === 424)
-  expect(await page.evaluate(() => document.querySelector('.kcms-editor-grip')!.getAttribute('aria-valuenow'))).toBe('424')
+  expect(await page.evaluate(() => document.querySelector('.kcms-editor [role=separator]')!.getAttribute('aria-valuenow'))).toBe('424')
 
   await page.reload()
   await page.waitUntil(() => document.querySelector('.kcms-editor')!.getBoundingClientRect().height === 424)
 
   // Down shrinks it again, never past its smallest height.
-  await page.evaluate(() => document.querySelector<HTMLElement>('.kcms-editor-grip')!.focus())
+  await page.evaluate(() => document.querySelector<HTMLElement>('.kcms-editor [role=separator]')!.focus())
   for (let press = 0; press < 20; press++)
     await page.press('ArrowDown')
 
   await page.waitUntil(() => document.querySelector('.kcms-editor')!.getBoundingClientRect().height === 160)
 
-  await page.click('.kcms-editor-head button[aria-label="Hide the editor"]')
-  await page.waitUntil(() => document.querySelector('.kcms-editor-open') === null)
+  await page.click('.kcms-editor [data-part=head] button[aria-label="Hide the editor"]')
+  await page.waitUntil(() => document.querySelector('.kcms-editor-toggle') !== null)
 
   const collapsed = await measure(page)
 
   expect(collapsed.panel.bottom - collapsed.panel.top).toBeLessThan(64)
-  expect(await page.evaluate(() => Number.parseFloat(getComputedStyle(document.body).paddingBottom))).toBe(0)
+  await page.waitUntil(() => Number.parseFloat(getComputedStyle(document.body).paddingBottom) === 0)
 
   await page.reload()
   await page.waitUntil(() => document.querySelector('.kcms-editor') !== null && document.documentElement.classList.contains('kcms-dock-bottom'))
-  expect(await page.evaluate(() => document.querySelector('.kcms-editor-open'))).toBeNull()
-  await page.click('.kcms-editor-head button[aria-label="Edit this page"]')
-  await page.waitUntil(() => document.querySelector('.kcms-editor-open') !== null)
+  expect(await page.evaluate(() => document.querySelector('.kcms-editor[open]'))).toBeNull()
+  await page.click('.kcms-editor-toggle')
+  await page.waitUntil(() => document.querySelector('.kcms-editor[open]') !== null)
   expect(page.errors).toEqual([])
 })
 
 test('the side is resized by the keyboard and the size remembered', async () => {
   const page = await open(1280, 800)
 
-  await page.evaluate(() => document.querySelector<HTMLElement>('.kcms-editor-grip')!.focus())
+  await page.evaluate(() => document.querySelector<HTMLElement>('.kcms-editor [role=separator]')!.focus())
   await page.press('ArrowLeft')
   await page.waitUntil(() => document.querySelector('.kcms-editor')!.getBoundingClientRect().width === 408)
   const resized = await measure(page)
@@ -280,7 +280,7 @@ test('the dock can be switched, below 40rem only the bottom being offered', asyn
 
   const phone = await open(390, 800)
 
-  expect(await phone.count('.kcms-editor-head button[aria-label^="Dock the editor"]')).toBe(0)
+  expect(await phone.count('.kcms-editor [data-part=head] button[aria-label^="Dock the editor"]')).toBe(0)
 })
 
 test('the editor sits beside the dev tool docked at the right or the bottom, and moves back when it goes', async () => {
@@ -489,8 +489,8 @@ test('the edge draws a thin line on hover and focus in both docks, its hit zone 
   for (const [width, height, dock] of [[1280, 800, 'side'], [800, 700, 'bottom']] as const) {
     const page = await open(width, height)
     const line = () => page.evaluate(() => {
-      const grip = document.querySelector<HTMLElement>('.kcms-editor-grip')!
-      const style = getComputedStyle(grip, '::after')
+      const grip = document.querySelector<HTMLElement>('.kcms-editor [role=separator]')!
+      const style = getComputedStyle(grip.firstElementChild!)
       const zone = grip.getBoundingClientRect()
 
       return { opacity: style.opacity, width: Number.parseFloat(style.width), height: Number.parseFloat(style.height), background: getComputedStyle(grip).backgroundColor, zone: Math.min(zone.width, zone.height) }
@@ -504,7 +504,7 @@ test('the edge draws a thin line on hover and focus in both docks, its hit zone 
     expect(idle.zone).toBe(24)
 
     const centre = await page.evaluate(() => {
-      const zone = document.querySelector('.kcms-editor-grip')!.getBoundingClientRect()
+      const zone = document.querySelector('.kcms-editor [role=separator]')!.getBoundingClientRect()
 
       return { x: zone.left + zone.width / 2, y: zone.top + zone.height / 2 }
     })
@@ -515,7 +515,7 @@ test('the edge draws a thin line on hover and focus in both docks, its hit zone 
     expect((await line()).opacity).toBe('0')
 
     // A key made it keyboard focus, which draws the line as well.
-    await page.evaluate(() => document.querySelector<HTMLElement>('.kcms-editor-grip')!.focus())
+    await page.evaluate(() => document.querySelector<HTMLElement>('.kcms-editor [role=separator]')!.focus())
     await page.press(dock === 'side' ? 'ArrowLeft' : 'ArrowUp')
 
     const focused = await line()

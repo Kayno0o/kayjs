@@ -93,6 +93,7 @@ Popover(placement="bottom-end")
 ```
 
 - Popover is the browser's popover, which needs Chrome and Edge 114, Firefox 125 or Safari 17, and it sits beside its trigger through CSS anchor positioning, Chrome and Edge 129, Firefox 147 or Safari 26, so an older browser opens it away from the trigger. A click on the trigger toggles it, and a click outside or Escape closes it. The panel draws an id unique on the page, pairing it with its trigger; an `id` given instead must be unique too, and made of letters, digits, `-` and `_`, since it also names the CSS anchor.
+- `at={{ x, y }}` opens the panel at a point of the window instead (a zero-size fixed anchor stands there, so `placement` and the flip apply) and `@trigger` is then not needed; `open` shows it.
 - `@trigger(attributes)` renders the trigger, which spreads `attributes`: `popovertarget`, `aria-expanded` and its anchor.
 - `placement` is `bottom-start`, `bottom-end`, `top-start` or `top-end`, and the browser flips it when there is no room.
 - `open` opens or closes it from the page, and `onOpenChange(open)` runs however it changed: a page driving `open` sets its own value back there, or it could not open the panel again after a click outside closed it.

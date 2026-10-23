@@ -1,6 +1,6 @@
 ---
 import type { JSX, Snippet } from 'kay'
-import { effect, listen, recipe } from 'kay'
+import { effect, listen, onCleanup, recipe, signal } from 'kay'
 import IconButton from './icon-button.kay'
 import { wording } from 'kay/words'
 
@@ -8,7 +8,9 @@ import { wording } from 'kay/words'
 // A dialog shown with show(), beside the page, is positioned absolute and sits in the page, so it is fixed to the edge and above the page.
 const look = recipe({
   parts: {
-    root: 'kui-side-panel inset-y-0 right-0 left-auto m-0 flex h-dvh max-h-dvh w-full max-w-[min(42rem,100vw)] flex-col overflow-hidden border-0 border-solid border-l-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-surface p-0 text-foreground [transition:translate_0.2s_ease-out,overlay_0.2s_allow-discrete,display_0.2s_allow-discrete] open:starting:[translate:100%_0] [&:not([open])]:[translate:100%_0] backdrop:bg-black/50 data-[modal=false]:fixed data-[modal=false]:z-30',
+    root: 'kui-side-panel inset-y-0 right-0 left-auto m-0 flex h-dvh max-h-dvh w-full max-w-[min(42rem,100vw)] flex-col overflow-hidden border-0 border-solid border-l-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-surface p-0 text-foreground [transition:translate_0.2s_ease-out,overlay_0.2s_allow-discrete,display_0.2s_allow-discrete] open:starting:[translate:100%_0] [&:not([open])]:[translate:100%_0] backdrop:bg-black/50 data-[modal=false]:fixed data-[modal=false]:z-30 data-dock:overflow-visible data-dock:[transition:none] data-dock:open:starting:[translate:none] data-dock:[&:not([open])]:[translate:none]',
+    grip: 'group/grip absolute z-[2] touch-none focus-visible:outline-2 focus-visible:outline-accent data-[dock=right]:inset-y-0 data-[dock=right]:-left-3 data-[dock=right]:w-6 data-[dock=right]:cursor-ew-resize data-[dock=bottom]:inset-x-0 data-[dock=bottom]:-top-3 data-[dock=bottom]:h-6 data-[dock=bottom]:cursor-ns-resize',
+    line: 'pointer-events-none absolute bg-accent opacity-0 shadow-[0_0_0_1px_var(--color-popover)] group-[&:hover]/grip:opacity-100 group-focus-visible/grip:opacity-100 data-[dock=right]:inset-y-0 data-[dock=right]:left-[calc(50%-1px)] data-[dock=right]:w-0.5 data-[dock=bottom]:inset-x-0 data-[dock=bottom]:top-[calc(50%-1px)] data-[dock=bottom]:h-0.5',
     head: 'flex shrink-0 items-center gap-2 border-b border-border px-5 py-3',
     title: 'min-w-0 flex-1 truncate text-lg [font-weight:var(--font-weight-kui-heading,var(--font-weight-semibold))] tracking-label text-foreground [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)]',
     body: 'min-h-0 flex-1 overflow-y-auto px-5 py-4',
@@ -16,7 +18,7 @@ const look = recipe({
   },
 })
 
-const { open, title, actions, footer, modal = true, closeHref, onOpenChange, closeLabel = wording('ui.sidePanel.close', 'Close'), ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'closedby' | 'closedBy'> & {
+const { open, title, actions, footer, modal = true, closeHref, onOpenChange, closeLabel = wording('ui.sidePanel.close', 'Close'), dock, size, onSizeChange, resizeLabel = wording('ui.sidePanel.resize', 'Resize'), style, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'closedby' | 'closedBy' | 'style'> & {
   // Shows the panel along the edge, as a modal unless `modal` is false; the parent sets it back to false in `onOpenChange`.
   open: boolean
   title: string
@@ -28,11 +30,181 @@ const { open, title, actions, footer, modal = true, closeHref, onOpenChange, clo
   modal?: boolean | undefined
   // Makes the close control a link to this URL, for a panel open on the server whose close needs no JavaScript; the link navigates and `onOpenChange(false)` is called as well, so its handler need not navigate.
   closeHref?: string | undefined
+  // Written after the component's own declarations, so it wins: a docked panel's `z-index` is set here.
+  style?: string | undefined
+  // With `modal={false}`, docks the panel to this edge as a tool beside the page: fixed along the edge next to the dev tool's docked drawer, padding the page's `body` by its size, publishing it as `--kay-panel-right` or `-bottom` (for the dev tool's bar) and `--kui-dock-right` or `-bottom`, resized by a grip on its inner edge. Only its close control closes it, Escape does not. A fixed header across the top is cleared with `--kui-dock-top` on `html`.
+  dock?: 'right' | 'bottom' | undefined
+  // The docked panel's width (right) or height (bottom) in px, kept within what the page and the panel need; 24rem or half the window when not given.
+  size?: number | undefined
+  // Called with the size the grip reached: `settled` is false while a drag is under way and true once it ends or a key moved it, so a parent keeps it then.
+  onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined
+  resizeLabel?: string | undefined
   // Called with `false` however the panel closes, a click outside and Escape included. Closed by either of those or its close button, its content is still there to read; closed by the parent, it is already gone.
   onOpenChange: (open: boolean) => unknown
 }>()
 
+// A docked panel keeps the page this much of the window beside it, and itself at least its minimum.
+const DOCKS = { right: { min: 280, page: 352, step: 24, fallback: 384 }, bottom: { min: 160, page: 160, step: 24, fallback: 0 } }
+
+const docked = !modal && dock !== undefined
+const room = signal({ width: 0, height: 0, right: 0, bottom: 0 })
+const reached = signal<number>()
 let panel: HTMLDialogElement | undefined
+let frame = 0
+
+// What another tool already holds along the edges, as the dev tool's docked drawer publishes it.
+function measure() {
+  const held = getComputedStyle(document.documentElement)
+  const next = { width: window.innerWidth, height: window.innerHeight, right: Number.parseFloat(held.getPropertyValue('--kay-dev-inset-right')) || 0, bottom: Number.parseFloat(held.getPropertyValue('--kay-dev-inset-bottom')) || 0 }
+  const now = room()
+
+  if (next.width !== now.width || next.height !== now.height || next.right !== now.right || next.bottom !== now.bottom)
+    room.set(next)
+}
+
+function measureSoon() {
+  if (frame !== 0)
+    return
+
+  frame = requestAnimationFrame(() => {
+    frame = 0
+    measure()
+  })
+}
+
+function limits(edge: 'right' | 'bottom') {
+  const { min, page } = DOCKS[edge]
+  const whole = edge === 'right' ? room().width - room().right : room().height - room().bottom
+
+  // Before the window is measured, which the server cannot do, nothing bounds it.
+  return { min, max: room().width === 0 ? Number.POSITIVE_INFINITY : Math.max(min, whole - page) }
+}
+
+function clamp(edge: 'right' | 'bottom', value: number) {
+  const { min, max } = limits(edge)
+
+  return Math.round(Math.max(min, Math.min(value, max)))
+}
+
+// The size on show: the parent's, else the one the grip reached, else the edge's own default.
+function shownSize() {
+  return dock === undefined ? 0 : clamp(dock, size ?? reached() ?? (dock === 'right' ? DOCKS.right.fallback : room().height / 2))
+}
+
+function resizeTo(next: number, settled: boolean) {
+  if (dock === undefined)
+    return
+
+  const kept = clamp(dock, next)
+
+  reached.set(kept)
+  onSizeChange?.(kept, settled)
+}
+
+// Dragging the inner edge toward the page grows the panel.
+function startResize(event: PointerEvent) {
+  if (dock === undefined || !panel)
+    return
+
+  const handle = event.currentTarget as HTMLElement
+  const box = panel.getBoundingClientRect()
+  const from = dock === 'right' ? { point: event.clientX, size: box.width } : { point: event.clientY, size: box.height }
+  const move = (next: PointerEvent) => resizeTo(from.size + from.point - (dock === 'right' ? next.clientX : next.clientY), false)
+  let ended = false
+
+  // A cancelled drag, as when the browser takes a touch over, ends it too, keeping the size it reached.
+  const end = () => {
+    if (ended)
+      return
+
+    ended = true
+    handle.removeEventListener('lostpointercapture', end)
+    handle.removeEventListener('pointermove', move)
+    handle.removeEventListener('pointerup', end)
+    handle.removeEventListener('pointercancel', end)
+    resizeTo(shownSize(), true)
+  }
+
+  event.preventDefault()
+  handle.setPointerCapture?.(event.pointerId)
+  handle.addEventListener('pointermove', move)
+  handle.addEventListener('lostpointercapture', end)
+  handle.addEventListener('pointerup', end)
+  handle.addEventListener('pointercancel', end)
+}
+
+function resizeByKey(event: KeyboardEvent) {
+  if (dock === undefined)
+    return
+
+  const step = DOCKS[dock].step * (event.shiftKey ? 4 : 1)
+  const grow = dock === 'right' ? 'ArrowLeft' : 'ArrowUp'
+  const shrink = dock === 'right' ? 'ArrowRight' : 'ArrowDown'
+  const delta = event.key === grow ? step : event.key === shrink ? -step : 0
+
+  if (delta === 0)
+    return
+
+  event.preventDefault()
+  resizeTo(shownSize() + delta, true)
+}
+
+// A docked panel's geometry first, then the parent's own style.
+function panelStyle() {
+  if (!docked || dock === undefined)
+    return style
+
+  const inset = 'right: var(--kay-dev-inset-right, 0px); bottom: var(--kay-dev-inset-bottom, 0px); max-width: none; max-height: none'
+  const edge = dock === 'right'
+    ? `top: var(--kui-dock-top, 0px); ${inset}; left: auto; width: ${shownSize()}px; height: auto`
+    : `top: auto; ${inset}; left: 0; width: auto; height: ${shownSize()}px; border-left-width: 0; border-top-width: var(--kui-border-width, var(--border-width))`
+
+  return [edge, style].filter(Boolean).join('; ')
+}
+
+// A shown docked panel makes room on the page and publishes what it holds, for the dev tool's bar and floating drawer to keep out of.
+effect(() => {
+  if (!docked || dock === undefined || !open)
+    return
+
+  const root = document.documentElement
+  const edge = dock
+  const px = `${shownSize()}px`
+
+  root.dataset.kuiDock = edge
+  root.style.setProperty(`--kay-panel-${edge}`, px)
+  root.style.setProperty(`--kui-dock-${edge}`, px)
+  onCleanup(() => {
+    delete root.dataset.kuiDock
+    // Another tool's own value on the shared variable stays.
+    if (root.style.getPropertyValue(`--kay-panel-${edge}`) === px)
+      root.style.removeProperty(`--kay-panel-${edge}`)
+
+    root.style.removeProperty(`--kui-dock-${edge}`)
+  })
+})
+
+// A docked dev tool pads the page, which the root's content shows at the side and its border box at the bottom.
+effect(() => {
+  if (!docked)
+    return
+
+  measure()
+
+  const content = new ResizeObserver(measureSoon)
+  const border = new ResizeObserver(measureSoon)
+
+  content.observe(document.documentElement)
+  border.observe(document.documentElement, { box: 'border-box' })
+  onCleanup(() => {
+    content.disconnect()
+    border.disconnect()
+    cancelAnimationFrame(frame)
+    frame = 0
+  })
+})
+
+listen(() => window, 'resize', measureSoon)
 
 effect(() => {
   const shown = open
@@ -56,7 +228,7 @@ const renderedOpen = !modal && open
 
 // A browser with `closedby` closes a non-modal panel on Escape, stacked with the layers above it. Without it the panel listens itself, and leaves an Escape that belongs to a modal dialog or an open popover.
 listen(document, 'keydown', event => {
-  if (event.key !== 'Escape' || modal || !open || event.defaultPrevented || event.isComposing || 'closedBy' in HTMLDialogElement.prototype)
+  if (event.key !== 'Escape' || modal || !open || event.defaultPrevented || event.isComposing || docked || 'closedBy' in HTMLDialogElement.prototype)
     return
 
   if (!document.querySelector(':modal, :popover-open'))
@@ -64,8 +236,11 @@ listen(document, 'keydown', event => {
 })
 ---
 // Named by its title for screen readers. Every way of closing it ends in the dialog's `close` event, the close button included, so `onOpenChange` is the one place the parent learns of it.
-dialog(part="root" aria-label={title} {...rest} open={renderedOpen} data-modal={modal ? undefined : 'false'} ref={element => panel = element} closedby={modal ? 'any' : 'closerequest'} onClose={() => onOpenChange(false)})
+dialog(part="root" aria-label={title} {...rest} open={renderedOpen} data-modal={modal ? undefined : 'false'} data-dock={docked ? dock : undefined} style={panelStyle()} ref={element => panel = element} closedby={modal ? 'any' : docked ? 'none' : 'closerequest'} onClose={() => onOpenChange(false)})
   if open
+    if docked && dock as edge
+      div(part="grip" role="separator" tabindex="0" aria-label={resizeLabel} aria-orientation={edge === 'right' ? 'vertical' : 'horizontal'} aria-valuenow={shownSize()} aria-valuemin={limits(edge).min} aria-valuemax={Number.isFinite(limits(edge).max) ? limits(edge).max : undefined} data-dock={edge} onPointerDown={startResize} onKeyDown={resizeByKey})
+        span(part="line" data-dock={edge})
     header(part="head")
       h2(part="title") {title}
       | {actions}

@@ -23,7 +23,7 @@ async function open(width: number, height: number, corner: string) {
     localStorage.setItem('kay-dev-layout', JSON.stringify({ dock: 'float', corner: layout, max: false, bottom: 320, right: 448 }))
   }, corner)
   await page.reload()
-  await page.waitUntil(() => document.querySelector('kay-dev')?.shadowRoot?.querySelector('.bar') != null && document.querySelector('.kcms-editor-open') !== null && document.documentElement.classList.contains('kcms-dock-side') !== document.documentElement.classList.contains('kcms-dock-bottom'))
+  await page.waitUntil(() => document.querySelector('kay-dev')?.shadowRoot?.querySelector('.bar') != null && document.querySelector('.kcms-editor[open]') !== null && document.documentElement.classList.contains('kcms-dock-side') !== document.documentElement.classList.contains('kcms-dock-bottom'))
 
   return page
 }
@@ -40,7 +40,7 @@ async function measureBar(page: Awaited<ReturnType<typeof open>>) {
 
 // Whether the middle of each button of the editor's header is the button itself, not the dev tool's bar above it.
 async function reachable(page: Awaited<ReturnType<typeof open>>): Promise<boolean[]> {
-  return page.evaluate(() => [...document.querySelectorAll('.kcms-editor-head button')].map((button) => {
+  return page.evaluate(() => [...document.querySelectorAll('.kcms-editor [data-part=head] button, .kcms-editor-toggle')].map((button) => {
     const box = button.getBoundingClientRect()
 
     return button.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2))
@@ -64,8 +64,8 @@ test('the dev tool bar at the top right leaves the header of the editor at the s
 test('the dev tool bar at the bottom right leaves the collapsed editor button reachable', async () => {
   const page = await open(390, 800, 'bottom-right')
 
-  await page.click('.kcms-editor-head button[aria-label="Hide the editor"]')
-  await page.waitUntil(() => document.querySelector('.kcms-editor-open') === null)
+  await page.click('.kcms-editor [data-part=head] button[aria-label="Hide the editor"]')
+  await page.waitUntil(() => document.querySelector('.kcms-editor-toggle') !== null)
   expect(await reachable(page)).toEqual([true])
 })
 
@@ -104,7 +104,7 @@ test('a drawer docked at the right keeps the full window height beside the edito
     sessionStorage.clear()
   })
   await page.reload()
-  await page.waitUntil(() => document.querySelector('.kcms-editor-open') !== null)
+  await page.waitUntil(() => document.querySelector('.kcms-editor[open]') !== null)
   const { drawer } = await drawerBeside(page)
 
   expect(drawer.top).toBe(0)
@@ -115,7 +115,7 @@ test('a drawer docked at the right keeps the full window height beside the edito
     sessionStorage.clear()
   })
   await page.reload()
-  await page.waitUntil(() => document.querySelector('.kcms-editor-open') !== null)
+  await page.waitUntil(() => document.querySelector('.kcms-editor[open]') !== null)
 
   const sized = await drawerBeside(page)
 

@@ -14,6 +14,10 @@ The `@trigger(attributes)` block renders the button, which spreads the `attribut
 
 <Demo name="popover/controlled" />
 
+## At a point
+
+`at={{ x, y }}` opens the panel at a point of the window instead of against a trigger, and `@trigger` is then not needed. `open` shows it. A fixed anchor with no size stands at the point, so `placement` and the browser's flip apply as usual.
+
 ## Id
 
 `id` is the panel's id, unique on the page. kay draws one when you give none.

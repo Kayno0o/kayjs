@@ -26,7 +26,7 @@ async function open(path = PATH, field = 'title') {
   opened.push(page)
   await page.evaluate(() => localStorage.clear())
   await page.reload()
-  await page.waitUntil((name: string) => document.querySelector('.kcms-editor-open') !== null && document.querySelector(`[data-kcms-path="${name}"] input`) !== null, undefined, field)
+  await page.waitUntil((name: string) => document.querySelector('.kcms-editor[open]') !== null && document.querySelector(`[data-kcms-path="${name}"] input`) !== null, undefined, field)
 
   return page
 }

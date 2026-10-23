@@ -186,7 +186,7 @@ function inView(box: DOMRect): boolean {
 function room(): { right: number, bottom: number } {
   const root = document.documentElement
   const room = { right: root.clientWidth, bottom: root.clientHeight }
-  const panel = document.querySelector('.kcms-editor-open')?.getBoundingClientRect()
+  const panel = document.querySelector('.kcms-editor[open]')?.getBoundingClientRect()
 
   if (panel && panel.width > 0) {
     if (root.classList.contains('kcms-dock-side'))

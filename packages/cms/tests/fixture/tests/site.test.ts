@@ -37,11 +37,11 @@ test('kay check passes on the fixture, the editor\'s components included', async
 }, 60_000)
 
 test('kay renders the editor in edit mode alone, a form per entry the page read, each loading in the browser', async () => {
-  expect((await site.visit('/blog/hello')).find('aside.kcms-editor')).toEqual([])
+  expect((await site.visit('/blog/hello')).find('dialog.kcms-editor')).toEqual([])
 
   const page = await editor.visit('/admin/page?path=/blog/hello')
 
-  expect(page.find('aside.kcms-editor-open')[0]?.attributes['aria-label']).toBe('Content editor')
+  expect(page.find('dialog.kcms-editor[open]')[0]?.attributes['aria-label']).toBe('Content editor')
   expect(page.find('.kcms-entry-title').map(title => title.text)).toEqual(['hello'])
   expect(page.find('.kcms-entry-collection').map(collection => collection.text)).toEqual(['Posts'])
   expect(page.find('.kcms-entry-loading')).toHaveLength(1)
@@ -63,21 +63,21 @@ test('a link from another site waits for the editor\'s click, and only a post fr
   for (const headers of [{ 'sec-fetch-site': 'same-site' } as Record<string, string>, { 'sec-fetch-site': 'same-origin', 'sec-fetch-dest': 'image' }])
     expect((await arriving.fetch('/admin/page?path=/blog/hello', { headers, redirect: 'manual' })).status, JSON.stringify(headers)).toBe(200)
 
-  expect((await arriving.visit('/blog/hello')).find('aside.kcms-editor')).toEqual([])
+  expect((await arriving.visit('/blog/hello')).find('dialog.kcms-editor')).toEqual([])
 
   const { enterEditing } = await import(PAGE_ROUTE) as { enterEditing: Action<{ path?: string | undefined }, unknown> }
 
   expect((await arriving.submit(enterEditing, { path: '/blog/hello' }, { from: '/admin/page' })).url).toBe('/blog/hello')
-  expect((await arriving.visit('/blog/hello')).find('aside.kcms-editor')).toHaveLength(1)
+  expect((await arriving.visit('/blog/hello')).find('dialog.kcms-editor')).toHaveLength(1)
   expect((await arriving.fetch('/admin/page?path=/blog/hello', { headers: { 'sec-fetch-site': 'same-origin', 'sec-fetch-dest': 'document' }, redirect: 'manual' })).status).toBe(302)
 })
 
 test('stopping editing leaves edit mode, the page rendering no editor again', async () => {
   const leaving = await testSite({ root: ROOT })
 
-  expect((await leaving.visit('/admin/page?path=/blog/hello')).find('aside.kcms-editor')).toHaveLength(1)
+  expect((await leaving.visit('/admin/page?path=/blog/hello')).find('dialog.kcms-editor')).toHaveLength(1)
   expect(await (await leaving.fetch('/_kay/cms/preview/exit', { method: 'POST' })).json()).toEqual({ left: true })
-  expect((await leaving.visit('/blog/hello')).find('aside.kcms-editor')).toEqual([])
+  expect((await leaving.visit('/blog/hello')).find('dialog.kcms-editor')).toEqual([])
 })
 
 test('the editor says when nothing on the page comes from a collection', async () => {
@@ -894,8 +894,8 @@ test('in the browser, the media library renames an upload in place and deletes a
     // A used upload cannot be deleted, an unused one asks first.
     expect(await page.evaluate(() => document.querySelector('button[aria-label="Delete in use.png"]') === null)).toBe(true)
     await page.click('button[aria-label="Delete Spare part.png"]')
-    await page.waitUntil(() => document.querySelector('dialog[open]') !== null)
-    await page.evaluate(() => [...document.querySelectorAll<HTMLButtonElement>('dialog[open] button')].find(button => button.textContent?.trim() === 'Delete')!.click())
+    await page.waitUntil(() => document.querySelector('dialog[open]:not(.kcms-editor)') !== null)
+    await page.evaluate(() => [...document.querySelectorAll<HTMLButtonElement>('dialog[open]:not(.kcms-editor) button')].find(button => button.textContent?.trim() === 'Delete')!.click())
     await page.waitUntil(() => ![...document.querySelectorAll('.kcms-media tbody tr')].some(row => row.textContent?.includes('Spare part.png') === true))
     expect((await built.fetch(stray)).status).toBe(404)
     expect((await built.fetch(used)).status).toBe(200)
@@ -1369,7 +1369,7 @@ test('an editor who opened the screens finds the link on a page they read and la
   await page.waitUntil(() => document.querySelector('html > a[href^="/admin/page"]') !== null)
   expect(await page.evaluate(selector => document.querySelector(selector)?.textContent, link)).toBe('Edit this page')
   await page.click(link)
-  await page.waitUntil(() => document.querySelector('aside.kcms-editor') !== null)
+  await page.waitUntil(() => document.querySelector('dialog.kcms-editor') !== null)
   expect(await page.evaluate(() => location.pathname)).toBe('/about')
   expect(await page.evaluate(selector => document.querySelector(selector), link)).toBeNull()
   expect(page.errors).toEqual([])

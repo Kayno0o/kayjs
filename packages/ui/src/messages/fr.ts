@@ -123,7 +123,7 @@ export default defineMessages({
     },
     scatterChart: { empty: 'Aucune donnée pour le moment.' },
     select: { loading: 'Chargement…' },
-    sidePanel: { close: 'Fermer' },
+    sidePanel: { close: 'Fermer', resize: 'Redimensionner' },
     siteNav: { menu: 'Menu' },
     splitLayout: { back: 'Retour', resize: 'Redimensionner la liste' },
     steps: { done: 'terminée' },

@@ -43,6 +43,7 @@
 - `Menu(label="Actions" icon="plus" items={[{ label: 'Rename', onSelect: rename }, 'separator', { label: 'Delete', icon: 'delete', tone: 'danger', onSelect: remove }]})`:
   - An IconButton opening a `role="menu"` popover; `'separator'` draws a rule between groups, and `class` styles that button.
   - Opening focuses the first enabled entry; the arrows, Home and End move between enabled entries, an accent bar marking the one the keyboard is on, and Tab closes it.
+  - `at={{ x, y }}` with `open` and `onOpenChange` opens it at a point of the window (`clientX`, `clientY` of a click) with no trigger and no `icon`, as a context menu or a choice next to a click; `placement` is `bottom-start` then, the browser flips it inside the window, Escape and a click outside close it and give focus back.
   - An entry's `onSelect` runs once the menu has closed and focus is back on the trigger, so a dialog it opens takes focus from there.
 - `IconPicker(search={findIcons} value={post.icon} name="icon" onChange={icon.set})`:
   - A search that rejects is logged and shown as `errorLabel` (`ui.iconPicker.error`), the last grid kept.

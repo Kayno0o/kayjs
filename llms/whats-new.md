@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-ui: `SidePanel` takes `dock` to sit beside the page as a resizable tool panel, and `Menu` and `Popover` take `at` to open at a point with no trigger ([SidePanel](../packages/ui/llms/page-layout-palette-and-trees.md), [Menu](../packages/ui/llms/forms.md)).
 - kayjs-cms: the on-page editor titles an entry by itself, collapses its form to the field clicked or typed on the page with anchors to the others, and offers Save all over several entries ([Editor](../packages/cms/llms/editor.md)).
 
 ## 1.72.0

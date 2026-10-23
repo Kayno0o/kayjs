@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { BOTTOM, clampSize, DEFAULT_LAYOUT, dockOf, readLayout, revealBy, SIDE, sizeOf, writeLayout } from '../src/editor/dock'
+import { DEFAULT_LAYOUT, dockOf, readLayout, revealBy, writeLayout } from '../src/editor/dock'
 
 const store = (value: string | null) => ({ getItem: () => value })
 
@@ -15,26 +15,6 @@ describe('the dock', () => {
     expect(dockOf({ open: true, dock: 'bottom' }, 1600)).toBe('bottom')
     expect(dockOf({ open: true, dock: 'side' }, 800)).toBe('side')
     expect(dockOf({ open: true, dock: 'side' }, 639)).toBe('bottom')
-  })
-})
-
-describe('the size', () => {
-  const room = { width: 1280, height: 800 }
-
-  test('is kept between a minimum and what leaves the page its share, less what another tool holds', () => {
-    expect(clampSize('side', 10, room)).toBe(SIDE.min)
-    expect(clampSize('side', 5000, room)).toBe(1280 - SIDE.page)
-    expect(clampSize('side', 5000, room, 448)).toBe(1280 - 448 - SIDE.page)
-    expect(clampSize('bottom', 10, room)).toBe(BOTTOM.min)
-    expect(clampSize('bottom', 5000, room)).toBe(800 - BOTTOM.page)
-    expect(clampSize('side', 5000, { width: 500, height: 800 })).toBe(SIDE.min)
-  })
-
-  test('defaults to 24rem at the side and half the window at the bottom', () => {
-    expect(sizeOf(DEFAULT_LAYOUT, 'side', room)).toBe(384)
-    expect(sizeOf(DEFAULT_LAYOUT, 'bottom', room)).toBe(400)
-    expect(sizeOf({ open: true, side: 500, bottom: 300 }, 'side', room)).toBe(500)
-    expect(sizeOf({ open: true, side: 500, bottom: 300 }, 'bottom', room)).toBe(300)
   })
 })
 
