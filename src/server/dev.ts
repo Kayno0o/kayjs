@@ -23,12 +23,12 @@ import { bootDevTool } from '../runtime/dev-boot'
 import { kayLog } from '../runtime/log'
 import { isCrossSite } from './actions'
 import { routerPath } from './base'
-import { nodeNet } from './builtins'
 import { BUILD_FAILURE, clientOptionsKey, fromManifest, readManifest } from './client'
 import { recordTypeErrors } from './dev-errors'
 import { redirectedBy } from './dev-notes'
 import { editorCommand } from './editor'
 import { readCapped } from './errors'
+import { hostName, isLocalHost } from './host-allowlist'
 import { localeCopies } from './i18n'
 import { compileErrorPage } from './overlay'
 import { requestId } from './protection'
@@ -78,9 +78,6 @@ const LIVE_RELOAD_HEADER = 'x-kay-live-reload'
 const LIVE_RELOAD_TIMING = 'kay-live-reload'
 const POSITION = /^(.+\.(?:kay|[cm]?[jt]sx?|css)):(\d+):(\d+)$/
 const BACKSLASH = /\\/g
-const BRACKETS = /^\[|\]$/g
-const LOCAL_NAME = /(?:^|\.)localhost$/
-const TRAILING_DOT = /\.$/
 const SOURCE_FILE = /\.(?:kay|[cm]?[jt]sx?|json|css)$/
 // A path a request fills in, which the Routes tab cannot link to.
 const PATH_PARAM = /[:*]/
@@ -565,9 +562,9 @@ export function refuseForeignHosts(app: Elysia, site: string | undefined, securi
 
   app.onRequest(({ request }) => {
     const host = request.headers.get('host')
-    const name = host === null ? undefined : URL.parse(`http://${host}`)?.hostname.replace(TRAILING_DOT, '')
+    const name = host === null ? undefined : hostName(host)
 
-    if (host === null || (name !== undefined && (LOCAL_NAME.test(name) || nodeNet().isIP(name.replace(BRACKETS, '')) !== 0 || allowed.has(name))))
+    if (host === null || (name !== undefined && (isLocalHost(name) || allowed.has(name))))
       return
 
     return new Response(`kay dev answers to localhost, an IP address or the site, and ${host} is none of them; list it in KAY_DEV_HOSTS to reach the server by that name\n`, { status: 421, headers: { ...security, 'content-type': 'text/plain; charset=utf-8' } })

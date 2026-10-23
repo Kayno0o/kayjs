@@ -16,7 +16,7 @@ import { boundToPage, isCrossSite, postedFrom, unadmittedCrossSite } from './act
 import { RESOURCE_METADATA } from './api-modules'
 import { answeredAsPage, currentRequest } from './log'
 import { actionOperation, guardRefusal, toolName } from './openapi'
-import { clientAddress, keepRequestId, markAgentCall, overLimit, requestId, requestServer, wasChallenged } from './protection'
+import { clientAddress, keepRequestId, markAgentCall, requestId, requestServer, sharedLimit, wasChallenged } from './protection'
 import { requestUrl } from './request-url'
 import { sendFrom } from './rewrite'
 import { toolSettings } from './tool-settings'
@@ -470,7 +470,7 @@ export function serveMcp(app: Elysia, document: Schema, options: McpOptions): vo
     if (isCrossSite(request))
       return new Response('Cross-site request refused', { status: 403 })
 
-    const wait = options.perMinute === undefined ? undefined : overLimit(RATE_NAME, clientAddress(request, server), options.perMinute, MINUTE_MS)
+    const wait = options.perMinute === undefined ? undefined : await sharedLimit(RATE_NAME, clientAddress(request, server), options.perMinute, MINUTE_MS)
 
     if (wait !== undefined)
       return new Response('Too many requests', { status: 429, headers: { 'retry-after': String(wait) } })

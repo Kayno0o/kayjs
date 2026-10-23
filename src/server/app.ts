@@ -166,6 +166,9 @@ function refuseScanned({ root, config }: Project<PagesOptions>, { routes, files,
 
   const mcpAt = mcpPath(config.mcp)
 
+  // Refused here with the other settings, not when the endpoint is first mounted.
+  mcpRateLimit(config.mcp)
+
   if (mcpAt !== undefined)
     served.claim({ path: mcpAt, owner: '`mcp`', kind: 'kay', method: 'ALL' })
 

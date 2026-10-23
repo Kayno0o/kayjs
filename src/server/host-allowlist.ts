@@ -11,6 +11,11 @@ export function hostName(host: string): string | undefined {
   return URL.parse(`http://${host}`)?.hostname.replace(TRAILING_DOT, '')
 }
 
+// Whether a host name is localhost, a subdomain of it or an IP address, which a rebinding page cannot make a browser send.
+export function isLocalHost(name: string): boolean {
+  return LOCAL_NAME.test(name) || nodeNet().isIP(name.replace(BRACKETS, '')) !== 0
+}
+
 // Names other than a site's own are refused in production when `security.hosts` is set, as a page of another site renaming itself to this server's address (DNS rebinding) would reach it by its own name.
 // Localhost and IP addresses are always let in, as a health check or a collector on the private network reaches the server by them and a rebinding page cannot make a browser send one.
 export function refuseUnknownHosts(app: Elysia, options: { site: string | undefined, hosts: string[] | true, localeHosts: string[], security: Record<string, string> | undefined }): void {
@@ -31,7 +36,7 @@ export function refuseUnknownHosts(app: Elysia, options: { site: string | undefi
 
     const name = hostName(host)
 
-    if (name !== undefined && (allowed.has(name) || LOCAL_NAME.test(name) || nodeNet().isIP(name.replace(BRACKETS, '')) !== 0))
+    if (name !== undefined && (allowed.has(name) || isLocalHost(name)))
       return
 
     return new Response('Misdirected request: this host is not one the site answers to\n', { status: 421, headers: { ...options.security, 'content-type': 'text/plain; charset=utf-8' } })

@@ -52,6 +52,24 @@ console.log(JSON.stringify([await read(build(), sealed), await read(build('${FIR
     expect(warned((await isolated(`build('${weak}')`, { NODE_ENV: 'development' })).err)).toBe(false)
   })
 
+  it('warns of a preview.secret of few different characters and refuses a short one in a list', async () => {
+    const preview = async (secret: string) => isolated(`
+import { setupPreview } from '${ROOT}/src/server/preview'
+try {
+  setupPreview({ secret: ${secret} }, '')
+  console.log(JSON.stringify('set'))
+}
+catch (error) {
+  console.log(JSON.stringify(error.message))
+}
+`, { NODE_ENV: 'production' })
+    const random = 'f3a9c1d7-52b8-4e6a-9d04-7b1c8e2a5f60'
+
+    expect((await preview(`'${'a'.repeat(40)}'`)).err).toContain('`preview.secret` in kay.config.ts holds a secret of fewer than 10 different characters')
+    expect((await preview(`'${random}'`)).err).not.toContain('fewer than')
+    expect((await preview(`['${random}', 'short']`)).out).toContain('lists a secret that is 5 characters long')
+  })
+
   it('refuses to start a production server on a key of its process, unless a secret is set or an ephemeral key is asked for', async () => {
     const start = async (env: Record<string, string>, secret = '') => (await isolated(`
 import { refuseProcessKey, warnOnStampKey } from '${ROOT}/src/server/stamp'

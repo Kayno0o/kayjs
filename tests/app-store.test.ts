@@ -142,6 +142,24 @@ describe('the app store of a test site', () => {
   })
 })
 
+describe('the MCP endpoint', () => {
+  it('counts its limit in the store the site is given, so replicas share it', async () => {
+    const app = counting()
+    const site = await testSite({ routes: 'tests/fixtures/mcp/src/routes', api: 'tests/fixtures/mcp/src/api', mcp: { rateLimit: 2 }, islands: false, store: { rates: app.store } })
+    const ping = async () => site.fetch('/mcp', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' }) })
+
+    try {
+      expect((await ping()).status).toBe(200)
+      expect((await ping()).status).toBe(200)
+      expect((await ping()).status).toBe(429)
+      expect(app.seen.length).toBe(3)
+    }
+    finally {
+      await site.close()
+    }
+  })
+})
+
 describe('an app store without peek', () => {
   it('refuses a limit counting the posts that went through', async () => {
     const { protectionRefusal } = await import('../src/server/protection')

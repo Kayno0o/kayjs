@@ -20,7 +20,7 @@ import { nodeCrypto } from './builtins'
 import { cookieName, prefixedNames } from './cookie-names'
 import { requestCookies } from './cookies'
 import { overHttps, requestUrl } from './request-url'
-import { MIN_SECRET_LENGTH, sameText } from './seal'
+import { MIN_SECRET_LENGTH, sameText, warnLowEntropy } from './seal'
 import { appSecrets, noAppSecret, useStampSecret } from './stamp'
 import { markInternal, visitAs } from './visit'
 
@@ -91,10 +91,17 @@ export function setupPreview(config: PreviewConfig | false | undefined, base: st
   if (typeof secret !== 'string' || secret.length < MIN_SECRET_LENGTH)
     throw new KayError('config-invalid', `kay: preview.secret in kay.config.ts is ${typeof secret === 'string' ? `${secret.length} characters long` : 'missing'}: it signs preview links and cookies, so it is at least ${MIN_SECRET_LENGTH} random characters, read from the environment`)
 
-  const all = [secrets].flat() as string[]
+  const all = [secrets].flat()
+  const weak = all.find(one => typeof one !== 'string' || one.length < MIN_SECRET_LENGTH)
 
-  useStampSecret(all, 'preview')
-  settings = { secrets: all, maxAge: wholeSeconds(config.maxAge ?? DEFAULT_MAX_AGE, 'preview.maxAge'), base }
+  if (weak !== undefined)
+    throw new KayError('config-invalid', `kay: preview.secret in kay.config.ts lists a secret that is ${typeof weak === 'string' ? `${weak.length} characters long` : 'not a string'}: each is at least ${MIN_SECRET_LENGTH} random characters, read from the environment`)
+
+  if (configured !== undefined)
+    warnLowEntropy(all as string[], '`preview.secret` in kay.config.ts')
+
+  useStampSecret(all as string[], 'preview')
+  settings = { secrets: all as string[], maxAge: wholeSeconds(config.maxAge ?? DEFAULT_MAX_AGE, 'preview.maxAge'), base }
 }
 
 // A key of preview's own, derived from the app's secret so what signs a preview link never passes for the session's or the stamps'.

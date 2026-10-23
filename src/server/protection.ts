@@ -563,6 +563,11 @@ export async function overLimit(name: string, client: string, max: number, windo
   return waitFor(memoryOf(name).hit(key, window), max)
 }
 
+// `overLimit` counting in the app's `store.rates` where one is set, so replicas share the limit.
+export async function sharedLimit(name: string, client: string, max: number, windowMs: number): Promise<number | undefined> {
+  return waitFor(await sharedRates(name).hit(limitKey(name, client), `${windowMs}ms`), max)
+}
+
 // The store a limit counts in when it names none: the app's `store.rates`, else this process's memory.
 function sharedRates(name: string): RateStore {
   return appStore()?.rates ?? memoryOf(name)
