@@ -390,6 +390,8 @@ describe('content', () => {
   test('the old props of Badge, Notice, FormField, FileDrop and QrCode still draw as they did, and variant beats the booleans', async () => {
     expect(await attributes('/content', '#legacy-stamp, #legacy-solid, #variant-wins', ['data-stamp', 'data-solid'])).toEqual([{ 'data-stamp': '', 'data-solid': null }, { 'data-stamp': null, 'data-solid': '' }, { 'data-stamp': null, 'data-solid': null }])
     expect(await attributes('/content', '#legacy-compact, #legacy-field [data-compact], #legacy-drop [data-compact]', ['data-compact'])).toEqual([{ 'data-compact': '' }, { 'data-compact': '' }, { 'data-compact': '' }])
+    expect(await attributes('/content', '#solid-variant-stamp', ['data-stamp', 'data-solid'])).toEqual([{ 'data-stamp': null, 'data-solid': '' }])
+    expect(await attributes('/content', '#md-compact, #md-field [data-compact], #md-drop [data-compact]', ['data-compact'])).toEqual([{ 'data-compact': '' }, { 'data-compact': '' }, { 'data-compact': '' }])
     expect(await attributes('/content', '#legacy-qr', ['width', 'height'])).toEqual([{ width: '90', height: '90' }])
   })
 
