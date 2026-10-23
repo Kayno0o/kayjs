@@ -8,6 +8,7 @@ import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import PageHeader from '@kaynooo/kayjs-ui/page-header.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import Select from '@kaynooo/kayjs-ui/select.kay'
+import Stat from '@kaynooo/kayjs-ui/stat.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import '../app.css'
 
@@ -30,6 +31,7 @@ main
   Button#button(label="Go")
   Button#danger(tone="danger" label="Delete")
   ColorInput#color(label="Colour" value="#ff0000")
+  Stat#stat(value={3} label="Moons" variant="tile")
   PageHeader#header(title="Page")
   PageSection#section(title="Section")
     p part

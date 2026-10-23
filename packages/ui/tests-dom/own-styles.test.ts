@@ -50,11 +50,11 @@ test('a ZoomPane writes the style an app gives it after its own declarations, so
 test('a Masonry writes the style an app gives it after its own declarations, so the app wins', async () => {
   const style = await styles()
 
-  expect(style('#masonry')).toMatch(/--kui-masonry-gap: 12px;.*--_masonry-gap: 1px$/)
+  expect(style('#masonry')).toMatch(/--_masonry-gap: 12px;.*--_masonry-gap: 1px$/)
 })
 
 test('a SplitLayout writes the style an app gives it after its own declarations, so the app wins', async () => {
   const style = await styles()
 
-  expect(style('#split')).toBe('--kui-split-list-width: 260px; --_split-list-width: 5px')
+  expect(style('#split')).toBe('--_split-list-width: 260px; --_split-list-width: 5px')
 })
