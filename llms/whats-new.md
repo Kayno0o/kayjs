@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.73.0
 
 - A link pressed while a view transition runs no longer reports an `AbortError` to `/_kay/error` when the transition is skipped before its animations start.
 - kayjs-ui: `Toolbar`, `PageSection` takes `subtitle` and `sticky`, and `SidePanel` takes `launcher` and `launcherLayer`; the cms editor's list bars, entry heads, collapsed button and Stop editing question are built on them ([Toolbar](../packages/ui/llms/page-layout-palette-and-trees.md)).
