@@ -21,16 +21,17 @@ export const enterEditing = action(s.Object({ path: s.Optional(s.String({ maxLen
 
 const path = ctx.url.searchParams.get('path')
 const fetchSite = ctx.request.headers.get('sec-fetch-site')
+const fetchDest = ctx.request.headers.get('sec-fetch-dest')
 
-// A link from this site, a bookmark or a typed address enters at once; one from another site waits for the editor's click, so no page can put a signed-in editor in edit mode by a link. A missing or outside path lands back on the screens.
-if (fetchSite === null || fetchSite === 'same-origin' || fetchSite === 'none')
+// A navigation from this site, a bookmark or a typed address enters at once; a link from another site, or a request that is no navigation (an image, a fetch, a prefetch), waits for the editor's click, so no page can put a signed-in editor in edit mode by a link. A missing or outside path lands back on the screens.
+if ((fetchSite === null || fetchSite === 'same-origin' || fetchSite === 'none') && (fetchDest === null || fetchDest === 'document'))
   enter(ctx, path)
 ---
 head
-  title {adminTitle(wording('cms.page.enterTitle', 'Edit this page'))}
+  title {adminTitle(wording('cms.page.edit', 'Edit this page'))}
 .kcms-sign-in
-  h1 {wording('cms.page.enterTitle', 'Edit this page')}
+  h1 {wording('cms.page.edit', 'Edit this page')}
   p {wording('cms.page.enterMessage', 'Another site sent you here. Open the page in edit mode?')}
   form(action={enterEditing})
     input(type="hidden" name="path" value={path ?? ''})
-    Button(type="submit" tone="accent" label={wording('cms.page.enterConfirm', 'Edit this page')})
+    Button(type="submit" tone="accent" label={wording('cms.page.edit', 'Edit this page')})

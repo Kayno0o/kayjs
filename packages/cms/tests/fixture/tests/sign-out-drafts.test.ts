@@ -23,7 +23,7 @@ test('signing out forgets the drafts the browser kept, and a draft is kept under
   await page.waitUntil(() => document.querySelector('.kcms-admin-who') !== null, { timeout: '15s' })
 
   // The admin names the person it let in, which the editor keys its drafts by.
-  expect(await page.evaluate(() => (/(?:^|; )kcms_editor=[0-9a-f]{16}/).test(document.cookie))).toBe(true)
+  expect(await page.evaluate(() => (/(?:^|; )kcms_editor=[\w-]{22}/).test(document.cookie))).toBe(true)
   await page.evaluate(() => {
     localStorage.setItem('kcms:draft:somebody:posts:hello', '{}')
   })

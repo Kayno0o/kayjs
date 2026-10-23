@@ -89,6 +89,7 @@ test('the activity log is for a role that may delete, as it names every editor',
   await site.submit(signOut, {}, { from: '/admin' })
   await site.submit(signIn, { password: 'pw-admin' }, { from: '/admin/sign-in' })
   expect((await site.fetch('/admin/activity')).status).toBe(200)
+  expect((await site.visit('/admin')).find('a[href="/admin/activity"]')).toHaveLength(1)
   await site.submit(signOut, {}, { from: '/admin' })
 })
 

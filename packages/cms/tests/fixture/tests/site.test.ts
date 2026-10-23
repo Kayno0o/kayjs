@@ -55,13 +55,21 @@ test('a link from another site waits for the editor\'s click, and only a post fr
   const response = await arriving.fetch('/admin/page?path=/blog/hello', { headers: { 'sec-fetch-site': 'cross-site' }, redirect: 'manual' })
 
   expect(response.status).toBe(200)
-  expect(await response.text()).toContain('name="path"')
+  const html = await response.text()
+
+  expect(html).toContain('name="path"')
+  expect(html).toContain('value="/blog/hello"')
+
+  for (const headers of [{ 'sec-fetch-site': 'same-site' } as Record<string, string>, { 'sec-fetch-site': 'same-origin', 'sec-fetch-dest': 'image' }])
+    expect((await arriving.fetch('/admin/page?path=/blog/hello', { headers, redirect: 'manual' })).status, JSON.stringify(headers)).toBe(200)
+
   expect((await arriving.visit('/blog/hello')).find('aside.kcms-editor')).toEqual([])
 
   const { enterEditing } = await import(PAGE_ROUTE) as { enterEditing: Action<{ path?: string | undefined }, unknown> }
 
   expect((await arriving.submit(enterEditing, { path: '/blog/hello' }, { from: '/admin/page' })).url).toBe('/blog/hello')
   expect((await arriving.visit('/blog/hello')).find('aside.kcms-editor')).toHaveLength(1)
+  expect((await arriving.fetch('/admin/page?path=/blog/hello', { headers: { 'sec-fetch-site': 'same-origin', 'sec-fetch-dest': 'document' }, redirect: 'manual' })).status).toBe(302)
 })
 
 test('an edit link\'s holder, whom the guard refuses, is told apart from a signed-in editor by the answer of /can', async () => {

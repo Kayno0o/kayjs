@@ -165,7 +165,7 @@ Every page carries one short script that looks for either cookie, so a visitor w
 
 With another way of signing in, an editor who never opened the admin sees no button until they open it once.
 
-A link to the button from another site does not open edit mode by itself. It lands on a page with one button that does, so no other site can put a signed-in editor in edit mode.
+A link from another site does not open edit mode by itself. A browser that says so (`Sec-Fetch-Site`) lands on a page with one button that does, so no other site can put a signed-in editor in edit mode. An old browser that sends no such header opens it at once.
 
 To place the link yourself, write an `a(data-kcms-edit-page hidden)` in your layout. The cms fills in its address, shows it, and writes its text when it is empty, instead of drawing its own button. `cms({ pageLink: false })` turns the button off, and the hint cookie with it.
 
@@ -179,9 +179,9 @@ Drag the editor's inner edge, or focus it and press the arrow keys, to resize it
 
 What you type is kept in the browser, so a reload, a crash or a second tab brings it back with a note saying so. Save, Reset and Stop editing clear it. A draft is kept a week at most, and one made from an older copy of the entry than the saved one is left out with a note, so it never writes over a newer save. Reloading, closing the tab or following a link with changes not saved asks first.
 
-The admin also marks the browser with a `kcms_editor` cookie holding a digest of the person signed in, and drafts are kept under it, so another person on the same browser does not meet them. Signing out clears every kept draft.
+The admin also marks the browser with a `kcms_editor` cookie holding a digest of the person signed in, and drafts are kept under it, so another person on the same browser does not meet them. The cms Sign out button clears every kept draft. A guard that names nobody gives everyone the same digest.
 
-Stop editing clears every kept draft of the browser, but a draft left by a visit that ended another way stays until the week passes, and the edit cookie names no user, so on a browser several people sign in to, they should leave with Stop editing. Where the browser gives no storage, edits are only kept until the page closes.
+Stop editing clears every kept draft of the browser, but a draft left by a visit that ended another way, such as an expired session or your own sign-out, stays until the week passes under its owner's digest. Where the browser gives no storage, edits are only kept until the page closes.
 
 When the dev tool is docked to the right or the bottom, the editor sits beside it instead of under it. Clicking an element of the page scrolls it above the sheet when the sheet would hide it.
 

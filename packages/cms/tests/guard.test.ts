@@ -278,8 +278,8 @@ describe('the screens\' guard', () => {
 
     const [first, second] = [ann.cookies.get('kcms_editor'), bob.cookies.get('kcms_editor')]
 
-    expect(first).toMatch(/^[0-9a-f]{16}$/)
-    expect(second).toMatch(/^[0-9a-f]{16}$/)
+    expect(first).toMatch(/^[\w-]{22}$/)
+    expect(second).toMatch(/^[\w-]{22}$/)
     expect(first).not.toBe(second)
     expect(first).not.toContain('Ann')
   })

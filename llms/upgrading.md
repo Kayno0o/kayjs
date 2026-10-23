@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.72.0
 
+### kayjs-cms: the activity log needs the `delete` role
+
+With `cms({ roles })`, the activity screen answers 403 and its button is disabled for a person whose roles lack `delete`, as it names every editor. Add `delete` to the roles that read it. Drafts the on-page editor kept before are no longer offered, as they are kept per person now.
+
 ### An OAuth token bound to a resource works only under it
 
 A token the OAuth server issued for a `resource` (the `/mcp` an MCP client asks for) now passes only on requests to that path or under it, within its scopes, and is a 401 on the rest of the app, where it used to pass. The calls kay's `/mcp` endpoint dispatches to your tools count as made to `/mcp`. A client that needs your API with the same token asks for a resource covering it, such as the site root. A token asked for no resource, and one stored before the binding, work everywhere as before. `userFromToken(token)` refuses a bound token unless given the handshake's address as a second argument.

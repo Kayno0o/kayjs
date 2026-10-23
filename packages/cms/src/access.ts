@@ -2,7 +2,7 @@ import type { GuardContext } from 'kay'
 import type { Passwords } from './password'
 import type { Action } from './roles'
 import { localPath } from 'kay'
-import { READ_METHODS } from 'kay/library'
+import { keyedDigest, READ_METHODS } from 'kay/library'
 import { wording } from 'kay/words'
 import { authOf } from './auth-like'
 import { activePasswords, HOST_SESSION_COOKIE, LEGACY_SESSION_COOKIE, SESSION_COOKIE, sessionCookiesOf, signedInBy } from './password'
@@ -82,11 +82,11 @@ async function readMember(ctx: GuardContext): Promise<Member | undefined> {
   return { name: String(name ?? ''), held, email: typeof user.email === 'string' && user.email !== '' ? user.email : undefined }
 }
 
-// A digest naming the signed-in person, which tells two people on one browser apart without carrying their name or email; the same for every person a guard without a name admits.
+// A digest naming the signed-in person, keyed by the app's secret so a guessed email cannot be checked against it, which tells two people on one browser apart; the same for every person a guard without a name admits.
 export async function whoOf(ctx: GuardContext): Promise<string> {
   const member = await memberOf(ctx)
 
-  return new Bun.CryptoHasher('sha256').update(JSON.stringify([member?.name ?? '', member?.email ?? ''])).digest('hex').slice(0, 16)
+  return keyedDigest('cms-editor', JSON.stringify([member?.name ?? '', member?.email ?? '']))
 }
 
 // The actions the signed-in person may not do, each with the reason a disabled control gives; empty when the app lists no roles.
