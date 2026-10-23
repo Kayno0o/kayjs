@@ -3,6 +3,8 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { Database } from 'bun:sqlite'
 import { afterEach, describe, expect, it } from 'bun:test'
+import { Elysia } from 'elysia'
+import { extensionServers } from '../src/config'
 import { cached } from '../src/runtime/cache'
 import { memoryJobs, memoryRates, rateLimit } from '../src/server'
 import { appStore, setupStore } from '../src/server/app-store'
@@ -65,6 +67,19 @@ describe('the app-wide store', () => {
     expect(sqliteData('data/app.sqlite').database).toBe(`sqlite://${join(process.cwd(), 'data/app.sqlite')}`)
     expect(sqliteData(':memory:').database).toBeUndefined()
     expect(pgData('postgres://u:p@localhost:5432/app').database).toBe('postgres://u:p@localhost:5432/app')
+  })
+
+  it('hands the database of the config store to an extension server', async () => {
+    const path = join(await scratchDir('app-store'), 'app.sqlite')
+    let given: string | undefined
+
+    setupStore(sqliteData(path))
+    await extensionServers([{ name: 'probe', server: (app) => {
+      given = app.database
+
+      return new Elysia()
+    } }], process.cwd())
+    expect(given).toBe(`sqlite://${path}`)
   })
 
   it('creates no file until sqliteData is used', async () => {
