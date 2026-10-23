@@ -170,6 +170,96 @@ afterAll(async () => {
   await admin?.close()
 })
 
+// A writer holding the file's write lock while the move starts, so the move's read and write meet what that writer commits.
+function holdingWriteLock(path: string, table: string, change: { title: string, order?: number }): { locked: Promise<void>, committed: Promise<void> } {
+  const worker = new Worker(new URL('./hold-write-lock.worker.ts', import.meta.url))
+  const heard = async (what: string) => new Promise<void>((resolve) => {
+    worker.addEventListener('message', function listen(event: MessageEvent<string>) {
+      if (event.data !== what)
+        return
+
+      worker.removeEventListener('message', listen)
+      resolve()
+    })
+  })
+  const result = { locked: heard('locked'), committed: heard('committed').finally(() => worker.terminate()) }
+
+  worker.postMessage({ path, table, holdMs: 300, ...change })
+
+  return result
+}
+
+// A connection of its own to the file, waiting for another writer's lock as the loader does for a path.
+function connected(path: string): Database {
+  const db = new Database(path, { create: true })
+
+  db.run('PRAGMA busy_timeout = 5000')
+
+  return db
+}
+
+const swapped = [{ slug: 'a', data: { title: 'A', order: 2 }, expect: { field: 'order', was: 1 } }, { slug: 'b', data: { title: 'B', order: 1 }, expect: { field: 'order', was: 2 } }]
+
+describe('a move meeting a writer of another connection', () => {
+  test('sqlite waits for the commit of the writer and keeps its save, writing only the order', async () => {
+    const path = join(await scratchDir('loader-'), 'move.db')
+    const mine = sqliteLoader({ name: 'posts', table: 'moves', database: connected(path), seed })
+
+    await mine.load({ preview: false })
+
+    const writer = holdingWriteLock(path, 'moves', { title: 'A by someone else' })
+
+    await writer.locked
+    // The move's transaction waits for the writer's lock, then reads what it committed.
+    await mine.saveMany!(swapped)
+    await writer.committed
+    expect(await mine.get!('a', { preview: false })).toEqual({ slug: 'a', data: { title: 'A by someone else', order: 2 }, body: 'about a' })
+    expect((await mine.get!('b', { preview: false }))!.data).toEqual({ title: 'B', order: 1 })
+  })
+
+  test('sqlite refuses the move, and writes nothing, when the writer moved the entry', async () => {
+    const path = join(await scratchDir('loader-'), 'moved.db')
+    const mine = sqliteLoader({ name: 'posts', table: 'moves', database: connected(path), seed })
+
+    await mine.load({ preview: false })
+
+    const writer = holdingWriteLock(path, 'moves', { title: 'A', order: 5 })
+
+    await writer.locked
+    await expect(mine.saveMany!(swapped)).rejects.toBeInstanceOf(ContentChangedError)
+    await writer.committed
+    expect((await mine.get!('a', { preview: false }))!.data).toEqual({ title: 'A', order: 5 })
+    expect((await mine.get!('b', { preview: false }))!.data).toEqual({ title: 'B', order: 2 })
+  })
+
+  postgresTest('postgres waits for the open transaction on the row and keeps its save, writing only the order', async () => {
+    shared ??= new SQL(Object.assign(new URL(url), { pathname: `/${database}` }).href, { max: 4 })
+
+    const mine = pgLoader({ name: 'posts', table: 'moves_pg', sql: shared, seed })
+
+    await mine.load({ preview: false })
+
+    let moved = false
+    let move: Promise<void> | undefined
+    const moving = async () => {
+      await mine.saveMany!(swapped)
+      moved = true
+    }
+
+    await shared.begin(async (tx) => {
+      await tx.unsafe(`UPDATE moves_pg SET data = jsonb_set(data, '{title}', '"A by someone else"') WHERE collection = 'posts' AND place = 'a'`)
+      // The move starts while the row is held, and cannot finish before this transaction does.
+      move = moving()
+
+      await Bun.sleep(300)
+      expect(moved).toBe(false)
+    })
+    await move
+    expect(await mine.get!('a', { preview: false })).toEqual({ slug: 'a', data: { title: 'A by someone else', order: 2 }, body: 'about a' })
+    expect((await mine.get!('b', { preview: false }))!.data).toEqual({ title: 'B', order: 1 })
+  })
+})
+
 describe('as a collection', () => {
   test('reads the seeded entries through kay, typed from the schema', async () => {
     const posts = collection(sqliteLoader({ name: 'posts', database: ':memory:', seed }), { schema: s.Object({ title: s.String(), order: s.Optional(s.Number()) }), order: 'order' })
