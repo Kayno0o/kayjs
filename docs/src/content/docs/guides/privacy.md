@@ -37,9 +37,17 @@ Under a `base`, `kay_flash`, `kay_locale` and `kay_preview` are set for that pat
 | `sessionStorage` `kay_editor-refused` | kayjs-cms, for a signed-in visitor who is no editor | the tab's life |
 | `localStorage` `kcms:draft:<entry>` | kayjs-cms, an editor's unsaved draft | a week, dropped once saved |
 | `localStorage` under a name | a `persisted()` signal with `storage: 'local'` | until the app clears it |
-| Cache Storage `kay-w<version>` | the service worker, when `offline` is on | until the next build replaces it |
+| `localStorage` `kcms-editor` | kayjs-cms, the editor's panel position and size | until the editor clears it |
+| `localStorage` `kcms:rebuilding` | kayjs-cms, a save the site is still rebuilding for | until the rebuild ends |
+| `sessionStorage` under `remember` | kayjs-ai `Chat`, only when you name a key | the tab's life; the conversation's text, up to 200,000 characters |
+| `localStorage` under `listWidthKey` | kayjs-ui `SplitLayout`, only when you name a key | until the visitor clears it; the list's width |
+| Cache Storage `kay-w<version>` | the service worker, when `offline` is on | until `offline` is turned off or the worker's version changes |
 
-The first three are necessary for what the visitor or editor asked, so need no consent. The offline cache keeps only public pages and files, never one marked `private` or `no-store`, so nothing of a visitor.
+`kay-reloaded`, `kay_editor-refused`, `kcms:rebuilding` and the editor's draft are necessary for what the visitor or editor asked, so need no consent; the panel and list sizes are preferences they set.
+
+The offline cache keeps the pages `offline.pages` names (the public prerendered ones by default) and the files, and later only responses that are public: never one marked `private` or `no-store`. A page of `offline.pages` that holds a visitor's render is kept as it was served, so list only public ones.
+
+The conversation of a `remember` chat is what the visitor wrote, so tell them.
 
 ## What the server keeps
 
@@ -185,7 +193,7 @@ The page title is not sent unless you write `titles: true`, since a title can na
 
 ### Counting without asking
 
-Plausible, Umami, Simple Analytics and Matomo count at once, and kay shows a short information line with an `OK` button and an `Opt out` button. Opting out writes `kay_analytics=no`, and your server then passes on nothing for that visitor, on any page. Word it with `info: { text, ok, optOut }`, each a string or one per language. If your site already informs visitors and lets them object, write `info: false`.
+Plausible, Simple Analytics, Matomo and Umami on your own `host` count at once, and kay shows a short information line with an `OK` button and an `Opt out` button. Opting out writes `kay_analytics=no`, and your server then passes on nothing for that visitor, on any page. Word it with `info: { text, ok, optOut }`, each a string or one per language. If your site already informs visitors and lets them object, write `info: false`.
 
 The line reads in English, or in French on a page whose `lang` is `fr`; your own strings win over both.
 
@@ -219,7 +227,7 @@ Whichever tool you use, your privacy notice names it, what it is for and how lon
 | --- | --- | --- | --- |
 | Plausible, Umami or Matomo on your own server | The exemption above, or consent | You, with no third party | None to sign, and no transfer if your server is in the EU |
 | Plausible Cloud, Matomo Cloud, Simple Analytics | The same | A processor working for you | An agreement the provider offers, with an EU region available. Simple Analytics never gets a visitor's address from kay |
-| Umami Cloud | The same | A processor | An agreement the provider offers. Check its hosting region for a transfer |
+| Umami Cloud | Consent by default, or `consent: false` to count at once | A processor | An agreement the provider offers. Check its hosting region for a transfer |
 | Google Analytics | Consent, always | Google, a processor (and for some uses a controller) | Google's data processing terms, accepted in your account, and a US transfer under the Data Privacy Framework or standard clauses |
 | Fathom | Consent | A processor (Fathom Analytics, Canada) | An agreement the provider offers. Check the transfer to Canada |
 | Cloudflare Web Analytics | Consent | Cloudflare, a processor | Cloudflare's agreement in its customer terms, and a US transfer under the Data Privacy Framework or standard clauses |

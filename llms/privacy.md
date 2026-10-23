@@ -114,7 +114,11 @@ export async function archive(scan: File) {
 - `sessionStorage` `kay_editor-refused` (kayjs-cms): the sign-in value the editor check refused, so a signed-in visitor who is no editor costs one request per tab; necessary, the tab's life.
 - `localStorage` `kcms:draft:<entry>` (kayjs-cms): an editor's unsaved draft of an entry, whatever they typed; necessary for the editor who asked to keep it, a week, dropped once saved.
 - `localStorage` under the name of a `persisted(name, ..., { storage: 'local' })` signal, as the cookies above.
-- With `offline`, the service worker and its Cache Storage `kay-w<version>`: public pages and files that answered 200 without `private` or `no-store`, kept until the next build replaces the worker; necessary for the offline use the app turned on, and holding nothing of a visitor.
+- `localStorage` `kcms-editor` (kayjs-cms): where the editor's panel sits and how big it is; a preference, until the editor clears it.
+- `localStorage` `kcms:rebuilding` (kayjs-cms): the time of a save the site is still rebuilding for, so the notice shows in every tab; necessary, dropped when the rebuild ends.
+- `sessionStorage` under the `remember` key of kayjs-ai's `Chat` and `ChatLauncher` (none unless named): the conversation's text, up to 200,000 characters, what the visitor wrote included; the tab's life, nothing without `remember`.
+- `localStorage` under the `listWidthKey` of kayjs-ui's `SplitLayout` (none unless named): the list's width, a preference.
+- With `offline`, the service worker and its Cache Storage `kay-w<version>`: the pages `offline.pages` names (the public prerendered ones by default) and the files, and the public pages and files it fetched later that answered 200 without `private` or `no-store`; each copy changes with the build and the cache stays until `offline` is turned off or the worker's version changes. A page of `offline.pages` that holds a visitor's render is kept as it was served, so list only public ones.
 
 ### What the server keeps
 

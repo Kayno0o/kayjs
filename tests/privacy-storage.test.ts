@@ -9,7 +9,7 @@ const CALLED = /(?:new Bun\.Cookie|cookies\.set)\(\s*'([^']+)'/g
 // The value a constant such as `kay_analytics=yes` adds to the cookie's name.
 const VALUE = /=.*/
 // Names built from a template or by a helper, which no pattern above sees.
-const BUILT = ['ksteps_', 'kcms:draft:', 'kay_session', 'kay-w']
+const BUILT = ['ksteps_', 'kcms:draft:', 'kcms:rebuilding', 'kcms-editor', 'kay_editor-refused', 'kay_session', 'kay-w', 'remember', 'listWidthKey']
 
 async function sourceFiles(): Promise<string[]> {
   const found: string[] = []
@@ -55,7 +55,7 @@ describe('the privacy pages name every cookie and storage key', () => {
   for (const [label, file] of [['llms/privacy.md', 'llms/privacy.md'], ['the docs privacy page', 'docs/src/content/docs/guides/privacy.md']] as const) {
     it(`${label} lists each one`, async () => {
       const page = await Bun.file(join(root, file)).text()
-      const missing = [...await storedNames()].filter(([name]) => !page.includes(name)).map(([name, from]) => `${name} (${from})`)
+      const missing = [...await storedNames()].filter(([name]) => !new RegExp(`${RegExp.escape(name)}(?![\\w-])`).test(page)).map(([name, from]) => `${name} (${from})`)
 
       expect(missing).toEqual([])
     })

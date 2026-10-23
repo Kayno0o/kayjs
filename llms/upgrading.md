@@ -38,7 +38,7 @@ A server started with `NODE_ENV=development` outside `kay dev` no longer serves 
 A plain param value listed by `prerender` (a slug) holding `/`, `\` or a NUL is refused; only a catch-all keeps its slashes.
 ### `analytics({ provider: 'umami' })` on Umami Cloud asks for consent
 
-Umami without a `host` (or with `https://cloud.umami.is`) now waits for the visitor's yes like `ga4`, as Umami Cloud is a third party that gets the visitor's address. An app that counted Umami Cloud at once either keeps that with `consent: false`, which it answers for, or runs Umami itself and names it as `host`.
+Umami without a `host` (or with `https://cloud.umami.is`) now waits for the visitor's yes like `ga4`, as Umami Cloud is a third party that gets the visitor's address. An app that counted Umami Cloud at once either keeps that with `consent: false`, which it answers for, or runs Umami itself and names it as `host`. An `info` object on Umami Cloud is refused now, as on any provider that asks: word the notice with `consent` instead. No `deprecated` lint exists, as a default has no old form to recognise.
 
 ### kayjs-ui props take enum values: `variant`, `size` and `pixels`
 

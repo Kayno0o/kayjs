@@ -463,11 +463,21 @@ describe('consent by provider', () => {
     await asks({ provider: 'umami', websiteId: 'w', host: 'https://u.example', consent: true })
   })
 
-  it('forwards nothing to Umami Cloud before the yes', async () => {
-    const app = await site({ provider: 'umami', websiteId: 'w' })
+  it('forwards nothing to Umami Cloud before the yes, and one visit after it', async () => {
+    const forwarded = spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 202 }))
 
-    await send(app, visit())
-    expect(received).toEqual([])
+    try {
+      const app = await site({ provider: 'umami', websiteId: 'w' })
+
+      await send(app, visit())
+      expect(forwarded).not.toHaveBeenCalled()
+      await send(app, visit(), { cookie: 'kay_analytics=yes' })
+      expect(forwarded).toHaveBeenCalledTimes(1)
+      expect(String(forwarded.mock.calls[0]![0])).toStartWith('https://cloud.umami.is/api/send')
+    }
+    finally {
+      forwarded.mockRestore()
+    }
   })
 
   it('translates the information line, and leaves it out with info false or consent false and nothing to say', async () => {
