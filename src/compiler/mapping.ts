@@ -287,7 +287,7 @@ export class SourceMap {
     return exact && exact.generated + source - exact.source
   }
 
-  // The generated span from the first to the last of the code copied from a source span, where generated code may reorder it; undefined when none was.
+  // The generated span from the first to the last of the code copied from a source span, where generated code may reorder it; undefined when none was; a copy touching an edge counts, as a type hint sits right after a name.
   generatedHull(start: number, end: number): Span | undefined {
     let hull: Span | undefined
 

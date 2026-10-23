@@ -170,6 +170,10 @@ function fenceTokens(fence: ParsedFence, known: Categories, handed: Categories |
   const categoryOf = (path: NodePath<t.Identifier>): Category | undefined => {
     const binding = path.scope.getBinding(path.node.name)
 
+    // Babel gives a destructured `catch` parameter no binding.
+    if (binding === undefined && path.isBindingIdentifier())
+      return undefined
+
     if (binding === undefined)
       return known.get(path.node.name) ?? handed?.get(path.node.name)
 
@@ -256,7 +260,8 @@ function expressionTokens(source: string, span: Span, known: Categories, hidden:
 
   loadTraverse()(file, {
     Identifier(path) {
-      const category = hidden.has(path.node.name) || path.scope.getBinding(path.node.name) ? undefined : known.get(path.node.name)
+      // What the expression itself declares, a destructured `catch` parameter included, is never the file's.
+      const category = hidden.has(path.node.name) || path.isBindingIdentifier() || path.scope.getBinding(path.node.name) ? undefined : known.get(path.node.name)
 
       if (category && isNameSite(path))
         add({ start: span.start + path.node.start! - 1, end: span.start + path.node.end! - 1 }, category)

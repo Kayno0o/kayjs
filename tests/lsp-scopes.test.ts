@@ -41,6 +41,11 @@ describe('semantic tokens in template expressions', () => {
     expect(tokens(page(...head, 'p {(() => { try { run() } catch (count) { return count } })()}'))).toEqual(['1:6 count variable declaration,signal'])
   })
 
+  it('treats a destructured catch parameter as a binder', () => {
+    expect(tokens(page(...head, 'p {(() => { try { run() } catch ({ count }) { return count } })()}'))).toEqual(['1:6 count variable declaration,signal'])
+    expect(tokens(page(...head, 'p {(() => { try { run() } catch ([count]) { return count } })()}'))).toEqual(['1:6 count variable declaration,signal'])
+  })
+
   it('treats a nested function declaration and its parameters as binders', () => {
     expect(tokens(page(...head, 'p {[1].map(function count(count) { return count })}'))).toEqual(['1:6 count variable declaration,signal'])
   })
@@ -144,6 +149,10 @@ describe('the generated code of a source range', () => {
     expect(map.generatedHull(12, 32)).toEqual({ start: 20, end: 105 })
     expect(map.generatedHull(0, 60)).toEqual({ start: 20, end: 105 })
     expect(map.generatedHull(31, 52)).toEqual({ start: 21, end: 62 })
+  })
+
+  it('counts a copy touching an edge of the range, as a type hint sits right after a name', () => {
+    expect(map.generatedHull(15, 29)).toEqual({ start: 105, end: 105 })
   })
 
   it('is nothing for a range copying no code', () => {

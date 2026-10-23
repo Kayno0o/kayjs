@@ -1018,7 +1018,7 @@ export class KayLanguageServer {
       return []
 
     const wanted = { start: toOffset(document.source, params.range.start), end: toOffset(document.source, params.range.end) }
-    // The generated code of the range, a character further so a type following its last name is inside.
+    // The generated code of the range, with a character of slack.
     const generated = document.map.generatedHull(wanted.start, wanted.end)
 
     if (!generated)
