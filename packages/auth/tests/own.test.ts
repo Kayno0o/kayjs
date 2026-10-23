@@ -5,6 +5,7 @@ import type { OwnOptions } from '../src/own'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { Database } from 'bun:sqlite'
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { Elysia } from 'elysia'
 import { appModules, setSite } from 'kay/library'
@@ -37,8 +38,8 @@ afterEach(() => {
 type Options = OwnOptions<string, string>
 
 // What kay's `pages()` hands the server function: the root, and the app files the extension named.
-async function boot(extension: KayExtension, at = root, extensions: string[] = []): Promise<AnyElysia> {
-  return (extension.server as (app: unknown) => Promise<AnyElysia>)({ root: at, modules: await appModules(at, extension), extensions })
+async function boot(extension: KayExtension, at = root, extensions: string[] = [], database?: string): Promise<AnyElysia> {
+  return (extension.server as (app: unknown) => Promise<AnyElysia>)({ root: at, modules: await appModules(at, extension), extensions, database })
 }
 
 // The app an `auth()` with no module serves, the way kay's `pages()` mounts its server.
@@ -212,8 +213,8 @@ describe('found by convention', () => {
 })
 
 describe('the store', () => {
-  async function registerOn(options: Options) {
-    const plugin = await boot(auth({ captcha: false, ...options }))
+  async function registerOn(options: Options, database?: string) {
+    const plugin = await boot(auth({ captcha: false, ...options }), root, [], database)
     const app = new Elysia().use(plugin).post('/register', async (context) => {
       const { auth: current } = context as unknown as { auth: { register: (input: unknown) => Promise<unknown> } }
 
@@ -274,6 +275,70 @@ describe('the store', () => {
     }
 
     expect(existsSync(join(root, 'data/auth.db'))).toBe(true)
+  })
+
+  describe('inferred from the app\'s store', () => {
+    const shared = () => join(root, 'data/app.sqlite')
+
+    async function withAppTable() {
+      mkdirSync(join(root, 'data'))
+
+      const db = new Database(shared())
+
+      db.run('CREATE TABLE app_things (id text PRIMARY KEY)')
+      db.run('INSERT INTO app_things VALUES (\'kept\')')
+      db.close()
+    }
+
+    async function inDevelopment(run: () => Promise<void>) {
+      process.env.NODE_ENV = 'development'
+
+      try {
+        await run()
+      }
+      finally {
+        process.env.NODE_ENV = 'test'
+      }
+    }
+
+    function tables() {
+      const db = new Database(shared(), { readonly: true })
+      const names = db.query('SELECT name FROM sqlite_master WHERE type = \'table\'').all().map(row => (row as { name: string }).name)
+      const things = db.query('SELECT id FROM app_things').all()
+
+      db.close()
+
+      return { names, things }
+    }
+
+    test('keeps its tables in the database of the app\'s store, beside tables that are not its own', async () => {
+      await withAppTable()
+      await inDevelopment(async () => registerOn({}, `sqlite://${shared()}`))
+
+      expect(existsSync(join(root, 'data/auth.db'))).toBe(false)
+      expect(tables().names).toContain('kay_users')
+      expect(tables().things).toEqual([{ id: 'kept' }])
+    })
+
+    test('yields to the store option and to KAYJS_AUTH_DATABASE_URL', async () => {
+      await withAppTable()
+      await inDevelopment(async () => registerOn({ store: { url: 'sqlite://data/own.db' } }, `sqlite://${shared()}`))
+
+      process.env.KAYJS_AUTH_DATABASE_URL = 'sqlite://data/other.db'
+
+      await inDevelopment(async () => registerOn({}, `sqlite://${shared()}`))
+
+      expect(existsSync(join(root, 'data/own.db'))).toBe(true)
+      expect(existsSync(join(root, 'data/other.db'))).toBe(true)
+      expect(tables().names).not.toContain('kay_users')
+    })
+
+    test('stays in memory under test, so a test never writes into the app\'s database', async () => {
+      await withAppTable()
+      await registerOn({}, `sqlite://${shared()}`)
+
+      expect(tables().names).not.toContain('kay_users')
+    })
   })
 
   test('is in memory under test, so no file is kept between runs', async () => {

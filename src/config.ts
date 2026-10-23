@@ -29,6 +29,7 @@ import process from 'node:process'
 import { libraryMessageExtensions } from './build/manifests'
 import { KayError } from './compiler/errors'
 import { kayLog } from './runtime/log'
+import { appStore } from './server/app-store'
 import { bundled, importModule } from './server/bundle'
 import { publicEnvFiles } from './server/env-state'
 
@@ -419,6 +420,8 @@ export interface ExtensionApp {
   extensions: string[]
   // The cookies of the test site this app is built for, set by `testSite()` only: what a library tells that site by.
   testCookies?: Bun.CookieMap | undefined
+  // The database the app's `store` keeps its data in (`AppStore.database`), for an extension keeping tables of its own there.
+  database?: string | undefined
   modules: Record<string, Record<string, unknown> | undefined>
 }
 
@@ -503,7 +506,7 @@ export async function extensionServers(extensions: KayExtension[] | undefined, r
     if (serverModule !== undefined)
       return [(async () => ({ name, server: await serverFromModule(name, serverModule, root) }))()]
 
-    return server === undefined ? [] : [(async () => ({ name, server: typeof server === 'function' ? await server({ root: bundled() ? process.cwd() : root, modules: await appModules(root, extension), extensions: names, testCookies }) : server }))()]
+    return server === undefined ? [] : [(async () => ({ name, server: typeof server === 'function' ? await server({ root: bundled() ? process.cwd() : root, modules: await appModules(root, extension), extensions: names, testCookies, database: appStore()?.database }) : server }))()]
   }))
 }
 

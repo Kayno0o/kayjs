@@ -121,5 +121,5 @@ export function pgData(source: PgJobsSource) {
 
   const handle = pgHandle(db)
 
-  return { sessions: pgSessions(handle), cache: pgCache(handle), jobs: pgJobs(db), rates: pgRates(handle), rooms: pgRooms(handle), vitals: pgVitals(handle), live: pgLive(handle) } satisfies { [Kind in keyof AppStore]-?: NonNullable<AppStore[Kind]> } & { sessions: SessionStore & { deleteWhere: NonNullable<SessionStore['deleteWhere']> } }
+  return { sessions: pgSessions(handle), cache: pgCache(handle), jobs: pgJobs(db), rates: pgRates(handle), rooms: pgRooms(handle), vitals: pgVitals(handle), live: pgLive(handle), ...typeof source === 'string' && { database: source } } satisfies { [Kind in Exclude<keyof AppStore, 'database'>]-?: NonNullable<AppStore[Kind]> } & { sessions: SessionStore & { deleteWhere: NonNullable<SessionStore['deleteWhere']> } }
 }

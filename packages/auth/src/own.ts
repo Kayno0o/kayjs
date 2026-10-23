@@ -38,7 +38,7 @@ const PRESETS = {
 /** The hooks an app keeps in `src/auth.ts` as `export const hooks`, or hands to `auth({ hooks })`. */
 export type AuthHooks = Partial<Pick<AuthOptions<AuthSessionData, string>, 'allow' | 'authorize' | 'exportData' | 'locate' | 'onAuthEvent' | 'onDelete' | 'onSignUp' | 'profileFields'>>
 
-/** Where kayjs-auth keeps its data when `store` is left out: a pg-orm database at `url`, a SQLite file `data/auth.db` by default. */
+/** Where kayjs-auth keeps its data when `store` is left out: a pg-orm database at `url`, the database of the app's `store` in kay.config.ts when it names one, else a SQLite file `data/auth.db`. */
 export interface StoreUrl {
   url: string
 }
@@ -58,7 +58,7 @@ export interface OwnOptions<Role extends string = string, Prefix extends string 
   pages?: boolean | Pick<AuthPagesConfig, 'profile' | 'remember'> | undefined
   // Providers by the name their routes take: `{ github: true }` reads `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` (a preset: github, discord, google, microsoft or gitlab), an object adds options to a preset, and a full `OAuthApp` is an app of any provider.
   oauth?: Record<string, true | PresetApp | OAuthApp> | undefined
-  // The users' data: a pg-orm database at `{ url }`, the store itself, or a function building it. `data/auth.db` (SQLite) by default, or `KAYJS_AUTH_DATABASE_URL` when set.
+  // The users' data: a pg-orm database at `{ url }`, the store itself, or a function building it. `KAYJS_AUTH_DATABASE_URL` when set, else the database of the app's `store` (`sqliteData(path)`, `pgData(url)`), else `data/auth.db` (SQLite).
   store?: StoreOption | undefined
   // Mail for verification, resets and magic links. Left out, `src/mail.ts` exporting kayjs-mail's `mail` sends them; `false` sends none.
   email?: EmailOptions | false | undefined
@@ -84,7 +84,7 @@ export function ownEnv(options: Pick<OwnOptions, 'oauth' | 'store'>) {
   const names = Object.entries(options.oauth ?? {}).filter(([, app]) => isPreset(app) && (app === true || app.clientId === undefined || app.clientSecret === undefined)).map(([name]) => name)
 
   return s.Object({
-    ...options.store === undefined && { KAYJS_AUTH_DATABASE_URL: s.Optional(s.String({ description: 'the database kayjs-auth keeps its users in, a Postgres or SQLite url; data/auth.db (SQLite) when unset' })) },
+    ...options.store === undefined && { KAYJS_AUTH_DATABASE_URL: s.Optional(s.String({ description: 'the database kayjs-auth keeps its users in, a Postgres or SQLite url; the one of the app\'s store, else data/auth.db (SQLite), when unset' })) },
     ...Object.fromEntries(names.flatMap(name => [
       [`${name.toUpperCase()}_CLIENT_ID`, s.String({ description: `the ${name} OAuth app's client id`, requiredInProduction: true })],
       [`${name.toUpperCase()}_CLIENT_SECRET`, s.String({ description: `the ${name} OAuth app's client secret`, requiredInProduction: true })],
@@ -127,7 +127,12 @@ function underRoot(url: string, root: string): string {
   return file === undefined ? url : `sqlite://${resolve(root, file)}`
 }
 
-async function storeOf(store: StoreOption | undefined, root: string): Promise<AuthStore> {
+// Every table of the database that is not kayjs-auth's own, which sharing the app's database must leave alone: pg-orm's sync would drop them.
+function foreignTables(names: readonly string[]): RegExp {
+  return new RegExp(`^(?!(?:${names.join('|')})$)`)
+}
+
+async function storeOf(store: StoreOption | undefined, root: string, shared: string | undefined): Promise<AuthStore> {
   if (typeof store === 'function')
     return store()
 
@@ -135,11 +140,14 @@ async function storeOf(store: StoreOption | undefined, root: string): Promise<Au
     return store
 
   // An empty value, as .env.example lists it, is not a url.
-  const url = store?.url ?? filled(process.env.KAYJS_AUTH_DATABASE_URL)
+  const given = store?.url ?? filled(process.env.KAYJS_AUTH_DATABASE_URL)
 
   // Tests start from no users each run, as a file kept between them would not.
-  if (url === undefined && process.env.NODE_ENV === 'test')
+  if (given === undefined && process.env.NODE_ENV === 'test')
     return memoryAuthStore()
+
+  // The database of the app's own `store` when it names one, so `sqliteData` or `pgData(url)` in kay.config.ts is the only place to say where the data lives.
+  const url = given ?? shared
 
   let orm: typeof import('@kaynooo/pg-orm')
   let pg: typeof import('./pg')
@@ -154,7 +162,7 @@ async function storeOf(store: StoreOption | undefined, root: string): Promise<Au
 
   const db = new orm.Database({ url: underRoot(url ?? 'sqlite://data/auth.db', root), tables: [...pg.authTables] })
 
-  await db.sync()
+  await db.sync(url !== undefined && url === shared ? { ignoreTables: [foreignTables(pg.authTables.map(table => table.name))] } : undefined)
 
   return pg.pgStore(db)
 }
@@ -210,15 +218,15 @@ export async function buildOwn(options: OwnOptions, app: ExtensionApp): Promise<
   const hooks = loadHooks ? (await loadHooks()).hooks : conventionalHooks(app.modules.hooks)
   const mailer = await emailOf(email, app)
 
-  if (store === undefined && process.env.NODE_ENV === 'production' && filled(process.env.KAYJS_AUTH_DATABASE_URL) === undefined)
-    log.warn('auth() keeps its users in data/auth.db, a SQLite file: set KAYJS_AUTH_DATABASE_URL, or `store`, for a database that outlives a deploy')
+  if (store === undefined && app.database === undefined && process.env.NODE_ENV === 'production' && filled(process.env.KAYJS_AUTH_DATABASE_URL) === undefined)
+    log.warn('auth() keeps its users in data/auth.db, a SQLite file: set the app\'s `store` (`sqliteData` or `pgData`) in kay.config.ts, KAYJS_AUTH_DATABASE_URL, or auth\'s `store`, for a database that outlives a deploy')
 
   const made = createAuth({
     ...hooks,
     ...rest,
     ...prefix !== undefined && { prefix },
     sessions: session<AuthSessionData>(),
-    store: await storeOf(store, app.root),
+    store: await storeOf(store, app.root, app.database),
     ...oauth && { oauth: Object.fromEntries(Object.entries(oauth).map(([name, app]) => [name, appOf(name, app)])) },
     ...mailer && { email: mailer },
     pages: pages === false ? undefined : { prefix: prefix ?? '/auth', home: home ?? '/', ...typeof pages === 'object' && pages },

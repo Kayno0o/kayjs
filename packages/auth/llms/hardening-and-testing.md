@@ -30,24 +30,22 @@ const page = await site.submit(signIn, { identifier: 'ada@example.com', password
 
 ### Sign a test site in
 
-A test site signs in with one call, no form round trip: `await auth.signInAs(site, { email: 'ada@example.com', username: 'Ada' })` makes the member when no user has that email or username (`createUser`'s fields: `email`, `username`, `password`, `roles`, `emailVerified`, `locale`, and `data` for the fields of the app's `user` schema), signs an existing one in as they are (it throws when the email, username or data given differ from theirs, or a role given is one they lack), sets the session cookie in the site's cookie jar and returns the user. A second call switches member and `auth.signOut(site)` makes the site anonymous again, its other cookies kept. It goes through the store, so it works on `pgStore` as on `memoryAuthStore`. `auth` is the app's own `createAuth` result, so `kay/test` imports nothing of kayjs-auth and the app declares nothing.
-
-```ts
-import { auth } from '../src/auth'
-
-await auth.signInAs(site, { email: 'ada@example.com', username: 'Ada', emailVerified: true })
-expect((await site.visit('/auth/account')).status).toBe(200)
-auth.signOut(site)
-expect((await site.visit('/auth/account')).url).toBe('/auth/sign-in?redirect=%2Fauth%2Faccount')
-```
-
-An app whose kay.config.ts holds `auth()` and no `src/auth.ts` module has no `auth` to import: `authTest(site)` from `@kaynooo/kayjs-auth/test` is the same calls (`signInAs`, `signOut`, `sessionCookie`) on the auth that site's `testSite()` built (each site its own, whatever was built after), so call it after `testSite()`. `kay generate resource` writes its test with it.
+A test site signs in with one call, no form round trip. `authTest(site)` from `@kaynooo/kayjs-auth/test` is the auth that site's `testSite()` built (each site its own, so call it after `testSite()`), and `kay generate resource` writes its test with it:
 
 ```ts
 import { authTest } from '@kaynooo/kayjs-auth/test'
 
-await authTest(site).signInAs({ email: 'ada@example.com', username: 'Ada' })
+const as = authTest(site)
+
+await as.signInAs({ email: 'ada@example.com', username: 'Ada', emailVerified: true })
+expect((await site.visit('/auth/account')).status).toBe(200)
+as.signOut()
+expect((await site.visit('/auth/account')).url).toBe('/auth/sign-in?redirect=%2Fauth%2Faccount')
 ```
+
+`signInAs` makes the member when no user has that email or username (`createUser`'s fields: `email`, `username`, `password`, `roles`, `emailVerified`, `locale`, and `data` for the fields of the app's `user` schema), signs an existing one in as they are (it throws when the email, username or data given differ from theirs, or a role given is one they lack), sets the session cookie in the site's cookie jar and returns the user. A second call switches member and `signOut()` makes the site anonymous again, its other cookies kept. It goes through the store, so it works on `pgStore` as on `memoryAuthStore`.
+
+An app with a `src/auth.ts` module calls the same on its `auth` with the site first: `await auth.signInAs(site, { email })`, `auth.signOut(site)`, `await auth.sessionCookie(userId)`; `auth.test(site)` names the site once, as `authTest` does.
 
 ## Reference
 
@@ -57,7 +55,7 @@ await authTest(site).signInAs({ email: 'ada@example.com', username: 'Ada' })
 - `proofOfWork({ difficulty, maxAge, store, on })`: `difficulty` is 100,000 by default, doubled with each request past the threshold up to 16 times, and `maxAge` an hour; `store` keeps the solutions already used, this process's memory by default, `sqliteRates(path)` from `kay/server` sharing them between processes; `on` asks registering, resets and magic links always, a password sign-in from the third attempt, and a guest sign-in never, which an app often makes with no form.
 - `await auth.captchaChallenge(action)` is the challenge for this client's next request, null when none is needed or the CAPTCHA is a third party's. A form carries it as `input(type="hidden" name="captcha" data-kay-work={challenge})`, kay's script posts its solution as the field's value, and the action passes it on as the token below; the prebuilt pages do, naming the field `kayjs-captcha`.
 - A browser without JavaScript posts the field empty, refused as `'captcha'`, and so does a form kay's script leaves to the browser (`navigation: false` with no island, `data-reload`, a `target`); the prebuilt pages then say JavaScript is needed, and that a stale solution should be sent again, and set a honeypot and a two-second `minTime` on their forms for the requests a post without JavaScript still reaches.
-- Upgrading from a kayjs-auth without it: the app's own register, reset and magic-link forms carry the field, or the app sets `captcha: false`. A client kay's script does not run in, a plain Elysia app's own pages, a mobile app or a SPA calling the API, has no solver: it sets `captcha: false` or a third party's check. A test calling `auth.register()` directly passes `captcha: false` to the auth it builds. A custom `verify` is now given `'guest'` for `signInAsGuest`, `'register'` before. A test posts from the page it visited, `site.submit(register, fields, { from: await site.visit('/register') })`, which `site.submit` solves the field of.
+- The app's own register, reset and magic-link forms carry the field, or the app sets `captcha: false`. A client kay's script does not run in, a plain Elysia app's own pages, a mobile app or a SPA calling the API, has no solver: it sets `captcha: false` or a third party's check. A test calling `auth.register()` directly passes `captcha: false` to the auth it builds. A custom `verify` is given `'guest'` for `signInAsGuest`. A test posts from the page it visited, `site.submit(register, fields, { from: await site.visit('/register') })`, which `site.submit` solves the field of.
 - What the provider sees: `turnstile(secret)` and `hcaptcha(secret)` send the provider's siteverify only the secret and the token, never an address, email or user, from the server. The widget runs in the visitor's browser, which loads the provider's script (`challenges.cloudflare.com`, `js.hcaptcha.com`) and talks to it directly, so the provider receives the visitor's address, browser and cookies there: say so in the site's privacy notice and consent flow. kay's proof of work calls no third party.
 - `captcha.verify(token, action, { hostname })` checks the token the page's widget posted, `hostname` being the site's own from `site`, for `action` one of `'register'`, `'guest'`, `'sign-in'`, `'reset'` and `'magic-link'`. `turnstile(secret)` and `hcaptcha(secret)` are presets calling the provider's siteverify; their widgets post the token as `cf-turnstile-response` and `h-captcha-response`, which the action passes on. The presets refuse a token the provider says was made for another hostname, and Turnstile one made for another action (the prebuilt pages' widgets set `data-action`; a widget with none passes). The documented test secrets of both providers skip these two checks, as their answers name a hostname and action of their own.
 - The token goes in the trailing options object of `register(input, { captcha })`, `signInWithPassword(input, { captcha })`, `requestPasswordReset(email, { captcha })` and `requestMagicLink(email, { captcha })`. A missing or refused token answers `{ ok: false, error: 'captcha' }`, and so does a `verify` that throws. The request still counts against the client's limit.
@@ -88,8 +86,6 @@ Attempts are counted in the store, so every process shares them, per client addr
 The prebuilt pages' actions import as `@kaynooo/kayjs-auth/pages/<page>.kay`, such as `import { password } from '@kaynooo/kayjs-auth/pages/sign-in.kay'` and `import { changeUsername } from '@kaynooo/kayjs-auth/pages/account/index.kay'`, and a test submits them as it does its own; the sign-out button, a post to `/auth/sign-out`, a test makes with `site.fetch('/auth/sign-out', { method: 'POST' })`. `kay check` types such a module's named exports as the file declares them, so the test imports an action without a cast (`examples/noticeboard/tests/pages.ts` re-exports them).
 
 A test needing a signed-in request without going through a form takes `await auth.sessionCookie(userId)`, the `Cookie` header of a new session signed in as that user, as `signIn` makes it, against the app's own auth, to send by hand: `app.handle(new Request(url, { headers: { cookie } }))`. It mints `kay_session`, which a request over http reads; one over https (directly or with `x-forwarded-proto: https`) reads `__Host-kay_session` alone, so it mints the one the app reads from a request with no `x-forwarded-proto`: `__Host-kay_session` in production when kay.config.ts `site` is https, else `kay_session`. `auth.sessionCookie(userId, { secure: true })` asks for `__Host-kay_session` (`secure: false` for `kay_session`), as for a request sent over https in a test, or a site with no `site` behind a proxy sending `x-forwarded-proto: https`.
-
-`auth.test(site)` names the site once: `const as = auth.test(site)`, then `await as.signInAs({ email })`, `as.signOut()` and `await as.sessionCookie(userId)`, the same calls as above without the `site` argument.
 
 Each `testSite` keeps its own cookies, one browser each. `memoryAuthStore()` keeps each test's users apart, and a mailer pushing into an array hands the test the links it would have mailed, `url` included; with kayjs-mail, its `outbox` holds what was sent.
 

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'bun:test'
 import { cached } from '../src/runtime/cache'
 import { memoryJobs, memoryRates, rateLimit } from '../src/server'
 import { appStore, setupStore } from '../src/server/app-store'
+import { pgData } from '../src/server/pg-data'
 import { defaultJobStore } from '../src/server/queue'
 import { sqliteData } from '../src/server/sqlite-data'
 import { testSite } from '../src/test'
@@ -58,6 +59,12 @@ describe('the app-wide store', () => {
     expect(defaultJobStore()).toBe(jobs)
     setupStore(undefined)
     expect(defaultJobStore()).not.toBe(jobs)
+  })
+
+  it('names its database for a library keeping tables there, as an absolute url', () => {
+    expect(sqliteData('data/app.sqlite').database).toBe(`sqlite://${join(process.cwd(), 'data/app.sqlite')}`)
+    expect(sqliteData(':memory:').database).toBeUndefined()
+    expect(pgData('postgres://u:p@localhost:5432/app').database).toBe('postgres://u:p@localhost:5432/app')
   })
 
   it('creates no file until sqliteData is used', async () => {

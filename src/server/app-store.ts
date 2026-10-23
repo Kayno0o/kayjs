@@ -18,6 +18,8 @@ export interface AppStore {
   rates?: RateStore | undefined
   rooms?: RoomStore | AsyncRoomStore | undefined
   vitals?: VitalsStore | undefined
+  // The url of the database these stores keep their data in, `sqlite:///abs/path` for `sqliteData` and the url `pgData` was given, for a library keeping tables of its own there: kayjs-auth keeps its users in it. Left out for a store built by hand, and for `pgData` given a connection.
+  database?: string | undefined
 }
 
 let current: AppStore | undefined
