@@ -20,11 +20,11 @@ import { wording } from 'kay/words'
 import { today } from '../datetime'
 import { blockOf, checkField, emptyBlock, emptyValue, htmlPattern, isCompact, itemAt, itemTitle } from '../fields'
 import { fieldId, joinPath, siblingPath } from '../paths'
+import { setImageSize } from './image-value'
 import { followFolds } from './folds'
 import { markdownOptions } from './markdown-options'
 import { previewMarkdown } from './preview'
 import { referenceChoices } from './references'
-import { sizeOfPath } from '../upload-text'
 import Adorned from './adorned.kay'
 import ReadyInput from './ready-input.kay'
 import DatetimeInput from './datetime-input.kay'
@@ -372,24 +372,10 @@ function setAlt(text: string): void {
     drafts.set(entry, siblingPath(path, alt.key), text === '' ? undefined : text)
 }
 
-// The file set, and the size of an image beside it when the schema keeps one: the upload's answer, else the size kay's storage put in the name of a file picked or typed; a path with none leaves no size behind that would describe the old image.
+// The file set, and the size of an image beside it.
 function setFile(next: string, uploaded?: { width: number, height: number }): void {
-  const size = uploaded ?? sizeOfPath(next)
-
   set(next)
-
-  if (field.kind !== 'image')
-    return
-
-  // The alt text described the image that went.
-  if (next === '' && field.upload?.alt !== undefined)
-    drafts.set(entry, siblingPath(path, field.upload.alt.key), undefined)
-
-  if (field.upload?.width !== undefined)
-    drafts.set(entry, siblingPath(path, field.upload.width.key), size?.width)
-
-  if (field.upload?.height !== undefined)
-    drafts.set(entry, siblingPath(path, field.upload.height.key), size?.height)
+  setImageSize(drafts, entry, path, field, next, uploaded)
 }
 
 // The draft takes each text that parses as it is typed; one that does not keeps the last value and stops the save until it is fixed.

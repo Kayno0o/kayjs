@@ -14,7 +14,7 @@ export default defineConfig({ preview: { secret: env.PREVIEW_SECRET }, extension
 
 ### Make a field editable on the page
 
-Render the entry's field as usual: kay marks the element itself in edit mode, so a click opens the field in the editor, or types in it where it stands: a text, a long text and a paragraph, heading or list item of Markdown ([Typing on the page](screens.md)).
+Render the entry's field as usual: kay marks the element itself in edit mode, so a click opens the field in the editor, or types in it where it stands: a text, a long text and a paragraph, heading or list item of Markdown ([Typing on the page](screens.md)). An image field rendered in an attribute (`<img src>`) gets a Replace button over it under the pointer or the focus, and takes a file dropped on it (`page-images.ts`, `page-image-tools.kay`): the file goes through `uploadFile`, the draft takes its path and, when the field keeps them, its size (`image-value.ts`), and a refusal is toasted.
 
 ```kay
 h1 {post.data.title}

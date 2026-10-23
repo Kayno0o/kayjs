@@ -1,0 +1,36 @@
+---
+import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+import replace from '~icons/tabler/photo-up'
+import { wording } from 'kay/words'
+import type { ImageBar } from './page-images'
+import './editor.css'
+
+// The button over the image of the page under the pointer or the focus, which picks a file to put in its place.
+const { bar, onPick } = props<{ bar: ImageBar | undefined, onPick: (bar: ImageBar, file: File) => void }>()
+
+let picker: HTMLInputElement | undefined
+// The image the picker was opened for, as the bar goes when the pointer leaves the image for the file dialog.
+let chosen: ImageBar | undefined
+
+function choose(): void {
+  chosen = bar
+  picker?.click()
+}
+
+function picked(): void {
+  const [file] = picker?.files ?? []
+
+  if (chosen && file)
+    onPick(chosen, file)
+
+  chosen = undefined
+
+  if (picker)
+    picker.value = ''
+}
+---
+.kcms-page-images
+  if bar
+    .kcms-image-bar(data-kcms-image-bar style={bar.style})
+      IconButton(icon={replace} label={wording('cms.pageImage.replace', 'Replace {field}', { field: bar.label })} variant="ghost" size="sm" onClick={choose})
+  input(type="file" hidden accept={bar?.accept ?? chosen?.accept ?? 'image/*'} ref={element => picker = element} onChange={picked})

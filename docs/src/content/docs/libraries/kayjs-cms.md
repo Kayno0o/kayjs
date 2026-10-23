@@ -131,6 +131,10 @@ Delete asks first, names the entries that refer to this one, and locks the form 
 
 If you decline to leave because other entries hold edits not saved, the form is replaced by a notice with a link to that screen. A save started while the Delete confirmation is open leaves it open, with its confirm button disabled until the save ends.
 
+### Replacing an image on the page
+
+While you edit, point at an image the page shows from an image field, or Tab to it, and a Replace button appears over its top right corner. It picks a file, uploads it as the field's own upload does and swaps it in the draft, with its width and height when the field keeps them. A file dragged from your computer onto the image does the same. A refused file is toasted with its reason and the image stays as it was. The page needs nothing: it renders the field as usual.
+
 ### Typing on the page
 
 Click a text on the page and type in it where it stands, with no form to find. The text is edited as plain text: what you type or paste stays text, never markup, and in a one-line text a line break becomes a space. Enter keeps the text and ends the edit, as does a click elsewhere, and Escape puts back the text from before. Switching to another window does not end it.

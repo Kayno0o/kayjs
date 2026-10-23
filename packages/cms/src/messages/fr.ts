@@ -375,6 +375,10 @@ export default defineMessages({
       edit: 'Modifier cette page',
       enterMessage: 'Un autre site vous a envoyé ici. Ouvrir la page en mode édition ?',
     },
+    pageImage: {
+      replace: 'Remplacer {field}',
+      replaced: '{field} remplacé',
+    },
     pageList: {
       actions: 'Que faire de {item} ?',
       add: 'Ajouter à {list}',

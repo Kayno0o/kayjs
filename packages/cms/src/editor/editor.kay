@@ -33,9 +33,12 @@ import { drafts } from './drafts'
 import { rebuilding, watchRebuild } from './rebuild'
 import { notePlace } from './caret'
 import { forgetOpened } from './opened'
+import { replaceImage, watchImages } from './page-images'
+import type { ImageBar } from './page-images'
 import { saveAll } from './save-all'
 import { shipWords } from './words'
 import EntrySlot from './entry-slot.kay'
+import PageImageTools from './page-image-tools.kay'
 import PageListTools from './page-list-tools.kay'
 import './editor.css'
 
@@ -427,6 +430,18 @@ effect(() => {
     watched.destroy()
     lists = undefined
   })
+})
+
+// The button over the image of the page under the pointer or the focus, and the drop of a file on one.
+const imageBar = signal<ImageBar>()
+
+effect(() => {
+  if (!open() || browsing())
+    return
+
+  const watched = watchImages(drafts, found => imageBar = found, (bar, file) => void replaceImage(drafts, bar, file))
+
+  onCleanup(watched.destroy)
 })
 
 // The bars follow the drafts: a form that has loaded names its lists, and an edit changes their length.
@@ -824,6 +839,7 @@ SidePanel.kcms-editor(open={open()} modal={false} dock={dock() === 'bottom' ? 'b
 // Keyed by the question, so a choice that asks another one mounts a menu that opens afresh.
 for question of asked() key={question}
   Menu(id={MARKER_MENU} label={question.label} at={{ x: question.x, y: question.y }} open items={question.choices.map(choice => ({ label: choice.label, onSelect: choice.run }))} onOpenChange={shown => !shown && choosing() === question && (choosing = undefined)})
+PageImageTools(bar={imageBar()} onPick={(bar, file) => void replaceImage(drafts, bar, file)})
 PageListTools(bars={settling() ? [] : bars()} onMove={(bar, direction) => moveOne(bar.target, bar.index!, direction)} onAdd={(bar, event) => addTo(bar.target, bar.index === undefined ? 0 : bar.index + 1, { event })} onRemove={bar => removeOne(bar.target, bar.index!)})
 Toaster
 TooltipHost

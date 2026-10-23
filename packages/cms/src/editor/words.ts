@@ -126,6 +126,8 @@ export const AFTER_LOAD: readonly string[] = [
   'cms.media.renamed',
   'cms.missing.dismissFailure',
   'cms.missing.dismissed',
+  'cms.pageImage.replace',
+  'cms.pageImage.replaced',
   'cms.pageList.add',
   'cms.pageList.addAfter',
   'cms.pageList.caption',
