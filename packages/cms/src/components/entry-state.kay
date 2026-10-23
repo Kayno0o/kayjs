@@ -40,4 +40,4 @@ if deletable
   if denied.delete !== undefined
     Refused(label={wording('cms.bulk.delete', 'Delete')} reason={denied.delete} tone="danger")
   else
-    ConfirmDelete(message={deleteMessage(title, url, 'entry', referrers)} onOpen={onAskReferrers} disabled={saving} failure={wording('cms.save.deleteFailure', 'Could not delete')} trigger="button" onConfirm={onRemove})
+    ConfirmDelete(message={deleteMessage(title, url, 'entry', referrers)} onOpenChange={open => open && onAskReferrers()} disabled={saving} failure={wording('cms.save.deleteFailure', 'Could not delete')} trigger="button" onConfirm={onRemove})

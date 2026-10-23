@@ -8,7 +8,7 @@ const WIDTH = { default: 260, min: 180, max: 560, step: 20 }
 
 const look = recipe({ parts: { root: 'kui-split-layout', sidebar: 'kui-split-layout-sidebar', sidebarHead: 'kui-split-layout-sidebar-head', sidebarTitle: 'kui-split-layout-sidebar-title', sidebarBody: 'kui-split-layout-sidebar-body', list: 'kui-split-layout-list', listHead: 'kui-split-layout-list-head', resizer: 'kui-split-layout-resizer', detail: 'kui-split-layout-detail', detailHead: 'kui-split-layout-detail-head' } })
 
-const { list, detail, listHead, detailHead, sidebar, sidebarTitle = '', detailOpen = false, sidebarOpen = false, onSidebarClose, resizableList = false, listWidthKey, resizeLabel = wording('ui.splitLayout.resize', 'Resize list'), backLabel = wording('ui.splitLayout.back', 'Back'), style, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'style' | 'children'> & {
+const { list, detail, listHead, detailHead, sidebar, sidebarTitle = '', detailOpen = false, sidebarOpen = false, onSidebarOpenChange, onSidebarClose, resizableList = false, listWidthKey, resizeLabel = wording('ui.splitLayout.resize', 'Resize list'), backLabel = wording('ui.splitLayout.back', 'Back'), style, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'style' | 'children'> & {
   list: Snippet
   detail: Snippet
   listHead?: Snippet
@@ -18,8 +18,10 @@ const { list, detail, listHead, detailHead, sidebar, sidebarTitle = '', detailOp
   sidebarTitle?: string | undefined
   // Below `md`, whether the detail pane takes the list's place.
   detailOpen?: boolean | undefined
-  // Below `md`, whether the sidebar covers the layout; its back button calls `onSidebarClose` for the parent to set it back to false.
+  // Below `md`, whether the sidebar covers the layout; its back button calls `onSidebarOpenChange(false)` for the parent to set it back to false.
   sidebarOpen?: boolean | undefined
+  onSidebarOpenChange?: ((open: boolean) => unknown) | undefined
+  // The name `onSidebarOpenChange` replaced in 1.72, dropped in 1.75.
   onSidebarClose?: (() => unknown) | undefined
   // A handle on the list's right edge, from `md` up, dragged or moved with the arrow keys.
   resizableList?: boolean | undefined
@@ -31,6 +33,11 @@ const { list, detail, listHead, detailHead, sidebar, sidebarTitle = '', detailOp
 }>()
 
 const listWidth = signal(WIDTH.default)
+
+function closeSidebar() {
+  onSidebarOpenChange?.(false)
+  onSidebarClose?.()
+}
 
 function clampWidth(px: number): number {
   return Math.min(WIDTH.max, Math.max(WIDTH.min, px))
@@ -102,7 +109,7 @@ div(part="root" {...rest} style={`--kui-split-list-width: ${listWidth()}px;${sty
   if sidebar
     aside(part="sidebar")
       div(part="sidebarHead")
-        IconButton(icon="back" label={backLabel} variant="ghost" size="lg" onClick={() => onSidebarClose?.()})
+        IconButton(icon="back" label={backLabel} variant="ghost" size="lg" onClick={closeSidebar})
         span(part="sidebarTitle") {sidebarTitle}
       div(part="sidebarBody")
         | {sidebar}

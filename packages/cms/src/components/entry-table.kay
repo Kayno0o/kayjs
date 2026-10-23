@@ -161,7 +161,7 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf} sort={sort} serv
         if actions.has('delete') && denied.delete !== undefined
           Refused(icon="delete" label={wording('cms.table.delete', 'Delete {title}', { title: row.title })} reason={denied.delete} size="sm" variant="ghost")
         else if actions.has('delete')
-          ConfirmDelete(message={deleteMessage(row.title, row.url, 'table', referrers()[row.slug])} onOpen={() => askReferrers(row)} label={wording('cms.table.delete', 'Delete {title}', { title: row.title })} failure={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={() => remove(row)})
+          ConfirmDelete(message={deleteMessage(row.title, row.url, 'table', referrers()[row.slug])} onOpenChange={open => open && askReferrers(row)} label={wording('cms.table.delete', 'Delete {title}', { title: row.title })} failure={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={() => remove(row)})
   @empty
     if searched
       EmptyState(title={wording('cms.table.noMatch', 'No match')} description={wording('cms.table.noMatchHint', 'No entry matches the search and the filter.')})

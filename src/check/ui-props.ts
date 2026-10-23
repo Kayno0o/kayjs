@@ -9,12 +9,26 @@ import { analyzeScript, analyzeServer } from '../compiler/script'
 
 const KAY_ONLY = /\.kay$/
 
-// A prop of a kayjs-ui component renamed in 1.70: the component's file under `@kaynooo/kayjs-ui/`, the old and the new name, and why the new one is the one the other components use.
-const RENAMES = [
-  { component: 'select.kay', from: 'loading', to: 'busy', because: 'a control waiting on work is `busy` across kayjs-ui' },
-] as const
+// A prop of a kayjs-ui component renamed since 1.70: the component's file under `@kaynooo/kayjs-ui/`, the old and the new name, the minor that renamed it, and why the new one is the one the other components use.
+// `fix` is how far the rename is safe: `rename` always, `bare-arrow` only for a handler written `() => ...`, which ignores the argument the new prop passes, and `none` for a prop whose calls changed, where the lint only reports.
+const RENAMES: readonly Rename[] = [
+  { component: 'select.kay', from: 'loading', to: 'busy', since: '1.70', fix: 'rename', because: 'a control waiting on work is `busy` across kayjs-ui' },
+  { component: 'confirm-delete.kay', from: 'onOpen', to: 'onOpenChange', since: '1.72', fix: 'none', because: 'an open state is reported by `onOpenChange(open)` across kayjs-ui, which also tells when it closes: write `onOpenChange={open => open && ...}` to keep running on opening only' },
+  { component: 'split-layout.kay', from: 'onSidebarClose', to: 'onSidebarOpenChange', since: '1.72', fix: 'bare-arrow', because: 'an open state is reported by `onOpenChange(open)` across kayjs-ui, here with `false` when the back button closes the sidebar' },
+]
 
-// The props kayjs-ui components took under their old names before 1.70, as a tag writes them.
+interface Rename {
+  component: string
+  from: string
+  to: string
+  since: string
+  fix: 'rename' | 'bare-arrow' | 'none'
+  because: string
+}
+
+const BARE_ARROW = /^\(\s*\)\s*=>/
+
+// The props kayjs-ui components took under their old names before the minor that renamed them, as a tag writes them.
 // A tag is found through the default import of the component's file from the library; a tag spreading its props, or a component imported under a path of its own, is not read.
 export async function renamedUiProps(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   const level = lintLevel('deprecated-ui-prop', options.lints)
@@ -32,41 +46,42 @@ export async function renamedUiProps(root: string, options: CheckOptions): Promi
 
     const parsed = parseKay(source)
     const levelAt = lintLevels(source, options.lints)
-    const tags = new Map<string, (typeof RENAMES)[number]>()
+    const tags = new Map<string, Rename[]>()
 
     for (const binding of [...analyzeScript(source, parsed.script, [], [], parsed.module).imports, ...analyzeServer(source, parsed.server)?.imports ?? []]) {
-      const rename = binding.imported === 'default' ? RENAMES.find(candidate => binding.source === `@kaynooo/kayjs-ui/${candidate.component}`) : undefined
+      const renames = binding.imported === 'default' ? RENAMES.filter(candidate => binding.source === `@kaynooo/kayjs-ui/${candidate.component}`) : []
 
-      if (rename)
-        tags.set(binding.local, rename)
+      if (renames.length > 0)
+        tags.set(binding.local, renames)
     }
 
     for (const element of elementsIn(parsed.template)) {
-      const rename = element.component ? tags.get(element.name) : undefined
+      const renames = element.component ? tags.get(element.name) : undefined
 
-      if (!rename)
+      if (!renames)
         continue
 
       const named = (name: string) => element.attributes.filter((attribute): attribute is Exclude<Attribute, { kind: 'spread' }> => attribute.kind !== 'spread' && source.slice(attribute.name.start, attribute.name.end) === name)
 
-      for (const attribute of named(rename.from)) {
+      for (const { rename, attribute } of renames.flatMap(rename => named(rename.from).map(attribute => ({ rename, attribute })))) {
         const here = levelAt('deprecated-ui-prop', attribute.name.start)
 
         if (here === 'allow')
           continue
 
         const taken = named(rename.to).length > 0
+        const safe = rename.fix === 'rename' || (rename.fix === 'bare-arrow' && attribute.kind === 'expression' && !attribute.shorthand && BARE_ARROW.test(source.slice(attribute.expression.start, attribute.expression.end)))
         const text = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: `${rename.to}={${rename.from}}` } : { ...attribute.name, text: rename.to }
 
         found.push({
           file,
           ...positionAt(source, attribute.name.start),
           end: attribute.name.end,
-          message: `\`${rename.from}\` of \`${element.name}\` is \`${rename.to}\` since 1.70, as ${rename.because}`,
-          help: `write \`${rename.to}\` for \`${rename.from}\``,
+          message: `\`${rename.from}\` of \`${element.name}\` is \`${rename.to}\` since ${rename.since}, as ${rename.because}`,
+          help: `write \`${rename.to}\` for \`${rename.from}\`${rename.fix === 'rename' ? '' : ', which also reports closing: read its `open` argument'}`,
           code: 'deprecated-ui-prop',
           severity: here === 'warn' ? 'warning' : 'error',
-          ...!taken && { fixes: [{ title: `Use ${rename.to}`, edits: [{ start: text.start, end: text.end, text: text.text }], safe: true }] },
+          ...!taken && safe && { fixes: [{ title: `Use ${rename.to}`, edits: [{ start: text.start, end: text.end, text: text.text }], safe: true }] },
         })
       }
     }

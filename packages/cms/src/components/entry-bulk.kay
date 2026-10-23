@@ -72,4 +72,4 @@ else if actions.has('unpublish') && drafts() && fitting('unpublish').length > 0
 if actions.has('delete') && denied.delete !== undefined
   Refused(label={wording('cms.bulk.delete', 'Delete')} reason={denied.delete} tone="danger")
 else if actions.has('delete')
-  ConfirmDelete(trigger="button" label={wording('cms.bulk.delete', 'Delete')} message={bulkDeleteMessage(rows.length, referrers())} onOpen={askReferrers} failure={wording('cms.save.deleteFailure', 'Could not delete')} onConfirm={() => run('delete')})
+  ConfirmDelete(trigger="button" label={wording('cms.bulk.delete', 'Delete')} message={bulkDeleteMessage(rows.length, referrers())} onOpenChange={open => open && askReferrers()} failure={wording('cms.save.deleteFailure', 'Could not delete')} onConfirm={() => run('delete')})

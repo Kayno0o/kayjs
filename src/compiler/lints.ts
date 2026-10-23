@@ -661,7 +661,7 @@ export const LINTS = {
     group: 'deprecated',
     since: '1.70',
     site: true,
-    summary: 'A prop of a kayjs-ui component under its old name: `loading` of `Select`, which is `busy` since 1.70, as a control waiting on work is busy across kayjs-ui. The old name works three minors. The tag is found through the default import of the component from `@kaynooo/kayjs-ui/` in the project\'s `.kay` files, and the fix renames the prop, unless the new name is given beside it.',
+    summary: 'A prop of a kayjs-ui component under its old name: `loading` of `Select`, which is `busy` since 1.70, as a control waiting on work is busy across kayjs-ui; `onOpen` of `ConfirmDelete` and `onSidebarClose` of `SplitLayout`, which are `onOpenChange` and `onSidebarOpenChange` since 1.72, called with the open state as Dialog\'s is. The old name works three minors. The tag is found through the default import of the component from `@kaynooo/kayjs-ui/` in the project\'s `.kay` files, and the fix renames the prop, unless the new name is given beside it. `onOpen` is only reported, as `onOpenChange` is called on closing too, and `onSidebarClose` is renamed only where the handler is written `() => ...`, which ignores the argument.',
     wrong: 'Select(value={size} options={sizes} loading={sizes.length === 0})',
     right: 'Select(value={size} options={sizes} busy={sizes.length === 0})',
   },

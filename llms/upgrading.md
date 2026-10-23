@@ -29,6 +29,10 @@ RadioGroup, Segmented, Rating, Slider, ColorInput, DateInput, DateRangeInput, Co
 
 A `ui.*` or `cms.*` key ended in `Label` (`ui.table.filterLabel`, `cms.admin.searchLabel`); it is now the bare name, `ui.table.filter`, as kayjs-ai's are, and the components' props keep their names. The fourteen keys that met a visible text of the same name end in `Aria` instead (`cms.table.moveUpAria`), `cms.history.restoreLabel` is `cms.history.restoreButton` and `ui.markdownEditor.previewLabel` joins `ui.markdownEditor.preview`. A catalog still wording the old key keeps winning until 1.75, and `deprecated-message-key` reports it in `src/messages/<locale>.ts`; `kay upgrade` renames the keys.
 
+### kayjs-ui reports an open state with `onOpenChange`
+
+`ConfirmDelete(onOpen)` is `onOpenChange`, called with `true` when the trigger is pressed and with `false` once the dialog or the armed pair goes, as Dialog's is, so `onOpen={ask}` becomes `onOpenChange={open => open && ask()}`. `SplitLayout(onSidebarClose)` is `onSidebarOpenChange`, called with `false` when the back button closes the sidebar. The old names work until 1.75, and `deprecated-ui-prop` reports them; `kay upgrade` renames `onSidebarClose` where the handler is written `() => ...`, and leaves `onOpen` to you, as `onOpenChange` is called on closing too.
+
 ## 1.71.0
 
 ### kayjs-ui parts are selected by data-part

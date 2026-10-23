@@ -10,6 +10,7 @@ const { onClose, onDelete, dirty = false, apiRefusal } = props<{ onClose: () => 
 const open = signal(false)
 const bareOpen = signal(false)
 const busy = signal(false)
+const states = signal<string[]>([])
 
 // A delete made with `call()`, which throws ApiError for a refusal, built here so it is the class the library reads.
 async function removeByApi() {
@@ -46,6 +47,10 @@ ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} tone="neu
 ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} tone="neutral" variant="ghost" class="n-ghost")
 ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} trigger="button" variant="ghost" class="n-button")
 ConfirmDelete(message="Release it?" failure="Could not release" onConfirm={removeByApi} label="Release" refused={(data: { reason: string }) => data.reason.toUpperCase()} class="release")
+p#states {states().join(',')}
+// kay-allow deprecated-ui-prop: the old name stays covered until it is dropped
+ConfirmDelete(message="Watch it?" failure="Could not" onConfirm={onDelete} onOpenChange={open => states.set([...states(), open ? 'open' : 'closed'])} onOpen={() => states.set([...states(), 'onOpen'])} label="Watched" class="watched")
+ConfirmDelete(message="Watch it inline?" failure="Could not" onConfirm={onDelete} ask="inline" onOpenChange={open => states.set([...states(), open ? 'inline-open' : 'inline-closed'])} label="Watched inline" class="watched-inline")
 Toaster
 button#open-bare(onClick={() => bareOpen.set(true)}) Open bare
 Dialog#bare(open={bareOpen()} title="Bare" onOpenChange={() => bareOpen.set(false)})

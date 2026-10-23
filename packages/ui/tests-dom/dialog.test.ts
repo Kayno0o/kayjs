@@ -205,7 +205,7 @@ describe('ConfirmDelete', () => {
     const armed = () => root.querySelector('[data-part=armed]')
     const buttons = () => [...armed()?.querySelectorAll('button') ?? []].map(button => [button.textContent || button.getAttribute('aria-label'), button.disabled])
 
-    expect(root.querySelectorAll('dialog')).toHaveLength(17)
+    expect(root.querySelectorAll('dialog')).toHaveLength(18)
 
     click(trigger)
     await settle()
@@ -291,5 +291,35 @@ describe('ConfirmDelete', () => {
     click(root.querySelector('#busy'))
     await settle()
     expect(confirm().disabled).toBe(false)
+  })
+
+  test('reports its open state to onOpenChange as a Dialog does, once for each change, with the old onOpen still running on opening', async () => {
+    const root = await dialogs()
+    const states = () => root.querySelector('#states')!.textContent
+
+    click(root.querySelector('.kui-icon-btn[aria-label="Watched"]'))
+    await settle()
+
+    const shown = [...root.querySelectorAll('dialog')].find(each => each.textContent?.includes('Watch it?'))!
+
+    expect(states()).toBe('open,onOpen')
+
+    click([...shown.querySelectorAll('button')].find(button => button.textContent === 'Cancel') ?? null)
+    await settle()
+
+    expect(states()).toBe('open,onOpen,closed')
+  })
+
+  test('reports an inline ask arming and settling to onOpenChange', async () => {
+    const root = await dialogs()
+    const states = () => root.querySelector('#states')!.textContent
+
+    click(root.querySelector('.kui-icon-btn[aria-label="Watched inline"]'))
+    await settle()
+    expect(states()).toBe('inline-open')
+
+    click(root.querySelector('[role=group] .kui-icon-btn[aria-label="Cancel"]'))
+    await settle()
+    expect(states()).toBe('inline-open,inline-closed')
   })
 })

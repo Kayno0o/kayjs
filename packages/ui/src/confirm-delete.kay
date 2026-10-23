@@ -19,12 +19,14 @@ const frame = recipe({
   },
 })
 
-const { message, onConfirm, onOpen, failure, success, refused, tone = 'danger', trigger = 'icon', ask = 'dialog', disabled = false, label, title, confirmLabel, pendingLabel, cancelLabel = wording('ui.confirmDelete.cancel', 'Cancel'), size, variant } = props<{
+const { message, onConfirm, onOpenChange, onOpen, failure, success, refused, tone = 'danger', trigger = 'icon', ask = 'dialog', disabled = false, label, title, confirmLabel, pendingLabel, cancelLabel = wording('ui.confirmDelete.cancel', 'Cancel'), size, variant } = props<{
   // The dialog's question; asked inline, the armed pair's name for screen readers and the confirm button's tooltip.
   message: string
   // Deletes, or does what a neutral confirm asks. The dialog stays open, its buttons disabled, until a returned promise settles, and closes once it resolves.
   onConfirm: () => unknown
-  // Runs when the trigger is pressed, for a message that is read then rather than at render.
+  // Called with `true` when the trigger is pressed, for a message that is read then rather than at render, and with `false` once the dialog or the armed pair goes, as the `onOpenChange` of Dialog.
+  onOpenChange?: ((open: boolean) => unknown) | undefined
+  // The name `onOpenChange` replaced in 1.72: runs when the trigger is pressed, and is dropped in 1.75.
   onOpen?: (() => unknown) | undefined
   // Toasted when `onConfirm` throws, which leaves the dialog open, unless the call carries a message of its own: see `attempt`.
   failure: string
@@ -65,14 +67,22 @@ const pending = signal(false)
 let opener: HTMLElement | undefined
 let armed: HTMLElement | undefined
 
+function setOpen(next: boolean) {
+  if (open() === next)
+    return
+
+  open.set(next)
+  onOpenChange?.(next)
+}
+
 function start(event: MouseEvent) {
   opener = event.currentTarget as HTMLElement
-  open.set(true)
+  setOpen(true)
   onOpen?.()
 }
 
 function close() {
-  open.set(false)
+  setOpen(false)
 
   if (ask === 'inline')
     queueMicrotask(() => opener?.focus())
@@ -111,8 +121,8 @@ if ask === 'inline'
       Button(label={pending() ? pendingText() : confirmText()} tone={look()} busy={pending()} disabled={pending() || disabled} data-tooltip={message} onClick={confirm})
       IconButton(icon="close" label={cancelLabel} size={size} variant="ghost" disabled={pending()} onClick={close})
 else
-  Dialog(open={open()} title={dialogTitle()} dirty={pending()} onOpenChange={() => open.set(false)})
+  Dialog(open={open()} title={dialogTitle()} dirty={pending()} onOpenChange={() => close()})
     @footer
-      Button(label={cancelLabel} disabled={pending()} onClick={() => open.set(false)})
+      Button(label={cancelLabel} disabled={pending()} onClick={close})
       Button(label={pending() ? pendingText() : confirmText()} tone={look()} busy={pending()} disabled={pending() || disabled} onClick={confirm})
     p(part="message") {message}

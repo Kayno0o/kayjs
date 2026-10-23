@@ -4261,6 +4261,33 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports ConfirmDelete(onOpen) and SplitLayout(onSidebarClose) of kayjs-ui, fixing only the rename that keeps the call', async () => {
+    const page = [
+      '---',
+      'import ConfirmDelete from \'@kaynooo/kayjs-ui/confirm-delete.kay\'',
+      'import Layout from \'@kaynooo/kayjs-ui/split-layout.kay\'',
+      'const ask = () => {}',
+      'const onSidebarClose = () => {}',
+      '---',
+      'ConfirmDelete(message="Sure?" failure="No" onConfirm={ask} onOpen={ask})',
+      'Layout(list={ask} detail={ask} onSidebarClose={() => ask()})',
+      'Layout(list={ask} detail={ask} onSidebarClose={ask})',
+      'Layout(list={ask} detail={ask} {onSidebarClose})',
+      'Layout(list={ask} detail={ask} onSidebarClose={() => ask()} onSidebarOpenChange={ask})',
+      '',
+    ].join('\n')
+    const root = await scratchProject({ 'src/routes/index.kay': page })
+
+    try {
+      expect((await runCheck(root)).output.match(/deprecated-ui-prop/g)).toHaveLength(5)
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/routes/index.kay')).text()).toBe(page.replace('onSidebarClose={() => ask()})\nLayout(list={ask} detail={ask} onSidebarClose={ask})', 'onSidebarOpenChange={() => ask()})\nLayout(list={ask} detail={ask} onSidebarClose={ask})'))
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports data-cms-edit-page and --fix renames it to data-kcms-edit-page, leaving a tag that gives both', async () => {
     const page = [
       'a(data-cms-edit-page href="/admin") Edit',
