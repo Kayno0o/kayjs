@@ -16,7 +16,6 @@ const MAX_CLASSES = 4000
 const WHITESPACE = /\s+/g
 // eslint-disable-next-line no-control-regex
 const CONTROL = /[\u0000-\u001F\u007F]/
-const TRAILING_COMMA = /^\s*,/
 const INDENT = /^[ \t]*/
 
 const refused = (error: string, status = 400) => Response.json({ error }, { status })
@@ -92,14 +91,41 @@ function indentOf(source: string, offset: number): string {
   return INDENT.exec(source.slice(source.lastIndexOf('\n', offset - 1) + 1))![0]
 }
 
+// The offset just past the comma closing `from`, looking through whitespace and comments up to `limit`, or undefined without one.
+function commaAfter(source: string, from: number, limit: number, comments: readonly t.Comment[]): number | undefined {
+  let at = from
+
+  while (at < limit) {
+    const comment = comments.find(c => c.start === at)
+
+    if (comment !== undefined)
+      at = comment.end!
+    else if (source[at] === ',')
+      return at + 1
+    else if ((/\s/).test(source[at]!))
+      at++
+    else
+      return undefined
+  }
+
+  return undefined
+}
+
 // Adds `property` as the last one of an object literal, in the indentation of the others.
-function appendProperty(source: string, object: t.ObjectExpression, property: string): Edit {
+function appendProperty(source: string, object: t.ObjectExpression, property: string, comments: readonly t.Comment[]): Edit {
   const last = object.properties.at(-1)
   const start = object.start!
   const inline = !source.slice(start, object.end!).includes('\n')
 
-  if (last === undefined && inline)
+  if (last === undefined && inline) {
+    const kept = source.slice(start + 1, object.end! - 1).trim()
+
+    // A block comment in the braces stays, the property goes after it.
+    if (kept !== '')
+      return { at: start, remove: object.end! - start, text: `{ ${kept} ${property} }` }
+
     return { at: start, remove: object.end! - start, text: `{ ${property} }` }
+  }
 
   if (last === undefined) {
     const kept = source.slice(start + 1, object.end! - 1).trimEnd()
@@ -112,19 +138,20 @@ function appendProperty(source: string, object: t.ObjectExpression, property: st
   }
 
   const indent = indentOf(source, object.properties[0]!.start!)
-  const trailing = TRAILING_COMMA.exec(source.slice(last.end!))
+  const commaEnd = commaAfter(source, last.end!, object.end! - 1, comments)
+  const trailing = commaEnd === undefined ? null : commaEnd - last.end!
 
   if (inline)
-    return trailing === null ? { at: last.end!, remove: 0, text: `, ${property}` } : { at: last.end! + trailing[0].length, remove: 0, text: ` ${property},` }
+    return trailing === null ? { at: last.end!, remove: 0, text: `, ${property}` } : { at: last.end! + trailing, remove: 0, text: ` ${property},` }
 
   const tail = source.slice(last.end!, object.end! - 1).trimEnd()
-  const comment = tail.replace(TRAILING_COMMA, '').trim() !== ''
+  const comment = trailing === null ? tail !== '' : `${tail.slice(0, trailing - 1)}${tail.slice(trailing)}`.trim() !== ''
 
   // Comments after the last property stay where they are, the new one goes below them.
   if (comment)
     return trailing === null ? { at: last.end!, remove: tail.length, text: `,${tail}\n${indent}${property}` } : { at: last.end! + tail.length, remove: 0, text: `\n${indent}${property},` }
 
-  return trailing === null ? { at: last.end!, remove: 0, text: `,\n${indent}${property}` } : { at: last.end! + trailing[0].length, remove: 0, text: `\n${indent}${property},` }
+  return trailing === null ? { at: last.end!, remove: 0, text: `,\n${indent}${property}` } : { at: last.end! + trailing, remove: 0, text: `\n${indent}${property},` }
 }
 
 const isLiteral = (node: t.Node) => classesOf(node) !== undefined
@@ -152,7 +179,7 @@ function editFor(source: string, key: string, part: string, classes: string): Ed
   const entry = entries.find(property => keyOf(property) === key)
 
   if (entry === undefined)
-    return appendProperty(source, object, `${keyText(key)}: { parts: { ${partText} } }`)
+    return appendProperty(source, object, `${keyText(key)}: { parts: { ${partText} } }`, ast.comments ?? [])
 
   const value = unwrapped(entry.value)
 
@@ -162,7 +189,7 @@ function editFor(source: string, key: string, part: string, classes: string): Ed
   const parts = value.properties.find((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && keyOf(property) === 'parts')
 
   if (parts === undefined)
-    return appendProperty(source, value, `parts: { ${partText} }`)
+    return appendProperty(source, value, `parts: { ${partText} }`, ast.comments ?? [])
 
   const body = unwrapped(parts.value)
 
@@ -175,7 +202,7 @@ function editFor(source: string, key: string, part: string, classes: string): Ed
   const existing = body.properties.find((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && keyOf(property) === part)
 
   if (existing === undefined)
-    return appendProperty(source, body, partText)
+    return appendProperty(source, body, partText, ast.comments ?? [])
 
   const current = unwrapped(existing.value)
 

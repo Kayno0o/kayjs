@@ -110,6 +110,26 @@ describe('the Styles tab\'s endpoints', () => {
     expect(await ui()).toBe(`${head}  Badge: { parts: 'a' }, // after\n  Panel: { parts: { body: 'p-4' } }\n})\n`)
   })
 
+  it('keeps a block comment in a one-line empty object, and finds a trailing comma after a comment', async () => {
+    const head = 'import { defineUi } from \'kay\'\n\nexport default defineUi({\n'
+
+    await put('src/ui.ts', `${head}  Badge: { /* c */ },\n})\n`)
+    await write({ file: PANEL_FILE, part: 'body', classes: 'p-4' })
+    expect(await ui()).toBe(`${head}  Badge: { /* c */ },\n  Panel: { parts: { body: 'p-4' } },\n})\n`)
+
+    await put('src/ui.ts', `${head}  Badge: { parts: 'a' } /* c */,\n})\n`)
+    await write({ file: PANEL_FILE, part: 'body', classes: 'p-4' })
+    expect(await ui()).toBe(`${head}  Badge: { parts: 'a' } /* c */,\n  Panel: { parts: { body: 'p-4' } },\n})\n`)
+
+    await put('src/ui.ts', `${head}  Panel: { /* c */ },\n})\n`)
+    await write({ file: PANEL_FILE, part: 'body', classes: 'p-4' })
+    expect(await ui()).toBe(`${head}  Panel: { /* c */ parts: { body: 'p-4' } },\n})\n`)
+
+    await put('src/ui.ts', `${head}  Panel: { parts: { root: 'a' /* c */, } },\n})\n`)
+    await write({ file: PANEL_FILE, part: 'body', classes: 'p-4' })
+    expect(await ui()).toBe(`${head}  Panel: { parts: { root: 'a' /* c */, body: 'p-4', } },\n})\n`)
+  })
+
   it('refuses to guess at a file it cannot edit in place, and leaves it as it is', async () => {
     const dynamic = 'import { defineUi } from \'kay\'\n\nconst body = \'p-1\'\n\nexport default defineUi({\n  Panel: { parts: { body } },\n})\n'
 
