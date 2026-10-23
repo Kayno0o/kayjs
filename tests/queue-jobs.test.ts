@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { parse } from 'devalue'
 import { Elysia } from 'elysia'
 import { queue as makeQueue, memoryJobs, retryLater, shutdown } from '../src/server'
+import { beginDrain, stopGraceMs } from '../src/server/drain'
 import { forgetQueue } from '../src/server/queue'
 import { cleanUpAfterFile, kinds } from './job-stores'
 
@@ -467,6 +468,44 @@ describe.each(kinds)('a stopping queue on a $name store', ({ open }) => {
       await shutdown(app)
       expect(Date.now() - stopping).toBeLessThan(6000)
       expect(await jobs.job('k')).toMatchObject({ status: 'waiting', attempts: 0 })
+    }
+    finally {
+      logs.mockRestore()
+    }
+  }, 15_000)
+})
+
+describe('a stop that did not end the process', () => {
+  it('leaves the next shutdown the default grace for a run ignoring its signal', async () => {
+    const logs = spyOn(console, 'log').mockImplementation(noop)
+    const stuck = async (): Promise<number> => {
+      const started = { value: false }
+      const jobs = queue<number>(named(), async () => {
+        started.value = true
+        await new Promise(noop)
+      }, { store: memoryJobs(), idlePoll: '30s' })
+      const app = new Elysia().use(jobs).listen(0)
+
+      await jobs.enqueue(1)
+
+      for (const start = Date.now(); !started.value && Date.now() - start < 5000;)
+        await Bun.sleep(10)
+
+      const stopping = Date.now()
+
+      await shutdown(app)
+
+      return Date.now() - stopping
+    }
+
+    try {
+      beginDrain(500)
+      expect(stopGraceMs()).toBe(200)
+      expect(await stuck()).toBeLessThan(1500)
+      expect(stopGraceMs()).toBe(3000)
+
+      // A plain shutdown, no drain begun: the run gets the 3 s default.
+      expect(await stuck()).toBeGreaterThanOrEqual(2900)
     }
     finally {
       logs.mockRestore()

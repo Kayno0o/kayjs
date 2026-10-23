@@ -6,7 +6,7 @@ import { kayLog } from '../runtime/log'
 import { appStore } from './app-store'
 import { wholeResponse } from './compress'
 import { healthTimeoutMs, shutdownSeconds } from './config-limits'
-import { beginDrain } from './drain'
+import { beginDrain, endDrain } from './drain'
 import { endEventStreams, stopEventStreams } from './event-stream'
 import { logMessage } from './log'
 import { START_COMMAND, START_PARENT } from './parent'
@@ -239,17 +239,22 @@ export async function shutdown(app: AnyElysia, force = false): Promise<void> {
   if (!force)
     endEventStreams()
 
-  await stopServer(server, force)
-  app.server = null
+  try {
+    await stopServer(server, force)
+    app.server = null
 
-  for (const hook of app.event.stop ?? []) {
-    try {
-      await hook.fn(app)
+    for (const hook of app.event.stop ?? []) {
+      try {
+        await hook.fn(app)
+      }
+      catch (error) {
+        await reportBackgroundError('an onStop hook failed', error)
+        process.exitCode = 1
+      }
     }
-    catch (error) {
-      await reportBackgroundError('an onStop hook failed', error)
-      process.exitCode = 1
-    }
+  }
+  finally {
+    endDrain()
   }
 }
 

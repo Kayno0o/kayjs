@@ -27,3 +27,8 @@ export function beginDrain(budgetMs: number): void {
   for (const begin of begins)
     begin()
 }
+
+// Ends the drain `beginDrain` started, once the stop has run its hooks, so a stop that did not end the process leaves the next one the default grace.
+export function endDrain(): void {
+  grace = DEFAULT_GRACE_MS
+}
