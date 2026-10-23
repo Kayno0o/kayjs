@@ -478,6 +478,8 @@ describe('the id of a live value', () => {
     expect(named('export const a = live(0, { ttl: \'7d\' })')).toContain(`live(0, "${idOf('a')}", { ttl: '7d' })`)
     expect(named('export const a = live((id: string) => ({ id }), { ttl: \'1h\' },)')).toContain(`"${idOf('a')}", { ttl: '1h' }`)
     expect(named('export const a = live(0, options)')).not.toContain(idOf('a'))
+    expect(named('export const a = live(0, ({ ttl: \'7d\' }))')).not.toContain(idOf('a'))
+    expect(named('export const a = live(0, /* ends */ { ttl: \'7d\' })')).toContain(`live(0, /* ends */ "${idOf('a')}", { ttl`)
   })
 
   it('is followed by the constant\'s name for the server, which a browser build leaves out', () => {

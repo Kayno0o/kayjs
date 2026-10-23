@@ -53,6 +53,10 @@ export function liveIds(source: string, file: string, root: string, jsx = false,
       const options = init.arguments[1]
 
       if (options) {
+        // Options in parentheses are left without an id, which live() reports when it runs.
+        if (source.slice(0, options.start!).trimEnd().endsWith('('))
+          continue
+
         inserts.push({ at: options.start!, text: `${text}, ` })
 
         continue
