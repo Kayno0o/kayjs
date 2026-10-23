@@ -154,6 +154,14 @@ describe('large-public-image', () => {
     expect(at(problems)).toEqual(['doc.mdx:3', 'post.md:28', 'post.md:34'])
   })
 
+  it('closes a nested fence only on a fence line under its own container', async () => {
+    const problems = await bare({
+      'src/routes/post.md': ['> ```', '> ![a](/big.jpg)', '> - ```', '> ![b](/big.jpg)', '```', '', '- ```', '  ![c](/big.jpg)', '  > ```', '  ![d](/big.jpg)', '  ```', '', '![e](/big.jpg)', ''].join('\n'),
+    })
+
+    expect(at(problems)).toEqual(['post.md:13'])
+  })
+
   it('reads an HTML img by its own attributes, a nested bracket alt and the first reference definition', async () => {
     const problems = await bare({
       'src/routes/post.md': ['<img data-src="/big.jpg" src="/missing.jpg">', '<img alt="a > b src=/missing.jpg" src="/big.jpg">', '<img alt=don\'t src="/big.jpg">', '![a [b] c](/big.jpg)', '![ref][Two  Words]', '', '[two words]: /big.jpg', '[two words]: /missing.jpg', ''].join('\n'),

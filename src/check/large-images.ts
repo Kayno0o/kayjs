@@ -24,8 +24,9 @@ const STYLE_OR_MARKDOWN = /\.(?:css|md|mdx)$/i
 const CSS_COMMENT_OR_URL = /url\((?:"[^"\n]{0,2000}"|'[^'\n]{0,2000}'|[^)\n]{0,2000})\)|\/\*[\s\S]*?(?:\*\/|$)/gi
 const MARKDOWN_STYLE = /<style\b[\s\S]*?<\/style>/gi
 const INLINE_CODE = /`[^`\n]*`/g
-// A fence opens or closes after any indentation, blockquote marker or list marker, so one nested in a list item or a quote is still code.
-const FENCE_LINE = /^[ \t]*(?:>[ \t]*)*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)?(`{3,}(?!`)|~{3,}(?!~))(.*)$/
+// A fence opens after any indentation, blockquote marker or list marker, so one nested in a list item or a quote is still code; it closes only under the same blockquote depth and without a list marker, and its container ending ends it too.
+const FENCE_LINE = /^([ \t]*(?:>[ \t]*)*)((?:[-*+]|\d{1,9}[.)])[ \t]+)?(`{3,}(?!`)|~{3,}(?!~))(.*)$/
+const CONTAINER_PREFIX = /^[ \t]*(?:>[ \t]*)*/
 const HEADING = /^ {0,3}#{1,6}(?:[ \t]|$)/
 const DEEP_INDENT = /^(?: {8}|\t\t| {4}\t)/
 const HTML_COMMENT = /<!--[\s\S]*?(?:-->|$)/g
@@ -68,10 +69,29 @@ function blankCssComments(text: string): string {
   return text.replace(CSS_COMMENT_OR_URL, span => span.startsWith('/*') ? span.replaceAll(NOT_NEWLINE, ' ') : span)
 }
 
+function quoteDepth(prefix: string): number {
+  return prefix.split('>').length - 1
+}
+
+function columns(text: string): number {
+  return text.replaceAll('\t', '    ').length
+}
+
+// A blockquote ends a fence by a non-blank line with fewer markers, a list item by a non-blank line indented less than its content.
+function containerEnded(line: string, fence: { quotes: number, listColumn: number }): boolean {
+  if (line.trim() === '')
+    return false
+
+  const prefix = CONTAINER_PREFIX.exec(line)![0]
+  const depth = quoteDepth(prefix)
+
+  return depth < fence.quotes || (fence.listColumn > 0 && depth === fence.quotes && columns(prefix) < fence.listColumn)
+}
+
 // The fenced blocks (``` and ~~~), indented code blocks, inline code and HTML comments of a Markdown body. An indented line is code after a blank line, a heading, a fence or another code line, not in the middle of a paragraph; in a list item it takes two levels. MDX has no indented code.
 function blankMarkdownCode(text: string, indentedCode: boolean): string {
   const out: string[] = []
-  let fence: { char: string, length: number } | undefined
+  let fence: { char: string, length: number, quotes: number, listColumn: number } | undefined
   let codeAllowed = true
   let inList = false
 
@@ -79,10 +99,13 @@ function blankMarkdownCode(text: string, indentedCode: boolean): string {
     const blanked = line.replaceAll(NOT_NEWLINE, ' ')
     const marker = FENCE_LINE.exec(line)
 
+    if (fence !== undefined && containerEnded(line, fence))
+      fence = undefined
+
     if (fence !== undefined) {
       out.push(blanked)
 
-      if (marker && marker[1]![0] === fence.char && marker[1]!.length >= fence.length && marker[2]!.trim() === '') {
+      if (marker && marker[2] === undefined && quoteDepth(marker[1]!) === fence.quotes && marker[3]![0] === fence.char && marker[3]!.length >= fence.length && marker[4]!.trim() === '') {
         fence = undefined
         codeAllowed = true
       }
@@ -97,8 +120,8 @@ function blankMarkdownCode(text: string, indentedCode: boolean): string {
       continue
     }
 
-    if (marker && !(marker[1]![0] === '`' && marker[2]!.includes('`'))) {
-      fence = { char: marker[1]![0]!, length: marker[1]!.length }
+    if (marker && !(marker[3]![0] === '`' && marker[4]!.includes('`'))) {
+      fence = { char: marker[3]![0]!, length: marker[3]!.length, quotes: quoteDepth(marker[1]!), listColumn: marker[2] === undefined ? 0 : columns(marker[1]! + marker[2]) }
       out.push(blanked)
 
       continue
