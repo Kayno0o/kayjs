@@ -15,6 +15,8 @@ export const PAGE_LIMIT = 20_000
 export const MAX_PAGE_BYTES = 25_000
 // The size the newest minor of Upgrading is kept to, the `###` subsections past it moving to the archive as "continued".
 export const UPGRADING_CAP = 20_000
+// The size past which `just land` asks for the cap: the 3,000 bytes under the wall leave a batch room for its own lines.
+const CAP_DUE = 22_000
 // The size an archive is kept under by dropping its oldest releases: it only changes at a release, so it needs no room for the next one.
 const ARCHIVE_LIMIT = 24_000
 
@@ -63,7 +65,8 @@ export function archiveOldest(page: string, archive: string, limit = PAGE_LIMIT)
 
   const [archiveIntro, ...archived] = archive.split(SECTION)
   // What a cut of the newest release left at the top of the archive stays above the releases moved beside it.
-  const continued = `${releases.find(section => VERSION_HEADING.test(section))?.split('\n')[0]} (continued)\n`
+  const newest = releases.find(section => VERSION_HEADING.test(section)) ?? ''
+  const continued = `${newest.includes('\n') ? newest.slice(0, newest.indexOf('\n')) : newest} (continued)\n`
   const own = archived.findIndex(section => !section.startsWith(continued))
   const ownSections = archived.splice(0, own === -1 ? archived.length : own)
   const boundary = (text: string) => text.replace(BEFORE, `before ${boundaryVersion(oldestKept)}`)
@@ -216,6 +219,11 @@ if (import.meta.main) {
 
   for (const [page, archive] of ARCHIVES) {
     const [pageText, archiveText] = await Promise.all([Bun.file(page).text(), Bun.file(archive).text()])
+
+    // A landing stops only once a page nears the wall, so the cap runs every few batches rather than on each line added past it.
+    if (check && Buffer.byteLength(pageText) <= CAP_DUE)
+      continue
+
     const capped = WHATS_NEW.includes(page) ? capUnreleased(pageText, archiveText) : capNewest(pageText, archiveText, UPGRADING_CAP, '### ')
 
     if (capped.page === pageText)
