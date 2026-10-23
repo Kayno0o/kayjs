@@ -1,0 +1,26 @@
+---
+import Breadcrumb from '@kaynooo/kayjs-ui/breadcrumb.kay'
+import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
+import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
+import Steps from '@kaynooo/kayjs-ui/steps.kay'
+import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
+import PlanetTabs from '../components/planet-tabs.kay'
+import '../space.css'
+
+const trail = [{ label: 'Home', href: '/' }, { label: 'Moons', href: '/moons' }, { label: 'Jupiter', href: '/moons/jupiter' }, { label: 'Europa' }]
+const steps = [{ key: 'account', label: 'Account' }, { key: 'details', label: 'Details' }, { key: 'review', label: 'Review' }, { key: 'pay', label: 'Pay' }]
+const links = [{ href: '/', label: 'Home' }, { href: '/nav-recipes', label: 'Recipes' }]
+---
+//- The navigation recipes under the space skin, for the browser test to read their computed styles.
+main
+  #crumbs
+    Breadcrumb(items={trail} label="Trail")
+  #paging
+    Pagination(page={1} pages={3} url="/nav-recipes")
+  #tab-nav
+    TabNav(label="Sections" current="/nav-recipes" links={links})
+  #site-nav
+    SiteNav(id="recipe-links" links={links} current="/nav-recipes" label="Main")
+  PlanetTabs
+  #steps
+    Steps(steps={steps} current="details" done={['account']} url="/nav-recipes" label="Signup")

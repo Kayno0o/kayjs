@@ -628,7 +628,13 @@ inBrowser('FormField in an island', () => {
     const site = await shared()
 
     await using page = await site.open('/borders')
-    await page.evaluate(() => document.querySelector<HTMLElement>('#site-nav-list')!.showPopover())
+    await page.evaluate(() => {
+      // A manual popover stays open beside the other, where an auto one would close it.
+      for (const list of document.querySelectorAll<HTMLElement>('#site-nav-list, #recipe-list')) {
+        list.popover = 'manual'
+        list.showPopover()
+      }
+    })
 
     // Each box with the sides it draws, in the order top, right, bottom, left; the others stay 0. A button draws its keyline in ::before.
     const boxes: Record<string, [selector: string, sides: string]> = {
@@ -647,6 +653,7 @@ inBrowser('FormField in an island', () => {
       segmented: ['#segmented', 'trbl'],
       fileDrop: ['#file-drop', 'trbl'],
       step: ['#step', 'trbl'],
+      stepPart: ['#pager [data-part=step]', 'trbl'],
       chartTooltip: ['#chart-tooltip', 'trbl'],
       chipLabel: ['#chips [data-part=label]', 'trbl'],
       iconGrid: ['#icon-grid', 'trbl'],
@@ -659,6 +666,7 @@ inBrowser('FormField in an island', () => {
       sortButton: ['#sort-btn', 'trbl'],
       // The page is narrower than the desktop breakpoint, where the open list is a box of its own.
       siteNavList: ['#site-nav-list', 'trbl'],
+      siteNavListPart: ['#recipe-list[data-part=list]:popover-open', 'trbl'],
     }
 
     const widths = async (css: string): Promise<Record<string, number[]>> => page.evaluate((style: string, spec: typeof boxes) => {

@@ -1,7 +1,9 @@
 ---
 import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
 import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
+import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
 import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
 import '../app.css'
 
 const choices = [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }]
@@ -39,6 +41,8 @@ main
         tr#narrow-head
           th.kui-table-head-cell
             button#sort-btn.kui-table-sort-btn(type="button") sort
+  Pagination#pager(page={2} pages={3} url="/borders")
+  SiteNav(id="recipe-list" links={[{ href: '/', label: 'Home' }]} current="/" label="Recipe")
   nav.kui-site-nav
     ul#site-nav-list.kui-site-nav-list(popover)
       li.kui-site-nav-link link
