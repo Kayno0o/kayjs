@@ -90,7 +90,7 @@ export async function renamedUiProps(root: string, options: CheckOptions): Promi
           ...positionAt(source, attribute.name.start),
           end: attribute.name.end,
           message: `\`${rename.from}\` of \`${element.name}\` is \`${rename.to}\`${rename.value ? ' with a value' : ''} since ${rename.since}, as ${rename.because}`,
-          help: rename.value ? `write \`${rename.to}="${rename.value.on}"\` for \`${rename.from}\`` : `write \`${rename.to}\` for \`${rename.from}\`${rename.fix !== 'none' ? '' : ', which also reports closing: read its \`open\` argument'}`,
+          help: rename.value ? `write \`${rename.to}="${rename.value.on}"\` for \`${rename.from}\`` : `write \`${rename.to}\` for \`${rename.from}\`${rename.fix !== 'none' ? '' : ', which also reports closing: read its `open` argument'}`,
           code: rename.lint,
           severity: here === 'warn' ? 'warning' : 'error',
           ...!taken && edit && { fixes: [{ title: `Use ${rename.to}`, edits: [edit], safe: true }] },
