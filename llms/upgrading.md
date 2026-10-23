@@ -27,6 +27,9 @@ kayjs-auth's `auth_*` tables are no longer `renamedFrom` their old names. A data
 ### Props typed `Signal<T>` or `Memo<T>` are plain values
 
 A prop typed `Signal<T>` or `Memo<T>` is a plain value of that type now, no longer read by calling it or assigned: type a prop the child writes `Bindable<T>`, read and assign it as `open`, and bind it with `bind:open={open}`; a `Memo<T>` prop is a `T`, passed as `value={memo()}`.
+### kayjs-ui: stepDraft's maxAge is a duration
+
+`stepDraft(ctx.cookies, name, { maxAge: 3600 })` is `maxAge: '1h'`, as every duration in kay is. A number of seconds works until 1.77, and `kay upgrade` (`deprecated-step-draft-max-age`) rewrites a numeric literal at the call.
 
 ## 1.73.0
 
@@ -37,10 +40,6 @@ A site's CSS written against the editor's own markup changes. `.kcms-editor-open
 ### kayjs-cms: the editor's heads, bars and question are kayjs-ui parts
 
 An entry's head is a `PageSection` head: `.kcms-entry-head`, `.kcms-entry-title` and `.kcms-entry-collection` are gone for `.kcms-entry > [data-part='head']` with its `[data-part='title']` and `[data-part='subtitle']`. The buttons over a page list item are a floating `Toolbar` (`.kcms-list-bar`, `.kcms-list-start`), so `.kcms-list-caption` is `[data-part='caption']`. Stop editing's question over unsaved edits is a `Dialog`: `.kcms-editor-confirm` and `.kcms-editor-choice` are gone. A site CSS on one of them moves to the part, or to `--kui-sticky-top` for a header it must clear.
-
-### kayjs-ui: stepDraft's maxAge is a duration
-
-`stepDraft(ctx.cookies, name, { maxAge: 3600 })` is `maxAge: '1h'`, as every duration in kay is. A number of seconds works until 1.76, and `kay upgrade` (`deprecated-step-draft-max-age`) rewrites a numeric literal at the call.
 
 ### The forms deprecated in 1.69 and 1.70 are gone
 

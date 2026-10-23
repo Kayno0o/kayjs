@@ -13,7 +13,7 @@ const MAYBE_STEP_DRAFT = /\bstepDraft\b/
 const UI_PACKAGE = '@kaynooo/kayjs-ui'
 const UNITS = [['w', 604_800], ['d', 86_400], ['h', 3600], ['m', 60]] as const
 
-// The `stepDraft(...)` calls of kayjs-ui whose options give `maxAge` as a number of seconds, the form before 1.73 took a duration. The number still works until 1.76.
+// The `stepDraft(...)` calls of kayjs-ui whose options give `maxAge` as a number of seconds, the form before 1.74 took a duration. The number still works until 1.77.
 // The project's own TypeScript files and the script and server fences of its components are read, the options only as an object literal at the call. The fix writes the longest whole unit, `3600` as `'1h'`, and is not offered for a number that is no positive integer.
 export async function stepDraftMaxAge(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   const level = lintLevel('deprecated-step-draft-max-age', options.lints)
@@ -73,7 +73,7 @@ export async function stepDraftMaxAge(root: string, options: CheckOptions): Prom
             file,
             ...positionAt(source, at(value.start!)),
             end: at(value.end!),
-            message: '`maxAge` of `stepDraft` takes a duration since 1.73, not a number of seconds',
+            message: '`maxAge` of `stepDraft` takes a duration since 1.74, not a number of seconds',
             help: seconds > 0 ? `write \`'${durationText(seconds)}'\`` : 'write a positive duration such as `\'1h\'`',
             code: 'deprecated-step-draft-max-age',
             severity: level === 'warn' ? 'warning' : 'error',
