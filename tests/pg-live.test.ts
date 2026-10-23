@@ -421,7 +421,7 @@ pgDescribe('pgData live values', () => {
     const rows = await sql.unsafe<{ id: string }[]>('SELECT id FROM kay_live WHERE id = $1 AND key = $2', [event!.id, event!.key])
 
     expect(unescaped(event!.id)).not.toBe('app:legacy')
-    expect(rows).toEqual([])
+    expect(rows).toHaveLength(0)
     store.stop?.()
   })
 
