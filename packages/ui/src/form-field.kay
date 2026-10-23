@@ -19,7 +19,10 @@ const look = recipe({
     issues: FIELD_MESSAGE.issues,
     issue: FIELD_MESSAGE.issue,
   },
-  variants: { compact: { true: 'w-auto', false: '' } },
+  variants: {
+    // Sized by its control rather than the row, for a filter bar of fields side by side; it holds no message unless given a `name` or an `issue`.
+    compact: { true: 'w-auto', false: '' },
+  },
 })
 
 const { label, name, issue, hint, required = false, group = false, compact = false, action } = props<{
@@ -33,8 +36,6 @@ const { label, name, issue, hint, required = false, group = false, compact = fal
   required?: boolean | undefined
   // A control made of several inputs, such as a picker, is a labelled group rather than one label.
   group?: boolean | undefined
-  // Sized by its control rather than the row, for a filter bar of fields side by side; it holds no message unless given a `name` or an `issue`.
-  compact?: boolean | undefined
   // Sits on the label's line, pushed right: a preset button, a unit, a count.
   action?: Snippet
 }>()

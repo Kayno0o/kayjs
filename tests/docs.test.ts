@@ -12,6 +12,7 @@ import { PALETTES, paletteStylesheet, themeCss } from '../docs/src/palettes'
 import { loadReference } from '../docs/src/reference'
 import { partOf } from '../docs/src/sections'
 import { palette, pickTheme, scheme, THEME_SCRIPT, THEMES } from '../docs/src/theme'
+import { repeatedVariants } from '../docs/src/ui-props'
 import { brokenLinks, LINK } from '../scripts/links'
 import { compileKay, formatDiagnostic } from '../src/compiler'
 import { LINTS } from '../src/compiler/lints'
@@ -103,8 +104,20 @@ describe('the documentation site', () => {
     expect(components.filter(component => !component.body.includes('<Demo name=')).map(component => component.slug)).toEqual(['bell-inbox', 'bell', 'form-dialog'])
     expect(props.get('href')).toMatchObject({ type: 'string', optional: true })
     expect(props.get('variant')).toMatchObject({ type: '"solid" | "ghost" | "inline"', default: '\'solid\'' })
+    expect(props.get('tone')).toMatchObject({ type: '"neutral" | "accent" | "success" | "danger"', optional: true, default: '\'neutral\'' })
+    expect(props.get('tone')!.comment).toContain('main action')
+    expect(components.find(component => component.slug === 'copy-button')!.data.props.find(prop => prop.name === 'tone')!.type).toContain('"success"')
+    expect(components.find(component => component.slug === 'form-field')!.data.props.find(prop => prop.name === 'compact')).toMatchObject({ type: 'boolean', default: 'false' })
     expect(props.has('disabled')).toBe(false)
     expect(components.find(component => component.slug === 'table')!.data.props.find(prop => prop.name === 'onSort')!.type).toBe('(sort: SortState) => unknown')
+  })
+
+  // The docs read a variant from its recipe and the compiler types it from there, so a union beside it only drifts.
+  it('declares a variant in the recipe alone, never again in a component\'s props', () => {
+    const files = [...new Bun.Glob('packages/*/src/**/*.kay').scanSync({ cwd: root })].map(file => join(root, file))
+    const repeated = [...repeatedVariants(files)].filter(([, names]) => names.length > 0).map(([file, names]) => `${file.slice(root.length + 1)}: ${names.join(', ')}`)
+
+    expect(repeated).toEqual([])
   })
 
   // The parts are read by the compiler; this reads `part="..."` again, so a page that lists others than its source writes fails.

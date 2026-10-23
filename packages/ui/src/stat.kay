@@ -14,6 +14,7 @@ const look = recipe({
     label: 'text-kui-subtext0',
   },
   variants: {
+    // `inline` is the pill, figure and label side by side; `tile` is a framed box with the figure above its label, to stack in a grid.
     variant: {
       inline: '',
       tile: {
@@ -22,6 +23,7 @@ const look = recipe({
         label: 'text-kui-micro font-kui-label tracking-kui-label [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)]',
       },
     },
+    // Colours the figure, such as `danger` past a threshold; `neutral` keeps the text colour.
     tone: {
       neutral: '',
       accent: { value: 'text-kui-accent' },
@@ -38,10 +40,6 @@ const { value, label, icon, variant = 'inline', tone = 'neutral', ...rest } = pr
   value: number | string
   label?: string | undefined
   icon?: IconSlot | IconProps | undefined
-  // `inline` is the pill, figure and label side by side; `tile` is a framed box with the figure above its label, to stack in a grid.
-  variant?: 'inline' | 'tile' | undefined
-  // Colours the figure, such as `danger` past a threshold; `neutral` keeps the text colour.
-  tone?: 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info' | undefined
 }>()
 ---
 // A figure and what it counts, read together: "12 moons".

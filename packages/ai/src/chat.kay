@@ -17,8 +17,11 @@ import './chat.css'
 const look = recipe({
   parts: { root: 'kai-chat', empty: 'kai-chat-empty', greeting: 'kai-chat-greeting', suggestions: 'kai-chat-suggestions', suggestion: 'kai-chat-suggestion', log: 'kai-chat-log', turn: 'kai-chat-turn', text: 'kai-chat-text', thinking: 'kai-chat-text kai-chat-thinking', note: 'kai-chat-note', status: 'kai-chat-status', disclosure: 'kai-chat-disclosure', form: 'kai-chat-form', field: 'min-h-10 max-h-40 rounded-[1.25rem] px-3.5 leading-normal focus-visible:[outline:2px_solid_var(--kai-chat-accent,var(--color-kui-accent))] focus-visible:outline-offset-2', send: 'kai-chat-send', retry: 'kui-btn' },
   variants: {
+    // The form: `bubble` frames the visitor's messages, `plain` draws them as bare text.
     variant: { bubble: '', plain: '' },
+    // `accent` colours the send button and the visitor's bubble, `neutral` draws them in the text colour.
     tone: { accent: '', neutral: '' },
+    // The type scale of the turns and the suggestions.
     size: { sm: '', md: '', lg: '' },
   },
   defaults: { variant: 'bubble', tone: 'accent', size: 'md' },
@@ -94,12 +97,6 @@ const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placehol
   remember?: string | undefined
   // Where a link of a reply opens: `apart` in a new tab, so following it does not swap the page and drop a conversation that lives in it; `here` for a link of this site opens in place, for a chat that survives a swap (kept by `persist`, or by `remember`), while a link to another site still opens apart.
   links?: 'apart' | 'here' | undefined
-  // The form: `bubble` frames the visitor's messages, `plain` draws them as bare text.
-  variant?: 'bubble' | 'plain' | undefined
-  // `accent` colours the send button and the visitor's bubble, `neutral` draws them in the text colour.
-  tone?: 'accent' | 'neutral' | undefined
-  // The type scale of the turns and the suggestions.
-  size?: 'sm' | 'md' | 'lg' | undefined
 }>()
 
 let nextId = 0

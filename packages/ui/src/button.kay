@@ -15,20 +15,17 @@ const look = recipe({
     spinner: 'animate-spin motion-reduce:animate-none',
   },
   variants: {
+    // The form: `solid` is the framed button, `ghost` has no frame until hovered and `inline` reads as a link.
     variant: { solid: '', ghost: '', inline: 'p-0 underline underline-offset-4' },
+    // What the button means: `accent` for the main action, `success` for a confirming one, `danger` for a destructive one.
     tone: { neutral: '', accent: 'kui-btn-accent', success: 'kui-btn-success', danger: 'kui-btn-danger' },
     size: { xs: '', sm: '', md: '', lg: '' },
   },
   defaults: { variant: 'solid', tone: 'neutral', size: 'md' },
 })
 
-// The props the docs list, which button-props.ts repeats for BusyButton.
+// The props the docs list besides the recipe's variants, which button-props.ts repeats for BusyButton.
 interface Look {
-  // The form: `solid` is the framed button, `ghost` has no frame until hovered and `inline` reads as a link.
-  variant?: 'solid' | 'ghost' | 'inline' | undefined
-  // What the button means: `accent` for the main action, `success` for a confirming one, `danger` for a destructive one.
-  tone?: 'neutral' | 'accent' | 'success' | 'danger' | undefined
-  size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
   // Drawn before the label.
   icon?: IconSlot | IconProps | undefined
   // Spins in place of the icon while what the press started is under way.

@@ -12,11 +12,30 @@ export interface Prop {
 const FENCE = /^---(?<server> server)?(?:\s*<(?<generics>.*)>)?\s*$/
 const COMMENT_MARK = /^\/\/\s?/gm
 const UNDEFINED = / \| undefined$/
+const NUMBER = /^\d+(?:\.\d+)?$/
 
 const options: ts.CompilerOptions = { strict: true, exactOptionalPropertyTypes: true, target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler, jsx: ts.JsxEmit.Preserve, skipLibCheck: true, noEmit: true, types: [] }
 
 // The props each component declares itself, read with the checker from its `props<...>()` type in one program for all of them: attributes a component takes from an HTML element's type are left out, as it spreads those onto its root.
 export function propsOf(files: string[]): Map<string, Prop[]> {
+  const { program, checker } = programOf(files)
+
+  return new Map(files.map(file => [file, declaredProps(checker, program.getSourceFile(`${file}.ts`)!)]))
+}
+
+// The variants a component declares in its `props<>` as well as in its recipe, by file: a variant is declared once, in the recipe, and the props take it from there.
+export function repeatedVariants(files: string[]): Map<string, string[]> {
+  const { program, checker } = programOf(files)
+
+  return new Map(files.map((file) => {
+    const source = program.getSourceFile(`${file}.ts`)!
+    const declared = new Set(declaredProps(checker, source, false).map(prop => prop.name))
+
+    return [file, variantsOf(source).map(variant => variant.name).filter(name => declared.has(name))]
+  }))
+}
+
+function programOf(files: string[]) {
   const sources = new Map(files.map(file => [`${file}.ts`, scriptOf(readFileSync(file, 'utf8'))]))
   const host = ts.createCompilerHost(options)
   const getSourceFile = host.getSourceFile.bind(host)
@@ -30,9 +49,8 @@ export function propsOf(files: string[]): Map<string, Prop[]> {
   host.readFile = name => sources.get(name) ?? ts.sys.readFile(name)
 
   const program = ts.createProgram([...sources.keys()], options, host)
-  const checker = program.getTypeChecker()
 
-  return new Map(files.map(file => [file, declaredProps(checker, program.getSourceFile(`${file}.ts`)!)]))
+  return { program, checker: program.getTypeChecker() }
 }
 
 // The component script as TypeScript: its client fence, `props` declared, and the type parameters a generic component's fence line takes declared as their constraints.
@@ -67,7 +85,7 @@ function typeParameters(generics: string | undefined): string {
   return (declared.typeParameters ?? []).map(parameter => `interface ${parameter.name.text} {}`).join('\n')
 }
 
-function declaredProps(checker: ts.TypeChecker, source: ts.SourceFile): Prop[] {
+function declaredProps(checker: ts.TypeChecker, source: ts.SourceFile, withVariants = true): Prop[] {
   const call = find(source)
 
   if (call === undefined)
@@ -100,11 +118,59 @@ function declaredProps(checker: ts.TypeChecker, source: ts.SourceFile): Prop[] {
     }
   }
 
-  return [...props.values()].map(({ types, ...prop }) => {
+  const listed = [...props.values()].map(({ types, ...prop }) => {
     const shown = [...types].filter(type => type !== 'undefined' || types.size === 1)
 
     return { ...prop, type: shown.length === 1 ? unwrap(shown[0]!) : shown.join(' | ') }
   })
+
+  return withVariants ? [...listed, ...variantsOf(source, defaults).filter(variant => !props.has(variant.name))] : listed
+}
+
+// The variants of the component's recipe as props, declared there once: each value it names, the default it destructures or else the recipe's own, and the comment above the variant.
+export function variantsOf(source: ts.SourceFile, defaults = new Map<string, string>()): Prop[] {
+  const config = recipeConfig(source)
+  const variants = config === undefined ? undefined : objectOf(config, 'variants')
+
+  if (config === undefined || variants === undefined)
+    return []
+
+  const recipeDefaults = objectOf(config, 'defaults')
+
+  return variants.properties.flatMap((variant) => {
+    const name = nameOf(variant.name)
+    const values = ts.isPropertyAssignment(variant) && ts.isObjectLiteralExpression(variant.initializer) ? variant.initializer.properties.map(value => value.name === undefined ? undefined : nameOf(value.name)) : []
+
+    if (name === undefined || values.includes(undefined))
+      return []
+
+    const written = values as string[]
+    const type = written.length === 2 && written.includes('true') && written.includes('false') ? 'boolean' : written.map(value => NUMBER.test(value) ? value : `"${value}"`).join(' | ')
+    const fallback = recipeDefaults?.properties.find(candidate => nameOf(candidate.name) === name)
+
+    return [{ name, type, optional: true, default: defaults.get(name) ?? (fallback !== undefined && ts.isPropertyAssignment(fallback) ? fallback.initializer.getText() : undefined), comment: commentOf(variant) }]
+  })
+}
+
+// The object `recipe({ ... })` is called with, wherever the component's script declares it.
+function recipeConfig(node: ts.Node): ts.ObjectLiteralExpression | undefined {
+  if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'recipe') {
+    const [config] = node.arguments
+
+    return config !== undefined && ts.isObjectLiteralExpression(config) ? config : undefined
+  }
+
+  return ts.forEachChild(node, recipeConfig)
+}
+
+function objectOf(config: ts.ObjectLiteralExpression, key: string): ts.ObjectLiteralExpression | undefined {
+  const property = config.properties.find(candidate => ts.isPropertyAssignment(candidate) && nameOf(candidate.name) === key)
+
+  return property !== undefined && ts.isPropertyAssignment(property) && ts.isObjectLiteralExpression(property.initializer) ? property.initializer : undefined
+}
+
+function nameOf(name: ts.PropertyName | undefined): string | undefined {
+  return name !== undefined && (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) ? name.text : undefined
 }
 
 // The members of a union as printed, split at the top level only, so two shapes both taking `string` list it once.

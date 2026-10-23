@@ -4,7 +4,10 @@ import { effect, recipe, signal } from 'kay'
 
 const look = recipe({
   parts: { root: 'kui-dialog', title: 'kui-dialog-title', body: 'kui-dialog-body', footer: 'kui-dialog-footer' },
-  variants: { size: { sm: '', md: '', lg: '', full: '' } },
+  variants: {
+    // The width: `sm`, `md` (the default), `lg`, or `full`, which takes the whole viewport width and height less the margin, for content such as a canvas that fills the dialog.
+    size: { sm: '', md: '', lg: '', full: '' },
+  },
   defaults: { size: 'md' },
 })
 
@@ -14,8 +17,6 @@ const { open, title, level = 2, size = 'md', bare = false, dirty = false, onOpen
   title: string
   // The title's heading level: a modal opens over the page's own `h1`.
   level?: 2 | 3 | 4 | 5 | 6 | undefined
-  // The width: `sm`, `md` (the default), `lg`, or `full`, which takes the whole viewport width and height less the margin, for content such as a canvas that fills the dialog.
-  size?: 'sm' | 'md' | 'lg' | 'full' | undefined
   // No inset or scroll on the body, for content that runs to the dialog's edge; the title and footer keep theirs.
   bare?: boolean | undefined
   // Work the dialog must not drop, such as a request in flight: a click outside or Escape leaves it open. Typing inside the dialog counts on its own, though Escape still closes one with no footer.

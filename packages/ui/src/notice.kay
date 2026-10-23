@@ -4,13 +4,14 @@ import { recipe } from 'kay'
 
 const look = recipe({
   parts: { root: 'kui-notice rounded-kui-card border-solid px-4 py-3 text-sm font-kui-notice [background-color:var(--kui-notice-ground,var(--color-kui-surface1))] [border-color:var(--kui-notice-tone,var(--color-kui-overlay0))] [border-width:var(--kui-border-notice)] [color:var(--kui-notice-tone,var(--color-kui-text))] data-compact:border-0 data-compact:bg-transparent data-compact:p-0' },
-  variants: { tone: { info: '', success: '[--kui-notice-tone:var(--color-kui-success)]', warning: '[--kui-notice-tone:var(--color-kui-warning)]', danger: '[--kui-notice-ground:var(--color-kui-canvas)] [--kui-notice-tone:var(--color-kui-error)]' } },
+  variants: {
+    // A danger is an alert, read out at once; the other tones are a status, read once the reader is idle.
+    tone: { info: '', success: '[--kui-notice-tone:var(--color-kui-success)]', warning: '[--kui-notice-tone:var(--color-kui-warning)]', danger: '[--kui-notice-ground:var(--color-kui-canvas)] [--kui-notice-tone:var(--color-kui-error)]' },
+  },
   defaults: { tone: 'info' },
 })
 
 const { tone = 'info', label, compact = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'role'> & {
-  // A danger is an alert, read out at once; the other tones are a status, read once the reader is idle.
-  tone?: 'info' | 'success' | 'warning' | 'danger' | undefined
   label?: string | undefined
   // A line of text without the box, such as under a form's fields.
   compact?: boolean | undefined

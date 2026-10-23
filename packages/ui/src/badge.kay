@@ -25,7 +25,6 @@ const look = recipe({
 })
 
 const { tone = 'neutral', icon, label, stamp = false, solid = false, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class'> & {
-  tone?: 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info' | undefined
   icon?: IconSlot | IconProps | undefined
   label?: string | number | undefined
   // Drawn as a rubber stamp: a hairline in its text colour, small spaced capitals, filled again while a `.group` holding it is hovered.

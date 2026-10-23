@@ -20,7 +20,6 @@ const { src, name, size = 'md', label, ...rest } = props<Omit<JSX.IntrinsicEleme
   src?: string | null | undefined
   // Seeds the fallback's colour and gives its initial.
   name: string
-  size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
   // Names the picture for screen readers; without it the avatar is decorative, the name being written beside it.
   label?: string | undefined
 }>()

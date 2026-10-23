@@ -9,6 +9,7 @@ const look = recipe({
     label: 'sr-only',
   },
   variants: {
+    // `text` draws `lines` bars, the last one shorter; `avatar` a round block; `card` a block.
     shape: {
       text: '',
       avatar: { root: 'w-(--kui-skeleton-width,2.5rem)', block: 'aspect-square h-auto rounded-kui-full' },
@@ -19,8 +20,6 @@ const look = recipe({
 })
 
 const { shape = 'text', lines = 1, width, height, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
-  // `text` draws `lines` bars, the last one shorter; `avatar` a round block; `card` a block.
-  shape?: 'text' | 'avatar' | 'card' | undefined
   // How many bars `text` draws.
   lines?: number | undefined
   // A CSS length for the bars, the avatar or the card; `100%` by default, `2.5rem` for an avatar.

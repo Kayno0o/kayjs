@@ -13,7 +13,10 @@ const frame = recipe({
     armed: 'inline-flex items-center gap-1',
     message: 'text-kui-muted',
   },
-  variants: { trigger: { icon: '', button: '', link: 'cursor-pointer text-xs text-kui-subtext0 underline transition-colors hover:text-kui-text disabled:cursor-default disabled:opacity-40' } },
+  variants: {
+    // An icon by default; `button` is a labelled danger button, for a dialog footer, and `link` a plain underlined text button, for a confirm inside running text.
+    trigger: { icon: '', button: '', link: 'cursor-pointer text-xs text-kui-subtext0 underline transition-colors hover:text-kui-text disabled:cursor-default disabled:opacity-40' },
+  },
 })
 
 const { message, onConfirm, onOpen, failure, success, refused, tone = 'danger', trigger = 'icon', ask = 'dialog', disabled = false, label, title, confirmLabel, pendingLabel, cancelLabel = wording('ui.confirmDelete.cancelLabel', 'Cancel'), size, variant } = props<{
@@ -31,8 +34,6 @@ const { message, onConfirm, onOpen, failure, success, refused, tone = 'danger', 
   refused?: ((data: Data) => string | undefined) | undefined
   // `neutral` for a confirm that is not a deletion, such as a save with a consequence: accent buttons, a check icon, and every word taken from `label` unless given.
   tone?: 'danger' | 'neutral' | undefined
-  // An icon by default; `button` is a labelled danger button, for a dialog footer, and `link` a plain underlined text button, for a confirm inside running text.
-  trigger?: 'icon' | 'button' | 'link' | undefined
   // Disables the trigger and the confirm button while the caller is busy; an open dialog stays open, its confirm button disabled until this is false again.
   disabled?: boolean | undefined
   // `inline` asks in place of the trigger instead of in a dialog: a click arms it into a danger button that deletes and one that cancels, for a row of a list.

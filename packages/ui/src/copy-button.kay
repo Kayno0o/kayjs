@@ -22,7 +22,6 @@ const { text, label, html, variant = 'solid', size = 'md', copiedFor = '2s', cop
   html?: string | undefined
   // As a Button's: `solid`, `ghost` or `inline`.
   variant?: 'solid' | 'ghost' | 'inline' | undefined
-  tone?: 'neutral' | 'accent' | 'danger' | undefined
   size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
   // How long the button says `copiedLabel` once the copy went through.
   copiedFor?: Duration | undefined
