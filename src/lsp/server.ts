@@ -7,7 +7,7 @@ import type { Span } from '../compiler/ast'
 import type { KayConfig } from '../config'
 import type { Route, RouteMount } from '../server/routes'
 import type { ComponentInterface } from './component-props'
-import type { CodeAction, CodeActionParams, CodeLens, CompletionItem, CompletionList, Diagnostic, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, DocumentLink, DocumentSymbol, FileEvent, FoldingRange, Hover, InitializeParams, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, WorkspaceEdit } from './protocol'
+import type { CodeAction, CodeActionParams, CodeLens, CompletionItem, CompletionList, Diagnostic, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, DocumentLink, DocumentSymbol, FileEvent, FoldingRange, Hover, InitializeParams, InlayHint, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, TsgoInlayHint, WorkspaceEdit } from './protocol'
 import type { TemplateData, Wanted } from './template-completion'
 import { existsSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
@@ -122,6 +122,7 @@ const QUICK_FIX = 'quickfix'
 const CAPITALIZED = /^[A-Z]/
 const MODULE_FILE = /\.(?:[cm]?[jt]s|[jt]sx)$/
 const FIX_ALL = 'source.fixAll.kay'
+const PARAMETER_HINT = 2
 const PLAIN_FORMAT = 1
 const SNIPPET_FORMAT = 2
 const PACKAGE_TYPES = join(SHADOW_DIR, 'kay-packages.d.ts')
@@ -131,7 +132,9 @@ const KIND_PROPERTY = 10
 const DEFAULT_MEMBER = '.default'
 // Completions offer names from modules not imported yet, as editors do for TypeScript by default; added imports are quoted the way kay's own code is, since generated code would mislead the guess.
 // Types come from the project's own packages, so the server fetches none with npm, which would also run in a project with no npm of its own.
-const TYPESCRIPT_SETTINGS = { suggest: { autoImports: true }, preferences: { quoteStyle: 'single' }, disableAutomaticTypeAcquisition: true }
+// Hints for what the author did not write: the type of a variable and of a return, and the name of a parameter given a literal.
+const INLAY_HINTS = { variableTypes: { enabled: true, suppressWhenTypeMatchesName: true }, functionLikeReturnTypes: { enabled: true }, parameterNames: { enabled: 'literals', suppressWhenArgumentMatchesName: true } }
+const TYPESCRIPT_SETTINGS = { suggest: { autoImports: true }, preferences: { quoteStyle: 'single' }, inlayHints: INLAY_HINTS, disableAutomaticTypeAcquisition: true }
 const TYPESCRIPT_SECTIONS = new Set(['js/ts', 'typescript', 'javascript'])
 // How far a question follows names through generated code.
 const MAX_HOPS = 16
@@ -192,6 +195,7 @@ export class KayLanguageServer {
     client.onRequest<CodeActionParams>('textDocument/codeAction', async params => this.codeActions(params))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/documentSymbol', ({ textDocument }) => this.symbols(textDocument.uri))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/documentLink', async ({ textDocument }) => this.links(textDocument.uri))
+    client.onRequest<{ textDocument: TextDocumentIdentifier, range: Range }>('textDocument/inlayHint', async params => this.inlayHints(params))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/semanticTokens/full', ({ textDocument }) => this.tokens(textDocument.uri))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/foldingRange', ({ textDocument }) => this.folds(textDocument.uri))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/codeLens', ({ textDocument }) => this.lenses(textDocument.uri))
@@ -234,7 +238,7 @@ export class KayLanguageServer {
     connection.onRequest('workspace/diagnostic/refresh', () => this.scheduleDiagnostics())
 
     // tsgo asks this server for its settings, whatever the editor supports.
-    const capabilities = { ...params.capabilities, workspace: { ...params.capabilities.workspace as object, configuration: true }, textDocument: { ...params.capabilities.textDocument, diagnostic: { dynamicRegistration: false } } }
+    const capabilities = { ...params.capabilities, workspace: { ...params.capabilities.workspace as object, configuration: true }, textDocument: { ...params.capabilities.textDocument, diagnostic: { dynamicRegistration: false }, inlayHint: { dynamicRegistration: false } } }
     const result = await connection.request<{ capabilities: { completionProvider?: { triggerCharacters?: string[] }, signatureHelpProvider?: unknown } }>('initialize', { ...params, rootUri: pathToFileURL(this.root).href, capabilities, initializationOptions: undefined })
 
     return {
@@ -252,6 +256,7 @@ export class KayLanguageServer {
         documentSymbolProvider: true,
         foldingRangeProvider: true,
         semanticTokensProvider: { legend: { tokenTypes: TOKEN_TYPES, tokenModifiers: TOKEN_MODIFIERS }, full: true },
+        inlayHintProvider: true,
         documentLinkProvider: {},
         codeLensProvider: {},
       },
@@ -999,6 +1004,33 @@ export class KayLanguageServer {
     catch {
       return []
     }
+  }
+
+  // tsgo's hints for the types it infers and the names of the parameters a call fills, where the code they follow is the author's own: those of generated code have nowhere to show.
+  private async inlayHints(params: { textDocument: TextDocumentIdentifier, range: Range }): Promise<InlayHint[]> {
+    const document = this.documents.get(params.textDocument.uri)
+
+    if (!document)
+      return []
+
+    const whole = { start: { line: 0, character: 0 }, end: toPosition(document.tsx, document.tsx.length) }
+    const found = await this.server.request<TsgoInlayHint[] | null>('textDocument/inlayHint', { textDocument: { uri: document.shadowUri }, range: whole })
+    const wanted = { start: toOffset(document.source, params.range.start), end: toOffset(document.source, params.range.end) }
+
+    return (found ?? []).flatMap((hint) => {
+      const at = toOffset(document.tsx, hint.position)
+      // A type follows the code it is of, a parameter's name precedes the argument it names.
+      const span = hint.kind === PARAMETER_HINT ? sourceSpan(document, at, at + 1, 'code') : sourceSpan(document, at - 1, at, 'code')
+      const offset = span && (hint.kind === PARAMETER_HINT ? span.start : span.start + 1)
+
+      if (offset === undefined || offset < wanted.start || offset > wanted.end)
+        return []
+
+      const { label, textEdits, ...rest } = hint
+      const edits = textEdits && sourceEdits(document, textEdits, offset)
+
+      return [{ ...rest, position: toPosition(document.source, offset), label: typeof label === 'string' ? label : label.map(part => part.value).join(''), ...edits && { textEdits: edits } }]
+    })
   }
 
   // Signals, props and server values told apart from other names, whose tokens TypeScript does not know.

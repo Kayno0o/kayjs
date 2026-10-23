@@ -1,5 +1,5 @@
 import type { CheckDiagnostic } from '../src/check'
-import type { CodeAction, CompletionItem, CompletionList, Diagnostic, DocumentHighlight, DocumentLink, DocumentSymbol, FoldingRange, Hover, Location, LocationLink, Range, TextEdit, WorkspaceEdit } from '../src/lsp/protocol'
+import type { CodeAction, CompletionItem, CompletionList, Diagnostic, DocumentHighlight, DocumentLink, DocumentSymbol, FoldingRange, Hover, InlayHint, Location, LocationLink, Range, TextEdit, WorkspaceEdit } from '../src/lsp/protocol'
 import { cp, mkdir, mkdtemp, readdir, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -43,7 +43,7 @@ class Editor {
   }
 
   // What the server advertised.
-  advertised: { semanticTokensProvider?: { legend: { tokenTypes: string[], tokenModifiers: string[] } } } = {}
+  advertised: { inlayHintProvider?: boolean, semanticTokensProvider?: { legend: { tokenTypes: string[], tokenModifiers: string[] } } } = {}
 
   async start() {
     const { capabilities } = await this.connection.request<{ capabilities: Editor['advertised'] }>('initialize', { processId: process.pid, rootUri: this.fileUri(this.root), capabilities: this.capabilities })
@@ -1757,6 +1757,22 @@ const TOKENS_PAGE = [
   '',
 ].join('\n')
 
+const HINTS_PAGE = [
+  '--- server',
+  'function compute(left: number, right: number) { return left + right }',
+  'const total = compute(1, 2)',
+  'const label = \'😀é\'; const sum = compute(3, 4)',
+  '---',
+  '---',
+  'const clicks = signal(0)',
+  'function double(value: number) { return value * 2 }',
+  'const twice = double(5)',
+  '---',
+  'p {total} {label} {sum} {twice} {clicks}',
+  'p {double(6)}',
+  '',
+].join('\n')
+
 const LINKS_PAGE = [
   'a(href="/about") About',
   'a(href="/posts/42/") Post',
@@ -1789,6 +1805,7 @@ describe('kay lsp editor features of an app under a base', () => {
       Bun.write(join(dir, 'src/routes/empty.kay'), ''),
       Bun.write(join(dir, 'src/store.ts'), 'import { signal } from \'kay\'\n\nexport const open = signal(false)\n'),
       Bun.write(join(dir, 'src/routes/tokens.kay'), TOKENS_PAGE),
+      Bun.write(join(dir, 'src/routes/hints.kay'), HINTS_PAGE),
     ])
     editor = new Editor(dir)
     await editor.start()
@@ -1903,6 +1920,45 @@ describe('kay lsp editor features of an app under a base', () => {
 
       expect(await tokensOf('src/routes/broken.kay', '')).toEqual([])
       expect((await request<{ data: number[] }>('textDocument/semanticTokens/full', 'src/routes/empty.kay')).data).toEqual([])
+    })
+  })
+
+  describe('inlay hints', () => {
+    const hintsOf = async (path: string, start: number, end: number) => (await request<InlayHint[]>('textDocument/inlayHint', path, { range: { start: { line: start, character: 0 }, end: { line: end, character: 0 } } })).map(hint => `${hint.position.line}:${hint.position.character} ${hint.label}`)
+
+    it('advertises hints, and shows tsgo\'s for a server fence, a script and the template', async () => {
+      await editor.open('src/routes/hints.kay')
+
+      expect(editor.advertised.inlayHintProvider).toBe(true)
+      expect(await hintsOf('src/routes/hints.kay', 0, 20)).toEqual([
+        // The server fence: a return type, a variable's type and the parameters a call fills; columns count UTF-16 units, as the emoji comes first on line 3.
+        '1:45 : number',
+        '2:11 : number',
+        '2:22 left:',
+        '2:25 right:',
+        '3:30 : number',
+        '3:41 left:',
+        '3:44 right:',
+        // The script of the island, and an argument in the template.
+        '6:12 : Signal<number>',
+        '6:22 value:',
+        '7:30 : number',
+        '8:11 : number',
+        '8:21 value:',
+        '11:10 value:',
+      ])
+    })
+
+    it('shows only the hints inside the range asked for', async () => {
+      expect(await hintsOf('src/routes/hints.kay', 2, 3)).toEqual(['2:11 : number', '2:22 left:', '2:25 right:'])
+    })
+
+    it('gives a file with a syntax error or no text no hints', async () => {
+      await editor.open('src/routes/broken.kay')
+      await editor.open('src/routes/empty.kay')
+
+      expect(await hintsOf('src/routes/broken.kay', 0, 10)).toEqual([])
+      expect(await hintsOf('src/routes/empty.kay', 0, 10)).toEqual([])
     })
   })
 })

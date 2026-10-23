@@ -150,3 +150,18 @@ export interface CodeLens {
   range: Range
   command: { title: string, command: string }
 }
+
+export interface InlayHint {
+  position: Position
+  label: string
+  // 1 for the type of a declaration, 2 for the name of a parameter.
+  kind?: number | undefined
+  textEdits?: TextEdit[] | undefined
+  paddingLeft?: boolean | undefined
+  paddingRight?: boolean | undefined
+}
+
+// As tsgo answers: the label may come in parts, some linking to the declaration of a type.
+export interface TsgoInlayHint extends Omit<InlayHint, 'label'> {
+  label: string | { value: string }[]
+}
