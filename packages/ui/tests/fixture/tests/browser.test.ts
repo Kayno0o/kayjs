@@ -54,6 +54,16 @@ inBrowser('in the browser', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 
+  test('a selectable Table with a row selected passes axe, its aria-selected row allowed', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/table')
+
+    expect(await page.count('#selectable tr[aria-selected="true"]')).toBe(1)
+    expect(await page.a11y('#selectable')).toEqual([])
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
   test('a medium Button in a row of compact fields is as tall as they are at any density, and one elsewhere keeps its height', async () => {
     const site = await shared()
 
