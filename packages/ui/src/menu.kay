@@ -7,6 +7,7 @@ import { recipe, uid } from 'kay'
 import { stepIndex } from './cycle'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
+import { MENU_ITEM, MENU_LIST } from './menu-look'
 import Popover from './popover.kay'
 
 // The class given to a Menu goes to its trigger, as it always did: `root` is the trigger and the popover is `menu`.
@@ -15,11 +16,10 @@ const look = recipe({
   parts: {
     root: '',
     menu: 'kui-menu min-w-48',
-    list: 'flex flex-col gap-px p-1 outline-none',
+    list: MENU_LIST,
     separator: 'my-1 border-0 border-t border-kui-surface2',
     icon: 'size-4 shrink-0',
-    // The tint alone is too faint to find, so an accent bar marks the item the keyboard stands on; forced colours drop both and paint the transparent outline instead.
-    item: 'flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text-left text-sm text-kui-text outline-none hover:bg-kui-row-hover focus:bg-kui-row-hover focus-visible:[box-shadow:inset_2px_0_0_var(--color-kui-accent)] focus-visible:[outline-offset:-2px] focus-visible:[outline:2px_solid_transparent] data-danger:text-kui-error disabled:cursor-default disabled:opacity-50',
+    item: `${MENU_ITEM} data-danger:text-kui-error disabled:cursor-default disabled:opacity-50`,
   },
 })
 
