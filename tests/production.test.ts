@@ -1805,6 +1805,19 @@ describe('lifecycle', () => {
     }, 30_000)
   })
 
+  it('on SIGTERM leaves a schedule run ignoring its signal within a short shutdown timeout, exiting 0', async () => {
+    const { server, waitFor, output } = await startServer({ SCHEDULE: '1', SHUTDOWN_TIMEOUT: '2' })
+
+    await waitFor('schedule started\n')
+    server.kill('SIGTERM')
+
+    const stopping = Date.now()
+
+    expect(await server.exited).toBe(0)
+    expect(Date.now() - stopping).toBeLessThan(2000)
+    expect(await output()).not.toContain('requests still open')
+  }, 20_000)
+
   it('on SIGTERM closes an open websocket once the requests finished, runs the stop hooks and exits 0', async () => {
     const { server, url, slow, waitFor, output } = await startServer()
     const socket = new WebSocket(`${url.replace('http', 'ws')}/socket`)

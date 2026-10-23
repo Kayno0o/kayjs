@@ -46,7 +46,7 @@ A production server (`NODE_ENV=production`) runs each schedule once across all i
 
 In a rolling deploy, old and new builds with a changed job both run, as their locks differ. `{ lock: 'weekly-report' }` names it yourself, and `{ lock: false }` runs the job in every process. With `lock` and several jobs, each job locks as `<lock>:<its schedule>:<its place in that schedule's list>`.
 
-A run that takes longer than `timeout`, 10 minutes by default, is logged as failed and left behind, so a job that never settles does not block the next run. A shutdown aborts the signal and waits at most 5 seconds for a run that ignores it.
+A run that takes longer than `timeout`, 10 minutes by default, is logged as failed and left behind, so a job that never settles does not block the next run. A shutdown aborts the signal and waits at most 3 seconds, less with a short `shutdownTimeout`, for a run that ignores it.
 
 The job is called with the signal, so a job with an optional first parameter gets it. The job gets an `AbortSignal` as its argument, aborted at the timeout and when the server stops; `timeout: false` sets no limit.
 

@@ -1,5 +1,5 @@
 import { Elysia } from 'elysia'
-import { eventStream, pages, pgData, queue, sqliteJobs, sqliteRooms } from '../../../src/server'
+import { eventStream, pages, pgData, queue, schedule, sqliteJobs, sqliteRooms } from '../../../src/server'
 import { setupStore } from '../../../src/server/app-store'
 
 // Started by tests/production.test.ts in a process of its own, to be stopped by a signal.
@@ -70,6 +70,14 @@ if (data || (process.env.JOBS_PATH && process.env.ROOMS_PATH)) {
 
     return 'joined'
   })
+}
+
+// A schedule whose boot run ignores its signal.
+if (process.env.SCHEDULE) {
+  app.use(schedule('1h', async () => {
+    console.log('schedule started')
+    await new Promise(() => undefined)
+  }, { boot: true, lock: false }))
 }
 
 app.listen(0)

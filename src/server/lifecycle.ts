@@ -16,7 +16,7 @@ import { requestUrl } from './request-url'
 export const HEALTH_PATH = '/_kay/health'
 const DEFAULT_SHUTDOWN_TIMEOUT = '10s'
 const HEALTH_CACHE_MS = 3000
-const WEBSOCKET_POLL_MS = 25
+const REQUEST_POLL_MS = 25
 
 // Set on `globalThis` while a server watches its parent, so the watch `kay render` preloads, for a server nothing else stops, leaves it the stop.
 const PARENT_WATCHED = Symbol.for('kay.parentWatched')
@@ -212,17 +212,21 @@ async function stopServer(server: NonNullable<AnyElysia['server']>, force: boole
 
   const state = { stopped: false }
   const stopping = (async () => {
-    await server.stop(false)
-    state.stopped = true
+    try {
+      await server.stop(false)
+    }
+    finally {
+      state.stopped = true
+    }
   })()
 
   while (!state.stopped && server.pendingRequests > 0)
-    await Bun.sleep(WEBSOCKET_POLL_MS)
+    await Bun.sleep(REQUEST_POLL_MS)
 
-  if (!state.stopped && server.pendingWebSockets > 0)
-    void server.stop(true)
+  const closing = !state.stopped && server.pendingWebSockets > 0 ? server.stop(true) : undefined
 
   await stopping
+  await closing
 }
 
 // Ends the open event streams, which never finish by themselves, stops the server once its other open requests finished, or at once when `force` is set, then runs each `onStop` hook in turn, awaiting it, which Elysia's own `stop()` does not.
