@@ -304,14 +304,12 @@ function keepUndeclared(id: string, key: string, text: string | undefined, atSta
 
   const counted = !kept.startup.has(id)
 
-  if (expiresAt === undefined)
+  if (text === undefined || expiresAt === undefined)
     kept.undeclaredExpiry.delete(writtenKey(id, key))
-  else if (text !== undefined)
+  else
     kept.undeclaredExpiry.set(writtenKey(id, key), expiresAt)
 
   if (text === undefined) {
-    kept.undeclaredExpiry.delete(writtenKey(id, key))
-
     if (held?.delete(key) && counted)
       kept.undeclaredRows--
 
@@ -976,11 +974,7 @@ export function live(initial: unknown, first?: unknown, second?: unknown, third?
   const name = (options ? third : second) as string | undefined
 
   if (id === undefined)
-    throw new TypeError('kay: live() is declared as `export const name = live(...)` at the top of a module in the project, where the build names it')
+    throw new TypeError('kay: live() is declared as `export const name = live(...)` at the top of a module in the project, where the build names it; its options, if any, are an object written in the declaration')
 
-  return typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined' ? serverLive(id, initial, name, lifetimeOf(options, name ?? id)) : browserLive(id, initial)
-}
-
-function lifetimeOf(options: LiveOptions | undefined, name: string): number | undefined {
-  return options?.ttl === undefined ? undefined : durationSeconds(options.ttl, `the ttl of live() ${name}`) * 1000
+  return typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined' ? serverLive(id, initial, name, options?.ttl === undefined ? undefined : durationSeconds(options.ttl, `the ttl of live() ${name ?? id}`) * 1000) : browserLive(id, initial)
 }

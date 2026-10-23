@@ -64,7 +64,6 @@ export async function createDataTables(source: PgJobsSource): Promise<void> {
       await tx`CREATE TABLE IF NOT EXISTS kay_room_messages (id bigserial PRIMARY KEY, room text NOT NULL, text text NOT NULL, process text NOT NULL, skipped text, recipient text, at bigint NOT NULL)`
       await tx`CREATE TABLE IF NOT EXISTS kay_room_state (room text PRIMARY KEY, state text NOT NULL)`
       await tx`CREATE TABLE IF NOT EXISTS kay_live (id text NOT NULL, key text NOT NULL, value text NOT NULL, expires_at bigint, PRIMARY KEY (id, key))`
-      await tx`ALTER TABLE kay_live ADD COLUMN IF NOT EXISTS expires_at bigint`
       await tx`CREATE TABLE IF NOT EXISTS kay_live_events (seq bigserial PRIMARY KEY, origin text NOT NULL, id text NOT NULL, key text NOT NULL, at bigint NOT NULL)`
 
       await tx`CREATE TABLE IF NOT EXISTS kay_notifications (seq bigserial PRIMARY KEY, id text NOT NULL UNIQUE, user_id text NOT NULL, title text NOT NULL, url text, at bigint NOT NULL, expires bigint NOT NULL, read_at bigint)`
@@ -72,6 +71,9 @@ export async function createDataTables(source: PgJobsSource): Promise<void> {
       for (const index of OWN_INDEXES)
         await tx.unsafe(indexStatement(index, false))
     })
+
+    // A kay_live made before the column existed, with another table missing, is not touched by the CREATE above.
+    await addMissingColumns(db)
   }
   finally {
     if (typeof source === 'string')

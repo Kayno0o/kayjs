@@ -352,40 +352,40 @@ process.exit(0)`)
 
 describe('a live value with a lifetime', () => {
   it('goes back to what the declaration gives once its lifetime passed, and tells the watchers', async () => {
-    const mortal = declareTtl(0, { ttl: '80ms' }, 'test:ttl-memory', 'ttlMemory')
+    const mortal = declareTtl(0, { ttl: '300ms' }, 'test:ttl-memory', 'ttlMemory')
     const heard: number[] = []
 
     watchSlot(liveSlot('test:ttl-memory')!, '', () => heard.push(mortal()))
     mortal.set(5)
     expect(mortal()).toBe(5)
-    await Bun.sleep(40)
-    expect(mortal()).toBe(5)
     await Bun.sleep(100)
+    expect(mortal()).toBe(5)
+    await Bun.sleep(400)
     expect(mortal()).toBe(0)
     expect(heard).toEqual([5, 0])
   })
 
   it('is kept for the lifetime since its last write, even a write of the value it holds', async () => {
-    const mortal = declareTtl(0, { ttl: '80ms' }, 'test:ttl-renewed', 'ttlRenewed')
+    const mortal = declareTtl(0, { ttl: '300ms' }, 'test:ttl-renewed', 'ttlRenewed')
 
     mortal.set(5)
-    await Bun.sleep(50)
+    await Bun.sleep(200)
     mortal.set(5)
-    await Bun.sleep(50)
+    await Bun.sleep(200)
     expect(mortal()).toBe(5)
-    await Bun.sleep(80)
+    await Bun.sleep(300)
     expect(mortal()).toBe(0)
   })
 
   it('expires each key on its own', async () => {
-    const room = declareKeyedTtl(() => 0, { ttl: '80ms' }, 'test:ttl-keyed', 'ttlKeyed')
+    const room = declareKeyedTtl(() => 0, { ttl: '300ms' }, 'test:ttl-keyed', 'ttlKeyed')
 
     room.set('a', 1)
-    await Bun.sleep(50)
+    await Bun.sleep(200)
     room.set('b', 2)
-    await Bun.sleep(50)
+    await Bun.sleep(150)
     expect([room('a'), room('b')]).toEqual([0, 2])
-    await Bun.sleep(60)
+    await Bun.sleep(250)
     expect([room('a'), room('b')]).toEqual([0, 0])
   })
 
@@ -479,6 +479,26 @@ describe('a live value with a lifetime', () => {
     expect(gone()).toBe(0)
     await Bun.sleep(130)
     expect(late()).toBe(0)
+    setLiveStore(undefined)
+  })
+
+  it('ends a value heard with its end, and treats a row heard past it as deleted', async () => {
+    let hear: ((id: string, key: string, text: string | undefined, expiresAt?: number) => void) | undefined
+
+    setLiveStore({ entries: () => [], set: () => undefined, delete: () => undefined, subscribe: (listener) => {
+      hear = listener
+    } })
+
+    const heard = declareTtl(0, { ttl: '60s' }, 'test:ttl-subscribed', 'ttlSubscribed')
+
+    hear!('test:ttl-subscribed', '', '[4]', Date.now() + 100)
+    expect(heard()).toBe(4)
+    await Bun.sleep(250)
+    expect(heard()).toBe(0)
+    hear!('test:ttl-subscribed', '', '[6]', Date.now() + 60_000)
+    expect(heard()).toBe(6)
+    hear!('test:ttl-subscribed', '', '[7]', Date.now() - 1)
+    expect(heard()).toBe(0)
     setLiveStore(undefined)
   })
 

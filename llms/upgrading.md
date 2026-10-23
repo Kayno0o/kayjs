@@ -9,7 +9,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 Two `mailer()`s with the same `queue.name` and `store` that set `attempts`, `backoff`, `keepFailed`, `lostAfter`, `idlePoll` or `concurrency` differently now stop the boot, since the queue has one of each: give them the same values or their own `queue.name`. `onFailed` and `redact` may differ, and run for the mails their own mailer queued. A custom `transport.send(mail, signal)` gets the queue's abort signal: pass it to `fetch`.
 ### `pgData`: `kay_live` gains a column
 
-`pgData` adds `expires_at` to `kay_live` when it starts, for the `ttl` of `live()`. A role that may not alter tables makes it fail with a message: run `await createDataTables(db)` as the owner, as for the other tables.
+`pgData` adds `expires_at` to `kay_live` when it starts, for the `ttl` of `live()`. A role that may not alter tables makes it fail with a message: run `await createDataTables(db)` as the owner, as for the other tables. Update every replica before giving a `live()` a `ttl`: one still on the old version rewrites a row without its end.
 
 ### kayjs-cms: the activity log needs the `delete` role
 
