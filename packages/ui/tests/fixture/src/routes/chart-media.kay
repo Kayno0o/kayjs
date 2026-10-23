@@ -15,9 +15,9 @@ const tiles = [{ id: 1, height: 80 }, { id: 2, height: 120 }, { id: 3, height: 6
 //- The browser-drawn chart and media parts, for the browser test to read their computed styles.
 main
   #line
-    LineChart(label="Visits" labels={['a', 'b', 'c', 'd', 'e']} onRange={() => {}} series={[{ name: 'Visits', values: [3, 5, 2, 6, 4] }, { name: 'Sales', values: [1, 2, 1, 3, 2], color: 'red' }]})
+    LineChart(label="Visits" labels={['a', 'b', 'c', 'd', 'e']} onRange={() => undefined} series={[{ name: 'Visits', values: [3, 5, 2, 6, 4] }, { name: 'Sales', values: [1, 2, 1, 3, 2], color: 'red' }]})
   #scatter
-    ScatterChart(label="Games" onSelect={() => {}} points={[{ key: 1, label: 'Hades', x: 10, y: 90, weight: 4 }, { key: 2, label: 'Celeste', x: 30, y: 70 }]} x={{ label: 'Hours', domain: [0, 40] }} y={{ label: 'Score' }})
+    ScatterChart(label="Games" onSelect={() => undefined} points={[{ key: 1, label: 'Hades', x: 10, y: 90, weight: 4 }, { key: 2, label: 'Celeste', x: 30, y: 70 }]} x={{ label: 'Hours', domain: [0, 40] }} y={{ label: 'Score' }})
   #gallery(style="width: 480px")
     MediaGallery(items={items})
   #cropper(style="width: 400px")
