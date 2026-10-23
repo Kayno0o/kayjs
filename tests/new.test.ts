@@ -407,6 +407,7 @@ describe('kay command line', () => {
       expect(test).toContain('\npermissions:\n  contents: read\n')
       expect(test).toContain('run: bun run check --format github')
       expect(test).toContain('- 5432:5432')
+      expect(test).toMatch(/\n {8}image: postgres:18-alpine@sha256:[0-9a-f]{64}\n/)
       expect(test).toContain('DATABASE_URL: postgres://app:app@localhost:5432/app_test')
       expect(test).not.toContain('apt-get')
       expect(pages).toContain('uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5')
@@ -829,6 +830,8 @@ describe('kay new', () => {
       // Base images by digest, and the app container with no capability nor privilege gain.
       expect(await Bun.file(join(dir, 'Dockerfile')).text()).toMatch(/^FROM debian:bookworm-slim@sha256:[0-9a-f]{64}$/m)
       expect(compose).toMatch(/image: postgres:18-alpine@sha256:[0-9a-f]{64}/)
+      expect(await Bun.file(join(dir, 'compose.dev.yaml')).text()).toMatch(/\n {4}image: postgres:18-alpine@sha256:[0-9a-f]{64}\n/)
+      expect(await Bun.file(join(dir, '.forgejo/workflows/test.yml')).text()).toMatch(/\n {8}image: postgres:18-alpine@sha256:[0-9a-f]{64}\n/)
       expect(compose).toContain('cap_drop: [ALL]')
       expect(compose).toContain('no-new-privileges:true')
       expect(await Bun.file(join(dir, '.env.example')).text()).toMatch(/\nKAY_SECRET=\nSITE_URL=\nPOSTGRES_PASSWORD=\nAPP_DB_PASSWORD=\n$/)
