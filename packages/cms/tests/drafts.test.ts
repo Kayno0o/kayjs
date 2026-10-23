@@ -264,6 +264,22 @@ describe('saving', () => {
     expect(drafts.issues(post, '').map(issue => issue.message)).toEqual(['hello already exists'])
   })
 
+  it('replaces only the issues of the entry a save was refused for', () => {
+    const { drafts } = setup()
+    const home = { collection: 'pages', slug: 'home' }
+
+    drafts.report([{ collection: 'posts', slug: 'hello', path: 'title', message: 'Title is required' }, { ...home, path: 'headline', message: 'Headline is required' }])
+    drafts.report([], home)
+
+    expect(drafts.issues(post).map(issue => issue.message)).toEqual(['Title is required'])
+    expect(drafts.issues(home)).toEqual([])
+
+    drafts.report([{ ...home, path: 'headline', message: 'Again' }], home)
+
+    expect(drafts.issues(post)).toHaveLength(1)
+    expect(drafts.issues(home).map(issue => issue.message)).toEqual(['Again'])
+  })
+
   it('keeps the issues of a refused save through a render scheduled before it, until the next edit renders', async () => {
     const { drafts, calls } = setup(async () => ({ issues: [] }))
     const refusal = { collection: 'posts', slug: 'hello', path: '', message: 'would run as the site' }

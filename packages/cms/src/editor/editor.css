@@ -70,13 +70,12 @@ html.kcms-dock-side .kcms-editor-open {
   color: var(--color-muted);
 }
 
-.kcms-editor-status p.kcms-editor-failure {
-  color: var(--color-danger);
-}
-
 .kcms-editor-failure,
 .kcms-entry-failure {
   margin: 1rem;
+}
+
+p.kcms-entry-failure {
   color: var(--color-danger);
 }
 
@@ -104,7 +103,6 @@ html.kcms-dock-side .kcms-editor-open {
 
 .kcms-entry-hint {
   margin: 0;
-  color: var(--color-muted);
 }
 
 .kcms-editor-empty,

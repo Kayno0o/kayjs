@@ -26,7 +26,7 @@ afterEach(async () => {
 interface Write { url: string, data: Record<string, unknown> }
 
 // The entries API holding a post and the home page, recording every save; `refuse` answers a save of that collection with an issue on a field.
-function server(refuse?: { collection: string, path: string }) {
+function server(refuse?: { collection: string, path: string }, posts: object = POSTS) {
   const writes: Write[] = []
 
   asked = []
@@ -42,7 +42,7 @@ function server(refuse?: { collection: string, path: string }) {
     if (method === 'GET' && path.includes('/entries/')) {
       return path.includes('/home/')
         ? Response.json({ collection: HOME, entry: { slug: 'index', data: { headline: 'Welcome', tagline: 'Hi' }, version: 'v1', url: '/' } })
-        : Response.json({ collection: POSTS, entry: { slug: 'hello', data: { title: 'Hello world', summary: 'Short', tags: ['a'] }, version: 'v1', url: '/posts/hello' } })
+        : Response.json({ collection: posts, entry: { slug: 'hello', data: { title: 'Hello world', summary: 'Short', tags: ['a'], seo: { description: 'D', image: 'i.png' } }, version: 'v1', url: '/posts/hello' } })
     }
 
     if (method === 'POST' && path.includes('/entries/')) {
@@ -77,7 +77,7 @@ async function until(done: () => unknown): Promise<void> {
 
 async function open(entries: object[] = [HELLO]) {
   // The fields a visitor clicks on the page.
-  for (const marker of ['posts:hello:summary', 'posts:hello:title']) {
+  for (const marker of ['posts:hello:summary', 'posts:hello:title', 'posts:hello:tags', 'posts:hello:seo.description']) {
     const element = document.createElement('p')
 
     element.dataset.page = ''
@@ -210,7 +210,7 @@ test('what was typed in a field is kept while it is hidden, and Save writes it w
   button('Save')!.click()
   await until(() => writes.length > 0)
 
-  expect(writes.map(write => write.data)).toEqual([{ title: 'Mine', summary: 'Also mine', tags: ['a'] }])
+  expect(writes.map(write => write.data)).toMatchObject([{ title: 'Mine', summary: 'Also mine', tags: ['a'] }])
 })
 
 test('a save refused on a hidden field opens the form on it, and one refused on the shown field keeps it collapsed', async () => {
@@ -273,4 +273,93 @@ test('a page with one entry has no Save all', async () => {
   const { button } = await open()
 
   expect(button('Save all')).toBeUndefined()
+})
+
+const WITH_GROUP = { ...POSTS, schema: { type: 'object', properties: { ...POSTS.schema.properties, seo: { type: 'object', properties: { description: { type: 'string' }, image: { type: 'string' } } } } } }
+
+test('a click on a field the layout hides collapses nothing', async () => {
+  server(undefined, { ...POSTS, layout: { form: { hide: ['tags'] } } })
+
+  const { root, shown, button } = await open()
+
+  expect(shown()).toEqual(['title', 'summary'])
+  page('posts:hello:tags').click()
+  await settle()
+  await Bun.sleep(30)
+
+  expect(shown()).toEqual(['title', 'summary'])
+  expect(button('Show all fields')).toBeUndefined()
+  expect(root.querySelectorAll('.kcms-item[hidden]')).toHaveLength(0)
+})
+
+test('a field a layout placed is its own item, and its group keeps the rest', async () => {
+  server(undefined, { ...WITH_GROUP, layout: { form: { fields: [['title', 'seo.description']] } } })
+
+  const { root, shown, anchor } = await open()
+
+  page('posts:hello:seo.description').click()
+  await until(() => shown().length === 1)
+
+  expect(shown()).toEqual(['seo.description'])
+  expect([...root.querySelectorAll('.kcms-entry-anchors button')].filter(each => each.getAttribute('aria-pressed') === 'true').map(each => each.textContent?.trim())).toEqual(['Description'])
+
+  anchor('Seo').click()
+  await until(() => shown()[0] === 'seo')
+  expect(shown()).toEqual(['seo'])
+  expect(root.querySelector('[data-kcms-path="seo.image"]')).not.toBeNull()
+})
+
+test('Show all fields puts the focus on the anchors', async () => {
+  server()
+
+  const { root, anchor, button, shown } = await open()
+
+  anchor('Summary').click()
+  await until(() => shown().length === 1)
+  button('Show all fields')!.click()
+  await until(() => shown().length === 3)
+
+  expect(document.activeElement).toBe(root.querySelector('.kcms-entry-anchors button'))
+})
+
+test('the form is not collapsed again by a reload of its entry', async () => {
+  server()
+
+  const { shown, anchor, button } = await open()
+
+  page('posts:hello:summary').click()
+  await until(() => shown().length === 1)
+  button('Show all fields')!.click()
+  await until(() => shown().length === 3)
+  await Bun.sleep(50)
+
+  expect(shown()).toEqual(['title', 'summary', 'tags'])
+  expect(anchor('Title').getAttribute('aria-pressed')).toBeNull()
+})
+
+test('the body is an anchor of its own, named as the layout names it', async () => {
+  server(undefined, { ...POSTS, body: true, layout: { form: { body: { label: 'Text' } } } })
+
+  const { anchor, shown } = await open()
+
+  anchor('Text').click()
+  await until(() => shown()[0] === undefined)
+
+  expect(document.querySelector('.kcms-entry [data-kcms-body]')!.closest('.kcms-item')!.hasAttribute('hidden')).toBe(false)
+})
+
+test('Save all with one entry refused leaves it dirty with its message and the other saved', async () => {
+  const writes = server({ collection: 'posts', path: 'title' })
+  const { root, path, button, type } = await open([HELLO, HOME_ENTRY])
+  const save = (form: number) => [...root.querySelectorAll('.kcms-entry')[form]!.querySelectorAll<HTMLButtonElement>('button')].find(each => each.textContent?.trim() === 'Save')!
+
+  await type(path('title'), 'New title')
+  await type(root.querySelector<HTMLInputElement>('[data-kcms-path="headline"] input')!, 'New welcome')
+  button('Save all')!.click()
+  await until(() => writes.length === 2)
+  await until(() => root.querySelectorAll('.kcms-entry[aria-busy="true"]').length === 0)
+  await settle()
+
+  expect([save(0).disabled, save(1).disabled]).toEqual([false, true])
+  expect(root.querySelector('.kcms-entry [data-part="issue"]')?.textContent).toContain('Not valid')
 })

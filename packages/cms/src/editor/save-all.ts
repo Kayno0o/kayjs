@@ -21,16 +21,12 @@ export function registerSaver(entry: EntryRef, saver: Saver): () => void {
   }
 }
 
-// Saves each entry holding edits, in the order the page lists them and one after another, as each save is a commit of its own and two at once would race for the same branch. An entry refused stays as it is with its own message, and the others still go through; the count is how many were refused.
-export async function saveAll(entries: readonly EntryRef[]): Promise<number> {
-  let refused = 0
-
+// Saves each entry holding edits, in the order the page lists them and one after another, as each save is a commit of its own and two at once would race for the same branch. An entry refused stays as it is with its own message, and the others still go through.
+export async function saveAll(entries: readonly EntryRef[]): Promise<void> {
   for (const entry of entries) {
     const saver = savers.get(entryKey(entry))
 
-    if (saver?.pending() && !await saver.save())
-      refused++
+    if (saver?.pending())
+      await saver.save()
   }
-
-  return refused
 }

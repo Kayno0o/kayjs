@@ -7,7 +7,7 @@ import { BODY_ID } from '../layout'
 import { fieldsOf } from '../fields'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
-import { call, navigate, refresh, resource, untrack } from 'kay'
+import { call, flush, navigate, refresh, resource, untrack } from 'kay'
 import { wording } from 'kay/words'
 import editorApi from '../api/editor'
 import entriesApi from '../api/entries'
@@ -19,7 +19,7 @@ import { savedHandler } from './live'
 import { readReferrers } from './referrers'
 import { rebuildFinished, rebuildStarted } from './rebuild'
 import { unfoldAround } from './reorder'
-import { anchorsOf, covers, keyOfPath } from './anchors'
+import { anchorsOf, keyOfPath, ownerOf } from './anchors'
 import { registerSaver } from './save-all'
 import EntryFields from './entry-fields.kay'
 import { formScope } from '../form'
@@ -69,6 +69,7 @@ const scope = memo(() => {
   return answer && Object.defineProperty(formScope(drafts, entry, answer.collection), 'denied', { get: () => can.value()?.denied })
 })
 let box: HTMLElement | undefined
+let nav: HTMLElement | undefined
 
 effect(() => {
   const answer = source.value()
@@ -78,7 +79,7 @@ effect(() => {
     drafts.open({ ...entry, data: answer.entry.data ?? {}, body: answer.entry.body }, answer.entry.version)
 })
 
-// The path on the page the form is collapsed to, or all of it while none: a click on the page or an anchor collapses it, Show all fields or a refused save opens it again. A field keeps what was typed in it while hidden.
+// The item of the form it is collapsed to, or all of it while none: a click on the page or an anchor collapses it, Show all fields or a refused save opens it again. A field keeps what was typed in it while hidden.
 const current = signal<string>()
 const anchors = memo(() => {
   const answer = source.value()
@@ -86,13 +87,17 @@ const anchors = memo(() => {
   return answer ? anchorsOf(fieldsOf(answer.collection.schema), answer.collection.body !== undefined, answer.collection.layout?.form) : []
 })
 
-// Shows the field of a path, brings it into view (the unfolding is untracked, or the effect would follow the list's data and folds) and puts the caret in it.
+// Collapses the form to the item holding the field of a path of the form, brings the field into view (the unfolding is untracked, or the effect would follow the list's data and folds) and puts the caret in it. A path no item holds, such as a field the layout hides, changes nothing.
 function reveal(path: string): void {
   untrack(() => {
-    current = path
+    const owner = ownerOf(anchors(), path)
 
-    if (!box)
+    if (owner === undefined || !box)
       return
+
+    current = owner
+    // The item was hidden until now, which a focus asks to be shown.
+    flush()
 
     // A group, such as a list item, has no control of its own: its first field stands for it.
     const selector = path === BODY_ID ? '[data-kcms-body]' : `[data-kcms-path="${CSS.escape(path)}"], [data-kcms-path^="${CSS.escape(`${path}.`)}"]`
@@ -106,19 +111,22 @@ function reveal(path: string): void {
   })
 }
 
+// The form is loaded once its entry has come, which the page's clicks wait for.
+const loaded = memo(() => source.value() !== undefined)
+
 // Typing in a field on the page collapses the form to it, which keeps the focus where it is.
 effect(() => {
   const path = typing
 
-  if (path !== undefined && source.value())
-    untrack(() => current = keyOfPath(path))
+  if (path !== undefined && loaded())
+    untrack(() => current = ownerOf(anchors(), keyOfPath(path)) ?? current())
 })
 
 // A click on the page reveals its field, once the form has loaded.
 effect(() => {
   const path = focus
 
-  if (path !== undefined && source.value() && box)
+  if (path !== undefined && loaded() && box)
     reveal(keyOfPath(path))
 })
 
@@ -129,11 +137,17 @@ function openForIssues(): void {
   if (at === undefined)
     return
 
-  const shown = anchors().filter(anchor => covers(anchor.key, at))
   const stray = [...drafts.issues(entry).map(issue => issue.body === true ? BODY_ID : issue.path), ...drafts.blocked(entry).map(({ path }) => path)].filter(path => path !== '')
 
-  if (stray.some(path => !shown.some(anchor => covers(anchor.key, path))))
+  if (stray.some(path => ownerOf(anchors(), path) !== at))
     current = undefined
+}
+
+// Opens the form again, the focus going to the anchors as the button it was on goes.
+function showAll(): void {
+  current = undefined
+  flush()
+  nav?.querySelector<HTMLElement>('button')?.focus()
 }
 
 // A text that does not parse keeps Save and Reset enabled, so pressing Save says what to fix.
@@ -242,8 +256,7 @@ section.kcms-entry(aria-busy={saving()} ref={element => box = element})
         EntryState(draftField={draftField()} draft={isDraft()} dirty={unsaved()} saving={saving() || removed()} denied={can.value()?.denied} title={title()} url={answer.entry.url} referrers={referrers()} deletable={!isSingle() && !answer.seeded} onPublish={() => setDraft(false)} onUnpublish={() => setDraft(true)} onRemove={remove} onAskReferrers={askReferrers})
   EntryPresence(room={room.room} member={room.member})
   if stranded() as screen
-    .kcms-entry-failure(role="alert")
-      p {wording('cms.entry.deleted', 'This entry is deleted.')}
+    Notice.kcms-entry-failure(tone="danger" size="sm" label={wording('cms.entry.deleted', 'This entry is deleted.')})
       a(href={screen}) {wording('cms.entry.deletedLeave', 'Go to the collection')}
   else if source.status() === 'failed'
     Notice.kcms-entry-failure(tone="danger" size="sm" label={wording('cms.entry.loadFailure', 'Could not load this entry: {message}', { message: source.error()?.message ?? '' })})
@@ -255,11 +268,11 @@ section.kcms-entry(aria-busy={saving()} ref={element => box = element})
     if frozen() !== ''
       Notice.kcms-entry-hint(size="sm" label={wording('cms.entry.frozen', 'A click on the page cannot reach {fields}, held by a frozen object: edit it here.', { fields: frozen() })})
     if anchors().length > 1
-      nav.kcms-entry-anchors(aria-label={wording('cms.entry.fields', 'Fields')})
+      nav.kcms-entry-anchors(aria-label={wording('cms.entry.fields', 'Fields')} ref={element => nav = element})
         for anchor of anchors() key={anchor.key}
-          Button(label={anchor.label} size="sm" variant="ghost" pressed={current() === undefined ? undefined : covers(anchor.key, current()!)} onClick={() => reveal(anchor.key)})
+          Button(label={anchor.label} size="sm" variant="ghost" pressed={current() === undefined ? undefined : anchor.key === current()} onClick={() => reveal(anchor.key)})
         if current() !== undefined
-          Button(label={wording('cms.entry.showAll', 'Show all fields')} variant="inline" onClick={() => current = undefined})
+          Button(label={wording('cms.entry.showAll', 'Show all fields')} variant="inline" onClick={showAll})
     fieldset.kcms-entry-fields(disabled={saving() || removed()})
       EntryFields(form={scope()!} only={current()})
   else

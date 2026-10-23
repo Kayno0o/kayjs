@@ -13,13 +13,20 @@ export interface Anchor {
 
 // The form's items in the order it draws them, each named by its label: what the editor jumps to when the form is collapsed to one field.
 export function anchorsOf(fields: Field[], hasBody: boolean, layout?: FormLayout): Anchor[] {
-  return formRows(fields, hasBody, layout).flat().map(item => item === 'body' ? { key: BODY_ID, label: wording('cms.entry.body', 'Body') } : { key: item.at ?? String(item.key), label: item.label })
+  return formRows(fields, hasBody, layout).flat().map(item => item === 'body' ? { key: BODY_ID, label: layout?.body?.label ?? wording('cms.entry.body', 'Body') } : { key: item.at ?? String(item.key), label: item.label })
 }
 
 // The name a path on the page has among the form's items: the body's is the item's `#body`.
 export const keyOfPath = (path: FieldPath): string => path === BODY ? BODY_ID : path
 
-// Whether the item named `key` holds the field a path of the form names: the item itself, a field inside it (a list's item, a group's field), or the items placed from inside the group the path names.
-export function covers(key: string, path: string): boolean {
-  return key === path || path.startsWith(`${key}.`) || key.startsWith(`${path}.`)
+// The item of the form holding the field a path names: the item of that path or the longest one it lies inside (a list's item, a group's field, the group a placed field was taken from), else none, as for a field the layout hides.
+export function ownerOf(anchors: readonly Anchor[], path: string): string | undefined {
+  let owner: string | undefined
+
+  for (const { key } of anchors) {
+    if ((key === path || path.startsWith(`${key}.`)) && (owner === undefined || key.length > owner.length))
+      owner = key
+  }
+
+  return owner
 }

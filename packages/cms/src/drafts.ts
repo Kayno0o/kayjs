@@ -406,9 +406,10 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
       return changed().filter(entry => keys.has(entryKey(entry)))
     },
     // Shows the issues a save was refused with, as a render's are shown.
-    report(refusals: readonly Issue[]): void {
+    // With an entry, only its issues are replaced, so Save all keeps the refusal of one entry through the save of the next.
+    report(refusals: readonly Issue[], ref?: EntryRef): void {
       reported = true
-      issues.set(refusals)
+      issues.set(ref === undefined ? refusals : [...issues().filter(issue => entryKey(issue) !== entryKey(ref)), ...refusals])
     },
     // Drops one field's issues, such as the slug's of a new entry (`path` `''` with `key`), which no edit of the draft reaches.
     dismissWhere(ref: EntryRef, match: (issue: Issue) => boolean): void {

@@ -7,14 +7,13 @@ import EntryNotices from '../components/entry-notices.kay'
 import SessionEnded from '../components/session-ended.kay'
 import { fieldsOf } from '../fields'
 import { BODY_ID, formRows } from '../layout'
-import { covers } from './anchors'
 
 // An entry's form: a control per field of its collection's schema, then its Markdown body, arranged as the collection's layout says (`cms({ collections })`), and what went wrong above.
-// `only` is a path of the form (the body's is `#body`): the form then shows the item holding it and keeps the others hidden, still rendered, so what was typed in them stays.
+// `only` names an item of the form (the body's is `#body`): the form then shows that item and keeps the others hidden, still rendered, so what was typed in them stays.
 const { form, only } = props<{ form: FormScope, only?: string | undefined }>()
 
 const keyOf = (item: FormItem) => item === 'body' ? BODY_ID : item.at ?? String(item.key)
-const shown = (item: FormItem) => only === undefined || covers(keyOf(item), only)
+const shown = (item: FormItem) => only === undefined || keyOf(item) === only
 const rows = memo(() => formRows(fieldsOf(form.collection.schema), form.collection.body !== undefined, form.collection.layout?.form))
 ---
 SessionEnded

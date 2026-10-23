@@ -118,7 +118,7 @@ async function saveOnce(drafts: Drafts, ref: EntryRef, { slug = ref.slug, locale
 
   // A text that does not parse never reaches the server, which would save the value before it.
   if (blocked.length > 0) {
-    drafts.report([...drafts.issues(ref).filter(issue => issue.body === true || !blocked.some(({ path }) => path === issue.path)), ...blocked.map(({ path, message }) => ({ ...ref, path, message }))])
+    drafts.report([...drafts.issues(ref).filter(issue => issue.body === true || !blocked.some(({ path }) => path === issue.path)), ...blocked.map(({ path, message }) => ({ ...ref, path, message }))], ref)
     tell(flight, told, wording('cms.save.fields', 'Not saved: some fields need fixing'))
 
     return false
@@ -143,7 +143,7 @@ async function saveOnce(drafts: Drafts, ref: EntryRef, { slug = ref.slug, locale
       return false
     }
 
-    drafts.report(issues)
+    drafts.report(issues, ref)
     tell(flight, told, wording('cms.save.fields', 'Not saved: some fields need fixing'))
 
     return false
@@ -153,7 +153,7 @@ async function saveOnce(drafts: Drafts, ref: EntryRef, { slug = ref.slug, locale
     return false
 
   drafts.markSaved(ref, entry, 'version' in outcome ? outcome.version : undefined)
-  drafts.report([])
+  drafts.report([], ref)
   onSaved?.({ rebuilding: 'commit' in outcome && outcome.commit !== undefined })
 
   return true

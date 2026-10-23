@@ -1,5 +1,5 @@
 import { expect, it } from 'bun:test'
-import { anchorsOf, covers, keyOfPath } from '../src/editor/anchors'
+import { anchorsOf, keyOfPath, ownerOf } from '../src/editor/anchors'
 import { fieldsOf } from '../src/fields'
 import { BODY } from '../src/markers'
 
@@ -22,22 +22,35 @@ it('follows the layout: a placed field of a group is an item of its own, named b
   expect(anchorsOf(fields, false, { hide: ['items'] }).map(anchor => anchor.key)).toEqual(['title', 'seo'])
 })
 
-it('covers the item holding a path, however deep, and the items placed from inside the group a path names', () => {
-  expect(covers('title', 'title')).toBe(true)
-  expect(covers('items', 'items.2')).toBe(true)
-  expect(covers('seo', 'seo.description')).toBe(true)
-  expect(covers('seo.description', 'seo')).toBe(true)
-  expect(covers('seo.description', 'seo.description')).toBe(true)
+it('names the item of a body label the layout gives', () => {
+  expect(anchorsOf(fields, true, { body: { label: 'Text' } }).at(-1)).toEqual({ key: '#body', label: 'Text' })
 })
 
-it('covers nothing of a name that only starts the same', () => {
-  expect(covers('title', 'titles')).toBe(false)
-  expect(covers('items', 'items2.0')).toBe(false)
-  expect(covers('seo.description', 'seo.image')).toBe(false)
+it('finds the item holding a path, however deep', () => {
+  const keys = anchorsOf(fields, true)
+
+  expect(ownerOf(keys, 'title')).toBe('title')
+  expect(ownerOf(keys, 'items.2')).toBe('items')
+  expect(ownerOf(keys, 'seo.description')).toBe('seo')
+})
+
+it('prefers the placed field over the group it was taken from', () => {
+  const keys = anchorsOf(fields, false, { fields: [['title', 'seo.description']] })
+
+  expect(ownerOf(keys, 'seo.description')).toBe('seo.description')
+  expect(ownerOf(keys, 'seo.image')).toBe('seo')
+})
+
+it('finds nothing for a name that only starts the same, or a field the layout hides', () => {
+  const keys = anchorsOf(fields, false, { hide: ['items'] })
+
+  expect(ownerOf(keys, 'titles')).toBeUndefined()
+  expect(ownerOf(keys, 'items.0')).toBeUndefined()
 })
 
 it('keeps the body to its own item', () => {
-  expect(covers('#body', keyOfPath(BODY))).toBe(true)
-  expect(covers('title', keyOfPath(BODY))).toBe(false)
-  expect(covers('#body', 'title')).toBe(false)
+  const keys = anchorsOf(fields, true)
+
+  expect(ownerOf(keys, keyOfPath(BODY))).toBe('#body')
+  expect(ownerOf(keys, 'body')).toBeUndefined()
 })

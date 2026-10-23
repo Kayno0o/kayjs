@@ -830,6 +830,9 @@ async function askStop(): Promise<void> {
   confirming = true
 }
 
+// As an entry's own Save counts it: edits, or a text that does not parse, which saving explains.
+const hasEdits = () => drafts.anyChanged(entries) || entries.some(entry => drafts.blocked(entry).length > 0)
+
 // Saves every entry of the page holding edits, each as its own Save would.
 async function saveEverything(): Promise<void> {
   if (savingAll())
@@ -943,7 +946,7 @@ aside.kcms-editor(ref={element => panel = element} class={{ 'kcms-editor-open': 
         Notice.kcms-editor-failure(tone="danger" size="sm" label={wording('cms.editor.draftFailure', 'The page could not show your changes: {failure}', { failure })})
       if entries.length > 1
         .kcms-editor-all
-          Button(label={savingAll() ? wording('cms.entry.saving', 'Saving…') : wording('cms.editor.saveAll', 'Save all')} tone="accent" busy={savingAll()} disabled={savingAll() || !drafts.anyChanged(entries)} onClick={saveEverything})
+          Button(label={savingAll() ? wording('cms.entry.saving', 'Saving…') : wording('cms.editor.saveAll', 'Save all')} tone="accent" busy={savingAll()} disabled={savingAll() || !hasEdits()} onClick={saveEverything})
       for entry of entries key={entryKey(entry)}
         EntryForm(entry={entry} focus={focusIn(entry)} typing={typingIn(entry)} unclickable={unclickable.filter(field => entryKey(field) === entryKey(entry))})
       else

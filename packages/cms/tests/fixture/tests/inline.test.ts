@@ -267,8 +267,11 @@ test('typing the title collapses the form to its field, an anchor shows another,
   await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('.kcms-entry-anchors button')].find(button => button.textContent?.trim() === 'Tags')!.click())
   await page.waitUntil(() => document.querySelector('[data-kcms-path="tags"]')!.getBoundingClientRect().height > 0)
   expect(await visible(FORM_TITLE)).toBe(false)
+  // The field was hidden a moment ago, and a browser focuses nothing hidden.
+  await page.waitUntil(() => document.activeElement?.closest('[data-kcms-path="tags"]') != null)
 
   await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('.kcms-entry-anchors button')].find(button => button.textContent?.trim() === 'Show all fields')!.click())
   await page.waitUntil((selector: string) => document.querySelector(selector)!.getBoundingClientRect().height > 0, undefined, FORM_TITLE)
   expect(await visible('[data-kcms-path="tags"]')).toBe(true)
+  expect(await page.evaluate(() => document.activeElement?.closest('.kcms-entry-anchors') != null)).toBe(true)
 }, 60_000)
