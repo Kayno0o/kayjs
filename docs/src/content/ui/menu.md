@@ -6,7 +6,7 @@ description: An icon button opening a menu of actions.
 
 ## Entries
 
-`items` lists the entries: an object with a `label`, an `onSelect`, an optional `icon` and `danger` for a destructive one, or `'separator'` to draw a rule between groups. `icon` sets the trigger's icon and `label` names it. `onSelect` runs once the menu has closed and focus is back on the trigger.
+`items` lists the entries: an object with a `label`, an `onSelect`, an optional `icon` and `danger` for a destructive one, or `'separator'` to draw a rule between groups. `icon` sets the trigger's icon and `label` names it. `onSelect` runs once the menu has closed and focus is back on the trigger. A menu taller than the window scrolls, and its entries are taller on a touch screen.
 
 ## Row actions
 

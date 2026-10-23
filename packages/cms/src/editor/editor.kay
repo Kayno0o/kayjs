@@ -810,8 +810,9 @@ SidePanel.kcms-editor(open={open()} modal={false} dock={dock() === 'bottom' ? 'b
     EntryForm(entry={entry} focus={focusIn(entry)} typing={typingIn(entry)} unclickable={unclickable.filter(field => entryKey(field) === entryKey(entry))})
   else
     p.kcms-editor-empty {wording('cms.editor.empty', 'Nothing on this page comes from a collection.')}
-if choosing() as question
-  Menu(id={MARKER_MENU} label={question.label} at={{ x: question.x, y: question.y }} open items={question.choices.map(choice => ({ label: choice.label, onSelect: choice.run }))} onOpenChange={shown => !shown && (choosing = undefined)})
+// Keyed by the question, so a choice that asks another one mounts a menu that opens afresh.
+for question of [choosing()].filter(Boolean) key={question}
+  Menu(id={MARKER_MENU} label={question.label} at={{ x: question.x, y: question.y }} open items={question.choices.map(choice => ({ label: choice.label, onSelect: choice.run }))} onOpenChange={shown => !shown && choosing === question && (choosing = undefined)})
 PageListTools(bars={settling() ? [] : bars()} onMove={(bar, direction) => moveOne(bar.target, bar.index!, direction)} onAdd={(bar, event) => addTo(bar.target, bar.index === undefined ? 0 : bar.index + 1, { event })} onRemove={bar => removeOne(bar.target, bar.index!)})
 Toaster
 TooltipHost

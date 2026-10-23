@@ -166,6 +166,20 @@ test('a choice of the menu adds before or after the item', async () => {
   await page.waitUntil(() => document.activeElement?.closest('[data-kcms-path="steps.1"]') != null)
 }, 60_000)
 
+test('a choice of the item menu that asks for a block type opens that menu and keeps it', async () => {
+  const page = await open()
+
+  await page.evaluate(() => document.querySelector<HTMLElement>('.sections > p')!.focus())
+  await page.press('Enter', ALT_SHIFT)
+  await page.waitUntil((selector: string) => document.activeElement === document.querySelector(`${selector} button`), undefined, MENU)
+  await page.press('ArrowDown')
+  await page.press('Enter')
+  await page.waitUntil((selector: string) => document.querySelectorAll(`${selector} button`).length === 3, undefined, MENU)
+  // The first menu's closing arrives later than its choice, and must not take the second down.
+  await new Promise(done => setTimeout(done, 300))
+  expect(await page.evaluate((selector: string) => [...document.querySelectorAll(`${selector} button`)].map(item => item.textContent), MENU)).toEqual(['Hero', 'Text', 'Quote'])
+}, 60_000)
+
 test('a block list adds the block chosen by type and reorders blocks across types', async () => {
   const page = await open()
   const kinds = () => page.evaluate(() => [...document.querySelector('.sections')!.children].map(child => child.localName))

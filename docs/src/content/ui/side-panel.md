@@ -28,7 +28,7 @@ Escape and the close button still close it through `onOpenChange(false)`. It ren
 
 ## Docked
 
-`dock="right"` or `"bottom"`, with `modal={false}`, docks the panel to that edge as a tool beside the page. The page's `body` is padded by the panel's size, the panel sits beside the dev tool's docked drawer, and a grip on its inner edge resizes it with the pointer or the arrow keys (Shift moves four steps). The panel and the page each keep a minimum of the window.
+`dock="right"` or `"bottom"`, with `modal={false}`, docks the panel to that edge as a tool beside the page. The page's `body` is given room by the panel's size (a right margin, or bottom padding), the panel sits beside the dev tool's docked drawer, and a grip on its inner edge resizes it with the pointer or the arrow keys (Shift moves four steps). The panel and the page each keep a minimum of the window.
 
 `size` is the width, or the height at the bottom, in pixels, and `onSizeChange(size, settled)` tells the parent each size the grip reached: `settled` is false while a drag is under way and true when it ends or a key moved it, so keep it then. Only the close control closes a docked panel, Escape does not.
 

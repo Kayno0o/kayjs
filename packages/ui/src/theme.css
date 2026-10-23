@@ -2262,15 +2262,6 @@
     box-shadow: var(--shadow-raised);
   }
 
-  /* A docked SidePanel makes room for itself: its size is on `html`, where the page's own body is padded by it. */
-  html[data-kui-dock='right'] body {
-    margin-right: var(--kui-dock-right);
-  }
-
-  html[data-kui-dock='bottom'] body {
-    padding-bottom: var(--kui-dock-bottom);
-  }
-
   .kui-side-panel-head {
     @apply flex shrink-0 items-center gap-2 border-b border-border px-5 py-3;
   }
@@ -3146,4 +3137,13 @@
   .kui-card-body {
     @apply p-[var(--spacing-kui-card,calc(var(--spacing)*2.5*var(--density)))];
   }
+}
+
+/* Outside the layers, so a site's own unlayered `body` margin does not beat it: a docked SidePanel gives the page room for itself, its size being on `html`. */
+html[data-kui-dock='right'] body {
+  margin-right: var(--kui-dock-right);
+}
+
+html[data-kui-dock='bottom'] body {
+  padding-bottom: var(--kui-dock-bottom);
 }

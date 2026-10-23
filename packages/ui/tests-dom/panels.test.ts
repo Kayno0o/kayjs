@@ -202,6 +202,20 @@ describe('SidePanel with a dock', () => {
     expect(settled.at(-1)).toBe(Number(reached))
   })
 
+  test('a click on its grip that never moves settles nothing', async () => {
+    const settled: number[] = []
+
+    mounted = await mountComponent('src/components/panels.kay', { onClose: () => closes++, onSettled: (size: number) => settled.push(size) })
+
+    const pointer = (type: string, x: number) => grip(mounted!.root).dispatchEvent(new PointerEvent(type, { clientX: x, pointerId: 1, button: 0, bubbles: true, cancelable: true }))
+
+    pointer('pointerdown', 500)
+    pointer('pointerup', 500)
+    await settle()
+
+    expect(settled).toEqual([])
+  })
+
   test('moves to the bottom edge, where the grip resizes the height with the vertical arrows', async () => {
     const root = await panels()
 
