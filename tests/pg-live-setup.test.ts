@@ -201,4 +201,34 @@ pgDescribe('a pgData role that may not alter tables', () => {
       }
     })
   }, 60_000)
+
+  pgIt('refuses to boot on a database another app owns, and boots on its own or an adopted one', async () => {
+    await withDatabase(async (database) => {
+      const first = await project()
+      const second = await project()
+
+      await Bun.write(join(first, 'package.json'), JSON.stringify({ name: 'shop' }))
+      await Bun.write(join(second, 'package.json'), JSON.stringify({ name: 'blog' }))
+
+      const boot = async (root: string) => {
+        const before = process.env.KAY_ROOT
+
+        process.env.KAY_ROOT = root
+
+        try {
+          await pages({ root, routes: join(root, 'src/routes'), prebuilt: false, security: false, store: pgData(database) })
+        }
+        finally {
+          if (before === undefined)
+            delete process.env.KAY_ROOT
+          else
+            process.env.KAY_ROOT = before
+        }
+      }
+
+      await boot(first)
+      await boot(first)
+      await expect(boot(second)).rejects.toThrow('belongs to the app "shop"')
+    })
+  }, 60_000)
 })

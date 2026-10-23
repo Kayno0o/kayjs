@@ -1,7 +1,7 @@
 import type { BunPlugin } from 'bun'
 import type { Project } from '../project'
 import type { Route, SpecialPages } from '../server/routes'
-import { existsSync, realpathSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import { buildFailure, KayError, raisedMark } from '../compiler/errors'
@@ -70,6 +70,18 @@ function compressedWasm(): BunPlugin {
   }
 }
 
+// The package.json name of the project, which an executable carries as the app's identity.
+function projectName(root: string): string | undefined {
+  try {
+    const { name } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { name?: unknown }
+
+    return typeof name === 'string' && name !== '' ? name : undefined
+  }
+  catch {
+    return undefined
+  }
+}
+
 // The project's server entry, else kay's own, which only mounts the pages.
 function ownEntry(entry: string): string {
   return existsSync(entry) ? entry : PAGES_ENTRY
@@ -131,6 +143,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
     '',
     'registerBundle({',
     `  root: ${JSON.stringify(root)},`,
+    `  name: ${JSON.stringify(projectName(root))},`,
     `  routes: ${JSON.stringify(routes)},`,
     `  fallback: ${JSON.stringify(fallback)},`,
     `  api: ${JSON.stringify(api)},`,

@@ -203,6 +203,8 @@ It takes what `pgJobs` takes, and creates its tables when they are missing and i
 
 Replicas learn of each other's invalidations, live values and room messages by polling, within about half a second (5 seconds on an idle server), so nothing needs LISTEN and a pooler in front of Postgres works, except for building a missing index, which needs a session connection.
 
+A database belongs to one app. The first app to start on it records its `package.json` name, and a different app starting on the same database stops with an error naming both, because they would otherwise share queues, cached values, live values and rooms. Give each app a database of its own. If you renamed the app, start it once with `KAY_ADOPT_DATABASE=<old name>` to take the database over; a database made before this check belongs to the first app that starts on it.
+
 A server reads the live values when it starts; `kay build --static` and `kay check` read none. A room shares its members and messages, which reach the other replicas in the order one published them, and `rooms({ store: pgData(db).rooms, state })` keeps its state there too, with `state` and `update` giving promises.
 
 If the database stops answering, a call of any of these stores fails after 8 seconds (150 for the sweeps and the calls that scan a table) with a logged error instead of hanging, so a worker backs off, a stop is not held up and a request reading a session fails rather than waits. A connection kay opens from a URL times out connecting after 10 seconds, closes when idle for 60 and is replaced after 30 minutes.

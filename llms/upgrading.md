@@ -7,6 +7,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### kayjs-ui: states are ARIA or a named `data-*`
 
 A Combobox option the value stands on sets `data-picked` where it set `data-selected`, which repeated the name of `aria-selected` for another meaning, and a disabled FileDrop sets `aria-disabled` where it set `data-disabled`. A Steps item (`current`, `done` or `upcoming`) sets `data-step` where it set `data-state`, as a state that ARIA has no word for is a named attribute and never a generic `data-state`. A rule of the app on `[data-state='current']` inside a Steps becomes `[data-step='current']`. A DateInput day sets no `data-today` or `data-selected`: today is `aria-current="date"` on the day button and the picked day is `aria-selected="true"` on its `td`, and a Table row of a `selectable` table sets `aria-selected` (`true` or `false`) where it set `data-selected`. A rule of the app on those attributes follows. `kay check` does not report it: an attribute selector in a stylesheet carries no component name to match.
+### `pgData`: one database, one app
+
+`pgData` records the app's `package.json` name in `kay_meta` the first time it starts on a database, and another app starting on that database now fails its boot, naming both. Two apps that shared one database on purpose (their queues, cache and live values shared by accident) each need a database of their own; an app renamed since its first boot starts once with `KAY_ADOPT_DATABASE=<the old name>`. A database from before adopts the first app that starts. No `kay check` lint can tell which database an app meant.
 
 ### kayjs-mail: mailers sharing a queue agree on its retry and keep options
 

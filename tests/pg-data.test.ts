@@ -1,5 +1,7 @@
 import type { SQL } from 'bun'
 import type { PgHandle } from '../src/server/pg-data'
+import { join } from 'node:path'
+import process from 'node:process'
 import { afterEach, expect } from 'bun:test'
 import { stringify } from 'devalue'
 import { cached } from '../src/runtime/cache'
@@ -10,6 +12,7 @@ import { createMissingIndexes, indexStatement, pgJobs } from '../src/server/pg-j
 import { pgRooms } from '../src/server/pg-rooms'
 import { pgRates, pgSessions, pgVitals } from '../src/server/pg-stores'
 import { cleanUpAfterFile, pgDescribe, pgIt, postgres, replicas } from './job-stores'
+import { scratchDir } from './scratch'
 
 cleanUpAfterFile()
 
@@ -61,7 +64,7 @@ pgDescribe('pgData', () => {
   pgIt('gives each kind the SQLite one gives', async () => {
     const data = pgData(await fresh())
 
-    expect(Object.keys(data).sort()).toEqual(['cache', 'jobs', 'live', 'notifications', 'rates', 'rooms', 'sessions', 'vitals'])
+    expect(Object.keys(data).sort()).toEqual(['cache', 'jobs', 'live', 'notifications', 'rates', 'ready', 'rooms', 'sessions', 'vitals'])
   })
 
   pgIt('is the app store: what names no store of its own lands in Postgres', async () => {
@@ -857,5 +860,129 @@ pgDescribe('pgRooms', () => {
     })).rejects.toThrow('no')
     expect(await live.state('lobby')).toEqual({ count: 1 })
     store.close()
+  })
+})
+
+// Runs `use` with KAY_ROOT on a folder whose package.json names the app, which `pgData` reads when it first touches the database.
+async function asApp<Result>(name: string | undefined, use: () => Promise<Result>): Promise<Result> {
+  const dir = await scratchDir('pg-app-')
+  const before = process.env.KAY_ROOT
+
+  if (name !== undefined)
+    await Bun.write(join(dir, 'package.json'), JSON.stringify({ name }))
+
+  process.env.KAY_ROOT = dir
+
+  try {
+    return await use()
+  }
+  finally {
+    if (before === undefined)
+      delete process.env.KAY_ROOT
+    else
+      process.env.KAY_ROOT = before
+  }
+}
+
+async function owner(sql: SQL): Promise<string | undefined> {
+  return (await rows<{ value: string }>(sql, 'SELECT value FROM kay_meta WHERE name = \'app\'')).at(0)?.value
+}
+
+// What a call fails with, or nothing when it passes.
+async function refusal(call: () => Promise<unknown>): Promise<Error | undefined> {
+  try {
+    await call()
+  }
+  catch (error) {
+    return error as Error
+  }
+}
+
+pgDescribe('pgData app identity', () => {
+  pgIt('the first app to boot claims the database and a second one is refused naming both', async () => {
+    const sql = await fresh()
+
+    await asApp('shop', async () => pgData(sql).sessions.set('a', { user: 1 }, '1h'))
+    expect(await owner(sql)).toBe('shop')
+
+    // Every store refuses, the jobs' included, which would otherwise hand the other app's `mail` jobs to this one.
+    const blog = await asApp('blog', async () => pgData(sql))
+
+    for (const touch of [async () => blog.sessions.get('a'), async () => blog.jobs.add({ id: 'x', queue: 'mail', payload: '{}', attempts: 0, runAt: 0 }), async () => blog.cache.get('k')]) {
+      const error = await asApp('blog', async () => refusal(touch))
+
+      expect(error?.message).toContain('belongs to the app "shop"')
+      expect(error?.message).toContain('"blog" is starting')
+      expect(error?.message).toContain('KAY_ADOPT_DATABASE=shop')
+    }
+
+    expect(await owner(sql)).toBe('shop')
+  })
+
+  pgIt('the same app boots again, on every replica at once', async () => {
+    const sql = await fresh()
+
+    await asApp('shop', async () => Promise.all([pgData(sql).sessions.get('a'), pgData(sql).sessions.get('b'), pgData(sql).jobs.add({ id: 'y', queue: 'mail', payload: '{}', attempts: 0, runAt: 0 })]))
+    await asApp('shop', async () => pgData(sql).sessions.get('a'))
+    expect(await owner(sql)).toBe('shop')
+  })
+
+  pgIt('a database from before identities adopts the first app that boots', async () => {
+    const sql = await fresh()
+
+    await createDataTables(sql)
+    expect(await owner(sql)).toBeUndefined()
+    await asApp('legacy', async () => pgData(sql).sessions.get('a'))
+    expect(await owner(sql)).toBe('legacy')
+  })
+
+  pgIt('KAY_ADOPT_DATABASE naming the owner hands the database to a renamed app, and only that owner', async () => {
+    const sql = await fresh()
+
+    await asApp('old-name', async () => pgData(sql).sessions.get('a'))
+
+    process.env.KAY_ADOPT_DATABASE = 'someone-else'
+
+    try {
+      await expect(asApp('new-name', async () => pgData(sql).sessions.get('a'))).rejects.toThrow('belongs to the app "old-name"')
+      process.env.KAY_ADOPT_DATABASE = 'old-name'
+      await asApp('new-name', async () => pgData(sql).sessions.get('a'))
+      expect(await owner(sql)).toBe('new-name')
+      // Left set, it harms nothing: the owner is no longer the name it expects, so a third app is still refused.
+      await expect(asApp('third', async () => pgData(sql).sessions.get('a'))).rejects.toThrow('belongs to the app "new-name"')
+    }
+    finally {
+      delete process.env.KAY_ADOPT_DATABASE
+    }
+  })
+
+  pgIt('an app with no package.json name claims nothing and is refused nowhere', async () => {
+    const sql = await fresh()
+
+    await asApp('shop', async () => pgData(sql).sessions.get('a'))
+    await asApp(undefined, async () => pgData(sql).sessions.get('a'))
+    expect(await owner(sql)).toBe('shop')
+  })
+
+  pgIt('a pgHandle given no name reads the project\'s package.json', async () => {
+    const sql = await fresh()
+
+    await asApp('named', async () => pgHandle(sql).db())
+    expect(await owner(sql)).toBe('named')
+  })
+})
+
+pgDescribe('pgData ready', () => {
+  pgIt('refuses a database owned by another app, and ignores one it cannot reach', async () => {
+    const sql = await fresh()
+
+    await asApp('shop', async () => pgData(sql).sessions.get('a'))
+    await expect(asApp('blog', async () => pgData(sql).ready())).rejects.toThrow('belongs to the app "shop"')
+    await asApp('shop', async () => pgData(sql).ready())
+
+    const down = new Bun.SQL('postgres://nobody:none@127.0.0.1:1/none', { connectionTimeout: 1, max: 1 })
+
+    await asApp('shop', async () => pgData(down).ready())
+    await down.close()
   })
 })

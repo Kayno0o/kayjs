@@ -149,6 +149,10 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
     // An export holds no live values, so it never reads the store that keeps them: a build with no database reachable still ends.
     setupStore(exporting && config.store ? { ...config.store, live: undefined } : config.store)
     await liveStoreReady()
+
+    if (!exporting)
+      await config.store?.ready?.()
+
     // A test's server restarts with its process and has no replica, so a key of the process is right there.
     warnOnStampKey(!mode.dev && process.env.NODE_ENV !== 'test')
   }

@@ -7,6 +7,8 @@ import { KayError } from '../compiler/errors'
 export interface Bundle {
   // The project root at build time; the routes and modules are named by paths under it.
   root: string
+  // The package.json name of the project at build time, which names the app to the databases it claims.
+  name?: string | undefined
   routes: Route[]
   // The routes directory's own special pages, answering URLs no page serves.
   fallback: SpecialPages
