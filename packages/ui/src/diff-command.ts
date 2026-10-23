@@ -111,7 +111,7 @@ const command: KayCommand = {
 
       changed++
       const merge = diffs.length === 0 ? '' : `\n\n${diffs.join('\n\n')}\n\nMerge into the copy by hand, or per file with git (the copy's imports of the library were rewritten, so check them after):\n${merges.join('\n')}`
-      const helped = helpers.length === 0 ? '' : `\n\nHelpers the copy imports from kayjs-ui:\n${helpers.join('\n')}`
+      const helped = helpers.length === 0 ? '' : `\n\nHelpers the copy imports from kayjs-ui (once the copy works with them, \`kay ui diff ${file.replace('.kay', '')} --accept\` records them):\n${helpers.join('\n')}`
 
       console.log(`${file}: kayjs-ui changed it between ${version} and ${installed}${merge}${helped}`)
     }

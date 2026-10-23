@@ -188,7 +188,6 @@ function relativeSpecifier(from: string, to: string): string {
   return path.startsWith('.') ? path : `./${path}`
 }
 
-// The app's own sources that may import a component: `src/`, `tests/` and the `.ts` files at the root, such as `kay.config.ts`.
 // The library files a copy imports without taking along or finding already copied, the ones its rewritten imports point at.
 function helpersOf(ejection: Ejection, texts: Map<string, string>, earlier: Map<string, string>): string[] {
   const found = new Set<string>()
@@ -209,6 +208,7 @@ export function hashOf(text: string): string {
   return new Bun.CryptoHasher('sha1').update(text).digest('hex')
 }
 
+// The app's own sources that may import a component: `src/`, `tests/` and the `.ts` files at the root, such as `kay.config.ts`.
 async function appFiles(root: string): Promise<string[]> {
   const rootFiles = (await readdir(root, { withFileTypes: true })).filter(entry => entry.isFile() && SOURCE_SUFFIX.test(entry.name)).map(entry => join(root, entry.name))
   const tests = join(root, 'tests')
@@ -270,7 +270,7 @@ function withCopyKey(text: string, file: string, name: string, copy: string, not
   let ast: t.File
 
   try {
-    ast = parse(text, { sourceType: 'module', plugins: ['typescript'] })
+    ast = parse(text, { sourceType: 'module', plugins: ['typescript'], createParenthesizedExpressions: true })
   }
   catch {
     notes.push(`src/ui.ts could not be read: if it has an entry for ${name}, repeat it under '${copy}' by hand`)
@@ -404,7 +404,7 @@ function isEjected(value: unknown): value is Ejected {
 
   const { version, files, helpers } = value as Record<string, unknown>
 
-  return typeof version === 'string' && Array.isArray(files) && files.every(file => typeof file === 'string') && (helpers === undefined || (typeof helpers === 'object' && helpers !== null))
+  return typeof version === 'string' && Array.isArray(files) && files.every(file => typeof file === 'string') && (helpers === undefined || (typeof helpers === 'object' && helpers !== null && !Array.isArray(helpers) && Object.values(helpers).every(hash => typeof hash === 'string')))
 }
 
 export async function readManifest(root: string): Promise<Manifest> {
