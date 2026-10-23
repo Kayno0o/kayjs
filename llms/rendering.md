@@ -48,7 +48,7 @@ The app's `store` in kay.config.ts keeps every value on disk, so a restart or a 
 import { cached, sqliteCache } from 'kay/cache'
 
 const disk = sqliteCache('data/cache.sqlite')
-const reviews = await cached('reviews', 86_400, fetchReviews, { store: disk })
+const reviews = await cached('reviews', '1d', fetchReviews, { store: disk })
 ```
 
 A stored value stale for a week is dropped by the next write, at most hourly, by `sqliteCache` and `pgData` alike.
@@ -150,7 +150,7 @@ A value that should outlive a restart, such as one a paid or rate-limited API gi
 import { cached, sqliteCache } from 'kay/cache'
 
 const disk = sqliteCache('data/cache.sqlite')
-const reviews = await cached('reviews', 86_400, fetchReviews, { store: disk })
+const reviews = await cached('reviews', '1d', fetchReviews, { store: disk })
 ```
 
 - `store.cache` in kay.config.ts, which `sqliteData(path)` gives, is the store of every call naming none; `store: false` keeps a key in this process's memory alone, for a value built from the code itself, which a deploy should not find, or one devalue cannot carry. Under the app's store, a value devalue cannot carry stays in memory with a warning once per key, where a store the call names throws. Collections keep their loader's own `store` and never this one.

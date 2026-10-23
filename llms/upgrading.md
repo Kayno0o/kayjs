@@ -14,17 +14,18 @@ An entry's head is a `PageSection` head: `.kcms-entry-head`, `.kcms-entry-title`
 
 ### The forms deprecated in 1.69 and 1.70 are gone
 
-The lints that reported them, `deprecated-identity-key` and fifteen `since: '1.70'` ones, are gone with the old forms: an app still on one gets a type error or an unknown option instead of a warning. `kay upgrade` on 1.72 rewrites them.
+`deprecated-identity-key` and fourteen of the `since: '1.70'` lints go with the forms they reported: an app still on one gets a type error or an unknown option, bar a `JSX.Element` markup prop.
 
-- `// kay-allow identity-key` and an `identity-key` entry in `lints` are an unknown lint now: delete them.
-- Config: `authPages(...)`, `authExtension(...)` and `mailExtension(...)` are `auth({ module })` and `mail({ module })` (`auth({ plugin: false })` for pages alone); `bodyLimit` is `maxSize` in the config, an action's options, `api()` and a route's `detail`; kayjs-cms's `kayjs-cms/postgres` is `kayjs-cms/pg` and `postgresLoader` is `pgLoader`.
-- Durations: every duration is a `Duration` string (`'5m'`), a bare number is a type error, and `DurationText` is `Duration`.
-- Names: `limit` and `visitor` of `ai()` and `ask()` are `rateLimit` and `key`, kayjs-auth's `limits` is `rateLimit`, kayjs-mail's `smtp({ rateLimit })` takes `{ max, window }`; kayjs-auth's `expires`, `expiresIn`, `rememberMaxAge`, `tokenMaxAge`, `marginMs` and `invitationMaxAge` are `maxAge`; `createAuth({ url, site: 'Name' })` is `site` (the origin) and `name`, and a `site` without a scheme is refused; `forgejo({ url })` is `baseUrl`; kayjs-mail's `lang` is `locale` and a contact view's `origin` is `site`; `infiniteList({ size })` is `pageSize`; `data-cms-edit-page` is `data-kcms-edit-page`; `session.lifetime()` is `maxAge()`; `url(key, { expires })` of a file store is `maxAge`.
-- Renamed exports: `HydrationMismatch`, `ActionRedirect`, `CspViolation`, `RedirectRefused`, `SaveConflict` and `MailNotConfigured` end in `Error`; kayjs-mail's `Message`, `Field`, `Settings` and `defaults` are `MailMessage`, `MailField`, `MailSettings` and `mailDefaults`; kayjs-ui's `Settings` and `defaults` are `UiSettings` and `uiDefaults`; kayjs-auth's `Mail`, `Mailer` and `memoryStore` are `AuthMailMessage`, `AuthMailer` and `memoryAuthStore`.
-- kayjs-auth methods: `sessions`, `passkeys`, `tokens`, `members`, `organizations`, `invitations`, `myInvitations`, `oauthClients`, `identities`, `auditLog` and `adminAuditLog` are `list…` (`listSessions`); `organization` and `invitation` are `getOrganization` and `getInvitation`; `endSession`, `removePasskey`, `renamePasskey`, `revokeToken`, `revokeOAuthClient`, `removeMember`, `declineInvitation` and `setLocale` are `revokeSession`, `revokePasskey`, `updatePasskeyName`, `revokeBearerToken`, `revokeOAuthGrant`, `deleteMember`, `rejectInvitation` and `updateLocale`.
-- Tests and templates: `mountComponent('src/components/toggle.kay')` takes the imported component, `ctx.failed(action)` and `ctx.succeeded(action)` are `action.failed()` and `action.succeeded()`, a markup prop typed `JSX.Element` is a `Snippet`.
-- Hooks take one event object (`onSignUp({ user, profile })`, `onDelete({ user })`, `onError({ error, request })`, a queue's `onFailed({ payload, error })`): the positional shape is no longer read.
-- Still deprecated: `deprecated-signal-prop`, as props typed `Signal<T>` or `Memo<T>` are still compiled; it goes with that support.
+- `// kay-allow` comments and `lints` entries naming a removed lint are an unknown lint: delete them.
+- Config: `authPages`, `authExtension` and `mailExtension` are `auth({ module })` and `mail({ module })`; `bodyLimit` is `maxSize`; `kayjs-cms/postgres` is `kayjs-cms/pg`.
+- Durations: a bare number is a type error, `DurationText` is `Duration`.
+- Names: `limit` and `visitor` of `ai()` and `ask()` are `rateLimit` and `key`, kayjs-auth's `limits` is `rateLimit`, kayjs-mail's `smtp({ rateLimit })` takes `{ max, window }`; `expires`, `expiresIn`, `rememberMaxAge`, `tokenMaxAge`, `marginMs`, `invitationMaxAge` and `session.lifetime()` are `maxAge`; `createAuth({ url, site: 'Name' })` is `site` (the origin) and `name`; `forgejo({ url })` is `baseUrl`; kayjs-mail's `lang` is `locale`; `infiniteList({ size })` is `pageSize`; `data-cms-edit-page` is `data-kcms-edit-page`.
+- kayjs-auth's `AuthMailMessage` and `MailData` have no `site` and no `expires`: a template reads `name` and `maxAge`.
+- Exports: `HydrationMismatch`, `ActionRedirect`, `CspViolation`, `RedirectRefused`, `SaveConflict` and `MailNotConfigured` end in `Error`; kayjs-mail's `Message`, `Field`, `Settings` and `defaults`, kayjs-ui's `Settings` and `defaults`, kayjs-auth's `Mail`, `Mailer` and `memoryStore` take a `Mail`, `Ui` or `Auth` prefix (`MailMessage`, `uiDefaults`, `memoryAuthStore`).
+- kayjs-auth methods: `sessions`, `tokens`, `members` and the like are `listSessions`, `listTokens`, `listMembers`; `organization` and `invitation` are `getOrganization` and `getInvitation`; `endSession`, `removePasskey`, `removeMember`, `declineInvitation`, `setLocale` and the like are `revokeSession`, `revokePasskey`, `deleteMember`, `rejectInvitation`, `updateLocale`.
+- Tests: `mountComponent('src/components/toggle.kay')` takes the imported component; `ctx.failed(action)` and `ctx.succeeded(action)` are `action.failed()` and `action.succeeded()`; a `JSX.Element` markup prop is a `Snippet`, no longer reported.
+- Hooks take one event object (`onSignUp({ user, profile })`, `onError({ error, request })`): the positional shape is no longer read.
+- Still deprecated: `deprecated-signal-prop`, as props typed `Signal<T>` or `Memo<T>` are still compiled.
 
 ## 1.72.0
 

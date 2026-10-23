@@ -324,6 +324,31 @@ describe('mount', () => {
     }
   })
 
+  it('builds a component again once its file changed between two mounts', async () => {
+    const dir = await scratchDir('mount-')
+    const file = join(dir, 'edited.kay')
+
+    try {
+      await Bun.write(file, 'p.first First\n')
+
+      const component = await imported(file)
+      const first = await mountComponent(component)
+
+      expect(first.root.innerHTML).toBe('<p class="first">First</p>')
+      first.unmount()
+
+      await Bun.write(file, 'p.second Second\n')
+
+      const second = await mountComponent(component)
+
+      expect(second.root.innerHTML).toBe('<p class="second">Second</p>')
+      second.unmount()
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('unmounts twice without harm', async () => {
     const dir = await scratchDir('mount-')
     const file = join(dir, 'fixed.kay')

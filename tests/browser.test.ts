@@ -1180,7 +1180,7 @@ import process from 'node:process'
 import { browse } from ${JSON.stringify(resolve('src/test/browser.ts'))}
 
 const server = Bun.serve({ port: 0, fetch: () => new Response('<p>Hi</p>', { headers: { 'content-type': 'text/html' } }) })
-const page = await browse(\`http://localhost:\${server.port}/\`, { path: process.argv[2], timeout: 20_000 })
+const page = await browse(\`http://localhost:\${server.port}/\`, { path: process.argv[2], timeout: '20s' })
 const renderers = readdirSync('/proc').filter(name => readCmdline(name).includes(\`kay-chrome-\${process.pid}-\`) && readCmdline(name).includes('--type=renderer'))
 const outcome = async (call: Promise<unknown>) => {
   const started = Date.now()
