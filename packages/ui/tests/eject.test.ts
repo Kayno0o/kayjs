@@ -3,6 +3,7 @@ import { mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { afterAll, beforeEach, describe, expect, spyOn, test } from 'bun:test'
 import { kay } from '../../../src/build/plugin'
+import { createProject, PRESETS } from '../../../src/new'
 import { child } from '../../../src/runtime/html'
 import { scratchDir } from '../../../tests/scratch'
 import diff from '../src/diff-command'
@@ -113,10 +114,10 @@ describe('kay ui eject', () => {
   test('records the version and the upstream text the copy came from', async () => {
     await run(eject, ['Card'])
 
-    const manifest = JSON.parse(await readFile(join(root, UI_DIR, '.upstream/ejected.json'), 'utf8')) as Record<string, { version: string, files: string[] }>
+    const manifest = JSON.parse(await readFile(join(root, UI_DIR, '.upstream/ejected.json'), 'utf8')) as Record<string, { version: string, files: string[], helpers: Record<string, string> }>
     const { version } = JSON.parse(await readFile(join(LIBRARY, 'package.json'), 'utf8')) as { version: string }
 
-    expect(manifest['card.kay']).toEqual({ version, files: ['card.kay'] })
+    expect(manifest['card.kay']).toEqual({ version, files: ['card.kay'], helpers: {} })
     expect(await readFile(join(root, UI_DIR, '.upstream/card.kay.base'), 'utf8')).toBe(await readFile(join(LIBRARY, 'src/card.kay'), 'utf8'))
   })
 
@@ -181,6 +182,43 @@ describe('kay ui eject', () => {
     expect(text.match(/components\/ui\/card\.kay/g)).toHaveLength(1)
   })
 
+  test('finds a key written with double quotes, and ignores a path in a comment or a string', async () => {
+    await writeFile(join(root, 'src/ui.ts'), 'export default {\n  // "@kaynooo/kayjs-ui/card.kay": { was: "here" },\n  "@kaynooo/kayjs-ui/card.kay": { parts: { root: \'a\' } },\n  "Other": { parts: "\'./components/ui/card.kay\'" },\n}\n')
+
+    const { out } = await run(eject, ['card'])
+    const text = await readFile(join(root, 'src/ui.ts'), 'utf8')
+
+    expect(out).not.toContain('could not be read')
+    expect(text).toContain('  "@kaynooo/kayjs-ui/card.kay": { parts: { root: \'a\' } },\n  \'./components/ui/card.kay\': { parts: { root: \'a\' } },\n  "Other"')
+  })
+
+  test('leaves src/ui.ts alone when the copy already has its key, or when only a comment names the component', async () => {
+    const already = 'export default {\n  "./components/ui/card.kay": { parts: { root: \'b\' } },\n  \'@kaynooo/kayjs-ui/card.kay\': { parts: { root: \'a\' } },\n}\n'
+
+    await writeFile(join(root, 'src/ui.ts'), already)
+    await run(eject, ['card'])
+    expect(await readFile(join(root, 'src/ui.ts'), 'utf8')).toBe(already)
+
+    root = await freshApp()
+
+    const commented = 'export default {\n  // Card: { parts: { root: \'a\' } },\n}\n'
+
+    await writeFile(join(root, 'src/ui.ts'), commented)
+    await run(eject, ['card'])
+    expect(await readFile(join(root, 'src/ui.ts'), 'utf8')).toBe(commented)
+  })
+
+  test('reads an entry holding a regex with a brace and a template with nested braces', async () => {
+    const entry = '{ parts: { root: `a ${`b ${1}`} }`, head: [/}/.source].join(\' \') } }'
+
+    await writeFile(join(root, 'src/ui.ts'), `export default {\n  Card: ${entry},\n}\n`)
+
+    const { out } = await run(eject, ['card'])
+
+    expect(out).not.toContain('could not be read')
+    expect(await readFile(join(root, 'src/ui.ts'), 'utf8')).toBe(`export default {\n  '@kaynooo/kayjs-ui/card.kay': ${entry},\n  './components/ui/card.kay': ${entry},\n}\n`)
+  })
+
   test('says so when an entry of src/ui.ts cannot be read', async () => {
     await writeFile(join(root, 'src/ui.ts'), 'export default {\n  \'@kaynooo/kayjs-ui/card.kay\': { parts: { root: \'a\' } /* \n}\n')
 
@@ -197,6 +235,18 @@ describe('kay ui eject', () => {
 
     expect(text).toContain('from "../../components/ui/card.kay"')
     expect(text).toContain('import(\'../../components/ui/card.kay\')')
+  })
+
+  test('rewrites the imports of the app\'s tests and root files too', async () => {
+    await mkdir(join(root, 'tests'), { recursive: true })
+    await writeFile(join(root, 'tests/page.test.ts'), 'import Card from \'@kaynooo/kayjs-ui/card.kay\'\nexport { Card }\n')
+    await writeFile(join(root, 'kay.config.ts'), 'import Card from \'@kaynooo/kayjs-ui/card.kay\'\nexport default { Card }\n')
+
+    const { out } = await run(eject, ['card'])
+
+    expect(await readFile(join(root, 'tests/page.test.ts'), 'utf8')).toContain('from \'../src/components/ui/card.kay\'')
+    expect(await readFile(join(root, 'kay.config.ts'), 'utf8')).toContain('from \'./src/components/ui/card.kay\'')
+    expect(out).toContain('tests/page.test.ts')
   })
 
   test('points a copy at the copy of a component ejected before it', async () => {
@@ -264,6 +314,120 @@ describe('kay ui diff', () => {
   })
 })
 
+describe('a damaged record', () => {
+  test('is a message naming the file, not a stack trace', async () => {
+    await run(eject, ['card'])
+
+    const manifest = join(root, UI_DIR, '.upstream/ejected.json')
+
+    await writeFile(manifest, '{ nope')
+    expect((await run(diff, [])).err).toContain(`${UI_DIR}/.upstream/ejected.json does not parse`)
+    expect((await run(eject, ['button'])).code).toBe(1)
+
+    await writeFile(manifest, '{"card.kay": {"version": 1}}')
+    expect((await run(diff, [])).err).toContain('is not a record of ejected components')
+  })
+
+  test('names the base file that is missing, and --accept records it again', async () => {
+    await run(eject, ['card'])
+    await rm(join(root, UI_DIR, '.upstream/card.kay.base'))
+
+    const shown = await run(diff, [])
+
+    expect(shown.code).toBe(1)
+    expect(shown.err).toContain(`${UI_DIR}/.upstream/card.kay.base is missing`)
+    expect((await run(diff, ['card'], { accept: true })).code).toBe(0)
+    expect((await run(diff, [], { check: true })).out).toContain('up to date')
+  })
+})
+
+describe('the library helpers a copy imports', () => {
+  async function edit(change: (entry: { helpers?: Record<string, string> }) => void): Promise<void> {
+    const manifestPath = join(root, UI_DIR, '.upstream/ejected.json')
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Record<string, { helpers?: Record<string, string> }>
+
+    change(manifest['button.kay']!)
+    await writeFile(manifestPath, JSON.stringify(manifest))
+  }
+
+  test('are recorded with a hash, and a change in one shows in the diff', async () => {
+    await run(eject, ['button'])
+
+    const manifest = JSON.parse(await readFile(join(root, UI_DIR, '.upstream/ejected.json'), 'utf8')) as Record<string, { helpers: Record<string, string> }>
+
+    expect(Object.keys(manifest['button.kay']!.helpers)).toEqual(expect.arrayContaining(['defaults.ts', 'icon.kay']))
+    expect((await run(diff, [], { check: true })).code).toBe(0)
+
+    await edit((entry) => {
+      entry.helpers!['defaults.ts'] = 'stale'
+    })
+
+    const shown = await run(diff, [], { check: true })
+
+    expect(shown.code).toBe(1)
+    expect(shown.out).toContain('Helpers the copy imports from kayjs-ui')
+    expect(shown.out).toContain('defaults.ts changed in kayjs-ui')
+
+    expect((await run(diff, ['button'], { accept: true })).code).toBe(0)
+    expect((await run(diff, [], { check: true })).out).toContain('up to date')
+  })
+
+  test('are reported when the library dropped one', async () => {
+    await run(eject, ['button'])
+    await edit((entry) => {
+      entry.helpers!['gone.ts'] = 'x'
+    })
+
+    expect((await run(diff, [])).out).toContain('gone.ts is gone from kayjs-ui')
+  })
+
+  test('are left out once the component itself is ejected', async () => {
+    await run(eject, ['button'])
+    await run(eject, ['icon'])
+    await edit((entry) => {
+      entry.helpers!['icon.kay'] = 'stale'
+    })
+
+    expect((await run(diff, [], { check: true })).code).toBe(0)
+  })
+})
+
+describe('the command line', () => {
+  test('ejects and diffs on a scaffolded app, and a kayjs-ui bump shows a diff', async () => {
+    const app = join(await scratchDir('eject-cli-'), 'app')
+
+    roots.push(join(app, '..'))
+    await createProject(app, { kay: '^1.0.0', features: PRESETS.app.features })
+    await writeFile(join(app, 'src/demo.ts'), 'export { default as Card } from \'@kaynooo/kayjs-ui/card.kay\'\n')
+    await mkdir(join(app, 'tests'), { recursive: true })
+    await writeFile(join(app, 'tests/demo.ts'), 'export { default as Card } from \'@kaynooo/kayjs-ui/card.kay\'\n')
+
+    const kay = async (...args: string[]) => {
+      const proc = Bun.spawn(['bun', join(LIBRARY, '../../src/cli.ts'), ...args], { cwd: app, stdout: 'pipe', stderr: 'pipe' })
+      const [out, err, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited])
+
+      return { out, err, code }
+    }
+
+    const ejected = await kay('ui', 'eject', 'card')
+
+    expect(ejected.err).toBe('')
+    expect(ejected.out).toContain('copied card.kay')
+    expect(await readFile(join(app, 'src/demo.ts'), 'utf8')).toContain('./components/ui/card.kay')
+    expect(await readFile(join(app, 'tests/demo.ts'), 'utf8')).toContain('../src/components/ui/card.kay')
+    expect((await kay('ui', 'diff', '--check')).code).toBe(0)
+
+    const base = join(app, UI_DIR, '.upstream/card.kay.base')
+
+    await writeFile(base, (await readFile(base, 'utf8')).replace('level = 3', 'level = 2'))
+
+    const bumped = await kay('ui', 'diff', '--check')
+
+    expect(bumped.code).toBe(1)
+    expect(bumped.out).toContain('+const { title, level = 3')
+  }, 60_000)
+})
+
 describe('unifiedDiff', () => {
   test('is empty for equal texts and marks changed lines with their context', () => {
     expect(unifiedDiff('a\nb', 'a\nb', 'x')).toBe('')
@@ -275,5 +439,21 @@ describe('unifiedDiff', () => {
     expect(text).toContain('@@ -8,7 +8,7 @@')
     expect(text).toContain('-line 10\n+other')
     expect(text).not.toContain('line 2')
+  })
+
+  test('compares only what lies between the common lines, so a long file with one change stays cheap', () => {
+    const lines = Array.from({ length: 6000 }, (_, index) => `line ${index}`)
+    const started = performance.now()
+    const text = unifiedDiff(lines.join('\n'), lines.with(3000, 'other').join('\n'), 'x')
+
+    expect(text).toContain('@@ -2998,7 +2998,7 @@')
+    expect(text).toContain('-line 3000\n+other')
+    expect(performance.now() - started).toBeLessThan(1000)
+  })
+
+  test('marks a change at the very start, the very end and a pure insertion', () => {
+    expect(unifiedDiff('a\nb\nc', 'x\nb\nc', 'f')).toContain('-a\n+x\n b')
+    expect(unifiedDiff('a\nb\nc', 'a\nb\nz', 'f')).toContain(' b\n-c\n+z')
+    expect(unifiedDiff('a\nc', 'a\nb\nc', 'f')).toContain(' a\n+b\n c')
   })
 })

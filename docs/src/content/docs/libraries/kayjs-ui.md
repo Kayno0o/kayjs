@@ -166,13 +166,15 @@ A page can pass a Dialog or a Popover its content. A layout, or a page with a `-
 
 ## Copy a component
 
-A recipe in `src/ui.ts` cannot change a component's markup. For that, `kay ui eject card` copies `card.kay` into `src/components/ui/`, with the files only it uses, and points your imports of `@kaynooo/kayjs-ui/card.kay` at the copy. You then edit it like any of your components. Messages and the theme keep working, as they are not part of the file.
+A recipe in `src/ui.ts` cannot change a component's markup. For that, `kay ui eject card` copies `card.kay` into `src/components/ui/`, with the files only it uses, and points your imports of `@kaynooo/kayjs-ui/card.kay` in `src/`, `tests/` and the `.ts` files at the root, such as `kay.config.ts`, at the copy. You then edit it like any of your components. Messages and the theme keep working, as they are not part of the file.
 
 Files other components share, such as `icon.kay`, stay in the library, and the copy imports them from `@kaynooo/kayjs-ui/<name>.kay` or `@kaynooo/kayjs-ui/lib/<name>`, which is for such copies and not a stable API.
 
 Components of the library that use the one you copied, such as `FormDialog` for `Dialog`, keep the library's version; the command lists them. An entry of `src/ui.ts` keyed by the import path is repeated under the copy's path, so both keep your look. One keyed by the name (`Card`) becomes the library's path key plus the copy's, as a name names two components after the copy. `--dry-run` shows what would change without writing.
 
 The command records the version and the library's text of each copy in `src/components/ui/.upstream/`, to commit with it. After a kayjs-ui update, `kay ui diff` prints what the library changed in each copy since then, with the `git merge-file` line that merges it. Once merged, `kay ui diff card --accept` records the installed text, and `--check` makes the command exit 1 when anything changed, for CI.
+
+A file the copy imports from the library without taking it, such as `defaults.ts`, is reported too when it changed or went, as the copy would break at build time without a word. If a file in `.upstream/` is damaged or missing, the command names it and stops.
 
 ## Settings
 

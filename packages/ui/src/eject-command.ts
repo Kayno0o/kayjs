@@ -1,13 +1,13 @@
 // `kay ui eject <component>`: copies one component of kayjs-ui into the app, for what a recipe in `src/ui.ts` cannot express.
 import type { KayCommand } from 'kay/library'
 import { relative } from 'node:path'
-import { changesFor, componentFile, EJECTED_DIR, plan, readManifest, writeAll } from './eject'
+import { changesFor, componentFile, EJECTED_DIR, guarded, plan, readManifest, writeAll } from './eject'
 
 const command: KayCommand = {
   usage: 'ui eject <component> [--dry-run]',
   options: { 'dry-run': { type: 'boolean' } },
   positionals: 1,
-  run: async ({ values, positionals: [name] }, refuse, { root }) => {
+  run: async ({ values, positionals: [name] }, refuse, { root }) => guarded('eject', async () => {
     if (name === undefined)
       return refuse('ui eject needs the component to copy, such as `kay ui eject card`')
 
@@ -51,7 +51,7 @@ const command: KayCommand = {
       console.log(`  still on kayjs-ui's ${ejection.file}: ${ejection.users.join(', ')}`)
 
     return 0
-  },
+  }),
 }
 
 export default command

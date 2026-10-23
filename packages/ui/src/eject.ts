@@ -1,7 +1,9 @@
 // What `kay ui eject` and `kay ui diff` share: which files a component takes along, how the copy's and the app's imports are rewritten, and the record of the version a copy came from.
+import type * as t from '@babel/types'
 import { existsSync } from 'node:fs'
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join, relative } from 'node:path'
+import { parse } from '@babel/parser'
 
 const PACKAGE = '@kaynooo/kayjs-ui'
 
@@ -15,7 +17,6 @@ const KAY_SUFFIX = /\.kay$/
 const SOURCE_SUFFIX = /\.(?:kay|ts)$/
 const WORD_BOUNDARY = /(?<=[a-z0-9])(?=[A-Z])/g
 const DASHED = /(?:^|-)([a-z0-9])/g
-const ESCAPE = /[.*+?^${}()|[\]\\]/g
 // A module specifier written in an import, an export from or a dynamic import: the quote, then the specifier.
 const SPECIFIER = /(\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(['"])([^'"\n]+)\2/g
 
@@ -31,6 +32,8 @@ export interface Ejection {
 export interface Ejected {
   version: string
   files: string[]
+  // The library files the copy imports without taking them, by path under the library's `src/` and a hash of the text the copy was made with.
+  helpers?: Record<string, string>
 }
 
 export type Manifest = Record<string, Ejected | undefined>
@@ -185,6 +188,34 @@ function relativeSpecifier(from: string, to: string): string {
   return path.startsWith('.') ? path : `./${path}`
 }
 
+// The app's own sources that may import a component: `src/`, `tests/` and the `.ts` files at the root, such as `kay.config.ts`.
+// The library files a copy imports without taking along or finding already copied, the ones its rewritten imports point at.
+function helpersOf(ejection: Ejection, texts: Map<string, string>, earlier: Map<string, string>): string[] {
+  const found = new Set<string>()
+
+  for (const path of ejection.files) {
+    for (const { specifier } of specifiers(texts.get(path)!)) {
+      const target = specifier.startsWith('.') ? resolved(path, specifier) : undefined
+
+      if (target !== undefined && !ejection.files.includes(target) && !earlier.has(target))
+        found.add(target)
+    }
+  }
+
+  return [...found].toSorted()
+}
+
+export function hashOf(text: string): string {
+  return new Bun.CryptoHasher('sha1').update(text).digest('hex')
+}
+
+async function appFiles(root: string): Promise<string[]> {
+  const rootFiles = (await readdir(root, { withFileTypes: true })).filter(entry => entry.isFile() && SOURCE_SUFFIX.test(entry.name)).map(entry => join(root, entry.name))
+  const tests = join(root, 'tests')
+
+  return [...await appSources(join(root, 'src')), ...existsSync(tests) ? await appSources(tests) : [], ...rootFiles]
+}
+
 async function appSources(dir: string): Promise<string[]> {
   const found: string[] = []
 
@@ -203,78 +234,72 @@ async function appSources(dir: string): Promise<string[]> {
   return found
 }
 
-// The end of the object literal opening at `from`, after its closing brace; comments and strings are skipped.
-function objectEnd(text: string, from: number): number | undefined {
-  let depth = 0
-  let quote = ''
+const OBJECT_WRAPPERS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'ParenthesizedExpression'])
 
-  for (let index = from; index < text.length; index++) {
-    const char = text[index]!
+// The object a `src/ui.ts` exports by default, bare or as the argument of `defineUi(...)`.
+function configOf(ast: t.File): t.ObjectExpression | undefined {
+  const exported = ast.program.body.find(node => node.type === 'ExportDefaultDeclaration')
 
-    if (quote === '' && char === '/' && text[index + 1] === '/') {
-      const end = text.indexOf('\n', index)
+  if (exported === undefined)
+    return undefined
 
-      if (end === -1)
-        return undefined
+  let node: t.Node = exported.declaration
 
-      index = end
-    }
-    else if (quote === '' && char === '/' && text[index + 1] === '*') {
-      const end = text.indexOf('*/', index + 2)
-
-      if (end === -1)
-        return undefined
-
-      index = end + 1
-    }
-    else if (quote !== '') {
-      if (char === '\\')
-        index++
-      else if (char === quote)
-        quote = ''
-    }
-    else if (char === '"' || char === '\'' || char === '`') {
-      quote = char
-    }
-    else if (char === '{') {
-      depth++
-    }
-    else if (char === '}' && --depth === 0) {
-      return index + 1
-    }
+  for (;;) {
+    if (OBJECT_WRAPPERS.has(node.type))
+      node = (node as t.TSAsExpression).expression
+    else if (node.type === 'CallExpression' && node.arguments[0] !== undefined)
+      node = node.arguments[0]
+    else
+      break
   }
 
-  return undefined
+  return node.type === 'ObjectExpression' ? node : undefined
+}
+
+function keyOf(property: t.ObjectProperty): string | undefined {
+  if (property.key.type === 'Identifier')
+    return property.key.name
+
+  return property.key.type === 'StringLiteral' ? property.key.value : undefined
 }
 
 // The entry `src/ui.ts` has under the library's specifier or the component's name, repeated under the copy's path: the copy takes it, and the library's own components that use the component keep it. A name now names two components and reaches neither, so that key becomes the library's specifier.
 function withCopyKey(text: string, file: string, name: string, copy: string, notes: string[]): string {
   const specifier = `${PACKAGE}/${file}`
-  const pattern = `(?:(['"])${specifier.replace(ESCAPE, '\\$&')}\\1|(?<![\\w$.])(['"]?)${name}\\2)\\s*:\\s*(?=\\{)`
-  const keys = [...text.matchAll(new RegExp(pattern, 'g'))]
-  const [key] = keys
+  let ast: t.File
 
-  if (key === undefined || text.includes(`'${copy}'`))
+  try {
+    ast = parse(text, { sourceType: 'module', plugins: ['typescript'] })
+  }
+  catch {
+    notes.push(`src/ui.ts could not be read: if it has an entry for ${name}, repeat it under '${copy}' by hand`)
+
+    return text
+  }
+
+  const properties = (configOf(ast)?.properties ?? []).filter((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && !property.computed && !property.shorthand)
+  const keyed = (key: string) => properties.filter(property => keyOf(property) === key)
+  const named = [...keyed(specifier), ...keyed(name)]
+  const [entry] = named
+
+  if (entry === undefined || keyed(copy).length > 0)
     return text
 
-  if (keys.length > 1) {
+  if (named.length > 1) {
     notes.push(`src/ui.ts keys ${name} by name and by path, so the name now reaches neither component: merge both under '${specifier}' and '${copy}'`)
 
     return text
   }
 
-  const start = key.index + key[0].length
-  const end = objectEnd(text, start)
+  const { start, end } = entry.value
+  const value = text.slice(start!, end!)
+  const added = `,\n  '${copy}': ${value}`
 
-  if (end === undefined) {
-    notes.push(`src/ui.ts has an entry for ${name} that could not be read: repeat it under '${copy}' by hand`)
+  if (keyOf(entry) === specifier)
+    return text.slice(0, end!) + added + text.slice(end!)
 
-    return text
-  }
-
-  const named = key[0].includes(specifier) ? key[0] : `'${specifier}': `
-
-  return `${text.slice(0, key.index)}${named}${text.slice(start, end)},\n  '${copy}': ${text.slice(start, end)}${text.slice(end)}`
+  return `${text.slice(0, entry.key.start!)}'${specifier}': ${value}${added}${text.slice(end!)}`
 }
 
 export interface Changes {
@@ -295,8 +320,13 @@ export async function changesFor(root: string, ejection: Ejection): Promise<Chan
   const copyWrites = new Map<string, string>()
   const baseWrites = new Map<string, string>()
 
+  const texts = new Map<string, string>()
+
+  for (const path of ejection.files)
+    texts.set(path, await readFile(join(LIBRARY, path), 'utf8'))
+
   for (const path of ejection.files) {
-    const text = await readFile(join(LIBRARY, path), 'utf8')
+    const text = texts.get(path)!
 
     copyWrites.set(target(path), copyOf(path, target(path), text, ejection, earlier))
     baseWrites.set(upstreamPath(root, `${path}.base`), text)
@@ -317,7 +347,12 @@ export async function changesFor(root: string, ejection: Ejection): Promise<Chan
   const writes = new Map([...copyWrites, ...baseWrites])
   const manifestPath = upstreamPath(root, MANIFEST)
 
-  manifest[ejection.file] = { version: await libraryVersion(), files: ejection.files }
+  const helpers: Record<string, string> = {}
+
+  for (const path of helpersOf(ejection, texts, earlier))
+    helpers[path] = hashOf(await readFile(join(LIBRARY, path), 'utf8'))
+
+  manifest[ejection.file] = { version: await libraryVersion(), files: ejection.files, helpers }
 
   const copied = new Map(ejection.files.filter(path => path.endsWith('.kay')).map(path => [`${PACKAGE}/${path}`, target(path)]))
   const copies = new Set(ejection.files.map(target))
@@ -326,7 +361,7 @@ export async function changesFor(root: string, ejection: Ejection): Promise<Chan
   const name = nameOf(ejection.file)
   const uiFile = join(src, 'ui.ts')
 
-  for (const file of await appSources(src)) {
+  for (const file of await appFiles(root)) {
     if (copies.has(file))
       continue
 
@@ -356,10 +391,56 @@ export async function writeAll(writes: Map<string, string>): Promise<void> {
   }
 }
 
-export async function readManifest(root: string): Promise<Manifest> {
-  const path = join(root, 'src', EJECTED_DIR, UPSTREAM_DIR, MANIFEST)
+// A record under `.upstream/` the commands cannot use: its message names the file and what to do.
+export class UpstreamError extends Error {}
 
-  return existsSync(path) ? JSON.parse(await readFile(path, 'utf8')) as Manifest : {}
+function recorded(root: string, path: string): string {
+  return relative(root, upstreamPath(root, path))
+}
+
+function isEjected(value: unknown): value is Ejected {
+  if (typeof value !== 'object' || value === null)
+    return false
+
+  const { version, files, helpers } = value as Record<string, unknown>
+
+  return typeof version === 'string' && Array.isArray(files) && files.every(file => typeof file === 'string') && (helpers === undefined || (typeof helpers === 'object' && helpers !== null))
+}
+
+export async function readManifest(root: string): Promise<Manifest> {
+  const path = upstreamPath(root, MANIFEST)
+
+  if (!existsSync(path))
+    return {}
+
+  let manifest: unknown
+
+  try {
+    manifest = JSON.parse(await readFile(path, 'utf8'))
+  }
+  catch (error) {
+    throw new UpstreamError(`${recorded(root, MANIFEST)} does not parse (${error instanceof Error ? error.message : String(error)}): restore it from git`)
+  }
+
+  if (typeof manifest !== 'object' || manifest === null || !Object.values(manifest).every(isEjected))
+    throw new UpstreamError(`${recorded(root, MANIFEST)} is not a record of ejected components: restore it from git`)
+
+  return manifest as Manifest
+}
+
+// Runs a command whose failure on a damaged record is a message and an exit code, not a stack trace.
+export async function guarded(name: string, run: () => Promise<number>): Promise<number> {
+  try {
+    return await run()
+  }
+  catch (error) {
+    if (!(error instanceof UpstreamError))
+      throw error
+
+    console.error(`kay ui ${name}: ${error.message}`)
+
+    return 1
+  }
 }
 
 export function upstreamPath(root: string, path: string): string {
@@ -367,7 +448,12 @@ export function upstreamPath(root: string, path: string): string {
 }
 
 export async function upstreamBase(root: string, path: string): Promise<string> {
-  return readFile(upstreamPath(root, `${path}.base`), 'utf8')
+  const base = upstreamPath(root, `${path}.base`)
+
+  if (!existsSync(base))
+    throw new UpstreamError(`${recorded(root, `${path}.base`)} is missing, so what the library changed in ${path} is unknown: restore it from git, or \`kay ui diff <component> --accept\` records the installed text`)
+
+  return readFile(base, 'utf8')
 }
 
 const CONTEXT = 3
@@ -377,8 +463,21 @@ export function unifiedDiff(before: string, after: string, label: string): strin
   if (before === after)
     return ''
 
-  const a = before.split('\n')
-  const b = after.split('\n')
+  const whole = before.split('\n')
+  const other = after.split('\n')
+  let head = 0
+
+  while (head < whole.length && head < other.length && whole[head] === other[head])
+    head++
+
+  let tail = 0
+
+  while (tail < whole.length - head && tail < other.length - head && whole[whole.length - 1 - tail] === other[other.length - 1 - tail])
+    tail++
+
+  // Only what lies between the common lines is compared: the table is quadratic in it.
+  const a = whole.slice(head, whole.length - tail)
+  const b = other.slice(head, other.length - tail)
   const table = Array.from({ length: a.length + 1 }, () => Array.from<number>({ length: b.length + 1 }).fill(0))
 
   for (let i = a.length - 1; i >= 0; i--) {
@@ -386,7 +485,7 @@ export function unifiedDiff(before: string, after: string, label: string): strin
       table[i]![j] = a[i] === b[j] ? table[i + 1]![j + 1]! + 1 : Math.max(table[i + 1]![j]!, table[i]![j + 1]!)
   }
 
-  const lines: { mark: ' ' | '-' | '+', text: string }[] = []
+  const lines: { mark: ' ' | '-' | '+', text: string }[] = whole.slice(0, head).map(text => ({ mark: ' ', text }))
   let i = 0
   let j = 0
 
@@ -403,6 +502,8 @@ export function unifiedDiff(before: string, after: string, label: string): strin
       lines.push({ mark: '+', text: b[j++]! })
     }
   }
+
+  lines.push(...whole.slice(whole.length - tail).map((text): { mark: ' ', text: string } => ({ mark: ' ', text })))
 
   const changed = lines.flatMap((line, index) => line.mark === ' ' ? [] : [index])
 
