@@ -4,7 +4,6 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
-
 - kayjs-mail: a list store that was closed leaves the sweep, so a later app of the process logs no "could not be swept" warning for it.
 - A cms rename whose old address the full redirect set refuses toasts the editor why it will not redirect ([Rename](../packages/cms/llms/rename.md)).
 - kayjs-cms: a signed-in editor is told editor names in the on-page editor after a restart, on another replica and in streamed blocks, and two edit-link holders never share an edit cookie ([Editor](../packages/cms/llms/editor.md)).
