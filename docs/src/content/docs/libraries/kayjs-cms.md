@@ -575,7 +575,9 @@ A collection kept by `sqliteLoader` or `pgLoader` remembers what editors save. E
 
 You declare nothing for this. The versions sit in the same table as the entries, out of sight of your pages, lists and searches. The collection's list has a Trash button too: an entry you delete is kept there for 30 days, and Restore writes it back under its slug (a draft, for a role that may not publish). A restore is refused if someone saved the entry after you opened it, and a role that may not publish restores without publishing or unpublishing the entry.
 
-`cms({ history: { revisions: 100, trash: '7d' } })` keeps more or fewer saves, or the trash for another time (`trash: false` keeps none), and `cms({ history: false })` turns it off. The server drops the trash and the old versions by itself every hour, the first time a few minutes after it starts, and `maxAge` (a year by default, `false` for no limit) says how old a version or an activity event may get. Each hour it reads the trash and the activity only when something in them can have expired, and once a day it reads all of the history to find a version that lost its place in the list.
+`cms({ history: { revisions: 100, trash: '7d' } })` keeps more or fewer saves, or the trash for another time (`trash: false` keeps none), and `cms({ history: false })` turns it off. The server drops the trash and the old versions by itself every hour, the first time a few minutes after it starts, and `maxAge` (a year by default, `false` for no limit) says how old a version or an activity event may get.
+
+Each hour it reads the trash and the activity only when something in them can have expired, and once a day it reads all of the history to find a version that lost its place in the list.
 
 To leave one collection out, give it `history: false` in `collections`: `cms({ collections: { notes: { history: false } } })` keeps no revisions and no trash for it.
 
