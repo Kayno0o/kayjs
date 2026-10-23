@@ -6,7 +6,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### kayjs-cms: the editor panel is kayjs-ui's docked `SidePanel`
 
-A site's CSS written against the editor's own markup changes. `.kcms-editor-open`, `.kcms-marker-menu`, `.kcms-editor-grip` and the variables `--kcms-side`, `--kcms-bottom` and `--kcms-top` are gone: the panel is a `dialog.kcms-editor[open]` and the marker choice menu is `#kcms-marker-menu`. `--kcms-width` and `--kcms-height` on `html.kcms-editing` stay, and are `0px` along the edge the panel is not docked to. A collapsed editor is a `.kcms-editor-toggle` button. An app that sets the word `cms.editor.label` in its catalog can drop it: the panel is named by `cms.editor.title`, and the key is ignored. See [the editor's dock](../packages/cms/llms/editor.md).
+A site's CSS written against the editor's own markup changes. `.kcms-editor-open`, `.kcms-marker-menu`, `.kcms-editor-grip` and the variables `--kcms-side`, `--kcms-bottom` and `--kcms-top` are gone: the panel is a `dialog.kcms-editor[open]` and the marker choice menu is `#kcms-marker-menu`. The editor's inner classes `.kcms-editor-head`, `-body`, `-title` and `-pending`, `.kcms-dock-side`, `.kcms-dock-bottom` and `.kcms-marker-item` are gone too. `--kcms-width` and `--kcms-height` on `html.kcms-editing` stay but now follow the panel's dock, and are `0px` along the edge it is not docked to. A collapsed editor is a `.kcms-editor-toggle` button. An app that sets the word `cms.editor.label` in its catalog can drop it: the panel is named by `cms.editor.title`, and the key is ignored. See [the editor's dock](../packages/cms/llms/editor.md).
 
 ## 1.72.0
 
