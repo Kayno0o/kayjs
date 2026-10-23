@@ -10,9 +10,9 @@ const look = recipe({
   parts: {
     root: 'kui-steps block',
     list: 'm-0 flex list-none flex-wrap gap-x-6 gap-y-2 p-0',
-    item: 'group/step flex items-center text-sm text-muted data-[state=current]:font-medium data-[state=current]:text-foreground',
+    item: 'group/step flex items-center text-sm text-muted data-[step=current]:font-medium data-[step=current]:text-foreground',
     link: 'flex items-center gap-2 rounded-md no-underline [&:is(a)]:text-foreground [&:is(a)]:hover:text-accent',
-    marker: 'flex size-6 shrink-0 items-center justify-center rounded-full border border-border-strong text-xs group-data-[state=current]/step:border-accent group-data-[state=current]/step:bg-accent group-data-[state=current]/step:text-accent-foreground group-data-[state=done]/step:border-accent group-data-[state=done]/step:text-accent',
+    marker: 'flex size-6 shrink-0 items-center justify-center rounded-full border border-border-strong text-xs group-data-[step=current]/step:border-accent group-data-[step=current]/step:bg-accent group-data-[step=current]/step:text-accent-foreground group-data-[step=done]/step:border-accent group-data-[step=done]/step:text-accent',
     label: 'min-w-0',
     state: 'sr-only',
   },
