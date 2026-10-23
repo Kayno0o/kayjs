@@ -54,8 +54,21 @@ describe('the Zed extension release', () => {
     expect(zedReleasable('id = "kay"')).toBe(false)
     expect(released).toContain('version = "1.72.0"')
     expect(released).toContain('rev = "v1.72.0"')
-    expect(released.replaceAll('1.72.0', '').replace(/^rev = "v"$/m, '')).toContain('path = "editors/tree-sitter-kay"')
+    expect(released).toContain('path = "editors/tree-sitter-kay"')
     expect(await Bun.file(join(ROOT, ZED_MANIFEST)).text()).not.toContain('1.72.0')
+  })
+
+  it('leaves a version or rev key outside its table alone', async () => {
+    const dir = await scratchDir('zed-release-')
+    const copy = join(dir, 'extension.toml')
+
+    await Bun.write(copy, ['id = "kay"', 'version = "0.1.0"', '', '[language_servers.kay]', 'version = "9.9.9"', 'rev = "keep"', '', '[grammars.kay]', 'version = "8.8.8"', 'rev = "unreleased"', 'rev = "second"', '', '[other]', 'rev = "other"', ''].join('\n'))
+    const manifest = await Bun.file(copy).text()
+    const released = zedRelease(manifest, '1.72.0')
+
+    expect(released).toBe(manifest.replace('version = "0.1.0"', 'version = "1.72.0"').replace('rev = "unreleased"', 'rev = "v1.72.0"'))
+    expect(zedReleasable('[grammars.kay]\nrev = "x"')).toBe(false)
+    expect(zedReleasable('version = "1.0.0"\n[language_servers.kay]\nrev = "x"')).toBe(false)
   })
 })
 
