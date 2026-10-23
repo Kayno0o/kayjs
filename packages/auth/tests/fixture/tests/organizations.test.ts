@@ -125,6 +125,8 @@ describe('the organization pages', () => {
 
     expect(adminView.find(`[data-member="${owner.id}"] form`)).toHaveLength(0)
     expect(adminView.find(`[data-member="${plain.id}"] input[name="roles"]`).map(box => box.attributes.value)).toEqual(['admin', 'member'])
+    expect(adminView.find(`[data-member="${plain.id}"] fieldset legend`)).toHaveLength(1)
+    expect(adminView.find(`[data-member="${plain.id}"] fieldset legend`)[0]!.text).toContain('Roles of')
     expect(adminView.find('input[name="confirm"]')).toHaveLength(1)
 
     // A post from a page of an organization they are in never reaches another one.

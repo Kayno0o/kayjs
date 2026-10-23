@@ -929,7 +929,7 @@ describe('kay build checks the project first', () => {
     const config = (lints: string) => `export default { site: 'https://example.com', favicon: false, seo: { image: '/og.png' }, lints: ${lints} }\n`
     const root = await scratchProject({
       'tsconfig.json': tsconfig,
-      'kay.config.ts': config('{ \'missing-description\': \'allow\', \'unsized-share-image\': \'allow\' }'),
+      'kay.config.ts': config('{ \'missing-description\': \'allow\', \'unsized-share-image\': \'allow\', \'unstructured-page\': \'allow\' }'),
       'src/routes/index.kay': '--- server\nexport const page = { prerender: true }\n---\nhead\n  title Home\n  meta(name="robots" content="noindex")\np Home\n',
       'src/routes/about.kay': '--- server\nexport const page = { prerender: true }\n---\nhead\n  title Home\n  meta(name="description" content="Who we are")\np About\n',
     })
@@ -944,7 +944,7 @@ describe('kay build checks the project first', () => {
     expect(warned.code).toBe(0)
     expect((await build(root, '--no-check')).report).not.toContain('warning[')
 
-    await Bun.write(join(root, 'kay.config.ts'), config('{ seo: \'allow\', \'duplicate-title\': \'deny\' }'))
+    await Bun.write(join(root, 'kay.config.ts'), config('{ seo: \'allow\', a11y: \'allow\', \'duplicate-title\': \'deny\' }'))
     const refused = await build(root)
 
     expect(refused.report.match(/^\w+\[[\w-]+\]/gm)).toEqual(['error[duplicate-title]'])
@@ -964,7 +964,7 @@ describe('kay build checks the project first', () => {
     const page = (title: string, body: string, head = '') => `--- server\nexport const page = { prerender: true${body.startsWith('//') ? ', sitemap: false' : ''} }\n---\nhead\n  title ${title}\n  meta(name="description" content="${title} page")\n${head}${body.replace(/^\/\//, '')}`
     const root = await scratchProject({
       'tsconfig.json': tsconfig,
-      'kay.config.ts': config('{ \'missing-share-image\': \'allow\' }'),
+      'kay.config.ts': config('{ \'missing-share-image\': \'allow\', \'unstructured-page\': \'allow\' }'),
       'src/routes/index.kay': page('Home', 'a(href="/about") About\n'),
       'src/routes/about.kay': page('About', 'a(href="/") Home\n', '  link(rel="canonical" href="https://example.com/mid")\n'),
       'src/routes/lost.kay': page('Lost', '//p Nobody links here\n'),
@@ -979,7 +979,7 @@ describe('kay build checks the project first', () => {
     ])
     expect(warned.code).toBe(0)
 
-    await Bun.write(join(root, 'kay.config.ts'), config('{ seo: \'deny\', \'orphan-page\': \'allow\', \'missing-share-image\': \'allow\' }'))
+    await Bun.write(join(root, 'kay.config.ts'), config('{ seo: \'deny\', \'orphan-page\': \'allow\', \'missing-share-image\': \'allow\', \'unstructured-page\': \'allow\' }'))
 
     const refused = await build(root)
 
@@ -987,14 +987,14 @@ describe('kay build checks the project first', () => {
     expect(refused.report.match(/^\w+\[[\w-]+\]/gm)).toEqual(['error[redirect-chain]'])
     expect(refused.code).toBe(1)
 
-    await Bun.write(join(root, 'kay.config.ts'), config('{ seo: \'deny\', \'orphan-page\': \'allow\', \'redirect-chain\': \'allow\', \'missing-share-image\': \'allow\' }'))
+    await Bun.write(join(root, 'kay.config.ts'), config('{ seo: \'deny\', \'orphan-page\': \'allow\', \'redirect-chain\': \'allow\', \'missing-share-image\': \'allow\', \'unstructured-page\': \'allow\' }'))
     expect((await build(root)).report.match(/^\w+\[[\w-]+\]/gm)).toEqual(['error[broken-canonical]'])
   }, 60_000)
 
   it('has the hreflang alternates and canonical links of a localized site point at each other', async () => {
     const root = await scratchProject({
       'tsconfig.json': tsconfig,
-      'kay.config.ts': 'export default { site: \'https://example.com\', favicon: false, seo: { description: \'The site\' }, lints: { \'missing-share-image\': \'allow\' }, i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\', messages: \'src/messages\' } }\n',
+      'kay.config.ts': 'export default { site: \'https://example.com\', favicon: false, seo: { description: \'The site\' }, lints: { \'missing-share-image\': \'allow\', \'unstructured-page\': \'allow\' }, i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\', messages: \'src/messages\' } }\n',
       'src/messages/en.ts': 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ title: \'About\' })\n',
       'src/messages/fr.ts': 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ title: \'A propos\' })\n',
       'src/routes/index.kay': '--- server\nexport const page = { prerender: true }\n---\nhead\n  title Home\n  meta(name="description" content="Home page")\na(href="/about") {t(\'title\')}\n',
@@ -1016,7 +1016,7 @@ describe('kay build checks the project first', () => {
     const page = (title: string, body: string, unlisted = false) => `--- server\nexport const page = { prerender: true${unlisted ? ', sitemap: false' : ''} }\n---\nhead\n  title ${title}\n  meta(name="description" content="${title} page")\n${body}`
     const files = {
       'tsconfig.json': tsconfig,
-      'kay.config.ts': 'export default { site: \'https://example.com\', base: \'/docs\', trailingSlash: \'always\', favicon: false, seo: { description: \'The site\' }, lints: { \'missing-share-image\': \'allow\', \'unsized-share-image\': \'allow\' } }\n',
+      'kay.config.ts': 'export default { site: \'https://example.com\', base: \'/docs\', trailingSlash: \'always\', favicon: false, seo: { description: \'The site\' }, lints: { \'missing-share-image\': \'allow\', \'unstructured-page\': \'allow\', \'unsized-share-image\': \'allow\' } }\n',
       'src/routes/index.kay': page('Home', 'a(href="/blog") Blog\n'),
       'src/routes/blog/index.kay': page('Blog', 'a(href="post") Post\n'),
       'src/routes/blog/post.kay': page('Post', 'p Post\n', true),
@@ -1041,7 +1041,7 @@ describe('kay build checks the project first', () => {
     const page = (title: string, body: string, unlisted = false) => `--- server\nexport const page = { prerender: true${unlisted ? ', sitemap: false' : ''} }\n---\nhead\n  title ${title}\n  meta(name="description" content="${title} page")\n${body}`
     const files = {
       'tsconfig.json': tsconfig,
-      'kay.config.ts': 'export default { site: \'https://example.com\', base: \'/docs\', trailingSlash: \'always\', favicon: false, seo: { description: \'The site\' }, lints: { \'missing-share-image\': \'allow\', \'unsized-share-image\': \'allow\' }, extensions: [{ name: \'lib\', routes: { dir: \'lib/routes\', prefix: \'/auth\' } }] }\n',
+      'kay.config.ts': 'export default { site: \'https://example.com\', base: \'/docs\', trailingSlash: \'always\', favicon: false, seo: { description: \'The site\' }, lints: { \'missing-share-image\': \'allow\', \'unstructured-page\': \'allow\', \'unsized-share-image\': \'allow\' }, extensions: [{ name: \'lib\', routes: { dir: \'lib/routes\', prefix: \'/auth\' } }] }\n',
       'lib/routes/sign-in.kay': 'head\n  title Sign in\n  meta(name="description" content="Sign in")\nform(method="post")\n  button Sign in\n',
       'lib/routes/account/[id].kay': 'head\n  title Account\n  meta(name="description" content="Account")\np Account\n',
       'src/routes/index.kay': page('Home', 'a(href="/blog") Blog\n'),
@@ -1240,7 +1240,7 @@ describe('kay build checks the project first', () => {
     const built = await buildProject({ exportTo: 'dist' })
 
     // The heads' lints only warn, which fails no stage.
-    expect(built).toMatchObject({ checked: [], linted: [{ code: 'untitled-page', severity: 'warning' }, { code: 'undescribed-page', severity: 'warning' }], built: { islands: 0, stylesheets: 0, prerendered: 1, entries: 0 }, exported: { pages: 1, dir: join(root, 'dist') } })
+    expect(built).toMatchObject({ checked: [], linted: [{ code: 'untitled-page', severity: 'warning' }, { code: 'undescribed-page', severity: 'warning' }, { code: 'unstructured-page', severity: 'warning' }], built: { islands: 0, stylesheets: 0, prerendered: 1, entries: 0 }, exported: { pages: 1, dir: join(root, 'dist') } })
     expect(built.failed).toBeUndefined()
     expect(await Bun.file(join(root, 'dist/index.html')).text()).toContain('>Home</a>')
 

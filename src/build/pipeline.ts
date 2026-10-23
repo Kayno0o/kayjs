@@ -13,6 +13,7 @@ import { rename, rm } from 'node:fs/promises'
 import { availableParallelism } from 'node:os'
 import { join, relative, resolve } from 'node:path'
 import { check, configCheckOptions } from '../check'
+import { pageStructureLints } from '../check/page-structure'
 import { pageSeoLints, unkeptPageLints } from '../check/seo'
 import { hasUnseenPages, siteSeoLints } from '../check/site-seo'
 import { lintLevel } from '../compiler/lints'
@@ -461,7 +462,7 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   const configSource = checking && config.redirects !== undefined && await Bun.file(configFile).exists() ? await Bun.file(configFile).text() : undefined
 
   // The heads are the check's to read, so a build without checking skips them with it.
-  const linted = [...checking ? [...pageSeoLints(config, rendered, exported), ...siteSeoLints(config, rendered, others, { configFile, configSource, exported, unseen: hasUnseenPages(routes, rendered, others, exported, paths.routes), skipConfigChains: true }), ...unkeptPageLints(config, [...stops.values()])] : [], ...budgetLints(config.budget, config.lints, sizes, routes, client.report)]
+  const linted = [...checking ? [...pageSeoLints(config, rendered, exported), ...siteSeoLints(config, rendered, others, { configFile, configSource, exported, unseen: hasUnseenPages(routes, rendered, others, exported, paths.routes), skipConfigChains: true }), ...unkeptPageLints(config, [...stops.values()]), ...pageStructureLints(config, rendered)] : [], ...budgetLints(config.budget, config.lints, sizes, routes, client.report)]
 
   // Remote originals are kept between builds, revalidated as the image route does.
   const remote = remoteImages(cacheDir(root, 'remote'), remotePatterns(config.images?.remote), undefined, undefined, remoteLimits(config.images))

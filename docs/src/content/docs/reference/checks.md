@@ -69,6 +69,11 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `meta-refresh` | warn | a11y | A `meta` refresh with a delay |
 | `ungrouped-radios` | warn | a11y | Radios sharing a name outside a `fieldset` |
 | `section-not-a-link` | warn | a11y | A `section` mark on something that is not a link |
+| `table-without-header` | warn | a11y | A `table` with no `th` |
+| `fieldset-without-legend` | warn | a11y | A `fieldset` with no `legend` or name |
+| `mouse-only-event` | warn | a11y | A hover or leave handler with no focus or blur one beside it |
+| `missing-autocomplete` | warn | forms | An email or password `input` with no `autocomplete` |
+| `unstructured-page` | warn | a11y | A prerendered page with no `main` or no `h1`, reported by `kay build` |
 | `redundant-alt` | warn | a11y | Alt text that says it is an image |
 | `uncalled-signal` | deny | islands | A signal read by name where its value goes, or handed to a parameter that takes anything, not called |
 | `constant-signal` | warn | islands | A signal that is only ever read |

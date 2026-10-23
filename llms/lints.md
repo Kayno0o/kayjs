@@ -112,6 +112,11 @@ kay check --only seo
 | `meta-refresh` | warn | a11y | A `meta(http-equiv="refresh")` reloading or leaving the page after a delay. |
 | `ungrouped-radios` | warn | a11y | Radios sharing a `name` outside a `fieldset` or a `role="radiogroup"`. |
 | `section-not-a-link` | warn | a11y | A `section` on anything but an `a` with an `href`. |
+| `table-without-header` | warn | a11y | A `table` with no `th`, unless it has `role="presentation"` or holds a component, slot or block. |
+| `fieldset-without-legend` | warn | a11y | A `fieldset` with no `legend`, `aria-label` or `aria-labelledby`. |
+| `mouse-only-event` | warn | a11y | `onMouseOver` or `onMouseEnter` with no `onFocus` or `onFocusIn`, `onMouseOut` or `onMouseLeave` with no `onBlur` or `onFocusOut`. |
+| `missing-autocomplete` | warn | forms | An `input` of type `email` or `password` with no `autocomplete`. |
+| `unstructured-page` | warn | a11y | A prerendered page with no `main` (or `role="main"`) or no `h1`: reported by `kay build`, no `// kay-allow` comment reaches it. |
 | `redundant-alt` | warn | a11y | Alt text that is a filename or says it is an image. |
 | `uncalled-signal` | deny | islands | A signal or memo the template names without calling it where its value goes, `{count}` or `if count > 1`: a signal is read by calling it, in the template as in the script, `{count()}`. Handed on whole, as a component prop or a function argument, it passes the signal itself, which a parameter typed `Signal<T>`, `Memo<T>`, a function type or a generic `T` takes; one typed `unknown` or `any` is reported too, `String(count)`. `--fix` calls the signal named where its value goes. |
 | `constant-signal` | warn | islands | A signal the component script declares and only ever reads: it never changes, so a plain `const` renders the same without the reactivity. |

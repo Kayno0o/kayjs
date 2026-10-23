@@ -96,6 +96,8 @@ kay lint --cache
   - Radios sharing a `name` inside a `fieldset` or a `role="radiogroup"` or `role="group"` (`ungrouped-radios`).
   - Alt text that is not a filename nor says it is an image (`redundant-alt`).
   - An `autocomplete` value HTML's autofill defines (`invalid-autocomplete`).
+  - A `th` in a `table` (`table-without-header`), a `legend` or a name on a `fieldset` (`fieldset-without-legend`), `onFocus` beside `onMouseOver`/`onMouseEnter` and `onBlur` beside `onMouseOut`/`onMouseLeave` (`mouse-only-event`), `autocomplete` on an `email` or `password` input (`missing-autocomplete`).
+  - A `main` and an `h1` in each prerendered page, layouts included, reported by `kay build` (`unstructured-page`).
 - Only what the markup says for sure is reported: a value written as an expression, a spread or a component is left alone.
 
 - What the markup alone cannot tell, such as text too faint on its background, content outside any landmark or an id two islands both render, is checked on the rendered page.

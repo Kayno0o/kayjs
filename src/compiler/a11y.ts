@@ -33,6 +33,13 @@ const NAMED_ROLES = new Set(['slider', 'meter'])
 // Roles grouping radios under a name, as a `fieldset` does.
 const GROUP_ROLES = new Set(['group', 'radiogroup'])
 const REFRESH_DELAY = /^\s*(\d+)/
+// Inputs a browser or a password manager fills in, which `autocomplete` says how.
+const FILLED_TYPES = new Set(['email', 'password'])
+// Pointer events, and the keyboard events that reach the same thing: a hover shows what only the pointer sees unless focus does too.
+const POINTER_IN = ['onmouseover', 'onmouseenter']
+const FOCUS_IN = ['onfocus', 'onfocusin']
+const POINTER_OUT = ['onmouseout', 'onmouseleave']
+const FOCUS_OUT = ['onblur', 'onfocusout']
 
 interface Context {
   // Inside a `label`, which names the control it holds.
@@ -276,6 +283,19 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
     return hasContent(element.children)
   }
 
+  // Whether a template holds an element called `name`, or something that may render one: a component, a slot or a block.
+  function mayHold(nodes: Node[], name: string): boolean {
+    return nodes.some((node) => {
+      if (node.kind === 'text')
+        return node.parts.some(part => part.kind !== 'chunk' && part.kind !== 'expression' && (part.component || part.name === 'slot' || part.name === name || mayHold(part.children, name)))
+
+      if (node.kind === 'element')
+        return node.component || node.name === 'slot' || node.name === name || mayHold(node.children, name)
+
+      return node.kind !== 'const' && node.kind !== 'error'
+    })
+  }
+
   // Whether a `video` holds a captions track, or something that may render one.
   function hasCaptions(nodes: Node[]): boolean {
     return nodes.some((node) => {
@@ -455,6 +475,22 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
 
     if (section !== undefined && (element.name !== 'a' || !(has(element, 'href') || element.attributes.some(candidate => candidate.kind === 'spread'))))
       lint(section.name, 'section-not-a-link', 'A `section` only marks a link', { note: 'kay marks a link carrying it as current on the pages below it, and never writes the attribute out', help: 'put it on an `a` with an `href`, or remove it' })
+
+    if (element.name === 'table' && !roles.some(role => role === 'presentation' || role === 'none') && !mayHold(element.children, 'th'))
+      lint(element, 'table-without-header', 'This `table` has no `th`', { note: 'a screen reader announces a cell with the headings of its row and column, and has none to read here', help: 'mark the headings as `th`, or give a table used for layout `role="presentation"`' })
+
+    if (element.name === 'fieldset' && !NAMING.some(name => has(element, name)) && !mayHold(element.children, 'legend'))
+      lint(element, 'fieldset-without-legend', 'This `fieldset` has no `legend`', { note: 'a screen reader reads each field of a group under the name of the group, and this one has none', help: 'start it with a `legend` naming the group' })
+
+    for (const [events, answers, wanted] of [[POINTER_IN, FOCUS_IN, 'onFocus'], [POINTER_OUT, FOCUS_OUT, 'onBlur']] as const) {
+      const pointer = named(element).find(candidate => events.includes(text(candidate.name).toLowerCase()))
+
+      if (pointer && !answers.some(name => has(element, name)))
+        lint(pointer.name, 'mouse-only-event', `\`${text(pointer.name)}\` has no keyboard counterpart on this \`${element.name}\``, { note: 'what the pointer reveals or hides is never reached by a keyboard user, whom only focus tells', help: `handle \`${wanted}\` the same way, on an element the keyboard reaches` })
+    }
+
+    if (element.name === 'input' && type !== undefined && FILLED_TYPES.has(type) && !has(element, 'autocomplete'))
+      lint(element, 'missing-autocomplete', `This \`${type}\` input has no \`autocomplete\``, { note: 'a browser or a password manager fills a field from it, which people with motor or memory difficulties rely on', help: type === 'email' ? 'write `autocomplete="email"`, or `username`' : 'write `autocomplete="current-password"` or `new-password`' })
 
     const autocomplete = staticValue(element, 'autocomplete')
 

@@ -509,7 +509,7 @@ describe('literal-tag', () => {
 })
 
 describe('a11y lints', () => {
-  const A11Y = new Set(['unknown-aria', 'unknown-role', 'missing-state', 'hidden-focusable', 'positive-tabindex', 'autofocus', 'link-as-button', 'nested-control', 'duplicate-id', 'dangling-label', 'missing-captions', 'redundant-alt', 'invalid-autocomplete', 'dangling-aria', 'unannounced-click', 'unreachable-tooltip', 'meta-refresh', 'ungrouped-radios', 'section-not-a-link'])
+  const A11Y = new Set(['unknown-aria', 'unknown-role', 'missing-state', 'hidden-focusable', 'positive-tabindex', 'autofocus', 'link-as-button', 'nested-control', 'duplicate-id', 'dangling-label', 'missing-captions', 'redundant-alt', 'invalid-autocomplete', 'dangling-aria', 'unannounced-click', 'unreachable-tooltip', 'meta-refresh', 'ungrouped-radios', 'section-not-a-link', 'table-without-header', 'fieldset-without-legend', 'mouse-only-event', 'missing-autocomplete'])
   const a11y = (source: string) => lints(source).filter(d => A11Y.has(d.code ?? '')).map(d => `${d.code} ${d.at}`)
   // One lint alone, for those the other examples here would trip.
   const only = (code: string, source: string) => lints(source).filter(d => d.code === code).map(d => `${d.code} ${d.at}`)
@@ -646,6 +646,22 @@ describe('a11y lints', () => {
 
   it('reports radios sharing a name outside a fieldset or a radiogroup, once per name', () => {
     expect(a11y('input(type="radio" name="plan" value="a" aria-label="A")\ninput(type="radio" name="plan" value="b" aria-label="B")\ninput(type="radio" name="solo" aria-label="Solo")\nfieldset\n  legend Size\n  input(type="radio" name="size" value="s" aria-label="S")\n  input(type="radio" name="size" value="m" aria-label="M")\ndiv(role="radiogroup" aria-label="Tone")\n  input(type="radio" name="tone" value="a" aria-label="A")\n  input(type="radio" name="tone" value="b" aria-label="B")\n')).toEqual(['ungrouped-radios input'])
+  })
+
+  it('reports a table with no th, leaving layout tables, components, slots and blocks alone', () => {
+    expect(a11y('table\n  tr\n    td A\ntable\n  tr\n    th A\ntable(role="presentation")\n  tr\n    td A\ntable\n  Rows\ntable\n  for row of rows\n    tr\n      td {row}\n')).toEqual(['table-without-header table'])
+  })
+
+  it('reports a fieldset with no legend or name of its own', () => {
+    expect(a11y('fieldset\n  input(aria-label="A")\nfieldset\n  legend Group\n  input(aria-label="B")\nfieldset(aria-label="Group")\n  input(aria-label="C")\nfieldset\n  Fields\n')).toEqual(['fieldset-without-legend fieldset'])
+  })
+
+  it('reports a hover handler with no focus one beside it, and a leave with no blur', () => {
+    expect(a11y('button(onMouseOver={show}) A\nbutton(onMouseEnter={show} onFocus={show} onMouseLeave={hide} onBlur={hide}) B\nbutton(onMouseOut={hide}) C\nTip(onMouseOver={show}) D\n')).toEqual(['mouse-only-event onMouseOver', 'mouse-only-event onMouseOut'])
+  })
+
+  it('reports an email or password input with no autocomplete', () => {
+    expect(only('missing-autocomplete', 'input(type="email" aria-label="A")\ninput(type="password" aria-label="B")\ninput(type="email" aria-label="C" autocomplete="email")\ninput(type="text" aria-label="D")\ninput(type={kind} aria-label="E")\n')).toEqual(['missing-autocomplete input', 'missing-autocomplete input'])
   })
 
   it('reports a bare section, or one given an expression, on anything but a link with an href, and leaves a component its own prop', () => {

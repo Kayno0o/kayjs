@@ -129,10 +129,12 @@ PageSection(title={wording('auth.organizations.members', 'Members')})
           if editable(member.roles) && member.user.id !== me?.id
             form.flex.flex-wrap.items-center.gap-3(action={setRoles})
               input(type="hidden" name="userId" value={member.user.id})
-              for role of grantable key={role}
-                label.flex.items-center.gap-2
-                  input(type="checkbox" name="roles" value={role} checked={(member.roles as string[]).includes(role)})
-                  | {role}
+              fieldset.flex.flex-wrap.items-center.gap-3
+                legend.sr-only {wording('auth.organizations.rolesOf', 'Roles of {name}', { name: label(member.user) })}
+                for role of grantable key={role}
+                  label.flex.items-center.gap-2
+                    input(type="checkbox" name="roles" value={role} checked={(member.roles as string[]).includes(role)})
+                    | {role}
               Button(type="submit" label={wording('auth.organizations.saveRoles', 'Save the roles')} aria-label={`${wording('auth.organizations.saveRoles', 'Save the roles')}: ${label(member.user)}`})
 if manages
   PageSection(title={wording('auth.organizations.invitations', 'Invitations')})
@@ -154,7 +156,7 @@ if manages
     if features.email
       form.flex.flex-col.gap-3(action={invite})
         FormField(label={wording('auth.organizations.inviteEmail', 'Email address')} required)
-          input(type="email" name="email" maxlength="254" required)
+          input(type="email" name="email" maxlength="254" autocomplete="off" required)
         if grantable.length > 0
           FormField(label={wording('auth.organizations.inviteRoles', 'Roles')} group)
             for role of grantable key={role}
