@@ -91,6 +91,18 @@ for (const [kind, open, enabled] of stores) {
       expect(await store.broadcast(`b${run}-old-${counter}`)).toBeUndefined()
     })
 
+    it('keeps the proof of a subscription, source and wording, through its confirmation', async () => {
+      const store = open()
+      const { list, email } = names()
+
+      await store.ask(list, email('ada'), `proof1-${list}`, 'en', 1000, { source: '/news', wording: 'notice-v1' })
+      await store.ask(list, email('bob'), `proof2-${list}`, 'en', 1000)
+      await store.confirm(list, `proof1-${list}`, 2000)
+      await store.confirm(list, `proof2-${list}`, 2000)
+
+      expect(await store.subscribers(list)).toMatchObject([{ id: `proof1-${list}`, source: '/news', wording: 'notice-v1' }, { id: `proof2-${list}`, source: undefined, wording: undefined }])
+    })
+
     it('claims a recipient once, gives it back for a retry up to its tries, then fails it', async () => {
       const store = open()
       const { list, email } = names()

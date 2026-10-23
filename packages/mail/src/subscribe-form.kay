@@ -2,14 +2,23 @@
 import type { Action } from 'kay'
 import { wording } from 'kay/words'
 
-// A form for the action `mail.list().form()` gives: an email field, a button and the answer. Unstyled apart from the `kmail-subscribe` classes, which a site styles; it posts without JavaScript.
-const { action, label = wording('mail.list.form.email', 'Email'), submitLabel = wording('mail.list.form.submit', 'Subscribe'), sentLabel = wording('mail.list.form.sent', 'Almost done: open the mail we just sent you and confirm your address.') } = props<{
+// A form for the action `mail.list().form()` gives: an email field, a notice saying what the address is used for, a button and the answer. Unstyled apart from the `kmail-subscribe` classes, which a site styles; it posts without JavaScript.
+const { action, noticeText, privacyLabel = wording('mail.list.form.privacy', 'Privacy policy'), privacy, wordingId, label = wording('mail.list.form.email', 'Email'), submitLabel = wording('mail.list.form.submit', 'Subscribe'), sentLabel = wording('mail.list.form.sent', 'Almost done: open the mail we just sent you and confirm your address.') } = props<{
   action: Action<never, unknown>
   label?: string | undefined
   submitLabel?: string | undefined
+  // The line saying what the address is used for, shown by default; replace it with the sender, the content and the frequency of your list.
+  noticeText?: string | undefined
+  privacyLabel?: string | undefined
+  // Where the privacy page is, such as `/privacy`: linked after the notice.
+  privacy?: string | undefined
+  // Names the wording of `noticeText`, kept with the subscription as the proof of what was agreed to; left out, the stock notice is recorded by a digest of its text and a replaced one as `custom`.
+  wordingId?: string | undefined
   // Shown once the post went through, whether or not the address was already listed.
   sentLabel?: string | undefined
 }>()
+const notice = noticeText ?? wording('mail.list.form.notice', 'We use your address to send you the mails of this site, until you unsubscribe with the link in each one.')
+const shownWording = wordingId ?? (noticeText === undefined ? undefined : 'custom')
 ---
 form(class="kmail-subscribe" action={action} novalidate)
   label(class="kmail-subscribe-field")
@@ -18,6 +27,12 @@ form(class="kmail-subscribe" action={action} novalidate)
   span(class="kmail-subscribe-issue" aria-live="polite")
     if action.error('email') as issue
       | {issue}
+  p(class="kmail-subscribe-notice")
+    | {notice}{' '}
+    if privacy
+      a(href={privacy} target="_blank" rel="noopener") {privacyLabel}
+  if shownWording
+    input(type="hidden" name="wording" value={shownWording})
   button(type="submit") {submitLabel}
   if action.succeeded()
     p(class="kmail-subscribe-sent" role="status") {sentLabel}

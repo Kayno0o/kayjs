@@ -13,6 +13,7 @@ import { outbox } from '../src/outbox'
 interface Subscribe { email: string }
 
 const { subscribe, subscribeStrict, subscribeCounted } = await import(`${import.meta.dir}/fixture/src/routes/subscribe.kay`) as Record<'subscribe' | 'subscribeStrict' | 'subscribeCounted', Action<Subscribe, unknown>>
+const { subscribeNoticed } = await import(`${import.meta.dir}/fixture/src/routes/notice.kay`) as Record<'subscribeNoticed', Action<Subscribe & { wording?: string }, unknown>>
 const { rendered } = await import(`${import.meta.dir}/fixture/src/counter`) as typeof import('./fixture/src/counter')
 const { mail } = await import(`${import.meta.dir}/fixture/src/mail`) as typeof import('./fixture/src/mail')
 
@@ -519,6 +520,62 @@ describe('a link of a list this process does not declare', () => {
   })
 })
 
+describe('what the subscriber is told and what is kept', () => {
+  it('shows the stock notice by default, with no privacy link and no wording id', async () => {
+    const { html } = await site.visit('/subscribe')
+
+    expect(html).toContain('kmail-subscribe-notice')
+    expect(html).toContain('We use your address to send you the mails of this site')
+    expect(html).not.toContain('Privacy policy')
+    expect(html).not.toContain('name="wording"')
+  })
+
+  it('shows a notice of its own with the privacy link and posts its wording id', async () => {
+    const { html } = await site.visit('/notice')
+
+    expect(html).toContain('One mail a month about the spring season.')
+    expect(html).toContain('href="/privacy"')
+    expect(html).toContain('name="wording" value="spring-v1"')
+  })
+
+  it('names the list and links the policy in the confirmation mail', async () => {
+    const email = fresh()
+
+    await site.call(subscribeNoticed, { email })
+
+    const sent = await confirmationOf(email)
+
+    expect(sent.text).toContain('the list Spring news of http://localhost')
+    expect(outbox.links(sent)).toContain('http://localhost/privacy')
+  })
+
+  it('names no list in the confirmation mail of the default one', async () => {
+    const email = fresh()
+
+    await site.call(subscribe, { email })
+
+    const sent = await confirmationOf(email)
+
+    expect(sent.text).toContain('You will receive the mails of http://localhost')
+    expect(sent.text).not.toContain('/privacy')
+  })
+
+  it('keeps the page and the wording id of a confirmed subscription, the stock notice by its digest', async () => {
+    const [custom, stock] = [fresh(), fresh()]
+
+    await site.call(subscribeNoticed, { email: custom, wording: 'spring-v1' }, { headers: { referer: 'https://fixture.test/notice?utm=1' } })
+    await site.call(subscribe, { email: stock }, { headers: { referer: 'https://fixture.test/subscribe' } })
+
+    for (const email of [custom, stock])
+      await confirmPost(confirmLink(tokenOf(await confirmationOf(email), '/confirm')))
+
+    const kept = async (list: ReturnType<typeof mail.list>, email: string) => (await list.subscribers()).find(row => row.email === email)
+
+    expect(await kept(mail.list('spring'), custom)).toMatchObject({ source: '/notice', wording: 'spring-v1' })
+    expect(await kept(mail.list(), stock)).toMatchObject({ source: '/subscribe', wording: expect.stringMatching(/^mail\.list\.form\.notice:\w+$/) })
+  })
+})
+
 describe('the sweep of the lists', () => {
   const host = { configured: () => true, render: async () => ({}) as never, deliver: async () => undefined }
 
@@ -580,7 +637,7 @@ describe('the subscribe form\'s queue insert', () => {
     }, enqueueRun: async () => '', activate: () => undefined })
 
     const [, handler] = lists.list('news', { file }).form()
-    const ask = async (email: string) => handler({ email }, { fail: (status: number) => ({ status }) } as never)
+    const ask = async (email: string) => handler({ email }, { fail: (status: number) => ({ status }), request: new Request('https://fixture.test/_kay/subscribe', { method: 'POST' }), url: new URL('https://fixture.test/_kay/subscribe') } as never)
     const fresher = fresh()
 
     try {

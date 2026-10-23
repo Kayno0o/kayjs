@@ -7,12 +7,19 @@ import Layout from './layout.kay'
 import Link from './link.kay'
 import Paragraph from './paragraph.kay'
 
-// The default mail asking to confirm a subscription: `url` is the link whose click lists the address, `site` the site's origin.
-const { url, site } = props<ListConfirmProps>()
+// The default mail asking to confirm a subscription: `url` is the link whose button lists the address, `site` the site's origin, `list` what the list is called and `privacy` the policy to link.
+const { url, site, list, privacy } = props<ListConfirmProps>()
 ---
 Layout(preheader={wording('mail.list.confirm.lead', 'One click and you are subscribed.')})
   Heading {wording('mail.list.confirm.heading', 'Confirm your subscription')}
   Paragraph {wording('mail.list.confirm.body', 'Someone asked to receive the mails of {site} at this address. If it was you, confirm it.', { site })}
+  Paragraph
+    if list
+      | {wording('mail.list.confirm.whatList', 'You will receive the list {list} of {site}, and each mail carries a link to unsubscribe.', { list, site })}
+    else
+      | {wording('mail.list.confirm.what', 'You will receive the mails of {site}, and each one carries a link to unsubscribe.', { site })}
   Button(href={url}) {wording('mail.list.confirm.button', 'Confirm my subscription')}
   Paragraph(muted) {wording('mail.list.confirm.orPaste', 'Or paste this link in your browser:')} #[Link(href={url}) {url}]
-  Paragraph(muted) {wording('mail.list.confirm.ending', 'If you did not ask for it, ignore this mail: nothing is subscribed until the link is opened, and it stops working in three days.')}
+  if privacy
+    Paragraph(muted) {wording('mail.list.confirm.privacy', 'What we do with your address:')} #[Link(href={privacy}) {privacy}]
+  Paragraph(muted) {wording('mail.list.confirm.ending', 'If you did not ask for it, ignore this mail: nothing is subscribed until you confirm, and it stops working in three days.')}

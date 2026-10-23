@@ -1,6 +1,6 @@
 import type { SQL } from 'bun'
 import type { PgJobsSource } from 'kay/library'
-import type { Broadcast, BroadcastProgress, DeliveryState, ListStore, Subscriber } from './list-store'
+import type { Broadcast, BroadcastProgress, DeliveryState, ListStore, Proof, Subscriber } from './list-store'
 import { connectionOf, privilegeRefused, relationsMissing } from 'kay/library'
 import { DELIVERY_TRIES } from './list-store'
 
@@ -13,11 +13,11 @@ const BROADCAST_KEPT_MS = 30 * 24 * 3_600_000
 // What replicas starting together take turns on while one creates the tables.
 const MIGRATION_LOCK = 'kay_mail_lists'
 
-interface SubscriberRow { id: string, list: string, email: string, status: 'pending' | 'confirmed', locale: string, created_at: string, confirmed_at: string | null }
+interface SubscriberRow { id: string, list: string, email: string, status: 'pending' | 'confirmed', locale: string, created_at: string, confirmed_at: string | null, source: string | null, wording: string | null }
 interface BroadcastRow { id: string, list: string, created_at: string, finished_at: string | null, message: string }
 
 function subscriberOf(row: SubscriberRow): Subscriber {
-  return { id: row.id, list: row.list, email: row.email, status: row.status, locale: row.locale, createdAt: Number(row.created_at), confirmedAt: row.confirmed_at === null ? undefined : Number(row.confirmed_at) }
+  return { id: row.id, list: row.list, email: row.email, status: row.status, locale: row.locale, createdAt: Number(row.created_at), confirmedAt: row.confirmed_at === null ? undefined : Number(row.confirmed_at), source: row.source ?? undefined, wording: row.wording ?? undefined }
 }
 
 function broadcastOf(row: BroadcastRow): Broadcast {
@@ -38,7 +38,7 @@ export async function createMailListTables(source: PgJobsSource): Promise<void> 
 
     await db.begin(async (tx) => {
       await tx`SELECT pg_advisory_xact_lock(hashtext(${MIGRATION_LOCK}))`
-      await tx`CREATE TABLE IF NOT EXISTS kay_mail_subscribers (id text PRIMARY KEY, list text NOT NULL, email text NOT NULL, status text NOT NULL, locale text NOT NULL, created_at bigint NOT NULL, confirmed_at bigint)`
+      await tx`CREATE TABLE IF NOT EXISTS kay_mail_subscribers (id text PRIMARY KEY, list text NOT NULL, email text NOT NULL, status text NOT NULL, locale text NOT NULL, created_at bigint NOT NULL, confirmed_at bigint, source text, wording text)`
       await tx`CREATE UNIQUE INDEX IF NOT EXISTS kay_mail_subscribers_email ON kay_mail_subscribers (list, email)`
       await tx`CREATE INDEX IF NOT EXISTS kay_mail_subscribers_email_only ON kay_mail_subscribers (email)`
       await tx`CREATE INDEX IF NOT EXISTS kay_mail_subscribers_pending ON kay_mail_subscribers (status, created_at)`
@@ -126,8 +126,8 @@ export function pgLists(source: PgJobsSource): ListStore & { close: () => Promis
         await rows(tx, 'DELETE FROM kay_mail_broadcasts WHERE finished_at IS NOT NULL AND finished_at < $1::bigint', [now - BROADCAST_KEPT_MS])
       })
     },
-    async ask(list, email, id, locale, now = Date.now()): Promise<Subscriber> {
-      await query('INSERT INTO kay_mail_subscribers (id, list, email, status, locale, created_at) VALUES ($1, $2, $3, \'pending\', $4, $5::bigint) ON CONFLICT DO NOTHING', [id, list, email, locale, now])
+    async ask(list, email, id, locale, now = Date.now(), proof: Proof = {}): Promise<Subscriber> {
+      await query('INSERT INTO kay_mail_subscribers (id, list, email, status, locale, created_at, source, wording) VALUES ($1, $2, $3, \'pending\', $4, $5::bigint, $6, $7) ON CONFLICT DO NOTHING', [id, list, email, locale, now, proof.source ?? null, proof.wording ?? null])
 
       const [row] = await query<SubscriberRow>('SELECT * FROM kay_mail_subscribers WHERE list = $1 AND email = $2', [list, email])
 

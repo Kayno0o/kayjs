@@ -12,6 +12,15 @@ export interface Subscriber {
   locale: string
   createdAt: number
   confirmedAt: number | undefined
+  // What the subscription is kept with as proof of consent: the page the form was on and the id of the notice it showed.
+  source: string | undefined
+  wording: string | undefined
+}
+
+// Where a subscription came from and which notice the visitor saw.
+export interface Proof {
+  source?: string | undefined
+  wording?: string | undefined
 }
 
 export interface Broadcast {
@@ -28,8 +37,8 @@ type Maybe<T> = T | Promise<T>
 
 // What the mailing lists keep their data in; `openLists` is the SQLite one, `pgLists` the Postgres one, both with the same semantics: a delivery is claimed before its mail goes, and removing or erasing a subscriber takes its deliveries with it.
 export interface ListStore {
-  // The address's row on the list, made pending when it has none.
-  ask: (list: string, email: string, id: string, locale: string, now?: number) => Maybe<Subscriber>
+  // The address's row on the list, made pending when it has none, with the proof of the post that made it.
+  ask: (list: string, email: string, id: string, locale: string, now?: number, proof?: Proof) => Maybe<Subscriber>
   // Forgets the confirmations nobody clicked in 7 days and the broadcasts finished 30 days ago with their deliveries, which the lists run when a store opens and every hour.
   sweep: (now?: number) => Maybe<void>
   // Whether the subscriber exists after the call; one confirmed already stays as it is.
@@ -71,11 +80,11 @@ const PENDING_KEPT_MS = 7 * 24 * 3_600_000
 // A finished broadcast and its deliveries are kept this long.
 const BROADCAST_KEPT_MS = 30 * 24 * 3_600_000
 
-interface SubscriberRow { id: string, list: string, email: string, status: 'pending' | 'confirmed', locale: string, created_at: number, confirmed_at: number | null }
+interface SubscriberRow { id: string, list: string, email: string, status: 'pending' | 'confirmed', locale: string, created_at: number, confirmed_at: number | null, source: string | null, wording: string | null }
 interface BroadcastRow { id: string, list: string, created_at: number, finished_at: number | null, message: string }
 
 function subscriberOf(row: SubscriberRow): Subscriber {
-  return { id: row.id, list: row.list, email: row.email, status: row.status, locale: row.locale, createdAt: row.created_at, confirmedAt: row.confirmed_at ?? undefined }
+  return { id: row.id, list: row.list, email: row.email, status: row.status, locale: row.locale, createdAt: row.created_at, confirmedAt: row.confirmed_at ?? undefined, source: row.source ?? undefined, wording: row.wording ?? undefined }
 }
 
 function broadcastOf(row: BroadcastRow): Broadcast {
@@ -86,7 +95,7 @@ function broadcastOf(row: BroadcastRow): Broadcast {
 export function openLists(path: string) {
   const db: Database = openSqlite(path)
 
-  db.run('CREATE TABLE IF NOT EXISTS kay_mail_subscribers (id TEXT PRIMARY KEY, list TEXT NOT NULL, email TEXT NOT NULL, status TEXT NOT NULL, locale TEXT NOT NULL, created_at INTEGER NOT NULL, confirmed_at INTEGER)')
+  db.run('CREATE TABLE IF NOT EXISTS kay_mail_subscribers (id TEXT PRIMARY KEY, list TEXT NOT NULL, email TEXT NOT NULL, status TEXT NOT NULL, locale TEXT NOT NULL, created_at INTEGER NOT NULL, confirmed_at INTEGER, source TEXT, wording TEXT)')
   db.run('CREATE UNIQUE INDEX IF NOT EXISTS kay_mail_subscribers_email ON kay_mail_subscribers (list, email)')
   db.run('CREATE INDEX IF NOT EXISTS kay_mail_subscribers_email_only ON kay_mail_subscribers (email)')
   db.run('CREATE TABLE IF NOT EXISTS kay_mail_broadcasts (id TEXT PRIMARY KEY, list TEXT NOT NULL, created_at INTEGER NOT NULL, finished_at INTEGER, message TEXT NOT NULL)')
@@ -94,7 +103,7 @@ export function openLists(path: string) {
   db.run('CREATE INDEX IF NOT EXISTS kay_mail_subscribers_pending ON kay_mail_subscribers (status, created_at)')
   db.run('CREATE INDEX IF NOT EXISTS kay_mail_deliveries_subscriber ON kay_mail_deliveries (subscriber)')
 
-  const insertPending = db.query('INSERT OR IGNORE INTO kay_mail_subscribers (id, list, email, status, locale, created_at) VALUES (?1, ?2, ?3, \'pending\', ?4, ?5)')
+  const insertPending = db.query('INSERT OR IGNORE INTO kay_mail_subscribers (id, list, email, status, locale, created_at, source, wording) VALUES (?1, ?2, ?3, \'pending\', ?4, ?5, ?6, ?7)')
   const byEmail = db.query<SubscriberRow, [string, string]>('SELECT * FROM kay_mail_subscribers WHERE list = ?1 AND email = ?2')
   const byId = db.query<SubscriberRow, [string, string]>('SELECT * FROM kay_mail_subscribers WHERE list = ?1 AND id = ?2')
   const confirmRow = db.query('UPDATE kay_mail_subscribers SET status = \'confirmed\', confirmed_at = ?3 WHERE list = ?1 AND id = ?2 AND status = \'pending\'')
@@ -159,8 +168,8 @@ export function openLists(path: string) {
       sweepBroadcasts.immediate(now - BROADCAST_KEPT_MS)
     },
     // The address's row on the list, made pending when it has none.
-    ask(list: string, email: string, id: string, locale: string, now = Date.now()): Subscriber {
-      insertPending.run(id, list, email, locale, now)
+    ask(list: string, email: string, id: string, locale: string, now = Date.now(), proof: Proof = {}): Subscriber {
+      insertPending.run(id, list, email, locale, now, proof.source ?? null, proof.wording ?? null)
 
       const row = byEmail.get(list, email)
 

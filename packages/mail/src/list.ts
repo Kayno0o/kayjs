@@ -24,6 +24,7 @@ const PLACEHOLDER = 'https://unsubscribe.invalid/KAYUNSUBSCRIBE'
 const BODY_CLOSE = /<\/body>/i
 // A mail to nobody in particular, rendered once for the whole list.
 const LIST_RECIPIENT = 'list@kay.invalid'
+const STOCK_NOTICE = 'We use your address to send you the mails of this site, until you unsubscribe with the link in each one.'
 // The first sweep of the stores waits for the app to boot; the next ones follow at this pace.
 const FIRST_SWEEP_MS = 10_000
 const SWEEP_EVERY_MS = 3_600_000
@@ -33,6 +34,10 @@ export interface ListConfirmProps {
   url: string
   // The site's origin.
   site: string
+  // The list's `title`, or its name unless that is `default`; undefined for the site's only list.
+  list?: string | undefined
+  // The absolute link of the privacy policy, the list's `privacy`.
+  privacy?: string | undefined
 }
 
 export interface ListOptions {
@@ -48,6 +53,10 @@ export interface ListOptions {
   protection?: Omit<ActionProtect<string>, 'honeypot'> & Pick<ActionProtection, 'tool' | 'maxSize'> | undefined
   // The name of the honeypot field, `website` by default.
   honeypot?: string | undefined
+  // What the confirmation mail calls the list, its name by default.
+  title?: string | undefined
+  // The page explaining what is done with the address, a path or a URL: the confirmation mail links it.
+  privacy?: string | undefined
 }
 
 // The mail sent to a list: a message without recipients, which are the list's.
@@ -58,7 +67,8 @@ export interface BroadcastStatus extends BroadcastProgress {
   done: boolean
 }
 
-type SubscribeSchema = TSchema & { static: { email: string } }
+// `wording` is the id of the notice the form showed, posted by `SubscribeForm` and kept as the proof of consent.
+type SubscribeSchema = TSchema & { static: { email: string, wording?: string | undefined } }
 
 // One address on one list, as a person asking for their data is shown it.
 export interface Subscription {
@@ -71,7 +81,7 @@ export interface Subscription {
 export interface MailingList {
   readonly name: string
   // The arguments of `action` for the subscribe form, for a page to spread: `export const subscribe = action(...mail.list().form())`. A post lists the address as pending and mails a confirmation link; the answer is the same whatever the address is, listed or not.
-  form: () => [schema: SubscribeSchema, handler: (input: { email: string }, ctx: ActionContext) => Promise<Failure<string> | undefined>, protection: ActionProtection<string>]
+  form: () => [schema: SubscribeSchema, handler: (input: { email: string, wording?: string | undefined }, ctx: ActionContext) => Promise<Failure<string> | undefined>, protection: ActionProtection<string>]
   // Renders the message once and queues it for every confirmed subscriber, paced, each mail carrying its subscriber's own unsubscribe link.
   send: <P extends object>(message: ListMessage<P>) => Promise<{ id: string, recipients: number }>
   // Sends the message to one address now, as a preview of the list mail: its unsubscribe link does nothing.
@@ -81,7 +91,8 @@ export interface MailingList {
   // How far a broadcast got, undefined for one that is unknown or older than 30 days after it finished.
   status: (id: string) => Promise<BroadcastStatus | undefined>
   count: () => Promise<number>
-  subscribers: () => Promise<{ email: string, confirmedAt: Date }[]>
+  // The confirmed addresses with the proof kept of each consent: the page the form was on (`source`) and the id of the notice it showed (`wording`), undefined for a row older than the proof.
+  subscribers: () => Promise<{ email: string, confirmedAt: Date, source: string | undefined, wording: string | undefined }[]>
   // Takes the address off this list, whatever its state; whether it was there.
   unsubscribe: (address: string) => Promise<boolean>
 }
@@ -122,6 +133,23 @@ interface Entry {
   // The store when it is open or its file exists, so a sweep creates no file.
   readonly opened: () => ListStore | undefined
   pace: { batch: number, every: Duration }
+}
+
+// The page the form was on, without its query, which may hold anything; the action's own path when the browser sent no referrer.
+function sourceOf(ctx: ActionContext): string {
+  const referrer = ctx.request.headers.get('referer')
+
+  try {
+    return (referrer === null ? ctx.url : new URL(referrer)).pathname.slice(0, 200)
+  }
+  catch {
+    return ctx.url.pathname.slice(0, 200)
+  }
+}
+
+// The id of the stock notice in the page's language, for a form that posts none: its message key and a digest of its text, so a change of wording is told apart.
+function stockWording(): string {
+  return `mail.list.form.notice:${Bun.hash(wording('mail.list.form.notice', STOCK_NOTICE)).toString(36)}`
 }
 
 function randomId(): string {
@@ -255,9 +283,9 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
     const list: MailingList = {
       name,
       form() {
-        const schema = s.Object({ email: s.String({ format: 'email', maxLength: 254, error: emailError }) }) as unknown as SubscribeSchema
+        const schema = s.Object({ email: s.String({ format: 'email', maxLength: 254, error: emailError }), wording: s.Optional(s.String({ maxLength: 64 })) }) as unknown as SubscribeSchema
 
-        const handler = async (input: { email: string }, ctx: ActionContext): Promise<Failure<string> | undefined> => {
+        const handler = async (input: { email: string, wording?: string | undefined }, ctx: ActionContext): Promise<Failure<string> | undefined> => {
           if (!host.configured())
             return ctx.fail(503, wording('mail.list.notConfigured', 'The form cannot subscribe anyone yet.'))
 
@@ -272,12 +300,12 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
 
           const locale = await renderLocale()
           const origin = siteOrigin()
-          const subscriber = await lists.get().ask(name, email, randomId(), locale)
+          const subscriber = await lists.get().ask(name, email, randomId(), locale, Date.now(), { source: sourceOf(ctx), wording: input.wording ?? stockWording() })
 
           const url = `${origin}${LIST_PATH}/confirm?token=${signToken('confirm', { list: name, id: subscriber.id, locale })}`
           const site = new URL(origin).host
 
-          const confirmation: MailMessage<ListConfirmProps> = { to: email, subject: wording('mail.list.confirm.subject', 'Confirm your subscription to {site}', { site }), locale, view: options.view ?? await view<(props: ListConfirmProps) => JSX.Element>('confirm'), props: { url, site: origin } }
+          const confirmation: MailMessage<ListConfirmProps> = { to: email, subject: wording('mail.list.confirm.subject', 'Confirm your subscription to {site}', { site }), locale, view: options.view ?? await view<(props: ListConfirmProps) => JSX.Element>('confirm'), props: { url, site: origin, list: options.title ?? (name === 'default' ? undefined : name), privacy: options.privacy === undefined ? undefined : new URL(options.privacy, origin).href } }
 
           try {
             // Rendered for a listed address too, and only a pending one is queued, off the response path, so the answer takes the same time whether the address is known or not.
@@ -343,14 +371,14 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
         const locale = await renderLocale()
         const footer = await footerOf(locale)
         const noted = wording('mail.list.testNote', 'This is a test send: the unsubscribe link does nothing.')
-        const personal = personalise({ ...mail }, { id: 'test', list: name, email: addressOf(to), status: 'confirmed', locale, createdAt: 0, confirmedAt: 0 }, name, footer)
+        const personal = personalise({ ...mail }, { id: 'test', list: name, email: addressOf(to), status: 'confirmed', locale, createdAt: 0, confirmedAt: 0, source: undefined, wording: undefined }, name, footer)
 
         await host.deliver({ ...personal, subject: `[Test] ${mail.subject}`, text: `${noted}\n\n${personal.text}` })
       },
       async preview(given) {
         const { mail } = await message(given, LIST_RECIPIENT)
         const locale = await renderLocale()
-        const personal = personalise({ ...mail }, { id: 'preview', list: name, email: LIST_RECIPIENT, status: 'confirmed', locale, createdAt: 0, confirmedAt: 0 }, name, await footerOf(locale))
+        const personal = personalise({ ...mail }, { id: 'preview', list: name, email: LIST_RECIPIENT, status: 'confirmed', locale, createdAt: 0, confirmedAt: 0, source: undefined, wording: undefined }, name, await footerOf(locale))
 
         return { subject: mail.subject, html: personal.html, text: personal.text }
       },
@@ -360,7 +388,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
         return found?.list === name ? { id, done: found.finishedAt !== undefined, ...await lists.get().progress(found) } : undefined
       },
       count: async () => lists.get().count(name),
-      subscribers: async () => (await lists.get().subscribers(name)).map(subscriber => ({ email: subscriber.email, confirmedAt: new Date(subscriber.confirmedAt ?? subscriber.createdAt) })),
+      subscribers: async () => (await lists.get().subscribers(name)).map(subscriber => ({ email: subscriber.email, confirmedAt: new Date(subscriber.confirmedAt ?? subscriber.createdAt), source: subscriber.source, wording: subscriber.wording })),
       async unsubscribe(address) {
         const email = normalizeAddress(address)
 
