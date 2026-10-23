@@ -97,7 +97,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `trusted-folder` | warn | code | A folder collection with `trusted`, which only a loader's collection reads |
 | `untyped-socket` | warn | code | A `.ws()` route with a `body` and no `response`, so an island's `socket()` gets `unknown` messages |
 | `unsized-image` | warn | performance | An `img` with no `width` and `height`, unless its classes or `style` reserve the box, as `aspect-video w-full` |
-| `large-public-image` | warn | performance | An `img`, a CSS `url()`, a social card `meta` or a Markdown image using a public image over 256 KiB |
+| `large-public-image` | warn | performance | An `img`, a CSS `url()` or `image-set()` string, a social card `meta`, `seo.image`, or a Markdown image, HTML `img` or frontmatter `image:` using a public image over 256 KiB, as a path or an address under `site` |
 | `missing-site` | warn | seo | `seo` with no `site`, on a static export |
 | `missing-description` | warn | seo | No `seo.description` |
 | `missing-share-image` | warn | seo | No share image on any page |

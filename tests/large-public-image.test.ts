@@ -29,7 +29,9 @@ async function project(): Promise<string> {
   return dir
 }
 
-const found = async (dir: string, lints?: object, base?: string) => (await writeShadowTypes(dir, { routes: 'src/routes', lints, base })).problems.filter(problem => problem.code === 'large-public-image')
+const found = async (dir: string, lints?: object, base?: string, extra: object = {}) => (await writeShadowTypes(dir, { routes: 'src/routes', lints, base, ...extra })).problems.filter(problem => problem.code === 'large-public-image')
+
+const at = (problems: Awaited<ReturnType<typeof found>>) => problems.map(problem => `${problem.file.split('/').pop()}:${problem.line}`).toSorted()
 
 describe('large-public-image', () => {
   it('warns of an img with a static src naming a public raster over the threshold, and of nothing else', async () => {
@@ -48,7 +50,7 @@ describe('large-public-image', () => {
     expect((await found(dir, { performance: 'allow' }))).toEqual([])
   })
 
-  async function bare(files: Record<string, string>, base?: string) {
+  async function bare(files: Record<string, string>, base?: string, extra: object = {}) {
     const dir = await scratchDir('large-public-image-')
 
     await mkdir(join(dir, 'src', 'routes'), { recursive: true })
@@ -61,7 +63,7 @@ describe('large-public-image', () => {
       await writeFile(join(dir, name), text)
     }
 
-    return found(dir, undefined, base)
+    return found(dir, undefined, base, extra)
   }
 
   it('matches a src encoded differently from the file url', async () => {
@@ -92,6 +94,65 @@ describe('large-public-image', () => {
     }, '/docs')
 
     expect(problems.map(problem => `${problem.file.split('/').pop()}:${problem.line}`).toSorted()).toEqual(['Hero.kay:1', 'index.kay:1', 'index.kay:2', 'index.kay:3', 'index.kay:4', 'index.kay:6', 'post.md:1', 'post.md:5', 'styles.css:2'])
+  })
+
+  it('sees an absolute og:image under the site, and no other origin', async () => {
+    const problems = await bare({
+      'src/routes/index.kay': ['meta(property="og:image" content="https://example.com/docs/big.jpg")', 'meta(property="og:image" content="https://example.com/big.jpg?v=1")', 'meta(property="og:image" content="https://other.com/big.jpg")', 'meta(property="og:image" content="https://example.com.evil.com/big.jpg")', 'img(src="https://example.com/big.jpg" alt="a")', ''].join('\n'),
+    }, '/docs', { site: 'https://example.com/' })
+
+    expect(at(problems)).toEqual(['index.kay:1', 'index.kay:2', 'index.kay:5'])
+  })
+
+  it('reads seo.image from the config, one text per locale', async () => {
+    const one = await bare({ 'kay.config.ts': 'export default {\n  seo: {\n    image: \'/big.jpg\',\n  },\n}\n' }, undefined, { seo: { image: '/big.jpg' } })
+
+    expect(at(one)).toEqual(['kay.config.ts:3'])
+
+    const record = await bare({ 'kay.config.ts': 'export default {\n  seo: {\n    image: { en: \'/big.jpg\', fr: \'/missing.jpg\' },\n  },\n}\n' }, undefined, { seo: { image: { en: '/big.jpg', fr: '/missing.jpg' } } })
+
+    expect(at(record)).toEqual(['kay.config.ts:3'])
+    expect(at(await bare({}, undefined, { seo: { image: '/missing.jpg' } }))).toEqual([])
+    expect((await bare({}, undefined, { seo: { image: 'https://example.com/big.jpg' }, site: 'https://example.com' })).length).toBe(1)
+  })
+
+  it('reads the image field of a Markdown frontmatter', async () => {
+    const problems = await bare({
+      'src/routes/a.md': '---\ntitle: A\nimage: /big.jpg\n---\n\nBody\n',
+      'src/routes/b.md': '---\ntitle: B\nimage: "/my%20photo.jpg"\n---\n',
+      'src/routes/c.md': '---\ntitle: C\nimage: /missing.jpg\n---\n',
+      'src/routes/d.md': 'image: /big.jpg\n',
+      'src/routes/e.md': '---\ntitle: E\ncover: /big.jpg\n---\n\n    image: /big.jpg\n',
+    })
+
+    expect(at(problems)).toEqual(['a.md:3', 'b.md:3'])
+  })
+
+  it('sees an HTML img and a reference-style image in Markdown, and a bare string in image-set()', async () => {
+    const problems = await bare({
+      'src/routes/post.md': ['<img src="/big.jpg" alt="a">', '<img alt="b" src=\'/my%20photo.jpg\'>', '<img src="/big.jpg" srcset="/big.jpg 1x" alt="c">', '<IMG SRC=/big.jpg>', '', '![ref][hero] ![collapsed][] ![shortcut] ![none][nope] ![missing][gone]', '', '[hero]: /big.jpg "Title"', '[collapsed]: </my%20photo.jpg>', '[shortcut]: /big.jpg', '[none]: /missing.jpg', ''].join('\n'),
+      'src/styles.css': '.a { background: image-set("/big.jpg" 1x, "/missing.jpg" 2x) }\n.b { background: image-set(url("/big.jpg") 1x, \'/my%20photo.jpg\' 2x) }\n.c { background: image-set(url(/missing.jpg) 1x) }\n',
+    })
+
+    expect(at(problems)).toEqual(['post.md:1', 'post.md:2', 'post.md:4', 'post.md:6', 'post.md:6', 'post.md:6', 'styles.css:1', 'styles.css:2', 'styles.css:2'])
+  })
+
+  it('skips ~~~ fences and indented code in Markdown, but not a list continuation', async () => {
+    const problems = await bare({
+      'src/routes/post.md': ['~~~md', '![a](/big.jpg)', '~~~', '', '````md', '```', '![b](/big.jpg)', '````', '', 'Text', '', '    ![c](/big.jpg)', '', '\t![d](/big.jpg)', '', 'A paragraph', '    ![e](/big.jpg)', '', '- item', '', '    ![f](/big.jpg)', '', '![g](/big.jpg)', ''].join('\n'),
+    })
+
+    expect(at(problems)).toEqual(['post.md:17', 'post.md:21', 'post.md:23'])
+  })
+
+  it('blanks a CSS comment in a Markdown style block and keeps /* inside a url()', async () => {
+    const problems = await bare({
+      'src/routes/post.md': ['<style>', '/* .a { background: url(/big.jpg) } */', '.b { background: url(/a/*.jpg), url(/big.jpg) }', '</style>', '', 'A /* ![x](/big.jpg) */ prose.', ''].join('\n'),
+      'src/styles.css': '.a { background: url(/a/*.jpg), url(/big.jpg) }\n',
+      'src/routes/index.kay': ['div(style="/* url(/big.jpg) */")', 'div(style="background: url(/a/*.jpg), url(/big.jpg)")', ''].join('\n'),
+    })
+
+    expect(at(problems)).toEqual(['index.kay:2', 'post.md:3', 'post.md:6', 'styles.css:1'])
   })
 
   it('does not throw on a dangling symlink in public', async () => {
