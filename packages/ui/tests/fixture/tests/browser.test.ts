@@ -54,6 +54,32 @@ inBrowser('in the browser', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 
+  test('a medium Button in a row of compact fields is as tall as they are at any density, and one elsewhere keeps its height', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/filter-row')
+    const heights = (density: string) => page.evaluate((value: string) => {
+      document.documentElement.style.setProperty('--kui-density', value)
+
+      const height = (selector: string) => document.querySelector(selector)!.getBoundingClientRect().height
+
+      return { search: height('#search'), status: height('#status'), filter: height('#filter'), xs: height('#filter-xs'), inline: height('#filter-inline'), alone: height('#alone') }
+    }, density)
+
+    for (const density of ['0.5', '1', '1.5', '2']) {
+      const found = await heights(density)
+
+      expect(found.filter, density).toBeCloseTo(found.search, 0)
+      expect(found.status, density).toBeCloseTo(found.search, 0)
+      // Only a medium button follows the field; another size, the inline form and a button on its own keep theirs.
+      expect(found.xs, density).toBeLessThan(found.filter)
+      expect(found.inline, density).toBeLessThan(found.filter)
+      expect(found.alone, density).toBeCloseTo(24, 0)
+    }
+
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
   test('Table keeps a long unbroken value inside its stacked card, and its sort button 2rem tall', async () => {
     const site = await shared()
 

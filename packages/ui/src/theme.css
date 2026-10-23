@@ -107,6 +107,8 @@
   /* A text field's inset and its look while focused. Its border, the seed above, which buttons, toggles, carousel dots and empty stars draw too, is solid at 3:1 on every surface: an app changing its canvas sets it to match, since overlay0's hairline reads under 3:1. */
   --spacing-kui-field-x: calc(0.5625rem * var(--kui-density, 1));
   --spacing-kui-field-y: calc(0.25rem * var(--kui-density, 1));
+  /* The height of a text field: its two borders, its two paddings and a line of its text. A medium Button beside a compact field takes it. */
+  --spacing-kui-field-height: calc(2 * var(--kui-border-input) + 2 * var(--spacing-kui-field-y) + var(--text-sm, 0.875rem) * var(--text-sm--line-height, calc(1.25 / 0.875)));
   --color-kui-field-focus: var(--color-kui-accent);
   --kui-field-focus-shadow: none;
 
@@ -331,6 +333,11 @@
 
   .kui-btn:where([data-size='lg']:not([data-variant='inline'])) {
     @apply px-4 py-1.5 text-sm;
+  }
+
+  /* A medium button in a row of compact fields or bare field controls is as tall as they are at any density; a rule here rather than a utility, so no other button carries the selector. */
+  :where(:has(> .kui-form-field[data-compact], > .kui-field-input)) > .kui-btn:where([data-size=md]:not([data-variant=inline])) {
+    height: var(--spacing-kui-field-height);
   }
 
   /* A toggle button that is on: the keyline in the accent, after the variants and tones so it shows on each, and over the hover line. A filled accent button shows no difference, its fill being the accent already. */
@@ -878,6 +885,12 @@
       textarea
     ) {
     @apply w-full;
+  }
+
+  /* A select draws its text a little lower than a text box does, so it takes the height of one. */
+  select.kui-field-input,
+  .kui-form-field :where(select) {
+    min-height: var(--spacing-kui-field-height);
   }
 
   /* A compact field is as wide as its select, which then fits its options, as in a filter bar. */
