@@ -16,6 +16,7 @@ import { readCacheEntry, writeCacheEntry } from '../build/cache'
 import { findKayFiles, inWalkScope, treeEntries, writeIfChanged } from '../build/files'
 import { iconTypes } from '../build/icons'
 import { findKayLibraries, libraryOf, packageRoot, reachableLibraryFiles, throughNodeModules } from '../build/libraries'
+import { packageContextModule } from '../build/manifests'
 import { importedSignals } from '../build/signals'
 import { cacheEntry } from '../build/transform'
 import { uiKeyOf } from '../build/ui'
@@ -498,7 +499,7 @@ async function compileShadowCached(cacheDir: string, root: string, file: string,
   const matchers = Object.values(route?.matchers ?? {}).map(matcher => matcherSource(routesDir, matcher) ?? '')
   const signals = importedSignals(file, source)
   const queries = layoutQueries(file, source, routesDir, mounts)
-  const slot = cacheEntry(cacheDir, file, 'shadow', JSON.stringify([root, routesDir, mounts, insideIsland, lints ?? {}, matchers, signals, queries, shadowOf?.(file), uiKeyOf(root, file), source]))
+  const slot = cacheEntry(cacheDir, file, 'shadow', JSON.stringify([root, routesDir, mounts, insideIsland, lints ?? {}, matchers, signals, queries, shadowOf?.(file), uiKeyOf(root, file), packageContextModule(file), source]))
   const cached = await remembered(slot, async () => readCacheEntry<ShadowEntry>(slot))
 
   // An entry made for its types alone serves what wants no more, and is made again, whole, for what does.

@@ -363,7 +363,7 @@ class ModuleShell {
     const imported = new Set([...script.imports, ...fence?.imports ?? []].map(binding => binding.local))
     const implicit = [...script.implicit, ...fence?.implicit ?? []].filter(name => !imported.has(name))
 
-    // `ctx` typed with the keys of the package's own context module as well, on one line so the shadow keeps the source's line numbers.
+    // `ctx` typed with the keys of the package's own context module as well, as one statement line.
     const typed = this.options.contextModule !== undefined && implicit.includes('ctx')
     const names = [...new Set(implicit)].filter(name => !typed || name !== 'ctx')
 

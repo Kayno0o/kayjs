@@ -126,12 +126,7 @@ export function compileShadow(root: string, file: string, source: string, { rout
 function contextSpecifier(file: string, shadowDir: string): string | undefined {
   const module = packageContextModule(file)
 
-  if (module === undefined)
-    return undefined
-
-  const path = relative(shadowDir, module).replace(TS_FILE, '')
-
-  return path.startsWith('.') ? path : `./${path}`
+  return module === undefined ? undefined : relativeSpecifier(shadowDir, module.replace(TS_FILE, ''))
 }
 
 // The `query` types of the layouts above a page or a layout, which its shadow depends on besides its own source.

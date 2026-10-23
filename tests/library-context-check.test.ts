@@ -78,6 +78,43 @@ describe('a library component reading its extension\'s ctx key', () => {
   }, TIMEOUT)
 })
 
+describe('a library component', () => {
+  it('reading no ctx, or declaring its own, is checked as before', async () => {
+    const none = await check(await project(PLAIN, 'p yes\n'))
+    const own = await check(await project(PLAIN, '---\nconst ctx = { nope: true }\n---\nif ctx.nope\n  p yes\n'))
+
+    expect(none.output.slice(0, 600)).toMatch(CLEAN)
+    expect(own.output.slice(0, 600)).toMatch(CLEAN)
+  }, TIMEOUT)
+
+  it('loses its keys again when the package stops declaring the module, with no change to the component', async () => {
+    const root = await project(PLAIN, READS_INBOX)
+
+    expect((await check(root)).output.slice(0, 600)).toMatch(CLEAN)
+
+    const manifest = join(root, 'node_modules/ctxlib/package.json')
+    const declared = await Bun.file(manifest).json() as { kay?: unknown }
+
+    delete declared.kay
+    await Bun.write(manifest, JSON.stringify(declared))
+
+    const { code, output } = await check(root)
+
+    expect(output).toContain('\'inbox\'')
+    expect(code).not.toBe(0)
+  }, TIMEOUT)
+
+  it('naming a module that is not there stays untyped rather than breaking the shadow', async () => {
+    const root = await project(PLAIN, 'p yes\n')
+    const manifest = join(root, 'node_modules/ctxlib/package.json')
+    const declared = await Bun.file(manifest).json() as { kay: { context: string } }
+
+    declared.kay.context = './missing.ts'
+    await Bun.write(manifest, JSON.stringify(declared))
+    expect((await check(root)).output.slice(0, 600)).toMatch(CLEAN)
+  }, TIMEOUT)
+})
+
 describe('the keys the Bell reads off ctx', () => {
   it('are `inbox` alone, so a page reaching it loads that one context key', async () => {
     expect(implicitContextKeys(await Bun.file(resolve('packages/ui/src/bell.kay')).text())).toEqual(['inbox'])

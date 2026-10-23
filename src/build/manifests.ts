@@ -62,7 +62,10 @@ export function packageContextModule(file: string): string | undefined {
     if (existsSync(join(dir, 'package.json'))) {
       const declared = readManifest(dir)?.kay?.context
 
-      return typeof declared === 'string' ? resolve(dir, declared) : undefined
+      const module = typeof declared === 'string' ? resolve(dir, declared) : undefined
+
+      // A module that is not there is left to the build, which reports it, rather than typed into a shadow no line of the source maps to.
+      return module !== undefined && existsSync(module) ? module : undefined
     }
 
     if (dir === dirname(dir))
