@@ -8,7 +8,7 @@ const { label, placement } = props<{
   placement?: PopoverPlacement | undefined
 }>()
 ---
-// `inbox` is typed only where `ui()` is installed, so it is read through a cast (kaynooo/kayjs#2037): an app importing the Bell without it would otherwise fail to type check.
+// `inbox` is typed only where `ui()` is installed, so it is read through a cast (kaynooo/kayjs#2037), which also makes a page reaching the Bell load every ctx key rather than only `inbox`.
 // A signed-in visitor's notifications, with the unread count: nothing at all for anyone else, and no JavaScript for them.
 if (ctx as { inbox?: boolean }).inbox
   BellInbox(label={label} placement={placement})
