@@ -15,7 +15,7 @@ function preflight(): Response {
 // The documents and endpoints an MCP client signs in through, on kayjs-auth's own plugin: nothing the app declares.
 export function serveOAuthServer(plugin: Elysia, core: Core, stateOf: (ctx: unknown) => RequestState): void {
   // Any site's client posts to these, so kay's own 413 for a body over the app's limit carries the same open grant.
-  crossOriginPaths(plugin, [`${core.prefix}/oauth`], { origins: '*' })
+  crossOriginPaths(plugin, ['token', 'revoke', 'register'].map(name => `${core.prefix}/oauth/${name}`), { origins: '*' })
 
   for (const path of [AUTHORIZATION_SERVER_PATH, OPENID_CONFIGURATION_PATH]) {
     plugin

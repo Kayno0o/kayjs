@@ -186,6 +186,17 @@ describe('a cross-origin route of an extension', () => {
     expect((await tooBig(await app(), '/auth/token')).headers.get('access-control-allow-origin')).toBeNull()
   })
 
+  it('keeps a limit on a parent path holding the cross-origin one, and the grant on its 413', async () => {
+    for (const options of [{ extension: crossOrigin({ '/auth': 100 }) }, { extension: crossOrigin(), maxSizes: { '/auth': 100 } }]) {
+      const site = await app(options)
+      const refused = await tooBig(site, '/auth/token')
+
+      expect(refused.status).toBe(413)
+      expect(refused.headers.get('access-control-allow-origin')).toBe('*')
+      expect((await tooBig(site, '/auth/upload')).status).toBe(413)
+    }
+  })
+
   it('keeps the grant on a limit of its own, the app\'s maxSizes or the extension\'s maxSize', async () => {
     for (const options of [{ extension: crossOrigin({ '/auth/token': 100 }) }, { extension: crossOrigin(), maxSizes: { '/auth/token': 100 } }]) {
       const refused = await tooBig(await app(options), '/auth/token')
