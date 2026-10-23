@@ -1,13 +1,17 @@
+import type { SQL } from 'bun'
 import type { DevDataOverview, DevQueryResult, DevRows } from '../src/server/dev-data'
 import { join } from 'node:path'
 import process from 'node:process'
-import { SQL } from 'bun'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { closeDevData, refusedQuery } from '../src/server/dev-data'
+import { cleanUpAfterFile, postgres } from './job-stores'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
 const URL_ENV = process.env.TEST_DATABASE_URL
+
+cleanUpAfterFile()
+
 const HEADERS = { 'x-kay-dev': '1' }
 const SCHEMA = `kay_dev_data_${crypto.randomUUID().replaceAll('-', '').slice(0, 10)}`
 
@@ -142,8 +146,11 @@ describe('the dev tool\'s database endpoints', () => {
     let site: App
 
     beforeAll(async () => {
-      process.env.DATABASE_URL = URL_ENV!
-      admin = new SQL(URL_ENV!, { max: 1 })
+      // A database of its own, as TEST_DATABASE_URL names a server whose user may create them, not one to write into.
+      const database = await postgres()
+
+      process.env.DATABASE_URL = database.url
+      admin = database.sql
       await admin.unsafe(`CREATE SCHEMA ${SCHEMA}`)
       await admin.unsafe(`CREATE TABLE ${SCHEMA}.users (id serial PRIMARY KEY, name text NOT NULL, bio text)`)
       await admin.unsafe(`INSERT INTO ${SCHEMA}.users (name, bio) VALUES ('Ada', NULL), ('Grace', ${`'${'x'.repeat(1000)}'`})`)
@@ -155,11 +162,7 @@ describe('the dev tool\'s database endpoints', () => {
       site = await app()
     })
 
-    afterAll(async () => {
-      await closeDevData()
-      await admin.unsafe(`DROP SCHEMA ${SCHEMA} CASCADE`)
-      await admin.close()
-    })
+    afterAll(closeDevData)
 
     const rows = async (table: string, page = 0) => await (await get(site, `/_kay/dev/data/rows?table=${SCHEMA}.${table}&page=${page}`)).json() as DevRows
 
