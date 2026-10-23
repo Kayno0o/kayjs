@@ -714,7 +714,7 @@ describe('kay dev memory', () => {
     return lines(file).map(line => line.split(' ').map(Number) as [heap: number, rss: number, pid: number])
   }
 
-  it('holds the same heap after sixty edits of a large page as after thirty', async () => {
+  it('holds the same heap after sixty edits of a large page as after forty', async () => {
     const project = await servedWithin(4096)
     const file = join(project.root, '.memory')
 
@@ -723,9 +723,9 @@ describe('kay dev memory', () => {
 
       const sizes = await editing(project, file)
 
-      // The heap settles within a few dozen edits; one keeping each version of the page, 200 KB, would grow by 6 MB over the next thirty.
+      // The heap steps up by about 2 MB around the thirty-third edit, when JavaScriptCore compiles the hot compiler functions (flat with the JIT off), so the comparison starts after it; one keeping each version of the page, 200 KB, would grow by 4 MB over the next twenty.
       expect(project.children).toHaveLength(2)
-      expect(sizes.at(-1)![0]).toBeLessThan(sizes[30]![0] + 3_000_000)
+      expect(sizes.at(-1)![0]).toBeLessThan(sizes[40]![0] + 2_500_000)
     }
     finally {
       await project.cleanup()
