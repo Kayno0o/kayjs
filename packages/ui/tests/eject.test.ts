@@ -242,6 +242,16 @@ describe('kay ui eject', () => {
     expect((await run(eject, ['card'])).out).toContain('could not be read')
   })
 
+  test('copies the winning entry when an own key of src/ui.ts overrides a spread one, with no note about a name and a path', async () => {
+    await writeFile(join(root, 'src/ui.ts'), 'const shared = {\n  "@kaynooo/kayjs-ui/card.kay": { parts: { root: "a" } },\n}\n\nexport default defineUi({ ...shared, "@kaynooo/kayjs-ui/card.kay": { parts: { root: "b" } } })\n')
+
+    const { out } = await run(eject, ['card'])
+    const text = await readFile(join(root, 'src/ui.ts'), 'utf8')
+
+    expect(out).not.toContain('by name and by path')
+    expect(text).toContain('\n  \'./components/ui/card.kay\': { parts: { root: "b" } } })')
+  })
+
   test('rewrites the imports of nested files, type imports and dynamic imports', async () => {
     await mkdir(join(root, 'src/pages/deep'), { recursive: true })
     await writeFile(join(root, 'src/pages/deep/x.ts'), 'import type Card from "@kaynooo/kayjs-ui/card.kay"\nconst load = () => import(\'@kaynooo/kayjs-ui/card.kay\')\nexport { Card, load }\n')
