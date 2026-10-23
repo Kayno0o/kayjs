@@ -1684,6 +1684,13 @@ function kayImports(body: t.Statement[], wanted: Set<string>): Map<string, strin
       continue
 
     for (const specifier of statement.specifiers) {
+      if (specifier.type === 'ImportNamespaceSpecifier') {
+        for (const name of wanted)
+          local.set(`${specifier.local.name}.${name}`, name)
+
+        continue
+      }
+
       const imported = specifier.type === 'ImportSpecifier' ? specifier.imported : undefined
       const name = imported?.type === 'Identifier' ? imported.name : imported?.value
 
@@ -1720,15 +1727,24 @@ function propTypes(type: t.TSType | undefined, body: t.Statement[]): PropType[] 
   return found
 }
 
-function namedBy(option: t.TSType | undefined, names: Map<string, string>): option is t.TSTypeReference {
-  return option?.type === 'TSTypeReference' && option.typeName.type === 'Identifier' && names.has(option.typeName.name)
+// The `kay` name a type reference writes, as `Signal` or as `kay.Signal` through a namespace import.
+function kayName(option: t.TSType | undefined, names: Map<string, string>): string | undefined {
+  if (option?.type !== 'TSTypeReference')
+    return undefined
+
+  const { typeName } = option
+
+  if (typeName.type === 'Identifier')
+    return names.get(typeName.name)
+
+  return typeName.left.type === 'Identifier' ? names.get(`${typeName.left.name}.${typeName.right.name}`) : undefined
 }
 
 // The props a props type writes as `Bindable<T>` from `kay`: read as values, and written by assigning. `Bindable<T> | undefined` is as bindable as `Bindable<T>`.
 function bindableProps(type: t.TSType | undefined, body: t.Statement[]): Set<string> {
   const names = kayImports(body, new Set([BINDABLE_TYPE]))
 
-  return new Set(propTypes(type, body).filter(({ options }) => options.some(option => namedBy(option, names))).map(({ key }) => key))
+  return new Set(propTypes(type, body).filter(({ options }) => options.some(option => kayName(option, names) !== undefined)).map(({ key }) => key))
 }
 
 // A prop typed `Signal<T>` or `Memo<T>` of `kay` is a plain value since 1.74, so it compiles and silently stops working as a getter.
@@ -1740,10 +1756,11 @@ function reportSignalProps(type: t.TSType | undefined, body: t.Statement[], shif
 
   for (const { key, options } of propTypes(type, body)) {
     for (const option of options) {
-      if (!namedBy(option, names))
+      const name = kayName(option, names)
+
+      if (option === undefined || name === undefined)
         continue
 
-      const name = names.get((option.typeName as t.Identifier).name)
       const help = name === 'Signal'
         ? `type it \`Bindable<T>\` and pass it as \`bind:${key}={...}\` when the component writes it, or a plain \`T\` when it only reads it`
         : `type it a plain \`T\` and pass the value, \`${key}={memo()}\``

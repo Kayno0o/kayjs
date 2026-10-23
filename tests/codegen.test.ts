@@ -307,6 +307,8 @@ describe('elements', () => {
     expect(errors(page('type Props = { n?: Memo<number> | undefined }\nconst { n } = props<Props>()'))).toEqual([expect.stringContaining('prop `n` is typed `Memo`')])
     expect(errors(page('interface Props { open: Signal<boolean>, count: Memo<number> }\nconst { open } = props<Props>()'))).toHaveLength(2)
     expect(errors('---\nimport { Signal as S } from \'kay\'\nconst { open } = props<{ open: S<boolean> }>()\n---\np x')).toEqual([expect.stringContaining('typed `Signal`')])
+    expect(errors('---\nimport * as kay from \'kay\'\nconst { open } = props<{ open: kay.Signal<boolean>, n: kay.Memo<number> | undefined }>()\n---\np x')).toEqual([expect.stringContaining('typed `Signal`'), expect.stringContaining('typed `Memo`')])
+    expect(errors('---\nimport * as k from \'kay\'\nconst { open } = props<{ open: k.Bindable<boolean>, o: Other.Signal<number> }>()\n---\np x')).toEqual([])
     expect(errors(page('const { open } = props<{ open: Bindable<boolean> }>()'))).toEqual([])
     expect(errors('---\ntype Signal<T> = T\nconst { open } = props<{ open: Signal<boolean> }>()\n---\np x')).toEqual([])
   })
