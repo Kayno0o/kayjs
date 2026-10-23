@@ -40,6 +40,7 @@ const listWidth = signal(WIDTH.default)
 const narrow = signal(false)
 let sidebarPane: HTMLElement | undefined
 let detailPane: HTMLElement | undefined
+let listPane: HTMLElement | undefined
 
 effect(() => {
   const query = matchMedia(NARROW)
@@ -86,7 +87,12 @@ function followFocus(open: () => boolean, pane: () => HTMLElement | undefined) {
       const back = opener
 
       opener = null
-      queueMicrotask(() => back instanceof HTMLElement && back.isConnected && back.focus())
+      // A pane open from the first render has no opener, and a re-rendered opener is gone: the list's first control takes focus instead of the body.
+      queueMicrotask(() => {
+        const target = back instanceof HTMLElement && back.isConnected ? back : listPane?.querySelector<HTMLElement>(FOCUSABLE)
+
+        target?.focus()
+      })
     }
   })
 }
@@ -173,7 +179,7 @@ div(part="root" {...rest} style={`--kui-split-list-width: ${listWidth()}px;${sty
         span(part="sidebarTitle") {sidebarTitle}
       div(part="sidebarBody")
         | {sidebar}
-  section(part="list" inert={narrow() && sidebarOpen})
+  section(part="list" inert={narrow() && sidebarOpen} ref={element => listPane = element})
     if listHead
       div(part="listHead")
         | {listHead}

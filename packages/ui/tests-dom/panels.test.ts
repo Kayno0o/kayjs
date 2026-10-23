@@ -276,6 +276,18 @@ describe('SplitLayout on a phone', () => {
     })
   })
 
+  test('puts focus on the list when a pane open from the first render closes with no opener', async () => {
+    await whenNarrow(async () => {
+      const root = await panels()
+
+      click(root.querySelector('.kui-split-layout-sidebar-head .kui-icon-btn'))
+      await settle()
+      await Bun.sleep(0)
+
+      expect(document.activeElement).toBe(root.querySelector('#mars'))
+    })
+  })
+
   test('leaves focus alone on the first render and from md up', async () => {
     const root = await panels()
     const toggle = root.querySelector<HTMLElement>('#toggle-detail')!
