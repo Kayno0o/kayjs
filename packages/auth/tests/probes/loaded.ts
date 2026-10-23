@@ -36,6 +36,37 @@ const scenarios: Record<string, () => Promise<void>> = {
   async bearer() {
     await testApp().browser().fetch('/me', { headers: { authorization: 'Bearer unknown' } })
   },
+  // A bearer token the app issued itself, then used for a request.
+  async bearerIssued() {
+    const app = testApp()
+    const { user } = await app.browser().callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
+    const issued = await app.auth.issueToken(user.id, 'Kitchen display')
+
+    await app.browser().fetch('/me', { headers: { authorization: `Bearer ${issued.ok ? issued.token : ''}` } })
+  },
+  // Configured and never asked, then asked for its return page only.
+  async forwardUnused() {
+    const visitor = testApp({ url: SITE, forwardAuth: 'example.test' }).browser()
+
+    await visitor.json('/me')
+  },
+  async forwardReturn() {
+    const visitor = testApp({ url: SITE, forwardAuth: 'example.test' }).browser()
+
+    await visitor.fetch(`/auth/forward/return?to=${encodeURIComponent('https://app.example.test/')}`)
+  },
+  // Every switchable feature off, each method calling the closed door.
+  async switchesOff() {
+    const app = testApp({ url: SITE, passkeys: false, twoFactor: false, password: false, magicLink: false })
+    const visitor = app.browser()
+
+    await visitor.call('signInWithPassword', { email: 'ada@example.com', password: PASSWORD })
+    await visitor.call('signInWithMagicLink', 'token')
+    await visitor.call('setUpTwoFactor', { password: PASSWORD })
+    await visitor.call('enableTwoFactor', '123456')
+    await visitor.call('signInWithPasskey', {})
+    await visitor.call('changePassword', { password: PASSWORD }, PASSWORD)
+  },
   async forwardAuth() {
     const visitor = testApp({ url: SITE, forwardAuth: 'example.test' }).browser()
 
