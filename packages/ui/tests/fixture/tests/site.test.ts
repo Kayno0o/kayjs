@@ -657,6 +657,8 @@ describe('charts', () => {
     expect([...stacked.matchAll(/aria-label="([^"]+)" data-tooltip/g)].map(match => match[1])).toEqual(['Mon: Ok 3, Failed 1, Total 4', 'Tue: Ok 1, Failed 2, Total 3'])
     expect([...stacked.matchAll(/style="height: ([\d.]+)%/g)].map(match => match[1])).toEqual(['75', '25', '25', '50'])
     expect(stacked).toContain('data-stacked=""')
+    expect(stacked.match(/data-part="bar" data-stacked=""/g)).toHaveLength(4)
+    expect(bars).not.toContain('data-stacked=""')
     expect(stacked).toMatch(/<li class="[^"]*" data-part="legendItem"><span class="[^"]*" data-part="key" style="background-color: red"><\/span>Failed<\/li>/)
     expect(await page('no-bars')).toMatch(/^<p class="kui-bar-chart-empty [^"]*kui-bar-chart [^"]*" data-part="root">No runs<\/p>$/)
   })

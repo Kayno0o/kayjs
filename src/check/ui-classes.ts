@@ -4,7 +4,7 @@ import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
 
 // The part classes kayjs-ui components stopped setting once their recipes drew the look in utilities, with the component, the part that replaces each and the minor that dropped it. A slice of the move adds its components here; theme.css keeps the rules, and this table goes with them in 1.74.
-export const REMOVED_UI_CLASSES: Record<string, { component: string, part: string, since: string }> = {
+export const REMOVED_UI_CLASSES: Record<string, { component: string, part: string, since: string, use?: string }> = {
   // Charts and media (slice 6).
   'kui-bar-list-row': { component: 'BarList', part: 'row', since: '1.72' },
   'kui-bar-list-label': { component: 'BarList', part: 'label', since: '1.72' },
@@ -38,7 +38,7 @@ export const REMOVED_UI_CLASSES: Record<string, { component: string, part: strin
   'kui-line-chart-overlay': { component: 'LineChart', part: 'overlay', since: '1.72' },
   'kui-line-chart-tooltip': { component: 'LineChart', part: 'tooltip', since: '1.72' },
   'kui-line-chart-tooltip-label': { component: 'LineChart', part: 'tooltipLabel', since: '1.72' },
-  'kui-line-chart-tooltip-row': { component: 'LineChart', part: 'tooltipRow', since: '1.72' },
+  'kui-line-chart-tooltip-row': { component: 'LineChart', part: 'tooltipRow', since: '1.72', use: '[data-total]' },
   'kui-line-chart-tooltip-name': { component: 'LineChart', part: 'tooltipName', since: '1.72' },
   'kui-line-chart-tooltip-value': { component: 'LineChart', part: 'tooltipValue', since: '1.72' },
   'kui-line-chart-swatch': { component: 'LineChart', part: 'swatch', since: '1.72' },
@@ -76,7 +76,7 @@ export const REMOVED_UI_CLASSES: Record<string, { component: string, part: strin
   'kui-zoom-tools': { component: 'ZoomPane', part: 'tools', since: '1.72' },
   'kui-site-favicon-img': { component: 'SiteFavicon', part: 'img', since: '1.72' },
   'kui-site-favicon-icon': { component: 'SiteFavicon', part: 'icon', since: '1.72' },
-  'kui-contribution-graph-months': { component: 'ContributionGraph', part: 'root', since: '1.72' },
+  'kui-contribution-graph-months': { component: 'ContributionGraph', part: 'root', since: '1.72', use: '[data-months]' },
   'kui-line-chart-tooltip-total': { component: 'LineChart', part: 'tooltipRow', since: '1.72' },
   'kui-card-head': { component: 'Card', part: 'head', since: '1.71' },
   'kui-card-title': { component: 'Card', part: 'title', since: '1.71' },
@@ -250,7 +250,7 @@ export async function removedUiClasses(root: string, options: CheckOptions): Pro
         ...positionAt(source, match.index),
         end: match.index + match[0].length,
         message: `\`.${match[1]}\` is no longer set on the \`${removed.part}\` of \`${removed.component}\` since ${removed.since}, and its rule leaves theme.css in 1.74`,
-        help: `select \`[data-part='${removed.part}']\` under the component's root (with \`>\` where the part is a direct child, so a nested component's part is left alone), or restyle the part from src/ui.ts: \`'@kaynooo/kayjs-ui/${removed.component.replace(/[A-Z]/g, (letter, at) => `${at > 0 ? '-' : ''}${letter.toLowerCase()}`)}.kay': { parts: { ${removed.part}: '...' } }\``,
+        help: `select \`${removed.use ?? `[data-part='${removed.part}']`}\` under the component's root (with \`>\` where the part is a direct child, so a nested component's part is left alone), or restyle the part from src/ui.ts: \`'@kaynooo/kayjs-ui/${removed.component.replace(/[A-Z]/g, (letter, at) => `${at > 0 ? '-' : ''}${letter.toLowerCase()}`)}.kay': { parts: { ${removed.part}: '...' } }\``,
         code: 'deprecated-ui-class',
         severity: level === 'warn' ? 'warning' : 'error',
       })

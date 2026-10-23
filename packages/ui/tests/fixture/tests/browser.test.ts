@@ -421,6 +421,7 @@ inBrowser('LineChart stacked', () => {
     }
 
     expect(await read(1)).toEqual(['A1', 'B-', 'C2', 'Total3'])
+    expect(await page.evaluate(() => [...document.querySelectorAll('#stacked [data-part="tooltipRow"][data-total]')].map(row => row.textContent))).toEqual(['Total3'])
     expect(await page.evaluate(() => document.querySelector('#stacked [data-part="overlay"]')!.getAttribute('aria-valuetext'))).toEndWith('A 1, B -, C 2, Total 3')
     expect(await page.evaluate(() => [...document.querySelectorAll('#stacked [data-part="data"] th[scope="col"]')].map(th => th.textContent))).toEqual(['A', 'B', 'C', 'Total'])
     expect(page.errors).toEqual([])
