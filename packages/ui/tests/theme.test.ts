@@ -245,7 +245,6 @@ function blockOf(css: string, selector: string): string | undefined {
   return undefined
 }
 
-// The theme as Tailwind compiles it, with a skin's own CSS after it, or before it.
 // The CSS the utilities generate beyond the theme's own rules, which hold the same declarations for the old kui- classes.
 async function utilitiesOf(candidates: string[]): Promise<string> {
   const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
@@ -255,11 +254,12 @@ async function utilitiesOf(candidates: string[]): Promise<string> {
   return compiler.build(candidates).split('\n').filter(line => !had.has(line)).join('\n')
 }
 
-async function built(skin: string, where: 'after' | 'before' = 'after', candidates: string[] = []): Promise<string> {
+// The theme as Tailwind compiles it, with a skin's own CSS after it, or before it.
+async function built(skin: string, where: 'after' | 'before' = 'after'): Promise<string> {
   const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
   const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${where === 'before' ? `${skin}\n${theme}` : `${theme}\n${skin}`}`, { base: ROOT, loadStylesheet: async (_, base) => ({ path: tailwind, base, content: await Bun.file(tailwind).text() }) })
 
-  return compiler.build(candidates)
+  return compiler.build([])
 }
 
 describe('theme.css', () => {
@@ -446,6 +446,17 @@ describe('theme.css', () => {
         expect(rules.some(rule => rule.includes(declaration)), `${name} ${state} ${declaration}`).toBe(true)
       }
     }
+  })
+
+  test('has Menu and BellInbox draw their list and items from the shared menu-look source, not a copy', async () => {
+    const menu = await Bun.file(`${ROOT}src/menu.kay`).text()
+    const bell = await Bun.file(`${ROOT}src/bell-inbox.kay`).text()
+
+    for (const line of ['list: MENU_LIST,', 'item: `${MENU_ITEM} '])
+      expect(menu, line).toContain(line)
+
+    for (const line of ['list: MENU_LIST,', 'item: MENU_ITEM,', 'all: MENU_FOOTER,'])
+      expect(bell, line).toContain(line)
   })
 
   test('sets the toast tone colour from the tone a toast carries', async () => {
