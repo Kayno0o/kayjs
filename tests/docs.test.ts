@@ -1,6 +1,6 @@
 import type { RenderedPage } from 'kay/server'
 import { readFileSync } from 'node:fs'
-import { mkdtemp, readdir, rm } from 'node:fs/promises'
+import { mkdtemp, readdir, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { brotliCompressSync } from 'node:zlib'
@@ -395,6 +395,25 @@ describe('the docs footer\'s page weight', () => {
     const linked = brotli(FILES['/app.css']!) + brotli(FILES['/favicon.svg']!)
 
     expect(Number(WEIGHT.exec(html)?.[1])).toBe(Number(((brotli(html) + linked) / 1024).toFixed(1)))
+  })
+
+  it('keeps the size it measured for a page between builds, and measures it again when the kept one is unreadable', async () => {
+    const body = `<p>${Array.from({ length: 300 }, () => crypto.randomUUID()).join(' ')}</p>`
+    const first = await transform('', body)
+    const kept = join(import.meta.dir, '..', 'docs', '.kay', 'cache', 'page-weight', Bun.version)
+    const entries = await Promise.all((await readdir(kept)).filter(name => name.startsWith('page-')).map(async name => ({ name, time: (await stat(join(kept, name))).mtimeMs })))
+    const entry = join(kept, entries.sort((a, b) => b.time - a.time)[0]!.name)
+
+    await Bun.write(entry, '1')
+
+    const small = Number(WEIGHT.exec(await transform('', body))?.[1])
+
+    expect(small).toBeLessThan(Number(WEIGHT.exec(first)?.[1]))
+
+    await Bun.write(entry, 'not a size')
+
+    expect(await transform('', body)).toBe(first)
+    expect(Number.isSafeInteger(Number(await Bun.file(entry).text()))).toBe(true)
   })
 
   it('leaves a page without the footer as it is', async () => {
