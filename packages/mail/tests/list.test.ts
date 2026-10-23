@@ -8,7 +8,8 @@ import { outbox } from '../src/outbox'
 
 interface Subscribe { email: string }
 
-const { subscribe, subscribeStrict } = await import(`${import.meta.dir}/fixture/src/routes/subscribe.kay`) as Record<'subscribe' | 'subscribeStrict', Action<Subscribe, unknown>>
+const { subscribe, subscribeStrict, subscribeCounted } = await import(`${import.meta.dir}/fixture/src/routes/subscribe.kay`) as Record<'subscribe' | 'subscribeStrict' | 'subscribeCounted', Action<Subscribe, unknown>>
+const { rendered } = await import(`${import.meta.dir}/fixture/src/counter`) as typeof import('./fixture/src/counter')
 const { mail } = await import(`${import.meta.dir}/fixture/src/mail`) as typeof import('./fixture/src/mail')
 
 const site = await testSite({ root: 'tests/fixture' })
@@ -194,6 +195,25 @@ describe('the subscribe form', () => {
 
     await site.runJobs()
     expect(outbox.mails).toHaveLength(before)
+  })
+
+  it('takes the same steps for a listed address as for a new one, mailing only the new one', async () => {
+    const email = fresh()
+    const before = rendered.count
+
+    expect(await site.call(subscribeCounted, { email })).toBeUndefined()
+    expect(rendered.count).toBe(before + 1)
+
+    const confirm = tokenOf(await outbox.waitFor(email, { site, find: sent => sent.subject.startsWith('Confirm') }), '/confirm')
+
+    await site.fetch(`/_kay/mail/list/confirm?token=${confirm}`)
+
+    const mails = outbox.to(email).length
+
+    expect(await site.call(subscribeCounted, { email })).toBeUndefined()
+    await site.runJobs()
+    expect(rendered.count).toBe(before + 2)
+    expect(outbox.to(email)).toHaveLength(mails)
   })
 
   it('renders the honeypot', async () => {

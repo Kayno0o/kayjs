@@ -1,0 +1,10 @@
+---
+import type { ListConfirmProps } from '@kaynooo/kayjs-mail'
+import { rendered } from '../counter'
+
+const { url } = props<ListConfirmProps>()
+
+rendered.count++
+---
+p
+  a(href={url}) Confirm

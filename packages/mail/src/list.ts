@@ -223,15 +223,17 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun'>) 
           const origin = siteOrigin()
           const subscriber = lists.get().ask(name, email, randomId(), locale)
 
-          // A listed address is told nothing and mailed nothing.
-          if (subscriber.status !== 'pending')
-            return undefined
-
           const url = `${origin}${LIST_PATH}/confirm?token=${signToken('confirm', { list: name, id: subscriber.id, locale })}`
           const site = new URL(origin).host
 
+          const confirmation: MailMessage<ListConfirmProps> = { to: email, subject: wording('mail.list.confirm.subject', 'Confirm your subscription to {site}', { site }), locale, view: options.view ?? await view<(props: ListConfirmProps) => JSX.Element>('confirm'), props: { url, site: origin } }
+
           try {
-            await host.enqueueMail<ListConfirmProps>({ to: email, subject: wording('mail.list.confirm.subject', 'Confirm your subscription to {site}', { site }), locale, view: options.view ?? await view<(props: ListConfirmProps) => JSX.Element>('confirm'), props: { url, site: origin } })
+            // A listed address is mailed nothing, but the mail is rendered all the same, so the answer takes the same steps whether the address is known or not.
+            if (subscriber.status === 'pending')
+              await host.enqueueMail<ListConfirmProps>(confirmation)
+            else
+              await host.render<ListConfirmProps>(confirmation)
           }
           catch (error) {
             log.error('the confirmation mail of a list could not be queued', error)
