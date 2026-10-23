@@ -1,4 +1,4 @@
-import { editRequested, editSessionOf } from 'kay/server'
+import { editSessionOf } from 'kay/server'
 
 // How many edit cookies are kept as a guard's admitted ones, the oldest going first, and how long one is kept: an edit cookie's own life is shorter or as long.
 const MAX_ADMITTED = 2000
@@ -31,26 +31,36 @@ export function admitEditor(request: Request, given?: string): void {
   admitted.set(cookie, now)
 }
 
-function mayReadNames(request: Request): boolean {
-  if (!editRequested(request))
-    return true
-
-  const cookie = editSessionOf(request)
+// Whether the edit cookie of the request is one a guard of the app let through. A request with none is not told, whatever it replays: a proof is not tied to the cookie of the page that made it.
+function mayReadNames(request: Request | undefined): boolean {
+  const cookie = request === undefined ? undefined : editSessionOf(request)
   const seen = cookie === undefined ? undefined : admitted.get(cookie)
 
   return seen !== undefined && Date.now() - seen < KEPT_MS
 }
 
-// What a stream is sent of a room: the editors' names only when the app's guard let its request in, else the members with none, which counts them. A request in edit mode that no guard let in is an edit link's holder, whatever room its page named.
-export function viewMembers(request: Request, room: string, members: string[]): string[] {
-  if (!NAMED.test(room) || mayReadNames(request))
+// Whether the member was named by the screens: the guarded screens list an editor under the name `author` gave, or as a list watching, and the on-page editor under neither, so a page of an edit link's holder never proves such a member.
+function listedByScreen(member: string): boolean {
+  try {
+    const listed = JSON.parse(member) as { name?: unknown, watching?: unknown } | null
+
+    return (typeof listed?.name === 'string' && listed.name !== '') || listed?.watching === true
+  }
+  catch {
+    return false
+  }
+}
+
+// What a stream, or the render of a page, is sent of a room: the editors' names when the member joined from the guarded screens or the edit cookie was let through by the app's guard, else the members with none, which counts them.
+export function viewMembers(request: Request | undefined, room: string, members: string[], member: string): string[] {
+  if (!NAMED.test(room) || listedByScreen(member) || mayReadNames(request))
     return members
 
   return members.map((text) => {
     try {
-      const member = JSON.parse(text) as unknown
+      const listed = JSON.parse(text) as unknown
 
-      return typeof member === 'object' && member !== null && 'name' in member ? JSON.stringify({ ...member, name: '' }) : text
+      return typeof listed === 'object' && listed !== null && 'name' in listed ? JSON.stringify({ ...listed, name: '' }) : text
     }
     catch {
       return text

@@ -117,7 +117,7 @@ describe('presence on the server', () => {
   })
 
   it('sends a stream the members as the view of an extension gives them for its request, and every other stream whole', async () => {
-    viewPresenceWith((request, _room, members) => request.headers.has('x-hide') ? members.map(() => '{"name":""}') : members)
+    viewPresenceWith((request, _room, members) => request?.headers.has('x-hide') ? members.map(() => '{"name":""}') : members)
 
     try {
       const ann = await enter(site, 'Ann', 'ann-tab')

@@ -2,6 +2,7 @@ import type { RoomStoreBase } from './rooms'
 import { kayLog } from '../runtime/log'
 import { readPresenceWith } from '../runtime/presence'
 import { appStore } from './app-store'
+import { currentRequest } from './log'
 import { memoryRooms } from './rooms'
 
 // What a presence room is called in the store, apart from the rooms an app's own `rooms()` keep there.
@@ -75,7 +76,7 @@ function parsePresenceKey(key: string): { room: string, member: string } | undef
 readPresenceWith((key) => {
   const parsed = parsePresenceKey(key)
 
-  return parsed === undefined ? [] : membersOf(parsed.room)
+  return parsed === undefined ? [] : seenBy(currentRequest(), parsed.room, membersOf(parsed.room), parsed.member)
 })
 
 function recheckRoom(room: string): void {
@@ -170,10 +171,14 @@ function startTicker(): void {
   ticker.unref()
 }
 
-// What an extension holding names in a room tells the server about who may read them: the members of `room` as the stream of `request` is sent them, the members given when it may read them all. It runs at each read, so a verdict that changes is sent at the next recheck.
-export type PresenceView = (request: Request, room: string, members: string[]) => string[]
+// What an extension holding names in a room tells the server about who may read them: the members of `room` as `request` is sent them (a stream's, or the render of a page, `undefined` when none is known), joined as `member`; the members given when it may read them all. It runs at each read, so a verdict that changes is sent at the next recheck.
+export type PresenceView = (request: Request | undefined, room: string, members: string[], member: string) => string[]
 
 let view: PresenceView | undefined
+
+function seenBy(request: Request | undefined, room: string, members: string[], member: string): string[] {
+  return view === undefined ? members : view(request, room, members, member)
+}
 
 // Installed by an extension whose rooms hold what only some visitors may read, as the cms's editor names: every stream is sent the members as the view gives them, so a room a page proves is no more than the page's visitor may see.
 export function viewPresenceWith(next: PresenceView | undefined): void {
@@ -192,7 +197,7 @@ export function presenceEntry(key: string, tab: string, request?: Request): { va
   const others = (tabs: Tab[]) => {
     const rest = tabs.filter(entry => entry.tab !== tab).map(entry => entry.member)
 
-    return view === undefined || request === undefined ? rest : view(request, room, rest)
+    return seenBy(request, room, rest, member)
   }
 
   return {

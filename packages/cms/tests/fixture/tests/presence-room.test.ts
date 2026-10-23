@@ -57,6 +57,23 @@ test('an edit link\'s holder receives the editors only as a count, while a signe
   expect(hello.keys.some(key => key.includes('"Ann"'))).toBe(true)
   expect(second.keys.some(key => key.includes('"cms:posts:hello"'))).toBe(true)
   expect(namesIn(second)).not.toContain('Ann')
+  // The render itself carries no name either: the page and its live proofs are what the holder reads.
+  expect((await holder.visit('/blog/hello')).html).not.toContain('Ann')
+
+  // A proof replayed with no edit cookie at all is told no names: the proof is not tied to the page's cookies.
+  const { html } = await holder.visit('/blog/hello')
+  const pages = pagesOf(html)
+  const keys = pages.flatMap(page => page.values.filter(([id]) => id === PRESENCE).map(([, key]) => key))
+  const replay = new Feed(await holder.fetch('/_kay/live', { ...JSON_POST, headers: { ...JSON_POST.headers, cookie: 'kay_preview=' }, body: JSON.stringify({ proofs: proofsOf(pages), watch: keys.map(key => [PRESENCE, key]), tab: 'replay' } satisfies LiveRequest) }))
+
+  feeds.push(replay)
+
+  const replayed: string[] = []
+
+  while (replayed.length < keys.length)
+    replayed.push(...(await replay.next()).map(update => JSON.stringify(update)))
+
+  expect(replayed.join('')).not.toContain('Ann')
   // Counted all the same: the members are there, with no name.
   expect(second.messages.some(message => message.includes('"page":true') || message.includes('\\"page\\":true'))).toBe(true)
 
