@@ -7,7 +7,7 @@ import process from 'node:process'
 import { parse } from '@babel/parser'
 import { KayError } from '../compiler/errors'
 import { parseKay } from '../compiler/parser'
-import { loadTraverse } from '../compiler/rewrite'
+import { loadTraverse, walkScope } from '../compiler/rewrite'
 import { readCacheEntry, writeCacheEntry } from './cache'
 import { KAY_FILE } from './files'
 
@@ -83,7 +83,8 @@ function readsIn(code: string, fenced: boolean): Set<string> {
 function namesIn(program: t.File): Set<string> {
   const found = new Set<string>()
 
-  loadTraverse()(program, {
+  // A name declared in two fences is refused by Babel's scope, and reports nothing here: the fence reports it itself.
+  walkScope(program, {
     Identifier(path: NodePath<t.Identifier>) {
       const { name } = path.node
 

@@ -45,7 +45,7 @@ export function loadTraverse(): typeof traverseModule {
   return loadedTraverse
 }
 
-// Walks the fence with Babel's scope, false when the scope refuses a name declared twice, as an import and a `const` an edit passes through. The half-built scope is dropped then: Babel marks a scope built before crawling it, so a later walk would read it as whole and not refuse the fence. Every walk over a fence's scope goes through here, and any other error still throws.
+// Walks the fence with Babel's scope, false when the scope refuses a name declared twice, as an import and a `const` an edit passes through. The half-built scope is dropped then: Babel marks a scope built before crawling it, so a later walk would read it as whole and not refuse the fence.
 export function walkScope(ast: t.Node, visitor: Parameters<typeof traverseModule>[1]): boolean {
   try {
     loadTraverse()(ast, visitor)

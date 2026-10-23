@@ -88,6 +88,12 @@ describe('the modules a chunk read it from', () => {
   it('says so when no module of the chunk owns up to the read', () => {
     expect(serverOnlyReads('var s = process.env.X;\n', new Map([['src/a.ts', 'export const x = 1\n']]))).toEqual([{ name: 'process', modules: [] }])
   })
+
+  it('reads no module that declares a name in two fences, and does not throw', () => {
+    const twice = '--- server\nimport { a } from "x"\nconst r = process.env.X\n---\n---\nimport { a } from "x"\nconst z = process.cwd()\n---\np {z}\n'
+
+    expect(serverOnlyReads('process.cwd()', new Map([['a.kay', twice]]))).toEqual([{ name: 'process', modules: [] }])
+  })
 })
 
 describe('the scans a build keeps', () => {
