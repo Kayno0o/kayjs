@@ -8,7 +8,7 @@ const path = browserPath()
 // The server's control, described by its own note and the hint it renders after it.
 const SERVED = /aria-describedby="name-note (k[\w-]+)">.*data-part="hint" id="\1"/
 // What the controls of the form-reset page hold when it loads.
-const START = { agree: true, power: false, free: false, decks: ['films'], size: 'm', sort: null, level: 'b', tags: ['x', 'y'], title: 'Ada', bio: 'Hello', notes: '# Notes', range: [2, 8], icon: 'star', bare: 'star', heard: 'b', refd: true, form: 'x' }
+const START = { agree: true, power: false, free: false, decks: ['films'], size: 'm', sort: null, level: 'b', tags: ['x', 'y'], title: 'Ada', bio: 'Hello', notes: '# Notes', range: [2, 8], stay: ['2026-10-01', '2026-10-05'], icon: 'star', bare: 'star', heard: 'b', refd: true, form: 'x' }
 // One site and one browser for every test of the file; each test opens and closes its own page.
 let built: ReturnType<typeof testSite> | undefined
 const shared = async () => built ??= testSite({ root: ROOT, browser: { path } })
@@ -902,6 +902,7 @@ inBrowser('a form reset on a served page', () => {
       type('#notes', '# Other')
       type('input[aria-label="Range from"]', '4', 'change')
       type('input[aria-label="Range to"]', '9', 'change')
+      type('#stay input[aria-label="Stay to"]', '2026-10-20', 'change')
       click('#named .kui-icon-grid-option[aria-label="moon"]')
       click('#bare .kui-icon-grid-option[aria-label="moon"]')
       type('#fixed', 'a', 'change')

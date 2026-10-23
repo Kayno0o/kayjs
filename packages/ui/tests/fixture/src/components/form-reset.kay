@@ -5,13 +5,14 @@ import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
 import IconPicker from '@kaynooo/kayjs-ui/icon-picker.kay'
 import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
 import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
+import DateRangeInput from '@kaynooo/kayjs-ui/date-range-input.kay'
 import RangeInput from '@kaynooo/kayjs-ui/range-input.kay'
 import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
 import Select from '@kaynooo/kayjs-ui/select.kay'
 import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
-import type { IconChoice, RangeValue } from '@kaynooo/kayjs-ui'
+import type { DateRange, IconChoice, RangeValue } from '@kaynooo/kayjs-ui'
 
 // Every signal-driven control of the library, each one's value kept in a signal of the page and printed in `#state`, so a reset shows whether the page heard of it.
 // A page renders it without a `search`, and the icons are then the two it knows.
@@ -28,6 +29,7 @@ const title = signal('Ada')
 const bio = signal('Hello')
 const notes = signal('# Notes')
 const range = signal<RangeValue>([2, 8])
+const stay = signal<DateRange>(['2026-10-01', '2026-10-05'])
 const icon = signal('star')
 const free = signal(false)
 const bare = signal('star')
@@ -53,8 +55,9 @@ form#form
   Textarea#bio(name="bio" value={bio()} onInput={bio.set})
   MarkdownEditor#notes(value={notes()} onInput={notes.set})
   RangeInput(label="Range" value={range()} onChange={range.set})
+  DateRangeInput#stay(label="Stay" value={stay()} onChange={stay.set})
   IconPicker#named(name="icon" value={icon()} search={search} onChange={icon.set})
   IconPicker#bare(value={bare()} search={search} onChange={bare.set})
   Select#fixed(options={levels} value="b" onChange={heard.set} ref={() => refd.set(true)})
   button#reset(type="reset") Reset
-p#state {JSON.stringify({ agree: agree(), power: power(), free: free(), decks: decks(), size: size(), sort: sort(), level: level(), tags: tags(), title: title(), bio: bio(), notes: notes(), range: range(), icon: icon(), bare: bare(), heard: heard(), refd: refd(), form: formName() })}
+p#state {JSON.stringify({ agree: agree(), power: power(), free: free(), decks: decks(), size: size(), sort: sort(), level: level(), tags: tags(), title: title(), bio: bio(), notes: notes(), range: range(), stay: stay(), icon: icon(), bare: bare(), heard: heard(), refd: refd(), form: formName() })}

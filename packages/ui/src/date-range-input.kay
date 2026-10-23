@@ -4,6 +4,7 @@ import type { DateRange } from './date'
 import { effect, recipe, signal, untrack } from 'kay'
 import DateInput from './date-input.kay'
 import { dateRangeFrom } from './date'
+import { defaultKept, onFormReset, startRef } from './form-reset'
 import { wording } from 'kay/words'
 
 const look = recipe({
@@ -38,6 +39,24 @@ const pair = signal<DateRange>(untrack(() => value))
 
 effect(() => pair.set(value))
 
+let root: HTMLElement | undefined
+
+// What a reset goes back to: the pair it started with, or the one last saved by a SaveForm.
+const initial = defaultKept<DateRange>(() => root, pair, untrack(() => value))
+
+// The boxes follow the pair they are given, so a reset only has to put the pair back, which the app's `onChange` then hears of; it waits for the boxes' own reset, so it has the last word.
+onFormReset(() => root, () => {
+  const start = initial()
+
+  if (start[0] === pair()[0] && start[1] === pair()[1])
+    return
+
+  pair.set(start)
+  onChange?.(start)
+}, true)
+
+const ref = startRef<HTMLElement>(element => root = element, rest.ref)
+
 // A reversed pair is put back in order, in both boxes too.
 function commit(from: string, to: string) {
   const next = dateRangeFrom(from, to)
@@ -49,7 +68,7 @@ function commit(from: string, to: string) {
   onChange?.(next)
 }
 ---
-div({...rest} role="group" aria-label={label})
+div({...rest} ref={ref} role="group" aria-label={label})
   DateInput(name={fromName} min={min} max={max} firstDay={firstDay} disabled={disabled} aria-label={fromLabel ?? wording('ui.dateRangeInput.from', '{label} from', { label })} value={pair()[0] ?? ''} onChange={next => commit(next, pair()[1] ?? '')})
   span(part="separator" aria-hidden="true") -
   DateInput(name={toName} min={min} max={max} firstDay={firstDay} disabled={disabled} aria-label={toLabel ?? wording('ui.dateRangeInput.to', '{label} to', { label })} value={pair()[1] ?? ''} onChange={next => commit(pair()[0] ?? '', next)})
