@@ -673,6 +673,7 @@ inBrowser('FormField in an island', () => {
     // Each box with the sides it draws, in the order top, right, bottom, left; the others stay 0. A button draws its keyline in ::before.
     const boxes: Record<string, [selector: string, sides: string]> = {
       card: ['#card', 'trbl'],
+      head: ['#card [data-part=head]', 'b'],
       row: ['#row', 'trbl'],
       widget: ['#widget', 'trbl'],
       notice: ['#notice', 'trbl'],

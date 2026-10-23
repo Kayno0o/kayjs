@@ -110,7 +110,7 @@ To write every page yourself, leave out `pages` and set `signInPage` to your sig
 
 ### Postgres
 
-`pgStore(db)` from `@kaynooo/kayjs-auth/pg` keeps users in Postgres. Its tables come from `authTables`. List them in your pg-orm `Database`, then migrate as for your own tables. They are named `kay_*`: a database from before 1.71 holds `auth_*` tables, which the migration renames with their rows (read it first: it holds `RENAME` statements and no `DROP TABLE`).
+`pgStore(db)` from `@kaynooo/kayjs-auth/pg` keeps users in Postgres. Its tables come from `authTables`. List them in your pg-orm `Database`, then migrate as for your own tables. They are named `kay_*`: a database from before 1.71 holds `auth_*` tables, which 1.71 to 1.73 rename with their rows. From 1.74 nothing renames them, so apply that migration on 1.73 first ([Upgrading](../../../../../llms/upgrading.md)).
 
 ```ts
 import { authTables, pgStore } from '@kaynooo/kayjs-auth/pg'

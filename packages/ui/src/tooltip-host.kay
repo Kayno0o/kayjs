@@ -5,7 +5,7 @@ import { claim } from './claim'
 
 // An element carries its tooltip as `data-tooltip`, and where it sits as `data-tooltip-placement`, a CSS `position-area`, `top` by default. `data-hint` is a tooltip for the pointer alone, for text the keyboard has no stop on.
 const CARRIER = '[data-tooltip], [data-hint]'
-// The anchor name theme.css's `.kui-tooltip` positions against.
+// The anchor name the tooltip's recipe positions against.
 const ANCHOR = '--tooltip-anchor'
 const WHITESPACE = /\s+/
 // The id of the tooltip panel, which the element it shows for points at with `aria-describedby`.
