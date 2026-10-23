@@ -297,3 +297,56 @@ test('a form collapsed to one field holds no tab stop on the hidden ones', async
   expect(reached).not.toContain('hidden item')
   expect(await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('.kcms-item[hidden] :is(input, textarea, select, button, a[href], [tabindex])')].filter(each => each.checkVisibility() || each.getClientRects().length > 0).length)).toBe(0)
 }, 60_000)
+
+const BODY_PARAGRAPH = 'article p'
+const BODY_BOX = '[data-kcms-body] textarea'
+
+// The viewport point between two letters of the first text node of an element.
+function pointIn(page: Awaited<ReturnType<typeof open>>, selector: string, at: number) {
+  return page.evaluate((each: string, index: number) => {
+    const text = document.querySelector(each)!.firstChild!
+    const range = document.createRange()
+
+    range.setStart(text, index)
+    range.setEnd(text, index + 1)
+
+    const box = range.getBoundingClientRect()
+
+    return [box.left + 1, box.top + box.height / 2] as const
+  }, selector, at)
+}
+
+test('a click in a paragraph of the body types its Markdown in place with the caret where it landed, Enter taking a new line', async () => {
+  const page = await open()
+  const [x, y] = await pointIn(page, BODY_PARAGRAPH, 5)
+
+  for (const type of ['mousePressed', 'mouseReleased'])
+    await page.cdp('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 })
+
+  await page.waitUntil((selector: string) => document.activeElement === document.querySelector(selector) && document.activeElement?.getAttribute('contenteditable') === 'plaintext-only', undefined, BODY_PARAGRAPH)
+  await page.type('X')
+  await page.waitUntil((selector: string) => (document.querySelector(selector) as HTMLTextAreaElement).value.includes('Hi thXere.'), undefined, BODY_BOX)
+
+  // A line break stays a line break of the Markdown source while it is typed.
+  await page.press('Enter')
+  await page.type('**more**')
+  await page.waitUntil((selector: string) => (document.querySelector(selector) as HTMLTextAreaElement).value.includes('\n**more**'), undefined, BODY_BOX)
+  expect(await page.evaluate(selector => document.querySelector(selector)!.hasAttribute('contenteditable'), BODY_PARAGRAPH)).toBe(true)
+
+  // Ctrl+Enter keeps the text, and the page renders the Markdown again.
+  await page.press('Enter', { modifiers: ['Control'] } as never)
+  await page.waitUntil(() => document.querySelector('article p strong')?.textContent === 'more' && document.querySelector('article p')!.getAttribute('contenteditable') === null)
+}, 60_000)
+
+test('Escape in a body paragraph puts the page and the Markdown back', async () => {
+  const page = await open()
+
+  await page.click(BODY_PARAGRAPH)
+  await page.waitUntil((selector: string) => document.querySelector(selector)!.getAttribute('contenteditable') === 'plaintext-only', undefined, BODY_PARAGRAPH)
+  await page.type(' changed')
+  await page.waitUntil((selector: string) => (document.querySelector(selector) as HTMLTextAreaElement).value.includes('changed'), undefined, BODY_BOX)
+  await page.press('Escape')
+  await page.waitUntil((selector: string) => !document.querySelector(selector)!.hasAttribute('contenteditable') && !(document.querySelector('[data-kcms-body] textarea') as HTMLTextAreaElement).value.includes('changed'), undefined, BODY_PARAGRAPH)
+
+  expect(await page.text(BODY_PARAGRAPH)).toBe('Hi there.')
+}, 60_000)

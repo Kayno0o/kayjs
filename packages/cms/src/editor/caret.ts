@@ -110,8 +110,8 @@ function inline(source: string, from: number, end: number, keep: (index: number)
 // How much of the text around the caret is compared with the source: shorter windows are tried when the longer one is found nowhere.
 const WINDOWS = [24, 12, 6, 3]
 
-function squeeze(text: string): string {
-  return text.replaceAll(/\s+/g, '')
+export function squeeze(text: string | null): string {
+  return (text ?? '').replaceAll(/\s+/g, '')
 }
 
 // The offset in `source` of a caret placed in the `rendered` text of the field, `caret` characters in: the text around the caret is looked for in the source without its markup, and where it occurs more than once the occurrence nearest to the caret's place in the whole text is the one. None when the text is found nowhere, as for a value the page transforms.

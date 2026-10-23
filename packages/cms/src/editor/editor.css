@@ -171,6 +171,11 @@ html.kcms-editing [data-kay-field][contenteditable] {
   font: 0.8125rem/1.3 system-ui, sans-serif;
 }
 
+/* A long text or a block of Markdown is typed as its source, whose line breaks show. */
+html.kcms-editing [data-kay-multiline] {
+  white-space: pre-wrap;
+}
+
 html.kcms-editing [data-kay-field]:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;

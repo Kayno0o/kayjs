@@ -14,7 +14,7 @@ export default defineConfig({ preview: { secret: env.PREVIEW_SECRET }, extension
 
 ### Make a field editable on the page
 
-Render the entry's field as usual: kay marks the element itself in edit mode, so a click opens the field in the editor.
+Render the entry's field as usual: kay marks the element itself in edit mode, so a click opens the field in the editor, or types in it where it stands: a text, a long text and a paragraph, heading or list item of Markdown ([Typing on the page](screens.md)).
 
 ```kay
 h1 {post.data.title}

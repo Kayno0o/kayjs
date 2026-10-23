@@ -23,7 +23,7 @@ import { call, guardLeave, listen, refresh, untrack } from 'kay'
 import { wording } from 'kay/words'
 import previewApi from '../api/preview'
 import { BODY, entryKey, fieldsAt, formatMarker, markersOf } from '../markers'
-import { inlineTargetOf, isBusy, isTypingInline, markedLabel, reachMarked, startInline } from './inline'
+import { blockTargetOf, inlineTargetOf, isBusy, isTypingInline, markedLabel, reachMarked, startInline } from './inline'
 import { createMarks, readMarking, writeMarking } from './marks'
 import { MARKER_MENU, OWN } from './own'
 import { addItem, blockChoices, emptyListAt, focusItem, itemsAround, itemsOf, listFieldOf, movedWords, moveItem, removeItem, restoreItem, titleOf, watchLists } from './page-lists'
@@ -672,12 +672,12 @@ function act(event: Event, node: Node | undefined, at?: { x: number, y: number }
     return
   }
 
-  edit(field, at?.x, at?.y)
+  edit(field, at?.x, at?.y, undefined, node)
 }
 
-// Types in a field on the page when it is a one-line text, else brings it up in the form.
-function edit(field: MarkedField, x?: number, y?: number, back?: HTMLElement): void {
-  const inline = inlineTargetOf([field], drafts)
+// Types in a field on the page when it is a text or a paragraph of Markdown, else brings it up in the form. A block of Markdown needs the node clicked to know which one.
+function edit(field: MarkedField, x?: number, y?: number, back?: HTMLElement, node?: Node): void {
+  const inline = inlineTargetOf([field], drafts) ?? (node && blockTargetOf(field, node, drafts))
 
   if (inline && !inline.busy()) {
     typing = field.marker

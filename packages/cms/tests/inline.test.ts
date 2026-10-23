@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { fieldAtPath, inlineValue } from '../src/editor/inline'
+import { blockRange, fieldAtPath, inlineValue } from '../src/editor/inline'
 import { fieldsOf } from '../src/fields'
 
 const block = (type: string, properties: Record<string, unknown>) => ({ type: 'object', properties: { type: { const: type }, ...properties }, required: ['type'] })
@@ -53,5 +53,46 @@ describe('the value typed in place', () => {
     expect(inlineValue(optional, '')).toBeUndefined()
     expect(inlineValue(nullable, '')).toBeNull()
     expect(inlineValue(required, '')).toBe('')
+  })
+})
+
+describe('the lines a rendered block comes from', () => {
+  const source = 'First **bold** paragraph.\n\n# A heading\n\n- item a\n- item b\n\nSame.\n\nSame.\n\nTwo lines\nof one paragraph'
+  const lines = (from: number, to: number) => source.slice(from, to)
+  const find = (before: string, block: string) => {
+    const range = blockRange(source, before, block)
+
+    return range && lines(range.from, range.to)
+  }
+
+  it('is the whole lines holding the block\'s text, their markup included', () => {
+    expect(find('', 'First bold paragraph.')).toBe('First **bold** paragraph.')
+    expect(find('First bold paragraph.', 'A heading')).toBe('# A heading')
+    expect(find('First bold paragraph.A heading', 'item b')).toBe('- item b')
+  })
+
+  it('spans the lines of a paragraph of several', () => {
+    expect(find('First bold paragraph.A headingitem aitem bSame.Same.', 'Two lines of one paragraph')).toBe('Two lines\nof one paragraph')
+  })
+
+  it('goes to the occurrence nearest to the text before it', () => {
+    const second = blockRange(source, 'First bold paragraph.A headingitem aitem bSame.', 'Same.')!
+
+    expect(second.from).toBe(source.lastIndexOf('Same.'))
+  })
+
+  it('is none for a text the source does not hold, a part of a line or an empty block', () => {
+    expect(find('', 'Another paragraph')).toBeUndefined()
+    expect(find('', 'First')).toBeUndefined()
+    expect(find('', ' ')).toBeUndefined()
+  })
+})
+
+describe('the value of a long text typed in place', () => {
+  const long = fieldsOf({ type: 'object', properties: { a: { type: 'string', maxLength: 500 } } })[0]!
+
+  it('keeps its line breaks, normalised to a newline', () => {
+    expect(long.kind).toBe('textarea')
+    expect(inlineValue(long, 'a\r\nb\rc\n\nd')).toBe('a\nb\nc\n\nd')
   })
 })
