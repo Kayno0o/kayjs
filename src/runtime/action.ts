@@ -399,9 +399,9 @@ export function resolveProtection(options: ActionProtection<string> | undefined)
   if (options === undefined)
     return undefined
 
-  const { protect, tool, maxSize, bodyLimit, messages } = options
+  const { protect, tool, maxSize, messages } = options
 
-  return Object.fromEntries(Object.entries({ tool, maxSize, bodyLimit, messages, ...protect }).filter(([, value]) => value !== undefined))
+  return Object.fromEntries(Object.entries({ tool, maxSize, messages, ...protect }).filter(([, value]) => value !== undefined))
 }
 
 function declare(schema: TSchema, handler: (input: unknown, ctx: ActionContext) => unknown, options: ActionProtection<string> | undefined): ServerAction<TSchema, unknown> {
