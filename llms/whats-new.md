@@ -14,6 +14,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-cms sends no editor name to the on-page editor, which only counts the other editors, so an edit link's holder learns none ([Screens](../packages/cms/llms/screens-replacing.md)).
 - The Postgres and SQLite live and cache stores poll every 500 ms only while there is activity: an idle server backs off to 5 s, and a live store with no `live()` value declared, or a Postgres cache nothing used, is not polled ([Live values](live-values.md)).
 - The Postgres and SQLite live and cache stores poll every 500 ms only while there is activity: an idle server with no tab watching a value backs off to 5 s, and a live store with no `live()` value declared, or a Postgres cache nothing used, is not polled ([Live values](live-values.md)).
+- Postgres stores give up a call after 8 seconds with a logged error instead of hanging, and a room name is at most 256 characters, NUL allowed ([Jobs](queues.md), [Rooms](rooms.md)).
 - kayjs-ui roots write an app's `style` after their own declarations, so the app wins.
 - The Styles tab and LSP show a part's classes written as an imported constant.
 - kayjs-ui reads the app's own theme names (`--color-accent`, `--color-background`, `--density`), and the analytics consent banner now follows the app's `--color-accent`, `--color-surface`, `--color-foreground` and `--color-input` ([Setup](../packages/ui/llms/setup.md)).

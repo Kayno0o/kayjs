@@ -392,6 +392,8 @@ The state is kept as JSON, so a `Date` comes back as text. An `update` to a room
 
 Over `store: pgData(db).rooms`, replicas on several machines share the state, and `state` and `update` give promises, so `await games.update(room, ...)`. The snapshot a joiner gets is sent once the state is read.
 
+A room name has at most 256 characters, and `join`, `members`, `publish`, `state` and `update` throw past it, since a name any visitor can make up costs a row and a poll. A name may hold any character, NUL included.
+
 ### Sending a snapshot
 
 When many changes arrive together, `coalesce` sends the room one snapshot instead of one message each.

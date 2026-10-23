@@ -205,6 +205,8 @@ Replicas learn of each other's invalidations, live values and room messages by p
 
 A server reads the live values when it starts; `kay build --static` and `kay check` read none. A room shares its members and messages, which reach the other replicas in the order one published them, and `rooms({ store: pgData(db).rooms, state })` keeps its state there too, with `state` and `update` giving promises.
 
+If the database stops answering, a call of any of these stores fails after 8 seconds with a logged error instead of hanging, so a worker backs off, a stop is not held up and a request reading a session fails rather than waits. A connection kay opens from a URL times out connecting after 10 seconds, closes when idle for 60 and is replaced after 30 minutes.
+
 ### Your own store
 
 `sqliteJobs` is the default store, one file shared by the processes of a machine. For replicas on several machines, `pgJobs(db)` keeps the jobs in Postgres: pass it a Bun `SQL`, a pg-orm `Database` or a connection URL. To keep jobs elsewhere, Redis say, pass `store` an object of `JobStore`, from `kay/server`. Every process of the app opens it, so it must hand each job to one process only.

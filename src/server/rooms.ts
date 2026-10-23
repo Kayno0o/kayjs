@@ -102,6 +102,17 @@ export interface StoreRooms<Message, Member = undefined, State = undefined> exte
 }
 
 const DEFAULT_WAIT = '50ms'
+// The longest room name, a room being often named by a visitor's URL.
+const MAX_ROOM_NAME = 256
+
+// The room name itself, refused when it is longer than `MAX_ROOM_NAME` characters: a name any visitor can make up costs every store a row, a watch and a poll.
+function named(room: string): string {
+  if (room.length > MAX_ROOM_NAME)
+    throw new RangeError(`kay: a room name has at most ${MAX_ROOM_NAME} characters, and this one has ${room.length}`)
+
+  return room
+}
+
 // How a connection joined without a member is written, apart from one joined as `null`, which is JSON.
 const NO_MEMBER = ''
 // How often a process says it is alive, and how long after its last word its members stop counting.
@@ -130,7 +141,7 @@ export function rooms<Message, Member, State>(...[options = {}]: [options?: Room
 
     return (text === undefined ? undefined : JSON.parse(text)) as State
   }
-  const readState = (room: string): State | Promise<State> => after(store.state!(room), kept => (kept === undefined ? initial() : JSON.parse(kept) as State))
+  const readState = (room: string): State | Promise<State> => after(store.state!(named(room)), kept => (kept === undefined ? initial() : JSON.parse(kept) as State))
   // The connections of this process in each room, by their id, with their member as JSON, or empty without one.
   const local = new Map<string, Map<string, { raw: RoomConnection['raw'], member: string }>>()
   const ids = new WeakMap<object, string>()
@@ -174,6 +185,8 @@ export function rooms<Message, Member, State>(...[options = {}]: [options?: Room
       return written === undefined || written === NO_MEMBER ? undefined : JSON.parse(written) as Member
     },
     join(ws, room, ...[member]) {
+      named(room)
+
       const id = idOf(ws.raw)
       const written = member === undefined ? NO_MEMBER : JSON.stringify(member)
 
@@ -204,9 +217,9 @@ export function rooms<Message, Member, State>(...[options = {}]: [options?: Room
         leaveOne(ws.raw, name)
     },
     roomsOf: ws => [...joined.get(ws.raw) ?? []],
-    members: room => store.members(room).map(member => (member === NO_MEMBER ? undefined : JSON.parse(member)) as Member),
+    members: room => store.members(named(room)).map(member => (member === NO_MEMBER ? undefined : JSON.parse(member)) as Member),
     state: readState,
-    update: (room, change): State | Promise<State> => after(store.update!(room, (kept) => {
+    update: (room, change): State | Promise<State> => after(store.update!(named(room), (kept) => {
       const next = JSON.stringify(change(kept === undefined ? initial() : JSON.parse(kept) as State))
 
       if (next === undefined)
@@ -215,7 +228,7 @@ export function rooms<Message, Member, State>(...[options = {}]: [options?: Room
       return next
     }), text => JSON.parse(text) as State),
     publish(room, message, { except, to } = {}) {
-      store.publish(room, messageText(message), { ...except && { except: idOf(except.raw) }, ...to !== undefined && { to: JSON.stringify(to) } })
+      store.publish(named(room), messageText(message), { ...except && { except: idOf(except.raw) }, ...to !== undefined && { to: JSON.stringify(to) } })
     },
     coalesce(read, { wait = DEFAULT_WAIT } = {}) {
       const delay = optionMs(wait, '`coalesce` wait')

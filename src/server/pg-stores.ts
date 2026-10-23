@@ -7,6 +7,7 @@ import { parse, stringify } from 'devalue'
 import { durationSeconds, legacyMs } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { rowsOf } from './pg-jobs'
+import { limited, limitedStore } from './pg-limit'
 import { NOW, query } from './pg-sql'
 import { onReload } from './reload'
 import { matchesSession } from './session'
@@ -34,7 +35,7 @@ export function pgSessions(pg: PgHandle): SessionStore & { deleteWhere: NonNulla
 
   const sweepLogged = async () => {
     try {
-      await sweep()
+      await limited('sweeping the sessions', sweep)
     }
     catch (error) {
       kayLog('error', 'dropping the expired sessions failed; trying again in an hour', error)
@@ -51,7 +52,7 @@ export function pgSessions(pg: PgHandle): SessionStore & { deleteWhere: NonNulla
     onReload(() => clearInterval(timer))
   }
 
-  return {
+  return limitedStore({
     async get(id) {
       start()
 
@@ -99,7 +100,7 @@ export function pgSessions(pg: PgHandle): SessionStore & { deleteWhere: NonNulla
         }
       }
     },
-  }
+  }, 'the sessions store', ['get', 'set', 'delete', 'deleteWhere'], pg.db)
 }
 
 // Rate windows in Postgres, shared by every replica; a key is stored pseudonymised, by the app's secret or else by a random key every replica reads from the database.
@@ -127,7 +128,7 @@ export function pgRates(pg: PgHandle): RateStore {
   }
   const hashed = async (key: string) => new Bun.CryptoHasher('sha256', await keyOf()).update(key).digest('base64url')
 
-  return {
+  return limitedStore({
     async hit(key, window, weight = 1) {
       const hash = await hashed(key)
       const db = await pg.db()
@@ -150,14 +151,14 @@ export function pgRates(pg: PgHandle): RateStore {
 
       return row ? { count: row.count, resetAt: Number(row.reset_at) } : undefined
     },
-  }
+  }, 'the rates store', ['hit', 'peek'], pg.db)
 }
 
 // Web Vitals counts in Postgres: one row per day, route, metric and bucket, so replicas add their views to the others' with one increment each.
 export function pgVitals(pg: PgHandle): VitalsStore {
   let pruned = -1
 
-  return {
+  return limitedStore({
     async add(route: string, readings: VitalReading[], day: number) {
       const db = await pg.db()
 
@@ -178,7 +179,7 @@ export function pgVitals(pg: PgHandle): VitalsStore {
 
       return rows.map(row => ({ ...row, count: Number(row.count) }))
     },
-  }
+  }, 'the vitals store', ['add', 'counts'], pg.db)
 }
 
 // Notifications in Postgres, one row each, so replicas share a person's inbox; the clock a notification expires by is the caller's, as the store only compares.
@@ -194,7 +195,7 @@ export function pgNotifications(pg: PgHandle): NotificationStore {
 
   const sweep = async () => {
     try {
-      await counted('DELETE FROM kay_notifications WHERE expires <= $1::bigint', [Date.now()])
+      await limited('sweeping the notifications', async () => counted('DELETE FROM kay_notifications WHERE expires <= $1::bigint', [Date.now()]))
     }
     catch (error) {
       kayLog('error', 'dropping the expired notifications failed; trying again in an hour', error)
@@ -211,7 +212,7 @@ export function pgNotifications(pg: PgHandle): NotificationStore {
     onReload(() => clearInterval(timer))
   }
 
-  return {
+  return limitedStore({
     async add(user, note, most) {
       start()
 
@@ -253,5 +254,5 @@ export function pgNotifications(pg: PgHandle): NotificationStore {
     async prune(now) {
       return counted('DELETE FROM kay_notifications WHERE expires <= $1::bigint', [now])
     },
-  }
+  }, 'the notifications store', ['add', 'list', 'unread', 'markRead', 'markAllRead', 'erase', 'prune'], pg.db)
 }

@@ -5,6 +5,7 @@ import type { Stop } from './pg-poll'
 import { DEPS_PREFIX, PURGE_STALE_MS, readsOf, STALE_KEPT_MS, trackStore, untrackStore } from '../runtime/cache'
 import { kayLog } from '../runtime/log'
 import { rowsOf } from './pg-jobs'
+import { limitedStore } from './pg-limit'
 import { EVENT_TTL_MS, eventWindow, POLL_MS, pollerOf } from './pg-poll'
 import { NOW } from './pg-sql'
 import { onReload } from './reload'
@@ -168,6 +169,7 @@ export function pgCache(pg: PgHandle): CacheStore {
     },
   }
 
+  limitedStore(store, 'the cache store', ['get', 'set', 'delete', 'dependencies', 'keys', 'publish'], pg.db)
   self = store
 
   // A reload ends the polling for the module that named the store; the module running again names a store of its own.

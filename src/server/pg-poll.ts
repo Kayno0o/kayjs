@@ -28,7 +28,7 @@ export async function timeLimited<Result>(work: () => Promise<Result>, ms: numbe
         for (const statement of run.statements)
           statement.cancel()
 
-        reject(new Error(`${what} took more than ${ms / 1000} seconds`))
+        reject(Object.assign(new Error(`${what} took more than ${ms / 1000} seconds`), { timedOut: true }))
       }, ms)
       timer.unref()
     })])

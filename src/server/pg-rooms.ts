@@ -4,8 +4,9 @@ import type { PgHandle } from './pg-data'
 import type { AsyncRoomStore } from './rooms'
 import { optionMs } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
+import { limited } from './pg-limit'
 import { eventWindow, pollerOf } from './pg-poll'
-import { NOW, query } from './pg-sql'
+import { escaped, NOW, query, unescaped } from './pg-sql'
 import { onReload } from './reload'
 
 // How often a process says it is alive, and how long after its last word its members stop counting.
@@ -15,6 +16,10 @@ const EXPIRY = 10_000
 const KEPT = 30_000
 const WATCH_KEPT = 30_000
 const DEFAULT_POLL = optionMs('250ms', '')
+// Writes waiting behind a database that stopped answering: past this many a new one is dropped and logged, rather than held in memory.
+const MAX_QUEUED = 1000
+// The rooms asked about but not held that are read at once: past this the ones asked about longest ago are forgotten, so names a visitor made up do not swell every poll.
+const MAX_WATCHED = 1000
 
 interface Own {
   room: string
@@ -52,6 +57,8 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
   const watched = new Map<string, number>()
   const listeners = new Set<Listener>()
   let tail: Promise<void> = Promise.resolve()
+  let queued = 0
+  let overflowing = false
   const events = eventWindow()
   let stopReadingTask: (() => void) | undefined
   let reading = false
@@ -65,7 +72,7 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
     const run = (async () => {
       await prior
 
-      return work(await pg.db())
+      return limited('the rooms store', async () => work(await pg.db()))
     })()
 
     tail = (async () => {
@@ -82,13 +89,54 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
 
   // Like `ordered` for a write nobody awaits, its failure logged.
   const enqueue = (what: string, work: (db: SQL) => Promise<unknown>) => {
-    void logged(what, ordered(work))
+    if (queued >= MAX_QUEUED) {
+      if (!overflowing)
+        kayLog('error', `${what} failed: ${MAX_QUEUED} writes wait for the database, the ones after are dropped until it answers`)
+
+      overflowing = true
+
+      return
+    }
+
+    queued++
+    void (async () => {
+      try {
+        await logged(what, ordered(work))
+      }
+      finally {
+        queued--
+        overflowing &&= queued > 0
+      }
+    })()
+  }
+
+  const ownRooms = () => new Set([...own.values()].map(entry => entry.room))
+
+  // Marks a room as asked about now, forgetting the ones asked about longest ago past `MAX_WATCHED`, the rooms this process holds kept.
+  const watch = (room: string) => {
+    watched.delete(room)
+    watched.set(room, Date.now())
+
+    if (watched.size <= MAX_WATCHED)
+      return
+
+    const held = ownRooms()
+
+    for (const name of watched.keys()) {
+      if (watched.size <= MAX_WATCHED)
+        break
+
+      if (!held.has(name)) {
+        watched.delete(name)
+        remote.delete(name)
+      }
+    }
   }
 
   // Waits for the room's lock for 5 seconds at most, so a stuck update elsewhere fails this one rather than holding the store's writes, the heartbeat's included; a leaving member asks up to `LOCK_ATTEMPTS` times.
   const lockRoom = async (tx: SQL, room: string) => {
     await query(tx, 'SET LOCAL lock_timeout = \'5s\'')
-    await query(tx, 'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`kay_room_state\n${room}`])
+    await query(tx, 'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`kay_room_state\n${escaped(room)}`])
   }
 
   // The states of rooms with no member left.
@@ -105,10 +153,8 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
   }
 
   const upsert = async (db: SQL, room: string, connection: string, member: string, at: number) => {
-    await query(db, 'INSERT INTO kay_room_members (room, connection, process, member, at) VALUES ($1, $2, $3, $4, $5::bigint) ON CONFLICT (room, connection) DO UPDATE SET member = excluded.member', [room, connection, self, member, at])
+    await query(db, 'INSERT INTO kay_room_members (room, connection, process, member, at) VALUES ($1, $2, $3, $4, $5::bigint) ON CONFLICT (room, connection) DO UPDATE SET member = excluded.member', [escaped(room), connection, self, member, at])
   }
-
-  const ownRooms = () => new Set([...own.values()].map(entry => entry.room))
 
   const beat = () => {
     enqueue('marking this process alive in the rooms store', async (db) => {
@@ -126,6 +172,20 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
     })
   }
 
+  const readRooms = async (db: SQL, names: string[]) => {
+    const rows = await query<{ room: string, connection: string, member: string, at: string }>(db, `SELECT m.room, m.connection, m.member, m.at FROM kay_room_members m JOIN kay_room_processes p ON p.process = m.process WHERE m.room = ANY($1::text[]) AND m.process <> $2 AND p.seen > ${NOW} - ${EXPIRY}`, [names.map(escaped), self])
+    const byRoom = new Map<string, Own[]>()
+
+    for (const row of rows) {
+      const room = unescaped(row.room)
+
+      byRoom.set(room, [...byRoom.get(room) ?? [], { room, connection: row.connection, member: row.member, at: Number(row.at) }])
+    }
+
+    for (const room of names)
+      remote.set(room, byRoom.get(room) ?? [])
+  }
+
   const readMembers = async (db: SQL) => {
     const now = Date.now()
 
@@ -140,14 +200,25 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
       return
 
     const names = [...watched.keys()]
-    const rows = await query<{ room: string, connection: string, member: string, at: string }>(db, `SELECT m.room, m.connection, m.member, m.at FROM kay_room_members m JOIN kay_room_processes p ON p.process = m.process WHERE m.room = ANY($1::text[]) AND m.process <> $2 AND p.seen > ${NOW} - ${EXPIRY}`, [names, self])
-    const byRoom = new Map<string, Own[]>()
 
-    for (const row of rows)
-      byRoom.set(row.room, [...byRoom.get(row.room) ?? [], { room: row.room, connection: row.connection, member: row.member, at: Number(row.at) }])
+    try {
+      await readRooms(db, names)
+    }
+    catch (error) {
+      // A room the database refuses is left out and logged, the others read on.
+      kayLog('error', 'reading the members of the other processes failed; reading the rooms one by one', error)
 
-    for (const room of names)
-      remote.set(room, byRoom.get(room) ?? [])
+      for (const room of names) {
+        try {
+          await readRooms(db, [room])
+        }
+        catch (single) {
+          kayLog('error', `reading the members of the room ${JSON.stringify(room)} failed; it is left out`, single)
+          watched.delete(room)
+          remote.delete(room)
+        }
+      }
+    }
   }
 
   const readMessages = async (db: SQL) => {
@@ -176,7 +247,7 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
 
       for (const listener of listeners) {
         try {
-          listener(row.room, row.text, { ...row.skipped !== null && { except: row.skipped }, ...row.recipient !== null && { to: row.recipient } })
+          listener(unescaped(row.room), row.text, { ...row.skipped !== null && { except: row.skipped }, ...row.recipient !== null && { to: row.recipient } })
         }
         catch (error) {
           kayLog('error', `a listener of the room ${row.room} threw`, error)
@@ -199,8 +270,20 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
     reading = true
 
     try {
-      await readMembers(db)
+      // The messages are read even when the members could not be, so a room the database refuses does not silence the others.
+      let failure: unknown
+
+      try {
+        await readMembers(db)
+      }
+      catch (error) {
+        failure = error
+      }
+
       await readMessages(db)
+
+      if (failure !== undefined)
+        throw failure
     }
     finally {
       reading = false
@@ -240,7 +323,7 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
       const key = `${room}\n${connection}`
       const at = own.get(key)?.at ?? Date.now()
 
-      watched.set(room, Date.now())
+      watch(room)
       own.set(key, { room, connection, member, at })
       sync()
       enqueue('adding a member to the rooms store', async db => upsert(db, room, connection, member, at))
@@ -249,13 +332,13 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
       own.delete(`${room}\n${connection}`)
       sync()
       enqueue('removing a member from the rooms store', async (db) => {
-        await query(db, 'DELETE FROM kay_room_members WHERE room = $1 AND connection = $2', [room, connection])
+        await query(db, 'DELETE FROM kay_room_members WHERE room = $1 AND connection = $2', [escaped(room), connection])
         // Under the room's lock, so an update storing a state for the member that just left finishes first; a lock not given in time is asked for again rather than left to the next prune.
         for (let attempt = 1; ; attempt++) {
           try {
             await db.begin(async (tx) => {
               await lockRoom(tx, room)
-              await query(tx, 'DELETE FROM kay_room_state WHERE room = $1 AND NOT EXISTS (SELECT 1 FROM kay_room_members WHERE room = $1)', [room])
+              await query(tx, 'DELETE FROM kay_room_state WHERE room = $1 AND NOT EXISTS (SELECT 1 FROM kay_room_members WHERE room = $1)', [escaped(room)])
             })
 
             return
@@ -268,7 +351,7 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
       })
     },
     async state(room) {
-      const [row] = await ordered(async db => query<{ state: string }>(db, 'SELECT state FROM kay_room_state WHERE room = $1', [room]))
+      const [row] = await ordered(async db => query<{ state: string }>(db, 'SELECT state FROM kay_room_state WHERE room = $1', [escaped(room)]))
 
       return row?.state
     },
@@ -277,17 +360,17 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
       return ordered(async db => db.begin(async (tx) => {
         await lockRoom(tx, room)
 
-        const [row] = await query<{ state: string }>(tx, 'SELECT state FROM kay_room_state WHERE room = $1', [room])
+        const [row] = await query<{ state: string }>(tx, 'SELECT state FROM kay_room_state WHERE room = $1', [escaped(room)])
         const next = change(row?.state)
 
         // A room no live process has a member in keeps nothing, so a room named by a client costs no row.
-        await query(tx, `INSERT INTO kay_room_state (room, state) SELECT $1, $2 WHERE EXISTS (SELECT 1 FROM kay_room_members m JOIN kay_room_processes p ON p.process = m.process WHERE m.room = $1 AND p.seen > ${NOW} - ${EXPIRY}) ON CONFLICT (room) DO UPDATE SET state = excluded.state`, [room, next])
+        await query(tx, `INSERT INTO kay_room_state (room, state) SELECT $1, $2 WHERE EXISTS (SELECT 1 FROM kay_room_members m JOIN kay_room_processes p ON p.process = m.process WHERE m.room = $1 AND p.seen > ${NOW} - ${EXPIRY}) ON CONFLICT (room) DO UPDATE SET state = excluded.state`, [escaped(room), next])
 
         return next
       }))
     },
     members(room) {
-      watched.set(room, Date.now())
+      watch(room)
       sync()
 
       const mine = [...own.values()].filter(entry => entry.room === room)
@@ -301,7 +384,7 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
       const now = Date.now()
 
       enqueue('publishing to the rooms store', async (db) => {
-        await query(db, `INSERT INTO kay_room_messages (room, text, process, skipped, recipient, at) VALUES ($1, $2, $3, $4, $5, ${NOW})`, [room, text, self, recipients.except ?? null, recipients.to ?? null])
+        await query(db, `INSERT INTO kay_room_messages (room, text, process, skipped, recipient, at) VALUES ($1, $2, $3, $4, $5, ${NOW})`, [escaped(room), text, self, recipients.except ?? null, recipients.to ?? null])
 
         // A process only publishing has no beat, so its publishes prune, as often as a beat would.
         if (beating === undefined && now - pruned >= HEARTBEAT) {

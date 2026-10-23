@@ -1,6 +1,7 @@
 import type { SQL } from 'bun'
 import type { JobStore, StoredJob, StoredJobState } from './queue'
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { limitedStore } from './pg-limit'
 import { onReload } from './reload'
 
 interface PgJobRow {
@@ -29,6 +30,9 @@ const DEADLOCK_DETECTED = '40P01'
 const UNIQUE_VIOLATION = '23505'
 const INDEX_WAIT_MS = 120_000
 const INDEX_POLL_MS = 200
+
+// What a connection kay opens from a URL is given up on after, in seconds: a connect that does not answer, a connection idle in the pool, and one that lived long, so a session the server or a pooler dropped is replaced rather than kept.
+const CONNECTION = { connectionTimeout: 10, idleTimeout: 60, maxLifetime: 1800 }
 
 // The names of the tables a store keeps its jobs and schedule locks in, for a pg-orm `ignoreTables` of an app that creates them with `createJobTables`: one that lists the table definitions of `jobTables` from `kay/pg-orm` has no use for it.
 export const jobTables = ['kay_jobs', 'kay_locks'] as const
@@ -215,7 +219,7 @@ export async function rowsOf<Row>(query: PromiseLike<unknown>): Promise<Row[]> {
 
 export function connectionOf(source: PgJobsSource): SQL {
   if (typeof source === 'string')
-    return new Bun.SQL(source)
+    return new Bun.SQL(source, CONNECTION)
 
   return 'sql' in source ? source.sql : source
 }
@@ -303,7 +307,7 @@ export function pgJobs(source: PgJobsSource): JobStore {
     }
   }
 
-  return {
+  const store: JobStore = {
     async add(job) {
       const db = await open()
 
@@ -408,4 +412,6 @@ export function pgJobs(source: PgJobsSource): JobStore {
       return won.length === 1
     },
   }
+
+  return limitedStore(store, 'the jobs store', ['add', 'claim', 'complete', 'retry', 'release', 'progress', 'state', 'fail', 'purge', 'failed', 'revive', 'jobs', 'nextRunAt', 'lock'], open)
 }
