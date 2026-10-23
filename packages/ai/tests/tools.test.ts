@@ -1,4 +1,4 @@
-import type { Asked, ProviderMessage } from '../src'
+import type { Asked, Piece, ProviderMessage } from '../src'
 import type { Offered } from '../src/loop'
 import type { Outcome, Tools } from './helpers/tools'
 import { join } from 'node:path'
@@ -334,6 +334,33 @@ describe('a visitor leaving mid-loop', () => {
   function open(tools: Offered[], steps = 5) {
     return createReply(signal => converse(fakeAi, { messages: [{ role: 'user', content: 'go' }], system: undefined, model: 'fake', maxTokens: 10, temperature: undefined, timeouts: { connect: '5000s', idle: '5000s' } }, tools, steps, request, signal), [])
   }
+
+  it('estimates every step of a provider that reports no usage, as each one sends the conversation again', async () => {
+    let step = 0
+    const silent = {
+      name: 'silent',
+      async* stream(): AsyncGenerator<Piece> {
+        step++
+
+        if (step === 1)
+          yield { toolUse: { id: 'a', name: 'work', arguments: '{}' } }
+        else
+          yield { text: 'x'.repeat(40) }
+      },
+    }
+    const base = { messages: [{ role: 'user' as const, content: 'y'.repeat(400) }], system: undefined, model: 'silent', maxTokens: 10, temperature: undefined, timeouts: { connect: '5000s', idle: '5000s' } }
+    const usages: object[] = []
+
+    for await (const piece of converse(silent, base, offered(async () => ({ content: [{ type: 'text', text: 'ok' }] })), 5, request, new AbortController().signal)) {
+      if ('usage' in piece)
+        usages.push(piece.usage)
+    }
+
+    const last = usages.at(-1) as { inputTokens: number, outputTokens: number }
+
+    expect(last.inputTokens).toBeGreaterThan(200)
+    expect(last.outputTokens).toBe(Math.ceil(('work'.length + 2) / 4) + 10)
+  })
 
   it('runs no further call and asks nothing more once stopped while a call ran', async () => {
     const started = Promise.withResolvers<void>()

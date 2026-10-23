@@ -132,6 +132,13 @@ describe.each([
     expect(error.message).toContain('Invalid API key')
   })
 
+  it('reads only the start of an error body', async () => {
+    const big = serve(() => new Response('z'.repeat(5_000_000), { status: 500 }))
+    const error = await failure(asking(big.url))
+
+    expect(error.message.length).toBeLessThan(1000)
+  })
+
   it('reads Retry-After seconds and dates on a 429', async () => {
     const seconds = serve(() => Response.json({ error: { message: 'slow down' } }, { status: 429, headers: { 'retry-after': '20' } }))
     const date = serve(() => new Response('{}', { status: 429, headers: { 'retry-after': new Date(Date.now() + 30_000).toUTCString() } }))

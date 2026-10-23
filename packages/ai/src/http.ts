@@ -3,6 +3,7 @@ import { optionMs, parseEvents } from 'kay/library'
 import { AiError } from './errors'
 
 const MESSAGE_LIMIT = 200
+const BODY_LIMIT = 16_384
 // A shorter key would blank out ordinary words.
 const MIN_REDACTED = 8
 const SECONDS = /^\d+$/
@@ -13,10 +14,39 @@ export interface ServerEvent {
   data: string
 }
 
+// The first bytes of the body, as a provider that answers an error with a stream or a page has no reason to be read whole.
+async function head(response: Response): Promise<string> {
+  if (response.body === null)
+    return ''
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let text = ''
+
+  try {
+    while (text.length < BODY_LIMIT) {
+      const { done, value } = await reader.read()
+
+      if (done)
+        break
+
+      text += decoder.decode(value, { stream: true })
+    }
+  }
+  finally {
+    try {
+      await reader.cancel()
+    }
+    catch {}
+  }
+
+  return text.slice(0, BODY_LIMIT)
+}
+
 // What the provider said was wrong, kept short for a log line, and the code it gave it.
 async function reason(response: Response): Promise<{ said: string, code: string }> {
   try {
-    const body = await response.text()
+    const body = await head(response)
 
     try {
       const parsed = JSON.parse(body) as { error?: { message?: unknown, code?: unknown } | string, message?: unknown }

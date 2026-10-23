@@ -8,6 +8,7 @@ import { MAX_ARGUMENTS, MAX_CALLS_PER_STEP, MAX_STREAMED_CALLS } from './tool-li
 const log = logFrom('kayjs-ai')
 const MAX_RESULT = 20_000
 const MAX_NAME = 64
+const CHARS_PER_TOKEN = 4
 
 export interface Offered {
   name: string
@@ -24,6 +25,23 @@ interface Ran {
 
 function failed(result: string): Ran {
   return { status: 'failed', result }
+}
+
+// The characters a step sends: every message with its calls and results.
+function charsSent(messages: ProviderMessage[], system: string | undefined): number {
+  let chars = system?.length ?? 0
+
+  for (const message of messages) {
+    chars += message.content.length
+
+    for (const call of message.calls ?? [])
+      chars += call.name.length + call.arguments.length
+
+    for (const result of message.results ?? [])
+      chars += result.content.length
+  }
+
+  return chars
 }
 
 function clip(text: string, max: number): string {
@@ -166,6 +184,14 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
       else if ('finish' in piece) {
         finish = piece
       }
+    }
+
+    // A provider that reports no counts is estimated for each step, as every step sends the whole conversation again.
+    if (used.inputTokens === undefined && used.outputTokens === undefined) {
+      const received = text.length + uses.reduce((sum, use) => sum + use.name.length + use.arguments.length, 0)
+
+      used.inputTokens = Math.ceil(charsSent(messages, base.system) / CHARS_PER_TOKEN)
+      used.outputTokens = Math.ceil(received / CHARS_PER_TOKEN)
     }
 
     for (const field of USAGE_FIELDS) {

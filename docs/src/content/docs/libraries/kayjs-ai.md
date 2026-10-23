@@ -19,7 +19,7 @@ kay is a peer. kayjs-ai is released with kay, at kay's own version, and peers on
 
 In a kay project, `kay add ai` does the install and the line below for you.
 
-List the extension in `kay.config.ts`. It makes `kay env` show the variables below, sets your limits and adds `kay i18n translate`. `ask` works without it, with no limits.
+List the extension in `kay.config.ts`. It makes `kay env` show the variables below, sets your limits and adds `kay i18n translate`. `ask` works without it, with no limits in development and the production defaults otherwise.
 
 ```ts
 import { ai } from '@kaynooo/kayjs-ai'
@@ -338,7 +338,7 @@ kay i18n translate fr
 
 The dry run lists what would be translated, down to the fields of each entry, and guesses the tokens it would cost. It sends nothing and writes nothing.
 
-A translation is kept only when it keeps what the original had. Every `{placeholder}` stays, with the same name. Plural messages get the forms the language needs, such as `few` and `many` in Russian. Tags such as `<b>` stay.
+A translation is kept only when it keeps what the original had. Every `{placeholder}` stays, with the same name. Plural messages get the forms the language needs, such as `few` and `many` in Russian. Tags such as `<b>` stay. A reply with a URL, an email address or a number the original did not have is refused, as a translation moves none of them.
 
 In a tag only the text of `title`, `alt`, `aria-label` and `placeholder` is translated, and `href`, `src` and every other attribute stay as they were. A text, original or reply, holding a tag the check cannot read (an odd quote in it) is never written, and an original holding one fails at once, without asking the model.
 

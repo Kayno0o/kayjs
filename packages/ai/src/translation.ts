@@ -175,6 +175,10 @@ function readReply(reply: string, pending: Unit[]): { texts: Map<string, unknown
   return { texts: new Map(Object.entries(parsed)) }
 }
 
+const WEB_ADDRESS = /https?:\/\/[^\s<>"')\]]+/g
+const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g
+const DIGITS = /\d+/g
+
 // What the pattern finds in the text, its first group or the whole match, sorted so that two texts holding the same things, as many times, compare equal.
 function found(text: string, pattern: RegExp): string[] {
   return Array.from(text.matchAll(pattern), match => match.slice(1).find(group => group !== undefined) ?? match[0]).toSorted()
@@ -321,6 +325,15 @@ export function unitProblem(unit: Unit, value: unknown): string | undefined {
 
   if (unit.kind === 'markdown' && (!same(found(unit.text, LINK_TARGET), found(value, LINK_TARGET)) || unit.text.match(FENCE)?.length !== value.match(FENCE)?.length))
     return 'changes the link targets or code fences of the source'
+
+  // A model that writes an address or a number the source has not made it up, as a translation moves none of them.
+  for (const [what, pattern] of [['a URL', WEB_ADDRESS], ['an email', EMAIL], ['a number', DIGITS]] as const) {
+    const known = found(unit.text, pattern)
+    const invented = found(value, pattern).find(item => !known.includes(item))
+
+    if (invented !== undefined)
+      return `invents ${what}, ${invented}`
+  }
 
   return undefined
 }
