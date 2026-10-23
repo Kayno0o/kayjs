@@ -96,7 +96,7 @@ interface Document extends ShadowFile {
 const LAYOUT_SHADOW_SUFFIX = '/_layout.kay.tsx'
 const KAY_FILE = /^file:.*\.kay$/
 // The one TypeScript file the server completes besides the components: where an app restyles them.
-const UI_FILE = /^file:.*\/src\/ui\.ts$/
+const UI_DOCUMENT = /^file:.*\/src\/ui\.ts$/
 // The module of an import or a re-export in a component's text, fence or template.
 const IMPORT_SOURCE = /\b(?:from|import)\s*['"]([^'"]+)['"]/g
 const EXTENSION = /\.\w+$/
@@ -308,7 +308,7 @@ export class KayLanguageServer {
   }
 
   private open(item: TextDocumentItem) {
-    if (UI_FILE.test(item.uri))
+    if (UI_DOCUMENT.test(item.uri))
       this.uiFiles.set(item.uri, item.text)
 
     if (!KAY_FILE.test(item.uri))

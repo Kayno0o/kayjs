@@ -34,6 +34,13 @@ describe('the cursor in an object literal', () => {
     expect(objectCursor(' a: { b: 1 }, ')).toEqual({ path: [], at: 'key', word: '' })
   })
 
+  it('skips comments, an apostrophe in one included', () => {
+    expect(objectCursor('\n // don\'t\n Button: { parts: { ')).toEqual({ path: ['Button', 'parts'], at: 'key', word: '' })
+    expect(objectCursor('\n /* it\'s */ Button: { // fine\n parts: { ')).toEqual({ path: ['Button', 'parts'], at: 'key', word: '' })
+    expect(objectCursor(' // unfinished')).toBeUndefined()
+    expect(objectCursor(' head: \'a//b\', ')).toEqual({ path: [], at: 'key', word: '' })
+  })
+
   it('reads src/ui.ts from the object defineUi takes', () => {
     const source = 'import { defineUi } from \'kay\'\n\nexport default defineUi({\n  Card: {\n    parts: { | },\n  },\n})\n'
     const offset = source.indexOf('|')

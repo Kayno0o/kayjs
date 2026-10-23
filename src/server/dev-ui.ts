@@ -4,7 +4,7 @@ import type { UiSource } from '../build/ui'
 import type { StyleInfo } from '../build/ui-info'
 import { existsSync, realpathSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { parse } from '@babel/parser'
 import { findKayLibraries } from '../build/libraries'
 import { classesOf, componentFile, componentsNamed, exported, forgetNames, isComponentName, keyOf, UI_FILE, uiOf, unwrapped } from '../build/ui'
@@ -42,7 +42,11 @@ async function componentOf(root: string, name: unknown): Promise<{ info: StyleIn
     return refused('no such component', 404)
 
   const libraries = await findKayLibraries(root)
-  const within = (dir: string) => !relative(realOf(dir), file).startsWith('..') && !isAbsolute(relative(realOf(dir), file))
+  const within = (dir: string) => {
+    const from = relative(realOf(dir), file)
+
+    return from !== '..' && !from.startsWith(`..${sep}`) && !isAbsolute(from)
+  }
   const info = within(root) || libraries.some(library => within(library.realDir)) ? styleInfo(file) : undefined
 
   return info === undefined ? refused('this file has no parts or recipe to restyle', 404) : { info, libraries }
@@ -50,7 +54,7 @@ async function componentOf(root: string, name: unknown): Promise<{ info: StyleIn
 
 // The key `src/ui.ts` names a component by: the entry already naming it, else its bare name when no other component bears it, else the specifier it would be imported with.
 function keyFor(root: string, ui: UiSource | undefined, info: StyleInfo, libraries: KayLibrary[]): string {
-  const known = ui?.components.find(component => componentFile(ui, component) === info.file)
+  const known = ui?.components.findLast(component => componentFile(ui, component) === info.file)
 
   if (known !== undefined)
     return known.specifier
@@ -206,7 +210,9 @@ export async function devUiWrite(root: string, request: Request): Promise<Respon
   if (typeof body.part !== 'string' || typeof body.classes !== 'string')
     return refused('part and classes are texts')
 
-  if (body.classes.length > MAX_CLASSES || CONTROL.test(body.classes.replaceAll('\n', ' ')))
+  const classes = body.classes.replaceAll(WHITESPACE, ' ').trim()
+
+  if (classes.length > MAX_CLASSES || CONTROL.test(classes))
     return refused('classes are one line of text')
 
   const found = await componentOf(root, body.file)
@@ -220,7 +226,6 @@ export async function devUiWrite(root: string, request: Request): Promise<Respon
   if (!info.parts.some(candidate => candidate.name === part))
     return refused(`${info.name} has no part ${part}`, 404)
 
-  const classes = body.classes.replaceAll(WHITESPACE, ' ').trim()
   const file = join(root, UI_FILE)
   const ui = uiOf(root)
   const key = keyFor(root, ui, info, libraries)

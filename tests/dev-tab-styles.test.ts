@@ -96,6 +96,22 @@ describe('the Styles tab', () => {
     done()
   })
 
+  it('keeps a box being typed in while the pointer moves over the same part', async () => {
+    page()
+
+    const { panel, done } = open(() => Response.json(view))
+
+    await hover(document.getElementById('panel')!)
+
+    const box = panel.querySelector<HTMLTextAreaElement>('.row textarea')!
+
+    box.value = 'typed'
+    await hover(document.getElementById('panel')!)
+    expect(panel.querySelector<HTMLTextAreaElement>('.row textarea')).toBe(box)
+    expect(box.value).toBe('typed')
+    done()
+  })
+
   it('does nothing while its tab is hidden, and for a pointer over the tool itself', async () => {
     page()
 

@@ -114,8 +114,17 @@ describe('the Styles tab\'s endpoints', () => {
     expect(await ui()).toContain('Card: { parts: { head: \'p-8\' } }')
   })
 
-  it('refuses classes that are not one line of text', async () => {
+  it('writes into the last entry naming a component, the one that wins', async () => {
+    await put('src/ui.ts', 'import { defineUi } from \'kay\'\n\nexport default defineUi({\n  Panel: { parts: { body: \'a\' } },\n  \'./components/panel.kay\': { parts: { body: \'b\' } },\n})\n')
+    await write({ file: PANEL_FILE, part: 'body', classes: 'c' })
+    expect(await ui()).toContain('\'./components/panel.kay\': { parts: { body: \'c\' } }')
+    expect(await ui()).toContain('Panel: { parts: { body: \'a\' } }')
+  })
+
+  it('takes a pasted tab as a space, and refuses classes that are not one line of text', async () => {
     expect((await write({ file: PANEL_FILE, part: 'body', classes: 'a\u0000b' })).status).toBe(400)
+    expect((await write({ file: PANEL_FILE, part: 'body', classes: 'a\tb\r\nc' })).status).toBe(200)
+    expect(await ui()).toContain('body: \'a b c\'')
     expect((await write({ file: PANEL_FILE, part: 'body', classes: 3 })).status).toBe(400)
     expect((await write({ file: '../../etc/passwd', part: 'body', classes: 'a' })).status).toBe(400)
   })

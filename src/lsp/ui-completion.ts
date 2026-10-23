@@ -36,6 +36,18 @@ export function objectCursor(text: string): ObjectCursor | undefined {
   while (at < text.length) {
     const char = text[at]!
 
+    if (char === '/' && (text[at + 1] === '/' || text[at + 1] === '*')) {
+      const line = text[at + 1] === '/'
+      const end = text.indexOf(line ? '\n' : '*/', at + 2)
+
+      if (end === -1)
+        return undefined
+
+      at = end + (line ? 1 : 2)
+
+      continue
+    }
+
     if (QUOTES.has(char)) {
       let end = at + 1
 

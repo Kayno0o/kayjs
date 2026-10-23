@@ -182,8 +182,27 @@ export function appSpecifier(root: string, file: string): string {
 }
 
 // Every component of the app and its libraries `src/ui.ts` can restyle, each once, with the specifiers it can be keyed by.
-export async function styleInfos(root: string, libraries: KayLibrary[]): Promise<(StyleInfo & { specifiers: string[] })[]> {
-  const found = new Map<string, StyleInfo & { specifiers: string[] }>()
+type Infos = (StyleInfo & { specifiers: string[] })[]
+
+// How long the components found for completion are trusted, as typing in src/ui.ts asks for them on each key.
+const INFOS_LIFETIME = 2000
+const infosKept = new Map<string, { at: number, infos: Promise<Infos> }>()
+
+export async function styleInfos(root: string, libraries: KayLibrary[]): Promise<Infos> {
+  const kept = infosKept.get(root)
+
+  if (kept !== undefined && Date.now() - kept.at < INFOS_LIFETIME)
+    return kept.infos
+
+  const infos = readInfos(root, libraries)
+
+  infosKept.set(root, { at: Date.now(), infos })
+
+  return infos
+}
+
+async function readInfos(root: string, libraries: KayLibrary[]): Promise<Infos> {
+  const found = new Map<string, Infos[number]>()
   const add = (file: string, specifier: string) => {
     const real = realOf(file)
     const kept = found.get(real)

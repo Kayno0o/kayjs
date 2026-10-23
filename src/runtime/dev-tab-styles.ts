@@ -45,6 +45,7 @@ export default function stylesTab(tool: DevTool, tab: DevTab): () => void {
   const views = new Map<string, StyleView | null>()
   const host = tool.root.host
   let shown: string | undefined
+  let shownPart: string | undefined
   let asked = 0
 
   const lookup = async (file: string): Promise<StyleView | undefined> => {
@@ -126,9 +127,19 @@ export default function stylesTab(tool: DevTool, tab: DevTab): () => void {
           return
 
         if (file !== undefined && view !== undefined) {
+          const part = start.closest('[data-part]')?.getAttribute('data-part') ?? undefined
+
+          // A box being typed in stays as it is until the pointer shows another component or part.
+          if (shown === file && shownPart === part)
+            return
+
+          if (tool.root.activeElement !== null && body.contains(tool.root.activeElement))
+            return
+
           shown = file
+          shownPart = part
           status.textContent = ''
-          render(file, view, start.closest('[data-part]')?.getAttribute('data-part') ?? undefined)
+          render(file, view, part)
 
           return
         }
