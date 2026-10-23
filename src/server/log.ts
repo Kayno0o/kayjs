@@ -1,7 +1,6 @@
 import type { Elysia } from 'elysia'
 import type { LogLevel } from '../runtime/log'
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { STATUS_CODES } from 'node:http'
 import process from 'node:process'
 import { version } from '../../package.json'
 import { ASSET_PREFIX } from '../build/assets'
@@ -51,8 +50,8 @@ const answering = new AsyncLocalStorage<Request>()
 // The requests being answered: a context outliving its answer, a timer it started say, no longer logs under it.
 const inFlight = new WeakSet<Request>()
 
-// Elysia's status names are the standard reason phrases bar three it spells its own way, read here rather than from Elysia's StatusMap so kay check and the editor load no Elysia.
-const STATUS_CODE_OF: Record<string, number | undefined> = { ...Object.fromEntries(Object.entries(STATUS_CODES).map(([code, phrase]) => [phrase, Number(code)])), 'I\'m a teapot': 418, 'Enhance Your Calm': 420, 'Unprocessable Content': 422 }
+// Elysia's StatusMap, copied rather than imported so kay check and the editor load no Elysia.
+const STATUS_CODE_OF: Record<string, number | undefined> = { 'Continue': 100, 'Switching Protocols': 101, 'Processing': 102, 'Early Hints': 103, 'OK': 200, 'Created': 201, 'Accepted': 202, 'Non-Authoritative Information': 203, 'No Content': 204, 'Reset Content': 205, 'Partial Content': 206, 'Multi-Status': 207, 'Already Reported': 208, 'Multiple Choices': 300, 'Moved Permanently': 301, 'Found': 302, 'See Other': 303, 'Not Modified': 304, 'Temporary Redirect': 307, 'Permanent Redirect': 308, 'Bad Request': 400, 'Unauthorized': 401, 'Payment Required': 402, 'Forbidden': 403, 'Not Found': 404, 'Method Not Allowed': 405, 'Not Acceptable': 406, 'Proxy Authentication Required': 407, 'Request Timeout': 408, 'Conflict': 409, 'Gone': 410, 'Length Required': 411, 'Precondition Failed': 412, 'Payload Too Large': 413, 'URI Too Long': 414, 'Unsupported Media Type': 415, 'Range Not Satisfiable': 416, 'Expectation Failed': 417, 'I\'m a teapot': 418, 'Enhance Your Calm': 420, 'Misdirected Request': 421, 'Unprocessable Content': 422, 'Locked': 423, 'Failed Dependency': 424, 'Too Early': 425, 'Upgrade Required': 426, 'Precondition Required': 428, 'Too Many Requests': 429, 'Request Header Fields Too Large': 431, 'Unavailable For Legal Reasons': 451, 'Internal Server Error': 500, 'Not Implemented': 501, 'Bad Gateway': 502, 'Service Unavailable': 503, 'Gateway Timeout': 504, 'HTTP Version Not Supported': 505, 'Variant Also Negotiates': 506, 'Insufficient Storage': 507, 'Loop Detected': 508, 'Not Extended': 510, 'Network Authentication Required': 511 }
 
 // The status an Elysia response went out with: the response's own, else the one set on the context, else 200.
 export function statusOf(responseValue: unknown, set: { status?: unknown }): number {
