@@ -1,7 +1,7 @@
 import type { RateStore } from '../runtime/action'
 import type { Notification, NotificationStore } from './notifications'
 import type { PgHandle } from './pg-data'
-import type { SessionData, SessionStore } from './session'
+import type { DeletableSessionStore, SessionData } from './session'
 import type { VitalCount, VitalReading, VitalsStore } from './vitals-store'
 import { parse, stringify } from 'devalue'
 import { durationSeconds, legacyMs } from '../runtime/duration'
@@ -11,7 +11,7 @@ import { limited, limitedStore, MAINTENANCE_TIMEOUT_MS } from './pg-limit'
 import { TimeoutError } from './pg-poll'
 import { NOW, query } from './pg-sql'
 import { onReload } from './reload'
-import { matchesSession } from './session'
+import { compileMatch, matchesSession } from './session'
 import { sharedKey } from './stamp'
 import { WINDOW_DAYS } from './vitals-store'
 
@@ -23,8 +23,8 @@ const DELETE_PAGE = 500
 const RATES_KEY_BYTES = 32
 const RATES_KEY = 'rates_key'
 
-// Sessions in Postgres, shared by every replica; `deleteWhere` reads the live sessions a page at a time and deletes the ones `match` returns true for.
-export function pgSessions(pg: PgHandle): SessionStore & { deleteWhere: NonNullable<SessionStore['deleteWhere']> } {
+// Sessions in Postgres, shared by every replica; `deleteWhere` reads the live sessions a page at a time, only the ones holding an object match's values in the database, and deletes the ones `match` accepts.
+export function pgSessions(pg: PgHandle): DeletableSessionStore {
   let timer: ReturnType<typeof setInterval> | undefined
   let writes = 0
 
@@ -82,19 +82,21 @@ export function pgSessions(pg: PgHandle): SessionStore & { deleteWhere: NonNulla
     },
     async deleteWhere(match) {
       const db = await pg.db()
+      const { test, needles } = compileMatch(match)
+      const narrowed = needles.map((_, index) => ` AND strpos(data, $${index + 2}) > 0`).join('')
       let deleted = 0
       let after = ''
 
       // A page at a time by id, so a store of many sessions is never held in memory whole.
       for (;;) {
-        const page = await query<{ id: string, data: string }>(db, `SELECT id, data FROM kay_sessions WHERE expires >= ${NOW} AND id > $1 ORDER BY id LIMIT ${DELETE_PAGE}`, [after])
+        const page = await query<{ id: string, data: string }>(db, `SELECT id, data FROM kay_sessions WHERE expires >= ${NOW} AND id > $1${narrowed} ORDER BY id LIMIT ${DELETE_PAGE}`, [after, ...needles])
 
         if (page.length === 0)
           return deleted
 
         after = page.at(-1)!.id
 
-        const ids = page.filter(row => matchesSession(row.data, match)).map(row => row.id)
+        const ids = page.filter(row => matchesSession(row.data, test)).map(row => row.id)
 
         if (ids.length > 0) {
           await query(db, 'DELETE FROM kay_sessions WHERE id = ANY($1::text[])', [ids])

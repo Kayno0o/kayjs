@@ -356,6 +356,24 @@ pgDescribe('pgSessions', () => {
     expect(await store.deleteWhere(() => false)).toBe(0)
   })
 
+  pgIt('ends the sessions an object match names in the database, leaving a row it never reads', async () => {
+    const sql = await fresh()
+    const store = pgSessions(pgHandle(sql))
+
+    await store.set('a', { user: 1 }, '1h')
+    await store.set('b', { user: '1' }, '1h')
+    await store.set('c', { user: 'ada', note: 1 }, '1h')
+    await rows(sql, 'INSERT INTO kay_sessions (id, data, expires) VALUES (\'broken\', \'not devalue\', 9999999999999)')
+    await rows(sql, `INSERT INTO kay_sessions (id, data, expires) SELECT 'bulk' || n, '${stringify({ user: 2 })}', 9999999999999 FROM generate_series(1, 1300) AS n`)
+
+    expect(await store.deleteWhere({ user: 1 })).toBe(1)
+    expect(await store.deleteWhere({ user: 'ada' })).toBe(1)
+    expect(await store.deleteWhere({ user: 2 })).toBe(1300)
+    expect(await store.get('b')).toEqual({ user: '1' })
+    expect(await rows(sql, 'SELECT 1 FROM kay_sessions')).toHaveLength(2)
+    await expect((async () => store.deleteWhere({}))()).rejects.toThrow('deleteWhere takes')
+  })
+
   pgIt('reads the live sessions a page at a time, so more than a page of them are all matched', async () => {
     const sql = await fresh()
     const store = pgSessions(pgHandle(sql))

@@ -1,7 +1,7 @@
 import type { SQL } from 'bun'
 import type { AppStore } from './app-store'
 import type { PgIndex, PgJobsSource } from './pg-jobs'
-import type { SessionStore } from './session'
+import type { DeletableSessionStore } from './session'
 import { pgCache } from './pg-cache'
 import { connectionOf, createJobTables, createMissingIndexes, indexStatement, jobTables, pgJobs, privilegeRefused, relationsMissing, withMissingIndexes } from './pg-jobs'
 import { pgLive } from './pg-live'
@@ -124,5 +124,5 @@ export function pgData(source: PgJobsSource) {
 
   const handle = pgHandle(db)
 
-  return { sessions: pgSessions(handle), cache: pgCache(handle), jobs: pgJobs(db), rates: pgRates(handle), rooms: pgRooms(handle), vitals: pgVitals(handle), live: pgLive(handle), ...typeof source === 'string' && { database: source }, notifications: pgNotifications(handle) } satisfies { [Kind in Exclude<keyof AppStore, 'database'>]-?: NonNullable<AppStore[Kind]> } & { sessions: SessionStore & { deleteWhere: NonNullable<SessionStore['deleteWhere']> } }
+  return { sessions: pgSessions(handle), cache: pgCache(handle), jobs: pgJobs(db), rates: pgRates(handle), rooms: pgRooms(handle), vitals: pgVitals(handle), live: pgLive(handle), ...typeof source === 'string' && { database: source }, notifications: pgNotifications(handle) } satisfies { [Kind in Exclude<keyof AppStore, 'database'>]-?: NonNullable<AppStore[Kind]> } & { sessions: DeletableSessionStore }
 }

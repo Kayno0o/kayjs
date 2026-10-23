@@ -66,8 +66,10 @@ Adding a store signs everyone out once. A cookie sealed before holds its data, a
 To end every session of one person, call `deleteWhere` on `memoryStore()` or `sqliteStore()`. With `store: sqliteData(path)`, `sqliteStore(path)` of the same file gives the store the sessions are in. Use it when someone asks to be erased or changes their password.
 
 ```ts
-await store.deleteWhere(data => data.userId === id)
+await store.deleteWhere({ userId: id })
 ```
+
+The object names the fields a session holds equal, a string, number, boolean or null each. The Postgres and SQLite stores only read the sessions whose stored text holds those values, so one person's sessions are found without reading the rest. A function, `data => data.userId === id`, works too and reads every live session, 500 at a time. An empty object, or one with an `undefined` value, throws instead of ending every session.
 
 ### Your own store
 
@@ -88,7 +90,7 @@ const store: SessionStore = {
 }
 ```
 
-Add `deleteWhere(match)` to support ending every session of one person. It deletes each session whose data `match` accepts and resolves with how many went.
+Add `deleteWhere(match)` to support ending every session of one person. It deletes each session whose data `match` accepts and resolves with how many went; kay's own stores also take an object of fields held equal, `{ userId }`, which a database store can narrow.
 
 ### Session lifetime
 

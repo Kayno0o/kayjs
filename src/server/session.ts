@@ -19,6 +19,12 @@ import { appSecrets, noAppSecret, useStampSecret } from './stamp'
 
 export type SessionData = Record<string, unknown>
 
+// What `deleteWhere` of kay's own stores takes: an object of fields every deleted session holds equal (`{ userId: 7 }`), which the Postgres and SQLite stores narrow in the database, or a function over a session's data, which reads every live session a page at a time.
+export type SessionMatch = ((data: SessionData) => boolean) | Readonly<Record<string, string | number | boolean | null>>
+
+// A store of kay's own, whose `deleteWhere` takes either form of a match.
+export type DeletableSessionStore = SessionStore & { deleteWhere: (match: SessionMatch) => number | Promise<number> }
+
 // Where sessions live when the cookie only carries their id; each method may answer synchronously or with a promise.
 export interface SessionStore {
   get: (id: string) => SessionData | undefined | Promise<SessionData | undefined>
@@ -105,8 +111,10 @@ const MOST_SESSIONS = 100_000
 const SWEEP_MS = 60 * 60 * 1000
 // How often a SQLite store looks whether its file was deleted or replaced, at most.
 const FILE_CHECK_MS = 5000
+// How many sessions a `deleteWhere` reads at a time.
+const DELETE_PAGE = 500
 
-type SqliteSessionStore = SessionStore & { deleteWhere: NonNullable<SessionStore['deleteWhere']> }
+type SqliteSessionStore = DeletableSessionStore
 // Whether this process was told yet that a session without a store cannot be revoked.
 let warnedNoStore = false
 const sqliteStores = new Map<string, { store: SqliteSessionStore, reopen: () => void }>()
@@ -375,7 +383,7 @@ function opened(value: string, keys: Buffer[], name: string): { sealed: Sealed, 
 }
 
 // Sessions in this process's memory: gone on restart, and each process keeps its own. Fine for development and one-process sites that can sign everyone out on deploy.
-export function memoryStore(): SessionStore & { deleteWhere: NonNullable<SessionStore['deleteWhere']> } {
+export function memoryStore(): DeletableSessionStore {
   const sessions = new Map<string, { text: string, expires: number }>()
   let writes = 0
 
@@ -414,10 +422,11 @@ export function memoryStore(): SessionStore & { deleteWhere: NonNullable<Session
     },
     deleteWhere(match) {
       const now = Date.now()
+      const { test } = compileMatch(match)
       let deleted = 0
 
       for (const [id, entry] of sessions) {
-        if (entry.expires >= now && matchesSession(entry.text, match)) {
+        if (entry.expires >= now && matchesSession(entry.text, test)) {
           sessions.delete(id)
           deleted++
         }
@@ -523,7 +532,6 @@ function openSqliteStore(path: string): { store: SqliteSessionStore, close: () =
   const upsert = db.query('INSERT INTO kay_sessions (id, data, expires) VALUES (?, ?, ?) ON CONFLICT (id) DO UPDATE SET data = excluded.data, expires = excluded.expires')
   const remove = db.query('DELETE FROM kay_sessions WHERE id = ?')
   const sweep = db.query('DELETE FROM kay_sessions WHERE expires < ?')
-  const live = db.query<{ id: string, data: string }, [number]>('SELECT id, data FROM kay_sessions WHERE expires >= ?')
   let writes = 0
 
   sweep.run(Date.now())
@@ -555,14 +563,29 @@ function openSqliteStore(path: string): { store: SqliteSessionStore, close: () =
       remove.run(id)
     },
     deleteWhere(match) {
-      const ids = live.all(Date.now()).filter(row => matchesSession(row.data, match)).map(row => row.id)
+      const { test, needles } = compileMatch(match)
+      const page = db.query<{ id: string, data: string }, (string | number)[]>(`SELECT id, data FROM kay_sessions WHERE expires >= ? AND id > ?${' AND instr(data, ?) > 0'.repeat(needles.length)} ORDER BY id LIMIT ${DELETE_PAGE}`)
+      let deleted = 0
+      let after = ''
 
-      db.transaction(() => {
-        for (const id of ids)
-          remove.run(id)
-      })()
+      // A page at a time by id, so a store of many sessions is never held in memory whole.
+      for (;;) {
+        const rows = page.all(Date.now(), after, ...needles)
 
-      return ids.length
+        if (rows.length === 0)
+          return deleted
+
+        after = rows.at(-1)!.id
+
+        const ids = rows.filter(row => matchesSession(row.data, test)).map(row => row.id)
+
+        db.transaction(() => {
+          for (const id of ids)
+            remove.run(id)
+        })()
+
+        deleted += ids.length
+      }
     },
   }
 
@@ -570,6 +593,30 @@ function openSqliteStore(path: string): { store: SqliteSessionStore, close: () =
     clearInterval(timer)
     db.close()
   } }
+}
+
+// A match as a test over a session's data and the texts a stored session holding it must contain, which a database narrows the rows by before the test is made.
+// An object is refused empty or with an undefined value, which would end every session or none by mistake.
+export function compileMatch(match: SessionMatch): { test: (data: SessionData) => boolean, needles: string[] } {
+  if (typeof match === 'function')
+    return { test: match, needles: [] }
+
+  const fields = Object.entries(match)
+
+  if (fields.length === 0 || fields.some(([, value]) => value === undefined))
+    throw new KayError('config-invalid', 'kay: deleteWhere takes a function or an object with a string, number, boolean or null for each field, such as { userId: 7 }')
+
+  const needles: string[] = []
+
+  for (const [, value] of fields) {
+    // The value as devalue writes it inside the stored array, such as "abc" or 7.
+    if ((typeof value === 'number' && !Number.isFinite(value)) || Object.is(value, -0))
+      continue
+
+    needles.push(stringify(value).slice(1, -1))
+  }
+
+  return { test: data => fields.every(([field, value]) => Object.hasOwn(data, field) && data[field] === value), needles }
 }
 
 // Whether stored session data matches, a row that does not parse logged and skipped so the rest are still erased.

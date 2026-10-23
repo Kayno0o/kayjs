@@ -583,6 +583,65 @@ describe('sessions', () => {
     })
   }
 
+  for (const [name, store] of [['in memory', memoryStore()], ['in sqlite', sqliteStore(':memory:')]] as const) {
+    it(`erases one person's sessions ${name} out of many by an object match, equal values only`, async () => {
+      for (let n = 0; n < 1200; n++)
+        await store.set(`other${n}`, { userId: n % 2 === 0 ? 'u2' : 12 }, '60s')
+
+      await store.set('a', { userId: 1 }, '60s')
+      await store.set('b', { userId: '1' }, '60s')
+      await store.set('c', { userId: 1, cart: [3] }, '60s')
+      await store.set('d', { other: 1, userId: null }, '60s')
+      await store.set('e', { userId: 'u1', note: 'u2' }, '60s')
+
+      expect(await store.deleteWhere({ userId: 1 })).toBe(2)
+      expect(await store.deleteWhere({ userId: 'u1' })).toBe(1)
+      expect(await store.deleteWhere({ userId: 1 })).toBe(0)
+      expect(await store.deleteWhere({ userId: null })).toBe(1)
+      expect(await store.get('b')).toEqual({ userId: '1' })
+      expect(await store.deleteWhere({ userId: 'u2' })).toBe(600)
+      expect(await store.deleteWhere({ userId: 12 })).toBe(600)
+      expect(await store.deleteWhere({ userId: '1' })).toBe(1)
+    })
+
+    it(`refuses an object match ${name} that is empty or holds undefined, which would end every session or none`, async () => {
+      await store.set('a', { userId: 1 }, '60s')
+      await expect((async () => store.deleteWhere({}))()).rejects.toThrow('deleteWhere takes')
+      await expect((async () => store.deleteWhere({ userId: undefined } as never))()).rejects.toThrow('deleteWhere takes')
+      expect(await store.get('a')).toEqual({ userId: 1 })
+    })
+  }
+
+  it('reads the sqlite sessions a function match gets a page at a time, and only the rows holding an object match', async () => {
+    const dir = await scratchDir('sessions-')
+    const file = join(dir, 'sessions.sqlite')
+    const store = sqliteStoreAt(file)
+    const db = new Database(file)
+
+    await store.set('seed', { userId: 0 }, '60s')
+    db.run(`INSERT INTO kay_sessions (id, data, expires) SELECT 'bulk' || n, ?, ${Date.now() + 60_000} FROM (WITH RECURSIVE s(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM s WHERE n < 1300) SELECT n FROM s)`, [stringify({ userId: 1 })])
+
+    let seen = 0
+
+    expect(await store.deleteWhere((data) => {
+      seen++
+
+      return data.userId === 1
+    })).toBe(1300)
+    expect(seen).toBe(1301)
+    expect(db.query('SELECT id FROM kay_sessions').all()).toEqual([{ id: 'seed' }])
+
+    // A row that does not hold the value is never read, so it is not parsed nor logged.
+    db.run('INSERT INTO kay_sessions (id, data, expires) VALUES (?, ?, ?)', ['broken', '{not devalue', Date.now() + 60_000])
+
+    const logged = await logsOf(async () => {
+      expect(await store.deleteWhere({ userId: 7 })).toBe(0)
+    })
+
+    expect(logged).toEqual([])
+    db.close()
+  })
+
   it('erases no expired session and skips a row that does not parse, logged, in sqlite and in memory alike', async () => {
     const dir = await scratchDir('sessions-')
     const file = join(dir, 'sessions.sqlite')

@@ -84,7 +84,7 @@ export async function erase(userId: string) {
   if (user.avatar !== undefined)
     await files.delete(user.avatar)
 
-  await sessions.deleteWhere(data => data.userId === userId)
+  await sessions.deleteWhere({ userId })
   await mail.remove(job => job.userId === userId)
   await notifications.erase(userId)
 }
