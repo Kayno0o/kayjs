@@ -153,6 +153,10 @@ export class Connection {
     catch (error) {
       const code = error instanceof ResponseError ? error.code : INTERNAL_ERROR
 
+      // A deliberate error answers the client alone, any other is a bug whose stack the editor's output channel shows.
+      if (!(error instanceof ResponseError))
+        console.error(`kay lsp: ${method} failed:`, error)
+
       this.send({ jsonrpc: '2.0', id, error: { code, message: error instanceof Error ? error.message : String(error) } })
     }
   }

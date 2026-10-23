@@ -2039,3 +2039,35 @@ describe('kay lsp editor features of an app under a base', () => {
     })
   })
 })
+
+describe('kay lsp when a handler throws', () => {
+  it('answers a request with an internal error and logs the stack, and keeps serving', async () => {
+    const encoder = new TextEncoder()
+    const toServer = new TransformStream<Uint8Array>()
+    const toClient = new TransformStream<Uint8Array>()
+    const writeToServer = toServer.writable.getWriter()
+    const writeToClient = toClient.writable.getWriter()
+    const client = new Connection(toClient.readable, (data) => {
+      void writeToServer.write(encoder.encode(data))
+    })
+    const server = new KayLanguageServer(new Connection(toServer.readable, (data) => {
+      void writeToClient.write(encoder.encode(data))
+    }))
+    const failure = new Error('compile blew up')
+    const tokens = spyOn(server as unknown as { tokens: () => unknown }, 'tokens').mockImplementationOnce(() => {
+      throw failure
+    }).mockImplementation(() => ({ data: [] }))
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      await expect(client.request('textDocument/semanticTokens/full', { textDocument: { uri: 'file:///a.kay' } })).rejects.toMatchObject({ code: -32603, message: 'compile blew up' })
+      expect(logged).toHaveBeenCalledWith('kay lsp: textDocument/semanticTokens/full failed:', failure)
+      expect(await client.request('textDocument/semanticTokens/full', { textDocument: { uri: 'file:///a.kay' } })).toEqual({ data: [] })
+    }
+    finally {
+      logged.mockRestore()
+      tokens.mockRestore()
+      await Promise.all([writeToServer.close(), writeToClient.close()])
+    }
+  })
+})
