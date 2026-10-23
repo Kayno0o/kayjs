@@ -58,6 +58,10 @@ async function create(from: string, name: string): Promise<string> {
   for (const dir of PACKAGES)
     await $`bun install --frozen-lockfile`.cwd(join(path, dir)).quiet()
 
+  // The eslint config lints .kay files through dist/eslint.js, which is git-ignored, so `bunx keslint` fails in a fresh worktree without it.
+  if ((await Bun.file(join(path, 'package.json')).json() as { scripts?: Record<string, string> }).scripts?.['build:eslint'] !== undefined)
+    await $`bun run build:eslint`.cwd(path).quiet()
+
   return path
 }
 

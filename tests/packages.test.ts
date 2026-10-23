@@ -1,6 +1,6 @@
 import { Glob } from 'bun'
 import { describe, expect, it } from 'bun:test'
-import { archiveOldest, capNewest, capUnreleased, indexArchive, MAX_PAGE_BYTES, NEWEST_CAP, oversizedPages, releasePages, stampUnreleased, trimArchive } from '../scripts/whats-new'
+import { archiveOldest, capNewest, capUnreleased, indexArchive, MAX_PAGE_BYTES, NEWEST_CAP, oversizedPages, releasePages, relinkMoved, stampUnreleased, trimArchive } from '../scripts/whats-new'
 
 interface Manifest {
   name: string
@@ -176,6 +176,34 @@ describe('what\'s new', () => {
 
     expect(joined.archive.match(/## 1\.70\.0 \(continued\)/g)).toHaveLength(1)
     expect(joined.archive).toContain(`## 1.70.0 (continued)\n\n- c\n\n- ${c}\n\n## 1.68.0`)
+  })
+
+  it('keeps the newest release of an archive when a cap between releases trims it, and the continued sections above it', () => {
+    const big = 'x'.repeat(300)
+    const archive = `# Old\n\nWhat each release before 1.72 added.\n\n## Unreleased (continued)\n\n- ${big}\n\n## 1.72.0 (continued)\n\n- ${big}\n\n## 1.71.0\n\n- ${big}\n\n## 1.70.0\n\n- ${big}\n`
+    const capped = trimArchive(archive, 100, true)
+
+    expect(capped).toContain('## Unreleased (continued)')
+    expect(capped).toContain('## 1.72.0 (continued)')
+    expect(capped).toContain('## 1.71.0')
+    expect(capped).not.toContain('## 1.70.0')
+    // A release trims without that floor.
+    expect(trimArchive(archive, 100)).not.toContain('## 1.71.0')
+  })
+
+  it('points a link to an anchor a cap moved to the archive at the archive', async () => {
+    const before = '# U\n\n## 1.72.0\n\n### Stays\n\n- a\n\n### Moves\n\n- b\n'
+    const after = '# U\n\n## 1.72.0\n\n### Stays\n\n- a\n'
+    const texts = new Map([
+      ['llms/whats-new.md', '- [x](upgrading.md#moves) and [y](upgrading.md#stays)\n'],
+      ['llms/whats-new-archive.md', '- [z](upgrading.md#moves)\n'],
+      ['llms/islands.md', 'nothing\n'],
+    ])
+    const rewritten = await relinkMoved(texts, 'llms/upgrading.md', before, after, 'llms/upgrading-archive.md')
+
+    expect(rewritten.get('llms/whats-new.md')).toBe('- [x](upgrading-archive.md) and [y](upgrading.md#stays)\n')
+    expect(rewritten.get('llms/whats-new-archive.md')).toBe('- [z](upgrading-archive.md)\n')
+    expect(rewritten.has('llms/islands.md')).toBe(false)
   })
 
   it('keeps a continued section of the newest release above the older releases moved beside it', () => {

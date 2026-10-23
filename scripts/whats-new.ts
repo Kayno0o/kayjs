@@ -1,4 +1,6 @@
+import { readdir } from 'node:fs/promises'
 import process from 'node:process'
+import { renderMarkdown } from '../src/content/markdown'
 // The page listing what each release adds, which the docs site renders too, keeping what is not released yet under `## Unreleased`.
 export const WHATS_NEW = ['llms/whats-new.md']
 // The index whose lines list each archive and the release it starts before.
@@ -28,6 +30,7 @@ const VERSION_HEADING = /^## (\d+\.\d+(?:\.\d+)?)/
 // The line a capped release ends on, which means nothing once the release is in the archive beside its own continuation.
 const POINTER = /\n*The rest of this release is in [^\n]*\n/
 const FENCE = /^\s*(?:```|~~~)/
+const CONTINUED = /^## [^\n]* \(continued\)\n/
 const NOTE_LINK = /\[[^\]]*\]\([^)]*\)/
 
 const UNRELEASED = /^## Unreleased$/m
@@ -145,15 +148,17 @@ export const capNewest = (page: string, archive: string, cap = NEWEST_CAP, unit 
 // Cuts `## Unreleased` to `cap` bytes between releases the same way, its remaining lines going under `## Unreleased (continued)`, which the release names after its version.
 export const capUnreleased = (page: string, archive: string, cap = NEWEST_CAP) => capSection(page, archive, cap, UNRELEASED)
 
-// Drops an archive's oldest releases while it is over `limit` bytes, keeping its newest, and ends it on where the dropped ones are read: each tag's release notes open with its What's new.
-export function trimArchive(archive: string, limit = ARCHIVE_LIMIT): string {
+// Drops an archive's oldest releases while it is over `limit` bytes, keeping its newest and, with `keepNewestRelease`, the newest release it holds, which a cap between releases needs as the release just before the unreleased one; and ends it on where the dropped ones are read: each tag's release notes open with its What's new.
+export function trimArchive(archive: string, limit = ARCHIVE_LIMIT, keepNewestRelease = false): string {
   const [intro, ...sections] = archive.split(SECTION)
   const last = sections.at(-1)
   const note = last === undefined ? undefined : NOTE.exec(last)?.[1]
   const releases = sections.map(section => note === undefined || section !== last ? section : section.replace(`\n${note}\n`, ''))
   let dropped = false
+  // What a cut left at the top of the archive as "(continued)" is no release of its own, so the newest release is the first versioned section after them.
+  const floor = keepNewestRelease ? releases.findIndex(section => VERSION_HEADING.test(section) && !CONTINUED.test(section)) + 1 : 0
 
-  while (releases.length > 1 && Buffer.byteLength([intro, ...releases, RELEASES_NOTE].join('')) > limit) {
+  while (releases.length > Math.max(floor, 1) && Buffer.byteLength([intro, ...releases, RELEASES_NOTE].join('')) > limit) {
     releases.pop()
     dropped = true
   }
@@ -166,6 +171,31 @@ export function trimArchive(archive: string, limit = ARCHIVE_LIMIT): string {
     return archive
 
   return `${[intro, ...releases].join('').trimEnd()}\n\n${RELEASES_NOTE.replace(BEFORE, before)}\n`
+}
+
+// The heading ids of a Markdown text.
+const headingIds = async (markdown: string) => new Set((await renderMarkdown(markdown)).headings.map(heading => heading.id))
+
+// Points a link to an anchor a cap moved from `page` to its archive at the archive itself, without the anchor: the link check refuses an anchor into an archive, whose sections are dropped at a release. `texts` holds the pages by path from the repo root and the result only those it rewrote.
+export async function relinkMoved(texts: ReadonlyMap<string, string>, page: string, before: string, after: string, archive: string): Promise<Map<string, string>> {
+  const [wasThere, stays] = await Promise.all([headingIds(before), headingIds(after)])
+  const moved = new Set([...wasThere].filter(id => !stays.has(id)))
+  const rewritten = new Map<string, string>()
+
+  if (moved.size === 0)
+    return rewritten
+
+  const name = page.slice(page.lastIndexOf('/') + 1)
+  const link = new RegExp(String.raw`\]\(((?:llms\/)?)${name.replace('.', '\\.')}#([\w-]+)\)`, 'g')
+
+  for (const [path, text] of texts) {
+    const next = text.replace(link, (whole, prefix: string, id: string) => moved.has(id) ? `](${prefix}${archive.slice(archive.lastIndexOf('/') + 1)})` : whole)
+
+    if (next !== text)
+      rewritten.set(path, next)
+  }
+
+  return rewritten
 }
 
 // Rewrites the "before" version of the line listing an archive to the one its opening paragraph names, so the index says what the archive holds.
@@ -216,9 +246,12 @@ if (import.meta.main) {
     throw new Error('usage: bun scripts/whats-new.ts --cap [--check]')
 
   const changed: string[] = []
+  const names = (await readdir('llms')).filter(name => name.endsWith('.md')).map(name => `llms/${name}`)
+  const texts = new Map<string, string>(await Promise.all([...names, INDEX].map(async path => [path, await Bun.file(path).text()] as const)))
+  const writes = new Map<string, string>()
 
   for (const [page, archive] of ARCHIVES) {
-    const [pageText, archiveText] = await Promise.all([Bun.file(page).text(), Bun.file(archive).text()])
+    const [pageText, archiveText] = [texts.get(page)!, texts.get(archive)!]
 
     // A landing stops only once a page nears the wall, so the cap runs every few batches rather than on each line added past it.
     if (check && Buffer.byteLength(pageText) <= CAP_DUE)
@@ -230,15 +263,24 @@ if (import.meta.main) {
       continue
 
     changed.push(page)
+    texts.set(page, capped.page)
+    texts.set(archive, trimArchive(capped.archive, ARCHIVE_LIMIT, true))
+    writes.set(page, capped.page)
+    writes.set(archive, texts.get(archive)!)
 
-    if (!check)
-      await Promise.all([Bun.write(page, capped.page), Bun.write(archive, trimArchive(capped.archive))])
+    // The lines of a page that link a section the cap moved to its archive, on this page or another, follow it.
+    for (const [path, text] of await relinkMoved(texts, page, pageText, capped.page, archive)) {
+      texts.set(path, text)
+      writes.set(path, text)
+    }
   }
 
   if (check && changed.length > 0) {
     console.error(`${changed.join(', ')} outgrew the room kept for the next lines: run \`bun scripts/whats-new.ts --cap\` and commit the result, then land again`)
     process.exit(1)
   }
+
+  await Promise.all([...writes].map(async ([path, text]) => Bun.write(path, text)))
 
   if (changed.length > 0)
     console.log(`capped ${changed.join(', ')}`)
