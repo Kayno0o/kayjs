@@ -1,9 +1,8 @@
 // What `kay ui eject` and `kay ui diff` share: which files a component takes along, how the copy's and the app's imports are rewritten, and the record of the version a copy came from.
-import type * as t from '@babel/types'
 import { existsSync } from 'node:fs'
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join, relative } from 'node:path'
-import { parse } from '@babel/parser'
+import { uiConfigEntries } from 'kay/library'
 
 const PACKAGE = '@kaynooo/kayjs-ui'
 
@@ -234,52 +233,18 @@ async function appSources(dir: string): Promise<string[]> {
   return found
 }
 
-const OBJECT_WRAPPERS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'ParenthesizedExpression'])
-
-// The object a `src/ui.ts` exports by default, bare or as the argument of `defineUi(...)`.
-function configOf(ast: t.File): t.ObjectExpression | undefined {
-  const exported = ast.program.body.find(node => node.type === 'ExportDefaultDeclaration')
-
-  if (exported === undefined)
-    return undefined
-
-  let node: t.Node = exported.declaration
-
-  for (;;) {
-    if (OBJECT_WRAPPERS.has(node.type))
-      node = (node as t.TSAsExpression).expression
-    else if (node.type === 'CallExpression' && node.arguments[0] !== undefined)
-      node = node.arguments[0]
-    else
-      break
-  }
-
-  return node.type === 'ObjectExpression' ? node : undefined
-}
-
-function keyOf(property: t.ObjectProperty): string | undefined {
-  if (property.key.type === 'Identifier')
-    return property.key.name
-
-  return property.key.type === 'StringLiteral' ? property.key.value : undefined
-}
-
 // The entry `src/ui.ts` has under the library's specifier or the component's name, repeated under the copy's path: the copy takes it, and the library's own components that use the component keep it. A name now names two components and reaches neither, so that key becomes the library's specifier.
 function withCopyKey(text: string, file: string, name: string, copy: string, notes: string[]): string {
   const specifier = `${PACKAGE}/${file}`
-  let ast: t.File
+  const entries = uiConfigEntries(text)
 
-  try {
-    ast = parse(text, { sourceType: 'module', plugins: ['typescript'], createParenthesizedExpressions: true })
-  }
-  catch {
+  if (entries === undefined) {
     notes.push(`src/ui.ts could not be read: if it has an entry for ${name}, repeat it under '${copy}' by hand`)
 
     return text
   }
 
-  const properties = (configOf(ast)?.properties ?? []).filter((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && !property.computed && !property.shorthand)
-  const keyed = (key: string) => properties.filter(property => keyOf(property) === key)
+  const keyed = (key: string) => entries.filter(entry => entry.key === key)
   const named = [...keyed(specifier), ...keyed(name)]
   const [entry] = named
 
@@ -293,13 +258,13 @@ function withCopyKey(text: string, file: string, name: string, copy: string, not
   }
 
   const { start, end } = entry.value
-  const value = text.slice(start!, end!)
+  const value = text.slice(start, end)
   const added = `,\n  '${copy}': ${value}`
 
-  if (keyOf(entry) === specifier)
-    return text.slice(0, end!) + added + text.slice(end!)
+  if (entry.key === specifier)
+    return text.slice(0, end) + added + text.slice(end)
 
-  return `${text.slice(0, entry.key.start!)}'${specifier}': ${value}${added}${text.slice(end!)}`
+  return `${text.slice(0, entry.keySpan.start)}'${specifier}': ${value}${added}${text.slice(end)}`
 }
 
 export interface Changes {

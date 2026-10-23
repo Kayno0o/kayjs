@@ -2,7 +2,7 @@ import { Buffer } from 'node:buffer'
 import { createCipheriv, randomBytes } from 'node:crypto'
 import { describe, expect, it } from 'bun:test'
 import { s } from 'kay'
-import { acceptedLocales, asConfigError, checkAnswer, configError, durationSeconds, escapeHtml, jsonSchemaOf, matchLocale, nameUser, openWith, sameText, sealWith, userOf, weakSecrets } from 'kay/library'
+import { acceptedLocales, asConfigError, checkAnswer, configError, durationSeconds, escapeHtml, jsonSchemaOf, matchLocale, nameUser, openWith, sameText, sealWith, uiConfigEntries, userOf, weakSecrets } from 'kay/library'
 import { escape, escapeAttribute } from '../src/runtime/escape'
 
 const KEY = new Uint8Array(32).fill(7)
@@ -10,6 +10,17 @@ const OTHER_KEY = new Uint8Array(32).fill(9)
 
 // What kay hands its libraries in place of their own copies.
 describe('kay/library', () => {
+  it('reads the entries of src/ui.ts with their spans, as the build does', () => {
+    const text = 'const base = { "@kaynooo/kayjs-ui/card.kay": ({ parts: { head: "p-2" } }) as const }\n// Card: nope\nexport default defineUi({ ...base, Card: { parts: { head: "p-4" } }, [computed]: 1 })\n'
+    const entries = uiConfigEntries(text)!
+
+    expect(entries.map(entry => entry.key)).toEqual(['@kaynooo/kayjs-ui/card.kay', 'Card'])
+    expect(text.slice(entries[0]!.value.start, entries[0]!.value.end)).toBe('({ parts: { head: "p-2" } }) as const')
+    expect(text.slice(entries[1]!.keySpan.start, entries[1]!.keySpan.end)).toBe('Card')
+    expect(uiConfigEntries('export default 3')).toEqual([])
+    expect(uiConfigEntries('export default {')).toBeUndefined()
+  })
+
   it('escapes for any place in markup what escape and escapeAttribute escape for theirs', () => {
     const text = `Tom & "Jerry" <b>it's</b> > all`
 

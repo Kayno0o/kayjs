@@ -121,6 +121,8 @@ Type the result `KayExtension<typeof plugin>` when it has a `server` of its own,
 
 A library that keeps its own tables in the app's Postgres reads the connection and the schema the way kay's `pgData` does. All three helpers come from `kay/library`, with the `PgJobsSource` type.
 
+A command that rewrites the app's `src/ui.ts` reads it with `uiConfigEntries(text)` from `kay/library`, which gives each entry's key and the spans of its key and value, the way kay's own build reads the file. `kay ui eject` uses it.
+
 - `connectionOf(source)` gives the Bun `SQL` of a `SQL`, a pg-orm `Database` or a connection URL.
 - `relationsMissing(db, names)` tells whether one of the tables does not exist.
 - `privilegeRefused(error)` tells that a statement was refused because the role may not create tables, so the library can say who should.

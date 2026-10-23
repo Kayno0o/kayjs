@@ -6,7 +6,7 @@ import { readdirSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { parse } from '@babel/parser'
 import { componentName, ROUTE_FILES } from '../compiler'
-import { unwrapped } from '../compiler/object-literal'
+import { constBindings, exportedObject, propertiesOf, unwrapped } from '../compiler/object-literal'
 import { parseKay } from '../compiler/parser'
 
 // Where an app sets the parts and variants of its components and its libraries'.
@@ -406,4 +406,37 @@ export function uiEntryOf(root: string, file: string): UiEntry | undefined {
 // Whatever `src/ui.ts` changes in a component's compiled output, as text for a cache key.
 export function uiKeyOf(root: string, file: string): string {
   return JSON.stringify(uiEntryOf(root, file) ?? null)
+}
+
+export interface UiConfigEntry {
+  // The key as `src/ui.ts` names it, and where it is written.
+  key: string
+  keySpan: Span
+  // The entry's value, whole: parentheses and `as` or `satisfies` included.
+  value: Span
+}
+
+// The entries of the object a `src/ui.ts` text exports by default, with their spans, for a tool that rewrites the file; none when it does not parse, and an empty list when it exports no object literal.
+export function uiConfigEntries(text: string): UiConfigEntry[] | undefined {
+  let ast: t.File
+
+  try {
+    ast = parse(text, { sourceType: 'module', plugins: ['typescript'], createParenthesizedExpressions: true })
+  }
+  catch {
+    return undefined
+  }
+
+  const bindings = constBindings(ast.program)
+  const object = exportedObject(ast.program, bindings)
+  const entries: UiConfigEntry[] = []
+
+  for (const property of object ? propertiesOf(object, bindings) : []) {
+    const key = property.type === 'ObjectProperty' && !property.shorthand ? keyOf(property) : undefined
+
+    if (property.type === 'ObjectProperty' && key !== undefined)
+      entries.push({ key, keySpan: span(property.key), value: span(property.value) })
+  }
+
+  return entries
 }

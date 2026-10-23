@@ -431,6 +431,22 @@ describe('the command line', () => {
 
     expect(bumped.code).toBe(1)
     expect(bumped.out).toContain('+const { title, level = 3')
+
+    await writeFile(base, (await readFile(base, 'utf8')).replace('level = 2', 'level = 3'))
+    expect((await kay('ui', 'eject', 'button')).code).toBe(0)
+
+    const manifestPath = join(app, UI_DIR, '.upstream/ejected.json')
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Record<string, { version: string, helpers: Record<string, string> }>
+
+    manifest['button.kay']!.version = '0.0.1'
+    manifest['button.kay']!.helpers['defaults.ts'] = 'stale'
+    await writeFile(manifestPath, JSON.stringify(manifest))
+
+    const helper = await kay('ui', 'diff', 'button', '--check')
+
+    expect(helper.code).toBe(1)
+    expect(helper.out).toContain('between 0.0.1 and')
+    expect(helper.out).toContain('defaults.ts changed in kayjs-ui')
   }, 60_000)
 })
 

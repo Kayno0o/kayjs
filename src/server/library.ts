@@ -16,6 +16,8 @@ export interface Logo {
   href?: string | undefined
 }
 export { KAY_DIR, underKayDev } from '../build/assets'
+export { uiConfigEntries } from '../build/ui'
+export type { UiConfigEntry } from '../build/ui'
 export type { KayCommand, Parsed } from '../commands/command'
 export { appModules } from '../config'
 export type { DataValue, JsonSchema } from '../content/edit'
