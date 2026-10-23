@@ -27,7 +27,7 @@ RadioGroup, Segmented, Rating, Slider, ColorInput, DateInput, DateRangeInput, Co
 
 ### kayjs-ui and kayjs-cms message keys drop their `Label` suffix
 
-A `ui.*` or `cms.*` key ended in `Label` (`ui.table.filterLabel`, `cms.admin.searchLabel`); it is now the bare name, `ui.table.filter`, as kayjs-ai's are, and the components' props keep their names. The sixteen keys that met a visible text of the same name end in `Aria` instead (`cms.table.moveUpAria`), `cms.history.restoreLabel` is `cms.history.restoreButton` and `ui.markdownEditor.previewLabel` joins `ui.markdownEditor.preview`. A catalog still wording the old key keeps winning until 1.75, and `deprecated-message-key` reports it in `src/messages/<locale>.ts`; `kay upgrade` renames the keys.
+A `ui.*` or `cms.*` key ended in `Label` (`ui.table.filterLabel`, `cms.admin.searchLabel`); it is now the bare name, `ui.table.filter`, as kayjs-ai's are, and the components' props keep their names. The fourteen keys that met a visible text of the same name end in `Aria` instead (`cms.table.moveUpAria`), `cms.history.restoreLabel` is `cms.history.restoreButton` and `ui.markdownEditor.previewLabel` joins `ui.markdownEditor.preview`. A catalog still wording the old key keeps winning until 1.75, and `deprecated-message-key` reports it in `src/messages/<locale>.ts`; `kay upgrade` renames the keys.
 
 ## 1.71.0
 

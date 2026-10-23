@@ -5,6 +5,7 @@ import { existsSync } from 'node:fs'
 import { parse } from '@babel/parser'
 import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
+import { PLURAL_CATEGORIES } from '../runtime/i18n'
 import { messagesFile } from '../server/i18n'
 import { renamedMessageKey } from '../server/legacy-keys'
 import { keyOf } from './retired-lint'
@@ -74,7 +75,7 @@ function visit(object: t.ObjectExpression, path: string[], context: Context): vo
     if (name === undefined)
       continue
 
-    if (property.value.type === 'ObjectExpression') {
+    if (property.value.type === 'ObjectExpression' && !pluralForms(property.value)) {
       visit(property.value, [...path, name], context)
 
       continue
@@ -99,4 +100,11 @@ function visit(object: t.ObjectExpression, path: string[], context: Context): vo
       ...!siblings.has(replacement) && { fixes: [{ title: `Rename to ${replacement}`, edits: [{ start: property.key.start!, end: property.key.end!, text: `${quote}${replacement}${quote}` }], safe: true }] },
     })
   }
+}
+
+// An object of plural forms only, `other` among them, which is one message as `isPlural` reads it.
+function pluralForms(object: t.ObjectExpression): boolean {
+  const names = object.properties.map(property => property.type === 'ObjectProperty' ? keyOf(property) : undefined)
+
+  return names.includes('other') && names.every(name => name !== undefined && PLURAL_CATEGORIES.has(name))
 }

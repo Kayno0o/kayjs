@@ -4319,7 +4319,7 @@ describe.concurrent('kay check, unused code', () => {
       'export default {',
       '  title: { pageLabel: \'a\' },',
       '  ui: {',
-      '    table: { filterLabel: \'Filtrer\', rowCount: \'x\' },',
+      '    table: { filterLabel: \'Filtrer\', rowCount: \'x\', selectedLabel: { one: \'un\', other: \'{count}\' } },',
       '    pagination: { label: \'Pagination\', nextLabel: \'Suivant\', next: \'Après\' },',
       '    markdownEditor: { previewLabel: \'Aperçu\' },',
       '  },',
@@ -4332,10 +4332,10 @@ describe.concurrent('kay check, unused code', () => {
     try {
       const { output } = await runCheck(root)
 
-      expect(output.match(/warning\[deprecated-message-key\]/g)).toHaveLength(4)
+      expect(output.match(/warning\[deprecated-message-key\]/g)).toHaveLength(5)
       expect(output).toContain('`cms.table.moveUpLabel` is `cms.table.moveUpAria` since 1.72')
       await runCheck(root, '--fix')
-      expect(await Bun.file(join(root, 'src/messages/fr.ts')).text()).toBe(messages.replace('filterLabel', 'filter').replace('previewLabel', 'preview').replace('moveUpLabel', 'moveUpAria'))
+      expect(await Bun.file(join(root, 'src/messages/fr.ts')).text()).toBe(messages.replace('filterLabel', 'filter').replace('previewLabel', 'preview').replace('moveUpLabel', 'moveUpAria').replace('selectedLabel', 'selected'))
     }
     finally {
       await rm(root, { recursive: true, force: true })
