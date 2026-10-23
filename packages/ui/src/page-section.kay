@@ -5,7 +5,7 @@ import type { JSX, Snippet } from 'kay'
 const look = recipe({
   parts: {
     root: 'kui-page-section flex flex-col gap-[var(--spacing-kui-section,calc(var(--spacing)*3.5*var(--density)))]',
-    head: 'flex items-center gap-3 data-sticky:sticky data-sticky:top-[var(--kui-sticky-top,0px)] data-sticky:z-[1] data-sticky:flex-nowrap data-sticky:justify-between data-sticky:border-b data-sticky:border-border data-sticky:bg-surface data-sticky:px-4 data-sticky:py-3',
+    head: 'flex items-center gap-3 data-sticky:sticky data-sticky:top-[var(--kui-sticky-top,0px)] data-sticky:z-[1] data-sticky:border-b data-sticky:border-border data-sticky:bg-surface data-sticky:px-4 data-sticky:py-3',
     title: 'min-w-0 flex-1 data-sticky:truncate',
     heading: 'min-w-0 flex-1',
     subtitle: 'm-0 truncate text-sm text-muted',
@@ -23,36 +23,38 @@ const { title, level = 2, subtitle, sticky = false, actions, ...rest } = props<O
   // The end of the head line: a `+` IconButton, a link, a row of controls.
   actions?: Snippet
 }>()
+
+const marker = sticky ? '' : undefined
 ---
 // A titled stretch of a page, its title one level under the page's own unless `level` says otherwise.
 section({...rest})
-  div(part="head" data-sticky={sticky ? '' : undefined})
+  div(part="head" data-sticky={marker})
     if subtitle !== undefined
       hgroup(part="heading")
         if level === 1
-          h1.kui-heading-section(part="title" data-sticky={sticky ? '' : undefined}) {title}
+          h1.kui-heading-section(part="title" data-sticky={marker}) {title}
         else if level === 2
-          h2.kui-heading-section(part="title" data-sticky={sticky ? '' : undefined}) {title}
+          h2.kui-heading-section(part="title" data-sticky={marker}) {title}
         else if level === 3
-          h3.kui-heading-section(part="title" data-sticky={sticky ? '' : undefined}) {title}
+          h3.kui-heading-section(part="title" data-sticky={marker}) {title}
         else if level === 4
-          h4.kui-heading-section(part="title" data-sticky={sticky ? '' : undefined}) {title}
+          h4.kui-heading-section(part="title" data-sticky={marker}) {title}
         else if level === 5
-          h5.kui-heading-section(part="title" data-sticky={sticky ? '' : undefined}) {title}
+          h5.kui-heading-section(part="title" data-sticky={marker}) {title}
         else
-          h6.kui-heading-section(part="title" data-sticky={sticky ? '' : undefined}) {title}
+          h6.kui-heading-section(part="title" data-sticky={marker}) {title}
         p(part="subtitle") {subtitle}
     else if level === 1
-      h1.kui-heading-section(part="title" data-sticky={sticky ? '' : undefined}) {title}
+      h1.kui-heading-section(part="title" data-sticky={marker}) {title}
     else if level === 2
-      h2.kui-heading-section(part="title" data-sticky={sticky ? '' : undefined}) {title}
+      h2.kui-heading-section(part="title" data-sticky={marker}) {title}
     else if level === 3
-      h3.kui-heading-section(part="title" data-sticky={sticky ? '' : undefined}) {title}
+      h3.kui-heading-section(part="title" data-sticky={marker}) {title}
     else if level === 4
-      h4.kui-heading-section(part="title" data-sticky={sticky ? '' : undefined}) {title}
+      h4.kui-heading-section(part="title" data-sticky={marker}) {title}
     else if level === 5
-      h5.kui-heading-section(part="title" data-sticky={sticky ? '' : undefined}) {title}
+      h5.kui-heading-section(part="title" data-sticky={marker}) {title}
     else
-      h6.kui-heading-section(part="title" data-sticky={sticky ? '' : undefined}) {title}
+      h6.kui-heading-section(part="title" data-sticky={marker}) {title}
     | {actions}
   slot

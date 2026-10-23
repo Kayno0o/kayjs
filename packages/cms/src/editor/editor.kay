@@ -263,7 +263,7 @@ function inBars(node: Node | undefined): boolean {
 listen(() => document, 'pointerdown', (event) => {
   const node = event.target instanceof Node ? event.target : undefined
 
-  if (event.pointerType !== 'mouse' && open() && !browsing() && node && !inBars(node) && !isOwn(node))
+  if (event.pointerType !== 'mouse' && open() && !browsing() && node && !isOwn(node))
     lists?.hover(node, { x: event.clientX, y: event.clientY })
 }, { passive: true, capture: true })
 
@@ -301,7 +301,7 @@ function focusedFields(): MarkedField[] | undefined {
 function focusedElement(): Element | undefined {
   const element = document.activeElement
 
-  return element && element !== document.body && !isOwn(element) && !inBars(element) ? element : undefined
+  return element && element !== document.body && !isOwn(element) ? element : undefined
 }
 
 // The bar of the focused item keeps the item while the focus is on it.

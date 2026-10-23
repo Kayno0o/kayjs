@@ -5,11 +5,10 @@ html.kcms-editing {
 }
 
 /* The panel's body scrolls the forms, which pad themselves. */
-.kcms-editor [data-part='body'] {
+.kcms-editor > [data-part='body'] {
   padding: 0 0 env(safe-area-inset-bottom, 0px);
   overscroll-behavior: contain;
 }
-
 
 .kcms-editor-status p {
   margin: 0.5rem 1rem;

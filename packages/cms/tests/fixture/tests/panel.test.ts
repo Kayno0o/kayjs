@@ -551,3 +551,22 @@ test('a single collection\'s entry shows no collection under its title in the ed
   expect(await page.evaluate(() => document.querySelector('.kcms-entry > [data-part=head] [data-part=subtitle]'))).toBeNull()
   expect(page.errors).toEqual([])
 })
+
+test('the Stop editing question keeps its dialog body padding inside the panel', async () => {
+  const page = await open(1280, 800)
+
+  await page.waitUntil(() => document.querySelector('.kcms-editor input[type="text"]') !== null)
+  await page.evaluate(() => {
+    const input = document.querySelector<HTMLInputElement>('.kcms-editor input[type="text"]')!
+
+    input.value = 'Changed'
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await page.waitUntil(() => document.querySelector('.kcms-editor-status') !== null)
+  await page.click('.kcms-editor > [data-part=head] button:not([aria-label])')
+  await page.waitUntil(() => document.querySelector('.kui-dialog[open]') !== null)
+
+  const padding = await page.evaluate(() => getComputedStyle(document.querySelector('.kui-dialog[open] [data-part=body]')!).paddingLeft)
+
+  expect(Number.parseFloat(padding)).toBeGreaterThan(8)
+}, 60_000)

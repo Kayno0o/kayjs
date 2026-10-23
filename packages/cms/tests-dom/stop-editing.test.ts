@@ -110,7 +110,7 @@ test('Stop editing with unsaved edits asks first, and Keep editing leaves the ed
   expect(left(fetched)).toBe(false)
 })
 
-test('the question is a modal dialog, so its two buttons are in view wherever the form is scrolled to, and Escape keeps editing', async () => {
+test('the question is a dialog inside the panel, and its closing keeps the edits and the edit mode', async () => {
   const fetched = server()
   const root = await typed()
 

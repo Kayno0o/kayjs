@@ -118,7 +118,7 @@ describe('SidePanel with modal={false}', () => {
 })
 
 describe('SidePanel with a dock', () => {
-  const launcher = (root: Element) => root.querySelector<HTMLElement>('#docked ~ [data-part=launcher], [data-part=launcher]')
+  const launcher = (root: Element) => root.querySelector<HTMLElement>('[data-part=launcher]')
 
   const html = document.documentElement
   const dock = (root: Element) => root.querySelector<HTMLDialogElement>('#docked')!
