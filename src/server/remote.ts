@@ -184,7 +184,7 @@ export function remoteImages(dir: string, patterns: readonly RemotePattern[], va
     if ((failedUntil.get(key) ?? 0) > Date.now())
       return kept ? { path, key } : { status: 502, message: 'The host did not give the image' }
 
-    if (client !== undefined && overLimit(DOWNLOADS, client, DOWNLOADS_PER_MINUTE, MINUTE_MS) !== undefined)
+    if (client !== undefined && await overLimit(DOWNLOADS, client, DOWNLOADS_PER_MINUTE, MINUTE_MS) !== undefined)
       return kept ? { path, key } : { status: 429, message: 'Too many new images at once; try again in a minute' }
 
     const result = await download(src, path, kept ? meta : undefined)

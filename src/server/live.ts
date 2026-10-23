@@ -384,7 +384,7 @@ export function serveLive(app: Elysia, config?: LiveConfig): void {
     if (Number(request.headers.get('content-length') ?? 0) > MAX_REQUEST_BYTES)
       return new Response(null, { status: 413 })
 
-    if (overLimit(LIMIT, clientAddress(request, server), perMinute, MINUTE_MS) !== undefined)
+    if (await overLimit(LIMIT, clientAddress(request, server), perMinute, MINUTE_MS) !== undefined)
       return new Response(null, { status: 429 })
 
     const text = await readCapped(request, MAX_REQUEST_BYTES)

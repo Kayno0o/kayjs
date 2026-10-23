@@ -90,7 +90,7 @@ Pass every message on exactly as it came, and never back to the process that pub
 
 <Callout type="note">
 
-The cache lives in the process, and every caller shares the value, so never mutate it. A `sqliteCache` is shared by the processes of one machine. It creates its file when the first value is stored, not when your code names it, so a build, a check or a test that loads the module writes nothing.
+The cache lives in the process, and every caller shares the value, so never mutate it. A `sqliteCache` is shared by the processes of one machine. It creates its file when the first value is stored, not when your code names it, so a build, a check or a test that loads the module writes nothing. A stored value that has been stale for a week is dropped by the next write, checked hourly at most, in `sqliteCache` and in `pgData`.
 
 In the browser, `kay/cache` has `cached`, `cache`, `cacheTag` and `invalidate` only. `kay check` reports `invalidatePage` or `sqliteCache` imported by an island.
 

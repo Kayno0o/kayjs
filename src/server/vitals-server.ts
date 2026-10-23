@@ -46,7 +46,7 @@ export function vitalsServer(options: VitalsOptions): AnyElysia {
       if (Number(request.headers.get('content-length') ?? 0) > MAX_BODY_BYTES)
         return new Response(null, { status: 413 })
 
-      if (overLimit(RATE_NAME, clientAddress(request, server), REPORTS_PER_MINUTE, MINUTE_MS) !== undefined)
+      if (await overLimit(RATE_NAME, clientAddress(request, server), REPORTS_PER_MINUTE, MINUTE_MS) !== undefined)
         return new Response(null, { status: 429 })
 
       const text = await readCapped(request, MAX_BODY_BYTES)

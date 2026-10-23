@@ -763,11 +763,12 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
     }
 
     const reports = progressWriter(job.id, held)
+    let succeeded = false
 
     try {
       await withinLostAfter(handler(parse(job.payload) as Payload, ended.signal, { id: job.id, attempts: job.attempts, progress: reports.write }), claimedAt, ended)
       await reports.settle()
-      await store().complete(job.id, held)
+      succeeded = true
     }
     catch (error) {
       await reports.settle()
@@ -814,6 +815,16 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
     }
     finally {
       stopping?.removeEventListener('abort', stop)
+    }
+
+    // Outside the try above: a store that fails here ran the handler to its end, so the run is not a failed one, and retrying it would run the handler twice. The job stays claimed, and another run takes it once its hold lapses.
+    if (succeeded) {
+      try {
+        await store().complete(job.id, held)
+      }
+      catch (error) {
+        kayLog('error', `a job of queue('${name}') ran, but its store could not mark it finished: it is taken again once its hold lapses`, error)
+      }
     }
 
     return true

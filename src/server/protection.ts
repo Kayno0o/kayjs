@@ -543,9 +543,22 @@ function filledIn(value: unknown): boolean {
   return typeof value === 'string' ? value !== '' : value !== undefined && value !== null
 }
 
-// Seconds until the client may try again under `name`, in this process's memory, or undefined while it is under the limit: for kay's own routes.
-export function overLimit(name: string, client: string, max: number, windowMs: number): number | undefined {
-  return waitFor(memoryOf(name).hit(limitKey(name, client), `${windowMs}ms`), max)
+// Seconds until the client may try again under `name`, in the app's `store.rates` else this process's memory, or undefined while it is under the limit: for kay's own routes. A rates store that fails counts in memory instead, so a route is never refused for it.
+export async function overLimit(name: string, client: string, max: number, windowMs: number): Promise<number | undefined> {
+  const key = limitKey(name, client)
+  const window = `${windowMs}ms` as const
+  const shared = appStore()?.rates
+
+  if (shared) {
+    try {
+      return waitFor(await shared.hit(key, window), max)
+    }
+    catch (error) {
+      kayLog('warn', `the rates store failed counting ${name}, so this process's memory counts instead`, error)
+    }
+  }
+
+  return waitFor(memoryOf(name).hit(key, window), max)
 }
 
 // The store a limit counts in when it names none: the app's `store.rates`, else this process's memory.

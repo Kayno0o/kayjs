@@ -138,6 +138,45 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
     })
   })
 
+  describe('a store that fails marking a finished job', () => {
+    it('is not a failed run: the handler is not retried nor kept as failed, and the failure is logged', async () => {
+      const errors = spyOn(console, 'error').mockImplementation(noop)
+      const warns = spyOn(console, 'warn').mockImplementation(noop)
+      const logs = spyOn(console, 'log').mockImplementation(noop)
+      const inner = await open()
+      const calls = { retry: 0, fail: 0 }
+      const store: JobStore = {
+        ...inner,
+        complete: async () => {
+          throw new Error('the database went away')
+        },
+        retry: async (...args) => {
+          calls.retry++
+
+          return inner.retry(...args)
+        },
+        fail: async (...args) => {
+          calls.fail++
+
+          return inner.fail(...args)
+        },
+      }
+      const failed: unknown[] = []
+      let runs = 0
+      const jobs = queue<number>(named(), () => void runs++, { store, attempts: 3, onFailed: ({ error }) => void failed.push(error) })
+
+      await jobs.enqueue(1)
+      await jobs.drain()
+      expect(runs).toBe(1)
+      expect(calls).toEqual({ retry: 0, fail: 0 })
+      expect(failed).toEqual([])
+      expect(errors.mock.calls.flat().join(' ')).toContain('the database went away')
+      logs.mockRestore()
+      errors.mockRestore()
+      warns.mockRestore()
+    })
+  })
+
   describe('retryLater', () => {
     afterEach(() => {
       setSystemTime()

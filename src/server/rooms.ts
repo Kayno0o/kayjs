@@ -110,6 +110,8 @@ const EXPIRY = 10_000
 // How often a process reads the messages others wrote, and how long they are kept: a write by another process wakes the read at once, so this is only the net under it, and a file whose changes cannot be watched is read at the shorter interval.
 const WATCHED_POLL_MS = optionMs('250ms', '')
 const UNWATCHED_POLL_MS = optionMs('25ms', '')
+// A file that cannot be watched is read this many times in a row with nothing new before the read slows to the watched interval, going back to the short one at the first message.
+const IDLE_POLLS = 40
 const KEPT = 30_000
 
 // Rooms of websocket connections, typed by what they send: join one in `open`, leave in `close`, and publish to it from anywhere.
@@ -320,7 +322,7 @@ export function memoryRooms(): RoomStore {
   }
 }
 
-// Rooms kept in a SQLite file every process of the machine opening it shares: a message published in one reaches the members connected to the others as the file changes, and at worst within `poll`, `'250ms'` by default (`'25ms'` where the file cannot be watched); a bare number throws.
+// Rooms kept in a SQLite file every process of the machine opening it shares: a message published in one reaches the members connected to the others as the file changes, and at worst within `poll`, `'250ms'` by default (`'25ms'` where the file cannot be watched, slowing to `'250ms'` after a second with no message); a bare number throws.
 // A process that stops without leaving, such as one that crashed, has its members dropped once it has not been heard from for 10 seconds; one that was only stalled that long writes its members back once it runs again.
 // The file is opened by the first call that needs it, so loading a config that names it, to build or check, creates nothing.
 export function sqliteRooms(path: string, { poll }: { poll?: Duration } = {}): RoomStore {
@@ -420,13 +422,24 @@ function openRooms(path: string, askedMs: number | undefined): RoomStore {
     }).immediate()
   }
 
-  const read = () => {
-    for (const row of since.all(last, self)) {
+  // How many messages of the other processes it heard.
+  const read = (): number => {
+    const rows = since.all(last, self)
+
+    for (const row of rows) {
       last = row.id
 
-      for (const listener of listeners)
-        listener(row.room, row.text, { ...row.skipped !== null && { except: row.skipped }, ...row.recipient !== null && { to: row.recipient } })
+      for (const listener of listeners) {
+        try {
+          listener(row.room, row.text, { ...row.skipped !== null && { except: row.skipped }, ...row.recipient !== null && { to: row.recipient } })
+        }
+        catch (error) {
+          kayLog('error', `a listener of the room ${row.room} threw`, error)
+        }
+      }
     }
+
+    return rows.length
   }
 
   const stopReading = () => {
@@ -456,9 +469,31 @@ function openRooms(path: string, askedMs: number | undefined): RoomStore {
       // Read from now on: what others published before anyone here listened is for the members they had then.
       last = latest.get()?.id ?? 0
 
-      const reader = guarded('reading what other processes published to rooms', read)
+      let idle = 0
+      let slowed = false
 
-      const readEvery = (ms: number) => {
+      // Only the read of a file nothing wakes it for, at the interval kay picked, backs off while no message comes.
+      const reader = guarded('reading what other processes published to rooms', () => {
+        const heard = read()
+
+        if (watcher || askedMs !== undefined)
+          return
+
+        if (heard > 0) {
+          idle = 0
+
+          if (slowed) {
+            slowed = false
+            readEvery(UNWATCHED_POLL_MS)
+          }
+        }
+        else if (!slowed && ++idle >= IDLE_POLLS) {
+          slowed = true
+          readEvery(WATCHED_POLL_MS)
+        }
+      })
+
+      function readEvery(ms: number) {
         if (reading)
           clearInterval(reading)
 
@@ -474,8 +509,11 @@ function openRooms(path: string, askedMs: number | undefined): RoomStore {
         }, 0)
       }, () => {
         // A watcher failing later leaves the interval the only read, so it goes back to the short one.
-        if (reading)
+        if (reading) {
+          slowed = false
+          idle = 0
           readEvery(askedMs ?? UNWATCHED_POLL_MS)
+        }
       })
       readEvery(askedMs ?? (watcher ? WATCHED_POLL_MS : UNWATCHED_POLL_MS))
     }

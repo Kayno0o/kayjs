@@ -1,7 +1,7 @@
 import type { SyncCacheStore } from './cache'
 import { existsSync } from 'node:fs'
 import { onReload } from '../server/reload'
-import { readsOf, trackStore, untrackStore } from './cache'
+import { PURGE_STALE_MS, readsOf, STALE_KEPT_MS, trackStore, untrackStore } from './cache'
 import { kayLog } from './log'
 import { openSqlite } from './sqlite.server'
 
@@ -43,6 +43,7 @@ function openCache(path: string) {
     select: db.query<{ value: string, fresh_until: number }, [string]>('SELECT value, fresh_until FROM kay_cache WHERE key = ?'),
     upsert: db.query('INSERT INTO kay_cache (key, value, fresh_until) VALUES (?, ?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value, fresh_until = excluded.fresh_until'),
     remove: db.query('DELETE FROM kay_cache WHERE key = ?'),
+    purge: db.query('DELETE FROM kay_cache WHERE fresh_until < ?'),
     names: db.query<{ key: string }, []>('SELECT key FROM kay_cache'),
     allDeps: db.query<{ key: string, reads: string }, []>('SELECT key, reads FROM kay_cache_deps'),
     insertEvent: db.query('INSERT INTO kay_events (origin, message, at) VALUES (?, ?, ?)'),
@@ -57,6 +58,7 @@ function openCache(path: string) {
 export function sqliteCache(path: string): SyncCacheStore {
   let opened: ReturnType<typeof openCache> | undefined
   let closed = false
+  let purged = 0
   const polls: ReturnType<typeof setInterval>[] = []
   const open = (create: boolean) => {
     if (closed)
@@ -75,7 +77,15 @@ export function sqliteCache(path: string): SyncCacheStore {
       return row ? { text: row.value, freshUntil: row.fresh_until } : undefined
     },
     set(key, text, freshUntil) {
-      open(true)!.upsert.run(key, text, freshUntil)
+      const { upsert, purge } = open(true)!
+      const now = Date.now()
+
+      if (now - purged > PURGE_STALE_MS) {
+        purged = now
+        purge.run(now - STALE_KEPT_MS)
+      }
+
+      upsert.run(key, text, freshUntil)
     },
     delete(key) {
       open(false)?.remove.run(key)

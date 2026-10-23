@@ -199,7 +199,7 @@ export function analyticsServer(options: AnalyticsOptions): AnyElysia {
       if (Number(request.headers.get('content-length') ?? 0) > MAX_BODY_BYTES)
         return new Response(null, { status: 413 })
 
-      if (overLimit(RATE_NAME, clientAddress(request, server), VISITS_PER_MINUTE, MINUTE_MS) !== undefined)
+      if (await overLimit(RATE_NAME, clientAddress(request, server), VISITS_PER_MINUTE, MINUTE_MS) !== undefined)
         return new Response(null, { status: 429 })
 
       const text = await readCapped(request, MAX_BODY_BYTES)
@@ -296,7 +296,7 @@ function customServer(options: Extract<AnalyticsOptions, { provider: 'custom' }>
       if (Number(request.headers.get('content-length') ?? 0) > MAX_COLLECT_BYTES)
         return new Response(null, { status: 413 })
 
-      if (overLimit(COLLECT_RATE_NAME, clientAddress(request, server), COLLECTS_PER_MINUTE, MINUTE_MS) !== undefined)
+      if (await overLimit(COLLECT_RATE_NAME, clientAddress(request, server), COLLECTS_PER_MINUTE, MINUTE_MS) !== undefined)
         return new Response(null, { status: 429 })
 
       const raw = request.headers.get('content-type') ?? ''

@@ -92,6 +92,9 @@ const clockListeners = new Set<(at: number) => void>()
 export const ALL_READS = '\0all'
 // What the stored text of a value built from other keys opens with: those keys as JSON, then a line break, then the value. A value with none is the bare text, as older versions wrote every one.
 export const DEPS_PREFIX = '#deps '
+// A stored value is dropped by the next write once it has been stale this long, at most hourly: a value nobody asks for again would otherwise stay in its store for good.
+export const STALE_KEPT_MS = 7 * 86_400_000
+export const PURGE_STALE_MS = 3_600_000
 // Past this many keys, the least recently written goes first.
 const MAX_ENTRIES = 10_000
 // The most times a stored row is read again because an invalidation ran meanwhile.

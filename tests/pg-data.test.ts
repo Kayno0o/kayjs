@@ -1,6 +1,7 @@
 import type { SQL } from 'bun'
 import type { PgHandle } from '../src/server/pg-data'
 import { afterEach, expect } from 'bun:test'
+import { stringify } from 'devalue'
 import { cached } from '../src/runtime/cache'
 import { rateLimit, rooms } from '../src/server'
 import { appStore, setupStore } from '../src/server/app-store'
@@ -354,6 +355,29 @@ pgDescribe('pgSessions', () => {
     expect(await store.get('c')).toEqual({ user: 2 })
     expect(await store.deleteWhere(() => false)).toBe(0)
   })
+
+  pgIt('reads the live sessions a page at a time, so more than a page of them are all matched', async () => {
+    const sql = await fresh()
+    const store = pgSessions(pgHandle(sql))
+
+    await store.set('seed', { user: 0 }, '1h')
+
+    const data = stringify({ user: 1 })
+
+    await rows(sql, `INSERT INTO kay_sessions (id, data, expires) SELECT 'bulk' || n, '${data}', 9999999999999 FROM generate_series(1, 1300) AS n`)
+    await rows(sql, `INSERT INTO kay_sessions (id, data, expires) VALUES ('gone', '${data}', 0)`)
+
+    let seen = 0
+
+    expect(await store.deleteWhere((session) => {
+      seen++
+
+      return session.user === 1
+    })).toBe(1300)
+    expect(seen).toBe(1301)
+    expect(await store.get('seed')).toEqual({ user: 0 })
+    expect(await rows(sql, 'SELECT 1 FROM kay_sessions')).toHaveLength(2)
+  })
 })
 
 pgDescribe('pgRates', () => {
@@ -440,6 +464,44 @@ pgDescribe('pgCache', () => {
     after.invalidate('greeting')
     expect(await after.cached('greeting', '600s', () => ++loads, { store: after.store })).toBe(2)
     await waitFor(async () => (await rows(sql, 'SELECT value FROM kay_cache')).length === 1, 'the row to be written again')
+  })
+
+  pgIt('drops the stored values stale for a week on a write, and keeps the ones stale for less', async () => {
+    const sql = await fresh()
+    const [handle] = handles(1)
+    const { store } = await boot('purge', handle!)
+    const day = 86_400_000
+
+    await store.set('warm', '"w"', Date.now() + 60_000)
+    await rows(sql, `INSERT INTO kay_cache (key, value, fresh_until) VALUES ('old', '"o"', ${Date.now() - 8 * day}), ('recent', '"r"', ${Date.now() - 2 * day})`)
+    // The purge ran with the first write, so a store of its own meets the old rows on its first.
+    const second = (await boot('purge-b', handle!)).store
+
+    await second.set('another', '"a"', Date.now() + 60_000)
+    await waitFor(async () => (await rows<{ key: string }>(sql, 'SELECT key FROM kay_cache ORDER BY key')).length === 3, 'the purge')
+    expect((await rows<{ key: string }>(sql, 'SELECT key FROM kay_cache ORDER BY key')).map(row => row.key)).toEqual(['another', 'recent', 'warm'])
+  })
+
+  pgIt('hears a message for every listener though one throws', async () => {
+    await fresh()
+
+    const [first, second] = handles(2)
+    const sender = await boot('listen-a', first!)
+    const { store: receiver } = await boot('listen-b', second!)
+
+    // Starts the poll of the receiver, which only a call needing the database does.
+    await receiver.keys()
+    const heard: string[] = []
+
+    receiver.subscribe!(() => {
+      throw new Error('a listener that threw')
+    })
+    receiver.subscribe!(message => void heard.push(message))
+    await waitFor(() => {
+      sender.invalidate('greeting')
+
+      return heard.length > 0
+    }, 'the poll to read the message')
   })
 
   pgIt('drops what a value was built from when a key it read is invalidated, even from a process that never held it', async () => {
@@ -593,6 +655,25 @@ pgDescribe('pgRooms', () => {
     expect(other).toHaveLength(3)
     await waitFor(() => own.length === 3, 'the message back')
     expect(own[2]).toBe('lobby:back')
+    await closed(first!, second!)
+  })
+
+  pgIt('delivers a message to the listeners of a replica after one that throws', async () => {
+    await fresh()
+
+    const [first, second] = handles(2).map(handle => pgRooms(handle, { poll: '20ms' }))
+    const heard: string[] = []
+
+    second!.subscribe(() => {
+      throw new Error('a listener that threw')
+    })
+    second!.subscribe((room, text) => void heard.push(`${room}:${text}`))
+    await waitFor(() => {
+      first!.publish('lobby', 'hello', {})
+
+      return heard.length > 0
+    }, 'the message after the throwing listener')
+    expect(heard[0]).toBe('lobby:hello')
     await closed(first!, second!)
   })
 

@@ -174,8 +174,14 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
 
       events.note(id)
 
-      for (const listener of listeners)
-        listener(row.room, row.text, { ...row.skipped !== null && { except: row.skipped }, ...row.recipient !== null && { to: row.recipient } })
+      for (const listener of listeners) {
+        try {
+          listener(row.room, row.text, { ...row.skipped !== null && { except: row.skipped }, ...row.recipient !== null && { to: row.recipient } })
+        }
+        catch (error) {
+          kayLog('error', `a listener of the room ${row.room} threw`, error)
+        }
+      }
     }
   }
 

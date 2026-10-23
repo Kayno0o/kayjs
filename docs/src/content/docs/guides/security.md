@@ -240,7 +240,7 @@ if (refusal !== undefined)
 
 `verifyWork` answers `undefined` once for each solution. Otherwise it says `missing`, `expired` or `wrong`. A solution can pass only once, so replaying one fails.
 
-Both take a `difficulty`, 100,000 by default, and `workChallenge` takes a `maxAge`, a day by default. Pass `store` to `verifyWork`, such as `sqliteRates(path)`, to share the used solutions between processes.
+Both take a `difficulty`, 100,000 by default, and `workChallenge` takes a `maxAge`, a day by default. Without a `store`, `verifyWork` keeps the used solutions in the app `store`'s `rates`, so replicas sharing one refuse a replay, else in this process's memory. Pass `store`, such as `sqliteRates(path)`, to keep them elsewhere.
 
 <ReadMore href="/llms/action-protection#proof-of-work-checked-in-code">The refusal values and what a prerendered page does.</ReadMore>
 

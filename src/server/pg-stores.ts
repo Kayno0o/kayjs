@@ -17,10 +17,11 @@ import { WINDOW_DAYS } from './vitals-store'
 const SWEEP_EVERY = 1000
 const SWEEP_SESSIONS_MS = 60 * 60 * 1000
 const SWEEP_RATES_MS = 60_000
+const DELETE_PAGE = 500
 const RATES_KEY_BYTES = 32
 const RATES_KEY = 'rates_key'
 
-// Sessions in Postgres, shared by every replica; `deleteWhere` reads the live sessions and deletes the ones `match` returns true for.
+// Sessions in Postgres, shared by every replica; `deleteWhere` reads the live sessions a page at a time and deletes the ones `match` returns true for.
 export function pgSessions(pg: PgHandle): SessionStore & { deleteWhere: NonNullable<SessionStore['deleteWhere']> } {
   let timer: ReturnType<typeof setInterval> | undefined
   let writes = 0
@@ -78,13 +79,25 @@ export function pgSessions(pg: PgHandle): SessionStore & { deleteWhere: NonNulla
     },
     async deleteWhere(match) {
       const db = await pg.db()
-      const live = await query<{ id: string, data: string }>(db, `SELECT id, data FROM kay_sessions WHERE expires >= ${NOW}`)
-      const ids = live.filter(row => matchesSession(row.data, match)).map(row => row.id)
+      let deleted = 0
+      let after = ''
 
-      if (ids.length > 0)
-        await query(db, 'DELETE FROM kay_sessions WHERE id = ANY($1::text[])', [ids])
+      // A page at a time by id, so a store of many sessions is never held in memory whole.
+      for (;;) {
+        const page = await query<{ id: string, data: string }>(db, `SELECT id, data FROM kay_sessions WHERE expires >= ${NOW} AND id > $1 ORDER BY id LIMIT ${DELETE_PAGE}`, [after])
 
-      return ids.length
+        if (page.length === 0)
+          return deleted
+
+        after = page.at(-1)!.id
+
+        const ids = page.filter(row => matchesSession(row.data, match)).map(row => row.id)
+
+        if (ids.length > 0) {
+          await query(db, 'DELETE FROM kay_sessions WHERE id = ANY($1::text[])', [ids])
+          deleted += ids.length
+        }
+      }
     },
   }
 }

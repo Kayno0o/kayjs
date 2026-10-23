@@ -51,6 +51,8 @@ const disk = sqliteCache('data/cache.sqlite')
 const reviews = await cached('reviews', 86_400, fetchReviews, { store: disk })
 ```
 
+A stored value stale for a week is dropped by the next write, at most hourly, by `sqliteCache` and `pgData` alike.
+
 ### Stream a slow value into the page
 
 A value left unawaited in the server fence is rendered by an `await` block: the page goes out at once and the `then` block streams in when it resolves:

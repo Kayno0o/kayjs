@@ -46,7 +46,7 @@ export function serveErrorReports(app: Elysia, onError: KayConfig['onError'], ma
     if (Number(request.headers.get('content-length') ?? 0) > MAX_REPORT_BYTES)
       return new Response(null, { status: 413 })
 
-    if (overLimit(REPORTS, clientAddress(request, server), REPORTS_PER_MINUTE, MINUTE_MS) !== undefined)
+    if (await overLimit(REPORTS, clientAddress(request, server), REPORTS_PER_MINUTE, MINUTE_MS) !== undefined)
       return new Response(null, { status: 429 })
 
     const text = await readCapped(request, MAX_REPORT_BYTES)

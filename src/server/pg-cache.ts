@@ -1,7 +1,8 @@
 import type { SQL } from 'bun'
 import type { CacheStore } from '../runtime/cache'
 import type { PgHandle } from './pg-data'
-import { DEPS_PREFIX, readsOf, trackStore, untrackStore } from '../runtime/cache'
+import { DEPS_PREFIX, PURGE_STALE_MS, readsOf, STALE_KEPT_MS, trackStore, untrackStore } from '../runtime/cache'
+import { kayLog } from '../runtime/log'
 import { rowsOf } from './pg-jobs'
 import { EVENT_TTL_MS, eventWindow, POLL_MS, pollerOf } from './pg-poll'
 import { NOW } from './pg-sql'
@@ -19,6 +20,7 @@ export function pgCache(pg: PgHandle): CacheStore {
   let stopPolling: (() => void) | undefined
   const events = eventWindow()
   let closed = false
+  let purged = 0
 
   const write = async <Result>(work: Promise<Result>): Promise<Result> => {
     writing.add(work)
@@ -52,8 +54,14 @@ export function pgCache(pg: PgHandle): CacheStore {
 
       events.note(id)
 
-      for (const listener of listeners)
-        listener(event.message)
+      for (const listener of listeners) {
+        try {
+          listener(event.message)
+        }
+        catch (error) {
+          kayLog('error', 'a listener of what the other processes invalidated threw', error)
+        }
+      }
     }
   }
 
@@ -83,6 +91,17 @@ export function pgCache(pg: PgHandle): CacheStore {
 
       await write((async () => {
         const db = await pg.db()
+
+        if (Date.now() - purged > PURGE_STALE_MS) {
+          purged = Date.now()
+
+          try {
+            await rowsOf(db.unsafe(`DELETE FROM kay_cache WHERE fresh_until < ${NOW} - ${STALE_KEPT_MS}`))
+          }
+          catch (error) {
+            kayLog('warn', 'dropping the stored values stale for a week failed; trying again in an hour', error)
+          }
+        }
 
         await rowsOf(db`INSERT INTO kay_cache (key, value, fresh_until, reads) VALUES (${key}, ${text}, ${Math.round(freshUntil)}::bigint, ${reads}) ON CONFLICT (key) DO UPDATE SET value = excluded.value, fresh_until = excluded.fresh_until, reads = excluded.reads`)
       })())
