@@ -8,7 +8,7 @@ import { countJobRun } from '../runtime/counters'
 import { DURATION_TEXT, durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { MAX_TIMER_MS } from './config-limits'
-import { onDrain } from './drain'
+import { onDrain, stopGraceMs, STOPPED } from './drain'
 import { defaultJobStore } from './queue'
 import { reportBackgroundError } from './report'
 
@@ -40,11 +40,7 @@ const SLOT_MS = 60_000
 const DEFAULT_TIMEOUT = 600
 // How far apart processes may start and still share one boot run; a start further apart is a restart and runs its own.
 const BOOT_WINDOW_MS = 60_000
-// How long a stop waits for a run that ignores its signal before leaving it.
-const STOP_GRACE_MS = 5000
 let warnedAutoLock = false
-// Why a run's signal aborted when the server stopped, as against its timeout running out.
-const STOPPED = new Error('the server is stopping')
 // The lock names the schedules of this process hold, so two schedules alike in every way still take a lock each.
 const autoLocks = new Set<string>()
 
@@ -256,7 +252,7 @@ function scheduledRun(label: string, slotMs: number, job: Job, options: Schedule
         // A stop waits for the run to wind down, but not past the grace, so a job ignoring its signal never holds a shutdown.
         const arm = () => {
           if (controller.signal.reason === STOPPED)
-            grace = setTimeout(reject, Math.min(STOP_GRACE_MS, timeout ?? STOP_GRACE_MS), STOPPED)
+            grace = setTimeout(reject, Math.min(stopGraceMs(), timeout ?? stopGraceMs()), STOPPED)
         }
 
         controller.signal.addEventListener('abort', arm)

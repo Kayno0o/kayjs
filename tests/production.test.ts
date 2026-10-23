@@ -27,6 +27,7 @@ import { sqliteRates } from '../src/server/protection'
 import { securityHeaders } from '../src/server/security'
 import { sqliteStoreAt } from '../src/server/session'
 import { CspViolationError } from '../src/server/violations'
+import { cleanUpAfterFile, url as databaseUrl, postgres } from './job-stores'
 import { prerendered, refusedPrerender } from './prerendered'
 import { fixtureCopy, scratchDir } from './scratch'
 import { pages } from './shared-pages'
@@ -1531,6 +1532,8 @@ describe('footprint', () => {
   })
 })
 
+cleanUpAfterFile()
+
 describe('lifecycle', () => {
   // A server in a process of its own, with the port kay's first line printed and what it prints after.
   async function startServer(env: Record<string, string> = {}) {
@@ -1677,45 +1680,150 @@ describe('lifecycle', () => {
     expect(await output()).not.toContain('requests still open')
   }, 20_000)
 
-  it('on SIGTERM gives back the job of a handler ignoring its signal and takes the replica out of the rooms', async () => {
+  // Where a stopped server's jobs and rooms are kept, and what is left of them once it stopped.
+  async function keptIn(kind: 'sqlite' | 'pg') {
+    if (kind === 'pg') {
+      const { sql, url } = await postgres()
+
+      await sql.unsafe('DROP TABLE IF EXISTS kay_jobs, kay_locks, kay_room_members, kay_room_processes, kay_room_state, kay_room_messages')
+
+      return {
+        env: { DATABASE_URL: url },
+        jobs: async () => (await sql.unsafe<{ held_until: unknown, attempts: number, failed: boolean }[]>('SELECT held_until, attempts, failed FROM kay_jobs')).map(row => ({ held: row.held_until !== null, attempts: row.attempts, failed: row.failed })),
+        members: async () => sql.unsafe<unknown[]>('SELECT * FROM kay_room_members'),
+        done: async () => undefined,
+      }
+    }
+
     const dir = await scratchDir('stop-')
-    const jobsPath = join(dir, 'jobs.sqlite')
-    const roomsPath = join(dir, 'rooms.sqlite')
 
-    try {
-      const { server, url, waitFor, output } = await startServer({ JOBS_PATH: jobsPath, ROOMS_PATH: roomsPath })
-      const stream = await fetch(`${url}/stream`)
+    return {
+      env: { JOBS_PATH: join(dir, 'jobs.sqlite'), ROOMS_PATH: join(dir, 'rooms.sqlite') },
+      jobs: async () => {
+        const db = new Database(join(dir, 'jobs.sqlite'), { readonly: true })
 
-      await stream.body!.getReader().read()
-      expect(await (await fetch(`${url}/join`)).text()).toBe('joined')
-      await waitFor('job started\n')
-      await Bun.sleep(300)
-      server.kill('SIGTERM')
+        try {
+          return db.query<{ held_until: number | null, attempts: number, failed: number }, []>('SELECT held_until, attempts, failed FROM kay_jobs').all().map(row => ({ held: row.held_until !== null, attempts: row.attempts, failed: row.failed === 1 }))
+        }
+        finally {
+          db.close()
+        }
+      },
+      members: async () => {
+        const db = new Database(join(dir, 'rooms.sqlite'), { readonly: true })
 
-      const stopping = Date.now()
+        try {
+          return db.query('SELECT * FROM kay_room_members').all()
+        }
+        finally {
+          db.close()
+        }
+      },
+      done: async () => rm(dir, { recursive: true, force: true }),
+    }
+  }
 
-      expect(await server.exited).toBe(0)
-      // Two queues ignoring their signal wait out their grace together, not one after the other.
-      expect(Date.now() - stopping).toBeLessThan(5000)
-      expect(await output()).toContain('jobs stopped')
+  // Given back untouched: free, and its attempt not counted.
+  const GIVEN_BACK = [{ held: false, attempts: 0, failed: false }, { held: false, attempts: 0, failed: false }]
 
-      const jobs = new Database(jobsPath, { readonly: true })
-      const rooms = new Database(roomsPath, { readonly: true })
+  describe.each(['sqlite', 'pg'] as const)('on SIGTERM with the jobs and rooms in %s', (kind) => {
+    const stopIt = it.skipIf(kind === 'pg' && databaseUrl === undefined && (process.env.CI ?? '') === '')
+
+    stopIt('gives back the job of a handler ignoring its signal and takes the replica out of the rooms', async () => {
+      const kept = await keptIn(kind)
 
       try {
-        // Given back untouched: free, and its attempt not counted.
-        expect(jobs.query('SELECT held_until, attempts, failed FROM kay_jobs').all()).toEqual([{ held_until: null, attempts: 0, failed: 0 }, { held_until: null, attempts: 0, failed: 0 }])
-        expect(rooms.query('SELECT * FROM kay_room_members').all()).toEqual([])
+        const { server, url, waitFor, output } = await startServer(kept.env)
+        const stream = await fetch(`${url}/stream`)
+
+        await stream.body!.getReader().read()
+        expect(await (await fetch(`${url}/join`)).text()).toBe('joined')
+        await waitFor('job started\n')
+        await Bun.sleep(300)
+        server.kill('SIGTERM')
+
+        const stopping = Date.now()
+
+        expect(await server.exited).toBe(0)
+        // Two queues ignoring their signal wait out their grace together, not one after the other.
+        expect(Date.now() - stopping).toBeLessThan(5000)
+        expect(await output()).toContain('jobs stopped')
+        expect(await kept.jobs()).toEqual(GIVEN_BACK)
+        expect(await kept.members()).toEqual([])
       }
       finally {
-        jobs.close()
-        rooms.close()
+        await kept.done()
       }
-    }
-    finally {
-      await rm(dir, { recursive: true, force: true })
-    }
-  }, 30_000)
+    }, 30_000)
+
+    stopIt('stops a web process and a worker sharing them, each leaving what it held', async () => {
+      const kept = await keptIn(kind)
+
+      try {
+        const web = await startServer({ ...kept.env, ROLE: 'web' })
+        const worker = await startServer({ ...kept.env, ROLE: 'worker' })
+        const stream = await fetch(`${web.url}/stream`)
+
+        await stream.body!.getReader().read()
+        expect(await (await fetch(`${web.url}/join`)).text()).toBe('joined')
+        await worker.waitFor('job started\n')
+        await Bun.sleep(300)
+        web.server.kill('SIGTERM')
+        worker.server.kill('SIGTERM')
+        expect(await Promise.all([web.server.exited, worker.server.exited])).toEqual([0, 0])
+        expect(await web.output()).toContain('jobs stopped')
+        expect(await worker.output()).toContain('jobs stopped')
+        expect(await kept.jobs()).toEqual(GIVEN_BACK)
+        expect(await kept.members()).toEqual([])
+      }
+      finally {
+        await kept.done()
+      }
+    }, 30_000)
+
+    stopIt('hands the jobs back and exits 0 within a short shutdown timeout, a run ignoring its signal included', async () => {
+      const kept = await keptIn(kind)
+
+      try {
+        const { server, url, waitFor, output } = await startServer({ ...kept.env, SHUTDOWN_TIMEOUT: '2' })
+
+        expect(await (await fetch(`${url}/join`)).text()).toBe('joined')
+        await waitFor('job started\n')
+        await Bun.sleep(300)
+        server.kill('SIGTERM')
+
+        const stopping = Date.now()
+
+        expect(await server.exited).toBe(0)
+        expect(Date.now() - stopping).toBeLessThan(2000)
+        expect(await output()).not.toContain('requests still open')
+        expect(await kept.jobs()).toEqual(GIVEN_BACK)
+      }
+      finally {
+        await kept.done()
+      }
+    }, 30_000)
+  })
+
+  it('on SIGTERM closes an open websocket once the requests finished, runs the stop hooks and exits 0', async () => {
+    const { server, url, slow, waitFor, output } = await startServer()
+    const socket = new WebSocket(`${url.replace('http', 'ws')}/socket`)
+    const closed = new Promise<number>((resolve) => {
+      socket.onclose = event => resolve(event.code)
+    })
+
+    await waitFor('socket open\n')
+
+    const { response } = await slow()
+
+    server.kill('SIGTERM')
+
+    // The request finishes first; the socket is closed after it, for the browser to reconnect.
+    expect(await (await response).text()).toBe('slow done')
+    expect(await closed).toBe(1001)
+    expect(await server.exited).toBe(0)
+    expect(await output()).toContain('jobs stopped')
+  }, 20_000)
 
   it('closes what is still open past the shutdown timeout and exits with 1', async () => {
     const { server, slow } = await startServer({ SHUTDOWN_TIMEOUT: '0.2', SLOW_MS: '5000' })

@@ -154,7 +154,7 @@ export default defineConfig({
 
 The check runs at most once every three seconds, however often the route is polled, and the probes in between get its last answer.
 
-On SIGTERM, SIGINT or SIGHUP the server stops taking connections, lets open requests finish and ends the event streams that never would, such as live values and presence, so browsers reconnect to the next instance. A queue job whose handler ignores its signal is handed back after 3 seconds, and the rooms store lets go of this replica's members. The server then runs the `onStop` hooks and exits. Requests still open after `shutdownTimeout`, 10 seconds by default, are closed.
+On SIGTERM, SIGINT or SIGHUP the server stops taking connections, lets open requests finish and ends the event streams and websockets that never would, such as live values and presence, so browsers reconnect to the next instance. A queue job whose handler ignores its signal is handed back after 3 seconds, or less with a short `shutdownTimeout`, and the rooms store lets go of this replica's members. The server then runs the `onStop` hooks and exits. Requests still open after `shutdownTimeout`, 10 seconds by default, are closed.
 
 ## Logs and tracing
 

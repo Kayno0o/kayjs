@@ -1,5 +1,5 @@
 import { Elysia } from 'elysia'
-import { eventStream, pages, queue, sqliteJobs, sqliteRooms } from '../../../src/server'
+import { eventStream, pages, pgData, queue, sqliteJobs, sqliteRooms } from '../../../src/server'
 import { setupStore } from '../../../src/server/app-store'
 
 // Started by tests/production.test.ts in a process of its own, to be stopped by a signal.
@@ -35,20 +35,35 @@ const app = new Elysia()
     console.log('jobs stopped')
   })
 
-// The files stand for a stopped server's jobs and rooms, which the test reads back.
-if (process.env.JOBS_PATH && process.env.ROOMS_PATH) {
-  const rooms = sqliteRooms(process.env.ROOMS_PATH)
-  const store = sqliteJobs(process.env.JOBS_PATH)
+// A socket that stays open, as a chat tab's does.
+app.ws('/socket', {
+  open() {
+    console.log('socket open')
+  },
+})
+
+// The jobs and rooms of a stopped server, which the test reads back: in the SQLite files JOBS_PATH and ROOMS_PATH, or in the Postgres DATABASE_URL names. ROLE splits one app over two processes sharing them: `web` enqueues and holds the members, `worker` runs the jobs.
+const role = process.env.ROLE
+const data = process.env.DATABASE_URL ? pgData(process.env.DATABASE_URL) : undefined
+
+if (data || (process.env.JOBS_PATH && process.env.ROOMS_PATH)) {
+  const rooms = data ? data.rooms : sqliteRooms(process.env.ROOMS_PATH!)
+  const store = data ? data.jobs : sqliteJobs(process.env.JOBS_PATH!)
   // Ignores its signal.
   const handler = async () => {
     console.log('job started')
     await new Promise(() => undefined)
   }
-  const jobs = queue('stuck', handler, { store })
-  const others = queue('stuck-too', handler, { store })
+  const options = { store, idlePoll: '1s' } as const
+  const jobs = queue('stuck', handler, options)
+  const others = queue('stuck-too', handler, options)
 
   setupStore({ rooms })
-  app.use(jobs).use(others).get('/join', () => {
+
+  if (role !== 'web')
+    app.use(jobs).use(others)
+
+  app.get('/join', () => {
     rooms.add('lobby', 'tab-1', 'visitor')
     void jobs.enqueue({})
     void others.enqueue({})

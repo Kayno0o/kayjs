@@ -17,7 +17,7 @@ const STEP_MS = 15_000
 // Prints what it runs as, so the test sees the environment `kay start` gave it.
 const SERVER = `import process from 'node:process'
 import { Elysia } from 'elysia'
-import { pages } from 'kay/server'
+import { eventStream, pages } from 'kay/server'
 
 let slow = 0
 
@@ -26,7 +26,10 @@ const app = new Elysia().get('/mode', () => \`\${process.env.NODE_ENV} \${proces
   await Bun.sleep(30_000)
 
   return 'late'
-}).use(await pages()).listen(Number(process.env.PORT ?? 0))
+}).get('/stream', () => eventStream(async function* () {
+  yield 1
+  await new Promise(() => undefined)
+})).ws('/socket', { open() {} }).onStop(() => console.log('stopped')).use(await pages()).listen(Number(process.env.PORT ?? 0))
 
 console.log(\`listening \${app.server?.port}\`)
 `
@@ -146,6 +149,20 @@ const server = Bun.serve({ port: Number(process.env.PORT ?? 0), fetch: () => new
 console.log(\`listening \${server.port}\`)
 `
 
+// Opens an event stream and a websocket on the server, which neither ends by itself, and resolves once both are open.
+async function holdConnections(port: string): Promise<void> {
+  const stream = await fetch(`http://localhost:${port}/stream`)
+
+  await stream.body!.getReader().read()
+
+  const socket = new WebSocket(`ws://localhost:${port}/socket`)
+
+  await new Promise((resolve, reject) => {
+    socket.onopen = resolve
+    socket.onerror = reject
+  })
+}
+
 // Polls a condition the server makes true, failing past 10 seconds.
 async function until(holds: () => boolean | Promise<boolean>): Promise<void> {
   for (const limit = Date.now() + 10_000; !await holds();) {
@@ -216,6 +233,17 @@ describe('kay start', () => {
 
     await utimes(join(dir, 'src/routes/index.kay'), later, later)
     expect((await listening(start(dir))).warned).toContain('the build is older than .kay/scratch/')
+  }, 60_000)
+
+  it('stops on SIGTERM with a stream and a websocket open: the stop hooks run and the exit is 0', async () => {
+    await build()
+    await rm(join(outputDir(dir), 'executable'), { force: true })
+
+    const port = String(freePort())
+    const stopped = await listening(start(dir, '--port', port), async () => holdConnections(port))
+
+    expect(stopped.code).toBe(0)
+    expect(stopped.printed).toContain('stopped\n')
   }, 60_000)
 
   it('serves the entry the build recorded without loading kay.config.ts, the supervisor holding little memory', async () => {
@@ -400,11 +428,14 @@ describe('kay start', () => {
       const port = String(freePort())
       const served = await listening(start(moved, '--port', port), async () => {
         expect(await (await fetch(`http://localhost:${port}/mode`)).text()).toBe('production production')
+        await holdConnections(port)
       })
 
       // Only an earlier test's source dated ahead is newer than the build.
       expect(served.warned).not.toContain('executable')
       expect(served.code).toBe(0)
+      // The executable stopped with a stream and a websocket open.
+      expect(served.printed).toContain('stopped\n')
     }
     finally {
       if (isMoved)

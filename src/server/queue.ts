@@ -12,7 +12,7 @@ import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { appStore } from './app-store'
 import { MAX_TIMER_MS } from './config-limits'
-import { onDrain } from './drain'
+import { onDrain, stopGraceMs, STOPPED } from './drain'
 import { onReload } from './reload'
 import { reportBackgroundError } from './report'
 
@@ -166,11 +166,6 @@ const IDLE_POLL_S = 10
 // The longest a worker waits between looks at a store that keeps failing.
 const MAX_OUTAGE_MS = 60_000
 const DEFAULT_PATH = 'data/jobs.sqlite'
-// Why a run's signal aborted when the server stopped, as against lostAfter running out.
-const STOPPED = new Error('the server is stopping')
-
-// How long a stop waits for a run that ignores its signal before giving its job back, short of the 10 s a shutdown waits by default.
-const STOP_GRACE_MS = 3000
 
 class RetryLater extends Error {
   readonly waitMs: number
@@ -701,7 +696,7 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
       await Promise.race([run, new Promise((_, reject) => {
         const arm = () => {
           if (ended.signal.reason === STOPPED)
-            grace = setTimeout(reject, STOP_GRACE_MS, STOPPED)
+            grace = setTimeout(reject, stopGraceMs(), STOPPED)
         }
 
         ended.signal.addEventListener('abort', arm)

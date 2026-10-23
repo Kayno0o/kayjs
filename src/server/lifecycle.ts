@@ -16,6 +16,7 @@ import { requestUrl } from './request-url'
 export const HEALTH_PATH = '/_kay/health'
 const DEFAULT_SHUTDOWN_TIMEOUT = '10s'
 const HEALTH_CACHE_MS = 3000
+const WEBSOCKET_POLL_MS = 25
 
 // Set on `globalThis` while a server watches its parent, so the watch `kay render` preloads, for a server nothing else stops, leaves it the stop.
 const PARENT_WATCHED = Symbol.for('kay.parentWatched')
@@ -118,7 +119,7 @@ export function stopOnSignal(app: Elysia, lifecycle: Lifecycle, wait: Duration =
 
       // Streams first, as they hold the server open, and the queues and schedules start their grace beside the open requests.
       stopEventStreams()
-      beginDrain()
+      beginDrain(timeout * 1000)
       await shutdown(root)
       await closeRooms()
       clearTimeout(forced)
@@ -201,6 +202,29 @@ async function closeRooms(): Promise<void> {
   }
 }
 
+// Stops taking connections and waits for the open requests; a websocket, which never ends by itself, is closed once no request is left, the browser reconnecting to the next instance.
+async function stopServer(server: NonNullable<AnyElysia['server']>, force: boolean): Promise<void> {
+  if (force) {
+    await server.stop(true)
+
+    return
+  }
+
+  const state = { stopped: false }
+  const stopping = (async () => {
+    await server.stop(false)
+    state.stopped = true
+  })()
+
+  while (!state.stopped && server.pendingRequests > 0)
+    await Bun.sleep(WEBSOCKET_POLL_MS)
+
+  if (!state.stopped && server.pendingWebSockets > 0)
+    void server.stop(true)
+
+  await stopping
+}
+
 // Ends the open event streams, which never finish by themselves, stops the server once its other open requests finished, or at once when `force` is set, then runs each `onStop` hook in turn, awaiting it, which Elysia's own `stop()` does not.
 export async function shutdown(app: AnyElysia, force = false): Promise<void> {
   const server = app.server
@@ -212,7 +236,7 @@ export async function shutdown(app: AnyElysia, force = false): Promise<void> {
   if (!force)
     endEventStreams()
 
-  await server.stop(force)
+  await stopServer(server, force)
   app.server = null
 
   for (const hook of app.event.stop ?? []) {
