@@ -104,7 +104,7 @@ describe('mailers sharing a queue', () => {
 
     mailer({ from: 'a@example.com', queue })
     expect(() => mailer({ from: 'b@example.com', queue: { ...queue, keepFailed: '30d' } })).not.toThrow()
-    expect(() => mailer({ from: 'c@example.com', queue: { ...queue, keepFailed: '30d' } })).not.toThrow()
+    expect(() => mailer({ from: 'c@example.com', queue })).not.toThrow()
   })
 
   it('without a store skip the check, as each uses the app\'s', () => {
@@ -189,13 +189,13 @@ describe('a queued delivery the queue aborts', () => {
     silenced()
 
     const server = startSmtp(0, { stall: true })
-    const mode = process.env.NODE_ENV
+    const saved = { NODE_ENV: process.env.NODE_ENV, MAIL_URL: process.env.MAIL_URL, MAIL_INSECURE: process.env.MAIL_INSECURE }
 
     process.env.NODE_ENV = 'production'
     Object.assign(process.env, { MAIL_URL: `smtp://127.0.0.1:${server.port}`, MAIL_INSECURE: 'true' })
 
     try {
-      const app = mailer({ from: 'a@example.com', queue: { ...shared(), lostAfter: '1s' } })
+      const app = mailer({ from: 'a@example.com', queue: { ...shared(), lostAfter: '3s' } })
 
       await app.enqueue({ to: 'ada@example.com', subject: 'Hi', text: 'Hello' })
       await app.drain()
@@ -205,19 +205,18 @@ describe('a queued delivery the queue aborts', () => {
       // The abort dropped the pool, so its connection closes as the server answers, well before the one second a pool left idle waits.
       server.release()
 
-      for (let look = 0; look < 20 && server.connections.closed === 0; look++)
+      for (const start = performance.now(); performance.now() - start < 500 && server.connections.closed === 0;)
         await Bun.sleep(25)
 
       expect(server.connections.closed).toBe(1)
     }
     finally {
-      for (const name of ['MAIL_URL', 'MAIL_INSECURE'])
-        delete process.env[name]
-
-      if (mode === undefined)
-        delete process.env.NODE_ENV
-      else
-        process.env.NODE_ENV = mode
+      for (const [name, value] of Object.entries(saved)) {
+        if (value === undefined)
+          delete process.env[name]
+        else
+          process.env[name] = value
+      }
 
       server.stop()
     }

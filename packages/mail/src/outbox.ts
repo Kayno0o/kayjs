@@ -129,7 +129,7 @@ function withinOutbox(mails: readonly SentMail[]): string {
 export function createOutbox(file?: string): Outbox {
   const mails: SentMail[] = file === undefined ? [] : readFile(file)
   let failedOnce = false
-  const keep = () => {
+  const persist = () => {
     if (file === undefined)
       return
 
@@ -165,7 +165,7 @@ export function createOutbox(file?: string): Outbox {
       if (mails.length > KEPT)
         mails.splice(0, mails.length - KEPT)
 
-      keep()
+      persist()
 
       for (const watcher of watchers)
         watcher(sent)
@@ -181,7 +181,7 @@ export function createOutbox(file?: string): Outbox {
     find: id => mails.find(mail => mail.id === id),
     clear: () => {
       mails.length = 0
-      keep()
+      persist()
     },
     links: mail => mail.html === undefined ? [...new Set(mail.text.match(TEXT_URL))] : linksOf(mail.html),
     link: (mail, match) => {
