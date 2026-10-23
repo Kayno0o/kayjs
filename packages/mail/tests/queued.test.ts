@@ -107,6 +107,15 @@ describe('mailers sharing a queue', () => {
     expect(() => mailer({ from: 'c@example.com', queue })).not.toThrow()
   })
 
+  it('compare each option with the last mailer that set it, whatever one between them left unset', () => {
+    const queue = shared()
+    const first = mailer({ from: 'a@example.com', queue: { ...queue, keepFailed: '7d' } })
+    const middle = mailer({ from: 'b@example.com', queue })
+
+    expect(() => mailer({ from: 'c@example.com', queue: { ...queue, keepFailed: '30d' } })).toThrow(/keepFailed/)
+    expect([first, middle]).toHaveLength(2)
+  })
+
   it('without a store skip the check, as each uses the app\'s', () => {
     const name = `shared${names++}`
 
