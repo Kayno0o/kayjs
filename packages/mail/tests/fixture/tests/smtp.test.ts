@@ -83,7 +83,8 @@ describe('smtp', () => {
       expect(refused).toContain(`warn kayjs-mail: 127.0.0.1:${server.port} did not upgrade to TLS with STARTTLS`)
       expect(refused).toContain('so no mail would be sent')
       expect(refused).toContain('MAIL_INSECURE=true')
-      expect(await boot('true')).toEqual([])
+      // Only the TLS check is asked about: a list sweep of another test's store may log in the same window, kaynooo/kayjs#2203.
+      expect((await boot('true')).filter(([, line]) => line.includes('TLS'))).toEqual([])
     }
     finally {
       process.env = saved
