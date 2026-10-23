@@ -73,7 +73,7 @@ export interface ChartSeries {
   name: string
   // One reading per label; `null` leaves a gap in the line rather than drawing a zero.
   values: (number | null)[]
-  // Any CSS colour; a series without one takes the next `--color-kui-chart-*` token.
+  // Any CSS colour; a series without one takes the next `--color-chart-*` token.
   color?: string
 }
 
@@ -108,7 +108,7 @@ export function steppedPoint(key: string, index: number, count: number): number 
   return step === undefined ? undefined : Math.min(Math.max(0, count - 1), Math.max(0, index + step))
 }
 
-// The colours a chart gives its series in turn, the `--color-kui-chart-*` tokens.
+// The colours a chart gives its series in turn, the `--color-chart-*` tokens.
 export const PALETTE = ['var(--kui-chart-1)', 'var(--kui-chart-2)', 'var(--kui-chart-3)', 'var(--kui-chart-4)', 'var(--kui-chart-5)', 'var(--kui-chart-6)']
 
 // One series of a `BarChart`.

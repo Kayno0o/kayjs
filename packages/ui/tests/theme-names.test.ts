@@ -16,7 +16,7 @@ const VAR_NAME = /var\((--[\w-]+)/g
 const ROOT_DECLARATION = /^\s{4}(--[\w-]+): (.+);$/gm
 const PROPERTY_AT_RULE = /@property\s+(--[\w-]+)/g
 
-// The old names theme.css still defines itself, as they fold into another name or into one of Tailwind's, until the readers of each move to the new one (#2080 lane 4).
+// The old names theme.css does not alias yet: it still defines them itself as they fold into another name or into one of Tailwind's, or they are set per instance and have no default, until their readers move to the new ones (#2080 lane 4).
 const NOT_ALIASED = new Set([
   '--color-kui-overlay1',
   '--color-kui-fill-hover',
@@ -24,12 +24,7 @@ const NOT_ALIASED = new Set([
   '--color-kui-stamp-fill',
   '--color-kui-stamp-fill-hover',
   '--color-kui-avatar-ring',
-  '--kui-chart-1',
-  '--kui-chart-2',
-  '--kui-chart-3',
-  '--kui-chart-4',
-  '--kui-chart-5',
-  '--kui-chart-6',
+  ...[1, 2, 3, 4, 5, 6].map(n => `--kui-chart-${n}`),
   '--text-kui-micro',
   '--text-kui-micro--line-height',
   '--tracking-kui-section',
@@ -120,10 +115,11 @@ const ALL_CANDIDATES = [...aliases.keys()].filter(name => name.startsWith('--col
 
 describe('the theme names', () => {
   test('keeps the new blocks free of nested braces, which the dev tool and the language server read with', () => {
-    const bodies = [...theme.replace(COMMENT, '').matchAll(/@theme\b[^{;]*\{/g)]
+    const opened = [...theme.replace(COMMENT, '').matchAll(/@theme\b[^{;]*\{/g)]
+    const closed = [...theme.replace(COMMENT, '').matchAll(BLOCK)]
 
-    expect(bodies.length).toBe(3)
-    expect([...theme.replace(COMMENT, '').matchAll(BLOCK)]).toHaveLength(3)
+    expect(opened.length).toBeGreaterThan(0)
+    expect(closed).toHaveLength(opened.length)
   })
 
   test('lists the new names for the Styles tab and completion, and the old ones kept as aliases as deprecated', () => {
@@ -168,7 +164,7 @@ describe('the theme names', () => {
 
       const reads = new RegExp(`^var\\(${old}[,)]`).test(defaults.get(token.to) ?? '')
 
-      expect(token.declares === true, `${old} declares ${token.to}`).toBe(reads)
+      expect(token.declares === true, `${old} declares ${token.to}`).toBe(reads && !NOT_ALIASED.has(old))
     }
   })
 
@@ -230,6 +226,7 @@ describe('the theme names', () => {
     ]) {
       const css = await built(`${app}\n.probe { color: var(--color-accent); background: var(--color-surface); border-color: var(--color-border); outline-color: var(--color-muted); fill: var(--color-chart-1); background-color: var(--color-popover); padding: var(--density); text-transform: var(--label-case); }`, ALL_CANDIDATES)
 
+      expect(rootDependencies(css).has('--color-accent'), app).toBe(true)
       expect(cycleIn(rootDependencies(css)), app).toBeUndefined()
     }
   })

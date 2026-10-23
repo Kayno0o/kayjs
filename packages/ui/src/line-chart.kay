@@ -16,7 +16,7 @@ const look = recipe({
     root: 'kui-line-chart flex flex-col gap-2',
     frame: 'relative',
     // chartist draws the plot, and the rules it needs from its own stylesheet stay on this class in theme.css.
-    plot: 'kui-line-chart-plot h-[var(--kui-line-chart-height,9rem)]',
+    plot: 'kui-line-chart-plot h-[var(--chart-height,var(--kui-line-chart-height,9rem))]',
     cursor: 'pointer-events-none absolute w-px bg-kui-overlay0',
     dot: 'pointer-events-none absolute size-2 -translate-1/2 border border-kui-canvas',
     band: 'pointer-events-none absolute border-x border-kui-accent bg-kui-accent/10',

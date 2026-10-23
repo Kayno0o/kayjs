@@ -103,7 +103,7 @@ export const UI_TOKENS: Readonly<Record<string, UiToken>> = Object.fromEntries([
   ['--radius-kui-full', { kind: 'radius', utility: 'full', value: 'calc(infinity * 1px)' }],
 
   renamed('--kui-density', '--density'),
-  renamed('--kui-border-width', '--border-width'),
+  ['--kui-border-width', { kind: 'var', to: '--border-width' }],
   border('card'),
   border('input'),
   border('badge'),

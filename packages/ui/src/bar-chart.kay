@@ -11,7 +11,7 @@ const look = recipe({
   parts: {
     // The plot leaves its left margin for the value labels, which hang outside it as they do in a ScatterChart.
     root: 'kui-bar-chart m-0 flex flex-col gap-2 pt-2 pr-3',
-    plot: 'relative ml-10 h-[var(--kui-bar-chart-height,12rem)] border-solid border-(length:--kui-border-width) border-kui-surface2 border-t-transparent border-r-transparent border-l-transparent',
+    plot: 'relative ml-10 h-[var(--chart-height,var(--kui-bar-chart-height,12rem))] border-solid border-(length:--kui-border-width) border-kui-surface2 border-t-transparent border-r-transparent border-l-transparent',
     grid: 'absolute inset-x-0 h-px bg-kui-surface2',
     tick: 'absolute right-full mr-2 -translate-y-1/2 text-kui-2xs whitespace-nowrap text-kui-overlay1 tabular-nums',
     columns: 'absolute inset-0 flex gap-1',

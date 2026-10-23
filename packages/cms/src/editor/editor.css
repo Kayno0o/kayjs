@@ -362,7 +362,7 @@ html.kcms-editing [data-kay-field][contenteditable] {
   padding: 0.25rem 0.5rem;
   border-radius: 0.25rem;
   border: 1px solid var(--color-danger);
-  background: var(--color-kui-surface);
+  background: var(--color-surface);
   color: var(--color-danger);
   font: 0.8125rem/1.3 system-ui, sans-serif;
 }

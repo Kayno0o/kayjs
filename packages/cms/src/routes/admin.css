@@ -121,7 +121,7 @@ body {
 
 .kcms-count {
   margin: 0 0 0.75rem;
-  color: var(--color-kui-subtext);
+  color: var(--color-muted);
 }
 
 .kcms-search input {

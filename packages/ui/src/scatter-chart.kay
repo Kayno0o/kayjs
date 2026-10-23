@@ -10,7 +10,7 @@ const look = recipe({
     root: 'kui-scatter-chart m-0 grid grid-cols-[auto_minmax(0,1fr)] grid-rows-[minmax(0,1fr)_auto] gap-2',
     axisLabel: 'text-center text-kui-2xs text-kui-subtext0 data-[axis=x]:col-start-2 data-[axis=y]:row-start-1 data-[axis=y]:rotate-180 data-[axis=y]:self-center data-[axis=y]:[writing-mode:vertical-rl]',
     // Tick labels hang outside the plot, into the margin it keeps for them.
-    plot: 'relative col-start-2 mb-5 ml-8 h-[var(--kui-scatter-chart-height,18rem)] border-solid border-(length:--kui-border-width) border-kui-surface2',
+    plot: 'relative col-start-2 mb-5 ml-8 h-[var(--chart-height,var(--kui-scatter-chart-height,18rem))] border-solid border-(length:--kui-border-width) border-kui-surface2',
     grid: 'absolute bg-kui-surface2 data-[axis=x]:inset-y-0 data-[axis=x]:w-px data-[axis=y]:inset-x-0 data-[axis=y]:h-px',
     tick: 'absolute text-kui-2xs whitespace-nowrap text-kui-overlay1 tabular-nums data-[axis=x]:top-full data-[axis=x]:mt-1 data-[axis=x]:-translate-x-1/2 data-[axis=y]:right-full data-[axis=y]:mr-2 data-[axis=y]:-translate-y-1/2',
     guide: 'absolute bg-kui-overlay0 data-[axis=x]:inset-y-0 data-[axis=x]:w-px data-[axis=y]:inset-x-0 data-[axis=y]:h-px',

@@ -1125,7 +1125,7 @@
 
 
   /* chartist draws the plot; only the rules a line chart needs from its own stylesheet are here, so the app imports none. */
-  /* Tailwind emits a theme variable only where something reads it, and a series colour is read from script, so the palette is named here for the app's `--color-kui-chart-*` to survive its build. */
+  /* Tailwind emits a theme variable only where something reads it, and a series colour is read from script, so the palette is named here for the app's `--color-chart-*` to survive its build. */
   .kui-line-chart {
     @apply flex flex-col gap-2;
     --kui-chart-1: var(--color-chart-1);
@@ -1141,7 +1141,7 @@
   }
 
   .kui-line-chart-plot {
-    height: var(--kui-line-chart-height, 9rem);
+    height: var(--chart-height, var(--kui-line-chart-height, 9rem));
 
     & :where(.ct-grid) {
       @apply stroke-kui-surface2;
@@ -1934,7 +1934,7 @@
   /* Tick labels hang outside the plot, into the margin it keeps for them. */
   .kui-scatter-chart-plot {
     @apply relative col-start-2 mb-5 ml-8 border-solid border-(length:--kui-border-width) border-kui-surface2;
-    height: var(--kui-scatter-chart-height, 18rem);
+    height: var(--chart-height, var(--kui-scatter-chart-height, 18rem));
   }
 
   .kui-scatter-chart-grid,
@@ -2007,7 +2007,7 @@
 
   .kui-bar-chart-plot {
     @apply relative ml-10 border-solid border-(length:--kui-border-width) border-kui-surface2 border-t-transparent border-r-transparent border-l-transparent;
-    height: var(--kui-bar-chart-height, 12rem);
+    height: var(--chart-height, var(--kui-bar-chart-height, 12rem));
   }
 
   .kui-bar-chart-grid {
@@ -2652,7 +2652,7 @@
   /* A virtual table scrolls in its own box, its headers kept on top. */
   .kui-table-wrap:where([data-virtual]) {
     @apply overflow-y-auto;
-    max-height: var(--kui-table-height, 70vh);
+    max-height: var(--table-height, var(--kui-table-height, 70vh));
     overflow-anchor: none;
 
     &:focus-visible {

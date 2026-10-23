@@ -12,7 +12,7 @@ import { wording } from 'kay/words'
 // 'kui-table-wrap' stays as the component's name for an app's CSS. The narrow form is a container named `table`, which its parts read with `@max-[30rem]/table:`; the name carries no `kui-` prefix so no old rule keeps its class alive.
 const look = recipe({
   parts: {
-    root: 'kui-table-wrap group/table w-full overflow-x-auto border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-surface0 data-[narrow=stack]:@container/table data-virtual:overflow-y-auto data-virtual:max-h-[var(--kui-table-height,70vh)] data-virtual:[overflow-anchor:none] data-virtual:focus-visible:outline-2 data-virtual:focus-visible:-outline-offset-2 data-virtual:focus-visible:outline-kui-accent',
+    root: 'kui-table-wrap group/table w-full overflow-x-auto border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-surface0 data-[narrow=stack]:@container/table data-virtual:overflow-y-auto data-virtual:max-h-[var(--table-height,var(--kui-table-height,70vh))] data-virtual:[overflow-anchor:none] data-virtual:focus-visible:outline-2 data-virtual:focus-visible:-outline-offset-2 data-virtual:focus-visible:outline-kui-accent',
     // Sticky, so the filter and the selection bar stay in view while a wide table scrolls under them.
     filter: 'sticky left-0 flex items-center gap-2 border-solid border-b-(length:--kui-border-width) border-kui-surface2 px-3 py-2',
     filterInput: 'w-56 max-w-full',
