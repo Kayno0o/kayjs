@@ -932,6 +932,10 @@
     @apply flex flex-col gap-1;
   }
 
+  .kui-contact-privacy {
+    @apply text-xs;
+  }
+
   :where(.kui-form-field, .kui-form-field-label) > * {
     @apply basis-full;
   }

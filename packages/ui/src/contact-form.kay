@@ -9,7 +9,7 @@ import FormField from './form-field.kay'
 import Notice from './notice.kay'
 import { OUTSIDE } from './outside'
 
-const look = recipe({ parts: { root: 'kui-contact-form', consent: 'kui-contact-consent', privacy: 'kui-contact-privacy text-xs', issues: FIELD_MESSAGE.issues, issue: FIELD_MESSAGE.issue } })
+const look = recipe({ parts: { root: 'kui-contact-form', consent: 'kui-contact-consent', privacy: 'kui-contact-privacy', issues: FIELD_MESSAGE.issues, issue: FIELD_MESSAGE.issue } })
 
 const { action, nameLabel = wording('ui.contactForm.name', wording('mail.contact.form.name', 'Name')), emailLabel = wording('ui.contactForm.email', wording('mail.contact.form.email', 'Email')), messageLabel = wording('ui.contactForm.message', wording('mail.contact.form.message', 'Message')), submitLabel = wording('ui.contactForm.submit', wording('mail.contact.form.submit', 'Send')), sentLabel = wording('ui.contactForm.sent', wording('mail.contact.form.sent', 'Thank you, your message has been sent.')), consentLabel = wording('ui.contactForm.consent', wording('mail.contact.form.consent', 'I agree that my details are used to answer my message.')), privacyLabel = wording('ui.contactForm.privacy', wording('mail.contact.form.privacy', 'Privacy policy')), privacy, consent, rows = 6 } = props<{
   // The action `contactForm(mail)` from kayjs-mail gives, or any with a `name`, an `email` and a `message` field.
