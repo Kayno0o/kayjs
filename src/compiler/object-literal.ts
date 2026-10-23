@@ -93,7 +93,7 @@ function nameOf(property: t.ObjectExpression['properties'][number]): string | un
   return property.type === 'ObjectProperty' ? keyName(property) : undefined
 }
 
-// The properties of an object with the spread of a const object replaced by that object's own, in order, so a key written by `{ ...base }` reads as written in place. A spread that is not a const object stays as it is, and a key a later property writes again drops the earlier ones, as the object holds only the last.
+// The properties of an object with the spread of a const object replaced by that object's own, in order, so a key written by `{ ...base }` reads as written in place. A spread that is not a const object stays as it is, and a key a later property writes again drops the earlier ones, as the object holds only the last. A node a const spread twice brings in is kept once, named or not, as it is one place to read or edit.
 export function propertiesOf(object: t.ObjectExpression, bindings: Bindings): t.ObjectExpression['properties'] {
   const flat = flattened(object, bindings, new Set())
   const last = new Map<string, t.ObjectExpression['properties'][number]>()
