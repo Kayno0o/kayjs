@@ -266,7 +266,7 @@ You can also read `reply.progress()` yourself. It gives the text so far and ever
 
 ## Limit what visitors spend
 
-A public chat lets anyone run up your bill, so in production kay limits it even when you set nothing: each visitor may ask 20 questions every 10 minutes and use 100,000 tokens a day. Set your own limit and token budget in `kay.config.ts`, or write `rateLimit: false` or `budget: false` to lift one when something else counts, such as a gateway in front of the app. Development and tests have no default.
+A public chat lets anyone run up your bill, so in production kay limits it even when you set nothing: each visitor may ask 20 questions every 10 minutes and use 100,000 tokens a day, and all visitors together 2,000,000 tokens a day. Set your own limit and token budget in `kay.config.ts`, or write `rateLimit: false` or `budget: false` to lift one when something else counts, such as a gateway in front of the app. Development and tests have no default.
 
 ```ts
 import { ai } from '@kaynooo/kayjs-ai'
@@ -280,7 +280,7 @@ export default defineConfig({
 })
 ```
 
-Those defaults count in memory and set no `total`, so give `budget` a `total` to cap what many accounts spend together. Behind a reverse proxy, set kay's `proxy` option, or every visitor shares the proxy's address and the defaults cap the whole site.
+Those defaults count in the `store.rates` of your `kay.config.ts` when it has one, else in memory. A `budget` you set yourself without a `total` logs a warning at boot in production, since nothing then caps what many accounts spend together. Behind a reverse proxy, set kay's `proxy` option, or every visitor shares the proxy's address and the defaults cap the whole site.
 
 `rateLimit` caps how many questions one visitor asks in a window. `budget.tokens` caps the tokens the answers to one visitor may use, and `budget.total` the tokens used for everyone. `ask` reads these on its own, so nothing changes where you call it.
 
@@ -290,7 +290,7 @@ To count users from a session of your own instead, pass `key`, a function from t
 
 The budget counts tokens, not money, because prices change too often to ship a table. Pick `tokens` from the price of your model. Tokens the provider read from its prompt cache, or wrote to it, count like any other, so a cached chat cannot spend past its budget unseen, even though a cache read costs less.
 
-The count lives in memory and starts over with the server. Give `store` a `sqliteRates(path)` to keep it across restarts and share it between processes. The file is created on the first ask, not when the config loads, so `kay build` and `kay check` leave none behind. A budget store must be able to `peek`, as both of kay's stores can.
+Unless you give `store`, the count lives in your app's `store.rates`, or in memory when there is none, where it starts over with the server. Give `store` a `sqliteRates(path)` to keep it across restarts and share it between processes. The file is created on the first ask, not when the config loads, so `kay build` and `kay check` leave none behind. A budget store must be able to `peek`, as both of kay's stores can.
 
 Tokens are added when a reply ends, with the count the provider reports. A reply that goes over the budget while it streams is let finish, and all of it counts. The next question is refused.
 

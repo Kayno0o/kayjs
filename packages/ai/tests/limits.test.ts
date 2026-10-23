@@ -3,9 +3,10 @@ import type { Piece, Provider } from '../src'
 import { existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { nameUser } from 'kay/library'
 import { memoryRates, sqliteRates } from 'kay/server'
+import { setupStore } from '../../../src/server/app-store'
 import { answeringRequest } from '../../../src/server/log'
 import { sendFrom } from '../../../src/server/rewrite'
 import { ai, AiError, ask, fakeAi } from '../src'
@@ -701,5 +702,98 @@ describe('maxInputChars', () => {
     expect((await failure(ask([{ role: 'user', content: 'x'.repeat(30) }, { role: 'assistant', content: 'y'.repeat(30) }], { maxInputChars: 59 }))).kind).toBe('too-long')
     await ask([{ role: 'user', content: 'x'.repeat(200_000) }], { maxInputChars: Infinity })
     expect(() => ask('a', { maxInputChars: 0 })).toThrow(expect.objectContaining({ code: 'config-invalid' }))
+  })
+})
+
+describe('the total budget in production', () => {
+  const was = process.env.NODE_ENV ?? 'test'
+
+  afterEach(() => {
+    process.env.NODE_ENV = was
+    setupStore(undefined)
+  })
+
+  it('caps all visitors together by default', async () => {
+    process.env.NODE_ENV = 'production'
+    ai()
+    fakeAi.reply(usedBy(2_000_000))
+    await ask('a', { key: 'one', provider: fakeAi })
+
+    expect((await failure(ask('a', { key: 'two', provider: fakeAi }))).limit).toBe('total')
+  })
+
+  it('warns at boot about a budget with no total, and about none else', () => {
+    process.env.NODE_ENV = 'production'
+
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      ai()
+      ai({ budget: { tokens: 10, total: 100, window: '1m' } })
+      ai({ budget: false })
+      expect(warn).not.toHaveBeenCalled()
+
+      ai({ budget: { tokens: 10, window: '1m' } })
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(String(warn.mock.calls[0]!.join(' '))).toContain('no total')
+
+      process.env.NODE_ENV = 'development'
+      ai({ budget: { tokens: 10, window: '1m' } })
+      expect(warn).toHaveBeenCalledTimes(1)
+    }
+    finally {
+      warn.mockRestore()
+    }
+  })
+})
+
+describe('the app store', () => {
+  afterEach(() => setupStore(undefined))
+
+  function counting() {
+    const inner = memoryRates()
+    const keys: string[] = []
+
+    return { keys, store: { hit: (key: string, window: Duration, weight?: number) => {
+      keys.push(key)
+
+      return inner.hit(key, window, weight)
+    }, peek: inner.peek } }
+  }
+
+  it('counts the limit and the budget in the app\'s store.rates when ai() names none', async () => {
+    const app = counting()
+
+    setupStore({ rates: app.store })
+    ai({ rateLimit: { max: 1, window: '1m' }, budget: { tokens: 1000, total: 1000, window: '1m' } })
+    await ask('a', { key: 'v' })
+
+    expect(app.keys.some(key => key.startsWith('ai:limit'))).toBe(true)
+    expect(app.keys.some(key => key.startsWith('ai:budget'))).toBe(true)
+    expect((await failure(ask('a', { key: 'v' }))).limit).toBe('asks')
+  })
+
+  it('prefers the store ai() was given', async () => {
+    const app = counting()
+    const own = counting()
+
+    setupStore({ rates: app.store })
+    ai({ rateLimit: { max: 5, window: '1m', store: own.store } })
+    await ask('a', { key: 'v' })
+
+    expect(own.keys).toHaveLength(1)
+    expect(app.keys).toHaveLength(0)
+  })
+
+  it('counts the budget in memory when the app store has no peek', async () => {
+    const app = counting()
+
+    setupStore({ rates: { hit: app.store.hit } })
+    ai({ budget: { tokens: 1000, window: '1m' } })
+    fakeAi.reply(usedBy(1000))
+    await ask('a', { key: 'v' })
+
+    expect(app.keys).toHaveLength(0)
+    expect((await failure(ask('a', { key: 'v' }))).limit).toBe('budget')
   })
 })

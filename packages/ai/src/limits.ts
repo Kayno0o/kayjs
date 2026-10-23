@@ -3,7 +3,7 @@ import type { AiLimit } from './errors'
 import type { Piece, Usage } from './types'
 import process from 'node:process'
 import { logFrom } from 'kay'
-import { configError, durationSeconds, keyedDigest, userOf } from 'kay/library'
+import { appStore, configError, durationSeconds, keyedDigest, userOf } from 'kay/library'
 import { clientAddress, memoryRates, rateKey } from 'kay/server'
 import { AiError } from './errors'
 
@@ -13,15 +13,16 @@ const CHARS_PER_TOKEN = 4
 const log = logFrom('kayjs-ai')
 // What a production app gets when it sets neither: a public chat is paid for by whoever runs it, so it is never unlimited by omission. `false` opts out.
 const DEFAULT_LIMIT: LimitOptions = { max: 20, window: '10m' }
-const DEFAULT_BUDGET: BudgetOptions = { tokens: 100_000, window: '1d' }
+const DEFAULT_BUDGET: BudgetOptions = { tokens: 100_000, total: 2_000_000, window: '1d' }
 // How long a store may take to answer before the ask is refused as `unavailable`, or the count given up on.
 let storeTimeoutMs = 5000
+let warnedPeek = false
 
 // How many asks a visitor makes in a window.
 export interface LimitOptions {
   max: number
   window: Duration
-  // In this process's memory unless given: `sqliteRates(path)` or a store of the app's own keeps the count over a restart and shares it between processes.
+  // The app's `store.rates` unless given, else this process's memory: `sqliteRates(path)` or a store of the app's own keeps the count over a restart and shares it between processes.
   store?: RateStore | undefined
 }
 
@@ -30,14 +31,14 @@ export interface BudgetOptions {
   tokens: number
   total?: number | undefined
   window: Duration
-  // As the limit's, and it must tell a window's count without adding to it (`peek`), as `memoryRates` and `sqliteRates` do.
+  // As the limit's (the app's `store.rates` unless given), and it must tell a window's count without adding to it (`peek`), as `memoryRates` and `sqliteRates` do.
   store?: RateStore | undefined
 }
 
 export interface AiOptions {
   // In production 20 asks per visitor every 10 minutes unless set; `false` lifts it.
   rateLimit?: LimitOptions | false | undefined
-  // In production 100,000 tokens per visitor every day unless set, with no total; `false` lifts it.
+  // In production 100,000 tokens per visitor and 2,000,000 in all every day unless set; `false` lifts it. A budget set without a `total` logs a warning at boot in production.
   budget?: BudgetOptions | false | undefined
   // Who a signed-in visitor is, such as their id: counted in place of their address, and in place of the user a library such as kayjs-auth names. Left out, that user counts, else the address.
   key?: ((request: Request) => string | undefined | Promise<string | undefined>) | undefined
@@ -49,7 +50,9 @@ export interface AiOptions {
 
 interface Counter {
   ms: number
-  store: RateStore
+  // The store the app named; undefined leaves it to the app's `store.rates`, read when an ask is counted since `ai()` runs before the server sets it up.
+  store: RateStore | undefined
+  memory: RateStore
 }
 
 interface Settings {
@@ -118,7 +121,7 @@ function settingsOf({ rateLimit, limit: oldLimit, budget, key, visitor }: AiOpti
   const chosenBudget = budget ?? (production ? DEFAULT_BUDGET : undefined)
 
   if (chosenLimit !== undefined && chosenLimit !== false)
-    settings.limit = { max: wholeNumber(chosenLimit.max, 'ai({ rateLimit }).max'), ms: durationSeconds(chosenLimit.window, 'ai({ rateLimit }).window') * 1000, store: chosenLimit.store ?? memoryFor(memories, 'limit') }
+    settings.limit = { max: wholeNumber(chosenLimit.max, 'ai({ rateLimit }).max'), ms: durationSeconds(chosenLimit.window, 'ai({ rateLimit }).window') * 1000, store: chosenLimit.store, memory: memoryFor(memories, 'limit') }
 
   if (chosenBudget !== undefined && chosenBudget !== false) {
     if (chosenBudget.store !== undefined && chosenBudget.store.peek === undefined)
@@ -128,8 +131,12 @@ function settingsOf({ rateLimit, limit: oldLimit, budget, key, visitor }: AiOpti
       tokens: wholeNumber(chosenBudget.tokens, 'ai({ budget }).tokens'),
       total: chosenBudget.total === undefined ? undefined : wholeNumber(chosenBudget.total, 'ai({ budget }).total'),
       ms: durationSeconds(chosenBudget.window, 'ai({ budget }).window') * 1000,
-      store: chosenBudget.store ?? memoryFor(memories, 'budget'),
+      store: chosenBudget.store,
+      memory: memoryFor(memories, 'budget'),
     }
+
+    if (production && chosenBudget.total === undefined)
+      log.warn('ai({ budget }) sets no total in production, so the visitors together can spend without a cap; add `total`, the tokens all of them may use every window')
   }
 
   return settings
@@ -152,6 +159,7 @@ export function limitsInEffect(): { limit: { max: number, seconds: number } | nu
 
 // Forgets the counts kept in memory: for a test.
 export function forgetCounts(): void {
+  warnedPeek = false
   slot().memories.clear()
   slot().held.clear()
 }
@@ -159,6 +167,28 @@ export function forgetCounts(): void {
 // Shortens the time a store may take, for a test.
 export function storeTimeout(ms: number): void {
   storeTimeoutMs = ms
+}
+
+// The store a counter uses: the one `ai()` was given, else the app's `store.rates`, else this process's memory. The budget reads without counting, so an app store with no `peek` is passed over for memory, said once.
+function storeOf(counter: Counter, needsPeek: boolean): RateStore {
+  if (counter.store)
+    return counter.store
+
+  const shared = appStore()?.rates
+
+  if (!shared)
+    return counter.memory
+
+  if (needsPeek && shared.peek === undefined) {
+    if (!warnedPeek) {
+      warnedPeek = true
+      log.error('the app\'s store.rates has no peek(key), which the budget reads before an ask without counting it, so the budget counts in this process\'s memory; give ai({ budget: { store } }) a store with one')
+    }
+
+    return counter.memory
+  }
+
+  return shared
 }
 
 // What a store answers, or a refusal to wait for it: a store over the network that hangs must not hang the chat.
@@ -231,7 +261,7 @@ async function admit(settings: Settings, asker: Asker): Promise<{ key: string | 
     const key = await visitorKey(settings.key, asker)
 
     if (limit && key !== undefined) {
-      const window = checked(await bounded(async () => limit.store.hit(`ai:limit\n${key}`, `${limit.ms}ms`)))!
+      const window = checked(await bounded(async () => storeOf(limit, false).hit(`ai:limit\n${key}`, `${limit.ms}ms`)))!
 
       if (window.count > limit.max)
         throw limited('asks', window.resetAt)
@@ -240,9 +270,10 @@ async function admit(settings: Settings, asker: Asker): Promise<{ key: string | 
     if (!budget)
       return { key, release: nothing }
 
+    const counting = storeOf(budget, true)
     const name = key === undefined ? undefined : `ai:budget\n${key}`
-    const visitor = name === undefined ? undefined : checked(await bounded(async () => budget.store.peek!(name)))
-    const total = budget.total === undefined ? undefined : checked(await bounded(async () => budget.store.peek!(TOTAL)))
+    const visitor = name === undefined ? undefined : checked(await bounded(async () => counting.peek!(name)))
+    const total = budget.total === undefined ? undefined : checked(await bounded(async () => counting.peek!(TOTAL)))
 
     // No await from here to the hold.
     if (name !== undefined && (visitor?.count ?? 0) + (held.get(name) ?? 0) >= budget.tokens)
@@ -283,9 +314,10 @@ function hold(names: string[], tokens: number): () => void {
 // Adds the tokens a reply used to the visitor's budget and the total. The reply was given, so a store failing or hanging here is logged, not thrown.
 async function record(budget: NonNullable<Settings['budget']>, key: string | undefined, used: number): Promise<void> {
   try {
+    const counting = storeOf(budget, true)
     const windows = await bounded(async () => Promise.all([
-      key === undefined ? undefined : budget.store.hit(`ai:budget\n${key}`, `${budget.ms}ms`, used),
-      budget.total === undefined ? undefined : budget.store.hit(TOTAL, `${budget.ms}ms`, used),
+      key === undefined ? undefined : counting.hit(`ai:budget\n${key}`, `${budget.ms}ms`, used),
+      budget.total === undefined ? undefined : counting.hit(TOTAL, `${budget.ms}ms`, used),
     ]))
 
     if (windows.some(window => window !== undefined && window.count < used))
