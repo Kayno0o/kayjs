@@ -31,7 +31,7 @@ function plugin(): AnyElysia {
     .post('/auth/upload', reach('upload'))
 }
 
-async function app(options: { base?: string, trailingSlash?: 'always' | 'never', maxSize?: string, extension?: Partial<KayExtension> } = {}) {
+async function app(options: { base?: string, trailingSlash?: 'always' | 'never', maxSize?: string, maxSizes?: Record<string, number | string>, extension?: Partial<KayExtension> } = {}) {
   const dir = await scratchDir('body-fallback-')
   const { extension, ...rest } = options
 
@@ -112,6 +112,31 @@ describe('a route no action, API module or extension limit covers', () => {
 
     expect((await post(site, '/_kay/jobs/delete', big)).status).toBe(413)
     expect((await post(site, '/_kay/jobs/retry', big)).status).toBe(413)
+  })
+})
+
+describe('the app\'s own limits by path', () => {
+  it('raises the limit for a route of its own: with a Content-Length, chunked, with a trailing slash and under a base', async () => {
+    for (const options of [{}, { trailingSlash: 'always' as const }, { base: '/blog' }]) {
+      const site = await app({ ...options, maxSizes: { '/auth/upload': '8mb' } })
+
+      expect((await post(site, '/auth/upload', big)).status).toBe(200)
+      expect((await post(site, '/auth/upload/', big)).status).toBe(200)
+      expect((await stream(site, '/auth/upload', 2 * MB)).status).toBe(200)
+      expect((await stream(site, '/auth/upload', 9 * MB)).status).toBe(413)
+      expect((await post(site, '/auth/upload', 'x'.repeat(9 * MB))).status).toBe(413)
+      expect((await site.handle(new Request('http://localhost/auth/upload', { method: 'POST', headers: { 'content-length': String(200 * MB) }, body: 'x' }))).status).toBe(413)
+      expect((await post(site, '/auth/token', big)).status).toBe(413)
+    }
+  })
+
+  it('lowers it, wins over an extension for one path, and stops the boot for a bad entry', async () => {
+    const site = await app({ maxSizes: { '/auth/token': 100, '/auth/upload': '1kb' }, extension: { maxSize: { '/auth/upload': '8mb' } } })
+
+    expect((await post(site, '/auth/token', 'x'.repeat(101))).status).toBe(413)
+    expect((await post(site, '/auth/upload', 'x'.repeat(2000))).status).toBe(413)
+    await expect(app({ maxSizes: { 'auth/token': '1mb' } })).rejects.toThrow('does not start with a slash')
+    await expect(app({ maxSizes: { '/auth/token': 0 } })).rejects.toThrow('maxSize')
   })
 })
 

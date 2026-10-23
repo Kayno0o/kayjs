@@ -23,7 +23,7 @@ A `.ws()` route of an `api()` module closes a socket sending a message over 1 MB
 
 ### Every route with a body is capped at `maxSize`
 
-A request over `maxSize` (1 MB by default) to a route of your own (`new Elysia().post()`), an extension or the jobs page now answers 413, where only Bun's 128 MB limited it; `kay check` cannot flag it, as no source says how large a request is. A route taking more raises `maxSize` in kay.config.ts, and an extension's route declares its own in the extension's `maxSize`.
+A request over `maxSize` (1 MB by default) to a route of your own (`new Elysia().post()`), an extension or the jobs page now answers 413, where only Bun's 128 MB limited it; `kay check` cannot flag it, as no source says how large a request is. A route of your own taking more is named in `maxSizes: { '/upload': '50mb' }` in kay.config.ts, and an extension's route declares its own in the extension's `maxSize`.
 
 ### kayjs-ui props take enum values: `variant`, `size` and `pixels`
 

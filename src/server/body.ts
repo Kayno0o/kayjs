@@ -73,14 +73,16 @@ export function limitBodies(app: Elysia, size: ByteSize, actionSizes: Map<string
   })
 }
 
-// The limits the extensions declare for their routes, answered with a plain 413 as the routes of no limit are.
-export function extensionLimits(extensions: KayExtension[] | undefined): Map<string, BodyLimit> {
+// The limits the extensions and the app declare for their routes, answered with a plain 413 as the routes of no limit are.
+export function extensionLimits(extensions: KayExtension[] | undefined, own: Record<string, ByteSize> | undefined = undefined): Map<string, BodyLimit> {
   const limits = new Map<string, BodyLimit>()
+  const declared = [...(extensions ?? []).map(({ name, maxSize }) => ({ what: `the maxSize of the extension ${name}`, sizes: maxSize })), { what: 'maxSizes in kay.config.ts', sizes: own }]
 
-  for (const { name, maxSize } of extensions ?? []) {
-    for (const [path, bytes] of Object.entries(maxSize ?? {})) {
+  // The app's own come last, so they win over an extension's for one path.
+  for (const { what, sizes } of declared) {
+    for (const [path, bytes] of Object.entries(sizes ?? {})) {
       if (!path.startsWith('/'))
-        throw new KayError('config-invalid', `kay: the maxSize of the extension ${name} names ${JSON.stringify(path)}, which does not start with a slash`)
+        throw new KayError('config-invalid', `kay: ${what} names ${JSON.stringify(path)}, which does not start with a slash`)
 
       limits.set(withoutSlash(path), { bytes, refuse: refusePlainly })
     }

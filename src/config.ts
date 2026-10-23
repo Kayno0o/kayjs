@@ -77,6 +77,8 @@ export interface KayConfig {
   maxSize?: ByteSize | undefined
   /** @deprecated The old name of `maxSize`, kept three minors. */
   bodyLimit?: ByteSize | undefined
+  // The most a request to a route of your own (`new Elysia().post()`) may send, by path: the route itself and what is under it, bytes or a size such as '50mb', in place of `maxSize`. The path is the one the server routes, without the `base`.
+  maxSizes?: Record<string, ByteSize> | undefined
   // Every page, action, endpoint and API module of the app answers 403 unless a `_guard.ts` covers it or it sets `guards: false`, in its `page` or its `api()` options; `kay check` reports each such route. A library's routes keep the guards it gives them.
   requireGuards?: boolean | undefined
   // Lets other sites' pages call every API module's routes from the browser, as `api({ cors })` does for one: `cors: { origins: ['https://app.example.com'], credentials: true }`. A module setting its own `cors` keeps it, and `api({ cors: false })` keeps a module to its own site.
