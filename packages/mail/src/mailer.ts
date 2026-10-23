@@ -9,7 +9,7 @@ import process from 'node:process'
 import { Elysia } from 'elysia'
 import { s } from 'kay'
 import { direction } from 'kay/i18n'
-import { callHook, configError, escapeHtml as escape, inFlightWork, underKayDev } from 'kay/library'
+import { configError, escapeHtml as escape, inFlightWork, underKayDev } from 'kay/library'
 import { defineEnv, queue, renderLocale, renderToString } from 'kay/server'
 import parseAddresses from 'nodemailer/lib/addressparser'
 import { attempt, deliveryAddress, messageOf } from './delivery'
@@ -65,8 +65,6 @@ export interface MailerOptions {
   smtp?: SmtpOverrides | undefined
   // The locale mails are written in unless one names its own: their component renders `t()` in it, and the `<html lang>` of the document follows. The site's default locale (the request's, while one runs) when left out.
   locale?: string | undefined
-  /** @deprecated Since 1.70, dropped in 1.73: this is `locale`. */
-  lang?: string | undefined
   // The queue `enqueue` hands mails to, `mail` unless named, retried as kay's queues are. A mail given up is kept 7 days (`keepFailed`) without its body, links, headers and attachments (`redact`); both can be set here.
   queue?: QueueOptions<Mail> & { name?: string | undefined } | undefined
   // Logs each mail's recipients in full rather than their count and domains, such as while setting up a site's mail.
@@ -88,11 +86,6 @@ export class MailNotConfiguredError extends Error {
     super(`${missing.length > 1 ? `${missing.slice(0, -1).join(', ')} and ${missing.at(-1)}` : missing[0]} must be set to send mail`)
   }
 }
-
-/** @deprecated Renamed `MailNotConfiguredError` in 1.70; the old name goes in 1.73. */
-export const MailNotConfigured = MailNotConfiguredError
-/** @deprecated Renamed `MailNotConfiguredError` in 1.70; the old name goes in 1.73. */
-export type MailNotConfigured = MailNotConfiguredError
 
 export type Mailer = Elysia & {
   // False for an `optional` mailer lacking its settings, whose sends throw `MailNotConfiguredError`.
@@ -385,11 +378,6 @@ export function mail(options: MailExtensionOptions): KayExtension<Mailer> {
   return module === undefined ? { name: '@kaynooo/kayjs-mail', server: server!, devTool, env } : { name: '@kaynooo/kayjs-mail', serverModule: { path: module, export: 'mail' }, devTool, env }
 }
 
-/** @deprecated Use `mail({ module })`, which `kay check --fix` rewrites it to. */
-export function mailExtension(from: string | (() => Promise<Mailer>)): KayExtension<Mailer> {
-  return typeof from === 'string' ? mail({ module: from }) : mail({ server: from })
-}
-
 // Sends mails written as `.kay` components, html or text: over SMTP in production, to the outbox in development and tests. Using it in the server runs the queue `enqueue` fills, and under `kay dev` lists the outbox at `/_kay/mail`.
 export function mailer(options: MailerOptions = {}): Mailer {
   adoptLegacyEnv()
@@ -456,7 +444,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
 
     const unsubscribe = message.unsubscribe === undefined ? {} : unsubscribeHeaders(message.unsubscribe, message.subject)
     // The locale the component renders `t()` in, which the document's `lang` follows: the message's, else the mailer's, else the site's default or the request's.
-    const chosen = message.locale ?? message.lang ?? options.locale ?? options.lang
+    const chosen = message.locale ?? options.locale
     const rendered = message.view ? await renderLocale(chosen) : chosen ?? await renderLocale()
     const markup = message.view ? await renderToString(message.view, ...[message.props, chosen === undefined ? undefined : { locale: chosen }] as never) : message.html
     // A mail has no page stylesheet to read the mark kay puts on a link it opens in a new tab, so it goes without.
@@ -553,7 +541,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
       log.error(`${described(mail)} to ${whom(recipientsOf(mail))} is given up after its last attempt`, error)
 
       if (onFailed)
-        await callHook(onFailed, { payload: mail, error }, [mail, error])
+        await onFailed({ payload: mail, error })
     },
   }
 

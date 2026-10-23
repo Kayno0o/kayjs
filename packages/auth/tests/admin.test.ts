@@ -86,7 +86,7 @@ describe('admin', () => {
     expect(await withToken('grantRole', ada.id, 'admin')).toEqual({ ok: false, error: 'forbidden' })
     expect(await withToken('banUser', ada.id)).toEqual({ ok: false, error: 'forbidden' })
     expect(await withToken('deleteUser', ada.id)).toEqual({ ok: false, error: 'forbidden' })
-    expect(await withToken('adminAuditLog')).toEqual({ ok: false, error: 'forbidden' })
+    expect(await withToken('listAdminAuditLog')).toEqual({ ok: false, error: 'forbidden' })
   })
 
   test('an admin changes users only within ten minutes of signing in or re-proving, and reads them any time', async () => {
@@ -212,8 +212,8 @@ describe('admin', () => {
     const mails: Mail[] = []
     const { admin, ada, member, store, heard } = await setup({
       audit: true,
-      url: 'https://site.test',
-      site: 'Site',
+      site: 'https://site.test',
+      name: 'Site',
       organizations: { roles: { owner: ['member'], member: [] }, owner: 'owner', defaultRoles: ['member'], invitationPage: '/invitation' },
       email: { mailer: { send: (mail: Mail) => void mails.push(mail) }, links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' }, requireVerified: false },
     })
@@ -285,7 +285,7 @@ describe('admin', () => {
     const mails: Mail[] = []
     const { admin, ada, store, told, browser } = await setup({
       audit: true,
-      url: 'https://site.test',
+      site: 'https://site.test',
       email: { mailer: { send: (mail: Mail) => void mails.push(mail) }, links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' }, requireVerified: false },
       onDelete: ({ user }: { user: User }) => {
         deleted.push(user)
@@ -304,12 +304,12 @@ describe('admin', () => {
     expect(await browser().post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, error: 'invalid' })
 
     // The entry stays, under a name that no longer leads to the user.
-    const log = await admin.browser.callOk('adminAuditLog', {})
+    const log = await admin.browser.callOk('listAdminAuditLog', {})
     const entry = log.entries.find((found: { event: string }) => found.event === 'account-deleted')
 
     expect(entry).toMatchObject({ actorId: admin.id })
     expect(entry!.userId).not.toBe(ada.id)
-    expect((await admin.browser.callOk('adminAuditLog', { userId: ada.id })).entries).toEqual([])
+    expect((await admin.browser.callOk('listAdminAuditLog', { userId: ada.id })).entries).toEqual([])
   })
 
   test('a deleted admin is no longer named in what they did to others', async () => {
@@ -388,8 +388,8 @@ describe('admin', () => {
     setSystemTime(new Date(Date.now() + 1000))
     await admin.browser.call('grantRole', ada.id, 'editor')
 
-    const everyone = await admin.browser.callOk('adminAuditLog')
-    const hers = await admin.browser.callOk('adminAuditLog', { userId: ada.id, limit: 1 })
+    const everyone = await admin.browser.callOk('listAdminAuditLog')
+    const hers = await admin.browser.callOk('listAdminAuditLog', { userId: ada.id, limit: 1 })
 
     expect(new Set(everyone.entries.map((entry: { userId: string }) => entry.userId))).toEqual(new Set([admin.id, ada.id]))
     expect(hers.entries).toEqual([expect.objectContaining({ event: 'role-granted', detail: 'editor', actorId: admin.id })])

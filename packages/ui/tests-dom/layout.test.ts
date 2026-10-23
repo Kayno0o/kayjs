@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { mountComponent } from 'kay/test'
+import Layout from '../tests/fixture/src/components/layout.kay'
 
 let mounted: Mounted | undefined
 
@@ -9,7 +10,7 @@ afterEach(() => {
 })
 
 async function layout() {
-  mounted = await mountComponent('src/components/layout.kay')
+  mounted = await mountComponent(Layout)
 
   return mounted.root
 }

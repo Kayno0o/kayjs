@@ -82,12 +82,11 @@ export function holdToasts(hold: ToastHold, on: boolean): void {
   }
 }
 
-// A bare number of milliseconds, `Infinity` included, still reads until 1.73.
 function askedMs(duration: Duration | false | undefined): number | undefined {
   if (duration === false)
     return Number.POSITIVE_INFINITY
 
-  return typeof duration === 'string' ? durationMs(duration) : duration
+  return duration === undefined ? undefined : durationMs(duration)
 }
 
 // Untracked: an effect toasting a settled task would otherwise read the list, and toast again on every toast it adds.

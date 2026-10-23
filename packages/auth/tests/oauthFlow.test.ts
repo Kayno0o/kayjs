@@ -54,7 +54,7 @@ afterEach(() => {
 function setup(options: Parameters<typeof testApp>[0] = {}) {
   const signUps: { user: User, profile: Profile | undefined }[] = []
   const app = testApp({
-    url: URL_BASE,
+    site: URL_BASE,
     signInPage: '/login',
     oauth: {
       discord: { provider: discordProvider(), clientId: 'discord-id', clientSecret: 'discord-secret', keepTokens: true },

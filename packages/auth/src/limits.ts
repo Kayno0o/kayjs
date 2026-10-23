@@ -56,7 +56,7 @@ export const DEFAULT_LIMITS = {
 // `oauthRegisterAll` has no default: one address cannot use up a budget every other client shares, so it is a ceiling an app chooses to add on all addresses together.
 export type Limits = Record<keyof typeof DEFAULT_LIMITS, Limit> & { oauthRegisterAll?: Limit }
 
-// A limit as the app writes it: the window seconds or a string such as '15m'.
+// A limit as the app writes it: the window a string such as '15m'.
 export interface LimitOption {
   max: number
   window: Duration
@@ -65,21 +65,16 @@ export interface LimitOption {
 // The limits `rateLimit` overrides, the rest keeping their defaults.
 export type LimitsOption = Partial<Record<keyof Limits, LimitOption>>
 
-// The defaults over what the app set in `rateLimit` and its old name `limits`, every window in seconds; a bad window throws naming its limit.
-export function resolveLimits(old: LimitsOption | undefined, given: LimitsOption | undefined): Limits {
+// The defaults over what the app set in `rateLimit`, every window in seconds; a bad window throws naming its limit.
+export function resolveLimits(given: LimitsOption | undefined): Limits {
   const limits: Limits = { ...DEFAULT_LIMITS }
 
-  applyLimits(limits, old, 'limits')
-  applyLimits(limits, given, 'rateLimit')
+  for (const [name, limit] of Object.entries(given ?? {}) as [keyof Limits, LimitOption | undefined][]) {
+    if (limit)
+      limits[name] = { max: limit.max, window: durationSeconds(limit.window, `rateLimit.${name}.window`) }
+  }
 
   return limits
-}
-
-function applyLimits(limits: Limits, option: LimitsOption | undefined, from: string): void {
-  for (const [name, limit] of Object.entries(option ?? {}) as [keyof Limits, LimitOption | undefined][]) {
-    if (limit)
-      limits[name] = { max: limit.max, window: durationSeconds(limit.window, `${from}.${name}.window`) }
-  }
 }
 
 // Counts one attempt and answers whether it was over the limit.

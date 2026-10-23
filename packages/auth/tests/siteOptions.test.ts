@@ -1,5 +1,5 @@
 import type { AuthSessionData } from '../src/auth'
-import type { Mail } from '../src/mail'
+import type { AuthMailMessage as Mail } from '../src/mail'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { Elysia } from 'elysia'
 import { setSite } from 'kay/library'
@@ -29,7 +29,7 @@ describe('site and name', () => {
     const mail = await registered({ site: 'https://site.test', name: 'Example' })
 
     expect(mail.url).toStartWith('https://site.test/v?token=')
-    expect(mail).toMatchObject({ name: 'Example', site: 'Example', subject: 'Confirm your email for Example' })
+    expect(mail).toMatchObject({ name: 'Example', subject: 'Confirm your email for Example' })
   })
 
   test('the name is the origin\'s host when left out', async () => {
@@ -50,20 +50,13 @@ describe('site and name', () => {
     expect((await registered({ site: 'https://own.test' })).url).toStartWith('https://own.test/v?token=')
   })
 
-  test('the old forms, url for the origin and a site that is a name, still work', async () => {
-    const mail = await registered({ url: 'https://site.test', site: 'Example' })
-
-    expect(mail.url).toStartWith('https://site.test/v?token=')
-    expect(mail).toMatchObject({ name: 'Example', subject: 'Confirm your email for Example' })
-  })
-
   test('a site that looks like a host but has no scheme is refused, pointing at name', () => {
     expect(() => testApp({ site: 'example.com' })).toThrow('has no scheme')
     expect(() => testApp({ site: 'localhost:3000' })).toThrow('https://localhost:3000')
   })
 
-  test('a site that is a plain name is still a name', async () => {
-    expect(await registered({ url: 'https://site.test', site: 'My site' })).toMatchObject({ name: 'My site' })
+  test('a site that is a plain name is refused, pointing at name', () => {
+    expect(() => testApp({ site: 'My site' })).toThrow('give the display name as `name`')
   })
 
   test('a mail with no origin anywhere is refused with the option to set', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { parseMailUrl } from '../src/env'
-import { mail, mailExtension } from '../src/mailer'
+import { mail } from '../src/mailer'
 
 describe('the mail extension\'s environment', () => {
   it('lists the mail variables with the server required in production only, so an app lists them without wiring', () => {
@@ -21,11 +21,6 @@ describe('mail()', () => {
   it('takes a module or a server, one of them', () => {
     expect(() => mail({})).toThrow('takes the path of the module')
     expect(() => mail({ module: './src/mail', server: async () => ({}) as never })).toThrow('not both')
-  })
-
-  it('is what mailExtension gives for a path or a function', () => {
-    expect(mailExtension('./src/mail').serverModule).toEqual({ path: './src/mail', export: 'mail' })
-    expect(mailExtension(async () => ({}) as never).serverModule).toBeUndefined()
   })
 })
 

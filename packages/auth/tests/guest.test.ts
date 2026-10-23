@@ -38,7 +38,7 @@ describe('guests', () => {
   })
 
   test('registering makes the guest a real account, keeping their id, even where addresses must be verified', async () => {
-    const { browser, signUps, store } = setup({ email: { mailer: { send: () => undefined }, links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' }, requireVerified: true }, url: 'https://site.test' })
+    const { browser, signUps, store } = setup({ email: { mailer: { send: () => undefined }, links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' }, requireVerified: true }, site: 'https://site.test' })
     const guest = browser()
     const { user } = await guest.callOk('signInAsGuest')
 
@@ -49,7 +49,7 @@ describe('guests', () => {
   })
 
   test('where addresses must be verified, a guest registering a held address stays a guest', async () => {
-    const { browser, store } = setup({ email: { mailer: { send: () => undefined }, links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' } }, url: 'https://site.test' })
+    const { browser, store } = setup({ email: { mailer: { send: () => undefined }, links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' } }, site: 'https://site.test' })
 
     await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', emailVerifiedAt: new Date() }))
     const guest = browser()

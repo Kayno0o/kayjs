@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Fields from '../tests/fixture/src/components/fields.kay'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -20,7 +21,7 @@ afterEach(() => {
 })
 
 async function fields() {
-  mounted = await mountComponent('src/components/fields.kay', { onPlanet: (value: string) => planets.push(value), onCommit: (value: string) => commits.push(value), onFilter: (query: string) => filters.push(query), onLeave: (id: string) => left.push(id), onPicked: (picked: unknown) => picks.push(picked) })
+  mounted = await mountComponent(Fields, { onPlanet: (value: string) => planets.push(value), onCommit: (value: string) => commits.push(value), onFilter: (query: string) => filters.push(query), onLeave: (id: string) => left.push(id), onPicked: (picked: unknown) => picks.push(picked) })
 
   return mounted.root
 }

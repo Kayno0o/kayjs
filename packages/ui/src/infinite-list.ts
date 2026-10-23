@@ -11,14 +11,13 @@ export interface PageAt<Row> {
   last: Row | undefined
 }
 
-export type InfiniteListOptions<Row> = InfinitePageSize & {
+export interface InfiniteListOptions<Row> {
+  // The rows a full page holds: a page of fewer ends the list.
+  pageSize: number
   // Tells a row from another, so one already shown is dropped when the list shifts between two pages.
   key?: ((row: Row) => unknown) | undefined
   load: (at: PageAt<Row>) => Promise<InfinitePage<Row>> | InfinitePage<Row>
 }
-
-// The rows a full page holds: a page of fewer ends the list. `size` is the deprecated old name of `pageSize`, kept three minors.
-type InfinitePageSize = { pageSize: number, size?: never } | { size: number, pageSize?: never }
 
 export interface InfiniteList<Row> {
   // The rows loaded so far, the first page first.
@@ -37,8 +36,7 @@ export interface InfiniteList<Row> {
 
 // The rows of a list that loads its next page as it scrolls, with `LoadMore` after the list drawing the sentinel and the failed state. The first page comes from the server; a page shorter than `pageSize` ends the list, one call runs at a time and a failed page loads no other until `retry`.
 export function infiniteList<Row>(first: Row[], options: InfiniteListOptions<Row>): InfiniteList<Row> {
-  const { key, load } = options
-  const size = options.pageSize ?? options.size
+  const { key, load, pageSize: size } = options
   const rows = signal(first)
   const ended = signal(first.length < size)
   const failed = signal(false)

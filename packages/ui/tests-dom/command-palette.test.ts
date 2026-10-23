@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Palette from '../tests/fixture/src/components/palette.kay'
 
 let mounted: Mounted | undefined
 const seen: { open: boolean[], recent: string[][], actions: string[] } = { open: [], recent: [], actions: [] }
@@ -24,7 +25,7 @@ afterEach(() => {
 })
 
 async function palette(props: { recent?: string[], hotkey?: string | null, siteSearch?: boolean, hostile?: boolean, loose?: boolean } = {}) {
-  mounted = await mountComponent('src/components/palette.kay', {
+  mounted = await mountComponent(Palette, {
     onOpenChange: (open: boolean) => seen.open.push(open),
     onRecentChange: (recent: string[]) => seen.recent.push(recent),
     onAction: (name: string) => seen.actions.push(name),

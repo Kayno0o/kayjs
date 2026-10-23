@@ -58,7 +58,7 @@ describe('one secret for the session and kayjs-auth', () => {
   test('an app\'s own secret wins over the session\'s', async () => {
     const secret = base32Encode(new TextEncoder().encode('a-plain-legacy-secret'))
     const attempt = async (options: { secret: string | undefined }) => {
-      const app = testApp({ sessions: session<AuthSessionData>({ secret: SECRET }), url: 'https://site.test', email: { mailer: mailbox().mailer, links: LINKS, requireVerified: false }, ...options })
+      const app = testApp({ sessions: session<AuthSessionData>({ secret: SECRET }), site: 'https://site.test', email: { mailer: mailbox().mailer, links: LINKS, requireVerified: false }, ...options })
 
       await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
 

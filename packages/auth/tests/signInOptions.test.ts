@@ -25,7 +25,7 @@ afterEach(() => {
 
 async function setup() {
   const { mails, mailer } = mailbox()
-  const app = testApp({ url: 'https://site.test', site: 'Site', captcha, email: { mailer, links: LINKS, requireVerified: false } })
+  const app = testApp({ site: 'https://site.test', name: 'Site', captcha, email: { mailer, links: LINKS, requireVerified: false } })
 
   await app.store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', passwordHash: await Bun.password.hash(PASSWORD) }))
 

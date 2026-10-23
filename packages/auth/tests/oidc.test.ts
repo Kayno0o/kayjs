@@ -73,7 +73,7 @@ function provider(issuer: string, endpoints: Endpoints, accounts: Record<string,
 function setup(name: string, oauthProvider: OAuthProvider, clientSecret: string | undefined = 'secret') {
   const signUps: Profile[] = []
   const app = testApp({
-    url: 'https://site.test',
+    site: 'https://site.test',
     signInPage: '/login',
     oauth: { [name]: { provider: oauthProvider, clientId: 'client-id', ...clientSecret === undefined ? {} : { clientSecret } } },
     onSignUp: ({ profile }) => {

@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent } from 'kay/test'
+import Stats from '../tests/fixture/src/components/stats.kay'
 
 let mounted: Mounted | undefined
 
@@ -9,7 +10,7 @@ afterEach(() => {
 })
 
 async function stats() {
-  mounted = await mountComponent('src/components/stats.kay', {})
+  mounted = await mountComponent(Stats, {})
 
   return (id: string) => mounted!.root.querySelector(`#${id}`)!
 }

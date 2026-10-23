@@ -112,8 +112,6 @@ export interface AskOptions {
   timeout?: { connect?: Duration | undefined, idle?: Duration | undefined } | undefined
   // Who the limits and budget set in `ai()` count this ask for, in place of the signed-in user its `key` names or the address of the request being answered: a job or a test names one.
   key?: string | undefined
-  // The old name of `key`, taken until 1.73.
-  visitor?: string | undefined
   // Actions the model may call, each run as the visitor through the whole app, guards, validation and rate limits included; passing one is its opt-in. They need the request being answered, so `ask` with tools called outside one throws.
   tools?: readonly ToolAction[] | undefined
   // The provider requests the tool loop may make, 5 by default; a reply still wanting tools after the last ends with `finish` `steps`.

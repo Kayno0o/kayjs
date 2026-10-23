@@ -1,9 +1,8 @@
 import type { Mounted } from 'kay/test'
-import { join } from 'node:path'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Editor from '../src/editor/editor.kay'
 
-const EDITOR = join(import.meta.dir, '../src/editor/editor.kay')
 const POSTS = { name: 'posts', title: 'Posts', kind: 'folder', localized: false, components: [], draftField: 'draft', schema: { type: 'object', properties: { title: { type: 'string' }, draft: { type: 'boolean' } } } }
 const SETTINGS = { name: 'index', title: 'Home', single: true, kind: 'file', localized: false, components: [], schema: { type: 'object', properties: { title: { type: 'string' } } } }
 const PLAIN = { name: 'notes', title: 'Notes', kind: 'folder', localized: false, components: [], schema: { type: 'object', properties: { title: { type: 'string' } } } }
@@ -108,7 +107,7 @@ async function until(done: () => unknown): Promise<void> {
 }
 
 async function open(entry: object = { collection: 'posts', slug: 'hello' }): Promise<ParentNode> {
-  mounted = await mountComponent(EDITOR, { entries: [entry], unclickable: [] })
+  mounted = await mountComponent(Editor, { entries: [entry], unclickable: [] })
 
   const root = mounted.root
 
@@ -347,7 +346,7 @@ test('Delete from the entry\'s own page, when leaving is declined over edits of 
   const ask = spyOn(globalThis, 'confirm').mockImplementation(() => false)
 
   happyDOM.setURL('http://localhost/posts/hello')
-  mounted = await mountComponent(EDITOR, { entries: [{ collection: 'posts', slug: 'hello' }, { collection: 'posts', slug: 'other' }], unclickable: [] })
+  mounted = await mountComponent(Editor, { entries: [{ collection: 'posts', slug: 'hello' }, { collection: 'posts', slug: 'other' }], unclickable: [] })
 
   const root = mounted.root
 

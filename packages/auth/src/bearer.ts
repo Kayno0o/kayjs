@@ -39,8 +39,6 @@ export interface TokenOptions<Scope extends string = string> {
   scopes?: Scope[] | undefined
   // How long until it stops working, a string such as '30d'; 90 days when left out, never with null.
   maxAge?: Duration | null | undefined
-  /** @deprecated Since 1.70, dropped in 1.73: this is `maxAge`. */
-  expiresIn?: Duration | null | undefined
 }
 
 // The seconds a token lives, undefined for a value that is no positive duration.
@@ -66,7 +64,7 @@ function tokenProblem(core: Core, name: string, options: TokenOptions): TokenPro
   if (options.scopes && (options.scopes.length === 0 || options.scopes.some(scope => !core.scopes.has(scope))))
     return 'scope'
 
-  const maxAge = tokenMaxAge(options)
+  const maxAge = options.maxAge
 
   return maxAge != null && expirySeconds(maxAge) === undefined ? 'expiry' : undefined
 }
@@ -79,14 +77,9 @@ function lifetime(maxAge: Duration | null | undefined): number | null {
   return maxAge === null ? null : expirySeconds(maxAge)!
 }
 
-// `maxAge`, or the `expiresIn` it was called before 1.70.
-function tokenMaxAge(options: TokenOptions): Duration | null | undefined {
-  return options.maxAge === undefined ? options.expiresIn : options.maxAge
-}
-
 async function storeToken(core: Core, userId: string, name: string, options: TokenOptions, token: string): Promise<string> {
   const id = crypto.randomUUID()
-  const seconds = lifetime(tokenMaxAge(options))
+  const seconds = lifetime(options.maxAge)
 
   await core.store.bearerTokens.create({
     id,

@@ -2,6 +2,9 @@ import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { focusInvalid } from 'kay'
 import { mountComponent, settle } from 'kay/test'
+import CountedTabs from '../tests/fixture/src/components/counted-tabs.kay'
+import GroupedTabs from '../tests/fixture/src/components/grouped-tabs.kay'
+import PlanetTabs from '../tests/fixture/src/components/planet-tabs.kay'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -13,7 +16,7 @@ afterEach(() => {
 })
 
 async function tabs() {
-  mounted = await mountComponent('src/components/planet-tabs.kay', { onChange: (value: string) => changes.push(value) })
+  mounted = await mountComponent(PlanetTabs, { onChange: (value: string) => changes.push(value) })
 
   const { root } = mounted
   const shown = () => [...root.querySelectorAll('[role="tab"]')].filter(tab => tab.getAttribute('aria-selected') === 'true').map(tab => tab.textContent)
@@ -86,7 +89,7 @@ test('moves between tabs with the arrows, wrapping, and Home and End, focus goin
 })
 
 test('keeps a panel, and the focus inside it, when the tabs are relabelled', async () => {
-  mounted = await mountComponent('src/components/counted-tabs.kay')
+  mounted = await mountComponent(CountedTabs)
 
   const { root } = mounted
   const input = root.querySelector<HTMLInputElement>('input[name="venus"]')!
@@ -128,7 +131,7 @@ test('shows the tab of a hidden panel when kay\'s focusInvalid reaches an invali
 })
 
 test('focusInvalid reaches a FormField group with an issue, showing its tab and focusing its first field, and a group without one is left alone', async () => {
-  mounted = await mountComponent('src/components/grouped-tabs.kay', {})
+  mounted = await mountComponent(GroupedTabs, {})
 
   const { root } = mounted
   const login = root.querySelector<HTMLInputElement>('#login')!

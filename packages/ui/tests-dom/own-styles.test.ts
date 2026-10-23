@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent } from 'kay/test'
+import OwnStyles from '../tests/fixture/src/components/own-styles.kay'
 
 let mounted: Mounted | undefined
 
@@ -9,7 +10,7 @@ afterEach(() => {
 })
 
 async function styles() {
-  mounted = await mountComponent('src/components/own-styles.kay', {})
+  mounted = await mountComponent(OwnStyles, {})
 
   return (selector: string) => mounted!.root.querySelector(selector)!.getAttribute('style')
 }

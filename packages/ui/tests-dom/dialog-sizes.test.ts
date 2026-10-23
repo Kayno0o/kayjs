@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import DialogSizes from '../tests/fixture/src/components/dialog-sizes.kay'
 
 let mounted: Mounted | undefined
 
@@ -9,7 +10,7 @@ afterEach(() => {
 })
 
 async function open() {
-  mounted = await mountComponent('src/components/dialog-sizes.kay', {})
+  mounted = await mountComponent(DialogSizes, {})
   await settle()
 
   return (id: string) => mounted!.root.querySelector<HTMLDialogElement>(`#${id}`)!

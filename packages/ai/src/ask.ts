@@ -131,7 +131,7 @@ function reply(prompt: string | Message[], options: AskOptions, answer: TSchema 
   if (typeof maxInputChars !== 'number' || !(maxInputChars >= 1))
     throw configError('maxInputChars is a number of characters of 1 or more')
 
-  const asker = { request: answering, visitor: options.key ?? options.visitor, chars: messageChars + (options.system?.length ?? 0) + (described?.chars ?? 0), maxTokens }
+  const asker = { request: answering, visitor: options.key, chars: messageChars + (options.system?.length ?? 0) + (described?.chars ?? 0), maxTokens }
   const signals = [answering?.signal, options.signal]
   const about = { provider: provider.name, model, prompt: messages.findLast(message => message.role === 'user')?.content ?? '', chars: asker.chars }
 

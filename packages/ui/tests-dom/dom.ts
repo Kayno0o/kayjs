@@ -6,9 +6,9 @@ import { settle } from 'kay/test'
 // Preloaded after `kay/test/dom`, which registers happy-dom with its popover shim. Components mount from the fixture app, which installs the library and replaces its settings as an app does.
 process.env.KAY_ROOT = join(import.meta.dir, '..', 'tests', 'fixture')
 
-// A component of the library, by its path under the fixture's node_modules.
-export function library(name: string): string {
-  return `node_modules/@kaynooo/kayjs-ui/src/${name}.kay`
+// A component of the library, imported from the fixture's node_modules for mountComponent.
+export async function library(name: string): Promise<(props: Record<string, unknown>) => unknown> {
+  return ((await import(`${process.env.KAY_ROOT}/node_modules/@kaynooo/kayjs-ui/src/${name}.kay`)) as { default: (props: Record<string, unknown>) => unknown }).default
 }
 
 // The kui names of an element, which stay when its recipe moves the look into utilities; an app's own class is read with classList.

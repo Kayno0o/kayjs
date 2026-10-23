@@ -26,12 +26,12 @@ export const posts = collection(sqliteLoader({
 
 ### Keep entries in Postgres
 
-`postgresLoader` from `@kaynooo/kayjs-cms/postgres` takes a connection URL or a Bun `SQL`:
+`pgLoader` from `@kaynooo/kayjs-cms/pg` takes a connection URL or a Bun `SQL`:
 
 ```ts
-import { postgresLoader } from '@kaynooo/kayjs-cms/postgres'
+import { pgLoader } from '@kaynooo/kayjs-cms/pg'
 
-export const posts = collection(postgresLoader({ name: 'posts', sql: process.env.DATABASE_URL! }), {
+export const posts = collection(pgLoader({ name: 'posts', sql: process.env.DATABASE_URL! }), {
   schema: s.Object({ title: s.String() }),
 })
 ```

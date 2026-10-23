@@ -109,20 +109,6 @@ describe('ai({ rateLimit })', () => {
     expect((await failure(ask('b', { key: 'two' }))).kind).toBe('limited')
   })
 
-  it('still takes the old names limit, visitor and the ask\'s visitor, with the new ones winning', async () => {
-    ai({ limit: { max: 1, window: '1m' }, visitor: () => 'old' })
-    await inside(rewrittenRequest('203.0.113.1'), () => ask('a'))
-    expect((await failure(inside(rewrittenRequest('203.0.113.2'), () => ask('b')))).limit).toBe('asks')
-    await ask('a', { visitor: 'named' })
-    expect((await failure(ask('b', { visitor: 'named' }))).limit).toBe('asks')
-
-    ai({ limit: { max: 1, window: '1m' }, rateLimit: { max: 3, window: '1m' } })
-    await ask('a', { key: 'v', visitor: 'ignored' })
-    await ask('b', { key: 'v' })
-    await ask('c', { key: 'v' })
-    expect((await failure(ask('d', { key: 'v' }))).limit).toBe('asks')
-  })
-
   it('counts the signed-in user the visitor hook names, else the address, and lets neither stand for the other', async () => {
     ai({ rateLimit: { max: 1, window: '1m' }, key: request => request.headers.get('x-user') ?? undefined })
 

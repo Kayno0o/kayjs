@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import SubmittingSelect from '../tests/fixture/src/components/submitting-select.kay'
 
 let mounted: Mounted | undefined
 
@@ -9,7 +10,7 @@ afterEach(() => {
 })
 
 async function filter() {
-  mounted = await mountComponent('src/components/submitting-select.kay', {})
+  mounted = await mountComponent(SubmittingSelect, {})
 
   const { root } = mounted
   const select = root.querySelector<HTMLSelectElement>('#kind')!
@@ -93,7 +94,7 @@ test('a pick from the list a key opened posts at once, since that change arrives
 test('a Select with submit still hands the page\'s own key, pointer and blur handlers their events', async () => {
   const heard: string[] = []
 
-  mounted = await mountComponent('src/components/submitting-select.kay', { heard })
+  mounted = await mountComponent(SubmittingSelect, { heard })
 
   const select = mounted.root.querySelector<HTMLSelectElement>('#kind')!
 
@@ -107,7 +108,7 @@ test('a Select with submit still hands the page\'s own key, pointer and blur han
 test('a Select without submit still hands the page\'s own handlers their events and never posts', async () => {
   const heard: string[] = []
 
-  mounted = await mountComponent('src/components/submitting-select.kay', { heard, submit: false })
+  mounted = await mountComponent(SubmittingSelect, { heard, submit: false })
 
   const select = mounted.root.querySelector<HTMLSelectElement>('#kind')!
 

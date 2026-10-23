@@ -35,7 +35,7 @@ function listing() {
 
 async function setup() {
   const mail = listing()
-  const app = testApp({ admin: 'admin', guests: { maxAge: '1d' }, url: 'http://localhost', email: { mailer: mail.mailer, links: LINKS, requireVerified: false } })
+  const app = testApp({ admin: 'admin', guests: { maxAge: '1d' }, site: 'http://localhost', email: { mailer: mail.mailer, links: LINKS, requireVerified: false } })
   const ada = app.browser()
   const { user } = await ada.callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
 
@@ -118,7 +118,7 @@ describe('erasing a user takes their notifications and mailing list rows', () =>
   })
 
   test('without a mailer that erases, only the notifications go', async () => {
-    const app = testApp({ url: 'http://localhost', email: { mailer: mailbox().mailer, links: LINKS, requireVerified: false } })
+    const app = testApp({ site: 'http://localhost', email: { mailer: mailbox().mailer, links: LINKS, requireVerified: false } })
     const ada = app.browser()
     const { user } = await ada.callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
 
@@ -138,7 +138,7 @@ describe('the export lists them', () => {
   })
 
   test('are empty without a mailer that lists', async () => {
-    const app = testApp({ url: 'http://localhost', email: { mailer: mailbox().mailer, links: LINKS, requireVerified: false } })
+    const app = testApp({ site: 'http://localhost', email: { mailer: mailbox().mailer, links: LINKS, requireVerified: false } })
     const ada = app.browser()
 
     await ada.callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })

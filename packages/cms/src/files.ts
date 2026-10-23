@@ -63,11 +63,6 @@ export class SaveConflictError extends Error {
   }
 }
 
-/** @deprecated Renamed `SaveConflictError` in 1.70; the old name goes in 1.73. */
-export const SaveConflict = SaveConflictError
-/** @deprecated Renamed `SaveConflictError` in 1.70; the old name goes in 1.73. */
-export type SaveConflict = SaveConflictError
-
 // The git blob sha of a file's bytes, which Forgejo names a file's version by.
 export function fileVersion(bytes: Uint8Array | string): string {
   const content = typeof bytes === 'string' ? Buffer.from(bytes) : bytes
@@ -183,15 +178,10 @@ interface ForgejoSettings {
   fetch?: typeof fetch | undefined
 }
 
-// The forge's address is `baseUrl`, `https://git.example.com`, as a service API is named across kay's libraries; `url` still works until 1.73 (the `deprecated-option-name` lint).
-export type ForgejoOptions = ForgejoSettings & (
-  | { baseUrl: string, url?: string | undefined }
-  | {
-    /** @deprecated Since 1.70, dropped in 1.73: this is `baseUrl`. */
-    url: string
-    baseUrl?: string | undefined
-  }
-)
+// The forge's address is `baseUrl`, `https://git.example.com`, as a service API is named across kay's libraries.
+export interface ForgejoOptions extends ForgejoSettings {
+  baseUrl: string
+}
 
 export class ForgeError extends Error {
   override readonly name = 'ForgeError'
@@ -226,12 +216,12 @@ function requireSecure(url: string): void {
 }
 
 // Commits each change through Forgejo's contents API, so the site rebuilds from git and every edit has history.
-export function forgejo({ baseUrl, url: legacyUrl, repo, branch, token, timeout: wait = '15s', fetch: request = fetch }: ForgejoOptions): FileSaver {
+export function forgejo({ baseUrl, repo, branch, token, timeout: wait = '15s', fetch: request = fetch }: ForgejoOptions): FileSaver {
   const timeout = optionMs(wait, 'forgejo timeout')
-  const url = baseUrl ?? legacyUrl ?? ''
 
-  requireSecure(url)
-  const api = `${url.replace(TRAILING_SLASHES, '')}/api/v1/repos/${repo}`
+  requireSecure(baseUrl)
+
+  const api = `${baseUrl.replace(TRAILING_SLASHES, '')}/api/v1/repos/${repo}`
   const headers = { 'authorization': `token ${token}`, 'content-type': 'application/json', 'accept': 'application/json' }
 
   async function answer<T>(response: Response): Promise<T> {

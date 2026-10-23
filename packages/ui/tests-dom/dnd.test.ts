@@ -6,6 +6,9 @@ import { Board } from '../src/dnd/board'
 import { DropTargets } from '../src/dnd/drop-targets'
 import { ACTIVATION_DELAY_MS } from '../src/dnd/pointer'
 import { Sortable } from '../src/dnd/sortable'
+import BoardColumns from '../tests/fixture/src/components/board-columns.kay'
+import NamedSortable from '../tests/fixture/src/components/named-sortable.kay'
+import SortableList from '../tests/fixture/src/components/sortable-list.kay'
 import { clock } from './dom'
 
 const MODIFIERS: KeyboardEventInit[] = [{ altKey: true }, { ctrlKey: true }, { metaKey: true }, { shiftKey: true }]
@@ -230,7 +233,7 @@ describe('Sortable, from the keyboard', () => {
   })
 
   test('names a handle in a rendered list after its item\'s text without the controls beside it, and again when the text changes', async () => {
-    mounted = await mountComponent('src/components/named-sortable.kay')
+    mounted = await mountComponent(NamedSortable)
 
     const { root } = mounted
     const grip = root.querySelector<HTMLElement>('.grip')!
@@ -243,7 +246,7 @@ describe('Sortable, from the keyboard', () => {
   })
 
   test('starts each move from where the rows stand now, and keeps focus on the handle a keyed list moved', async () => {
-    mounted = await mountComponent('src/components/sortable-list.kay')
+    mounted = await mountComponent(SortableList)
 
     const { root } = mounted
     const read = button(root, 'Read')
@@ -487,7 +490,7 @@ describe('Board, by pointer', () => {
 
 describe('Board, from the keyboard', () => {
   async function board() {
-    mounted = await mountComponent('src/components/board-columns.kay')
+    mounted = await mountComponent(BoardColumns)
 
     const { root } = mounted
     const titles = (column: string) => [...root.querySelector(`[aria-label="${column}"]`)!.querySelectorAll('button')].map(item => item.textContent?.trim())

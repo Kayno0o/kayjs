@@ -117,7 +117,6 @@ function guardSession(session: Session<AuthSessionData>, refuse: () => boolean, 
     settings: session.settings,
     regenerate: write(async () => session.regenerate()),
     maxAge: write(async maxAge => session.maxAge(maxAge)),
-    lifetime: write(async maxAge => session.maxAge(maxAge)),
   }
 }
 
@@ -135,11 +134,9 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   store: AuthStore
   // The site's public origin, such as `https://example.com`, which OAuth callbacks, mailed links and passkeys are built on: the `site` of kay.config.ts (or SITE_URL) when left out, so an app on kay sets it once.
   site?: string | undefined
-  /** @deprecated The old name of `site`, taken until 1.73: where both are set, `site` wins. */
-  url?: string | undefined
   // Where kayjs-auth's routes live, `/auth` by default: `/auth/discord` starts a Discord sign-in.
   prefix?: Prefix | undefined
-  // The site's name, as mails and authenticator apps show it; the origin's host by default. A `site` that is not a URL is taken as the name until 1.73, the form before `name` existed.
+  // The site's name, as mails and authenticator apps show it; the origin's host by default.
   name?: string | undefined
   // Where a sign-in that failed goes, with `?error=` saying why; the prebuilt sign-in page with `pages`, else `/`. Without `pages`, it is also where `guard()` and `requireUser()` send an anonymous visitor opening a page.
   signInPage?: string | undefined
@@ -164,19 +161,15 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   user?: (TSchema & { static: UserData }) | undefined
   // Called on every provider sign-in, the first and a link included, with `{ user, profile }`: the user as the app has them and the provider's profile. It runs before any second factor. What it returns is laid over `user().data`, only the fields `user` declares, and kept when the result fits the schema; return nothing to keep what is there, such as an avatar.
   profileFields?: ((event: { user: User<UserData>, profile: Profile }) => { [Field in keyof UserData]?: UserData[Field] | undefined } | void | Promise<{ [Field in keyof UserData]?: UserData[Field] | undefined } | void>) | undefined
-  // The old name of `profileFields`, called with `user` and `profile` as two arguments; read until 1.73.
-  onProviderProfile?: ((user: User<UserData>, profile: Profile) => { [Field in keyof UserData]?: UserData[Field] | undefined } | void | Promise<{ [Field in keyof UserData]?: UserData[Field] | undefined } | void>) | undefined
   // Called once a user is deleted, to delete the app's own records for them.
   onDelete?: ((event: { user: User }) => void | Promise<void>) | undefined
-  // Deletes a guest whose account is older than `maxAge` (seconds or a string such as '30d') and who has no session left, calling `onDelete` as for any user; 30 days by default.
+  // Deletes a guest whose account is older than `maxAge` (a string such as '30d') and who has no session left, calling `onDelete` as for any user; 30 days by default.
   guests?: { maxAge: Duration } | undefined
   // What the app keeps about a user, added to their `exportData()` as `app`: their posts, their orders. Called with `{ user }`.
   exportData?: ((event: { user: User }) => unknown) | undefined
-  // The old name of `exportData`, called with the user alone; read until 1.73.
-  onExport?: ((user: User) => unknown) | undefined
   // Called with every change to what protects an account, the ones mailed to the user, and with every sign-in, sign-out and failed sign-in of a known account, for an audit log of the app's own. It gets one object: `event`, `user`, `context` (where from, and who acted when not the user), and the fields of its kind, such as the `role` of a `role-granted` or the `method` of a `signed-in`.
   onAuthEvent?: ((info: AuthEventInfo) => void | Promise<void>) | undefined
-  // Keeps the same events in the store's audit log, for `auditLog()`; `maxAge` seconds or a string such as '365d', a year by default. Each entry keeps the address cut to its /24 (IPv4) or /48 (IPv6) unless `ip` is 'full'.
+  // Keeps the same events in the store's audit log, for `auditLog()`; `maxAge` a string such as '365d', a year by default. Each entry keeps the address cut to its /24 (IPv4) or /48 (IPv6) unless `ip` is 'full'.
   audit?: boolean | { maxAge?: Duration, ip?: 'full' | 'truncated' } | undefined
   // What a bearer token may be limited to, such as `['posts:read', 'posts:write']`: a route asks for one with `scope:`.
   scopes?: readonly Scope[] | undefined
@@ -190,8 +183,6 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   defaultRoles?: NoInfer<Role>[] | undefined
   // How long a session lives unseen when its sign-in asked to be remembered, `remember: true`: `remember: { maxAge: '90d' }`, 90 days by default. The other lifetimes are the session plugin's own: its `maxAge` without a choice, its `browserMaxAge` for `remember: false`, and its `absoluteMaxAge` from the sign-in however much it is used, "remember me" included.
   remember?: { maxAge?: Duration | undefined } | undefined
-  /** @deprecated Since 1.70, dropped in 1.73: this is `remember: { maxAge }`. */
-  rememberMaxAge?: Duration | undefined
   // The password and username rules, over the defaults of 10 to 128 characters and 2 to 32: `{ password: { min: 12, check: p => /\d/.test(p) ? undefined : 'Add a digit.' }, username: { min: 3, max: 16 } }`. The server, the prebuilt pages and `features().rules` all follow them, and an island passes the same object, or `features().rules`, to `passwordProblem` and `usernameProblem` from `@kaynooo/kayjs-auth/rules`.
   rules?: CredentialRules | undefined
   // The app's page listing where the user is signed in, linked from new sign-in mails: `/account/sessions`.
@@ -200,8 +191,6 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   locate?: ((ip: string) => string | null | undefined | Promise<string | null | undefined>) | undefined
   // Attempts allowed per client address and per account, over `DEFAULT_LIMITS`: `rateLimit: { signIn: { max: 10, window: '15m' } }`.
   rateLimit?: LimitsOption | undefined
-  // The old name of `rateLimit`, taken until 1.73: where both name a limit, `rateLimit` wins.
-  limits?: LimitsOption | undefined
   // Passkeys are made for `site`'s host and its origin; `rpId` widens them to a parent domain, `origins` lists every origin the site's pages are served from, and `rpName` is the name the authenticator shows (`name` by default). `userVerification` is how hard answering a second factor with a passkey asks for a PIN or a biometric, `'preferred'` by default: adding a passkey, signing in with one and re-proving always require it, as a passkey alone is two factors.
   passkeys?: { rpId?: string, origins?: string[], rpName?: string, userVerification?: 'required' | 'preferred' | 'discouraged' } | false | undefined
   // Password sign-in, registering, resets and changes; false answers `{ ok: false, error: 'off' }` from their methods and hides them from the prebuilt pages. On by default.
@@ -1035,111 +1024,6 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   // Revokes one of the signed-in user's bearer tokens, from a browser session only: `signed-out` through a token, `not-found` for one that is not theirs.
   async revokeBearerToken(id: string): Promise<{ ok: true } | { ok: false, error: 'signed-out' | 'not-found' }> {
     return (await load.bearer()).revokeToken(this[STATE], id)
-  }
-
-  /** @deprecated Renamed `listSessions`, kept three minors. */
-  async sessions(): Promise<UserSession[]> {
-    return this.listSessions()
-  }
-
-  /** @deprecated Renamed `listPasskeys`, kept three minors. */
-  async passkeys(): Promise<Passkey[]> {
-    return this.listPasskeys()
-  }
-
-  /** @deprecated Renamed `listTokens`, kept three minors. */
-  async tokens(): Promise<BearerToken[]> {
-    return this.listTokens()
-  }
-
-  /** @deprecated Renamed `listMembers`, kept three minors. */
-  async members(ref: string): Promise<{ ok: true, members: Member<OrgRole>[] } | { ok: false, error: OrganizationFailure }> {
-    return this.listMembers(ref)
-  }
-
-  /** @deprecated Renamed `listOrganizations`, kept three minors. */
-  async organizations(): Promise<Membership<OrgRole>[]> {
-    return this.listOrganizations()
-  }
-
-  /** @deprecated Renamed `getOrganization`, kept three minors. */
-  async organization(ref: string): Promise<Membership<OrgRole> | null> {
-    return this.getOrganization(ref)
-  }
-
-  /** @deprecated Renamed `listInvitations`, kept three minors. */
-  async invitations(ref: string): Promise<{ ok: true, invitations: Invitation<OrgRole>[] } | { ok: false, error: OrganizationFailure }> {
-    return this.listInvitations(ref)
-  }
-
-  /** @deprecated Renamed `listMyInvitations`, kept three minors. */
-  async myInvitations(): Promise<Invitation<OrgRole>[]> {
-    return this.listMyInvitations()
-  }
-
-  /** @deprecated Renamed `getInvitation`, kept three minors. */
-  async invitation(invitationId: string): Promise<Invitation<OrgRole> | null> {
-    return this.getInvitation(invitationId)
-  }
-
-  /** @deprecated Renamed `listOAuthClients`, kept three minors. */
-  async oauthClients(): Promise<ApprovedClient[]> {
-    return this.listOAuthClients()
-  }
-
-  /** @deprecated Renamed `listIdentities`, kept three minors. */
-  async identities(): Promise<string[]> {
-    return this.listIdentities()
-  }
-
-  /** @deprecated Renamed `listAuditLog`, kept three minors. */
-  async auditLog(options: { before?: AuditCursorInput, limit?: number } = {}): Promise<AuditEntry[]> {
-    return this.listAuditLog(options)
-  }
-
-  /** @deprecated Renamed `listAdminAuditLog`, kept three minors. */
-  async adminAuditLog(query: { userId?: string, before?: AuditCursorInput, limit?: number } = {}): Promise<{ ok: true, entries: AuditEntry[] } | { ok: false, error: 'forbidden' }> {
-    return this.listAdminAuditLog(query)
-  }
-
-  /** @deprecated Renamed `revokePasskey`, kept three minors. */
-  async removePasskey(id: string, proof: Proof): Promise<{ ok: true } | { ok: false, error: ProofFailure | 'not-found' | 'last-way-in' }> {
-    return this.revokePasskey(id, proof)
-  }
-
-  /** @deprecated Renamed `deleteMember`, kept three minors. */
-  async removeMember(ref: string, userId: string): Promise<MemberResult> {
-    return this.deleteMember(ref, userId)
-  }
-
-  /** @deprecated Renamed `revokeSession`, which answers `{ ok }`; kept three minors. */
-  async endSession(id: string): Promise<boolean> {
-    return (await this.revokeSession(id)).ok
-  }
-
-  /** @deprecated Renamed `revokeBearerToken`, which answers `{ ok }`; kept three minors. */
-  async revokeToken(id: string): Promise<boolean> {
-    return (await this.revokeBearerToken(id)).ok
-  }
-
-  /** @deprecated Renamed `revokeOAuthGrant`, which answers `{ ok }`; kept three minors. */
-  async revokeOAuthClient(clientId: string): Promise<boolean> {
-    return (await this.revokeOAuthGrant(clientId)).ok
-  }
-
-  /** @deprecated Renamed `updatePasskeyName`, which answers `{ ok }`; kept three minors. */
-  async renamePasskey(id: string, name: string): Promise<boolean> {
-    return (await this.updatePasskeyName(id, name)).ok
-  }
-
-  /** @deprecated Renamed `rejectInvitation`, which answers `{ ok }`; kept three minors. */
-  async declineInvitation(invitationId: string): Promise<boolean> {
-    return (await this.rejectInvitation(invitationId)).ok
-  }
-
-  /** @deprecated Renamed `updateLocale`, which answers `{ ok }`; kept three minors. */
-  async setLocale(locale: string): Promise<boolean> {
-    return (await this.updateLocale(locale)).ok
   }
 
   // Under a new session id, so one planted before is worth nothing; `method` says how, for the `signed-in` event.

@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import process from 'node:process'
 import { afterEach, describe, expect, test } from 'bun:test'
-import { authExtension, authPages } from '../src/pages'
+import { auth } from '../src/pages'
 import { testApp, userRecord } from './helpers/app'
 
 const devCode = process.env.KAY_DEV_CODE
@@ -39,8 +39,8 @@ describe('the dev tool\'s Auth tab', () => {
   })
 
   test('is named by both extensions, as one file', () => {
-    const extension = authExtension(async () => ({ auth: { plugin: testApp().auth.plugin } }))
-    const pages = authPages()
+    const extension = auth({ server: () => testApp().auth.plugin })
+    const pages = auth({ plugin: false })
 
     expect(extension.devTool).toEqual(pages.devTool)
     expect(existsSync(pages.devTool!.module)).toBe(true)

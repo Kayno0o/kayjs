@@ -9,7 +9,7 @@ const PORTAL = 'https://auth.example.test'
 const GUARDED = 'https://wiki.example.test/page?x=1'
 
 function setup(forwardAuth: ForwardDomains | ForwardAuthOptions = 'example.test') {
-  const app = testApp({ url: PORTAL, pages: true, forwardAuth })
+  const app = testApp({ site: PORTAL, pages: true, forwardAuth })
 
   // A person signed in on their own browser.
   async function signedIn(fields: { username?: string, email?: string, roles?: ('admin' | 'editor')[] }, twoFactor = false) {
@@ -153,7 +153,7 @@ describe('a proxy asking whether to let a request through', () => {
   })
 
   test('requireTwoFactor sends a user to the security page, a passkey holder too, as the session does not say how it signed in; the page is under of the pages\' prefix', async () => {
-    const app = testApp({ url: PORTAL, pages: { prefix: '/account-area' }, forwardAuth: { domains: 'example.test', requireTwoFactor: true } })
+    const app = testApp({ site: PORTAL, pages: { prefix: '/account-area' }, forwardAuth: { domains: 'example.test', requireTwoFactor: true } })
     const made = await app.auth.createUser({ username: 'key', password: PASSWORD, emailVerified: true })
 
     if (!made.ok)
@@ -169,7 +169,7 @@ describe('a proxy asking whether to let a request through', () => {
   })
 
   test('without the prebuilt pages a user missing two-factor is refused with a 403, there being no page to send them to', async () => {
-    const app = testApp({ url: PORTAL, forwardAuth: { domains: 'example.test', requireTwoFactor: true } })
+    const app = testApp({ site: PORTAL, forwardAuth: { domains: 'example.test', requireTwoFactor: true } })
     const made = await app.auth.createUser({ username: 'plain', password: PASSWORD, emailVerified: true })
 
     if (!made.ok)
@@ -216,7 +216,7 @@ describe('coming back from signing in', () => {
   })
 
   test('the home is the pages\' home', async () => {
-    const app = testApp({ url: PORTAL, pages: { home: '/dashboard' }, forwardAuth: 'example.test' })
+    const app = testApp({ site: PORTAL, pages: { home: '/dashboard' }, forwardAuth: 'example.test' })
 
     expect((await app.browser().fetch('/auth/forward/return?to=https://evil.test/')).headers.get('location')).toBe('/dashboard')
   })
@@ -254,7 +254,7 @@ describe('the domains', () => {
 
     try {
       expect(() => testApp({ forwardAuth: 'example.test' })).toThrow('forwardAuth sends visitors')
-      expect(() => testApp({ url: PORTAL, forwardAuth: 'example.test' })).not.toThrow()
+      expect(() => testApp({ site: PORTAL, forwardAuth: 'example.test' })).not.toThrow()
     }
     finally {
       process.env.NODE_ENV = previous
@@ -262,7 +262,7 @@ describe('the domains', () => {
   })
 
   test('are not served without the option', async () => {
-    const app = testApp({ url: PORTAL })
+    const app = testApp({ site: PORTAL })
 
     expect((await app.browser().fetch('/auth/forward')).status).toBe(404)
   })

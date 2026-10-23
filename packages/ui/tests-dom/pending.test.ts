@@ -1,6 +1,8 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Pending from '../tests/fixture/src/components/pending.kay'
+
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -8,8 +10,6 @@ let mounted: Mounted | undefined
 afterEach(() => {
   mounted?.unmount()
 })
-
-const FIXTURE = 'src/components/pending.kay'
 
 // How to drive one control of the fixture and read it back: `pick` changes it from `initial` to `picked`, `other` is another click on it, and `form` is what its field posts at each of the two.
 interface Control {
@@ -87,7 +87,7 @@ type Report = [control: string, value: unknown]
 async function open(answer: (control: string, value: unknown) => unknown, mirror = false) {
   const calls: Report[] = []
 
-  mounted = await mountComponent(FIXTURE, { mirror, onChange: (control: string, value: unknown) => {
+  mounted = await mountComponent(Pending, { mirror, onChange: (control: string, value: unknown) => {
     calls.push([control, value])
 
     return answer(control, value)
@@ -210,7 +210,7 @@ test('a ChipGroup leaves its disabled chip alone', async () => {
 })
 
 test('a Checkbox is indeterminate while its parent says so, a click toggling it from checked', async () => {
-  mounted = await mountComponent(FIXTURE, { onChange: () => undefined })
+  mounted = await mountComponent(Pending, { onChange: () => undefined })
 
   expect([...mounted.root.querySelectorAll('.kui-checkbox')].map(box => box.textContent)).toEqual(['I agreev2', 'Select all', 'Some'])
 
@@ -235,7 +235,7 @@ test('a Checkbox is indeterminate while its parent says so, a click toggling it 
 })
 
 test('a Segmented group shows none picked while its parent passes null, and again once the parent goes back to it', async () => {
-  mounted = await mountComponent(FIXTURE, { onChange: () => undefined })
+  mounted = await mountComponent(Pending, { onChange: () => undefined })
 
   const radios = () => [...mounted!.root.querySelectorAll<HTMLInputElement>('#zoom input')].map(radio => radio.checked)
 

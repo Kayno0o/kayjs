@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent } from 'kay/test'
+import SegmentedVertical from '../tests/fixture/src/components/segmented-vertical.kay'
 
 let mounted: Mounted | undefined
 
@@ -9,7 +10,7 @@ afterEach(() => {
 })
 
 test('a Segmented given orientation="vertical" says so to the page and to screen readers, a plain one stays a row', async () => {
-  mounted = await mountComponent('src/components/segmented-vertical.kay', {})
+  mounted = await mountComponent(SegmentedVertical, {})
 
   const column = mounted.root.querySelector('#column')!
   const row = mounted.root.querySelector('#row')!
@@ -19,7 +20,7 @@ test('a Segmented given orientation="vertical" says so to the page and to screen
 })
 
 test('a vertical Segmented keeps real radios in one group, so the arrow keys move through them as the column reads', async () => {
-  mounted = await mountComponent('src/components/segmented-vertical.kay', {})
+  mounted = await mountComponent(SegmentedVertical, {})
 
   const radios = [...mounted.root.querySelectorAll<HTMLInputElement>('#column input[type="radio"]')]
 

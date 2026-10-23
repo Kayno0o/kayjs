@@ -50,8 +50,8 @@ describe('the actions that re-prove the user', () => {
   // One account of each shape, signed in, with the action's own failures told apart from its refusals by `error`.
   async function shaped(shape: 'bare' | 'password' | 'twoFactor') {
     const app = testApp({
-      url: 'https://site.test',
-      site: 'Site',
+      site: 'https://site.test',
+      name: 'Site',
       email: { mailer: mailbox().mailer, links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' }, requireVerified: false },
       oauth: { github: { provider: githubProvider(), clientId: 'github-id', clientSecret: 'github-secret' } },
     })
@@ -121,8 +121,8 @@ describe('changing the email on an account with a second factor', () => {
   // Ada with two-factor on, and the secret her authenticator holds; `password: false` makes the account a passwordless one.
   async function twoFactor({ password = true } = {}) {
     const app = testApp({
-      url: 'https://site.test',
-      site: 'Site',
+      site: 'https://site.test',
+      name: 'Site',
       admin: 'admin',
       email: { mailer: mailbox().mailer, links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' }, requireVerified: false },
     })

@@ -40,7 +40,7 @@ const schema = s.Object({ avatar: s.Optional(s.String()), level: s.Optional(s.Nu
 
 function setup(options: Record<string, unknown> = {}) {
   return testApp({
-    url: 'https://site.test',
+    site: 'https://site.test',
     signInPage: '/login',
     oauth: {
       discord: { provider: discordProvider(), clientId: 'd', clientSecret: 'd', keepTokens: true },

@@ -1,6 +1,6 @@
 // Drives an app that uses one feature of kayjs-auth, or none, then prints the node_modules packages and the kayjs-auth modules that were loaded: `bun loaded.ts <scenario>`.
 import { discordProvider } from '../../src/oauth/providers'
-import { authPages } from '../../src/pages'
+import { auth } from '../../src/pages'
 import { testApp } from '../helpers/app'
 import '../../src/index'
 
@@ -27,7 +27,7 @@ const scenarios: Record<string, () => Promise<void>> = {
   },
   // The default app with the prebuilt pages, probed on a provider route it does not have.
   async pages() {
-    const visitor = testApp({ pages: authPages() }).browser()
+    const visitor = testApp({ pages: auth({ plugin: false }) }).browser()
 
     await visitor.fetch('/auth/nope/callback')
     await visitor.fetch('/auth/nope')
@@ -46,18 +46,18 @@ const scenarios: Record<string, () => Promise<void>> = {
   },
   // Configured and never asked, then asked for its return page only.
   async forwardUnused() {
-    const visitor = testApp({ url: SITE, forwardAuth: 'example.test' }).browser()
+    const visitor = testApp({ site: SITE, forwardAuth: 'example.test' }).browser()
 
     await visitor.json('/me')
   },
   async forwardReturn() {
-    const visitor = testApp({ url: SITE, forwardAuth: 'example.test' }).browser()
+    const visitor = testApp({ site: SITE, forwardAuth: 'example.test' }).browser()
 
     await visitor.fetch(`/auth/forward/return?to=${encodeURIComponent('https://app.example.test/')}`)
   },
   // Every switchable feature off, each method calling the closed door.
   async switchesOff() {
-    const app = testApp({ url: SITE, passkeys: false, twoFactor: false, password: false, magicLink: false })
+    const app = testApp({ site: SITE, passkeys: false, twoFactor: false, password: false, magicLink: false })
     const visitor = app.browser()
 
     await visitor.call('signInWithPassword', { identifier: 'ada@example.com', password: PASSWORD })
@@ -68,12 +68,12 @@ const scenarios: Record<string, () => Promise<void>> = {
     await visitor.call('changePassword', { password: PASSWORD }, PASSWORD)
   },
   async forwardAuth() {
-    const visitor = testApp({ url: SITE, forwardAuth: 'example.test' }).browser()
+    const visitor = testApp({ site: SITE, forwardAuth: 'example.test' }).browser()
 
     await visitor.fetch('/auth/forward')
   },
   async passkeys() {
-    const visitor = await signedIn(testApp({ url: SITE }))
+    const visitor = await signedIn(testApp({ site: SITE }))
 
     await visitor.call('passkeySignInOptions')
   },
@@ -93,19 +93,19 @@ const scenarios: Record<string, () => Promise<void>> = {
     await visitor.call('listUsers')
   },
   async oauth() {
-    const visitor = testApp({ url: SITE, oauth: { discord: { provider: discordProvider(), clientId: 'id', clientSecret: 'secret' } } }).browser()
+    const visitor = testApp({ site: SITE, oauth: { discord: { provider: discordProvider(), clientId: 'id', clientSecret: 'secret' } } }).browser()
 
     await visitor.fetch('/auth/discord')
   },
   // A pending flow met by a callback for a provider the app lacks, which spends it through the flow module.
   async oauthUnknownCallback() {
-    const visitor = testApp({ url: SITE, oauth: { discord: { provider: discordProvider(), clientId: 'id', clientSecret: 'secret' } } }).browser()
+    const visitor = testApp({ site: SITE, oauth: { discord: { provider: discordProvider(), clientId: 'id', clientSecret: 'secret' } } }).browser()
     const state = new URL((await visitor.fetch('/auth/discord')).headers.get('location')!).searchParams.get('state')!
 
     await visitor.fetch(`/auth/nope/callback?code=code-1&state=${state}`)
   },
   async oauthServer() {
-    const visitor = testApp({ url: SITE, pages: authPages(), scopes: ['posts:read'] }).browser()
+    const visitor = testApp({ site: SITE, pages: auth({ plugin: false }), scopes: ['posts:read'] }).browser()
 
     await visitor.fetch('/auth/oauth/register', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ client_name: 'Claude Code', redirect_uris: ['http://127.0.0.1:33418/callback'] }) })
   },

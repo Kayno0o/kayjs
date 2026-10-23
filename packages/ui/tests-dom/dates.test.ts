@@ -2,6 +2,7 @@ import type { Mounted } from 'kay/test'
 import type { DateRange } from '../src/date'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Dates from '../tests/fixture/src/components/dates.kay'
 
 let mounted: Mounted | undefined
 const seen: { date: string[], range: DateRange[], time: string[] } = { date: [], range: [], time: [] }
@@ -14,7 +15,7 @@ afterEach(() => {
 })
 
 async function dates(props: Record<string, unknown> = {}) {
-  mounted = await mountComponent('src/components/dates.kay', {
+  mounted = await mountComponent(Dates, {
     onDate: (value: string) => seen.date.push(value),
     onRange: (value: DateRange) => seen.range.push(value),
     onTime: (value: string) => seen.time.push(value),

@@ -2,6 +2,7 @@ import type { Mounted } from 'kay/test'
 import type { ScreenCollection } from '../src/kay/contract'
 import { afterEach, expect, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import EntryEditor from '../src/components/entry-editor.kay'
 
 const notes: ScreenCollection = {
   name: 'notes',
@@ -20,7 +21,7 @@ afterEach(() => {
 
 async function open(collection: ScreenCollection = notes, stored: object[] = STORED, prefix = '/admin') {
   spyOn(globalThis, 'fetch').mockImplementation((async () => Response.json(stored)) as unknown as typeof fetch)
-  mounted = await mountComponent('../../src/components/entry-editor.kay', { prefix, collection })
+  mounted = await mountComponent(EntryEditor, { prefix, collection })
   await settle()
 
   return mounted.root
@@ -108,7 +109,7 @@ test('keeps a loaded collection\'s slug as typed, with no suggestion and no fold
 
 test('leaves the form working when the slugs cannot be read', async () => {
   spyOn(globalThis, 'fetch').mockImplementation((async () => new Response('no', { status: 500 })) as unknown as typeof fetch)
-  mounted = await mountComponent('../../src/components/entry-editor.kay', { prefix: '/admin', collection: notes })
+  mounted = await mountComponent(EntryEditor, { prefix: '/admin', collection: notes })
   await settle()
   await type(mounted.root, 'Slug', 'hello')
   expect(mounted.root.querySelector('[data-part="issue"]')).toBeNull()

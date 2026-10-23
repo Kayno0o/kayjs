@@ -2,6 +2,8 @@ import type { Mounted } from 'kay/test'
 import type { ScreenCollection, StoredEntry } from '../src/kay/contract'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import EntryEditor from '../src/components/entry-editor.kay'
+import WithLeaveGuard from './with-leave-guard.kay'
 
 const POSTS: ScreenCollection = {
   name: 'posts',
@@ -45,7 +47,7 @@ function server(answer: object = { saved: true, version: 'v2' }, hold = false) {
 const sentData = (fetched: ReturnType<typeof server>['fetched'], at = 0) => JSON.parse(String((fetched.mock.calls[at]![1] as RequestInit).body)) as { data: Record<string, unknown>, locale?: string }
 
 async function open(entry: StoredEntry | undefined = stored({}), collection: ScreenCollection = POSTS, fresh = false) {
-  mounted = await mountComponent('../../src/components/entry-editor.kay', { prefix: '/admin', collection, entry: fresh ? undefined : entry })
+  mounted = await mountComponent(EntryEditor, { prefix: '/admin', collection, entry: fresh ? undefined : entry })
   await settle()
 
   return mounted.root
@@ -273,7 +275,7 @@ test('Delete with edits not saved, when leaving is declined, locks the form and 
 })
 
 test('a role that may not publish or delete sees those buttons disabled, with the reason as their tooltip', async () => {
-  mounted = await mountComponent('../../src/components/entry-editor.kay', { prefix: '/admin', collection: POSTS, entry: stored({ draft: true }), denied: { publish: 'Your role may not publish', delete: 'Your role may not delete' } })
+  mounted = await mountComponent(EntryEditor, { prefix: '/admin', collection: POSTS, entry: stored({ draft: true }), denied: { publish: 'Your role may not publish', delete: 'Your role may not delete' } })
   await settle()
 
   const { root } = mounted
@@ -306,7 +308,7 @@ test('every button of publishing is disabled for a role that may not publish', a
   ]
 
   for (const [data, labels] of cases) {
-    mounted = await mountComponent('../../src/components/entry-editor.kay', { prefix: '/admin', collection: future, entry: stored(data), denied })
+    mounted = await mountComponent(EntryEditor, { prefix: '/admin', collection: future, entry: stored(data), denied })
     await settle()
 
     for (const label of labels) {
@@ -374,7 +376,7 @@ test('Create, when leaving is declined over edits not saved elsewhere, locks the
   }) as unknown as typeof fetch)
   const ask = spyOn(globalThis, 'confirm').mockImplementation(() => false)
 
-  mounted = await mountComponent('../../tests-dom/with-leave-guard.kay', { collection: POSTS })
+  mounted = await mountComponent(WithLeaveGuard, { collection: POSTS })
 
   const root = mounted.root
 

@@ -1,10 +1,9 @@
 import type { Mounted } from 'kay/test'
-import { join } from 'node:path'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Editor from '../src/editor/editor.kay'
 import { EDITOR_COOKIE } from '../src/page-link'
 
-const EDITOR = join(import.meta.dir, '../src/editor/editor.kay')
 let mounted: Mounted | undefined
 
 Object.assign(document, { caretPositionFromPoint: () => null, elementsFromPoint: () => [] })
@@ -35,7 +34,7 @@ async function open(fields = '', data: Record<string, unknown> = DATA) {
   page.innerHTML = `<div data-kay-body="pages:home">${HTML}</div>${fields}`
   document.body.append(page)
 
-  mounted = await mountComponent(EDITOR, { entries: [{ collection: 'pages', slug: 'home' }], unclickable: [] })
+  mounted = await mountComponent(Editor, { entries: [{ collection: 'pages', slug: 'home' }], unclickable: [] })
   await settle()
   await Bun.sleep(50)
 

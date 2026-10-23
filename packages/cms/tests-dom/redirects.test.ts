@@ -1,6 +1,8 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import AddRedirect from '../src/components/add-redirect.kay'
+import WithToaster from './with-toaster.kay'
 
 type Added = [string, string, number]
 
@@ -14,7 +16,7 @@ afterEach(() => {
 async function open(props: Record<string, unknown>) {
   const calls: Added[] = []
 
-  mounted = await mountComponent('../../src/components/add-redirect.kay', { path: '/old', onAdd: async (from: string, to: string, status: number) => {
+  mounted = await mountComponent(AddRedirect, { path: '/old', onAdd: async (from: string, to: string, status: number) => {
     calls.push([from, to, status])
   }, ...props })
 
@@ -149,7 +151,7 @@ test('the target box sends one request for several keystrokes typed within the p
 test('the confirmed bulk actions reach their confirm when they fail, which stays open', async () => {
   spyOn(globalThis, 'fetch').mockImplementation((async () => new Response('boom', { status: 500 })) as unknown as typeof fetch)
 
-  mounted = await mountComponent('../../tests-dom/with-toaster.kay', { rows: [{ path: '/gone', hits: 1, lastSeen: '2026-01-01 00:00', pages: [], from: '', target: undefined, reason: undefined, line: undefined }] })
+  mounted = await mountComponent(WithToaster, { rows: [{ path: '/gone', hits: 1, lastSeen: '2026-01-01 00:00', pages: [], from: '', target: undefined, reason: undefined, line: undefined }] })
   await settle()
 
   button(mounted.root, 'Clear the list')?.click()
@@ -168,7 +170,7 @@ test('the confirmed bulk actions reach their confirm when they fail, which stays
 test('removing the selected redirects reaches its confirm when it fails, which stays open', async () => {
   spyOn(globalThis, 'fetch').mockImplementation((async () => new Response('boom', { status: 500 })) as unknown as typeof fetch)
 
-  mounted = await mountComponent('../../tests-dom/with-toaster.kay', { redirects: [{ from: '/old', to: '/new', status: 307, at: '2026-01-01 00:00' }] })
+  mounted = await mountComponent(WithToaster, { redirects: [{ from: '/old', to: '/new', status: 307, at: '2026-01-01 00:00' }] })
   await settle()
 
   const select = mounted.root.querySelector<HTMLInputElement>('thead input[type="checkbox"]') ?? mounted.root.querySelector<HTMLInputElement>('input[type="checkbox"]')

@@ -2,6 +2,7 @@ import type { Mounted } from 'kay/test'
 import type { ScreenCollection, StoredEntry } from '../src/kay/contract'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import EntryScreen from '../tests/fixture/src/components/entry-screen.kay'
 
 const SHOP: ScreenCollection = {
   name: 'shop',
@@ -35,7 +36,7 @@ async function open(data: Record<string, unknown> = {}, collection: ScreenCollec
   if (!('mock' in globalThis.fetch))
     spyOn(globalThis, 'fetch').mockImplementation((async () => Response.json([])) as unknown as typeof fetch)
 
-  mounted = await mountComponent('src/components/entry-screen.kay', { collection, entry: entry(data) })
+  mounted = await mountComponent(EntryScreen, { collection, entry: entry(data) })
   await settle()
 
   const root = mounted.root

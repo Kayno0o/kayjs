@@ -11,9 +11,9 @@ afterEach(() => {
   setSystemTime()
 })
 
-function setup(email: { expires?: Partial<Record<'verify-email' | 'magic-link', Duration>>, maxAge?: Partial<Record<'verify-email' | 'reset-password' | 'magic-link' | 'change-email' | 'sign-in-code' | 'verify-code', Duration>>, codes?: 'both' | 'code' } = {}, locales?: string[]) {
+function setup(email: { maxAge?: Partial<Record<'verify-email' | 'reset-password' | 'magic-link' | 'change-email' | 'sign-in-code' | 'verify-code', Duration>>, codes?: 'both' | 'code' } = {}, locales?: string[]) {
   const { mails, mailer } = mailbox()
-  const app = testApp({ url: 'https://site.test', site: 'Site', email: { mailer, links: LINKS, requireVerified: false, ...email, ...locales && { locales } } })
+  const app = testApp({ site: 'https://site.test', name: 'Site', email: { mailer, links: LINKS, requireVerified: false, ...email, ...locales && { locales } } })
 
   return { ...app, mails }
 }
@@ -28,7 +28,7 @@ describe('lifetime words', () => {
   })
 })
 
-describe('email.expires', () => {
+describe('email.maxAge', () => {
   test('the defaults hold and the mails state them', async () => {
     const { browser, mails } = setup({ codes: 'both' })
     const ada = browser()
@@ -48,8 +48,8 @@ describe('email.expires', () => {
     const seen: unknown[] = []
     const { mailer, mails } = mailbox()
     const { browser, store } = testApp({
-      url: 'https://site.test',
-      site: 'Site',
+      site: 'https://site.test',
+      name: 'Site',
       email: {
         mailer,
         links: LINKS,
@@ -58,7 +58,7 @@ describe('email.expires', () => {
         codes: 'both',
         maxAge: { 'verify-email': '7d', 'reset-password': '30m', 'magic-link': '2h', 'change-email': '3h', 'verify-code': '20m', 'sign-in-code': '5m' },
         templates: { 'reset-password': (data) => {
-          seen.push(data.expires)
+          seen.push(data.maxAge)
 
           return { subject: 's', text: 't', html: 'h' }
         } },
@@ -120,8 +120,5 @@ describe('email.expires', () => {
     expect(() => setup({ maxAge: { verify: '1d' } as never })).toThrow('kay: email.maxAge.verify is no link or code')
     expect(() => setup({ maxAge: { constructor: '1d' } as never })).toThrow('kay: email.maxAge.constructor is no link or code')
     expect(() => setup({ maxAge: { 'magic-link': '0s' } })).toThrow('kay: email.maxAge.magic-link is \'0s\'')
-    expect(() => setup({ expires: { 'verify-email': 'a week' as Duration } })).toThrow('kay: email.expires.verify-email is \'a week\'')
-    expect(() => setup({ expires: { verify: '1d' } as never })).toThrow('kay: email.expires.verify is no link or code')
-    expect(() => setup({ expires: { 'magic-link': '0s' }, maxAge: { 'verify-email': 'a week' as Duration } })).toThrow('kay: email.maxAge.verify-email is')
   })
 })

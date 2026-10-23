@@ -1,9 +1,9 @@
 import type { Mounted } from 'kay/test'
-import { join } from 'node:path'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Editor from '../src/editor/editor.kay'
+import WithSaveAll from './with-save-all.kay'
 
-const EDITOR = join(import.meta.dir, '../src/editor/editor.kay')
 const POSTS = { name: 'posts', title: 'Posts', kind: 'folder', localized: false, components: [], schema: { type: 'object', properties: { title: { type: 'string' }, summary: { type: 'string' }, tags: { type: 'array', items: { type: 'string' } } } } }
 const HOME = { name: 'home', title: 'Home page', single: true, kind: 'file', localized: false, components: [], schema: { type: 'object', properties: { headline: { type: 'string' }, tagline: { type: 'string' } } } }
 const HELLO = { collection: 'posts', slug: 'hello' }
@@ -89,7 +89,7 @@ async function open(entries: object[] = [HELLO], at = '', rows = false) {
     document.body.append(element)
   }
 
-  mounted = await mountComponent(EDITOR, { entries, unclickable: [] })
+  mounted = await mountComponent(Editor, { entries, unclickable: [] })
 
   const root = mounted.root
 
@@ -395,7 +395,7 @@ test('a form for a locale of an entry collapses to the field clicked on the page
 test('the registry forgets the saver of an entry when its form unmounts, so Save all no longer reaches it', async () => {
   const writes = server()
 
-  mounted = await mountComponent(join(import.meta.dir, 'with-save-all.kay'), { entry: HELLO })
+  mounted = await mountComponent(WithSaveAll, { entry: HELLO })
 
   const root = mounted.root
   const title = () => root.querySelector<HTMLInputElement>('[data-kcms-path="title"] input')!

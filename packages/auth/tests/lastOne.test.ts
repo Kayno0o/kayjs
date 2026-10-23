@@ -87,8 +87,8 @@ async function organization(parties: number, make: () => Promise<AuthStore>) {
   const race = overlapping(await make(), parties)
   const app = testApp({
     store: race.store,
-    url: 'https://site.test',
-    site: 'Site',
+    site: 'https://site.test',
+    name: 'Site',
     email: EMAIL,
     organizations: { roles: { owner: ['admin'], admin: ['member'], member: [] }, owner: 'owner', manage: 'admin', defaultRoles: ['member'], invitationPage: '/invitation' },
   })
@@ -314,8 +314,8 @@ describe('an undo meeting a store outage', () => {
     } } }
     const app = testApp({
       store,
-      url: 'https://site.test',
-      site: 'Site',
+      site: 'https://site.test',
+      name: 'Site',
       email: EMAIL,
       organizations: { roles: { owner: ['admin'], admin: ['member'], member: [] }, owner: 'owner', manage: 'admin', defaultRoles: ['member'], invitationPage: '/invitation' },
     })

@@ -4,7 +4,7 @@ import { Elysia } from 'elysia'
 import { setSite } from 'kay/library'
 import { session } from 'kay/server'
 import { createAuth } from '../src/auth'
-import { memoryStore } from '../src/memoryStore'
+import { memoryAuthStore } from '../src/memoryStore'
 import { discordProvider } from '../src/oauth/providers'
 import { SECRET, testApp } from './helpers/app'
 import { mailbox } from './helpers/mail'
@@ -17,7 +17,7 @@ afterEach(() => {
 })
 
 describe('the site\'s origin kayjs-auth builds URLs on', () => {
-  test('is the site of kay.config.ts when createAuth gets no url', async () => {
+  test('is the site of kay.config.ts when createAuth gets no site', async () => {
     setSite('https://app.example.com')
 
     const response = await testApp({ oauth: OAUTH }).browser().fetch('/auth/discord')
@@ -33,10 +33,10 @@ describe('the site\'s origin kayjs-auth builds URLs on', () => {
     expect(new URL(response.headers.get('location')!).searchParams.get('redirect_uri')).toBe('https://app.example.com/docs/auth/discord/callback')
   })
 
-  test('is the url given when both are set', async () => {
+  test('is the site given when both are set', async () => {
     setSite('https://app.example.com')
 
-    const response = await testApp({ oauth: OAUTH, url: 'https://given.example.com/' }).browser().fetch('/auth/discord')
+    const response = await testApp({ oauth: OAUTH, site: 'https://given.example.com/' }).browser().fetch('/auth/discord')
 
     expect(new URL(response.headers.get('location')!).searchParams.get('redirect_uri')).toBe('https://given.example.com/auth/discord/callback')
   })
@@ -59,12 +59,12 @@ describe('the site\'s origin kayjs-auth builds URLs on', () => {
 
     await ada.call('register', { email: 'ada@example.com', password: 'correct horse battery' })
 
-    expect(mails[0]).toMatchObject({ site: 'app.example.com' })
+    expect(mails[0]).toMatchObject({ name: 'app.example.com' })
     expect(mails[0]!.url).toStartWith('https://app.example.com/verify?token=')
   })
 
   test('refuses to start a server when OAuth or mail has no origin from anywhere, naming where it goes', () => {
-    const auth = createAuth({ sessions: session<AuthSessionData>({ secret: SECRET }), secret: SECRET, store: memoryStore(), oauth: OAUTH })
+    const auth = createAuth({ sessions: session<AuthSessionData>({ secret: SECRET }), secret: SECRET, store: memoryAuthStore(), oauth: OAUTH })
 
     expect(() => new Elysia().use(auth.plugin).listen(0)).toThrow('SITE_URL')
   })
@@ -74,7 +74,7 @@ describe('the site\'s origin kayjs-auth builds URLs on', () => {
   })
 
   test('keeps the objects it built with no origin, and builds them again once the site is known', async () => {
-    const auth = createAuth({ sessions: session<AuthSessionData>({ secret: SECRET }), secret: SECRET, store: memoryStore() })
+    const auth = createAuth({ sessions: session<AuthSessionData>({ secret: SECRET }), secret: SECRET, store: memoryAuthStore() })
     const app = new Elysia().use(auth.plugin).get('/core', ({ auth }) => {
       const state = Object.getOwnPropertySymbols(auth).find(symbol => symbol.description === 'kayjs-auth.state')!
       const { core } = (auth as unknown as Record<symbol, { core: { refreshers: unknown, oauth: unknown, name: string, passkeys: unknown } }>)[state]!

@@ -65,9 +65,8 @@ describe('bearer tokens', () => {
     const device = browser()
     const post = async (method: string, ...args: unknown[]) => device.json(`/call/${method}`, { method: 'POST', headers: { ...bearer, 'content-type': 'application/json' }, body: JSON.stringify(args) })
 
-    expect(await post('tokens')).toEqual([])
+    expect(await post('listTokens')).toEqual([])
     expect(await post('revokeBearerToken', minted.id)).toEqual({ ok: false, error: 'signed-out' })
-    expect(await post('revokeToken', minted.id)).toBe(false)
     expect(await post('enableTwoFactor', '123456')).toEqual({ ok: false, error: 'signed-out' })
     expect(await ada.call('listTokens')).toHaveLength(1)
   })

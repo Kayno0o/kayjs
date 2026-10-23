@@ -1,10 +1,9 @@
 import type { Mounted } from 'kay/test'
-import { join } from 'node:path'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Editor from '../src/editor/editor.kay'
 import { EDITOR_COOKIE } from '../src/page-link'
 
-const EDITOR = join(import.meta.dir, '../src/editor/editor.kay')
 let mounted: Mounted | undefined
 
 // happy-dom has no caret lookup, which the editor's click handler asks.
@@ -71,7 +70,7 @@ async function open(pages: Page[], entry: { collection: string, slug: string, lo
     return element
   })
 
-  mounted = await mountComponent(EDITOR, { entries: [entry], unclickable: [] })
+  mounted = await mountComponent(Editor, { entries: [entry], unclickable: [] })
   await settle()
   await Bun.sleep(50)
 
@@ -238,7 +237,7 @@ test('a text clicked before its entry has loaded is left to the form', async () 
   page.setAttribute('data-kay-field', 'pages:home:title')
   page.textContent = 'Home'
   document.body.append(page)
-  mounted = await mountComponent(EDITOR, { entries: [{ collection: 'pages', slug: 'home' }], unclickable: [] })
+  mounted = await mountComponent(Editor, { entries: [{ collection: 'pages', slug: 'home' }], unclickable: [] })
   await settle()
   page.click()
   await settle()

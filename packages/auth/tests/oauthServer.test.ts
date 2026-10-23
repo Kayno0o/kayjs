@@ -6,7 +6,7 @@ import { Elysia } from 'elysia'
 import { pages } from 'kay/server'
 import { scratchDir } from 'kay/test'
 import { memoryAuthStore } from '../src/memoryStore'
-import { authPages } from '../src/pages'
+import { auth } from '../src/pages'
 import { browser as browserOf, testApp } from './helpers/app'
 
 const PASSWORD = 'correct horse battery'
@@ -22,8 +22,8 @@ afterEach(() => {
 function server(options: { documents?: Record<string, unknown>, scopes?: ('posts:read' | 'posts:write')[], defaultScopes?: ('posts:read' | 'posts:write')[], store?: ReturnType<typeof memoryAuthStore> } = {}) {
   const fetched: string[] = []
   const app = testApp({
-    url: 'http://localhost',
-    pages: authPages(),
+    site: 'http://localhost',
+    pages: auth({ plugin: false }),
     scopes: options.scopes ?? ['posts:read', 'posts:write'],
     ...options.store && { store: options.store },
     oauthServer: {
@@ -187,7 +187,7 @@ describe('the authorization request', () => {
   })
 
   test('a default scope the app does not declare is refused at startup', () => {
-    expect(() => testApp({ url: 'http://localhost', pages: authPages(), scopes: ['posts:read'], oauthServer: { defaultScopes: ['posts:write'] } } as never)).toThrow('defaultScopes')
+    expect(() => testApp({ site: 'http://localhost', pages: auth({ plugin: false }), scopes: ['posts:read'], oauthServer: { defaultScopes: ['posts:write'] } } as never)).toThrow('defaultScopes')
   })
 
   test('shows the consent page once, then skips it until the client asks for more scopes', async () => {
@@ -484,7 +484,6 @@ describe('refresh tokens', () => {
     expect(await ada.call('listOAuthClients')).toEqual([expect.objectContaining({ id: client_id, name: 'Claude Code', scopes: ['posts:read'] })])
     expect(await ada.call('revokeOAuthGrant', client_id)).toEqual({ ok: true })
     expect(await ada.call('revokeOAuthGrant', client_id)).toEqual({ ok: false, error: 'not-found' })
-    expect(await ada.call('revokeOAuthClient', client_id)).toBe(false)
     expect(await ada.call('listOAuthClients')).toEqual([])
     expect((await token(app, { grant_type: 'refresh_token', refresh_token: String(first.body.refresh_token), client_id })).body.error).toBe('invalid_grant')
     expect(await app.browser().json('/me', { headers: { authorization: `Bearer ${first.body.access_token}` } })).toBe('anonymous')
@@ -502,8 +501,8 @@ describe('refresh tokens', () => {
 
 describe('the OAuth server being off', () => {
   test('serves nothing without pages, or with oauthServer false', async () => {
-    const plain = testApp({ url: 'http://localhost' })
-    const off = testApp({ url: 'http://localhost', pages: authPages(), oauthServer: false })
+    const plain = testApp({ site: 'http://localhost' })
+    const off = testApp({ site: 'http://localhost', pages: auth({ plugin: false }), oauthServer: false })
 
     for (const app of [plain, off]) {
       expect((await app.browser().fetch('/.well-known/oauth-authorization-server')).status).toBe(404)

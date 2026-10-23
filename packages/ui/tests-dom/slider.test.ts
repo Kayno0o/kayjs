@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Slider from '../tests/fixture/src/components/slider.kay'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -10,7 +11,7 @@ afterEach(() => {
 })
 
 async function open(onInput?: (value: number) => void, onChange?: (value: number) => unknown) {
-  mounted = await mountComponent('src/components/slider.kay', { onInput, onChange })
+  mounted = await mountComponent(Slider, { onInput, onChange })
 
   const root = mounted.root
   const input = root.querySelector<HTMLInputElement>('input[name="delay"]')!

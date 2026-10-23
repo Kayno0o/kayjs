@@ -51,7 +51,7 @@ describe('kayjs-mail\'s auth views', () => {
   for (const [locale, messages] of [['en', en], ['fr', fr]] as const) {
     test(`open on kayjs-auth's own lead in ${locale}`, () => {
       const words = messages.mail.auth as unknown as Record<string, { lead: string }> & { link: string }
-      const data = { name: 'Site', site: 'Site', email: 'ada@example.com', detail: 'Acme', url: 'https://site.test/l', locale }
+      const data = { name: 'Site', email: 'ada@example.com', detail: 'Acme', url: 'https://site.test/l', locale }
       const values: Record<string, string> = { site: data.name, email: data.email, detail: data.detail, what: words.link }
 
       for (const [kind, template] of Object.entries(builtInTemplates[locale]!))

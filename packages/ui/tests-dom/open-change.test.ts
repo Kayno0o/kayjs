@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import OpenChange from '../tests/fixture/src/components/open-change.kay'
 import { click, clock } from './dom'
 
 let mounted: Mounted | undefined
@@ -13,7 +14,7 @@ afterEach(() => {
 async function disclosures() {
   const calls: string[] = []
 
-  mounted = await mountComponent('src/components/open-change.kay', { calls })
+  mounted = await mountComponent(OpenChange, { calls })
 
   return { root: mounted.root, calls }
 }

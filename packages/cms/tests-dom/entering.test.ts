@@ -2,6 +2,7 @@ import type { Mounted } from 'kay/test'
 import type { ScreenCollection, StoredEntry } from '../src/kay/contract'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import EntryScreen from '../tests/fixture/src/components/entry-screen.kay'
 
 const PEOPLE: ScreenCollection = {
   name: 'people',
@@ -40,7 +41,7 @@ function server(issues?: { path: string, message: string, body?: true }[]) {
 }
 
 async function open(data: Record<string, unknown> = { note: 'x' }) {
-  mounted = await mountComponent('src/components/entry-screen.kay', { collection: PEOPLE, entry: entry(data) })
+  mounted = await mountComponent(EntryScreen, { collection: PEOPLE, entry: entry(data) })
   await settle()
 
   const root = mounted.root

@@ -2,6 +2,10 @@ import type { SortState } from '@kaynooo/kayjs-ui'
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import FilteredTable from '../tests/fixture/src/components/filtered-table.kay'
+import SelectableFeed from '../tests/fixture/src/components/selectable-feed.kay'
+import SelectableTable from '../tests/fixture/src/components/selectable-table.kay'
+import TableComponent from '../tests/fixture/src/components/table.kay'
 import { click } from './dom'
 
 const PLANETS = [{ id: 1, name: 'Mars', moons: 2 }, { id: 2, name: 'Earth', moons: 1 }, { id: 3, name: 'Venus', moons: 0 }]
@@ -19,7 +23,7 @@ describe('Table', () => {
   test('sorts by a header click, its default direction first, flipping on the next, with aria-sort following', async () => {
     const sorts: SortState[] = []
 
-    mounted = await mountComponent('src/components/table.kay', { rows: PLANETS, onSort: (sort: SortState) => sorts.push(sort) })
+    mounted = await mountComponent(TableComponent, { rows: PLANETS, onSort: (sort: SortState) => sorts.push(sort) })
 
     const { root } = mounted
 
@@ -46,14 +50,14 @@ describe('Table', () => {
   })
 
   test('draws the cells of a `cell: true` column through its @cell block, and never sorts a column without sortValue', async () => {
-    mounted = await mountComponent('src/components/table.kay', { rows: PLANETS })
+    mounted = await mountComponent(TableComponent, { rows: PLANETS })
 
     expect(mounted.root.querySelector('tbody td strong')?.textContent).toBe('Mars')
     expect(header(mounted.root, 2).querySelector('button')).toBeNull()
   })
 
   test('leaves rows the data source sorted as they came, showing only the sort in its headers', async () => {
-    mounted = await mountComponent('src/components/table.kay', { rows: PLANETS, serverSort: true })
+    mounted = await mountComponent(TableComponent, { rows: PLANETS, serverSort: true })
     click(header(mounted.root, 0).querySelector('button'))
     await settle()
 
@@ -62,7 +66,7 @@ describe('Table', () => {
   })
 
   test('shows its @empty block when there are no rows', async () => {
-    mounted = await mountComponent('src/components/table.kay', { rows: [] })
+    mounted = await mountComponent(TableComponent, { rows: [] })
 
     expect(mounted.root.querySelector('[data-part="emptyCell"]')?.getAttribute('colspan')).toBe('3')
     expect(mounted.root.querySelector('[data-part="emptyCell"] .nothing')?.textContent).toBe('No planets')
@@ -85,7 +89,7 @@ describe('Table with a filter', () => {
   }
 
   test('draws the columns through @cell without cell: true, a numeric one sorting largest first and a cell: false one as text', async () => {
-    mounted = await mountComponent('src/components/filtered-table.kay', { rows: MOONS })
+    mounted = await mountComponent(FilteredTable, { rows: MOONS })
 
     const cells = (row: number) => [...mounted!.root.querySelectorAll('tbody tr')[row]!.querySelectorAll('[data-part="cellBody"]')].map(cell => cell.innerHTML.replaceAll(/<!--[^>]*-->/g, ''))
 
@@ -100,7 +104,7 @@ describe('Table with a filter', () => {
   })
 
   test('keeps the rows whose named fields hold the typed text, whatever its case, says how many to screen readers, and when none does', async () => {
-    mounted = await mountComponent('src/components/filtered-table.kay', { rows: MOONS })
+    mounted = await mountComponent(FilteredTable, { rows: MOONS })
 
     expect(mounted.root.querySelector('[data-part="filter"]')?.textContent).toBe('Filter moons')
 
@@ -124,7 +128,7 @@ describe('Table with a filter', () => {
 
   test('keeps the typed text in the URL under filterParam, and starts from it', async () => {
     visit('http://localhost/?q=io')
-    mounted = await mountComponent('src/components/filtered-table.kay', { rows: MOONS, filterParam: 'q' })
+    mounted = await mountComponent(FilteredTable, { rows: MOONS, filterParam: 'q' })
 
     expect(names(mounted.root)).toEqual(['Io'])
     expect(mounted.root.querySelector<HTMLInputElement>('[data-part="filterInput"]')?.value).toBe('io')
@@ -137,7 +141,7 @@ describe('Table with a filter', () => {
   })
 
   test('shows its @empty block, not the no-match one, when there are no rows at all', async () => {
-    mounted = await mountComponent('src/components/filtered-table.kay', { rows: [] })
+    mounted = await mountComponent(FilteredTable, { rows: [] })
 
     expect(mounted.root.querySelector('[data-part="emptyCell"] .nothing')?.textContent).toBe('No moons')
   })
@@ -156,7 +160,7 @@ describe('Table with a selection', () => {
   }
 
   test('draws no box without `selectable`', async () => {
-    mounted = await mountComponent('src/components/table.kay', { rows: PLANETS })
+    mounted = await mountComponent(TableComponent, { rows: PLANETS })
 
     expect(mounted.root.querySelector('.kui-checkbox, [data-part="selection"]')).toBeNull()
   })
@@ -164,7 +168,7 @@ describe('Table with a selection', () => {
   test('picks rows, counts them, and shows the select-all box unticked, indeterminate for some and ticked for all', async () => {
     const seen: unknown[][] = []
 
-    mounted = await mountComponent('src/components/selectable-table.kay', { rows: MOONS, onSelect: (keys: unknown[]) => seen.push(keys) })
+    mounted = await mountComponent(SelectableTable, { rows: MOONS, onSelect: (keys: unknown[]) => seen.push(keys) })
 
     const { root } = mounted
 
@@ -193,7 +197,7 @@ describe('Table with a selection', () => {
   test('hands the keys in the rows\' order whatever the order they were picked in', async () => {
     const seen: unknown[][] = []
 
-    mounted = await mountComponent('src/components/selectable-table.kay', { rows: MOONS, onSelect: (keys: unknown[]) => seen.push(keys) })
+    mounted = await mountComponent(SelectableTable, { rows: MOONS, onSelect: (keys: unknown[]) => seen.push(keys) })
     toggle(boxes(mounted.root)[2]!)
     await settle()
     toggle(boxes(mounted.root)[0]!)
@@ -205,7 +209,7 @@ describe('Table with a selection', () => {
   test('hands the picked rows beside the keys, in the rows\' order', async () => {
     const seen: unknown[][] = []
 
-    mounted = await mountComponent('src/components/selectable-table.kay', { rows: MOONS, onSelect: (keys: unknown[], rows: unknown[]) => seen.push([keys, rows]) })
+    mounted = await mountComponent(SelectableTable, { rows: MOONS, onSelect: (keys: unknown[], rows: unknown[]) => seen.push([keys, rows]) })
     toggle(boxes(mounted.root)[2]!)
     await settle()
     toggle(boxes(mounted.root)[0]!)
@@ -215,7 +219,7 @@ describe('Table with a selection', () => {
   })
 
   test('keeps the bulk block mounted when the rows are replaced by others with the same keys', async () => {
-    mounted = await mountComponent('src/components/selectable-table.kay', { rows: MOONS, selected: [1] })
+    mounted = await mountComponent(SelectableTable, { rows: MOONS, selected: [1] })
     await settle()
 
     const action = mounted.root.querySelector('.bulk-action')
@@ -227,7 +231,7 @@ describe('Table with a selection', () => {
   })
 
   test('selects every row from select-all, and clears them from it once all are picked, and from the indeterminate state selects all', async () => {
-    mounted = await mountComponent('src/components/selectable-table.kay', { rows: MOONS })
+    mounted = await mountComponent(SelectableTable, { rows: MOONS })
 
     const { root } = mounted
 
@@ -248,7 +252,7 @@ describe('Table with a selection', () => {
   test('shows the bulk block beside the count with the keys in row order, and its clear function empties the selection', async () => {
     const acted: unknown[][] = []
 
-    mounted = await mountComponent('src/components/selectable-table.kay', { rows: MOONS, onBulk: (keys: unknown[]) => acted.push(keys) })
+    mounted = await mountComponent(SelectableTable, { rows: MOONS, onBulk: (keys: unknown[]) => acted.push(keys) })
 
     const { root } = mounted
 
@@ -264,7 +268,7 @@ describe('Table with a selection', () => {
   })
 
   test('labels each row box by its row, the select-all box and the column header, and takes the texts from the page', async () => {
-    mounted = await mountComponent('src/components/selectable-table.kay', { rows: MOONS })
+    mounted = await mountComponent(SelectableTable, { rows: MOONS })
 
     const { root } = mounted
 
@@ -272,7 +276,7 @@ describe('Table with a selection', () => {
     expect(header(root, 0).textContent).toBe('Select all')
     mounted.unmount()
 
-    mounted = await mountComponent('src/components/selectable-table.kay', { rows: MOONS, selected: [1, 2], selectAllLabel: 'Tout', selectedLabel: (count: number) => `${count} choisis`, selectRowLabel: (row: { name: string }) => `Choisir ${row.name}` })
+    mounted = await mountComponent(SelectableTable, { rows: MOONS, selected: [1, 2], selectAllLabel: 'Tout', selectedLabel: (count: number) => `${count} choisis`, selectRowLabel: (row: { name: string }) => `Choisir ${row.name}` })
 
     expect(toolbar(mounted.root)).toContain('2 choisis')
     expect(header(mounted.root, 0).textContent).toBe('Tout')
@@ -282,7 +286,7 @@ describe('Table with a selection', () => {
   test('starts from `selected` and drops keys of rows that are not there, telling the page', async () => {
     const seen: unknown[][] = []
 
-    mounted = await mountComponent('src/components/selectable-table.kay', { rows: MOONS, selected: [3, 9, 1], onSelect: (keys: unknown[]) => seen.push(keys) })
+    mounted = await mountComponent(SelectableTable, { rows: MOONS, selected: [3, 9, 1], onSelect: (keys: unknown[]) => seen.push(keys) })
     await settle()
 
     expect(ticked(mounted.root)).toEqual([true, false, true])
@@ -293,7 +297,7 @@ describe('Table with a selection', () => {
   test('prunes the keys of rows no longer in `rows`, and a row coming back is not picked again', async () => {
     const seen: unknown[][] = []
 
-    mounted = await mountComponent('src/components/selectable-table.kay', { rows: MOONS, selected: [1, 2, 3], onSelect: (keys: unknown[]) => seen.push(keys) })
+    mounted = await mountComponent(SelectableTable, { rows: MOONS, selected: [1, 2, 3], onSelect: (keys: unknown[]) => seen.push(keys) })
     await settle()
     click(mounted.root.querySelector('.drop'))
     await settle()
@@ -308,7 +312,7 @@ describe('Table with a selection', () => {
   })
 
   test('keeps the selection through a sort', async () => {
-    mounted = await mountComponent('src/components/selectable-table.kay', { rows: MOONS })
+    mounted = await mountComponent(SelectableTable, { rows: MOONS })
 
     const { root } = mounted
 
@@ -322,7 +326,7 @@ describe('Table with a selection', () => {
   })
 
   test('select-all acts on the rows the filter shows, leaving the ones it hides as they are', async () => {
-    mounted = await mountComponent('src/components/selectable-table.kay', { rows: MOONS, filter: true, selected: [3] })
+    mounted = await mountComponent(SelectableTable, { rows: MOONS, filter: true, selected: [3] })
 
     const { root } = mounted
     const input = root.querySelector<HTMLInputElement>('[data-part="filterInput"]')!
@@ -354,14 +358,14 @@ describe('Table with a selection', () => {
   })
 
   test('disables select-all for an empty table and gives the empty cell the extra column', async () => {
-    mounted = await mountComponent('src/components/selectable-table.kay', { rows: [] })
+    mounted = await mountComponent(SelectableTable, { rows: [] })
 
     expect(all(mounted.root).disabled).toBe(true)
     expect(mounted.root.querySelector('[data-part="emptyCell"]')?.getAttribute('colspan')).toBe('3')
   })
 
   test('keeps the select-all box outside the table, so stacked cards have it too, and a box in each card without a label', async () => {
-    mounted = await mountComponent('src/components/selectable-table.kay', { rows: MOONS, narrow: 'stack' })
+    mounted = await mountComponent(SelectableTable, { rows: MOONS, narrow: 'stack' })
 
     const { root } = mounted
 
@@ -372,7 +376,7 @@ describe('Table with a selection', () => {
   test('works with the rows of an infinite list: a page loaded later joins select-all and the picked rows stay picked', async () => {
     const seen: unknown[][] = []
 
-    mounted = await mountComponent('src/components/selectable-feed.kay', { onLoad: async () => [{ id: 3, name: 'Amalthea' }], onSelect: (keys: unknown[]) => seen.push(keys) })
+    mounted = await mountComponent(SelectableFeed, { onLoad: async () => [{ id: 3, name: 'Amalthea' }], onSelect: (keys: unknown[]) => seen.push(keys) })
 
     const { root } = mounted
 

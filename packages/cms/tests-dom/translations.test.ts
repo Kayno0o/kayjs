@@ -2,6 +2,7 @@ import type { Mounted } from 'kay/test'
 import type { ScreenCollection } from '../src/kay/contract'
 import { afterEach, expect, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import EntryEditor from '../src/components/entry-editor.kay'
 
 const pages: ScreenCollection = {
   name: 'pages',
@@ -23,7 +24,7 @@ afterEach(() => {
 
 async function open(props: object) {
   spyOn(globalThis, 'fetch').mockImplementation((async () => Response.json([])) as unknown as typeof fetch)
-  mounted = await mountComponent('../../src/components/entry-editor.kay', { prefix: '/admin', collection: pages, ...props })
+  mounted = await mountComponent(EntryEditor, { prefix: '/admin', collection: pages, ...props })
   await settle()
 
   return mounted.root

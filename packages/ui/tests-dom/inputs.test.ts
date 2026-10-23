@@ -2,6 +2,7 @@ import type { Mounted } from 'kay/test'
 import type { RangeValue } from '../src/range'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Inputs from '../tests/fixture/src/components/inputs.kay'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -18,7 +19,7 @@ afterEach(() => {
 })
 
 async function inputs(paste = false) {
-  mounted = await mountComponent('src/components/inputs.kay', {
+  mounted = await mountComponent(Inputs, {
     onRange: (value: RangeValue) => seen.range.push(value),
     onPlanets: (value: string[]) => seen.planets.push(value),
     onFiles: (names: string[]) => seen.files.push(names),

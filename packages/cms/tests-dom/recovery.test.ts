@@ -3,6 +3,7 @@ import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import { browserKeeper } from '../src/draft-storage'
 import { createDrafts } from '../src/drafts'
+import Notices from '../tests/fixture/src/components/notices.kay'
 
 const ENTRY = { collection: 'posts', slug: 'hello' }
 const COLLECTION = { name: 'posts', title: 'Posts' }
@@ -28,7 +29,7 @@ function memoryStorage(): Storage {
 }
 
 async function mountNotices(drafts: ReturnType<typeof createDrafts>) {
-  mounted = await mountComponent('src/components/notices.kay', { drafts })
+  mounted = await mountComponent(Notices, { drafts })
   await settle()
 
   return mounted.root

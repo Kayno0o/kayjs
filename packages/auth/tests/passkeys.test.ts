@@ -15,8 +15,8 @@ afterEach(() => {
 async function setup(passkeys?: NonNullable<Parameters<typeof testApp>[0]>['passkeys'], extra: Parameters<typeof testApp>[0] = {}) {
   const events: AuthEventInfo[] = []
   const app = testApp({
-    url: 'https://site.test',
-    site: 'Site',
+    site: 'https://site.test',
+    name: 'Site',
     ...passkeys !== undefined && { passkeys },
     ...extra,
     onAuthEvent: (info) => {
@@ -345,7 +345,6 @@ describe('a passkey as second factor and as proof', () => {
     expect(await ada.call('updatePasskeyName', id, ' ')).toEqual({ ok: false, error: 'invalid-name' })
     expect(await ada.call('updatePasskeyName', id, 'Work laptop')).toEqual({ ok: true })
     expect(await ada.call('listPasskeys')).toMatchObject([{ name: 'Work laptop' }])
-    expect(await ada.call('renamePasskey', id, 'Old name')).toBe(true)
   })
 })
 

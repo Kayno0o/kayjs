@@ -92,8 +92,8 @@ describe('a toast\'s time', () => {
   })
 
   test('falls back to the default time for a duration that is not a time', () => {
-    toast.info('NaN', { duration: Number.NaN as never })
-    toast.info('Negative', { duration: -5 as never })
+    toast.info('NaN', { duration: 'soon' as never })
+    toast.info('Negative', { duration: '-5s' as never })
     toast.info('Unset', { duration: undefined })
     jest.advanceTimersByTime(6000)
 

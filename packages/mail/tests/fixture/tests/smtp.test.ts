@@ -117,7 +117,7 @@ describe('smtp', () => {
     }
   })
 
-  it.each([[{ max: 1, window: '1s' }], [1]] as const)('holds sends to the rate limit, as %j', async (rateLimit) => {
+  it.each([[{ max: 1, window: '1s' }]] as const)('holds sends to the rate limit, as %j', async (rateLimit) => {
     const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: server.port, insecure: true, maxConnections: 1, rateLimit }) })
     const started = performance.now()
 
@@ -128,7 +128,6 @@ describe('smtp', () => {
 
   it('refuses a connection count or a rate limit that is no whole number of at least 1', () => {
     expect(() => smtp({ host: '127.0.0.1', maxConnections: 0 })).toThrow('maxConnections is 0')
-    expect(() => smtp({ host: '127.0.0.1', rateLimit: 0.5 })).toThrow('rateLimit is 0.5')
     expect(() => smtp({ host: '127.0.0.1', rateLimit: { max: 0, window: '1s' } })).toThrow('rateLimit.max is 0')
     expect(() => smtp({ host: '127.0.0.1', rateLimit: { max: 1, window: 'soon' as '1s' } })).toThrow('rateLimit.window')
   })
@@ -301,7 +300,6 @@ describe('mailer({ smtp })', () => {
     expect(() => mailer({ smtp: { timeout: '-5s' } })).toThrow('takes a positive duration')
     expect(() => mailer({ smtp: { timeout: '-1m' as '1m' } })).toThrow('takes a positive duration')
     expect(() => mailer({ smtp: { maxConnections: 0 } })).toThrow('mailer({ smtp })\'s maxConnections is 0')
-    expect(() => mailer({ smtp: { rateLimit: -1 } })).toThrow('rateLimit is -1')
     expect(() => smtp({ host: '127.0.0.1', name: ' ' })).toThrow('smtp()\'s name is')
   })
 

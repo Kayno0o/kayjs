@@ -20,7 +20,7 @@ afterEach(() => {
 function setup(options: Parameters<typeof testApp>[0] = {}) {
   const { mails, mailer, take } = mailbox()
   const app = testApp({
-    url: 'https://site.test',
+    site: 'https://site.test',
     email: {
       mailer,
       links: LINKS,

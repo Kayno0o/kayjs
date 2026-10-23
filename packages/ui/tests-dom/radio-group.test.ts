@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import RadioGroup from '../tests/fixture/src/components/radio-group.kay'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -12,7 +13,7 @@ afterEach(() => {
 async function open(answer: (value: number) => unknown = () => undefined) {
   const told: number[] = []
 
-  mounted = await mountComponent('src/components/radio-group.kay', { onChange: (value: number) => {
+  mounted = await mountComponent(RadioGroup, { onChange: (value: number) => {
     told.push(value)
 
     return answer(value)

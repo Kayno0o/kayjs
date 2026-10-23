@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import GroupValues from '../tests/fixture/src/components/group-values.kay'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -10,7 +11,7 @@ afterEach(() => {
 })
 
 async function mount(props: { onDays?: (days: number[]) => unknown, disabled?: boolean } = {}) {
-  mounted = await mountComponent('src/components/group-values.kay', { onDays: () => undefined, ...props })
+  mounted = await mountComponent(GroupValues, { onDays: () => undefined, ...props })
 
   return mounted.root
 }

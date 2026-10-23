@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent } from 'kay/test'
+import AppSwitchers from '../tests/fixture/src/components/app-switchers.kay'
 import { clock } from './dom'
 
 let mounted: Mounted | undefined
@@ -11,7 +12,7 @@ afterEach(() => {
 })
 
 async function switchers() {
-  mounted = await mountComponent('src/components/app-switchers.kay')
+  mounted = await mountComponent(AppSwitchers)
 
   clock.start()
 

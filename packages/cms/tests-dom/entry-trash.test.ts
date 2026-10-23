@@ -3,6 +3,7 @@ import type { ScreenCollection } from '../src/kay/contract'
 import type { TrashScreen } from '../src/screens'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import WithToaster from './with-toaster.kay'
 
 const NOTES: ScreenCollection = {
   name: 'notes',
@@ -24,7 +25,7 @@ afterEach(() => {
 })
 
 async function open(shown: TrashScreen['rows']): Promise<ParentNode> {
-  mounted = await mountComponent('../../tests-dom/with-toaster.kay', { trash: { collection: NOTES, rows: shown } })
+  mounted = await mountComponent(WithToaster, { trash: { collection: NOTES, rows: shown } })
   await settle()
 
   return mounted.root

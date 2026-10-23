@@ -12,8 +12,8 @@ const LINKS = { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-li
 function setup(email: Partial<EmailOptions> = {}) {
   const { mails, mailer, take } = mailbox()
   const app = testApp({
-    url: 'https://site.test',
-    site: 'Site',
+    site: 'https://site.test',
+    name: 'Site',
     email: {
       mailer,
       links: LINKS,
@@ -64,7 +64,6 @@ describe('locales', () => {
     expect(mails.at(-1)!.locale).toBe('fr')
     expect(await ada.call('updateLocale', 'not a tag')).toEqual({ ok: false, error: 'invalid-locale' })
     expect(await ada.call('updateLocale', 'en-GB')).toEqual({ ok: true })
-    expect(await ada.call('setLocale', 'not a tag')).toBe(false)
     expect(await ada.json('/me')).toMatchObject({ locale: 'en-GB' })
 
     await ada.call('requestPasswordReset', 'ada@example.com')
@@ -81,7 +80,7 @@ describe('locales', () => {
     const { browser, mails, take } = setup({
       locales: ['en', 'de'],
       templates: { 'magic-link': data => ({ subject: `magic ${data.locale}`, text: '', html: '' }) },
-      translations: { de: { 'verify-email': data => ({ subject: `Bestätigen ${data.site}`, text: '', html: '' }) } },
+      translations: { de: { 'verify-email': data => ({ subject: `Bestätigen ${data.name}`, text: '', html: '' }) } },
     })
 
     await browser().json('/call/register', speaking('de-AT', { email: 'ada@example.com', password: PASSWORD }))

@@ -1,6 +1,8 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { mountComponent } from 'kay/test'
+import Hosts from '../tests/fixture/src/components/hosts.kay'
+import Popovers from '../tests/fixture/src/components/popovers.kay'
 import { click, clock } from './dom'
 
 let mounted: Mounted | undefined
@@ -13,7 +15,7 @@ afterEach(() => {
 })
 
 async function popovers(delays: { showDelay?: string, hideDelay?: string } = {}) {
-  mounted = await mountComponent('src/components/popovers.kay', { onToggle: (open: boolean) => toggles.push(open), ...delays })
+  mounted = await mountComponent(Popovers, { onToggle: (open: boolean) => toggles.push(open), ...delays })
 
   clock.start()
 
@@ -190,7 +192,7 @@ test('waits as long as showDelay says before showing, and as hideDelay says befo
 })
 
 test('a second TooltipHost renders nothing while the first is mounted, and takes over once it unmounts', async () => {
-  mounted = await mountComponent('src/components/hosts.kay')
+  mounted = await mountComponent(Hosts)
   clock.start()
   const { root } = mounted
   const tip = root.querySelector('#tip')!

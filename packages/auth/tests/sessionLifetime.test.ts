@@ -104,7 +104,7 @@ describe('a sign-in follows the session plugin\'s lifetimes', () => {
 describe('a magic link carries the remember choice', () => {
   async function linked(remember: boolean | undefined) {
     const { mails, mailer } = mailbox()
-    const app = await setup({}, { url: 'https://site.test', email: { mailer, links: LINKS } })
+    const app = await setup({}, { site: 'https://site.test', email: { mailer, links: LINKS } })
     const asker = app.browser()
 
     await asker.call('requestMagicLink', 'ada@example.com', remember === undefined ? {} : { remember })
@@ -134,7 +134,7 @@ describe('a magic link carries the remember choice', () => {
 
   test('a mark on another kind of link is no token', async () => {
     const { mails, mailer } = mailbox()
-    const app = await setup({}, { url: 'https://site.test', email: { mailer, links: LINKS } })
+    const app = await setup({}, { site: 'https://site.test', email: { mailer, links: LINKS } })
 
     await app.browser().call('requestPasswordReset', 'ada@example.com')
 

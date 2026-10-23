@@ -1,13 +1,11 @@
-import type { AnyElysia } from 'elysia'
 import type { AuthMailMessage as Mail } from '../src/mail'
-import { afterEach, describe, expect, setSystemTime, spyOn, test } from 'bun:test'
+import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { Elysia } from 'elysia'
 import { session } from 'kay/server'
 import { createAuth } from '../src/auth'
-import { log } from '../src/log'
 import { memoryAuthStore } from '../src/memoryStore'
 import { discordProvider, githubProvider } from '../src/oauth/providers'
-import { auth, authExtension, authPages } from '../src/pages'
+import { auth } from '../src/pages'
 import { scopeLabel } from '../src/pages/forms'
 import { totpCode, totpStep } from '../src/totp'
 import { testApp, userRecord } from './helpers/app'
@@ -20,7 +18,7 @@ const mailer = (mails: Mail[]) => ({ send: (mail: Mail) => void mails.push(mail)
 describe('createAuth with the prebuilt pages', () => {
   test('the sign-in, two-factor and sessions pages and every mailed link default to the pages under their prefix', async () => {
     const mails: Mail[] = []
-    const { browser, store } = testApp({ url: 'http://localhost', pages: authPages({ prefix: '/account-pages' }), oauth: { discord: { provider: discordProvider(), clientId: 'id', clientSecret: 'secret' } }, email: { mailer: mailer(mails), links: { 'magic-link': '/magic' }, requireVerified: false } })
+    const { browser, store } = testApp({ site: 'http://localhost', pages: auth({ plugin: false, prefix: '/account-pages' }), oauth: { discord: { provider: discordProvider(), clientId: 'id', clientSecret: 'secret' } }, email: { mailer: mailer(mails), links: { 'magic-link': '/magic' }, requireVerified: false } })
     const ada = browser()
 
     await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', emailVerifiedAt: new Date() }))
@@ -35,85 +33,8 @@ describe('createAuth with the prebuilt pages', () => {
   })
 
   test('without pages, a mailed link with no page of its own stops createAuth', () => {
-    expect(() => testApp({ url: 'http://localhost', email: { mailer: mailer([]), links: { 'magic-link': '/magic' } } })).toThrow('email.links needs a page for verify-email, reset-password, change-email')
-    expect(() => testApp({ url: 'http://localhost', pages: true, email: { mailer: mailer([]) } })).not.toThrow()
-  })
-})
-
-describe('authPages and createAuth share the prefix and home', () => {
-  const SECRET = 'a-test-secret-that-is-long-enough-for-kayjs-auth'
-
-  // What `features().pages` says of an auth module that `authPages` loads, where `make` is the module's `createAuth` call.
-  async function loaded(extension: { prefix?: string, home?: string }, make: (pages: Record<string, unknown> | boolean | undefined) => ReturnType<typeof createAuth>, pages: Record<string, unknown> | boolean | undefined) {
-    const pagesExtension = authPages({ ...extension, auth: async () => ({ auth: make(pages) }) })
-    const plugin = await (pagesExtension.server as () => Promise<AnyElysia>)()
-    const app = new Elysia().use(plugin).get('/features', context => (context as unknown as { auth: { features: () => unknown } }).auth.features())
-
-    return (await (await app.handle(new Request('http://localhost/features'))).json() as { pages: unknown }).pages
-  }
-
-  const make = (pages: Record<string, unknown> | boolean | undefined) => createAuth({ sessions: session({ secret: SECRET }), secret: SECRET, store: memoryAuthStore(), proxy: { hops: 1 }, captcha: false, ...pages === undefined ? {} : { pages } })
-
-  test('the prefix and home given to authPages alone reach createAuth, which asks for the pages with `pages: true`', async () => {
-    expect(await loaded({ prefix: '/account', home: '/dashboard' }, make, true)).toMatchObject({ prefix: '/account', home: '/dashboard' })
-    expect(await loaded({}, make, true)).toMatchObject({ prefix: '/auth', home: '/' })
-  })
-
-  test('createAuth keeps its own home, and the same prefix given in both places is the one prefix', async () => {
-    expect(await loaded({ prefix: '/account' }, make, { home: '/dashboard' })).toMatchObject({ prefix: '/account', home: '/dashboard' })
-    expect(await loaded({ prefix: '/account' }, make, { prefix: '/account' })).toMatchObject({ prefix: '/account' })
-  })
-
-  test('a home given differently to createAuth and authPages logs a warning naming both and createAuth keeps its own, a home given alike or once logs none', async () => {
-    const warn = spyOn(log, 'warn').mockImplementation(() => undefined)
-
-    try {
-      expect(await loaded({ prefix: '/account', home: '/dashboard' }, make, { prefix: '/account', home: '/panel' })).toMatchObject({ prefix: '/account', home: '/panel' })
-      expect(warn).toHaveBeenCalledTimes(1)
-      expect(String(warn.mock.calls[0]![0])).toContain('auth({ home: \'/dashboard\' }) and createAuth({ pages: { home: \'/panel\' } }) differ')
-
-      await loaded({ home: '/panel' }, make, { home: '/panel' })
-      await loaded({}, make, { home: '/panel' })
-      await loaded({ prefix: '/account', home: '/dashboard' }, make, { prefix: '/account' })
-      await loaded({ home: '/dashboard' }, make, true)
-      expect(warn).toHaveBeenCalledTimes(1)
-    }
-    finally {
-      warn.mockRestore()
-    }
-  })
-
-  test('a prefix in createAuth that authPages does not serve stops the server, also when authPages gave none', async () => {
-    await expect(loaded({ prefix: '/account' }, make, { prefix: '/profile' })).rejects.toThrow('auth() serves the pages under \'/account\' and createAuth({ pages: { prefix: \'/profile\' } })')
-    await expect(loaded({}, make, { prefix: '/account' })).rejects.toThrow('Give auth({ prefix: \'/account\' })')
-  })
-
-  test('an auth module made before authPages loaded it follows it or is checked against it, and createAuth without pages is left alone', async () => {
-    const before = make({ prefix: '/profile' })
-    const defaults = make(true)
-    const plain = make(undefined)
-
-    await expect((authPages({ prefix: '/account', auth: async () => ({ auth: before }) }).server as () => Promise<AnyElysia>)()).rejects.toThrow('sends users to \'/profile\'')
-    await expect((authPages({ prefix: '/account', auth: async () => ({ auth: defaults }) }).server as () => Promise<AnyElysia>)()).resolves.toBeDefined()
-    await expect((authPages({ prefix: '/account', auth: async () => ({ auth: plain }) }).server as () => Promise<AnyElysia>)()).resolves.toBeDefined()
-    await expect((authPages({ auth: async () => ({ auth: defaults }) }).server as () => Promise<AnyElysia>)()).resolves.toBeDefined()
-  })
-
-  test('authExtension, which serves no pages, leaves a prefix of createAuth alone', async () => {
-    const plugin = await (authExtension(async () => ({ auth: make({ prefix: '/profile' }) })).server as () => Promise<AnyElysia>)()
-
-    expect(plugin).toBeDefined()
-  })
-
-  test('createAuth outside authPages takes the prefix it is given, and nothing leaks from a load that failed', async () => {
-    await expect(loaded({ prefix: '/account' }, make, { prefix: '/profile' })).rejects.toThrow()
-    await expect(loaded({}, () => {
-      throw new Error('store down')
-    }, true)).rejects.toThrow('store down')
-
-    const { browser } = testApp({ pages: true })
-
-    expect(await browser().call('features')).toMatchObject({ pages: { prefix: '/auth', home: '/' } })
+    expect(() => testApp({ site: 'http://localhost', email: { mailer: mailer([]), links: { 'magic-link': '/magic' } } })).toThrow('email.links needs a page for verify-email, reset-password, change-email')
+    expect(() => testApp({ site: 'http://localhost', pages: true, email: { mailer: mailer([]) } })).not.toThrow()
   })
 })
 
@@ -136,8 +57,8 @@ describe('auth({ module }) registers the app\'s auth module', () => {
     const extension = auth({ module: './src/auth' })
 
     expect(extension).toMatchObject({ name: '@kaynooo/kayjs-auth', serverModule: { path: './src/auth', export: 'auth' }, prefix: '/auth', home: '/', routes: { prefix: '/auth' } })
-    expect(extension.devTool).toEqual(authPages().devTool)
-    expect(extension.commands).toEqual(authPages().commands)
+    expect(extension.devTool).toEqual(auth({ plugin: false }).devTool)
+    expect(extension.commands).toEqual(auth({ plugin: false }).commands)
   })
 
   test('pages: false serves the plugin alone', () => {
@@ -147,7 +68,7 @@ describe('auth({ module }) registers the app\'s auth module', () => {
     expect(extension.serverModule?.export).toBe('auth')
   })
 
-  test('hands createAuth the prefix and home, as authPages did', async () => {
+  test('hands createAuth the prefix and home, as the pages extension gave them', async () => {
     expect(await adopted({ prefix: '/account', home: '/dashboard' }, true)).toMatchObject({ prefix: '/account', home: '/dashboard' })
     expect(await adopted({}, true)).toMatchObject({ prefix: '/auth', home: '/' })
     expect(await adopted({ prefix: '/account' }, { home: '/dashboard' })).toMatchObject({ prefix: '/account', home: '/dashboard' })
@@ -168,7 +89,7 @@ describe('auth({ module }) registers the app\'s auth module', () => {
 describe('features', () => {
   test('tells a page what the config enables', async () => {
     const { browser } = testApp({
-      url: 'http://localhost',
+      site: 'http://localhost',
       scopes: ['posts:read'],
       oauth: { github: { provider: githubProvider(), clientId: 'id', clientSecret: 'secret' }, chat: { provider: discordProvider(), clientId: 'id', clientSecret: 'secret', label: 'Our chat' } },
       email: { mailer: mailer([]), links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' }, codes: { 'magic-link': 'code' } },
@@ -205,7 +126,7 @@ describe('features', () => {
 
 describe('the data export route', () => {
   test('downloads the signed-in user\'s data as JSON, and refuses an anonymous visitor', async () => {
-    const { browser, store } = testApp({ site: 'My Site' })
+    const { browser, store } = testApp({ name: 'My Site' })
     const ada = browser()
 
     await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))

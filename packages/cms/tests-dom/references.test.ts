@@ -2,6 +2,8 @@ import type { Mounted } from 'kay/test'
 import type { ScreenCollection, StoredEntry } from '../src/kay/contract'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import EntryScreen from '../tests/fixture/src/components/entry-screen.kay'
+import ReferenceReads from './reference-reads.kay'
 
 const NOTES: ScreenCollection = {
   name: 'notes',
@@ -22,7 +24,7 @@ afterEach(() => {
 async function reader(): Promise<(collection: string) => Promise<{ value: string, label: string }[]>> {
   let read: ((collection: string) => Promise<{ value: string, label: string }[]>) | undefined
 
-  mounted = await mountComponent('../../tests-dom/reference-reads.kay', { expose: (found: typeof read) => {
+  mounted = await mountComponent(ReferenceReads, { expose: (found: typeof read) => {
     read = found
   } })
 
@@ -109,7 +111,7 @@ test('a collection too large to list rejects, and is not kept either', async () 
 async function open(held: string | undefined) {
   const entry = { slug: 'n', data: { title: 'N', ...held === undefined ? {} : { post: held } }, draft: false, version: 'v1', url: '/notes/n' } as unknown as StoredEntry
 
-  mounted = await mountComponent('src/components/entry-screen.kay', { collection: NOTES, entry })
+  mounted = await mountComponent(EntryScreen, { collection: NOTES, entry })
   await settle()
 
   const field = () => mounted!.root.querySelector<HTMLElement>('[data-kcms-path="post"]')!

@@ -35,7 +35,7 @@ describe('totp', () => {
 })
 
 async function enrolled() {
-  const app = testApp({ site: 'Site' })
+  const app = testApp({ name: 'Site' })
   const ada = app.browser()
 
   await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
@@ -132,7 +132,7 @@ describe('signing in with a second factor', () => {
 
   test('a magic link sign-in asks for the code too', async () => {
     const mails: Mail[] = []
-    const { browser } = testApp({ url: 'https://site.test', email: { mailer: { send: mail => void mails.push(mail) }, links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' }, requireVerified: false } })
+    const { browser } = testApp({ site: 'https://site.test', email: { mailer: { send: mail => void mails.push(mail) }, links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' }, requireVerified: false } })
     const ada = browser()
 
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })

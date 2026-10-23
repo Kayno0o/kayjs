@@ -14,10 +14,10 @@ cms({ guard, files, pageLink: false })
 
 ### Put the link where you want it
 
-Any `a[data-cms-edit-page]` written `hidden` is shown, given the address, and given the label when it has no text; the default button is then not drawn.
+Any `a[data-kcms-edit-page]` written `hidden` is shown, given the address, and given the label when it has no text; the default button is then not drawn.
 
 ```kay
-a(data-cms-edit-page hidden class="edit-link")
+a(data-kcms-edit-page hidden class="edit-link")
 ```
 
 ### Say which page an entry is shown on

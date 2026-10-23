@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent } from 'kay/test'
+import Options from '../tests/fixture/src/components/options.kay'
 
 let mounted: Mounted | undefined
 const tabbed: string[] = []
@@ -11,7 +12,7 @@ afterEach(() => {
 })
 
 async function options() {
-  mounted = await mountComponent('src/components/options.kay', { onTab: (value: string) => tabbed.push(value) })
+  mounted = await mountComponent(Options, { onTab: (value: string) => tabbed.push(value) })
 
   return mounted.root
 }

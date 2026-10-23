@@ -28,8 +28,8 @@ export interface SmtpSettings {
   timeout?: Duration | undefined
   // How many connections send at once. 5 by default.
   maxConnections?: number | undefined
-  // The most mails sent in a window, for a provider capping the rate: `{ max: 5, window: '1s' }`. Unlimited by default. A bare number of mails a second is the old form, taken until 1.73.
-  rateLimit?: { max: number, window: Duration } | number | undefined
+  // The most mails sent in a window, for a provider capping the rate: `{ max: 5, window: '1s' }`. Unlimited by default.
+  rateLimit?: { max: number, window: Duration } | undefined
   dkim?: DkimSettings | undefined
 }
 
@@ -85,16 +85,10 @@ function positiveInteger(what: string, name: string, value: number | undefined):
 
 const WHOLE_NUMBER = /^\d+$/
 
-// The `rateLimit` and `rateDelta` nodemailer takes for a cap, a bare number being mails a second; throws naming `what` for one that cannot be used.
+// The `rateLimit` and `rateDelta` nodemailer takes for a cap; throws naming `what` for one that cannot be used.
 function rateOf(limit: SmtpSettings['rateLimit'], what: string): { rateLimit: number, rateDelta: number } | undefined {
   if (limit === undefined)
     return undefined
-
-  if (typeof limit === 'number') {
-    positiveInteger(what, 'rateLimit', limit)
-
-    return { rateLimit: limit, rateDelta: 1000 }
-  }
 
   positiveInteger(what, 'rateLimit.max', limit.max)
 

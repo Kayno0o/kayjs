@@ -1,6 +1,8 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import MarkedGroup from '../tests/fixture/src/components/marked-group.kay'
+import RequiredFields from '../tests/fixture/src/components/required-fields.kay'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -10,7 +12,7 @@ afterEach(() => {
 })
 
 async function group() {
-  mounted = await mountComponent('src/components/marked-group.kay', {})
+  mounted = await mountComponent(MarkedGroup, {})
 
   const { root } = mounted
   const marks = (id: string) => {
@@ -53,7 +55,7 @@ test('a group\'s message leaves the field of a FormField nested in it alone', as
 })
 
 test('a required field\'s control is announced as required, the star beside its label being hidden from a screen reader', async () => {
-  mounted = await mountComponent('src/components/required-fields.kay', {})
+  mounted = await mountComponent(RequiredFields, {})
   await settle()
 
   const required = (id: string) => mounted!.root.querySelector(`#${id}`)!.getAttribute('aria-required')
@@ -63,7 +65,7 @@ test('a required field\'s control is announced as required, the star beside its 
 })
 
 test('each field of a required group is announced as required, a FormField nested in it left alone', async () => {
-  mounted = await mountComponent('src/components/required-fields.kay', {})
+  mounted = await mountComponent(RequiredFields, {})
   await settle()
 
   const required = (id: string) => mounted!.root.querySelector(`#${id}`)!.getAttribute('aria-required')

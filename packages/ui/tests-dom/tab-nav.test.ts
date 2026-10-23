@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent } from 'kay/test'
+import Tabs from '../tests/fixture/src/components/tabs.kay'
 
 // eslint-disable-next-line ts/unbound-method -- only put back on the prototype they were taken from
 const { getBoundingClientRect, scrollIntoView } = HTMLElement.prototype
@@ -19,7 +20,7 @@ test('centres the current tab in a bar too narrow for every tab, scrolling the b
     },
   })
 
-  const mounted = await mountComponent('src/components/tabs.kay')
+  const mounted = await mountComponent(Tabs)
 
   try {
     expect(mounted.root.querySelector('#tabs')?.scrollLeft).toBe(225)
@@ -30,7 +31,7 @@ test('centres the current tab in a bar too narrow for every tab, scrolling the b
 })
 
 test('carries the params it keeps from the current URL onto each link, marking the link to its path', async () => {
-  const mounted = await mountComponent('src/components/tabs.kay')
+  const mounted = await mountComponent(Tabs)
 
   try {
     const links = [...mounted.root.querySelectorAll('#kept a')]

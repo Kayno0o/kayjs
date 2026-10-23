@@ -18,7 +18,7 @@ function setup(options: { home?: string | undefined, pages?: boolean, requireVer
   const { mails, mailer, take } = mailbox()
   const pages = options.pages === false ? undefined : { home: options.home ?? '/' }
   const app = testApp({
-    url: 'https://site.test',
+    site: 'https://site.test',
     pages,
     signInPage: '/login',
     oauth: { discord: { provider: discordProvider(), clientId: 'id', clientSecret: 'secret' } },
@@ -116,7 +116,7 @@ describe('the pages option remember', () => {
     const modes: (RememberMode | undefined)[] = [undefined, 'always', 'never']
 
     for (const remember of modes) {
-      const { browser } = testApp({ url: 'https://site.test', pages: { remember } })
+      const { browser } = testApp({ site: 'https://site.test', pages: { remember } })
 
       expect(await browser().call('features')).toMatchObject({ pages: { prefix: '/auth', home: '/', remember: remember ?? 'checkbox' } })
     }

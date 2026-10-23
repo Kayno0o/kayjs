@@ -3,6 +3,7 @@ import type { ScreenCollection } from '../src/kay/contract'
 import type { EntryRow } from '../src/listing'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import WithToaster from './with-toaster.kay'
 
 const POSTS: ScreenCollection = {
   name: 'posts',
@@ -63,7 +64,7 @@ const refusing = (message: string) => Response.json({ issues: [{ collection: 'po
 async function openBar(rows: EntryRow[], actions = ['publish', 'unpublish', 'delete']) {
   const cleared = mock(() => undefined)
 
-  mounted = await mountComponent('../../tests-dom/with-toaster.kay', { bar: { collection: POSTS, rows, actions: new Set(actions), clear: cleared } })
+  mounted = await mountComponent(WithToaster, { bar: { collection: POSTS, rows, actions: new Set(actions), clear: cleared } })
   await settle()
 
   return { root: mounted.root, cleared }
@@ -132,7 +133,7 @@ test('a bulk delete names each row\'s version and runs the rows in turn', async 
 })
 
 async function openTable(rows: EntryRow[]) {
-  mounted = await mountComponent('../../tests-dom/with-toaster.kay', { table: { collection: POSTS, rows } })
+  mounted = await mountComponent(WithToaster, { table: { collection: POSTS, rows } })
   await settle()
 
   return mounted.root
@@ -166,7 +167,7 @@ test('a duplicate that went through is told', async () => {
 })
 
 test('the bar disables the actions the role may not do, with the reason', async () => {
-  mounted = await mountComponent('../../tests-dom/with-toaster.kay', { bar: { collection: POSTS, rows: [row('a')], actions: new Set(['publish', 'delete']), clear: () => undefined, denied: { publish: 'Your role may not publish', delete: 'Your role may not delete' } } })
+  mounted = await mountComponent(WithToaster, { bar: { collection: POSTS, rows: [row('a')], actions: new Set(['publish', 'delete']), clear: () => undefined, denied: { publish: 'Your role may not publish', delete: 'Your role may not delete' } } })
   await settle()
 
   for (const label of ['Publish', 'Delete']) {
@@ -178,7 +179,7 @@ test('the bar disables the actions the role may not do, with the reason', async 
 })
 
 test('a row of the list disables its publish and delete for a role that may not, with the reason', async () => {
-  mounted = await mountComponent('../../tests-dom/with-toaster.kay', { table: { collection: POSTS, rows: [row('a')], denied: { publish: 'Your role may not publish', delete: 'Your role may not delete' } } })
+  mounted = await mountComponent(WithToaster, { table: { collection: POSTS, rows: [row('a')], denied: { publish: 'Your role may not publish', delete: 'Your role may not delete' } } })
   await settle()
 
   const actions = mounted.root.querySelector('.kcms-row-actions')!
@@ -249,7 +250,7 @@ test('a row\'s Rename shows the refusal in the dialog, and a role without the re
   expect(document.querySelector('dialog[open]')!.textContent).toContain('The saver is down')
   mounted?.unmount()
 
-  mounted = await mountComponent('../../tests-dom/with-toaster.kay', { table: { collection: POSTS, rows: [row('a')], denied: { redirects: 'Your role may not redirect' } } })
+  mounted = await mountComponent(WithToaster, { table: { collection: POSTS, rows: [row('a')], denied: { redirects: 'Your role may not redirect' } } })
   await settle()
 
   const refused = mounted.root.querySelector('.kcms-row-actions [data-tooltip="Your role may not redirect"]')

@@ -2,6 +2,7 @@ import type { Mounted } from 'kay/test'
 import type { ScreenCollection } from '../src/kay/contract'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent } from 'kay/test'
+import EntryFieldProbe from '../tests/fixture/src/components/entry-field-probe.kay'
 
 const schema = { type: 'object', properties: { photo: { 'type': 'string', 'x-kay': { kind: 'image', alt: 'caption' } }, caption: { type: 'string' }, title: { type: 'string' } } }
 const collection = { name: 'posts', title: 'Posts', kind: 'folder', localized: false, components: [], schema } as unknown as ScreenCollection
@@ -12,7 +13,7 @@ afterEach(() => {
 })
 
 async function render(name: string): Promise<void> {
-  mounted = await mountComponent('src/components/entry-field-probe.kay', { name, collection })
+  mounted = await mountComponent(EntryFieldProbe, { name, collection })
 }
 
 test('a field paired with an image is not rendered by itself, and the error names the image to render', async () => {

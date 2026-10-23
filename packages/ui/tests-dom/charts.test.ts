@@ -2,6 +2,7 @@ import type { Mounted } from 'kay/test'
 import type { ScatterPoint } from '../src/plot'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Charts from '../tests/fixture/src/components/charts.kay'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -15,7 +16,7 @@ afterEach(() => {
 })
 
 async function charts() {
-  mounted = await mountComponent('src/components/charts.kay', { onSelect: (point: ScatterPoint) => selected.push(point.label), onRange: (from: number, to: number) => ranges.push([from, to]) })
+  mounted = await mountComponent(Charts, { onSelect: (point: ScatterPoint) => selected.push(point.label), onRange: (from: number, to: number) => ranges.push([from, to]) })
 
   return mounted.root
 }

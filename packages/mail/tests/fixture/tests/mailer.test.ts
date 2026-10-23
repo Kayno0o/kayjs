@@ -103,15 +103,6 @@ describe('rendering', () => {
     expect(own.html).toContain('<html lang="fr" dir="ltr"')
   })
 
-  it('still reads lang, the old name of locale, on a message and on the mailer, the new name winning', async () => {
-    const legacy = { lang: 'fr' }
-    const old = mailer({ from: 'hello@fixture.test', ...legacy, queue: { name: 'old-lang' } })
-
-    expect((await old.render({ to: 'ada@example.com', subject: 'Salut', view: Hello })).text).toBe('Bonjour')
-    expect((await old.render({ to: 'ada@example.com', subject: 'Hi', view: Hello, lang: 'en' })).text).toBe('Hello')
-    expect((await old.render({ to: 'ada@example.com', subject: 'Hi', view: Hello, lang: 'en', locale: 'fr' })).text).toBe('Bonjour')
-  })
-
   it('offers one-click unsubscribe through the headers RFC 8058 names, refusing a URL that is not https', async () => {
     const single = await mail.render({ to: 'ada@example.com', subject: 'News', text: 'Hi', unsubscribe: 'https://fixture.test/unsubscribe?u=1&t=<x>' })
     const both = await mail.render({ to: 'ada@example.com', subject: 'News', text: 'Hi', unsubscribe: { url: 'https://fixture.test/u', address: 'unsubscribe@fixture.test' } })

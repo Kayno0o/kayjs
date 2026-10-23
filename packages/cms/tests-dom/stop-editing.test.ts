@@ -1,10 +1,9 @@
 import type { Mounted } from 'kay/test'
-import { join } from 'node:path'
 import { afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Editor from '../src/editor/editor.kay'
 import { EDITOR_COOKIE } from '../src/page-link'
 
-const EDITOR = join(import.meta.dir, '../src/editor/editor.kay')
 const ENTRY = { collection: 'posts', slug: 'hello' }
 let mounted: Mounted | undefined
 
@@ -35,7 +34,7 @@ const left = (fetched: ReturnType<typeof server>) => fetched.mock.calls.some(([u
 
 // Opens the editor on the entry and types into its title, which leaves it with edits not saved.
 async function typed(): Promise<ParentNode> {
-  mounted = await mountComponent(EDITOR, { entries: [ENTRY], unclickable: [] })
+  mounted = await mountComponent(Editor, { entries: [ENTRY], unclickable: [] })
   await settle()
   await Bun.sleep(50)
 
@@ -60,7 +59,7 @@ const labels = (root: ParentNode) => [...root.querySelectorAll('button')].map(bu
 
 test('the page editor\'s Save is there from the start, disabled with nothing to save, and ready once a field is edited', async () => {
   server()
-  mounted = await mountComponent(EDITOR, { entries: [ENTRY], unclickable: [] })
+  mounted = await mountComponent(Editor, { entries: [ENTRY], unclickable: [] })
   await settle()
   await Bun.sleep(50)
 
@@ -79,7 +78,7 @@ test('the page editor\'s Save is there from the start, disabled with nothing to 
 test('Stop editing with nothing unsaved leaves at once', async () => {
   const fetched = server()
 
-  mounted = await mountComponent(EDITOR, { entries: [ENTRY], unclickable: [] })
+  mounted = await mountComponent(Editor, { entries: [ENTRY], unclickable: [] })
   await settle()
   await Bun.sleep(50)
   stop(mounted.root).click()
@@ -191,7 +190,7 @@ test('a reload brings the typed edits back, and Reset drops them for good', asyn
   mounted!.unmount()
   mounted = undefined
 
-  mounted = await mountComponent(EDITOR, { entries: [ENTRY], unclickable: [] })
+  mounted = await mountComponent(Editor, { entries: [ENTRY], unclickable: [] })
   await settle()
   await Bun.sleep(50)
 
@@ -228,7 +227,7 @@ test('asks before a leave only for the entries the page shows, not for edits lef
   // The mounted bundle has its own reactivity, so the props are plain and the guard is asked again by an edit.
   let shown = [ENTRY]
 
-  mounted = await mountComponent(EDITOR, { get entries() {
+  mounted = await mountComponent(Editor, { get entries() {
     return shown
   }, unclickable: [] })
   await settle()
@@ -261,7 +260,7 @@ test('asks before a leave only for the entries the page shows, not for edits lef
 
 test('names the fields of an entry the page does not let the editor click, and those of a frozen object', async () => {
   server()
-  mounted = await mountComponent(EDITOR, { entries: [ENTRY, { collection: 'posts', slug: 'other' }], unclickable: [{ ...ENTRY, path: 'title' }, { ...ENTRY, path: 'seo.title', frozen: true }, { collection: 'posts', slug: 'other', path: 'elsewhere' }] })
+  mounted = await mountComponent(Editor, { entries: [ENTRY, { collection: 'posts', slug: 'other' }], unclickable: [{ ...ENTRY, path: 'title' }, { ...ENTRY, path: 'seo.title', frozen: true }, { collection: 'posts', slug: 'other', path: 'elsewhere' }] })
   await settle()
   for (const idle of mounted.root.querySelectorAll<HTMLButtonElement>('.kcms-entry-idle button'))
     idle.click()

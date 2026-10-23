@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import SegmentedNumber from '../tests/fixture/src/components/segmented-number.kay'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -14,7 +15,7 @@ type Told = [name: string, value: number | string | null]
 async function open(answer: (name: string, value: number | string | null) => unknown = () => undefined) {
   const told: Told[] = []
 
-  mounted = await mountComponent('src/components/segmented-number.kay', { onChange: (name: string, value: number | string | null) => {
+  mounted = await mountComponent(SegmentedNumber, { onChange: (name: string, value: number | string | null) => {
     told.push([name, value])
 
     return answer(name, value)

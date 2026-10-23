@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Menus from '../tests/fixture/src/components/menus.kay'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -10,7 +11,7 @@ afterEach(() => {
 })
 
 test('a Menu entry is destructive by its tone or the deprecated danger flag, the tone winning', async () => {
-  mounted = await mountComponent('src/components/menus.kay')
+  mounted = await mountComponent(Menus)
 
   const items = [...mounted.root.querySelectorAll('#by-tone [data-part=item]')].map(item => [item.textContent, item.hasAttribute('data-danger')])
 
@@ -18,7 +19,7 @@ test('a Menu entry is destructive by its tone or the deprecated danger flag, the
 })
 
 test('a Menu trigger takes a tone, the danger variant being the danger tone', async () => {
-  mounted = await mountComponent('src/components/menus.kay')
+  mounted = await mountComponent(Menus)
 
   const trigger = (id: string) => {
     const button = mounted!.root.querySelector(`[popovertarget="${id}"]`)!
@@ -30,7 +31,7 @@ test('a Menu trigger takes a tone, the danger variant being the danger tone', as
 })
 
 test('a Menu entry with an icon draws it as the icon part, sized and shrunk, and one without writes none', async () => {
-  mounted = await mountComponent('src/components/menus.kay')
+  mounted = await mountComponent(Menus)
 
   const [added, bare] = [...mounted.root.querySelectorAll('#icons [data-part=item]')]
 
@@ -39,7 +40,7 @@ test('a Menu entry with an icon draws it as the icon part, sized and shrunk, and
 })
 
 test('a Menu given a point renders no trigger, opens beside a fixed anchor at the point and reports its state', async () => {
-  mounted = await mountComponent('src/components/menus.kay')
+  mounted = await mountComponent(Menus)
 
   const root = mounted.root
   const menu = root.querySelector<HTMLElement>('#at-point')!
@@ -62,7 +63,7 @@ test('a Menu given a point renders no trigger, opens beside a fixed anchor at th
 })
 
 test('a Menu at a point runs the entry picked after it closes, and a light dismiss tells the parent', async () => {
-  mounted = await mountComponent('src/components/menus.kay')
+  mounted = await mountComponent(Menus)
 
   const root = mounted.root
   const menu = root.querySelector<HTMLElement>('#at-point')!

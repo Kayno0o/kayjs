@@ -1,10 +1,9 @@
 import type { Mounted } from 'kay/test'
-import { join } from 'node:path'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Editor from '../src/editor/editor.kay'
 import { EDITOR_COOKIE } from '../src/page-link'
 
-const EDITOR = join(import.meta.dir, '../src/editor/editor.kay')
 const POSTS = { name: 'posts', title: 'Posts', kind: 'folder', localized: false, components: [], schema: { type: 'object', properties: { title: { type: 'string' }, summary: { type: 'string' } } } }
 const MENU = { name: 'menu', title: 'Menu', single: true, kind: 'file', localized: false, components: [], schema: { type: 'object', properties: { label: { type: 'string' } } } }
 const HELLO = { collection: 'posts', slug: 'hello' }
@@ -73,7 +72,7 @@ async function open(entries: object[], settleEvery?: number) {
   element.setAttribute('data-kay-field', 'posts:hello:summary')
   element.innerHTML = 'S<em>hort</em>'
   document.body.append(element)
-  mounted = await mountComponent(EDITOR, { entries, unclickable: [], settleEvery })
+  mounted = await mountComponent(Editor, { entries, unclickable: [], settleEvery })
   await settle()
   await Bun.sleep(30)
 

@@ -41,10 +41,6 @@ export interface AiOptions {
   budget?: BudgetOptions | false | undefined
   // Who a signed-in visitor is, such as their id: counted in place of their address, and in place of the user a library such as kayjs-auth names. Left out, that user counts, else the address.
   key?: ((request: Request) => string | undefined | Promise<string | undefined>) | undefined
-  // The old name of `rateLimit`, taken until 1.73: where both are given, `rateLimit` wins.
-  limit?: LimitOptions | false | undefined
-  // The old name of `key`, taken until 1.73.
-  visitor?: ((request: Request) => string | undefined | Promise<string | undefined>) | undefined
 }
 
 interface Counter {
@@ -114,11 +110,10 @@ function wholeNumber(value: unknown, what: string): number {
 }
 
 // The settings an app's options give, the production defaults filling what it left out.
-function settingsOf({ rateLimit, limit: oldLimit, budget, key, visitor }: AiOptions, memories: Map<string, RateStore>): Settings {
-  const settings: Settings = { limit: undefined, budget: undefined, key: key ?? visitor }
-  const limit = rateLimit ?? oldLimit
+function settingsOf({ rateLimit, budget, key }: AiOptions, memories: Map<string, RateStore>): Settings {
+  const settings: Settings = { limit: undefined, budget: undefined, key }
   const production = process.env.NODE_ENV === 'production'
-  const chosenLimit = limit ?? (production ? DEFAULT_LIMIT : undefined)
+  const chosenLimit = rateLimit ?? (production ? DEFAULT_LIMIT : undefined)
   const chosenBudget = budget ?? (production ? DEFAULT_BUDGET : undefined)
 
   if (chosenLimit !== undefined && chosenLimit !== false)

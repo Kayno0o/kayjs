@@ -1,3 +1,4 @@
+import type { AnyElysia } from 'elysia'
 import type { Parsed } from 'kay/library'
 import type { KayConfig } from 'kay/server'
 import { parseArgs } from 'node:util'
@@ -7,13 +8,15 @@ import { session } from 'kay/server'
 import { createAuth } from '../src/auth'
 import { createUserCommand, readFromTerminal, typedSecret } from '../src/createUserCommand'
 import { memoryAuthStore } from '../src/memoryStore'
-import { authExtension, auth as authFrom, authPages, LOAD_AUTH } from '../src/pages'
+import { auth as authFrom, LOAD_AUTH } from '../src/pages'
 import { SECRET } from './helpers/app'
 
 const FIXTURE = `${import.meta.dir}/fixture`
 const store = memoryAuthStore()
 const auth = createAuth({ sessions: session({ secret: SECRET }), secret: SECRET, store, roles: { admin: [] } })
-const CONFIG: KayConfig = { extensions: [authPages({ auth: async () => ({ auth }) })] }
+// An auth extension whose plugin carries the `createAuth` result a function builds, as the command reaches it.
+const withAuth = (load: () => Promise<{ auth: { plugin: AnyElysia } }>) => authFrom({ server: async () => (await load()).auth.plugin })
+const CONFIG: KayConfig = { extensions: [withAuth(async () => ({ auth }))] }
 const PASSWORD = 'a long enough password'
 const errors = spyOn(console, 'error').mockImplementation(() => undefined)
 const logs = spyOn(console, 'log').mockImplementation(() => undefined)
@@ -42,9 +45,9 @@ describe('the command is reached from the extension', () => {
     const given = CONFIG.extensions?.[0]
 
     expect(Object.keys(given?.commands ?? {})).toEqual(['auth create-user'])
-    expect(authExtension(async () => ({ auth })).commands).toEqual(given?.commands)
+    expect(withAuth(async () => ({ auth })).commands).toEqual(given?.commands)
 
-    const viaPlugin = authPages({ server: () => auth.plugin })
+    const viaPlugin = authFrom({ server: () => auth.plugin })
     const symbols = Object.getOwnPropertySymbols(viaPlugin)
 
     expect(symbols).toHaveLength(1)
@@ -60,7 +63,7 @@ describe('the command is reached from the extension', () => {
   })
 
   test('a plugin that is not a createAuth result is told', async () => {
-    const lone = authPages({ server: () => ({}) as never })
+    const lone = authFrom({ server: () => ({}) as never })
     const [symbol] = Object.getOwnPropertySymbols(lone)
 
     await expect((lone as unknown as Record<symbol, () => Promise<unknown>>)[symbol!]!()).rejects.toThrow('the `server` of auth() is not the `plugin`')
@@ -282,9 +285,9 @@ describe('the order of the command', () => {
 
     expect(await attempt(['taken@example.com'], CONFIG)).toBe(1)
     expect(await attempt(['other', '--role', 'nobody'], CONFIG)).toBe(1)
-    expect(await attempt(['fresh@example.com'], { extensions: [authPages({ auth: async () => {
+    expect(await attempt(['fresh@example.com'], { extensions: [withAuth(async () => {
       throw new Error('config broken')
-    } })] })).toBe(1)
+    })] })).toBe(1)
     expect(asked).toBe(0)
     expect(errors.mock.calls.map(call => call.join(' ')).join('\n')).toContain('email taken')
     expect(errors.mock.calls.map(call => call.join(' ')).join('\n')).toContain('config broken')
@@ -300,7 +303,7 @@ describe('the command in production', () => {
     setSite(undefined)
 
     try {
-      const config: KayConfig = { site: 'https://auth.example.test', extensions: [authPages({ auth: async () => ({ auth: createAuth({ sessions: session({ secret: SECRET }), secret: SECRET, store: memoryAuthStore(), forwardAuth: 'example.test' }) }) })] }
+      const config: KayConfig = { site: 'https://auth.example.test', extensions: [withAuth(async () => ({ auth: createAuth({ sessions: session({ secret: SECRET }), secret: SECRET, store: memoryAuthStore(), forwardAuth: 'example.test' }) }))] }
 
       expect(await run(['prod@example.com'], PASSWORD, config)).toMatchObject({ code: 0 })
     }
@@ -317,11 +320,11 @@ describe('the site the command sets', () => {
     let seen: string | undefined
 
     try {
-      const config: KayConfig = { site, ...base !== undefined && { base }, extensions: [authPages({ auth: async () => {
+      const config: KayConfig = { site, ...base !== undefined && { base }, extensions: [withAuth(async () => {
         seen = configuredSite()?.origin
 
         return { auth }
-      } })] }
+      })] }
       const result = await run(['site@example.com'], PASSWORD, config)
 
       return { ...result, seen }

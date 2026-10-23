@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import MoonAccordion from '../tests/fixture/src/components/moon-accordion.kay'
 
 let mounted: Mounted | undefined
 
@@ -15,7 +16,7 @@ function key(name: string, init: KeyboardEventInit = {}): KeyboardEvent {
 }
 
 test('moves focus between the headers with the arrows, wrapping, and Home and End', async () => {
-  mounted = await mountComponent('src/components/moon-accordion.kay')
+  mounted = await mountComponent(MoonAccordion)
 
   const summaries = [...mounted.root.querySelectorAll('summary')] as [HTMLElement, HTMLElement, HTMLElement]
 
@@ -39,7 +40,7 @@ test('moves focus between the headers with the arrows, wrapping, and Home and En
 })
 
 test('shares one name across its sections and opens the flagged one', async () => {
-  mounted = await mountComponent('src/components/moon-accordion.kay')
+  mounted = await mountComponent(MoonAccordion)
 
   const sections = [...mounted.root.querySelectorAll('details')]
 
@@ -49,7 +50,7 @@ test('shares one name across its sections and opens the flagged one', async () =
 })
 
 test('with multiple, shares no name and honors every open flag', async () => {
-  mounted = await mountComponent('src/components/moon-accordion.kay', { multiple: true })
+  mounted = await mountComponent(MoonAccordion, { multiple: true })
 
   const sections = [...mounted.root.querySelectorAll('details')]
 
@@ -58,7 +59,7 @@ test('with multiple, shares no name and honors every open flag', async () => {
 })
 
 test('leaves a chord to the browser', async () => {
-  mounted = await mountComponent('src/components/moon-accordion.kay')
+  mounted = await mountComponent(MoonAccordion)
   mounted.root.querySelector('summary')!.focus()
 
   for (const chord of [{ shiftKey: true }, { altKey: true }, { metaKey: true }])

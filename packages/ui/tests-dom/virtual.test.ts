@@ -1,6 +1,10 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import ExportableTable from '../tests/fixture/src/components/exportable-table.kay'
+import TableComponent from '../tests/fixture/src/components/table.kay'
+import VirtualListComponent from '../tests/fixture/src/components/virtual-list.kay'
+import VirtualTable from '../tests/fixture/src/components/virtual-table.kay'
 import { click } from './dom'
 
 // A stand-in for the observer happy-dom never fires: each one made is kept, to be fired by hand.
@@ -44,7 +48,7 @@ async function scrollTo(box: Element, top: number) {
 
 describe('VirtualList', () => {
   test('draws the first rows of a long list, numbered among all, with room standing for the others', async () => {
-    mounted = await mountComponent('src/components/virtual-list.kay', { count: 1000 })
+    mounted = await mountComponent(VirtualListComponent, { count: 1000 })
 
     const { root } = mounted
     const items = rowsOf(root, '[role="listitem"]')
@@ -62,7 +66,7 @@ describe('VirtualList', () => {
   })
 
   test('moves the window with the scroll, and draws a short list whole', async () => {
-    mounted = await mountComponent('src/components/virtual-list.kay', { count: 1000 })
+    mounted = await mountComponent(VirtualListComponent, { count: 1000 })
 
     const { root } = mounted
 
@@ -75,13 +79,13 @@ describe('VirtualList', () => {
     expect(texts.length).toBeLessThan(50)
 
     mounted.unmount()
-    mounted = await mountComponent('src/components/virtual-list.kay', { count: 3 })
+    mounted = await mountComponent(VirtualListComponent, { count: 3 })
 
     expect(rowsOf(mounted.root, '.cell').map(row => row.textContent)).toEqual(['Row 0', 'Row 1', 'Row 2'])
   })
 
   test('takes the heights the rows measure in place of the estimate', async () => {
-    mounted = await mountComponent('src/components/virtual-list.kay', { count: 100 })
+    mounted = await mountComponent(VirtualListComponent, { count: 100 })
 
     const { root } = mounted
     const before = rowsOf(root, '[role="listitem"]').length
@@ -99,7 +103,7 @@ describe('VirtualList', () => {
   })
 
   test('scrolls by the height a row above the window changes by, so what is in view stays put', async () => {
-    mounted = await mountComponent('src/components/virtual-list.kay', { count: 1000 })
+    mounted = await mountComponent(VirtualListComponent, { count: 1000 })
 
     const { root } = mounted
     const box = root.querySelector('[role="list"]') as HTMLElement
@@ -119,7 +123,7 @@ describe('VirtualList', () => {
 
 describe('Table with virtual', () => {
   test('draws the rows in view of a long table, numbered from the header row, between two spacer rows', async () => {
-    mounted = await mountComponent('src/components/virtual-table.kay', { count: 5000 })
+    mounted = await mountComponent(VirtualTable, { count: 5000 })
 
     const { root } = mounted
     const rows = rowsOf(root, 'tbody tr[data-part="row"]')
@@ -144,7 +148,7 @@ describe('Table with virtual', () => {
   })
 
   test('keeps a measured height with its row when a sort moves it, and measures a row at the index it moved to', async () => {
-    mounted = await mountComponent('src/components/virtual-table.kay', { count: 30 })
+    mounted = await mountComponent(VirtualTable, { count: 30 })
 
     const { root } = mounted
     const rowNamed = (name: string) => rowsOf(root, 'tbody tr[data-part="row"]').find(row => row.textContent?.includes(name))
@@ -172,7 +176,7 @@ describe('Table with virtual', () => {
   })
 
   test('draws every row without it', async () => {
-    mounted = await mountComponent('src/components/table.kay', { rows: [{ id: 1, name: 'Mars', moons: 2 }, { id: 2, name: 'Earth', moons: 1 }] })
+    mounted = await mountComponent(TableComponent, { rows: [{ id: 1, name: 'Mars', moons: 2 }, { id: 2, name: 'Earth', moons: 1 }] })
 
     expect(rowsOf(mounted.root, 'tbody tr')).toHaveLength(2)
     expect(mounted.root.querySelector('table')?.hasAttribute('aria-rowcount')).toBe(false)
@@ -192,7 +196,7 @@ describe('Table with exportable', () => {
     ]
 
     try {
-      mounted = await mountComponent('src/components/exportable-table.kay', {})
+      mounted = await mountComponent(ExportableTable, {})
 
       const { root } = mounted
       const input = root.querySelector('input[type="search"]') as HTMLInputElement
@@ -218,7 +222,7 @@ describe('Table with exportable', () => {
   })
 
   test('links an endpoint given as an address, with the sort and the filter text on screen', async () => {
-    mounted = await mountComponent('src/components/exportable-table.kay', { exportable: '/planets.csv?team=a', filterParam: 'search' })
+    mounted = await mountComponent(ExportableTable, { exportable: '/planets.csv?team=a', filterParam: 'search' })
 
     const { root } = mounted
     const input = root.querySelector('input[type="search"]') as HTMLInputElement
@@ -236,7 +240,7 @@ describe('Table with exportable', () => {
   })
 
   test('shows no button without it', async () => {
-    mounted = await mountComponent('src/components/exportable-table.kay', { exportable: false })
+    mounted = await mountComponent(ExportableTable, { exportable: false })
 
     expect(mounted.root.textContent).not.toContain('Export CSV')
   })

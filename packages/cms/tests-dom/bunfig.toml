@@ -1,7 +1,7 @@
 [test]
 root = "./tests-dom"
 preload = [
+  "./tests-dom/dom.ts",
   "kay/test/preload",
-  "kay/test/dom",
-  "./tests-dom/dom.ts"
+  "kay/test/dom"
 ]

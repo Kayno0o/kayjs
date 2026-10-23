@@ -28,7 +28,7 @@ describe('credential rules', () => {
 
   test('reset, change password, change username and createUser apply them', async () => {
     const { mailer, mails } = mailbox()
-    const { auth, browser } = testApp({ rules: RULES, url: 'https://site.test', email: { mailer, links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' }, requireVerified: false } })
+    const { auth, browser } = testApp({ rules: RULES, site: 'https://site.test', email: { mailer, links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' }, requireVerified: false } })
     const ada = browser()
 
     await ada.call('register', { email: 'ada@example.com', password: GOOD })

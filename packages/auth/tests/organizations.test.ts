@@ -18,8 +18,8 @@ async function setup(options: { invitationPage?: string | undefined, create?: 'a
   // What `onAuthEvent` hears of the same events: the event, who it happened to, its fields and who acted.
   const heard: [AuthEvent, string | null, object, string | undefined][] = []
   const app = testApp({
-    url: 'https://site.test',
-    site: 'Site',
+    site: 'https://site.test',
+    name: 'Site',
     email: {
       mailer: {
         send: (mail) => {
@@ -131,7 +131,7 @@ describe('organizations', () => {
     const { invitation } = await ada.browser.callOk('invite', org, 'Grace@Example.com')
 
     expect(invitation).toMatchObject({ email: 'grace@example.com', roles: ['member'], invitedBy: ada.id, organization: { name: 'Acme' } })
-    expect(mails.at(-1)).toMatchObject({ kind: 'invitation', site: 'Site', detail: 'Acme', to: 'grace@example.com', url: `https://site.test/invitation?invitation=${invitation.id}`, subject: 'Join Acme on Site' })
+    expect(mails.at(-1)).toMatchObject({ kind: 'invitation', name: 'Site', detail: 'Acme', to: 'grace@example.com', url: `https://site.test/invitation?invitation=${invitation.id}`, subject: 'Join Acme on Site' })
     expect(await alan.browser.call('getInvitation', invitation.id)).toMatchObject({ email: 'grace@example.com', organization: { name: 'Acme' } })
     expect(await alan.browser.call('acceptInvitation', invitation.id)).toEqual({ ok: false, error: 'wrong-account' })
     expect(await grace.browser.call('listMyInvitations')).toEqual([])
@@ -182,13 +182,13 @@ describe('organizations', () => {
     expect(await grace.browser.call('acceptInvitation', invitation.id)).toEqual({ ok: false, error: 'not-found' })
     expect(await grace.browser.call('getInvitation', invitation.id)).toBeFalsy()
     expect(await ada.browser.call('invite', org, 'grace@example.com')).toEqual({ ok: false, error: 'member' })
-    expect((await ada.browser.callOk('members', org)).members).toMatchObject([{ user: { email: 'ada@example.com' }, roles: ['owner'] }, { user: { id: grace.id }, roles: ['admin'] }])
+    expect((await ada.browser.callOk('listMembers', org)).members).toMatchObject([{ user: { email: 'ada@example.com' }, roles: ['owner'] }, { user: { id: grace.id }, roles: ['admin'] }])
     expect(await store.members!.get(org, grace.id)).toMatchObject({ roles: ['admin'] })
     expect(heard.at(-1)).toEqual(['member-joined', 'grace@example.com', { organizationId: org, roles: ['admin'] }, undefined])
   })
 
-  test('invitations.maxAge takes a duration string, the bare seconds of before 1.70 still work, and a bad one fails naming the option', async () => {
-    for (const maxAge of ['2d' as never, 2 * 24 * 60 * 60 as never]) {
+  test('invitations.maxAge takes a duration string, and a bad one fails naming the option', async () => {
+    for (const maxAge of ['2d' as const]) {
       const { ada, org } = await setup({ invitations: { maxAge } })
       const { invitation } = await ada.browser.callOk('invite', org, 'grace@example.com')
 
@@ -199,23 +199,13 @@ describe('organizations', () => {
     await expect(setup({ invitations: { maxAge: 'soon' as Duration } })).rejects.toThrow('kay: organizations.invitations.maxAge is \'soon\'')
   })
 
-  test('invitationMaxAge, its name before 1.70, still sets the lifetime, and invitations.maxAge wins beside it', async () => {
-    for (const [options, days] of [[{ invitationMaxAge: '2d' }, 2], [{ invitationMaxAge: '2d', invitations: { maxAge: '4d' } }, 4]] as const) {
-      const { ada, org } = await setup(options as never)
-      const { invitation } = await ada.browser.callOk('invite', org, 'grace@example.com')
-
-      expect(new Date(invitation.expiresAt).getTime() - Date.now()).toBeGreaterThan(days * 24 * 60 * 60 * 1000 - 60_000)
-      expect(new Date(invitation.expiresAt).getTime() - Date.now()).toBeLessThanOrEqual(days * 24 * 60 * 60 * 1000)
-    }
-  })
-
   test('invitations are listed for managers, replaced when sent again, revoked, declined and expire', async () => {
     const { ada, org, person } = await setup()
     const grace = await person('grace@example.com')
     const first = (await ada.browser.callOk('invite', org, 'grace@example.com')).invitation
     const second = (await ada.browser.callOk('invite', org, 'grace@example.com')).invitation
 
-    expect((await ada.browser.callOk('invitations', org)).invitations.map((invitation: { id: string }) => invitation.id)).toEqual([second.id])
+    expect((await ada.browser.callOk('listInvitations', org)).invitations.map((invitation: { id: string }) => invitation.id)).toEqual([second.id])
     expect(await grace.browser.call('getInvitation', first.id)).toBeFalsy()
     expect(await grace.browser.call('listInvitations', org)).toEqual({ ok: false, error: 'not-found' })
     expect(await ada.browser.call('revokeInvitation', org, second.id)).toEqual({ ok: true })
@@ -230,7 +220,7 @@ describe('organizations', () => {
     setSystemTime(new Date(Date.now() + 8 * 24 * 60 * 60 * 1000))
 
     expect(await grace.browser.call('acceptInvitation', fourth.id)).toEqual({ ok: false, error: 'not-found' })
-    expect((await ada.browser.callOk('invitations', org)).invitations).toEqual([])
+    expect((await ada.browser.callOk('listInvitations', org)).invitations).toEqual([])
   })
 
   describe('an invitation stands only while its sender may still grant it', () => {
@@ -258,7 +248,7 @@ describe('organizations', () => {
 
       expect(await ada.browser.call('deleteMember', org, bob.id)).toEqual({ ok: true })
       expect(await grace.browser.call('getInvitation', invitation.id)).toBeFalsy()
-      expect(await grace.browser.call('myInvitations')).toEqual([])
+      expect(await grace.browser.call('listMyInvitations')).toEqual([])
       expect(await grace.browser.call('acceptInvitation', invitation.id)).toEqual({ ok: false, error: 'not-found' })
     })
 
@@ -288,9 +278,9 @@ describe('organizations', () => {
     test('is dead when its sender deletes their account while a member, and listed to managers only while it stands', async () => {
       const { ada, bob, grace, invitation, org } = await sentByBob()
 
-      expect((await ada.browser.callOk('invitations', org)).invitations).toHaveLength(1)
+      expect((await ada.browser.callOk('listInvitations', org)).invitations).toHaveLength(1)
       expect(await bob.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
-      expect((await ada.browser.callOk('invitations', org)).invitations).toEqual([])
+      expect((await ada.browser.callOk('listInvitations', org)).invitations).toEqual([])
       expect(await grace.browser.call('acceptInvitation', invitation.id)).toEqual({ ok: false, error: 'not-found' })
     })
   })
@@ -500,9 +490,9 @@ describe('organizations', () => {
     const device = browserOn(site)
     const bearer = async (method: string, ...args: unknown[]) => device.json(`/call/${method}`, { method: 'POST', headers: { 'authorization': `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(args) })
 
-    expect(await bearer('members', org)).toMatchObject({ ok: true })
+    expect(await bearer('listMembers', org)).toMatchObject({ ok: true })
     expect(await bearer('setMemberRoles', org, grace.id, ['admin'])).toEqual({ ok: false, error: 'signed-out' })
-    expect(await bearer('removeMember', org, grace.id)).toEqual({ ok: false, error: 'signed-out' })
+    expect(await bearer('deleteMember', org, grace.id)).toEqual({ ok: false, error: 'signed-out' })
     expect(await bearer('deleteOrganization', org)).toEqual({ ok: false, error: 'signed-out' })
     expect(await ada.browser.call('listMembers', org)).toMatchObject({ ok: true, members: [{}, { roles: ['member'] }] })
     expect(await ada.browser.call('setMemberRoles', org, grace.id, ['admin'])).toEqual({ ok: true })
@@ -522,15 +512,14 @@ describe('organizations', () => {
 
     expect(await bearer(graceToken, 'acceptInvitation', invitation.id)).toEqual({ ok: false, error: 'signed-out' })
     expect(await bearer(graceToken, 'rejectInvitation', invitation.id)).toEqual({ ok: false, error: 'signed-out' })
-    expect(await bearer(graceToken, 'declineInvitation', invitation.id)).toBe(false)
     expect(await bearer(graceToken, 'createOrganization', { name: 'Mine' })).toEqual({ ok: false, error: 'signed-out' })
     expect(await bearer(adaToken, 'updateOrganization', org, { name: 'Renamed' })).toEqual({ ok: false, error: 'signed-out' })
     expect(await bearer(adaToken, 'invite', org, 'bob@example.com')).toEqual({ ok: false, error: 'signed-out' })
-    expect(await bearer(adaToken, 'invitations', org)).toEqual({ ok: false, error: 'signed-out' })
+    expect(await bearer(adaToken, 'listInvitations', org)).toEqual({ ok: false, error: 'signed-out' })
     expect(await bearer(adaToken, 'revokeInvitation', org, spare.id)).toEqual({ ok: false, error: 'signed-out' })
     expect(mails).toEqual([])
     expect(await grace.browser.call('listOrganizations')).toEqual([])
-    expect(await bearer(graceToken, 'myInvitations')).toMatchObject([{ id: invitation.id }])
+    expect(await bearer(graceToken, 'listMyInvitations')).toMatchObject([{ id: invitation.id }])
     expect(await ada.browser.call('getOrganization', org)).toMatchObject({ organization: { name: 'Acme' } })
     expect(await ada.browser.call('listInvitations', org)).toMatchObject({ ok: true, invitations: [{}, {}] })
     expect(await grace.browser.call('acceptInvitation', invitation.id)).toMatchObject({ ok: true })

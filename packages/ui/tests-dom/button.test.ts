@@ -1,6 +1,8 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import ButtonPart from '../tests/fixture/src/components/button-part.kay'
+import Buttons from '../tests/fixture/src/components/buttons.kay'
 import { click, kuiClasses } from './dom'
 
 let mounted: Mounted | undefined
@@ -24,7 +26,7 @@ function state(root: Element, id: string) {
 test('a Button is busy and disabled alone until the promise its onClick returned settles', async () => {
   const save = later()
 
-  mounted = await mountComponent('src/components/buttons.kay', { onSave: save.run, onSubmit: () => undefined })
+  mounted = await mountComponent(Buttons, { onSave: save.run, onSubmit: () => undefined })
 
   const root = mounted.root
 
@@ -45,7 +47,7 @@ test('a Button comes back from a promise that rejects, logging it', async () => 
   const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
   try {
-    mounted = await mountComponent('src/components/buttons.kay', { onSave: async () => {
+    mounted = await mountComponent(Buttons, { onSave: async () => {
       throw new Error('refused')
     }, onSubmit: () => undefined })
     click(mounted.root.querySelector('#save'))
@@ -62,7 +64,7 @@ test('a Button comes back from a promise that rejects, logging it', async () => 
 test('a submit Button is busy while its form\'s async onSubmit runs, and a plain one is not', async () => {
   const submit = later()
 
-  mounted = await mountComponent('src/components/buttons.kay', { onSave: () => undefined, onSubmit: submit.run })
+  mounted = await mountComponent(Buttons, { onSave: () => undefined, onSubmit: submit.run })
 
   const root = mounted.root
 
@@ -79,7 +81,7 @@ test('a submit Button is busy while its form\'s async onSubmit runs, and a plain
 })
 
 test('a submit Button whose onSubmit answers at once never shows busy', async () => {
-  mounted = await mountComponent('src/components/buttons.kay', { onSave: () => undefined, onSubmit: () => undefined })
+  mounted = await mountComponent(Buttons, { onSave: () => undefined, onSubmit: () => undefined })
 
   click(mounted.root.querySelector('#send'))
   await settle()
@@ -90,7 +92,7 @@ test('a submit Button whose onSubmit answers at once never shows busy', async ()
 test('an explicit busy prop wins, whether it is false or true', async () => {
   const save = later()
 
-  mounted = await mountComponent('src/components/buttons.kay', { onSave: save.run, onSubmit: () => undefined, busy: false })
+  mounted = await mountComponent(Buttons, { onSave: save.run, onSubmit: () => undefined, busy: false })
 
   const root = mounted.root
 
@@ -105,7 +107,7 @@ test('an explicit busy prop wins, whether it is false or true', async () => {
   expect(save.settles.length).toBe(2)
 
   mounted.unmount()
-  mounted = await mountComponent('src/components/buttons.kay', { onSave: save.run, onSubmit: () => undefined, busy: true })
+  mounted = await mountComponent(Buttons, { onSave: save.run, onSubmit: () => undefined, busy: true })
 
   expect(state(mounted.root, 'forced')).toEqual(['true', false])
 })
@@ -114,7 +116,7 @@ test('a submit Button whose onClick answers a promise still submits its form, bu
   const save = later()
   const submits: number[] = []
 
-  mounted = await mountComponent('src/components/buttons.kay', { onSave: save.run, onSubmit: () => submits.push(1) })
+  mounted = await mountComponent(Buttons, { onSave: save.run, onSubmit: () => submits.push(1) })
 
   const root = mounted.root
 
@@ -132,7 +134,7 @@ test('a submit Button whose onClick answers a promise still submits its form, bu
 test('spinner={false} keeps the label and icon while the button is still busy and disabled until its promise settles', async () => {
   const save = later()
 
-  mounted = await mountComponent('src/components/buttons.kay', { onSave: save.run, onSubmit: () => undefined })
+  mounted = await mountComponent(Buttons, { onSave: save.run, onSubmit: () => undefined })
 
   const root = mounted.root
   const quiet = root.querySelector<HTMLButtonElement>('#quiet')!
@@ -151,7 +153,7 @@ test('spinner={false} keeps the label and icon while the button is still busy an
 })
 
 test('spinner={false} on a static submit button marks it for the stylesheet, which then draws no spinner of its own', async () => {
-  mounted = await mountComponent('src/components/buttons.kay', { onSave: () => undefined, onSubmit: () => undefined })
+  mounted = await mountComponent(Buttons, { onSave: () => undefined, onSubmit: () => undefined })
 
   const root = mounted.root
 
@@ -159,7 +161,7 @@ test('spinner={false} on a static submit button marks it for the stylesheet, whi
 })
 
 test('pressed writes aria-pressed on a toggle button, true or false, and leaves a plain button without it', async () => {
-  mounted = await mountComponent('src/components/buttons.kay', { onSave: () => undefined, onSubmit: () => undefined })
+  mounted = await mountComponent(Buttons, { onSave: () => undefined, onSubmit: () => undefined })
 
   const pressed = (id: string) => mounted!.root.querySelector(`#${id}`)!.getAttribute('aria-pressed')
 
@@ -167,26 +169,26 @@ test('pressed writes aria-pressed on a toggle button, true or false, and leaves 
 })
 
 test('tone success draws the success button', async () => {
-  mounted = await mountComponent('src/components/buttons.kay', { onSave: () => undefined, onSubmit: () => undefined })
+  mounted = await mountComponent(Buttons, { onSave: () => undefined, onSubmit: () => undefined })
 
   expect(kuiClasses(mounted.root.querySelector('#success'))).toBe('kui-btn kui-btn-success')
 })
 
 test('a Button used as a part of another component keeps the part name its caller hands it, busy or not', async () => {
-  mounted = await mountComponent('src/components/button-part.kay', {})
+  mounted = await mountComponent(ButtonPart, {})
 
   expect(mounted.root.querySelector('#plain')?.getAttribute('data-part')).toBe('cta')
   expect(mounted.root.querySelector('#busy')?.getAttribute('data-part')).toBe('busyCta')
 })
 
 test('a TimeInput used as a part of another component keeps the part name its caller hands it', async () => {
-  mounted = await mountComponent('src/components/button-part.kay', {})
+  mounted = await mountComponent(ButtonPart, {})
 
   expect(mounted.root.querySelector('#start')?.getAttribute('data-part')).toBe('cta')
 })
 
 test('an IconButton draws the snippet it is handed in place of an icon of the set', async () => {
-  mounted = await mountComponent('src/components/button-part.kay', {})
+  mounted = await mountComponent(ButtonPart, {})
 
   const button = mounted.root.querySelector('#drawn')!
 

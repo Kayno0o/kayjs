@@ -1,7 +1,8 @@
-import type { DurationText } from 'kay'
+import type { Duration } from 'kay'
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent } from 'kay/test'
+import Carousel from '../tests/fixture/src/components/carousel.kay'
 import { click, clock } from './dom'
 
 // How often the carousel turns on its own in these tests, and the fake time covering two turns.
@@ -20,8 +21,8 @@ afterEach(() => {
 })
 
 // Mounting waits on real timers, so a carousel is mounted before the clock is faked: its own interval would run in real time. A pointer resting on it then leaving makes it set the interval again, on the fake clock.
-async function carousel(autoplay?: DurationText) {
-  mounted = await mountComponent('src/components/carousel.kay', { autoplay, onIndexChange: (index: number) => turns.push(index) })
+async function carousel(autoplay?: Duration) {
+  mounted = await mountComponent(Carousel, { autoplay, onIndexChange: (index: number) => turns.push(index) })
 
   const { root } = mounted
   const section = root.querySelector<HTMLElement>('.kui-carousel')!
@@ -107,10 +108,6 @@ test('turns on its own, held while the pointer or the focus is on it, and stops 
   await clock.elapse(TWO_TURNS_MS)
 
   expect(turns).toEqual([])
-})
-
-test('throws on an autoplay that is a bare number, which was milliseconds', async () => {
-  await expect(carousel(5000 as never)).rejects.toThrow()
 })
 
 test('stops for good from its pause button, which a carousel without autoplay leaves out', async () => {

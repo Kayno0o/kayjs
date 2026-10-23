@@ -46,14 +46,14 @@ describe('the dev tool\'s AI tab', () => {
 
   it('lists the asks newest first with their tokens and outcome, and the limit in effect, under kay dev', async () => {
     process.env.KAY_DEV_CODE = '0'
-    const extension = ai({ limit: { max: 2, window: '10m' }, budget: { tokens: 1000, total: 5000, window: '1d' } })
+    const extension = ai({ rateLimit: { max: 2, window: '10m' }, budget: { tokens: 1000, total: 5000, window: '1d' } })
 
     fakeAi.reply('first')
-    await ask('Hello there', { visitor: 'v' })
+    await ask('Hello there', { key: 'v' })
     fakeAi.reply('second')
-    await ask('Another one', { visitor: 'v' })
+    await ask('Another one', { key: 'v' })
 
-    await expect(await failure(ask('Third', { visitor: 'v' }))).toBeInstanceOf(AiError)
+    await expect(await failure(ask('Third', { key: 'v' }))).toBeInstanceOf(AiError)
 
     const response = await read(extension)
     const body = await response.json() as { provider: string, limit: unknown, budget: unknown, asks: { prompt: string, outcome: string, tokens: number }[] }

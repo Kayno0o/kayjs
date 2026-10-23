@@ -22,8 +22,6 @@ export interface Envelope {
   subject: string
   // The locale the mail is written in, the mailer's `locale` unless given: its component renders `t()` in it, which must be one of the site's, and its `<html lang>` follows.
   locale?: string | undefined
-  /** @deprecated Since 1.70, dropped in 1.73: this is `locale`. */
-  lang?: string | undefined
   headers?: Record<string, string> | undefined
   attachments?: Attachment[] | undefined
   // Where the recipient unsubscribes in one click, written as `List-Unsubscribe` and `List-Unsubscribe-Post`: an https URL answering a POST, and an address to write to as well.
@@ -46,9 +44,6 @@ export interface TextContent {
 }
 
 export type MailMessage<P extends object = object> = Envelope & (ViewContent<P> | HtmlContent | TextContent)
-
-/** @deprecated Renamed `MailMessage` in 1.70, as kayjs-ai has a `Message` of its own; the old name goes in 1.73. */
-export type Message<P extends object = object> = MailMessage<P>
 
 // A mail once rendered: what a transport sends, the queue keeps and the outbox shows.
 export interface Mail {
@@ -85,6 +80,3 @@ export interface MailField {
   value?: string | undefined
   href?: string | undefined
 }
-
-/** @deprecated Renamed `MailField` in 1.70, as kayjs-cms has a `Field` of its own; the old name goes in 1.73. */
-export type Field = MailField

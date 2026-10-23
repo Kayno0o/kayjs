@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent } from 'kay/test'
+import AppHeader from '../tests/fixture/src/components/app-header.kay'
 
 let mounted: Mounted | undefined
 
@@ -9,7 +10,7 @@ afterEach(() => {
 })
 
 async function header() {
-  mounted = await mountComponent('src/components/app-header.kay')
+  mounted = await mountComponent(AppHeader)
 
   const { root } = mounted
 

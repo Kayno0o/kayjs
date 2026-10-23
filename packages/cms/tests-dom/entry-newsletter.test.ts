@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import EntryNewsletter from '../src/components/entry-newsletter.kay'
 
 let mounted: Mounted | undefined
 let dirty = false
@@ -23,7 +24,7 @@ function server() {
 async function open(denied: Record<string, string> = {}): Promise<void> {
   const form = { collection: { name: 'posts' }, stored: { slug: 'hello' }, dirty: () => dirty, saving: () => false, isDraft: () => draft }
 
-  mounted = await mountComponent('../../src/components/entry-newsletter.kay', { form, denied })
+  mounted = await mountComponent(EntryNewsletter, { form, denied })
   await settle()
 }
 

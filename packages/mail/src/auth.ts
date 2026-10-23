@@ -28,8 +28,6 @@ export interface AuthMail {
   kind: string
   // The site's name.
   name: string
-  /** @deprecated The old name of `name`, kept until 1.73. */
-  site: string
   locale: string
   subject: string
   text: string
@@ -38,8 +36,6 @@ export interface AuthMail {
   code?: string | undefined
   // How many seconds its link and its code work, for the ones it carries.
   maxAge?: { link?: number, code?: number } | undefined
-  /** @deprecated Since 1.70, dropped in 1.73: this is `maxAge`. */
-  expires?: { link?: number, code?: number } | undefined
   // The organization an invitation is to, or the provider, passkey, token or new address an event is about.
   detail?: string | undefined
 }

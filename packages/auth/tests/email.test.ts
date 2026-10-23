@@ -12,8 +12,8 @@ function setup(options: { requireVerified?: boolean, defaultRoles?: ('admin' | '
   const { mails, mailer, take } = mailbox()
   const app = testApp({
     defaultRoles: options.defaultRoles,
-    url: 'https://site.test/',
-    site: 'Site',
+    site: 'https://site.test/',
+    name: 'Site',
     email: {
       mailer,
       links: LINKS,
@@ -36,7 +36,7 @@ describe('verifying an email', () => {
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
 
     expect(mails).toHaveLength(1)
-    expect(mails[0]).toMatchObject({ to: 'ada@example.com', kind: 'verify-email', site: 'Site', subject: 'Confirm your email for Site' })
+    expect(mails[0]).toMatchObject({ to: 'ada@example.com', kind: 'verify-email', name: 'Site', subject: 'Confirm your email for Site' })
     expect(mails[0]!.url).toStartWith('https://site.test/verify?token=')
     expect(mails[0]!.html).toContain(mails[0]!.url!.replaceAll('&', '&amp;'))
 
@@ -194,8 +194,8 @@ describe('verifying an email', () => {
   })
 
   test('with a mailer, addresses must be verified unless the app says otherwise', async () => {
-    const { browser } = testApp({ url: 'https://site.test', email: { mailer: { send: () => undefined }, links: LINKS } })
-    const { browser: open } = testApp({ url: 'https://site.test', email: { mailer: { send: () => undefined }, links: LINKS, requireVerified: false } })
+    const { browser } = testApp({ site: 'https://site.test', email: { mailer: { send: () => undefined }, links: LINKS } })
+    const { browser: open } = testApp({ site: 'https://site.test', email: { mailer: { send: () => undefined }, links: LINKS, requireVerified: false } })
 
     expect(await browser().call('register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: true, signedIn: false })
     expect(await open().call('register', { email: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: true, signedIn: true })

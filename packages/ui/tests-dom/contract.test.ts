@@ -165,7 +165,7 @@ describe('component contract', () => {
     test(name, async () => {
       const { default: render } = await import(`${process.env.KAY_ROOT}/${wrapper}`) as { default: (props: { name: string }) => { t: string } }
       const server = render({ name }).t
-      const browser = await mountComponent(wrapper, { name })
+      const browser = await mountComponent(render, { name })
 
       mounted.push(browser)
 
@@ -186,7 +186,8 @@ describe('component contract', () => {
 
   // The bar's buttons come from a chunk loaded after mount, so the comparison above leaves them out: they must appear, and be named.
   test('markdown-editor hydrates its toolbar buttons', async () => {
-    const browser = await mountComponent(wrapper, { name: 'markdown-editor' })
+    const { default: render } = await import(`${process.env.KAY_ROOT}/${wrapper}`) as { default: (props: { name: string }) => { t: string } }
+    const browser = await mountComponent(render, { name: 'markdown-editor' })
 
     mounted.push(browser)
 

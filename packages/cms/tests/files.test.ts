@@ -138,23 +138,6 @@ describe('forgejo', () => {
     expect(make('https://git.example.com')).not.toThrow()
   })
 
-  test('still takes url, the old name of baseUrl, which wins when both are given', async () => {
-    const sent: string[] = []
-    const request = (async (input: unknown) => {
-      sent.push(String(input))
-
-      return Response.json({ content: { sha: 'a' }, commit: { sha: 'c0ffee' } }, { status: 201 })
-    }) as unknown as typeof fetch
-    const change = { repoPath: 'content/a.md', absolute: '/tmp/a.md', text: 'x' }
-
-    for (const options of [{ url: 'https://old.example.com' }, { url: 'https://old.example.com', baseUrl: 'https://new.example.com' }])
-      await forgejo({ ...options, repo: 'me/site', token: 't0k', fetch: request }).save({ ...change, message: 'm' })
-
-    expect(sent[0]).toStartWith('https://old.example.com/api/v1/repos/me/site/')
-    expect(sent.at(-1)).toStartWith('https://new.example.com/api/v1/repos/me/site/')
-    expect(() => forgejo({ repo: 'me/site', token: 't0k' } as never)).toThrow('forgejo baseUrl')
-  })
-
   test('throws a proxy\'s plain-text refusal as it came, cut to its first 200 characters', async () => {
     const { saver } = forge({}, new Response('Bad gateway', { status: 502 }))
 

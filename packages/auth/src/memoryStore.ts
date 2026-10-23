@@ -594,6 +594,3 @@ function oldestFirst<T extends { createdAt: Date }>(records: T[]): T[] {
 function clone<T extends object>(value: T | undefined): T | undefined {
   return value && { ...value }
 }
-
-/** @deprecated Renamed `memoryAuthStore` in 1.70, as kay's `memoryStore` is the session one; the old name goes in 1.73. */
-export const memoryStore = memoryAuthStore

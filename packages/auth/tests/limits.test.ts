@@ -50,7 +50,7 @@ async function pendingSignIn(limits: LimitsOption) {
 
 // The options of an app that mails, to a mailer nobody reads.
 function mail(codes?: 'code') {
-  return { url: 'https://site.test', email: { mailer: mailbox().mailer, links: LINKS, codes, requireVerified: false } }
+  return { site: 'https://site.test', email: { mailer: mailbox().mailer, links: LINKS, codes, requireVerified: false } }
 }
 
 async function mailed(limits: LimitsOption) {
@@ -84,7 +84,7 @@ const rows: Row[] = [
     per: 'client',
     limit: { max: 2, window: '3600s' },
     prepare: async (limits) => {
-      const { browser } = testApp({ limits })
+      const { browser } = testApp({ rateLimit: limits })
 
       return async n => browser().post('/register', { email: `user${n}@example.com`, password: PASSWORD })
     },
@@ -95,7 +95,7 @@ const rows: Row[] = [
     per: 'client',
     limit: { max: 2, window: '900s' },
     prepare: async (limits) => {
-      const { browser } = testApp({ limits })
+      const { browser } = testApp({ rateLimit: limits })
 
       return async n => browser().post('/password', { identifier: `user${n}@example.com`, password: PASSWORD })
     },
@@ -311,7 +311,7 @@ describe('rate limits', () => {
   test.each(rows.map(row => [`${row.key}${row.action === undefined ? '' : ` (${row.action})`}`, row.per, row] as const))('%s answers `limited` once its attempts are spent, per %s', async (_name, _per, row) => {
     const key = row.key
     const limit = row.limit ?? DEFAULT_LIMITS[key]
-    const attempt = await row.prepare({ [key]: limit })
+    const attempt = await row.prepare({ [key]: { max: limit.max, window: typeof limit.window === 'number' ? `${limit.window}s` : limit.window } })
 
     for (let n = 1; n <= limit.max; n++)
       expect(await attempt(n)).toMatchObject(row.answers)

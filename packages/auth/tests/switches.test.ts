@@ -12,14 +12,14 @@ const email = () => ({ mailer: mailbox().mailer, links: { 'verify-email': '/v', 
 
 describe('feature switches', () => {
   test('are all on by default and in features()', async () => {
-    const { browser } = testApp({ url: 'http://localhost', email: email() })
+    const { browser } = testApp({ site: 'http://localhost', email: email() })
 
     expect(await browser().call('features')).toMatchObject({ password: true, passkeys: true, magicLink: true, twoFactor: true })
   })
 
   test('password: false closes registering, signing in, resets and changes', async () => {
     const mails = mailbox()
-    const { browser, store } = testApp({ url: 'http://localhost', password: false, email: { ...email(), mailer: mails.mailer } })
+    const { browser, store } = testApp({ site: 'http://localhost', password: false, email: { ...email(), mailer: mails.mailer } })
     const ada = browser()
 
     await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', emailVerifiedAt: new Date() }))
@@ -37,7 +37,7 @@ describe('feature switches', () => {
 
   test('magicLink: false closes links and codes, and features() says so even with mail', async () => {
     const mails = mailbox()
-    const { browser, store } = testApp({ url: 'http://localhost', magicLink: false, email: { ...email(), mailer: mails.mailer } })
+    const { browser, store } = testApp({ site: 'http://localhost', magicLink: false, email: { ...email(), mailer: mails.mailer } })
     const ada = browser()
 
     await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', emailVerifiedAt: new Date() }))
@@ -50,11 +50,11 @@ describe('feature switches', () => {
   })
 
   test('magicLink is off in features() without mail', async () => {
-    expect(await testApp({ url: 'http://localhost' }).browser().call('features')).toMatchObject({ magicLink: false })
+    expect(await testApp({ site: 'http://localhost' }).browser().call('features')).toMatchObject({ magicLink: false })
   })
 
   test('twoFactor: false closes setting it up, but a user who has it is still asked for the code', async () => {
-    const { browser, store } = testApp({ url: 'http://localhost', twoFactor: false })
+    const { browser, store } = testApp({ site: 'http://localhost', twoFactor: false })
     const ada = browser()
 
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
@@ -91,8 +91,8 @@ describe('feature switches', () => {
   })
 
   test('twoFactor: false cannot be asked of forwardAuth, which sends users to set it up', () => {
-    expect(() => testApp({ url: 'http://localhost', twoFactor: false, forwardAuth: { domains: 'example.com', requireTwoFactor: true } })).toThrow('twoFactor: false')
-    expect(() => testApp({ url: 'http://localhost', forwardAuth: { domains: 'example.com', requireTwoFactor: true } })).not.toThrow()
+    expect(() => testApp({ site: 'http://localhost', twoFactor: false, forwardAuth: { domains: 'example.com', requireTwoFactor: true } })).toThrow('twoFactor: false')
+    expect(() => testApp({ site: 'http://localhost', forwardAuth: { domains: 'example.com', requireTwoFactor: true } })).not.toThrow()
   })
 
   test('a way in that is switched off is no way in when a user unlinks or revokes the last', async () => {
@@ -112,7 +112,7 @@ describe('feature switches', () => {
   })
 
   test('passkeys: false closes every passkey method, though the site has an origin', async () => {
-    const { browser } = testApp({ url: 'http://localhost', passkeys: false })
+    const { browser } = testApp({ site: 'http://localhost', passkeys: false })
     const ada = browser()
 
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })

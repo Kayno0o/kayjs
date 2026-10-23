@@ -4,6 +4,9 @@ import type { ScreenCollection } from '../src/kay/contract'
 import { afterEach, expect, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import { createDrafts } from '../src/drafts'
+import EntryBodyProbe from '../tests/fixture/src/components/entry-body-probe.kay'
+import EntryFieldProbe from '../tests/fixture/src/components/entry-field-probe.kay'
+import ListField from '../tests/fixture/src/components/list-field.kay'
 
 const REFUSAL = 'Your role may not do this: publish or unpublish'
 const schema = { type: 'object', properties: { title: { type: 'string' }, draft: { type: 'boolean' }, publishAt: { type: 'string', format: 'date' }, endsAt: { type: 'string', format: 'date' } } }
@@ -17,7 +20,7 @@ afterEach(() => {
 })
 
 async function field(name: string, denied?: Record<string, string>): Promise<HTMLElement> {
-  mounted = await mountComponent('src/components/entry-field-probe.kay', { name, collection, denied })
+  mounted = await mountComponent(EntryFieldProbe, { name, collection, denied })
   await settle()
 
   return mounted.root
@@ -100,13 +103,13 @@ async function markdownField(): Promise<HTMLElement> {
   const drafts = createDrafts({ show: async () => ({}) })
 
   drafts.open({ collection: 'posts', slug: 'hello', data: { tags: '' } })
-  mounted = await mountComponent('src/components/list-field.kay', { drafts, field: MARKDOWN })
+  mounted = await mountComponent(ListField, { drafts, field: MARKDOWN })
 
   return mounted.root
 }
 
 async function bodyField(): Promise<HTMLElement> {
-  mounted = await mountComponent('src/components/entry-body-probe.kay', { collection })
+  mounted = await mountComponent(EntryBodyProbe, { collection })
 
   return mounted.root
 }

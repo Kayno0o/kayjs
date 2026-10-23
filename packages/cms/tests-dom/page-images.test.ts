@@ -1,13 +1,12 @@
 import type { Mounted } from 'kay/test'
-import { join } from 'node:path'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import { sameBar } from '../src/editor/image-bar'
 import { EDITOR_LAYER } from '../src/editor/layer'
 import { OWN } from '../src/editor/own'
+import Editor from '../src/editor/editor.kay'
 import { EDITOR_COOKIE } from '../src/page-link'
 
-const EDITOR = join(import.meta.dir, '../src/editor/editor.kay')
 const SCHEMA = {
   type: 'object',
   properties: {
@@ -111,7 +110,7 @@ async function open(entries: object[] = [HELLO]) {
   title.textContent = 'Hello'
   Object.assign(image, { getBoundingClientRect: () => ({ left: 10, top: 10, right: 310, bottom: 210, width: 300, height: 200 }) })
   document.body.append(image, title)
-  mounted = await mountComponent(EDITOR, { entries, unclickable: [] })
+  mounted = await mountComponent(Editor, { entries, unclickable: [] })
   await settle()
   await Bun.sleep(30)
 

@@ -22,8 +22,6 @@ export interface AuthMailMessage extends MailContent {
   kind: MailKind
   // The site's name, as the templates write it.
   name: string
-  /** @deprecated The old name of `name`, kept until 1.73. */
-  site: string
   // The organization an invitation is to, or the provider, passkey, token or new address an event is about.
   detail?: string
   url?: string
@@ -33,8 +31,6 @@ export interface AuthMailMessage extends MailContent {
   locale: string
   // How many seconds its link and its code work, for the ones it carries.
   maxAge?: { link?: number, code?: number } | undefined
-  /** @deprecated Since 1.70, dropped in 1.73: this is `maxAge`. */
-  expires?: { link?: number, code?: number } | undefined
 }
 
 // One address on one mailing list, as kayjs-mail's `subscriptions` answers it.
@@ -54,17 +50,9 @@ export interface AuthMailer {
   subscriptions?: ((address: string) => Promise<MailingSubscription[]>) | undefined
 }
 
-/** @deprecated Renamed `AuthMailMessage` in 1.70, as kayjs-mail has a `Mail` of its own; the old name goes in 1.73. */
-export type Mail = AuthMailMessage
-
-/** @deprecated Renamed `AuthMailer` in 1.70, as kayjs-mail has a `Mailer` of its own; the old name goes in 1.73. */
-export type Mailer = AuthMailer
-
 // What a template is given: the site's `name`, the address written to, the link and the code when the mail carries them, and the provider or token an event is about, or the organization an invitation is to.
 export interface MailData {
   name: string
-  /** @deprecated The old name of `name`, kept until 1.73. */
-  site: string
   email: string
   url?: string | undefined
   code?: string | undefined
@@ -73,8 +61,6 @@ export interface MailData {
   locale: string
   // How many seconds the mail's link and its code work, for the ones it carries: `{ link: 86400, code: 600 }`. `lifetime(seconds, locale)` words them.
   maxAge?: { link?: number, code?: number } | undefined
-  /** @deprecated Since 1.70, dropped in 1.73: this is `maxAge`. */
-  expires?: { link?: number, code?: number } | undefined
 }
 
 export type Templates = Record<MailKind, (data: MailData) => MailContent>
@@ -146,7 +132,7 @@ export const lifetime = durationWords
 
 // How long what the mail carries works, a magic link being usable once.
 function lasting(words: Wording, data: MailData, once = false): string {
-  const { link, code } = data.maxAge ?? data.expires ?? {}
+  const { link, code } = data.maxAge ?? {}
   const parts = [data.url === undefined || link === undefined ? undefined : words.linkWorks(lifetime(link, data.locale), once), data.code === undefined || code === undefined ? undefined : words.codeWorks(lifetime(code, data.locale))]
 
   return parts.filter(part => part !== undefined).join(' ')

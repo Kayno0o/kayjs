@@ -223,42 +223,6 @@ async function authOfServer(server: (() => AnyElysia | Promise<AnyElysia>) | und
   return auth
 }
 
-async function pluginIn<Module extends AuthModule>(load: () => Promise<Module>, given?: { prefix?: string | undefined, home?: string | undefined }): Promise<PluginOf<Module>> {
-  const auth = authOfModule(await load())
-
-  if (given)
-    auth[PAGES_OF]?.adopt(given)
-
-  return auth.plugin as PluginOf<Module>
-}
-
-/** @deprecated Use `auth({ module, pages: false })`, which `kay check --fix` rewrites it to. */
-// kayjs-auth for `extensions` in kay.config.ts, as the whole declaration: `authExtension(() => import('./src/auth'))` for the module making `auth` with `createAuth`, exported as `auth` or by default. The module loads as the server starts, never as the config is read, so the config stays off the app's database, and `kay check` types `ctx.locals.auth` and links to kayjs-auth's routes off it.
-export function authExtension<Module extends AuthModule>(load: () => Promise<Module>): KayExtension<PluginOf<Module>> {
-  const extension: KayExtension<PluginOf<Module>> = { name: 'auth', server: async () => pluginIn(load), devTool: DEV_TOOL, commands: COMMANDS }
-
-  return Object.assign(extension, { [LOAD_AUTH]: async () => authOfModule(await load()) as unknown as UserMaker })
-}
-
-/** @deprecated Use `auth({ module })`, which `kay check --fix` rewrites it to. */
-// The sign-in, register, mailed-link and account pages, for `extensions` in kay.config.ts. With `auth`, `createAuth({ pages: true })` takes this `prefix` and `home`; one given in both places must match for the prefix.
-// `auth` loads the app's `auth` as `authExtension` does, so the app mounts nothing else and `kay check` types `ctx.locals.auth` and links to kayjs-auth's routes; `server` hands `pages()` any other plugin carrying it.
-export function authPages<Module extends AuthModule>(options: AuthPagesOptions & { auth: () => Promise<Module> }): AuthPages<PluginOf<Module>>
-export function authPages<Server extends AnyElysia = AnyElysia>(options?: AuthPagesOptions & { server?: (() => Server | Promise<Server>) | undefined }): AuthPages<Server>
-export function authPages(options: AuthPagesOptions & { auth?: (() => Promise<AuthModule>) | undefined, server?: (() => AnyElysia | Promise<AnyElysia>) | undefined } = {}): AuthPages {
-  const extension: AuthPages = {
-    name: '@kaynooo/kayjs-auth',
-    server: options.auth ? async () => pluginIn(options.auth!, { prefix: options.prefix, home: options.home }) : options.server,
-    routes: { dir: `${import.meta.dir}/routes`, prefix: options.prefix ?? DEFAULT_PREFIX },
-    devTool: DEV_TOOL,
-    commands: COMMANDS,
-    prefix: options.prefix ?? DEFAULT_PREFIX,
-    home: options.home ?? '/',
-  }
-
-  return Object.assign(extension, { [LOAD_AUTH]: options.auth ? async () => authOfModule(await options.auth!()) as unknown as UserMaker : async () => authOfServer(options.server) })
-}
-
 const VIEWER_LAYOUT = `${import.meta.dir}/../viewer-layout/_layout.kay`
 const CONTEXT = `${import.meta.dir}/../context.ts`
 

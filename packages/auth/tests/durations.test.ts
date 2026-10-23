@@ -11,8 +11,8 @@ afterEach(() => {
 })
 
 describe('time options take a Duration', () => {
-  test('remember.maxAge takes a string, the bare seconds of before 1.70 still work, and a bad one fails at boot naming it', async () => {
-    for (const maxAge of ['45d' as never, 45 * 24 * 60 * 60 as never]) {
+  test('remember.maxAge takes a string, and a bad one fails at boot naming it', async () => {
+    for (const maxAge of ['45d' as const]) {
       const { browser, store } = testApp({ remember: { maxAge } })
       const ada = browser()
 
@@ -95,7 +95,7 @@ describe('time options take a Duration', () => {
     expect(() => testApp({ rateLimit: { signIn: { max: 1, window: '-5m' } } })).toThrow('rateLimit.signIn.window is \'-5m\'')
   })
 
-  test('limits, the old name of rateLimit, still counts, and rateLimit wins where both name a limit', async () => {
+  test('rateLimit windows reach the store as seconds', async () => {
     const windows: Duration[] = []
     const base = memoryAuthStore()
     const store = { ...base, attempts: { ...base.attempts, hit: async (key: string, window: Duration) => {
@@ -103,12 +103,12 @@ describe('time options take a Duration', () => {
 
       return base.attempts.hit(key, window)
     } } }
-    const { browser } = testApp({ store, limits: { register: { max: 1, window: '2h' }, signIn: { max: 1, window: '1h' } }, rateLimit: { register: { max: 1, window: '3h' } } })
+    const { browser } = testApp({ store, rateLimit: { register: { max: 1, window: '3h' }, signIn: { max: 1, window: '1h' } } })
 
     await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
     expect(windows).toContain('10800s')
     expect(windows).not.toContain('7200s')
-    expect(() => testApp({ limits: { signIn: { max: 1, window: '-5m' } } })).toThrow('kay: limits.signIn.window is \'-5m\'')
+    expect(() => testApp({ rateLimit: { signIn: { max: 1, window: '-5m' } } })).toThrow('kay: rateLimit.signIn.window is \'-5m\'')
   })
 
   test('a token\'s maxAge takes a string, and a bad one answers expiry', async () => {

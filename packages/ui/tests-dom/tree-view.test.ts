@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Tree from '../tests/fixture/src/components/tree.kay'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -14,7 +15,7 @@ afterEach(() => {
 })
 
 async function tree() {
-  mounted = await mountComponent('src/components/tree.kay', { onSelect: (id: string, node: { label: string }) => {
+  mounted = await mountComponent(Tree, { onSelect: (id: string, node: { label: string }) => {
     picks.push(id)
     nodes.push(node.label)
   } })

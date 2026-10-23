@@ -6,7 +6,7 @@ import { underResource } from '../src/authorize/resource'
 import { validRedirectUri, validRedirectUris } from '../src/authorize/uris'
 import { digest } from '../src/keys'
 import { memoryAuthStore } from '../src/memoryStore'
-import { authPages } from '../src/pages'
+import { auth } from '../src/pages'
 import { browser as browserOf, testApp } from './helpers/app'
 
 const PASSWORD = 'correct horse battery'
@@ -182,10 +182,10 @@ describe('client names', () => {
   })
 })
 
-function server(options: { documents?: Record<string, unknown>, limits?: Record<string, { max: number, window: number }>, url?: string | null } = {}) {
+function server(options: { documents?: Record<string, unknown>, limits?: Record<string, { max: number, window: string }>, url?: string | null } = {}) {
   return testApp({
-    ...options.url === null ? {} : { url: options.url ?? 'http://localhost' },
-    pages: authPages(),
+    ...options.url === null ? {} : { site: options.url ?? 'http://localhost' },
+    pages: auth({ plugin: false }),
     scopes: ['posts:read', 'posts:write'],
     admin: 'admin',
     ...options.limits && { rateLimit: options.limits },
@@ -221,24 +221,24 @@ async function token(app: Server, form: Record<string, string>) {
 
 describe('the limits', () => {
   test('registration answers 429 past the limit of an address, and past the one of all addresses together when the app sets it', async () => {
-    const byAddress = server({ limits: { oauthRegister: { max: 2, window: 3600 } } })
+    const byAddress = server({ limits: { oauthRegister: { max: 2, window: '3600s' } } })
 
     expect([(await register(byAddress)).status, (await register(byAddress)).status, (await register(byAddress)).status]).toEqual([201, 201, 429])
 
-    const all = server({ limits: { oauthRegisterAll: { max: 2, window: 3600 } } })
+    const all = server({ limits: { oauthRegisterAll: { max: 2, window: '3600s' } } })
 
     expect([(await register(all)).status, (await register(all)).status, (await register(all)).status]).toEqual([201, 201, 429])
   })
 
   test('registration has no budget shared by all addresses unless the app sets one', async () => {
-    const app = server({ limits: { oauthRegister: { max: 600, window: 3600 } } })
+    const app = server({ limits: { oauthRegister: { max: 600, window: '3600s' } } })
 
     for (let n = 0; n < 501; n++)
       expect((await register(app)).status).toBe(201)
   })
 
   test('the token endpoint answers 429 past its limit', async () => {
-    const app = server({ limits: { oauthToken: { max: 2, window: 900 } } })
+    const app = server({ limits: { oauthToken: { max: 2, window: '900s' } } })
     const statuses = []
 
     for (let attempt = 0; attempt < 3; attempt++)
@@ -249,7 +249,7 @@ describe('the limits', () => {
 
   test('metadata documents are read a limited number of times per address', async () => {
     const documents = { [DOCUMENT]: { client_id: DOCUMENT, redirect_uris: [REDIRECT] }, 'https://other.example/c.json': { client_id: 'https://other.example/c.json', redirect_uris: [REDIRECT] } }
-    const app = server({ documents, limits: { oauthDocument: { max: 1, window: 900 } } })
+    const app = server({ documents, limits: { oauthDocument: { max: 1, window: '900s' } } })
     const ada = await signedIn(app)
 
     expect(await ada.call('oauthAuthorize', params(DOCUMENT))).toMatchObject({ kind: 'consent' })

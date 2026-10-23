@@ -120,7 +120,7 @@ describe('createAuth', () => {
     }
 
     test('mints the http cookie outside production, whatever the url', async () => {
-      const { auth, read } = await seed({ url: 'https://example.com' })
+      const { auth, read } = await seed({ site: 'https://example.com' })
       const cookie = await auth.sessionCookie('u1')
 
       expect(cookie).toStartWith('kay_session=')
@@ -152,7 +152,7 @@ describe('createAuth', () => {
     })
 
     test('in production with an https auth url but no site, mints what the server reads: kay_session', async () => {
-      const { auth, read } = await seed({ url: 'https://example.com' })
+      const { auth, read } = await seed({ site: 'https://example.com' })
 
       process.env.NODE_ENV = 'production'
 

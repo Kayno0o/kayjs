@@ -2,6 +2,7 @@ import type { Mounted } from 'kay/test'
 import type { ScreenCollection, StoredEntry } from '../src/kay/contract'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent } from 'kay/test'
+import EntryEditor from '../src/components/entry-editor.kay'
 
 const home: ScreenCollection = {
   name: 'home',
@@ -21,7 +22,7 @@ afterEach(() => {
 })
 
 async function open(entry?: StoredEntry, collection = home, prefix = '/admin') {
-  mounted = await mountComponent('../../src/components/entry-editor.kay', { prefix, collection, entry })
+  mounted = await mountComponent(EntryEditor, { prefix, collection, entry })
 
   return mounted.root
 }

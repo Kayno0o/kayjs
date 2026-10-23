@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, setSystemTime, spyOn, test } from 'bun:test'
-import { authPages } from '../src/pages'
+import { auth } from '../src/pages'
 import { testApp } from './helpers/app'
 
 const PASSWORD = 'correct horse battery'
@@ -13,7 +13,7 @@ afterEach(() => {
 })
 
 function server(options: { scopes?: ('posts:read')[], oauthServer?: boolean } = {}) {
-  return testApp({ url: 'http://localhost', pages: authPages(), scopes: options.scopes ?? ['posts:read'], ...options.oauthServer === undefined ? {} : { oauthServer: options.oauthServer } } as never)
+  return testApp({ site: 'http://localhost', pages: auth({ plugin: false }), scopes: options.scopes ?? ['posts:read'], ...options.oauthServer === undefined ? {} : { oauthServer: options.oauthServer } } as never)
 }
 
 type Server = ReturnType<typeof server>
@@ -97,7 +97,7 @@ describe('the revocation endpoint (RFC 7009)', () => {
   })
 
   test('counts its own budget, apart from the token endpoint', async () => {
-    const app = testApp({ url: 'http://localhost', pages: authPages(), scopes: ['posts:read'], rateLimit: { oauthToken: { max: 2, window: 900 } } } as never)
+    const app = testApp({ site: 'http://localhost', pages: auth({ plugin: false }), scopes: ['posts:read'], rateLimit: { oauthToken: { max: 2, window: '900s' } } } as never)
     const statuses = []
 
     for (let attempt = 0; attempt < 3; attempt++)
@@ -127,7 +127,7 @@ describe('an OAuth server without declared scopes', () => {
     const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
 
     try {
-      testApp({ url: 'http://localhost', pages: authPages(), oauthServer: true })
+      testApp({ site: 'http://localhost', pages: auth({ plugin: false }), oauthServer: true })
       expect(warned.mock.calls.flat().join(' ')).toContain('declares no `scopes`')
     }
     finally {
@@ -136,13 +136,13 @@ describe('an OAuth server without declared scopes', () => {
   })
 
   test.each([
-    ['declared scopes', { pages: authPages(), scopes: ['posts:read'], oauthServer: true }],
-    ['only the default, off the pages', { pages: authPages() }],
+    ['declared scopes', { pages: auth({ plugin: false }), scopes: ['posts:read'], oauthServer: true }],
+    ['only the default, off the pages', { pages: auth({ plugin: false }) }],
   ])('stays quiet with %s', (_name, options) => {
     const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
 
     try {
-      testApp({ url: 'http://localhost', ...options } as never)
+      testApp({ site: 'http://localhost', ...options } as never)
       expect(warned.mock.calls.flat().join(' ')).not.toContain('declares no `scopes`')
     }
     finally {

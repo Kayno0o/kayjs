@@ -2,6 +2,8 @@ import type { Mounted } from 'kay/test'
 import type { FormLayout, ScreenCollection } from '../src/kay/contract'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import EntryBodyProbe from '../tests/fixture/src/components/entry-body-probe.kay'
+import EntryFieldProbe from '../tests/fixture/src/components/entry-field-probe.kay'
 
 const schema = { type: 'object', properties: { intro: { 'type': 'string', 'x-kay': { kind: 'markdown' } }, extra: { type: 'object', properties: { note: { 'type': 'string', 'x-kay': { kind: 'markdown' } } } } } }
 let mounted: Mounted | undefined
@@ -18,7 +20,7 @@ function collectionWith(form?: FormLayout): ScreenCollection {
 const buttons = (root: Element) => [...root.querySelectorAll('.kui-markdown-bar button')].map(button => button.getAttribute('aria-label'))
 
 async function body(form?: Parameters<typeof collectionWith>[0]): Promise<HTMLElement> {
-  mounted = await mountComponent('src/components/entry-body-probe.kay', { collection: collectionWith(form) })
+  mounted = await mountComponent(EntryBodyProbe, { collection: collectionWith(form) })
   await settle()
 
   return mounted.root
@@ -43,14 +45,14 @@ test('the body is labelled Body with every button, until the collection words it
 })
 
 test('the collection\'s toolbar reaches a Markdown field as it reaches the body', async () => {
-  mounted = await mountComponent('src/components/entry-field-probe.kay', { name: 'intro', collection: collectionWith({ toolbar: ['italic'] }) })
+  mounted = await mountComponent(EntryFieldProbe, { name: 'intro', collection: collectionWith({ toolbar: ['italic'] }) })
   await settle()
 
   expect(buttons(mounted.root)).toEqual(['Italic', 'Preview'])
 })
 
 test('and one inside a group', async () => {
-  mounted = await mountComponent('src/components/entry-field-probe.kay', { name: 'extra', collection: collectionWith({ toolbar: ['heading'] }) })
+  mounted = await mountComponent(EntryFieldProbe, { name: 'extra', collection: collectionWith({ toolbar: ['heading'] }) })
   await settle()
 
   expect(buttons(mounted.root)).toEqual(['Heading', 'Preview'])

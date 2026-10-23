@@ -59,7 +59,7 @@ describe('a plain Elysia app on auth.plugin', () => {
   })
 
   test('takes the host of `url` as its own, for a proxy that does not pass Host on', async () => {
-    const app = testApp({ url: 'https://app.example.com' })
+    const app = testApp({ site: 'https://app.example.com' })
 
     await app.store.users.create(userRecord({ id: 'u1' }))
     const browser = app.browser()

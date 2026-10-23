@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Editor from '../tests/fixture/src/components/editor.kay'
 
 let mounted: Mounted | undefined
 
@@ -13,7 +14,7 @@ afterEach(() => {
 async function editor(initial: string, onImage?: (file: File) => Promise<string>, extra: Record<string, unknown> = {}) {
   let value = initial
 
-  mounted = await mountComponent('src/components/editor.kay', { value: initial, onInput: (next: string) => value = next, onImage, ...extra })
+  mounted = await mountComponent(Editor, { value: initial, onInput: (next: string) => value = next, onImage, ...extra })
 
   const area = mounted.root.querySelector<HTMLTextAreaElement>('#editor')!
 

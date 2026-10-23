@@ -59,18 +59,6 @@ describe('sessions', () => {
     expect(await laptop.call('listSessions')).toHaveLength(1)
   })
 
-  test('the old names of the renamed methods still answer as they did', async () => {
-    const { signedIn } = await setup()
-    const laptop = await signedIn()
-    const phone = await signedIn('10.0.0.2', IPHONE)
-    const other = (await laptop.call('sessions'))[1]!
-
-    expect(await laptop.call('listSessions')).toEqual(await laptop.call('sessions'))
-    expect(await laptop.call('endSession', other.id)).toBe(true)
-    expect(await laptop.call('endSession', other.id)).toBe(false)
-    expect(await phone.json('/me')).toBe('anonymous')
-  })
-
   test('ending this session signs out, and a session of someone else is not ended', async () => {
     const { signedIn, store, browser } = await setup()
     const laptop = await signedIn()
@@ -221,7 +209,7 @@ describe('sessions', () => {
   test('a new sign-in mail links to the app\'s sessions page', async () => {
     const mails: Mail[] = []
     const { browser } = await setup({
-      url: 'https://site.test',
+      site: 'https://site.test',
       sessionsPage: '/account/sessions',
       email: { mailer: { send: mail => void mails.push(mail) }, links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' }, requireVerified: false },
     })
@@ -243,7 +231,7 @@ describe('what ends the user\'s other sessions and bearer tokens', () => {
   // A signed-in user with a password, and a way to add another browser and a device token that the action under test must end.
   async function account() {
     const { mails, mailer } = mailbox()
-    const app = testApp({ url: 'https://site.test', site: 'Site', email: { mailer, links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' }, requireVerified: false } })
+    const app = testApp({ site: 'https://site.test', name: 'Site', email: { mailer, links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' }, requireVerified: false } })
     const ada = app.browser()
 
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })

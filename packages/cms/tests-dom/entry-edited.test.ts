@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import EntryEdited from '../src/components/entry-edited.kay'
 
 let mounted: Mounted | undefined
 
@@ -14,7 +15,7 @@ test('the day an entry was last edited is written once the browser says its zone
   const at = Date.UTC(2026, 9, 20, 23, 30)
 
   document.documentElement.lang = 'fr'
-  mounted = await mountComponent('../../src/components/entry-edited.kay', { at })
+  mounted = await mountComponent(EntryEdited, { at })
   await settle()
 
   const time = mounted.root.querySelector('time')!
@@ -27,12 +28,12 @@ test('the day an entry was last edited is written once the browser says its zone
 test('the sentence form names the day and who edited, and the day alone without an author', async () => {
   const at = Date.UTC(2026, 9, 20, 12)
 
-  mounted = await mountComponent('../../src/components/entry-edited.kay', { at, sentence: true, author: 'Ada' })
+  mounted = await mountComponent(EntryEdited, { at, sentence: true, author: 'Ada' })
   await settle()
   expect(mounted.root.querySelector('time')!.textContent).toMatch(/^Last edited .*2026.* by Ada$/u)
   mounted.unmount()
 
-  mounted = await mountComponent('../../src/components/entry-edited.kay', { at, sentence: true })
+  mounted = await mountComponent(EntryEdited, { at, sentence: true })
   await settle()
   expect(mounted.root.querySelector('time')!.textContent).toMatch(/^Last edited .*2026.*(?<! by Ada)$/u)
 })

@@ -1,6 +1,8 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, jest, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Hosts from '../tests/fixture/src/components/hosts.kay'
+import Toasts from '../tests/fixture/src/components/toasts.kay'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -10,7 +12,7 @@ afterEach(() => {
 })
 
 test('a toast shows in the toaster and is read from a region kept in the page, an error as an alert, and leaves once dismissed', async () => {
-  mounted = await mountComponent('src/components/toasts.kay')
+  mounted = await mountComponent(Toasts)
   click(mounted.root.querySelector('#saved'))
   click(mounted.root.querySelector('#refused'))
   await settle()
@@ -34,7 +36,7 @@ async function elapse(ms: number) {
 }
 
 test('the toasts hold while the pointer rests on them, and run out once it leaves', async () => {
-  mounted = await mountComponent('src/components/toasts.kay')
+  mounted = await mountComponent(Toasts)
   const { root } = mounted
   const messages = () => [...root.querySelectorAll('.kui-toast [data-part=message]')].map(item => item.textContent)
 
@@ -66,7 +68,7 @@ test('the toasts hold while the pointer rests on them, and run out once it leave
 })
 
 test('an info toast is drawn in the info tone, and a sticky one stays until it is dismissed', async () => {
-  mounted = await mountComponent('src/components/toasts.kay')
+  mounted = await mountComponent(Toasts)
   const { root } = mounted
   const messages = () => [...root.querySelectorAll('.kui-toast [data-part=message]')].map(item => item.textContent)
 
@@ -97,7 +99,7 @@ test('an info toast is drawn in the info tone, and a sticky one stays until it i
 })
 
 test('a second Toaster renders nothing while the first is mounted, and takes over once it unmounts', async () => {
-  mounted = await mountComponent('src/components/hosts.kay')
+  mounted = await mountComponent(Hosts)
   const { root } = mounted
   const toasters = () => [...root.querySelectorAll('.kui-toaster')]
 
@@ -119,7 +121,7 @@ test('a second Toaster renders nothing while the first is mounted, and takes ove
 })
 
 test('Alt+T moves focus to the toasts and Escape dismisses the focused one', async () => {
-  mounted = await mountComponent('src/components/toasts.kay')
+  mounted = await mountComponent(Toasts)
   click(mounted.root.querySelector('#saved'))
   click(mounted.root.querySelector('#refused'))
   await settle()
@@ -136,7 +138,7 @@ test('Alt+T moves focus to the toasts and Escape dismisses the focused one', asy
 })
 
 test('Alt+T leaves the key alone when no toast is on screen', async () => {
-  mounted = await mountComponent('src/components/toasts.kay')
+  mounted = await mountComponent(Toasts)
 
   const event = new KeyboardEvent('keydown', { key: 't', altKey: true, bubbles: true, cancelable: true })
 
@@ -147,7 +149,7 @@ test('Alt+T leaves the key alone when no toast is on screen', async () => {
 })
 
 test('a toast carries its tone as an attribute, and its tone variants set the colour its icon takes', async () => {
-  mounted = await mountComponent('src/components/toasts.kay')
+  mounted = await mountComponent(Toasts)
 
   for (const dismiss of mounted.root.querySelectorAll('.kui-toast [data-part=dismiss]'))
     click(dismiss)

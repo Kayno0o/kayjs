@@ -12,7 +12,7 @@ const HOSTILE = ['//evil.test', 'https://evil.test', '/\\evil.test', 'javascript
 
 function setup(options: { requireVerified?: boolean, codes?: CodeMode } = {}) {
   const { mails, mailer, take } = mailbox()
-  const app = testApp({ url: 'https://site.test/', site: 'Site', signInPage: '/login', email: { mailer, links: LINKS, requireVerified: options.requireVerified ?? false, codes: options.codes } })
+  const app = testApp({ site: 'https://site.test/', name: 'Site', signInPage: '/login', email: { mailer, links: LINKS, requireVerified: options.requireVerified ?? false, codes: options.codes } })
   const tokenOf = (kind: Mail['kind']) => new URL(mails.findLast(mail => mail.kind === kind)!.url!).searchParams.get('token')!
   const codeOf = (kind: Mail['kind']) => mails.findLast(mail => mail.kind === kind)!.code!
 
@@ -131,7 +131,7 @@ describe('a forgotten password', () => {
 
 describe('the second factor', () => {
   test('a password sign-in asked for a page carries it to the code page, and the code leads on to it', async () => {
-    const { browser } = testApp({ site: 'Site' })
+    const { browser } = testApp({ name: 'Site' })
     const ada = browser()
 
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
@@ -147,7 +147,7 @@ describe('the second factor', () => {
   })
 
   test('with no page asked for, the code page is as bare as before', async () => {
-    const { browser } = testApp({ site: 'Site' })
+    const { browser } = testApp({ name: 'Site' })
     const ada = browser()
 
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })

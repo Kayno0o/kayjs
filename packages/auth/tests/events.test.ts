@@ -197,7 +197,7 @@ describe('the audit log', () => {
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
 
     for (const before of [new Date(Number.NaN), null, 'soon', 12, { at: 'soon', id: 'x' }, { at: new Date().toISOString() }])
-      expect(await ada.post('/call/auditLog', [{ before }])).toEqual([])
+      expect(await ada.post('/call/listAuditLog', [{ before }])).toEqual([])
   })
 
   test('reads entries of one millisecond newest written first', async () => {

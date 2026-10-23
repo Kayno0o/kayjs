@@ -130,7 +130,7 @@ describe('sign-in answers in the same time for a held address and a free one', (
   test('the lockout answer does not wait on the holder\'s notice, held address or not', async () => {
     const slow = gate()
     const box = mailbox()
-    const app = testApp({ rateLimit: { signInAccountAll: { max: 1, window: '900s' } }, url: 'https://site.test', email: { mailer: box.mailer, links: LINKS, requireVerified: false }, onAuthEvent: async (info) => {
+    const app = testApp({ rateLimit: { signInAccountAll: { max: 1, window: '900s' } }, site: 'https://site.test', email: { mailer: box.mailer, links: LINKS, requireVerified: false }, onAuthEvent: async (info) => {
       if (info.event === 'sign-in-locked')
         await slow.closed
     } })
@@ -168,7 +168,7 @@ describe('registering an address that is held', () => {
   test('hashes the password as a free address does, and does not wait on the holder\'s notice', async () => {
     const slow = gate()
     const sent: Mail[] = []
-    const app = testApp({ url: 'https://site.test', email: { mailer: { send: async (mail) => {
+    const app = testApp({ site: 'https://site.test', email: { mailer: { send: async (mail) => {
       sent.push(mail)
       await slow.closed
     } }, links: LINKS } })
@@ -192,7 +192,7 @@ describe('registering under requireVerified', () => {
     const slow = gate()
     let armed = false
     const ran: string[] = []
-    const app = testApp({ url: 'https://site.test', email: { mailer: { send: () => undefined }, links: LINKS }, onSignUp: async ({ user }) => {
+    const app = testApp({ site: 'https://site.test', email: { mailer: { send: () => undefined }, links: LINKS }, onSignUp: async ({ user }) => {
       if (armed) {
         await slow.closed
         ran.push(`signed-up:${user.email}`)
@@ -226,7 +226,7 @@ describe('mail requests', () => {
   for (const method of ['requestPasswordReset', 'requestMagicLink'] as const) {
     test(`${method} does not wait on the mailer for a held address, and parks a code for a free one alike`, async () => {
       const slow = gate()
-      const app = testApp({ url: 'https://site.test', email: { mailer: { send: async () => slow.closed }, links: LINKS, codes: 'both', requireVerified: false } })
+      const app = testApp({ site: 'https://site.test', email: { mailer: { send: async () => slow.closed }, links: LINKS, codes: 'both', requireVerified: false } })
 
       await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
 
@@ -245,7 +245,7 @@ describe('mail requests', () => {
 describe('confirming an address with a password', () => {
   test('an account without a password is checked against a hash as one with a password is', async () => {
     const box = mailbox()
-    const app = testApp({ url: 'https://site.test', secret: SECRET, email: { mailer: box.mailer, links: LINKS } })
+    const app = testApp({ site: 'https://site.test', secret: SECRET, email: { mailer: box.mailer, links: LINKS } })
 
     await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
     await app.browser().call('register', { email: 'bob@example.com', password: PASSWORD })
@@ -268,7 +268,7 @@ describe('confirming an address with a password', () => {
 describe('a replaced unverified account whose erase fails', () => {
   test('stays listed as stale, so the sweep erases it later', async () => {
     let failing = true
-    const app = testApp({ url: 'https://site.test', email: { mailer: { send: () => undefined }, links: LINKS }, onDelete: () => {
+    const app = testApp({ site: 'https://site.test', email: { mailer: { send: () => undefined }, links: LINKS }, onDelete: () => {
       if (failing)
         throw new Error('hook down')
     } })

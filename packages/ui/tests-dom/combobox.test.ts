@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Combobox from '../tests/fixture/src/components/combobox.kay'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -16,7 +17,7 @@ afterEach(() => {
 const PLANETS = [{ value: 'mars', label: 'Mars' }, { value: 'moon', label: 'Moon', disabled: true }, { value: 'earth', label: 'Earth' }]
 
 async function combobox(options: unknown = PLANETS, minLength?: number, create = true, extra: Record<string, unknown> = {}) {
-  mounted = await mountComponent('src/components/combobox.kay', { options, minLength, create, ...extra, onChange: (value: string) => changes.push(value), onCreate: (text: string) => created.push(text) })
+  mounted = await mountComponent(Combobox, { options, minLength, create, ...extra, onChange: (value: string) => changes.push(value), onCreate: (text: string) => created.push(text) })
 
   const { root } = mounted
   const input = root.querySelector<HTMLInputElement>('input[role="combobox"]')!

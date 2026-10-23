@@ -1,6 +1,8 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Feed from '../tests/fixture/src/components/feed.kay'
+import MediaComponent from '../tests/fixture/src/components/media.kay'
 import { click } from './dom'
 
 // Stand-ins for the observers happy-dom lacks or never fires: each one made is kept, to be fired by hand.
@@ -43,7 +45,7 @@ afterEach(() => {
 })
 
 async function media() {
-  mounted = await mountComponent('src/components/media.kay', { onIndexChange: (index: number) => seen.index.push(index), onCrop: (crop: typeof seen.crops[number]) => seen.crops.push(crop), onMore: () => seen.more++, onTiles: (set: typeof setTiles) => setTiles = set })
+  mounted = await mountComponent(MediaComponent, { onIndexChange: (index: number) => seen.index.push(index), onCrop: (crop: typeof seen.crops[number]) => seen.crops.push(crop), onMore: () => seen.more++, onTiles: (set: typeof setTiles) => setTiles = set })
 
   return mounted.root
 }
@@ -389,7 +391,7 @@ describe('WhenVisible loading from a source', () => {
 
   async function feed() {
     loads.length = 0
-    mounted = await mountComponent('src/components/feed.kay', { load: async () => new Promise<number>(resolve => loads.push(resolve)) })
+    mounted = await mountComponent(Feed, { load: async () => new Promise<number>(resolve => loads.push(resolve)) })
 
     const sentinel = mounted.root.querySelector('.kui-when-visible')!
 

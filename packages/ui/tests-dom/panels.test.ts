@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Panels from '../tests/fixture/src/components/panels.kay'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -13,7 +14,7 @@ afterEach(() => {
 })
 
 async function panels(listWidthKey?: string) {
-  mounted = await mountComponent('src/components/panels.kay', { onClose: () => closes++, listWidthKey })
+  mounted = await mountComponent(Panels, { onClose: () => closes++, listWidthKey })
 
   return mounted.root
 }
@@ -154,7 +155,7 @@ describe('SidePanel with a dock', () => {
   test('resizes by the arrow keys within its bounds and tells the parent when a size settles', async () => {
     const settled: number[] = []
 
-    mounted = await mountComponent('src/components/panels.kay', { onClose: () => closes++, onSettled: (size: number) => settled.push(size) })
+    mounted = await mountComponent(Panels, { onClose: () => closes++, onSettled: (size: number) => settled.push(size) })
 
     const root = mounted.root
     const read = () => [grip(root).getAttribute('aria-valuenow'), grip(root).getAttribute('aria-valuemin'), grip(root).getAttribute('aria-orientation')]
@@ -183,7 +184,7 @@ describe('SidePanel with a dock', () => {
   test('resizes by dragging its grip, a cancelled drag keeping the size it reached', async () => {
     const settled: number[] = []
 
-    mounted = await mountComponent('src/components/panels.kay', { onClose: () => closes++, onSettled: (size: number) => settled.push(size) })
+    mounted = await mountComponent(Panels, { onClose: () => closes++, onSettled: (size: number) => settled.push(size) })
 
     const root = mounted.root
     const pointer = (type: string, x: number) => grip(root).dispatchEvent(new PointerEvent(type, { clientX: x, pointerId: 1, button: 0, bubbles: true, cancelable: true }))
@@ -207,7 +208,7 @@ describe('SidePanel with a dock', () => {
   test('a click on its grip that never moves settles nothing', async () => {
     const settled: number[] = []
 
-    mounted = await mountComponent('src/components/panels.kay', { onClose: () => closes++, onSettled: (size: number) => settled.push(size) })
+    mounted = await mountComponent(Panels, { onClose: () => closes++, onSettled: (size: number) => settled.push(size) })
 
     const pointer = (type: string, x: number) => grip(mounted!.root).dispatchEvent(new PointerEvent(type, { clientX: x, pointerId: 1, button: 0, bubbles: true, cancelable: true }))
 

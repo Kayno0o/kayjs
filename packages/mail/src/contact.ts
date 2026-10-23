@@ -17,8 +17,6 @@ export interface ContactMailProps {
   message: string
   fields: MailField[]
   site: string
-  /** @deprecated The old name of `site`, given until 1.73. */
-  origin?: string
 }
 
 // A line break in the name would let it write its own mail headers.
@@ -122,7 +120,7 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
         replyTo: { name, address: email },
         subject,
         view: options.view ?? await defaultView(),
-        props: { subject, name, email, message, fields: given, site: origin, origin },
+        props: { subject, name, email, message, fields: given, site: origin },
       })
     }
     catch (error) {

@@ -48,9 +48,3 @@ const uiDefaults: UiSettings = {
 }
 
 export default uiDefaults
-
-/** @deprecated Renamed `UiSettings` in 1.70, as kayjs-mail has a `Settings` of its own; the old name goes in 1.73. */
-export type Settings = UiSettings
-
-/** @deprecated Renamed `uiDefaults` in 1.70, as kayjs-mail has a `defaults` of its own; the old name goes in 1.73. */
-export const defaults = uiDefaults

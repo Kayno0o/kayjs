@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Data from '../tests/fixture/src/components/data.kay'
 import { click, clock } from './dom'
 
 let mounted: Mounted | undefined
@@ -12,7 +13,7 @@ afterEach(() => {
 })
 
 async function data(src = '/favicon.png', copiedFor?: string) {
-  mounted = await mountComponent('src/components/data.kay', { onSelect: (key: string) => selected.push(key), src, copiedFor })
+  mounted = await mountComponent(Data, { onSelect: (key: string) => selected.push(key), src, copiedFor })
 
   return mounted.root
 }

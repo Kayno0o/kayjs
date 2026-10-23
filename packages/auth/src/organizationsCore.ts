@@ -4,7 +4,7 @@ import type { Requirement } from './types'
 import { durationSeconds } from 'kay/library'
 import { createRoleHierarchy } from './roles'
 
-const DEFAULT_INVITATION_MAX_AGE = 7 * 24 * 60 * 60
+const DEFAULT_INVITATION_MAX_AGE = '7d'
 
 export interface OrganizationsOptions<OrgRole extends string, Role extends string> {
   // Each organization role and the roles it includes, as `roles` is for the site: `{ owner: ['admin'], admin: ['member'], member: [] }`.
@@ -21,8 +21,6 @@ export interface OrganizationsOptions<OrgRole extends string, Role extends strin
   invitationPage?: string | undefined
   // How long an invitation lasts, `invitations: { maxAge: '7d' }`, a week by default.
   invitations?: { maxAge?: Duration | undefined } | undefined
-  /** @deprecated Since 1.70, dropped in 1.73: this is `invitations: { maxAge }`. */
-  invitationMaxAge?: Duration | undefined
   // The route param naming the organization a route is about, by id or slug, for `memberOf`: `org` by default.
   param?: string | undefined
 }
@@ -54,6 +52,6 @@ export function organizationsCore<OrgRole extends string, Role extends string>(o
     defaultRoles: [...options.defaultRoles ?? []],
     param: options.param ?? 'org',
     invitationPage: options.invitationPage,
-    invitationMaxAge: durationSeconds(options.invitations?.maxAge ?? options.invitationMaxAge ?? DEFAULT_INVITATION_MAX_AGE, 'organizations.invitations.maxAge'),
+    invitationMaxAge: durationSeconds(options.invitations?.maxAge ?? DEFAULT_INVITATION_MAX_AGE, 'organizations.invitations.maxAge'),
   }
 }

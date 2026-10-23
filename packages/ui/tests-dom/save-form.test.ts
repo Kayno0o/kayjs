@@ -3,6 +3,9 @@ import type { IconChoice } from '../src/icon-picker'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { trustHtml } from 'kay'
 import { mountComponent, settle } from 'kay/test'
+import SaveFormControls from '../tests/fixture/src/components/save-form-controls.kay'
+import SaveFormSignals from '../tests/fixture/src/components/save-form-signals.kay'
+import SaveFormComponent from '../tests/fixture/src/components/save-form.kay'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -18,7 +21,7 @@ afterEach(() => {
 type Answer = string | { errors: Record<string, string> }
 
 async function saveForm(save: (input: { name: string }) => Promise<Answer>, shortcut?: string | false) {
-  mounted = await mountComponent('src/components/save-form.kay', { save, onSaved: (name: string) => saved.push(name), onDiscard: () => discarded++, shortcut })
+  mounted = await mountComponent(SaveFormComponent, { save, onSaved: (name: string) => saved.push(name), onDiscard: () => discarded++, shortcut })
 
   return mounted.root
 }
@@ -344,7 +347,7 @@ describe('SaveForm', () => {
   })
 
   test('Discard puts the library\'s signal-driven controls back on the saved values, and the page signals with them', async () => {
-    mounted = await mountComponent('src/components/save-form-controls.kay', { find: async () => [] })
+    mounted = await mountComponent(SaveFormControls, { find: async () => [] })
     await settle()
 
     const root = mounted.root
@@ -379,7 +382,7 @@ describe('SaveForm', () => {
   })
 
   test('Discard after a save empties the search boxes of an IconPicker and a MultiSelect, which are no saved values', async () => {
-    mounted = await mountComponent('src/components/save-form-controls.kay', { find: async () => [] })
+    mounted = await mountComponent(SaveFormControls, { find: async () => [] })
     await settle()
 
     const root = mounted.root
@@ -408,7 +411,7 @@ describe('SaveForm and the pick of a Combobox and an IconPicker', () => {
   test('Discard after a save goes back to the pick saved, not the one the page started with', async () => {
     const icon = (name: string): IconChoice => ({ name, icon: { 'viewBox': '0 0 24 24', 'width': '1em', 'height': '1em', 'aria-hidden': 'true', 'innerHTML': trustHtml(`<path data-icon="${name}"/>`) } })
 
-    mounted = await mountComponent('src/components/save-form-controls.kay', { find: async () => [icon('tabler:home'), icon('tabler:house')] })
+    mounted = await mountComponent(SaveFormControls, { find: async () => [icon('tabler:home'), icon('tabler:house')] })
     await settle()
 
     const root = mounted.root
@@ -450,7 +453,7 @@ describe('SaveForm and the pick of a Combobox and an IconPicker', () => {
 
 describe('SaveForm driven by signals', () => {
   async function editor(save: (input: { name: string }) => Promise<boolean | { errors: Record<string, string> } | undefined>, props: { isNew?: boolean, status?: string } = {}) {
-    mounted = await mountComponent('src/components/save-form-signals.kay', { save, onDiscard: () => discarded++, ...props })
+    mounted = await mountComponent(SaveFormSignals, { save, onDiscard: () => discarded++, ...props })
 
     return mounted.root
   }

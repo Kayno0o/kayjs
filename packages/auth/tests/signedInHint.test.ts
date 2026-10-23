@@ -75,7 +75,7 @@ describe('the cookie marking a browser as signed in', () => {
     setSite('https://site.test')
 
     try {
-      const app = testApp({ url: 'https://site.test/' })
+      const app = testApp({ site: 'https://site.test/' })
       const ada = await user(app)
       const response = await app.app.handle(new Request(`http://site.test/sign-in/${ada.id}`, { method: 'POST' }))
       const lines = response.headers.getSetCookie()
@@ -105,7 +105,7 @@ describe('the cookie marking a browser as signed in', () => {
 
   test('rides a response that is a refusal after the sign-in, and one signed in by a magic link', async () => {
     const mails: { url?: string | undefined }[] = []
-    const app = testApp({ url: 'https://site.test/', site: 'Site', email: { mailer: { send: mail => void mails.push(mail) }, links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' }, requireVerified: false } })
+    const app = testApp({ site: 'https://site.test/', name: 'Site', email: { mailer: { send: mail => void mails.push(mail) }, links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' }, requireVerified: false } })
     const ada = await user(app)
     const wrapped = new Elysia().use(app.app).post('/refuse/:id', async ({ auth, params, status }) => {
       await auth.signIn({ id: params.id })
@@ -137,7 +137,7 @@ describe('the cookie marking a browser as signed in', () => {
   })
 
   test('waits for the second factor: a password alone sets nothing, the code does', async () => {
-    const app = testApp({ site: 'Site' })
+    const app = testApp({ name: 'Site' })
     const ada = await user(app)
     const owner = app.browser()
 

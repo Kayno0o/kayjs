@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import ColorInput from '../tests/fixture/src/components/color-input.kay'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -10,7 +11,7 @@ afterEach(() => {
 })
 
 async function open(onChange?: (value: string) => unknown) {
-  mounted = await mountComponent('src/components/color-input.kay', { onChange })
+  mounted = await mountComponent(ColorInput, { onChange })
 
   const root = mounted.root
   const input = root.querySelector<HTMLInputElement>('input[name="light"]')!
@@ -56,7 +57,7 @@ test('hides the hex text from screen readers, the input being named already', as
 })
 
 test('shows an upper case or invalid parent colour as the input holds it', async () => {
-  mounted = await mountComponent('src/components/color-input.kay', {})
+  mounted = await mountComponent(ColorInput, {})
 
   const root = mounted.root
 

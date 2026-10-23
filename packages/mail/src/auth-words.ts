@@ -27,9 +27,9 @@ export function authWords(mail: AuthMail): AuthWords {
     throw configError(`${kind} is no kind of mail kayjs-auth sends`)
 
   const english = ENGLISH[kind]!
-  const of = (line: 'subject' | 'lead' | 'ending'): string => wording(`mail.auth.${kind}.${line}`, english[line], { site: mail.name ?? mail.site, email: mail.to, detail: mail.detail ?? '', what: mail.url === undefined ? wording('mail.auth.code', 'code') : wording('mail.auth.link', 'link') })
+  const of = (line: 'subject' | 'lead' | 'ending'): string => wording(`mail.auth.${kind}.${line}`, english[line], { site: mail.name, email: mail.to, detail: mail.detail ?? '', what: mail.url === undefined ? wording('mail.auth.code', 'code') : wording('mail.auth.link', 'link') })
   // How long a link works, left unsaid when its `lasts` is empty; the figure kayjs-auth was set to when it sends one, the default wording otherwise.
-  const maxAge = mail.maxAge ?? mail.expires
+  const maxAge = mail.maxAge
   const link = maxAge?.link === undefined ? undefined : durationWords(maxAge.link, mail.locale) + (kind === 'magic-link' ? wording('mail.auth.once', ', once') : '')
   const lasts = isLinkKind(kind) && mail.url !== undefined ? link ?? wording(`mail.auth.${kind}.lasts`, english.lasts ?? '') : ''
   const duration = maxAge?.code === undefined ? wording('mail.auth.codeLasts', '10 minutes') : durationWords(maxAge.code, mail.locale)

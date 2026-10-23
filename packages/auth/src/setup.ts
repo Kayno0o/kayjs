@@ -4,7 +4,7 @@ import type { AuthSessionData, Core } from './core'
 import type { EmailOptions } from './email'
 import type { AuthPagesConfig, PagesHandle } from './pages'
 import type { AuthStore, LinkType, TokenType } from './store'
-import { asConfigError, callHook, configError, configuredSite, durationSeconds } from 'kay/library'
+import { asConfigError, configError, configuredSite, durationSeconds } from 'kay/library'
 import { pwnedPassword } from './breached'
 import { proofOfWork } from './captcha'
 import { forwardOf } from './forwardAuth'
@@ -41,18 +41,16 @@ const TOKEN_LIFETIMES: Record<TokenType, number> = {
 }
 
 // The lifetimes the `maxAge` option sets over the defaults, in seconds, a bad one failing at boot naming it.
-// `legacy` holds the lifetimes given under the old `expires` name, which an error names as the app wrote them.
-export function tokenLifetimes(maxAge: EmailOptions['maxAge'], legacy: EmailOptions['expires'] = {}): Record<TokenType, number> {
+export function tokenLifetimes(maxAge: EmailOptions['maxAge']): Record<TokenType, number> {
   const lifetimes = { ...TOKEN_LIFETIMES }
-  const merged = { ...legacy, ...maxAge }
-  const named = (key: string): string => `email.${Object.hasOwn(maxAge ?? {}, key) ? 'maxAge' : 'expires'}.${key}`
-  const unknown = Object.keys(merged).find(key => !Object.hasOwn(TOKEN_LIFETIMES, key))
+  const named = (key: string): string => `email.maxAge.${key}`
+  const unknown = Object.keys(maxAge ?? {}).find(key => !Object.hasOwn(TOKEN_LIFETIMES, key))
 
   if (unknown !== undefined)
     throw configError(`${named(unknown)} is no link or code of kayjs-auth`)
 
   for (const type of Object.keys(lifetimes) as TokenType[]) {
-    const wanted = merged[type]
+    const wanted = maxAge?.[type]
 
     if (wanted !== undefined)
       lifetimes[type] = durationSeconds(wanted, named(type))
@@ -61,9 +59,9 @@ export function tokenLifetimes(maxAge: EmailOptions['maxAge'], legacy: EmailOpti
   return lifetimes
 }
 
-// A hook of the options as the positional function the core calls, given its event object or, in the old shape, its arguments.
+// A hook of the options as the positional function the core calls, given its event object.
 function hooked<Args extends unknown[], Result>(hook: ((...args: never[]) => Result) | undefined, event: (...args: Args) => object): ((...args: Args) => Result) | undefined {
-  return hook && ((...args: Args) => callHook(hook, event(...args), args))
+  return hook && ((...args: Args) => hook(event(...args) as never))
 }
 
 // The seconds of a lifetime option, rounded up to whole ones as a cookie's Max-Age and the stored lifetimes take them.
@@ -125,18 +123,14 @@ export function pagesHandle(core: Core, options: { pages?: boolean | AuthPagesCo
 const HAS_SCHEME = /^[a-z][\d+.a-z-]*:\/\//i
 const HOST_LIKE = /^(?:[\w-]+(?:\.[\w-]+)+(?::\d+)?|[\w.-]+:\d+)$/
 
-// The origin and the display name the options give, whichever form they are written in: `site` is the origin, and until 1.73 `url` too, while a `site` that is no URL is the name it meant before `name` existed.
-function siteOptions(options: { site?: string | undefined, url?: string | undefined, name?: string | undefined }): { origin: string | undefined, name: string | undefined } {
+// The origin and the display name the options give: `site` is the origin, which has a scheme.
+function siteOptions(options: { site?: string | undefined, name?: string | undefined }): { origin: string | undefined, name: string | undefined } {
   const site = options.site
 
-  if (site !== undefined && !HAS_SCHEME.test(site)) {
-    if (HOST_LIKE.test(site))
-      throw configError(`\`site\` is the site's origin, such as \`https://${site}\`, and \`${site}\` has no scheme: add it, or give the display name as \`name\``)
+  if (site !== undefined && !HAS_SCHEME.test(site))
+    throw configError(HOST_LIKE.test(site) ? `\`site\` is the site's origin, such as \`https://${site}\`, and \`${site}\` has no scheme: add it, or give the display name as \`name\`` : `\`site\` is the site's origin, such as \`https://example.com\`, and \`${site}\` is not one: give the display name as \`name\``)
 
-    return { origin: options.url, name: options.name ?? site }
-  }
-
-  return { origin: site ?? options.url, name: options.name }
+  return { origin: site, name: options.name }
 }
 
 function noSecret(): never {
@@ -224,7 +218,7 @@ export function createCore<Data extends AuthSessionData, Role extends string, Pr
     get name() {
       return bind().name
     },
-    limits: resolveLimits(options.limits, options.rateLimit),
+    limits: resolveLimits(options.rateLimit),
     rules: asConfigError(() => resolveRules(options.rules)),
     sessionsPage: options.sessionsPage ?? paths?.sessions,
     securityPage: paths?.security,
@@ -238,7 +232,7 @@ export function createCore<Data extends AuthSessionData, Role extends string, Pr
     breached: breachedCheck(options.breachedPasswords),
     email: options.email && {
       ...options.email,
-      maxAge: tokenLifetimes(options.email.maxAge, options.email.expires),
+      maxAge: tokenLifetimes(options.email.maxAge),
       links: emailLinks(options.email.links, paths?.links),
       requireVerified: options.email.requireVerified ?? true,
       locales,
@@ -258,17 +252,17 @@ export function createCore<Data extends AuthSessionData, Role extends string, Pr
     defaultRoles: [...(options.defaultRoles ?? [])],
     roles: options.roles && new Set(Object.keys(options.roles)),
     onSignUp: hooked(options.onSignUp, (user, profile) => ({ user, profile })),
-    onProviderProfile: (options.profileFields ? hooked(options.profileFields, (user, profile) => ({ user, profile })) : options.onProviderProfile) as Core['onProviderProfile'],
+    onProviderProfile: hooked(options.profileFields, (user, profile) => ({ user, profile })),
     userData: options.user && userDataRules(options.user),
     onDelete: hooked(options.onDelete, user => ({ user })),
     guestMaxAge: options.guests === undefined ? DEFAULT_GUEST_MAX_AGE : wholeSeconds(options.guests.maxAge, 'guests.maxAge'),
     unverifiedMaxAge: unverifiedMaxAge(options.email),
-    onExport: options.exportData ? hooked(options.exportData, user => ({ user })) : options.onExport,
+    onExport: hooked(options.exportData, user => ({ user })),
     onAuthEvent: options.onAuthEvent,
     organizations: options.organizations && organizationsCore(options.organizations),
     pruned: { at: 0, running: Promise.resolve() },
     audit: options.audit == null || options.audit === false ? undefined : { maxAge: auditMaxAge(options.audit), prunedAt: 0, ip: options.audit === true ? 'truncated' : options.audit.ip ?? 'truncated' },
-    rememberMaxAge: wholeSeconds(options.remember?.maxAge ?? options.rememberMaxAge ?? `${DEFAULT_REMEMBER_MAX_AGE}s`, 'remember.maxAge'),
+    rememberMaxAge: wholeSeconds(options.remember?.maxAge ?? `${DEFAULT_REMEMBER_MAX_AGE}s`, 'remember.maxAge'),
   }
 
   function refreshersFor(made: SiteBound): void {

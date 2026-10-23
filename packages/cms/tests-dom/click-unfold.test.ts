@@ -1,9 +1,8 @@
 import type { Mounted } from 'kay/test'
-import { join } from 'node:path'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Editor from '../src/editor/editor.kay'
 
-const EDITOR = join(import.meta.dir, '../src/editor/editor.kay')
 const ENTRY = { collection: 'pages', slug: 'home' }
 let mounted: Mounted | undefined
 
@@ -50,7 +49,7 @@ async function open() {
   // Styled text is not typed in place, which a plain one would be.
   page.innerHTML = 'T<em>wo</em>'
   document.body.append(page)
-  mounted = await mountComponent(EDITOR, { entries: [ENTRY], unclickable: [] })
+  mounted = await mountComponent(Editor, { entries: [ENTRY], unclickable: [] })
   await settle()
   await Bun.sleep(50)
 

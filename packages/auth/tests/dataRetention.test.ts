@@ -24,7 +24,7 @@ describe('pruning accounts never verified', () => {
     const deleted: string[] = []
     const app = testApp({
       store: options.store ?? memoryAuthStore(),
-      url: 'https://site.test',
+      site: 'https://site.test',
       defaultRoles: ['editor'],
       onDelete: ({ user }) => {
         deleted.push(user.id)
@@ -168,7 +168,7 @@ describe('provider tokens', () => {
   }
 
   function setup(keepTokens?: boolean) {
-    const app = testApp({ url: 'https://site.test', signInPage: '/login', oauth: { discord: { provider: discordProvider(), clientId: 'id', clientSecret: 'secret', ...keepTokens === undefined ? {} : { keepTokens } } } })
+    const app = testApp({ site: 'https://site.test', signInPage: '/login', oauth: { discord: { provider: discordProvider(), clientId: 'id', clientSecret: 'secret', ...keepTokens === undefined ? {} : { keepTokens } } } })
 
     return app
   }

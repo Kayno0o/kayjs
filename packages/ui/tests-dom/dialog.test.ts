@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, jest, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Dialogs from '../tests/fixture/src/components/dialogs.kay'
 import { click, kuiClasses } from './dom'
 
 let mounted: Mounted | undefined
@@ -12,7 +13,7 @@ afterEach(() => {
 })
 
 async function dialogs(onDelete: () => Promise<void> = async () => Promise.resolve(), dirty = false, apiRefusal?: { status: number, message: string, answer?: unknown }) {
-  mounted = await mountComponent('src/components/dialogs.kay', { onClose: () => closes++, onDelete, dirty, apiRefusal })
+  mounted = await mountComponent(Dialogs, { onClose: () => closes++, onDelete, dirty, apiRefusal })
 
   return mounted.root
 }

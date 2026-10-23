@@ -38,7 +38,6 @@
     "./file-input.kay": "./src/editor/file-input.kay",
     "./form": "./src/form.ts",
     "./pg": "./src/loaders/pg.ts",
-    "./postgres": "./src/loaders/postgres.ts",
     "./presence": "./src/presence.ts",
     "./room": "./src/room.ts",
     "./sqlite": "./src/loaders/sqlite.ts",

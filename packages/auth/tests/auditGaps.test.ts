@@ -21,7 +21,7 @@ afterEach(() => {
 describe('emailed codes', () => {
   test('five misses from another session\'s nonce leave the holder\'s live code working', async () => {
     const { mailer, take } = mailbox()
-    const { browser, store } = testApp({ url: 'https://site.test', email: { mailer, links: LINKS, codes: 'code' } })
+    const { browser, store } = testApp({ site: 'https://site.test', email: { mailer, links: LINKS, codes: 'code' } })
 
     await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', emailVerifiedAt: new Date() }))
 
@@ -45,7 +45,7 @@ describe('resetting a password', () => {
   test('a stream of forged links does not reach the breached-password service past the link limit', async () => {
     const asked: string[] = []
     const { browser } = testApp({
-      url: 'https://site.test',
+      site: 'https://site.test',
       rateLimit: { link: { max: 2, window: '900s' } } satisfies LimitsOption,
       email: { mailer: mailbox().mailer, links: LINKS },
       breachedPasswords: (password) => {
@@ -65,7 +65,7 @@ describe('resetting a password', () => {
 
   test('a refused password still leaves the link usable', async () => {
     const { mailer, take } = mailbox()
-    const { browser, store } = testApp({ url: 'https://site.test', email: { mailer, links: LINKS }, breachedPasswords: password => password === 'known breached one' })
+    const { browser, store } = testApp({ site: 'https://site.test', email: { mailer, links: LINKS }, breachedPasswords: password => password === 'known breached one' })
 
     await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', emailVerifiedAt: new Date() }))
     await browser().call('requestPasswordReset', 'ada@example.com')
@@ -81,7 +81,7 @@ describe('resetting a password', () => {
 describe('the second factor cap', () => {
   test('mails the holder once when the account has had too many guesses', async () => {
     const box = mailbox()
-    const app = testApp({ rateLimit: { twoFactorAccount: { max: 3, window: '900s' } }, url: 'https://site.test', email: { mailer: box.mailer, links: LINKS, requireVerified: false } })
+    const app = testApp({ rateLimit: { twoFactorAccount: { max: 3, window: '900s' } }, site: 'https://site.test', email: { mailer: box.mailer, links: LINKS, requireVerified: false } })
 
     await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
 
@@ -109,7 +109,7 @@ describe('the second factor cap', () => {
 describe('OAuth', () => {
   function oauthApp() {
     return testApp({
-      url: 'https://site.test',
+      site: 'https://site.test',
       signInPage: '/login',
       oauth: {
         discord: { provider: discordProvider(), clientId: 'discord-id', clientSecret: 's' },
@@ -177,14 +177,14 @@ describe('OAuth', () => {
   test('an https site refuses a provider endpoint on plain http whatever NODE_ENV says', () => {
     process.env.NODE_ENV = 'development'
 
-    expect(() => testApp({ url: 'https://site.test', oauth: { github: { provider: githubProvider({ url: 'http://git.example.com' }), clientId: 'a', clientSecret: 'b' } } })).toThrow('not https')
-    expect(() => testApp({ url: 'http://localhost:3000', oauth: { github: { provider: githubProvider({ url: 'http://git.example.com' }), clientId: 'a', clientSecret: 'b' } } })).not.toThrow()
+    expect(() => testApp({ site: 'https://site.test', oauth: { github: { provider: githubProvider({ url: 'http://git.example.com' }), clientId: 'a', clientSecret: 'b' } } })).toThrow('not https')
+    expect(() => testApp({ site: 'http://localhost:3000', oauth: { github: { provider: githubProvider({ url: 'http://git.example.com' }), clientId: 'a', clientSecret: 'b' } } })).not.toThrow()
   })
 
   test('an http OpenID Connect issuer is refused at an https site outside production too', () => {
     process.env.NODE_ENV = 'development'
 
-    expect(() => testApp({ url: 'https://site.test', oauth: { idp: { provider: oidcProvider({ issuer: 'http://idp.test' }), clientId: 'a', clientSecret: 'b' } } })).toThrow('not https')
+    expect(() => testApp({ site: 'https://site.test', oauth: { idp: { provider: oidcProvider({ issuer: 'http://idp.test' }), clientId: 'a', clientSecret: 'b' } } })).toThrow('not https')
   })
 
   test('a discovered endpoint on plain http is refused for an https site', async () => {

@@ -4,8 +4,6 @@ export const HINT_COOKIE = 'kay_editor'
 export const SIGNED_IN_COOKIE = 'kay_user'
 // The attribute of a link the app renders itself, which the module fills in and shows in place of its own button.
 export const PAGE_LINK_ATTRIBUTE = 'data-kcms-edit-page'
-// The attribute before 1.70, still matched so an app's own link keeps working.
-export const LEGACY_PAGE_LINK_ATTRIBUTE = 'data-cms-edit-page'
 // Where the guarded check and the public module are served, under the app's base and kay's own `/_kay`, whatever its `apiPath`.
 export const CHECK_PATH = '/_kay/cms/editor'
 export const MODULE_PATH = '/_kay/cms/editor/module.js'
@@ -14,7 +12,7 @@ export const EDITOR_COOKIE = 'kay_editor_who'
 const HINT_AGE = 90 * 24 * 60 * 60
 
 // What the browser runs on a page read by a signed-in editor: asks the guard whether the editor is still signed in, then shows the "Edit this page" link.
-// It is stringified and served as a module, so it uses nothing of this file's scope: `hint` and `attribute` come in as arguments, `attribute` a comma-separated list of names.
+// It is stringified and served as a module, so it uses nothing of this file's scope: `hint` and `attribute` come in as arguments.
 // It runs wherever a page reads it, so it stays free of imports and of anything the server alone has.
 export function pageLink(hint: string, attribute: string, endpoint: string, signedIn: string): void {
   const base = document.querySelector<HTMLMetaElement>('meta[name=kay-base]')?.content ?? ''
@@ -60,7 +58,7 @@ export function pageLink(hint: string, attribute: string, endpoint: string, sign
 
   const sync = async () => {
     // The admin's own screens and edit mode have no use for the link.
-    const links = [...document.querySelectorAll<HTMLAnchorElement>(attribute.split(',').map(name => `[${name}]`).join())]
+    const links = [...document.querySelectorAll<HTMLAnchorElement>(`[${attribute}]`)]
     const away = document.querySelector('.kcms-admin, .kcms-editor') !== null
     // Read again at each swap: one signing in as another user must not get the old verdict.
     const signIn = cookie(signedIn)
@@ -117,7 +115,7 @@ export function pageLink(hint: string, attribute: string, endpoint: string, sign
 
 // The module an editor's browser loads: the function above, called with the names this file holds.
 export function pageLinkModule(): string {
-  return `(${pageLink.toString()})(${JSON.stringify(HINT_COOKIE)},${JSON.stringify(`${PAGE_LINK_ATTRIBUTE},${LEGACY_PAGE_LINK_ATTRIBUTE}`)},${JSON.stringify(CHECK_PATH)},${JSON.stringify(SIGNED_IN_COOKIE)})`
+  return `(${pageLink.toString()})(${JSON.stringify(HINT_COOKIE)},${JSON.stringify(PAGE_LINK_ATTRIBUTE)},${JSON.stringify(CHECK_PATH)},${JSON.stringify(SIGNED_IN_COOKIE)})`
 }
 
 // What the head of every page carries: one line that loads the module for a browser holding the hint or signed in, and costs any other nothing.

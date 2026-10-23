@@ -18,7 +18,7 @@ afterEach(() => {
 
 // The fixture app has no `src/ui.ts`, so a component mounts as the library draws it; the restyle app has one, which `mountComponent` merges as a build does.
 test('mountComponent applies the src/ui.ts of the project it mounts from', async () => {
-  const plain = await mountComponent(library('card'), { title: 'x' })
+  const plain = await mountComponent(await library('card'), { title: 'x' })
 
   mounted.push(plain)
   expect(plain.root.querySelector('.kui-card')?.className).toStartWith('kui-card ')
@@ -33,7 +33,7 @@ test('mountComponent applies the src/ui.ts of the project it mounts from', async
 
   process.env.KAY_ROOT = app
 
-  const restyled = await mountComponent(library('card'), { title: 'x' })
+  const restyled = await mountComponent(await library('card'), { title: 'x' })
 
   mounted.push(restyled)
   const classes = (selector: string) => (restyled.root.querySelector(selector)?.className ?? '').split(' ')
@@ -47,7 +47,7 @@ test('an inline ConfirmDelete draws its armed pair with the restyle once a click
 
   process.env.KAY_ROOT = app
 
-  const confirm = await mountComponent(library('confirm-delete'), { message: 'Sure?', failure: 'Failed', ask: 'inline', trigger: 'button', onConfirm: () => undefined })
+  const confirm = await mountComponent(await library('confirm-delete'), { message: 'Sure?', failure: 'Failed', ask: 'inline', trigger: 'button', onConfirm: () => undefined })
 
   mounted.push(confirm)
   expect(confirm.root.querySelector('[data-part=armed]')).toBeNull()

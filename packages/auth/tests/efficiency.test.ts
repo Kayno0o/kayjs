@@ -144,7 +144,7 @@ describe('an authenticated request', () => {
 describe('lists', () => {
   async function organizations(store: AuthStore) {
     const { mailer } = mailbox()
-    const app = testApp({ store, url: 'https://site.test', email: { mailer, links: LINKS, requireVerified: false }, organizations: { roles: { owner: ['member'], member: [] }, owner: 'owner', manage: 'owner', defaultRoles: ['member'], invitationPage: '/invitation' } })
+    const app = testApp({ store, site: 'https://site.test', email: { mailer, links: LINKS, requireVerified: false }, organizations: { roles: { owner: ['member'], member: [] }, owner: 'owner', manage: 'owner', defaultRoles: ['member'], invitationPage: '/invitation' } })
     const owner = app.browser()
 
     await owner.call('register', { email: 'owner@example.com', password: PASSWORD })
@@ -161,7 +161,7 @@ describe('lists', () => {
 
     const orgId = first.membership.organization.id
 
-    const sender = (await owner.callOk('members', orgId)).members[0]?.user.id ?? ''
+    const sender = (await owner.callOk('listMembers', orgId)).members[0]?.user.id ?? ''
 
     for (const email of ['b@example.com', 'c@example.com', 'd@example.com']) {
       await store.users.create(userRecord({ id: email, email }))
@@ -171,7 +171,7 @@ describe('lists', () => {
 
     log.reset()
 
-    expect((await owner.callOk('members', orgId)).members).toHaveLength(4)
+    expect((await owner.callOk('listMembers', orgId)).members).toHaveLength(4)
     expect(log.count('users.getMany')).toBe(1)
     expect(log.calls.filter(call => call.name === 'users.get').map(call => call.args[0])).not.toContain('b@example.com')
 
@@ -181,7 +181,7 @@ describe('lists', () => {
     expect(log.count('organizations.get')).toBe(0)
 
     log.reset()
-    expect((await owner.callOk('invitations', orgId)).invitations).toHaveLength(3)
+    expect((await owner.callOk('listInvitations', orgId)).invitations).toHaveLength(3)
     expect(log.count('invitations.listByOrganization')).toBe(1)
   })
 
@@ -193,7 +193,7 @@ describe('lists', () => {
     await store.invitations!.create({ id: 'late', organizationId: membership.organization.id, email: 'late@example.com', roles: ['member'], invitedBy: null, createdAt: new Date(), expiresAt: new Date(Date.now() - 1000) })
     log.reset()
 
-    expect((await owner.callOk('invitations', membership.organization.id)).invitations).toEqual([])
+    expect((await owner.callOk('listInvitations', membership.organization.id)).invitations).toEqual([])
     expect(log.count('invitations.delete')).toBe(0)
   })
 
@@ -210,7 +210,7 @@ describe('lists', () => {
     await store.users.create(userRecord({ id: 'b', email: 'b@example.com' }))
     await store.members!.add({ organizationId: organization.id, userId: 'b', roles: ['member'], createdAt: new Date() })
 
-    expect((await owner.callOk('members', organization.id)).members).toHaveLength(2)
+    expect((await owner.callOk('listMembers', organization.id)).members).toHaveLength(2)
     expect(await owner.call('listOrganizations')).toHaveLength(1)
   })
 })
@@ -255,7 +255,7 @@ describe('revoking in bulk', () => {
   test('claiming an address deletes the stranger\'s identities with one call', async () => {
     const log = recorded()
     const { mails, mailer } = mailbox()
-    const { browser, store } = testApp({ store: log.store, url: 'https://site.test', email: { mailer, links: LINKS, requireVerified: false } })
+    const { browser, store } = testApp({ store: log.store, site: 'https://site.test', email: { mailer, links: LINKS, requireVerified: false } })
 
     await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
 
@@ -333,7 +333,7 @@ describe('attempt keys', () => {
   test('hold no email: the address is a digest, and the limit still counts per address', async () => {
     const log = recorded()
     const { mailer } = mailbox()
-    const { browser } = testApp({ store: log.store, url: 'https://site.test', email: { mailer, links: LINKS, requireVerified: false } })
+    const { browser } = testApp({ store: log.store, site: 'https://site.test', email: { mailer, links: LINKS, requireVerified: false } })
     const answers: { ok: boolean, error?: string }[] = []
 
     for (let attempt = 0; attempt < 4; attempt++)

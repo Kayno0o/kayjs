@@ -7,6 +7,11 @@ import { afterEach, expect, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import { inputValue } from '../src/datetime'
 import { createDrafts } from '../src/drafts'
+import FileField from '../tests/fixture/src/components/file-field.kay'
+import ListField from '../tests/fixture/src/components/list-field.kay'
+import ListState from '../tests/fixture/src/components/list-state.kay'
+import ScheduledEntry from '../tests/fixture/src/components/scheduled-entry.kay'
+import ScheduledRows from '../tests/fixture/src/components/scheduled-rows.kay'
 
 const ENTRY = { collection: 'posts', slug: 'hello' }
 const TAGS: Field = { key: 'tags', label: 'Tags', hint: undefined, required: false, kind: 'list', numbered: true, item: { key: 0, label: 'Tag', hint: undefined, required: false, kind: 'text' } }
@@ -20,7 +25,7 @@ async function open(items: string[]) {
   const drafts = createDrafts({ show: async () => ({}) })
 
   drafts.open({ ...ENTRY, data: { tags: items } })
-  mounted = await mountComponent('src/components/list-field.kay', { drafts, field: TAGS })
+  mounted = await mountComponent(ListField, { drafts, field: TAGS })
 
   return { drafts, root: mounted.root }
 }
@@ -61,7 +66,7 @@ test('Alt and Shift with an arrow in a field of an item moves it, and a move pas
 const PEOPLE: Field = { key: 'tags', label: 'People', hint: undefined, required: false, kind: 'list', numbered: true, minItems: 1, maxItems: 3, item: { key: 0, label: 'Person', hint: undefined, required: true, kind: 'group', fields: [{ key: 'name', label: 'Name', hint: undefined, required: false, kind: 'text', default: 'Anon' }, { key: 'role', label: 'Role', hint: undefined, required: true, kind: 'select', options: [{ value: 'a', label: 'A', raw: 'a' }, { value: 'b', label: 'B', raw: 'b' }] }] } }
 
 async function openField(field: Field, data: unknown, issues: { path: string, message: string }[] = []) {
-  mounted = await mountComponent('src/components/list-state.kay', { data, field, issues })
+  mounted = await mountComponent(ListState, { data, field, issues })
   await settle()
 
   const root = mounted.root
@@ -200,7 +205,7 @@ async function openDate(stored: string | undefined) {
   const field: Field = { key: 'tags', label: 'Publish at', hint: undefined, required: false, kind: 'datetime' }
 
   drafts.open({ ...ENTRY, data: { tags: stored } })
-  mounted = await mountComponent('src/components/list-field.kay', { drafts, field })
+  mounted = await mountComponent(ListField, { drafts, field })
   await settle()
 
   const input = mounted.root.querySelector<HTMLInputElement>('input[type="datetime-local"]')!
@@ -296,7 +301,7 @@ test('the scheduled badge of an entry screen names the time in the editor\'s zon
 
   const at = new Date(clock.now + 100)
 
-  mounted = await mountComponent('src/components/scheduled-entry.kay', { collection: TALKS, entry: talk(at.toISOString()) })
+  mounted = await mountComponent(ScheduledEntry, { collection: TALKS, entry: talk(at.toISOString()) })
   await settle()
   expect(badge()).toMatch(new RegExp(`^Scheduled for ${inputValue(at.toISOString(), 'Europe/Paris').replace('T', ' ')} GMT\\+[12]$`))
 
@@ -305,7 +310,7 @@ test('the scheduled badge of an entry screen names the time in the editor\'s zon
 
 test('the badge comes back for a date typed ahead and goes for a date typed in the past', async () => {
   process.env.TZ = 'UTC'
-  mounted = await mountComponent('src/components/scheduled-entry.kay', { collection: TALKS, entry: talk('2026-10-01T00:00:00Z') })
+  mounted = await mountComponent(ScheduledEntry, { collection: TALKS, entry: talk('2026-10-01T00:00:00Z') })
   await settle()
   expect(badge()).toBeUndefined()
 
@@ -330,7 +335,7 @@ test('the list names a scheduled time in the editor\'s zone, as the entry screen
 
   const ahead = new Date(Date.now() + 3_600_000).toISOString()
 
-  mounted = await mountComponent('src/components/scheduled-rows.kay', { collection: TALKS, rows: [rowOf('later', ahead), rowOf('live', '2020-01-01'), rowOf('plain', undefined)] })
+  mounted = await mountComponent(ScheduledRows, { collection: TALKS, rows: [rowOf('later', ahead), rowOf('live', '2020-01-01'), rowOf('plain', undefined)] })
   await settle()
   expect(statusOf('later')).toMatch(new RegExp(`^Scheduled for ${inputValue(ahead, 'Europe/Paris').replace('T', ' ')} GMT\\+[12]$`))
   expect([statusOf('live'), statusOf('plain')]).toEqual(['Published', 'Published'])
@@ -340,12 +345,12 @@ test('the list names a time in UTC for an editor in UTC and the offset of a half
   const ahead = '2999-10-19T06:00:00Z'
 
   process.env.TZ = 'UTC'
-  mounted = await mountComponent('src/components/scheduled-rows.kay', { collection: TALKS, rows: [{ ...rowOf('later', ahead), scheduledAt: Date.parse(ahead) }] })
+  mounted = await mountComponent(ScheduledRows, { collection: TALKS, rows: [{ ...rowOf('later', ahead), scheduledAt: Date.parse(ahead) }] })
   await settle()
   expect(statusOf('later')).toBe('Scheduled for 2999-10-19 06:00 UTC')
   mounted.unmount()
   process.env.TZ = 'Asia/Kolkata'
-  mounted = await mountComponent('src/components/scheduled-rows.kay', { collection: TALKS, rows: [{ ...rowOf('later', ahead), scheduledAt: Date.parse(ahead) }] })
+  mounted = await mountComponent(ScheduledRows, { collection: TALKS, rows: [{ ...rowOf('later', ahead), scheduledAt: Date.parse(ahead) }] })
   await settle()
   expect(statusOf('later')).toBe('Scheduled for 2999-10-19 11:30 GMT+5:30')
 })
@@ -357,7 +362,7 @@ test('the list\'s badge turns to Published when its date passes, with no reload'
 
   const at = clock.now + 100
 
-  mounted = await mountComponent('src/components/scheduled-rows.kay', { collection: TALKS, rows: [{ ...rowOf('later', undefined), scheduledAt: at }] })
+  mounted = await mountComponent(ScheduledRows, { collection: TALKS, rows: [{ ...rowOf('later', undefined), scheduledAt: at }] })
   await settle()
   expect(statusOf('later')).toStartWith('Scheduled for ')
 
@@ -372,14 +377,14 @@ async function openImage(data: Record<string, unknown>, hints: Parameters<typeof
   const drafts = createDrafts({ show: async () => ({}) })
 
   drafts.open({ ...ENTRY, data })
-  mounted = await mountComponent('src/components/list-field.kay', { drafts, field: PHOTO(hints) })
+  mounted = await mountComponent(ListField, { drafts, field: PHOTO(hints) })
   await settle()
 
   return { drafts, root: mounted.root }
 }
 
 async function openFile(initial: string, options: { image?: boolean, many?: boolean, upload?: UploadHints, alt?: { id: string, value: string, issue?: string, required: boolean }, sizeIssues?: { id: string, message: string }[] } = {}) {
-  mounted = await mountComponent('src/components/file-field.kay', { initial, ...options })
+  mounted = await mountComponent(FileField, { initial, ...options })
   await settle()
 
   return mounted.root
@@ -624,7 +629,7 @@ test('the zone of a list of images shows and applies the item field\'s own limit
   const item: Field = { key: 0, label: 'Photo', hint: undefined, required: false, kind: 'image', upload: { accept: ['image/png'], maxSize: 1024 } }
 
   drafts.open({ ...ENTRY, data: { tags: [] } })
-  mounted = await mountComponent('src/components/list-field.kay', { drafts, field: { key: 'tags', label: 'Photos', hint: undefined, required: false, kind: 'list', numbered: true, item } })
+  mounted = await mountComponent(ListField, { drafts, field: { key: 'tags', label: 'Photos', hint: undefined, required: false, kind: 'list', numbered: true, item } })
   await settle()
   expect(mounted.root.querySelector('.kcms-file-rules')?.textContent).toBe('Accepts PNG. Up to 1 KB.')
   expect(mounted.root.querySelector('input[type=file]')?.getAttribute('accept')).toBe('image/png')
@@ -642,7 +647,7 @@ test('an image field built without upload hints, as an app\'s own code may, work
   const drafts = createDrafts({ show: async () => ({}) })
 
   drafts.open({ ...ENTRY, data: { tags: UPLOADED } })
-  mounted = await mountComponent('src/components/list-field.kay', { drafts, field: { key: 'tags', label: 'Photo', hint: undefined, required: false, kind: 'image' } })
+  mounted = await mountComponent(ListField, { drafts, field: { key: 'tags', label: 'Photo', hint: undefined, required: false, kind: 'image' } })
   await settle()
   mounted.root.querySelector<HTMLButtonElement>('.kcms-file-name button')!.click()
   await settle()
@@ -661,7 +666,7 @@ test('the refusal of an image\'s width and height in the drafts reaches the fiel
 
   drafts.open({ ...ENTRY, data: { tags: UPLOADED } })
   drafts.report([{ ...ENTRY, path: 'width', message: 'Width is required' }, { ...ENTRY, path: 'height', message: 'Height is required' }])
-  mounted = await mountComponent('src/components/list-field.kay', { drafts, field: PHOTO({ width: sibling('width'), height: sibling('height') }) })
+  mounted = await mountComponent(ListField, { drafts, field: PHOTO({ width: sibling('width'), height: sibling('height') }) })
   await settle()
   expect([...mounted.root.querySelectorAll('.kcms-file-error')].map(item => item.textContent)).toEqual(['Width is required', 'Height is required'])
 })

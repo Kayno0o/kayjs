@@ -12,8 +12,8 @@ const CODE = /\b(\d{6})\b/
 async function setup(codes: CodeMode | Partial<Record<CodedLink, CodeMode>>, limits: LimitsOption = {}) {
   const { mails, mailer, take } = mailbox()
   const app = testApp({
-    url: 'https://site.test',
-    site: 'Site',
+    site: 'https://site.test',
+    name: 'Site',
     rateLimit: limits,
     email: {
       mailer,
