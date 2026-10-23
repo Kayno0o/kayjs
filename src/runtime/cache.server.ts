@@ -3,9 +3,10 @@ import { existsSync } from 'node:fs'
 import { onReload } from '../server/reload'
 import { PURGE_STALE_MS, readsOf, STALE_KEPT_MS, trackStore, untrackStore } from './cache'
 import { kayLog } from './log'
+import { pollLoop } from './poll-backoff'
 import { openSqlite } from './sqlite.server'
 
-// How often a process reads what the others sharing a store invalidated, and how long a message is kept for one that reads late.
+// How often a process reads what the others sharing a store invalidated while there is activity, and how long a message is kept for one that reads late.
 const POLL_MS = 500
 const EVENT_TTL_MS = 60_000
 // Tells this process's own messages apart from the others', whatever store instance wrote them.
@@ -59,7 +60,8 @@ export function sqliteCache(path: string): SyncCacheStore {
   let opened: ReturnType<typeof openCache> | undefined
   let closed = false
   let purged = 0
-  const polls: ReturnType<typeof setInterval>[] = []
+  const listeners: ((message: string) => void)[] = []
+  let poll: ReturnType<typeof pollLoop> | undefined
   const open = (create: boolean) => {
     if (closed)
       throw new Error('kay: the cache store was closed')
@@ -70,13 +72,48 @@ export function sqliteCache(path: string): SyncCacheStore {
     return opened
   }
 
+  // Polls from the first listener on, as a prerendered page is marked stale by an invalidation this process never read a value for.
+  const follow = () => {
+    if (closed || poll !== undefined || listeners.length === 0)
+      return
+
+    // What was published before this process opened a file that exists is in what it reads from the store already; a file made later, by this process or another, holds only what came after.
+    let seen = open(false)?.lastEvent.get()?.id ?? 0
+
+    poll = pollLoop(POLL_MS, () => {
+      let heard = false
+
+      try {
+        for (const event of open(false)?.eventsAfter.all(seen, PROCESS) ?? []) {
+          seen = event.id
+          heard = true
+
+          for (const listener of listeners)
+            listener(event.message)
+        }
+      }
+      catch (error) {
+        kayLog('error', 'reading what the other processes invalidated failed; trying again', error)
+      }
+
+      return heard
+    })
+  }
+
+  // A use of the store brings a poll that slowed down while nothing happened back to its pace.
+  const use = () => poll?.wake()
+
   const store: SyncCacheStore = {
     get(key) {
+      use()
+
       const row = open(false)?.select.get(key)
 
       return row ? { text: row.value, freshUntil: row.fresh_until } : undefined
     },
     set(key, text, freshUntil) {
+      use()
+
       const { upsert, purge } = open(true)!
       const now = Date.now()
 
@@ -88,38 +125,31 @@ export function sqliteCache(path: string): SyncCacheStore {
       upsert.run(key, text, freshUntil)
     },
     delete(key) {
+      use()
+
       open(false)?.remove.run(key)
     },
     dependencies() {
+      use()
+
       return new Map(open(false)?.allDeps.all().map(row => [row.key, readsOf(row.reads)]))
     },
     keys() {
+      use()
+
       return open(false)?.names.all().map(row => row.key) ?? []
     },
     publish(message) {
+      use()
+
       const { insertEvent, pruneEvents } = open(true)!
 
       insertEvent.run(PROCESS, message, Date.now())
       pruneEvents.run(Date.now() - EVENT_TTL_MS)
     },
     subscribe(listener) {
-      // What was published before this process opened a file that exists is in what it reads from the store already; a file made later, by this process or another, holds only what came after.
-      let seen = open(false)?.lastEvent.get()?.id ?? 0
-
-      const poll = setInterval(() => {
-        try {
-          for (const event of open(false)?.eventsAfter.all(seen, PROCESS) ?? []) {
-            seen = event.id
-            listener(event.message)
-          }
-        }
-        catch (error) {
-          kayLog('error', 'reading what the other processes invalidated failed; trying again', error)
-        }
-      }, POLL_MS)
-
-      poll.unref()
-      polls.push(poll)
+      listeners.push(listener)
+      follow()
     },
   }
 
@@ -128,9 +158,7 @@ export function sqliteCache(path: string): SyncCacheStore {
   onReload(() => {
     closed = true
 
-    for (const poll of polls)
-      clearInterval(poll)
-
+    poll?.stop()
     untrackStore(store)
     opened?.db.close()
   })

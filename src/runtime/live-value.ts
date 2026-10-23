@@ -46,6 +46,8 @@ export interface LiveStore {
   subscribe: (listener: (id: string, key: string, text: string | undefined) => void) => void
   // Stops following the other processes, as when another store replaces this one; a later `subscribe` follows again.
   stop?: () => void
+  // Brings a poll that slowed down while nothing happened back to its pace, as a new watcher needs the next change at once.
+  wake?: () => void
 }
 
 // The page's script of live values: the value of each as the server rendered it, with the signature that proves the page read those keys.
@@ -120,6 +122,8 @@ export function watchSlot(slot: ServerSlot, key: string, listener: () => void): 
     slot.listeners.set(key, set = new Set())
 
   set.add(listener)
+  // A store that slowed its poll while nothing happened polls at its pace again, as this watcher waits on the next change.
+  state().store?.wake?.()
 
   return () => {
     set.delete(listener)
@@ -144,6 +148,8 @@ interface ServerState {
   written: Set<string> | undefined
   // The read of a store that answers late.
   reading: Promise<void> | undefined
+  // The store read at the start and not followed yet, as no module declared a value of the app.
+  idle: LiveStore | undefined
 }
 
 const STATE = Symbol.for('kay.live.state')
@@ -153,7 +159,7 @@ const UNDECLARED_ROWS = 10_000
 function state(): ServerState {
   const holder = globalThis as Record<symbol, ServerState | undefined>
 
-  return holder[STATE] ??= { store: undefined, subscribed: new WeakSet(), undeclared: new Map(), undeclaredRows: 0, startup: new Set(), checkWrite: undefined, written: undefined, reading: undefined }
+  return holder[STATE] ??= { store: undefined, subscribed: new WeakSet(), undeclared: new Map(), undeclaredRows: 0, startup: new Set(), checkWrite: undefined, written: undefined, reading: undefined, idle: undefined }
 }
 
 // Installed by the server: refuses a value a browser could not be sent where it is set.
@@ -242,6 +248,7 @@ export function setLiveStore(store: LiveStore | undefined): void {
   const replaced = kept.store
 
   kept.store = store
+  kept.idle = undefined
 
   if (replaced !== undefined) {
     replaced.stop?.()
@@ -297,11 +304,18 @@ async function readLater(store: LiveStore, pending: Promise<Entries>): Promise<v
     follow(store)
 }
 
+// A store with no value of the app declared has nothing to follow: the first declaration reads it again and follows, so the store is not polled until then.
 function follow(store: LiveStore): void {
   const kept = state()
 
   if (kept.subscribed.has(store))
     return
+
+  if (![...slots().values()].some(shared)) {
+    kept.idle = store
+
+    return
+  }
 
   kept.subscribed.add(store)
   // A store replaced or removed since still delivers, which is ignored.
@@ -309,6 +323,26 @@ function follow(store: LiveStore): void {
     if (kept.store === store)
       hear(id, key, text)
   })
+}
+
+// Reads a store again that was left unfollowed, then follows it: what the other processes set meanwhile is in its rows, and `entries` notes the last event before reading them so none is missed.
+function followLate(store: LiveStore): void {
+  const kept = state()
+
+  kept.idle = undefined
+
+  const rows = store.entries()
+
+  if (!Array.isArray(rows)) {
+    kept.reading = readLater(store, rows)
+
+    return
+  }
+
+  for (const [id, key, text] of rows)
+    hear(id, key, text, true)
+
+  follow(store)
 }
 
 function writtenKey(id: string, key: string): string {
@@ -389,6 +423,7 @@ function serverLive(id: string, initial: unknown, name: string | undefined): Han
 
   if (!known) {
     const kept = state()
+    const idle = kept.idle
     const held = kept.undeclared.get(id)
 
     for (const [key, text] of held ?? []) {
@@ -404,6 +439,9 @@ function serverLive(id: string, initial: unknown, name: string | undefined): Han
       if (!kept.startup.delete(id))
         kept.undeclaredRows -= held.size
     }
+
+    if (idle !== undefined && idle === kept.store && shared(slot))
+      followLate(idle)
   }
 
   const read = (key: string): unknown => {

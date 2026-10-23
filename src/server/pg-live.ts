@@ -22,7 +22,7 @@ export function pgLive(pg: PgHandle): LiveStore {
   const self = crypto.randomUUID()
   const listeners = new Set<Listener>()
   let tail: Promise<void> = Promise.resolve()
-  let stopPolling: (() => void) | undefined
+  let polling: ReturnType<ReturnType<typeof pollerOf>['add']> | undefined
   const events = eventWindow()
   let queued = 0
   let overflowing = false
@@ -66,6 +66,7 @@ export function pgLive(pg: PgHandle): LiveStore {
     const at = `${escaped(id)}\0${escaped(key)}`
 
     queued++
+    polling?.wake()
     pending.set(at, (pending.get(at) ?? 0) + 1)
 
     try {
@@ -148,7 +149,7 @@ export function pgLive(pg: PgHandle): LiveStore {
     }
   }
 
-  const poll = async (db: SQL) => {
+  const poll = async (db: SQL): Promise<'heard' | undefined> => {
     // What was set before this process first used the store is in what it reads from the store already.
     if (events.from() === undefined)
       await startAt(db)
@@ -171,11 +172,13 @@ export function pgLive(pg: PgHandle): LiveStore {
         }
       }
     }
+
+    return read.fresh.length > 0 ? 'heard' : undefined
   }
 
   const stop = () => {
-    stopPolling?.()
-    stopPolling = undefined
+    polling?.()
+    polling = undefined
     listeners.clear()
   }
 
@@ -186,6 +189,7 @@ export function pgLive(pg: PgHandle): LiveStore {
 
   return {
     stop,
+    wake: () => polling?.wake(),
     // After the writes made before it, and noting the last event before the rows are read, so a set between the two is heard.
     async entries() {
       return ordered(async () => {
@@ -202,10 +206,10 @@ export function pgLive(pg: PgHandle): LiveStore {
     subscribe(listener) {
       listeners.add(listener)
 
-      if (stopPolling !== undefined || closed)
+      if (polling !== undefined || closed)
         return
 
-      stopPolling = pollerOf(pg).add({ every: POLL_MS, wanted: () => listeners.size > 0 && !closed, run: poll, failed: 'reading the live values the other processes set failed' }, false)
+      polling = pollerOf(pg).add({ every: POLL_MS, backoff: true, wanted: () => listeners.size > 0 && !closed, run: poll, failed: 'reading the live values the other processes set failed' }, false)
     },
   }
 }

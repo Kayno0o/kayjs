@@ -1,10 +1,11 @@
 import type { LiveStore } from '../runtime/live-value'
 import { existsSync } from 'node:fs'
 import { kayLog } from '../runtime/log'
+import { pollLoop } from '../runtime/poll-backoff'
 import { openSqlite } from '../runtime/sqlite.server'
 import { onReload } from './reload'
 
-// How often a process reads what the others set, and how long a message is kept for one that reads late.
+// How often a process reads what the others set while there is activity, and how long a message is kept for one that reads late.
 const POLL_MS = 500
 const EVENT_TTL_MS = 60_000
 // Tells this process's own messages apart from the others'.
@@ -47,7 +48,7 @@ export function sqliteLive(path: string): LiveStore {
   let closed = false
   // The last event before the rows were read, so a set between the two is heard.
   let before: number | undefined
-  const polls: ReturnType<typeof setInterval>[] = []
+  const polls: ReturnType<typeof pollLoop>[] = []
   const open = (create: boolean) => {
     if (closed)
       throw new Error('kay: the live values store was closed')
@@ -60,7 +61,7 @@ export function sqliteLive(path: string): LiveStore {
 
   const stop = () => {
     for (const poll of polls)
-      clearInterval(poll)
+      poll.stop()
 
     polls.length = 0
   }
@@ -71,8 +72,14 @@ export function sqliteLive(path: string): LiveStore {
     opened?.db.close()
   })
 
+  const wake = () => {
+    for (const poll of polls)
+      poll.wake()
+  }
+
   return {
     stop,
+    wake,
     entries() {
       const live = open(false)
 
@@ -80,13 +87,21 @@ export function sqliteLive(path: string): LiveStore {
 
       return live?.all.all().map(row => [row.id, row.key, row.value]) ?? []
     },
-    set: (id, key, text) => open(true)!.set(id, key, text),
-    delete: (id, key) => open(false)?.remove(id, key),
+    set(id, key, text) {
+      wake()
+
+      return open(true)!.set(id, key, text)
+    },
+    delete(id, key) {
+      wake()
+
+      return open(false)?.remove(id, key)
+    },
     subscribe(listener) {
       // What was set before this process opened a file that exists is in what it read from the store already.
       let seen = before ?? open(false)?.lastEvent.get()?.seq ?? 0
 
-      const poll = setInterval(() => {
+      const poll = pollLoop(POLL_MS, () => {
         const heard: [id: string, key: string, text: string | undefined][] = []
 
         try {
@@ -105,7 +120,7 @@ export function sqliteLive(path: string): LiveStore {
         catch (error) {
           kayLog('error', 'reading the live values the other processes set failed; trying again', error)
 
-          return
+          return false
         }
 
         for (const [id, key, text] of heard) {
@@ -116,9 +131,10 @@ export function sqliteLive(path: string): LiveStore {
             kayLog('error', `a watcher of the live value ${id} threw`, error)
           }
         }
-      }, POLL_MS)
 
-      poll.unref()
+        return heard.length > 0
+      })
+
       polls.push(poll)
     },
   }

@@ -12,6 +12,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay check` and the language server stop waiting for a `kay.config.ts` that never settles after 30 seconds, and an effect loop stops after 1,000 rounds, naming the effect in development.
 - kayjs-cms moves entries of a loaded collection by writing only their order field, refused if another process changed it since (`expect` of `saveMany`, `ContentChangedError`). Its hourly sweep reads revision indexes, erase answers 404 for an unknown collection and the media library labels uploads a revision or the trash holds ([Loaders](../packages/cms/llms/loaders.md), [Content](content-cms.md)).
 - kayjs-cms sends no editor name to the on-page editor, which only counts the other editors, so an edit link's holder learns none ([Screens](../packages/cms/llms/screens-replacing.md)).
+- The Postgres and SQLite live and cache stores poll every 500 ms only while there is activity: an idle server backs off to 5 s, and a live store with no `live()` value declared, or a Postgres cache nothing used, is not polled ([Live values](live-values.md)).
 - kayjs-ui roots write an app's `style` after their own declarations, so the app wins.
 - The Styles tab and LSP show a part's classes written as an imported constant.
 - kayjs-ui reads the app's own theme names (`--color-accent`, `--color-background`, `--density`), and the analytics consent banner now follows the app's `--color-accent`, `--color-surface`, `--color-foreground` and `--color-input` ([Setup](../packages/ui/llms/setup.md)).

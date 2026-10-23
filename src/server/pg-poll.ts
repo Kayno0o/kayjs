@@ -1,9 +1,10 @@
 import type { SQL } from 'bun'
 import type { PgHandle } from './pg-data'
 import { kayLog } from '../runtime/log'
+import { delayAfter, pollClock } from '../runtime/poll-backoff'
 import { startedStatements, trackStatements } from './pg-jobs'
 
-// How often a process reads what the others wrote, and how long a message is kept for one that reads late.
+// How often a process reads what the others wrote while there is activity (see `delayAfter` for how it slows down when idle), and how long a message is kept for one that reads late.
 export const POLL_MS = 500
 export const EVENT_TTL_MS = 60_000
 // A read or a write that takes longer is given up, so a database that stopped answering holds neither the poll nor a store's queue.
@@ -89,8 +90,10 @@ export interface PollTask {
   every: number
   // Whether there is anything to read; the database is not reached when not.
   wanted: () => boolean
-  // Resolves 'busy' when it did not read because its last run is still going: that is neither a success nor a failure, so a streak of failed runs goes on.
-  run: (db: SQL) => Promise<void | 'busy'>
+  // Resolves 'busy' when it did not read because its last run is still going: that is neither a success nor a failure, so a streak of failed runs goes on. Resolves 'heard' when it read something, which keeps a task with `backoff` at its base rate.
+  run: (db: SQL) => Promise<void | 'busy' | 'heard'>
+  // Whether the task polls less often after runs that heard nothing, back at `every` on a `wake`.
+  backoff?: boolean
   // What the log says when a streak of failed runs begins.
   failed: string
 }
@@ -100,10 +103,15 @@ interface Entry {
   next: number
   running: boolean
   failing: boolean
+  // The runs in a row that heard nothing, and when the last began.
+  quiet: number
+  began: number
 }
 
+type Stop = (() => void) & { wake: () => void }
+
 interface Poller {
-  add: (task: PollTask, now: boolean) => () => void
+  add: (task: PollTask, now: boolean) => Stop
 }
 
 const pollers = new WeakMap<PgHandle, Poller>()
@@ -125,11 +133,11 @@ const GROUP_MS = 25
 
 function createPoller(pg: PgHandle): Poller {
   const entries = new Set<Entry>()
-  let timer: ReturnType<typeof setTimeout> | undefined
+  let timer: unknown
 
   // One timeout at the earliest due time of the tasks not running; a task ending schedules again.
   const schedule = () => {
-    clearTimeout(timer)
+    pollClock.clearTimeout(timer)
     timer = undefined
 
     const idle = [...entries].filter(entry => !entry.running)
@@ -137,16 +145,20 @@ function createPoller(pg: PgHandle): Poller {
     if (idle.length === 0)
       return
 
-    timer = setTimeout(tick, Math.max(0, Math.min(...idle.map(entry => entry.next)) - Date.now()))
-    timer.unref()
+    timer = pollClock.setTimeout(tick, Math.max(0, Math.min(...idle.map(entry => entry.next)) - pollClock.now()))
   }
 
   const runEntry = async (entry: Entry, db: Promise<SQL>) => {
     try {
       const outcome = await timeLimited(async () => entry.task.run(await db), DB_TIMEOUT_MS, 'reading the events')
 
-      if (outcome !== 'busy')
+      if (outcome !== 'busy') {
         entry.failing = false
+        entry.quiet = outcome === 'heard' ? 0 : entry.quiet + 1
+
+        if (entry.task.backoff)
+          entry.next = entry.began + delayAfter(entry.task.every, entry.quiet)
+      }
     }
     catch (error) {
       // A streak of failed reads logs once, as the poll runs several times a second.
@@ -162,7 +174,7 @@ function createPoller(pg: PgHandle): Poller {
   }
 
   function tick() {
-    const now = Date.now()
+    const now = pollClock.now()
     let db: Promise<SQL> | undefined
 
     for (const entry of entries) {
@@ -170,6 +182,7 @@ function createPoller(pg: PgHandle): Poller {
         continue
 
       entry.next = now + entry.task.every
+      entry.began = now
 
       if (!entry.task.wanted())
         continue
@@ -185,15 +198,21 @@ function createPoller(pg: PgHandle): Poller {
 
   return {
     add(task, now) {
-      const entry: Entry = { task, next: now ? 0 : Date.now() + task.every, running: false, failing: false }
+      const entry: Entry = { task, next: now ? 0 : pollClock.now() + task.every, running: false, failing: false, quiet: 0, began: 0 }
 
       entries.add(entry)
       schedule()
 
-      return () => {
+      return Object.assign(() => {
         entries.delete(entry)
         schedule()
-      }
+      }, {
+        wake() {
+          entry.quiet = 0
+          entry.next = Math.min(entry.next, pollClock.now() + task.every)
+          schedule()
+        },
+      })
     },
   }
 }

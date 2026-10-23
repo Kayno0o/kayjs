@@ -17,7 +17,7 @@ export function pgCache(pg: PgHandle): CacheStore {
   const listeners: ((message: string) => void)[] = []
   // The writes still running, which a listing of the keys waits for so an `invalidate` never misses a row being written.
   const writing = new Set<Promise<unknown>>()
-  let stopPolling: (() => void) | undefined
+  let polling: ReturnType<ReturnType<typeof pollerOf>['add']> | undefined
   const events = eventWindow()
   let closed = false
   let purged = 0
@@ -33,7 +33,7 @@ export function pgCache(pg: PgHandle): CacheStore {
     }
   }
 
-  const poll = async (db: SQL) => {
+  const poll = async (db: SQL): Promise<'heard' | undefined> => {
     const from = events.from()
 
     if (from === undefined) {
@@ -42,8 +42,10 @@ export function pgCache(pg: PgHandle): CacheStore {
 
       events.start([Number(last?.id ?? 0)])
 
-      return
+      return undefined
     }
+
+    let heard = false
 
     // Ordered by the table column: a bare `id` is the text of the select list, where '100' sorts before '99'.
     for (const event of await rowsOf<{ id: string, message: string }>(db`SELECT id::text, message FROM kay_events WHERE id > ${from}::bigint AND origin != ${PROCESS} ORDER BY kay_events.id`)) {
@@ -53,6 +55,7 @@ export function pgCache(pg: PgHandle): CacheStore {
         continue
 
       events.note(id)
+      heard = true
 
       for (const listener of listeners) {
         try {
@@ -63,14 +66,22 @@ export function pgCache(pg: PgHandle): CacheStore {
         }
       }
     }
+
+    return heard ? 'heard' : undefined
   }
 
-  // Started by the first call that needs the database, so only an app that reads, writes or invalidates a value connects.
+  // Started by the first call that needs the database, so only an app that reads, writes or invalidates a value connects; a later call brings a slowed poll back to its base rate.
   const start = () => {
-    if (stopPolling !== undefined || closed)
+    if (closed)
       return
 
-    stopPolling = pollerOf(pg).add({ every: POLL_MS, wanted: () => listeners.length > 0, run: poll, failed: 'reading what the other processes invalidated failed' }, true)
+    if (polling !== undefined) {
+      polling.wake()
+
+      return
+    }
+
+    polling = pollerOf(pg).add({ every: POLL_MS, backoff: true, wanted: () => listeners.length > 0, run: poll, failed: 'reading what the other processes invalidated failed' }, true)
   }
 
   const store: CacheStore = {
@@ -144,7 +155,7 @@ export function pgCache(pg: PgHandle): CacheStore {
   // A reload ends the polling for the module that named the store; the module running again names a store of its own.
   onReload(() => {
     closed = true
-    stopPolling?.()
+    polling?.()
     untrackStore(store)
   })
 

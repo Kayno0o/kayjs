@@ -291,8 +291,11 @@ process.exit(0)`)
 
   it('ends the poll of a real sqliteLive it replaces', async () => {
     const store = sqliteLive(await storePath())
-    const started = spyOn(globalThis, 'setInterval')
-    const cleared = spyOn(globalThis, 'clearInterval')
+
+    declare(0, 'test:poll-end', 'pollEnd')
+
+    const started = spyOn(globalThis, 'setTimeout')
+    const cleared = spyOn(globalThis, 'clearTimeout')
 
     try {
       setLiveStore(store)
