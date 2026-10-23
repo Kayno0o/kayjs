@@ -139,9 +139,10 @@ describe('draft messages', () => {
     expect(draftMessages(`${base}export default { ...base, nav: { home: 'Maison' } }\n`)).toEqual([])
     expect(draftMessages(`${base}export default { nav: { home: 'Maison' }, ...base }\n`).map(({ key }) => key)).toEqual(['nav.home'])
 
-    const root = await project({ 'src/messages/fr.ts': `${base}export default { ...base, nav: {} }\n` })
+    const root = await project({ 'src/messages/fr.ts': `${base}export default { ...base, nav: { about: 'A propos' } }\n` })
 
     expect(await writeDraftMessages(root, { i18n }, 'fr', { 'nav.home': 'Maison' })).toEqual(['nav.home'])
+    expect(await Bun.file(join(root, 'src/messages/fr.ts')).text()).toContain('nav: {\n  about: \'A propos\',\n  home: \'Maison\', // draft\n} }')
   })
 
   it('list a const group spread twice once', () => {
