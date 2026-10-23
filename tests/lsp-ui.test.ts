@@ -3,10 +3,10 @@ import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { recipeParts, styleInfo, styleInfos, themeTokens, tokensNamedBy } from '../src/build/ui-info'
+import { recipeParts, styleInfo, styleInfos, themeBlockTokens, themeTokens, tokensNamedBy } from '../src/build/ui-info'
 import { Connection } from '../src/lsp/rpc'
 import { templateContext } from '../src/lsp/template-completion'
-import { objectCursor, uiFileCursor } from '../src/lsp/ui-completion'
+import { objectCursor, uiFileCursor, uiItems } from '../src/lsp/ui-completion'
 import { spawnSuiteServer } from './listening'
 import { scratchDir } from './scratch'
 
@@ -225,5 +225,39 @@ describe('the components found for completion', () => {
     await expect(styleInfos(root, [])).rejects.toThrow('ENOENT')
     await mkdir(join(root, 'src'))
     expect(await styleInfos(root, [])).toEqual([])
+  })
+
+  const SPLIT_THEME = `
+@property --border-width { syntax: '<length>'; inherits: false; initial-value: 1px; }
+@theme default {
+  /* a { comment } */
+  --color-background: light-dark(#fff, #000);
+  --color-accent: red;
+  --color-chart-2: blue;
+  --border-width: 1px;
+  --radius-lg: 0.5rem;
+}
+@theme default inline reference {
+  --color-kui-canvas: var(--color-background);
+  --color-kui-accent: var(--color-accent);
+  --kui-border-width: var(--border-width);
+}
+.x { --not-a-token: 1; }`
+
+  it('reads token names from the @theme blocks and marks the reference block deprecated', () => {
+    const tokens = themeBlockTokens(SPLIT_THEME)
+
+    expect(tokens.map(token => token.name)).toEqual(['--color-background', '--color-accent', '--color-chart-2', '--border-width', '--radius-lg', '--color-kui-canvas', '--color-kui-accent', '--kui-border-width'])
+    expect(tokens.filter(token => token.deprecated).map(token => token.name)).toEqual(['--color-kui-canvas', '--color-kui-accent', '--kui-border-width'])
+    expect(tokensNamedBy('bg-background text-accent/50 hover:bg-chart-2 rounded-lg p-2 border-(length:--border-width) bg-kui-canvas', tokens).map(token => token.name)).toEqual(['--color-background', '--color-accent', '--color-chart-2', '--border-width', '--radius-lg', '--color-kui-canvas'])
+    expect(themeBlockTokens('@theme default { --color-kui-canvas: red; }').map(token => token.name)).toEqual(['--color-kui-canvas'])
+  })
+
+  it('hides deprecated tokens from completion', () => {
+    const cursor = { path: [], at: 'string' as const, key: 'root', word: '--' }
+    const labels = uiItems(cursor, 'Card', { components: [], tokens: themeBlockTokens(SPLIT_THEME) }).map(item => item.label)
+
+    expect(labels).toContain('--color-background')
+    expect(labels).not.toContain('--color-kui-canvas')
   })
 })

@@ -169,7 +169,7 @@ export function uiItems(cursor: ObjectCursor, tag: string | undefined, data: UiD
   if (cursor.at === 'string') {
     const typed = TOKEN_BEFORE.exec(cursor.word)
 
-    return typed === null ? [] : data.tokens.map(token => ({ ...item(token.name, KIND_VARIABLE, token.value), filterText: token.name }))
+    return typed === null ? [] : data.tokens.filter(token => token.deprecated !== true).map(token => ({ ...item(token.name, KIND_VARIABLE, token.value), filterText: token.name }))
   }
 
   const parts = (component: StyleInfo | undefined) => (component?.parts ?? []).map(part => item(part.name, KIND_FIELD, part.classes === '' ? 'part' : `part: ${part.classes}`))

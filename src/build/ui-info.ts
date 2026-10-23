@@ -13,6 +13,8 @@ import { classesOf, keyOf } from './ui'
 export interface Token {
   name: string
   value: string
+  // An old name kept as an alias: declared in a `@theme ... reference` block, so completion hides it.
+  deprecated?: boolean
 }
 
 export interface StyleInfo {
@@ -27,6 +29,9 @@ export interface StyleInfo {
 
 const THEME = '@kaynooo/kayjs-ui/theme.css'
 const DECLARATION = /^\s*(--[\w-]+)\s*:([^;]+);/gm
+const COMMENT = /\/\*[\s\S]*?\*\//g
+const THEME_BLOCK = /@theme\b([^{;]*)\{([^{}]*)\}/g
+const WORDS = /\S+/g
 const VARIABLE = /--[\w-]+/g
 const UTILITY = /(?<=-)kui-([\w-]+)/g
 const RECIPE_CALL = /\brecipe\s*\(/
@@ -41,6 +46,23 @@ function realOf(file: string): string {
   catch {
     return file
   }
+}
+
+// The tokens the `@theme` blocks of a stylesheet declare, so a name needs no particular prefix. A block with the `reference` modifier holds the old names kept as aliases, which a name declared there alone is marked deprecated by.
+export function themeBlockTokens(css: string): Token[] {
+  const seen = new Map<string, Token>()
+
+  for (const [, head, body] of css.replace(COMMENT, '').matchAll(THEME_BLOCK)) {
+    const deprecated = head!.match(WORDS)?.includes('reference') === true
+
+    for (const [, name, value] of body!.matchAll(DECLARATION)) {
+      const kept = seen.get(name!)
+
+      seen.set(name!, { name: name!, value: value!.trim(), ...deprecated && (kept === undefined || kept.deprecated === true) ? { deprecated: true } : {} })
+    }
+  }
+
+  return [...seen.values()]
 }
 
 // The custom properties the kayjs-ui theme declares, read again when the file changes; none when the app has not installed it.
@@ -65,19 +87,37 @@ export function themeTokens(root: string): Token[] {
   if (kept?.stamp === stamp)
     return kept.tokens
 
-  const seen = new Map<string, string>()
-
-  for (const [, name, value] of readFileSync(file, 'utf8').matchAll(DECLARATION))
-    seen.set(name!, value!.trim())
-
-  const tokens = [...seen].map(([name, value]) => ({ name, value }))
+  const tokens = themeBlockTokens(readFileSync(file, 'utf8'))
 
   themes.set(file, { stamp, tokens })
 
   return tokens
 }
 
-// The tokens a string of classes names: a `var(--x)` or `(length:--x)` it writes, or the utility of a theme token such as `bg-kui-surface0` for `--color-kui-surface0`.
+// The theme namespaces a utility prefix reads: `bg-accent` is `--color-accent`, `rounded-lg` is `--radius-lg`.
+const NAMESPACES: Record<string, string[]> = {
+  bg: ['color'],
+  text: ['color', 'text'],
+  border: ['color'],
+  ring: ['color'],
+  fill: ['color'],
+  stroke: ['color'],
+  divide: ['color'],
+  outline: ['color'],
+  decoration: ['color'],
+  shadow: ['color', 'shadow'],
+  font: ['font', 'font-weight'],
+  tracking: ['tracking'],
+  leading: ['leading'],
+  rounded: ['radius'],
+}
+const SPACING = new Set(['p', 'px', 'py', 'pt', 'pb', 'pl', 'pr', 'ps', 'pe', 'm', 'mx', 'my', 'mt', 'mb', 'ml', 'mr', 'ms', 'me', 'gap', 'gap-x', 'gap-y', 'space-x', 'space-y', 'size', 'w', 'h', 'min-w', 'min-h', 'max-w', 'max-h'])
+const LEADING_MARKS = /^[!-]+/
+const OPACITY = /\/\d+$/
+const DASH = /-/g
+const VARIANTS = /^(?:[^:[\]]|\[[^\]]*\])*:/
+
+// The tokens a string of classes names: a `var(--x)` or `(length:--x)` it writes, or the utility of a theme token such as `bg-surface` for `--color-surface` or `bg-kui-surface0` for `--color-kui-surface0`.
 export function tokensNamedBy(classes: string, tokens: Token[]): Token[] {
   const names = new Set(classes.match(VARIABLE))
 
@@ -87,6 +127,22 @@ export function tokensNamedBy(classes: string, tokens: Token[]): Token[] {
     for (const token of tokens) {
       if (token.name.endsWith(suffix))
         names.add(token.name)
+    }
+  }
+
+  for (const word of classes.match(WORDS) ?? []) {
+    const utility = word.replace(VARIANTS, '').replace(LEADING_MARKS, '').replace(OPACITY, '')
+    const split = [...utility.matchAll(DASH)].map(match => match.index)
+
+    for (const at of split) {
+      const prefix = utility.slice(0, at)
+      const rest = utility.slice(at + 1)
+      const spaces = SPACING.has(prefix) ? ['spacing'] : NAMESPACES[prefix]
+
+      for (const space of spaces ?? []) {
+        if (tokens.some(token => token.name === `--${space}-${rest}`))
+          names.add(`--${space}-${rest}`)
+      }
     }
   }
 
