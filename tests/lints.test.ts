@@ -306,6 +306,33 @@ describe('external-redirect', () => {
     expect(found('const next = "/a"\nconst go = () => {\n  const { next } = ctx.query\n  redirect(next)\n}')).toHaveLength(1)
   })
 
+  it('reads a const in the scope that declares it, not in every handler of the fence', () => {
+    expect(found('const next = "/a"\nconst one = () => redirect(next)\nconst two = () => {\n  const next = ctx.query.n\n  redirect(next)\n}')).toHaveLength(1)
+    expect(found('const one = () => {\n  const next = "/a"\n  redirect(next)\n}\nconst two = () => {\n  const next = ctx.query.n\n  redirect(next)\n}')).toHaveLength(1)
+    expect(found('const one = () => {\n  const next = "/a"\n  redirect(next)\n}\nconst two = () => {\n  const next = "/b"\n  redirect(next)\n}')).toEqual([])
+    expect(found('if (a) {\n  const to = "/a"\n  redirect(to)\n}\nelse {\n  const to = ctx.query.n\n  redirect(to)\n}')).toHaveLength(1)
+    expect(found('const to = ctx.query.n\nconst go = () => {\n  const to = "/a"\n  redirect(to)\n}')).toEqual([])
+    expect(found('let to = "/a"\nconst go = () => {\n  to = ctx.query.n\n}\nredirect(to)')).toHaveLength(1)
+  })
+
+  it('does not take a name used twice for a cycle', () => {
+    expect(found('const d = cfg.home\nredirect(a ? d : d)')).toEqual([])
+    expect(found('const d = "/home"\nredirect(a ? d : d)')).toEqual([])
+    expect(found('const d = ctx.query.n\nredirect(a ? d : d)')).toHaveLength(1)
+    expect(found('const a = b\nconst b = a\nredirect(a)')).toHaveLength(1)
+  })
+
+  it('counts a computed ctx[\'query\'] and a destructured url, headers or cookies as the request', () => {
+    expect(found('redirect(ctx[\'query\'].next)')).toHaveLength(1)
+    expect(found('redirect(ctx["url"].searchParams.get("r"))')).toHaveLength(1)
+    expect(found('const { url } = ctx\nredirect(url.searchParams.get("r"))')).toHaveLength(1)
+    expect(found('const { headers } = ctx\nredirect(headers.get("referer"))')).toHaveLength(1)
+    expect(found('const { cookies } = ctx\nredirect(cookies.get("next"))')).toHaveLength(1)
+    expect(moduleChecks('export default guard(({ redirect, headers }) => redirect(headers.get("referer")))\n').map(d => d.code)).toEqual(['external-redirect'])
+    expect(moduleChecks('export default guard(({ redirect, url }) => redirect(url.searchParams.get("r")))\n').map(d => d.code)).toEqual(['external-redirect'])
+    expect(found('const url = "/home"\nredirect(build(url))')).toEqual([])
+  })
+
   it('does not read a property name as a variable, trusts a checker\'s result and a call built from a posted form', () => {
     expect(found('const redirect = localPath(ctx.url.searchParams.get("r"), "/")\nconst result = await go(1)\nctx.redirect(localize(result.redirect))')).toEqual([])
     expect(found('const back = localPath(ctx.url.searchParams.get("r"), "/")\nredirect(signInTarget(ctx, back) ?? "/in")')).toEqual([])

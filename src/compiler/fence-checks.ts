@@ -447,7 +447,7 @@ function adjacent(node: t.TemplateLiteral): t.Node[] {
 const SITE_CHECKERS = new Set(['localPath', 'safeRedirect'])
 
 // Whether a redirect target is written as a path of this site: a literal starting with one slash, a template or a concatenation whose text before the first value is `/` and a name (`/posts/`) or whose first value is itself a site path, a call to a checker, `localize(...)` of a site path, or a `const` holding one.
-function isSitePath(node: t.Node, constants: ReadonlyMap<string, t.Node[]>, seen = new Set<string>()): boolean {
+function isSitePath(node: t.Node, constants: Scope, seen = new Set<readonly t.Node[]>()): boolean {
   const site = (inner: t.Node) => isSitePath(inner, constants, seen)
 
   if (node.type === 'StringLiteral')
@@ -475,14 +475,18 @@ function isSitePath(node: t.Node, constants: ReadonlyMap<string, t.Node[]>, seen
     return site(node.expression)
 
   if (node.type === 'Identifier') {
-    const inits = constants.get(node.name)
+    const hit = constants.resolve(node.name)
 
-    if (!inits || seen.has(node.name))
+    if (!hit || seen.has(hit.inits))
       return false
 
-    seen.add(node.name)
+    seen.add(hit.inits)
 
-    return inits.every(site)
+    const site = hit.inits.every(init => isSitePath(init, hit.scope, seen))
+
+    seen.delete(hit.inits)
+
+    return site
   }
 
   if (node.type !== 'CallExpression' || node.callee.type !== 'Identifier')
@@ -496,53 +500,143 @@ function isSitePath(node: t.Node, constants: ReadonlyMap<string, t.Node[]>, seen
   return node.callee.name === 'localize' && first !== undefined && first.type !== 'SpreadElement' && site(first)
 }
 
-// The initialisers of every variable name in the fence; a name that is assigned, a parameter or declared without a value holds nothing known.
-function constantsOf(fence: ParsedFence): Map<string, t.Node[]> {
-  const constants = new Map<string, t.Node[]>()
-  const unknown = new Set<string>()
+// The variables one block, function or catch clause declares: a name's initialisers, or no value known for it (a parameter, a pattern, an assigned name).
+class Scope {
+  readonly inits = new Map<string, t.Node[]>()
+  readonly unknown = new Set<string>()
 
-  eachNode(fence.ast.program, (node) => {
-    if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier' && node.init) {
-      constants.set(node.id.name, [...constants.get(node.id.name) ?? [], node.init])
+  constructor(readonly parent?: Scope, readonly isFunction = true) {}
+
+  // The scope that declares a name and what it holds there; undefined when the name is unknown or declared in no scope.
+  resolve(name: string): { inits: readonly t.Node[], scope: Scope } | undefined {
+    if (this.unknown.has(name))
+      return undefined
+
+    const inits = this.inits.get(name)
+
+    return inits ? { inits, scope: this } : this.parent?.resolve(name)
+  }
+
+  declaring(name: string): Scope | undefined {
+    return this.unknown.has(name) || this.inits.has(name) ? this : this.parent?.declaring(name)
+  }
+
+  // `var` belongs to the function around it, `const` and `let` to the block.
+  get hoist(): Scope {
+    return this.isFunction || !this.parent ? this : this.parent.hoist
+  }
+}
+
+function opensScope(node: t.Node): boolean {
+  return isFunction(node) || node.type === 'BlockStatement' || node.type === 'CatchClause' || node.type === 'ForStatement' || node.type === 'ForInStatement' || node.type === 'ForOfStatement' || node.type === 'SwitchStatement' || node.type === 'StaticBlock'
+}
+
+// The names a function's parameters or a catch clause's parameter bind.
+function boundNames(node: t.Node): string[] {
+  if (isFunction(node))
+    return node.params.flatMap(param => patternNames(param))
+
+  return node.type === 'CatchClause' ? patternNames(node.param) : []
+}
+
+function declareIn(node: t.Node, scope: Scope, scopes: Map<t.Node, Scope>): void {
+  eachNode(node, (inner, parent) => {
+    if (inner !== node && opensScope(inner)) {
+      const own = new Scope(scope, isFunction(inner))
+
+      scopes.set(inner, own)
+      declareIn(inner, own, scopes)
+
+      return false
     }
-    else if (node.type === 'VariableDeclarator') {
-      for (const name of patternNames(node.id))
-        unknown.add(name)
+
+    if (inner === node) {
+      for (const name of boundNames(inner))
+        scope.unknown.add(name)
     }
-    else if (node.type === 'AssignmentExpression') {
-      for (const name of patternNames(node.left))
-        unknown.add(name)
+    else if (inner.type === 'VariableDeclarator' && inner.id.type === 'Identifier' && inner.init) {
+      const target = parent?.type === 'VariableDeclaration' && parent.kind === 'var' ? scope.hoist : scope
+
+      target.inits.set(inner.id.name, [...target.inits.get(inner.id.name) ?? [], inner.init])
     }
-    else if (node.type === 'CatchClause') {
-      for (const name of patternNames(node.param))
-        unknown.add(name)
+    else if (inner.type === 'VariableDeclarator') {
+      const target = parent?.type === 'VariableDeclaration' && parent.kind === 'var' ? scope.hoist : scope
+
+      for (const name of patternNames(inner.id))
+        target.unknown.add(name)
     }
-    else if (isFunction(node)) {
-      for (const param of node.params) {
-        for (const name of patternNames(param))
-          unknown.add(name)
-      }
+    else if ((inner.type === 'FunctionDeclaration' || inner.type === 'ClassDeclaration') && inner.id) {
+      scope.unknown.add(inner.id.name)
     }
+    else if (inner.type === 'ImportSpecifier' || inner.type === 'ImportDefaultSpecifier' || inner.type === 'ImportNamespaceSpecifier') {
+      scope.unknown.add(inner.local.name)
+    }
+
+    return true
+  })
+}
+
+// Visits every node of `node` with the scope it is written in.
+function eachScoped(node: t.Node, scope: Scope, scopes: ReadonlyMap<t.Node, Scope>, visit: (node: t.Node, scope: Scope) => void): void {
+  eachNode(node, (inner) => {
+    const own = inner === node ? undefined : scopes.get(inner)
+
+    if (own) {
+      eachScoped(inner, own, scopes, visit)
+
+      return false
+    }
+
+    visit(inner, scope)
+
+    return true
+  })
+}
+
+// The variables of a fence by scope, a name assigned after it is declared holding nothing known.
+function scopesOf(fence: ParsedFence): { root: Scope, scopes: Map<t.Node, Scope> } {
+  const root = new Scope()
+  const scopes = new Map<t.Node, Scope>()
+
+  declareIn(fence.ast.program, root, scopes)
+
+  eachScoped(fence.ast.program, root, scopes, (node, scope) => {
+    if (node.type !== 'AssignmentExpression')
+      return
+
+    for (const name of patternNames(node.left))
+      (scope.declaring(name) ?? root).unknown.add(name)
   })
 
-  for (const name of unknown)
-    constants.delete(name)
-
-  return constants
+  return { root, scopes }
 }
 
 const REQUEST_CONTEXT = new Set(['query', 'params', 'body', 'request', 'url', 'input', 'headers', 'cookies', 'form'])
 // What a visitor posts, bare or by member: a call result built from it (a sign-in checking a form) is not followed back to it, which a direct `redirect(input.next)` still is.
 const POSTED = new Set(['input', 'body', 'form', 'formData'])
 const REQUEST_ROOTS = new Set(['query', 'params', 'body', 'input', 'request', 'searchParams', 'formData'])
+// Names that are the request only when destructured from the context, not when the code declares them itself.
+const DESTRUCTURED_ROOTS = new Set(['url', 'headers', 'cookies'])
+
+function isRoot(name: string, constants: Scope): boolean {
+  return REQUEST_ROOTS.has(name) || (DESTRUCTURED_ROOTS.has(name) && !constants.resolve(name))
+}
 
 // A call result is a value the callee made: a request member it was given taints it, the bare request object (an action's `input`) does not.
 function isCall(node: t.Node): boolean {
   return node.type === 'AwaitExpression' ? isCall(node.argument) : node.type === 'CallExpression'
 }
 
+// The name a member access reads: `.query` or `['query']`.
+function accessedName(property: t.Node, computed: boolean): string | undefined {
+  if (property.type === 'Identifier' && !computed)
+    return property.name
+
+  return property.type === 'StringLiteral' ? property.value : undefined
+}
+
 // Whether a node reads the request: `ctx.query...`, `ctx.url...`, a destructured `query` or a `const` holding one.
-function readsRequest(node: t.Node, constants: ReadonlyMap<string, t.Node[]>, seen: Set<string>, bare = true): boolean {
+function readsRequest(node: t.Node, constants: Scope, seen: Set<readonly t.Node[]>, bare = true): boolean {
   let found = false
 
   eachNode(node, (inner, parent) => {
@@ -566,15 +660,22 @@ function readsRequest(node: t.Node, constants: ReadonlyMap<string, t.Node[]>, se
         base = base.object
       }
 
-      if (base.type === 'Identifier' && 'property' in first && first.property.type === 'Identifier')
-        found = base.name === 'ctx' ? REQUEST_CONTEXT.has(first.property.name) && (bare || !POSTED.has(first.property.name)) : REQUEST_ROOTS.has(base.name) && (bare || !POSTED.has(base.name))
+      const member = 'property' in first ? accessedName(first.property, first.computed) : undefined
+
+      if (base.type === 'Identifier' && member !== undefined)
+        found = base.name === 'ctx' ? REQUEST_CONTEXT.has(member) && (bare || !POSTED.has(member)) : isRoot(base.name, constants) && (bare || !POSTED.has(base.name))
     }
-    else if (bare && inner.type === 'Identifier' && REQUEST_ROOTS.has(inner.name)) {
+    else if (bare && inner.type === 'Identifier' && isRoot(inner.name, constants)) {
       found = true
     }
-    else if (inner.type === 'Identifier' && constants.has(inner.name) && !seen.has(inner.name)) {
-      seen.add(inner.name)
-      found = constants.get(inner.name)!.some(init => readsRequest(init, constants, seen, bare && !isCall(init)))
+    else if (inner.type === 'Identifier') {
+      const hit = constants.resolve(inner.name)
+
+      if (hit && !seen.has(hit.inits)) {
+        seen.add(hit.inits)
+        found = hit.inits.some(init => readsRequest(init, hit.scope, seen, bare && !isCall(init)))
+        seen.delete(hit.inits)
+      }
     }
 
     return !found
@@ -585,7 +686,7 @@ function readsRequest(node: t.Node, constants: ReadonlyMap<string, t.Node[]>, se
 
 // Whether a target that is not written as a site path may be any URL: a literal or text that is not a path, an unknown name, a member of the request, or a call fed the request.
 // A value a helper builds from the app's own values (`organizationPage(features, org)`, `result.redirect`) is left alone, as it does not come from the visitor.
-function leaks(node: t.Node, constants: ReadonlyMap<string, t.Node[]>, seen = new Set<string>()): boolean {
+function leaks(node: t.Node, constants: Scope, seen = new Set<readonly t.Node[]>()): boolean {
   const next = (inner: t.Node) => leaks(inner, constants, seen)
 
   if (isSitePath(node, constants))
@@ -613,14 +714,18 @@ function leaks(node: t.Node, constants: ReadonlyMap<string, t.Node[]>, seen = ne
     return false
 
   if (node.type === 'Identifier') {
-    const inits = constants.get(node.name)
+    const hit = constants.resolve(node.name)
 
-    if (!inits || seen.has(node.name))
+    if (!hit || seen.has(hit.inits))
       return true
 
-    seen.add(node.name)
+    seen.add(hit.inits)
 
-    return inits.some(next)
+    const leaking = hit.inits.some(init => leaks(init, hit.scope, seen))
+
+    seen.delete(hit.inits)
+
+    return leaking
   }
 
   if (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression' || node.type === 'CallExpression' || node.type === 'OptionalCallExpression')
@@ -635,9 +740,9 @@ export function openRedirects(fence: ParsedFence): Diagnostic[] {
     return []
 
   const diagnostics: Diagnostic[] = []
-  const constants = constantsOf(fence)
+  const { root, scopes } = scopesOf(fence)
 
-  eachNode(fence.ast.program, (node) => {
+  eachScoped(fence.ast.program, root, scopes, (node, constants) => {
     if (node.type !== 'CallExpression' || !node.arguments[0] || node.arguments[0].type === 'SpreadElement')
       return
 
