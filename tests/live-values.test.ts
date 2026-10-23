@@ -474,9 +474,9 @@ describe('the id of a live value', () => {
     expect(named('export const a = live(\n  (id: string) => ({ id }),\n)')).toContain(`({ id }), "${idOf('a')}"\n)`)
   })
 
-  it('follows the options of a declaration', () => {
-    expect(named('export const a = live(0, { ttl: \'7d\' })')).toContain(`live(0, { ttl: '7d' }, "${idOf('a')}")`)
-    expect(named('export const a = live((id: string) => ({ id }), { ttl: \'1h\' },)')).toContain(`{ ttl: '1h' }, "${idOf('a')}"`)
+  it('precedes the options of a declaration', () => {
+    expect(named('export const a = live(0, { ttl: \'7d\' })')).toContain(`live(0, "${idOf('a')}", { ttl: '7d' })`)
+    expect(named('export const a = live((id: string) => ({ id }), { ttl: \'1h\' },)')).toContain(`"${idOf('a')}", { ttl: '1h' }`)
     expect(named('export const a = live(0, options)')).not.toContain(idOf('a'))
   })
 

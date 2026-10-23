@@ -12,8 +12,8 @@ import { sqliteLive } from '../src/server/sqlite-live'
 // The build gives a declaration its id and name; a test passes them itself.
 const declare = live as unknown as (initial: number, id: string, name: string) => { (): number, set: (next: number) => void }
 // A value declared with a lifetime: the options come before the id and name the build adds.
-const declareTtl = live as unknown as (initial: number, options: { ttl: string }, id: string, name: string) => { (): number, set: (next: number) => void }
-const declareKeyedTtl = live as unknown as (initial: (key: string) => number, options: { ttl: string }, id: string, name: string) => { (key: string): number, set: (key: string, next: number) => void, delete: (key: string) => void }
+const declareTtl = live as unknown as (initial: number, id: string, name: string, options: { ttl: string }) => { (): number, set: (next: number) => void }
+const declareKeyedTtl = live as unknown as (initial: (key: string) => number, id: string, name: string, options: { ttl: string }) => { (key: string): number, set: (key: string, next: number) => void, delete: (key: string) => void }
 const dirs: string[] = []
 const VALUE = resolve('src/runtime/live-value.ts')
 const STORE = resolve('src/server/sqlite-live.ts')
@@ -352,7 +352,7 @@ process.exit(0)`)
 
 describe('a live value with a lifetime', () => {
   it('goes back to what the declaration gives once its lifetime passed, and tells the watchers', async () => {
-    const mortal = declareTtl(0, { ttl: '300ms' }, 'test:ttl-memory', 'ttlMemory')
+    const mortal = declareTtl(0, 'test:ttl-memory', 'ttlMemory', { ttl: '300ms' })
     const heard: number[] = []
 
     watchSlot(liveSlot('test:ttl-memory')!, '', () => heard.push(mortal()))
@@ -366,7 +366,7 @@ describe('a live value with a lifetime', () => {
   })
 
   it('is kept for the lifetime since its last write, even a write of the value it holds', async () => {
-    const mortal = declareTtl(0, { ttl: '300ms' }, 'test:ttl-renewed', 'ttlRenewed')
+    const mortal = declareTtl(0, 'test:ttl-renewed', 'ttlRenewed', { ttl: '300ms' })
 
     mortal.set(5)
     await Bun.sleep(200)
@@ -378,7 +378,7 @@ describe('a live value with a lifetime', () => {
   })
 
   it('expires each key on its own', async () => {
-    const room = declareKeyedTtl(() => 0, { ttl: '300ms' }, 'test:ttl-keyed', 'ttlKeyed')
+    const room = declareKeyedTtl(() => 0, 'test:ttl-keyed', 'ttlKeyed', { ttl: '300ms' })
 
     room.set('a', 1)
     await Bun.sleep(200)
@@ -390,7 +390,7 @@ describe('a live value with a lifetime', () => {
   })
 
   it('drops 20,000 keys ending a few milliseconds apart without scanning the ones still to come', async () => {
-    const room = declareKeyedTtl(() => 0, { ttl: '5s' }, 'test:ttl-many', 'ttlMany')
+    const room = declareKeyedTtl(() => 0, 'test:ttl-many', 'ttlMany', { ttl: '5s' })
     const expires = liveSlot('test:ttl-many')!.expires
     let yielded = 0
 
@@ -430,7 +430,7 @@ describe('a live value with a lifetime', () => {
       hear = listener
     } })
 
-    const room = declareKeyedTtl(() => 0, { ttl: '60s' }, 'test:ttl-renewed-by-watcher', 'ttlRenewedByWatcher')
+    const room = declareKeyedTtl(() => 0, 'test:ttl-renewed-by-watcher', 'ttlRenewedByWatcher', { ttl: '60s' })
     const ends = Date.now() + 100
 
     hear!('test:ttl-renewed-by-watcher', 'a', '[1]', ends)
@@ -448,7 +448,7 @@ describe('a live value with a lifetime', () => {
       hear = listener
     } })
 
-    const room = declareKeyedTtl(() => 0, { ttl: '60s' }, 'test:ttl-unordered', 'ttlUnordered')
+    const room = declareKeyedTtl(() => 0, 'test:ttl-unordered', 'ttlUnordered', { ttl: '60s' })
     const now = Date.now()
 
     hear!('test:ttl-unordered', 'late', '[1]', now + 400)
@@ -467,11 +467,11 @@ describe('a live value with a lifetime', () => {
     const written: [string, string, number | undefined][] = []
     const store: LiveStore = { entries: () => [['test:ttl-before', '', '[4]'], ['test:ttl-before-declared', '', '[5]']], set: (id, _key, _text, expiresAt) => void written.push([id, _key, expiresAt]), delete: () => undefined, subscribe: () => undefined }
     // Declared after the store was read, then before it.
-    const early = declareTtl(0, { ttl: '300ms' }, 'test:ttl-before-declared', 'ttlBeforeDeclared')
+    const early = declareTtl(0, 'test:ttl-before-declared', 'ttlBeforeDeclared', { ttl: '300ms' })
 
     setLiveStore(store)
 
-    const late = declareTtl(0, { ttl: '300ms' }, 'test:ttl-before', 'ttlBefore')
+    const late = declareTtl(0, 'test:ttl-before', 'ttlBefore', { ttl: '300ms' })
 
     expect([early(), late()]).toEqual([5, 4])
     expect(written.map(row => row[0]).sort()).toEqual(['test:ttl-before', 'test:ttl-before-declared'])
@@ -496,7 +496,7 @@ describe('a live value with a lifetime', () => {
     const store = sqliteLive(path)
 
     setLiveStore(store)
-    declareTtl(0, { ttl: '60s' }, 'test:ttl-kept', 'ttlKept')
+    declareTtl(0, 'test:ttl-kept', 'ttlKept', { ttl: '60s' })
     await Bun.sleep(50)
     setLiveStore(undefined)
 
@@ -527,7 +527,7 @@ describe('a live value with a lifetime', () => {
 
     setLiveStore(undefined)
     setLiveStore(first)
-    declareTtl(0, { ttl: '60s' }, 'test:ttl-race', 'ttlRace')
+    declareTtl(0, 'test:ttl-race', 'ttlRace', { ttl: '60s' })
 
     const row = (sqliteLive(path).entries() as LiveEntry[]).find(entry => entry[0] === 'test:ttl-race')
 
@@ -563,7 +563,7 @@ describe('a live value with a lifetime', () => {
 
     expect((await lines.read()).value).toContain('ready')
     setLiveStore(store)
-    declareKeyedTtl(() => 0, { ttl: '60s' }, 'test:ttl-many', 'ttlMany')
+    declareKeyedTtl(() => 0, 'test:ttl-many', 'ttlMany', { ttl: '60s' })
 
     const heard = JSON.parse(((await lines.read()).value as string).trim()) as { heard: number, dated: boolean }
 
@@ -586,7 +586,7 @@ describe('a live value with a lifetime', () => {
 
     setLiveStore(store)
 
-    const keyed = declareKeyedTtl(() => 0, { ttl: '300ms' }, 'test:ttl-all', 'ttlAll')
+    const keyed = declareKeyedTtl(() => 0, 'test:ttl-all', 'ttlAll', { ttl: '300ms' })
 
     expect([keyed('a'), keyed('b')]).toEqual([1, 2])
     await Promise.resolve()
@@ -605,7 +605,7 @@ describe('a live value with a lifetime', () => {
       }, async (): Promise<void> => Promise.reject(new Error('the database is down'))]) {
         setLiveStore({ entries: () => [['test:ttl-all-refused', 'a', '[1]']], set: () => undefined, endAll, delete: () => undefined, subscribe: () => undefined })
 
-        const keyed = declareKeyedTtl(() => 0, { ttl: '60s' }, 'test:ttl-all-refused', 'ttlAllRefused')
+        const keyed = declareKeyedTtl(() => 0, 'test:ttl-all-refused', 'ttlAllRefused', { ttl: '60s' })
 
         expect(keyed('a')).toBe(1)
         await Bun.sleep(10)
@@ -621,7 +621,7 @@ describe('a live value with a lifetime', () => {
     setLiveStore({ entries: () => [['test:ttl-refused', '', '[3]']], set: () => {
       throw new Error('the database is locked')
     }, delete: () => undefined, subscribe: () => undefined })
-    expect(declareTtl(0, { ttl: '60s' }, 'test:ttl-refused', 'ttlRefused')()).toBe(3)
+    expect(declareTtl(0, 'test:ttl-refused', 'ttlRefused', { ttl: '60s' })()).toBe(3)
     setLiveStore(undefined)
   })
 
@@ -635,14 +635,14 @@ describe('a live value with a lifetime', () => {
   })
 
   it('refuses a lifetime that is not a positive duration', () => {
-    expect(() => declareTtl(0, { ttl: '0s' }, 'test:ttl-bad', 'ttlBad')).toThrow(/ttl/)
-    expect(() => declareTtl(0, { ttl: 'soon' }, 'test:ttl-bad', 'ttlBad')).toThrow(/ttl/)
+    expect(() => declareTtl(0, 'test:ttl-bad', 'ttlBad', { ttl: '0s' })).toThrow(/ttl/)
+    expect(() => declareTtl(0, 'test:ttl-bad', 'ttlBad', { ttl: 'soon' })).toThrow(/ttl/)
   })
 
   it('is written to a store with the time it ends, and is not read back once past', async () => {
     const path = await storePath()
     const store = sqliteLive(path)
-    const mortal = declareTtl(0, { ttl: '100ms' }, 'test:ttl-sqlite', 'ttlSqlite')
+    const mortal = declareTtl(0, 'test:ttl-sqlite', 'ttlSqlite', { ttl: '100ms' })
     const forever = declare(0, 'test:ttl-none', 'ttlNone')
     const before = Date.now()
 
@@ -717,8 +717,8 @@ describe('a live value with a lifetime', () => {
     await store.set('test:ttl-gone', '', '[8]', Date.now() - 1)
     setLiveStore(store)
 
-    const late = declareTtl(0, { ttl: '60s' }, 'test:ttl-late', 'ttlLate')
-    const gone = declareTtl(0, { ttl: '60s' }, 'test:ttl-gone', 'ttlGone')
+    const late = declareTtl(0, 'test:ttl-late', 'ttlLate', { ttl: '60s' })
+    const gone = declareTtl(0, 'test:ttl-gone', 'ttlGone', { ttl: '60s' })
 
     expect(late()).toBe(7)
     expect(gone()).toBe(0)
@@ -734,7 +734,7 @@ describe('a live value with a lifetime', () => {
       hear = listener
     } })
 
-    const heard = declareTtl(0, { ttl: '60s' }, 'test:ttl-subscribed', 'ttlSubscribed')
+    const heard = declareTtl(0, 'test:ttl-subscribed', 'ttlSubscribed', { ttl: '60s' })
 
     hear!('test:ttl-subscribed', '', '[4]', Date.now() + 100)
     expect(heard()).toBe(4)

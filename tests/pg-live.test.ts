@@ -9,7 +9,7 @@ import { cleanUpAfterFile, pgDescribe, pgIt, postgres, replicas } from './job-st
 
 cleanUpAfterFile()
 
-const declareKeyedTtl = live as unknown as (initial: (key: string) => number, options: { ttl: string }, id: string, name: string) => (key: string) => number
+const declareKeyedTtl = live as unknown as (initial: (key: string) => number, id: string, name: string, options: { ttl: string }) => (key: string) => number
 const declare = live as unknown as (initial: number, id: string, name: string) => { (): number, set: (next: number) => void }
 
 async function waitFor(check: () => boolean | Promise<boolean>, what: string, ms = 4000): Promise<void> {
@@ -378,7 +378,7 @@ pgDescribe('pgData live values', () => {
 
     other.subscribe((id, key, _text, expiresAt) => id === 'app:many' && heard.push([key, expiresAt]))
     setLiveStore(store)
-    declareKeyedTtl(() => 0, { ttl: '60s' }, 'app:many', 'many')
+    declareKeyedTtl(() => 0, 'app:many', 'many', { ttl: '60s' })
     await liveStoreReady()
     await waitFor(async () => (await sql.unsafe<{ count: string }[]>('SELECT count(*)::text AS count FROM kay_live WHERE expires_at IS NULL'))[0]!.count === '0', 'the rows to be dated', 10_000)
     await waitFor(() => heard.length === ROWS + 1, 'the other replica to hear the ends', 10_000)
@@ -555,7 +555,7 @@ pgDescribe('pgData live values', () => {
 
   pgIt('forgets a declared value after its ttl, here and in the table', async () => {
     const sql = await fresh()
-    const mortal = (live as unknown as (initial: number, options: { ttl: string }, id: string, name: string) => { (): number, set: (next: number) => void })(0, { ttl: '100ms' }, 'test:pg-ttl', 'pgTtl')
+    const mortal = (live as unknown as (initial: number, id: string, name: string, options: { ttl: string }) => { (): number, set: (next: number) => void })(0, 'test:pg-ttl', 'pgTtl', { ttl: '100ms' })
 
     setupStore(pgData(sql))
     await liveStoreReady()

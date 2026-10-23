@@ -1063,14 +1063,17 @@ function browserLive(id: string, initial: unknown): Handle {
 // `live(0, { ttl: '7d' })` forgets the value, in every store, that long after its last write.
 export function live<T, const Ttl extends Duration = Duration>(initial: PlainValue<T>, options?: LiveOptions<Ttl>): Live<T>
 export function live<K extends LiveKey, T, const Ttl extends Duration = Duration>(initial: (key: K) => PlainValue<T>, options?: LiveOptions<Ttl>): LiveByKey<K, T>
-// The build adds the id and the name after the declaration's own arguments, so they follow the options when there are some.
-export function live(initial: unknown, first?: unknown, second?: unknown, third?: unknown): unknown {
-  const options = typeof first === 'object' && first !== null ? first as LiveOptions : undefined
-  const id = (options ? second : first) as string | undefined
-  const name = (options ? third : second) as string | undefined
+// The build adds the id and the name after the value, before the options when there are some, so a browser reads the id second without looking for the options it has no use for.
+export function live(initial: unknown, id?: unknown, name?: unknown, options?: unknown): unknown {
+  if (typeof id !== 'string')
+    throw new TypeError('kay: live() is declared as `export const name = live(...)` at the top of a module in the project, where the build names it')
 
-  if (id === undefined)
-    throw new TypeError('kay: live() is declared as `export const name = live(...)` at the top of a module in the project, where the build names it; its options, if any, are an object written in the declaration')
+  return typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined' ? serverLive(id, initial, typeof name === 'string' ? name : undefined, ttlOf(id, name, options)) : browserLive(id, initial)
+}
 
-  return typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined' ? serverLive(id, initial, name, options?.ttl === undefined ? undefined : durationSeconds(options.ttl, `the ttl of live() ${name ?? id}`) * 1000) : browserLive(id, initial)
+// The lifetime in milliseconds a declaration gives its value, from the options that follow the id, or the name when there is one.
+function ttlOf(id: string, name: unknown, options: unknown): number | undefined {
+  const declared = (typeof name === 'object' ? name : options) as LiveOptions | null | undefined
+
+  return declared?.ttl === undefined ? undefined : durationSeconds(declared.ttl, `the ttl of live() ${typeof name === 'string' ? name : id}`) * 1000
 }

@@ -96,3 +96,27 @@ describe('the browser bundle, branches with no string of their own', () => {
     expect((await build(name, true)).length).toBeLessThan((await build(name, false)).length)
   })
 })
+
+// The ids the build gives a declaration come before its options, so a browser reads the id second and carries none of the code that turns a ttl into a lifetime.
+describe('the browser bundle of a live declaration with a ttl', () => {
+  const build = async (browser: boolean): Promise<string> => {
+    const result = await Bun.build({
+      entrypoints: ['entry.ts'],
+      files: { 'entry.ts': `import { live } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/live-value.ts'))}\n\nexport const a = live(0, 'id', { ttl: '7d' })\n` },
+      target: 'browser',
+      minify: true,
+      define: { 'KAY_BROWSER': browser ? 'true' : 'undefined', 'KAY_STATIC_EXPORT': 'undefined', 'KAY_FRENCH': 'undefined', 'process.env.NODE_ENV': '"production"' },
+    })
+
+    return result.outputs[0]!.text()
+  }
+
+  it('leaves the ttl and the server slots out', async () => {
+    const unguarded = await build(false)
+    const browser = await build(true)
+
+    expect(unguarded).toContain('the ttl of live()')
+    expect(browser).not.toContain('the ttl of live()')
+    expect(browser.length).toBeLessThan(unguarded.length / 2)
+  })
+})

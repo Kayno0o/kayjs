@@ -11,7 +11,7 @@ export function liveId(file: string, root: string, name: string): string {
   return new Bun.CryptoHasher('sha256').update(`${relative(root, file).split('\\').join('/')}#${name}`).digest('base64url').slice(0, ID_LENGTH)
 }
 
-// Gives each `const name = live(...)` at the top of a module the id it is known by, after its arguments (the value, and the options when there are some), so the server and the browser, which each load the module, name the same value.
+// Gives each `const name = live(...)` at the top of a module the id it is known by, after its value and before its options when there are some, so the server and the browser, which each load the module, name the same value, and a browser build, which has no use for the options, reads the id second whatever the declaration has.
 // With `names`, the constant's name follows as a third, which the server prints in its errors and a browser has no use for.
 export function liveIds(source: string, file: string, root: string, jsx = false, names = false): string {
   if (!MENTIONS_LIVE.test(source) || !NAMES_KAY.test(source))
@@ -49,8 +49,16 @@ export function liveIds(source: string, file: string, root: string, jsx = false,
       if (id.type !== 'Identifier' || init?.type !== 'CallExpression' || init.callee.type !== 'Identifier' || !locals.has(init.callee.name) || !(init.arguments.length === 1 || (init.arguments.length === 2 && init.arguments[1]!.type === 'ObjectExpression')))
         continue
 
-      const at = argumentsEnd(source, ast, init)
       const text = names ? `${JSON.stringify(liveId(file, root, id.name))}, ${JSON.stringify(id.name)}` : JSON.stringify(liveId(file, root, id.name))
+      const options = init.arguments[1]
+
+      if (options) {
+        inserts.push({ at: options.start!, text: `${text}, ` })
+
+        continue
+      }
+
+      const at = argumentsEnd(source, ast, init)
 
       inserts.push(source[at - 1] === ',' ? { at, text: ` ${text}` } : { at, text: `, ${text}` })
     }
