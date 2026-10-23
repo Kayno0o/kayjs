@@ -195,3 +195,13 @@ test('a type reads as the extension an editor knows, a vendor\'s long ones inclu
   expect(typeName('application/vnd.acme.report')).toBe('ACME.REPORT')
   expect(typeName('application/x-tar')).toBe('TAR')
 })
+
+test('the upload module declares its own body limit, which the app-wide 1 MB cap would otherwise refuse', async () => {
+  configure({ uploads: { maxSize: '20mb' } })
+
+  const { default: filesApi } = await import('../src/api/files')
+  const limit = (filesApi as unknown as Record<symbol, unknown>)[Symbol.for('kay.bodyLimit')]
+
+  expect(limit).toBe(uploadMaxSize)
+  expect(uploadMaxSize()).toBeGreaterThan(1024 * 1024)
+})
