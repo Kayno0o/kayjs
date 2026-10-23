@@ -164,6 +164,14 @@ A page can pass a Dialog or a Popover its content. A layout, or a page with a `-
 
 </Callout>
 
+## Copy a component
+
+A recipe in `src/ui.ts` cannot change a component's markup. For that, `kay ui eject card` copies `card.kay` into `src/components/ui/`, with the files only it uses, and points your imports of `@kaynooo/kayjs-ui/card.kay` at the copy. You then edit it like any of your components. Messages and the theme keep working, as they are not part of the file.
+
+Files other components share, such as `icon.kay`, stay in the library, and the copy imports them from `@kaynooo/kayjs-ui`. Components of the library that use the one you copied, such as `FormDialog` for `Dialog`, keep the library's version; the command lists them. An entry of `src/ui.ts` keyed by the import path is repeated under the copy's path, so both keep your look. One keyed by the name (`Card`) names two components after the copy, so key it by path. `--dry-run` shows what would change without writing.
+
+The command records the version and the library's text of each copy in `src/components/ui/.upstream/`, to commit with it. After a kayjs-ui update, `kay ui diff` prints what the library changed in each copy since then, with the `git merge-file` line that merges it. Once merged, `kay ui diff card --accept` records the installed text, and `--check` makes the command exit 1 when anything changed, for CI.
+
 ## Settings
 
 Icons are slots (`close`, `delete`, `search`, ...) mapped to any icon set. Replace some in your own settings module.

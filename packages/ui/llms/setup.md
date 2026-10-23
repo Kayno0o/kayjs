@@ -131,6 +131,16 @@ A variant or value the component lacks is added: `Button(tone="brand")` types an
 - ZoomPane has `root`, `plate` and `tools`; QrCode, SiteFavicon (`root`, `img`, `icon`), Icon and WhenVisible `root`; IconPicker `root`, `search`, `grid`, `option`, `empty`, `bar`, `selection`, `clear`, `error` and `more`; MarkdownEditor `wrap`, `grid`, `root` (the textarea), `bar` and `barFailed`.
 - Accordion `root`; Skeleton `root`, `block` and `label`; Progress `root` and `fill`; Breadcrumb `root`, `list`, `more`, `item`, `link` and `text`; RadioGroup `root`, `radio`, `choice`, `input`, `label` and `description`; MarkdownEditor's preview `root`, `failed` and `body`, its `previewClass` string landing on `body`.
 
+### Copy a component into the app
+
+When a recipe cannot express the change, `kay ui eject card` copies `card.kay` into `src/components/ui/`, with the files only it uses, and points the app's imports of `@kaynooo/kayjs-ui/card.kay` at the copy. Edit the copy; the theme, the `ui.*` messages and the other components stay the library's.
+
+- Files other components share (`icon.kay`, `defaults.ts`) stay in the library, and the copy imports them as `@kaynooo/kayjs-ui/icon.kay` and `@kaynooo/kayjs-ui/lib/defaults`. Another public component the copy uses stays upstream too: eject it separately.
+- kayjs-ui's own components keep the library's version of what they use (`FormDialog` uses the library's `Dialog`); the command lists them.
+- An entry of `src/ui.ts` keyed by the import path is repeated under the copy's path, so the copy and the library's own users keep the app's look; one keyed by the name (`Card`) names two components after the copy, so key it by path.
+- `src/components/ui/.upstream/` records the version and the library's text each copy came from, to commit with it. `--dry-run` writes nothing, and an ejected or existing file is refused.
+- `kay ui diff [component]` prints what the library changed in each copy since that version, with the `git merge-file` line to merge it; `--check` exits 1 when anything changed, and `--accept` records the installed text once merged.
+
 ### Testing an app's use of it
 
 A page that uses the components renders them in `testSite()` like the app's own. To test what their handlers do, `mountComponent(Component, props)` from `kay/test` renders a component of the app into the DOM `kay/test/dom` registers, listed after `kay/test/preload` under `[test] preload` in bunfig.toml with `@happy-dom/global-registrator` installed; it shims the popover API happy-dom lacks, which Toaster and Popover use.
