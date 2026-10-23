@@ -81,6 +81,29 @@ describe('images', () => {
   })
 })
 
+describe('a script with a computed type', () => {
+  const props = { json: '{"a":"</script><!--"}' }
+
+  it('writes < as \\u003c for a JSON type and breaks it with a backslash for another, whatever its content holds', async () => {
+    const header = '---\nconst { json, type } = props<{ json: string, type: string }>()\n---\n'
+    const json = await renderKay(`${header}script(type={type}) {json}`, { ...props, type: 'application/ld+json' })
+    const module = await renderKay(`${header}script(type={type}) {json}`, { ...props, type: 'module' })
+    const mixed = await renderKay(`${header}script(type={type})\n  | x {json} y`, { ...props, type: 'importmap' })
+
+    expect(json).toBe('<script type="application/ld+json">{"a":"\\u003c/script>\\u003c!--"}</script>')
+    expect(JSON.parse(json.slice(json.indexOf('{'), json.lastIndexOf('}') + 1))).toEqual({ a: '</script><!--' })
+    expect(module).toBe('<script type="module">{"a":"<\\/script><\\!--"}</script>')
+    expect(mixed).toContain('\\u003c!--')
+  })
+
+  it('still decides by the type after a declaration among its children', async () => {
+    const html = await renderKay('---\nconst { json, type } = props<{ json: string, type: string }>()\n---\nscript(type={type})\n  const label = "x"\n  | {json}{label}', { ...props, type: 'application/ld+json' })
+
+    expect(html).toContain('\\u003c!--')
+    expect(html).not.toContain('<\\!--')
+  })
+})
+
 describe('describeField', () => {
   beforeAll(async () => {
     await Bun.write(join(scratch, 'describe-field.ts'), 'import { describeField } from \'kay\'\n\nexport const describe = (ids: string) => describeField(ids)\n')

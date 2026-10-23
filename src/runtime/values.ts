@@ -237,7 +237,7 @@ export function partClass(props: unknown, part: string): unknown {
   return typeof entry === 'object' && entry !== null && !Array.isArray(entry) ? taggedParts(entry as Record<string, unknown>) : entry
 }
 
-// Whether a property and its value make one declaration: what is left of the value once its strings and parentheses are taken out holds no `;`, `{`, `}`, quote, parenthesis, backslash or comment start, which would add declarations or swallow the next.
+// Whether a property and its value make one declaration: the value holds no comment start outside its strings, and what is left once its strings and parentheses are taken out holds no `;`, `{`, `}`, quote, parenthesis or backslash, which would add declarations or swallow the next.
 function declarationOf(name: string, value: unknown): boolean {
   let rest = String(value).replace(CSS_STRING, '')
 

@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
 import { compileKay } from '../src/compiler'
 import { loadConfigWithin } from '../src/config'
-import { dynamic as dynamicHtml, element, leadingNewline, raw, rawData, rawTyped } from '../src/runtime/html'
+import { dynamic as dynamicHtml, element, leadingNewline, rawData } from '../src/runtime/html'
 import { safeUrl } from '../src/runtime/url'
 import { elementName, styleText } from '../src/runtime/values'
 import { scratchDir } from './scratch'
@@ -16,6 +16,7 @@ let dynamicDom: typeof import('../src/runtime/dom-spread').dynamic
 let client: typeof import('../src/runtime/client')
 let swap: typeof import('../src/runtime/page-swap')
 let navigation: typeof import('../src/runtime/navigation')
+let submitForm: typeof import('../src/runtime/forms').submit
 let dir: string
 
 beforeAll(async () => {
@@ -27,6 +28,7 @@ beforeAll(async () => {
   client = await import('../src/runtime/client')
   swap = await import('../src/runtime/page-swap')
   navigation = await import('../src/runtime/navigation')
+  ;({ submit: submitForm } = await import('../src/runtime/forms'))
   dir = await scratchDir('parity-gaps-')
 })
 
@@ -96,6 +98,7 @@ describe('a style value', () => {
     expect(styleText({ width: 'calc(1px /*)', height: '2px' })).toBe('height:2px')
     expect(styleText({ width: 'calc(min(1px, 2px) /* x)', height: '2px', content: '"/*"' })).toBe('height:2px;content:"/*"')
     expect(styleText('top:1px', [['width', 'calc(1px /*)'], ['height', '2px']])).toBe('top:1px;height:2px')
+    expect(styleText({ width: '1px/(2)*3', height: '2px' })).toBe('width:1px/(2)*3;height:2px')
     expect(styleText({ '--2xl-gap': '1px', '-webkit-line-clamp': 2 })).toBe('--2xl-gap:1px;-webkit-line-clamp:2')
   })
 })
@@ -135,24 +138,6 @@ describe('a script holding JSON', () => {
     expect(compiled('script(type="application/ld+json") {json}')).toContain('RawData(')
     expect(compiled('script(type="importmap")\n  | {json}')).toContain('RawData(')
     expect(compiled('script {json}')).not.toContain('RawData(')
-  })
-
-  it('is told apart as it renders when the type is an expression', () => {
-    const render = (type: string) => {
-      const source = `---\nconst json = props<{ json: string }>().json\n---\nscript(type={${JSON.stringify(type)}}) {json}\n`
-      const { tsx } = compileKay(source, 'main.kay', { output: 'html' })
-
-      expect(tsx).toContain('RawTyped(')
-
-      return element('script', [{ type, children: json }]).t
-    }
-
-    expect(render('application/ld+json')).toBe(`<script type="application/ld+json">${rawData(json)}</script>`)
-    expect(render('module')).toBe(`<script type="module">${raw(json)}</script>`)
-
-    expect(JSON.parse(rawTyped('application/ld+json', json))).toEqual({ a: '</script><!--' })
-    expect(rawTyped('module', json)).toBe(raw(json))
-    expect(rawTyped(undefined, json)).toBe(raw(json))
   })
 })
 
@@ -252,6 +237,7 @@ describe('loading the config', () => {
 describe('a page prefetched while a form post was out', () => {
   it('is forgotten once the post finished', async () => {
     const real = globalThis.XMLHttpRequest
+    let sent = false
 
     class Posting {
       responseType = ''
@@ -266,6 +252,7 @@ describe('a page prefetched while a form post was out', () => {
       }
 
       send(): void {
+        sent = true
         swap.prefetch(new URL('http://localhost/next'), document.createElement('a'))
         setTimeout(() => this.onload?.(), 5)
       }
@@ -280,10 +267,11 @@ describe('a page prefetched while a form post was out', () => {
 
     try {
       try {
-        await (await import('../src/runtime/forms')).submit(form, null, new URL('http://localhost/post'))
+        await submitForm(form, null, new URL('http://localhost/post'))
       }
       catch {}
 
+      expect(sent).toBe(true)
       expect([...navigation.prefetched.keys()]).toEqual([])
     }
     finally {

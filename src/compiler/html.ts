@@ -22,7 +22,7 @@ function contentHelper(content: { property: string, raw: boolean } | undefined):
   return content?.property === 'innerHTML' ? 'innerMarkup' : 'child'
 }
 
-// How the expressions inside `script` and `style` text are written: a script holding JSON writes `<` as `\u003c`, where other raw text breaks it with a backslash, and a script whose type an expression gives decides as it renders.
+// How the expressions inside `script` and `style` text are written: a script holding JSON writes `<` as `\u003c`, where other raw text breaks it with a backslash, and a script whose type an expression gives decides as it renders, the expression read again for each.
 type RawText = 'raw' | 'rawData' | { typed: () => void }
 
 const NEWLINE_START = /^[\r\n]/
@@ -138,6 +138,14 @@ export class HtmlTemplate extends TemplateWriter {
         markup.dynamic(() => {
           const rest = new Markup(this.b)
 
+          // A type expression is read before the declaration, whose name may shadow one it holds.
+          const typed = typeof raw === 'object'
+          const inner: RawText | undefined = typed ? { typed: () => void this.b.add('KayRawType') } : raw
+
+          if (typed) {
+            this.b.add('((KayRawType) => ')
+          }
+
           this.b.add('(() => { ')
 
           if (item.kind === 'snippet')
@@ -146,9 +154,15 @@ export class HtmlTemplate extends TemplateWriter {
             this.b.wrap(item.node, () => constDeclaration(this.b, item.node, this.src, this.options.accessorLoops === true ? helperName('memo') : undefined))
 
           this.b.add('return (')
-          this.items(items.slice(index + 1), rest, raw, markers)
+          this.items(items.slice(index + 1), rest, inner, markers)
           rest.end()
           this.b.add(') })()')
+
+          if (typed) {
+            this.b.add(')(')
+            raw.typed()
+            this.b.add(')')
+          }
         })
 
         return
