@@ -94,7 +94,9 @@ cp editors/tree-sitter-kay/queries/*.scm ~/.config/helix/runtime/queries/kay/
 
 ## Zed
 
-Zed runs a language server and highlights a language only through an extension, and kay has one in the `editors/zed` folder of the repository. It adds the `Kay` language with the grammar and its queries, and starts `kay lsp --stdio` from the `kay` on the PATH, or through `bunx` when there is none. In a checkout of the repository, run `zed: install dev extension` from the command palette and pick `editors/zed`. Rust installed through rustup is needed to build the extension, and Zed fetches the target and the wasi-sdk the grammar needs.
+Zed runs a language server and highlights a language only through an extension, and kay has one in the `editors/zed` folder of the repository. It adds the `Kay` language with the grammar and its queries, and starts `kay lsp --stdio` from the `kay` on the PATH, or through `bunx` when there is none.
+
+In a checkout of the repository, run `zed: install dev extension` from the command palette and pick `editors/zed`. Rust installed through rustup is needed to build the extension, and Zed fetches the target and the wasi-sdk the grammar needs.
 
 This setting then formats the language with `kay fmt`:
 
