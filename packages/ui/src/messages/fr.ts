@@ -5,6 +5,12 @@ export default defineMessages({
   ui: {
     barChart: { emptyLabel: 'Aucune donnée pour le moment.', total: 'Total' },
     barList: { emptyLabel: 'Aucune donnée pour le moment.' },
+    bell: {
+      emptyLabel: 'Aucune notification',
+      label: 'Notifications',
+      markAllLabel: 'Tout marquer comme lu',
+      unreadLabel: { one: '{label}, {count} non lue', other: '{label}, {count} non lues' },
+    },
     carousel: {
       dotLabel: 'Aller à la diapositive {n}',
       label: 'Carrousel',

@@ -207,7 +207,7 @@ A server reads the live values when it starts; `kay build --static` and `kay che
 
 `sqliteJobs` is the default store, one file shared by the processes of a machine. For replicas on several machines, `pgJobs(db)` keeps the jobs in Postgres: pass it a Bun `SQL`, a pg-orm `Database` or a connection URL. To keep jobs elsewhere, Redis say, pass `store` an object of `JobStore`, from `kay/server`. Every process of the app opens it, so it must hand each job to one process only.
 
-To put the sessions, the cached and live values, the jobs, the schedule locks, the rate limit counts and the members of presence rooms and the Web Vitals of the whole app in one place, set `store` in `kay.config.ts`: `store: sqliteData('data/app.sqlite')`, or `{ sessions, cache, live, jobs, rates, rooms, vitals }` with stores of your own. A session, a `cached` call, a queue, a schedule or a limit naming its own `store` keeps it.
+To put the sessions, the cached and live values, the jobs, the schedule locks, the rate limit counts and the members of presence rooms and the Web Vitals of the whole app in one place, set `store` in `kay.config.ts`: `store: sqliteData('data/app.sqlite')`, or `{ sessions, cache, live, jobs, rates, rooms, vitals, notifications }` with stores of your own. A session, a `cached` call, a queue, a schedule or a limit naming its own `store` keeps it.
 
 | Method | Does |
 | --- | --- |

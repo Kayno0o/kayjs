@@ -48,6 +48,21 @@ CommandPalette(entries={[{ label: 'Moons', group: 'Pages', href: '/moons' }, { l
 - `siteSearch` searches the text of the pages too, as kay indexes them under `search: true`: a query lists the sections it finds, `{ limit }` of them, after the entries it matches, under `siteSearchLabel` (`In the pages`), each with the lines it was found in, the words found marked in the accent colour there and in its heading, then how many more its text holds (`siteSearchMore(count)`, `2 more matches`), leaving out a section an entry already links to, and listing an entry that matches by its characters in order alone after them; a followed section's page marks the words typed (kay's `?kay_q=`, which the dedupe ignores); a followed section is not kept in `recent`, and an index that fails to load shows `siteSearchError`. It is read once, as the palette is set up.
 - `label` and `placeholder` (`Search`) and `emptyLabel` (`No results`) are its words; screen readers hear how many rows a query lists from a status region, worded by `resultsLabel(count)`. It renders inside an island, since actions are functions.
 
+### Bell
+
+```kay
+---
+import Bell from '@kaynooo/kayjs-ui/bell.kay'
+---
+header
+  Bell
+```
+
+- An icon button with the unread count of the signed-in visitor's in-app notifications and a menu listing the newest 20, stored by `notify(userId, { title, url })` from `kay/server` ([Notifications](../../../llms/notifications.md)). Opening an item marks it read and follows its link; "Mark all as read" marks the rest. It shows nothing to a visitor nobody is signed in as, and updates in every open tab.
+- The visitor is the user the auth library names (kayjs-auth does), read on the server: `Bell` has no `user` prop. A page with a `Bell` is private and rendered per request, and `ui()` serves its `GET /_kay/ui/inbox` and `POST /_kay/ui/inbox/read`.
+- `label` (`Notifications`) names the button and `placement` is the menu's, as `Menu` takes it. The `bell` icon slot maps its icon ([Setup](setup.md)); `ui.bell.*` are its words ([Words](words.md)).
+- A title is text and a link is drawn only for a path of the site or an http(s) URL; an external one opens in a new tab.
+
 ### TreeView
 
 ```kay

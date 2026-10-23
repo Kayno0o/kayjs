@@ -278,6 +278,34 @@ A dropped connection reconnects by itself. It waits while the tab is hidden or o
 
 A socket a guard refuses keeps retrying, shown as `connecting`.
 
+## Notifications
+
+Tell a signed-in user that something happened with `notify`. It keeps the notification in the app's store, so you write no table.
+
+```ts
+import { notify } from 'kay/server'
+
+export async function shipOrder(order: { id: string, userId: string }) {
+  await notify(order.userId, { title: `Order ${order.id} shipped`, url: `/orders/${order.id}` })
+}
+```
+
+The `Bell` of kayjs-ui shows them. Put it in a layout and it draws nothing for a visitor who is not signed in. For a signed-in one it shows how many notifications are unread, and a list that marks each one read when it is opened. Every open tab updates within a second of a new notification, a read or an erase.
+
+```kay
+---
+import Bell from '@kaynooo/kayjs-ui/bell.kay'
+---
+header
+  Bell
+```
+
+Without a `store` in `kay.config.ts` the notifications live in the process's memory. `sqliteData` and `pgData` keep them in a `kay_notifications` table, created on first use.
+
+A notification is deleted after 90 days. `keep: '7d'` in `notify` shortens or lengthens that for one, and a user keeps their newest 200.
+
+The title is text, never HTML. The link is kept only when it is a path of your site or an http or https URL, so a `javascript:` link is dropped. `notifications` from `kay/server` lists, reads and erases a user's inbox from your own code, and `notifications.erase(userId)` belongs in the function that [erases a person](/guides/privacy#erasing-a-person).
+
 ## Rooms
 
 Rooms group a module's connections, such as a game's players or a document's editors. `rooms()` from `kay/server` keeps them.

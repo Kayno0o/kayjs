@@ -6,7 +6,7 @@ import { pgCache } from './pg-cache'
 import { connectionOf, createJobTables, createMissingIndexes, indexStatement, jobTables, pgJobs, relationsMissing, withMissingIndexes } from './pg-jobs'
 import { pgLive } from './pg-live'
 import { pgRooms } from './pg-rooms'
-import { pgRates, pgSessions, pgVitals } from './pg-stores'
+import { pgNotifications, pgRates, pgSessions, pgVitals } from './pg-stores'
 import { onReload } from './reload'
 
 // What replicas starting together take turns on while one creates the tables.
@@ -14,7 +14,7 @@ const MIGRATION_LOCK = 'kay_data'
 const INSUFFICIENT_PRIVILEGE = '42501'
 
 // The tables `pgData` creates besides the jobs' ones.
-const OWN_TABLES = ['kay_sessions', 'kay_cache', 'kay_events', 'kay_rates', 'kay_meta', 'kay_vitals', 'kay_room_members', 'kay_room_processes', 'kay_room_messages', 'kay_room_state', 'kay_live', 'kay_live_events'] as const
+const OWN_TABLES = ['kay_sessions', 'kay_cache', 'kay_events', 'kay_rates', 'kay_meta', 'kay_vitals', 'kay_room_members', 'kay_room_processes', 'kay_room_messages', 'kay_room_state', 'kay_live', 'kay_live_events', 'kay_notifications'] as const
 
 const OWN_INDEXES: readonly PgIndex[] = [
   { name: 'kay_sessions_expires', on: 'kay_sessions (expires)' },
@@ -23,6 +23,8 @@ const OWN_INDEXES: readonly PgIndex[] = [
   { name: 'kay_room_members_process', on: 'kay_room_members (process)' },
   { name: 'kay_room_messages_at', on: 'kay_room_messages (at)' },
   { name: 'kay_live_events_at', on: 'kay_live_events (at)' },
+  { name: 'kay_notifications_user', on: 'kay_notifications (user_id, seq)' },
+  { name: 'kay_notifications_expires', on: 'kay_notifications (expires)' },
 ]
 
 // The names of the tables `pgData` keeps its data in, the jobs' included, for a pg-orm `ignoreTables` of an app that creates them with `createDataTables`.
@@ -62,6 +64,8 @@ export async function createDataTables(source: PgJobsSource): Promise<void> {
       await tx`CREATE TABLE IF NOT EXISTS kay_room_state (room text PRIMARY KEY, state text NOT NULL)`
       await tx`CREATE TABLE IF NOT EXISTS kay_live (id text NOT NULL, key text NOT NULL, value text NOT NULL, PRIMARY KEY (id, key))`
       await tx`CREATE TABLE IF NOT EXISTS kay_live_events (seq bigserial PRIMARY KEY, origin text NOT NULL, id text NOT NULL, key text NOT NULL, at bigint NOT NULL)`
+
+      await tx`CREATE TABLE IF NOT EXISTS kay_notifications (seq bigserial PRIMARY KEY, id text NOT NULL UNIQUE, user_id text NOT NULL, title text NOT NULL, url text, at bigint NOT NULL, expires bigint NOT NULL, read_at bigint)`
 
       for (const index of OWN_INDEXES)
         await tx.unsafe(indexStatement(index, false))
@@ -109,7 +113,7 @@ export function pgHandle(db: SQL): PgHandle {
   } }
 }
 
-// Sessions, cached values, jobs, rate counts, the members of presence rooms, the values of `live()` and the Web Vitals visitors reported in the app's Postgres, shared by every process of every replica opening it: `store: pgData(db)` in kay.config.ts, `db` a Bun `SQL`, a pg-orm `Database` or a connection URL as `pgJobs` takes.
+// Sessions, cached values, jobs, rate counts, the members of presence rooms, the values of `live()` and the Web Vitals visitors reported and the notifications of a person in the app's Postgres, shared by every process of every replica opening it: `store: pgData(db)` in kay.config.ts, `db` a Bun `SQL`, a pg-orm `Database` or a connection URL as `pgJobs` takes.
 // The `kay_*` tables are created when missing, which takes a role that may create tables: with one that may not, `createDataTables` run by the owner makes them. Replicas hear each other's invalidations, live values and room messages by polling, within about half a second, so nothing needs LISTEN and a pooler in front of Postgres is fine.
 // A room's state is kept there too, so `rooms({ state, store: pgData(db).rooms })` answers `state` and `update` with promises.
 export function pgData(source: PgJobsSource) {
@@ -121,5 +125,5 @@ export function pgData(source: PgJobsSource) {
 
   const handle = pgHandle(db)
 
-  return { sessions: pgSessions(handle), cache: pgCache(handle), jobs: pgJobs(db), rates: pgRates(handle), rooms: pgRooms(handle), vitals: pgVitals(handle), live: pgLive(handle), ...typeof source === 'string' && { database: source } } satisfies { [Kind in Exclude<keyof AppStore, 'database'>]-?: NonNullable<AppStore[Kind]> } & { sessions: SessionStore & { deleteWhere: NonNullable<SessionStore['deleteWhere']> } }
+  return { sessions: pgSessions(handle), cache: pgCache(handle), jobs: pgJobs(db), rates: pgRates(handle), rooms: pgRooms(handle), vitals: pgVitals(handle), live: pgLive(handle), ...typeof source === 'string' && { database: source }, notifications: pgNotifications(handle) } satisfies { [Kind in Exclude<keyof AppStore, 'database'>]-?: NonNullable<AppStore[Kind]> } & { sessions: SessionStore & { deleteWhere: NonNullable<SessionStore['deleteWhere']> } }
 }

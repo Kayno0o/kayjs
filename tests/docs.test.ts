@@ -98,9 +98,9 @@ describe('the documentation site', () => {
     expect(libraries.find(library => library.slug === 'kayjs-ai-personal-data')!.body).toContain('](/llms/privacy)')
     expect(libraries.flatMap(library => [...library.body.matchAll(LINK)].filter(([, path]) => path !== undefined))).toEqual([])
     expect(ui.data.version).toBe((await Bun.file(join(root, 'node_modules/@kaynooo/kayjs-ui/package.json')).json() as { version: string }).version)
-    // FormDialog posts to an action, which the static site cannot serve, so its page shows code alone.
+    // FormDialog posts to an action and Bell needs a signed-in visitor, neither of which the static site has, so their pages show code alone.
     expect(components.filter(component => component.data.description === '').map(component => component.slug)).toEqual([])
-    expect(components.filter(component => !component.body.includes('<Demo name=')).map(component => component.slug)).toEqual(['form-dialog'])
+    expect(components.filter(component => !component.body.includes('<Demo name=')).map(component => component.slug)).toEqual(['bell-inbox', 'bell', 'form-dialog'])
     expect(props.get('href')).toMatchObject({ type: 'string', optional: true })
     expect(props.get('variant')).toMatchObject({ type: '"solid" | "ghost" | "inline"', default: '\'solid\'' })
     expect(props.has('disabled')).toBe(false)

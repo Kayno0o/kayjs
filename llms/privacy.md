@@ -11,7 +11,7 @@ kay sets no cookie and stores nothing of a visitor until the app uses a feature 
 Delete the app's own rows first, then the sessions and jobs kay keeps for them and the files they uploaded:
 
 ```ts
-import { files, queue, sqliteStore } from 'kay/server'
+import { files, notifications, queue, sqliteStore } from 'kay/server'
 import { db } from './db'
 import { sendMail } from './mail'
 
@@ -27,6 +27,7 @@ export async function erase(userId: string) {
 
   await sessions.deleteWhere(data => data.userId === userId)
   await mail.remove(job => job.userId === userId)
+  await notifications.erase(userId)
 }
 ```
 
@@ -113,6 +114,7 @@ export async function archive(scan: File) {
 - A queue keeps a waiting job's payload until it runs and a failed one's for `keepFailed`, 30 days by default from when its last attempt was due, or for good with `false`.
 - `queue.remove(id)` removes one job, and `queue.remove(match)` every waiting or failed job whose payload `match` returns true for, resolving with how many went; an app's own `JobStore` takes a function only when it has `jobs(queue)`.
 - kayjs-mail's mailing lists keep each subscriber's address, language and confirmation date in `data/mail-list.sqlite` until they unsubscribe or `mail.erase(address)` (which also removes the mails queued for it); an address nobody confirmed is dropped after 7 days, a broadcast and its deliveries (random ids, no address) 30 days after it finished.
+- Notifications (`notify()`, [Notifications](notifications.md)) live 90 days, or the `keep` given, in `store.notifications` (memory without a store), the newest 200 per user; `notifications.erase(userId)` deletes a person's.
 - The paths a production server counted 404s at (`data/not-found.sqlite`) are forgotten 90 days after the last visit, with their referrers, checked on opening and at most hourly; the redirects stored beside them stay.
 - `sqliteRooms` from `kay/server` keeps a room's messages 30 seconds, for the processes sharing it to read.
 - The SQLite files `sqliteStore`, `sqliteRates`, `sqliteJobs`, `sqliteRooms` and `sqliteCache` create are readable by the server's user alone, and `sqliteStore`, `sqliteRates` and `sqliteRooms` create theirs on first use, so loading a config that names one to build or check makes no file.

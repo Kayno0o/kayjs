@@ -1,6 +1,7 @@
 import type { RateStore } from '../runtime/action'
 import type { CacheStore } from '../runtime/cache'
 import type { LiveStore } from '../runtime/live-value'
+import type { NotificationStore } from './notifications'
 import type { JobStore } from './queue'
 import type { AsyncRoomStore, RoomStore } from './rooms'
 import type { SessionStore } from './session'
@@ -8,7 +9,7 @@ import type { VitalsStore } from './vitals-store'
 import { setAppCache } from '../runtime/cache'
 import { setLiveStore } from '../runtime/live-value'
 
-// What the app keeps beyond one process: the data of each `session()` in `sessions`, the values of each `cached` in `cache`, the values of `live()` in `live`, queued jobs and schedule locks in `jobs`, rate limit counts in `rates`, the tabs a page's `presence()` lists in `rooms`, the Web Vitals visitors reported in `vitals`.
+// What the app keeps beyond one process: the data of each `session()` in `sessions`, the values of each `cached` in `cache`, the values of `live()` in `live`, queued jobs and schedule locks in `jobs`, rate limit counts in `rates`, the tabs a page's `presence()` lists in `rooms`, the Web Vitals visitors reported in `vitals`, the notifications `notify()` stores in `notifications`.
 // Each is used by every session, cached value, queue, locked schedule, rate limit and presence room that names no store of its own.
 export interface AppStore {
   sessions?: SessionStore | undefined
@@ -20,6 +21,7 @@ export interface AppStore {
   vitals?: VitalsStore | undefined
   // The url of the database these stores keep their data in, `sqlite:///abs/path` for `sqliteData` and the url `pgData` was given, for a library keeping tables of its own there: kayjs-auth keeps its users in it. Left out for a store built by hand, and for `pgData` given a connection.
   database?: string | undefined
+  notifications?: NotificationStore | undefined
 }
 
 let current: AppStore | undefined

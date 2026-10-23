@@ -148,8 +148,11 @@ function nameOf(element: Element): string {
 // Controls and images a screen reader announces, which must say what they are.
 const NAMED = 'button, a[href], input:not([type="hidden"]), select, textarea, [role="slider"], [role="switch"], [role="tab"], [role="radiogroup"], [role="group"], [role="meter"], [role="img"], [role="menuitem"], [role="figure"], [role="listbox"], [role="tree"], [role="dialog"], dialog'
 
+// Bell reads the signed-in visitor from the request, which this fixture has none of: the root tests/inbox*.test.ts draw it.
+const NEEDS_A_VISITOR = new Set(['bell', 'bell-inbox'])
+
 test('every component the library exports has fixture props', () => {
-  const exported = readdirSync(join(import.meta.dir, '..', 'src')).filter(file => file.endsWith('.kay')).map(file => file.slice(0, -4)).sort()
+  const exported = readdirSync(join(import.meta.dir, '..', 'src')).filter(file => file.endsWith('.kay')).map(file => file.slice(0, -4)).filter(name => !NEEDS_A_VISITOR.has(name)).sort()
 
   expect(Object.keys(CASES).sort()).toEqual(exported)
 })

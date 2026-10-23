@@ -60,7 +60,7 @@ pgDescribe('pgData', () => {
   pgIt('gives each kind the SQLite one gives', async () => {
     const data = pgData(await fresh())
 
-    expect(Object.keys(data).sort()).toEqual(['cache', 'jobs', 'live', 'rates', 'rooms', 'sessions', 'vitals'])
+    expect(Object.keys(data).sort()).toEqual(['cache', 'jobs', 'live', 'notifications', 'rates', 'rooms', 'sessions', 'vitals'])
   })
 
   pgIt('is the app store: what names no store of its own lands in Postgres', async () => {

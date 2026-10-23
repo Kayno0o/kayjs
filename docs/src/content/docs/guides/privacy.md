@@ -31,6 +31,7 @@ Under a `base`, `kay_flash`, `kay_locale` and `kay_preview` are set for that pat
 - **Jobs**: a waiting job's payload until it runs, a failed one's for 30 days from when its last attempt was due, or what the queue's `keepFailed` says (7 days for kayjs-mail, without the body).
 - **Mailing lists** (kayjs-mail): a subscriber's address, language and the date of their confirmation, in `data/mail-list.sqlite`, until they unsubscribe or you call `mail.erase`; an address nobody confirmed is dropped after 7 days. A broadcast and who it was sent to (by a random id, not the address) are kept 30 days after it finished.
 - **Rooms**: a message 30 seconds in `sqliteRooms`.
+- **Notifications**: the title, link and read state of each, 90 days by default or what `keep` says, the newest 200 per user. See [Notifications](/guides/live-and-realtime#notifications).
 - **Uploads**: until the app deletes them, without the metadata a camera writes in a JPEG, PNG, WebP, AVIF or HEIC.
 - **Missing pages**: the paths visitors found nothing at, in `data/not-found.sqlite`, until 90 days after the last visit.
 
@@ -41,7 +42,7 @@ Every SQLite file kay creates is readable by the server's user alone.
 Delete the app's own rows, then what kay keeps for them.
 
 ```ts
-import { files, queue, sqliteStore } from 'kay/server'
+import { files, notifications, queue, sqliteStore } from 'kay/server'
 import { db } from './db'
 import { sendMail } from './mail'
 
@@ -57,6 +58,7 @@ export async function erase(userId: string) {
 
   await sessions.deleteWhere(data => data.userId === userId)
   await mail.remove(job => job.userId === userId)
+  await notifications.erase(userId)
 }
 ```
 

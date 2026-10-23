@@ -88,11 +88,12 @@ To build a site, read [Build a site](llms/site.md) first. The topic files below 
 - [Language server, screenshot and MCP](llms/editor-and-agent-commands.md): `kay lsp`, `screenshot`, `mcp`
 - [Running in production](llms/production.md): logs, tracing, health checks, shutdown, cron, jobs
 - [Queues](llms/queues.md): jobs that survive a restart
-- [Proxies, security headers and compression](llms/proxy-and-security.md): headers, CSP, compression
+- [Proxies and security headers](llms/proxy-and-security.md): headers, CSP, compression
 - [Upgrading](llms/upgrading.md): what each recent minor breaks, and what an app changes
-- [Upgrading, older releases](llms/upgrading-archive.md): the same for the minors before 1.71
+- [Upgrading, older releases](llms/upgrading-archive.md): the minors before 1.71
 - [What's new](llms/whats-new.md): what each recent release adds
-- [What's new, older releases](llms/whats-new-archive.md): the releases before 1.71 and the end of a cut one
+- [What's new, older releases](llms/whats-new-archive.md): the releases before 1.71
 - [Privacy and personal data](llms/privacy.md): what kay keeps, for how long, erasing a person
-- [Analytics and Web Vitals](llms/analytics.md): visits and load times through your origin, consent
-- [Eco-design](llms/eco-design.md): the RGESN criteria kay meets or leaves to the app
+- [Notifications](llms/notifications.md): `notify()`, the Bell
+- [Analytics and Web Vitals](llms/analytics.md): visits and load times, consent
+- [Eco-design](llms/eco-design.md): the RGESN criteria kay meets

@@ -1,0 +1,13 @@
+---
+import type { PopoverPlacement } from './popover'
+import BellInbox from './bell-inbox.kay'
+
+const { label, placement } = props<{
+  // Names the button and the list it opens; the `ui.bell.label` message by default.
+  label?: string | undefined
+  placement?: PopoverPlacement | undefined
+}>()
+---
+// A signed-in visitor's notifications, with the unread count: nothing at all for anyone else, and no JavaScript for them.
+if ctx.inbox
+  BellInbox(label={label} placement={placement})

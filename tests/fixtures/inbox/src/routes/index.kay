@@ -1,0 +1,5 @@
+---
+import Bell from '@kaynooo/kayjs-ui/bell.kay'
+---
+h1 Inbox
+Bell

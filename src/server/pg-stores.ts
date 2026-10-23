@@ -1,4 +1,5 @@
 import type { RateStore } from '../runtime/action'
+import type { Notification, NotificationStore } from './notifications'
 import type { PgHandle } from './pg-data'
 import type { SessionData, SessionStore } from './session'
 import type { VitalCount, VitalReading, VitalsStore } from './vitals-store'
@@ -163,6 +164,81 @@ export function pgVitals(pg: PgHandle): VitalsStore {
       const rows = await rowsOf<Omit<VitalCount, 'count'> & { count: string }>(db`SELECT route, vital, bucket, SUM(count)::text AS count FROM kay_vitals WHERE day >= ${since}::integer GROUP BY route, vital, bucket`)
 
       return rows.map(row => ({ ...row, count: Number(row.count) }))
+    },
+  }
+}
+
+// Notifications in Postgres, one row each, so replicas share a person's inbox; the clock a notification expires by is the caller's, as the store only compares.
+export function pgNotifications(pg: PgHandle): NotificationStore {
+  let timer: ReturnType<typeof setInterval> | undefined
+
+  const counted = async (text: string, values: (string | number)[]) => {
+    const db = await pg.db()
+    const [row] = await query<{ count: string }>(db, `WITH changed AS (${text} RETURNING 1) SELECT count(*)::text AS count FROM changed`, values)
+
+    return Number(row?.count ?? 0)
+  }
+
+  const sweep = async () => {
+    try {
+      await counted('DELETE FROM kay_notifications WHERE expires <= $1::bigint', [Date.now()])
+    }
+    catch (error) {
+      kayLog('error', 'dropping the expired notifications failed; trying again in an hour', error)
+    }
+  }
+
+  // Started by the first call, so loading a config that names the store connects to nothing.
+  const start = () => {
+    if (timer !== undefined)
+      return
+
+    timer = setInterval(() => void sweep(), SWEEP_SESSIONS_MS)
+    timer.unref()
+    onReload(() => clearInterval(timer))
+  }
+
+  return {
+    async add(user, note, most) {
+      start()
+
+      const db = await pg.db()
+
+      await query(db, 'INSERT INTO kay_notifications (id, user_id, title, url, at, expires) VALUES ($1, $2, $3, $4, $5::bigint, $6::bigint)', [note.id, user, note.title, note.url ?? null, note.at, note.expires])
+      await query(db, 'DELETE FROM kay_notifications WHERE user_id = $1 AND seq <= (SELECT seq FROM kay_notifications WHERE user_id = $1 ORDER BY seq DESC LIMIT 1 OFFSET $2::integer)', [user, most])
+      await query(db, 'DELETE FROM kay_notifications WHERE expires <= $1::bigint', [note.at])
+    },
+    async list(user, limit, now) {
+      start()
+
+      const db = await pg.db()
+      const rows = await query<{ id: string, title: string, url: string | null, at: string, read: boolean }>(db, 'SELECT id, title, url, at::text, (read_at IS NOT NULL) AS read FROM kay_notifications WHERE user_id = $1 AND expires > $2::bigint ORDER BY seq DESC LIMIT $3::integer', [user, now, limit])
+
+      return rows.map((row): Notification => ({ id: row.id, title: row.title, ...row.url === null ? {} : { url: row.url }, at: Number(row.at), read: row.read }))
+    },
+    async unread(user, now) {
+      const db = await pg.db()
+      const [row] = await query<{ count: string }>(db, 'SELECT count(*)::text AS count FROM kay_notifications WHERE user_id = $1 AND expires > $2::bigint AND read_at IS NULL', [user, now])
+
+      return Number(row?.count ?? 0)
+    },
+    async markRead(user, id, now) {
+      const db = await pg.db()
+
+      await query(db, 'UPDATE kay_notifications SET read_at = $3::bigint WHERE user_id = $1 AND id = $2 AND expires > $3::bigint AND read_at IS NULL', [user, id, now])
+
+      const [row] = await query<{ found: number }>(db, 'SELECT 1 AS found FROM kay_notifications WHERE user_id = $1 AND id = $2 AND expires > $3::bigint', [user, id, now])
+
+      return row !== undefined
+    },
+    async markAllRead(user, now) {
+      return counted('UPDATE kay_notifications SET read_at = $2::bigint WHERE user_id = $1 AND expires > $2::bigint AND read_at IS NULL', [user, now])
+    },
+    async erase(user) {
+      return counted('DELETE FROM kay_notifications WHERE user_id = $1', [user])
+    },
+    async prune(now) {
+      return counted('DELETE FROM kay_notifications WHERE expires <= $1::bigint', [now])
     },
   }
 }
