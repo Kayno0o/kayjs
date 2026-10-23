@@ -210,6 +210,22 @@ table
 
 `linked` and `selection` come from `kay`, so import them.
 
+## State mutated in place
+
+`store(obj)` wraps a plain object or array so that every read is tracked per property. Change it in place, `game.coins += 5` or `game.miners.push(miner)`, and only what read that property updates. It suits state a loop changes many times a second, where one signal holding a copy would re-run every reader on every tick.
+
+```kay
+---
+const game = store({ coins: 0, miners: [{ id: 1, ore: 0 }] })
+
+every('50ms', () => game.miners[0].ore += 1)
+---
+button(onClick={() => game.coins += 5}) Earn {game.coins}
+p {game.miners[0].ore}
+```
+
+Writing the value a property already holds does nothing, and `batch` runs the readers once after several writes. Objects and arrays are tracked at any depth. A `Map`, a `Set`, a `Date` or a class instance is not, so keep that state in objects and arrays. `snapshot(game)` gives a plain deep copy to save or send.
+
 ## Generic components
 
 Type parameters on the fence line make a component generic. Each use infers them from its props.

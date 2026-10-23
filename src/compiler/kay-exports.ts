@@ -55,6 +55,8 @@ export const KAY_VALUES: readonly string[] = [
   'shortcut',
   'signal',
   'socket',
+  'snapshot',
+  'store',
   'stream',
   'trustHtml',
   'uid',

@@ -1,0 +1,6 @@
+---
+import type { Game } from './types'
+
+const { game } = props<{ game: Game }>()
+---
+p.ore {game.miners[0].ore}

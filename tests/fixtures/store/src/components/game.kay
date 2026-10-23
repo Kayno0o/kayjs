@@ -1,0 +1,19 @@
+---
+import Readout from './readout.kay'
+
+const game = store({ coins: 0, ticks: 0, miners: [{ id: 1, ore: 0 }] })
+const tick = () => {
+  game.ticks++
+  game.miners[0].ore += 2
+}
+const earn = () => game.coins += 5
+const hire = () => game.miners.push({ id: game.miners.length + 1, ore: 0 })
+---
+section.game
+  button.tick(onClick={tick}) Tick
+  button.earn(onClick={earn}) Earn
+  button.hire(onClick={hire}) Hire
+  p.coins {game.coins}
+  p.ticks {game.ticks}
+  p.miners {game.miners.length}
+  Readout(game={game})

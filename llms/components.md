@@ -229,6 +229,26 @@ ul
 - A write in between, as by a function the expression calls, is not seen by that narrowing.
 - Reads inside a function the template writes, a handler or a `.map` callback, run later and are not narrowed at all: copy the value into a `const` in the script, or assert it, `sent()!`.
 
+### State mutated in place
+
+- `store(obj)` from `kay` returns a proxy over a plain object or array that tracks every read per property and notifies on every write: `game.coins += 1`, `game.miners.push(m)`, `delete game.flags.x`, no setter and no copy. It suits state a loop mutates, such as a simulation at 20 ticks a second.
+- A read subscribes to exactly the property it reads, at any depth, so `{game.miners[0].ore}` re-runs only when that `ore` changes. Reading a key that does not exist yet subscribes to it, and adding it notifies; `in`, `Object.keys`, spread and array iteration subscribe to the key set, an array to its `length` too.
+- Writing the value a property already holds notifies nothing. Writes coalesce into one run per flush like a signal's, and inside `batch(() => ...)` readers run once at its end. `push`, `splice`, `sort` and the other array mutators work as written, and an effect calling one is not subscribed to the array.
+- Only plain objects and arrays are tracked, deeply and lazily. A `Map`, a `Set`, a `Date`, a class instance and a function are kept as written and not tracked: hold that state as objects and arrays, or in a `signal`.
+- A store is not a signal: read and write it as the plain object, with no call and no `.set`. It is a plain value for a prop, so a child island typed with the object reads it tracked; assigned into another store it stores the raw object.
+- `snapshot(store)` from `kay` is a plain deep copy with no proxy in it and nothing tracked, for saving or sending. A `Map` or a `Date` inside is kept by reference.
+- On the server a store reads as the plain values, and one made at module level is shared by every request like any module state.
+
+```kay
+---
+const game = store({ coins: 0, miners: [{ id: 1, ore: 0 }] })
+
+every('50ms', () => game.miners[0].ore += 1)
+---
+button(onClick={() => game.coins += 5}) Earn {game.coins}
+p {game.miners[0].ore}
+```
+
 ### Derived values
 
 - A derived value is a `memo`, or a plain function the template calls: `const shown = () => todos.filter(t => !t.done)`, read as `shown()`.
