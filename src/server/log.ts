@@ -1,8 +1,8 @@
 import type { Elysia } from 'elysia'
 import type { LogLevel } from '../runtime/log'
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { STATUS_CODES } from 'node:http'
 import process from 'node:process'
-import { StatusMap } from 'elysia'
 import { version } from '../../package.json'
 import { ASSET_PREFIX } from '../build/assets'
 import { describeThrown } from '../build/sourcemap'
@@ -51,13 +51,16 @@ const answering = new AsyncLocalStorage<Request>()
 // The requests being answered: a context outliving its answer, a timer it started say, no longer logs under it.
 const inFlight = new WeakSet<Request>()
 
+// Elysia's status names are the standard reason phrases bar three it spells its own way, read here rather than from Elysia's StatusMap so kay check and the editor load no Elysia.
+const STATUS_CODE_OF: Record<string, number | undefined> = { ...Object.fromEntries(Object.entries(STATUS_CODES).map(([code, phrase]) => [phrase, Number(code)])), 'I\'m a teapot': 418, 'Enhance Your Calm': 420, 'Unprocessable Content': 422 }
+
 // The status an Elysia response went out with: the response's own, else the one set on the context, else 200.
 export function statusOf(responseValue: unknown, set: { status?: unknown }): number {
   if (responseValue instanceof Response)
     return responseValue.status
 
   if (typeof set.status === 'string')
-    return StatusMap[set.status as keyof typeof StatusMap] ?? 200
+    return STATUS_CODE_OF[set.status] ?? 200
 
   return typeof set.status === 'number' ? set.status : 200
 }
