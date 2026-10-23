@@ -11,6 +11,7 @@ import { bodylessLayout, layoutProblems, whenProblems } from './layout'
 import { log } from './log'
 import { migrateUploads } from './migrate-uploads'
 import { pageLinkLoader } from './page-link'
+import { startSweeping } from './retention'
 import { configure, settings } from './settings'
 
 // Where the editor and the screens call the API, outside `apiPath` like kay's own files.
@@ -114,6 +115,8 @@ export function cms(options: CmsOptions = {}): KayExtension {
         catch (error) {
           log.warn(UNCHECKED, error)
         }
+
+        startSweeping()
 
         // Uploads an older release kept in a folder per collection move to the shared folder, once and without the app asking.
         try {

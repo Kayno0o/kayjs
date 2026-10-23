@@ -177,6 +177,8 @@ export const AFTER_LOAD: readonly string[] = [
   'cms.slug.suggest',
   'cms.store.exists',
   'cms.table.deleteMessage',
+  'cms.trash.eraseFailure',
+  'cms.trash.erased',
   'cms.upload.empty',
   'cms.upload.theFile',
   'cms.upload.tooLarge',

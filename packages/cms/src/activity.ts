@@ -88,6 +88,23 @@ export async function recordActivity(event: SaveEvent): Promise<void> {
   }
 }
 
+// Drops the events older than `cutoff`. Never throws.
+export async function pruneActivity(collection: string, cutoff: number): Promise<void> {
+  const hidden = hiddenOf(collection, 'activity')
+
+  if (hidden === undefined)
+    return
+
+  try {
+    const old = (await hidden.load({ preview: true })).filter(row => isEvent(row.data) && row.data.at < cutoff)
+
+    await Promise.all(old.map(async row => hidden.remove!({ slug: row.slug })))
+  }
+  catch (error) {
+    log.error(`${collection}'s old activity could not be dropped`, error)
+  }
+}
+
 // A collection's events, newest first; none for a collection that keeps no history. What is past the most kept is dropped as it is read.
 export async function activityOf(collection: string): Promise<Activity[]> {
   const hidden = hiddenOf(collection, 'activity')

@@ -1,4 +1,5 @@
 ---
+import type { Denials } from '../access'
 import type { ScreenCollection } from '../kay/contract'
 import type { TrashScreen } from '../screens'
 import Badge from '@kaynooo/kayjs-ui/badge.kay'
@@ -6,18 +7,25 @@ import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import { refresh } from 'kay'
 import { wording } from 'kay/words'
-import { restoreDeleted } from '../editor/save'
+import { eraseDeleted, restoreDeleted } from '../editor/save'
 import { shipWords } from '../editor/words'
 import EntryEdited from './entry-edited.kay'
+import Refused from './refused.kay'
 
 // The entries deleted from a collection and still kept, newest first, each with a button that writes it back under its slug.
-const { collection, rows } = props<{ collection: ScreenCollection, rows: TrashScreen['rows'] }>()
+// `denied`, from `denials`, disables the erasure when the signed-in person's role may not delete.
+const { collection, rows, denied = {} } = props<{ collection: ScreenCollection, rows: TrashScreen['rows'], denied?: Denials }>()
 
 // Looks up what a restore says once the page has loaded, so the page sends it.
 shipWords()
 
 async function restore(id: string): Promise<void> {
   if (await restoreDeleted(collection.name, id))
+    await refresh()
+}
+
+async function erase(row: TrashScreen['rows'][number]): Promise<void> {
+  if (await eraseDeleted({ collection: collection.name, slug: row.slug, locale: row.locale }))
     await refresh()
 }
 ---
@@ -34,3 +42,7 @@ else
             | {wording('cms.trash.deleted', 'Deleted')} 
             EntryEdited(at={row.at} moment author={row.author})
           ConfirmDelete(tone="neutral" trigger="button" label={wording('cms.history.restoreButton', 'Restore')} message={wording('cms.trash.restoreMessage', 'Restore {title}? It comes back under its slug.', { title: row.title })} failure={wording('cms.history.restoreFailure', 'Could not restore')} onConfirm={async () => { await restore(row.id) }})
+          if denied.delete !== undefined
+            Refused(label={wording('cms.trash.erase', 'Erase for good')} reason={denied.delete})
+          else
+            ConfirmDelete(trigger="button" label={wording('cms.trash.erase', 'Erase for good')} message={wording('cms.trash.eraseMessage', 'Erase {title} for good? It leaves the trash, its revisions and the activity log, and cannot come back.', { title: row.title })} failure={wording('cms.trash.eraseFailure', 'Could not erase')} onConfirm={async () => { await erase(row) }})

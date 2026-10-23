@@ -6,8 +6,9 @@ import { settings } from './settings'
 const kept = new WeakMap<ContentLoader, Map<string, ContentLoader>>()
 
 // The hidden collection of that kind (`history`, `trash`, `activity`) beside a loaded collection's entries, written through its own loader; undefined when `cms({ history })` or the collection's `history` is off, the collection is a folder's or its loader has no `sibling`.
-export function hiddenOf(collection: string, kind: 'history' | 'trash' | 'activity'): ContentLoader | undefined {
-  if (settings().history === undefined || settings().layouts.get(collection)?.history === false || (kind === 'trash' && settings().history?.trash === undefined))
+// `anyway` reaches what a turned-off history left in the store, for an erasure to remove.
+export function hiddenOf(collection: string, kind: 'history' | 'trash' | 'activity', { anyway = false }: { anyway?: boolean } = {}): ContentLoader | undefined {
+  if (!anyway && (settings().history === undefined || settings().layouts.get(collection)?.history === false || (kind === 'trash' && settings().history?.trash === undefined)))
     return undefined
 
   const loader = collectionLoader(collection)

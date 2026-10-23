@@ -14,10 +14,10 @@ cms({ guard, files, collections: { notes: { history: false } } })
 
 ### Keep more revisions or a longer trash
 
-`history.revisions` is the number of saves kept per entry, `history.trash` how long a deleted entry stays, a duration or `false` for none.
+`history.revisions` is the number of saves kept per entry, `history.trash` how long a deleted entry stays, a duration or `false` for none, and `history.maxAge` how old a revision or an activity event may get, `'365d'` by default, `false` for no limit.
 
 ```ts
-cms({ guard, files, history: { revisions: 100, trash: '7d' } })
+cms({ guard, files, history: { revisions: 100, trash: '7d', maxAge: '90d' } })
 ```
 
 ### Give a loader of your own a history
@@ -47,14 +47,21 @@ const loader = {
 
 - Deleting a loaded entry (from its screen, the list or a bulk delete) keeps it first: its data, body, locale, who deleted it and when, in a hidden collection of the loader. The collection's list has a Trash button, opening `<prefix>/trash/<collection>`: the deleted entries newest first, each with a Restore.
 - Restore writes the entry back under its slug and locale as a new entry (`verb: 'restore'` in `onSave`), so the schema applies and a slug made again since refuses it, the entry staying in the trash. It leaves the trash once restored, and its revisions are still there. A role that may not `publish` gets the entry back as a draft (held back by a far publish date in a collection with no draft flag), as it would a new entry.
-- `cms({ history: { trash: '7d' } })` keeps them for another duration, `false` keeps none. What is older is dropped when the trash is read, with no timer, and the revisions of an entry never made again go with it. Turning the trash off leaves the rows already there untouched. A restored entry comes back without its old place in an ordered collection.
+- `cms({ history: { trash: '7d' } })` keeps them for another duration, `false` keeps none. What is older is dropped when the trash is read and by the server itself every hour, whether or not anyone opens the trash, and the revisions of an entry never made again go with it. Turning the trash off leaves the rows already there untouched. A restored entry comes back without its old place in an ordered collection.
 - A trash that cannot be written is logged and the delete goes on, so it cannot be undone. A delete the collection refuses keeps nothing, and the trash holds the entry as the loader gave it, so a restore after the schema changed may be refused for what it now requires.
 
 ### The activity log
 
 - `<prefix>/activity`, an Activity button on the content list, lists what editors did across the collections, newest first and paged by `pageSize`: who, when, and created, saved, published, unpublished, duplicated, deleted, restored or renamed (with the old slug) which entry, linked to its screen only while the entry holds that slug (not after a delete or a rename). It shows once a collection keeps a history, and a folder collection, one with `history: false` or `cms({ history: false })` adds nothing to it.
 - Each event is a small row of a third hidden collection, `activity`, written when the change is, so two saves at once never write over each other and a delete or rename is in it whether or not the trash is on. A reorder is not logged, and a save that changes nothing is, as the editor did save.
-- The last 500 events of each collection are kept: what is past them is dropped when the log is read, and by a process once in 100 events it writes.
+- The last 500 events of each collection are kept: what is past them is dropped when the log is read, and by a process once in 100 events it writes. Events older than `history.maxAge` go with the hourly sweep.
+
+### Personal data
+
+- The trash holds the whole data of a deleted entry, which may be a visitor's (a contact request, a comment); the revisions hold every version of an entry; and the activity log, the revisions and the trash hold the name an `author` gave, which is personal data of an editor (RGPD art. 4). Keeping them has a limit: the trash `'30d'`, the revisions and the activity `maxAge`, `'365d'` by default, each dropped by an hourly sweep of the server, the newest revision of an entry excepted.
+- An erasure request needs more than a delete. `POST /_kay/cms/history/<collection>/<slug>/erase` (`{ locale? }`), behind the `delete` role, removes an entry from the trash, its revisions and the activity log, even from a history turned off since, and the trash screen has an Erase for good button doing the same; `eraseHistory({ collection, slug, locale })` from `@kaynooo/kayjs-cms` is the same in code. Delete the entry itself first, as erasing leaves the entry alone and a later save starts a history again.
+- An editor who asks to be forgotten has their name rewritten to `Former editor` in the trash, the revisions and the activity log of every loaded collection: `POST /_kay/cms/history/forget-editor` (`{ name }`, `delete` role) or `forgetEditor(name)` from `@kaynooo/kayjs-cms`. It does not reach git: with `forgejo()` a commit keeps the `author` it was made under, so give `author` a pseudonym unless editors agreed to stay in it.
+- Upload files an entry named are not removed by an erasure: the unused-uploads screen deletes them once no entry, revision or trashed entry mentions them.
 
 ### Which collections
 

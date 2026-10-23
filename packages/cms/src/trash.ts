@@ -35,8 +35,8 @@ function trashedOf(id: string, row: Row): Trashed {
   return { id, at: row.at, author: row.author, slug: row.slug, locale: row.locale, data: row.data, body: row.body }
 }
 
-// Drops what has been in the trash longer than it is kept, with the history of an entry that was never made again. Never throws.
-async function purge(collection: string): Promise<void> {
+// Drops what has been in the trash longer than it is kept, with the history of an entry that was never made again, which the cms does on its own every hour and when the trash is read. Never throws.
+export async function purge(collection: string): Promise<void> {
   const trash = hiddenOf(collection, 'trash')
   const kept = settings().history?.trash
 

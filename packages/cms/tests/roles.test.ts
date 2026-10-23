@@ -81,6 +81,8 @@ const RESTRICTED = [
   ['POST', '/newsletter/posts/hello/send', 'publish'],
   ['DELETE', '/entries/posts/hello', 'delete'],
   ['POST', '/files/unused/delete', 'delete'],
+  ['POST', '/history/posts/hello/erase', 'delete'],
+  ['POST', '/history/forget-editor', 'delete'],
   ['POST', '/files/posts', 'upload'],
   ['POST', '/files/media/rename', 'upload'],
   ['POST', '/entries/posts/hello/rename', 'redirects'],

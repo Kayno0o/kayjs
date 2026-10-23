@@ -83,13 +83,15 @@ const UPLOAD = /^\/files\/[^/]+$/
 const MEDIA_RENAME = /^\/files\/media\/rename$/
 const RESTORE = /^\/(?:history\/[^/]+\/[^/]+|trash\/[^/]+\/[^/]+)\/restore$/
 const UNUSED_UPLOADS = /^\/files\/unused\/delete$/
+// Erasing an entry's history, or an editor's name from it, removes what a delete kept.
+const ERASE = /^\/history\/(?:[^/]+\/[^/]+\/erase|forget-editor)$/
 
 // Which action of `cms({ roles })` a request needs, from its method and path as the router reads them.
 function actionOf(method: string, path: string): Action | undefined {
   if (REDIRECTS.test(path) || (method === 'POST' && ENTRY_RENAME.test(path)))
     return 'redirects'
 
-  if ((method === 'DELETE' && ENTRY.test(path)) || UNUSED_UPLOADS.test(path))
+  if ((method === 'DELETE' && ENTRY.test(path)) || UNUSED_UPLOADS.test(path) || (method === 'POST' && ERASE.test(path)))
     return 'delete'
 
   if (method === 'POST' && (PUBLISH.test(path) || NEWSLETTER.test(path)))

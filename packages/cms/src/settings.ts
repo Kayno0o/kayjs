@@ -85,8 +85,8 @@ export interface CmsOptions {
   author?: ((ctx: GuardContext) => Identity | undefined | Promise<Identity | undefined>) | undefined
   // Runs after each save, deletion and move an editor made went through, in the process that handled it: to purge a CDN, tell a webhook or rebuild what the app keeps beside its entries. A loaded collection's entries, the pages that read them and the sitemap are refreshed already, a folder entry's file shows with the next build or deploy; a throw is logged and never undoes the save.
   onSave?: ((event: SaveEvent) => void | Promise<void>) | undefined
-  // What a loaded collection keeps beside its entries, on by default for a loader with a `sibling` (SQLite and Postgres): the last `revisions` saves of each entry, 50 by default, which an editor lists, compares and restores, and the entries deleted, kept for `trash`, `'30d'` by default, `false` for none. `false` turns both off, and `collections: { name: { history: false } }` for one collection.
-  history?: false | { revisions?: number | undefined, trash?: Duration | false | undefined } | undefined
+  // What a loaded collection keeps beside its entries, on by default for a loader with a `sibling` (SQLite and Postgres): the last `revisions` saves of each entry, 50 by default, which an editor lists, compares and restores, and the entries deleted, kept for `trash`, `'30d'` by default, `false` for none. `maxAge` is how old a revision or an activity event may get before it is dropped, `'365d'` by default, `false` for no limit. `false` turns it all off, and `collections: { name: { history: false } }` for one collection.
+  history?: false | { revisions?: number | undefined, trash?: Duration | false | undefined, maxAge?: Duration | false | undefined } | undefined
 }
 
 // What `cms({ history })` comes to: undefined when off.
@@ -94,6 +94,8 @@ export interface HistorySettings {
   revisions: number
   // How long a deleted entry is kept, in milliseconds; undefined keeps none.
   trash: number | undefined
+  // How old a revision or an activity event may get, in milliseconds; undefined keeps them without a limit.
+  maxAge: number | undefined
 }
 
 export interface CmsSettings {
@@ -120,6 +122,7 @@ export interface CmsSettings {
 
 const DEFAULT_REVISIONS = 50
 const DEFAULT_TRASH: Duration = '30d'
+const DEFAULT_MAX_AGE: Duration = '365d'
 
 const DEFAULT_UPLOADS = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif', 'application/pdf']
 
@@ -183,12 +186,12 @@ function checkHistory(history: CmsOptions['history']): HistorySettings | undefin
   if (history === false)
     return undefined
 
-  const { revisions = DEFAULT_REVISIONS, trash = DEFAULT_TRASH } = history ?? {}
+  const { revisions = DEFAULT_REVISIONS, trash = DEFAULT_TRASH, maxAge = DEFAULT_MAX_AGE } = history ?? {}
 
   if (!Number.isInteger(revisions) || revisions < 1)
     throw configError('`cms({ history: { revisions } })`', revisions, 'a positive whole number of saves to keep per entry')
 
-  return { revisions, trash: trash === false ? undefined : optionMs(trash, '`cms({ history: { trash } })`') }
+  return { revisions, trash: trash === false ? undefined : optionMs(trash, '`cms({ history: { trash } })`'), maxAge: maxAge === false ? undefined : optionMs(maxAge, '`cms({ history: { maxAge } })`') }
 }
 
 // The bytes `uploads.maxSize` stands for, whole and positive, else the default; a size that is none throws as kay.config.ts loads.

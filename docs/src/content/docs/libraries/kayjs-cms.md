@@ -565,11 +565,13 @@ A collection kept by `sqliteLoader` or `pgLoader` remembers what editors save. E
 
 You declare nothing for this. The versions sit in the same table as the entries, out of sight of your pages, lists and searches. The collection's list has a Trash button too: an entry you delete is kept there for 30 days, and Restore writes it back under its slug (a draft, for a role that may not publish). A restore is refused if someone saved the entry after you opened it, and a role that may not publish restores without publishing or unpublishing the entry.
 
-`cms({ history: { revisions: 100, trash: '7d' } })` keeps more or fewer saves, or the trash for another time (`trash: false` keeps none), and `cms({ history: false })` turns it off.
+`cms({ history: { revisions: 100, trash: '7d' } })` keeps more or fewer saves, or the trash for another time (`trash: false` keeps none), and `cms({ history: false })` turns it off. The server drops the trash and the old versions by itself every hour, and `maxAge` (a year by default, `false` for no limit) says how old a version or an activity event may get.
 
 To leave one collection out, give it `history: false` in `collections`: `cms({ collections: { notes: { history: false } } })` keeps no revisions and no trash for it.
 
 A loader of your own gets the same by giving a `sibling(kind)` function that returns a loader for a hidden collection in its store. Folder collections keep no history of their own: their files are in git.
+
+A deleted entry may hold a visitor's data, and the history holds the names of your editors, which is personal data. When someone asks you to erase theirs, delete the entry, then press Erase for good on its line in the trash: it leaves the trash, its versions and the activity log. For an editor, `forgetEditor(name)` replaces their name with `Former editor` in all three.
 
 ### Seeing what editors did
 

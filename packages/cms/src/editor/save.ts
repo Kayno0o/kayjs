@@ -319,6 +319,22 @@ export async function restoreDeleted(collection: string, id: string): Promise<bo
   return settled(outcome, wording('cms.history.restored', 'Restored'), wording('cms.history.notRestored', 'Not restored'))
 }
 
+// Removes a deleted entry from the trash, its revisions and the activity log for good, and says how it went; true once erased.
+export async function eraseDeleted(ref: EntryRef): Promise<boolean> {
+  const outcome = await attempt(async () => call(historyApi, '/:collection/:slug/erase', {
+    method: 'post',
+    params: { collection: ref.collection, slug: ref.slug },
+    body: { ...localeOf(ref) },
+  }), wording('cms.trash.eraseFailure', 'Could not erase'))
+
+  if (!outcome)
+    return false
+
+  toast.success(wording('cms.trash.erased', 'Erased'))
+
+  return true
+}
+
 // Asks for a link showing the entry's saved draft to whoever it is sent to and copies it, the link toasted when the browser refuses the clipboard; true once made.
 export async function shareDraft(ref: EntryRef): Promise<boolean> {
   const outcome = await attempt(async () => call(entriesApi, '/:collection/:slug/share', { method: 'post', params: { collection: ref.collection, slug: ref.slug }, query: localeOf(ref) }), wording('cms.share.failure', 'Could not make the link'))
