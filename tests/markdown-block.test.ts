@@ -184,7 +184,7 @@ describe('lowering', () => {
   })
 
   it('lowers a task list, a table and an image', () => {
-    expect(lines('- [x] done\n\n![alt](/i.png)').template).toEqual(['ul', '  li(class="task-list-item")', '    | #[input(type="checkbox" class="task-list-item-checkbox" disabled checked)]done', 'p', '  | #[img(src="/i.png" alt="alt")]'])
+    expect(lines('- [x] done\n\n![alt](/i.png)').template).toEqual(['ul', '  li(class="task-list-item")', '    label', '      | #[input(type="checkbox" class="task-list-item-checkbox" disabled checked)]done', 'p', '  | #[img(src="/i.png" alt="alt")]'])
   })
 
   it('reports a Markdown problem on the block and keeps what its holes read read', () => {

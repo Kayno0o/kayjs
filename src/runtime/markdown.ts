@@ -1,5 +1,6 @@
 import type { SafeHtml } from './checks'
 import type { SanitizeOptions } from './sanitize'
+import { labelTasks, unlabelTasks } from './markdown-task'
 import { vouch } from './safe-html'
 import { sanitizeHtml } from './sanitize'
 
@@ -22,9 +23,9 @@ function openLeavingLinks(html: string, leaves: (href: string) => boolean): stri
   return html.replace(LINK, (link, href: string) => leaves(href.replace(AMPERSAND, '&')) ? `<a href="${href}" target="_blank" rel="nofollow ugc noopener">` : link)
 }
 
-// Markdown's HTML through `sanitizeHtml`, a task's checkbox held as a private character the user's own text cannot hold, and the links leaving the site opening in a new tab.
+// Markdown's HTML through `sanitizeHtml`, a task's checkbox held as a private character the user's own text cannot hold, and the links leaving the site opening in a new tab, each checkbox named by its item's text.
 export function sanitizedMarkdown(html: string, leaves: (href: string) => boolean): SafeHtml {
-  const held = html.replace(MARKS, mark => `&#${mark.codePointAt(0)};`).replace(TASK, (_, checked: string | undefined) => checked !== undefined ? '<li>\uE001' : '<li>\uE000')
+  const held = unlabelTasks(html).replace(MARKS, mark => `&#${mark.codePointAt(0)};`).replace(TASK, (_, checked: string | undefined) => checked !== undefined ? '<li>\uE001' : '<li>\uE000')
 
-  return vouch(openLeavingLinks(sanitizeHtml(held, KEPT), leaves).replace(ODD_ALIGN, '').replace(MARKED_TASK, (_, mark: string) => `<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled${mark === '\uE001' ? ' checked' : ''}>`))
+  return vouch(labelTasks(openLeavingLinks(sanitizeHtml(held, KEPT), leaves).replace(ODD_ALIGN, '').replace(MARKED_TASK, (_, mark: string) => `<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled${mark === '\uE001' ? ' checked' : ''}>`)))
 }

@@ -3,6 +3,7 @@ import type { SafeHtml } from '../runtime/checks'
 import { escape, escapeAttribute } from '../runtime/escape'
 import { outsideLinks } from '../runtime/html'
 import { MARKDOWN_OPTIONS } from '../runtime/markdown'
+import { labelTasks } from '../runtime/markdown-task'
 import { vouch } from '../runtime/safe-html'
 
 export interface Heading {
@@ -145,7 +146,7 @@ export async function renderMarkdown(markdown: string, options: { highlight?: Hi
 async function renderedMarkdown(markdown: string, options: { highlight?: Highlighter | undefined, headingLinks?: boolean | undefined } = {}): Promise<RenderedMarkdown> {
   const links = options.headingLinks !== false
   // Always rendered with anchors, which tell Markdown's headings from raw `<h2 id>` tags; they are taken off after when `headingLinks` is false.
-  let html = withImageDefaults(Bun.markdown.html(markdown, { ...MARKDOWN_OPTIONS, headings: { ids: true, autolink: true } }))
+  let html = labelTasks(withImageDefaults(Bun.markdown.html(markdown, { ...MARKDOWN_OPTIONS, headings: { ids: true, autolink: true } })))
   const headings: Heading[] = []
   let plain = ''
   let last = 0

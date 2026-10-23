@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
+import { Window } from 'happy-dom'
 import { clientDir } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
 import { renderMarkdown } from '../src/content'
@@ -138,7 +139,7 @@ describe('markdownHtml', () => {
 
     expect(html).toContain('<th align="center">a</th>')
     expect(html).toContain('<img src="/x.png" alt="x" title="t">')
-    expect(html).toContain('<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled checked>done</li>')
+    expect(html).toContain('<li class="task-list-item"><label><input type="checkbox" class="task-list-item-checkbox" disabled checked>done</label></li>')
     expect(html).not.toContain('<script')
     expect(html).not.toContain('href="javascript')
     expect(html.match(/<input/g)).toHaveLength(1)
@@ -184,5 +185,57 @@ describe('markdownHtml', () => {
     finally {
       await rm(root, { recursive: true, force: true })
     }
+  })
+})
+
+describe('task list checkboxes', () => {
+  const TASKS = '- [x] done **bold**\n- [ ] next [link](/a)\n  - [ ] nested\n- plain\n\n- [ ] loose\n\n  more\n\n1. [ ] ordered `c`\n'
+
+  it('names each box by its item text on the server, in an island and in an entry body', async () => {
+    const entry = (await renderMarkdown(TASKS)).html
+
+    for (const html of [markdownHtml(TASKS), islandMarkdown(TASKS), entry]) {
+      expect(html.match(/<input/g)).toHaveLength(5)
+      expect(html.match(/<label><input/g)).toHaveLength(5)
+      expect(html).toContain('<label><input type="checkbox" class="task-list-item-checkbox" disabled checked>done <strong>bold</strong></label>')
+      expect(html).toContain('<p><label><input type="checkbox" class="task-list-item-checkbox" disabled>loose</label></p>')
+      expect(html).toContain('<li class="task-list-item"><label><input type="checkbox" class="task-list-item-checkbox" disabled>nested</label></li>')
+    }
+
+    expect(islandMarkdown(TASKS)).toBe(markdownHtml(TASKS))
+  })
+
+  it('leaves axe no label violation on a body with a task list', async () => {
+    const window = new Window()
+    const scope = globalThis as unknown as Record<string, unknown>
+
+    Object.assign(scope, { window, document: window.document, Node: window.Node, Element: window.Element })
+
+    const axe = (await import('axe-core')).default
+    const violations = async (html: string) => {
+      window.document.body.innerHTML = `<main>${html}</main>`
+
+      return (await axe.run(window.document.body as unknown as Element, { runOnly: ['label'] })).violations.length
+    }
+
+    try {
+      expect(await violations(markdownHtml(TASKS))).toBe(0)
+      expect(await violations((await renderMarkdown(TASKS)).html)).toBe(0)
+      expect(await violations('<ul><li><input type="checkbox" disabled>unnamed</li></ul>')).toBe(1)
+    }
+    finally {
+      for (const key of ['window', 'document', 'Node', 'Element'])
+        Reflect.deleteProperty(scope, key)
+    }
+  })
+
+  it('leaves a box with no text as it is, and a hostile line quick', () => {
+    expect(markdownHtml('- [ ]\n  - [ ] sub')).not.toContain('<label><input type="checkbox" class="task-list-item-checkbox" disabled></label>')
+
+    const started = performance.now()
+
+    markdownHtml('- [ ] a <b>'.repeat(5000))
+    markdownHtml('- [ ] a\n\n'.repeat(3000))
+    expect(performance.now() - started).toBeLessThan(3000)
   })
 })

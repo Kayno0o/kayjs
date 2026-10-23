@@ -400,7 +400,7 @@ A highlighter whose output changes with no change to its source needs that folde
 
 ## Markdown in an island
 
-`markdownHtml` from `kay/markdown` renders Markdown a user writes as sanitized HTML. Use it for an editor's preview or a chat reply streaming in. Tables, images and task lists are kept, and scripts and handlers are dropped.
+`markdownHtml` from `kay/markdown` renders Markdown a user writes as sanitized HTML. Use it for an editor's preview or a chat reply streaming in. Tables, images and task lists are kept, and scripts and handlers are dropped. Each task list checkbox sits in a `label` with its item's text, in every Markdown body, so a screen reader names it.
 
 ```kay
 ---

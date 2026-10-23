@@ -2,6 +2,7 @@
 import type { Diagnostic, ElementNode, KayFile, Span } from './ast'
 import { extractComponents, MarkdownError } from '../content/markdown'
 import { MARKDOWN_OPTIONS } from '../runtime/markdown'
+import { labelTasks } from '../runtime/markdown-task'
 import { elementsIn } from './ast'
 import { parseKay } from './parser'
 import { Scanner } from './scanner'
@@ -382,7 +383,7 @@ function lowerLines(text: string, holes: Hole[], pad: string): string[] {
   const indent = Math.min(...lines.filter(line => line.trim() !== '').map(line => INDENT.exec(line)![0].length), Infinity)
   const dedented = lines.map(line => line.slice(Number.isFinite(indent) ? Math.min(indent, INDENT.exec(line)![0].length) : 0)).join('\n')
   const { text: marked, components } = extractComponents(dedented, 1)
-  const html = Bun.markdown.html(marked, MARKDOWN_OPTIONS).replace(ENCODED_HOLE, (_, n: string) => `${OPEN}${n}${CLOSE}`)
+  const html = labelTasks(Bun.markdown.html(marked, MARKDOWN_OPTIONS)).replace(ENCODED_HOLE, (_, n: string) => `${OPEN}${n}${CLOSE}`)
   const tree = parseHtml(html)
 
   return blockLines(tree, pad, false, new Context(holes, components))
