@@ -3,7 +3,7 @@ import type { JSX } from 'kay'
 import type { ComboboxOption, ComboboxOptions } from './combobox'
 import { effect, onCleanup, recipe, signal, uid, untrack } from 'kay'
 import { enabledIndex, exactOption, matchingOptions, offersCreate } from './combobox'
-import { onFormReset, startRef } from './form-reset'
+import { defaultKept, onFormReset, startRef } from './form-reset'
 import { wording } from 'kay/words'
 
 // 'kui-field-input' is the field's name for the skins and an app's CSS, which the input takes its look from.
@@ -68,7 +68,6 @@ const failed = signal(false)
 const enhanced = signal(false)
 let input: HTMLInputElement | undefined
 let request = 0
-const initial = untrack(() => ({ text: text(), picked: picked() }))
 
 effect(() => {
   const next = value
@@ -320,9 +319,12 @@ effect(() => {
     document.getElementById(optionId(index))?.scrollIntoView({ block: 'nearest' })
 })
 
+// What a reset goes back to: the pick it started with, or the one last saved by a SaveForm.
+const initial = defaultKept(() => input, () => ({ text: text(), picked: picked() }), untrack(() => ({ text: text(), picked: picked() })))
+
 onFormReset(() => input, () => {
-  text.set(initial.text)
-  picked.set(initial.picked)
+  text.set(initial().text)
+  picked.set(initial().picked)
   open.set(false)
   active.set(-1)
 })
