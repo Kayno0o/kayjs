@@ -509,6 +509,7 @@ describe('a live value with a lifetime', () => {
   it('dates the row without writing its text again, so a value set meanwhile survives', async () => {
     const path = await storePath()
     const first = sqliteLive(path)
+    const other = sqliteLive(path)
 
     await first.set('test:ttl-race', '', '[1]')
     setLiveStore(first)
