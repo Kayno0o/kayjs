@@ -168,7 +168,7 @@ describe('deprecated-ui-token', () => {
 
   it('has a row for every kui name theme.css declares or reads', async () => {
     const theme = await Bun.file(join(import.meta.dir, '../packages/ui/src/theme.css')).text()
-    const dynamic = new Set(['--color-kui-chart-', '--kui-dock-bottom', '--kui-dock-right', '--kui-dock-bottom', '--kui-dock-right', '--kui-hover-card-', '--kui-popover-', '--kui-site-nav-'])
+    const dynamic = new Set(['--color-kui-chart-', '--kui-dock-bottom', '--kui-dock-right', '--kui-hover-card-', '--kui-popover-', '--kui-site-nav-'])
     const missing = [...new Set(theme.match(/--[\w-]*kui-[\w-]+/g))].filter(name => UI_TOKENS[name] === undefined && !dynamic.has(name))
 
     expect(missing).toEqual([])
