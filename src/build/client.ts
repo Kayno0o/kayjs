@@ -328,11 +328,11 @@ export async function clearClientOutput(root: string): Promise<void> {
 }
 
 // The stylesheet build hands these to Tailwind, which cannot read the `.class` shorthand: see styleImports.
-// `.kay` ignores itself, as Tailwind would otherwise scan all of it as soon as an app's `@source` names `.kay/classes.txt` (#2239), and read the classes of its own output back in.
+// `.kay` ignores itself, as Tailwind would otherwise scan all of it as soon as an app's `@source` names `.kay/classes.txt` (#2239), and read the classes of its own output back in; `scratch` stays seen, as the projects `kay/test` makes there are scanned as their own.
 export async function writeClasses(root: string, classes: Set<string>): Promise<void> {
   const file = projectPaths(root).classes
 
-  await writeIfChanged(join(dirname(file), '.gitignore'), '*\n')
+  await writeIfChanged(join(dirname(file), '.gitignore'), '*\n!/scratch/\n!/scratch/**\n')
   await writeIfChanged(file, [...classes].sort().join('\n'))
 }
 
