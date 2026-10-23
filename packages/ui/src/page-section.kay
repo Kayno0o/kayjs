@@ -2,30 +2,57 @@
 import { recipe } from 'kay'
 import type { JSX, Snippet } from 'kay'
 
-const look = recipe({ parts: { root: 'kui-page-section flex flex-col gap-[var(--spacing-kui-section,calc(var(--spacing)*3.5*var(--density)))]', head: 'flex items-center gap-3', title: 'min-w-0 flex-1' } })
+const look = recipe({
+  parts: {
+    root: 'kui-page-section flex flex-col gap-[var(--spacing-kui-section,calc(var(--spacing)*3.5*var(--density)))]',
+    head: 'flex items-center gap-3 data-sticky:sticky data-sticky:top-[var(--kui-sticky-top,0px)] data-sticky:z-[1] data-sticky:flex-nowrap data-sticky:justify-between data-sticky:border-b data-sticky:border-border data-sticky:bg-surface data-sticky:px-4 data-sticky:py-3',
+    title: 'min-w-0 flex-1 data-sticky:truncate',
+    heading: 'min-w-0 flex-1',
+    subtitle: 'm-0 truncate text-sm text-muted',
+  },
+})
 
-const { title, level = 2, actions, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'title'> & {
+const { title, level = 2, subtitle, sticky = false, actions, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'title'> & {
   title: string
   // The title's heading level, `1` for a section holding a whole page.
   level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
+  // A muted line under the title, such as the collection an entry belongs to.
+  subtitle?: string | undefined
+  // Keeps the head at the top of the scrolling area it is in while the section runs under it, on one line: the title gives way before the actions do. A fixed bar above the area is cleared with `--kui-sticky-top`.
+  sticky?: boolean | undefined
   // The end of the head line: a `+` IconButton, a link, a row of controls.
   actions?: Snippet
 }>()
 ---
 // A titled stretch of a page, its title one level under the page's own unless `level` says otherwise.
 section({...rest})
-  div(part="head")
-    if level === 1
-      h1.kui-heading-section(part="title") {title}
+  div(part="head" data-sticky={sticky ? '' : undefined})
+    if subtitle !== undefined
+      hgroup(part="heading")
+        if level === 1
+          h1.kui-heading-section(part="title" data-sticky={sticky ? '' : undefined}) {title}
+        else if level === 2
+          h2.kui-heading-section(part="title" data-sticky={sticky ? '' : undefined}) {title}
+        else if level === 3
+          h3.kui-heading-section(part="title" data-sticky={sticky ? '' : undefined}) {title}
+        else if level === 4
+          h4.kui-heading-section(part="title" data-sticky={sticky ? '' : undefined}) {title}
+        else if level === 5
+          h5.kui-heading-section(part="title" data-sticky={sticky ? '' : undefined}) {title}
+        else
+          h6.kui-heading-section(part="title" data-sticky={sticky ? '' : undefined}) {title}
+        p(part="subtitle") {subtitle}
+    else if level === 1
+      h1.kui-heading-section(part="title" data-sticky={sticky ? '' : undefined}) {title}
     else if level === 2
-      h2.kui-heading-section(part="title") {title}
+      h2.kui-heading-section(part="title" data-sticky={sticky ? '' : undefined}) {title}
     else if level === 3
-      h3.kui-heading-section(part="title") {title}
+      h3.kui-heading-section(part="title" data-sticky={sticky ? '' : undefined}) {title}
     else if level === 4
-      h4.kui-heading-section(part="title") {title}
+      h4.kui-heading-section(part="title" data-sticky={sticky ? '' : undefined}) {title}
     else if level === 5
-      h5.kui-heading-section(part="title") {title}
+      h5.kui-heading-section(part="title" data-sticky={sticky ? '' : undefined}) {title}
     else
-      h6.kui-heading-section(part="title") {title}
+      h6.kui-heading-section(part="title" data-sticky={sticky ? '' : undefined}) {title}
     | {actions}
   slot

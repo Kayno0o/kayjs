@@ -165,6 +165,36 @@ test('an element with several fields asks which one, by click and by key', async
   await page.waitUntil((selector: string) => document.querySelector(selector)!.getAttribute('contenteditable') === 'plaintext-only' && document.querySelector('#kcms-marker-menu') === null, undefined, TITLE)
 }, 60_000)
 
+test('the choice opens at the click, and Escape closes it while the editor stays open', async () => {
+  const page = await open()
+
+  await page.evaluate((selector: string) => document.querySelector(selector)!.setAttribute('data-kay-field-title', 'posts:hello:title'), TITLE)
+  await page.click(TITLE)
+  await page.waitUntil((selector: string) => document.querySelector(selector) !== null, undefined, MENU)
+
+  // The anchor is a zero-size fixed span where the click landed, inside the heading; the menu hangs off its corner, a margin below.
+  const placed = await page.evaluate((selector: string, title: string) => {
+    const menu = document.querySelector(selector)!.getBoundingClientRect()
+    const anchor = document.querySelector('[aria-hidden=true][style*="anchor-name"]')!.getBoundingClientRect()
+    const heading = document.querySelector(title)!.getBoundingClientRect()
+
+    return { inside: anchor.left >= heading.left && anchor.left <= heading.right && anchor.top >= heading.top && anchor.top <= heading.bottom, dx: Math.abs(menu.left - anchor.left), dy: menu.top - anchor.top }
+  }, MENU, TITLE)
+
+  expect(placed.inside).toBe(true)
+  expect(placed.dx).toBeLessThan(2)
+  expect(placed.dy).toBeGreaterThan(0)
+  expect(placed.dy).toBeLessThan(12)
+
+  await page.press('Escape')
+  await page.waitUntil(selector => document.querySelector(selector) === null, undefined, MENU)
+  expect(await page.evaluate(() => document.querySelector('.kcms-editor')!.hasAttribute('open'))).toBe(true)
+
+  // Escape with nothing else open leaves the docked editor open as well: only its close button hides it.
+  await page.press('Escape')
+  expect(await page.evaluate(() => document.querySelector('.kcms-editor')!.hasAttribute('open'))).toBe(true)
+}, 60_000)
+
 test('the choice closes on a click elsewhere, and a field chosen with the second item opens in the form', async () => {
   const page = await open()
 

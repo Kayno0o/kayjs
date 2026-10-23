@@ -1,0 +1,7 @@
+---
+import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+import Toolbar from '@kaynooo/kayjs-ui/toolbar.kay'
+---
+Toolbar(label="Moon" caption="Moons: Io")
+  IconButton(icon="plus" label="Add after Io" variant="ghost" size="sm")
+  IconButton(icon="delete" label="Remove Io" variant="ghost" size="sm")

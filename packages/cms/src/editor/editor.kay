@@ -7,6 +7,7 @@ import type { Marks } from './marks'
 import type { Choice, ListBar, ListTarget, Removed } from './page-lists'
 import type { Direction } from './reorder'
 import Button from '@kaynooo/kayjs-ui/button.kay'
+import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
 import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
 import Menu from '@kaynooo/kayjs-ui/menu.kay'
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
@@ -45,8 +46,6 @@ import './editor.css'
 // Where across the window the top is probed for a header, and the positions that hold one there.
 const PROBES = [0.25, 0.5, 0.75]
 const PINNED = new Set(['fixed', 'sticky'])
-// The collapsed button's distance from the window's right edge, which what keeps off it counts too.
-const COLLAPSED_GAP = 16
 // How long a change of a list waits for the page to show it before the editor takes new ones again.
 const SETTLE_LIMIT = 4000
 
@@ -80,8 +79,6 @@ const choosing = signal<{ label: string, choices: Choice[], x: number, y: number
 const bars = signal<ListBar[]>([])
 const removed = signal<Removed>()
 const settling = signal(false)
-// The button that opens the hidden editor.
-const toggle = signal<HTMLElement>()
 const room = signal({ width: 0, height: 0 })
 // How far down a fixed header holds the top of the window.
 const clear = signal(0)
@@ -100,9 +97,8 @@ let frame = 0
 const layout = (): Layout => ({ open: open(), dock: chosen(), side: side(), bottom: bottom() })
 // None until the window is measured, which the server cannot do.
 const dock = memo(() => room().width === 0 ? undefined : dockOf(layout(), room().width))
-// The editor's own parts, the panel, its collapsed button and the choice of field: a click or a hover on them is no business of the page's fields.
-const OWN_PARTS = `.kcms-editor, .kcms-editor-toggle, #${MARKER_MENU}`
-const isOwn = (node: Node | null | undefined) => (node instanceof Element ? node : node?.parentElement)?.closest(OWN_PARTS) != null
+// A click or a hover on the editor's own parts is no business of the page's fields.
+const isOwn = (node: Node | null | undefined) => (node instanceof Element ? node : node?.parentElement)?.closest(OWN) != null
 const panelBox = () => document.querySelector('.kcms-editor[open]')?.getBoundingClientRect()
 
 // How far down the page's own header, fixed or sticky at the top of the window, reaches, so the side dock sits under it and a reveal keeps clear of it.
@@ -786,22 +782,6 @@ effect(() => {
   onCleanup(() => document.documentElement.classList.remove('kcms-editing', 'kcms-browsing'))
 })
 
-// The collapsed button is a panel too, so the dev tool's bar and a floating drawer at the bottom right keep off it.
-effect(() => {
-  const button = toggle()
-
-  if (!ready() || open() || !button)
-    return
-
-  const root = document.documentElement
-  const width = button.offsetWidth
-
-  if (width > 0)
-    root.style.setProperty('--kay-panel-right', `${width + COLLAPSED_GAP}px`)
-
-  onCleanup(() => root.style.removeProperty('--kay-panel-right'))
-})
-
 // The page's own styles read the dock from its root, where the panel makes the room, and the panel clears a fixed header at the top.
 effect(() => {
   const root = document.documentElement
@@ -819,29 +799,19 @@ effect(() => {
   })
 })
 
-// A question to answer asks Stop editing's two buttons to be seen, wherever the form is scrolled to.
-let confirmBox: HTMLElement | undefined
-
-effect(() => {
-  if (confirming() && confirmBox)
-    confirmBox.scrollIntoView({ block: 'nearest' })
-})
 ---
-if !open()
-  IconButton.kcms-editor-toggle(ref={element => toggle = element} icon="menu" label={wording('cms.editor.open', 'Edit this page')} variant="ghost" onClick={() => open = true})
-SidePanel.kcms-editor(open={open()} modal={false} dock={dock() === 'bottom' ? 'bottom' : 'right'} size={dock() === 'side' ? side() : bottom()} onSizeChange={resized} resizeLabel={wording('cms.editor.resize', 'Resize the editor')} closeLabel={wording('cms.editor.hide', 'Hide the editor')} title={wording('cms.editor.title', 'Edit this page')} style={`z-index: 2147483000${ready() && open() ? '' : '; visibility: hidden'}`} onOpenChange={shown => open = shown})
+SidePanel.kcms-editor(open={open()} modal={false} dock={dock() === undefined ? undefined : dock() === 'bottom' ? 'bottom' : 'right'} size={dock() === 'side' ? side() : bottom()} onSizeChange={resized} resizeLabel={wording('cms.editor.resize', 'Resize the editor')} closeLabel={wording('cms.editor.hide', 'Hide the editor')} title={wording('cms.editor.title', 'Edit this page')} launcher={wording('cms.editor.open', 'Edit this page')} style={`z-index: 2147483000${ready() ? '' : '; visibility: hidden'}`} onOpenChange={shown => open = shown})
   @actions
     Button(label={leaving() ? wording('cms.editor.leaving', 'Leaving…') : wording('cms.editor.stop', 'Stop editing')} busy={leaving()} onClick={askStop})
     if dock() && canSide(room().width)
       IconButton(icon={dock() === 'side' ? layoutBottom : layoutSide} label={dock() === 'side' ? wording('cms.editor.dockBottom', 'Dock the editor to the bottom') : wording('cms.editor.dockSide', 'Dock the editor to the side')} variant="ghost" onClick={() => chosen = dock() === 'side' ? 'bottom' : 'side'})
     IconButton(icon={outline} label={marking() ? wording('cms.editor.markingOff', 'Stop outlining every field') : wording('cms.editor.markingOn', 'Outline every field of the page')} variant={marking() ? 'solid' : 'ghost'} aria-pressed={marking()} onClick={toggleMarking})
     IconButton(icon={browse} label={browsing() ? wording('cms.editor.browseOff', 'Edit the page again') : wording('cms.editor.browseOn', 'Browse the page: links and menus work')} variant={browsing() ? 'solid' : 'ghost'} aria-pressed={browsing()} onClick={() => browsing = !browsing()})
-  if confirming()
-    .kcms-editor-confirm(role="alert" ref={element => confirmBox = element})
-      p {wording('cms.editor.discardAsk', 'You have changes that are not saved. Stopping drops them.')}
-      .kcms-editor-choice
-        Button(label={wording('cms.editor.keepEditing', 'Keep editing')} onClick={() => confirming = false})
-        Button(label={wording('cms.editor.discard', 'Drop them and stop')} tone="danger" onClick={stopEditing})
+  Dialog(open={confirming()} title={wording('cms.editor.stop', 'Stop editing')} size="sm" onOpenChange={shown => confirming = shown})
+    @footer
+      Button(label={wording('cms.editor.keepEditing', 'Keep editing')} onClick={() => confirming = false})
+      Button(label={wording('cms.editor.discard', 'Drop them and stop')} tone="danger" onClick={stopEditing})
+    p {wording('cms.editor.discardAsk', 'You have changes that are not saved. Stopping drops them.')}
   .kcms-editor-status(role="status" aria-live="polite")
     if removed() as gone
       .kcms-editor-undo

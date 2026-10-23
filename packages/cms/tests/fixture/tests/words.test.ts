@@ -47,7 +47,7 @@ test('the editor server-renders its texts in the locale, a value holding HTML st
 
   expect(editor?.attributes['aria-label']).toBe('Modifier cette page')
   expect(page.find('.kcms-editor [data-part=title]')[0]?.text).toBe('Modifier cette page')
-  expect(page.find('.kcms-editor [data-part=head] button').map(button => button.text)).toContain('Arrêter de modifier')
+  expect(page.find('.kcms-editor > [data-part=head] button').map(button => button.text)).toContain('Arrêter de modifier')
   expect(page.find('.kcms-entry-loading')[0]?.text).toBe('Chargement…')
   expect(page.html).toContain('aria-label="&lt;b>Masquer&lt;/b> l\'éditeur"')
   expect(page.html).not.toContain('<b>Masquer</b>')
@@ -123,13 +123,13 @@ test('a swap from a French page to an English one in edit mode shows the editor 
     // Another locale loads the page afresh, which is what keeps the first locale's texts out of the editor.
     expect(await page.evaluate(() => 'sameDocument' in window)).toBe(false)
     expect(await page.evaluate(title)).toBe('Edit this page')
-    expect(await page.evaluate(() => document.querySelector('.kcms-editor [data-part=head] button')?.textContent)).toBe('Stop editing')
+    expect(await page.evaluate(() => document.querySelector('.kcms-editor > [data-part=head] button')?.textContent)).toBe('Stop editing')
 
     await page.evaluate(follow, '/fr/blog/hello')
     await page.click('#swap')
     await page.waitUntil(() => location.pathname === '/fr/blog/hello')
     await page.waitUntil(() => document.querySelector('.kcms-editor [data-part=title]')?.textContent === 'Modifier cette page')
-    expect(await page.evaluate(() => document.querySelector('.kcms-editor [data-part=head] button')?.textContent)).toBe('Arrêter de modifier')
+    expect(await page.evaluate(() => document.querySelector('.kcms-editor > [data-part=head] button')?.textContent)).toBe('Arrêter de modifier')
     expect(page.errors).toEqual([])
   }
   finally {

@@ -118,6 +118,8 @@ describe('SidePanel with modal={false}', () => {
 })
 
 describe('SidePanel with a dock', () => {
+  const launcher = (root: Element) => root.querySelector<HTMLElement>('#docked ~ [data-part=launcher], [data-part=launcher]')
+
   const html = document.documentElement
   const dock = (root: Element) => root.querySelector<HTMLDialogElement>('#docked')!
   const grip = (root: Element) => dock(root).querySelector<HTMLElement>('[role=separator]')!
@@ -250,6 +252,50 @@ describe('SidePanel with a dock', () => {
     finally {
       html.style.removeProperty('--kay-dev-inset-right')
     }
+  })
+
+  test('leaves a launcher in the corner once closed, which opens it again and holds the dev tool\'s bar off it', async () => {
+    const width = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth')
+
+    Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, get: () => 40 })
+
+    try {
+      const root = await panels()
+
+      await settle()
+      expect(launcher(root)).toBeNull()
+
+      click(dock(root).querySelector('.kui-icon-btn[aria-label="Close"]'))
+      await settle()
+
+      expect(launcher(root)?.getAttribute('aria-label')).toBe('Open Jupiter')
+      expect(html.style.getPropertyValue('--kay-panel-right')).toBe('56px')
+
+      click(launcher(root))
+      await settle()
+
+      expect(dock(root).open).toBe(true)
+      expect(launcher(root)).toBeNull()
+      expect(html.style.getPropertyValue('--kay-panel-right')).toBe('384px')
+    }
+    finally {
+      if (width)
+        Object.defineProperty(HTMLElement.prototype, 'offsetWidth', width)
+    }
+  })
+
+  test('a panel whose dock arrives later docks then, and makes no room before', async () => {
+    const root = await panels()
+    const late = root.querySelector<HTMLDialogElement>('#late')!
+
+    expect(late.dataset.dock).toBeUndefined()
+    expect(late.querySelector('[role=separator]')).toBeNull()
+
+    click(root.querySelector('#late-dock'))
+    await settle()
+
+    expect(late.dataset.dock).toBe('bottom')
+    expect(late.querySelector('[role=separator]')).not.toBeNull()
   })
 
   test('publishes nothing once closed', async () => {

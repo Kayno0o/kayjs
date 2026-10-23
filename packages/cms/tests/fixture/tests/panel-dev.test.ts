@@ -40,7 +40,7 @@ async function measureBar(page: Awaited<ReturnType<typeof open>>) {
 
 // Whether the middle of each button of the editor's header is the button itself, not the dev tool's bar above it.
 async function reachable(page: Awaited<ReturnType<typeof open>>): Promise<boolean[]> {
-  return page.evaluate(() => [...document.querySelectorAll('.kcms-editor [data-part=head] button, .kcms-editor-toggle')].map((button) => {
+  return page.evaluate(() => [...document.querySelectorAll('.kcms-editor > [data-part=head] button, [data-part=launcher]')].map((button) => {
     const box = button.getBoundingClientRect()
 
     return button.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2))
@@ -64,8 +64,8 @@ test('the dev tool bar at the top right leaves the header of the editor at the s
 test('the dev tool bar at the bottom right leaves the collapsed editor button reachable', async () => {
   const page = await open(390, 800, 'bottom-right')
 
-  await page.click('.kcms-editor [data-part=head] button[aria-label="Hide the editor"]')
-  await page.waitUntil(() => document.querySelector('.kcms-editor-toggle') !== null)
+  await page.click('.kcms-editor > [data-part=head] button[aria-label="Hide the editor"]')
+  await page.waitUntil(() => document.querySelector('[data-part=launcher]') !== null)
   expect(await reachable(page)).toEqual([true])
 })
 

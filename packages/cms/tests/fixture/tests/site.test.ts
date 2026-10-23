@@ -42,8 +42,8 @@ test('kay renders the editor in edit mode alone, a form per entry the page read,
   const page = await editor.visit('/admin/page?path=/blog/hello')
 
   expect(page.find('dialog.kcms-editor[open]')[0]?.attributes['aria-label']).toBe('Edit this page')
-  expect(page.find('.kcms-entry-title').map(title => title.text)).toEqual(['hello'])
-  expect(page.find('.kcms-entry-collection').map(collection => collection.text)).toEqual(['Posts'])
+  expect(page.find('.kcms-entry > [data-part=head] [data-part=title]').map(title => title.text)).toEqual(['hello'])
+  expect(page.find('.kcms-entry > [data-part=head] [data-part=subtitle]').map(collection => collection.text)).toEqual(['Posts'])
   expect(page.find('.kcms-entry-loading')).toHaveLength(1)
 })
 

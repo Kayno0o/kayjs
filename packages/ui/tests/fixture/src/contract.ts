@@ -73,6 +73,7 @@ import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
 import TimeInput from '@kaynooo/kayjs-ui/time-input.kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+import Toolbar from '@kaynooo/kayjs-ui/toolbar.kay'
 import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
 import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
 import VirtualList from '@kaynooo/kayjs-ui/virtual-list.kay'
@@ -174,6 +175,7 @@ export const COMPONENTS = {
   'time-input': TimeInput,
   'toaster': Toaster,
   'toggle': Toggle,
+  'toolbar': Toolbar,
   'tooltip-host': TooltipHost,
   'tree-view': TreeView,
   'virtual-list': VirtualList,
@@ -258,6 +260,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'time-input': { 'aria-label': 'Start', 'value': '09:30' },
   'toaster': {},
   'toggle': { label: 'Digest' },
+  'toolbar': { label: 'Actions', caption: 'Mars', children: 'Move' },
   'tooltip-host': {},
   'tree-view': { nodes: tree, label: 'Planets', selected: 'phobos' },
   'virtual-list': { items: [1, 2, 3], item: (row: number) => String(row), label: 'Numbers' },

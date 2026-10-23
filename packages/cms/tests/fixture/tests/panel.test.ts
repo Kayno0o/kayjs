@@ -57,7 +57,7 @@ async function open(width: number, height: number) {
 
 async function measure(page: Awaited<ReturnType<typeof open>>): Promise<Sized> {
   return page.evaluate(() => {
-    const panel = (document.querySelector('.kcms-editor[open]') ?? document.querySelector('.kcms-editor-toggle'))!.getBoundingClientRect()
+    const panel = (document.querySelector('.kcms-editor[open]') ?? document.querySelector('[data-part=launcher]'))!.getBoundingClientRect()
     const body = document.body.getBoundingClientRect()
 
     return {
@@ -157,8 +157,8 @@ test('the values of the bottom separator account for a bottom-docked dev tool, w
 test('an editor left collapsed never shows open while the page loads', async () => {
   const page = await open(390, 800)
 
-  await page.click('.kcms-editor [data-part=head] button[aria-label="Hide the editor"]')
-  await page.waitUntil(() => document.querySelector('.kcms-editor-toggle') !== null)
+  await page.click('.kcms-editor > [data-part=head] button[aria-label="Hide the editor"]')
+  await page.waitUntil(() => document.querySelector('[data-part=launcher]') !== null)
   await page.cdp('Page.addScriptToEvaluateOnNewDocument', {
     source: `(function watch() {
       const panel = document.querySelector('.kcms-editor[open]')
@@ -180,13 +180,13 @@ test('the collapsed button is published as a panel at the right, so the dev tool
   const held = () => page.evaluate(() => document.documentElement.style.getPropertyValue('--kay-panel-right'))
 
   expect(Number.parseFloat(await held())).toBeGreaterThan(0)
-  await page.click('.kcms-editor [data-part=head] button[aria-label="Hide the editor"]')
-  await page.waitUntil(() => document.querySelector('.kcms-editor-toggle') !== null && document.documentElement.style.getPropertyValue('--kay-panel-right') !== '')
+  await page.click('.kcms-editor > [data-part=head] button[aria-label="Hide the editor"]')
+  await page.waitUntil(() => document.querySelector('[data-part=launcher]') !== null && document.documentElement.style.getPropertyValue('--kay-panel-right') !== '')
 
-  const button = await page.evaluate(() => document.querySelector('.kcms-editor-toggle')!.getBoundingClientRect().width)
+  const button = await page.evaluate(() => document.querySelector('[data-part=launcher]')!.getBoundingClientRect().width)
 
   expect(Number.parseFloat(await held())).toBe(button + 16)
-  await page.click('.kcms-editor-toggle')
+  await page.click('[data-part=launcher]')
   await page.waitUntil(() => Number.parseFloat(document.documentElement.style.getPropertyValue('--kay-panel-right')) === document.querySelector('.kcms-editor[open]')?.getBoundingClientRect().width)
 })
 
@@ -239,8 +239,8 @@ test('on a phone the sheet can be resized by the keyboard, the size remembered, 
 
   await page.waitUntil(() => document.querySelector('.kcms-editor')!.getBoundingClientRect().height === 160)
 
-  await page.click('.kcms-editor [data-part=head] button[aria-label="Hide the editor"]')
-  await page.waitUntil(() => document.querySelector('.kcms-editor-toggle') !== null)
+  await page.click('.kcms-editor > [data-part=head] button[aria-label="Hide the editor"]')
+  await page.waitUntil(() => document.querySelector('[data-part=launcher]') !== null)
 
   const collapsed = await measure(page)
 
@@ -250,7 +250,7 @@ test('on a phone the sheet can be resized by the keyboard, the size remembered, 
   await page.reload()
   await page.waitUntil(() => document.querySelector('.kcms-editor') !== null && document.documentElement.classList.contains('kcms-dock-bottom'))
   expect(await page.evaluate(() => document.querySelector('.kcms-editor[open]'))).toBeNull()
-  await page.click('.kcms-editor-toggle')
+  await page.click('[data-part=launcher]')
   await page.waitUntil(() => document.querySelector('.kcms-editor[open]') !== null)
   expect(page.errors).toEqual([])
 })
@@ -280,7 +280,7 @@ test('the dock can be switched, below 40rem only the bottom being offered', asyn
 
   const phone = await open(390, 800)
 
-  expect(await phone.count('.kcms-editor [data-part=head] button[aria-label^="Dock the editor"]')).toBe(0)
+  expect(await phone.count('.kcms-editor > [data-part=head] button[aria-label^="Dock the editor"]')).toBe(0)
 })
 
 test('the editor sits beside the dev tool docked at the right or the bottom, and moves back when it goes', async () => {
@@ -359,7 +359,7 @@ test('the entry header stays on one line on a phone, its buttons reachable', asy
   await page.waitUntil(() => document.querySelector('.kcms-entry-actions button') !== null)
 
   const head = await page.evaluate(() => {
-    const element = document.querySelector<HTMLElement>('.kcms-entry-head')!
+    const element = document.querySelector<HTMLElement>('.kcms-entry > [data-part=head]')!
     const style = getComputedStyle(element)
     const buttons = [...element.querySelectorAll('button')].map(button => button.getBoundingClientRect())
 
@@ -540,14 +540,14 @@ test('a single collection\'s entry shows no collection under its title in the ed
 
     w.slugSeen = false
     new MutationObserver(() => {
-      if (document.querySelector('.kcms-entry-collection'))
+      if (document.querySelector('.kcms-entry > [data-part=head] [data-part=subtitle]'))
         w.slugSeen = true
     }).observe(document, { childList: true, subtree: true })
   })
   await page.reload()
-  await page.waitUntil(() => document.querySelector('.kcms-entry-title')?.textContent === 'Welcome page')
+  await page.waitUntil(() => document.querySelector('.kcms-entry > [data-part=head] [data-part=title]')?.textContent === 'Welcome page')
 
   expect(await page.evaluate(() => (window as unknown as { slugSeen: boolean }).slugSeen)).toBe(false)
-  expect(await page.evaluate(() => document.querySelector('.kcms-entry-collection'))).toBeNull()
+  expect(await page.evaluate(() => document.querySelector('.kcms-entry > [data-part=head] [data-part=subtitle]'))).toBeNull()
   expect(page.errors).toEqual([])
 })

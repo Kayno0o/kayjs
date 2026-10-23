@@ -1,0 +1,27 @@
+---
+import type { JSX } from 'kay'
+import { recipe } from 'kay'
+
+const look = recipe({
+  parts: {
+    root: 'flex items-center gap-0.5 data-floating:fixed data-floating:rounded-lg data-floating:border data-floating:border-solid data-floating:border-border-strong data-floating:bg-popover data-floating:p-0.5 data-floating:text-foreground data-floating:shadow-[0_0.25rem_1rem_rgb(0_0_0/0.2)]',
+    caption: 'order-first max-w-32 self-center truncate px-1.5 text-xs text-muted',
+  },
+})
+
+const { label, caption, floating = false, role = 'toolbar', ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'role' | 'aria-label' | 'children'> & {
+  // Names the group of buttons for screen readers.
+  label: string
+  // A line of text before the buttons, for the eyes only since `label` says it to the rest: what the buttons act on.
+  caption?: string | undefined
+  // Frames the buttons in a card that sits at a point of the window: `position: fixed`, which the app places with `style` (`left` and `top`) and layers with `z-index`.
+  floating?: boolean | undefined
+  // `group` for a lone button, which is no toolbar.
+  role?: 'toolbar' | 'group' | undefined
+}>()
+---
+// A row of buttons acting on the same thing, a toolbar for assistive technology.
+div(part="root" {...rest} role={role} aria-label={label} data-floating={floating ? '' : undefined})
+  slot
+  if caption
+    span(part="caption" aria-hidden="true") {caption}

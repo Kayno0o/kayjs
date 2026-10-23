@@ -78,7 +78,7 @@ test('a page that reads several entries shows each as a row and reads none of th
 
   const { root } = await open([NAV, HELLO])
 
-  expect([...root.querySelectorAll('.kcms-entry-idle .kcms-entry-title')].map(title => title.textContent)).toEqual(['menu', 'posts/hello'])
+  expect([...root.querySelectorAll('.kcms-entry-idle > [data-part=head] [data-part=title]')].map(title => title.textContent)).toEqual(['menu', 'posts/hello'])
   expect([...root.querySelectorAll('.kcms-entry-idle button')].map(button => button.textContent?.trim())).toEqual(['Edit menu', 'Edit posts/hello'])
   expect(reads()).toEqual([])
 })
@@ -88,7 +88,7 @@ test('the page\'s only entry loads at once', async () => {
 
   const { root } = await open([HELLO])
 
-  await until(() => root.querySelector('.kcms-entry-title')?.textContent === 'Hello world')
+  await until(() => root.querySelector('.kcms-entry > [data-part=head] [data-part=title]')?.textContent === 'Hello world')
   expect(root.querySelector('.kcms-entry-idle')).toBeNull()
   expect(reads()).toHaveLength(1)
 })
@@ -99,7 +99,7 @@ test('a row\'s button loads that entry alone, which then stays open', async () =
   const { root } = await open([NAV, HELLO])
 
   root.querySelectorAll<HTMLButtonElement>('.kcms-entry-idle button')[1]!.click()
-  await until(() => root.querySelector('.kcms-entry:not(.kcms-entry-idle) .kcms-entry-title')?.textContent === 'Hello world')
+  await until(() => root.querySelector('.kcms-entry:not(.kcms-entry-idle) > [data-part=head] [data-part=title]')?.textContent === 'Hello world')
 
   expect(reads()).toHaveLength(1)
   expect(reads()[0]).toContain('/posts/hello')

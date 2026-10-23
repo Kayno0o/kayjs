@@ -53,6 +53,8 @@ async function typed(): Promise<ParentNode> {
 // How many drafts the browser keeps, apart from the editor's dock.
 const kept = () => Object.keys(localStorage).filter(key => key.startsWith('kcms:draft:')).length
 
+// The question Stop editing asks over unsaved edits, a modal dialog once it is asked.
+const confirmation = (root: ParentNode) => root.querySelector<HTMLDialogElement>('.kui-dialog[open]')
 const stop = (root: ParentNode) => [...root.querySelectorAll('button')].find(button => button.textContent?.trim() === 'Stop editing')!
 const labels = (root: ParentNode) => [...root.querySelectorAll('button')].map(button => button.textContent?.trim())
 
@@ -83,7 +85,7 @@ test('Stop editing with nothing unsaved leaves at once', async () => {
   stop(mounted.root).click()
   await settle()
 
-  expect(mounted.root.querySelector('.kcms-editor-confirm')).toBeNull()
+  expect(confirmation(mounted.root)).toBeNull()
   expect(left(fetched)).toBe(true)
 })
 
@@ -94,7 +96,7 @@ test('Stop editing with unsaved edits asks first, and Keep editing leaves the ed
   stop(root).click()
   await settle()
 
-  const confirm = root.querySelector('.kcms-editor-confirm')
+  const confirm = confirmation(root)
 
   expect(confirm?.textContent).toContain('not saved')
   expect(labels(confirm!)).toEqual(['Keep editing', 'Drop them and stop'])
@@ -103,9 +105,29 @@ test('Stop editing with unsaved edits asks first, and Keep editing leaves the ed
   confirm!.querySelectorAll('button')[0]!.click()
   await settle()
 
-  expect(root.querySelector('.kcms-editor-confirm')).toBeNull()
+  expect(confirmation(root)).toBeNull()
   expect(root.querySelector<HTMLInputElement>('input')!.value).toBe('Mine')
   expect(left(fetched)).toBe(false)
+})
+
+test('the question is a modal dialog, so its two buttons are in view wherever the form is scrolled to, and Escape keeps editing', async () => {
+  const fetched = server()
+  const root = await typed()
+
+  stop(root).click()
+  await settle()
+
+  const asked = confirmation(root)!
+
+  expect(asked.getAttribute('aria-label') ?? asked.querySelector('h2')?.textContent).toContain('Stop editing')
+  expect(asked.parentElement?.closest('.kcms-editor')).not.toBeNull()
+
+  asked.dispatchEvent(new Event('close'))
+  await settle()
+
+  expect(confirmation(root)).toBeNull()
+  expect(left(fetched)).toBe(false)
+  expect(root.querySelector<HTMLInputElement>('input')!.value).toBe('Mine')
 })
 
 test('Drop them and stop leaves the edit mode', async () => {
@@ -114,7 +136,7 @@ test('Drop them and stop leaves the edit mode', async () => {
 
   stop(root).click()
   await settle()
-  root.querySelectorAll<HTMLButtonElement>('.kcms-editor-confirm button')[1]!.click()
+  confirmation(root)!.querySelectorAll<HTMLButtonElement>('button')[1]!.click()
   await settle()
   await Bun.sleep(50)
 
@@ -129,7 +151,7 @@ test('a leave that fails keeps the edits', async () => {
 
   stop(root).click()
   await settle()
-  root.querySelectorAll<HTMLButtonElement>('.kcms-editor-confirm button')[1]!.click()
+  confirmation(root)!.querySelectorAll<HTMLButtonElement>('button')[1]!.click()
   await settle()
   await Bun.sleep(50)
 
@@ -146,7 +168,7 @@ test('Stop editing pressed again while the question shows asks again and leaves 
   stop(root).click()
   await settle()
 
-  expect(root.querySelector('.kcms-editor-confirm')).not.toBeNull()
+  expect(confirmation(root)).not.toBeNull()
   expect(left(fetched)).toBe(false)
   expect(kept()).toBe(1)
 })

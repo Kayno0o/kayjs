@@ -34,4 +34,6 @@ Escape and the close button still close it through `onOpenChange(false)`. It ren
 
 The panel publishes its size on `html` as `--kui-dock-right` or `--kui-dock-bottom`, and as `--kay-panel-right` or `--kay-panel-bottom` for the dev tool's bar to keep out of. A fixed header across the top is cleared by setting `--kui-dock-top` on `html`, and a `style` sets the panel's `z-index`. `resizeLabel` names the grip, `Resize` by default.
 
+`launcher` is the label of a button the closed panel leaves in the window's bottom right corner, off the dev tool's drawer, which opens it through `onOpenChange(true)`; it takes the panel's `style`, so its `z-index` is the panel's, and publishes its room as `--kay-panel-right`.
+
 `closeHref` makes the close button a link to that URL, so such a page closes it with no JavaScript too. With JavaScript the link navigates and `onOpenChange(false)` is called as well, so its handler need not navigate.

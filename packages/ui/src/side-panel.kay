@@ -15,10 +15,12 @@ const look = recipe({
     title: 'min-w-0 flex-1 truncate text-lg [font-weight:var(--font-weight-kui-heading,var(--font-weight-semibold))] tracking-label text-foreground [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)]',
     body: 'min-h-0 flex-1 overflow-y-auto px-5 py-4',
     footer: 'flex shrink-0 flex-wrap justify-end gap-2 border-t border-border px-5 py-4',
+    // The button a closed docked panel leaves in the corner, off the dev tool's docked drawer.
+    launcher: 'fixed z-30 right-[calc(1rem+var(--kay-dev-inset-right,0px))] bottom-[calc(1rem+var(--kay-dev-inset-bottom,0px)+env(safe-area-inset-bottom,0px))] rounded-xl border border-solid border-border bg-popover text-foreground shadow-[0_0.5rem_2rem_rgb(0_0_0/0.25)]',
   },
 })
 
-const { open, title, actions, footer, modal = true, closeHref, onOpenChange, closeLabel = wording('ui.sidePanel.close', 'Close'), dock, size, onSizeChange, resizeLabel = wording('ui.sidePanel.resize', 'Resize'), style, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'closedby' | 'closedBy' | 'style'> & {
+const { open, title, actions, footer, modal = true, closeHref, launcher, onOpenChange, closeLabel = wording('ui.sidePanel.close', 'Close'), dock, size, onSizeChange, resizeLabel = wording('ui.sidePanel.resize', 'Resize'), style, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'closedby' | 'closedBy' | 'style'> & {
   // Shows the panel along the edge, as a modal unless `modal` is false; the parent sets it back to false in `onOpenChange`.
   open: boolean
   title: string
@@ -30,7 +32,9 @@ const { open, title, actions, footer, modal = true, closeHref, onOpenChange, clo
   modal?: boolean | undefined
   // Makes the close control a link to this URL, for a panel open on the server whose close needs no JavaScript; the link navigates and `onOpenChange(false)` is called as well, so its handler need not navigate.
   closeHref?: string | undefined
-  // Written after the component's own declarations, so it wins: a docked panel's `z-index` is set here.
+  // With `dock`, a closed panel leaves a button of this label in the window's bottom right corner that opens it through `onOpenChange(true)`, off the dev tool's drawer, and publishes the room it takes as `--kay-panel-right` for the dev tool's bar. Without it a closed panel leaves nothing.
+  launcher?: string | undefined
+  // Written after the component's own declarations, so it wins, on the launcher too: a docked panel's `z-index` is set here.
   style?: string | undefined
   // With `modal={false}`, docks the panel to this edge as a tool beside the page: fixed along the edge next to the dev tool's docked drawer, padding the page's `body` by its size, publishing it as `--kay-panel-right` or `-bottom` (for the dev tool's bar) and `--kui-dock-right` or `-bottom`, resized by a grip on its inner edge. Only its close control closes it, Escape does not. A fixed header across the top is cleared with `--kui-dock-top` on `html`.
   dock?: 'right' | 'bottom' | undefined
@@ -46,9 +50,13 @@ const { open, title, actions, footer, modal = true, closeHref, onOpenChange, clo
 // A docked panel keeps the page this much of the window beside it, and itself at least its minimum.
 const DOCKS = { right: { min: 280, page: 352, step: 24, fallback: 384 }, bottom: { min: 160, page: 160, step: 24, fallback: 0 } }
 
-const docked = !modal && dock !== undefined
+// The launcher's distance from the window's right edge, which what keeps off it counts too.
+const LAUNCHER_GAP = 16
+
+const docked = () => !modal && dock !== undefined
 const room = signal({ width: 0, height: 0, right: 0, bottom: 0 })
 const reached = signal<number>()
+const launching = signal<HTMLElement>()
 const dragging = signal(false)
 let panel: HTMLDialogElement | undefined
 let frame = 0
@@ -64,7 +72,7 @@ function measure() {
 }
 
 function measureSoon() {
-  if (frame !== 0 || !docked)
+  if (frame !== 0 || !docked())
     return
 
   frame = requestAnimationFrame(() => {
@@ -163,7 +171,7 @@ function resizeByKey(event: KeyboardEvent) {
 
 // A docked panel's geometry first, then the parent's own style.
 function panelStyle() {
-  if (!docked || dock === undefined)
+  if (!docked() || dock === undefined)
     return style
 
   const inset = 'right: var(--kay-dev-inset-right, 0px); bottom: var(--kay-dev-inset-bottom, 0px); max-width: none; max-height: none'
@@ -176,7 +184,7 @@ function panelStyle() {
 
 // A shown docked panel makes room on the page and publishes what it holds, for the dev tool's bar and floating drawer to keep out of.
 effect(() => {
-  if (!docked || dock === undefined || !open)
+  if (!docked() || dock === undefined || !open)
     return
 
   const root = document.documentElement
@@ -198,7 +206,7 @@ effect(() => {
 
 // A docked dev tool pads the page, which the root's content shows at the side and its border box at the bottom.
 effect(() => {
-  if (!docked)
+  if (!docked())
     return
 
   measure()
@@ -214,6 +222,26 @@ effect(() => {
     cancelAnimationFrame(frame)
     frame = 0
   })
+})
+
+// The launcher is a panel too, so the dev tool's bar and a floating drawer at the bottom right keep off it.
+effect(() => {
+  const button = launching()
+
+  if (!button || open)
+    return
+
+  const root = document.documentElement
+  const width = button.offsetWidth
+
+  if (width <= 0)
+    return
+
+  const px = `${width + LAUNCHER_GAP}px`
+
+  root.style.setProperty('--kay-panel-right', px)
+  // The panel shown again has set its own by then.
+  onCleanup(() => root.style.getPropertyValue('--kay-panel-right') === px && root.style.removeProperty('--kay-panel-right'))
 })
 
 listen(() => window, 'resize', measureSoon)
@@ -240,7 +268,7 @@ const renderedOpen = !modal && open
 
 // A browser with `closedby` closes a non-modal panel on Escape, stacked with the layers above it. Without it the panel listens itself, and leaves an Escape that belongs to a modal dialog or an open popover.
 listen(document, 'keydown', event => {
-  if (event.key !== 'Escape' || modal || !open || event.defaultPrevented || event.isComposing || docked || 'closedBy' in HTMLDialogElement.prototype)
+  if (event.key !== 'Escape' || modal || !open || event.defaultPrevented || event.isComposing || docked() || 'closedBy' in HTMLDialogElement.prototype)
     return
 
   if (!document.querySelector(':modal, :popover-open'))
@@ -248,9 +276,9 @@ listen(document, 'keydown', event => {
 })
 ---
 // Named by its title for screen readers. Every way of closing it ends in the dialog's `close` event, the close button included, so `onOpenChange` is the one place the parent learns of it.
-dialog(part="root" aria-label={title} {...rest} open={renderedOpen} data-modal={modal ? undefined : 'false'} data-dock={docked ? dock : undefined} style={panelStyle()} ref={element => panel = element} closedby={modal ? 'any' : docked ? 'none' : 'closerequest'} onClose={() => onOpenChange(false)})
+dialog(part="root" aria-label={title} {...rest} open={renderedOpen} data-modal={modal ? undefined : 'false'} data-dock={docked() ? dock : undefined} style={panelStyle()} ref={element => panel = element} closedby={modal ? 'any' : docked() ? 'none' : 'closerequest'} onClose={() => onOpenChange(false)})
   if open
-    if docked && dock as edge
+    if docked() && dock as edge
       div(part="grip" role="separator" tabindex="0" aria-label={resizeLabel} aria-orientation={edge === 'right' ? 'vertical' : 'horizontal'} aria-valuenow={shownSize()} aria-valuemin={limits(edge).min} aria-valuemax={Number.isFinite(limits(edge).max) ? limits(edge).max : undefined} data-dock={edge} onPointerDown={startResize} onKeyDown={resizeByKey})
         span(part="line" data-dock={edge})
     header(part="head")
@@ -262,3 +290,5 @@ dialog(part="root" aria-label={title} {...rest} open={renderedOpen} data-modal={
     if footer
       div(part="footer")
         | {footer}
+if docked() && !open && launcher
+  IconButton(part="launcher" icon="menu" label={launcher} variant="ghost" style={style} ref={element => launching.set(element)} onClick={() => onOpenChange(true)})

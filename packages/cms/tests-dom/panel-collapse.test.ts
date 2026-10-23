@@ -123,8 +123,8 @@ test('the form is titled by the entry and the collection sits under it', async (
 
   const { root } = await open()
 
-  expect(root.querySelector('.kcms-entry-title')?.textContent).toBe('Hello world')
-  expect(root.querySelector('.kcms-entry-collection')?.textContent).toBe('Posts')
+  expect(root.querySelector('.kcms-entry > [data-part=head] [data-part=title]')?.textContent).toBe('Hello world')
+  expect(root.querySelector('.kcms-entry > [data-part=head] [data-part=subtitle]')?.textContent).toBe('Posts')
 })
 
 test('a single collection\'s form is titled by the collection alone', async () => {
@@ -132,8 +132,8 @@ test('a single collection\'s form is titled by the collection alone', async () =
 
   const { root } = await open([HOME_ENTRY])
 
-  expect(root.querySelector('.kcms-entry-title')?.textContent).toBe('Home page')
-  expect(root.querySelector('.kcms-entry-collection')).toBeNull()
+  expect(root.querySelector('.kcms-entry > [data-part=head] [data-part=title]')?.textContent).toBe('Home page')
+  expect(root.querySelector('.kcms-entry > [data-part=head] [data-part=subtitle]')).toBeNull()
 })
 
 test('the form starts whole, with an anchor per field and none of them pressed', async () => {

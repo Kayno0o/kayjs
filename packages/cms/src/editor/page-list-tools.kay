@@ -1,6 +1,7 @@
 ---
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+import Toolbar from '@kaynooo/kayjs-ui/toolbar.kay'
 import arrowDown from '~icons/tabler/arrow-down'
 import arrowUp from '~icons/tabler/arrow-up'
 import plus from '~icons/tabler/plus'
@@ -10,20 +11,21 @@ import type { ListBar } from './page-lists'
 import type { Direction } from './reorder'
 import './editor.css'
 
+// Above the outlines of the page and below the editor's menus.
+const LAYER = 2147483000
+
 // The buttons beside the item of a list under the pointer or the focus on the page, and the Add of an empty list.
 const { bars, onMove, onAdd, onRemove } = props<{ bars: ListBar[], onMove: (bar: ListBar, direction: Direction) => void, onAdd: (bar: ListBar, event: MouseEvent) => void, onRemove: (bar: ListBar) => void }>()
 ---
 .kcms-page-lists
   for bar of bars key={bar.key}
     if bar.index === undefined
-      .kcms-list-start(style={bar.style})
+      Toolbar.kcms-list-start(floating role="group" label={wording('cms.pageList.add', 'Add to {list}', { list: bar.list })} style={`z-index: ${LAYER}; ${bar.style}`})
         Button(label={wording('cms.pageList.add', 'Add to {list}', { list: bar.list })} icon="plus" size="sm" disabled={!bar.add} onClick={event => onAdd(bar, event)})
     else
-      .kcms-list-bar(role="toolbar" data-key={bar.key} style={bar.style} aria-label={wording('cms.pageList.item', '{item}, of {list}', { item: bar.item, list: bar.list })})
+      Toolbar.kcms-list-bar(floating data-key={bar.key} style={`z-index: ${LAYER}; ${bar.style}`} label={wording('cms.pageList.item', '{item}, of {list}', { item: bar.item, list: bar.list })} caption={wording('cms.pageList.caption', '{list}: {item}', { list: bar.list, item: bar.item })})
         IconButton(icon={arrowUp} label={wording('cms.reorder.up', 'Move {item} up', { item: bar.item })} variant="ghost" size="sm" disabled={!bar.up} onClick={() => onMove(bar, 'up')})
         IconButton(icon={arrowDown} label={wording('cms.reorder.down', 'Move {item} down', { item: bar.item })} variant="ghost" size="sm" disabled={!bar.down} onClick={() => onMove(bar, 'down')})
         IconButton(icon={plus} label={wording('cms.pageList.addAfter', 'Add after {item}', { item: bar.item })} variant="ghost" size="sm" disabled={!bar.add} aria-haspopup={bar.blocks ? 'menu' : undefined} onClick={event => onAdd(bar, event)})
         IconButton(icon={trash} label={wording('cms.field.removeItem', 'Remove {item}', { item: bar.item })} variant="ghost" size="sm" disabled={!bar.remove} onClick={() => onRemove(bar)})
-        // What the bar acts on, for the eyes; the toolbar's label says it to the rest. After the buttons in the markup, before them on screen.
-        span.kcms-list-caption(aria-hidden="true") {wording('cms.pageList.caption', '{list}: {item}', { list: bar.list, item: bar.item })}
         .kcms-list-outline(style={bar.outline})

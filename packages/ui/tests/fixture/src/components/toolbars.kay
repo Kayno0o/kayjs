@@ -1,0 +1,17 @@
+---
+import Toolbar from '@kaynooo/kayjs-ui/toolbar.kay'
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+---
+Toolbar#plain(label="Moons")
+  button Up
+Toolbar#floating(label="Phobos, of Moons" caption="Moons: Phobos" floating style="top: 10px; left: 20px")
+  button Up
+  button Down
+Toolbar#group(label="Add" role="group" floating)
+  button Add
+PageSection#sticky(title="Phobos" level={3} subtitle="Moons" sticky)
+  @actions
+    button Save
+  p Body
+PageSection#plain-section(title="Deimos" level={3})
+  p Body

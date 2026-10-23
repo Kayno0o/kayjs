@@ -10,18 +10,6 @@ html.kcms-editing {
   overscroll-behavior: contain;
 }
 
-/* The button that opens the hidden editor, kept off the dev tool's docked drawer. */
-.kcms-editor-toggle {
-  position: fixed;
-  z-index: 2147483000;
-  right: calc(1rem + var(--kay-dev-inset-right, 0px));
-  bottom: calc(1rem + var(--kay-dev-inset-bottom, 0px) + env(safe-area-inset-bottom, 0px));
-  color: var(--color-foreground);
-  background: var(--color-popover);
-  border: 1px solid var(--color-border);
-  border-radius: 0.75rem;
-  box-shadow: 0 0.5rem 2rem rgb(0 0 0 / 0.25);
-}
 
 .kcms-editor-status p {
   margin: 0.5rem 1rem;
@@ -42,23 +30,6 @@ p.kcms-entry-failure {
   color: var(--color-warning);
 }
 
-.kcms-editor-confirm {
-  display: grid;
-  justify-items: start;
-  gap: 0.5rem;
-  margin: 1rem;
-}
-
-.kcms-editor-confirm p {
-  margin: 0;
-}
-
-.kcms-editor-choice {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
 .kcms-entry-hint {
   margin: 0;
 }
@@ -77,43 +48,9 @@ p.kcms-entry-failure {
   border-bottom: 1px solid var(--color-border);
 }
 
-/* Stays at the top of the form on one line, so its buttons are always in reach and never cover the fields. */
-.kcms-entry-head {
-  position: sticky;
-  z-index: 1;
-  top: 0;
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
+/* The head of an entry bleeds over the form's padding, and stays at the top of the panel's body. */
+.kcms-entry > [data-part='head'] {
   margin: -1rem -1rem 0;
-  padding: 0.75rem 1rem;
-  background: var(--color-popover);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.kcms-entry-head hgroup {
-  min-width: 0;
-  flex: 1;
-}
-
-.kcms-entry-title,
-.kcms-entry-collection {
-  margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.kcms-entry-title {
-  font-size: 0.95rem;
-  font-weight: 600;
-}
-
-.kcms-entry-collection {
-  font-size: 0.8rem;
-  color: var(--color-muted);
 }
 
 html.kcms-editing:not(.kcms-browsing) [data-kay-field]:hover,
@@ -183,36 +120,6 @@ html.kcms-editing [data-kay-field]:focus-visible {
 
 html.kcms-editing [data-kay-field][aria-invalid="true"] {
   outline-color: var(--color-danger);
-}
-
-/* The buttons of the list item under the pointer or the focus, above the outlines and below the editor's menus. */
-.kcms-page-lists .kcms-list-bar,
-.kcms-page-lists .kcms-list-start {
-  position: fixed;
-  z-index: 2147483000;
-}
-
-.kcms-page-lists .kcms-list-bar {
-  display: flex;
-  gap: 0.125rem;
-  padding: 0.125rem;
-  background: var(--color-popover);
-  border: 1px solid var(--color-border);
-  border-radius: 0.5rem;
-  box-shadow: 0 0.25rem 1rem rgb(0 0 0 / 0.2);
-}
-
-.kcms-page-lists .kcms-list-caption {
-  box-sizing: border-box;
-  max-width: 128px;
-  order: -1;
-  align-self: center;
-  padding: 0 0.375rem;
-  overflow: hidden;
-  font-size: 0.75rem;
-  color: var(--color-muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* The item the bar acts on, drawn over the page while the pointer or the focus is on the bar, never moving it. */

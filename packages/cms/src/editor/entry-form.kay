@@ -7,6 +7,7 @@ import { BODY_ID } from '../layout'
 import { fieldsOf } from '../fields'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import { call, flush, navigate, refresh, resource, untrack } from 'kay'
 import { wording } from 'kay/words'
 import editorApi from '../api/editor'
@@ -243,12 +244,8 @@ async function remove(): Promise<void> {
 saveShortcut(save)
 onCleanup(registerSaver(entry, { pending: () => unsaved() && !saving() && !removed(), save }))
 ---
-section.kcms-entry(aria-busy={saving()} ref={element => box = element})
-  header.kcms-entry-head
-    hgroup
-      h3.kcms-entry-title {isSingle() ? collectionName() : title()}
-      if subtitle() !== undefined
-        p.kcms-entry-collection {subtitle()}
+PageSection.kcms-entry(title={isSingle() ? collectionName() : title()} level={3} subtitle={subtitle()} sticky aria-busy={saving()} ref={element => box = element})
+  @actions
     .kcms-entry-actions
       EntrySaveState(changed={drafts.changed(entry)} saving={saving()} saved={lastSave()} url={source.value()?.entry.url})
       ResetButton(disabled={saving() || removed() || !unsaved()} onReset={() => drafts.reset(entry)})

@@ -514,7 +514,7 @@ test('the focus on an item puts its bar outside it as well', async () => {
   expect(overlaps(item, bar)).toBe(false)
 }, 60_000)
 
-const captions = (page: Page) => page.evaluate(() => [...document.querySelectorAll('.kcms-list-bar')].map(bar => bar.querySelector('.kcms-list-caption')?.textContent))
+const captions = (page: Page) => page.evaluate(() => [...document.querySelectorAll('.kcms-list-bar')].map(bar => bar.querySelector('[data-part=caption]')?.textContent))
 
 test('each bar says which list and item it acts on, nested ones apart', async () => {
   const page = await open()
@@ -537,11 +537,11 @@ test('a long caption is cut with an ellipsis and the bar stays in its room', asy
 
   await showBarAt(page, 'ol.steps li:first-child', 120)
   await page.evaluate(() => {
-    document.querySelector('.kcms-list-caption')!.textContent = 'A very long title of a list, with an item title longer still'
+    document.querySelector('[data-part=caption]')!.textContent = 'A very long title of a list, with an item title longer still'
   })
 
   const [style, bar] = await page.evaluate(() => {
-    const caption = getComputedStyle(document.querySelector('.kcms-list-caption')!)
+    const caption = getComputedStyle(document.querySelector('[data-part=caption]')!)
 
     return [[caption.textOverflow, caption.whiteSpace], document.querySelector('.kcms-list-bar')!.getBoundingClientRect().width]
   }) as [string[], number]

@@ -3,6 +3,7 @@ import type { Unclickable } from 'kay/edit'
 import type { EntryRef } from '../kay/contract'
 import type { FieldPath } from '../markers'
 import Button from '@kaynooo/kayjs-ui/button.kay'
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import { untrack } from 'kay'
 import { wording } from 'kay/words'
 import { SINGLE_SLUG } from '../listing'
@@ -26,11 +27,7 @@ const name = entry.slug === SINGLE_SLUG ? entry.collection : `${entry.collection
 if wanted()
   EntryForm(entry={entry} focus={focus} typing={typing} unclickable={unclickable})
 else
-  section.kcms-entry.kcms-entry-idle
-    header.kcms-entry-head
-      hgroup
-        h3.kcms-entry-title {name}
-        if entry.locale !== undefined
-          p.kcms-entry-collection {entry.locale}
+  PageSection.kcms-entry.kcms-entry-idle(title={name} level={3} subtitle={entry.locale} sticky)
+    @actions
       .kcms-entry-actions
         Button(label={wording('cms.entry.open', 'Edit {entry}', { entry: name })} onClick={() => openEntry(entry)})
