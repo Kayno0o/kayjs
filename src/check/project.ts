@@ -63,16 +63,18 @@ export async function contentChecks(root: string, options: CheckOptions, memory?
 
   await writeIfChanged(join(projectPaths(root).types, CONTENT_CHECK), props.code)
 
-  const drafts = lintLevel('draft-entry', options.lints)
-  const folders = lintLevel('trusted-folder', options.lints)
+  // The lints the content check reports as problems, each at the level the app set and with the way out its message lacks.
+  const held = new Map([
+    ['trusted-folder', { level: lintLevel('trusted-folder', options.lints), help: 'remove `trusted`, or give the collection a loader' }],
+    ['draft-entry', { level: lintLevel('draft-entry', options.lints), help: 'read it, then delete its `# draft` line, or save the entry from a CMS' }],
+  ])
   const problems = content.problems.flatMap((problem) => {
-    if (problem.code === 'trusted-folder')
-      return folders === 'allow' ? [] : [{ ...problem, severity: folders === 'warn' ? 'warning' : 'error', help: 'remove `trusted`, or give the collection a loader' } satisfies CheckDiagnostic]
+    const lint = problem.code === undefined ? undefined : held.get(problem.code)
 
-    if (problem.code !== 'draft-entry')
+    if (lint === undefined)
       return [problem]
 
-    return drafts === 'allow' ? [] : [{ ...problem, severity: drafts === 'warn' ? 'warning' : 'error', help: 'read it, then delete its `# draft` line, or save the entry from a CMS' } satisfies CheckDiagnostic]
+    return lint.level === 'allow' ? [] : [{ ...problem, severity: lint.level === 'warn' ? 'warning' : 'error', help: lint.help } satisfies CheckDiagnostic]
   })
 
   return { problems, feeds: content.feeds, routes: content.routes, props: props.lines }

@@ -406,14 +406,6 @@ export const LINTS = {
     wrong: '# src/content/news/fr/launch.yaml\n# draft\ntitle: Lancement',
     right: '# src/content/news/fr/launch.yaml\ntitle: Lancement',
   },
-  'trusted-folder': {
-    level: 'warn',
-    group: 'code',
-    site: true,
-    summary: 'A collection of a folder with the `trusted` option, which only a loader\'s collection reads: a folder\'s files are the site\'s own and always keep their raw HTML, so the option does nothing there.',
-    wrong: 'export const posts = collection(\'src/content/posts\', { schema, trusted: true })',
-    right: 'export const posts = collection(\'src/content/posts\', { schema })',
-  },
   'hidden-tool': {
     level: 'warn',
     group: 'code',
@@ -421,6 +413,14 @@ export const LINTS = {
     summary: 'With `mcp`, an API route with an inline handler whose `detail` sets `tool` and `hide: true`. A hidden route is left out of the OpenAPI document and offered as no tool, so `tool` does nothing there.',
     wrong: 'export default api().get(\'/gate\', () => ok(), { detail: { hide: true, tool: true } })',
     right: 'export default api().get(\'/gate\', () => ok(), { detail: { hide: true } })',
+  },
+  'trusted-folder': {
+    level: 'warn',
+    group: 'code',
+    site: true,
+    summary: 'A collection of a folder with the `trusted` option, which only a loader\'s collection reads: a folder\'s files are the site\'s own and always keep their raw HTML, so the option does nothing there.',
+    wrong: 'export const posts = collection(\'src/content/posts\', { schema, trusted: true })',
+    right: 'export const posts = collection(\'src/content/posts\', { schema })',
   },
   'untyped-socket': {
     level: 'warn',
