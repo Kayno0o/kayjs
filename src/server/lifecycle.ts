@@ -3,8 +3,10 @@ import type { HealthConfig } from '../config'
 import type { Duration } from '../runtime/duration'
 import process from 'node:process'
 import { kayLog } from '../runtime/log'
+import { appStore } from './app-store'
 import { wholeResponse } from './compress'
 import { healthTimeoutMs, shutdownSeconds } from './config-limits'
+import { endEventStreams } from './event-stream'
 import { logMessage } from './log'
 import { START_COMMAND, START_PARENT } from './parent'
 import { reportBackgroundError } from './report'
@@ -114,6 +116,7 @@ export function stopOnSignal(app: Elysia, lifecycle: Lifecycle, wait: Duration =
       }, timeout * 1000)
 
       await shutdown(root)
+      await closeRooms()
       clearTimeout(forced)
       process.exit()
     }
@@ -180,13 +183,28 @@ async function withTimeout(check: unknown, ms: number): Promise<unknown> {
   }
 }
 
-// Stops the server once its open requests finished, or at once when `force` is set, then runs each `onStop` hook in turn, awaiting it, which Elysia's own `stop()` does not.
+// Lets go of the rooms store of `store.rooms`, so a replica that stops leaves no member behind for the others to list until it is dropped as quiet.
+async function closeRooms(): Promise<void> {
+  try {
+    const closing: unknown = appStore()?.rooms?.close()
+
+    if (closing instanceof Promise)
+      await closing
+  }
+  catch (error) {
+    await reportBackgroundError('closing the rooms store failed', error)
+    process.exitCode = 1
+  }
+}
+
+// Ends the open event streams, which never finish by themselves, stops the server once its other open requests finished, or at once when `force` is set, then runs each `onStop` hook in turn, awaiting it, which Elysia's own `stop()` does not.
 export async function shutdown(app: AnyElysia, force = false): Promise<void> {
   const server = app.server
 
   if (!server)
     return
 
+  endEventStreams()
   await server.stop(force)
   app.server = null
 

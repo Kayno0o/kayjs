@@ -168,6 +168,9 @@ const DEFAULT_PATH = 'data/jobs.sqlite'
 // Why a run's signal aborted when the server stopped, as against lostAfter running out.
 const STOPPED = new Error('the server is stopping')
 
+// How long a stop waits for a run that ignores its signal before giving its job back, short of the 10 s a shutdown waits by default.
+const STOP_GRACE_MS = 3000
+
 class RetryLater extends Error {
   readonly waitMs: number
 
@@ -688,11 +691,23 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
 
   // A run that outlasts `lostAfter` fails and its signal aborts, so its worker takes the next job and a handler listening to the signal stops rather than run beside the retry.
   // It ends a moment before the hold does, so no other process takes the job while this one still marks how it went: counted from before the claim on this process's monotonic clock, as a store holding by its own clock stores a hold this one's cannot be compared to.
+  // A stop waits for the run to wind down, but not past the grace, so a handler ignoring its signal never holds a shutdown or keeps its job held until `lostAfter`: the job is given back as for a run that gave up.
   const withinLostAfter = async (run: unknown, claimedAt: number, ended: AbortController): Promise<void> => {
     let timer: ReturnType<typeof setTimeout> | undefined
+    let grace: ReturnType<typeof setTimeout> | undefined
 
     try {
       await Promise.race([run, new Promise((_, reject) => {
+        const arm = () => {
+          if (ended.signal.reason === STOPPED)
+            grace = setTimeout(reject, STOP_GRACE_MS, STOPPED)
+        }
+
+        ended.signal.addEventListener('abort', arm)
+
+        if (ended.signal.aborted)
+          arm()
+
         timer = setTimeout(() => {
           const error = new Error(`it ran past lostAfter, ${Math.round(lostAfter / 1000)} s`)
 
@@ -703,6 +718,7 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
     }
     finally {
       clearTimeout(timer)
+      clearTimeout(grace)
     }
   }
 

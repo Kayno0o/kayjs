@@ -405,6 +405,36 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
   })
 })
 
+describe.each(kinds)('a stopping queue on a $name store', ({ open }) => {
+  it('gives the job of a handler ignoring its signal back after a short grace, not held until lostAfter, its attempt not counted', async () => {
+    const logs = spyOn(console, 'log').mockImplementation(noop)
+    const started = { value: false }
+    const jobs = queue<number>(named(), async () => {
+      started.value = true
+      await new Promise(noop)
+    }, { store: await open(), lostAfter: '10m', idlePoll: '30s' })
+    const app = new Elysia().use(jobs).listen(0)
+
+    try {
+      await jobs.enqueue(1, { key: 'k' })
+
+      for (const start = Date.now(); !started.value && Date.now() - start < 5000;)
+        await Bun.sleep(10)
+
+      expect(await jobs.job('k')).toMatchObject({ status: 'running', attempts: 1 })
+
+      const stopping = Date.now()
+
+      await shutdown(app)
+      expect(Date.now() - stopping).toBeLessThan(6000)
+      expect(await jobs.job('k')).toMatchObject({ status: 'waiting', attempts: 0 })
+    }
+    finally {
+      logs.mockRestore()
+    }
+  }, 15_000)
+})
+
 describe('a queue on a store without keys', () => {
   it('throws from enqueue with a key and from state, rather than leave a key unkept', async () => {
     const store: JobStore = { ...memoryJobs(), state: undefined }

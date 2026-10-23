@@ -561,8 +561,9 @@ pgDescribe('pgRooms', () => {
 
     first.add('lobby', 'c1', '"ada"')
     await waitFor(async () => (await rows(sql, 'SELECT 1 FROM kay_room_members')).length === 1, 'the row')
-    first.close()
-    await waitFor(async () => (await rows(sql, 'SELECT 1 FROM kay_room_members')).length === 0, 'the row to go')
+    // A stop waits for the promise, so the members are gone when it settles.
+    await first.close()
+    expect(await rows(sql, 'SELECT 1 FROM kay_room_members')).toEqual([])
   })
 
   pgIt('delivers a message to the listeners of the other replicas and of its own, honouring except and to', async () => {

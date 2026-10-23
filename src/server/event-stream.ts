@@ -8,6 +8,15 @@ import { encodeValue, unsendable } from '../runtime/wire'
 const HEARTBEAT_MS = 5000
 const HEARTBEAT = new TextEncoder().encode(':\n\n')
 
+// The streams being read, each with what ends it cleanly: a stop ends them all first, as one that never ends would keep the server from stopping.
+const draining = new Set<() => void>()
+
+// Ends every open event stream with no end or error event, which a browser takes as a drop and opens again after its backoff, on the next instance.
+export function endEventStreams(): void {
+  for (const end of draining)
+    end()
+}
+
 // Where a failing event stream reports its error: logged, and handed to `onError` once the route answering with it is known.
 export const streamReporters = new WeakMap<Response, { report: (error: unknown) => void }>()
 
@@ -65,8 +74,15 @@ export function eventBody<T>(source: Source<T>, report: (error: unknown) => void
   let cancelled = false
   const gone = new AbortController()
   const encoder = new TextEncoder()
+  let drain: (() => void) | undefined
+
+  const leave = () => {
+    if (drain)
+      draining.delete(drain)
+  }
 
   const finish = (controller: ReadableStreamDefaultController<Uint8Array>, event: string) => {
+    leave()
     clearInterval(heartbeat)
     controller.enqueue(encoder.encode(`event: ${event}\ndata:\n\n`))
     controller.close()
@@ -81,6 +97,19 @@ export function eventBody<T>(source: Source<T>, report: (error: unknown) => void
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
       heartbeat ??= setInterval(() => controller.enqueue(HEARTBEAT), HEARTBEAT_MS)
+
+      if (!drain) {
+        drain = () => {
+          leave()
+          cancelled = true
+          gone.abort()
+          clearInterval(heartbeat)
+          void iterator?.return?.()
+          controller.close()
+        }
+
+        draining.add(drain)
+      }
 
       try {
         iterator ??= open()
@@ -100,6 +129,7 @@ export function eventBody<T>(source: Source<T>, report: (error: unknown) => void
           return
 
         if (error instanceof StreamRefusedError) {
+          leave()
           clearInterval(heartbeat)
           controller.close()
 
@@ -113,6 +143,7 @@ export function eventBody<T>(source: Source<T>, report: (error: unknown) => void
     },
     // Not awaited: an async generator waiting on its next value only returns once it has one, which a quiet feed may never give.
     cancel() {
+      leave()
       cancelled = true
       gone.abort()
       clearInterval(heartbeat)

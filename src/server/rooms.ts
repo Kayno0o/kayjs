@@ -32,8 +32,8 @@ export interface RoomStoreBase {
   publish: (room: string, text: string, recipients: RoomRecipients) => void
   // Called with each message published from then on; returns what stops it.
   subscribe: (listener: RoomListener) => () => void
-  // Stops what the store runs in the background and lets go of its file.
-  close: () => void
+  // Stops what the store runs in the background and lets go of its file; a store keeping members elsewhere drops this process's first, and may return a promise a stop waits for.
+  close: () => unknown
 }
 
 export interface RoomStore extends RoomStoreBase {
@@ -533,12 +533,27 @@ function openRooms(path: string, askedMs: number | undefined): RoomStore {
         sync()
       }
     },
+    // Leaves with its members, so the other processes do not list them until this one is dropped as quiet.
     close() {
+      const emptied = new Set([...own.values()].map(entry => entry.room))
+
       closed = true
       clearInterval(beating)
       stopReading()
       beating = undefined
       listeners.clear()
+      own.clear()
+
+      // A file that fails here is logged: the members then expire as for a process that crashed.
+      guarded('leaving the rooms store', () => {
+        db.transaction(() => {
+          db.run('DELETE FROM kay_room_members WHERE process = ?', [self])
+          db.run('DELETE FROM kay_room_processes WHERE process = ?', [self])
+
+          for (const room of emptied)
+            drop.run(room, room, Date.now() - EXPIRY)
+        }).immediate()
+      })()
       db.close()
     },
   }

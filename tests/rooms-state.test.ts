@@ -315,6 +315,26 @@ describe('a room\'s state in a SQLite file', () => {
     }
   })
 
+  it('takes the members and the state of a store that closed out of the file at once, not once it is dropped as quiet', () => {
+    const path = join(dir, 'closed.sqlite')
+    const store = sqliteRooms(path, { poll: '5ms' })
+    const live = rooms<Message, string, State>({ ...options, store })
+    const file = new Database(path)
+
+    try {
+      live.join(connection(), 'hall', 'ada')
+      live.update('hall', state => ({ ...state, round: 3 }))
+      expect(file.query('SELECT 1 FROM kay_room_members').all()).toHaveLength(1)
+      store.close()
+      expect(file.query('SELECT 1 FROM kay_room_members').all()).toEqual([])
+      expect(file.query('SELECT 1 FROM kay_room_state').all()).toEqual([])
+      expect(file.query('SELECT 1 FROM kay_room_processes').all()).toEqual([])
+    }
+    finally {
+      file.close()
+    }
+  })
+
   it('drops the state of a room whose only process died', async () => {
     const path = join(dir, 'crashed.sqlite')
     const store = sqliteRooms(path, { poll: '5ms' })

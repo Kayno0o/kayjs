@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { brotliDecompressSync, constants } from 'node:zlib'
+import { Database } from 'bun:sqlite'
 import { describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { version } from '../package.json'
@@ -1570,8 +1571,14 @@ describe('lifecycle', () => {
 
       return { response }
     }
+    const waitFor = async (text: string) => {
+      for (const start = Date.now(); !output.includes(text) && Date.now() - start < 10_000;)
+        await Bun.sleep(10)
 
-    return { server, url, slow, output: async () => rest }
+      expect(output).toContain(text)
+    }
+
+    return { server, url, slow, waitFor, output: async () => rest }
   }
 
   it('answers the health route while it takes requests', async () => {
@@ -1629,6 +1636,68 @@ describe('lifecycle', () => {
     expect(await server.exited).toBe(0)
     expect(await output()).toContain('jobs stopped')
   }, 20_000)
+
+  it('on SIGTERM with an event stream open ends the stream, runs the stop hooks and exits 0', async () => {
+    const { server, url, waitFor, output } = await startServer()
+    const response = await fetch(`${url}/stream`)
+    const reader = response.body!.getReader()
+
+    await reader.read()
+    await waitFor('stream started\n')
+    server.kill('SIGTERM')
+
+    // The stream ends with no end or error event, which a browser reads as a drop and opens again.
+    let text = ''
+
+    for (;;) {
+      const { value, done } = await reader.read()
+
+      if (done)
+        break
+
+      text += new TextDecoder().decode(value)
+    }
+
+    expect(text).not.toContain('event:')
+    expect(await server.exited).toBe(0)
+    expect(await output()).toContain('jobs stopped')
+    expect(await output()).not.toContain('requests still open')
+  }, 20_000)
+
+  it('on SIGTERM gives back the job of a handler ignoring its signal and takes the replica out of the rooms', async () => {
+    const dir = await scratchDir('stop-')
+    const jobsPath = join(dir, 'jobs.sqlite')
+    const roomsPath = join(dir, 'rooms.sqlite')
+
+    try {
+      const { server, url, waitFor, output } = await startServer({ JOBS_PATH: jobsPath, ROOMS_PATH: roomsPath })
+      const stream = await fetch(`${url}/stream`)
+
+      await stream.body!.getReader().read()
+      expect(await (await fetch(`${url}/join`)).text()).toBe('joined')
+      await waitFor('job started\n')
+      server.kill('SIGTERM')
+
+      expect(await server.exited).toBe(0)
+      expect(await output()).toContain('jobs stopped')
+
+      const jobs = new Database(jobsPath, { readonly: true })
+      const rooms = new Database(roomsPath, { readonly: true })
+
+      try {
+        // Given back untouched: free, and its attempt not counted.
+        expect(jobs.query('SELECT held_until, attempts, failed FROM kay_jobs').all()).toEqual([{ held_until: null, attempts: 0, failed: 0 }])
+        expect(rooms.query('SELECT * FROM kay_room_members').all()).toEqual([])
+      }
+      finally {
+        jobs.close()
+        rooms.close()
+      }
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  }, 30_000)
 
   it('closes what is still open past the shutdown timeout and exits with 1', async () => {
     const { server, slow } = await startServer({ SHUTDOWN_TIMEOUT: '0.2', SLOW_MS: '5000' })

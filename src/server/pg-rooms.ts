@@ -316,7 +316,7 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
         sync()
       }
     },
-    close() {
+    async close(): Promise<void> {
       const had = own.size > 0
 
       closed = true
@@ -327,10 +327,10 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
       own.clear()
 
       if (had) {
-        enqueue('leaving the rooms store', async (db) => {
+        await logged('leaving the rooms store', ordered(async (db) => {
           await query(db, 'DELETE FROM kay_room_members WHERE process = $1', [self])
           await dropStates(db)
-        })
+        }))
       }
     },
   }

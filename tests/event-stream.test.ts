@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { eventBody, eventStream } from '../src/server/event-stream'
+import { endEventStreams, eventBody, eventStream } from '../src/server/event-stream'
 
 // A source blocked on a feed that never speaks, freed only by the signal it was handed.
 function quiet(seen: { signal?: AbortSignal, freed: boolean }) {
@@ -62,5 +62,32 @@ describe('an event stream whose source is a function of a signal', () => {
 
     expect(text).toContain('event: error')
     expect((reported[0] as Error).message).toBe('no source')
+  })
+})
+
+describe('endEventStreams', () => {
+  it('ends every stream being read with no end or error event, freeing its source, and leaves one already finished alone', async () => {
+    const seen: { signal?: AbortSignal, freed: boolean } = { freed: false }
+    const first = eventBody(quiet(seen), () => undefined).getReader()
+    const second = eventBody(quiet({ freed: false }), () => undefined).getReader()
+    const done = new Response(eventBody(() => [1], () => undefined))
+    const pending = [first.read(), second.read()]
+
+    await Bun.sleep(5)
+    endEventStreams()
+    expect((await Promise.all(pending)).map(read => read.done)).toEqual([true, true])
+    expect(seen.signal?.aborted).toBe(true)
+    expect(seen.freed).toBe(true)
+    expect(await done.text()).toContain('event: end')
+  })
+
+  it('has nothing to end once the streams are cancelled or ended', async () => {
+    const reader = eventBody(quiet({ freed: false }), () => undefined).getReader()
+    const pending = reader.read()
+
+    await Bun.sleep(5)
+    await reader.cancel()
+    await pending
+    expect(() => endEventStreams()).not.toThrow()
   })
 })
