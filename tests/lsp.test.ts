@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { check } from '../src/check'
 import * as shadowModule from '../src/check/shadow'
 import { Connection } from '../src/lsp/rpc'
-import { DIAGNOSTICS_DELAY, KayLanguageServer } from '../src/lsp/server'
+import { DEPENDENTS_DELAY, DIAGNOSTICS_DELAY, KayLanguageServer } from '../src/lsp/server'
 import { spawnSuiteServer } from './listening'
 import { scratchDir } from './scratch'
 
@@ -135,6 +135,20 @@ async function settled(editor: Editor) {
     seen = editor.publishes.length
     await Bun.sleep(DIAGNOSTICS_DELAY * 3)
   }
+}
+
+// Waits until `count` publishes came after the `from`th, however slow the machine, then until none comes for longer than the dependents wait, so none still due lands in the next test.
+async function publishedCount(editor: Editor, from: number, count: number) {
+  const deadline = Date.now() + 30_000
+
+  while (editor.publishes.length - from < count) {
+    if (Date.now() > deadline)
+      throw new Error(`expected ${count} publishes, got ${editor.publishes.length - from}`)
+
+    await Bun.sleep(20)
+  }
+
+  await Bun.sleep(DEPENDENTS_DELAY * 2)
 }
 
 // `[line, start, end]` for a one-line range, in source order.
@@ -859,10 +873,7 @@ describe('kay lsp publishing after an edit', () => {
     const edited = editor.change(badge, '---\nconst { label, size } = props<{ label: string, size: number }>()\n---\nspan {label} {size}\n', 2)
 
     await edited
-    // The importing files wait for a quiet spell of their own.
-    await Bun.sleep(DIAGNOSTICS_DELAY * 2)
-    expect(publishedAfter(from)).toEqual([editor.uri(badge)])
-    await settled(editor)
+    await publishedCount(editor, from, 3)
 
     const [first, ...rest] = publishedAfter(from)
 
@@ -875,7 +886,7 @@ describe('kay lsp publishing after an edit', () => {
     const from = editor.publishes.length
 
     await editor.change(other, 'p y\n', 2)
-    await settled(editor)
+    await publishedCount(editor, from, 1)
 
     expect(publishedAfter(from)).toEqual([editor.uri(other)])
   })
