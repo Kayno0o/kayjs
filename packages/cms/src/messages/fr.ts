@@ -267,6 +267,10 @@ export default defineMessages({
       unpublish: 'Dépubliée',
       update: 'Enregistrée',
     },
+    inline: {
+      kept: '{field} mis à jour',
+      restored: '{field} rétabli',
+    },
     locales: {
       body: 'Corps',
       compare: 'Comparer',

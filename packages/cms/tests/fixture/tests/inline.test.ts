@@ -55,6 +55,9 @@ test('a click on the title types in place, the form follows, and Enter ends the 
 
   expect(await page.text(TITLE)).toBe('Hello inline')
   expect(await page.value(FORM_TITLE)).toBe('Hello inline')
+  // The focus stays on the title and a polite live region says the text was kept.
+  expect(await page.evaluate(selector => document.activeElement === document.querySelector(selector), TITLE)).toBe(true)
+  await page.waitUntil(() => (document.querySelector('[data-kui-announce]')?.textContent ?? '').endsWith('updated'))
 }, 60_000)
 
 test('text with a line break and HTML lands as one line of text', async () => {
@@ -163,6 +166,8 @@ test('Escape puts back the text from before the edit, in the page and the form',
   await page.waitUntil(() => document.querySelector('.kcms-editor-status p') === null)
 
   expect(await page.text(TITLE)).toBe(before)
+  expect(await page.evaluate(selector => document.activeElement === document.querySelector(selector), TITLE)).toBe(true)
+  await page.waitUntil(() => (document.querySelector('[data-kui-announce]')?.textContent ?? '').endsWith('restored'))
 }, 60_000)
 
 test('the title takes a tab stop, and Enter on it starts the edit', async () => {

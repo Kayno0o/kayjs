@@ -2,6 +2,8 @@ import type { Drafts } from '../drafts'
 import type { Field } from '../fields'
 import type { EntryRef, ScreenCollection } from '../kay/contract'
 import type { FieldMarker, MarkedField } from '../markers'
+import { announce } from '@kaynooo/kayjs-ui/announce'
+import { wording } from 'kay/words'
 import { checkField, fieldsOf, itemAt } from '../fields'
 import { BODY, entryKey, markersOf } from '../markers'
 import { joinPath, pathSegments, valueAt } from '../paths'
@@ -381,7 +383,10 @@ export function startInline({ entry, path, field, element, busy }: InlineTarget,
 
     event.preventDefault()
     cancelled = event.key === 'Escape'
-    element.blur()
+    end()
+    // The element stays the focused one, as a tab stop, rather than the focus falling to the page.
+    element.focus({ preventScroll: true })
+    announce(cancelled ? wording('cms.inline.restored', '{field} restored', { field: field.label }) : wording('cms.inline.kept', '{field} updated', { field: field.label }))
   }, { signal })
   // The window losing the focus (alt-tab) blurs the element while it stays the focused one: the edit goes on, and the browser gives the focus back with the window.
   element.addEventListener('blur', () => {
