@@ -16,7 +16,7 @@ export const subscribe = action(...mail.list().form())
 SubscribeForm(action={subscribe})
 ```
 
-- A post mails the address a confirmation link (valid 3 days) and lists it only once the link is opened: double opt-in. The answer is the same for a new, a pending, a confirmed or an unknown address, and a confirmed one is mailed nothing. The confirmation mail is rendered for every address but queued off the response path, so a listed and a new address answer in the same steps; a queue failure is logged, not shown.
+- A post mails the address a confirmation link (valid 3 days) and lists it only once its page's button is pressed: double opt-in. Opening the link (a mail scanner or prefetch does) shows a page with one button and lists no one; the button's POST confirms. The answer is the same for a new, a pending, a confirmed or an unknown address, and a confirmed one is mailed nothing. The confirmation mail is rendered for every address but queued off the response path, so a listed and a new address answer in the same steps; a queue failure is logged, not shown.
 - `SubscribeForm` is unstyled markup with `kmail-subscribe*` classes and the honeypot; a form of your own is `form(action={subscribe})` with `input(field="email")`. Its props are `label`, `submitLabel`, `sentLabel`.
 - Protection: the action's `rateLimit` (10 posts every 10 minutes, per IP), `minTime` 2 seconds and a `website` honeypot, replaced by `list(name, { protection, honeypot })`; and 3 confirmation mails an hour per address, then the post still answers the same and mails nothing, so the form cannot mail-bomb anyone.
 - Addresses are stored once, normalised: Unicode NFC, lower case, domain in punycode; a `+tag` stays part of it. Anything that is not one plain address (second `@`, comma list, name with angle brackets, line break, IP domain) is refused with the field's message.
@@ -47,7 +47,7 @@ await mail.list().status(id) // { done, sent, failed, retrying, unsure, waiting 
 
 - `mail.list(name = 'default', options)` is made on its first call and the same after; a name is letters, digits, dashes and underscores, 40 at most. Several lists share a file, `file` names another.
 - `options`: `file`, `store`, `pace`, `view` (the confirmation mail's `.kay` component, given `{ url, site }`), `protection`, `honeypot`.
-- The routes `GET /_kay/mail/list/confirm`, `GET` and `POST /_kay/mail/list/unsubscribe` (query `token`) are served by the mailer, at the site's origin, whatever the `base`; the pages are worded in the subscriber's language (`mail.list.*` messages, English and French shipped) and sent `no-store`. A valid link whose list has no store in this process yet answers 503 with `retry-after: 60` and a "try again later" page (`mail.list.page.later`), never as done or as broken.
+- The routes `GET` and `POST /_kay/mail/list/confirm`, `GET` and `POST /_kay/mail/list/unsubscribe` (query `token`) are served by the mailer, at the site's origin, whatever the `base`; the pages are worded in the subscriber's language (`mail.list.*` messages, English and French shipped) and sent `no-store`. A valid link whose list has no store in this process yet answers 503 with `retry-after: 60` and a "try again later" page (`mail.list.page.later`), never as done or as broken.
 - Tables: `kay_mail_subscribers`, `kay_mail_broadcasts`, `kay_mail_deliveries`. Replicas on several machines need the SQLite file shared, or Postgres:
 
 ```ts

@@ -32,12 +32,15 @@ function tokenOf(sent: Parameters<typeof outbox.token>[0], part: string): string
   return outbox.token(sent, part)
 }
 
+const confirmLink = (token: string) => `/_kay/mail/list/confirm?token=${token}`
+const confirmPost = async (path: string) => site.fetch(path, { method: 'POST' })
+
 async function subscribed(email = fresh()): Promise<{ email: string, confirm: string }> {
   await site.call(subscribe, { email })
 
   const confirm = tokenOf(await confirmationOf(email), '/confirm')
 
-  expect((await site.fetch(`/_kay/mail/list/confirm?token=${confirm}`)).status).toBe(200)
+  expect((await confirmPost(confirmLink(confirm))).status).toBe(200)
 
   return { email, confirm }
 }
@@ -130,7 +133,7 @@ describe('the subscribe form', () => {
     expect(sent.headers['List-Unsubscribe']).toBeUndefined()
     expect((await mail.list().subscribers()).length).toBe(before)
 
-    expect((await site.fetch(outbox.link(sent, '/confirm').replace('https://fixture.test', ''))).status).toBe(200)
+    expect((await confirmPost(outbox.link(sent, '/confirm').replace('https://fixture.test', ''))).status).toBe(200)
     expect((await mail.list().subscribers()).map(row => row.email)).toContain(email)
   })
 
@@ -143,7 +146,7 @@ describe('the subscribe form', () => {
 
     const token = tokenOf(await confirmationOf(email), '/confirm')
 
-    await site.fetch(`/_kay/mail/list/confirm?token=${token}`)
+    await confirmPost(confirmLink(token))
     expect(await mail.list().count()).toBe(before + 1)
     expect((await mail.list().subscribers()).filter(row => row.email === email)).toHaveLength(1)
   })
@@ -210,7 +213,7 @@ describe('the subscribe form', () => {
 
     const confirm = tokenOf(await outbox.waitFor(email, { site, find: sent => sent.subject.startsWith('Confirm') }), '/confirm')
 
-    await site.fetch(`/_kay/mail/list/confirm?token=${confirm}`)
+    await confirmPost(confirmLink(confirm))
 
     const mails = outbox.to(email).length
 
@@ -242,7 +245,39 @@ describe('the subscribe form', () => {
 })
 
 describe('the confirmation link', () => {
-  const page = async (token: string) => (await site.fetch(`/_kay/mail/list/confirm?token=${token}`)).text()
+  const page = async (token: string) => (await confirmPost(confirmLink(token))).text()
+
+  it('does not list the address on a GET, which a link scanner makes, and asks first', async () => {
+    const email = fresh()
+
+    await site.call(subscribe, { email })
+
+    const token = tokenOf(await confirmationOf(email), '/confirm')
+    const before = await mail.list().count()
+    const response = await site.fetch(confirmLink(token))
+    const body = await response.text()
+
+    expect(response.status).toBe(200)
+    expect(body).toContain('method="post"')
+    expect(body).not.toContain('Subscription confirmed')
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(response.headers.get('referrer-policy')).toBe('no-referrer')
+    expect(await mail.list().count()).toBe(before)
+    expect((await mail.list().subscribers()).map(row => row.email)).not.toContain(email)
+
+    expect(await (await confirmPost(confirmLink(token))).text()).toContain('Subscription confirmed')
+    expect((await mail.list().subscribers()).map(row => row.email)).toContain(email)
+  })
+
+  it('answers a forged or expired link on a GET with the page that does not work, without a form', async () => {
+    const expired = signToken('confirm', { list: 'default', id: 'nobody' }, Date.now() - 4 * 24 * 3_600_000)
+    const pages = await Promise.all([expired, 'nonsense', ''].map(async token => (await site.fetch(confirmLink(token))).text()))
+
+    for (const body of pages) {
+      expect(body).toContain('This link does not work')
+      expect(body).not.toContain('<form')
+    }
+  })
 
   it('answers a second click like the first, adding nobody', async () => {
     const { email, confirm } = await subscribed()
@@ -262,7 +297,7 @@ describe('the confirmation link', () => {
 
     expect(pages[0]).toContain('This link does not work')
     expect(new Set(pages).size).toBe(1)
-    expect((await site.fetch('/_kay/mail/list/confirm')).status).toBe(200)
+    expect((await confirmPost('/_kay/mail/list/confirm')).status).toBe(200)
   })
 
   it('does not list an address that unsubscribed before it was confirmed', async () => {

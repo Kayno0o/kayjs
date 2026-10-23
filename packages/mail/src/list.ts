@@ -514,7 +514,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
 
       return { valid: true, locale: checked.claims.locale }
     },
-    page: async (kind: 'confirmed' | 'invalid' | 'expired' | 'later' | 'ask' | 'unsubscribed', locale: string | undefined, action?: string, status = 200): Promise<Response> => {
+    page: async (kind: 'confirmed' | 'invalid' | 'expired' | 'later' | 'ask' | 'askConfirm' | 'unsubscribed', locale: string | undefined, action?: string, status = 200): Promise<Response> => {
       const page = await view<(props: { part?: 'title' | 'body', kind: typeof kind, action?: string | undefined }) => JSX.Element>('page')
       const [title, body] = await Promise.all([renderToString(page, { part: 'title', kind }, locale === undefined ? undefined : { locale }), renderToString(page, { kind, action }, locale === undefined ? undefined : { locale })])
       const lang = locale ?? await renderLocale()
@@ -537,11 +537,20 @@ export type ListsHandle = ReturnType<typeof createLists>
 export function mountListRoutes(plugin: Elysia, handle: () => ListsHandle): void {
   const token = (query: Record<string, unknown>) => query.token
 
+  // A GET only asks, as a link scanner opens it for whoever's address was typed in; the page's own form posts to confirm.
   plugin.get(`${LIST_PATH}/confirm`, async ({ query }) => {
+    const checked = checkToken('confirm', token(query))
+
+    if (!checked.ok)
+      return handle().page(checked.reason, undefined)
+
+    return handle().page('askConfirm', checked.claims.locale, `${LIST_PATH}/confirm?token=${encodeURIComponent(String(token(query)))}`)
+  })
+  plugin.post(`${LIST_PATH}/confirm`, async ({ query }) => {
     const result = await handle().confirm(token(query))
 
     return result.kind === 'unavailable' ? handle().page('later', result.locale, undefined, 503) : handle().page(result.kind, result.locale)
-  })
+  }, { parse: 'none' })
   plugin.get(`${LIST_PATH}/unsubscribe`, async ({ query }) => {
     const checked = checkToken('unsubscribe', token(query))
 

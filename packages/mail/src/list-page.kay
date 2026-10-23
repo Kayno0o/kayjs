@@ -1,14 +1,15 @@
 ---
 import { wording } from 'kay/words'
 
-// What the confirmation and unsubscribe links answer. `part` `title` is the page's title alone; `ask` is the unsubscribe page, a form posting to `action`.
-const { part = 'body', kind, action } = props<{ part?: 'title' | 'body', kind: 'confirmed' | 'invalid' | 'expired' | 'later' | 'ask' | 'unsubscribed', action?: string | undefined }>()
+// What the confirmation and unsubscribe links answer. `part` `title` is the page's title alone; `ask` is the unsubscribe page and `askConfirm` the confirmation page, each a form posting to `action`, so a link scanner opening the link changes nothing.
+const { part = 'body', kind, action } = props<{ part?: 'title' | 'body', kind: 'confirmed' | 'invalid' | 'expired' | 'later' | 'ask' | 'askConfirm' | 'unsubscribed', action?: string | undefined }>()
 const titles = {
   confirmed: wording('mail.list.page.confirmedTitle', 'Subscription confirmed'),
   invalid: wording('mail.list.page.invalidTitle', 'This link does not work'),
   expired: wording('mail.list.page.invalidTitle', 'This link does not work'),
   later: wording('mail.list.page.laterTitle', 'This link cannot be served yet'),
   ask: wording('mail.list.page.askTitle', 'Unsubscribe'),
+  askConfirm: wording('mail.list.page.askConfirmTitle', 'Confirm your subscription'),
   unsubscribed: wording('mail.list.page.unsubscribedTitle', 'You are unsubscribed'),
 }
 const texts = {
@@ -17,6 +18,7 @@ const texts = {
   expired: wording('mail.list.page.invalid', 'This link is not valid, or was already used. If you want to subscribe, use the form again.'),
   later: wording('mail.list.page.later', 'This link is valid, but the site cannot act on it right now. Please try again later.'),
   ask: wording('mail.list.page.ask', 'Do you want to stop receiving these mails?'),
+  askConfirm: wording('mail.list.page.askConfirm', 'Do you want to receive these mails at this address?'),
   unsubscribed: wording('mail.list.page.unsubscribed', 'You will not receive these mails any more.'),
 }
 ---
@@ -30,3 +32,6 @@ else
       form(method="post" action={action})
         input(type="hidden" name="List-Unsubscribe" value="One-Click")
         button(type="submit") {wording('mail.list.page.askButton', 'Unsubscribe')}
+    else if kind === 'askConfirm' && action
+      form(method="post" action={action})
+        button(type="submit") {wording('mail.list.page.askConfirmButton', 'Confirm my subscription')}
