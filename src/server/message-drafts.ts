@@ -9,7 +9,7 @@ import { dirname } from 'node:path'
 import process from 'node:process'
 import { parse } from '@babel/parser'
 import { KayError } from '../compiler/errors'
-import { constBindings, exportedObject, objectOf, propertiesOf, unwrapped } from '../compiler/object-literal'
+import { constBindings, exportedObject, keyName, objectOf, propertiesOf, unwrapped } from '../compiler/object-literal'
 import { messagesFile } from './i18n'
 
 const COMMENTS = /\/\/[^\n]*|\/\*[\s\S]*?\*\//g
@@ -268,16 +268,6 @@ function parsed(source: string): t.File | undefined {
   catch {
     return undefined
   }
-}
-
-function keyName(property: t.ObjectProperty): string | undefined {
-  if (property.computed)
-    return undefined
-
-  if (property.key.type === 'Identifier')
-    return property.key.name
-
-  return property.key.type === 'StringLiteral' ? property.key.value : undefined
 }
 
 // A plural's forms, `{ one: '...', other: '...' }`, read as one message as `isPlural` reads the value.

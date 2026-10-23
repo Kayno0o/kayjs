@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path'
 import { parse } from '@babel/parser'
 import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
+import { keyName } from '../compiler/object-literal'
 import { loadTraverse } from '../compiler/rewrite'
 import { CONFIG_FILE } from '../config'
 import { importedName, walk } from './ast'
@@ -33,16 +34,6 @@ interface Found {
   call: t.CallExpression
   // The rewritten call, else why it has none.
   rewrite: string | undefined
-}
-
-function keyOf(property: t.ObjectProperty): string | undefined {
-  if (property.computed)
-    return undefined
-
-  if (property.key.type === 'Identifier')
-    return property.key.name
-
-  return property.key.type === 'StringLiteral' ? property.key.value : undefined
 }
 
 // The path of `() => import('./src/auth')`, async or not.
@@ -127,7 +118,7 @@ function rewritten(form: OldForm, call: t.CallExpression, source: string, root: 
       continue
     }
 
-    const key = keyOf(property)
+    const key = keyName(property)
 
     if (key === 'auth' || key === 'server')
       loads = true
@@ -135,7 +126,7 @@ function rewritten(form: OldForm, call: t.CallExpression, source: string, root: 
     const path = key === 'auth' ? importedPath(property.value) : undefined
 
     // The old form took both and `auth` won; the new takes one.
-    if (key === 'server' && first.properties.some(other => other.type === 'ObjectProperty' && keyOf(other) === 'auth'))
+    if (key === 'server' && first.properties.some(other => other.type === 'ObjectProperty' && keyName(other) === 'auth'))
       return undefined
 
     if (key === 'auth' && (path === undefined || !exportsAuth(root, path)))
@@ -281,7 +272,7 @@ function bareAuthCalls(ast: t.File, source: string, file: string, root: string, 
 
     const properties = options?.properties ?? []
 
-    if (properties.some(property => property.type !== 'ObjectProperty' || ['module', 'server', 'plugin'].includes(keyOf(property) ?? '')))
+    if (properties.some(property => property.type !== 'ObjectProperty' || ['module', 'server', 'plugin'].includes(keyName(property) ?? '')))
       return
 
     const last = properties.at(-1)

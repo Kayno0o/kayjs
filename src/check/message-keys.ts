@@ -6,11 +6,10 @@ import { existsSync } from 'node:fs'
 import { parse } from '@babel/parser'
 import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
-import { constBindings, exportedObject, objectOf, propertiesOf } from '../compiler/object-literal'
+import { constBindings, exportedObject, keyName, objectOf, propertiesOf } from '../compiler/object-literal'
 import { PLURAL_CATEGORIES } from '../runtime/i18n'
 import { messagesFile } from '../server/i18n'
 import { renamedMessageKey } from '../server/legacy-keys'
-import { keyOf } from './retired-lint'
 
 // The `ui.*` and `cms.*` messages of the project's catalogs worded under a key ending in `Label`, which kayjs-ui and kayjs-cms dropped in 1.72 (`ui.table.filterLabel` is `ui.table.filter`). The old key still wins three minors; the fix renames it, unless the catalog words the new key too.
 export async function renamedMessageKeys(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
@@ -63,13 +62,13 @@ interface Context {
 function visit(object: t.ObjectExpression, path: string[], context: Context): void {
   const { file, source, level, found, bindings } = context
   const properties = propertiesOf(object, bindings)
-  const siblings = new Set(properties.flatMap(property => property.type === 'ObjectProperty' ? keyOf(property) ?? [] : []))
+  const siblings = new Set(properties.flatMap(property => property.type === 'ObjectProperty' ? keyName(property) ?? [] : []))
 
   for (const property of properties) {
     if (property.type !== 'ObjectProperty')
       continue
 
-    const name = keyOf(property)
+    const name = keyName(property)
 
     if (name === undefined)
       continue
@@ -109,7 +108,7 @@ function visit(object: t.ObjectExpression, path: string[], context: Context): vo
 
 // An object of plural forms only, `other` among them, which is one message as `isPlural` reads it.
 function pluralForms(object: t.ObjectExpression): boolean {
-  const names = object.properties.map(property => property.type === 'ObjectProperty' ? keyOf(property) : undefined)
+  const names = object.properties.map(property => property.type === 'ObjectProperty' ? keyName(property) : undefined)
 
   return names.includes('other') && names.every(name => name !== undefined && PLURAL_CATEGORIES.has(name))
 }

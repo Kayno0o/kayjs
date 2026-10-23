@@ -4,9 +4,9 @@ import { parse } from '@babel/parser'
 import { findProjectFiles } from '../build/files'
 import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
+import { keyName } from '../compiler/object-literal'
 import { parseKay } from '../compiler/parser'
 import { importedName, walk } from './ast'
-import { keyOf } from './retired-lint'
 
 const SOURCE_FILE = /(?:(?<!\.d)\.tsx?|\.kay)$/
 const AI_PACKAGE = '@kaynooo/kayjs-ai'
@@ -104,12 +104,12 @@ export async function rateLimitNames(root: string, options: CheckOptions): Promi
         if (site === undefined || argument?.type !== 'ObjectExpression')
           return
 
-        const nested = site.inside === undefined ? undefined : argument.properties.find((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && keyOf(property) === site.inside)?.value
+        const nested = site.inside === undefined ? undefined : argument.properties.find((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && keyName(property) === site.inside)?.value
         const target = site.inside === undefined ? argument : nested
         const properties = (target?.type === 'ObjectExpression' ? target.properties : []).filter((property): property is t.ObjectProperty => property.type === 'ObjectProperty')
 
         for (const property of properties) {
-          if (site.count === undefined || keyOf(property) !== site.count || property.value.type !== 'NumericLiteral' || !Number.isInteger(property.value.value) || property.value.value < 1)
+          if (site.count === undefined || keyName(property) !== site.count || property.value.type !== 'NumericLiteral' || !Number.isInteger(property.value.value) || property.value.value < 1)
             continue
 
           const value = property.value
@@ -128,14 +128,14 @@ export async function rateLimitNames(root: string, options: CheckOptions): Promi
         }
 
         for (const property of properties) {
-          const old = keyOf(property)
+          const old = keyName(property)
           const renamed = old === undefined ? undefined : site.renames[old]
 
           if (old === undefined || renamed === undefined)
             continue
 
           // The new name beside the old one: the new wins already, and renaming would repeat a key.
-          const taken = properties.some(other => keyOf(other) === renamed)
+          const taken = properties.some(other => keyName(other) === renamed)
           const at = base + property.key.start!
 
           found.push({

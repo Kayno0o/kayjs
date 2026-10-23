@@ -4,9 +4,9 @@ import { parse } from '@babel/parser'
 import { findProjectFiles } from '../build/files'
 import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
+import { keyName } from '../compiler/object-literal'
 import { parseKay } from '../compiler/parser'
 import { importedName, walk } from './ast'
-import { keyOf } from './retired-lint'
 
 const SOURCE_FILE = /(?:(?<!\.d)\.tsx?|\.kay)$/
 const FLAT = new Set(['rateLimit', 'honeypot', 'minTime', 'proofOfWork'])
@@ -58,15 +58,15 @@ export async function actionOptions(root: string, options: CheckOptions): Promis
           return
 
         const properties = argument.properties
-        const flat = properties.filter((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && FLAT.has(keyOf(property) ?? ''))
+        const flat = properties.filter((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && FLAT.has(keyName(property) ?? ''))
 
         if (flat.length === 0)
           return
 
         const at = (offset: number) => base + offset
-        const names = flat.map(property => keyOf(property)!)
+        const names = flat.map(property => keyName(property)!)
         const gaps = properties.slice(1).every((property, index) => BETWEEN.test(source.slice(at(properties[index]!.end!), at(property.start!))))
-        const rewritable = gaps && properties.every(property => property.type === 'ObjectProperty' && !property.computed) && !properties.some(property => property.type === 'ObjectProperty' && keyOf(property) === 'protect')
+        const rewritable = gaps && properties.every(property => property.type === 'ObjectProperty' && !property.computed) && !properties.some(property => property.type === 'ObjectProperty' && keyName(property) === 'protect')
         const first = flat[0]!
 
         found.push({

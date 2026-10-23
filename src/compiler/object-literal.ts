@@ -78,15 +78,19 @@ export function exportedObject(program: t.Program, bindings: Bindings = constBin
   return objectOf(exportedDefault(program), bindings, true)
 }
 
-// The name a non-computed property is written under.
-function nameOf(property: t.ObjectExpression['properties'][number]): string | undefined {
-  if (property.type !== 'ObjectProperty' || property.computed)
+// The name a non-computed property is written under, as an identifier or a string.
+export function keyName(property: t.ObjectProperty): string | undefined {
+  if (property.computed)
     return undefined
 
   if (property.key.type === 'Identifier')
     return property.key.name
 
   return property.key.type === 'StringLiteral' ? property.key.value : undefined
+}
+
+function nameOf(property: t.ObjectExpression['properties'][number]): string | undefined {
+  return property.type === 'ObjectProperty' ? keyName(property) : undefined
 }
 
 // The properties of an object with the spread of a const object replaced by that object's own, in order, so a key written by `{ ...base }` reads as written in place. A spread that is not a const object stays as it is, and a key a later property writes again drops the earlier ones, as the object holds only the last.
@@ -101,10 +105,17 @@ export function propertiesOf(object: t.ObjectExpression, bindings: Bindings): t.
       last.set(name, property)
   }
 
-  return flat.filter((property, index) => {
+  const kept = new Set<t.ObjectExpression['properties'][number]>()
+
+  return flat.filter((property) => {
+    if (kept.has(property))
+      return false
+
+    kept.add(property)
+
     const name = nameOf(property)
 
-    return name === undefined || (last.get(name) === property && flat.indexOf(property) === index)
+    return name === undefined || last.get(name) === property
   })
 }
 

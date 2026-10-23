@@ -4,6 +4,7 @@ import { parse } from '@babel/parser'
 import { findProjectFiles } from '../build/files'
 import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
+import { keyName } from '../compiler/object-literal'
 import { parseKay } from '../compiler/parser'
 import { importedName, walk } from './ast'
 
@@ -35,16 +36,6 @@ const RENAMES: Rename[] = [
 ]
 
 const BY_PACKAGE = Map.groupBy(RENAMES, rename => rename.package)
-
-function keyOf(property: t.ObjectProperty): string | undefined {
-  if (property.computed)
-    return undefined
-
-  if (property.key.type === 'Identifier')
-    return property.key.name
-
-  return property.key.type === 'StringLiteral' ? property.key.value : undefined
-}
 
 // The edit renaming `property`: the key alone, or the whole property when the new name sits under a key of its own.
 function fix(rename: Rename, property: t.ObjectProperty, base: number, code: string): { start: number, end: number, text: string } {
@@ -127,7 +118,7 @@ export async function renamedOptions(root: string, options: CheckOptions): Promi
           let holder: t.Node | null | undefined = node.arguments[rename.at]
 
           for (const key of rename.path ?? []) {
-            const next: t.ObjectProperty | undefined = holder?.type === 'ObjectExpression' ? holder.properties.find((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && keyOf(property) === key) : undefined
+            const next: t.ObjectProperty | undefined = holder?.type === 'ObjectExpression' ? holder.properties.find((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && keyName(property) === key) : undefined
 
             holder = next?.value
           }
@@ -139,9 +130,9 @@ export async function renamedOptions(root: string, options: CheckOptions): Promi
           const was = [...rename.path ?? [], rename.from].join('.')
           const now = rename.wrap === undefined ? rename.to : `${rename.wrap}: { ${rename.to} }`
 
-          for (const property of properties.filter(property => keyOf(property) === rename.from)) {
+          for (const property of properties.filter(property => keyName(property) === rename.from)) {
             // The new name beside the old one: the new wins already, and renaming would repeat a key.
-            const taken = properties.some(other => keyOf(other) === (rename.wrap ?? rename.to))
+            const taken = properties.some(other => keyName(other) === (rename.wrap ?? rename.to))
             const at = base + property.key.start!
 
             found.push({

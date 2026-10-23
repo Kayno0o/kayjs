@@ -1,6 +1,6 @@
 import type * as t from '@babel/types'
 import { parse } from '@babel/parser'
-import { constBindings, exportedDefault, objectOf, unwrapped } from '../compiler/object-literal'
+import { constBindings, exportedDefault, keyName, objectOf, unwrapped } from '../compiler/object-literal'
 
 export interface ConfigPosition {
   line: number
@@ -8,16 +8,6 @@ export interface ConfigPosition {
 }
 
 const START: ConfigPosition = { line: 1, column: 1 }
-
-function keyName(property: t.ObjectProperty): string | undefined {
-  if (property.computed)
-    return undefined
-
-  if (property.key.type === 'Identifier')
-    return property.key.name
-
-  return property.key.type === 'StringLiteral' ? property.key.value : undefined
-}
 
 function positionOf(node: t.Node): ConfigPosition {
   return node.loc ? { line: node.loc.start.line, column: node.loc.start.column + 1 } : START

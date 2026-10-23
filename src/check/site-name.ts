@@ -4,9 +4,9 @@ import { parse } from '@babel/parser'
 import { findProjectFiles } from '../build/files'
 import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
+import { keyName } from '../compiler/object-literal'
 import { parseKay } from '../compiler/parser'
 import { importedName, walk } from './ast'
-import { keyOf } from './retired-lint'
 
 const SOURCE_FILE = /(?:(?<!\.d)\.tsx?|\.kay)$/
 const AUTH_PACKAGE = '@kaynooo/kayjs-auth'
@@ -75,7 +75,7 @@ export async function siteNames(root: string, options: CheckOptions): Promise<Ch
           return
 
         const properties = argument.properties.filter((property): property is t.ObjectProperty => property.type === 'ObjectProperty')
-        const named = (key: string): t.ObjectProperty | undefined => properties.find(property => keyOf(property) === key)
+        const named = (key: string): t.ObjectProperty | undefined => properties.find(property => keyName(property) === key)
         const url = named('url')
         const site = named('site')
         const siteIsName = site !== undefined && site.value.type === 'StringLiteral' && !HAS_SCHEME.test(site.value.value)
@@ -119,7 +119,7 @@ export async function siteNames(root: string, options: CheckOptions): Promise<Ch
 }
 
 function rename(property: t.ObjectProperty, to: string, base: number): { start: number, end: number, text: string } {
-  const old = keyOf(property)!
+  const old = keyName(property)!
 
   return property.shorthand
     ? { start: base + property.start!, end: base + property.end!, text: `${to}: ${old}` }

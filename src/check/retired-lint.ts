@@ -6,6 +6,7 @@ import { parse } from '@babel/parser'
 import { findProjectFiles } from '../build/files'
 import { lintLevel, RETIRED_LINTS } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
+import { keyName } from '../compiler/object-literal'
 import { CONFIG_FILE } from '../config'
 import { walk } from './ast'
 
@@ -18,16 +19,6 @@ interface Edit {
   start: number
   end: number
   text: string
-}
-
-export function keyOf(property: t.ObjectProperty): string | undefined {
-  if (property.computed)
-    return undefined
-
-  if (property.key.type === 'Identifier')
-    return property.key.name
-
-  return property.key.type === 'StringLiteral' ? property.key.value : undefined
 }
 
 // The `// kay-allow` comments of a source naming `name`: the span of the name and the edit that removes it, the whole comment (and its line, when it stands alone) when it names nothing else, else the name with a comma beside it.
@@ -82,13 +73,13 @@ function configEntries(source: string, name: string): { start: number, end: numb
   const found: { start: number, end: number, edit: Edit }[] = []
 
   walk(ast, (node) => {
-    if (node.type !== 'ObjectProperty' || keyOf(node) !== 'lints' || node.value.type !== 'ObjectExpression')
+    if (node.type !== 'ObjectProperty' || keyName(node) !== 'lints' || node.value.type !== 'ObjectExpression')
       return
 
     const properties = node.value.properties
 
     for (const [index, property] of properties.entries()) {
-      if (property.type !== 'ObjectProperty' || keyOf(property) !== name)
+      if (property.type !== 'ObjectProperty' || keyName(property) !== name)
         continue
 
       const next = properties[index + 1]
