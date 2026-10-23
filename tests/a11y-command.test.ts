@@ -1,8 +1,9 @@
 import { existsSync } from 'node:fs'
-import { mkdir, readFile, rm } from 'node:fs/promises'
+import { chmod, mkdir, readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { browserFailure } from '../src/a11y/audit'
 import { declaration, failed, formatReport, reportOf } from '../src/a11y/report'
 import { RGAA_CRITERIA, WCAG_CRITERIA } from '../src/a11y/rgaa-criteria'
 import { judge, RGAA_DECIDED, RGAA_FAILS } from '../src/a11y/standards'
@@ -22,6 +23,28 @@ async function run(cwd: string, args: string[], env: Record<string, string> = {}
   const [stdout, stderr] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()])
 
   return { code: await child.exited, stdout, stderr }
+}
+
+// Waits for a process to be gone, as a condition rather than a delay.
+async function gone(pid: number): Promise<boolean> {
+  const deadline = Date.now() + 15_000
+
+  while (Date.now() < deadline) {
+    try {
+      process.kill(pid, 0)
+    }
+    catch {
+      return true
+    }
+
+    await Bun.sleep(50)
+  }
+
+  return false
+}
+
+async function pids(file: string): Promise<number[]> {
+  return existsSync(file) ? (await readFile(file, 'utf8')).split('\n').filter(line => line !== '').map(Number) : []
 }
 
 async function project(prefix: string, config: string, routes: Record<string, string>): Promise<string> {
@@ -119,6 +142,14 @@ describe('what a scan decides', () => {
   })
 })
 
+describe('the reason a page the browser failed on is left out', () => {
+  it('names the first error beside the last when they differ, and once when they are the same', () => {
+    expect(browserFailure([new Error('tab crashed'), new Error('timed out')])).toEqual({ why: 'the browser could not check it: tab crashed; then: timed out', whyFr: 'le navigateur n\'a pas pu la vérifier : tab crashed ; puis : timed out' })
+    expect(browserFailure([new Error('timed out'), new Error('timed out')]).why).toBe('the browser could not check it: timed out')
+    expect(browserFailure(['gone']).why).toBe('the browser could not check it: gone')
+  })
+})
+
 describe('kay a11y refusing before it builds anything', () => {
   it('says which variable names Chrome when there is none', async () => {
     const root = await project('a11y-nochrome-', 'export default {}\n', { 'index.kay': 'head\n  title Home\nmain\n  h1 Home\n' })
@@ -213,6 +244,70 @@ describe.skipIf(skipBrowser)('kay a11y on a site', () => {
     expect(await readFile(file, 'utf8')).toContain('Accessibility statement')
   }, 120_000)
 
+  it('stops the server and Chrome it started once the run is over', async () => {
+    const dir = await scratchDir('a11y-stop-')
+    const chrome = join(dir, 'chrome.sh')
+    const chromePids = join(dir, 'chrome.pids')
+    const serverPids = join(dir, 'server.pids')
+    const stopped = await project('a11y-stop-site-', 'export default {}\n', {
+      // Only the server booted for the audit has KAY_START_PID; the audit itself lists the page without it.
+      'index.kay': `--- server\nif (process.env.KAY_START_PID !== undefined)\n  await Bun.write(${JSON.stringify(serverPids)}, \`\${process.pid}\\n\`)\n---\nhead\n  title Home\nmain\n  h1 Home\n`,
+    })
+
+    try {
+      await Bun.write(chrome, `#!/bin/sh\necho $$ >> ${chromePids}\nexec ${browserPath()} "$@"\n`)
+      await chmod(chrome, 0o755)
+
+      const { code } = await run(stopped, ['.', '--dry-run', '--format', 'json'], { BUN_CHROME_PATH: chrome })
+      const [server, browser] = await Promise.all([pids(serverPids), pids(chromePids)])
+
+      expect(code).toBe(0)
+      expect(server.length).toBeGreaterThan(0)
+      expect(browser.length).toBeGreaterThan(0)
+      expect(await Promise.all([...server, ...browser].map(gone))).toEqual([...server, ...browser].map(() => true))
+    }
+    finally {
+      await Promise.all([dir, stopped].map(async each => rm(each, { recursive: true, force: true })))
+    }
+  }, 120_000)
+
+  it('opens the pages at the path trailingSlash gives them', async () => {
+    const slashed = await project('a11y-slash-', 'export default { trailingSlash: \'always\' }\n', {
+      'index.kay': 'head\n  title Home\nmain\n  h1 Home\n',
+      'about.kay': 'head\n  title About\nmain\n  h1 About\n',
+    })
+
+    try {
+      const { code, stdout } = await run(slashed, ['.', '--format', 'json', '--dry-run'])
+      const report = JSON.parse(stdout) as ReturnType<typeof reportOf>
+
+      expect(code).toBe(0)
+      expect(report.skipped).toEqual([])
+      expect(report.audited.map(page => page.path).toSorted()).toEqual(['/', '/about/'])
+    }
+    finally {
+      await rm(slashed, { recursive: true, force: true })
+    }
+  }, 120_000)
+
+  it('says in the text and in the JSON why a run that audited no page failed', async () => {
+    const empty = await project('a11y-empty-', 'export default {}\n', { 'tags/[tag].kay': 'head\n  title Tag\nmain\n  h1 Tag\n' })
+
+    try {
+      const text = await run(empty, ['.', '--dry-run'])
+      const json = await run(empty, ['.', '--dry-run', '--format', 'json'])
+
+      expect(text.code).toBe(1)
+      expect(text.stdout).toContain('0 pages audited, 1 not audited, 0 findings')
+      expect(text.stdout).toContain('kay a11y: no page could be audited, which fails the run')
+      expect(json.code).toBe(1)
+      expect(JSON.parse(json.stdout)).toMatchObject({ audited: [], failure: 'no page could be audited, which fails the run' })
+    }
+    finally {
+      await rm(empty, { recursive: true, force: true })
+    }
+  }, 120_000)
+
   it('audits and prints with --dry-run, and writes no draft', async () => {
     const file = join(clean, 'out', 'dry.md')
     const { code, stdout } = await run(clean, ['.', '--declaration', file, '--dry-run'])
@@ -221,5 +316,15 @@ describe.skipIf(skipBrowser)('kay a11y on a site', () => {
     expect(stdout).toContain('Draft statement, not written')
     expect(existsSync(file)).toBe(false)
     expect(existsSync(join(clean, '.kay', 'a11y', 'declaration.md'))).toBe(false)
+  }, 120_000)
+
+  it('says it is a dry run in the JSON, and writes no draft either', async () => {
+    const file = join(clean, 'out', 'dry-json.md')
+    const { code, stdout } = await run(clean, ['.', '--declaration', file, '--dry-run', '--format', 'json'])
+    const report = JSON.parse(stdout) as { dryRun: boolean, declaration: string, failure: string | null }
+
+    expect(code).toBe(0)
+    expect(report).toMatchObject({ dryRun: true, declaration: file, failure: null })
+    expect(existsSync(file)).toBe(false)
   }, 120_000)
 })

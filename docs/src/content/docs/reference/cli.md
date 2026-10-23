@@ -386,7 +386,7 @@ It opens a page once for each locale, and a page with params once for each value
 
 The report groups the findings by rule, then by page. Each element comes with the `.kay` file, line and column it was written at, when the development build marked it. The command exits with 1 when it finds anything, so CI can run it.
 
-It also drafts the accessibility statement as Markdown, in `.kay/a11y/declaration.md` or the file `--declaration` names. It lists the pages audited and the pages left out. Every criterion is marked verified, failed or to review by hand. `--standard rgaa` lists the 106 criteria of RGAA 4.1 in French, and is the default when the default locale is French. `--standard wcag` lists the WCAG 2.1 success criteria in English.
+It also drafts the accessibility statement as Markdown, in `.kay/a11y/declaration.md` or the file `--declaration` names, and writes none with `--dry-run`. It lists the pages audited and the pages left out. Every criterion is marked verified, failed or to review by hand. `--standard rgaa` lists the 106 criteria of RGAA 4.1 in French, and is the default when the default locale is French. `--standard wcag` lists the WCAG 2.1 success criteria in English.
 
 A criterion is verified only when axe-core fully decides it and every page was audited, which is the case of 8.3 (the page has a language) and 8.5 (the page has a title) in RGAA, and of none in WCAG. The run fails when no page could be audited. A criterion fails when a rule that breaks it fails on a page. All the others stay to review: automatic checks find a part of the problems, and the declaration needs an audit by a person. What axe-core finds that no criterion takes in is listed apart.
 
@@ -395,7 +395,7 @@ A criterion is verified only when axe-core fully decides it and every page was a
 | `--standard rgaa\|wcag` | The criteria the draft lists, RGAA by default for a French site |
 | `--dry-run` | Audits and prints, and writes no draft |
 | `--declaration <file>` | Where the draft is written |
-| `--format text\|json` | One JSON document with the pages, the findings and the criteria |
+| `--format text\|json` | One JSON document with the pages, the findings and the criteria, and `failure`, the reason when no page was audited |
 | `--quiet` | Do not print each page as it is opened |
 
 ## kay screenshot

@@ -16,6 +16,9 @@ export function reportOf(audit: Audit, standard: Standard): A11yReport {
   return { ...audit, standard, criteria: judge(standard, audit.violations, audit.audited.length > 0 && audit.skipped.length === 0), unfiled: unfiled(standard, audit.violations) }
 }
 
+// Why a run that audited no page failed, for the JSON document.
+export const NO_PAGE_AUDITED = 'no page could be audited, which fails the run'
+
 // Whether the audit fails a CI run: any finding, a page the site got wrong, or no page audited at all.
 export function failed(report: Pick<A11yReport, 'audited' | 'violations' | 'skipped'>): boolean {
   return report.audited.length === 0 || report.violations.length > 0 || report.skipped.some(page => page.failed)

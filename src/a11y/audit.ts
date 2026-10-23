@@ -84,12 +84,10 @@ export async function auditSite(root: string, config: KayConfig, progress: (path
         continue
       }
 
-      let failure: unknown
+      const failures: unknown[] = []
 
       // A tab that fails on a loaded machine gets a second, fresh try before the page is reported.
       for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
-        failure = undefined
-
         try {
           // Each page as a first visit: the locale cookie of the one before would send this one to another.
           if (page === undefined) {
@@ -113,6 +111,8 @@ export async function auditSite(root: string, config: KayConfig, progress: (path
           if (landed !== new URL(url).pathname) {
             skipped.push({ path: target.path, route: target.route, file: target.file, why: `it lands on ${landed}`, whyFr: `elle redirige vers ${landed}`, failed: false })
 
+            failures.length = 0
+
             break
           }
 
@@ -121,19 +121,21 @@ export async function auditSite(root: string, config: KayConfig, progress: (path
           result.audited.push({ path: target.path, route: target.route, file: target.file, locale: target.locale })
           result.violations.push(...violations)
 
+          failures.length = 0
+
           break
         }
         catch (error) {
-          failure = error
+          failures.push(error)
           page?.close()
           page = undefined
         }
       }
 
-      if (failure !== undefined) {
-        const message = failure instanceof Error ? failure.message : String(failure)
+      if (failures.length > 0) {
+        const { why, whyFr } = browserFailure(failures)
 
-        skipped.push({ path: target.path, route: target.route, file: target.file, why: `the browser could not check it: ${message}`, whyFr: `le navigateur n'a pas pu la vérifier : ${message}`, failed: true })
+        skipped.push({ path: target.path, route: target.route, file: target.file, why, whyFr, failed: true })
       }
     }
   }
@@ -144,6 +146,18 @@ export async function auditSite(root: string, config: KayConfig, progress: (path
   }
 
   return result
+}
+
+// The reason a page the browser failed on every attempt is left out: the first error is the likelier cause, so it is kept beside the last one when they differ.
+export function browserFailure(errors: unknown[]): Pick<Skipped, 'why' | 'whyFr'> {
+  const messages = errors.map(error => error instanceof Error ? error.message : String(error))
+  const [first] = messages
+  const last = messages.at(-1)
+
+  if (messages.length < 2 || first === last)
+    return { why: `the browser could not check it: ${last}`, whyFr: `le navigateur n'a pas pu la vérifier : ${last}` }
+
+  return { why: `the browser could not check it: ${first}; then: ${last}`, whyFr: `le navigateur n'a pas pu la vérifier : ${first} ; puis : ${last}` }
 }
 
 // What the server answers a page with before the browser opens it: only a 200 is audited, as a redirect lands on another page and a refusal is a sign-in the audit has none for.

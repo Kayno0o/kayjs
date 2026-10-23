@@ -4,7 +4,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { A11yRefusedError, auditSite } from '../a11y/audit'
-import { declaration, failed, formatReport, reportOf, tally } from '../a11y/report'
+import { declaration, failed, formatReport, NO_PAGE_AUDITED, reportOf, tally } from '../a11y/report'
 import { KAY_DIR } from '../build/assets'
 import { loadConfig } from '../config'
 import { buildingWithoutEnv } from '../server/env-state'
@@ -55,7 +55,7 @@ export const a11y: Command = {
       }
 
       if (format === 'json') {
-        printDocument({ ...report, declaration: file, dryRun })
+        printDocument({ ...report, declaration: file, dryRun, failure: report.audited.length === 0 ? NO_PAGE_AUDITED : null })
       }
       else {
         const counts = tally(report.criteria)
@@ -69,7 +69,7 @@ export const a11y: Command = {
         console.log(`${dryRun ? 'Draft statement, not written' : 'Draft statement'}: ${relative(process.cwd(), file) || file}`)
 
         if (report.audited.length === 0)
-          console.log('kay a11y: no page could be audited, which fails the run')
+          console.log(`kay a11y: ${NO_PAGE_AUDITED}`)
       }
 
       return failed(report) ? 1 : 0
