@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { scratchDir, testSite } from 'kay/test'
-import { createLists } from '../src/list'
+import { CONFIRMS_PER_HOUR, createLists } from '../src/list'
 import { normalizeAddress } from '../src/list-address'
 import { openLists } from '../src/list-store'
 import { checkToken, signToken } from '../src/list-token'
@@ -12,7 +12,7 @@ import { outbox } from '../src/outbox'
 
 interface Subscribe { email: string, wording?: string }
 
-const { subscribe, subscribeStrict, subscribeCounted } = await import(`${import.meta.dir}/fixture/src/routes/subscribe.kay`) as Record<'subscribe' | 'subscribeStrict' | 'subscribeCounted', Action<Subscribe, unknown>>
+const { subscribe, subscribeStrict, subscribeCounted, subscribeFlood } = await import(`${import.meta.dir}/fixture/src/routes/subscribe.kay`) as Record<'subscribe' | 'subscribeStrict' | 'subscribeCounted' | 'subscribeFlood', Action<Subscribe, unknown>>
 const { subscribeNoticed } = await import(`${import.meta.dir}/fixture/src/routes/notice.kay`) as Record<'subscribeNoticed', Action<Subscribe, unknown>>
 const { rendered } = await import(`${import.meta.dir}/fixture/src/counter`) as typeof import('./fixture/src/counter')
 const { mail } = await import(`${import.meta.dir}/fixture/src/mail`) as typeof import('./fixture/src/mail')
@@ -93,6 +93,7 @@ describe('list tokens', () => {
       process.env.NODE_ENV = 'production'
       delete process.env.KAY_SECRET
       expect(() => signToken('unsubscribe', claims)).toThrow('KAY_SECRET')
+      expect(checkToken('unsubscribe', 'abc.def')).toEqual({ ok: false, reason: 'invalid' })
 
       process.env.KAY_SECRET = 'a'.repeat(40)
 
@@ -177,6 +178,20 @@ describe('the subscribe form', () => {
 
     expect(new Set(answers.map(answer => JSON.stringify(answer))).size).toBe(1)
     expect(outbox.to(email)).toHaveLength(3)
+  })
+
+  it('sends a list\'s confirmation mails at most a fixed number an hour, whoever asks, and answers the same after', async () => {
+    const emails = Array.from({ length: CONFIRMS_PER_HOUR + 2 }, () => fresh())
+    const answers = []
+
+    for (const email of emails)
+      answers.push(await site.call(subscribeFlood, { email }))
+
+    await site.runJobs()
+
+    expect(new Set(answers.map(answer => JSON.stringify(answer))).size).toBe(1)
+    expect(emails.filter(email => outbox.to(email).length > 0)).toHaveLength(CONFIRMS_PER_HOUR)
+    expect(outbox.to(emails.at(-1)!)).toHaveLength(0)
   })
 
   it('refuses a post past the limit of its address, the same whatever the address is', async () => {
@@ -371,6 +386,18 @@ describe('unsubscribing', () => {
     expect(first.status).toBe(200)
     expect(await first.text()).toContain('You are unsubscribed')
     expect(await second.text()).toContain('You are unsubscribed')
+    expect((await mail.list().subscribers()).map(row => row.email)).not.toContain(email)
+  })
+
+  it('unsubscribes an address that subscribed again through the link of its earlier mail', async () => {
+    const { email } = await subscribed()
+    const { token } = await listMail(email)
+
+    await mail.list().unsubscribe(email)
+    await subscribed(email)
+    expect((await mail.list().subscribers()).map(row => row.email)).toContain(email)
+
+    expect(await (await site.fetch(link(token), { method: 'POST', body: ONE_CLICK })).text()).toContain('You are unsubscribed')
     expect((await mail.list().subscribers()).map(row => row.email)).not.toContain(email)
   })
 

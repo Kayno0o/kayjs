@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test'
+import { parseMailUrl } from '../src/env'
 import { mail, mailExtension } from '../src/mailer'
 
 describe('the mail extension\'s environment', () => {
@@ -25,5 +26,18 @@ describe('mail()', () => {
   it('is what mailExtension gives for a path or a function', () => {
     expect(mailExtension('./src/mail').serverModule).toEqual({ path: './src/mail', export: 'mail' })
     expect(mailExtension(async () => ({}) as never).serverModule).toBeUndefined()
+  })
+})
+
+describe('MAIL_URL', () => {
+  it('names MAIL_URL for a login that is no percent-encoding, instead of a bare URIError', () => {
+    expect(() => parseMailUrl('smtp://ada:100%@mail.example.com')).toThrow('MAIL_URL')
+    expect(parseMailUrl('smtp://ada:p%40ss@mail.example.com')).toMatchObject({ user: 'ada', pass: 'p@ss' })
+  })
+
+  it('reads smtps: as TLS from the start on any port, and smtp: as the port decides', () => {
+    expect(parseMailUrl('smtps://mail.example.com:2465')).toMatchObject({ port: 2465, secure: true })
+    expect(parseMailUrl('smtps://mail.example.com')).toMatchObject({ port: 465, secure: true })
+    expect(parseMailUrl('smtp://mail.example.com:587').secure).toBeUndefined()
   })
 })

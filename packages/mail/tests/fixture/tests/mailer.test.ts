@@ -21,7 +21,7 @@ describe('rendering', () => {
   it('renders a .kay mail as a whole html document, themed by the app\'s settings, and writes its text from it', async () => {
     const rendered = await mail.render({ to: 'ada@example.com', subject: 'Welcome <Ada>', view: Welcome, props: { name: 'Ada', url: URL } })
 
-    expect(rendered.html).toStartWith('<!doctype html><html lang="fr" xmlns:v="urn:schemas-microsoft-com:vml"')
+    expect(rendered.html).toStartWith('<!doctype html><html lang="fr" dir="ltr" xmlns:v="urn:schemas-microsoft-com:vml"')
     expect(rendered.html).toContain('<title>Welcome &lt;Ada&gt;</title>')
     expect(rendered.html).toContain('background:#0047ff')
     expect(rendered.text).toBe(`Welcome, Ada\n\nYour account is ready. Confirm your address to start.\n\nConfirm my address (${URL})\n\nOr paste ${URL} into your browser.\n\nSent by the fixture site`)
@@ -95,6 +95,14 @@ describe('rendering', () => {
     expect((await mailer({ from: 'hello@fixture.test', queue: { name: 'default-lang' } }).render({ to: 'ada@example.com', subject: 'Hi', view: Hello })).html).toContain('<html lang="en"')
   })
 
+  it('writes the html direction from the locale, and takes an html mail\'s language from the mailer', async () => {
+    const arabic = await mail.render({ to: 'ada@example.com', subject: 'Hi', html: '<p>Hi</p>', locale: 'ar' })
+    const own = await mail.render({ to: 'ada@example.com', subject: 'Hi', html: '<p>Hi</p>' })
+
+    expect(arabic.html).toContain('<html lang="ar" dir="rtl"')
+    expect(own.html).toContain('<html lang="fr" dir="ltr"')
+  })
+
   it('still reads lang, the old name of locale, on a message and on the mailer, the new name winning', async () => {
     const legacy = { lang: 'fr' }
     const old = mailer({ from: 'hello@fixture.test', ...legacy, queue: { name: 'old-lang' } })
@@ -108,7 +116,7 @@ describe('rendering', () => {
     const single = await mail.render({ to: 'ada@example.com', subject: 'News', text: 'Hi', unsubscribe: 'https://fixture.test/unsubscribe?u=1&t=<x>' })
     const both = await mail.render({ to: 'ada@example.com', subject: 'News', text: 'Hi', unsubscribe: { url: 'https://fixture.test/u', address: 'unsubscribe@fixture.test' } })
 
-    expect(single.headers).toEqual({ 'List-Unsubscribe': '<https://fixture.test/unsubscribe?u=1&t=%3Cx%3E>', 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' })
+    expect(single.headers).toEqual({ 'Message-ID': expect.stringMatching(/^<[\w-]+@fixture\.test>$/), 'List-Unsubscribe': '<https://fixture.test/unsubscribe?u=1&t=%3Cx%3E>', 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' })
     expect(both.headers['List-Unsubscribe']).toBe('<https://fixture.test/u>, <mailto:unsubscribe@fixture.test>')
     await expect(mail.render({ to: 'ada@example.com', subject: 'News', text: 'Hi', unsubscribe: 'http://fixture.test/u' })).rejects.toThrow('it takes an https URL')
   })
@@ -294,9 +302,12 @@ describe('the outbox helpers', () => {
 describe('the queue', () => {
   it('renders a mail when enqueued and sends it once drained, retrying a failure', async () => {
     const sent: Mail[] = []
+    const attempts: (string | undefined)[] = []
     let failures = 1
     const flaky: Transport = {
       send: async (queued) => {
+        attempts.push(queued.headers['Message-ID'])
+
         if (failures-- > 0)
           throw new Error('server away')
 
@@ -315,6 +326,10 @@ describe('the queue', () => {
     expect(await queued.drain()).toBe(1)
     expect(sent.map(each => each.subject)).toEqual(['Queued'])
     expect(sent[0]!.html).toContain('Welcome, Ada')
+    // Every attempt goes out under the id of the first.
+    expect(attempts).toHaveLength(2)
+    expect(attempts[0]).toMatch(/^<[\w-]+@example\.com>$/)
+    expect(attempts[1]).toBe(attempts[0])
   })
 
   it('lists the mails it gave up on, and removes a person\'s queued and failed mails, by recipient, id or match', async () => {

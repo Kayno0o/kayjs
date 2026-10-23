@@ -8,6 +8,7 @@ import type { Address, Delivery, Envelope, Mail, MailMessage, Transport } from '
 import process from 'node:process'
 import { Elysia } from 'elysia'
 import { s } from 'kay'
+import { direction } from 'kay/i18n'
 import { callHook, configError, escapeHtml as escape, inFlightWork, underKayDev } from 'kay/library'
 import { defineEnv, queue, renderLocale, renderToString } from 'kay/server'
 import parseAddresses from 'nodemailer/lib/addressparser'
@@ -195,7 +196,7 @@ function asDocument(html: string, subject: string, lang: string): string {
   // Light alone unless the styles carry dark colours, so a client never inverts some colours and leaves others.
   const schemes = styles.some(style => DARK_RULES.test(style)) ? 'light dark' : 'light'
 
-  return `<!doctype html><html lang="${escape(lang)}" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="x-apple-disable-message-reformatting" content="true"><meta name="color-scheme" content="${schemes}"><meta name="supported-color-schemes" content="${schemes}"><title>${escape(subject)}</title>${OUTLOOK_SETTINGS}${styles.join('')}</head><body style="margin:0;padding:0">${html.replace(STYLE_ELEMENT, '')}</body></html>`
+  return `<!doctype html><html lang="${escape(lang)}" dir="${direction(lang)}" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="x-apple-disable-message-reformatting" content="true"><meta name="color-scheme" content="${schemes}"><meta name="supported-color-schemes" content="${schemes}"><title>${escape(subject)}</title>${OUTLOOK_SETTINGS}${styles.join('')}</head><body style="margin:0;padding:0">${html.replace(STYLE_ELEMENT, '')}</body></html>`
 }
 
 // RFC 8058's one-click unsubscribe, which Gmail and Yahoo require of bulk senders.
@@ -267,7 +268,7 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
   const missing = () => [...server === undefined ? ['MAIL_URL'] : [], ...from === undefined && env.MAIL_FROM === undefined && defaultSender() === undefined ? ['MAIL_FROM'] : []]
 
   // Built on the first mail, as `kay build` runs without the server's environment and leaves a missing variable to throw where it is read.
-  const opened = () => transport ??= smtp({ host: server!.host, port: server!.port, insecure: env.MAIL_INSECURE, user: server!.user, pass: server!.pass, rateLimit, name: greetingOf(domainOf(sender())), ...defined(overrides), dkim: dkimKey === undefined ? undefined : { domain: env.MAIL_DKIM_DOMAIN ?? domainOf(sender())!, selector: env.MAIL_DKIM_SELECTOR!, privateKey: dkimKey } })
+  const opened = () => transport ??= smtp({ host: server!.host, port: server!.port, secure: server!.secure, insecure: env.MAIL_INSECURE, user: server!.user, pass: server!.pass, rateLimit, name: greetingOf(domainOf(sender())), ...defined(overrides), dkim: dkimKey === undefined ? undefined : { domain: env.MAIL_DKIM_DOMAIN ?? domainOf(sender())!, selector: env.MAIL_DKIM_SELECTOR!, privateKey: dkimKey } })
 
   return {
     transport: {
@@ -398,7 +399,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     const unsubscribe = message.unsubscribe === undefined ? {} : unsubscribeHeaders(message.unsubscribe, message.subject)
     // The locale the component renders `t()` in, which the document's `lang` follows: the message's, else the mailer's, else the site's default or the request's.
     const chosen = message.locale ?? message.lang ?? options.locale ?? options.lang
-    const rendered = message.view ? await renderLocale(chosen) : chosen ?? 'en'
+    const rendered = message.view ? await renderLocale(chosen) : chosen ?? await renderLocale()
     const markup = message.view ? await renderToString(message.view, ...[message.props, chosen === undefined ? undefined : { locale: chosen }] as never) : message.html
     const html = markup === undefined ? undefined : asDocument(markup, message.subject, rendered)
 
@@ -411,7 +412,8 @@ export function mailer(options: MailerOptions = {}): Mailer {
       subject: message.subject,
       html,
       text: message.text ?? htmlToText(html!),
-      headers: { ...unsubscribe, ...message.headers },
+      // Made here, once, so every retry of a queued mail goes out under the id of the first attempt and a relay that took it twice can tell.
+      headers: { ...Object.keys(message.headers ?? {}).some(header => header.toLowerCase() === 'message-id') ? {} : { 'Message-ID': `<${crypto.randomUUID()}@${domainOf(from ?? sender()) ?? 'localhost'}>` }, ...unsubscribe, ...message.headers },
       attachments: message.attachments ?? [],
     }
   }
@@ -486,7 +488,12 @@ export function mailer(options: MailerOptions = {}): Mailer {
 
     return owner(mail)
   }
-  const jobs = queue<Queued>(name, deliverQueued, {
+  const jobs = queue<Queued>(name, async (mail, signal) => {
+    // A run the queue gave up on (stopped, or past lostAfter) sends nothing, so the retry is the only one to.
+    signal.throwIfAborted()
+
+    return deliverQueued(mail)
+  }, {
     ...queueOptions,
     keepFailed: queueOptions.keepFailed ?? FAILED_KEPT,
     redact: queueOptions.redact ?? withoutBody,

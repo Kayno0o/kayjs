@@ -57,7 +57,7 @@ In production the mailer reads its settings from the environment. `MAIL_URL` is 
 | `MAIL_INSECURE` | Optional. `true` sends in clear to a server without STARTTLS, such as a local Mailpit. |
 | `MAIL_TO` | Optional. Where a mail naming no recipient goes, such as a contact form's. |
 
-On a port other than 465 a server not offering STARTTLS is refused, at the first mail and in a warning when the server starts. Set `MAIL_INSECURE=true` for a local Mailpit. A password in `MAIL_URL` overrides it, so a password never goes in clear.
+`smtps://` instead of `smtp://` speaks TLS from the start on any port. On a port other than 465 with `smtp://` a server not offering STARTTLS is refused, at the first mail and in a warning when the server starts. Set `MAIL_INSECURE=true` for a local Mailpit. A password in `MAIL_URL` overrides it, so a password never goes in clear.
 
 The names kayjs-mail read before 1.70, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_INSECURE`, `SMTP_DKIM_*`, `SMTP_FROM` and `SMTP_RATE_LIMIT`, still work until 1.73, with a warning naming the new one.
 
@@ -319,7 +319,7 @@ The page the form was on and the id of the notice are kept with the confirmation
 
 Every visitor sees the same answer, whether the address is new, waiting, already listed or refused, so the form tells nothing about who subscribed. A confirmed address is mailed nothing.
 
-The form cannot be used to mail-bomb someone. Each IP may post 10 times every 10 minutes, a honeypot and a minimum time catch bots, and one address gets at most 3 confirmation mails an hour. Past that the answer stays the same and nothing is sent.
+The form cannot be used to mail-bomb someone. Each IP may post 10 times every 10 minutes, a honeypot and a minimum time catch bots, and one address gets at most 3 confirmation mails an hour and a list at most 300. Past that the answer stays the same and nothing is sent.
 
 Links in the mails are signed with the app secret (`KAY_SECRET`), hold a random id and never the address, and a link made for confirming cannot unsubscribe. A forged, expired, used or unknown link shows one page that says it does not work.
 

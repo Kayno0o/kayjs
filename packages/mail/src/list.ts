@@ -146,6 +146,9 @@ function sourceOf(ctx: ActionContext): string {
   }
 }
 
+// The confirmation mails one list sends in an hour, whoever asks.
+export const CONFIRMS_PER_HOUR = 300
+
 function randomId(): string {
   return Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString('base64url')
 }
@@ -208,6 +211,8 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
   // The stores given to a list, which an erase reaches beside the files.
   const given = new Set<ListStore>(fallback.store === undefined ? [] : [fallback.store])
   const addressLimit = rateLimit('kmail-list-address', { max: 3, window: '1h' })
+  // Across every address of one list, which the per-IP limit alone does not stop from a botnet.
+  const confirmLimit = rateLimit('kmail-list-confirm', { max: CONFIRMS_PER_HOUR, window: '1h' })
 
   const open = (file: string): ListStore => {
     let lists = files.get(file)
@@ -301,9 +306,14 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
           if (await addressLimit.hit(keyedDigest('mail-list', `${name}\n${email}`)) !== undefined)
             return undefined
 
+          // A list sends at most this many confirmation mails an hour, so a botnet cannot turn the form into a flood from the app's sender.
+          if (await confirmLimit.hit(name) !== undefined)
+            return undefined
+
           const locale = await renderLocale()
           const origin = siteOrigin()
-          const subscriber = await lists.get().ask(name, email, randomId(), locale, Date.now(), { source: sourceOf(ctx), wording: input.wording })
+          // Derived from the list and the address rather than drawn, so the unsubscribe link of an earlier mail still removes the address after it subscribed again.
+          const subscriber = await lists.get().ask(name, email, keyedDigest('mail-list-id', `${name}\n${email}`), locale, Date.now(), { source: sourceOf(ctx), wording: input.wording })
 
           const url = `${origin}${LIST_PATH}/confirm?token=${signToken('confirm', { list: name, id: subscriber.id, locale })}`
           const site = new URL(origin).host

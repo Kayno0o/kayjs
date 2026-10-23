@@ -78,21 +78,31 @@ export interface MailServer {
   port: number
   user: string | undefined
   pass: string | undefined
+  // `smtps:` speaks TLS from the start on any port.
+  secure: true | undefined
 }
 
-// The server `MAIL_URL` names: `smtp://user:pass@host:port`, the login and the port optional, the port 465 when left out.
+// The server `MAIL_URL` names: `smtp://user:pass@host:port`, the login and the port optional, the port 465 when left out. `smtps:` speaks TLS from the start on any port.
 export function parseMailUrl(value: string): MailServer {
   const url = URL.parse(value)
 
   if (url === null || (url.protocol !== 'smtp:' && url.protocol !== 'smtps:') || url.hostname === '')
     throw configError('MAIL_URL is no SMTP server: write it as smtp://user:pass@mail.example.com:465, the login and the port optional, a password with special characters percent-encoded')
 
-  const [user, pass] = [url.username === '' ? undefined : decodeURIComponent(url.username), url.password === '' ? undefined : decodeURIComponent(url.password)]
+  let user: string | undefined
+  let pass: string | undefined
+
+  try {
+    [user, pass] = [url.username === '' ? undefined : decodeURIComponent(url.username), url.password === '' ? undefined : decodeURIComponent(url.password)]
+  }
+  catch {
+    throw configError('the login in MAIL_URL has a malformed percent-encoding: write a password with special characters percent-encoded, as %40 for @ and %25 for %')
+  }
 
   if ((user === undefined) !== (pass === undefined))
     throw configError('the login in MAIL_URL needs a user and a password, written smtp://user:pass@host: give both, or neither for a server that needs no login')
 
-  return { host: url.hostname, port: url.port === '' ? DEFAULT_PORT : Number(url.port), user, pass }
+  return { host: url.hostname, port: url.port === '' ? DEFAULT_PORT : Number(url.port), user, pass, secure: url.protocol === 'smtps:' ? true : undefined }
 }
 
 // The address a mail comes from when nothing sets one: `noreply@` the site's host, which has no `www.`. Undefined while the site is unset or has no domain to send from, such as `localhost`.

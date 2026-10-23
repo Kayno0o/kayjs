@@ -5,6 +5,7 @@ import { describe, expect, it } from 'bun:test'
 import { scratchDir } from 'kay/test'
 import { devFile } from '../src/delivery'
 import { createOutbox, outbox } from '../src/outbox'
+import { nodemailerMessage } from '../src/smtp'
 import { logged } from './fixture/tests/logged'
 
 const mail = (subject: string, extra: Partial<Mail> = {}): Mail => ({ from: 'dev@example.com', to: ['ada@example.com'], cc: [], bcc: [], subject, text: `Text of ${subject}`, headers: {}, attachments: [], ...extra })
@@ -105,5 +106,14 @@ describe('the outbox kept in a file', () => {
     outbox.clear()
 
     expect(existsSync(devFile('mail-outbox.json'))).toBe(false)
+  })
+})
+
+describe('the message nodemailer composes', () => {
+  it('takes the Message-ID header as the message id, once', () => {
+    const composed = nodemailerMessage(mail('Id', { headers: { 'Message-ID': '<a@example.com>', 'X-Test': '1' } }))
+
+    expect(composed.messageId).toBe('<a@example.com>')
+    expect(composed.headers).toEqual({ 'X-Test': '1' })
   })
 })

@@ -16,6 +16,8 @@ export interface SmtpSettings {
   host: string
   // 465 by default, which speaks TLS from the start; any other port upgrades through STARTTLS, and a server not offering it is refused.
   port?: number | undefined
+  // Speaks TLS from the start, which port 465 does by default; `true` does on any port, as `smtps://` in MAIL_URL does.
+  secure?: boolean | undefined
   // Sends in clear to a server not offering STARTTLS, such as a local Mailpit; a password still never goes in clear.
   insecure?: boolean | undefined
   user?: string | undefined
@@ -58,7 +60,11 @@ export function checkKey(key: string, what: string): void {
 
 // The message as nodemailer composes it, for the SMTP transport and the outbox page's .eml alike.
 export function nodemailerMessage(mail: Mail) {
+  // A Message-ID the mail carries goes as nodemailer's own option, so a retried mail keeps the id its first attempt had and the header is not written twice.
+  const { 'Message-ID': messageId, ...headers } = mail.headers
+
   return {
+    messageId,
     from: mail.from,
     to: mail.to,
     cc: mail.cc,
@@ -67,7 +73,7 @@ export function nodemailerMessage(mail: Mail) {
     subject: mail.subject,
     text: mail.text,
     html: mail.html,
-    headers: mail.headers,
+    headers,
     attachments: mail.attachments.map(({ filename, content, contentType, cid }) => ({ filename, content: typeof content === 'string' ? content : Buffer.from(content), contentType, cid })),
   }
 }
@@ -209,7 +215,7 @@ async function closeOpened(pending: Promise<Awaited<ReturnType<typeof open>>>): 
   }
 }
 
-async function open({ host, port = DEFAULT_PORT, insecure = false, user, pass, name, maxConnections, rateLimit: cap, dkim }: SmtpSettings, wait: number) {
+async function open({ host, port = DEFAULT_PORT, secure = port === 465, insecure = false, user, pass, name, maxConnections, rateLimit: cap, dkim }: SmtpSettings, wait: number) {
   const auth = user === undefined || pass === undefined ? undefined : { user, pass }
 
   // nodemailer is read with the first mail, so an app that never sends over SMTP never loads it.
@@ -222,9 +228,9 @@ async function open({ host, port = DEFAULT_PORT, insecure = false, user, pass, n
     host,
     port,
     name,
-    secure: port === 465,
+    secure,
     // A server whose STARTTLS was stripped on the way is refused rather than sent a reset link or a password in clear.
-    requireTLS: port !== 465 && (!insecure || auth !== undefined),
+    requireTLS: !secure && (!insecure || auth !== undefined),
     auth,
     dkim: dkim && { domainName: dkim.domain, keySelector: dkim.selector, privateKey: dkim.privateKey },
     connectionTimeout: wait,

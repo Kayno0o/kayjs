@@ -51,7 +51,8 @@ export function checkToken(purpose: TokenPurpose, token: unknown, now = Date.now
   const payload = token.slice(0, dot)
   const given = token.slice(dot + 1)
 
-  if (!secrets().some(secret => sameText(given, signature(secret, purpose, payload))))
+  // With no secret nothing was signed, so every token is invalid rather than a configuration error on a public link.
+  if (!appSecrets()?.some(secret => sameText(given, signature(secret, purpose, payload))))
     return { ok: false, reason: 'invalid' }
 
   let claims: { p?: unknown, l?: unknown, i?: unknown, c?: unknown, e?: unknown }

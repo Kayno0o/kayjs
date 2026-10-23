@@ -13,5 +13,5 @@ form(action={signUp})
     input(name="name")
   label
     | Email
-    input(name="email" type="email")
+    input(name="email" type="email" autocomplete="email")
   button Sign up
