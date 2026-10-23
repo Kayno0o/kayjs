@@ -165,6 +165,8 @@ Every page carries one short script that looks for either cookie, so a visitor w
 
 With another way of signing in, an editor who never opened the admin sees no button until they open it once.
 
+A link to the button from another site does not open edit mode by itself. It lands on a page with one button that does, so no other site can put a signed-in editor in edit mode.
+
 To place the link yourself, write an `a(data-kcms-edit-page hidden)` in your layout. The cms fills in its address, shows it, and writes its text when it is empty, instead of drawing its own button. `cms({ pageLink: false })` turns the button off, and the hint cookie with it.
 
 The editor never covers the page it edits. From 64rem wide it docks to the right and moves the page's body aside by its width. On a narrower window, and always below 40rem, it is a sheet at the bottom and pads the page by its height, so the page keeps its width and a fixed header at the top stays in view. At the side, the editor starts under a header fixed or sticky across the top of the window, so the header stays visible, and the dev tool's bar and floating drawer sit outside it.
@@ -176,6 +178,8 @@ While the page updates, the editor says so in a line screen readers announce. If
 Drag the editor's inner edge, or focus it and press the arrow keys, to resize it. The button in its head docks it to the other edge, and the hide button folds it into one button. It remembers the edge, the size and whether it is hidden in the browser.
 
 What you type is kept in the browser, so a reload, a crash or a second tab brings it back with a note saying so. Save, Reset and Stop editing clear it. A draft is kept a week at most, and one made from an older copy of the entry than the saved one is left out with a note, so it never writes over a newer save. Reloading, closing the tab or following a link with changes not saved asks first.
+
+The admin also marks the browser with a `kcms_editor` cookie holding a digest of the person signed in, and drafts are kept under it, so another person on the same browser does not meet them. Signing out clears every kept draft.
 
 Stop editing clears every kept draft of the browser, but a draft left by a visit that ended another way stays until the week passes, and the edit cookie names no user, so on a browser several people sign in to, they should leave with Stop editing. Where the browser gives no storage, edits are only kept until the page closes.
 
@@ -579,7 +583,7 @@ A deleted entry may hold a visitor's data, and the history holds the names of yo
 
 ### Seeing what editors did
 
-When a collection keeps a history, the content list has an Activity button. It opens one page listing what editors did across the collections, newest first, a page at a time: who, when, and whether the entry was created, saved, published, unpublished, duplicated, deleted, restored or renamed.
+When a collection keeps a history, the content list has an Activity button, shown to a role that may delete when you list roles, as the page names every editor. It opens one page listing what editors did across the collections, newest first, a page at a time: who, when, and whether the entry was created, saved, published, unpublished, duplicated, deleted, restored or renamed.
 
 Each line links to the entry, except a deleted one. The log keeps the last 500 events of each collection, and a collection left out with `history: false` adds nothing to it.
 

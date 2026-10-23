@@ -363,6 +363,9 @@ export default defineMessages({
     },
     page: {
       edit: 'Modifier cette page',
+      enterConfirm: 'Modifier cette page',
+      enterMessage: 'Un autre site vous a envoyé ici. Ouvrir la page en mode édition ?',
+      enterTitle: 'Modifier cette page',
     },
     pageList: {
       actions: 'Que faire de {item} ?',

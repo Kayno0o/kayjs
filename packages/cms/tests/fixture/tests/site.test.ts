@@ -1,3 +1,4 @@
+import type { Action } from 'kay'
 import { join } from 'node:path'
 import process from 'node:process'
 import { beforeAll, expect, setSystemTime, test } from 'bun:test'
@@ -44,6 +45,31 @@ test('kay renders the editor in edit mode alone, a form per entry the page read,
   expect(page.find('.kcms-entry-title').map(title => title.text)).toEqual(['Posts'])
   expect(page.find('.kcms-entry-slug').map(slug => slug.text)).toEqual(['hello'])
   expect(page.find('.kcms-entry-loading')).toHaveLength(1)
+})
+
+// The route file is imported by path, which the checker cannot follow into the linked package.
+const PAGE_ROUTE = '../../../src/routes/page.kay'
+
+test('a link from another site waits for the editor\'s click, and only a post from this site puts the visitor in edit mode', async () => {
+  const arriving = await testSite({ root: ROOT })
+  const response = await arriving.fetch('/admin/page?path=/blog/hello', { headers: { 'sec-fetch-site': 'cross-site' }, redirect: 'manual' })
+
+  expect(response.status).toBe(200)
+  expect(await response.text()).toContain('name="path"')
+  expect((await arriving.visit('/blog/hello')).find('aside.kcms-editor')).toEqual([])
+
+  const { enterEditing } = await import(PAGE_ROUTE) as { enterEditing: Action<{ path?: string | undefined }, unknown> }
+
+  expect((await arriving.submit(enterEditing, { path: '/blog/hello' }, { from: '/admin/page' })).url).toBe('/blog/hello')
+  expect((await arriving.visit('/blog/hello')).find('aside.kcms-editor')).toHaveLength(1)
+})
+
+test('an edit link\'s holder, whom the guard refuses, is told apart from a signed-in editor by the answer of /can', async () => {
+  const holder = await testSite({ root: ROOT })
+
+  await holder.visit('/admin/page?path=/blog/hello')
+  expect((await holder.fetch('/_kay/cms/editor/can')).status).toBe(200)
+  expect((await holder.fetch('/_kay/cms/editor/can', { headers: { 'x-deny': '1' } })).status).toBe(403)
 })
 
 test('stopping editing leaves edit mode, the page rendering no editor again', async () => {

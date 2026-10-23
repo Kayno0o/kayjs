@@ -1,9 +1,36 @@
 --- server
-import { localPath } from 'kay'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import { localPath, s } from 'kay'
 import { enterPreview } from 'kay/server'
+import { wording } from 'kay/words'
+import { adminTitle } from '../listing'
 import { settings } from '../settings'
 
-// The screens' guard let the request in, so it may edit the page it names; a missing or outside path lands back on the screens.
-enterPreview(ctx, { edit: true })
-ctx.redirect(localPath(ctx.url.searchParams.get('path'), settings().prefix))
+export const page = { noindex: true }
+
+function enter(ctx: { cookies: Bun.CookieMap, request: Request, redirect: (to: string) => never }, path: string | null | undefined): never {
+  enterPreview(ctx, { edit: true })
+
+  return ctx.redirect(localPath(path, settings().prefix))
+}
+
+// The button of a page another site linked to: entering edit mode is a write, so it takes a post from this site.
+export const enterEditing = action(s.Object({ path: s.Optional(s.String({ maxLength: 2000 })) }), async ({ path }, ctx) => {
+  enter(ctx, path)
+})
+
+const path = ctx.url.searchParams.get('path')
+const fetchSite = ctx.request.headers.get('sec-fetch-site')
+
+// A link from this site, a bookmark or a typed address enters at once; one from another site waits for the editor's click, so no page can put a signed-in editor in edit mode by a link. A missing or outside path lands back on the screens.
+if (fetchSite === null || fetchSite === 'same-origin' || fetchSite === 'none')
+  enter(ctx, path)
 ---
+head
+  title {adminTitle(wording('cms.page.enterTitle', 'Edit this page'))}
+.kcms-sign-in
+  h1 {wording('cms.page.enterTitle', 'Edit this page')}
+  p {wording('cms.page.enterMessage', 'Another site sent you here. Open the page in edit mode?')}
+  form(action={enterEditing})
+    input(type="hidden" name="path" value={path ?? ''})
+    Button(type="submit" tone="accent" label={wording('cms.page.enterConfirm', 'Edit this page')})
