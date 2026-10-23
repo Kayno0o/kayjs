@@ -8,12 +8,12 @@ export const NATIVE_PLUGINS: Record<string, string> = { 'bun-plugin-tailwind': '
 const ENTRY = new RegExp(`[\\\\/]node_modules[\\\\/](${Object.keys(NATIVE_PLUGINS).join('|')})[\\\\/]index\\.mjs$`)
 const STYLESHEET = /\.css$/
 const STYLE_MODULE = /\.module\.css$/
-const EXPORT_STAR = /(?:^|[;{}\n])\s*export\s*\*\s*from\b/
+const EXPORT_STAR = /(?:^|[;{}\n])[ \t]*export\s*\*\s*from\b/
 const transpiler = new Bun.Transpiler({ loader: 'js' })
 let registered = false
 const shims = new Map<string, string>()
 
-// The shim: `default` runs the real plugin, loaded when a build runs it. The other exports are live bindings filled in once the real module loads, as an ES module cannot export a value it has not read. The real file is imported again with a query, which the filter does not match. A bundle re-exporting with `export *` cannot be listed by a scan, so it fails the import instead of missing exports. The scan of a bundle of about 1 MB runs once per file and process.
+// The shim: `default` runs the real plugin, loaded when a build runs it. The other exports are live bindings filled in once the real module loads, as an ES module cannot export a value it has not read. The real file is imported again with a query, which the filter does not match. A bundle re-exporting with `export *` cannot be listed by a scan, so it fails the import instead of missing exports. The scan of a bundle of about 1 MB runs once per module instance, so once per test file under `--isolate`.
 export function shim(name: string, real: string): string {
   const cached = shims.get(real)
 
@@ -66,15 +66,15 @@ const URL_BEFORE = /url$/i
 const HEX = /^[\da-f]{1,6}/i
 const WHITESPACE = /\s/
 
-// The end of a quoted string starting at `start`, whose escapes are skipped.
+// The end of a quoted string starting at `start`, whose escapes are skipped, or of its line when it is never closed, as CSS ends a bad string.
 function stringEnd(css: string, start: number): number {
   const quote = css[start]
   let index = start + 1
 
-  while (index < css.length && css[index] !== quote)
+  while (index < css.length && css[index] !== quote && css[index] !== '\n')
     index += css[index] === '\\' ? 2 : 1
 
-  return index + 1
+  return css[index] === quote ? index + 1 : index
 }
 
 // The end of a `url(` whose opening parenthesis is at `open`: a quoted argument ends at its quote, an unquoted one at the first unescaped `)`.

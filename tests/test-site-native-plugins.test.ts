@@ -130,6 +130,7 @@ it('the class names of a stylesheet are read past hostile and unusual input', ()
   expect(classNameList(`.a { background: url('a)b.png') } .b { background: url( x.png ) } .c { content: "\\" .no" } .d {}`)).toEqual(['a', 'b', 'c', 'd'])
   expect(classNameList('.café, .日本 > .a-é_b { margin: 0.5em; width: 1.5px }')).toEqual(['café', '日本', 'a-é_b'])
   expect(classNameList('.sm\\:flex, .w-1\\/2, .\\31 0, .\\1F600 x, .a\\.b { }')).toEqual(['sm:flex', 'w-1/2', '10', '😀x', 'a.b'])
+  expect(classNameList('.a { content: \'x } \n.b {}')).toEqual(['a', 'b'])
   expect(classNameList('/* .gone */ .x::after { content: ".q" } @media (min-width: .5em) {}')).toEqual(['x'])
 })
 
@@ -146,6 +147,11 @@ it('the shim lists the exports of the real plugin once per file, string names in
   // A cached shim is not read again.
   await Bun.write(real, `export * from './other.mjs'\n`)
   expect(shim('bun-plugin-tailwind', real)).toBe(first)
+
+  const alias = join(dir, 'alias/node_modules/bun-plugin-tailwind/index.mjs')
+
+  await Bun.write(alias, `export * as ns from './other.mjs'\nexport default {}\n`)
+  expect(shim('bun-plugin-tailwind', alias)).toContain('"ns"')
 
   const star = join(dir, 'star/node_modules/bun-plugin-tailwind/index.mjs')
 
