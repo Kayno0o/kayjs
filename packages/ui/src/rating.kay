@@ -4,7 +4,13 @@ import { recipe } from 'kay'
 import Icon from './icon.kay'
 import { wording } from 'kay/words'
 
-const look = recipe({ parts: { root: 'kui-rating', stars: 'kui-rating-stars', fill: 'kui-rating-fill' } })
+const look = recipe({
+  parts: {
+    root: 'kui-rating relative inline-flex text-kui-field-border',
+    stars: 'flex w-max gap-0.5',
+    fill: 'absolute inset-y-0 left-0 overflow-hidden text-kui-warning',
+  },
+})
 
 const { value, max = 5, label, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children' | 'role'> & {
   // Any number from 0 to `max`, so an average such as 4.6 fills part of its fifth star.

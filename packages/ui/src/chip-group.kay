@@ -7,7 +7,16 @@ import { changeAccepted } from './change'
 import { onFormReset, resetWhenIdle, startRef } from './form-reset'
 import Icon from './icon.kay'
 
-const look = recipe({ parts: { root: 'kui-chip-group', chip: 'kui-chip', input: 'kui-chip-input', label: 'kui-chip-label', icon: 'kui-chip-icon' } })
+// 'kui-chip' stays as the name of a chip for an app's CSS and the skins; the label reads the input before it.
+const look = recipe({
+  parts: {
+    root: 'kui-chip-group group/chips flex flex-wrap gap-2',
+    chip: 'kui-chip relative cursor-pointer has-[input:disabled]:cursor-not-allowed has-[input:disabled]:opacity-50 group-aria-busy/chips:cursor-progress',
+    input: 'peer/chip absolute size-0 opacity-0',
+    label: 'inline-flex items-center gap-1 rounded-kui-md border-solid border-(length:--kui-border-width) bg-kui-surface0 px-2.5 py-1 text-xs text-kui-subtext0 transition-colors [border-color:var(--kui-control-line,var(--color-kui-surface2))] hover:text-kui-text peer-checked/chip:border-kui-accent peer-checked/chip:bg-kui-accent peer-checked/chip:text-kui-on-accent peer-checked/chip:hover:text-kui-on-accent peer-focus-visible/chip:outline-2 peer-focus-visible/chip:outline-offset-2 peer-focus-visible/chip:outline-kui-accent',
+    icon: 'size-3.5 shrink-0',
+  },
+})
 
 const { options, value, label, name, disabled = false, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // `icon` sits before the label; `disabled` keeps that chip as it is.
@@ -39,7 +48,7 @@ effect(() => {
   synced++
 })
 
-const boxes = () => [...root?.querySelectorAll<HTMLInputElement>('.kui-chip-input') ?? []]
+const boxes = () => [...root?.querySelectorAll<HTMLInputElement>('[data-part=input]') ?? []]
 
 // Ticks the boxes of `wanted` again, in this group only: the binding may never have seen the box that took the click.
 // A box holds its value as text, so a number option is found by its text.

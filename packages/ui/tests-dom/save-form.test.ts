@@ -352,7 +352,7 @@ describe('SaveForm', () => {
       click(root.querySelector('input[name="power"]'))
       click(root.querySelector(`input[name="decks"][value="${deck}"]`))
       type(root, level, '#level', 'change')
-      click(root.querySelectorAll('.kui-multi-select-checkbox')[1] ?? null)
+      click(root.querySelectorAll('.kui-multi-select [data-part=checkbox]')[1] ?? null)
       type(root, title, '#title')
       await settle()
     }
@@ -383,14 +383,14 @@ describe('SaveForm', () => {
     const root = mounted.root
     const searches = () => [...root.querySelectorAll<HTMLInputElement>('input[type="search"]')].map(box => box.value)
 
-    type(root, 'mo', '.kui-multi-select-search')
+    type(root, 'mo', '.kui-multi-select [data-part=search]')
     type(root, 'sta', '.kui-icon-picker input[type="search"]')
     type(root, 'Grace', '#title')
     await settle()
     root.querySelector('form')!.requestSubmit()
     await settle()
     // Emptied again before the discard, so the page's signal for it has nothing to change on the reset.
-    type(root, '', '.kui-multi-select-search')
+    type(root, '', '.kui-multi-select [data-part=search]')
     type(root, '', '.kui-icon-picker input[type="search"]')
     click(root.querySelector('input[name="agree"]'))
     await settle()

@@ -12,8 +12,8 @@ const BROWSER_DRAWN: Record<string, string | undefined> = {
 
 // What the browser adds once the island runs, the server holding the plain date field alone: the calendar's button and panel.
 const BROWSER_ADDED: Record<string, string | undefined> = {
-  'date-input': '.kui-date-input-trigger, .kui-date-input-panel',
-  'date-range-input': '.kui-date-input-trigger, .kui-date-input-panel',
+  'date-input': '.kui-date-input [data-part=trigger], .kui-date-input [data-part=panel]',
+  'date-range-input': '.kui-date-input [data-part=trigger], .kui-date-input [data-part=panel]',
 }
 
 // What an effect adds to the browser's render while the server's holds none, by component.

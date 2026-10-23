@@ -50,10 +50,10 @@ test('an inline ConfirmDelete draws its armed pair with the restyle once a click
   const confirm = await mountComponent(library('confirm-delete'), { message: 'Sure?', failure: 'Failed', ask: 'inline', trigger: 'button', onConfirm: () => undefined })
 
   mounted.push(confirm)
-  expect(confirm.root.querySelector('.kui-confirm-delete-armed')).toBeNull()
+  expect(confirm.root.querySelector('[data-part=armed]')).toBeNull()
 
   confirm.root.querySelector('button')?.click()
   await settle()
 
-  expect(confirm.root.querySelector('.kui-confirm-delete-armed')?.className).toBe('kui-confirm-delete-armed gap-2')
+  expect(confirm.root.querySelector('[data-part=armed]')?.className).toBe('inline-flex items-center gap-1 gap-2')
 })

@@ -3,7 +3,17 @@ import type { JSX } from 'kay'
 import { recipe, uid, untrack } from 'kay'
 import { controlledRadios } from './controlled-radios'
 
-const look = recipe({ parts: { root: 'kui-radio-group', radio: 'kui-radio', choice: 'kui-radio-choice', input: 'kui-radio-input', label: 'kui-radio-label', description: 'kui-radio-description' } })
+// 'kui-radio-group' stays as the component's name for an app's CSS; the group is named so a choice reads its busy state.
+const look = recipe({
+  parts: {
+    root: 'kui-radio-group group/radios flex flex-col gap-2',
+    radio: 'flex flex-col',
+    choice: 'inline-flex cursor-pointer items-center gap-2 self-start has-[input:disabled]:cursor-not-allowed has-[input:disabled]:opacity-50 group-aria-busy/radios:cursor-progress',
+    input: 'm-0 size-4 shrink-0 cursor-[inherit] accent-kui-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kui-accent',
+    label: 'text-sm text-kui-text',
+    description: 'pl-6 text-xs text-kui-subtext0',
+  },
+})
 
 const { options, value, label, name, disabled = false, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // `description` is a quieter line under the label, which screen readers hear after it; `disabled` keeps that option from being picked.
@@ -24,7 +34,7 @@ const { options, value, label, name, disabled = false, onChange, ...rest } = pro
 
 const { group, picked, busy, ref, pick } = controlledRadios({
   control: 'RadioGroup',
-  input: '.kui-radio-input',
+  input: '[data-part=input]',
   options: () => options,
   value: () => value,
   name: () => name,

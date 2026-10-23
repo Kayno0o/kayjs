@@ -14,7 +14,7 @@ async function open(onInput?: (value: number) => void, onChange?: (value: number
 
   const root = mounted.root
   const input = root.querySelector<HTMLInputElement>('input[name="delay"]')!
-  const shown = () => root.querySelector('#delay')?.closest('.kui-slider')?.querySelector('.kui-slider-value')?.textContent
+  const shown = () => root.querySelector('#delay')?.closest('.kui-slider')?.querySelector('[data-part=value]')?.textContent
   const drag = async (value: string) => {
     input.value = value
     input.dispatchEvent(new Event('input', { bubbles: true }))
@@ -34,14 +34,14 @@ test('draws a native range input named by its label, holding the value and the b
   const { input, root } = await open()
 
   expect([input.type, input.min, input.max, input.step, input.value, input.getAttribute('aria-label')]).toEqual(['range', '0', '100', '10', '40', 'Delay'])
-  expect(root.querySelector('#delay')?.closest('.kui-slider')?.querySelector('.kui-slider-label')?.textContent).toBe('Delay')
+  expect(root.querySelector('#delay')?.closest('.kui-slider')?.querySelector('[data-part=label]')?.textContent).toBe('Delay')
 })
 
 test('shows the value through formatValue, and without it as the bare number', async () => {
   const { shown, root } = await open()
 
   expect(shown()).toBe('40 ms')
-  expect(root.querySelector('#quiet')?.closest('.kui-slider')?.querySelector('.kui-slider-value')).toBeNull()
+  expect(root.querySelector('#quiet')?.closest('.kui-slider')?.querySelector('[data-part=value]')).toBeNull()
   expect(root.querySelector('#quiet')?.getAttribute('aria-valuetext')).toBeNull()
 })
 

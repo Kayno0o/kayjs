@@ -34,7 +34,7 @@ function key(element: Element | null, name: string, shiftKey = false) {
 const calendar = (root: HTMLElement, field = '#date') => root.querySelector(field)!.closest('.kui-date-input')!
 
 async function open(root: HTMLElement, field = '#date') {
-  calendar(root, field).querySelector<HTMLElement>('.kui-date-input-panel')!.showPopover()
+  calendar(root, field).querySelector<HTMLElement>('.kui-date-input [data-part=panel]')!.showPopover()
   await settle()
 }
 
@@ -50,7 +50,7 @@ describe('DateInput', () => {
     expect(input.name).toBe('day')
     expect(input.value).toBe('2026-10-21')
     expect(input.min).toBe('2026-10-05')
-    expect(calendar(root).querySelector('.kui-date-input-trigger')?.getAttribute('aria-label')).toBe('Choose a date')
+    expect(calendar(root).querySelector('.kui-date-input [data-part=trigger]')?.getAttribute('aria-label')).toBe('Choose a date')
   })
 
   test('opens on the chosen day, in a grid of its month with the weeks starting where firstDay says', async () => {
@@ -62,7 +62,7 @@ describe('DateInput', () => {
 
     expect(cell.closest('[role="gridcell"]')?.getAttribute('aria-selected')).toBe('true')
     expect(focused()).toBe('2026-10-21')
-    expect(calendar(root).querySelector('.kui-date-input-title')?.textContent).toMatch(/2026/)
+    expect(calendar(root).querySelector('.kui-date-input [data-part=title]')?.textContent).toMatch(/2026/)
     expect([...calendar(root).querySelectorAll('thead th')].map(head => head.getAttribute('abbr'))[0]).toBe('Monday')
     expect(calendar(root).querySelectorAll('tbody tr')).toHaveLength(5)
     expect(calendar(root).querySelector('tbody tr td button')?.getAttribute('data-day')).toBe('2026-09-28')
@@ -87,7 +87,7 @@ describe('DateInput', () => {
 
   test('a click on a day writes it into the field, tells onChange once and closes', async () => {
     const root = await dates()
-    const panel = calendar(root).querySelector<HTMLElement>('.kui-date-input-panel')!
+    const panel = calendar(root).querySelector<HTMLElement>('.kui-date-input [data-part=panel]')!
 
     await open(root)
     day(root, '2026-10-03').click()
@@ -121,7 +121,7 @@ describe('DateInput', () => {
     expect(focused()).toBe('2026-10-25')
     await press('PageDown')
     expect(focused()).toBe('2026-11-25')
-    expect(calendar(root).querySelector('.kui-date-input-title')?.textContent).toMatch(/2026/)
+    expect(calendar(root).querySelector('.kui-date-input [data-part=title]')?.textContent).toMatch(/2026/)
     await press('PageUp', true)
     expect(focused()).toBe('2025-11-25')
   })
@@ -138,20 +138,20 @@ describe('DateInput', () => {
     await settle()
 
     expect(focused()).toBe('2026-10-22')
-    expect(calendar(root).querySelectorAll<HTMLButtonElement>('.kui-date-input-step')[0]!.disabled).toBe(true)
-    expect(calendar(root).querySelectorAll<HTMLButtonElement>('.kui-date-input-step')[1]!.disabled).toBe(true)
+    expect(calendar(root).querySelectorAll<HTMLButtonElement>('.kui-date-input [data-part=step]')[0]!.disabled).toBe(true)
+    expect(calendar(root).querySelectorAll<HTMLButtonElement>('.kui-date-input [data-part=step]')[1]!.disabled).toBe(true)
   })
 
   test('the month buttons and Today move and pick', async () => {
     const root = await dates()
 
     await open(root)
-    calendar(root).querySelectorAll<HTMLButtonElement>('.kui-date-input-step')[1]!.click()
+    calendar(root).querySelectorAll<HTMLButtonElement>('.kui-date-input [data-part=step]')[1]!.click()
     await settle()
 
     expect(day(root, '2026-11-21')).not.toBeNull()
 
-    calendar(root).querySelector<HTMLButtonElement>('.kui-date-input-today')!.click()
+    calendar(root).querySelector<HTMLButtonElement>('.kui-date-input [data-part=today]')!.click()
     await settle()
 
     expect(seen.date).toHaveLength(1)
@@ -177,10 +177,10 @@ describe('DateInput', () => {
 
     await open(root, '#held')
 
-    const panel = calendar(root, '#held').querySelector<HTMLElement>('.kui-date-input-panel')!
+    const panel = calendar(root, '#held').querySelector<HTMLElement>('.kui-date-input [data-part=panel]')!
     const click = new MouseEvent('click', { bubbles: true, cancelable: true })
 
-    calendar(root, '#held').querySelector('.kui-date-input-title')!.dispatchEvent(click)
+    calendar(root, '#held').querySelector('.kui-date-input [data-part=title]')!.dispatchEvent(click)
 
     expect(click.defaultPrevented).toBe(true)
     expect(panel.matches(':popover-open')).toBe(true)
@@ -188,18 +188,18 @@ describe('DateInput', () => {
 
   test('closing the panel, as the browser does on Escape, turns the trigger back to collapsed', async () => {
     const root = await dates()
-    const panel = calendar(root).querySelector<HTMLElement>('.kui-date-input-panel')!
+    const panel = calendar(root).querySelector<HTMLElement>('.kui-date-input [data-part=panel]')!
 
     await open(root)
     panel.hidePopover()
     await settle()
 
-    expect(calendar(root).querySelector('.kui-date-input-trigger')?.getAttribute('aria-expanded')).toBe('false')
+    expect(calendar(root).querySelector('.kui-date-input [data-part=trigger]')?.getAttribute('aria-expanded')).toBe('false')
   })
 
   test('Tab out of the panel closes it, a focus loss with no target keeps it open', async () => {
     const root = await dates()
-    const panel = calendar(root).querySelector<HTMLElement>('.kui-date-input-panel')!
+    const panel = calendar(root).querySelector<HTMLElement>('.kui-date-input [data-part=panel]')!
     const leave = (relatedTarget: Element | null) => day(root, '2026-10-21').dispatchEvent(new FocusEvent('focusout', { relatedTarget, bubbles: true }))
 
     await open(root)
@@ -232,7 +232,7 @@ describe('DateInput', () => {
   test('a read-only field cannot be changed through the calendar', async () => {
     const root = await dates()
 
-    expect(calendar(root, '#locked').querySelector<HTMLButtonElement>('.kui-date-input-trigger')!.disabled).toBe(true)
+    expect(calendar(root, '#locked').querySelector<HTMLButtonElement>('.kui-date-input [data-part=trigger]')!.disabled).toBe(true)
   })
 
   test('a plain one keeps what is picked for a form to post', async () => {

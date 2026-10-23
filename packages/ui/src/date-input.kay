@@ -8,19 +8,21 @@ import Popover from './popover.kay'
 import TextInput from './text-input.kay'
 import { pageLocale, wording } from 'kay/words'
 
+// The browser's own picker button gives way to the calendar's once it is drawn, and a step's chevron turns by the step's direction.
 const look = recipe({
   parts: {
-    root: 'kui-date-input',
-    input: 'kui-date-input-box',
-    trigger: 'kui-date-input-trigger',
-    panel: 'kui-date-input-panel',
-    head: 'kui-date-input-head',
-    title: 'kui-date-input-title',
-    step: 'kui-date-input-step',
-    grid: 'kui-date-input-grid',
-    weekday: 'kui-date-input-weekday',
-    day: 'kui-date-input-day',
-    today: 'kui-date-input-today',
+    root: 'kui-date-input inline-flex min-w-0 items-center gap-1 [&:has([data-part=trigger])_[data-part=input]::-webkit-calendar-picker-indicator]:hidden',
+    input: 'min-w-0 flex-1 tabular-nums',
+    trigger: 'inline-flex shrink-0 cursor-pointer items-center justify-center rounded-kui-card p-1 text-kui-subtext0 hover:text-kui-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kui-accent disabled:cursor-default disabled:opacity-40',
+    panel: 'w-64 p-2',
+    head: 'mb-1 flex items-center justify-between gap-2',
+    title: 'text-sm font-medium capitalize',
+    step: 'group/step inline-flex size-7 cursor-pointer items-center justify-center rounded-kui-card text-kui-subtext0 hover:bg-kui-row-hover hover:text-kui-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kui-accent disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent',
+    stepIcon: 'group-data-[direction=previous]/step:rotate-90 group-data-[direction=previous]/step:rtl:-rotate-90 group-data-[direction=next]/step:-rotate-90 group-data-[direction=next]/step:rtl:rotate-90',
+    grid: 'w-full table-fixed border-collapse text-center text-sm',
+    weekday: 'py-1 text-kui-2xs font-normal text-kui-subtext0 [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)]',
+    day: 'h-8 w-full cursor-pointer rounded-kui-card tabular-nums hover:bg-kui-row-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kui-accent disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent data-outside:text-kui-subtext0 data-today:font-semibold data-today:text-kui-accent data-selected:bg-kui-accent data-selected:text-kui-on-accent data-selected:hover:bg-kui-accent data-selected:data-today:text-kui-on-accent',
+    today: 'mt-1 w-full cursor-pointer rounded-kui-card py-1 text-center text-kui-2xs tracking-kui-label text-kui-subtext0 [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)] hover:text-kui-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kui-accent disabled:cursor-default disabled:opacity-40',
   },
 })
 
@@ -148,11 +150,11 @@ div(ref={element => root = element})
           Icon(icon="calendar")
       div(part="head")
         button(part="step" type="button" data-direction="previous" aria-label={previousLabel} disabled={!canStepBack()} onClick={() => go(addMonths(cursor(), -1))})
-          Icon(icon="chevron")
+          Icon(icon="chevron" part="stepIcon")
         // Read out as the month changes, which is otherwise silent.
         div(part="title" aria-live="polite") {monthTitle(cursor(), pageLocale())}
         button(part="step" type="button" data-direction="next" aria-label={nextLabel} disabled={!canStepOn()} onClick={() => go(addMonths(cursor(), 1))})
-          Icon(icon="chevron")
+          Icon(icon="chevron" part="stepIcon")
       // The days are built while the panel is open, as a range input holds two calendars that are mostly shut.
       if opened()
         table(part="grid" role="grid" aria-label={monthTitle(cursor(), pageLocale())})

@@ -14,7 +14,7 @@ async function open(onChange?: (value: string) => unknown) {
 
   const root = mounted.root
   const input = root.querySelector<HTMLInputElement>('input[name="light"]')!
-  const shown = () => input.closest('.kui-color-input')?.querySelector('.kui-color-input-value')?.textContent
+  const shown = () => input.closest('.kui-color-input')?.querySelector('[data-part=value]')?.textContent
   const drag = async (value: string) => {
     input.value = value
     input.dispatchEvent(new Event('input', { bubbles: true }))
@@ -33,7 +33,7 @@ async function open(onChange?: (value: string) => unknown) {
 test('draws a native colour input named by its label, with the swatch value and the hex beside it', async () => {
   const { input, shown, root } = await open()
 
-  expect([input.type, input.value, shown(), input.closest('.kui-color-input')?.querySelector('.kui-color-input-label')?.textContent]).toEqual(['color', '#ff8800', '#ff8800', 'Light'])
+  expect([input.type, input.value, shown(), input.closest('.kui-color-input')?.querySelector('[data-part=label]')?.textContent]).toEqual(['color', '#ff8800', '#ff8800', 'Light'])
   expect(root.querySelector<HTMLInputElement>('input[name="locked"]')!.disabled).toBe(true)
 })
 
@@ -52,7 +52,7 @@ test('an app\'s aria-label wins over the label as the input\'s name, and aria-la
 test('hides the hex text from screen readers, the input being named already', async () => {
   const { root } = await open()
 
-  expect(root.querySelector('.kui-color-input-value')?.getAttribute('aria-hidden')).toBe('true')
+  expect(root.querySelector('[data-part=value]')?.getAttribute('aria-hidden')).toBe('true')
 })
 
 test('shows an upper case or invalid parent colour as the input holds it', async () => {
@@ -63,12 +63,12 @@ test('shows an upper case or invalid parent colour as the input holds it', async
   click(root.querySelector('#upper'))
   await settle()
 
-  expect([root.querySelector<HTMLInputElement>('input[name="light"]')!.value, root.querySelector('.kui-color-input-value')?.textContent]).toEqual(['#abcdef', '#abcdef'])
+  expect([root.querySelector<HTMLInputElement>('input[name="light"]')!.value, root.querySelector('[data-part=value]')?.textContent]).toEqual(['#abcdef', '#abcdef'])
 
   click(root.querySelector('#invalid'))
   await settle()
 
-  expect([root.querySelector<HTMLInputElement>('input[name="light"]')!.value, root.querySelector('.kui-color-input-value')?.textContent]).toEqual(['#000000', '#000000'])
+  expect([root.querySelector<HTMLInputElement>('input[name="light"]')!.value, root.querySelector('[data-part=value]')?.textContent]).toEqual(['#000000', '#000000'])
 })
 
 test('a refusal puts the previous colour back when the parent never changed its value', async () => {

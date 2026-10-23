@@ -6,7 +6,15 @@ import IconButton from './icon-button.kay'
 import { attempt } from './toast'
 import { wording } from 'kay/words'
 
-const frame = recipe({ parts: { root: '', armed: 'kui-confirm-delete-armed', message: 'kui-confirm-delete-message' } })
+// 'kui-confirm-delete-link' stays on the link trigger as its name for an app's CSS and the always-hidden guard.
+const frame = recipe({
+  parts: {
+    root: '',
+    armed: 'inline-flex items-center gap-1',
+    message: 'text-kui-muted',
+  },
+  variants: { trigger: { icon: '', button: '', link: 'cursor-pointer text-xs text-kui-subtext0 underline transition-colors hover:text-kui-text disabled:cursor-default disabled:opacity-40' } },
+})
 
 const { message, onConfirm, onOpen, failure, success, refused, tone = 'danger', trigger = 'icon', ask = 'dialog', disabled = false, label, title, confirmLabel, pendingLabel, cancelLabel = wording('ui.confirmDelete.cancelLabel', 'Cancel'), size, variant } = props<{
   // The dialog's question; asked inline, the armed pair's name for screen readers and the confirm button's tooltip.

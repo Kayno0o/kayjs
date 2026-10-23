@@ -91,7 +91,7 @@ describe('ConfirmDelete', () => {
     await settle()
 
     expect(dialog().open).toBe(true)
-    expect(dialog().querySelector('.kui-confirm-delete-message')?.textContent).toBe('Delete this?')
+    expect(dialog().querySelector('[data-part=message]')?.textContent).toBe('Delete this?')
 
     click(dialog().querySelector('.kui-btn-danger'))
     await settle()
@@ -202,7 +202,7 @@ describe('ConfirmDelete', () => {
     const { promise, resolve: finish } = Promise.withResolvers<void>()
     const root = await dialogs(async () => promise)
     const trigger = root.querySelector<HTMLButtonElement>('.kui-icon-btn[aria-label="Remove"]')!
-    const armed = () => root.querySelector('.kui-confirm-delete-armed')
+    const armed = () => root.querySelector('[data-part=armed]')
     const buttons = () => [...armed()?.querySelectorAll('button') ?? []].map(button => [button.textContent || button.getAttribute('aria-label'), button.disabled])
 
     expect(root.querySelectorAll('dialog')).toHaveLength(17)
@@ -234,7 +234,7 @@ describe('ConfirmDelete', () => {
   // A delete the handler rejects toasts, and leaves the confirmation open and enabled for another try, asked in a dialog or inline.
   test.each([
     { how: 'in a dialog', focused: undefined, trigger: '.kui-icon-btn[aria-label="Delete"]', confirmation: (root: Element) => root.querySelectorAll('dialog')[1]!, toast: 'Could not delete' },
-    { how: 'inline', trigger: '.kui-icon-btn[aria-label="Remove"]', confirmation: (root: Element) => root.querySelector('.kui-confirm-delete-armed')!, toast: 'Could not remove', focused: 'Delete' },
+    { how: 'inline', trigger: '.kui-icon-btn[aria-label="Remove"]', confirmation: (root: Element) => root.querySelector('[data-part=armed]')!, toast: 'Could not remove', focused: 'Delete' },
   ])('asked $how, toasts a failed delete and stays open for another try', async ({ trigger, confirmation, toast, focused }) => {
     const root = await dialogs(async () => Promise.reject(new Error('refused')))
 
@@ -258,9 +258,9 @@ describe('ConfirmDelete', () => {
       click(trigger)
       await settle()
 
-      expect([name, trigger.hidden, root.querySelectorAll('.kui-confirm-delete-armed').length]).toEqual([name, true, 1])
+      expect([name, trigger.hidden, root.querySelectorAll('[data-part=armed]').length]).toEqual([name, true, 1])
 
-      click(root.querySelector('.kui-confirm-delete-armed .kui-icon-btn'))
+      click(root.querySelector('[data-part=armed] .kui-icon-btn'))
       await settle()
 
       expect([name, trigger.hidden, document.activeElement]).toEqual([name, false, trigger])

@@ -32,7 +32,7 @@ test('draws real radios, the first checked, a disabled option and a description 
   expect([radios().length, checked(), radios().map(radio => radio.disabled)]).toEqual([3, '1', [false, true, false]])
   expect(root.querySelector('[role="radiogroup"]')).not.toBeNull()
   expect(described?.textContent).toBe('Up to 3 sites')
-  expect(root.querySelector('.kui-radio-choice')?.textContent).toBe('Free')
+  expect(root.querySelector('[data-part=choice]')?.textContent).toBe('Free')
   expect(radios()[2]!.getAttribute('aria-describedby')?.split(' ').length).toBe(1)
 })
 

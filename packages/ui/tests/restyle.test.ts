@@ -17,7 +17,7 @@ const LIBRARY = join(import.meta.dir, '..')
 const LINK = join(ROOT, 'node_modules', '@kaynooo', 'kayjs-ui')
 const OUT = join(ROOT, 'node_modules', '.cache', 'out')
 const MARKERS = /<!--[[\]]-->/g
-const REMOVED_CLASS = new RegExp(Object.keys(REMOVED_UI_CLASSES).map(name => `\\b${name}\\b`).join('|'))
+const REMOVED_CLASS = new RegExp(Object.keys(REMOVED_UI_CLASSES).map(name => `(?<![\\w-])${name}(?![\\w-])`).join('|'))
 
 let html = ''
 let browser = ''
@@ -65,29 +65,13 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     'kui-table-selection mb-2',
     'kui-table-head-cell uppercase',
     'kui-table-cell py-4',
-    'kui-date-input gap-2',
-    'kui-date-range-input-separator mx-1',
-    'kui-field-input kui-multi-select-trigger min-w-40',
-    'kui-multi-select-option py-2',
-    'kui-multi-select-action underline',
     'kui-field-input kui-range-input-box w-24',
     'kui-range-input-unit ml-1',
-    'kui-segmented-option px-5',
-    'kui-icon kui-segmented-icon size-3',
-    'kui-rating-stars text-amber-500',
-    'kui-file-drop border-dashed',
-    'kui-btn kui-copy-btn kui-btn-accent ring-2',
-    'kui-copy-btn-text font-mono',
     'kui-menu-item py-3',
     'kui-menu-list min-w-48',
-    'kui-color-input-label font-medium',
-    'kui-color-input-value tabular-nums',
-    'kui-slider-label font-medium',
-    'kui-slider-value tabular-nums',
     'kui-bar-list-row py-1',
     'kui-bar-list-label font-medium',
     'kui-bar-list-track h-2',
-    'kui-chip rounded-full',
     'kui-collapsible-section-summary py-3',
     'kui-collapsible-section-body pt-2',
     'kui-popover shadow-xl',
@@ -145,10 +129,6 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     'kui-breadcrumb-list gap-4',
     'kui-breadcrumb-link underline',
     'kui-breadcrumb-text font-bold',
-    'kui-radio-group gap-5',
-    'kui-radio-choice p-2',
-    'kui-radio-label font-medium',
-    'kui-radio-description text-xs',
     'kui-toaster z-50',
     'kui-toaster-live gap-2',
     'kui-tooltip text-xs',
@@ -161,14 +141,10 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     'kui-icon kui-tabs-icon size-3',
     'kui-icon kui-site-nav-toggle-menu size-6',
     'kui-icon kui-tree-view-icon size-3',
-    'kui-icon kui-chip-icon size-3',
     'kui-pagination-gap opacity-50',
     'kui-site-favicon-img rounded-sm',
     'kui-load-more py-6',
-    'kui-combobox gap-2',
     'kui-field-input h-11',
-    'kui-combobox-option py-2',
-    'kui-combobox-status text-xs',
     'kui-steps-list gap-4',
     'kui-steps-marker size-8',
     'kui-steps-state sr-only',
@@ -292,7 +268,7 @@ describe('the buttons and fields whose recipe holds their look', () => {
     const time = classesOfPart('time')
 
     expect(date[0]).toBe('kui-field-input')
-    expect(date.slice(-3)).toEqual(['h-12', 'kui-date-input-box', 'w-44'])
+    expect(date.slice(-5)).toEqual(['h-12', 'min-w-0', 'flex-1', 'tabular-nums', 'w-44'])
     expect(time[0]).toBe('kui-field-input')
     expect(time.slice(-3)).toEqual(['h-12', 'kui-time-input', 'w-32'])
   })
@@ -388,6 +364,54 @@ describe('a component whose recipe holds its look', () => {
     expect(html).toMatch(/<h3 class="[^"]*\bitalic" data-part="title">/)
     expect(html).toMatch(/<div class="p-kui-card p-9" data-part="body">/)
     expect(html).not.toMatch(/kui-card-(?:head|title|body)|kui-badge-icon/)
+  })
+})
+
+describe('the remaining field and button components whose recipe holds their look', () => {
+  // The class tokens of every tag drawing the part, matched whatever the attribute order.
+  const TAG = /<\w+(?: [\w:-]+(?:="[^"]*")?)*>/g
+  const tokensOf = (part: string) =>
+    [...html.matchAll(TAG)]
+      .filter(match => (part === 'root' && !match[0].includes(' data-part=')) || match[0].includes(`data-part="${part}"`))
+      .map(match => ((/ class="([^"]*)"/).exec(match[0])?.[1] ?? '').split(' '))
+  const drawn = (part: string, base: string, restyle: string) => tokensOf(part).some(tokens => tokens.includes(base) && tokens.at(-1) === restyle)
+
+  test.each([
+    ['root', 'kui-date-input', 'gap-2'],
+    ['separator', 'text-kui-subtext0', 'mx-1'],
+    ['trigger', 'data-empty:text-kui-overlay1', 'min-w-40'],
+    ['option', 'has-[[data-part=checkbox]:disabled]:opacity-50', 'py-2'],
+    ['action', 'hover:text-kui-text', 'underline'],
+    ['option', 'group-aria-busy/segmented:cursor-progress', 'px-5'],
+    ['icon', 'size-3.5', 'size-3'],
+    ['stars', 'w-max', 'text-amber-500'],
+    ['root', 'kui-file-drop', 'border-dotted'],
+    ['root', 'kui-copy-btn', 'ring-2'],
+    ['text', 'after:content-[attr(data-other)]', 'font-mono'],
+    ['label', '[font-family:var(--kui-label-font,inherit)]', 'font-medium'],
+    ['value', 'text-kui-text', 'tabular-nums'],
+    ['label', 'text-kui-micro', 'font-medium'],
+    ['chip', 'group-aria-busy/chips:cursor-progress', 'rounded-full'],
+    ['root', 'group/radios', 'gap-5'],
+    ['choice', 'self-start', 'p-2'],
+    ['label', 'text-kui-text', 'font-medium'],
+    ['description', 'pl-6', 'text-xs'],
+    ['root', 'kui-combobox', 'gap-2'],
+    ['option', 'aria-selected:bg-kui-row-hover', 'py-2'],
+    ['status', 'sr-only', 'text-xs'],
+  ] as const)('draws the %s part with %s, then what src/ui.ts sets: %s', (part, base, restyle) => {
+    expect(drawn(part, base, restyle)).toBe(true)
+  })
+
+  test('keeps the kui class of a root, a chip and the combobox input as names, and no other part sets one', () => {
+    for (const name of ['kui-date-input', 'kui-segmented', 'kui-rating', 'kui-slider', 'kui-color-input', 'kui-chip-group', 'kui-chip', 'kui-file-drop', 'kui-copy-btn', 'kui-radio-group', 'kui-combobox', 'kui-multi-select', 'kui-date-range-input'])
+      expect(html, name).toMatch(new RegExp(`class="(?:[^"]* )?${name}[ "]`))
+
+    expect(html).not.toMatch(REMOVED_CLASS)
+  })
+
+  test('the browser build of a ChipGroup, a RadioGroup and a Segmented selects its inputs by data-part', () => {
+    expect(browser).not.toMatch(/kui-(?:chip|radio|segmented)-input/)
   })
 })
 

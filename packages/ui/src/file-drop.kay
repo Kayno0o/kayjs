@@ -3,7 +3,13 @@ import type { JSX, Snippet } from 'kay'
 import { listen, recipe, signal } from 'kay'
 import { acceptsFile } from './accept'
 
-const look = recipe({ parts: { root: 'kui-file-drop', input: 'kui-file-drop-input' } })
+// 'kui-file-drop' stays as the component's name for an app's CSS and the skins; the border colour reads --kui-control-line, which a skin sets.
+const look = recipe({
+  parts: {
+    root: 'kui-file-drop flex flex-col items-center justify-center gap-3 border-dashed border-(length:--kui-border-width) p-6 text-center transition-colors [border-color:var(--kui-control-line,var(--color-kui-surface2))] data-compact:flex-row data-compact:justify-start data-compact:p-3 data-compact:text-left data-disabled:opacity-50 data-dragging:border-kui-accent data-dragging:bg-kui-accent/10',
+    input: 'hidden',
+  },
+})
 
 const { accept, multiple = false, paste = false, disabled = false, compact = false, onFiles, onReject, content, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
   // The files the zone takes, as an `accept` attribute: the picker filters on it, and dropped or pasted files that miss it are ignored.

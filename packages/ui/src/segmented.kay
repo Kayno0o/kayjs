@@ -6,7 +6,16 @@ import { recipe, untrack } from 'kay'
 import { controlledRadios } from './controlled-radios'
 import Icon from './icon.kay'
 
-const look = recipe({ parts: { root: 'kui-segmented', option: 'kui-segmented-option', input: 'kui-segmented-input', label: 'kui-segmented-label', icon: 'kui-segmented-icon' } })
+// 'kui-segmented' stays as the component's name for an app's CSS and the skins; the border colour reads --kui-control-line, which a skin sets.
+const look = recipe({
+  parts: {
+    root: 'kui-segmented group/segmented inline-flex border-solid border-(length:--kui-border-width) bg-kui-surface0 [border-color:var(--kui-control-line,var(--color-kui-surface2))] data-[orientation=vertical]:flex-col',
+    option: 'relative cursor-pointer has-[input:disabled]:cursor-not-allowed has-[input:disabled]:opacity-50 group-aria-busy/segmented:cursor-progress',
+    input: 'peer/option absolute size-0 opacity-0',
+    label: 'flex items-center gap-1 px-3 py-1.5 text-xs text-kui-subtext0 transition-colors hover:text-kui-text peer-checked/option:bg-kui-accent peer-checked/option:text-kui-on-accent peer-checked/option:hover:text-kui-on-accent peer-focus-visible/option:outline-2 peer-focus-visible/option:-outline-offset-2 peer-focus-visible/option:outline-kui-accent',
+    icon: 'size-3.5 shrink-0',
+  },
+})
 
 const { options, value, label, name, disabled = false, orientation = 'horizontal', onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // `icon` sits before the label; `disabled` keeps that option from being picked.
@@ -29,7 +38,7 @@ const { options, value, label, name, disabled = false, orientation = 'horizontal
 
 const { group, picked, busy, ref, pick } = controlledRadios({
   control: 'Segmented',
-  input: '.kui-segmented-input',
+  input: '[data-part=input]',
   options: () => options,
   value: () => value,
   name: () => name,

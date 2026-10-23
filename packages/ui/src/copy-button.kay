@@ -5,8 +5,13 @@ import { durationMs, onCleanup, recipe, signal } from 'kay'
 import { attempt } from './toast'
 import { wording } from 'kay/words'
 
+// 'kui-copy-btn' stays as the component's name for an app's CSS; its padding is a utility, which beats the Button's per-size rules.
 const look = recipe({
-  parts: { root: 'kui-copy-btn', text: 'kui-copy-btn-text', live: 'kui-copy-btn-live' },
+  parts: {
+    root: 'kui-copy-btn px-1.5 py-0.5',
+    text: 'inline-flex flex-col items-center after:invisible after:h-0 after:overflow-hidden after:content-[attr(data-other)]',
+    live: 'sr-only',
+  },
   variants: { tone: { neutral: '', accent: 'kui-btn-accent', success: 'kui-btn-success', danger: 'kui-btn-danger' } },
 })
 

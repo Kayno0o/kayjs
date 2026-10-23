@@ -4,7 +4,15 @@ import { effect, recipe, signal, untrack } from 'kay'
 import { changeAccepted } from './change'
 import { onFormReset, resetWhenIdle, startRef } from './form-reset'
 
-const look = recipe({ parts: { root: 'kui-color-input', input: 'kui-color-input-input', label: 'kui-color-input-label', value: 'kui-color-input-value' } })
+// The swatch of both engines has no native chrome around it, in the keyline and radius of the fields.
+const look = recipe({
+  parts: {
+    root: 'kui-color-input inline-flex items-center gap-2',
+    input: 'size-8 shrink-0 cursor-pointer appearance-none rounded-kui-card border-solid border-(length:--kui-border-width) border-kui-field-border bg-transparent p-0.5 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-kui-card [&::-webkit-color-swatch]:border-0 [&::-moz-color-swatch]:rounded-kui-card [&::-moz-color-swatch]:border-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kui-accent disabled:cursor-default disabled:opacity-50',
+    label: 'text-kui-micro font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--kui-label-font,inherit)] [text-transform:var(--kui-label-case)]',
+    value: 'text-xs text-kui-text tabular-nums',
+  },
+})
 
 const { value, label, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'class' | 'children' | 'type' | 'value' | 'onInput' | 'onChange'> & {
   // The colour as `#rrggbb`, which is what the native picker and a form hold; a box whose parent passes another one follows it.

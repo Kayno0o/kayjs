@@ -27,7 +27,7 @@ export default defineUi({
   '@kaynooo/kayjs-ui/range-input.kay': { parts: { box: 'w-24', unit: 'ml-1' } },
   '@kaynooo/kayjs-ui/segmented.kay': { parts: { option: 'px-5', icon: 'size-3' } },
   '@kaynooo/kayjs-ui/rating.kay': { parts: { stars: 'text-amber-500' } },
-  '@kaynooo/kayjs-ui/file-drop.kay': { parts: { root: 'border-dashed' } },
+  '@kaynooo/kayjs-ui/file-drop.kay': { parts: { root: 'border-dotted' } },
   '@kaynooo/kayjs-ui/icon-button.kay': { parts: 'rounded-full' },
   '@kaynooo/kayjs-ui/copy-button.kay': { parts: { text: 'font-mono' }, variants: { tone: { accent: { root: 'ring-2' } } } },
   '@kaynooo/kayjs-ui/menu.kay': { parts: { item: 'py-3', list: 'min-w-48' } },

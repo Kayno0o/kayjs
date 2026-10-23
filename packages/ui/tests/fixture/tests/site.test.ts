@@ -533,9 +533,9 @@ describe('data', () => {
   test('Rating reads its value out of its max, filling that share of the stars, kept between none and all', async () => {
     const rating = async (id: string) => {
       const [meter] = await find('/data', `#${id} [role="img"]`)
-      const [fill] = await find('/data', `#${id} .kui-rating-fill`)
+      const [fill] = await find('/data', `#${id} [data-part=fill]`)
 
-      return [meter!.attributes['aria-label'], fill!.attributes.style, (await find('/data', `#${id} [role="img"] > .kui-rating-stars svg`)).length]
+      return [meter!.attributes['aria-label'], fill!.attributes.style, (await find('/data', `#${id} [role="img"] > [data-part=stars] svg`)).length]
     }
 
     expect(await rating('rating')).toEqual(['4.6 out of 5', 'width: 92%', 5])
@@ -559,9 +559,9 @@ describe('inputs', () => {
     const form = (await element('/inputs', 'form')).replaceAll(/<!--[^>]*-->/g, '')
 
     expect([...form.matchAll(/aria-label="(Hours \w+)" placeholder="(\d+)" min="0" max="24" value="(\d*)"/g)].map(match => match.slice(1))).toEqual([['Hours from', '0', '2'], ['Hours to', '24', '']])
-    expect(form).toContain('<span class="kui-multi-select-summary" data-part="summary">Mars</span>')
-    expect(form).toContain(`<input class="kui-multi-select-checkbox" data-part="checkbox" type="checkbox" checked><span class="kui-multi-select-label" data-part="label">Mars</span>`)
-    expect(form).not.toContain('kui-multi-select-search')
+    expect(form).toContain('<span class="min-w-0 flex-1 truncate" data-part="summary">Mars</span>')
+    expect(form).toContain(`<input class="size-3.5 shrink-0 accent-kui-accent" data-part="checkbox" type="checkbox" checked><span class="min-w-0 truncate" data-part="label">Mars</span>`)
+    expect(form).not.toContain('data-part="search"')
     expect(form).toContain('<input type="hidden" name="planet" value="mars">')
   })
 })
@@ -580,7 +580,7 @@ describe('date and time inputs', () => {
 
 describe('drawn ids', () => {
   test('Segmented groups given no name each draw one of their own, shared by their radios', async () => {
-    const groups = (await element('/controls', 'unnamed')).split('class="kui-segmented"').slice(1).map(group => [...new Set([...group.matchAll(/type="radio" name="([^"]+)"/g)].map(match => match[1]))])
+    const groups = (await element('/controls', 'unnamed')).split('class="kui-segmented ').slice(1).map(group => [...new Set([...group.matchAll(/type="radio" name="([^"]+)"/g)].map(match => match[1]))])
 
     expect(groups.map(names => names.length)).toEqual([1, 1])
     expect(groups[0]![0]).not.toBe(groups[1]![0])

@@ -67,27 +67,27 @@ describe('MultiSelect', () => {
     root.querySelector<HTMLElement>('#planets')!.showPopover()
     await settle()
 
-    const search = root.querySelector('.kui-multi-select-search')
+    const search = root.querySelector('.kui-multi-select [data-part=search]')
 
     expect(document.activeElement).toBe(search)
 
     type(search, 'ur', 'input')
     await settle()
 
-    expect([...root.querySelectorAll('.kui-multi-select-label')].map(label => label.textContent)).toEqual(['Mercury', 'Saturn', 'Uranus'])
+    expect([...root.querySelectorAll('.kui-multi-select [data-part=label]')].map(label => label.textContent)).toEqual(['Mercury', 'Saturn', 'Uranus'])
 
     type(search, 'zz', 'input')
     await settle()
 
-    expect(root.querySelector('.kui-multi-select-empty')?.textContent).toBe('No match')
-    expect(root.querySelector('.kui-multi-select-empty')?.getAttribute('role')).toBe('status')
+    expect(root.querySelector('.kui-multi-select [data-part=empty]')?.textContent).toBe('No match')
+    expect(root.querySelector('.kui-multi-select [data-part=empty]')?.getAttribute('role')).toBe('status')
     expect(root.querySelector('#planets')?.getAttribute('role')).toBe('group')
   })
 
   test('keeps what is picked in the options\' order, sums it up on the trigger, and posts each value', async () => {
     const root = await inputs()
-    const box = (label: string) => [...root.querySelectorAll('.kui-multi-select-option')].find(option => option.textContent === label)!.querySelector('input')
-    const summary = () => root.querySelector('.kui-multi-select-summary')?.textContent
+    const box = (label: string) => [...root.querySelectorAll('.kui-multi-select [data-part=option]')].find(option => option.textContent === label)!.querySelector('input')
+    const summary = () => root.querySelector('.kui-multi-select [data-part=summary]')?.textContent
     const posted = () => [...root.querySelectorAll<HTMLInputElement>('input[type="hidden"][name="planet"]')].map(input => input.value)
 
     expect(summary()).toBe('Any')
@@ -102,20 +102,20 @@ describe('MultiSelect', () => {
 
     expect(seen.planets).toEqual([['mars'], ['venus', 'mars']])
     expect(summary()).toBe('2 selected')
-    expect(root.querySelector('.kui-multi-select-trigger')?.getAttribute('aria-label')).toEndWith(': 2 selected')
-    expect(root.querySelector('.kui-multi-select-trigger')?.getAttribute('aria-description')).toBe('Venus, Mars')
+    expect(root.querySelector('.kui-multi-select [data-part=trigger]')?.getAttribute('aria-label')).toEndWith(': 2 selected')
+    expect(root.querySelector('.kui-multi-select [data-part=trigger]')?.getAttribute('aria-description')).toBe('Venus, Mars')
     expect(posted()).toEqual(['venus', 'mars'])
 
-    click(root.querySelectorAll('.kui-multi-select-action')[1]!)
+    click(root.querySelectorAll('.kui-multi-select [data-part=action]')[1]!)
     await settle()
 
     expect(posted()).toEqual([])
 
-    click(root.querySelectorAll('.kui-multi-select-action')[0]!)
+    click(root.querySelectorAll('.kui-multi-select [data-part=action]')[0]!)
     await settle()
 
     expect(posted()).toHaveLength(9)
-    expect(root.querySelector<HTMLButtonElement>('.kui-multi-select-action')?.disabled).toBe(true)
+    expect(root.querySelector<HTMLButtonElement>('.kui-multi-select [data-part=action]')?.disabled).toBe(true)
   })
 
   test('ArrowDown leaves the search box for the options, where the arrows, Home and End move between them', async () => {
@@ -124,7 +124,7 @@ describe('MultiSelect', () => {
     root.querySelector<HTMLElement>('#planets')!.showPopover()
     await settle()
 
-    const focused = () => document.activeElement?.closest('.kui-multi-select-option')?.textContent
+    const focused = () => document.activeElement?.closest('[data-part=option]')?.textContent
     const moves = ['ArrowDown', 'ArrowDown', 'ArrowUp', 'ArrowUp', 'End', 'Home'].map((name) => {
       key(document.activeElement, name)
 
@@ -133,7 +133,7 @@ describe('MultiSelect', () => {
 
     expect(moves).toEqual(['Mercury', 'Venus', 'Mercury', 'Pluto', 'Pluto', 'Mercury'])
 
-    root.querySelector<HTMLElement>('.kui-multi-select-action')!.focus()
+    root.querySelector<HTMLElement>('.kui-multi-select [data-part=action]')!.focus()
     key(document.activeElement, 'ArrowDown')
 
     expect(focused()).toBe('Mercury')
@@ -142,7 +142,7 @@ describe('MultiSelect', () => {
   test('closes once focus moves on past its controls, staying open while it moves among them', async () => {
     const root = await inputs()
     const panel = root.querySelector<HTMLElement>('#planets')!
-    const boxes = root.querySelectorAll<HTMLInputElement>('.kui-multi-select-checkbox')
+    const boxes = root.querySelectorAll<HTMLInputElement>('.kui-multi-select [data-part=checkbox]')
     const leave = (to: Element | null) => boxes[0]!.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: to }))
 
     panel.showPopover()
@@ -159,11 +159,11 @@ describe('MultiSelect', () => {
 
   test('picks and drops only the options a search shows', async () => {
     const root = await inputs()
-    const [all, none] = root.querySelectorAll<HTMLButtonElement>('.kui-multi-select-action')
+    const [all, none] = root.querySelectorAll<HTMLButtonElement>('.kui-multi-select [data-part=action]')
     const posted = () => [...root.querySelectorAll<HTMLInputElement>('input[type="hidden"][name="planet"]')].map(input => input.value)
 
-    click([...root.querySelectorAll('.kui-multi-select-option')].find(option => option.textContent === 'Venus')!.querySelector('input'))
-    type(root.querySelector('.kui-multi-select-search'), 'ur', 'input')
+    click([...root.querySelectorAll('.kui-multi-select [data-part=option]')].find(option => option.textContent === 'Venus')!.querySelector('input'))
+    type(root.querySelector('.kui-multi-select [data-part=search]'), 'ur', 'input')
     await settle()
 
     expect(none!.disabled).toBe(true)
@@ -244,7 +244,7 @@ describe('FileDrop', () => {
     const root = await inputs(true)
     let opened = 0
 
-    root.querySelector('.kui-file-drop-input')!.addEventListener('click', () => opened++)
+    root.querySelector('.kui-file-drop [data-part=input]')!.addEventListener('click', () => opened++)
     click(root.querySelector('#pick'))
 
     expect(opened).toBe(1)

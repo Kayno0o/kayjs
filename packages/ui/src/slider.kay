@@ -4,7 +4,15 @@ import { effect, recipe, signal, untrack } from 'kay'
 import { changeAccepted } from './change'
 import { onFormReset, resetWhenIdle, startRef } from './form-reset'
 
-const look = recipe({ parts: { root: 'kui-slider', label: 'kui-slider-label', input: 'kui-slider-input', value: 'kui-slider-value' } })
+// The track and the thumb of both engines are drawn from the field and accent tokens.
+const look = recipe({
+  parts: {
+    root: 'kui-slider grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1',
+    label: 'text-kui-micro font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)]',
+    input: 'col-span-2 h-4 w-full cursor-pointer appearance-none bg-transparent [&::-webkit-slider-runnable-track]:h-1 [&::-webkit-slider-runnable-track]:bg-kui-field-border [&::-moz-range-track]:h-1 [&::-moz-range-track]:bg-kui-field-border [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:-mt-1.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-kui-card [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:bg-kui-accent [&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-kui-card [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-kui-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kui-accent disabled:cursor-default disabled:opacity-50',
+    value: 'text-xs text-kui-text tabular-nums',
+  },
+})
 
 const { value, min = 0, max = 100, step, label, showValue = true, formatValue, onInput, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'class' | 'children' | 'type' | 'value' | 'min' | 'max' | 'step' | 'onInput' | 'onChange'> & {
   // The value to start with; a slider whose parent passes another follows it.

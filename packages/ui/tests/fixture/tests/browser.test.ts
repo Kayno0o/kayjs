@@ -63,7 +63,7 @@ inBrowser('in the browser', () => {
 
       const height = (selector: string) => document.querySelector(selector)!.getBoundingClientRect().height
 
-      return { plainSearch: height('#plain-search'), besidePlain: height('#beside-plain'), wrapped: height('#wrapped'), wrappedSearch: height('#wrapped-search'), note: height('#note'), besideNote: height('#beside-note'), tags: height('.kui-multi-select-trigger'), besideTags: height('#beside-tags'), besideToggle: height('#beside-toggle'), search: height('#search'), status: height('#status'), filter: height('#filter'), xs: height('#filter-xs'), inline: height('#filter-inline'), alone: height('#alone') }
+      return { plainSearch: height('#plain-search'), besidePlain: height('#beside-plain'), wrapped: height('#wrapped'), wrappedSearch: height('#wrapped-search'), note: height('#note'), besideNote: height('#beside-note'), tags: height('.kui-multi-select [data-part=trigger]'), besideTags: height('#beside-tags'), besideToggle: height('#beside-toggle'), search: height('#search'), status: height('#status'), filter: height('#filter'), xs: height('#filter-xs'), inline: height('#filter-inline'), alone: height('#alone') }
     }, density)
 
     for (const density of ['0.5', '1', '1.5', '2']) {
@@ -860,8 +860,8 @@ inBrowser('a form reset on a served page', () => {
       click('input[name="size"][value="l"]')
       click('input[name="sort"][value="l"]')
       type('#level', 'c', 'change')
-      document.querySelectorAll<HTMLElement>('.kui-multi-select-checkbox')[0]!.click()
-      document.querySelectorAll<HTMLElement>('.kui-multi-select-checkbox')[2]!.click()
+      document.querySelectorAll<HTMLElement>('.kui-multi-select [data-part=checkbox]')[0]!.click()
+      document.querySelectorAll<HTMLElement>('.kui-multi-select [data-part=checkbox]')[2]!.click()
       type('#title', 'Grace')
       type('#bio', 'Bye')
       type('#notes', '# Other')
@@ -920,7 +920,7 @@ inBrowser('a Segmented busy with a change on a served page', () => {
     await page.press('ArrowLeft')
     expect(await state()).toEqual({ checked: 'l', focused: 'l' })
     await page.press('ArrowLeft')
-    await page.click('.kui-segmented-option:first-child .kui-segmented-label')
+    await page.click('.kui-segmented [data-part=option]:first-child [data-part=label]')
     expect(await state()).toEqual({ checked: 'l', focused: 'l' })
 
     // The refusal puts the first option back, and focus follows it.
@@ -936,7 +936,7 @@ inBrowser('a Segmented busy with a change on a served page', () => {
 
     await using page = await site.open('/segmented-busy')
 
-    await page.click('.kui-segmented-option:last-child .kui-segmented-label')
+    await page.click('.kui-segmented [data-part=option]:last-child [data-part=label]')
     await page.waitUntil(() => (window as unknown as { held?: string }).held === 'l')
     await page.click('#release')
     await page.waitUntil(() => document.querySelector<HTMLInputElement>('input[name="size"]:checked')!.value === 'm')
@@ -1069,12 +1069,12 @@ inBrowser('a CopyButton on a served page', () => {
     for (const id of ids)
       await page.click(`#${id}`)
 
-    await page.waitUntil(() => document.querySelectorAll('.kui-copy-btn-live:not(:empty)').length === 5)
+    await page.waitUntil(() => document.querySelectorAll('span[data-part=live]:not(:empty)').length === 5)
 
     expect(await widths()).toEqual(before)
     expect(await texts()).toEqual(['Copied!', 'Copied to the clipboard', 'Done', 'Copied!', 'Copied!'])
     expect(await names()).toEqual(['Copied!', 'Copied to the clipboard', 'Done', 'Copied!', 'Copied!'].map(name => name.toLowerCase()))
-    await page.waitUntil(() => document.querySelectorAll('.kui-copy-btn-live:not(:empty)').length === 0, { timeout: '10s' })
+    await page.waitUntil(() => document.querySelectorAll('span[data-part=live]:not(:empty)').length === 0, { timeout: '10s' })
 
     expect(await widths()).toEqual(before)
     expect(await texts()).toEqual(['Copy', 'Copy', 'Copy the install command', 'Copy', 'Copy'])
@@ -1134,9 +1134,9 @@ inBrowser('a non-modal SidePanel and the space skin on a served page', () => {
     await using page = await site.open('/space')
     // Everything opens by keyboard: a click would leave the focus moved after it as a pointer's, which :focus-visible does not follow.
     await page.press('Tab')
-    await page.evaluate(() => document.querySelector<HTMLElement>('.kui-multi-select-trigger')!.focus())
+    await page.evaluate(() => document.querySelector<HTMLElement>('.kui-multi-select [data-part=trigger]')!.focus())
     await page.press('Enter')
-    await page.waitFor('.kui-multi-select-checkbox')
+    await page.waitFor('.kui-multi-select [data-part=checkbox]')
 
     const seen = await page.evaluate(() => {
       const one = (selector: string) => document.querySelector<HTMLElement>(selector)!
@@ -1158,7 +1158,7 @@ inBrowser('a non-modal SidePanel and the space skin on a served page', () => {
         boxes,
         select: { appearance: select.appearance, image: select.backgroundImage, supported: CSS.supports('appearance', 'base-select'), pickerIcon: getComputedStyle(one('#kind'), '::picker-icon').content },
         // The open panel first: focusing a control outside it closes the panel.
-        focus: { multiSelect: focusRing(one('.kui-multi-select-checkbox'), one('.kui-multi-select-option')), checkbox: focusRing(one('#ticked')), select: focusRing(one('#kind')), key: focusRing(one('#key')), iconKey: focusRing(one('#icon-key')) },
+        focus: { multiSelect: focusRing(one('.kui-multi-select [data-part=checkbox]'), one('.kui-multi-select [data-part=option]')), checkbox: focusRing(one('#ticked')), select: focusRing(one('#kind')), key: focusRing(one('#key')), iconKey: focusRing(one('#icon-key')) },
       }
     })
     const [ticked, plain] = seen.boxes

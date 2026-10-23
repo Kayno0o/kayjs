@@ -6,7 +6,12 @@ import DateInput from './date-input.kay'
 import { dateRangeFrom } from './date'
 import { wording } from 'kay/words'
 
-const look = recipe({ parts: { root: 'kui-date-range-input', separator: 'kui-date-range-input-separator' } })
+const look = recipe({
+  parts: {
+    root: 'kui-date-range-input inline-flex items-center gap-1.5',
+    separator: 'text-xs text-kui-subtext0',
+  },
+})
 
 const { value = [null, null], min, max, firstDay, label, fromLabel, toLabel, fromName, toName, disabled, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // The dates to start with as `YYYY-MM-DD`, each open when null; a pair whose parent passes another follows it.

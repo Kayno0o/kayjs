@@ -56,7 +56,7 @@ const tokens = new Set([...theme.matchAll(DEFINED_TOKEN)].map(([, token]) => tok
 const classes = new Set([...theme.matchAll(DEFINED_CLASS)].map(([, name = '']) => name))
 
 // The components whose look is a recipe of utilities (#1885), each with its part classes in REMOVED_UI_CLASSES; theme.css keeps their old rules until 1.74.
-const RECIPE_COMPONENTS = new Set(['src/card.kay', 'src/badge.kay', 'src/notice.kay', 'src/avatar.kay', 'src/stat.kay', 'src/page-header.kay', 'src/page-section.kay', 'src/empty-state.kay', 'src/card-row.kay', 'src/widget.kay', 'src/meter.kay', 'src/progress.kay', 'src/skeleton.kay', 'src/button.kay', 'src/form-field.kay', 'src/checkbox.kay', 'src/toggle.kay', 'src/text-input.kay', 'src/textarea.kay', 'src/select.kay', 'src/contact-form.kay'])
+const RECIPE_COMPONENTS = new Set(['src/card.kay', 'src/badge.kay', 'src/notice.kay', 'src/avatar.kay', 'src/stat.kay', 'src/page-header.kay', 'src/page-section.kay', 'src/empty-state.kay', 'src/card-row.kay', 'src/widget.kay', 'src/meter.kay', 'src/progress.kay', 'src/skeleton.kay', 'src/button.kay', 'src/form-field.kay', 'src/checkbox.kay', 'src/toggle.kay', 'src/text-input.kay', 'src/textarea.kay', 'src/select.kay', 'src/contact-form.kay', 'src/radio-group.kay', 'src/segmented.kay', 'src/rating.kay', 'src/slider.kay', 'src/color-input.kay', 'src/date-input.kay', 'src/date-range-input.kay', 'src/combobox.kay', 'src/multi-select.kay', 'src/chip-group.kay', 'src/file-drop.kay', 'src/copy-button.kay', 'src/confirm-delete.kay'])
 
 // Every class a component writes: the `.class` shorthand, plain `class` attributes, and the names a `class` expression holds.
 function writtenClasses(path: string, source: string): string[] {
@@ -369,8 +369,10 @@ describe('theme.css', () => {
     expect([...written].filter(name => !classes.has(name))).toEqual([])
   })
 
-  test('defines no class that nothing writes', () => {
-    const written = new Set(components.flatMap(({ path, source }) => writtenClasses(path, source)))
+  test('defines no class that nothing writes', async () => {
+    // field-look.ts holds the recipes the form components share, so its kui- hooks are written there.
+    const fieldLook = (await Bun.file(`${ROOT}src/field-look.ts`).text()).match(KUI_NAME) ?? []
+    const written = new Set([...components.flatMap(({ path, source }) => writtenClasses(path, source)), ...fieldLook])
     const quoted = new Set([...components.map(({ source }) => source), ...scripts].flatMap(source => [...source.matchAll(QUOTED)].map(([, name]) => name)))
 
     expect([...classes].filter(name => !written.has(name) && !quoted.has(name) && !THIRD_PARTY.test(name) && !Object.hasOwn(REMOVED_UI_CLASSES, name))).toEqual([])
@@ -517,8 +519,8 @@ describe('theme.css', () => {
       expect(failing(LINES, 3, tokens), name).toEqual([])
 
       for (const [, token] of skin.matchAll(/^\s*(--[\w-]+):/gm)) {
-        // The label font has no default: it falls back to inherit where it is read. --font-sans is Tailwind's own.
-        if (!token!.startsWith('--color-kui-') && token !== '--kui-label-font' && token !== '--font-sans')
+        // The label font and the control line have no default: they fall back to inherit where it is read. --font-sans is Tailwind's own.
+        if (!token!.startsWith('--color-kui-') && token !== '--kui-label-font' && token !== '--kui-control-line' && token !== '--font-sans')
           expect(theme, `${name} ${token}`).toContain(`${token}:`)
       }
 
@@ -560,6 +562,22 @@ describe('theme.css', () => {
     expect(css).toContain(':not([multiple], [size])')
     // The skin sets one colour scheme, so it never asks for light.
     expect(skin).not.toContain('light-dark(')
+  })
+
+  test('keeps the space skin on the parts the recipes draw: the line they read, the combobox list and the multi-select checkbox', async () => {
+    const skin = await Bun.file(`${ROOT}src/skins/space.css`).text()
+    const source = async (name: string) => Bun.file(`${ROOT}src/${name}.kay`).text()
+
+    expect(skin).toMatch(/--kui-control-line: var\(--color-kui-field-border\)/)
+
+    for (const name of ['segmented', 'chip-group', 'file-drop'])
+      expect(await source(name), name).toContain('--kui-control-line')
+
+    // A part a skin selects by data-part is one the component still sets.
+    expect(await source('combobox')).toContain('list: ')
+    expect(await source('multi-select')).toContain('checkbox: ')
+    expect(skin).toContain(`.kui-combobox [data-part='list']`)
+    expect(skin).toContain(`.kui-multi-select [data-part='checkbox']`)
   })
 
   test('sizes the keyline of every framed box by --kui-border-width, a length the old --kui-border-card still sets', () => {

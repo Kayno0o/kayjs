@@ -6,7 +6,16 @@ import { enabledIndex, exactOption, matchingOptions, offersCreate } from './comb
 import { onFormReset, startRef } from './form-reset'
 import { wording } from 'kay/words'
 
-const look = recipe({ parts: { root: 'kui-combobox', input: 'kui-field-input', list: 'kui-combobox-list', option: 'kui-combobox-option', status: 'kui-combobox-status' } })
+// 'kui-field-input' is the field's name for the skins and an app's CSS, which the input takes its look from.
+const look = recipe({
+  parts: {
+    root: 'kui-combobox relative inline-flex min-w-0 flex-col',
+    input: 'kui-field-input',
+    list: 'absolute inset-x-0 top-full z-20 m-0 mt-1 max-h-64 list-none overflow-y-auto border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-mantle p-1 text-sm text-kui-text [&[hidden]]:hidden',
+    option: 'cursor-pointer px-2 py-1.5 hover:bg-kui-row-hover aria-selected:bg-kui-row-hover aria-selected:outline-2 aria-selected:-outline-offset-2 aria-selected:outline-transparent aria-selected:[box-shadow:inset_2px_0_0_var(--color-kui-accent)] aria-disabled:cursor-not-allowed aria-disabled:opacity-50 data-create:italic data-selected:font-medium data-selected:text-kui-accent',
+    status: 'sr-only',
+  },
+})
 
 // A remote search waits this long after the last key.
 const DEBOUNCE_MS = 200

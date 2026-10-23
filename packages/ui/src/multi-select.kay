@@ -10,22 +10,23 @@ import { pickedLabels, pickedShown, selectionSummary, toggledValue } from './mul
 import Popover from './popover.kay'
 import { wording } from 'kay/words'
 
+// The checkbox's own ring is too small to find, so the row the keyboard stands on takes the menu's tint and accent bar; forced colours paint the transparent outline instead.
 const look = recipe({
   parts: {
-    root: 'kui-multi-select',
-    panel: 'kui-multi-select-panel',
-    trigger: 'kui-multi-select-trigger',
-    summary: 'kui-multi-select-summary',
-    chevron: 'kui-multi-select-chevron',
-    search: 'kui-multi-select-search',
-    bar: 'kui-multi-select-bar',
-    action: 'kui-multi-select-action',
-    options: 'kui-multi-select-options',
-    option: 'kui-multi-select-option',
-    checkbox: 'kui-multi-select-checkbox',
-    icon: 'kui-multi-select-icon',
-    label: 'kui-multi-select-label',
-    empty: 'kui-multi-select-empty',
+    root: 'kui-multi-select inline-flex min-w-0',
+    panel: 'flex max-h-80 w-64 flex-col [min-inline-size:anchor-size(width)]',
+    trigger: 'flex w-full min-w-0 cursor-pointer items-center gap-2 text-left data-empty:text-kui-overlay1',
+    summary: 'min-w-0 flex-1 truncate',
+    chevron: 'size-4 shrink-0 text-kui-subtext0',
+    search: 'm-2 mb-0',
+    bar: 'flex gap-3 border-b border-kui-surface2 px-3 py-1.5',
+    action: 'cursor-pointer text-kui-2xs tracking-kui-label text-kui-subtext0 [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)] hover:text-kui-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kui-accent disabled:cursor-default disabled:opacity-40',
+    options: 'min-h-0 flex-1 overflow-y-auto p-1',
+    option: 'flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm text-kui-text hover:bg-kui-row-hover has-[[data-part=checkbox]:focus-visible]:bg-kui-row-hover has-[[data-part=checkbox]:focus-visible]:outline-2 has-[[data-part=checkbox]:focus-visible]:-outline-offset-2 has-[[data-part=checkbox]:focus-visible]:outline-transparent has-[[data-part=checkbox]:focus-visible]:[box-shadow:inset_2px_0_0_var(--color-kui-accent)] has-[[data-part=checkbox]:disabled]:cursor-not-allowed has-[[data-part=checkbox]:disabled]:bg-transparent has-[[data-part=checkbox]:disabled]:opacity-50',
+    icon: 'size-3.5 shrink-0',
+    checkbox: 'size-3.5 shrink-0 accent-kui-accent',
+    label: 'min-w-0 truncate',
+    empty: 'px-2 py-3 text-center text-xs text-kui-subtext0 empty:p-0',
   },
 })
 
@@ -98,7 +99,7 @@ onFormReset(() => root, () => {
   if (!same)
     set([...initial])
 
-  for (const [index, box] of [...root?.querySelectorAll<HTMLInputElement>('.kui-multi-select-checkbox') ?? []].entries()) {
+  for (const [index, box] of [...root?.querySelectorAll<HTMLInputElement>('[data-part=checkbox]') ?? []].entries()) {
     const option = shown()[index]
 
     box.checked = option !== undefined && picked().includes(option.value)
@@ -118,14 +119,14 @@ onFormDefaults(() => root, () => {
 // The panel only shows once the browser has opened the popover, so focus moves on its toggle rather than on the click; closing clears the search.
 function toggled(open: boolean) {
   if (open)
-    root?.querySelector<HTMLInputElement>('.kui-multi-select-search, .kui-multi-select-checkbox:not(:disabled)')?.focus()
+    root?.querySelector<HTMLInputElement>('[data-part=search], [data-part=checkbox]:not(:disabled)')?.focus()
   else
     query.set('')
 }
 
 // From the search box or the bar, ArrowDown reaches the first option; there the arrows, Home and End move between enabled options, which Tab would walk one by one.
 function keyDown(event: KeyboardEvent) {
-  const boxes = [...root?.querySelectorAll<HTMLInputElement>('.kui-multi-select-checkbox:not(:disabled)') ?? []]
+  const boxes = [...root?.querySelectorAll<HTMLInputElement>('[data-part=checkbox]:not(:disabled)') ?? []]
   const index = boxes.indexOf(event.target as HTMLInputElement)
   let move = MOVES[event.key]
 
