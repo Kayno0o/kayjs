@@ -2,7 +2,7 @@ import type { CheckDiagnostic, CheckOptions } from '.'
 import type { NamedAttribute } from '../compiler/ast'
 import type { ServedProject } from './shadow-types'
 import { stat } from 'node:fs/promises'
-import { findKayFiles } from '../build/files'
+import { findKayFiles, findProjectFiles } from '../build/files'
 import { walkNodes } from '../compiler/ast'
 import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
@@ -13,6 +13,10 @@ export const LARGE_IMAGE_BYTES = 256 * 1024
 const RASTER = /\.(?:png|jpe?g|gif|webp|avif|bmp)$/i
 const QUERY_OR_HASH = /[?#].*$/
 const TRAILING_SLASHES = /\/+$/
+const SOCIAL_IMAGE = /^(?:og|twitter):image(?::url)?$/i
+const STYLE_OR_MARKDOWN = /\.(?:css|md|mdx)$/i
+const CSS_URL = /url\(\s*(?:"([^"]+)"|'([^']+)'|([^"')\s]+))\s*\)/gi
+const MARKDOWN_IMAGE_OR_CSS_URL = new RegExp(`!\\[[^\\]]*\\]\\(\\s*<?([^)\\s>]+)|${CSS_URL.source}`, 'gi')
 
 // A url as the server compares it, percent-escapes decoded; a malformed escape is left as written.
 function decoded(url: string): string {
@@ -52,36 +56,66 @@ export async function largePublicImages(options: CheckOptions, root: string, { p
   const base = (options.base ?? '').replace(TRAILING_SLASHES, '')
   const bySrc = (url: string) => large.get(decoded(url)) ?? (base !== '' && url.startsWith(`${base}/`) ? large.get(decoded(url.slice(base.length))) : undefined)
 
+  const report = (file: string, source: string, start: number, end: number, url: string, size: number) => found.push({
+    file,
+    ...positionAt(source, start),
+    end,
+    message: `\`${url}\` is ${Math.round(size / 1024)} KiB and public files are sent as they are, so every visitor downloads it whole`,
+    help: 'move it into `src/` and import it, `import hero from \'./hero.jpg\'` then `img(src={hero})`, so kay serves it resized as WebP at the width the page shows it',
+    code: 'large-public-image',
+    severity: level === 'warn' ? 'warning' : 'error',
+  })
+
+  // The files that name a raster outside an `img`: a CSS `url()` in a stylesheet, a `style` block or attribute, and a Markdown image.
+  const scanText = (file: string, source: string, pattern: RegExp) => {
+    for (const match of source.matchAll(pattern)) {
+      const url = (match.slice(1).find(group => group !== undefined) ?? '').replace(QUERY_OR_HASH, '')
+      const size = bySrc(url)
+
+      if (size !== undefined)
+        report(file, source, match.index, match.index + match[0].length, url, size)
+    }
+  }
+
   for (const file of await findKayFiles(root, { project: true, ownKayOnly: true })) {
     const source = await Bun.file(file).text()
 
-    if (!source.includes('img'))
+    if (source.includes('url('))
+      scanText(file, source, CSS_URL)
+
+    if (!source.includes('img') && !source.includes('image'))
       continue
 
     walkNodes(parseKay(source).template, undefined, (node) => {
-      if (node.kind !== 'element' || node.component || node.name !== 'img')
+      if (node.kind !== 'element' || node.component || (node.name !== 'img' && node.name !== 'meta'))
         return undefined
 
       const named = (name: string) => node.attributes.find((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && source.slice(attribute.name.start, attribute.name.end) === name)
-      const src = named('src')
-      const url = src?.kind === 'static' ? src.text.replace(QUERY_OR_HASH, '') : undefined
-      const size = url === undefined ? undefined : bySrc(url)
+      const staticText = (attribute: NamedAttribute | undefined) => attribute?.kind === 'static' ? attribute.text : undefined
 
-      if (src === undefined || size === undefined || named('srcset'))
+      // A social card names its picture in a `meta`, which every crawler downloads whole.
+      const isCard = node.name === 'meta' && SOCIAL_IMAGE.test(staticText(named('property')) ?? staticText(named('name')) ?? '')
+
+      if (node.name === 'meta' && !isCard)
         return undefined
 
-      found.push({
-        file,
-        ...positionAt(source, src.name.start),
-        end: src.name.end,
-        message: `\`${url}\` is ${Math.round(size / 1024)} KiB and public files are sent as they are, so every visitor downloads it whole`,
-        help: 'move it into `src/` and import it, `import hero from \'./hero.jpg\'` then `img(src={hero})`, so kay serves it resized as WebP at the width the page shows it',
-        code: 'large-public-image',
-        severity: level === 'warn' ? 'warning' : 'error',
-      })
+      const src = named(isCard ? 'content' : 'src')
+      const url = staticText(src)?.replace(QUERY_OR_HASH, '')
+      const size = url === undefined ? undefined : bySrc(url)
+
+      if (src === undefined || url === undefined || size === undefined || (!isCard && named('srcset')))
+        return undefined
+
+      report(file, source, src.name.start, src.name.end, url, size)
 
       return undefined
     })
+  }
+
+  for (const file of await findProjectFiles(root, STYLE_OR_MARKDOWN, { project: true, ownKayOnly: true })) {
+    const source = await Bun.file(file).text()
+
+    scanText(file, source, file.endsWith('.css') ? CSS_URL : MARKDOWN_IMAGE_OR_CSS_URL)
   }
 
   return found

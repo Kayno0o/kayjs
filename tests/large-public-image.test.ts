@@ -83,6 +83,18 @@ describe('large-public-image', () => {
     expect(problems.map(problem => problem.file.split('/').pop()).toSorted()).toEqual(['Hero.kay', 'layout.kay'])
   })
 
+  it('also sees a raster in a CSS url(), a style attribute, a social card meta and a Markdown image', async () => {
+    const problems = await bare({
+      'src/routes/index.kay': ['div(style="background: url(/big.jpg)")', 'div(style="background: url(\'/my%20photo.jpg\')")', 'meta(property="og:image" content="/big.jpg")', 'meta(name="twitter:image" content="/big.jpg?v=2")', 'meta(property="og:title" content="/big.jpg")', 'div(style="background: url(/small.jpg)")', 'div(style="background: url(https://example.com/big.jpg)")', ''].join('\n'),
+      'src/components/Hero.kay': `div(style='background: image-set(url("/big.jpg") 1x)')\n`,
+      'src/styles.css': '.a { background: url(/big.jpg) }\n.b { background: url(/missing.jpg) }\n',
+      'src/routes/post.md': '![hero](/big.jpg)\n\n![none](/missing.jpg)\n\n![spaced](/docs/big.jpg "title")\n',
+    }, '/docs')
+
+    expect(problems.map(problem => [problem.file.split('/').pop(), problem.line])).toEqual(expect.arrayContaining([['index.kay', 1], ['index.kay', 2], ['index.kay', 3], ['index.kay', 4], ['Hero.kay', 1], ['styles.css', 1], ['post.md', 1], ['post.md', 5]]))
+    expect(problems.length).toBe(8)
+  })
+
   it('does not throw on a dangling symlink in public', async () => {
     const dir = await project()
 
