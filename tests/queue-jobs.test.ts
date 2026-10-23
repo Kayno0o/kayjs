@@ -499,9 +499,15 @@ describe('a stop that did not end the process', () => {
     }
 
     try {
-      beginDrain(500)
+      const endDrain = beginDrain(500)
+      const other = beginDrain(5000)
+
+      expect(stopGraceMs()).toBe(200)
+      // Another app's drain ending leaves this one's grace short.
+      other()
       expect(stopGraceMs()).toBe(200)
       expect(await stuck()).toBeLessThan(1500)
+      endDrain()
       expect(stopGraceMs()).toBe(3000)
 
       // A plain shutdown, no drain begun: the run gets the 3 s default.

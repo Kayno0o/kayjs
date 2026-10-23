@@ -6,7 +6,7 @@ import { kayLog } from '../runtime/log'
 import { appStore } from './app-store'
 import { wholeResponse } from './compress'
 import { healthTimeoutMs, shutdownSeconds } from './config-limits'
-import { beginDrain, endDrain } from './drain'
+import { beginDrain } from './drain'
 import { endEventStreams, stopEventStreams } from './event-stream'
 import { logMessage } from './log'
 import { START_COMMAND, START_PARENT } from './parent'
@@ -119,8 +119,15 @@ export function stopOnSignal(app: Elysia, lifecycle: Lifecycle, wait: Duration =
 
       // Streams first, as they hold the server open, and the queues and schedules start their grace beside the open requests.
       stopEventStreams()
-      beginDrain(timeout * 1000)
-      await shutdown(root)
+      const endDrain = beginDrain(timeout * 1000)
+
+      try {
+        await shutdown(root)
+      }
+      finally {
+        endDrain()
+      }
+
       await closeRooms()
       clearTimeout(forced)
       process.exit()
@@ -235,26 +242,21 @@ export async function shutdown(app: AnyElysia, force = false): Promise<void> {
   if (!server)
     return
 
-  try {
-    // A forced stop closes every connection by itself, and ending streams is not this app's to do for the others in the process.
-    if (!force)
-      endEventStreams()
+  // A forced stop closes every connection by itself, and ending streams is not this app's to do for the others in the process.
+  if (!force)
+    endEventStreams()
 
-    await stopServer(server, force)
-    app.server = null
+  await stopServer(server, force)
+  app.server = null
 
-    for (const hook of app.event.stop ?? []) {
-      try {
-        await hook.fn(app)
-      }
-      catch (error) {
-        await reportBackgroundError('an onStop hook failed', error)
-        process.exitCode = 1
-      }
+  for (const hook of app.event.stop ?? []) {
+    try {
+      await hook.fn(app)
     }
-  }
-  finally {
-    endDrain()
+    catch (error) {
+      await reportBackgroundError('an onStop hook failed', error)
+      process.exitCode = 1
+    }
   }
 }
 

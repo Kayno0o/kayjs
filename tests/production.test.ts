@@ -1849,7 +1849,7 @@ describe('lifecycle', () => {
   }, 20_000)
 
   it('returns from shutdown(app) over a server with an open websocket, closing the socket', async () => {
-    const app = new Elysia().ws('/socket', { open() {} }).listen(0)
+    const app = new Elysia().ws('/socket', { open: () => undefined }).listen(0)
     const socket = new WebSocket(`ws://localhost:${app.server!.port}/socket`)
     const closed = new Promise<number>((resolve) => {
       socket.onclose = event => resolve(event.code)
@@ -1884,7 +1884,7 @@ describe('lifecycle', () => {
 
     expect(await server.exited).toBe(1)
     expect(await hung).toBe('closed')
-    expect(typeof await closed).toBe('number')
+    expect(await closed).toBe(1001)
   }, 20_000)
 })
 
