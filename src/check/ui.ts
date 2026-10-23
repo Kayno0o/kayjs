@@ -75,7 +75,7 @@ function componentProblems(ui: UiSource, component: UiComponent, report: (span: 
   }
 }
 
-// What `src/ui.ts` sets that the components it names do not have: an unknown component, part, variant or value, and a file the compiler cannot read as written.
+// What `src/ui.ts` sets that the components it names do not have: an unknown or ambiguous component, an unknown part, and a file the compiler cannot read as written.
 export function uiProblems(root: string): CheckDiagnostic[] {
   const ui = uiOf(root)
 

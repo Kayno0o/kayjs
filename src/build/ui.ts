@@ -23,9 +23,8 @@ export interface UiComponent {
   // The component's file, as Bun loads it, when a specifier resolves to one.
   file?: string | undefined
   entry: UiEntry
-  // The span of each part and of each variant and its values, for the check to point at.
+  // The span of each part, for the check to point at.
   parts: { name: string, span: Span }[]
-  variants: { name: string, span: Span, values: { name: string, span: Span }[] }[]
 }
 
 interface NameIndex {
@@ -172,17 +171,14 @@ function entryOf(node: t.Node, component: UiComponent, problems: UiProblem[]): v
     else if (key === 'variants') {
       const variants = record<Record<string, string | Record<string, string>>>()
 
-      eachProperty(value, '`variants`', problems, (name, values, variantProperty) => {
+      eachProperty(value, '`variants`', problems, (name, values) => {
         const options = record<string | Record<string, string>>()
-        const variant: UiComponent['variants'][number] = { name, span: span(variantProperty.key), values: [] }
 
         eachProperty(values, `The values of \`${name}\``, problems, (option, classes, optionProperty) => {
           const found = variantClasses(classes, problems)
 
           if (found !== undefined)
             options[option] = found
-
-          variant.values.push({ name: option, span: span(optionProperty.key) })
 
           // A part named in a value is checked like one in `parts`.
           if (typeof found === 'object') {
@@ -191,7 +187,6 @@ function entryOf(node: t.Node, component: UiComponent, problems: UiProblem[]): v
           }
         })
         variants[name] = options
-        component.variants.push(variant)
       })
       entry.variants = variants
     }
@@ -367,7 +362,7 @@ function readUi(file: string): UiSource | undefined {
   }
   else {
     eachProperty(config, 'The default export', problems, (specifier, value, property) => {
-      const component: UiComponent = { specifier, span: span(property.key), entry: {}, parts: [], variants: [] }
+      const component: UiComponent = { specifier, span: span(property.key), entry: {}, parts: [] }
 
       entryOf(value, component, problems)
       components.push(component)
