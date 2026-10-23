@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { expect, it } from 'bun:test'
+import { classNameList, shim } from '../src/test/lazy-plugins'
 import { fixtureCopy, scratchDir } from './scratch'
 
 // Bun keeps the global of a file alive for as long as the process runs once the file loaded a native addon, and under `bun test --isolate` that is every module the file imported: a site whose config imports Tailwind's plugin costs the run its whole module graph per file.
@@ -122,4 +123,53 @@ console.log(JSON.stringify({ success: build.success, logs: build.logs.map(String
   expect({ success, logs }).toEqual({ success: true, logs: [] })
   expect(['card-title', 'z', 'new', 'x_y'].filter(name => !code.includes(`"${name}"`))).toEqual([])
   expect(code).not.toMatch(/gone|quoted|a\.png|"png"/)
+}, 60_000)
+
+it('the class names of a stylesheet are read past hostile and unusual input', () => {
+  expect(classNameList('.a { background: url("a)b") } .after { x: 1 }')).toEqual(['a', 'after'])
+  expect(classNameList(`.a { background: url('a)b.png') } .b { background: url( x.png ) } .c { content: "\\" .no" } .d {}`)).toEqual(['a', 'b', 'c', 'd'])
+  expect(classNameList('.café, .日本 > .a-é_b { margin: 0.5em; width: 1.5px }')).toEqual(['café', '日本', 'a-é_b'])
+  expect(classNameList('.sm\\:flex, .w-1\\/2, .\\31 0, .\\1F600 x, .a\\.b { }')).toEqual(['sm:flex', 'w-1/2', '10', '😀x', 'a.b'])
+  expect(classNameList('/* .gone */ .x::after { content: ".q" } @media (min-width: .5em) {}')).toEqual(['x'])
+})
+
+it('the shim lists the exports of the real plugin once per file, string names included, and refuses an export *', async () => {
+  const dir = await scratchDir('native-exports-')
+  const real = join(dir, 'node_modules/bun-plugin-tailwind/index.mjs')
+
+  await Bun.write(real, `const x = 1\nexport { x as "str-name", x as y }\nexport default { name: 'n' }\n`)
+
+  const first = shim('bun-plugin-tailwind', real)
+
+  expect(first).toContain('"str-name"')
+
+  // A cached shim is not read again.
+  await Bun.write(real, `export * from './other.mjs'\n`)
+  expect(shim('bun-plugin-tailwind', real)).toBe(first)
+
+  const star = join(dir, 'star/node_modules/bun-plugin-tailwind/index.mjs')
+
+  await Bun.write(star, `export * from './other.mjs'\nexport * as ns from './other.mjs'\n`)
+  expect(() => shim('bun-plugin-tailwind', star)).toThrow('export *')
+})
+
+it('the shim of a plugin with a string-named export loads', async () => {
+  const dir = await scratchDir('native-string-')
+
+  await Bun.write(join(dir, 'node_modules/bun-plugin-tailwind/package.json'), JSON.stringify({ name: 'bun-plugin-tailwind', type: 'module', exports: './index.mjs' }))
+  await Bun.write(join(dir, 'node_modules/bun-plugin-tailwind/index.mjs'), `const x = 7\nexport { x as "str-name" }\nexport default { name: '@tailwindcss/bun', setup() {} }\n`)
+  await Bun.write(join(dir, 'config.ts'), `import * as all from 'bun-plugin-tailwind'\nexport { all }\n`)
+
+  const result = await run(`import { lazyNativePlugins } from ${JSON.stringify(resolve('src/test/lazy-plugins'))}
+
+lazyNativePlugins()
+
+const { all } = await import(${JSON.stringify(join(dir, 'config.ts'))})
+
+await all.default.setup({})
+console.log(JSON.stringify(all['str-name']))
+process.exit(0)
+`, dir)
+
+  expect(result).toBe(7)
 }, 60_000)

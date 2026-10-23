@@ -8,18 +8,27 @@ export const NATIVE_PLUGINS: Record<string, string> = { 'bun-plugin-tailwind': '
 const ENTRY = new RegExp(`[\\\\/]node_modules[\\\\/](${Object.keys(NATIVE_PLUGINS).join('|')})[\\\\/]index\\.mjs$`)
 const STYLESHEET = /\.css$/
 const STYLE_MODULE = /\.module\.css$/
-const COMMENTS_STRINGS_URLS = /\/\*[\s\S]*?\*\/|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|url\([^)]*\)/g
-const CLASS_NAME = /\.(-?[_a-z][\w-]*)/gi
+const EXPORT_STAR = /(?:^|[;{}\n])\s*export\s*\*\s*from\b/
 const transpiler = new Bun.Transpiler({ loader: 'js' })
 let registered = false
+const shims = new Map<string, string>()
 
-// The shim: `default` runs the real plugin, loaded when a build runs it. The other exports are live bindings filled in once the real module loads, as an ES module cannot export a value it has not read. The real file is imported again with a query, which the filter does not match. Only plain `export` names are followed, which the plugins listed here use.
-function shim(name: string, real: string): string {
-  const others = transpiler.scan(readFileSync(real, 'utf8')).exports.filter(one => one !== 'default')
-  const declared = others.map(one => `export let ${one}`).join('\n')
-  const filled = others.map(one => `${one} = real.${one}`).join('; ')
+// The shim: `default` runs the real plugin, loaded when a build runs it. The other exports are live bindings filled in once the real module loads, as an ES module cannot export a value it has not read. The real file is imported again with a query, which the filter does not match. A bundle re-exporting with `export *` cannot be listed by a scan, so it fails the import instead of missing exports. The scan of a bundle of about 1 MB runs once per file and process.
+export function shim(name: string, real: string): string {
+  const cached = shims.get(real)
 
-  return `${declared}
+  if (cached !== undefined)
+    return cached
+
+  const source = readFileSync(real, 'utf8')
+
+  if (EXPORT_STAR.test(source))
+    throw new Error(`kay/test: ${real} uses \`export *\`, which the lazy shim of NATIVE_PLUGINS cannot list; list its exports in src/test/lazy-plugins.ts first`)
+
+  const others = transpiler.scan(source).exports.filter(one => one !== 'default')
+  const declared = others.map((one, index) => `let v${index}; export { v${index} as ${JSON.stringify(one)} }`).join('\n')
+  const filled = others.map((one, index) => `v${index} = real[${JSON.stringify(one)}]`).join('; ')
+  const text = `${declared}
 export default {
   name: ${JSON.stringify(NATIVE_PLUGINS[name])},
   kayNative: true,
@@ -30,6 +39,10 @@ export default {
   },
 }
 `
+
+  shims.set(real, text)
+
+  return text
 }
 
 // A config importing one of NATIVE_PLUGINS gets a plugin that loads the real one when a build runs it, not when the config is read, so a file that never builds a client for a browser loads no addon. Bun resolves the import from the project as usual, so each project meets its own.
@@ -47,9 +60,121 @@ export function lazyNativePlugins(): void {
   })
 }
 
-// What a stylesheet module exports without being parsed: every class name its selectors mention, as the default object and as a named export, a string name so a reserved word such as `new` exports too.
+const START_NOT_IDENTIFIER = /^(?:\d|-\d)/
+const NAME_CHAR = /[\w-]/
+const URL_BEFORE = /url$/i
+const HEX = /^[\da-f]{1,6}/i
+const WHITESPACE = /\s/
+
+// The end of a quoted string starting at `start`, whose escapes are skipped.
+function stringEnd(css: string, start: number): number {
+  const quote = css[start]
+  let index = start + 1
+
+  while (index < css.length && css[index] !== quote)
+    index += css[index] === '\\' ? 2 : 1
+
+  return index + 1
+}
+
+// The end of a `url(` whose opening parenthesis is at `open`: a quoted argument ends at its quote, an unquoted one at the first unescaped `)`.
+function urlEnd(css: string, open: number): number {
+  let index = open + 1
+
+  while (WHITESPACE.test(css[index] ?? ''))
+    index++
+
+  if (css[index] === '"' || css[index] === '\'')
+    index = stringEnd(css, index)
+
+  while (index < css.length && css[index] !== ')')
+    index += css[index] === '\\' ? 2 : 1
+
+  return index + 1
+}
+
+// The class name starting right after a dot, with escapes decoded and non-ASCII characters kept, and where it ends. A name starting with a digit, or a dash and a digit, is no identifier (`0.5em`).
+function identifier(css: string, start: number): { name: string, end: number } | undefined {
+  let index = start
+  let name = ''
+
+  while (index < css.length) {
+    const char = css[index]!
+
+    if (char === '\\') {
+      const hex = HEX.exec(css.slice(index + 1, index + 7))?.[0]
+
+      if (hex === undefined) {
+        if (index + 1 >= css.length)
+          break
+
+        const next = String.fromCodePoint(css.codePointAt(index + 1)!)
+
+        name += next
+        index += 1 + next.length
+
+        continue
+      }
+
+      name += String.fromCodePoint(Math.min(Number.parseInt(hex, 16), 0x10FFFF) || 0xFFFD)
+      index += 1 + hex.length
+
+      if (css.startsWith('\r\n', index))
+        index += 2
+      else if (WHITESPACE.test(css[index] ?? ''))
+        index++
+
+      continue
+    }
+
+    if (!NAME_CHAR.test(char) && char.charCodeAt(0) < 0x80)
+      break
+
+    name += char
+    index++
+  }
+
+  return name === '' || START_NOT_IDENTIFIER.test(css.slice(start, start + 2)) ? undefined : { name, end: index }
+}
+
+// Every class name the selectors of a stylesheet mention, found by one pass that skips comments, strings and `url()` arguments.
+export function classNameList(css: string): string[] {
+  const names = new Set<string>()
+  let index = 0
+
+  while (index < css.length) {
+    const char = css[index]!
+
+    if (char === '/' && css[index + 1] === '*') {
+      const end = css.indexOf('*/', index + 2)
+
+      index = end < 0 ? css.length : end + 2
+    }
+    else if (char === '"' || char === '\'') {
+      index = stringEnd(css, index)
+    }
+    else if (char === '(' && URL_BEFORE.test(css.slice(Math.max(0, index - 3), index))) {
+      index = urlEnd(css, index)
+    }
+    else if (char === '.') {
+      const found = identifier(css, index + 1)
+
+      if (found)
+        names.add(found.name)
+
+      index = found?.end ?? index + 1
+    }
+    else {
+      index++
+    }
+  }
+
+  return [...names]
+}
+
+// What a stylesheet module exports without being parsed: every class name, as the default object and as a named export, a string name so a reserved word such as `new` exports too.
 function classNames(css: string): string {
-  const names = [...new Set([...css.replace(COMMENTS_STRINGS_URLS, '').matchAll(CLASS_NAME)].map(match => match[1]!))]
+  const names = classNameList(css)
   const named = names.filter(name => name !== 'default').map((name, index) => `const v${index} = ${JSON.stringify(name)}; export { v${index} as ${JSON.stringify(name)} }`)
 
   return `export default { ${names.map(name => `${JSON.stringify(name)}: ${JSON.stringify(name)}`).join(', ')} }\n${named.join('\n')}\n`
