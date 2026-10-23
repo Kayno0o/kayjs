@@ -1,6 +1,7 @@
 import type { CollectionInfo, EntryRef } from './kay/contract'
 import { files } from 'kay/server'
 import { wording } from 'kay/words'
+import { hiddenOf } from './hidden'
 import { collections, entries } from './kay/content'
 import { log } from './log'
 import { forgetUploads, MEDIA_FOLDER, mediaIndex, movedKeys } from './media'
@@ -36,6 +37,8 @@ export interface Read {
   stored: Stored[]
   // The entries mentioning each upload's id.
   usedBy: Map<string, Map<string, EntryRef>>
+  // The ids that only a revision or a trashed entry mentions, which restoring brings back to an entry.
+  held: Set<string>
 }
 
 export const idOf = (key: string) => KEY_ID.exec(key)?.[1]
@@ -61,6 +64,17 @@ export async function listUploads(): Promise<{ stored: Stored[], listed: Collect
   return { stored, listed }
 }
 
+function idsIn(data: unknown, body: string | undefined): Set<string> {
+  const found = new Set<string>()
+
+  for (const text of [JSON.stringify(data, (_, value: unknown) => typeof value === 'bigint' ? String(value) : value) ?? '', body ?? '']) {
+    for (const match of text.toLowerCase().matchAll(IDS))
+      found.add(match[1]!)
+  }
+
+  return found
+}
+
 // Every upload of the CMS's folders and the entries of any collection, locale or draft that mention each, or why they cannot be told.
 export async function readUploads(listing?: { stored: Stored[], listed: CollectionInfo[] }): Promise<Read | { blocked: string[] }> {
   const blocked: string[] = []
@@ -72,6 +86,7 @@ export async function readUploads(listing?: { stored: Stored[], listed: Collecti
   const { stored, listed } = found
 
   const usedBy = new Map<string, Map<string, EntryRef>>()
+  const held = new Set<string>()
 
   for (const collection of listed) {
     try {
@@ -82,13 +97,11 @@ export async function readUploads(listing?: { stored: Stored[], listed: Collecti
           continue
         }
 
-        for (const text of [JSON.stringify(entry.data, (_, value: unknown) => typeof value === 'bigint' ? String(value) : value), entry.body ?? '']) {
-          for (const match of text.toLowerCase().matchAll(IDS)) {
-            const users = usedBy.get(match[1]!) ?? new Map<string, EntryRef>()
+        for (const id of idsIn(entry.data, entry.body)) {
+          const users = usedBy.get(id) ?? new Map<string, EntryRef>()
 
-            users.set(`${collection.name}/${entry.slug}/${entry.locale ?? ''}`, { collection: collection.name, slug: entry.slug, ...entry.locale !== undefined && { locale: entry.locale } })
-            usedBy.set(match[1]!, users)
-          }
+          users.set(`${collection.name}/${entry.slug}/${entry.locale ?? ''}`, { collection: collection.name, slug: entry.slug, ...entry.locale !== undefined && { locale: entry.locale } })
+          usedBy.set(id, users)
         }
       }
     }
@@ -96,14 +109,28 @@ export async function readUploads(listing?: { stored: Stored[], listed: Collecti
       log.error(`reading ${collection.name} failed`, error)
       blocked.push(wording('cms.uploads.collectionRead', '{collection} cannot be read', { collection: collection.name }))
     }
+
+    // A revision or a trashed entry restored points at the upload again, so it keeps the file.
+    for (const kind of ['history', 'trash'] as const) {
+      try {
+        for (const row of await hiddenOf(collection.name, kind)?.load({ preview: true }) ?? []) {
+          for (const id of idsIn(row.data, row.body))
+            held.add(id)
+        }
+      }
+      catch (error) {
+        log.error(`reading ${collection.name}'s ${kind} failed`, error)
+        blocked.push(wording('cms.uploads.collectionRead', '{collection} cannot be read', { collection: collection.name }))
+      }
+    }
   }
 
-  return blocked.length > 0 ? { blocked } : { stored, usedBy }
+  return blocked.length > 0 ? { blocked } : { stored, usedBy, held }
 }
 
 // The uploads of the CMS's folders, the shared one and each collection's older one, that no entry of any collection, locale or draft mentions.
-// An upload modified less than a day ago, or that the store dates not at all, is held back.
-// A URL hardcoded in a page, a file of the repository outside the collections or an older revision a revert brings back is not seen: the editor confirms before anything goes.
+// An upload modified less than a day ago, or that the store dates not at all, is held back, and so is one a revision or a trashed entry of a loaded collection still mentions.
+// A URL hardcoded in a page or a file of the repository outside the collections is not seen: the editor confirms before anything goes.
 export async function unusedUploads(): Promise<UploadScan> {
   const read = await readUploads()
 
@@ -114,7 +141,7 @@ export async function unusedUploads(): Promise<UploadScan> {
   const orphans = read.stored.filter((file) => {
     const id = idOf(file.key)
 
-    return id !== undefined && !read.usedBy.has(id) && file.modified !== undefined && now - file.modified.getTime() >= GRACE
+    return id !== undefined && !read.usedBy.has(id) && !read.held.has(id) && file.modified !== undefined && now - file.modified.getTime() >= GRACE
   }).map(file => file.key).toSorted()
   const variants = await files.variants(orphans)
   const unused = orphans.map(key => ({ key, url: files.url(key), variants: variants.get(key) ?? [] }))
@@ -135,7 +162,7 @@ export interface LibraryUpload {
   at: number | undefined
   // The entries mentioning it.
   usedIn: EntryRef[]
-  // Whether the unused-uploads rules let it be deleted: no entry mentions it and it is over a day old.
+  // Whether the unused-uploads rules let it be deleted: no entry, revision or trashed entry mentions it and it is over a day old.
   deletable: boolean
 }
 
@@ -202,7 +229,7 @@ export async function libraryUploads(options: { page?: number | undefined, q?: s
       by: record?.by,
       at: record?.at ?? file.modified?.getTime(),
       usedIn,
-      deletable: usedIn.length === 0 && file.modified !== undefined && now - file.modified.getTime() >= GRACE,
+      deletable: usedIn.length === 0 && !read.held.has(idOf(file.key)!) && file.modified !== undefined && now - file.modified.getTime() >= GRACE,
     }
   }))
 

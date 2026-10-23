@@ -434,7 +434,7 @@ Uploads an older release kept in a folder per collection move over by themselves
 
 The old file stays where it was, since pages the site has not rebuilt from still name it; the library hides it and the unused-uploads screen offers it for deletion once no entry names it. An entry that cannot be saved right then is tried again at the next start.
 
-Replacing or removing a file leaves the old upload stored. The unused-uploads screen at `<prefix>/uploads` lists the uploads no entry mentions, and deletes only the ones you confirm, and only with a `guard`.
+Replacing or removing a file leaves the old upload stored. The unused-uploads screen at `<prefix>/uploads` lists the uploads no entry mentions, and deletes only the ones you confirm, and only with a `guard`. An upload that a kept revision or a trashed entry still mentions is not listed, so a restore finds its image.
 
 Check each upload before you confirm. A URL written by hand in a page, or a file outside the collections, is not seen as a use.
 

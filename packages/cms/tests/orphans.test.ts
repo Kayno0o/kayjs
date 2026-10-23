@@ -7,6 +7,7 @@ import { files, memoryFiles } from 'kay/server'
 import { scratchDir } from 'kay/test'
 import { encodePng } from '../../../src/server/png'
 import { setupStorage } from '../../../src/server/storage'
+import { configure } from '../src/settings'
 
 const shape = { schema: { type: 'object' }, components: [], localized: false } satisfies Omit<CollectionInfo, 'name' | 'kind'>
 const posts: CollectionInfo = { ...shape, name: 'posts', kind: 'folder', localized: true }
@@ -62,6 +63,7 @@ afterEach(() => {
 })
 
 beforeEach(async () => {
+  configure({})
   setupStorage(memoryFiles(), '/nonexistent', undefined)
   listed = [posts, products]
   infoCalls = []
