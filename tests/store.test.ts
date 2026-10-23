@@ -432,6 +432,28 @@ describe('store deps', () => {
     seen.stop()
   })
 
+  it('notifies a reader of a key whose dep was dropped and made again', async () => {
+    const game = store<{ a?: number }>({})
+
+    watching(() => game.a).stop()
+    await Promise.resolve()
+    expect(trackedCount(game)).toBe(0)
+
+    const again = watching(() => game.a)
+
+    game.a = 2
+    flush()
+    expect(again.seen).toEqual([undefined, 2])
+    again.stop()
+  })
+
+  it('starts afresh when the kept value is of another kind', () => {
+    const first = recordSignals(() => store({ n: 1 }))
+    const second = recordSignals(() => store([1]), first.values())
+
+    expect(second.result).toEqual([1])
+  })
+
   it('takes its state back across a hot swap', () => {
     const first = recordSignals(() => store({ n: 1 }))
 

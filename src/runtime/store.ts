@@ -88,11 +88,11 @@ function trackKey(target: object, key: string): void {
   if (!tracking())
     return
 
-  const { keys } = metaOf(target)
-  let one = keys.get(key)
+  const meta = metaOf(target)
+  let one = meta.keys.get(key)
 
   if (!one)
-    keys.set(key, one = dep(metaOf(target), key))
+    meta.keys.set(key, one = dep(meta, key))
 
   one.read()
 }
