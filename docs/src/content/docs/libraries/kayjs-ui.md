@@ -41,7 +41,7 @@ An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never
 }
 ```
 
-To use a theme utility in `@apply`, such as `@apply border border-kui-surface2 bg-kui-mantle`, write it in `src/app.css`, with nothing else: `ui()` gives that stylesheet the tokens and writes no rule, so the theme is not loaded a second time. An `@reference '@kaynooo/kayjs-ui/theme.css';` you already wrote keeps working. Without `ui()`, start the stylesheet with that line, or the build fails with `Cannot apply unknown utility class`.
+To use a theme utility in `@apply`, such as `@apply border border-border bg-popover`, write it in `src/app.css`, with nothing else: `ui()` gives that stylesheet the tokens and writes no rule, so the theme is not loaded a second time. An `@reference '@kaynooo/kayjs-ui/theme.css';` you already wrote keeps working. Without `ui()`, start the stylesheet with that line, or the build fails with `Cannot apply unknown utility class`.
 
 Your stylesheet ships only the rules of the components you render. kay drops every `kui-` rule whose class no file of your app, and no component it renders, writes whole.
 
@@ -53,17 +53,19 @@ The palette button in this site's header picks a theme, from Catppuccin to Tokyo
 
 <ThemeTokens />
 
-Colours are named as the app names them (`--color-accent`, `--color-background`, `--color-danger`), used as the utility `bg-kui-<old name>` (the utilities keep the `kui-` form), and hold `light-dark(light, dark)`. `--color-input` is the solid line of text fields, buttons, toggles, carousel dots and empty stars, at 3:1 on every surface. A palette that changes the surfaces sets it to match.
+Colours are named as the app names them (`--color-accent`, `--color-background`, `--color-danger`), so one theme feeds your app and the library, and the utilities are yours too (`bg-surface`, `text-muted`, `border-border`). They hold `light-dark(light, dark)`.
 
-Eight colours are seeds: `--color-background`, `--color-foreground`, `--color-accent`, `--color-success`, `--color-warning`, `--color-info`, `--color-danger` and `--color-input`. Set those eight in your `@theme` and every other colour follows: the surfaces and greys are mixed from the canvas and the text, the hairlines are the text at an alpha, and the accent's hover is the accent shaded. A seed must read at 4.5:1 on `mantle` and `surface1`, the deepest surfaces, and `field-border` at 3:1.
+An app built from kay's template already sets `--color-base`, `--color-text` and `--color-error`, which `background`, `foreground` and `danger` fall back to. A name your app already sets for its own use, such as `--color-accent` or `--radius-md`, drives kayjs-ui too: that is the point of one theme. `--color-input` is the solid line of text fields, buttons, toggles, carousel dots and empty stars, at 3:1 on every surface. A palette that changes the surfaces sets it to match.
+
+Eight colours are seeds: `--color-background`, `--color-foreground`, `--color-accent`, `--color-success`, `--color-warning`, `--color-info`, `--color-danger` and `--color-input`. Set those eight in your `@theme` and every other colour follows: the surfaces and greys are mixed from the background and the text, the hairlines are the text at an alpha, and the accent's hover is the accent shaded. A seed must read at 4.5:1 on `popover` and `surface-strong`, the deepest surfaces, and `input` at 3:1.
 
 Set them on `:root` or `html`, as `@theme` does: a seed set on one element does not change the colours mixed inside it. A colour you set yourself wins over the one mixed for it. A site in one scheme writes each seed once and sets `color-scheme` on `:root` to it.
 
-`--kui-border-width` is the keyline of buttons, cards, rows, widgets, notices, avatars, toasts, dialogs, side panels, tooltips, tables, boxed sections, segmented controls, chips, toggles, chart plots and the other framed boxes. The dashed frame and the handles the image cropper draws around the crop keep their fixed borders, as they have to show over any photo. It is a length: `2px`, not `2px solid red`, which it ignores. The old name, `--kui-border-card`, works until 1.61.
+`--border-width` is the keyline of buttons, cards, rows, widgets, notices, avatars, toasts, dialogs, side panels, tooltips, tables, boxed sections, segmented controls, chips, toggles, chart plots and the other framed boxes. The dashed frame and the handles the image cropper draws around the crop keep their fixed borders, as they have to show over any photo. It is a length: `2px`, not `2px solid red`, which it ignores.
 
 Labels, headings and table heads are uppercase unless `--label-case` is `none`, and `--font-label` sets their font. Three skins ship, `@kaynooo/kayjs-ui/skins/brutalist.css` (which sets the three shadow tokens below), `soft.css` and `space.css`, imported after `theme.css`; an app importing none keeps the default theme, and your own `@theme` after one wins.
 
-The space skin is dark only: a near-black canvas, a starlight accent, red kept for errors, and no lines around boxes, where the fill tells them apart. Buttons become hairline keys that light in the accent on hover, checkboxes are drawn, selects are themed, and the `starfield` class paints tiled dots behind a page or a section. It uses Space Grotesk, which you serve with `fonts: [{ fontsource: '@fontsource-variable/space-grotesk' }]` in `kay.config.ts`.
+The space skin is dark only: a near-black background, a starlight accent, red kept for errors, and no lines around boxes, where the fill tells them apart. Buttons become hairline keys that light in the accent on hover, checkboxes are drawn, selects are themed, and the `starfield` class paints tiled dots behind a page or a section. It uses Space Grotesk, which you serve with `fonts: [{ fontsource: '@fontsource-variable/space-grotesk' }]` in `kay.config.ts`.
 
 Add the one line to `src/app.css`, after the theme import (an app using `ui()` has the theme already):
 
@@ -71,9 +73,9 @@ Add the one line to `src/app.css`, after the theme import (an app using `ui()` h
 @import '@kaynooo/kayjs-ui/skins/space.css';
 ```
 
-`--radius-kui-sm`, `--radius-kui-md` and `--radius-kui-full` round what sits inside a framed box (badges and toggle thumbs, chips and toggle tracks, avatars), square except `full`. `--font-kui-mono` is the monospace of the markdown editor, code and stamps, `--font-kui-body` sets the font of labels and text fields when an app wants one, and `--density` (`1`) multiplies the card, inline and section gaps and the field insets.
+Corners are Tailwind's own `--radius-sm` (badges, toggle thumbs), `--radius-md` (buttons, fields, chips, toggle tracks) and `--radius-lg` (cards, dialogs, popovers, notices), and avatars are round. Set all three to `0` for square corners. `--font-mono` is the monospace of the markdown editor and code, and `--density` (`1`) multiplies the card, inline and section gaps and the field insets.
 
-A few tokens shape boxes rather than colour them. A brutalist skin sets `--shadow-raised` (under cards, rows, widgets and toasts), `--shadow-press` (under framed buttons) and `--press-travel` (how far a pressed button moves down). All three draw nothing by default.
+A few tokens shape boxes rather than colour them. A setting only one component reads is no token: restyle that component everywhere in `src/ui.ts`, or one instance with `class`. A brutalist skin sets `--shadow-raised` (under cards, rows, widgets and toasts), `--shadow-press` (under framed buttons) and `--press-travel` (how far a pressed button moves down). All three draw nothing by default.
 
 ### Light or dark
 
@@ -136,7 +138,7 @@ A variant or value the component lacks is added: `Button(tone="brand")` types an
 - A part keeps its `kui-` class and the rules of `theme.css` until its component's recipe holds the look. Card, Badge and Notice (1.71) do, and so do Avatar, Stat, PageHeader, PageSection, EmptyState, CardRow, Widget, Meter, Progress and Skeleton (1.72), then Button, IconButton, FormField, Checkbox, Toggle, TextInput, Textarea and Select (1.72), and the charts and media components too (1.72).
 - RadioGroup, Segmented, Rating, Slider, ColorInput, DateInput, DateRangeInput, Combobox, MultiSelect, ChipGroup, FileDrop, CopyButton and ConfirmDelete follow the same way (1.72), and so do the overlays: Dialog, FormDialog, Menu, BellInbox, Popover, HoverCard, SidePanel, CommandPalette, Toaster and TooltipHost. A Dialog `size` is a recipe variant, so a `max-w-*` in `src/ui.ts` or `class` replaces its width.
 - In those, the root keeps its `kui-` class (`kui-card`, `kui-badge`, `kui-stat-badge`) as a name for your CSS, and the other parts carry `data-part` alone (`.kui-card > [data-part='head']`, a child selector, as `head`, `title` and `body` are names other components use too).
-- A recipe holds the look as utilities, so `src/ui.ts` or `class` replaces the one it sets, such as `p-6` for `p-kui-card`, instead of overriding a rule. `kay check` reports a stylesheet selecting a removed part class (`deprecated-ui-class`). A utility of `src/ui.ts` or of `class` wins over a theme rule on the same property.
+- A recipe holds the look as utilities, so `src/ui.ts` or `class` replaces the one it sets, such as `p-6` for the padding it sets, instead of overriding a rule. `kay check` reports a stylesheet selecting a removed part class (`deprecated-ui-class`). A utility of `src/ui.ts` or of `class` wins over a theme rule on the same property.
 - A part is named after what its `kui-` class draws: Card has `root`, `head`, `title` and `body`, Dialog `root`, `title`, `body` and `footer`, Button `root` and `spinner`.
 - Table has `root` (the wrapper), `table`, `head`, `headRow`, `headCell`, `body`, `row`, `cell`, `cellBody`, `cellLabel`, `sortButton`, `sortIcon`, `filter`, `filterInput`, `count`, `selection`, `selected`, `bulk`, `selectHead`, `selectCell`, `selectText`, `spacer` and `emptyCell`.
 - DateInput has `root`, `input`, `trigger`, `panel`, `head`, `title`, `step`, `stepIcon`, `grid`, `weekday`, `day` and `today`, DateRangeInput `root` and `separator`, TimeInput `root`.

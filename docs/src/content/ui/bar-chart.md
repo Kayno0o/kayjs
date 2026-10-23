@@ -12,7 +12,7 @@ The value axis spans the highest reading rounded up to 1, 2, 4, 6, 8 or 10 times
 
 ## Colour and notes per bar
 
-A series takes an optional CSS `color`, otherwise the next `--color-kui-chart-*` token. `colors` gives one colour per label and wins over it, so a bar can show its status, and `notes` adds one message per label to that bar's tooltip. A column with no height keeps a short stub where its series gives it a `notes` entry, or a `colors` one with a reading, so a failed run recorded as 0 still shows. A colour is no cue for everyone, so give a failed bar a note.
+A series takes an optional CSS `color`, otherwise the next `--color-chart-*` token. `colors` gives one colour per label and wins over it, so a bar can show its status, and `notes` adds one message per label to that bar's tooltip. A column with no height keeps a short stub where its series gives it a `notes` entry, or a `colors` one with a reading, so a failed run recorded as 0 still shows. A colour is no cue for everyone, so give a failed bar a note.
 
 <Demo name="bar-chart/status" />
 
@@ -26,7 +26,7 @@ A series takes an optional CSS `color`, otherwise the next `--color-kui-chart-*`
 
 The columns are one tab stop on the latest one, the arrows walking the others and Home and End reaching either end. Hovering or focusing a column shows a tooltip reading the label, each series' value and its notes, which screen readers hear as well. The tooltip needs a TooltipHost on the page, which `ui()` mounts.
 
-`--kui-bar-chart-height` sets the plot's height, `12rem` by default.
+`--chart-height` sets the plot's height, `12rem` by default.
 
 ## Empty
 

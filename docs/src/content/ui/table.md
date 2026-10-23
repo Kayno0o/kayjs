@@ -44,7 +44,7 @@ When the page holds only a part of the rows, give `exportable` an address: the b
 
 ## Many rows
 
-`virtual` draws only the rows in view, with room above and below standing for the others, so ten thousand rows and more stay light. The table scrolls in a box of its own, 70vh tall unless `--kui-table-height` says otherwise, with its headers kept on top. Rows are measured as they draw, stacked cards included, and the table tells screen readers its real row count and each row's position.
+`virtual` draws only the rows in view, with room above and below standing for the others, so ten thousand rows and more stay light. The table scrolls in a box of its own, 70vh tall unless `--table-height` says otherwise, with its headers kept on top. Rows are measured as they draw, stacked cards included, and the table tells screen readers its real row count and each row's position.
 
 <Demo name="table/virtual" />
 

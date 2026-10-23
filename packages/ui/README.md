@@ -28,12 +28,12 @@ The stylesheet the root layout imports brings the theme in right after Tailwind.
 @source '../.kay/classes.txt';
 
 @theme {
-  --color-kui-accent: light-dark(#3b6fd4, #7aa2f7);
+  --color-accent: light-dark(#3b6fd4, #7aa2f7);
 }
 ```
 
-- Every class and token is prefixed `kui-`, so a site's own `btn`, `card` or `--color-accent` never meets them. A rule on `.kui-btn` restyles every button; utilities passed through a component's `class` prop restyle one.
-- The tokens are `@theme default`, so the app's `@theme` overrides any of them. Each colour is `--color-kui-<name>`, used as `bg-kui-<name>` and the like, and holds `light-dark(light, dark)`.
+- Every class is prefixed `kui-`, so a site's own `btn` or `card` never meets them. A rule on `.kui-btn` restyles every button; utilities passed through a component's `class` prop restyle one.
+- The tokens are `@theme default` and carry the app's own names, so the app's `@theme` overrides any of them and its utilities share them. Each colour is `--color-<name>` (`bg-surface`, `text-muted`) and holds `light-dark(light, dark)`.
 - The theme is dark unless the visitor's system asks for light. `data-theme="light"` or `data-theme="dark"` on `html` wins over both, for a site with its own switch, and on any element it themes what that element holds.
 
 ## A first component

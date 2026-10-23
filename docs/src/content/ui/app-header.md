@@ -26,4 +26,4 @@ Below the `lg` breakpoint the links fold behind SiteNav's menu button, which ope
 
 ## Colors
 
-It is painted with the `--color-kui-*` tokens: the canvas for its ground and the surface line under it. A skin changes it with no CSS of its own.
+It is painted with the theme's colours: the background for its ground and the border line under it. A skin changes it with no CSS of its own.

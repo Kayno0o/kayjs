@@ -12,7 +12,7 @@ The chart is drawn by chartist, which the app installs with `bun add chartist`. 
 
 ## Colors, legend and formatting
 
-A series takes an optional CSS `color`, otherwise the next `--color-kui-chart-*` token, and every line after the first is dashed in its own pattern, which the legend shows, so the series stay apart without their colours. `legend` names the series under the chart, by default once there is more than one. `formatValue` formats the y-axis, the tooltip and what screen readers hear.
+A series takes an optional CSS `color`, otherwise the next `--color-chart-*` token, and every line after the first is dashed in its own pattern, which the legend shows, so the series stay apart without their colours. `legend` names the series under the chart, by default once there is more than one. `formatValue` formats the y-axis, the tooltip and what screen readers hear.
 
 A label that is a date, such as `2026-10-21` or `2026-10-21T16:12:12Z`, heads the tooltip as a date in the page's language, with its time when it has one and its seconds when points are under a minute apart.
 

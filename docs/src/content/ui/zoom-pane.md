@@ -20,7 +20,7 @@ description: A pane that zooms and pans what it holds, by wheel, pinch, drag, ke
 
 ## Marks that keep their size
 
-The zoom is published as `--kui-zoom-scale`, so a mark standing on the pane can undo it with `scale(calc(1 / var(--kui-zoom-scale)))` and stay readable while the map grows.
+The zoom is published as `--zoom-scale`, so a mark standing on the pane can undo it with `scale(calc(1 / var(--zoom-scale)))` and stay readable while the map grows.
 
 <Demo name="zoom-pane/marks" />
 

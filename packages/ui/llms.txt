@@ -17,4 +17,4 @@ The rest by topic, each file read whole with one command:
 
 ## A `style` on a root
 
-A component's root writes its own declarations first and an app's `style` after them, as an app's `class` wins the class merge: ZoomPane, Masonry, SplitLayout, Popover, HoverCard, QrCode and Skeleton all do. A declaration the component computes to work (ZoomPane's `touch-action`, a Popover's `position-anchor`, a Skeleton's `--kui-skeleton-width`, a QrCode's `width`) is overridden the same way, so an app that sets one owns the result.
+A component's root writes its own declarations first and an app's `style` after them, as an app's `class` wins the class merge: ZoomPane, Masonry, SplitLayout, Popover, HoverCard, QrCode and Skeleton all do. A declaration the component computes to work (ZoomPane's `touch-action`, a Popover's `position-anchor`, a Skeleton's `--_skeleton-width`, a QrCode's `width`) is overridden the same way, so an app that sets one owns the result.
