@@ -1,9 +1,10 @@
-import { afterEach, beforeEach, expect, setSystemTime, test } from 'bun:test'
+import { afterEach, beforeEach, expect, setSystemTime, spyOn, test } from 'bun:test'
 import { s } from 'kay'
 import { collection } from 'kay/content'
 import { files, memoryFiles } from 'kay/server'
 import { registerCollections } from '../../../src/content/edit'
 import { setupStorage } from '../../../src/server/storage'
+import * as hidden from '../src/hidden'
 import { sqliteLoader } from '../src/loaders/sqlite'
 import { storeUpload } from '../src/media'
 import { deleteUnusedUploads, libraryUploads, unusedUploads } from '../src/orphans'
@@ -93,4 +94,29 @@ test('sending the same bytes again refreshes the grace of an old upload', async 
   expect(await unusedKeys()).toEqual([key])
   expect(await storeUpload(png())).toBe(key)
   expect(await unusedKeys()).toEqual([])
+})
+
+test('an unreadable history blocks the cleanup and makes the library delete nothing', async () => {
+  await storeUpload(png())
+  aged()
+
+  const before = await libraryUploads()
+
+  expect('uploads' in before && before.uploads.some(upload => upload.deletable)).toBe(true)
+
+  const spy = spyOn(hidden, 'hiddenOf').mockImplementation(() => ({ name: 'x', load: async () => {
+    throw new Error('down')
+  } }))
+
+  try {
+    expect('blocked' in await unusedUploads()).toBe(true)
+
+    const library = await libraryUploads()
+
+    expect('blocked' in library).toBe(false)
+    expect('uploads' in library && library.uploads.length > 0 && library.uploads.every(upload => !upload.deletable)).toBe(true)
+  }
+  finally {
+    spy.mockRestore()
+  }
 })

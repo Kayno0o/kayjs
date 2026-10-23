@@ -38,7 +38,8 @@ export interface Read {
   // The entries mentioning each upload's id.
   usedBy: Map<string, Map<string, EntryRef>>
   // The ids that only a revision or a trashed entry mentions, which restoring brings back to an entry.
-  held: Set<string>
+  // The uploads revisions and trash mention; undefined when they could not be read, so nothing is known deletable.
+  held: Set<string> | undefined
 }
 
 export const idOf = (key: string) => KEY_ID.exec(key)?.[1]
@@ -76,7 +77,8 @@ function idsIn(data: unknown, body: string | undefined): Set<string> {
 }
 
 // Every upload of the CMS's folders and the entries of any collection, locale or draft that mention each, or why they cannot be told.
-export async function readUploads(listing?: { stored: Stored[], listed: CollectionInfo[] }): Promise<Read | { blocked: string[] }> {
+// `history` reads the revisions and the trash too: `'block'` fails on one that cannot be read, `'soft'` leaves `held` undefined.
+export async function readUploads(listing?: { stored: Stored[], listed: CollectionInfo[] }, history?: 'block' | 'soft'): Promise<Read | { blocked: string[] }> {
   const blocked: string[] = []
   const found = listing ?? await listUploads()
 
@@ -86,7 +88,7 @@ export async function readUploads(listing?: { stored: Stored[], listed: Collecti
   const { stored, listed } = found
 
   const usedBy = new Map<string, Map<string, EntryRef>>()
-  const held = new Set<string>()
+  let held: Set<string> | undefined = new Set<string>()
 
   for (const collection of listed) {
     try {
@@ -111,15 +113,22 @@ export async function readUploads(listing?: { stored: Stored[], listed: Collecti
     }
 
     // A revision or a trashed entry restored points at the upload again, so it keeps the file.
-    for (const kind of ['history', 'trash'] as const) {
+    for (const kind of history === undefined ? [] : ['history', 'trash'] as const) {
       try {
         for (const row of await hiddenOf(collection.name, kind)?.load({ preview: true }) ?? []) {
           for (const id of idsIn(row.data, row.body))
-            held.add(id)
+            held?.add(id)
         }
       }
       catch (error) {
         log.error(`reading ${collection.name}'s ${kind} failed`, error)
+
+        if (history === 'soft') {
+          held = undefined
+
+          continue
+        }
+
         blocked.push(wording('cms.uploads.collectionRead', '{collection} cannot be read', { collection: collection.name }))
       }
     }
@@ -132,7 +141,7 @@ export async function readUploads(listing?: { stored: Stored[], listed: Collecti
 // An upload modified less than a day ago, or that the store dates not at all, is held back, and so is one a revision or a trashed entry of a loaded collection still mentions.
 // A URL hardcoded in a page or a file of the repository outside the collections is not seen: the editor confirms before anything goes.
 export async function unusedUploads(): Promise<UploadScan> {
-  const read = await readUploads()
+  const read = await readUploads(undefined, 'block')
 
   if ('blocked' in read)
     return read
@@ -141,7 +150,7 @@ export async function unusedUploads(): Promise<UploadScan> {
   const orphans = read.stored.filter((file) => {
     const id = idOf(file.key)
 
-    return id !== undefined && !read.usedBy.has(id) && !read.held.has(id) && file.modified !== undefined && now - file.modified.getTime() >= GRACE
+    return id !== undefined && !read.usedBy.has(id) && !read.held!.has(id) && file.modified !== undefined && now - file.modified.getTime() >= GRACE
   }).map(file => file.key).toSorted()
   const variants = await files.variants(orphans)
   const unused = orphans.map(key => ({ key, url: files.url(key), variants: variants.get(key) ?? [] }))
@@ -199,7 +208,7 @@ export interface Library {
 
 // A page of the uploads, the newest first, with the entries using each and what the index knows of it, or why they cannot be told. `q` keeps the uploads whose name or key holds it; an older upload that a copy in the shared folder replaced is left out.
 export async function libraryUploads(options: { page?: number | undefined, q?: string | undefined } = {}): Promise<Library | { blocked: string[] }> {
-  const read = await readUploads()
+  const read = await readUploads(undefined, 'soft')
 
   if ('blocked' in read)
     return read
@@ -229,7 +238,7 @@ export async function libraryUploads(options: { page?: number | undefined, q?: s
       by: record?.by,
       at: record?.at ?? file.modified?.getTime(),
       usedIn,
-      deletable: usedIn.length === 0 && !read.held.has(idOf(file.key)!) && file.modified !== undefined && now - file.modified.getTime() >= GRACE,
+      deletable: usedIn.length === 0 && read.held !== undefined && !read.held.has(idOf(file.key)!) && file.modified !== undefined && now - file.modified.getTime() >= GRACE,
     }
   }))
 
