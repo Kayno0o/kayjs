@@ -121,13 +121,13 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('the Bell
   }, 30_000)
 
   it('expires a notification, and forgets a person who was erased, while their page is open', async () => {
-    const now = Date.now()
-
-    await STORE.add('ada', { id: 'short', title: 'Short lived', at: now, expires: now + 1500 }, 200)
     await using page = await main.open('/')
 
+    // The notification is added once the page is open, so a slow load cannot spend its time to live before the page shows it.
+    const short = await notify('ada', { title: 'Short lived', keep: 2 })
+
     await page.waitUntil(() => document.querySelector('.kui-bell button')?.getAttribute('aria-label') === 'Notifications, 1 unread')
-    await Bun.sleep(1700)
+    await Bun.sleep(Math.max(0, short.at + 2000 - Date.now()) + 200)
     invalidate(() => true)
     await page.waitUntil(() => document.querySelector('.kui-bell button')?.getAttribute('aria-label') === 'Notifications')
     await notify('ada', { title: 'Again' })
