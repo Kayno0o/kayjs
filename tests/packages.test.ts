@@ -207,9 +207,10 @@ describe('what\'s new', () => {
 })
 
 describe('the TypeScript packages', () => {
-  it('give kay the native compiler under its own alias and typescript 6 under the name typescript-eslint reads', () => {
+  it('give kay the native compiler under its own alias, and typescript 6 only to its own lint, as an app gets the one typescript-eslint asks for', () => {
     expect(root.dependencies?.typescript7).toStartWith('npm:typescript@')
-    expect(root.dependencies?.typescript).toStartWith('^6')
+    expect(root.dependencies?.typescript).toBeUndefined()
+    expect(root.devDependencies?.typescript).toStartWith('^6')
   })
 
   it('give an app the tsgo command running the native compiler', async () => {
