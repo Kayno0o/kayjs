@@ -248,7 +248,7 @@ pgDescribe('pgData', () => {
     }
     finally {
       await reserved.unsafe('SELECT pg_advisory_unlock(hashtext(\'kay_indexes\'))')
-      reserved.release()
+      await reserved.release()
     }
 
     await waiting

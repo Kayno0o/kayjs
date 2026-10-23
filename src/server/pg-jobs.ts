@@ -158,7 +158,7 @@ async function buildMissingIndexes(db: SQL, indexes: readonly PgIndex[]): Promis
     }
   }
   finally {
-    session.release()
+    await session.release()
   }
 }
 

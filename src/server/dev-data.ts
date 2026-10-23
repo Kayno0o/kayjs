@@ -383,7 +383,7 @@ export async function devQuery(request: Request): Promise<Response> {
       // The connection died with the query: releasing it is all that is left.
     }
     finally {
-      reserved?.release()
+      await reserved?.release()
     }
   }
 }
