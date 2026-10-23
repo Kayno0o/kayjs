@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, test } from 'bun:test'
 import { browserPath, testSite } from 'kay/test'
+import { hoverable } from './hoverable'
 
 const ROOT = join(import.meta.dir, '..')
 const path = browserPath()
@@ -16,24 +17,6 @@ afterAll(async () => {
 
 // CI installs Chromium: there, a missing browser fails rather than skipping.
 const inBrowser = describe.skipIf(path === undefined && (process.env.CI ?? '') === '')
-
-// The test browser has no hover-capable pointer, so Tailwind's hover: rules, kept behind (hover: hover), never apply: the sheets are rewritten with that query always true, the cascade and layers kept.
-async function hoverable(page: { evaluate: (run: () => void) => Promise<unknown> }) {
-  return page.evaluate(() => {
-    for (const sheet of document.styleSheets) {
-      const owner = sheet.ownerNode as HTMLElement | null
-
-      if (!owner)
-        continue
-
-      const style = document.createElement('style')
-
-      style.textContent = [...sheet.cssRules].map(rule => rule.cssText).join('\n').replaceAll('(hover: hover)', 'all')
-      owner.after(style)
-      owner.remove()
-    }
-  })
-}
 
 inBrowser('navigation recipes in the browser', () => {
   test('Breadcrumb keeps its ellipsis and middle items to a phone, and draws a separator between the others', async () => {
