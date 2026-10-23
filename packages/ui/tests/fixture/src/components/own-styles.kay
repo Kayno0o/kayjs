@@ -1,0 +1,17 @@
+---
+// kay-island
+import HoverCard from '@kaynooo/kayjs-ui/hover-card.kay'
+import Popover from '@kaynooo/kayjs-ui/popover.kay'
+import QrCode from '@kaynooo/kayjs-ui/qr-code.kay'
+import Skeleton from '@kaynooo/kayjs-ui/skeleton.kay'
+---
+Popover(id="menu" style="color: red")
+  @trigger(attributes)
+    button({...attributes}) Menu
+  p Inside
+HoverCard(id="card" anchor={null} style="color: red") Detail
+QrCode#qr-image(value="https://kay.dev" style="margin: 1px")
+QrCode#qr-inline(value="https://kay.dev" inline pixels={64} style="margin: 1px")
+QrCode#qr-bare(value="https://kay.dev" inline style="margin: 1px")
+Skeleton#skeleton(width="50%" style="margin: 2px")
+Skeleton#skeleton-bare(style="margin: 2px")

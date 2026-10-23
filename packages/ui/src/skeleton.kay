@@ -19,7 +19,9 @@ const look = recipe({
   defaults: { shape: 'text' },
 })
 
-const { shape = 'text', lines = 1, width, height, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+const { shape = 'text', lines = 1, width, height, label, style, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'style'> & {
+  // Kept next to the component's own declarations, which win.
+  style?: string | undefined
   // How many bars `text` draws.
   lines?: number | undefined
   // A CSS length for the bars, the avatar or the card; `100%` by default, `2.5rem` for an avatar.
@@ -30,10 +32,10 @@ const { shape = 'text', lines = 1, width, height, label, ...rest } = props<Omit<
   label?: string | undefined
 }>()
 
-const style = () => width || height ? `${width ? `--kui-skeleton-width: ${width};` : ''}${height ? `--kui-skeleton-height: ${height};` : ''}` : undefined
+const own = () => width || height ? `${width ? `--kui-skeleton-width: ${width};` : ''}${height ? `--kui-skeleton-height: ${height};` : ''}` : undefined
 const count = () => shape === 'text' ? Number.isFinite(lines) ? Math.max(1, Math.floor(lines)) : 1 : 1
 ---
-div(part="root" {...rest} data-shape={shape} style={style()})
+div(part="root" {...rest} data-shape={shape} style={[style, own()].filter(Boolean).join('; ') || undefined})
   for index of Array.from({ length: count() }, (_, position) => position) key={index}
     span(part="block" aria-hidden="true" data-last={shape === 'text' && count() > 1 && index === count() - 1 ? '' : undefined})
   if label

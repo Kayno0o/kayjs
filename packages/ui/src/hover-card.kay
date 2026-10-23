@@ -13,7 +13,9 @@ const look = recipe({
   },
 })
 
-const { id, anchor, placement = 'top', ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'id' | 'popover' | 'class' | 'children' | 'role'> & {
+const { id, anchor, placement = 'top', style, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'id' | 'popover' | 'class' | 'children' | 'role' | 'style'> & {
+  // Kept next to the component's own declarations, which win.
+  style?: string | undefined
   // The panel's id, unique on the page; one is drawn when none is given.
   id?: string | undefined
   // The element the card sits beside, set from the page whenever the pointer or focus lands on another one, and `undefined` or `null` for none: the card shows while there is one. An element of an SVG works too.
@@ -98,6 +100,6 @@ effect(() => {
 
 onCleanup(unmark)
 ---
-div(part="root" {...rest} ref={element => panel = element} id={panelId} popover="manual" data-placement={placement} style={`position-anchor: ${name}`})
+div(part="root" {...rest} ref={element => panel = element} id={panelId} popover="manual" data-placement={placement} style={`${style ? `${style}; ` : ''}position-anchor: ${name}`})
   slot
 span(part="stand" ref={element => stand = element} popover="manual" aria-hidden="true")

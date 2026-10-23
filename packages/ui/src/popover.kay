@@ -6,7 +6,9 @@ import { effect, recipe, signal, uid } from 'kay'
 // 'kui-popover' stays as the component's name for an app's CSS and the always-hidden guard; theme.css still has its old rule until 1.74.
 const look = recipe({ parts: { root: 'kui-popover inset-auto mx-0 my-1 [position-try-fallbacks:flip-block,flip-inline] rounded-kui-card border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-mantle p-0 text-kui-text data-[placement=bottom-start]:[position-area:block-end_span-inline-end] data-[placement=bottom-end]:[position-area:block-end_span-inline-start] data-[placement=top-start]:[position-area:block-start_span-inline-end] data-[placement=top-end]:[position-area:block-start_span-inline-start]' } })
 
-const { id, open = false, placement = 'bottom-start', trigger, onOpenChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'id' | 'popover' | 'class' | 'children' | 'onToggle'> & {
+const { id, open = false, placement = 'bottom-start', trigger, onOpenChange, style, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'id' | 'popover' | 'class' | 'children' | 'onToggle' | 'style'> & {
+  // Kept next to the component's own declarations, which win.
+  style?: string | undefined
   // The panel's id, unique on the page; one is drawn when none is given.
   id?: string | undefined
   // Shows the panel when the page sets it; the trigger, a click outside and Escape open and close it on their own.
@@ -46,5 +48,5 @@ function toggled(event: ToggleEvent) {
 }
 ---
 | {trigger({ 'popovertarget': panelId, 'aria-expanded': shown() ? 'true' : 'false', 'style': `anchor-name: ${anchor}` })}
-div(part="root" {...rest} ref={element => panel = element} id={panelId} popover="auto" data-placement={placement} style={`position-anchor: ${anchor}`} onToggle={toggled})
+div(part="root" {...rest} ref={element => panel = element} id={panelId} popover="auto" data-placement={placement} style={`${style ? `${style}; ` : ''}position-anchor: ${anchor}`} onToggle={toggled})
   slot
