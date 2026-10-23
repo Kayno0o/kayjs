@@ -101,6 +101,10 @@ Dialog#dialog(open={true} title="Rename" onOpenChange={() => undefined})
   @footer
     p footer
   p body
+Dialog#small(open={true} title="Small" size="sm" onOpenChange={() => undefined})
+  p small
+Dialog#full(open={true} title="Full" size="full" bare onOpenChange={() => undefined})
+  p full
 Table#table(columns={[{ key: 'name', header: 'Name', sortValue: true as const }]} rows={planets} rowKey="id" sort={{ key: 'name', direction: 'asc' }} filter={['name'] as const} selectable)
 Avatar#avatar(name="Mars")
 Stat#stat(value={3} label="moons")

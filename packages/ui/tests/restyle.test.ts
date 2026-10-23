@@ -563,6 +563,12 @@ describe('the overlays whose recipe holds their look', () => {
 
   test('a Dialog size is a variant of its root that replaces the width, and a bare body writes data-bare', () => {
     expect(html.match(/<dialog[^>]*id="dialog"[^>]*>/)![0]).not.toContain('data-size')
-    expect(classesOfPart('dialog').filter(name => name.startsWith('max-w-'))).toHaveLength(1)
+    // The merge that drops the base width needs the class table of a built app; here the variant comes after the base, which is what it reads.
+    expect(classesOfPart('dialog').filter(name => name.startsWith('max-w-'))).toEqual(['max-w-[min(42rem,calc(100vw-2rem))]'])
+    expect(classesOfPart('small').filter(name => name.startsWith('max-w-')).at(-1)).toBe('max-w-[min(28rem,calc(100vw-2rem))]')
+    expect(classesOfPart('full').filter(name => name.startsWith('max-w-')).at(-1)).toBe('max-w-[calc(100vw-2rem)]')
+    expect(classesOfPart('full')).toContain('h-[calc(100dvh-2rem)]')
+    expect(html.match(/<div[^>]*data-part="body"[^>]*>/g)!.filter(tag => (/ data-bare[ =>]/).test(tag))).toHaveLength(1)
+    expect(html.match(/<dialog[^>]*id="full"[\s\S]*?<div[^>]*data-part="body"[^>]*>/)![0]).toMatch(/ data-bare[ =>]/)
   })
 })

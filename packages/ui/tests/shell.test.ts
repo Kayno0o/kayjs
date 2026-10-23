@@ -12,7 +12,7 @@ describe('the ui extension', () => {
     try {
       const html = (await site.visit('/shell')).html
 
-      expect(html.match(/class="kui-toaster"/g)).toHaveLength(1)
+      expect(html.match(/class="kui-toaster /g)).toHaveLength(1)
       expect(html.match(/id="kui-tooltip"/g)).toHaveLength(1)
     }
     finally {
