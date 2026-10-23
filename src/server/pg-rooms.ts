@@ -43,7 +43,7 @@ async function logged(what: string, work: Promise<unknown>): Promise<void> {
 const SQLSTATE = /^[0-9A-Z]{5}$/
 
 // Whether Postgres itself refused a statement (an SQLSTATE code), as against a connection lost or a call given up on.
-const refused = (error: unknown): boolean => (/^[0-9A-Z]{5}$/).test(String((error as { errno?: unknown }).errno))
+const refused = (error: unknown): boolean => SQLSTATE.test(String((error as { errno?: unknown }).errno))
 
 // How many times a change asks for a room's lock, a stuck update elsewhere letting go meanwhile; Postgres' lock_not_available.
 const LOCK_ATTEMPTS = 3
