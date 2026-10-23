@@ -4407,6 +4407,25 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('does not read a key a later property of the catalog overrides', async () => {
+    const cases: [string, number][] = [
+      ['const base = { ui: { table: { filterLabel: "a" } } }\nexport default { ...base, ui: { table: {} } }', 0],
+      ['const base = { ui: { table: { filterLabel: "a" } } }\nexport default { ui: { table: {} }, ...base }', 1],
+      ['const base = { ui: { table: { filterLabel: "a" } } }\nexport default { ...base, ui: { table: { selectedLabel: "b" } } }', 1],
+    ]
+
+    for (const [form, count] of cases) {
+      const root = await scratchProject({ 'src/routes/index.kay': 'p hi\n', 'src/messages/fr.ts': `${form}\n`, 'kay.config.ts': 'export default { i18n: { locales: [\'fr\'], defaultLocale: \'fr\' } }\n' })
+
+      try {
+        expect((await runCheck(root)).output.match(/warning\[deprecated-message-key\]/g)?.length ?? 0, form).toBe(count)
+      }
+      finally {
+        await rm(root, { recursive: true, force: true })
+      }
+    }
+  })
+
   it('reports but does not fix a shorthand key, and reads no reassigned let or multi-argument call', async () => {
     const cases: [string, number, boolean][] = [
       ['const filterLabel = "x"\nexport default { ui: { table: { filterLabel } } }', 1, false],

@@ -133,6 +133,17 @@ describe('draft messages', () => {
     expect((await Bun.file(join(root, 'src/messages/fr.ts')).text()).match(/c:/g)).toHaveLength(1)
   })
 
+  it('skip a key a later property overrides, so a draft it hid is not listed and its replacement is', async () => {
+    const base = 'const base = {\n  nav: {\n    home: \'Accueil\', // draft\n  },\n}\n'
+
+    expect(draftMessages(`${base}export default { ...base, nav: { home: \'Maison\' } }\n`)).toEqual([])
+    expect(draftMessages(`${base}export default { nav: { home: \'Maison\' }, ...base }\n`).map(({ key }) => key)).toEqual(['nav.home'])
+
+    const root = await project({ 'src/messages/fr.ts': `${base}export default { ...base, nav: {} }\n` })
+
+    expect(await writeDraftMessages(root, { i18n }, 'fr', { 'nav.home': 'Maison' })).toEqual(['nav.home'])
+  })
+
   it('create the locale\'s file when it is missing, and the default export of an empty one', async () => {
     const root = await project({ 'src/messages/fr.ts': messages('{}') })
 

@@ -78,8 +78,37 @@ export function exportedObject(program: t.Program, bindings: Bindings = constBin
   return objectOf(exportedDefault(program), bindings, true)
 }
 
-// The properties of an object with the spread of a const object replaced by that object's own, in order, so a key written by `{ ...base }` reads as written in place. A spread that is not a const object stays as it is.
-export function propertiesOf(object: t.ObjectExpression, bindings: Bindings, seen: ReadonlySet<string> = new Set()): t.ObjectExpression['properties'] {
+// The name a non-computed property is written under.
+function nameOf(property: t.ObjectExpression['properties'][number]): string | undefined {
+  if (property.type !== 'ObjectProperty' || property.computed)
+    return undefined
+
+  if (property.key.type === 'Identifier')
+    return property.key.name
+
+  return property.key.type === 'StringLiteral' ? property.key.value : undefined
+}
+
+// The properties of an object with the spread of a const object replaced by that object's own, in order, so a key written by `{ ...base }` reads as written in place. A spread that is not a const object stays as it is, and a key a later property writes again drops the earlier ones, as the object holds only the last.
+export function propertiesOf(object: t.ObjectExpression, bindings: Bindings): t.ObjectExpression['properties'] {
+  const flat = flattened(object, bindings, new Set())
+  const last = new Map<string, t.ObjectExpression['properties'][number]>()
+
+  for (const property of flat) {
+    const name = nameOf(property)
+
+    if (name !== undefined)
+      last.set(name, property)
+  }
+
+  return flat.filter((property) => {
+    const name = nameOf(property)
+
+    return name === undefined || last.get(name) === property
+  })
+}
+
+function flattened(object: t.ObjectExpression, bindings: Bindings, seen: ReadonlySet<string>): t.ObjectExpression['properties'] {
   return object.properties.flatMap((property) => {
     if (property.type !== 'SpreadElement')
       return [property]
@@ -87,6 +116,6 @@ export function propertiesOf(object: t.ObjectExpression, bindings: Bindings, see
     const name = unwrapped(property.argument)
     const spread = name.type === 'Identifier' && !seen.has(name.name) ? objectOf(name, bindings) : undefined
 
-    return spread ? propertiesOf(spread, bindings, new Set([...seen, (name as t.Identifier).name])) : [property]
+    return spread ? flattened(spread, bindings, new Set([...seen, (name as t.Identifier).name])) : [property]
   })
 }
