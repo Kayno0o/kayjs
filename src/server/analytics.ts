@@ -43,7 +43,7 @@ export interface AnalyticsInfo {
 
 interface Common {
   // Waits for the visitor's yes before counting a visit, with a notice kay shows until they chose; `true` for the notice in English.
-  // Left out, `ga4`, `fathom`, `cloudflare` and `custom` ask like `true`, as they are not self-hostable cookieless counters; `consent: false` counts them without asking, which shows `info` and its opt-out.
+  // Left out, `ga4`, `fathom`, `cloudflare`, `custom` and Umami Cloud (no `host`) ask like `true`, as they are not self-hostable cookieless counters; `consent: false` counts them without asking, which shows `info` and its opt-out.
   // Left out or `false`, `plausible`, `umami`, `simpleanalytics` and `matomo` count at once and show `info`, as do the others with `consent: false`, whose own script kay then loads until the visitor opts out.
   consent?: boolean | AnalyticsConsent | undefined
   // The information line and opt-out kay shows where visits are counted without asking, `false` when the app informs and lets visitors object itself.
@@ -75,7 +75,7 @@ export interface UmamiOptions extends Counted {
   provider: 'umami'
   // The website's id in Umami.
   websiteId: string
-  // A self-hosted Umami; Umami Cloud, `https://cloud.umami.is`, by default.
+  // A self-hosted Umami; Umami Cloud, `https://cloud.umami.is`, by default, which asks for consent unless `consent: false`.
   host?: string | undefined
 }
 
@@ -165,7 +165,7 @@ const MEASUREMENT_ID = /^G-[A-Z\d]{4,20}$/i
 const PROVIDER_NAMES: Record<string, string> = { plausible: 'Plausible', umami: 'Umami', simpleanalytics: 'Simple Analytics', matomo: 'Matomo', ga4: 'Google Analytics', fathom: 'Fathom', cloudflare: 'Cloudflare Web Analytics' }
 const LOCAL_PATH = /^\/(?![/\\])/
 const MAX_CONSENT_AGE = 395 * 24 * 60 * 60
-// The providers that wait for a yes unless the app wrote `consent: false`.
+// The providers that wait for a yes unless the app wrote `consent: false`; Umami joins them while it has no `host`.
 const ASKS_BY_DEFAULT: ReadonlySet<string> = new Set(['ga4', 'fathom', 'cloudflare', 'custom'])
 
 // The seconds a consent lasts, NaN for what is no positive duration.
@@ -178,9 +178,16 @@ function consentSeconds(age: unknown): number {
   }
 }
 
-// Whether a visit waits for the visitor's yes: the app's `consent`, else the provider's default.
+// Whether a visit waits for the visitor's yes: the app's `consent`, else the provider's default. Umami on its cloud host is a third party that gets the visitor's address, so it asks unless the app names another `host`.
 export function isGated(options: AnalyticsOptions): boolean {
-  return options.consent === undefined ? ASKS_BY_DEFAULT.has(options.provider) : options.consent !== false
+  if (options.consent !== undefined)
+    return options.consent !== false
+
+  return ASKS_BY_DEFAULT.has(options.provider) || (options.provider === 'umami' && onUmamiCloud(options.host))
+}
+
+function onUmamiCloud(host: string | undefined): boolean {
+  return host === undefined || URL.parse(host)?.hostname === 'cloud.umami.is'
 }
 
 // Counts the site's visits with a provider, through the site's own origin where the provider takes visits from a server: the browser loads one small script from the app and posts to a route of the app, which forwards each visit to the provider, so the CSP needs no third-party host and ad blockers have nothing to match.

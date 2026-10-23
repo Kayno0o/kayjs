@@ -440,12 +440,34 @@ describe('consent by provider', () => {
   })
 
   it.each(['plausible', 'umami', 'simpleanalytics', 'matomo'] as const)('%s counts at once and shows the information line and its opt-out', async (name) => {
-    const options = { plausible: { provider: 'plausible' }, umami: { provider: 'umami', websiteId: 'w' }, simpleanalytics: { provider: 'simpleanalytics' }, matomo: { provider: 'matomo', siteId: 1, host: 'https://m.example' } }[name] as AnalyticsOptions
+    const options = { plausible: { provider: 'plausible' }, umami: { provider: 'umami', websiteId: 'w', host: 'https://u.example' }, simpleanalytics: { provider: 'simpleanalytics' }, matomo: { provider: 'matomo', siteId: 1, host: 'https://m.example' } }[name] as AnalyticsOptions
     const html = await page(options)
 
     expect(html).toContain('data-info')
     expect(html).not.toContain('data-consent')
     expect(html).toContain('Opt\u00A0out')
+  })
+
+  it('asks first of Umami Cloud, which gets the visitor\'s address on its default host, unless the app answers for it or names its own host', async () => {
+    const asks = async (options: AnalyticsOptions, gate = 'data-consent') => {
+      const html = await page(options)
+
+      expect(html).toContain(gate)
+      expect(html).not.toContain(gate === 'data-consent' ? 'data-info' : 'data-consent')
+    }
+
+    await asks({ provider: 'umami', websiteId: 'w' })
+    await asks({ provider: 'umami', websiteId: 'w', host: 'https://cloud.umami.is' })
+    await asks({ provider: 'umami', websiteId: 'w', host: 'https://u.example' }, 'data-info')
+    await asks({ provider: 'umami', websiteId: 'w', consent: false }, 'data-info')
+    await asks({ provider: 'umami', websiteId: 'w', host: 'https://u.example', consent: true })
+  })
+
+  it('forwards nothing to Umami Cloud before the yes', async () => {
+    const app = await site({ provider: 'umami', websiteId: 'w' })
+
+    await send(app, visit())
+    expect(received).toEqual([])
   })
 
   it('translates the information line, and leaves it out with info false or consent false and nothing to say', async () => {

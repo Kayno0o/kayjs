@@ -148,6 +148,7 @@ Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(paylo
 - A prerendered page has none, but one with server islands carries the timings of the loads and render that filled them.
 - `tracer` takes an OpenTelemetry tracer, which kay calls without depending on OpenTelemetry: the app installs `@opentelemetry/api` and an SDK exporting the spans, as `@opentelemetry/sdk-trace-node` with an OTLP exporter, registered before the server starts, then passes `tracer: trace.getTracer('my-site')`.
 - Without one, kay starts no span and the requests cost nothing more.
+- A span carries the request path (`url.path`, and a route's `[slug]` as the name) and a failed one the exception message, so a path or a message holding an id, an address or a name is personal data in the tracing backend: give it the retention and access of one, and keep such values out of messages thrown.
 - A page request is a server span named after its route, `GET /blog/[slug]`, with `http.request.method`, `http.route`, `url.path` and `http.response.status_code`, and inside it one span per load, `kay.load src/routes/blog/[slug].kay`, and one for the render, `kay.render ...`.
 - Spans the loads start nest under theirs.
 - An action call is one too, `POST /_kay/action/...`, holding the handler's spans and the page it renders back.

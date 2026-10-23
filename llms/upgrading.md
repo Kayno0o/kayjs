@@ -36,6 +36,9 @@ A tool offered to `ask` with no `confirm` no longer runs on the model's word: it
 A server started with `NODE_ENV=development` outside `kay dev` no longer serves `/_kay/dev/*` nor the dev tool's scripts on its pages. Run it through `kay dev`, or pass `dev: true` to `pages()` yourself. Under `kay dev --host`, every dev route but the tool's scripts answers this machine only, and a `dev` OpenAPI document is served under `kay dev` only; `KAY_DEV_REMOTE=1` opens them to the network.
 
 A plain param value listed by `prerender` (a slug) holding `/`, `\` or a NUL is refused; only a catch-all keeps its slashes.
+### `analytics({ provider: 'umami' })` on Umami Cloud asks for consent
+
+Umami without a `host` (or with `https://cloud.umami.is`) now waits for the visitor's yes like `ga4`, as Umami Cloud is a third party that gets the visitor's address. An app that counted Umami Cloud at once either keeps that with `consent: false`, which it answers for, or runs Umami itself and names it as `host`.
 
 ### kayjs-ui props take enum values: `variant`, `size` and `pixels`
 

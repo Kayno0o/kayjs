@@ -102,7 +102,7 @@ export default defineConfig({
 })
 ```
 
-Plausible, Umami (give it `websiteId`), Simple Analytics (`provider: 'simpleanalytics'`) and Matomo (`siteId` and `host`) work this way. All four set no cookie and can be run on your own server, so they count from the first page, with an information line and a way to opt out (see below). Matomo only gets the visitor's address if you give it a `tokenAuth` of a user with write access to the site, as Matomo requires; without one it sees your server's address.
+Plausible, Umami on your own server (give it `websiteId` and `host`), Simple Analytics (`provider: 'simpleanalytics'`) and Matomo (`siteId` and `host`) work this way. All four set no cookie and can be run on your own server, so they count from the first page, with an information line and a way to opt out (see below). Matomo only gets the visitor's address if you give it a `tokenAuth` of a user with write access to the site, as Matomo requires; without one it sees your server's address.
 
 Fathom and Cloudflare Web Analytics are different. Like Google Analytics and `custom`, they wait for the visitor's yes unless you write `consent: false`. They take data only from their own scripts, so kay cannot send for them. `provider: 'fathom'` (`siteId`) and `provider: 'cloudflare'` (`token`) add their script to your pages and open the content security policy for their domains.
 
@@ -139,7 +139,11 @@ Behind a CDN or proxy set `proxy`, or every visitor shares the proxy's address a
 
 ### Asking first
 
-Google Analytics, Fathom, Cloudflare and `custom` ask by default, as if you wrote `consent: true`; for Plausible, Umami, Simple Analytics and Matomo you add it. Kay shows a notice until the visitor chooses. Nothing is counted before a yes, and the server checks that on every visit rather than trusting the page. The answer is kept in the `kay_analytics` cookie for 180 days, for your `base` path. A refusal is kept as long as a yes.
+Google Analytics, Fathom, Cloudflare, `custom` and Umami Cloud (an Umami without a `host`, or with `cloud.umami.is`) ask by default, as if you wrote `consent: true`, because it is a third party that gets the visitor's address; for Plausible, Simple Analytics, Matomo and an Umami with your own `host` you add it. `consent: false` counts Umami Cloud at once, and the transfer is yours to answer for.
+
+Kay shows a notice until the visitor chooses. Nothing is counted before a yes, and the server checks that on every visit rather than trusting the page. The answer is kept in the `kay_analytics` cookie for 180 days, for your `base` path. A refusal is kept as long as a yes.
+
+The cookie is the only record of the answer, and it lives in the visitor's browser: kay keeps no list of who agreed or when. A site that must prove a visitor's consent (GDPR art. 7(1)) records it itself, for example by posting `consent()` to an action from the handler that calls `consent.set`, with the date, the wording shown and no more of the visitor than the proof needs.
 
 `consent: { maxAge }` sets another time, a string such as `'180d'`, up to 13 months, the longest the CNIL accepts.
 
@@ -205,7 +209,7 @@ Not asking is lawful only where an exemption applies, and a cookieless id is not
 - Data is kept 25 months at most, and an identifier lives 13 months at most (`kay_analytics` lasts 180 days, and `maxAge` allows up to 13 months).
 - An address is truncated or dropped by the tool.
 
-This is one regulator's position. Other countries may ask for consent anyway. Plausible, Umami and Matomo get the visitor's address to tell visitors apart, so the exemption holds only if the tool drops it: run it yourself, or check its terms. Google Analytics is never exempt. The information line and the opt-out are the notice and the objection the exemption asks for, not the whole of it.
+This is one regulator's position. Other countries may ask for consent anyway. Plausible, Umami and Matomo get the visitor's address to tell visitors apart, so the exemption holds only if the tool drops it: run it yourself, or check its terms. Umami Cloud therefore asks first unless you write `consent: false`. Google Analytics is never exempt. The information line and the opt-out are the notice and the objection the exemption asks for, not the whole of it.
 
 ### Processors, agreements and transfers
 
