@@ -127,6 +127,8 @@ export interface CollectionInfo {
   publishField?: string | undefined
   // The date field `unpublishAt` names, which takes an entry down from its time: a CMS shows it and marks an entry whose date is ahead or past.
   unpublishField?: string | undefined
+  // A loader's collection keeping its entries' raw HTML on the page, from its `trusted` option; any other sanitizes a body, so nothing in it runs.
+  trusted?: true | undefined
   // The number field `order` names, which the entries are ordered by and a CMS moves one by writing.
   orderField?: string | undefined
   // The collection holds one entry, which a CMS opens its form on from the content list, with no row, no New entry and no Delete.
@@ -496,6 +498,7 @@ async function infoOf(name: string, collection: Collection<unknown>, repoRoot: s
     ...typeof draft === 'string' && { draftField: draft },
     ...publishAt !== undefined && { publishField: publishAt },
     ...unpublishAt !== undefined && { unpublishField: unpublishAt },
+    ...dir === undefined && collection.options.trusted === true && { trusted: true as const },
     ...order !== undefined && { orderField: order },
     ...collection.options.single && { single: true as const },
     ...collection.options.single && collection.options.seed !== undefined && { seed: collection.options.seed as Record<string, DataValue> },

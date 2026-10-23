@@ -254,7 +254,8 @@ interface SaveOptions extends VersionRule {
 async function writeEntry(entry: DraftEntry, { create = false, version, required = false, verb, author, bodyKept = false, heldData, revived = false }: SaveOptions): Promise<SaveOutcome> {
   const collection = await collectionNamed(entry.collection)
 
-  if (entry.body !== undefined && !bodyKept && !settings().rawHtml.has(collection.name)) {
+  // A loader's body is sanitized on the page unless the collection is `trusted`, so nothing in it runs as the site and there is nothing to refuse.
+  if (entry.body !== undefined && !bodyKept && (collection.kind === 'folder' || collection.trusted === true) && !settings().rawHtml.has(collection.name)) {
     const script = await scriptInBody(entry.body)
 
     if (script !== undefined)

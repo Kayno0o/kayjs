@@ -132,6 +132,7 @@ void mock.module('../src/kay/content', () => content)
 
 // Imported once the mock is in place, so the store reads it.
 const { default: entriesApi } = await import('../src/api/entries')
+const { default: markdownApi } = await import('../src/api/markdown')
 const { leavesPublication } = await import('../src/publishing')
 const { copySlug, deleteEntry, duplicateEntry, entryOf, entryScreen, moveEntry, publishEntry, saveEntry, UnknownCollectionError } = await import('../src/store')
 
@@ -176,6 +177,35 @@ describe('saveEntry', () => {
 
     configure({ files: { save: async change => void saved.push(change) }, rawHtml: ['posts'] })
     expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Hi' }, body: '<script>trusted()</script>' })).toHaveProperty('saved', true)
+  })
+
+  test('checks a loader\'s body only when its collection keeps raw HTML on the page, as trusted', async () => {
+    const script = '<script>run()</script>'
+    const index = collectionList.indexOf(products)
+
+    // Sanitized on the page, so it runs nowhere and rawHtml changes nothing.
+    expect(await saveEntry({ collection: 'products', slug: 'mug', data: { name: 'Mug' }, body: script })).toHaveProperty('saved', true)
+
+    // Raw on the page: refused as a folder\'s body is, unless rawHtml lists it.
+    collectionList[index] = { ...products, trusted: true }
+
+    try {
+      expect(await saveEntry({ collection: 'products', slug: 'mug', data: { name: 'Mug' }, body: script })).toHaveProperty('issues')
+      configure({ files: { save: async change => void saved.push(change) }, rawHtml: ['products'] })
+      expect(await saveEntry({ collection: 'products', slug: 'mug', data: { name: 'Mug' }, body: script })).toHaveProperty('saved', true)
+    }
+    finally {
+      collectionList[index] = products
+    }
+  })
+
+  test('previews a loader\'s body as the page keeps it, and a folder\'s with an image\'s size', async () => {
+    const markdown = '<img src="https://x.example/a.png" width="10" alt="a"> [rel](./sibling)'
+    const preview = async (collection: string) => (await markdownApi.handle(new Request('http://site.test/', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ markdown, collection }) }))).json() as Promise<{ html: string }>
+
+    expect((await preview('products')).html).toContain('<img src="https://x.example/a.png" alt="a">')
+    expect((await preview('products')).html).toContain('href="./sibling"')
+    expect((await preview('posts')).html).toContain('width="10"')
   })
 
   test('passes on the schema\'s issues and writes nothing', async () => {

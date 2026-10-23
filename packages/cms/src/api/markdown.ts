@@ -3,7 +3,7 @@ import { api } from 'kay/server'
 import { bodyHtml, MarkdownError } from '../kay/content'
 import { setCodeAside } from '../preview-code'
 import { folderImage, imagesFromFolder } from '../preview-images'
-import { UnknownCollectionError } from '../store'
+import { collectionNamed, UnknownCollectionError } from '../store'
 
 // Where bodyHtml stands a component, which the preview shows as the content it wraps; the sanitizer does not read a tag name with a hyphen, and a heading's anchor points nowhere in the screens.
 const COMPONENT_TAGS = /<kay-component\b[^>]*>|<\/kay-component>/g
@@ -16,6 +16,19 @@ const MAX_MARKDOWN = '1mb'
 // What the editor's preview keeps besides formatted text: images, and tables as the pages show them.
 const KEPT = { tags: ['img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'], attributes: { img: ['src', 'alt', 'width', 'height'] } }
 
+// What the page keeps of a loader's body, which it sanitizes unless the collection is `trusted`: no image size, relative URLs kept.
+const LOADED = { tags: KEPT.tags, attributes: { img: ['src', 'alt', 'title'], th: ['align'], td: ['align'] }, relativeUrls: true }
+
+// Whether the page sanitizes the collection's bodies, so the preview shows only what it keeps.
+async function sanitizedOnPage(name: string | undefined): Promise<boolean> {
+  if (name === undefined)
+    return false
+
+  const info = await collectionNamed(name)
+
+  return info.kind === 'loaded' && info.trusted !== true
+}
+
 // A Markdown text rendered by the site's own parser, for the editor's Preview: its structure, with a component shown as its content, code highlighted by the site's highlighter, and an image written as a path in the entry's folder shown from there. The HTML is sanitized, as it is shown inside the screens, which a `<script>` in a text must not run in; a link opens in a new tab so a click never leaves a draft.
 const markdown = api({ maxSize: MAX_MARKDOWN })
   .onError(({ error, status }) => error instanceof UnknownCollectionError ? status(404, error.message) : undefined)
@@ -24,7 +37,7 @@ const markdown = api({ maxSize: MAX_MARKDOWN })
       const html = (await bodyHtml(body.markdown)).replace(COMPONENT_TAGS, '')
       const aside = await setCodeAside(html)
       const place = body.collection !== undefined && body.slug !== undefined ? { collection: body.collection, slug: body.slug, locale: body.locale } : undefined
-      const safe = String(sanitizeHtml(place ? imagesFromFolder(aside.html, place, apiUrl(request, '/image')) : aside.html, KEPT))
+      const safe = String(sanitizeHtml(place ? imagesFromFolder(aside.html, place, apiUrl(request, '/image')) : aside.html, await sanitizedOnPage(body.collection) ? LOADED : KEPT))
 
       return { html: aside.restore(safe.replace(HEADING_ANCHOR, '$1').replace(LINK, '<a target="_blank" ')) }
     }

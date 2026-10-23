@@ -490,7 +490,7 @@ A key a locale lacks reads the English, and `kay check` leaves the `cms` keys ou
 
 A Markdown body whose HTML would run as the site or cover it is refused on save. That is anything kay's sanitizer drops, such as a `<script>`, an `onclick`, a `style`, a `javascript:` link, or a tag left open for the page around it to close.
 
-List the collection in `rawHtml` to allow it. The collection's own components and HTML shown in a code block are always fine.
+List the collection in `rawHtml` to allow it. A collection filled by a loader is the exception: the page sanitizes its bodies unless the collection sets `trusted: true`, so its HTML is never run, nothing is refused, and its preview shows only what the page keeps. To keep raw HTML in one, set `trusted: true` on the collection and list it in `rawHtml`. The collection's own components and HTML shown in a code block are always fine.
 
 ## Collections from a loader
 
