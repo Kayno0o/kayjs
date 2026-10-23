@@ -9,7 +9,7 @@ const CALLED = /(?:new Bun\.Cookie|cookies\.set)\(\s*'([^']+)'/g
 // The value a constant such as `kay_analytics=yes` adds to the cookie's name.
 const VALUE = /=.*/
 // Names built from a template or by a helper, which no pattern above sees.
-const BUILT = ['ksteps_', 'kcms:draft:', 'kcms:rebuilding', 'kcms-editor', 'kay_editor-refused', 'kay_session', 'kay-w', 'remember', 'listWidthKey']
+const BUILT = ['ksteps_', 'kcms:draft:', 'kcms:rebuilding', 'kcms-editor', 'kay_editor-refused', 'kay_session', 'kay-w']
 
 async function sourceFiles(): Promise<string[]> {
   const found: string[] = []
