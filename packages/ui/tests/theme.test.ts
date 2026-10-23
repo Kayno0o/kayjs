@@ -55,7 +55,7 @@ const tokens = new Set([...theme.matchAll(DEFINED_TOKEN)].map(([, token]) => tok
 const classes = new Set([...theme.matchAll(DEFINED_CLASS)].map(([, name = '']) => name))
 
 // Classes a component writes that no rule of the theme selects any more: rule-free names for an app's CSS and skins.
-const HOOKS = new Set(['kui-menu', 'kui-toaster', 'kui-tooltip', 'kui-card', 'kui-card-row', 'kui-widget', 'kui-notice', 'kui-avatar', 'kui-checkbox', 'kui-radio-group', 'kui-chip', 'kui-chip-group', 'kui-copy-btn', 'kui-empty-state', 'kui-file-drop', 'kui-meter', 'kui-progress', 'kui-skeleton', 'kui-page-header', 'kui-page-section', 'kui-date-input', 'kui-date-range-input', 'kui-segmented', 'kui-slider', 'kui-color-input', 'kui-combobox', 'kui-rating', 'kui-toggle'])
+const HOOKS = new Set(['kui-menu', 'kui-toaster', 'kui-tooltip', 'kui-card', 'kui-card-row', 'kui-widget', 'kui-notice', 'kui-avatar', 'kui-checkbox', 'kui-radio-group', 'kui-chip', 'kui-chip-group', 'kui-copy-btn', 'kui-empty-state', 'kui-file-drop', 'kui-meter', 'kui-progress', 'kui-skeleton', 'kui-page-header', 'kui-page-section', 'kui-date-input', 'kui-date-range-input', 'kui-segmented', 'kui-slider', 'kui-color-input', 'kui-combobox', 'kui-rating', 'kui-toggle', 'kui-contact-form', 'kui-contact-consent', 'kui-contact-privacy'])
 
 // The source of a component of the library.
 const sourceOf = (name: string): string => components.find(component => component.path === `src/${name}.kay`)!.source

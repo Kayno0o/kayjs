@@ -544,19 +544,6 @@
     @apply grid grid-cols-1 gap-3 sm:grid-cols-2;
   }
 
-  /* ContactForm: its fields and the button in a column, which its recipe names only. */
-  .kui-contact-form {
-    @apply flex flex-col items-start gap-4;
-  }
-
-  .kui-contact-consent {
-    @apply flex flex-col gap-1;
-  }
-
-  .kui-contact-privacy {
-    @apply text-xs;
-  }
-
   /* SubscribeForm: the email, its notice and the button in a column. */
   .kui-subscribe-form {
     @apply flex flex-col items-start gap-3;

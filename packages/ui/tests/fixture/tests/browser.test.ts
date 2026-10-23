@@ -689,6 +689,8 @@ inBrowser('FormField in an island', () => {
       iconGrid: ['#icon-grid', 'trbl'],
       tableFilter: ['#table [data-part=filter]', 'b'],
       tableSelection: ['#table [data-part=selection]', 'b'],
+      narrowHead: ['#narrow-table [data-part=headRow]', 'b'],
+      sortButton: ['#narrow-table [data-part=sortButton]', 'trbl'],
       toggleTrack: ['#toggle + [data-part=track]', 'trbl'],
       scatterPlot: ['#scatter [data-part=plot]', 'trbl'],
       cropperStage: ['#cropper [data-part=stage]', 'trbl'],

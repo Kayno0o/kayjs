@@ -17,6 +17,7 @@ import Widget from '@kaynooo/kayjs-ui/widget.kay'
 import '../app.css'
 
 const columns: Column<{ id: number, name: string }>[] = [{ key: 'name', header: 'Name' }]
+const sortable: Column<{ id: number, name: string }>[] = [{ key: 'name', header: 'Name', sortValue: true }]
 const choices = [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }]
 ---
 //- One of each box the keyline token sizes, the components drawn by their own recipe and the rest written with their class whole so its rules ship.
@@ -37,6 +38,8 @@ main
   ChipGroup#chips(label="Chips" options={choices} value={['a']})
   ul#icon-grid.kui-icon-grid
   Table#table(columns={columns} rows={[{ id: 1, name: 'Io' }]} rowKey="id" selectable filter={['name']})
+  div#narrow-table(style="width: 15rem")
+    Table(columns={sortable} rows={[{ id: 1, name: 'Io' }]} rowKey="id" narrow="stack")
   Toggle#toggle(label="Toggle")
   ScatterChart#scatter(label="Games" points={[{ key: 1, label: 'Hades', x: 10, y: 90 }]})
   ImageCropper#cropper(src="/photo.png")
