@@ -52,20 +52,22 @@ async function brotliSize(input: string | Uint8Array, quality?: number): Promise
   return new Promise((resolve, reject) => brotliCompress(input, quality === undefined ? {} : { params: { [constants.BROTLI_PARAM_QUALITY]: quality } }, (error, result) => error ? reject(error) : resolve(result.length)))
 }
 
-// Sizes are kept between builds, named by what they measured: the same bytes brotli compresses to the same length, so a build that changed nothing measures nothing. Bun's version is in the folder's name, as the encoder is its.
-const SIZES = join(import.meta.dir, '..', '.kay', 'cache', 'page-weight', Bun.version)
+const line = (bytes: number) => `<span data-page-weight>This page: ${(bytes / 1024).toFixed(1)} KB.</span>`
+const QUICK_QUALITY = 5
+
+// Sizes are kept between builds, named by what they measured: the same bytes brotli compresses to the same length, so a build that changed nothing measures nothing. The folder's name holds Bun's version, as the encoder is its, and a hash of what else the sizes depend on here.
+const SIZES = join(import.meta.dir, '..', '.kay', 'cache', 'page-weight', `${Bun.version}-${Bun.hash(`${line(0)}${QUICK_QUALITY}${COMPRESSED.source}`).toString(36)}`)
 let sizesMade: Promise<unknown> | undefined
 
 async function keptSize(key: string): Promise<number | undefined> {
-  const file = Bun.file(join(SIZES, key))
+  try {
+    const size = Number(await Bun.file(join(SIZES, key)).text())
 
-  if (!await file.exists())
+    return Number.isSafeInteger(size) && size > 0 ? size : undefined
+  }
+  catch {
     return undefined
-
-  // A file another page is still writing reads short or empty: it is measured again.
-  const size = Number(await file.text())
-
-  return Number.isSafeInteger(size) && size > 0 ? size : undefined
+  }
 }
 
 // A folder that cannot be written costs the next build its measuring, never this one.
@@ -105,11 +107,9 @@ async function servedSize(path: string): Promise<number> {
   return size
 }
 
-const line = (bytes: number) => `<span data-page-weight>This page: ${(bytes / 1024).toFixed(1)} KB.</span>`
-
 // A quick brotli only picks the digits; the page is measured at full strength once, with the line in place, which it adds a few bytes to.
 async function fullSize(html: string, linked: number): Promise<number> {
-  const quick = await brotliSize(html, 5)
+  const quick = await brotliSize(html, QUICK_QUALITY)
 
   return brotliSize(html.replace(SLOT, () => line(quick + linked)))
 }

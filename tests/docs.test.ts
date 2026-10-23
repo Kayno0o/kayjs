@@ -1,6 +1,6 @@
 import type { RenderedPage } from 'kay/server'
 import { readFileSync } from 'node:fs'
-import { mkdtemp, readdir, rm, stat } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { brotliCompressSync } from 'node:zlib'
@@ -364,6 +364,7 @@ describe('the documentation\'s colours', () => {
 })
 
 const FILES: Record<string, string> = { '/app.css': 'a { color: red }', '/logo.svg': '<svg></svg>', '/favicon.ico': 'icon'.repeat(500), '/favicon.svg': '<svg viewBox="0 0 32 32"/>', '/entry.js': 'export {}', '/apple-touch-icon.png': 'touch' }
+const PAGE_WEIGHT_CACHE = join(import.meta.dir, '..', 'docs', '.kay', 'cache', 'page-weight')
 const WEIGHT = /This page: ([\d.]+) KB\./
 let dir: string
 
@@ -376,10 +377,10 @@ afterAll(async () => rm(dir, { recursive: true, force: true }))
 
 const brotli = (text: string) => brotliCompressSync(text).length
 
-async function transform(head: string, body = ''): Promise<string> {
-  const html = `<html><head><link rel="stylesheet" href="/app.css"><link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">${head}</head><body>${body}<footer><span data-page-weight></span></footer></body></html>`
+const markup = (head: string, body = '') => `<html><head><link rel="stylesheet" href="/app.css"><link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png">${head}</head><body>${body}<footer><span data-page-weight></span></footer></body></html>`
 
-  return pageWeight.transformPage!({ path: '/', locale: 'en', html, file: async url => url in FILES ? join(dir, url) : undefined })
+async function transform(head: string, body = ''): Promise<string> {
+  return pageWeight.transformPage!({ path: '/', locale: 'en', html: markup(head, body), file: async url => url in FILES ? join(dir, url) : undefined })
 }
 
 describe('the docs footer\'s page weight', () => {
@@ -399,10 +400,11 @@ describe('the docs footer\'s page weight', () => {
 
   it('keeps the size it measured for a page between builds, and measures it again when the kept one is unreadable', async () => {
     const body = `<p>${Array.from({ length: 300 }, () => crypto.randomUUID()).join(' ')}</p>`
+    const html = markup('', body)
     const first = await transform('', body)
-    const kept = join(import.meta.dir, '..', 'docs', '.kay', 'cache', 'page-weight', Bun.version)
-    const entries = await Promise.all((await readdir(kept)).filter(name => name.startsWith('page-')).map(async name => ({ name, time: (await stat(join(kept, name))).mtimeMs })))
-    const entry = join(kept, entries.sort((a, b) => b.time - a.time)[0]!.name)
+    // Named by the page it measured, which the random body makes this test's own.
+    const prefix = `page-${Bun.hash(html)}-${html.length}-`
+    const entry = join(PAGE_WEIGHT_CACHE, (await readdir(PAGE_WEIGHT_CACHE, { recursive: true })).find(name => name.includes(prefix))!)
 
     await Bun.write(entry, '1')
 
@@ -414,6 +416,14 @@ describe('the docs footer\'s page weight', () => {
 
     expect(await transform('', body)).toBe(first)
     expect(Number.isSafeInteger(Number(await Bun.file(entry).text()))).toBe(true)
+
+    // A directory where the size should be cannot be read, and the page is measured again all the same.
+    await rm(entry)
+    await mkdir(entry)
+
+    expect(await transform('', body)).toBe(first)
+
+    await rm(entry, { recursive: true })
   })
 
   it('leaves a page without the footer as it is', async () => {
