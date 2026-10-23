@@ -12,4 +12,5 @@ const items: MenuEntry[] = [
 ]
 ---
 Menu(id="by-tone" items={items} label="By tone" icon="plus" tone="danger")
+Menu(id="icons" items={[{ label: 'Add', icon: 'plus', onSelect: () => undefined }, { label: 'Bare', onSelect: () => undefined }]} label="Icons" icon="plus")
 Menu(id="plain" items={items} label="Plain" icon="plus")

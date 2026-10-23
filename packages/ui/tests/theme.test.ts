@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { compileKay } from 'kay/compiler'
 import { compile } from 'tailwindcss'
 import { REMOVED_UI_CLASSES } from '../../../src/check/ui-classes'
+import { MENU_FOOTER, MENU_ITEM } from '../src/menu-look'
 
 const ROOT = new URL('..', import.meta.url).pathname
 
@@ -245,11 +246,20 @@ function blockOf(css: string, selector: string): string | undefined {
 }
 
 // The theme as Tailwind compiles it, with a skin's own CSS after it, or before it.
-async function built(skin: string, where: 'after' | 'before' = 'after'): Promise<string> {
+// The CSS the utilities generate beyond the theme's own rules, which hold the same declarations for the old kui- classes.
+async function utilitiesOf(candidates: string[]): Promise<string> {
+  const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
+  const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${theme}\n@tailwind utilities;`, { base: ROOT, loadStylesheet: async (_, base) => ({ path: tailwind, base, content: await Bun.file(tailwind).text() }) })
+  const had = new Set(compiler.build([]).split('\n'))
+
+  return compiler.build(candidates).split('\n').filter(line => !had.has(line)).join('\n')
+}
+
+async function built(skin: string, where: 'after' | 'before' = 'after', candidates: string[] = []): Promise<string> {
   const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
   const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${where === 'before' ? `${skin}\n${theme}` : `${theme}\n${skin}`}`, { base: ROOT, loadStylesheet: async (_, base) => ({ path: tailwind, base, content: await Bun.file(tailwind).text() }) })
 
-  return compiler.build([])
+  return compiler.build(candidates)
 }
 
 describe('theme.css', () => {
@@ -418,15 +428,34 @@ describe('theme.css', () => {
     }
   })
 
-  test('marks the focused menu item and the selected palette option with an accent bar, and an outline forced colours paint', () => {
-    const marks = [['.kui-menu-item', '&:focus-visible'], ['.kui-command-palette-option', '&:where([aria-selected=\'true\'])']] as const
+  test('marks the focused menu item and the selected palette option with an accent bar, and an outline forced colours paint', async () => {
+    const recipeOf = async (path: string, part: string) => (await Bun.file(`${ROOT}${path}`).text()).match(new RegExp(`\\n\\s+${part}: '([^']+)'`))![1]!.split(WHITESPACE)
+    const marks = [
+      ['a Menu item', MENU_ITEM.split(WHITESPACE), ':focus-visible'],
+      ['the BellInbox footer', MENU_FOOTER.split(WHITESPACE), ':focus-visible'],
+      ['a palette option', await recipeOf('src/command-palette.kay', 'option'), '[aria-selected'],
+    ] as const
 
-    for (const [selector, state] of marks) {
-      const bar = blockOf(blockOf(theme, selector) ?? '', state)
+    for (const [name, candidates, state] of marks) {
+      const css = await utilitiesOf(candidates)
 
-      expect(bar, `${selector} ${state}`).toContain('box-shadow: inset 2px 0 0 var(--color-kui-accent);')
-      expect(bar, `${selector} ${state}`).toContain('outline: 2px solid transparent;')
+      // Each declaration sits in the rule of the state that marks the item.
+      for (const declaration of ['box-shadow: inset 2px 0 0 var(--color-kui-accent);', 'outline: 2px solid transparent;']) {
+        const rules = css.split('\n.').filter(rule => rule.slice(0, rule.indexOf('{')).includes(state))
+
+        expect(rules.some(rule => rule.includes(declaration)), `${name} ${state} ${declaration}`).toBe(true)
+      }
     }
+  })
+
+  test('sets the toast tone colour from the tone a toast carries', async () => {
+    const toast = (await Bun.file(`${ROOT}src/toaster.kay`).text()).match(/\n\s+toast: '([^']+)'/)![1]!.split(WHITESPACE)
+    const css = await utilitiesOf(toast)
+
+    for (const [tone, color] of [['danger', 'error'], ['success', 'success'], ['info', 'info']])
+      expect(css, tone).toMatch(new RegExp(String.raw`\[data-tone[=~]?"?${tone}"?\][^{]*\{[^}]*--kui-toast-tone: var\(--color-kui-${color}\)`))
+
+    expect(css).toMatch(/--kui-toast-tone: var\(--color-kui-accent\)/)
   })
 
   test('sizes a select by its options inside a compact field, and by the row inside any other', async () => {

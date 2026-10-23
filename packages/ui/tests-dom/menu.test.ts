@@ -27,3 +27,12 @@ test('a Menu trigger takes a tone, the danger variant being the danger tone', as
 
   expect([trigger('by-tone'), trigger('plain')]).toEqual([['ghost', 'danger'], ['ghost', 'neutral']])
 })
+
+test('a Menu entry with an icon draws it as the icon part, sized and shrunk, and one without writes none', async () => {
+  mounted = await mountComponent('src/components/menus.kay')
+
+  const [added, bare] = [...mounted.root.querySelectorAll('#icons [data-part=item]')]
+
+  expect([...added!.querySelectorAll('[data-part=icon]')].map(icon => [...icon.classList])).toEqual([expect.arrayContaining(['size-4', 'shrink-0'])])
+  expect(bare!.querySelector('[data-part=icon]')).toBeNull()
+})

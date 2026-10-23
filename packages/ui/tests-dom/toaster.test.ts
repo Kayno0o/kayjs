@@ -145,3 +145,26 @@ test('Alt+T leaves the key alone when no toast is on screen', async () => {
 
   expect(event.defaultPrevented).toBe(false)
 })
+
+test('a toast carries its tone as an attribute, and its tone variants set the colour its icon takes', async () => {
+  mounted = await mountComponent('src/components/toasts.kay')
+
+  for (const dismiss of mounted.root.querySelectorAll('.kui-toast [data-part=dismiss]'))
+    click(dismiss)
+
+  click(mounted.root.querySelector('#saved'))
+  click(mounted.root.querySelector('#refused'))
+  click(mounted.root.querySelector('#copied'))
+  await settle()
+
+  const toasts = [...mounted.root.querySelectorAll('.kui-toast')]
+
+  expect(toasts.map(item => item.getAttribute('data-tone'))).toEqual(['success', 'danger', 'info'])
+
+  for (const [item, color] of toasts.map((item, index) => [item, ['success', 'error', 'info'][index]] as const)) {
+    const tone = item.getAttribute('data-tone')
+
+    expect([...item.classList], tone ?? '').toContain(`data-[tone=${tone}]:[--kui-toast-tone:var(--color-kui-${color})]`)
+    expect(item.querySelector('[data-part=icon]')?.classList.contains('text-(--kui-toast-tone)')).toBe(true)
+  }
+})

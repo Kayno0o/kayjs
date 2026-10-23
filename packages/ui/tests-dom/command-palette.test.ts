@@ -280,6 +280,34 @@ describe('CommandPalette with siteSearch', () => {
     expect(active()).toBe('Tab left')
   })
 
+  test('draws an option\'s icon, and a section found with its snippet taller, its words found in the accent mark', async () => {
+    const { root, input, labels } = await palette({ siteSearch: true })
+    const options = () => [...root.querySelectorAll<HTMLElement>('[data-part=option]')]
+
+    press(window, 'k', { ctrlKey: true })
+    await settle()
+
+    const action = options().find(option => option.textContent?.includes('New moon'))!
+
+    expect([...action.querySelector('[data-part=icon]')?.classList ?? []]).toEqual(expect.arrayContaining(['size-5', 'text-kui-overlay1']))
+    expect(options().some(option => option.hasAttribute('data-snippet'))).toBe(false)
+
+    await search(input()!, 'table')
+    await until(() => labels().includes('Sorting'))
+
+    const found = options().filter(option => option.hasAttribute('data-snippet'))
+
+    expect(found.map(option => option.querySelector('[data-part=label]')?.textContent)).toEqual(['Sorting'])
+    expect(found[0]!.classList).toContain('data-snippet:h-auto')
+    expect(options().filter(option => !option.hasAttribute('data-snippet')).length).toBeGreaterThan(0)
+
+    const mark = found[0]!.querySelector('[data-part=snippet] [data-part=mark]')
+
+    expect(mark?.textContent).toBe('table')
+    expect(mark?.tagName).toBe('MARK')
+    expect(mark?.classList).toContain('text-kui-accent')
+  })
+
   test('marks the words found in a section\'s heading, and shows a heading with none found as it reads', async () => {
     const { root, input, labels } = await palette({ siteSearch: true })
     const marked = () => [...root.querySelectorAll('[data-part=label] mark')].map(mark => mark.textContent)
