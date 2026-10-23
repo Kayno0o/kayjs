@@ -2,10 +2,13 @@ import { existsSync } from 'node:fs'
 import { mkdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { dirname, join, relative } from 'node:path'
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
+import { buildClassTable } from '../../../src/build/class-table'
 import { kay } from '../../../src/build/plugin'
 import { uiProblems } from '../../../src/check/ui'
 import { REMOVED_UI_CLASSES } from '../../../src/check/ui-classes'
+import { installClassTable } from '../../../src/runtime/class-table'
 import { child } from '../../../src/runtime/html'
+import { scratchDir } from '../../../tests/scratch'
 
 // An app of its own, as `src/ui.ts` restyles every instance of a component in the app: the library's fixture app renders the same components untouched, and its contract tests compare them. Built apart from testSite, which serves one project per test process.
 const ROOT = join(import.meta.dir, 'restyle-app')
@@ -17,6 +20,7 @@ const REMOVED_CLASS = new RegExp(Object.keys(REMOVED_UI_CLASSES).map(name => `\\
 
 let html = ''
 let browser = ''
+let renderPage: (props: Record<string, unknown>) => unknown
 
 beforeAll(async () => {
   if (!existsSync(LINK)) {
@@ -31,6 +35,7 @@ beforeAll(async () => {
 
   const { Page } = await import(build.outputs[0]!.path) as { Page: (props: Record<string, unknown>) => unknown }
 
+  renderPage = Page
   html = child(Page({})).replace(MARKERS, '')
 
   const dom = await Bun.build({ entrypoints: [join(ROOT, 'src/entry.ts')], outdir: join(OUT, 'dom'), target: 'browser', plugins: [kay({ root: ROOT, target: 'dom' })] })
@@ -218,7 +223,7 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
   test('a component used as a part of another keeps the part name its caller hands it', () => {
     expect(html).toMatch(/<svg[^>]*data-part="spinner"/)
     expect(classesOfTag('data-part="step"', 'button').filter(name => name === 'kui-icon-btn')).toHaveLength(1)
-    expect(classesOfTag('data-part="step"', 'button').slice(-3)).toEqual(['rounded-full', 'kui-carousel-step', 'size-12'])
+    expect(classesOfTag('data-part="step"', 'button')).toEqual(['kui-icon-btn', 'rounded-full', 'kui-carousel-step', 'size-12'])
     expect(html).toMatch(/<svg[^>]*data-part="sortIcon"/)
   })
 
@@ -279,6 +284,45 @@ describe('the buttons and fields whose recipe holds their look', () => {
       expect(classes, name).not.toContain(name)
 
     expect(classes).toContain('enabled:not-aria-busy:cursor-pointer')
+  })
+
+  test('a DateInput and a TimeInput draw the field look, then what src/ui.ts sets on them', () => {
+    const date = classesOfPart('date', 'input')
+    const time = classesOfPart('time')
+
+    expect(date[0]).toBe('kui-field-input')
+    expect(date.slice(-3)).toEqual(['h-12', 'kui-date-input-box', 'w-44'])
+    expect(time[0]).toBe('kui-field-input')
+    expect(time.slice(-3)).toEqual(['h-12', 'kui-time-input', 'w-32'])
+  })
+
+  test('with the class table installed, what src/ui.ts sets replaces the utility it overrides', async () => {
+    const dir = await scratchDir('restyle-merge-')
+    const words = new Set(html.match(/ class="[^"]*"/g)?.flatMap(attribute => attribute.slice(8, -1).split(' ')))
+
+    await Bun.write(join(dir, 'src', 'app.css'), '@import "tailwindcss";\n@theme { --tracking-kui-action: 0.05em; }\n')
+
+    try {
+      installClassTable(await buildClassTable(dir, words, []))
+
+      const merged = child(renderPage({})).replace(MARKERS, '')
+      const classesOf = (id: string, part?: string) => {
+        const start = part === undefined ? merged.indexOf(`id="${id}"`) : merged.indexOf(`data-part="${part}"`, merged.indexOf(`id="${id}"`))
+
+        return (merged.slice(merged.lastIndexOf('<', start), merged.indexOf('>', start)).match(/ class="([^"]*)"/)?.[1] ?? '').split(' ')
+      }
+
+      expect(classesOf('busy')).not.toContain('tracking-kui-action')
+      expect(classesOf('busy').at(-1)).toBe('tracking-wide')
+      expect(classesOf('checkbox', 'input')).not.toContain('size-4')
+      expect(classesOf('checkbox', 'input').at(-1)).toBe('size-5')
+      expect(classesOf('toggle', 'track')).not.toContain('w-9')
+      expect(classesOf('toggle', 'track').at(-1)).toBe('w-12')
+    }
+    finally {
+      installClassTable(undefined)
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 
   test('only a root keeps a kui class, and the label type FormField shares with Table', () => {

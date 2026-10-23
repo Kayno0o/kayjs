@@ -1,7 +1,9 @@
 ---
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
 import Select from '@kaynooo/kayjs-ui/select.kay'
+import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import '../app.css'
 ---
@@ -16,3 +18,19 @@ main
     Button#filter-inline(type="button" label="Reset" variant="inline")
   div.flex.items-end.gap-3
     Button#alone(type="submit" label="Filter")
+  div.flex.items-end.gap-3
+    FormField(label="Search")
+      TextInput#plain-search(name="plain")
+    Button#beside-plain(type="submit" label="Filter")
+  div.flex.items-end.gap-3
+    div
+      FormField(label="Search" compact)
+        TextInput#wrapped-search(name="wrapped")
+    div
+      Button#wrapped(type="submit" label="Filter")
+  div.flex.items-end.gap-3
+    Textarea#note(name="note" rows="3" aria-label="Note")
+    Button#beside-note(type="submit" label="Filter")
+  div.flex.items-end.gap-3
+    MultiSelect#tags(label="Tags" options={[{ value: 'a', label: 'A' }]})
+    Button#beside-tags(type="submit" label="Filter")

@@ -335,8 +335,8 @@
     @apply px-4 py-1.5 text-sm;
   }
 
-  /* A medium button in a row of compact fields or bare field controls is as tall as they are at any density; a rule here rather than a utility, so no other button carries the selector. */
-  :where(:has(> .kui-form-field[data-compact], > .kui-field-input)) > .kui-btn:where([data-size=md]:not([data-variant=inline])) {
+  /* A medium button in a row of compact fields or bare single-line field controls (a Textarea not) is as tall as they are at any density; a rule here rather than a utility, so no other button carries the selector. */
+  :where(:has(> .kui-form-field[data-compact], > .kui-field-input:not(textarea))) > .kui-btn:where([data-size=md]:not([data-variant=inline])) {
     height: var(--spacing-kui-field-height);
   }
 

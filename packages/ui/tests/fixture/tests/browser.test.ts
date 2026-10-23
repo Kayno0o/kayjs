@@ -63,7 +63,7 @@ inBrowser('in the browser', () => {
 
       const height = (selector: string) => document.querySelector(selector)!.getBoundingClientRect().height
 
-      return { search: height('#search'), status: height('#status'), filter: height('#filter'), xs: height('#filter-xs'), inline: height('#filter-inline'), alone: height('#alone') }
+      return { plainSearch: height('#plain-search'), besidePlain: height('#beside-plain'), wrapped: height('#wrapped'), wrappedSearch: height('#wrapped-search'), note: height('#note'), besideNote: height('#beside-note'), tags: height('.kui-multi-select-trigger'), besideTags: height('#beside-tags'), search: height('#search'), status: height('#status'), filter: height('#filter'), xs: height('#filter-xs'), inline: height('#filter-inline'), alone: height('#alone') }
     }, density)
 
     for (const density of ['0.5', '1', '1.5', '2']) {
@@ -75,6 +75,11 @@ inBrowser('in the browser', () => {
       expect(found.xs, density).toBeLessThan(found.filter)
       expect(found.inline, density).toBeLessThan(found.filter)
       expect(found.alone, density).toBeCloseTo(24, 0)
+      // A Button beside a non-compact FormField, in a wrapper of its own or beside a Textarea keeps its height; beside a MultiSelect, whose trigger is no direct child of the row, too.
+      expect(found.besidePlain, density).toBeCloseTo(24, 0)
+      expect(found.wrapped, density).toBeCloseTo(24, 0)
+      expect(found.besideNote, density).toBeCloseTo(24, 0)
+      expect(found.besideTags, density).toBeCloseTo(24, 0)
     }
 
     expect(page.errors).toEqual([])
