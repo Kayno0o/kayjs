@@ -10,7 +10,7 @@ export const LEGACY_PAGE_LINK_ATTRIBUTE = 'data-cms-edit-page'
 export const CHECK_PATH = '/_kay/cms/editor'
 export const MODULE_PATH = '/_kay/cms/editor/module.js'
 // The cookie naming who the admin let in, a digest and nothing else the browser could be asked for: the on-page editor keeps its drafts under it, so another person on the same browser does not meet them.
-export const EDITOR_COOKIE = 'kcms_editor'
+export const EDITOR_COOKIE = 'kay_editor_who'
 const HINT_AGE = 90 * 24 * 60 * 60
 
 // What the browser runs on a page read by a signed-in editor: asks the guard whether the editor is still signed in, then shows the "Edit this page" link.

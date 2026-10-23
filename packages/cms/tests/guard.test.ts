@@ -276,7 +276,7 @@ describe('the screens\' guard', () => {
     await screenGuard(ann)
     await screenGuard(bob)
 
-    const [first, second] = [ann.cookies.get('kcms_editor'), bob.cookies.get('kcms_editor')]
+    const [first, second] = [ann.cookies.get('kay_editor_who'), bob.cookies.get('kay_editor_who')]
 
     expect(first).toMatch(/^[\w-]{22}$/)
     expect(second).toMatch(/^[\w-]{22}$/)

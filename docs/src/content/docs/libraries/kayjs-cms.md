@@ -179,7 +179,7 @@ Drag the editor's inner edge, or focus it and press the arrow keys, to resize it
 
 What you type is kept in the browser, so a reload, a crash or a second tab brings it back with a note saying so. Save, Reset and Stop editing clear it. A draft is kept a week at most, and one made from an older copy of the entry than the saved one is left out with a note, so it never writes over a newer save. Reloading, closing the tab or following a link with changes not saved asks first.
 
-The admin also marks the browser with a `kcms_editor` cookie holding a digest of the person signed in, and drafts are kept under it, so another person on the same browser does not meet them. The cms Sign out button clears every kept draft. A guard that names nobody gives everyone the same digest.
+The admin also marks the browser with a `kay_editor_who` cookie holding a digest of the person signed in, and drafts are kept under it, so another person on the same browser does not meet them. The cms Sign out button clears every kept draft. A guard that names nobody gives everyone the same digest.
 
 Stop editing clears every kept draft of the browser, but a draft left by a visit that ended another way, such as an expired session or your own sign-out, stays until the week passes under its owner's digest. Where the browser gives no storage, edits are only kept until the page closes.
 
