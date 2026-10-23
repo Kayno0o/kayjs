@@ -39,6 +39,7 @@ if (outcome?.kind === 'sign-in')
   ctx.redirect(auth.signInUrl())
 
 if (outcome?.kind === 'redirect')
+  // kay-allow external-redirect: the client's registered redirect URI, matched exactly
   ctx.redirect(outcome.url)
 
 const problem = refused ?? (outcome?.kind === 'error' ? outcome.error : undefined)

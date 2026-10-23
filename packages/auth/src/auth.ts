@@ -1336,6 +1336,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       if (started === undefined)
         return status(404, 'Not Found')
 
+      // kay-allow external-redirect: the provider's authorize URL, else a sign-in page of this site
       return redirect(typeof started === 'string' ? started : failed(started.error, text(query.redirect)), 303)
     })
     .get(`${core.prefix}/:provider/callback` as `${Prefix}/:provider/callback`, async ({ auth, params, query, redirect }) => {
@@ -1398,6 +1399,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
         return answer(ctx, core, forward, (ctx as unknown as { auth: Auth }).auth, (role, user) => isGranted(role, user.roles))
       })
       // Back from signing in to the guarded site, if it is on the domains the app allows, else home.
+      // kay-allow external-redirect: `returnTarget` keeps only an https URL on the allowed domains
       .get(`${route}/return`, ({ query, redirect }) => redirect(returnTarget(typeof query.to === 'string' ? query.to : undefined, forward.domains) ?? homeOf(core), 303))
   }
 
@@ -1522,6 +1524,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
         if (!user) {
           if (redirect !== undefined && isNavigation(ctx.request))
+            // kay-allow external-redirect: `redirect` is the app's own sign-in page, the visited path rides in its query
             ctx.redirect(withBack(redirect, ctx.url.pathname + ctx.url.search))
 
           ctx.deny(401, 'Sign in to continue')
