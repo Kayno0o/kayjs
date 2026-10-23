@@ -19,7 +19,7 @@ const look = recipe({
   parts: {
     root: 'kui-toaster pointer-events-none fixed inset-auto right-4 bottom-4 z-100 m-0 flex w-[calc(100%-2rem)] max-w-sm flex-col gap-2 overflow-visible border-0 bg-transparent p-0',
     live: 'sr-only',
-    toast: 'kui-toast pointer-events-auto flex items-start gap-2 rounded-kui-card border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-surface0 px-3 py-2 [--kui-toast-tone:var(--color-kui-accent)] data-[tone=danger]:[--kui-toast-tone:var(--color-kui-error)] data-[tone=success]:[--kui-toast-tone:var(--color-kui-success)] data-[tone=info]:[--kui-toast-tone:var(--color-kui-info)]',
+    toast: 'kui-toast pointer-events-auto flex items-start gap-2 rounded-kui-card border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-surface0 px-3 py-2 [--kui-toast-tone:var(--color-accent)] data-[tone=danger]:[--kui-toast-tone:var(--color-danger)] data-[tone=success]:[--kui-toast-tone:var(--color-success)] data-[tone=info]:[--kui-toast-tone:var(--color-info)]',
     icon: 'mt-0.5 size-4 shrink-0 text-(--kui-toast-tone)',
     message: 'min-w-0 flex-1 text-xs/snug text-kui-text',
     dismiss: 'shrink-0 text-kui-overlay1 hover:text-kui-text',

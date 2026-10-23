@@ -49,7 +49,7 @@ async function failure(root: string, extensions?: KayExtension[]): Promise<strin
 }
 
 function mantleDeclarations(css: string): number {
-  return css.split('--color-kui-mantle:').length - 1
+  return css.split('--color-popover:').length - 1
 }
 
 afterAll(async () => {
@@ -76,8 +76,8 @@ describe('@apply of a kui utility in the app\'s stylesheet with ui() alone', () 
       it(`builds with no @reference, ${dev ? 'dev' : 'production'}, base ${base || 'unset'}`, async () => {
         const css = await stylesheet(await app(''), { hot: dev, ...base === '' ? {} : { base } })
 
-        expect(css).toMatch(/\.card\s*\{[^}]*border-color: var\(--color-kui-surface2[,)]/)
-        expect(css).toMatch(/\.card\s*\{[^}]*background-color: var\(--color-kui-mantle[,)]/)
+        expect(css).toMatch(/\.card\s*\{[^}]*border-color: var\(--color-border[,)]/)
+        expect(css).toMatch(/\.card\s*\{[^}]*background-color: var\(--color-popover[,)]/)
       }, 120_000)
     }
   }
@@ -113,7 +113,7 @@ describe('@apply of a kui utility in the app\'s stylesheet with ui() alone', () 
 
     await Bun.write(join(root, 'src/parts.css'), '.card { @apply bg-kui-mantle; }\n')
 
-    expect(await stylesheet(root, { hot: false })).toMatch(/\.card\s*\{[^}]*background-color: var\(--color-kui-mantle[,)]/)
+    expect(await stylesheet(root, { hot: false })).toMatch(/\.card\s*\{[^}]*background-color: var\(--color-popover[,)]/)
   }, 120_000)
 
   it('leaves an app without ui() to the reference it writes', async () => {

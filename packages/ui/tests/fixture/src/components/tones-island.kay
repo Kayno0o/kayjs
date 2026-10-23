@@ -7,6 +7,6 @@ const open = signal(false)
 ---
 button(onClick={() => open.set(!open())}) Toggle
 if open()
-  Card#island-card(class="border-kui-error" title="Moons")
+  Card#island-card(class="border-danger" title="Moons")
     Badge(tone="success" label="New")
   Notice(tone="danger" label="Failed")

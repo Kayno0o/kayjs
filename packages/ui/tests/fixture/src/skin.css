@@ -2,5 +2,5 @@
 @import '@kaynooo/kayjs-ui/theme.css';
 
 @theme {
-  --color-kui-accent: #123456;
+  --color-accent: #123456;
 }

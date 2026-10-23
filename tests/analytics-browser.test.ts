@@ -107,7 +107,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('analytics 
       const root = document.documentElement
 
       root.style.colorScheme = 'light'
-      root.style.cssText += ';--color-kui-surface0:light-dark(rgb(1, 1, 1), rgb(2, 2, 2));--color-kui-text:rgb(3, 3, 3);--color-kui-overlay0:rgb(4, 4, 4);--color-kui-accent:rgb(5, 5, 5);--color-kui-on-accent:rgb(6, 6, 6);--color-kui-field-border:rgb(7, 7, 7);--radius-kui-card:0px'
+      root.style.cssText += ';--color-surface:light-dark(rgb(1, 1, 1), rgb(2, 2, 2));--color-foreground:rgb(3, 3, 3);--color-border-strong:rgb(4, 4, 4);--color-accent:rgb(5, 5, 5);--color-accent-foreground:rgb(6, 6, 6);--color-input:rgb(7, 7, 7);--radius-kui-card:0px'
     })
     expect(await looks()).toEqual({ background: 'rgb(1, 1, 1)', color: 'rgb(3, 3, 3)', border: 'rgb(4, 4, 4)', radius: '0px', yes: ['rgb(5, 5, 5)', 'rgb(6, 6, 6)'], no: 'rgb(7, 7, 7)' })
 

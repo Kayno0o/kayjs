@@ -14,7 +14,7 @@ main
   article#no-scatter-label
     ScatterChart(label="Games" points={[]} emptyLabel="No titles")
   article#graph
-    ContributionGraph(days={days} color="var(--color-kui-accent)" today="2026-09-02" months)
+    ContributionGraph(days={days} color="var(--color-accent)" today="2026-09-02" months)
   article#bars
     BarChart(label="Backups" labels={['Mon', 'Tue', 'Wed']} xLabels series={[{ name: 'Minutes', values: [4, 0, 8], colors: ['green', null, 'red'], notes: [null, null, 'Timed out'] }]})
   article#stacked-bars

@@ -15,6 +15,6 @@ const rows = Array.from({ length: 400 }, (_, index) => ({ id: index, name: `Row 
 const columns: Column<Row>[] = [{ key: 'name', header: 'Name', sortValue: true }, { key: 'id', header: 'Id', sortValue: true }]
 ---
 button#grow(onClick={() => tall.set(true)}) Grow
-Table(columns={columns} rows={rows} rowKey="id" virtual sort={sorted ? { key: 'name', direction: 'desc' } : undefined} class="[--kui-table-height:20rem]")
+Table(columns={columns} rows={rows} rowKey="id" virtual sort={sorted ? { key: 'name', direction: 'desc' } : undefined} class="[--table-height:20rem]")
   @cell(row)
     div(style={tall() ? 'height: 90px' : undefined}) {row.name}

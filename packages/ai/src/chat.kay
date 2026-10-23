@@ -16,7 +16,7 @@ import './chat.css'
 
 // The chat's own classes are its parts, so an app restyles them from src/ui.ts or a `class` object. The table of a reply is built as a string and keeps its class.
 const look = recipe({
-  parts: { root: 'kai-chat', empty: 'kai-chat-empty', greeting: 'kai-chat-greeting', suggestions: 'kai-chat-suggestions', suggestion: 'kai-chat-suggestion', log: 'kai-chat-log', turn: 'kai-chat-turn', text: 'kai-chat-text', thinking: 'kai-chat-text kai-chat-thinking', note: 'kai-chat-note', status: 'kai-chat-status', disclosure: 'kai-chat-disclosure', form: 'kai-chat-form', field: 'min-h-10 max-h-40 rounded-[1.25rem] px-3.5 leading-normal focus-visible:[outline:2px_solid_var(--kai-chat-accent,var(--color-kui-accent))] focus-visible:outline-offset-2', send: 'kai-chat-send', retry: 'kui-btn', approval: 'kai-chat-approval', approvalText: 'kai-chat-approval-text', allow: 'kui-btn', deny: 'kui-btn' },
+  parts: { root: 'kai-chat', empty: 'kai-chat-empty', greeting: 'kai-chat-greeting', suggestions: 'kai-chat-suggestions', suggestion: 'kai-chat-suggestion', log: 'kai-chat-log', turn: 'kai-chat-turn', text: 'kai-chat-text', thinking: 'kai-chat-text kai-chat-thinking', note: 'kai-chat-note', status: 'kai-chat-status', disclosure: 'kai-chat-disclosure', form: 'kai-chat-form', field: 'min-h-10 max-h-40 rounded-[1.25rem] px-3.5 leading-normal focus-visible:[outline:2px_solid_var(--kai-chat-accent,var(--color-accent))] focus-visible:outline-offset-2', send: 'kai-chat-send', retry: 'kui-btn', approval: 'kai-chat-approval', approvalText: 'kai-chat-approval-text', allow: 'kui-btn', deny: 'kui-btn' },
   variants: {
     // The form: `bubble` frames the visitor's messages, `plain` draws them as bare text.
     variant: { bubble: '', plain: '' },

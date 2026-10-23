@@ -12,7 +12,7 @@ const look = recipe({
     root: 'kui-form-field flex w-full flex-wrap items-center gap-1 [:where(&)>*]:basis-full',
     label: 'contents [:where(&)>*]:basis-full',
     head: 'float-left order-first flex flex-1 basis-auto flex-wrap items-center gap-2 p-0',
-    text: 'kui-label-text text-kui-micro font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)]',
+    text: 'kui-label-text text-kui-micro font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)]',
     required: 'ml-0.5 text-kui-error',
     action: 'order-first ml-auto flex basis-auto flex-wrap items-center justify-end gap-1.5',
     hint: FIELD_MESSAGE.hint,

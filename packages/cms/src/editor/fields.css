@@ -28,7 +28,7 @@
 .kcms-save-state {
   margin: 0;
   font-size: 0.8rem;
-  color: var(--color-kui-subtext0);
+  color: var(--color-muted);
 }
 
 .kcms-list,
@@ -43,7 +43,7 @@
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.5rem;
-  border: 1px solid var(--color-kui-surface1);
+  border: 1px solid var(--color-surface-strong);
   border-radius: 0.5rem;
 }
 
@@ -80,7 +80,7 @@
 .kcms-item-issues,
 .kcms-item-error {
   margin: 0;
-  color: var(--color-kui-error);
+  color: var(--color-danger);
   font-size: 0.85rem;
 }
 
@@ -129,7 +129,7 @@
   align-items: center;
   gap: 0.5rem;
   margin: 0;
-  color: var(--color-kui-subtext0);
+  color: var(--color-muted);
   font-size: 0.85rem;
 }
 
@@ -151,7 +151,7 @@
   object-fit: contain;
   align-self: start;
   border-radius: 0.5rem;
-  background: var(--color-kui-surface0);
+  background: var(--color-surface);
 }
 
 .kcms-file-link {
@@ -171,18 +171,18 @@
   justify-content: flex-start;
   gap: 0.5rem;
   padding: 0.375rem 0.5rem;
-  border: 1px dashed var(--color-kui-surface2);
+  border: 1px dashed var(--color-border);
   border-radius: 0.5rem;
 }
 
 .kcms-file-drop[data-dragging] {
-  border-color: var(--color-kui-accent);
+  border-color: var(--color-accent);
 }
 
 .kcms-file-hint,
 .kcms-file-rules {
   margin: 0;
-  color: var(--color-kui-subtext0);
+  color: var(--color-muted);
   font-size: 0.85rem;
 }
 
@@ -193,7 +193,7 @@
 }
 
 .kcms-file-alt-label {
-  color: var(--color-kui-subtext0);
+  color: var(--color-muted);
   font-size: 0.85rem;
 }
 
@@ -206,20 +206,20 @@
 .kcms-file-broken {
   margin: 0;
   white-space: pre-line;
-  color: var(--color-kui-error);
+  color: var(--color-danger);
   font-size: 0.85rem;
 }
 
 .kcms-file-broken {
   padding: 0.75rem;
-  border: 1px dashed var(--color-kui-error);
+  border: 1px dashed var(--color-danger);
   border-radius: 0.5rem;
 }
 
 .kcms-file-path > summary,
 .kcms-file-pick > summary {
   width: fit-content;
-  color: var(--color-kui-subtext0);
+  color: var(--color-muted);
   font-size: 0.85rem;
   cursor: pointer;
 }
@@ -241,9 +241,9 @@
   padding: 0;
   overflow: hidden;
   aspect-ratio: 1;
-  border: 1px solid var(--color-kui-surface2);
+  border: 1px solid var(--color-border);
   border-radius: 0.5rem;
-  background: var(--color-kui-surface0);
+  background: var(--color-surface);
   color: inherit;
   font-size: 0.75rem;
   overflow-wrap: anywhere;
@@ -252,7 +252,7 @@
 
 .kcms-file-choice:hover,
 .kcms-file-choice:focus-visible {
-  border-color: var(--color-kui-accent);
+  border-color: var(--color-accent);
 }
 
 .kcms-file-choice img {
@@ -265,13 +265,13 @@
 .kui-form-field.kcms-group {
   padding: 0.5rem 0 0.5rem 0.75rem;
   border: 0;
-  border-left: 2px solid var(--color-kui-surface2);
+  border-left: 2px solid var(--color-border);
   border-radius: 0;
 }
 
 .kcms-refusal {
   display: grid;
-  color: var(--color-kui-error);
+  color: var(--color-danger);
   justify-items: start;
   gap: 0.5rem;
 }
@@ -340,7 +340,7 @@
 
 .kcms-adorn {
   flex: none;
-  color: var(--color-kui-subtext0);
+  color: var(--color-muted);
 }
 
 /* A text given its rows starts at them and grows with what is typed. */
@@ -362,7 +362,7 @@ textarea[data-kcms-grow] {
   gap: 0.125rem;
   padding: 0.125rem 0.25rem 0.125rem 0.625rem;
   border-radius: 999px;
-  background: var(--color-kui-surface2);
+  background: var(--color-border);
   font-size: 0.875rem;
 }
 
@@ -387,7 +387,7 @@ textarea[data-kcms-grow] {
   inline-size: 2.5rem;
   block-size: 2.25rem;
   padding: 0.125rem;
-  border: 1px solid var(--color-kui-surface2);
+  border: 1px solid var(--color-border);
   border-radius: 0.375rem;
   background: none;
   cursor: pointer;

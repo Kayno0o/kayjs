@@ -9,9 +9,9 @@ html.kcms-editing {
   z-index: 2147483000;
   right: calc(1rem + var(--kay-dev-inset-right, 0px));
   bottom: calc(1rem + var(--kay-dev-inset-bottom, 0px) + env(safe-area-inset-bottom, 0px));
-  color: var(--color-kui-text);
-  background: var(--color-kui-mantle);
-  border: 1px solid var(--color-kui-surface2);
+  color: var(--color-foreground);
+  background: var(--color-popover);
+  border: 1px solid var(--color-border);
   border-radius: 0.75rem;
   box-shadow: 0 0.5rem 2rem rgb(0 0 0 / 0.25);
 }
@@ -34,7 +34,7 @@ html.kcms-editing {
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0.5rem 0.5rem 0.5rem 1rem;
-  border-bottom: 1px solid var(--color-kui-surface2);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .kcms-editor:not(.kcms-editor-open) .kcms-editor-head {
@@ -67,22 +67,22 @@ html.kcms-dock-side .kcms-editor-open {
 
 .kcms-editor-status p {
   margin: 0.5rem 1rem;
-  color: var(--color-kui-subtext0);
+  color: var(--color-muted);
 }
 
 .kcms-editor-status p.kcms-editor-failure {
-  color: var(--color-kui-error);
+  color: var(--color-danger);
 }
 
 .kcms-editor-failure,
 .kcms-entry-failure {
   margin: 1rem;
-  color: var(--color-kui-error);
+  color: var(--color-danger);
 }
 
 .kcms-entry-presence p {
   margin: 0 1rem 0.5rem;
-  color: var(--color-kui-warning);
+  color: var(--color-warning);
 }
 
 .kcms-editor-confirm {
@@ -104,13 +104,13 @@ html.kcms-dock-side .kcms-editor-open {
 
 .kcms-entry-hint {
   margin: 0;
-  color: var(--color-kui-subtext0);
+  color: var(--color-muted);
 }
 
 .kcms-editor-empty,
 .kcms-entry-loading {
   margin: 1rem;
-  color: var(--color-kui-subtext0);
+  color: var(--color-muted);
 }
 
 .kcms-entry {
@@ -118,7 +118,7 @@ html.kcms-dock-side .kcms-editor-open {
   flex-direction: column;
   gap: 0.75rem;
   padding: 1rem;
-  border-bottom: 1px solid var(--color-kui-surface2);
+  border-bottom: 1px solid var(--color-border);
 }
 
 /* Stays at the top of the form on one line, so its buttons are always in reach and never cover the fields. */
@@ -133,8 +133,8 @@ html.kcms-dock-side .kcms-editor-open {
   gap: 0.5rem;
   margin: -1rem -1rem 0;
   padding: 0.75rem 1rem;
-  background: var(--color-kui-mantle);
-  border-bottom: 1px solid var(--color-kui-surface2);
+  background: var(--color-popover);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .kcms-entry-head hgroup {
@@ -157,7 +157,7 @@ html.kcms-dock-side .kcms-editor-open {
 
 .kcms-entry-slug {
   font-size: 0.8rem;
-  color: var(--color-kui-subtext0);
+  color: var(--color-muted);
 }
 
 /* What the open editor holds, for the dev tool's bar and floating drawer to keep out of. */
@@ -245,8 +245,8 @@ html.kcms-dock-bottom .kcms-editor-grip {
 .kcms-editor-grip::after {
   content: '';
   position: absolute;
-  background: var(--color-kui-accent);
-  box-shadow: 0 0 0 1px var(--color-kui-mantle);
+  background: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-popover);
   opacity: 0;
   pointer-events: none;
 }
@@ -271,7 +271,7 @@ html.kcms-dock-bottom .kcms-editor-grip::after {
 }
 
 .kcms-editor-grip:focus-visible {
-  outline: 2px solid var(--color-kui-accent);
+  outline: 2px solid var(--color-accent);
 }
 
 html.kcms-editing:not(.kcms-browsing) [data-kay-field]:hover,
@@ -290,18 +290,18 @@ html.kcms-editing:not(.kcms-browsing) [data-kay-body]:hover {
 .kcms-mark {
   position: fixed;
   box-sizing: border-box;
-  border: 1px dotted color-mix(in srgb, var(--color-kui-accent) 80%, transparent);
+  border: 1px dotted color-mix(in srgb, var(--color-accent) 80%, transparent);
   border-radius: 0.125rem;
-  background: color-mix(in srgb, var(--color-kui-accent) 8%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
 }
 
 .kcms-mark[data-focus] {
-  border: 2px solid var(--color-kui-accent);
+  border: 2px solid var(--color-accent);
 }
 
 .kcms-mark[data-hover] {
-  border: 2px dashed var(--color-kui-accent);
-  background: color-mix(in srgb, var(--color-kui-accent) 14%, transparent);
+  border: 2px dashed var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
 }
 
 /* The choice among the fields of one element, next to the click. */
@@ -312,9 +312,9 @@ html.kcms-editing:not(.kcms-browsing) [data-kay-body]:hover {
   min-width: 12rem;
   max-width: 16rem;
   padding: 0.25rem;
-  color: var(--color-kui-text);
-  background: var(--color-kui-mantle);
-  border: 1px solid var(--color-kui-surface2);
+  color: var(--color-foreground);
+  background: var(--color-popover);
+  border: 1px solid var(--color-border);
   border-radius: 0.5rem;
   max-height: calc(100dvh - 1rem);
   overflow-y: auto;
@@ -338,12 +338,12 @@ html.kcms-editing:not(.kcms-browsing) [data-kay-body]:hover {
 
 .kcms-marker-item:hover,
 .kcms-marker-item:focus-visible {
-  background: color-mix(in srgb, var(--color-kui-accent) 18%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
   outline: none;
 }
 
 html.kcms-editing [data-kay-field][contenteditable] {
-  outline: 2px solid var(--color-kui-accent);
+  outline: 2px solid var(--color-accent);
   outline-offset: 2px;
   cursor: text;
 }
@@ -361,19 +361,19 @@ html.kcms-editing [data-kay-field][contenteditable] {
   margin: 0;
   padding: 0.25rem 0.5rem;
   border-radius: 0.25rem;
-  border: 1px solid var(--color-kui-error);
+  border: 1px solid var(--color-danger);
   background: var(--color-kui-surface);
-  color: var(--color-kui-error);
+  color: var(--color-danger);
   font: 0.8125rem/1.3 system-ui, sans-serif;
 }
 
 html.kcms-editing [data-kay-field]:focus-visible {
-  outline: 2px solid var(--color-kui-accent);
+  outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
 
 html.kcms-editing [data-kay-field][aria-invalid="true"] {
-  outline-color: var(--color-kui-error);
+  outline-color: var(--color-danger);
 }
 
 /* The buttons of the list item under the pointer or the focus, above the outlines and below the editor's menus. */
@@ -387,8 +387,8 @@ html.kcms-editing [data-kay-field][aria-invalid="true"] {
   display: flex;
   gap: 0.125rem;
   padding: 0.125rem;
-  background: var(--color-kui-mantle);
-  border: 1px solid var(--color-kui-surface2);
+  background: var(--color-popover);
+  border: 1px solid var(--color-border);
   border-radius: 0.5rem;
   box-shadow: 0 0.25rem 1rem rgb(0 0 0 / 0.2);
 }
@@ -401,7 +401,7 @@ html.kcms-editing [data-kay-field][aria-invalid="true"] {
   padding: 0 0.375rem;
   overflow: hidden;
   font-size: 0.75rem;
-  color: var(--color-kui-subtext0);
+  color: var(--color-muted);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -411,7 +411,7 @@ html.kcms-editing [data-kay-field][aria-invalid="true"] {
   position: fixed;
   display: none;
   pointer-events: none;
-  outline: 2px solid var(--color-kui-accent);
+  outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
 

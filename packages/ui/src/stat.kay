@@ -20,7 +20,7 @@ const look = recipe({
       tile: {
         root: 'flex flex-col items-start gap-1 px-kui-field-x py-3',
         value: 'text-2xl/none',
-        label: 'text-kui-micro font-kui-label tracking-kui-label [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)]',
+        label: 'text-kui-micro font-kui-label tracking-kui-label [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)]',
       },
     },
     // Colours the figure, such as `danger` past a threshold; `neutral` keeps the text colour.

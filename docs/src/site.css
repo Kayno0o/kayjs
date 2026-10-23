@@ -13,7 +13,7 @@
 
 @layer base {
   .ui-stage {
-    color: var(--color-kui-text);
+    color: var(--color-foreground);
     font-family: var(--font-sans);
     line-height: 1.5;
   }

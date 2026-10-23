@@ -115,6 +115,7 @@ describe('what a component offers src/ui.ts', () => {
     const tokens = themeTokens(checkout)
     const names = tokens.map(token => token.name)
 
+    expect(names).toContain('--color-background')
     expect(names).toContain('--color-kui-canvas')
     expect(names).toContain('--kui-border-width')
     expect(tokensNamedBy('p-kui-card border-(length:--kui-border-width) bg-kui-surface0 kui-card', tokens).map(token => token.name)).toEqual(expect.arrayContaining(['--kui-border-width', '--color-kui-surface0']))
@@ -195,10 +196,10 @@ describe('completion through the language server', () => {
     editor.open('src/routes/index.kay', text.replace('|', ''), 'kay')
     expect(await editor.labels('src/routes/index.kay', text)).toEqual(['root', 'body'])
 
-    const string = page('Panel(class={{ body: \'p-2 --color-kui-|\' }})')
+    const string = page('Panel(class={{ body: \'p-2 --color-ba|\' }})')
 
     editor.connection.notify('textDocument/didChange', { textDocument: { uri: editor.uri('src/routes/index.kay'), version: 2 }, contentChanges: [{ text: string.replace('|', '') }] })
-    expect(await editor.labels('src/routes/index.kay', string)).toContain('--color-kui-canvas')
+    expect(await editor.labels('src/routes/index.kay', string)).toContain('--color-background')
   })
 
   it('offers nothing for a component with no parts, and for one that is not imported', async () => {

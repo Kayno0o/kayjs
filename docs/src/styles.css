@@ -3,13 +3,13 @@
   color-scheme: light dark;
   /* Room for the page scrollbar on a short page too, so the column does not shift between a page that scrolls and one that does not. */
   scrollbar-gutter: stable;
-  --base: var(--color-kui-canvas);
-  --mantle: var(--color-kui-mantle);
-  --crust: light-dark(color-mix(in srgb, var(--color-kui-mantle) 95%, black), color-mix(in srgb, var(--color-kui-mantle) 72%, black));
-  --muted: var(--color-kui-subtext0);
-  --subtext: color-mix(in srgb, var(--color-kui-text) 50%, var(--color-kui-subtext0));
-  --text: var(--color-kui-text);
-  --accent: var(--color-kui-accent);
+  --base: var(--color-background);
+  --mantle: var(--color-popover);
+  --crust: light-dark(color-mix(in srgb, var(--color-popover) 95%, black), color-mix(in srgb, var(--color-popover) 72%, black));
+  --muted: var(--color-muted);
+  --subtext: color-mix(in srgb, var(--color-foreground) 50%, var(--color-muted));
+  --text: var(--color-foreground);
+  --accent: var(--color-accent);
   /* The accent the theme picker sets, faint under the page shown and a card hovered. */
   --tint: color-mix(in srgb, var(--accent) 14%, var(--base));
   --line: color-mix(in srgb, var(--text) 12%, transparent);
@@ -22,9 +22,9 @@
   --shiki-background: var(--mantle);
   --shiki-token-punctuation: var(--subtext);
   --shiki-token-link: var(--accent);
-  --shiki-token-inserted: var(--color-kui-success);
-  --shiki-token-deleted: var(--color-kui-error);
-  --shiki-token-changed: var(--color-kui-warning);
+  --shiki-token-inserted: var(--color-success);
+  --shiki-token-deleted: var(--color-danger);
+  --shiki-token-changed: var(--color-warning);
   --bar: 0px;
   /* The width of a page's text, its demos and code blocks included. */
   --measure: 54rem;
@@ -610,11 +610,11 @@ pre code {
 }
 
 .callout:where([data-tone='success']) > svg {
-  color: var(--color-kui-success);
+  color: var(--color-success);
 }
 
 .callout:where([data-tone='warning']) > svg {
-  color: var(--color-kui-warning);
+  color: var(--color-warning);
 }
 
 /* min-width: 0 lets a code block inside scroll instead of widening the callout. */
@@ -965,7 +965,7 @@ pre code {
 /* A demo sits on the ground an app would give it, dotted so it reads apart from the code under it. */
 .example > .ui-stage {
   padding: 1.5rem 1.25rem;
-  background: radial-gradient(color-mix(in srgb, var(--text) 5%, transparent) 1px, transparent 1px) 0 0 / 1rem 1rem, var(--color-kui-canvas);
+  background: radial-gradient(color-mix(in srgb, var(--text) 5%, transparent) 1px, transparent 1px) 0 0 / 1rem 1rem, var(--color-background);
   border-bottom: 1px solid var(--line);
 }
 
@@ -1273,5 +1273,5 @@ pre code {
 }
 
 .html-converter-error {
-  color: var(--color-kui-error);
+  color: var(--color-danger);
 }

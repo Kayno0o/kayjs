@@ -331,8 +331,8 @@ describe('a component whose recipe holds its look', () => {
     expect(card).toContain('rounded-kui-card')
     expect(card.at(-1)).toBe('rounded-xl')
     expect(card.indexOf('rounded-kui-card')).toBeLessThan(card.indexOf('rounded-xl'))
-    expect(classesOf('id="badge"')).toEqual(expect.arrayContaining(['kui-badge', '[--kui-badge-color:var(--color-kui-success)]', 'bg-green-100']))
-    expect(classesOf('id="notice"')).toEqual(expect.arrayContaining(['kui-notice', '[--kui-notice-tone:var(--color-kui-error)]', 'border-2']))
+    expect(classesOf('id="badge"')).toEqual(expect.arrayContaining(['kui-badge', '[--kui-badge-color:var(--color-success)]', 'bg-green-100']))
+    expect(classesOf('id="notice"')).toEqual(expect.arrayContaining(['kui-notice', '[--kui-notice-tone:var(--color-danger)]', 'border-2']))
   })
 
   test('sets no kui class on its other parts, which carry data-part to select them by', () => {
@@ -364,7 +364,7 @@ describe('the remaining field and button components whose recipe holds their loo
     ['root', 'kui-file-drop', 'border-dotted'],
     ['root', 'kui-copy-btn', 'ring-2'],
     ['text', 'after:content-[attr(data-other)]', 'font-mono'],
-    ['label', '[font-family:var(--kui-label-font,inherit)]', 'font-medium'],
+    ['label', '[font-family:var(--font-label,inherit)]', 'font-medium'],
     ['value', 'text-kui-text', 'tabular-nums'],
     ['label', 'text-kui-micro', 'font-medium'],
     ['chip', 'group-aria-busy/chips:cursor-progress', 'rounded-full'],

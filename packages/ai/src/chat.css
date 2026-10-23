@@ -15,7 +15,7 @@
     max-height: 32rem;
     overflow-y: auto;
     padding: 0.25rem 0.125rem;
-    color: var(--color-kui-text);
+    color: var(--color-foreground);
   }
 
   /* Before the first message the greeting stands in for the list, which has nothing to show. */
@@ -24,7 +24,7 @@
   }
 
   .kai-chat-log:focus-visible {
-    outline: 2px solid var(--kai-chat-accent, var(--color-kui-accent));
+    outline: 2px solid var(--kai-chat-accent, var(--color-accent));
     outline-offset: 2px;
   }
 
@@ -38,7 +38,7 @@
   .kai-chat-greeting {
     margin: 0;
     font-size: 0.9375rem;
-    color: var(--color-kui-text);
+    color: var(--color-foreground);
   }
 
   .kai-chat-suggestions {
@@ -54,10 +54,10 @@
   .kai-chat-suggestion {
     max-width: 100%;
     padding: 0.375rem 0.75rem;
-    border: 1px solid var(--color-kui-surface2);
+    border: 1px solid var(--color-border);
     border-radius: 9999px;
     background-color: transparent;
-    color: var(--color-kui-text);
+    color: var(--color-foreground);
     font: inherit;
     font-size: 0.8125rem;
     line-height: 1.4;
@@ -67,12 +67,12 @@
   }
 
   .kai-chat-suggestion:hover {
-    border-color: var(--kai-chat-accent, var(--color-kui-accent));
-    background-color: var(--color-kui-row-hover);
+    border-color: var(--kai-chat-accent, var(--color-accent));
+    background-color: var(--color-hover);
   }
 
   .kai-chat-suggestion:focus-visible {
-    outline: 2px solid var(--kai-chat-accent, var(--color-kui-accent));
+    outline: 2px solid var(--kai-chat-accent, var(--color-accent));
     outline-offset: 2px;
   }
 
@@ -89,7 +89,7 @@
     padding: 0.5rem 0.75rem;
     border-radius: var(--kai-chat-radius, 0.75rem);
     border-end-end-radius: 0.25rem;
-    background-color: var(--kai-chat-bubble, color-mix(in srgb, var(--kai-chat-accent, var(--color-kui-accent)) 16%, var(--color-kui-canvas)));
+    background-color: var(--kai-chat-bubble, color-mix(in srgb, var(--kai-chat-accent, var(--color-accent)) 16%, var(--color-background)));
     white-space: pre-wrap;
   }
 
@@ -122,7 +122,7 @@
     overflow-x: auto;
     padding: 0.5rem 0.625rem;
     border-radius: 0.5rem;
-    background-color: var(--color-kui-mantle);
+    background-color: var(--color-popover);
     font-size: 0.75rem;
     line-height: 1.5;
   }
@@ -133,12 +133,12 @@
   }
 
   .kai-chat-text :where(a) {
-    color: var(--color-kui-accent-hi);
+    color: var(--color-accent-hover);
   }
 
   .kai-chat-text :where(th, td) {
     padding: 0.25rem 0.5rem;
-    border: 1px solid var(--color-kui-surface2);
+    border: 1px solid var(--color-border);
   }
 
   /* A table wider than the log scrolls inside it; its cells keep their words whole, since breaking them anywhere would squeeze it to fit. */
@@ -150,7 +150,7 @@
   }
 
   .kai-chat-table:focus-visible {
-    outline: 2px solid var(--kai-chat-accent, var(--color-kui-accent));
+    outline: 2px solid var(--kai-chat-accent, var(--color-accent));
     outline-offset: 2px;
   }
 
@@ -171,8 +171,8 @@
     width: 0.4375rem;
     height: 0.4375rem;
     border-radius: 9999px;
-    background-color: var(--color-kui-muted);
-    box-shadow: 0.875rem 0 var(--color-kui-muted), 1.75rem 0 var(--color-kui-muted);
+    background-color: var(--color-muted);
+    box-shadow: 0.875rem 0 var(--color-muted), 1.75rem 0 var(--color-muted);
     animation: kai-chat-dot 1.2s ease-in-out infinite;
   }
 
@@ -195,14 +195,14 @@
   .kai-chat-note {
     display: block;
     margin-top: 0.25rem;
-    color: var(--color-kui-muted);
+    color: var(--color-muted);
   }
 
   .kai-chat-disclosure {
     margin: 0;
     padding: 0 0.25rem;
     font-size: 0.75rem;
-    color: var(--color-kui-muted);
+    color: var(--color-muted);
   }
 
   .kai-chat-form {
@@ -230,8 +230,8 @@
     padding: 0;
     border: 0;
     border-radius: 9999px;
-    background-color: var(--kai-chat-accent, var(--color-kui-accent));
-    color: var(--color-kui-on-accent);
+    background-color: var(--kai-chat-accent, var(--color-accent));
+    color: var(--color-accent-foreground);
     cursor: pointer;
     transition: background-color 0.15s;
   }
@@ -242,11 +242,11 @@
   }
 
   .kai-chat-send:hover {
-    background-color: var(--color-kui-accent-hi);
+    background-color: var(--color-accent-hover);
   }
 
   .kai-chat-send:focus-visible {
-    outline: 2px solid var(--kai-chat-accent, var(--color-kui-accent));
+    outline: 2px solid var(--kai-chat-accent, var(--color-accent));
     outline-offset: 2px;
   }
 
@@ -264,7 +264,7 @@
   .kai-chat-calls {
     margin: 0 0 0.5rem;
     font-size: 0.75rem;
-    color: var(--color-kui-muted);
+    color: var(--color-muted);
   }
 
   .kai-chat-calls-summary {
@@ -293,7 +293,7 @@
   }
 
   .kai-chat-call[data-status='failed'] .kai-chat-call-status {
-    color: var(--color-kui-error);
+    color: var(--color-danger);
   }
 
   .kai-chat-approval {
@@ -338,18 +338,18 @@
     height: 3.25rem;
     border: 0;
     border-radius: 9999px;
-    background-color: var(--kai-chat-accent, var(--color-kui-accent));
-    color: var(--color-kui-on-accent);
+    background-color: var(--kai-chat-accent, var(--color-accent));
+    color: var(--color-accent-foreground);
     box-shadow: 0 0.25rem 1rem rgb(0 0 0 / 25%);
     cursor: pointer;
   }
 
   .kai-launcher .kai-launcher-button:hover {
-    background-color: var(--color-kui-accent-hi);
+    background-color: var(--color-accent-hover);
   }
 
   .kai-launcher .kai-launcher-button:focus-visible {
-    outline: 2px solid var(--kai-chat-accent, var(--color-kui-accent));
+    outline: 2px solid var(--kai-chat-accent, var(--color-accent));
     outline-offset: 3px;
   }
 
@@ -374,10 +374,10 @@
     width: min(var(--kai-chat-width, 36rem), calc(100vw - 2rem));
     height: min(var(--kai-chat-height, 40rem), calc(100dvh - 7.5rem));
     padding: 0 1rem 0.75rem;
-    border: 1px solid var(--color-kui-surface2);
+    border: 1px solid var(--color-border);
     border-radius: calc(var(--kai-chat-radius, 0.75rem) + 0.25rem);
-    background-color: var(--color-kui-canvas);
-    color: var(--color-kui-text);
+    background-color: var(--color-background);
+    color: var(--color-foreground);
     box-shadow: var(--kai-chat-shadow, 0 0.75rem 2.5rem rgb(0 0 0 / 22%), 0 0 0 1px light-dark(transparent, rgb(255 255 255 / 6%)));
   }
 
@@ -397,7 +397,7 @@
     gap: 0.5rem;
     margin-inline: -1rem;
     padding: 0.5rem 0.75rem 0.5rem 1rem;
-    border-bottom: 1px solid var(--color-kui-surface2);
+    border-bottom: 1px solid var(--color-border);
   }
 
   .kai-launcher-title {
@@ -447,7 +447,7 @@
     margin-top: 0.5rem;
     font-size: 0.75rem;
     line-height: 1.4;
-    color: var(--color-kui-muted);
+    color: var(--color-muted);
     text-align: start;
   }
 
@@ -458,15 +458,15 @@
 
   /* The chat's props: `tone="neutral"` draws the send button and the visitor's bubble in the text colour instead of the accent, `variant="plain"` draws the visitor's message as bare text, `size` scales the type of the turns and the suggestions. */
   .kai-chat[data-tone='neutral'] {
-    --kai-chat-accent: var(--color-kui-text);
+    --kai-chat-accent: var(--color-foreground);
   }
 
   .kai-chat[data-tone='neutral'] .kai-chat-send {
-    color: var(--color-kui-canvas);
+    color: var(--color-background);
   }
 
   .kai-chat[data-tone='neutral'] .kai-chat-send:hover {
-    background-color: color-mix(in srgb, var(--color-kui-text) 85%, var(--color-kui-canvas));
+    background-color: color-mix(in srgb, var(--color-foreground) 85%, var(--color-background));
   }
 
   .kai-chat[data-variant='plain'] .kai-chat-turn[data-role='user'] {

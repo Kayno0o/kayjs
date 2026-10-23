@@ -9,7 +9,7 @@ import Icon from './icon.kay'
 // 'kui-segmented' stays as the component's name for an app's CSS and the skins; the border colour reads --kui-control-line, which a skin sets.
 const look = recipe({
   parts: {
-    root: 'kui-segmented group/segmented inline-flex border-solid border-(length:--kui-border-width) bg-kui-surface0 [border-color:var(--kui-control-line,var(--color-kui-surface2))] data-[orientation=vertical]:flex-col',
+    root: 'kui-segmented group/segmented inline-flex border-solid border-(length:--kui-border-width) bg-kui-surface0 [border-color:var(--kui-control-line,var(--color-border))] data-[orientation=vertical]:flex-col',
     option: 'relative cursor-pointer has-[input:disabled]:opacity-50 group-aria-busy/segmented:cursor-progress group-not-aria-busy/segmented:has-[input:disabled]:cursor-not-allowed',
     input: 'peer/option absolute size-0 opacity-0',
     label: 'flex items-center gap-1 px-3 py-1.5 text-xs text-kui-subtext0 transition-colors hover:text-kui-text peer-checked/option:bg-kui-accent peer-checked/option:text-kui-on-accent peer-checked/option:hover:text-kui-on-accent peer-focus-visible/option:outline-2 peer-focus-visible/option:-outline-offset-2 peer-focus-visible/option:outline-kui-accent',

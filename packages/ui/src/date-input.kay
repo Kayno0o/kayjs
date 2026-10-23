@@ -20,9 +20,9 @@ const look = recipe({
     step: 'group/step inline-flex size-7 cursor-pointer items-center justify-center rounded-kui-card text-kui-subtext0 hover:bg-kui-row-hover hover:text-kui-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kui-accent disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent',
     stepIcon: 'group-data-[direction=previous]/step:rotate-90 group-data-[direction=previous]/step:rtl:-rotate-90 group-data-[direction=next]/step:-rotate-90 group-data-[direction=next]/step:rtl:rotate-90',
     grid: 'w-full table-fixed border-collapse text-center text-sm',
-    weekday: 'py-1 text-kui-2xs font-normal text-kui-subtext0 [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)]',
+    weekday: 'py-1 text-kui-2xs font-normal text-kui-subtext0 [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)]',
     day: 'h-8 w-full cursor-pointer rounded-kui-card tabular-nums hover:bg-kui-row-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kui-accent disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent data-outside:text-kui-subtext0 data-today:font-semibold data-today:text-kui-accent data-selected:bg-kui-accent data-selected:text-kui-on-accent data-selected:hover:bg-kui-accent data-selected:data-today:text-kui-on-accent',
-    today: 'mt-1 w-full cursor-pointer rounded-kui-card py-1 text-center text-kui-2xs tracking-kui-label text-kui-subtext0 [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)] hover:text-kui-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kui-accent disabled:cursor-default disabled:opacity-40',
+    today: 'mt-1 w-full cursor-pointer rounded-kui-card py-1 text-center text-kui-2xs tracking-kui-label text-kui-subtext0 [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)] hover:text-kui-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kui-accent disabled:cursor-default disabled:opacity-40',
   },
 })
 

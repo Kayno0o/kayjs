@@ -163,16 +163,16 @@ export const NOTICE_SCRIPT = `(() => {
       return
 
     const page = painted(document.body) ? paint(document.body) : painted(document.documentElement) ? paint(document.documentElement) : 'Canvas'
-    const accent = tone('accent', 'var(--color-kui-accent, ' + getComputedStyle(document.body).color + ')')
+    const accent = tone('accent', 'var(--color-accent, ' + getComputedStyle(document.body).color + ')')
     const [yes, no] = banner.querySelectorAll('button')
     const button = 'font:inherit;padding:.4em .9em;cursor:pointer;border:' + edge + ';border-radius:inherit;'
 
     banner.style.cssText = 'position:fixed;inset:auto 1rem 1rem 1rem;max-width:36rem;margin-inline:auto;padding:.75rem 1rem;display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;font-size:.875rem;line-height:1.45;z-index:2147483647'
-      + ';background:' + tone('background', 'var(--color-kui-surface0, ' + page + ')') + ';color:' + tone('color', 'var(--color-kui-text, inherit)')
-      + ';border:' + edge + tone('border', 'var(--color-kui-overlay0, color-mix(in srgb, currentColor 22%, transparent))') + ';border-radius:' + tone('radius', 'var(--radius-kui-card, .5rem)')
-      + ';box-shadow:' + tone('shadow', 'var(--kui-shadow-raised, 0 10px 32px rgb(0 0 0 / 18%), 0 1px 3px rgb(0 0 0 / 10%))')
-    yes.style.cssText = button + 'background:' + accent + ';color:' + tone('on-accent', 'var(--color-kui-on-accent, ' + page + ')') + ';border-color:' + accent
-    no.style.cssText = button + 'background:transparent;color:inherit;border-color:' + tone('line', 'var(--color-kui-field-border, color-mix(in srgb, currentColor 45%, transparent))')
+      + ';background:' + tone('background', 'var(--color-surface, ' + page + ')') + ';color:' + tone('color', 'var(--color-foreground, inherit)')
+      + ';border:' + edge + tone('border', 'var(--color-border-strong, color-mix(in srgb, currentColor 22%, transparent))') + ';border-radius:' + tone('radius', 'var(--radius-kui-card, .5rem)')
+      + ';box-shadow:' + tone('shadow', 'var(--shadow-raised, 0 10px 32px rgb(0 0 0 / 18%), 0 1px 3px rgb(0 0 0 / 10%))')
+    yes.style.cssText = button + 'background:' + accent + ';color:' + tone('on-accent', 'var(--color-accent-foreground, ' + page + ')') + ';border-color:' + accent
+    no.style.cssText = button + 'background:transparent;color:inherit;border-color:' + tone('line', 'var(--color-input, color-mix(in srgb, currentColor 45%, transparent))')
   }
 
   // A theme switched by a class, an attribute or the system's scheme changes the page's colours under an open notice.

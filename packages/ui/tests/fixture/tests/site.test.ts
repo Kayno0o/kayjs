@@ -250,7 +250,7 @@ describe('recipe colours under Tailwind', () => {
   test('a tone and an override of the page replace the base class they set, on the server', async () => {
     const card = (await served('card')).split(' ')
 
-    expect(card).toContain('border-kui-error')
+    expect(card).toContain('border-danger')
     expect(card).not.toContain('border-kui-surface2')
   })
 
@@ -263,8 +263,8 @@ describe('recipe colours under Tailwind', () => {
       expect(classes, id).toEqual(expect.arrayContaining(recipeRoot(text, name).split(' ')))
     }
 
-    expect(await served('badge')).toContain('[--kui-badge-color:var(--color-kui-success)]')
-    expect(await served('notice')).toContain('[--kui-notice-tone:var(--color-kui-error)]')
+    expect(await served('badge')).toContain('[--kui-badge-color:var(--color-success)]')
+    expect(await served('notice')).toContain('[--kui-notice-tone:var(--color-danger)]')
   })
 
   test('an island drops them the same through the class table of its bundle, and keeps both without it', async () => {
@@ -272,11 +272,11 @@ describe('recipe colours under Tailwind', () => {
 
     expect(table).toBeDefined()
 
-    const card = `${recipeRoot(text, 'kui-card')} border-kui-error`
+    const card = `${recipeRoot(text, 'kui-card')} border-danger`
 
     expect(resolveClasses(card, table).split(' ')).not.toContain('border-kui-surface2')
-    expect(resolveClasses(card, table).split(' ')).toContain('border-kui-error')
-    expect(resolveClasses(card, { sets: [], classes: {} }).split(' ')).toEqual(expect.arrayContaining(['border-kui-surface2', 'border-kui-error']))
+    expect(resolveClasses(card, table).split(' ')).toContain('border-danger')
+    expect(resolveClasses(card, { sets: [], classes: {} }).split(' ')).toEqual(expect.arrayContaining(['border-kui-surface2', 'border-danger']))
 
     // What the page served for a tone is what the island would render, and the table leaves it whole.
     for (const id of ['badge', 'notice']) {
@@ -318,7 +318,7 @@ describe('the display components whose recipe holds their look, under Tailwind',
   })
 
   test('a fillClass replaces the accent of the Meter\'s fill, and one that sets no colour keeps it', async () => {
-    expect(await classes('#meter [data-part=fill]')).toContain('bg-kui-error')
+    expect(await classes('#meter [data-part=fill]')).toContain('bg-danger')
     expect(await classes('#meter [data-part=fill]')).not.toContain('bg-kui-accent')
     expect(await classes('#meter-rounded [data-part=fill]')).toEqual(expect.arrayContaining(['bg-kui-accent', 'rounded-full']))
   })
@@ -716,8 +716,8 @@ describe('charts', () => {
 
     expect(cells.slice(0, 3)).toEqual([
       ['3 commits · 2026-08-31', false, 'grid-row: 2; grid-column: 1'],
-      ['50% · 2026-09-01', false, 'background-color: color-mix(in srgb, var(--color-kui-accent) 63%, transparent); grid-row: 3; grid-column: 1'],
-      ['100% · 2026-09-02', true, 'background-color: color-mix(in srgb, var(--color-kui-accent) 100%, transparent); grid-row: 4; grid-column: 1'],
+      ['50% · 2026-09-01', false, 'background-color: color-mix(in srgb, var(--color-accent) 63%, transparent); grid-row: 3; grid-column: 1'],
+      ['100% · 2026-09-02', true, 'background-color: color-mix(in srgb, var(--color-accent) 100%, transparent); grid-row: 4; grid-column: 1'],
     ])
     expect(cells.at(-1)?.[2]).toContain('grid-row: 8; grid-column: 3')
     expect(graph).toMatch(/^<div data-part="root" role="group" aria-label="Contributions" data-months class="kui-contribution-graph [^"]*"><span class="[^"]*" data-part="month" aria-hidden="true" style="grid-column: 1">Sep\w*<\/span><span class="[^"]*" data-part="cell"/)

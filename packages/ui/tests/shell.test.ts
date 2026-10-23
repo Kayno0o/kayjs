@@ -34,7 +34,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the ui ext
     const page = await site.open('/shell')
 
     // The theme's tokens and the rules of the classes the page draws, from the extension's stylesheet alone.
-    expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--color-kui-accent').trim())).not.toBe('')
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--color-accent').trim())).not.toBe('')
     expect(await page.evaluate(() => getComputedStyle(document.querySelector('.kui-icon-btn')!).display)).toBe('inline-flex')
 
     await page.click('#saved')
@@ -69,6 +69,33 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the ui ext
   it('lets the app\'s own theme import and tokens win over the extension\'s', async () => {
     const page = await site.open('/skin')
 
-    expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--color-kui-accent').trim())).toBe('#123456')
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--color-accent').trim())).toBe('#123456')
+  }, 60_000)
+
+  it('restyles a Button from the app\'s own accent', async () => {
+    const page = await site.open('/skin')
+
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector('#plain')!).backgroundColor)).toBe('rgb(18, 52, 86)')
+  }, 60_000)
+
+  it('restyles a Button from the old --color-kui-accent, which the app\'s accent reads first', async () => {
+    const page = await site.open('/buttons')
+    const fill = async () => page.evaluate(() => getComputedStyle(document.querySelector('#accent')!).backgroundColor)
+    const before = await fill()
+
+    await page.evaluate(() => document.documentElement.style.setProperty('--color-kui-accent', '#654321'))
+
+    expect(await fill()).toBe('rgb(101, 67, 33)')
+
+    await page.evaluate(() => document.documentElement.style.setProperty('--color-accent', '#123456'))
+
+    expect(await fill()).toBe('rgb(18, 52, 86)')
+
+    await page.evaluate(() => {
+      document.documentElement.style.removeProperty('--color-kui-accent')
+      document.documentElement.style.removeProperty('--color-accent')
+    })
+
+    expect(await fill()).toBe(before)
   }, 60_000)
 })

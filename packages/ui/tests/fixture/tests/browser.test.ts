@@ -588,10 +588,12 @@ inBrowser('FormField in an island', () => {
       document.documentElement.dataset.theme = chosen
       document.documentElement.setAttribute('style', css)
 
+      const NAMES: Record<string, string> = { 'mantle': '--color-popover', 'surface0': '--color-surface', 'surface1': '--color-surface-strong', 'surface2': '--color-border', 'subtext0': '--color-muted', 'accent-hi': '--color-accent-hover' }
+
       return Object.fromEntries(['mantle', 'surface0', 'surface1', 'overlay1', 'subtext0', 'accent-hi', 'fill-danger', 'surface2'].map((name) => {
         const probe = document.createElement('i')
 
-        probe.style.color = `var(--color-kui-${name})`
+        probe.style.color = `var(${NAMES[name] ?? `--color-kui-${name}`})`
         document.body.append(probe)
 
         // Chromium reports a mix as oklab(...), which a canvas turns back into the pixel it paints.
@@ -1275,8 +1277,8 @@ inBrowser('the space skin on Segmented, ChipGroup and FileDrop', () => {
       }
 
       return {
-        field: probe('var(--color-kui-field-border)'),
-        accent: probe('var(--color-kui-accent)'),
+        field: probe('var(--color-input)'),
+        accent: probe('var(--color-accent)'),
         segmented: line('#segmented'),
         checkedChip: line('#chips [data-part=chip]:has(input:checked) [data-part=label]'),
         uncheckedChip: line('#chips [data-part=chip]:has(input:not(:checked)) [data-part=label]'),

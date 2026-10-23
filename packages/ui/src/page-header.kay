@@ -6,7 +6,7 @@ const look = recipe({
   parts: {
     root: 'kui-page-header flex flex-col gap-2',
     head: 'flex flex-wrap items-center gap-4',
-    title: 'm-0 text-xl font-kui-heading tracking-kui-label text-kui-text [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)]',
+    title: 'm-0 text-xl font-kui-heading tracking-kui-label text-kui-text [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)]',
     meta: 'flex flex-wrap items-center gap-2 text-sm text-kui-subtext0',
     actions: 'flex flex-wrap items-center gap-2 border-l border-kui-surface2 pl-4',
     description: 'm-0 text-sm text-kui-subtext0',

@@ -14,11 +14,11 @@ const look = recipe({
     search: 'flex shrink-0 items-center gap-2 border-b border-kui-surface2 px-4',
     // The icon of the search line and of an option.
     icon: 'size-5 shrink-0 text-kui-overlay1',
-    input: 'h-11 min-w-0 flex-1 bg-transparent text-sm text-kui-text outline-none placeholder:text-kui-overlay1 focus-visible:[outline:2px_solid_var(--color-kui-accent)] focus-visible:[outline-offset:-2px]',
+    input: 'h-11 min-w-0 flex-1 bg-transparent text-sm text-kui-text outline-none placeholder:text-kui-overlay1 focus-visible:[outline:2px_solid_var(--color-accent)] focus-visible:[outline-offset:-2px]',
     list: 'min-h-0 flex-1 overflow-y-auto py-1',
     heading: 'px-4 pt-2 pb-1',
     // The tint alone is too faint to find, so an accent bar marks the option Enter opens; forced colours drop both and paint the transparent outline instead. One holding a section the site search found writes data-snippet, taller than the others.
-    option: 'flex h-11 w-full cursor-pointer items-center gap-3 px-4 text-left text-sm text-kui-text no-underline outline-none aria-selected:bg-kui-row-hover aria-selected:[box-shadow:inset_2px_0_0_var(--color-kui-accent)] aria-selected:[outline-offset:-2px] aria-selected:[outline:2px_solid_transparent] data-snippet:h-auto data-snippet:py-2',
+    option: 'flex h-11 w-full cursor-pointer items-center gap-3 px-4 text-left text-sm text-kui-text no-underline outline-none aria-selected:bg-kui-row-hover aria-selected:[box-shadow:inset_2px_0_0_var(--color-accent)] aria-selected:[outline-offset:-2px] aria-selected:[outline:2px_solid_transparent] data-snippet:h-auto data-snippet:py-2',
     label: 'min-w-0 flex-1 truncate',
     group: 'max-w-[40%] shrink-0 truncate text-xs text-kui-subtext0',
     text: 'flex min-w-0 flex-1 flex-col',

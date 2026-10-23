@@ -13,7 +13,7 @@ main
   article#stat
     Stat(value={12} label="moons" icon="info")
   article#meter
-    Meter(value={140} label="Disk" fillClass="bg-kui-error")
+    Meter(value={140} label="Disk" fillClass="bg-danger")
   article#skeleton
     Skeleton(lines={3} label="Loading")
   article#avatar-skeleton

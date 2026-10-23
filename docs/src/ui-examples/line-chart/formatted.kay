@@ -11,7 +11,7 @@ const labels = [
 const series = [{
   name: 'Revenue',
   values: [1200, 1800, 1500, 2100, 2600],
-  color: 'var(--color-kui-success)',
+  color: 'var(--color-success)',
 }]
 const thousands = signal(false)
 const format = (value: number) => thousands()

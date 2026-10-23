@@ -5,7 +5,7 @@ const runs = ['02:00', '03:00', '04:00', '05:00', '06:00']
 const series = [{
   name: 'Minutes',
   values: [4, 5, 0, 31, 4],
-  colors: ['var(--color-kui-success)', 'var(--color-kui-success)', null, 'var(--color-kui-error)', 'var(--color-kui-success)'],
+  colors: ['var(--color-success)', 'var(--color-success)', null, 'var(--color-danger)', 'var(--color-success)'],
   notes: [null, null, 'Missed', 'Timed out', null],
 }]
 ---

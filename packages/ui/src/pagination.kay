@@ -9,7 +9,7 @@ import { wording } from 'kay/words'
 const look = recipe({
   parts: {
     root: 'kui-pagination flex flex-wrap items-center gap-1 text-sm',
-    step: 'min-w-9 border-solid border-(length:--kui-border-width) px-3 py-1.5 text-center text-kui-subtext0 transition-colors hover:text-kui-text [border-color:var(--kui-control-line,var(--color-kui-surface2))] [&:is(span)]:opacity-50 [&:is(span)]:hover:text-kui-subtext0',
+    step: 'min-w-9 border-solid border-(length:--kui-border-width) px-3 py-1.5 text-center text-kui-subtext0 transition-colors hover:text-kui-text [border-color:var(--kui-control-line,var(--color-border))] [&:is(span)]:opacity-50 [&:is(span)]:hover:text-kui-subtext0',
     gap: 'px-2 text-kui-overlay1',
     page: 'min-w-9 border-solid border-(length:--kui-border-width) px-3 py-1.5 text-center text-kui-subtext0 transition-colors hover:text-kui-text aria-[current=page]:border-kui-accent aria-[current=page]:text-kui-accent border-kui-surface2',
   },

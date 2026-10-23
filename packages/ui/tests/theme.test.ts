@@ -31,7 +31,7 @@ const QUOTED = /'([a-z][\w-]*)'/g
 // What chartist draws itself, styled here but written by no source of the library, and Tailwind's `group`, which the app writes on what holds a stamp.
 const THIRD_PARTY = /^(?:ct-|group$)/
 // The tokens of a skin's offset shadows and press-down, with their value.
-const PRESS_TOKEN = /(--kui-(?:shadow-raised|shadow-press|press-travel)): ([^;]+);/g
+const PRESS_TOKEN = /(--(?:shadow-raised|shadow-press|press-travel)): ([^;]+);/g
 
 // A `kui-` class a string or template literal ends on, with more added to it; `--kui-` names an anchor or a token.
 const BUILT_CLASS = /(?<![\w-])kui-[\w-]*(?:\$\{|['"`]\s*\+)/g
@@ -86,11 +86,31 @@ const SEEDS = ['canvas', 'text', 'accent', 'success', 'warning', 'info', 'error'
 
 type Tokens = Map<string, string>
 
-const colourTokens: Tokens = new Map([...theme.matchAll(COLOUR_TOKEN)].map(([, token = '', value = '']) => [token, value.trim()]))
+// The colours the theme names with the app's own words read the old `--color-kui-` name first and fall back to their value, and the readers use the new names: this puts them back to one name per colour, so the contrast maths below reads values.
+const COLOUR_NAMES: Record<string, string> = { 'background': 'canvas', 'foreground': 'text', 'danger': 'error', 'input': 'field-border', 'popover': 'mantle', 'surface': 'surface0', 'surface-strong': 'surface1', 'border': 'surface2', 'border-strong': 'overlay0', 'accent-hover': 'accent-hi', 'accent-foreground': 'on-accent', 'hover': 'row-hover', 'ring': 'field-focus', 'accent': 'accent', 'success': 'success', 'warning': 'warning', 'info': 'info', 'muted': 'muted', ...Object.fromEntries([1, 2, 3, 4, 5, 6].map(n => [`chart-${n}`, `chart-${n}`])) }
+const NEW_COLOUR = new RegExp(String.raw`--color-(${Object.keys(COLOUR_NAMES).sort((a, b) => b.length - a.length).join('|')})(?![\w-])`, 'g')
+const FALLBACK_DECLARATION = /^(\s*)(--color-[\w-]+): var\((--color-kui-[\w-]+), (.*)\);$/gm
+const SEEDED = /^var\(--color-(?:base|text|error), (.*)\)$/
+const SUBTEXT = /^var\(--color-kui-subtext0, (.*)\)$/
+
+function legacyColours(css: string): string {
+  const named = css
+    .replace(/@theme default inline reference \{[^}]*\}/, '')
+    .replace(FALLBACK_DECLARATION, (_, indent: string, _name: string, old: string, fallback: string) => {
+      const value = SEEDED.exec(fallback)?.[1] ?? fallback
+      const subtext = SUBTEXT.exec(value)?.[1]
+
+      return subtext === undefined ? `${indent}${old}: ${value};` : `${indent}--color-kui-subtext0: ${subtext};\n${indent}${old}: var(--color-kui-subtext0);`
+    })
+
+  return named.replace(NEW_COLOUR, (_, name: string) => `--color-kui-${COLOUR_NAMES[name]}`)
+}
+
+const colourTokens: Tokens = new Map([...legacyColours(theme).matchAll(COLOUR_TOKEN)].map(([, token = '', value = '']) => [token, value.trim()]))
 
 // The theme's colours under a skin's own declarations, `--color-kui-name: value;`.
 function withSkin(skin: string): Tokens {
-  return new Map([...colourTokens, ...[...skin.matchAll(COLOUR_TOKEN)].map(([, token = '', value = '']) => [token, value.trim()] as const)])
+  return new Map([...colourTokens, ...[...legacyColours(skin).matchAll(COLOUR_TOKEN)].map(([, token = '', value = '']) => [token, value.trim()] as const)])
 }
 
 // The arguments of a function call, split at the commas outside any parenthesis.
@@ -359,15 +379,15 @@ describe('theme.css', () => {
   test('fills a solid badge with its tone, its text read from one token a skin can set', () => {
     const solid = theme.slice(theme.indexOf(':where([data-solid])'))
 
-    expect(solid.slice(0, solid.indexOf('}'))).toMatch(/background-color: var\(--kui-badge-tone\);[^}]*var\(--kui-badge-solid-text, var\(--color-kui-on-accent\)\)/)
+    expect(solid.slice(0, solid.indexOf('}'))).toMatch(/background-color: var\(--kui-badge-tone\);[^}]*var\(--kui-badge-solid-text, var\(--color-accent-foreground\)\)/)
 
-    for (const [tone, colour] of [['accent', 'accent'], ['success', 'success'], ['warning', 'warning'], ['danger', 'error'], ['info', 'info']])
-      expect(theme, tone).toContain(`[data-tone='${tone}']) {\n      --kui-badge-tone: var(--color-kui-${colour});`)
+    for (const tone of ['accent', 'success', 'warning', 'danger', 'info'])
+      expect(theme, tone).toContain(`[data-tone='${tone}']) {\n      --kui-badge-tone: var(--color-${tone});`)
   })
 
   test('draws the controls a hairline would leave under 3:1 with the field border', () => {
     for (const selector of ['.kui-carousel-dot', '.kui-rating', '.kui-toggle-track', '.kui-btn'])
-      expect(blockOf(theme, selector), selector).toContain('kui-field-border')
+      expect(blockOf(theme, selector), selector).toMatch(/kui-field-border|color-input/)
   })
 
   test('defines every colour its classes paint with', () => {
@@ -404,7 +424,7 @@ describe('theme.css', () => {
   })
 
   test('gives every colour a light and a dark value, or names another colour', () => {
-    const colours = [...theme.matchAll(COLOUR_TOKEN)]
+    const colours = [...legacyColours(theme).matchAll(COLOUR_TOKEN)]
 
     expect(colours.length).toBeGreaterThan(0)
     expect(colours.filter(([, , value = '']) => !PAIRED.test(value)).map(([, token]) => token)).toEqual([])
@@ -440,7 +460,7 @@ describe('theme.css', () => {
       const css = await utilitiesOf(candidates)
 
       // Each declaration sits in the rule of the state that marks the item.
-      for (const declaration of ['box-shadow: inset 2px 0 0 var(--color-kui-accent);', 'outline: 2px solid transparent;']) {
+      for (const declaration of ['box-shadow: inset 2px 0 0 var(--color-accent);', 'outline: 2px solid transparent;']) {
         const rules = css.split('\n.').filter(rule => rule.slice(0, rule.indexOf('{')).includes(state))
 
         expect(rules.some(rule => rule.includes(declaration)), `${name} ${state} ${declaration}`).toBe(true)
@@ -463,10 +483,10 @@ describe('theme.css', () => {
     const toast = (await Bun.file(`${ROOT}src/toaster.kay`).text()).match(/\n\s+toast: '([^']+)'/)![1]!.split(WHITESPACE)
     const css = await utilitiesOf(toast)
 
-    for (const [tone, color] of [['danger', 'error'], ['success', 'success'], ['info', 'info']])
-      expect(css, tone).toMatch(new RegExp(String.raw`\[data-tone[=~]?"?${tone}"?\][^{]*\{[^}]*--kui-toast-tone: var\(--color-kui-${color}\)`))
+    for (const tone of ['danger', 'success', 'info'])
+      expect(css, tone).toMatch(new RegExp(String.raw`\[data-tone[=~]?"?${tone}"?\][^{]*\{[^}]*--kui-toast-tone: var\(--color-${tone}\)`))
 
-    expect(css).toMatch(/--kui-toast-tone: var\(--color-kui-accent\)/)
+    expect(css).toMatch(/--kui-toast-tone: var\(--color-accent\)/)
   })
 
   test('sizes a select by its options inside a compact field, and by the row inside any other', async () => {
@@ -487,14 +507,15 @@ describe('theme.css', () => {
   test('draws no offset shadow nor press-down unless a skin sets their tokens alone', async () => {
     const build = async (skin: string) => [...(await built(skin)).matchAll(PRESS_TOKEN)].map(([, token, value]) => `${token} ${value}`)
 
-    expect(await build('')).toEqual(['--kui-shadow-raised none', '--kui-shadow-press none', '--kui-press-travel 0px'])
-    expect(await build('@theme { --kui-shadow-raised: 4px 4px 0 black; --kui-shadow-press: 3px 3px 0 black; --kui-press-travel: 3px; }')).toEqual(['--kui-shadow-raised 4px 4px 0 black', '--kui-shadow-press 3px 3px 0 black', '--kui-press-travel 3px'])
-    expect(blockOf(theme, ':is(.kui-card, .kui-card-row, .kui-widget, .kui-toast)')).toContain('box-shadow: var(--kui-shadow-raised);')
+    expect(await build('')).toEqual(['--shadow-raised var(--kui-shadow-raised, none)', '--shadow-press var(--kui-shadow-press, none)', '--press-travel var(--kui-press-travel, 0px)'])
+    expect(await build('@theme { --shadow-raised: 4px 4px 0 black; --shadow-press: 3px 3px 0 black; --press-travel: 3px; }')).toEqual(['--shadow-raised 4px 4px 0 black', '--shadow-press 3px 3px 0 black', '--press-travel 3px'])
+    expect(await build('@theme { --kui-shadow-raised: 4px 4px 0 black; --kui-shadow-press: 3px 3px 0 black; --kui-press-travel: 3px; }')).toContain('--shadow-raised var(--kui-shadow-raised, none)')
+    expect(blockOf(theme, ':is(.kui-card, .kui-card-row, .kui-widget, .kui-toast)')).toContain('box-shadow: var(--shadow-raised);')
 
     const press = blockOf(theme, '.kui-icon-btn:where(.kui-shell)')
 
-    expect(press).toContain('box-shadow: var(--kui-shadow-press);')
-    expect(blockOf(press ?? '', '&:active')).toContain('translate: 0 var(--kui-press-travel);')
+    expect(press).toContain('box-shadow: var(--shadow-press);')
+    expect(blockOf(press ?? '', '&:active')).toContain('translate: 0 var(--press-travel);')
   })
 
   test('rounds cards, buttons and overlays by --radius-kui-card, square unless a skin sets it', async () => {
@@ -541,10 +562,10 @@ describe('theme.css', () => {
   test('scales the card, inline and section gaps and the field insets by --kui-density, 1 unless set', async () => {
     const css = await built('@theme { --kui-density: 0.75; }')
 
-    expect(theme).toContain('--kui-density: 1;')
+    expect(theme).toContain('--density: var(--kui-density, 1);')
 
     for (const token of ['--spacing-kui-card', '--spacing-kui-inline', '--spacing-kui-section', '--spacing-kui-field-x', '--spacing-kui-field-y'])
-      expect(theme, token).toMatch(new RegExp(`${token}: calc\\([\\d.]+rem \\* var\\(--kui-density, 1\\)\\);`))
+      expect(theme, token).toMatch(new RegExp(`${token}: calc\\([\\d.]+rem \\* var\\(--density\\)\\);`))
 
     expect(css).toContain('--kui-density: 0.75')
   })
@@ -552,9 +573,9 @@ describe('theme.css', () => {
   test('sets the case and font of labels, headings and table heads by --kui-label-case and --kui-label-font, uppercase unless a skin sets them', async () => {
     const css = await built('@theme { --kui-label-case: none; --kui-label-font: var(--font-mono); }')
 
-    expect(theme).toContain('--kui-label-case: uppercase;')
-    expect(blockOf(css, '.kui-btn')).toContain('text-transform: var(--kui-label-case)')
-    expect(blockOf(css, '.kui-btn')).toContain('font-family: var(--kui-label-font,var(--font-kui-body,inherit))')
+    expect(theme).toContain('--label-case: var(--kui-label-case, uppercase);')
+    expect(blockOf(css, '.kui-btn')).toContain('text-transform: var(--label-case)')
+    expect(blockOf(css, '.kui-btn')).toContain('font-family: var(--font-label,var(--font-kui-body,inherit))')
     expect(css).toContain('--kui-label-case: none')
     // Only the stamp badge, which has --kui-badge-case, and an avatar's initial keep their own case.
     expect(theme.match(/@apply [^\n]* uppercase/g)).toHaveLength(2)
@@ -606,7 +627,7 @@ describe('theme.css', () => {
     for (const [, name = ''] of skin.matchAll(/\.(kui-[\w-]+)/g))
       expect(classes, name).toContain(name)
 
-    expect(skin).toMatch(/--color-kui-mantle: color-mix\(in oklab, var\(--color-kui-canvas\), black/)
+    expect(skin).toMatch(/--color-kui-mantle: color-mix\(in oklab, var\(--color-background\), black/)
     expect(css).toContain('@media (forced-colors: active)')
     expect(css).toMatch(/\.kui-icon-btn\.kui-shell/)
     expect(css).toContain(':not([multiple], [size])')
@@ -618,7 +639,7 @@ describe('theme.css', () => {
     const skin = await Bun.file(`${ROOT}src/skins/space.css`).text()
     const source = async (name: string) => Bun.file(`${ROOT}src/${name}.kay`).text()
 
-    expect(skin).toMatch(/--kui-control-line: var\(--color-kui-field-border\)/)
+    expect(skin).toMatch(/--kui-control-line: var\(--color-input\)/)
 
     for (const name of ['segmented', 'chip-group', 'file-drop'])
       expect(await source(name), name).toContain('--kui-control-line')
@@ -642,9 +663,9 @@ describe('theme.css', () => {
   test('draws the info toast in the info colour, the danger and success toasts in theirs', () => {
     const toast = blockOf(theme, '.kui-toast') ?? ''
 
-    expect(blockOf(toast, '&:where([data-tone=\'info\'])')).toContain('--kui-toast-tone: var(--color-kui-info);')
-    expect(blockOf(toast, '&:where([data-tone=\'danger\'])')).toContain('--kui-toast-tone: var(--color-kui-error);')
-    expect(blockOf(toast, '&:where([data-tone=\'success\'])')).toContain('--kui-toast-tone: var(--color-kui-success);')
+    expect(blockOf(toast, '&:where([data-tone=\'info\'])')).toContain('--kui-toast-tone: var(--color-info);')
+    expect(blockOf(toast, '&:where([data-tone=\'danger\'])')).toContain('--kui-toast-tone: var(--color-danger);')
+    expect(blockOf(toast, '&:where([data-tone=\'success\'])')).toContain('--kui-toast-tone: var(--color-success);')
   })
 
   // The recipes read these as a tone of their own element: inherited, a Badge or a Notice inside a toned one would take its colours, and a theme rule setting one would hide the recipe's neutral fallback.
