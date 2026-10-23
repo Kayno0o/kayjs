@@ -437,3 +437,29 @@ describe('the deprecations', () => {
     expect(past.sort()).toEqual([...overdue])
   })
 })
+
+// Migration shims kept for a few minors: the first minor each must be gone by, and the code that marks it. A shim past its minor fails here, so the release that reaches it drops it.
+const SHIMS = [
+  { what: 'the kayjs-cms former API prefix', file: 'packages/cms/src/extension.ts', pattern: /FORMER_PREFIX/, removedIn: [1, 74] },
+  { what: 'the kayjs-auth renamedFrom of the auth_ tables', file: 'packages/auth/src/pg.ts', pattern: /renamedFrom\('auth_/, removedIn: [1, 74] },
+] as const
+
+// Whether a shim marked for `removedIn` is overdue at `version`.
+function overdue(version: string, removedIn: readonly [number, number]): boolean {
+  const [major, minor] = minorOf(version)!
+
+  return major > removedIn[0] || (major === removedIn[0] && minor >= removedIn[1])
+}
+
+describe('the migration shims', () => {
+  it('judge a shim overdue from its minor on', () => {
+    expect([overdue('1.73.9', [1, 74]), overdue('1.74.0', [1, 74]), overdue('2.0.0', [1, 74])]).toEqual([false, true, true])
+  })
+
+  it('are gone from the minor each names', async () => {
+    const { version } = (await Bun.file(join(import.meta.dir, '../package.json')).json()) as { version: string }
+    const left = await Promise.all(SHIMS.filter(shim => overdue(version, shim.removedIn)).map(async shim => (shim.pattern.test(await Bun.file(join(import.meta.dir, '..', shim.file)).text()) ? shim.what : undefined)))
+
+    expect(left.filter(Boolean)).toEqual([])
+  })
+})
