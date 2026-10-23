@@ -107,6 +107,9 @@ interface ServerSlot {
   ttl: number | undefined
   // When each value held with an end is forgotten, in milliseconds; a read past it gives what the declaration gives, and the timer drops it and tells the watchers.
   expires: Map<string, number>
+  // Whether `expires` is ordered by end, as local writes keep it, so the timer reads only its first keys; an end heard out of order clears it until the next pass sorts the map. `latest` is the highest end appended.
+  ordered: boolean
+  latest: number
   timer: { handle: ReturnType<typeof setTimeout>, at: number } | undefined
 }
 
@@ -144,31 +147,51 @@ const MIN_TIMER_MS = 25
 
 // Sets or clears when a key is forgotten, and makes sure a timer is due by then.
 function setExpiry(slot: ServerSlot, key: string, at: number | undefined): void {
-  if (at === undefined) {
-    slot.expires.delete(key)
+  // Deleted first, so the key moves to the end of the map.
+  slot.expires.delete(key)
 
+  if (at === undefined)
     return
-  }
+
+  if (slot.expires.size === 0 || at >= slot.latest)
+    slot.latest = at
+  else
+    slot.ordered = false
 
   slot.expires.set(key, at)
 
   if (slot.timer !== undefined && at < slot.timer.at) {
+    // The timer was due at the lowest end, so this one is the new lowest.
     clearTimeout(slot.timer.handle)
     slot.timer = undefined
+    armExpiry(slot, at)
+
+    return
   }
 
   armExpiry(slot)
 }
 
-function armExpiry(slot: ServerSlot): void {
+// Puts `expires` in order of end again, once an end was heard out of order.
+function sortExpiry(slot: ServerSlot): void {
+  if (slot.ordered)
+    return
+
+  slot.expires = new Map([...slot.expires].toSorted((first, second) => first[1] - second[1]))
+  slot.ordered = true
+  slot.latest = [...slot.expires.values()].at(-1) ?? 0
+}
+
+function armExpiry(slot: ServerSlot, lowest?: number): void {
   if (slot.timer !== undefined || slot.expires.size === 0)
     return
 
-  let next = Number.POSITIVE_INFINITY
+  if (lowest === undefined) {
+    sortExpiry(slot)
+    lowest = slot.expires.values().next().value!
+  }
 
-  for (const at of slot.expires.values())
-    next = Math.min(next, at)
-
+  const next = lowest
   const handle = setTimeout(() => {
     slot.timer = undefined
     dropExpired(slot)
@@ -183,9 +206,12 @@ function armExpiry(slot: ServerSlot): void {
 function dropExpired(slot: ServerSlot): void {
   const now = Date.now()
 
+  sortExpiry(slot)
+
   for (const [key, at] of slot.expires) {
+    // In order of end, so the first one still to come ends the pass.
     if (at > now)
-      continue
+      break
 
     slot.expires.delete(key)
 
@@ -516,7 +542,7 @@ function hear(id: string, key: string, text: string | undefined, atStart = false
   if (read === undefined)
     return
 
-  setExpiry(slot, key, expiresAt)
+  setExpiry(slot, key, expiresAt ?? (atStart ? stamped(slot, key, text) : undefined))
 
   if (slot.values.has(key) && encodeValue(slot.values.get(key)) === text)
     return
@@ -525,11 +551,24 @@ function hear(id: string, key: string, text: string | undefined, atStart = false
   notify(slot, key)
 }
 
+// The end of a value the store holds without one, though its declaration has a `ttl` now (it was stored before): the lifetime counts from the first time this process reads it, and the store keeps that end so a restart does not renew it. Only rows read at the start are given one, so a store that ignores the end cannot make processes rewrite a row at each other.
+function stamped(slot: ServerSlot, key: string, text: string): number | undefined {
+  if (slot.ttl === undefined)
+    return undefined
+
+  const expiresAt = Date.now() + slot.ttl
+
+  if (shared(slot))
+    sendToStore(slot.id, key, (store): void | Promise<void> => store.set(slot.id, key, text, expiresAt))
+
+  return expiresAt
+}
+
 function serverLive(id: string, initial: unknown, name: string | undefined, ttl: number | undefined): Handle {
   const keyed = typeof initial === 'function'
   const known = slots().get(id)
   // A dev reload evaluates the module again: the values and watchers stay, the declaration is the new one.
-  const slot: ServerSlot = known ?? { id, name, initial, keyed, values: new Map(), listeners: new Map(), ttl, expires: new Map(), timer: undefined }
+  const slot: ServerSlot = known ?? { id, name, initial, keyed, values: new Map(), listeners: new Map(), ttl, expires: new Map(), ordered: true, latest: 0, timer: undefined }
 
   if (known) {
     known.initial = initial
@@ -566,7 +605,7 @@ function serverLive(id: string, initial: unknown, name: string | undefined, ttl:
 
       if (read !== undefined) {
         slot.values.set(key, read.value)
-        setExpiry(slot, key, at)
+        setExpiry(slot, key, at ?? stamped(slot, key, text))
       }
     }
 

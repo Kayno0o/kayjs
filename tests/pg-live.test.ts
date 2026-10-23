@@ -337,7 +337,37 @@ pgDescribe('pgData live values', () => {
       setSystemTime()
     }
 
-    expect((await sql.unsafe<{ key: string }[]>('SELECT key FROM kay_live ORDER BY key')).map(row => row.key)).toEqual(['a', 'c', 'd'])
+    await waitFor(async () => (await sql.unsafe<{ key: string }[]>('SELECT key FROM kay_live ORDER BY key')).map(row => row.key).join() === 'a,c,d', 'the purge to drop the row past its end')
+    store.stop?.()
+  })
+
+  pgIt('purges apart from the write, so a purge stuck on a locked row costs the write nothing', async () => {
+    const sql = await fresh()
+    const [store] = twoReplicas()
+
+    await store.set('app:purge', 'old', '[1]', Date.now() + 50)
+    await Bun.sleep(100)
+
+    const holder = await sql.reserve()
+
+    await holder.unsafe('BEGIN')
+    await holder.unsafe('SELECT 1 FROM kay_live WHERE key = \'old\' FOR UPDATE')
+    setSystemTime(new Date(Date.now() + 2 * 3_600_000))
+
+    try {
+      const began = performance.now()
+
+      await store.set('app:purge', 'new', '[2]')
+      expect(performance.now() - began).toBeLessThan(2000)
+    }
+    finally {
+      setSystemTime()
+    }
+
+    expect((await sql.unsafe<{ key: string }[]>('SELECT key FROM kay_live ORDER BY key')).map(row => row.key)).toContain('new')
+    await holder.unsafe('COMMIT')
+    holder.release()
+    await waitFor(async () => (await sql.unsafe<{ key: string }[]>('SELECT key FROM kay_live ORDER BY key')).map(row => row.key).join() === 'new', 'the purge to drop the row once unlocked')
     store.stop?.()
   })
 

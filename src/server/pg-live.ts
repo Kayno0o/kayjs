@@ -52,7 +52,7 @@ export function pgLive(pg: PgHandle): LiveStore {
   }
 
   // The row and its message go together, so a process that heard the message finds the row.
-  const write = async (what: string, id: string, key: string, change: (tx: SQL) => Promise<unknown>, beforeBegin?: (db: SQL) => Promise<void>): Promise<void> => {
+  const write = async (what: string, id: string, key: string, change: (tx: SQL) => Promise<unknown>): Promise<void> => {
     if (queued >= MAX_QUEUED) {
       if (!overflowing)
         kayLog('error', `${what} the live value ${id} failed: ${MAX_QUEUED} writes wait for the database, the ones after are dropped until it answers`)
@@ -73,7 +73,6 @@ export function pgLive(pg: PgHandle): LiveStore {
       await ordered(async () => timeLimited(async () => {
         const db = await pg.db()
 
-        await beforeBegin?.(db)
         await db.begin(async (tx) => {
           await change(tx)
           await query(tx, `INSERT INTO kay_live_events (origin, id, key, at) VALUES ($1, $2, $3, ${NOW})`, [self, escaped(id), escaped(key)])
@@ -95,15 +94,18 @@ export function pgLive(pg: PgHandle): LiveStore {
     }
   }
 
-  // Drops the rows past their end, at most once an hour and outside the write's transaction, so a refused purge never costs the value its write.
-  const purge = async (db: SQL): Promise<void> => {
-    if (Date.now() - purged <= PURGE_STALE_MS)
+  // Drops the rows past their end, at most once an hour, apart from the write that triggers it and under a time limit of its own, so a slow or refused purge never costs a write.
+  const purge = (): void => {
+    if (closed || Date.now() - purged <= PURGE_STALE_MS)
       return
 
     purged = Date.now()
+    void purging()
+  }
 
+  const purging = async (): Promise<void> => {
     try {
-      await query(db, `DELETE FROM kay_live WHERE expires_at < ${NOW}`)
+      await timeLimited(async () => query(await pg.db(), `DELETE FROM kay_live WHERE expires_at < ${NOW}`), DB_TIMEOUT_MS, 'the purge')
     }
     catch (error) {
       kayLog('warn', 'dropping the live values past their ttl failed; trying again in an hour', error)
@@ -223,11 +225,15 @@ export function pgLive(pg: PgHandle): LiveStore {
       })
     },
     // The end is stored on the database's clock, as the remaining time, so replicas whose clocks disagree forget a value together; the rows give it back on the reader's.
-    set: async (id, key, text, expiresAt) => write('writing', id, key, async (tx) => {
-      const remaining = expiresAt === undefined ? null : Math.max(0, Math.round(expiresAt - Date.now()))
+    set: async (id, key, text, expiresAt) => {
+      await write('writing', id, key, async (tx) => {
+        const remaining = expiresAt === undefined ? null : Math.max(0, Math.round(expiresAt - Date.now()))
 
-      await query(tx, `INSERT INTO kay_live (id, key, value, expires_at) VALUES ($1, $2, $3, CASE WHEN $4::bigint IS NULL THEN NULL ELSE ${NOW} + $4::bigint END) ON CONFLICT (id, key) DO UPDATE SET value = excluded.value, expires_at = excluded.expires_at`, [escaped(id), escaped(key), text, remaining])
-    }, purge),
+        await query(tx, `INSERT INTO kay_live (id, key, value, expires_at) VALUES ($1, $2, $3, CASE WHEN $4::bigint IS NULL THEN NULL ELSE ${NOW} + $4::bigint END) ON CONFLICT (id, key) DO UPDATE SET value = excluded.value, expires_at = excluded.expires_at`, [escaped(id), escaped(key), text, remaining])
+      })
+
+      purge()
+    },
     delete: async (id, key) => write('deleting', id, key, async tx => query(tx, 'DELETE FROM kay_live WHERE id = $1 AND key = $2', [escaped(id), escaped(key)])),
     subscribe(listener) {
       listeners.add(listener)

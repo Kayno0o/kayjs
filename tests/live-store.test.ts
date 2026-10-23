@@ -389,6 +389,94 @@ describe('a live value with a lifetime', () => {
     expect([room('a'), room('b')]).toEqual([0, 0])
   })
 
+  it('drops 20,000 keys ending a few milliseconds apart without scanning the ones still to come', async () => {
+    const room = declareKeyedTtl(() => 0, { ttl: '200ms' }, 'test:ttl-many', 'ttlMany')
+    const expires = liveSlot('test:ttl-many')!.expires
+    let yielded = 0
+
+    for (const method of [Symbol.iterator, 'values', 'entries'] as const) {
+      const original = expires[method].bind(expires) as () => Iterator<unknown>
+
+      ;(expires as unknown as Record<string | symbol, unknown>)[method] = function* () {
+        const iterator = original()
+
+        for (let step = iterator.next(); step.done !== true; step = iterator.next()) {
+          yielded++
+          yield step.value
+        }
+      }
+    }
+
+    for (let key = 0; key < 20_000; key++) {
+      room.set(String(key), 1)
+
+      // Spreads the ends over a few timer passes.
+      if (key % 2000 === 1999)
+        await Bun.sleep(5)
+    }
+
+    expect(expires.size).toBe(20_000)
+    await Bun.sleep(500)
+    expect(expires.size).toBe(0)
+    expect(room('0') + room('19999')).toBe(0)
+    // Each key is read once as it is dropped, and a pass stops at the first key still to come.
+    expect(yielded).toBeLessThan(20_000 + 300)
+  })
+
+  it('drops an end heard out of order on time', async () => {
+    let hear: ((id: string, key: string, text: string | undefined, expiresAt?: number) => void) | undefined
+
+    setLiveStore({ entries: () => [], set: () => undefined, delete: () => undefined, subscribe: (listener) => {
+      hear = listener
+    } })
+
+    const room = declareKeyedTtl(() => 0, { ttl: '60s' }, 'test:ttl-unordered', 'ttlUnordered')
+    const now = Date.now()
+
+    hear!('test:ttl-unordered', 'late', '[1]', now + 400)
+    hear!('test:ttl-unordered', 'soon', '[2]', now + 100)
+    hear!('test:ttl-unordered', 'middle', '[3]', now + 250)
+    await Bun.sleep(180)
+    expect([room('late'), room('soon'), room('middle')]).toEqual([1, 0, 3])
+    await Bun.sleep(120)
+    expect([room('late'), room('middle')]).toEqual([1, 0])
+    await Bun.sleep(200)
+    expect(room('late')).toBe(0)
+    setLiveStore(undefined)
+  })
+
+  it('gives a value stored before its ttl was declared an end from the declaration, kept in the store', async () => {
+    const written: [string, string, number | undefined][] = []
+    const store: LiveStore = { entries: () => [['test:ttl-before', '', '[4]'], ['test:ttl-before-declared', '', '[5]']], set: (id, _key, _text, expiresAt) => void written.push([id, _key, expiresAt]), delete: () => undefined, subscribe: () => undefined }
+    // Declared after the store was read, then before it.
+    const early = declareTtl(0, { ttl: '300ms' }, 'test:ttl-before-declared', 'ttlBeforeDeclared')
+
+    setLiveStore(store)
+
+    const late = declareTtl(0, { ttl: '300ms' }, 'test:ttl-before', 'ttlBefore')
+
+    expect([early(), late()]).toEqual([5, 4])
+    expect(written.map(row => row[0]).sort()).toEqual(['test:ttl-before', 'test:ttl-before-declared'])
+
+    for (const row of written)
+      expect(Math.abs((row[2] ?? 0) - Date.now() - 300)).toBeLessThan(200)
+
+    await Bun.sleep(150)
+    expect([early(), late()]).toEqual([5, 4])
+    await Bun.sleep(300)
+    expect([early(), late()]).toEqual([0, 0])
+    setLiveStore(undefined)
+  })
+
+  it('leaves a value without a ttl alone', () => {
+    const written: string[] = []
+
+    setLiveStore({ entries: () => [['test:ttl-never', '', '[6]']], set: id => void written.push(id), delete: () => undefined, subscribe: () => undefined })
+    expect(declare(0, 'test:ttl-never', 'ttlNever')()).toBe(6)
+    expect(written).toEqual([])
+    setLiveStore(undefined)
+  })
+
   it('refuses a lifetime that is not a positive duration', () => {
     expect(() => declareTtl(0, { ttl: '0s' }, 'test:ttl-bad', 'ttlBad')).toThrow(/ttl/)
     expect(() => declareTtl(0, { ttl: 'soon' }, 'test:ttl-bad', 'ttlBad')).toThrow(/ttl/)

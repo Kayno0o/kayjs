@@ -5,8 +5,9 @@ import process from 'node:process'
 import { SQL } from 'bun'
 import { afterAll, afterEach, describe, expect, it } from 'bun:test'
 import { setLiveStore } from '../src/runtime/live-value'
-import { pages, pgData } from '../src/server'
+import { createDataTables, pages, pgData } from '../src/server'
 import { setupStore } from '../src/server/app-store'
+import { pgHandle } from '../src/server/pg-data'
 import { pgDescribe, pgIt, url } from './job-stores'
 import { scratchDir } from './scratch'
 
@@ -168,6 +169,36 @@ pgDescribe('a server starting against Postgres', () => {
 
       await pages({ root, routes: join(root, 'src/routes'), prebuilt: false, security: false, store: pgData(database) })
       expect(await tables()).toContain('kay_live')
+    })
+  }, 60_000)
+})
+
+pgDescribe('a pgData role that may not alter tables', () => {
+  pgIt('is told to run createDataTables again when kay_live predates expires_at', async () => {
+    await withDatabase(async (database) => {
+      const role = `kay_live_reader_${process.pid}`
+      const owner = new SQL(database, { max: 1 })
+      const admin = new SQL(Object.assign(new URL(url!.href), { pathname: '/postgres' }).href)
+      const restricted = new SQL(Object.assign(new URL(database), { username: role, password: 'readerpass0123' }).href, { max: 1 })
+
+      try {
+        await createDataTables(owner)
+        await owner.unsafe('ALTER TABLE kay_live DROP COLUMN expires_at')
+        await admin.unsafe(`DROP ROLE IF EXISTS ${role}`)
+        await admin.unsafe(`CREATE ROLE ${role} LOGIN PASSWORD 'readerpass0123'`)
+        await owner.unsafe(`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${role}`)
+        await expect(pgHandle(restricted).db()).rejects.toThrow('run `await createDataTables(db)`')
+        await createDataTables(owner)
+        expect((await owner.unsafe<{ found: number }[]>('SELECT 1 AS found FROM pg_attribute WHERE attrelid = \'kay_live\'::regclass AND attname = \'expires_at\' AND NOT attisdropped')).length).toBe(1)
+        await expect(pgHandle(restricted).db()).resolves.toBeDefined()
+      }
+      finally {
+        await restricted.close()
+        await owner.unsafe(`DROP OWNED BY ${role}`)
+        await admin.unsafe(`DROP ROLE IF EXISTS ${role}`)
+        await owner.close()
+        await admin.close()
+      }
     })
   }, 60_000)
 })
