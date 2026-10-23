@@ -6,6 +6,7 @@ import { editedEntry, editRequested } from 'kay/server'
 import { wording } from 'kay/words'
 import { forbidden, may, memberOf, routePath } from '../access'
 import { authors, testAddresses } from '../authors'
+import { admitEditor } from '../editor-names'
 import { leavesPublication, restrain } from '../publishing'
 import { settings } from '../settings'
 import devApi from './dev'
@@ -145,6 +146,7 @@ export default guard(async (ctx) => {
     return ctx.deny(403, refusal(editing, READ_METHODS.has(method)))
 
   await admits(ctx)
+  admitEditor(ctx.request)
 
   if (settings().roles !== undefined) {
     // Read now so the route that tells what the person may do has it; every other route reads it only when it needs it.

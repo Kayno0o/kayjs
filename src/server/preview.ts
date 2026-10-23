@@ -280,18 +280,26 @@ export function editedEntry(request: Request, collection: string, slug: string):
   return session !== undefined && session.until > Date.now() / 1000 && session.entries.has(entryKey(collection, slug))
 }
 
+// The valid edit cookie of the request in edit mode, which names its edit session and is tied to no user: a CMS keeps what it learns of a person against it.
+export function editSessionOf(request: Request): string | undefined {
+  return editCookie(request)
+}
+
 // Whether the request is in edit mode, for a CMS's API module or guard to let in the editor alone outside a page's render, where `editing()` tells.
 export function editRequested(request: Request): boolean {
   return previewRequested(request) === 'edit'
 }
 
-// Puts the visitor in preview mode for `preview.maxAge`, from a guard, a page or an action whose `ctx` carries cookies, such as one letting a signed-in editor in; `edit` puts them in edit mode as well.
-export function enterPreview(ctx: { cookies: CookieMap, request: Request }, options: { edit?: boolean } = {}): void {
+// Puts the visitor in preview mode for `preview.maxAge`, from a guard, a page or an action whose `ctx` carries cookies, such as one letting a signed-in editor in; `edit` puts them in edit mode as well. It gives the cookie's value, which the request the browser sends next carries.
+export function enterPreview(ctx: { cookies: CookieMap, request: Request }, options: { edit?: boolean } = {}): string {
   const current = settingsFor('enterPreview()')
   const until = String(Math.floor(Date.now() / 1000) + current.maxAge)
   const edit = options.edit === true
+  const value = [until, ...edit ? [EDIT] : [], sign(current, cookieText(until, edit))].join('.')
 
-  ctx.cookies.set(cookieName(PREVIEW_COOKIE, overHttps(ctx.request), current.base), [until, ...edit ? [EDIT] : [], sign(current, cookieText(until, edit))].join('.'), { httpOnly: true, sameSite: 'lax', secure: overHttps(ctx.request), path: current.base || '/', maxAge: current.maxAge })
+  ctx.cookies.set(cookieName(PREVIEW_COOKIE, overHttps(ctx.request), current.base), value, { httpOnly: true, sameSite: 'lax', secure: overHttps(ctx.request), path: current.base || '/', maxAge: current.maxAge })
+
+  return value
 }
 
 // Renders the page at `url` through `handle` in edit mode, as an editor's request would, and gives the entries it read; undefined when the app has no preview, or the page answered nothing.

@@ -3,13 +3,15 @@ import Button from '@kaynooo/kayjs-ui/button.kay'
 import { localPath, s } from 'kay'
 import { enterPreview } from 'kay/server'
 import { wording } from 'kay/words'
+import { admitEditor } from '../editor-names'
 import { adminTitle } from '../listing'
 import { settings } from '../settings'
 
 export const page = { noindex: true }
 
 function enter(ctx: { cookies: Bun.CookieMap, request: Request, redirect: (to: string) => never }, path: string | null | undefined): never {
-  enterPreview(ctx, { edit: true })
+  // The guard let this person in, so the cookie they are given reads editor names.
+  admitEditor(ctx.request, enterPreview(ctx, { edit: true }))
 
   return ctx.redirect(localPath(path, settings().prefix))
 }

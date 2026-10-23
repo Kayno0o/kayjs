@@ -20,14 +20,14 @@ test('two lists open on the same entries do not say they are being edited', asyn
   expect(await second.evaluate(() => document.querySelectorAll('.kcms-entry-watch').length)).toBe(0)
 }, 60_000)
 
-test('the on-page editor and the list join an entry\'s room: the screen names its editors, the page editor counts them, and a list only shows that the entry is being edited', async () => {
+test('the on-page editor and the list join an entry\'s room: the screen names its editors, the page editor of a signed-in editor names them too, and a list only shows that the entry is being edited', async () => {
   const screenSays = () => document.querySelector('.kcms-entry-presence')?.textContent?.trim()
   const pageSays = () => document.querySelector('.kcms-editor .kcms-entry-presence')?.textContent?.trim()
 
   await using screen = await built.open('/admin/collections/posts/hello?as=Ann')
   await using onPage = await built.open('/admin/page?path=/blog/hello')
 
-  await onPage.waitUntil(() => document.querySelector('.kcms-editor .kcms-entry-presence')?.textContent?.trim() === '1 other editor', SETTLED)
+  await onPage.waitUntil(() => document.querySelector('.kcms-editor .kcms-entry-presence')?.textContent?.trim() === 'Also open: Ann', SETTLED)
   await screen.waitUntil(() => document.querySelector('.kcms-entry-presence')?.textContent?.trim() === '1 other editor', SETTLED)
 
   await using list = await built.open('/admin/collections/posts?as=Bob')
@@ -36,7 +36,7 @@ test('the on-page editor and the list join an entry\'s room: the screen names it
   // The list is no editor: neither the screen nor the page editor counts it.
   await Bun.sleep(300)
   expect(await screen.evaluate(screenSays)).toBe('1 other editor')
-  expect(await onPage.evaluate(pageSays)).toBe('1 other editor')
+  expect(await onPage.evaluate(pageSays)).toBe('Also open: Ann')
 }, 60_000)
 
 test('editors with no name still count each other when a list is open, and the list says the entry is being edited', async () => {

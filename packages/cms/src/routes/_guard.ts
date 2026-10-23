@@ -1,6 +1,7 @@
 import { guard } from 'kay'
 import { overHttps } from 'kay/library'
 import { sendToSignIn, whoOf } from '../access'
+import { admitEditor } from '../editor-names'
 import { EDITOR_COOKIE, editorCookie, hintCookie } from '../page-link'
 import { settings } from '../settings'
 
@@ -19,6 +20,9 @@ export default guard(async (ctx) => {
 
     throw error
   }
+
+  // The edit cookie this browser holds is an editor's from here on, so the on-page editor is told the names too.
+  admitEditor(ctx.request)
 
   // An editor the guard let in is marked for the pages they read next, which show them the link into edit mode.
   if (pageLink)

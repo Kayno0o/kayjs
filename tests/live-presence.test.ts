@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it, setSystemTime } from 'bun:te
 import { chromium } from 'playwright-core'
 import { PROOF_LIFETIME_MS } from '../src/runtime/live-value'
 import { PRESENCE_LIVE_ID } from '../src/runtime/presence'
-import { presenceGrace } from '../src/server/presence'
+import { presenceGrace, viewPresenceWith } from '../src/server/presence'
 import { memoryRooms, sqliteRooms } from '../src/server/rooms'
 import { browserPath, testSite } from '../src/test'
 import { Feed, JSON_POST, pagesOf, proofsOf } from './live-helpers'
@@ -114,6 +114,28 @@ describe('presence on the server', () => {
     expect(await ann.next()).toEqual([[PRESENCE_LIVE_ID, keyOf('entry:1', { name: 'Ann' }), []]])
     await ann.close()
     await leaves(rooms, ROOM, 0)
+  })
+
+  it('sends a stream the members as the view of an extension gives them for its request, and every other stream whole', async () => {
+    viewPresenceWith((request, _room, members) => request.headers.has('x-hide') ? members.map(() => '{"name":""}') : members)
+
+    try {
+      const ann = await enter(site, 'Ann', 'ann-tab')
+
+      await ann.next()
+
+      const { proofs, keys } = await visit(site, '/entry/1', 'Bob')
+      const hidden = new Feed(await site.fetch('/_kay/live', { ...JSON_POST, headers: { ...JSON_POST.headers, 'x-hide': '1' }, body: JSON.stringify({ proofs, watch: keys.map(key => [PRESENCE_LIVE_ID, key]), tab: 'bob-tab' } satisfies LiveRequest) }))
+      const seen = new Feed(await connect(site, proofs, keys, 'cy-tab'))
+
+      expect(await hidden.next()).toEqual([[PRESENCE_LIVE_ID, keyOf('entry:1', { name: 'Bob' }), ['{"name":""}']]])
+      expect(JSON.stringify(await seen.next())).toContain('Ann')
+      await Promise.all([hidden.close(), seen.close(), ann.close()])
+      await leaves(rooms, ROOM, 0)
+    }
+    finally {
+      viewPresenceWith(undefined)
+    }
   })
 
   it('writes the members a page renders for into the page, the visitor not among them yet', async () => {

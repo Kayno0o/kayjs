@@ -2,6 +2,7 @@ import type { TestSite } from 'kay/test'
 import type { LiveRequest } from '../../../../../src/runtime/live-value'
 import { join } from 'node:path'
 import { afterAll, expect, test } from 'bun:test'
+import { previewUrl } from 'kay/server'
 import { testSite } from 'kay/test'
 import { Feed, JSON_POST, pagesOf, proofsOf } from '../../../../../tests/live-helpers'
 
@@ -29,34 +30,48 @@ async function receives(site: TestSite, path: string, tab: string): Promise<{ ke
   return { keys, messages }
 }
 
-test('an edit link\'s holder receives the editors only as a count, while a signed-in editor on the screen still receives their names', async () => {
+// What a request sent of the entry's rooms, as the names of the editors in them.
+function namesIn(received: { messages: string[] }): string {
+  return received.messages.join('')
+}
+
+test('an edit link\'s holder receives the editors only as a count, while a signed-in editor, on a screen or on the page, receives their names', async () => {
   const screen = await testSite({ root: ROOT })
   const ann = await receives(screen, '/admin/collections/posts/notes/garden?as=Ann', 'ann-screen')
 
   expect(ann.keys.some(key => key.includes('"Ann"'))).toBe(true)
 
-  // The page editor's cookie is all an edit link gives, and its page proves the rooms the screens' editors are not named in.
+  // An edit link is all this browser holds: no guard of the app let it in.
   const holder = await testSite({ root: ROOT })
 
-  await holder.visit('/admin/page?path=/blog/hello')
+  await holder.visit(previewUrl('/blog/hello', { edit: true }))
 
   const page = await receives(holder, '/blog/hello', 'holder-page')
 
-  expect(page.keys.length).toBeGreaterThan(0)
-  expect(page.keys.every(key => key.includes('open:'))).toBe(true)
+  expect(page.keys.some(key => key.includes('open:'))).toBe(true)
 
   // Ann edits the entry the holder's page shows, from the screens.
   const hello = await receives(screen, '/admin/collections/posts/hello?as=Ann', 'ann-hello')
   const second = await receives(holder, '/blog/hello', 'holder-page-again')
 
   expect(hello.keys.some(key => key.includes('"Ann"'))).toBe(true)
-  expect(second.messages.join('')).not.toContain('Ann')
+  expect(second.keys.some(key => key.includes('"cms:posts:hello"'))).toBe(true)
+  expect(namesIn(second)).not.toContain('Ann')
+  // Counted all the same: the members are there, with no name.
   expect(second.messages.some(message => message.includes('"page":true') || message.includes('\\"page\\":true'))).toBe(true)
 
-  // A signed-in editor on the screen is told Ann's name.
+  // A person the guard let in, on a screen and on the page, is told Ann's name.
   const bob = await receives(screen, '/admin/collections/posts/hello?as=Bob', 'bob-hello')
 
-  expect(bob.messages.join('')).toContain('Ann')
-  // And the holder is counted by the screen, with no name to give.
-  expect(bob.messages.join('')).toContain('page')
+  expect(namesIn(bob)).toContain('Ann')
+  expect(namesIn(bob)).toContain('page')
+
+  const member = await testSite({ root: ROOT })
+
+  await member.visit('/admin/page?path=/blog/hello')
+
+  const named = await receives(member, '/blog/hello', 'member-page')
+
+  expect(named.keys.some(key => key.includes('"cms:posts:hello"'))).toBe(true)
+  expect(namesIn(named)).toContain('Ann')
 }, 30_000)

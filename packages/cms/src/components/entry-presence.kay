@@ -5,7 +5,7 @@ import { wording } from 'kay/words'
 import { editorsOf, openRoom, watchRoom } from '../room'
 
 // Who else has an entry open: their names when `cms({ author })` gives them, else how many they are. `room` and `member` come from `entryPresence`, or from `entryRoom` with `page: true` for the on-page editor, which asks no author.
-// The names live in rooms only the screens join, as a room is sent whole to whoever joins it and the on-page editor's visitor may hold an edit link and no account. The on-page editor joins the room every editor is listed in with no name, and so counts.
+// The server sends the names of the entry's room to an editor the app's guard let in alone, the on-page editor's included, and an edit link's holder is sent the members with none, so counts only. The room that holds no name counts everyone.
 const { room, member } = props<{ room: string, member: Member }>()
 const onPage = member.page === true
 const open = openRoom(room)
@@ -13,14 +13,14 @@ const nameless: Member = onPage ? member : { name: '' }
 const everyone = presence(open, nameless)
 // Also listed in the rooms a list watches the entry through, which nothing here shows: a room is joined by reading it.
 const watchedBy = presence(watchRoom(open), nameless)
-const named = onPage ? undefined : presence(room, member)
-const namedWatchedBy = onPage ? undefined : presence(watchRoom(room), member)
+const named = presence(room, member)
+const namedWatchedBy = presence(watchRoom(room), member)
 
 effect(() => void watchedBy.count())
-effect(() => void namedWatchedBy?.count())
+effect(() => void namedWatchedBy.count())
 
-const editors = memo(() => named === undefined ? { names: [], unnamed: 0 } : editorsOf(named.others(), named.count(), member))
-// An editor on the page is in no room of names, so it is told of the screens' editors and of the other editors on a page by their number.
+const editors = memo(() => editorsOf(named.others(), named.count(), member))
+// A screen's editor is told of an editor on a page by their number, as the page lists none by name.
 const paged = memo(() => everyone.others().some(other => other.page === true))
 const text = memo(() => {
   if (editors().names.length > 0)

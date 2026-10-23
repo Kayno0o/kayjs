@@ -170,8 +170,18 @@ function startTicker(): void {
   ticker.unref()
 }
 
+// What an extension holding names in a room tells the server about who may read them: the members of `room` as the stream of `request` is sent them, the members given when it may read them all. It runs at each read, so a verdict that changes is sent at the next recheck.
+export type PresenceView = (request: Request, room: string, members: string[]) => string[]
+
+let view: PresenceView | undefined
+
+// Installed by an extension whose rooms hold what only some visitors may read, as the cms's editor names: every stream is sent the members as the view gives them, so a room a page proves is no more than the page's visitor may see.
+export function viewPresenceWith(next: PresenceView | undefined): void {
+  view = next
+}
+
 // What a stream watching a presence key sends: the members of the room besides the tab's own, as JSON texts, a changed list after the first calling `notify`. It joins the room when it starts watching and leaves, after a short grace, when it stops.
-export function presenceEntry(key: string, tab: string): { value: () => string[], watch: (notify: () => void) => () => void } | undefined {
+export function presenceEntry(key: string, tab: string, request?: Request): { value: () => string[], watch: (notify: () => void) => () => void } | undefined {
   const parsed = parsePresenceKey(key)
 
   if (parsed === undefined)
@@ -179,7 +189,11 @@ export function presenceEntry(key: string, tab: string): { value: () => string[]
 
   const { room, member } = parsed
   let last = ''
-  const others = (tabs: Tab[]) => tabs.filter(entry => entry.tab !== tab).map(entry => entry.member)
+  const others = (tabs: Tab[]) => {
+    const rest = tabs.filter(entry => entry.tab !== tab).map(entry => entry.member)
+
+    return view === undefined || request === undefined ? rest : view(request, room, rest)
+  }
 
   return {
     value() {

@@ -419,7 +419,7 @@ export function serveLive(app: Elysia, config?: LiveConfig): void {
     for (const [id, key] of asked.watch) {
       const slot = liveSlot(id)
       const provenAt = proven.get(JSON.stringify([id, key]))
-      const here = id === PRESENCE_LIVE_ID && provenAt !== undefined ? presenceEntry(key, tab) : undefined
+      const here = id === PRESENCE_LIVE_ID && provenAt !== undefined ? presenceEntry(key, tab, request) : undefined
 
       if (here !== undefined) {
         oldest = Math.min(oldest, provenAt!)

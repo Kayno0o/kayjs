@@ -2,8 +2,9 @@ import type { KayExtension } from 'kay/server'
 import type { FileSaver } from './files'
 import type { CmsOptions } from './settings'
 import { s } from 'kay'
-import { configError, serverRoot, underKayDev } from 'kay/library'
+import { configError, serverRoot, underKayDev, viewPresenceWith } from 'kay/library'
 import { api, defineEnv } from 'kay/server'
+import { viewMembers } from './editor-names'
 import { forgejo } from './files'
 import { collectionInfo, collections } from './kay/content'
 import { hintProblems, missingKindLines } from './kinds'
@@ -95,6 +96,9 @@ export function cms(options: CmsOptions = {}): KayExtension {
     },
     // Run as the server boots, never by `kay build` or `kay check`.
     server: () => {
+      // Editor names reach the guard's editors alone, however a page names the room it joins.
+      viewPresenceWith(viewMembers)
+
       if (options.files === undefined && process.env.NODE_ENV === 'production')
         settings().files = savedFromEnv()
 
