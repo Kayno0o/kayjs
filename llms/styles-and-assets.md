@@ -200,7 +200,7 @@ export default defineConfig({ plugins: [tailwind] })
 ```
 
 - `src/app.css`, imported by the root `_layout.kay`, needs nothing more than `@import 'tailwindcss';`.
-- Tailwind cannot read classes off the `.class` shorthand, `div.md:flex.w-1/2`, so kay collects them into `.kay/classes.txt` and hands them to it as the stylesheets build.
+- Tailwind cannot read classes off the `.class` shorthand, `div.md:flex.w-1/2`, so kay collects them into `.kay/classes.txt` and hands them to it as the stylesheets build, with no `@source` line; one pointing at that file works, as `.kay/.gitignore` keeps Tailwind from scanning the rest of `.kay`.
 - `source(none)` on the import turns that off along with Tailwind's own scan of the project.
 
 ### Public files

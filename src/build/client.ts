@@ -12,7 +12,7 @@ import type { Reached } from './styles'
 import type { FileDiagnostic } from './transform'
 import { existsSync, realpathSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
-import { basename, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { formatDiagnostic } from '../compiler'
 import { buildFailure, errorCodeOf, KayError, raisedMark } from '../compiler/errors'
 import { gitIgnoredNames, isSource } from '../dev/sources'
@@ -328,8 +328,12 @@ export async function clearClientOutput(root: string): Promise<void> {
 }
 
 // The stylesheet build hands these to Tailwind, which cannot read the `.class` shorthand: see styleImports.
+// `.kay` ignores itself, as Tailwind would otherwise scan all of it as soon as an app's `@source` names `.kay/classes.txt` (#2239), and read the classes of its own output back in.
 export async function writeClasses(root: string, classes: Set<string>): Promise<void> {
-  await writeIfChanged(projectPaths(root).classes, [...classes].sort().join('\n'))
+  const file = projectPaths(root).classes
+
+  await writeIfChanged(join(dirname(file), '.gitignore'), '*\n')
+  await writeIfChanged(file, [...classes].sort().join('\n'))
 }
 
 // The table of Tailwind classes a later one overrides, from every word of the components and of the other files an app writes markup in; none when the app has no Tailwind.

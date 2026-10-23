@@ -5,6 +5,9 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## 1.74.0
 
 - A `pgData` store has `close()` (and `await using`), ending its polling and timers and closing the pool it opened from a URL ([Queues](queues.md)).
+## Unreleased
+
+- A rebuild no longer gets a new stylesheet when the app's CSS has `@source '../.kay/classes.txt'`: `.kay` holds a `.gitignore` of `*`, so Tailwind reads that one file and not the build's own output ([Styles and assets](styles-and-assets.md)).
 
 ## 1.73.0
 

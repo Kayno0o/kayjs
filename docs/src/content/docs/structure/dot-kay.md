@@ -15,6 +15,7 @@ kay writes `.kay/` at the project's root, and nothing in it is the project's to 
   cache/  compiled files, so a restart compiles only what changed
   screenshots/  the PNGs kay screenshot writes
   classes.txt  the .class shorthand's classes, handed to Tailwind
+  .gitignore  ignores everything in .kay, so Tailwind reads classes.txt and not the build's own output
 " />
 
 A `.ts` file imports a component as `import Card from './card.kay'`, typed through the `.kay/types` tree that [`tsconfig.json`](/structure/tsconfig) merges with the sources.

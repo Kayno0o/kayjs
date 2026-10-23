@@ -213,6 +213,30 @@ describe('kay build', () => {
     }
   })
 
+  it('builds the same stylesheet each time when the app points an @source at the classes file in .kay', async () => {
+    const project = resolve(await fixtureCopy('tailwind'))
+    const page = join(project, 'src/routes/index.kay')
+
+    await Bun.write(join(project, 'src/app.css'), '@import "tailwindcss" source("..");\n@source "../.kay/classes.txt";\n')
+    await Bun.write(page, `${await Bun.file(page).text()}  p(class='after:content-[""]') Hi\n`)
+    await Bun.write(join(project, 'kay.config.ts'), 'import tailwind from \'bun-plugin-tailwind\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ plugins: [tailwind] })\n')
+    await Bun.write(join(project, 'tsconfig.json'), '{ "compilerOptions": { "strict": true } }')
+
+    try {
+      // Tailwind reads `.kay` as a source once an @source names a file in it, unless kay's output tells it not to: the class then comes back escaped once more from each build's output, and the stylesheet is a new file each time.
+      for (let build = 0; build < 3; build++)
+        expect(await Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', project, '--no-check'], { stdout: 'ignore', stderr: 'ignore' }).exited).toBe(0)
+
+      const sheets = (await readdir(clientDir(project))).filter(name => name.endsWith('.css'))
+
+      expect(sheets).toHaveLength(1)
+      expect(await Bun.file(join(clientDir(project), sheets[0]!)).text()).toContain('.after\\:content-\\[\\"\\"\\]')
+    }
+    finally {
+      await rm(join(project, '.kay'), { recursive: true, force: true })
+    }
+  })
+
   it('builds the stylesheets again in kay dev only for a word Tailwind makes a class of', async () => {
     const project = resolve(await fixtureCopy('tailwind'))
     const page = join(project, 'src/routes/index.kay')
