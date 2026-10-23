@@ -2,7 +2,7 @@ import type { AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfNode, Mat
 import type { CodeBuilder } from './mapping'
 import { isHead, isSlot } from './ast'
 import { PROPS } from './names'
-import { parsedBindingNames } from './template-reads'
+import { parsedBindingNames } from './pattern-names'
 
 // The children of an element or a block as the markup holds them: runs of static text, plain elements, and dynamic parts.
 // Server markup and browser code both walk this list, so hydration finds a dynamic part where the browser expects it.

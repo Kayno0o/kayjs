@@ -2,7 +2,7 @@ import type * as t from '@babel/types'
 import type { Attribute, KayFile, Node, Span } from './ast'
 import { parseExpression } from '@babel/parser'
 import { childBlocks, nodeExpressions, visitNodes } from './ast'
-import { patternNames } from './pattern-names'
+import { parsedBindingNames } from './pattern-names'
 import { codeOf, KAY_NAME } from './script'
 
 const WORD = /[\w$]+/g
@@ -69,18 +69,6 @@ function parameters(code: string): Set<string> | undefined {
   walk(expression, false)
 
   return names
-}
-
-// The names a pattern or a parameter list (`{ a: b }, [c], ...d` or `x: typeof y`) binds: a key or a type it holds binds none. Undefined when it does not parse.
-export function parsedBindingNames(pattern: string): string[] | undefined {
-  try {
-    const expression = parseExpression(`(${pattern}\n) => 0`, { plugins: ['typescript'] })
-
-    return expression.type === 'ArrowFunctionExpression' ? expression.params.flatMap(param => patternNames(param)) : []
-  }
-  catch {
-    return undefined
-  }
 }
 
 // The names of `parsedBindingNames`, or every word of the pattern when it does not parse.
