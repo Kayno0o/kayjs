@@ -85,7 +85,7 @@
     "@kaynooo/kayjs-mail": "workspace:~",
     "@kaynooo/kayjs-ui": "workspace:~",
     "@kaynooo/pg-orm": "^7.1.2",
-    "@types/bun": "^1.4.3",
+    "@types/bun": "^1.4.4",
     "elysia": "^1.4.30",
     "typescript": "^6.0.3"
   }

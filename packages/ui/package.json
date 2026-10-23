@@ -76,7 +76,7 @@
     "@happy-dom/global-registrator": "^21.0.3",
     "@iconify-json/tabler": "^1.2.42",
     "@kaynooo/eslint": "^7.0.4",
-    "@types/bun": "^1.4.3",
+    "@types/bun": "^1.4.4",
     "chartist": "^1.5.0",
     "elysia": "^1.4.30",
     "hls.js": "^1.7.0",
