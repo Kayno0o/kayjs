@@ -7,7 +7,7 @@ publish = false
 
 [lib]
 path = "src/lib.rs"
-crate-type = ["cdylib"]
+crate-type = [ "cdylib" ]
 
 [dependencies]
 zed_extension_api = "0.7.0"
