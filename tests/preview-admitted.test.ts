@@ -30,6 +30,8 @@ test('an edit cookie is admitted only by the admitted cookie signed for it', () 
   const holder = enter('http://localhost/', false)
   const member = enter('http://localhost/', true)
 
+  // As after a restart: the process remembers nothing, and the cookies alone tell.
+  setupPreview({ secret: SECRET }, '')
   expect(editSessionAdmitted(asked(holder.header))).toBe(false)
   expect(editSessionAdmitted(asked(member.header))).toBe(true)
   expect(editSessionAdmitted(asked(`kay_preview=${holder.edit}; kay_preview_admitted=${member.admitted}`))).toBe(false)
@@ -40,25 +42,39 @@ test('an edit cookie is admitted only by the admitted cookie signed for it', () 
 test('the admitted cookie goes out and is read under the names of the scheme', () => {
   const member = enter('https://localhost/', true)
 
+  setupPreview({ secret: SECRET }, '')
   expect(member.header).toContain('__Host-kay_preview_admitted=')
   expect(editSessionAdmitted(asked(member.header, 'https://localhost/'))).toBe(true)
   expect(editSessionAdmitted(asked(member.header.replaceAll('__Host-', ''), 'https://localhost/'))).toBe(false)
 })
 
-test('an edit cookie from before the nonce is still in edit mode, and is admitted like any other', () => {
+test('an edit cookie from before the nonce is in edit mode but never admitted, as two of them issued in one second are the same', () => {
   const until = String(Math.floor(Date.now() / 1000) + 600)
   const old = `${until}.edit.${createHmac('sha256', SECRET).update(`cookie\n${until}\nedit`).digest('base64url')}`
   const request = asked(`kay_preview=${old}`)
-
-  expect(previewRequested(request)).toBe('edit')
-  expect(editSessionAdmitted(request)).toBe(false)
-
   const cookies = new Bun.CookieMap()
 
+  expect(previewRequested(request)).toBe('edit')
   admitEditSession({ cookies, request })
+  admitEditSession({ cookies, request }, old)
+  expect(cookies.toSetCookieHeaders()).toEqual([])
+  expect(editSessionAdmitted(request)).toBe(false)
+})
 
-  const header = cookies.toSetCookieHeaders()[0]!
-  const pair = header.slice(0, header.indexOf(';'))
+test('admitting refuses a value that is no valid edit cookie, a preview cookie included', () => {
+  const cookies = new Bun.CookieMap()
+  const request = new Request('http://localhost/')
 
-  expect(editSessionAdmitted(asked(`kay_preview=${old}; ${pair}`))).toBe(true)
+  admitEditSession({ cookies, request }, 'forged')
+  admitEditSession({ cookies, request }, `${Math.floor(Date.now() / 1000) + 600}.edit.${'0'.repeat(32)}.nope`)
+  expect(cookies.toSetCookieHeaders()).toEqual([])
+})
+
+test('a request that carries the edit cookie alone is told once this process has admitted it, which an open stream needs', () => {
+  const holder = enter('http://localhost/', false)
+  const request = asked(holder.header)
+
+  expect(editSessionAdmitted(request)).toBe(false)
+  admitEditSession({ cookies: new Bun.CookieMap(), request: new Request('http://localhost/') }, holder.edit)
+  expect(editSessionAdmitted(request)).toBe(true)
 })

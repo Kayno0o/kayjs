@@ -70,6 +70,8 @@ interface EditSession {
 let settings: PreviewSettings | undefined
 // The entries the pages rendered in edit mode read, by the edit cookie they were rendered for.
 const editSessions = new Map<string, EditSession>()
+// The edit cookies a guard let through in this process, each against its expiry: a stream open when the cookie was marked reads its request from before, and this tells it.
+const admittedHere = new Map<string, number>()
 const store = new AsyncLocalStorage<PreviewState>()
 const probes = new Map<string, EntryRef[]>()
 // Set while a page renders for a probe, where a CMS screen asking for pages must not start another.
@@ -80,6 +82,8 @@ setPreviewScope(() => store.getStore())
 
 // `preview` from kay.config.ts, checked as the server boots; without it no request is ever in preview mode.
 export function setupPreview(config: PreviewConfig | false | undefined, base: string): void {
+  admittedHere.clear()
+
   if (config === undefined || config === false) {
     settings = undefined
 
@@ -210,10 +214,12 @@ function isDraft(value: unknown): boolean {
 
 // The mode the request's preview cookie, signed by this site and not expired yet, puts it in: `until.sig`, or `until.edit.nonce.sig` for edit mode (`until.edit.sig`, from before the nonce, still counts).
 export function previewRequested(request: Request): PreviewMode | undefined {
-  if (!settings)
-    return undefined
+  return settings === undefined ? undefined : modeOf(settings, previewCookie(request, settings))?.mode
+}
 
-  const [until, ...rest] = previewCookie(request, settings)?.split('.') ?? []
+// What a preview cookie's value puts a visitor in, when it is signed by this site and not expired: its mode, its expiry and, for an edit cookie, its nonce.
+function modeOf(current: PreviewSettings, value: string | undefined): { mode: PreviewMode, until: number, nonce: string | undefined } | undefined {
+  const [until, ...rest] = value?.split('.') ?? []
   const edit = rest[0] === EDIT && (rest.length === 2 || rest.length === 3)
   const sig = rest.at(-1)
   const nonce = edit && rest.length === 3 ? rest[1] : undefined
@@ -221,10 +227,10 @@ export function previewRequested(request: Request): PreviewMode | undefined {
   if (until === undefined || sig === undefined || (rest.length !== 1 && !edit) || !(Number(until) > Date.now() / 1000))
     return undefined
 
-  if (!signed(settings, cookieText(until, edit, nonce), sig))
+  if (!signed(current, cookieText(until, edit, nonce), sig))
     return undefined
 
-  return edit ? 'edit' : 'preview'
+  return { mode: edit ? 'edit' : 'preview', until: Number(until), nonce }
 }
 
 // The preview cookie of the request, under the name its scheme and the site's base give it.
@@ -288,28 +294,51 @@ export function editSessionOf(request: Request): string | undefined {
   return editCookie(request)
 }
 
-// Whether a guard of the app let the request's edit cookie through, by the cookie it set beside it with `admitEditSession`: an edit link's holder has the edit cookie alone. False outside edit mode.
+// Whether a guard of the app let the request's edit cookie through, by the cookie it set beside it with `admitEditSession`, or by this process having seen it do so, which tells a stream opened before the cookie was set. An edit link's holder has the edit cookie alone, and a cookie from before the nonce is never admitted, as two of them issued in one second are the same. False outside edit mode.
 export function editSessionAdmitted(request: Request): boolean {
   const cookie = editCookie(request)
 
-  if (!settings || cookie === undefined)
+  if (!settings || cookie === undefined || modeOf(settings, cookie)?.nonce === undefined)
     return false
 
-  const given = requestCookies(request).get(cookieName(ADMITTED_COOKIE, overHttps(request), settings.base))
-
-  return given !== null && given !== undefined && signed(settings, admittedText(cookie), given)
+  return admittedHere.has(cookie) || markedBy(request, cookie)
 }
 
-// Marks an edit cookie as one the app's guard let through, from that guard or a page after it: the edit cookie of the request, or the one just given to it by `enterPreview`. A request in edit mode already marked is left as it is.
-export function admitEditSession(ctx: { cookies: CookieMap, request: Request }, given?: string): void {
-  if (!settings || (given === undefined && editSessionAdmitted(ctx.request)))
-    return
+// Whether the request carries the admitted cookie signed for `cookie`, its edit cookie.
+function markedBy(request: Request, cookie: string): boolean {
+  const given = settings === undefined ? undefined : requestCookies(request).get(cookieName(ADMITTED_COOKIE, overHttps(request), settings.base))
 
+  return settings !== undefined && given !== null && given !== undefined && signed(settings, admittedText(cookie), given)
+}
+
+function rememberAdmitted(cookie: string, until: number): void {
+  const now = Date.now() / 1000
+
+  for (const [key, each] of admittedHere) {
+    if (each > now && admittedHere.size < MAX_EDIT_SESSIONS)
+      break
+
+    admittedHere.delete(key)
+  }
+
+  admittedHere.delete(cookie)
+  admittedHere.set(cookie, until)
+}
+
+// Marks an edit cookie as one the app's guard let through, from that guard or a page after it: the edit cookie of the request, or the one just given to it by `enterPreview`, which must be a valid edit cookie. A request in edit mode already marked is left as it is.
+export function admitEditSession(ctx: { cookies: CookieMap, request: Request }, given?: string): void {
   const cookie = given ?? editCookie(ctx.request)
 
-  if (cookie === undefined)
+  if (!settings || cookie === undefined || (given === undefined && markedBy(ctx.request, cookie)))
     return
 
+  const valid = modeOf(settings, cookie)
+
+  // A cookie from before the nonce is no one's alone, so it is never marked.
+  if (valid?.mode !== 'edit' || valid.nonce === undefined)
+    return
+
+  rememberAdmitted(cookie, valid.until)
   ctx.cookies.set(cookieName(ADMITTED_COOKIE, overHttps(ctx.request), settings.base), sign(settings, admittedText(cookie)), { httpOnly: true, sameSite: 'lax', secure: overHttps(ctx.request), path: settings.base || '/', maxAge: settings.maxAge })
 }
 
@@ -346,7 +375,8 @@ export async function entriesReadAt(handle: (request: Request) => Promise<Respon
   probes.set(id, reads)
 
   try {
-    const headers = new Headers({ [PROBE_HEADER]: id, cookie: `${name}=${[until, EDIT, sign(settings, cookieText(until, true))].join('.')}` })
+    const nonce = id.replaceAll('-', '')
+    const headers = new Headers({ [PROBE_HEADER]: id, cookie: `${name}=${[until, EDIT, nonce, sign(settings, cookieText(until, true, nonce))].join('.')}` })
 
     const response = await withinTimeout(timeout, async signal => probing.run(true, async () => handle(new Request(url, { headers: markInternal(headers), signal }))))
 

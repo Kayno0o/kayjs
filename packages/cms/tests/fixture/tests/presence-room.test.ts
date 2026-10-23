@@ -113,3 +113,16 @@ test('a person who entered edit mode through an edit link and was let in by the 
   await other.visit(previewUrl('/blog/hello', { edit: true }))
   expect(namesIn(await receives(other, '/blog/hello', 'other-holder'))).not.toContain('Ann')
 }, 30_000)
+
+test('a person the guard lets in who only reads the page is told the names once the editor has read its entry', async () => {
+  const screen = await testSite({ root: ROOT })
+
+  await receives(screen, '/admin/collections/posts/hello?as=Ann', 'ann-screen')
+
+  const reader = await testSite({ root: ROOT })
+
+  await reader.visit(previewUrl('/blog/hello', { edit: true }))
+  await reader.visit('/blog/hello')
+  expect((await reader.fetch('/_kay/cms/entries/posts/hello')).status).toBe(200)
+  expect(namesIn(await receives(reader, '/blog/hello', 'reader-page'))).toContain('Ann')
+}, 30_000)

@@ -1,7 +1,7 @@
-import type { GuardContext } from 'kay'
+import type { Guard, GuardContext } from 'kay'
 import type { Action } from '../roles'
 import { apiUrl, guard } from 'kay'
-import { READ_METHODS, underKayDev } from 'kay/library'
+import { editSessionAdmitted, READ_METHODS, underKayDev } from 'kay/library'
 import { editedEntry, editRequested } from 'kay/server'
 import { wording } from 'kay/words'
 import { forbidden, may, memberOf, routePath } from '../access'
@@ -101,6 +101,20 @@ function actionOf(method: string, path: string): Action | undefined {
   return method === 'POST' && (UPLOAD.test(path) || MEDIA_RENAME.test(path)) ? 'upload' : undefined
 }
 
+// Marks the edit cookie of a person the app's guard lets in who only reads: the guard is asked once, and an edit link's holder, whom it turns away, reads on all the same.
+async function admitReader(ctx: GuardContext, admits: Guard | undefined): Promise<void> {
+  if (!admits || editSessionAdmitted(ctx.request))
+    return
+
+  try {
+    await admits(ctx)
+    admitEditor(ctx)
+  }
+  catch {
+    // Not a person the guard admits, which is no failure of the read.
+  }
+}
+
 // Whether the edit cookie may read this request: only an entry the pages rendered in edit mode read, since it is tied to no user and a preview link goes to people the app has not signed in.
 function mayRead(ctx: GuardContext, root: string | undefined): boolean {
   const path = ownPath(ctx.url.pathname, root)
@@ -138,8 +152,12 @@ export default guard(async (ctx) => {
     if (method === 'POST' && LEAVING.test(ownPath(ctx.url.pathname, root)))
       return
 
-    if (READ_METHODS.has(method) ? mayRead(ctx, root) : !admits && underKayDev())
+    if (READ_METHODS.has(method) ? mayRead(ctx, root) : !admits && underKayDev()) {
+      if (READ_METHODS.has(method))
+        await admitReader(ctx, admits)
+
       return
+    }
   }
 
   if (!admits)
