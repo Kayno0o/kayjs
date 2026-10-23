@@ -71,16 +71,21 @@ function parameters(code: string): Set<string> | undefined {
   return names
 }
 
-// The names a pattern or a parameter list (`{ a: b }, [c], ...d` or `x: typeof y`) binds: a key or a type it holds binds none. Every word of it when it does not parse.
-export function bindingNames(pattern: string): string[] {
+// The names a pattern or a parameter list (`{ a: b }, [c], ...d` or `x: typeof y`) binds: a key or a type it holds binds none. Undefined when it does not parse.
+export function parsedBindingNames(pattern: string): string[] | undefined {
   try {
     const expression = parseExpression(`(${pattern}\n) => 0`, { plugins: ['typescript'] })
 
     return expression.type === 'ArrowFunctionExpression' ? expression.params.flatMap(param => patternNames(param)) : []
   }
   catch {
-    return pattern.match(WORD) ?? []
+    return undefined
   }
+}
+
+// The names of `parsedBindingNames`, or every word of the pattern when it does not parse.
+export function bindingNames(pattern: string): string[] {
+  return parsedBindingNames(pattern) ?? pattern.match(WORD) ?? []
 }
 
 const reads = new WeakMap<KayFile, string[]>()

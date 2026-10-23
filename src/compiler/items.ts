@@ -1,9 +1,8 @@
 import type { AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfNode, MatchNode, Node, PendingNode, SnippetNode, TextExpression, TryNode } from './ast'
 import type { CodeBuilder } from './mapping'
-import { parseExpression } from '@babel/parser'
 import { isHead, isSlot } from './ast'
 import { PROPS } from './names'
-import { patternNames } from './pattern-names'
+import { parsedBindingNames } from './template-reads'
 
 // The children of an element or a block as the markup holds them: runs of static text, plain elements, and dynamic parts.
 // Server markup and browser code both walk this list, so hydration finds a dynamic part where the browser expects it.
@@ -154,14 +153,7 @@ export function constDeclaration(b: CodeBuilder, node: ConstNode, src: string, m
 
 // The names a destructuring pattern or a parameter list declares, in order.
 export function parameterNames(pattern: string): string[] {
-  try {
-    const fn = parseExpression(`(${pattern}) => 0`, { plugins: ['typescript'] })
-
-    return fn.type === 'ArrowFunctionExpression' ? fn.params.flatMap(param => patternNames(param)) : []
-  }
-  catch {
-    return []
-  }
+  return parsedBindingNames(pattern) ?? []
 }
 
 // What a `slot` renders: the component's children, or the block prop it names, called with its arguments when it has some.
