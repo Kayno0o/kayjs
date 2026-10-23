@@ -10,8 +10,17 @@ import { outbox } from '../src/outbox'
 
 await testSite({ root: 'tests/fixture' })
 
-// Skipped without a Postgres: the throwaway container of the repo's tests, or any database the role may create tables in.
-const url = process.env.TEST_DATABASE_URL ?? ''
+// Skipped without a Postgres. A database of its own, as TEST_DATABASE_URL names a server whose user may create them, not one to write into.
+const server = process.env.TEST_DATABASE_URL ?? ''
+const database = `kay_mail_lists_${process.pid}`
+const admin = server === '' ? undefined : new Bun.SQL(Object.assign(new URL(server), { pathname: '/postgres' }).href)
+const url = server === '' ? '' : Object.assign(new URL(server), { pathname: `/${database}` }).href
+
+if (admin !== undefined) {
+  await admin.unsafe(`DROP DATABASE IF EXISTS ${database} WITH (FORCE)`)
+  await admin.unsafe(`CREATE DATABASE ${database}`)
+}
+
 const DAY = 24 * 3_600_000
 let counter = 0
 const run = Math.random().toString(36).slice(2, 8)
@@ -30,16 +39,9 @@ const stores: [string, () => ListStore, boolean][] = [
 ]
 
 afterAll(async () => {
-  if (pg === undefined)
-    return
-
-  const cleaner = new Bun.SQL(url)
-
-  await cleaner.unsafe('DELETE FROM kay_mail_deliveries WHERE broadcast LIKE $1', [`b${run}%`])
-  await cleaner.unsafe('DELETE FROM kay_mail_broadcasts WHERE id LIKE $1', [`b${run}%`])
-  await cleaner.unsafe('DELETE FROM kay_mail_subscribers WHERE list LIKE $1', [`l${run}%`])
-  await cleaner.close()
-  await pg.close()
+  await pg?.close()
+  await admin?.unsafe(`DROP DATABASE IF EXISTS ${database} WITH (FORCE)`)
+  await admin?.close()
 })
 
 for (const [kind, open, enabled] of stores) {
