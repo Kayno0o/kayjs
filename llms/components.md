@@ -237,6 +237,7 @@ ul
 - Only plain objects and arrays are tracked, deeply and lazily. A `Map`, a `Set`, a `Date`, a class instance and a function are kept as written and not tracked: hold that state as objects and arrays, or in a `signal`.
 - A store is not a signal: read and write it as the plain object, with no call and no `.set`. It is a plain value for a prop, so a child island typed with the object reads it tracked; assigned into another store it stores the raw object, and `includes` on an array of objects needs the object as read from the store.
 - `snapshot(store)` from `kay` is a plain deep copy with no proxy in it and nothing tracked, for saving or sending. A `Map` or a `Date` inside is kept by reference.
+- A store made while an island renders keeps its state across a `kay dev` hot swap, as a signal does. A key read in an effect and then gone, such as an entity id that despawned, leaves nothing behind once the effect is disposed. An `undoable` optimistic change does not cover store writes: a store changes in place and is not rolled back.
 - On the server a store reads as the plain values, and one made at module level is shared by every request like any module state.
 
 ```kay

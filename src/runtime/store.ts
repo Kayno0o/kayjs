@@ -1,9 +1,10 @@
-import { ownSignal, tracking, untrack } from './reactive'
+import { kept, ownDep, tracking, untrack } from './reactive'
 
-// A dependency on one key or on an object's set of keys: a signal that notifies on every write and holds nothing.
+// A dependency on one key or on an object's set of keys: it notifies on every write and holds nothing.
 interface Dep {
-  read: () => number
-  write: (next: number) => void
+  observers: () => number
+  read: () => void
+  write: () => void
 }
 
 interface Meta {
@@ -31,10 +32,46 @@ function plain(value: unknown): value is object {
 
 const unwrap = <T>(value: T): T => (typeof value === 'object' && value !== null ? raws.get(value) as T | undefined : undefined) ?? value
 
-function dep(): Dep {
-  const [read, write] = ownSignal(0, { equals: false })
+// Deps that lost their last observer, checked once the current run ends: a computation re-reading its sources in another order leaves one for a moment and takes it back.
+let idle: (() => void)[] = []
 
-  return { read, write }
+function sweep(): void {
+  const pending = idle
+
+  idle = []
+
+  for (const drop of pending)
+    drop()
+}
+
+// `key` undefined is the object's key set. An unobserved dep leaves `meta` so an id read once and gone does not stay in the map for the life of the store.
+function dep(meta: Meta, key: string | undefined): Dep {
+  const made: Dep = ownDep(() => {
+    idle.push(() => {
+      if (made.observers() > 0)
+        return
+
+      if (key === undefined) {
+        if (meta.shape === made)
+          meta.shape = undefined
+      }
+      else if (meta.keys.get(key) === made) {
+        meta.keys.delete(key)
+      }
+    })
+
+    if (idle.length === 1)
+      queueMicrotask(sweep)
+  })
+
+  return made
+}
+
+// How many deps a store object holds, for tests.
+export function trackedCount(value: object): number {
+  const meta = metas.get(unwrap(value))
+
+  return meta ? meta.keys.size + (meta.shape ? 1 : 0) : 0
 }
 
 function metaOf(target: object): Meta {
@@ -55,7 +92,7 @@ function trackKey(target: object, key: string): void {
   let one = keys.get(key)
 
   if (!one)
-    keys.set(key, one = dep())
+    keys.set(key, one = dep(metaOf(target), key))
 
   one.read()
 }
@@ -66,16 +103,16 @@ function trackShape(target: object): void {
 
   const meta = metaOf(target)
 
-  meta.shape ??= dep()
+  meta.shape ??= dep(meta, undefined)
   meta.shape.read()
 }
 
 function touch(target: object, key: string): void {
-  metas.get(target)?.keys.get(key)?.write(0)
+  metas.get(target)?.keys.get(key)?.write()
 }
 
 function touchShape(target: object): void {
-  metas.get(target)?.shape?.write(0)
+  metas.get(target)?.shape?.write()
 }
 
 // Pops, splices and the rest read the array they change: untracked, so an effect calling one is not subscribed to it.
@@ -199,7 +236,7 @@ function wrap<T extends object>(target: T): T {
 // State mutated in place that a read tracks per property: `game.coins += 1` re-runs what read `game.coins` and nothing else.
 // Plain objects and arrays are tracked, deeply; a Map, a Set, a Date or a class instance is kept as written and is not.
 export function store<T extends object>(value: T): T {
-  return plain(value) ? wrap(unwrap(value)) : value
+  return plain(value) ? wrap(kept(unwrap(value))) : value
 }
 
 // A plain deep copy of a store, or of any plain value, with no proxy in it and nothing tracked by reading it: what to save or send.

@@ -153,6 +153,24 @@ export function createSignal<T>(value: T, options?: InternalSignalOptions<T>): [
   return [read, write]
 }
 
+// A dependency that holds no value and notifies on every write, made by a store per key; `idle` runs when its last observer leaves, which a signal's own hot path does not check.
+export function ownDep(idle: () => void): { observers: () => number, read: () => void, write: () => void } {
+  const observers = new Set<Computation>()
+  const remove = observers.delete.bind(observers)
+  const node: Source = { observers }
+
+  observers.delete = (item) => {
+    const had = remove(item)
+
+    if (had && observers.size === 0)
+      idle()
+
+    return had
+  }
+
+  return { observers: () => observers.size, read: () => track(node), write: () => notify(node) }
+}
+
 // kay's own signal, such as a socket's status or an action's pending, which an edited island never takes back, nor an optimistic change written in.
 export function ownSignal<T>(value: T, options?: SignalOptions<T>): [read: () => T, write: (next: T) => void] {
   const [read, write] = unrecorded(() => createSignal(value, options))
@@ -348,6 +366,11 @@ export function recordSignals<T>(fn: () => T, values?: unknown[]): { result: T, 
   finally {
     slot.created = outer
   }
+}
+
+// `value`, or in `kay dev` the one an island's last version held in its place, as a signal's value is kept across a hot swap.
+export function kept<T>(value: T): T {
+  return process.env.NODE_ENV === 'production' ? value : untrack(createSignal(value)[0])
 }
 
 // Runs `fn` with the signals it creates left out of an island's recorded ones: kay's own, such as a socket's status, and those of a block that may render or not, or once per row, whose order says nothing about which is which.

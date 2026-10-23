@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { batch, flush, root, signal } from '../src/runtime'
-import { renderEffect } from '../src/runtime/reactive'
-import { snapshot, store } from '../src/runtime/store'
+import { recordSignals, renderEffect } from '../src/runtime/reactive'
+import { snapshot, store, trackedCount } from '../src/runtime/store'
 
 // Runs `read` now and again whenever what it read changed, counting its runs; `stop` ends it.
 function watching<T>(read: () => T) {
@@ -374,5 +374,71 @@ describe('store array shrink', () => {
     flush()
     expect(last.seen).toEqual([3, undefined])
     last.stop()
+  })
+})
+
+describe('store deps', () => {
+  it('drops the dep of every absent key once its reader is disposed', async () => {
+    const entities = store<Record<string, { hp: number }>>({})
+    const stops: (() => void)[] = []
+
+    for (let id = 0; id < 500; id++)
+      stops.push(watching(() => entities[id]?.hp).stop)
+
+    expect(trackedCount(entities)).toBe(500)
+
+    for (const stop of stops)
+      stop()
+
+    await Promise.resolve()
+    expect(trackedCount(entities)).toBe(0)
+  })
+
+  it('keeps a dep another reader still observes, and the key set', async () => {
+    const game = store<{ list: number[], a?: number }>({ list: [1] })
+    const one = watching(() => game.a)
+    const two = watching(() => game.a)
+    const keys = watching(() => Object.keys(game).length)
+
+    one.stop()
+    await Promise.resolve()
+    expect(trackedCount(game)).toBe(2)
+
+    game.a = 4
+    flush()
+    expect(two.seen).toEqual([undefined, 4])
+    expect(keys.seen).toEqual([1, 2])
+    two.stop()
+    keys.stop()
+    await Promise.resolve()
+    expect(trackedCount(game)).toBe(0)
+  })
+
+  it('still notifies a reader that re-reads its keys in another order', async () => {
+    const game = store({ a: 1, b: 1 })
+    let swap = false
+    const seen = watching(() => (swap ? [game.b, game.a] : [game.a, game.b]).join())
+
+    swap = true
+    game.a = 2
+    flush()
+    await Promise.resolve()
+    game.a = 3
+    flush()
+    game.b = 9
+    flush()
+    expect(seen.seen[0]).toBe('1,1')
+    expect(seen.seen.at(-1)).toBe('9,3')
+    seen.stop()
+  })
+
+  it('takes its state back across a hot swap', () => {
+    const first = recordSignals(() => store({ n: 1 }))
+
+    first.result.n = 7
+
+    const second = recordSignals(() => store({ n: 1 }), first.values())
+
+    expect(second.result.n).toBe(7)
   })
 })

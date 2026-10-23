@@ -226,6 +226,8 @@ p {game.miners[0].ore}
 
 Writing the value a property already holds does nothing, and `batch` runs the readers once after several writes. Objects and arrays are tracked at any depth. A `Map`, a `Set`, a `Date` or a class instance is not, so keep that state in objects and arrays. `snapshot(game)` gives a plain deep copy to save or send.
 
+A store made while an island renders keeps its state when `kay dev` swaps the island's code, as a signal does. Reading a key that does not exist, such as the id of an entity that is gone, leaves nothing behind once the reader is disposed. An `undoable` optimistic change does not cover store writes, as a store changes in place and is not rolled back.
+
 ## Generic components
 
 Type parameters on the fence line make a component generic. Each use infers them from its props.
