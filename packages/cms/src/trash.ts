@@ -38,7 +38,24 @@ function trashedOf(id: string, row: Row): Trashed {
 // What a purge leaves in the trash: the places of the entries it holds, and a time before which none of its rows was put there, so the next sweep knows when a row can first expire.
 export interface Purged {
   oldest: number
+  // A hash of the slugs of the rows the trash keeps, so a later sweep tells the trash changed even when it holds as many rows.
+  slugs: string
   places: string[]
+}
+
+// A hash of the slugs of the trash rows, in any order.
+export function slugsHash(rows: readonly { slug: string }[]): string {
+  return Bun.hash(rows.map(row => row.slug).sort().join('\u0000')).toString(36)
+}
+
+// The hash of the trash as it is now; undefined when it could not be read.
+export async function trashHash(collection: string): Promise<string | undefined> {
+  try {
+    return slugsHash((await hiddenOf(collection, 'trash')?.load({ preview: true }) ?? []).filter(row => isRow(row.data)))
+  }
+  catch {
+    return undefined
+  }
 }
 
 // Drops what has been in the trash longer than it is kept, with the history of an entry that was never made again, which the cms does on its own every hour and when the trash is read. Never throws; undefined when it could not read the trash.
@@ -67,7 +84,7 @@ export async function purge(collection: string): Promise<Purged | undefined> {
         await forgetRevisions({ collection, slug, locale })
     }
 
-    return { oldest: Math.min(Date.now(), ...staying.map(row => (row.data as Row).at)), places: [...new Set(staying.map(row => placeOf(row.data as EntryRef)))] }
+    return { oldest: Math.min(Date.now(), ...staying.map(row => (row.data as Row).at)), slugs: slugsHash(staying), places: [...new Set(staying.map(row => placeOf(row.data as EntryRef)))] }
   }
   catch (error) {
     log.error(`${collection}'s trash could not be emptied of what expired`, error)

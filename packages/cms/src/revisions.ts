@@ -151,13 +151,13 @@ export async function openTrail(ref: EntryRef, current: (() => Promise<Version |
   }
 }
 
-// Drops the revisions of every entry of a collection that are older than `cutoff`, always keeping the newest of an entry; the entry as it stood before its first recorded save counts as old as the revision after it. Never throws.
+// Drops the revisions of every entry of a collection that are older than `cutoff`, always keeping the newest of an entry; the entry as it stood before its first recorded save counts as old as the revision after it. Never throws; false when it failed.
 // Given the `places` that can hold revisions, it reads only their indexes, not every row the history holds, and finds no revision left out of an index; without them it reads every row, which finds those too.
-export async function pruneRevisions(collection: string, cutoff: number, places?: readonly string[]): Promise<void> {
+export async function pruneRevisions(collection: string, cutoff: number, places?: readonly string[]): Promise<boolean> {
   const hidden = hiddenOf(collection, 'history')
 
   if (hidden === undefined)
-    return
+    return true
 
   try {
     const rows = places === undefined ? await hidden.load({ preview: true }) : undefined
@@ -193,9 +193,13 @@ export async function pruneRevisions(collection: string, cutoff: number, places?
       if (at !== undefined && index !== undefined && !index.includes(Number(at)) && Number(at) < cutoff)
         await hidden.remove!({ slug: row.slug })
     }
+
+    return true
   }
   catch (error) {
     log.error(`${collection}'s old revisions could not be dropped`, error)
+
+    return false
   }
 }
 

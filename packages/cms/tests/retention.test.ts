@@ -1,14 +1,18 @@
-import { afterEach, beforeEach, describe, expect, setSystemTime, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, mock, setSystemTime, spyOn, test } from 'bun:test'
 import { s } from 'kay'
 import { collection } from 'kay/content'
 import { registerCollections } from '../../../src/content/edit'
 import { activityOf } from '../src/activity'
-import { hiddenOf } from '../src/hidden'
+import * as activity from '../src/activity'
+import { hiddenOf, SWEEP_MARKER } from '../src/hidden'
 import { sqliteLoader } from '../src/loaders/sqlite'
+import { restoreTrashed } from '../src/restore'
 import { eraseHistory, forgetEditor, startSweeping, sweepHistory } from '../src/retention'
+import * as revisions from '../src/revisions'
 import { revisionsOf } from '../src/revisions'
 import { configure } from '../src/settings'
 import { deleteEntry, saveEntry } from '../src/store'
+import * as trash from '../src/trash'
 import { trashOf } from '../src/trash'
 
 const schema = s.Object({ title: s.String() })
@@ -50,6 +54,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  mock.restore()
   setSystemTime()
   registerCollections(restore)
 })
@@ -133,7 +138,7 @@ describe('sweepHistory', () => {
     expect((await revisionsOf(ref)).map(revision => revision.data.title)).toEqual(['Three'])
   })
 
-  test('reads neither the trash nor the activity on a light sweep before a row of theirs can expire, also the first after a restart', async () => {
+  test('reads the activity not at all and the trash only for its slugs on a light sweep before a row of theirs can expire, also the first after a restart', async () => {
     await saveEntry({ ...ref, data: { title: 'One' } }, { create: true, author: ada })
     await deleteEntry(ref, ada)
     await sweepHistory()
@@ -143,11 +148,11 @@ describe('sweepHistory', () => {
     // Another process, a restart: the sweep knows only what the history store marked.
     await sweepHistory()
     await sweepHistory({ full: false })
-    expect(loads()).toEqual({ trash: 0, activity: 0 })
+    expect(loads()).toEqual({ trash: 2, activity: 0 })
     expect(await rowCount('trash')).toBe(1)
   })
 
-  test('reads the trash and the activity on a light sweep once a row of theirs can have expired, and when the trash changed size', async () => {
+  test('reads the trash and the activity on a light sweep once a row of theirs can have expired, and when the trash changed', async () => {
     configure({ history: { trash: '2h' } })
     await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
     await deleteEntry(ref, ada)
@@ -197,6 +202,121 @@ describe('sweepHistory', () => {
   test('takes a duration for maxAge and refuses nonsense', () => {
     expect(() => configure({ history: { maxAge: '90d' } })).not.toThrow()
     expect(() => configure({ history: { maxAge: 'soon' as never } })).toThrow()
+  })
+})
+
+async function marker(): Promise<{ full: number, trash?: { places: string[], slugs: string }, activity?: { oldest: number } } | undefined> {
+  const row = (await hiddenOf('notes', 'history', { anyway: true })!.load({ preview: true })).find(found => found.slug === SWEEP_MARKER)
+
+  return row?.data as never
+}
+
+describe('the sweep marker', () => {
+  test('keeps a light sweep from skipping the trash at the edge of the clock skew', async () => {
+    configure({ history: { trash: '2h' } })
+
+    const start = Date.now()
+
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
+    await deleteEntry(ref, ada)
+    await sweepHistory()
+
+    const loads = spyOnLoads()
+
+    // The trashed row is two hours old minus the skew: the sweep still leaves the purge alone.
+    setSystemTime(new Date(start + 2 * 60 * 60 * 1000 - 60 * 1000))
+    await sweepHistory({ full: false })
+    expect(loads().trash).toBe(1)
+
+    setSystemTime(new Date(start + 2 * 60 * 60 * 1000 - 60 * 1000 + 100))
+    await sweepHistory({ full: false })
+    expect(loads().trash).toBe(3)
+  })
+
+  test('prunes the revisions of an entry trashed while another left the trash, the count staying the same', async () => {
+    configure({ history: { trash: '800d' } })
+
+    for (const slug of ['one', 'two']) {
+      await saveEntry({ collection: 'notes', slug, data: { title: 'A' } }, { create: true })
+      await saveEntry({ collection: 'notes', slug, data: { title: 'B' } })
+    }
+
+    await deleteEntry({ collection: 'notes', slug: 'one' }, ada)
+    await sweepHistory()
+    setSystemTime(new Date(Date.now() + 400 * DAY))
+    await sweepHistory({ full: false })
+
+    // The entry in the trash is restored while the other is deleted: still one row.
+    const [item] = await trashOf('notes')
+
+    await restoreTrashed('notes', item!.id)
+    await deleteEntry({ collection: 'notes', slug: 'two' }, ada)
+    expect(await rowCount('trash')).toBe(1)
+    await sweepHistory({ full: false })
+
+    expect((await revisionsOf({ collection: 'notes', slug: 'two' })).map(revision => revision.data.title)).toEqual(['B'])
+  })
+
+  test('does not advance the day of the last full sweep when pruning the revisions failed', async () => {
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
+
+    const prune = spyOn(revisions, 'pruneRevisions').mockResolvedValue(false)
+
+    await sweepHistory()
+    expect((await marker())?.full).toBe(0)
+    prune.mockRestore()
+    await sweepHistory()
+    expect((await marker())?.full).toBeGreaterThan(0)
+  })
+
+  test('keeps the places it read when a light sweep could not purge the trash', async () => {
+    configure({ history: { trash: '800d' } })
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
+    await saveEntry({ ...ref, data: { title: 'Two' } })
+    await saveEntry({ ...ref, data: { title: 'Three' } })
+    await deleteEntry(ref, ada)
+    await sweepHistory()
+
+    setSystemTime(new Date(Date.now() + 400 * DAY))
+    await saveEntry({ ...ref, slug: 'second', data: { title: 'Other' } }, { create: true })
+    await deleteEntry({ ...ref, slug: 'second' }, ada)
+    spyOn(trash, 'purge').mockResolvedValue(undefined)
+    await sweepHistory({ full: false })
+
+    expect((await revisionsOf(ref)).map(revision => revision.data.title)).toEqual(['Three'])
+    expect((await marker())?.trash?.places).toHaveLength(1)
+  })
+
+  test('leaves the activity unmarked when pruning it answered nothing', async () => {
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
+    spyOn(activity, 'pruneActivity').mockResolvedValue(undefined)
+    await sweepHistory()
+
+    expect((await marker())?.activity).toBeUndefined()
+  })
+
+  test('writes no marker with the history off, and none for activity or the trash without a maxAge or a trash', async () => {
+    configure({ history: false })
+    await sweepHistory()
+    expect(await marker()).toBeUndefined()
+
+    configure({ history: { maxAge: false, trash: false } })
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
+    await sweepHistory()
+    expect(await marker()).toEqual({ full: expect.any(Number) } as never)
+  })
+
+  test('is not an entry, an erasure nor an editor', async () => {
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true, author: ada })
+    await deleteEntry(ref, ada)
+    await sweepHistory()
+
+    const before = await marker()
+
+    expect(before).toBeDefined()
+    expect(await eraseHistory(ref)).toBeGreaterThan(0)
+    expect(await forgetEditor('Ada')).toBeGreaterThanOrEqual(0)
+    expect(await marker()).toEqual(before as never)
   })
 })
 

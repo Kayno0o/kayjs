@@ -28,6 +28,9 @@ export function hiddenOf(collection: string, kind: 'history' | 'trash' | 'activi
   return sibling
 }
 
+// The row of the history store that remembers what the sweeps found: no entry has its place, and no revision or index is taken for it.
+export const SWEEP_MARKER = '\u0002sweep'
+
 // The row of a place in a hidden collection, whether or not its loader answers one place alone.
 export async function rowOf(hidden: ContentLoader, place: string): Promise<{ data: unknown, body?: string | undefined } | undefined> {
   return hidden.get === undefined ? (await hidden.load({ preview: true })).find(row => row.slug === place) : hidden.get(place, { preview: true })

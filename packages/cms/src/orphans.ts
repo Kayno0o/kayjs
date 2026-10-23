@@ -1,7 +1,7 @@
 import type { CollectionInfo, EntryRef } from './kay/contract'
 import { files } from 'kay/server'
 import { wording } from 'kay/words'
-import { hiddenOf } from './hidden'
+import { hiddenOf, SWEEP_MARKER } from './hidden'
 import { collections, entries } from './kay/content'
 import { log } from './log'
 import { forgetUploads, MEDIA_FOLDER, mediaIndex, movedKeys } from './media'
@@ -116,6 +116,9 @@ export async function readUploads(listing?: { stored: Stored[], listed: Collecti
     for (const kind of history === undefined ? [] : ['history', 'trash'] as const) {
       try {
         for (const row of await hiddenOf(collection.name, kind)?.load({ preview: true }) ?? []) {
+          if (row.slug === SWEEP_MARKER)
+            continue
+
           for (const id of idsIn(row.data, row.body))
             held?.add(id)
         }
