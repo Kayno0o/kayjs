@@ -92,7 +92,7 @@ describe('the browser bundle, branches with no string of their own', () => {
     return result.outputs[0]!.text()
   }
 
-  it.each(['action', 'live-value', 'client', 'leave', 'shortcut', 'follow-log', 'focus', 'navigate-api', 'edit', 'search', 'dom'])('drops the server test of %s', async (name) => {
+  it.each(['action', 'live-value', 'client', 'leave', 'shortcut', 'follow-log', 'focus', 'navigate-api', 'edit', 'search', 'dom', 'page-swap'])('drops the server test of %s', async (name) => {
     expect((await build(name, true)).length).toBeLessThan((await build(name, false)).length)
   })
 })

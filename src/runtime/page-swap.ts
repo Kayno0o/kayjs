@@ -9,6 +9,8 @@ import { ROOT_ATTRIBUTES } from './root'
 import { NAVIGATE_HEADER, RELOAD_HEADER } from './swap'
 import { decodeServerValue } from './wire'
 
+declare const KAY_BROWSER: true | undefined
+
 // The page swap itself, which `./navigate` loads once a visitor is about to follow a link, and `./forms` once a form is posted.
 // The body's content becomes the next page's, morphed so what renders again stays the same element, islands kept only by `persist` or a refresh.
 // Everything else follows one rule: what the server served changes as the next page serves it, what a script changed or added since stays the script's. The served state is `served` for `<html>`, read from the server's meta, each head element's own `_$s` for the head, and none for `<body>`, which the server writes bare.
@@ -80,7 +82,7 @@ const ISOLATING_EMBEDDERS = new Set(['require-corp', 'credentialless'])
 const POLICY_PARAMS = /;.*/
 
 // What the server set on `<html>` for the page shown, by name: read from its meta as the swap loads, then kept as each swap commits, since a navigation dropped midway may have merged its own meta into the head.
-let served = typeof document === 'undefined' ? new Map<string, string>() : servedRoot(document)
+let served = typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined' ? new Map<string, string>() : servedRoot(document)
 
 interface KeptIsland extends HTMLElement {
   // Set by the entry once the island hydrated: gives it new props.
