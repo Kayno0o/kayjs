@@ -338,6 +338,8 @@ describe('external-redirect', () => {
     expect(found('const { url } = {}, [headers] = list\nredirect(url.href + headers.get("r"))')).toHaveLength(1)
     expect(found('const go = (headers = new Headers()) => redirect(headers.get("r"))')).toEqual([])
     expect(found('const go = ([headers]) => redirect(headers.get("r"))')).toEqual([])
+    expect(found('const go = ([{ url }, headers]) => redirect(url.href + headers.get("r"))')).toHaveLength(1)
+    expect(found('const go = ([{ url }, headers]) => redirect(headers.get("r"))')).toEqual([])
     expect(found('const go = (headers) => redirect(headers.get("x"))')).toEqual([])
     expect(found('function go(headers) {\n  return headers.href\n}\nredirect(go(a))')).toEqual([])
     expect(found('const url = new URL("/a", base)\nredirect(url.href)')).toEqual([])
