@@ -3,8 +3,9 @@ import type { Route } from './routes'
 import { KayError } from '../compiler/errors'
 import { isCollection, isPaginated } from '../content'
 
-// The locales holding a localized collection's entry, which a page listing it is served in, with every other one when the default locale holds it.
 const FILE_BREAKERS = /[\\\0]/
+
+// The locales holding a localized collection's entry, which a page listing it is served in, with every other one when the default locale holds it.
 const ENTRY_LOCALES = Symbol('kay.entryLocales')
 
 // The locales a paginated list has a page in, each counting its own entries.
