@@ -102,7 +102,7 @@ function commaAfter(source: string, from: number, limit: number, comments: reado
       at = comment.end!
     else if (source[at] === ',')
       return at + 1
-    else if ((/\s/).test(source[at]!))
+    else if (source[at]!.trim() === '')
       at++
     else
       return undefined

@@ -113,9 +113,9 @@ describe('the Styles tab\'s endpoints', () => {
   it('keeps a block comment in a one-line empty object, and finds a trailing comma after a comment', async () => {
     const head = 'import { defineUi } from \'kay\'\n\nexport default defineUi({\n'
 
-    await put('src/ui.ts', `${head}  Badge: { /* c */ },\n})\n`)
+    await put('src/ui.ts', `${head}  Panel: { parts: {\n    root: 'a' // c\n    ,\n  } },\n})\n`)
     await write({ file: PANEL_FILE, part: 'body', classes: 'p-4' })
-    expect(await ui()).toBe(`${head}  Badge: { /* c */ },\n  Panel: { parts: { body: 'p-4' } },\n})\n`)
+    expect(await ui()).toBe(`${head}  Panel: { parts: {\n    root: 'a' // c\n    ,\n    body: 'p-4',\n  } },\n})\n`)
 
     await put('src/ui.ts', `${head}  Badge: { parts: 'a' } /* c */,\n})\n`)
     await write({ file: PANEL_FILE, part: 'body', classes: 'p-4' })
