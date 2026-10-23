@@ -52,6 +52,27 @@ describe('the query box\'s refusals', () => {
     expect(refusedQuery('select "set_config"(\'statement_timeout\', \'0\', true)')).toContain('set_config')
   })
 
+  it('refuses a semicolon hidden in a quoted name or a dollar-quoted string', () => {
+    for (const sql of ['select 1 as "a;b"', 'select $$;$$', 'select $t$ ; $t$'])
+      expect(refusedQuery(sql), sql).toContain('one statement')
+  })
+
+  it('refuses the unicode-escaped spelling of a name or a string, wherever its function is hidden', () => {
+    for (const sql of ['select U&"set\\005fconfig"(\'statement_timeout\', \'0\', true)', 'select u&"a" from t', 'select U&\'\\0041\'', 'select 1 where x = U&\'a\' uescape \'!\'', 'select U&"pg\\005fterminate\\005fbackend"(1)'])
+      expect(refusedQuery(sql), sql).toContain('U&')
+
+    expect(refusedQuery('select \'U&"a"\'')).toBeUndefined()
+    expect(refusedQuery('select 1 -- U&"a"')).toBeUndefined()
+  })
+
+  it('refuses every function the read-only transaction does not stop, in any case, quoting or schema', () => {
+    for (const name of ['set_config', 'SET_CONFIG', '"set_config"', 'pg_catalog.set_config', 'pg_catalog."set_config"', 'pg_terminate_backend', 'pg_cancel_backend', 'pg_reload_conf', 'pg_notify', 'pg_advisory_lock', 'pg_try_advisory_lock_shared', 'pg_stat_reset', 'pg_switch_wal', 'pg_create_restore_point', 'pg_rotate_logfile', 'pg_logical_emit_message', 'pg_read_file', 'pg_read_binary_file', 'pg_ls_dir', 'lo_import', 'lo_export', 'query_to_xml', 'query_to_xml_and_xmlschema', 'cursor_to_xml', 'table_to_xml', 'ts_stat', 'dblink', 'dblink_exec']) {
+      expect(refusedQuery(`select ${name}(1)`), name).toContain('not allowed')
+      expect(refusedQuery(`select * from ${name}(1)`), name).toContain('not allowed')
+      expect(refusedQuery(`select ${name}(1)::text`), name).toContain('not allowed')
+    }
+  })
+
   it('refuses a string, a name or a comment that never ends, which could hide a semicolon from the check', () => {
     for (const sql of ['select \'a', 'select "a', 'select /* a', 'select $x$ a'])
       expect(refusedQuery(sql)).toContain('never ends')
@@ -198,8 +219,30 @@ describe('the dev tool\'s database endpoints', () => {
       const found = await (await query(site, `select id, name, bio is null as no_bio, now() > '2000-01-01' as recent, 12345678901234567890::numeric as big, '{"a":1}'::jsonb as doc, '\\x00ff'::bytea as bytes from ${SCHEMA}.users order by id`)).json() as DevQueryResult
 
       expect(found.columns).toEqual(['id', 'name', 'no_bio', 'recent', 'big', 'doc', 'bytes'])
-      expect(found.rows[0]).toEqual(['1', 'Ada', 'true', 'true', '12345678901234567890', '{"a":1}', '\\x00ff (2 bytes)'])
+      expect(found.rows[0]).toEqual(['1', 'Ada', 'true', 'true', '12345678901234567890', '{"a": 1}', '\\x00ff (2 bytes)'])
       expect(found.truncated).toBe(false)
+    })
+
+    it('cuts a huge cell in the database, as the rows view does', async () => {
+      const found = await (await query(site, 'select jsonb_build_object(\'k\', repeat(\'x\', 5000000)) as doc, convert_to(repeat(\'y\', 5000000), \'UTF8\') as bytes, repeat(\'z\', 300) as note, 1 as one, 2 as one')).json() as DevQueryResult
+
+      expect(found.columns).toEqual(['doc', 'bytes', 'note', 'one', 'one'])
+      expect(found.rows[0]![0]).toHaveLength(203)
+      expect(found.rows[0]![0]).toEndWith('...')
+      expect(found.rows[0]![1]).toBe(`\\x${'79'.repeat(24)}... (5000000 bytes)`)
+      expect(found.rows[0]![2]).toBe(`${'z'.repeat(200)}...`)
+      expect(found.rows[0]!.slice(3)).toEqual(['1', '2'])
+    })
+
+    it('answers a query with no column and one with no row', async () => {
+      expect(await (await query(site, `select from ${SCHEMA}.users`)).json()).toEqual({ columns: [], rows: [], truncated: false })
+      expect(await (await query(site, `select id, name from ${SCHEMA}.users where false`)).json()).toEqual({ columns: ['id', 'name'], rows: [], truncated: false })
+    })
+
+    it('runs VALUES, TABLE and a trailing comment inside the wrapped statement', async () => {
+      expect(((await (await query(site, 'values (1, \'a\'), (2, \'b\') -- done')).json()) as DevQueryResult).rows).toEqual([['1', 'a'], ['2', 'b']])
+      expect(((await (await query(site, `table ${SCHEMA}.users`)).json()) as DevQueryResult).rows).toHaveLength(2)
+      expect((await query(site, 'select 1) as x, (select 2')).status).toBe(400)
     })
 
     it('stops a result at 500 rows without reading the rest', async () => {
@@ -248,11 +291,14 @@ describe('the dev tool\'s database endpoints', () => {
       expect(await admin.unsafe(`select count(*)::int as n from ${SCHEMA}.users`)).toEqual(expect.arrayContaining([expect.objectContaining({ n: 2 })]))
     })
 
-    it('stops every spelling of the switch to read-write in the database itself, a unicode-escaped function name included', async () => {
+    it('stops every spelling of the switch to read-write and of the timeout, a unicode-escaped function name included', async () => {
       const switching = [
         'select set_config(\'transaction_read_only\', \'off\', true)',
         'select "set_config"(\'transaction_read_only\', \'off\', true)',
+        'select pg_catalog.set_config(\'statement_timeout\', \'0\', true)',
         'select U&"set\\005fconfig"(\'transaction_read_only\', \'off\', true)',
+        'select u&"set\\005fconfig"(\'statement_timeout\', \'0\', true)',
+        'select query_to_xml(\'select set_config(\'\'statement_timeout\'\', \'\'0\'\', true)\', false, false, \'\')',
       ]
 
       for (const sql of switching) {
@@ -261,9 +307,9 @@ describe('the dev tool\'s database endpoints', () => {
         expect(found.status, sql).toBe(400)
       }
 
-      const escaped = await (await query(site, switching[2]!)).json() as { error: string }
+      const escaped = await (await query(site, switching[3]!)).json() as { error: string }
 
-      expect(escaped.error).toContain('read-write')
+      expect(escaped.error).toContain('U&')
 
       for (const sql of ['set transaction_read_only = off', 'set transaction read write'])
         expect((await query(site, sql)).status, sql).toBe(400)

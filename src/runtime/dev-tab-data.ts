@@ -57,6 +57,7 @@ export default function dataTab(tool: DevTool, tab: DevTab): () => void {
   const input = tool.make('textarea', 'query')
   const run = tool.make('button', 'tool', 'Run query')
   const result = tool.make('div', 'stack')
+  const guarantee = tool.make('div', 'note', 'Postgres refuses every write here and stops a query after 5 seconds. A few functions that act outside the transaction are refused by name; one that is not on that list (an extension\'s, or your own) still runs.')
   let shown: DevTable | undefined
   let page = 0
 
@@ -136,7 +137,7 @@ export default function dataTab(tool: DevTool, tab: DevTab): () => void {
 
       picker.replaceChildren()
       tab.count(found.tables.length)
-      input.hidden = run.hidden = !found.configured
+      input.hidden = run.hidden = guarantee.hidden = !found.configured
 
       if (!found.configured) {
         status.textContent = 'The app has no Postgres database: set DATABASE_URL to a postgres:// address to list its tables here.'
@@ -162,7 +163,7 @@ export default function dataTab(tool: DevTool, tab: DevTab): () => void {
     }
   }
 
-  tab.panel.append(status, picker, rows, input, run, result)
+  tab.panel.append(status, picker, rows, input, run, guarantee, result)
 
   return () => void list()
 }

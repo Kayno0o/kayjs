@@ -12,8 +12,10 @@ const BINARY_BYTES = 24
 const POSTGRES_URL = /^postgres(?:ql)?:\/\//
 const QUERY_START = /^[\s(]*(?:select|with|values|table)\b/i
 const FIRST_WORD = /^[\s(]*(\w*)/
-const SET_CONFIG = /\bset_config\b/i
-const OUTSIDE_FUNCTION = /\b(pg_terminate_backend|pg_cancel_backend|pg_reload_conf)\b/i
+// Functions a read-only transaction does not stop. A text denylist, not a sandbox: see `refusedQuery`.
+const DENIED_FUNCTION = /\b(set_config|pg_terminate_backend|pg_cancel_backend|pg_reload_conf|pg_notify|pg_advisory_lock\w*|pg_try_advisory_lock\w*|pg_stat_reset\w*|pg_switch_wal|pg_create_restore_point|pg_rotate_logfile|pg_logical_emit_message|pg_read_file|pg_read_binary_file|pg_ls_dir|lo_import|lo_export|query_to_xml\w*|cursor_to_xml|table_to_xml\w*|ts_stat|dblink\w*)\b/i
+const UNICODE_ESCAPE = /u&$/i
+const BYTEA_OID = 17
 const IDENTIFIER_CHAR = /\w/
 const ESCAPE_PREFIX = /E/i
 const DOLLAR_TAG = /^\$(?:[A-Z_]\w*)?\$/i
@@ -198,7 +200,8 @@ export async function devRows(request: Request): Promise<Response> {
 }
 
 // The statement with its strings, quoted names and comments blanked, or why it cannot be read: what `;`, a first word and a function are looked for in.
-function blanked(text: string): string | undefined {
+function blanked(text: string): { code: string } | { error: string } {
+  const unreadable = { error: 'the statement has a string, a quoted name or a comment that never ends' }
   let code = ''
 
   for (let at = 0; at < text.length;) {
@@ -230,19 +233,23 @@ function blanked(text: string): string | undefined {
       }
 
       if (depth > 0)
-        return undefined
+        return unreadable
 
       code += ' '
       at = cursor
     }
     else if (char === '\'' || char === '"') {
+      // U&"..." and U&'...' spell a name or a string with escapes, which the text checks cannot read.
+      if (UNICODE_ESCAPE.test(code))
+        return { error: 'U&"..." and U&\'...\' are not allowed: an escaped name hides a function from the checks' }
+
       // An E'...' string lets a backslash escape the quote.
       const escapes = char === '\'' && at > 0 && ESCAPE_PREFIX.test(text[at - 1]!) && !IDENTIFIER_CHAR.test(text[at - 2] ?? ' ')
       let cursor = at + 1
 
       for (;;) {
         if (cursor >= text.length)
-          return undefined
+          return unreadable
 
         if (escapes && text[cursor] === '\\') {
           cursor += 2
@@ -266,7 +273,7 @@ function blanked(text: string): string | undefined {
       const end = text.indexOf(tag, at + tag.length)
 
       if (end === -1)
-        return undefined
+        return unreadable
 
       code += ' '
       at = end + tag.length
@@ -277,17 +284,17 @@ function blanked(text: string): string | undefined {
     }
   }
 
-  return code
+  return { code }
 }
 
-// Why the query box refuses a statement, undefined for one it runs: a single SELECT, WITH, VALUES or TABLE, with no `set_config` (which could undo the timeout). Postgres' read-only transaction is the second wall.
+// Why the query box refuses a statement, undefined for one it runs: a single SELECT, WITH, VALUES or TABLE, with no `U&` escape and none of the functions in `DENIED_FUNCTION`. The refusals read the text, so a function they do not name (an extension's, or one the app defined) still runs: only the read-only transaction, which Postgres enforces, is a wall.
 export function refusedQuery(text: string): string | undefined {
-  const code = blanked(text)
+  const blank = blanked(text)
 
-  if (code === undefined)
-    return 'the statement has a string, a quoted name or a comment that never ends'
+  if ('error' in blank)
+    return blank.error
 
-  const statement = code.replace(TRAILING_SEMICOLON, '')
+  const statement = blank.code.replace(TRAILING_SEMICOLON, '')
   const raw = text.replace(TRAILING_SEMICOLON, '')
 
   if (statement.trim() === '')
@@ -303,30 +310,9 @@ export function refusedQuery(text: string): string | undefined {
     return first === 'SET' ? 'SET is not allowed: the box only reads' : `the box only reads: start with SELECT, WITH, VALUES or TABLE${first === undefined || first === '' ? '' : `, not ${first}`}`
   }
 
-  const outside = OUTSIDE_FUNCTION.exec(raw)?.[1]
+  const denied = DENIED_FUNCTION.exec(raw)?.[1]
 
-  if (outside !== undefined)
-    return `${outside} is not allowed: it acts outside the transaction`
-
-  return SET_CONFIG.test(raw) ? 'set_config is not allowed: the box only reads' : undefined
-}
-
-function shown(value: unknown): string | null {
-  if (value === null || value === undefined)
-    return null
-
-  let text: string
-
-  if (value instanceof Uint8Array)
-    text = `\\x${Buffer.from(value.subarray(0, BINARY_BYTES)).toString('hex')}${value.length > BINARY_BYTES ? '...' : ''} (${value.length} bytes)`
-  else if (value instanceof Date)
-    text = Number.isNaN(value.getTime()) ? 'invalid date' : value.toISOString()
-  else if (typeof value === 'object')
-    text = JSON.stringify(value, (_, inner: unknown) => typeof inner === 'bigint' ? String(inner) : inner)
-  else
-    text = String(value)
-
-  return text.length > CELL_CHARS ? `${text.slice(0, CELL_CHARS)}...` : text
+  return denied === undefined ? undefined : `${denied} is not allowed: the box only reads`
 }
 
 // Runs the box's query in a read-only transaction under a statement timeout, through a cursor so a large result is never read past `QUERY_ROWS` rows.
@@ -366,12 +352,25 @@ export async function devQuery(request: Request): Promise<Response> {
     await reserved.unsafe(`SET LOCAL statement_timeout = ${QUERY_TIMEOUT_MS}`)
     // Postgres refuses to make a transaction read-write once a query has run in it, so no spelling of that switch gets through; the text checks above are only a first refusal.
     await reserved.unsafe('SELECT 1')
-    await reserved.unsafe(`DECLARE kay_dev_query NO SCROLL CURSOR FOR ${body.sql.replace(TRAILING_SEMICOLON, '')}\n`)
+    const text = body.sql.replace(TRAILING_SEMICOLON, '')
 
-    const found = await reserved.unsafe<Record<string, unknown>[]>(`FETCH ${QUERY_ROWS + 1} FROM kay_dev_query`)
-    const columns = Object.keys(found[0] ?? {})
+    // The statement alone first, for its columns and for Postgres to refuse it as it is: a closing parenthesis or a comment in it cannot reach the wrapped one.
+    await reserved.unsafe(`DECLARE kay_dev_columns NO SCROLL CURSOR FOR ${text}\n`)
 
-    return Response.json({ columns, rows: found.slice(0, QUERY_ROWS).map(row => columns.map(name => shown(row[name]))), truncated: found.length > QUERY_ROWS } satisfies DevQueryResult)
+    const described = (await reserved.unsafe('FETCH 0 FROM kay_dev_columns')) as unknown as { columns: { name: string, type: number }[] }
+    const columns = described.columns.map(({ name }) => name)
+
+    if (columns.length === 0)
+      return Response.json({ columns, rows: [], truncated: false } satisfies DevQueryResult)
+
+    const cells = described.columns.map(({ type }, at) => cell({ name: `c${at}`, type: '', kind: type === BYTEA_OID ? 'binary' : 'text', primary: false }))
+
+    // Each cell is cut in the database, as the rows view does, so a huge value is never sent; the columns are renamed by position as names may repeat.
+    await reserved.unsafe(`DECLARE kay_dev_query NO SCROLL CURSOR FOR SELECT ${cells.join(', ')} FROM (${text}\n) AS source(${columns.map((_, at) => `c${at}`).join(', ')})`)
+
+    const found = await reserved.unsafe<Record<string, string | null>[]>(`FETCH ${QUERY_ROWS + 1} FROM kay_dev_query`)
+
+    return Response.json({ columns, rows: found.slice(0, QUERY_ROWS).map(row => columns.map((_, at) => row[`c${at}`] ?? null)), truncated: found.length > QUERY_ROWS } satisfies DevQueryResult)
   }
   catch (error) {
     return refused(error instanceof Error ? error.message : String(error))
