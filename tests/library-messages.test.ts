@@ -139,11 +139,13 @@ describe('a ui.* or cms.* key an app words under its pre-1.72 Label name', () =>
   })
 
   test('yields to the new key when the same catalog words both, and leaves other keys ending in Label alone', async () => {
-    const root = await project('export default {}\n', { 'src/messages/fr.ts': MESSAGES('{ ui: { table: { filterLabel: \'Vieux\', filter: \'Neuf\' } }, mine: { titleLabel: \'T\' } }') })
+    const root = await project('export default {}\n', { 'src/messages/fr.ts': MESSAGES('{ ui: { table: { filterLabel: \'Vieux\', filter: \'Neuf\' }, hero: { titleLabel: \'Mien\' } }, mine: { titleLabel: \'T\' } }') })
     const { translations } = await loadI18n(root, config, (await loadConfig(root)).extensions)
     const fr = translations.get('fr')!
 
     expect(lookup(fr, 'ui.table.filter')).toBe('Neuf')
     expect(lookup(fr, 'mine.title')).toBeUndefined()
+    expect(lookup(fr, 'ui.hero.titleLabel')).toBe('Mien')
+    expect(lookup(fr, 'ui.hero.title')).toBeUndefined()
   })
 })

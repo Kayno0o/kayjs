@@ -4322,6 +4322,7 @@ describe.concurrent('kay check, unused code', () => {
       '    table: { filterLabel: \'Filtrer\', rowCount: \'x\', selectedLabel: { one: \'un\', other: \'{count}\' } },',
       '    pagination: { label: \'Pagination\', nextLabel: \'Suivant\', next: \'Après\' },',
       '    markdownEditor: { previewLabel: \'Aperçu\' },',
+      '    hero: { titleLabel: \'Mien\' },',
       '  },',
       '  cms: { table: { \'moveUpLabel\': \'Monter\' } },',
       '}',
