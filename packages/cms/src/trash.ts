@@ -27,7 +27,7 @@ interface Row {
 }
 
 // Rows a loader answering several kinds from one store may hold are not trashed entries.
-function isRow(data: unknown): boolean {
+export function isRow(data: unknown): boolean {
   return typeof data === 'object' && data !== null && typeof (data as Row).data === 'object' && typeof (data as Row).at === 'number'
 }
 

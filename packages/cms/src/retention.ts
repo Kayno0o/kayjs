@@ -1,11 +1,11 @@
 import type { EntryRef } from './kay/contract'
-import { pruneActivity } from './activity'
+import { isEvent, pruneActivity } from './activity'
 import { hiddenOf, rowOf } from './hidden'
-import { collections } from './kay/content'
+import { collections, entries } from './kay/content'
 import { log } from './log'
 import { placeOf, pruneRevisions } from './revisions'
 import { settings } from './settings'
-import { purge } from './trash'
+import { isRow, purge } from './trash'
 
 // How often a server drops what its trash, revisions and activity may no longer keep.
 const SWEEP_EVERY = 60 * 60 * 1000
@@ -13,6 +13,14 @@ const SWEEP_EVERY = 60 * 60 * 1000
 const FORGOTTEN = 'Former editor'
 
 const KINDS = ['history', 'trash', 'activity'] as const
+
+// A row another kind wrote into the same store, a blog entry with an `author` field for one, is not touched.
+function isOfKind(kind: (typeof KINDS)[number], slug: string, data: unknown): boolean {
+  if (kind === 'trash')
+    return isRow(data)
+
+  return kind === 'activity' ? isEvent(data) : slug.includes('\u0001')
+}
 
 async function loadedNames(): Promise<string[]> {
   return (await collections({ counts: false })).filter(collection => collection.kind === 'loaded').map(collection => collection.name)
@@ -54,14 +62,10 @@ export function startSweeping(): void {
   sweeping.unref()
 }
 
-export function stopSweeping(): void {
-  clearInterval(sweeping)
-  sweeping = undefined
-}
-
-// Removes an entry from the trash, its revisions and the activity log, for good: what an erasure request needs once the entry itself is deleted. The entry in the collection is not touched. Returns how many rows went.
+// Removes an entry from the trash, its revisions and the activity log, for good: what an erasure request needs once the entry itself is deleted. The entry in the collection is not touched, and when a new entry took the slug its revisions and activity stay, as they are its own. Returns how many rows went.
 export async function eraseHistory(ref: EntryRef): Promise<number> {
   let erased = 0
+  const live = (await entries(ref.collection, { slug: ref.slug, locale: ref.locale })).length > 0
   const trash = hiddenOf(ref.collection, 'trash', { anyway: true })
   const activity = hiddenOf(ref.collection, 'activity', { anyway: true })
 
@@ -69,7 +73,7 @@ export async function eraseHistory(ref: EntryRef): Promise<number> {
     for (const row of await trash.load({ preview: true })) {
       const kept = row.data as { slug?: unknown, locale?: unknown } | undefined
 
-      if (kept?.slug === ref.slug && kept.locale === ref.locale) {
+      if (isRow(row.data) && kept?.slug === ref.slug && kept.locale === ref.locale) {
         await trash.remove!({ slug: row.slug })
         erased++
       }
@@ -78,7 +82,7 @@ export async function eraseHistory(ref: EntryRef): Promise<number> {
 
   const history = hiddenOf(ref.collection, 'history', { anyway: true })
 
-  if (history !== undefined) {
+  if (history !== undefined && !live) {
     const place = placeOf(ref)
 
     for (const row of await history.load({ preview: true })) {
@@ -89,11 +93,11 @@ export async function eraseHistory(ref: EntryRef): Promise<number> {
     }
   }
 
-  if (activity !== undefined) {
+  if (activity !== undefined && !live) {
     for (const row of await activity.load({ preview: true })) {
       const event = row.data as { slug?: unknown, from?: unknown, locale?: unknown } | undefined
 
-      if ((event?.slug === ref.slug || event?.from === ref.slug) && event?.locale === ref.locale) {
+      if (isEvent(row.data) && (event?.slug === ref.slug || event?.from === ref.slug) && event?.locale === ref.locale) {
         await activity.remove!({ slug: row.slug })
         erased++
       }
@@ -117,13 +121,13 @@ export async function forgetEditor(name: string): Promise<number> {
       for (const row of await hidden.load({ preview: true })) {
         const data = row.data as { author?: unknown } | undefined
 
-        if (data?.author !== name)
+        if (data?.author !== name || !isOfKind(kind, row.slug, row.data))
           continue
 
         // Read the row again, as a save may have changed it since the listing.
         const current = await rowOf(hidden, row.slug)
 
-        if ((current?.data as { author?: unknown } | undefined)?.author !== name)
+        if ((current?.data as { author?: unknown } | undefined)?.author !== name || !isOfKind(kind, row.slug, current!.data))
           continue
 
         await hidden.save!({ slug: row.slug, data: { ...current!.data as object, author: FORGOTTEN }, ...current!.body !== undefined && { body: current!.body } })

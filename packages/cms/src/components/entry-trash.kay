@@ -43,6 +43,6 @@ else
             EntryEdited(at={row.at} moment author={row.author})
           ConfirmDelete(tone="neutral" trigger="button" label={wording('cms.history.restoreButton', 'Restore')} message={wording('cms.trash.restoreMessage', 'Restore {title}? It comes back under its slug.', { title: row.title })} failure={wording('cms.history.restoreFailure', 'Could not restore')} onConfirm={async () => { await restore(row.id) }})
           if denied.delete !== undefined
-            Refused(label={wording('cms.trash.erase', 'Erase for good')} reason={denied.delete})
+            Refused(tone="danger" label={wording('cms.trash.erase', 'Erase for good')} reason={denied.delete})
           else
-            ConfirmDelete(trigger="button" label={wording('cms.trash.erase', 'Erase for good')} message={wording('cms.trash.eraseMessage', 'Erase {title} for good? It leaves the trash, its revisions and the activity log, and cannot come back.', { title: row.title })} failure={wording('cms.trash.eraseFailure', 'Could not erase')} onConfirm={async () => { await erase(row) }})
+            ConfirmDelete(trigger="button" label={wording('cms.trash.erase', 'Erase for good')} title={wording('cms.trash.erase', 'Erase for good')} confirmLabel={wording('cms.trash.erase', 'Erase for good')} message={wording('cms.trash.eraseMessage', 'Erase {title} for good? It leaves the trash, its revisions and the activity log, and cannot come back.', { title: row.title })} failure={wording('cms.trash.eraseFailure', 'Could not erase')} onConfirm={async () => { await erase(row) }})

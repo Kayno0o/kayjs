@@ -14,6 +14,10 @@ A token the OAuth server issued for a `resource` (the `/mcp` an MCP client asks 
 
 `passwordGuard()` signs its cookie with a key that now includes the app's secret (`KAY_SECRET`) when `{ secret }` is not given, so editors signed in before the update sign in once more. In production a password shorter than 12 characters, or one shared by two roles, throws at start. Signing out is recorded in `store.rates` (the app's, else the process's memory), the cookie is `__Host-kay_editor_session` over https, and 100 wrong passwords from anyone in 15 minutes refuse every try with a 429. `PasswordOptions` gains `store`. No `kay check` lint can tell a password's length.
 
+### kayjs-cms drops revisions and activity older than a year
+
+A cms server now sweeps every hour: revisions and activity events older than `history.maxAge` (`'365d'` by default) go, the newest revision of each entry excepted, and the trash goes at `history.trash`. An app that keeps its history longer sets `history: { maxAge: false }`; see [History](../packages/cms/llms/history.md).
+
 ### kayjs-ui props take enum values: `variant`, `size` and `pixels`
 
 `Badge`'s booleans are values of `variant` (`outline` by default, `solid`, `stamp`): `stamp` is `variant="stamp"` and `solid` is `variant="solid"`. `compact` of `FormField`, `FileDrop` and `Notice` is `size="sm"` (`md` by default), as `size` is a step in the other components. `QrCode`'s `size` in pixels is `pixels`, so `size` means a step everywhere. The old props work until 1.75, and `kay upgrade` rewrites them (the `deprecated-ui-prop` lint): `compact={flag}` becomes `size={flag ? 'sm' : 'md'}`, and a tag giving the new prop beside the old one, or both `stamp` and `solid`, is reported and left to you. An explicit `variant` beats `stamp` and `solid`, while `size="md"` beside `compact` still gives the compact look. Table's `onSelect` gets the picked rows after the keys and TreeView's the node after the id, so a handler taking one argument keeps working.

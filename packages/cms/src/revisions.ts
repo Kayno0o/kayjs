@@ -161,6 +161,8 @@ export async function pruneRevisions(collection: string, cutoff: number): Promis
   try {
     const rows = await hidden.load({ preview: true })
 
+    const listed = new Map<string, number[]>()
+
     for (const row of rows) {
       // Revision rows are keyed below their entry's, and carry no index.
       if (row.slug.includes('\u0001') || !Array.isArray((row.data as Index | undefined)?.ats))
@@ -168,6 +170,9 @@ export async function pruneRevisions(collection: string, cutoff: number): Promis
 
       // Read again, as a save may have added a revision since the rows were listed.
       const ats = await indexOf(hidden, row.slug)
+
+      listed.set(row.slug, ats)
+
       const newest = ats.at(-1)
       const old = ats.filter((at, position) => at !== newest && (at === 0 ? ats[position + 1]! : at) < cutoff)
 
@@ -178,6 +183,17 @@ export async function pruneRevisions(collection: string, cutoff: number): Promis
 
       for (const at of old)
         await hidden.remove!({ slug: revisionPlace(row.slug, at) })
+
+      listed.set(row.slug, ats.filter(at => !old.includes(at)))
+    }
+
+    // A revision a concurrent save left out of its index, or a crash before the removal, would never be listed nor swept.
+    for (const row of rows) {
+      const [place, at] = row.slug.split('\u0001')
+      const index = place === undefined ? undefined : listed.get(place)
+
+      if (at !== undefined && index !== undefined && !index.includes(Number(at)) && Number(at) < cutoff)
+        await hidden.remove!({ slug: row.slug })
     }
   }
   catch (error) {

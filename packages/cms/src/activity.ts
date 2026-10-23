@@ -54,7 +54,7 @@ function trimLater(collection: string, hidden: ContentLoader, rows: () => Return
 }
 
 // A row a loader of another kind wrote here by mistake has no verb.
-function isEvent(data: unknown): data is Row {
+export function isEvent(data: unknown): data is Row {
   return typeof data === 'object' && data !== null && typeof (data as Row).verb === 'string' && typeof (data as Row).at === 'number'
 }
 

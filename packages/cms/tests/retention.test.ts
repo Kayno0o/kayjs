@@ -69,6 +69,21 @@ describe('sweepHistory', () => {
     expect(await activityOf('notes')).toEqual([])
   })
 
+  test('drops a revision a save left out of its index', async () => {
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
+    await saveEntry({ ...ref, data: { title: 'Two' } })
+
+    const history = hiddenOf('notes', 'history', { anyway: true })!
+    const place = (await history.load({ preview: true })).find(row => !row.slug.includes('\u0001'))!.slug
+
+    await history.save!({ slug: `${place}\u00011000`, data: { verb: 'update', title: 'Lost' } })
+    setSystemTime(new Date(Date.now() + 400 * DAY))
+    await saveEntry({ ...ref, data: { title: 'Three' } })
+    await sweepHistory()
+
+    expect((await history.load({ preview: true })).some(row => row.slug.endsWith('\u00011000'))).toBe(false)
+  })
+
   test('keeps everything when maxAge is false', async () => {
     configure({ history: { maxAge: false } })
     await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
@@ -99,6 +114,17 @@ describe('eraseHistory', () => {
     expect(await revisionsOf({ ...ref, slug: 'other' })).toHaveLength(1)
   })
 
+  test('keeps the history of a new entry that took the slug', async () => {
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
+    await deleteEntry(ref)
+    await saveEntry({ ...ref, data: { title: 'Again' } }, { create: true })
+
+    await eraseHistory(ref)
+    expect(await trashOf('notes')).toEqual([])
+    expect(await revisionsOf(ref)).toHaveLength(1)
+    expect((await activityOf('notes')).map(event => event.slug)).toContain('first')
+  })
+
   test('reaches what a history turned off left in the store', async () => {
     await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
     await deleteEntry(ref)
@@ -124,5 +150,23 @@ describe('forgetEditor', () => {
     expect((await revisionsOf(ref)).map(revision => revision.author)).toEqual(['Former editor', 'Grace'])
     expect((await activityOf('notes')).map(event => event.author).toSorted()).toEqual(['Former editor', 'Former editor', 'Grace'])
     expect(await forgetEditor('Ada')).toBe(0)
+  })
+
+  test('leaves a row of another kind with an author field alone', async () => {
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true, author: ada })
+
+    const stray = { slug: 'stray', data: { author: 'Ada', title: 'Blog' } }
+
+    await hiddenOf('notes', 'history', { anyway: true })!.save!(stray)
+    await hiddenOf('notes', 'trash', { anyway: true })!.save!(stray)
+    await hiddenOf('notes', 'activity', { anyway: true })!.save!(stray)
+
+    await forgetEditor('Ada')
+
+    for (const kind of ['history', 'trash', 'activity'] as const) {
+      const row = (await hiddenOf('notes', kind, { anyway: true })!.load({ preview: true })).find(item => item.slug === 'stray')
+
+      expect((row!.data as { author: string }).author).toBe('Ada')
+    }
   })
 })
