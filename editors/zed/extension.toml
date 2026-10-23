@@ -1,0 +1,16 @@
+id = "kay"
+name = "Kay"
+description = "Highlighting and the kay language server for .kay components"
+version = "0.1.0"
+schema_version = 1
+authors = ["Kaynooo"]
+repository = "https://github.com/Kayno0o/kayjs"
+
+[grammars.kay]
+repository = "https://github.com/Kayno0o/kayjs"
+rev = "main"
+path = "editors/tree-sitter-kay"
+
+[language_servers.kay]
+name = "Kay"
+languages = ["Kay"]

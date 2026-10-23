@@ -134,6 +134,7 @@ kay fmt --check
 
 - `kay fmt --stdin [path]` reads a source on stdin and prints it formatted on stdout, for an editor's formatter (conform.nvim, Helix, Zed): `path` names the file it is for, which may not exist and decides the Tailwind order; a source that does not compile prints its problems on stderr, nothing on stdout, and exits 1; `--check`, `--from-html`, `--format json` and several paths are refused.
 - `kay fmt` refuses a path that is missing or is neither a directory nor a `.kay` file.
+- Neovim, Helix and Zed highlight `.kay` files with the tree-sitter grammar in `editors/tree-sitter-kay` of the kay repository (queries for highlights, injections and indents; scripts and holes inject TypeScript, `--- style` CSS, `markdown` Markdown), and Zed with the extension in `editors/zed`, which also starts `kay lsp --stdio`; setup in the docs' Other editors guide.
 - The TextMate grammar the extension highlights `.kay` files with ships as `kay/kay.tmLanguage.json`, for a highlighter such as Shiki: register it as `{ ...grammar, name: 'kay', embeddedLangs: ['typescript'] }`.
 
 ### Compile a component from a tool

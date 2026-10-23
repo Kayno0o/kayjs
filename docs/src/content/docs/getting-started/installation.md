@@ -74,7 +74,7 @@ Any editor that speaks the Language Server Protocol, such as Neovim, Helix or Ze
 
 The server runs the project's `kay.config.ts` when a `.kay` file opens, so open only a project you trust.
 
-An editor or highlighter that takes a TextMate grammar can use `kay/kay.tmLanguage.json`.
+An editor or highlighter that takes a TextMate grammar can use `kay/kay.tmLanguage.json`. Neovim, Helix and Zed highlight with tree-sitter instead: [Other editors](/guides/other-editors) has the grammar and the Zed extension.
 
 ## Troubleshooting
 
