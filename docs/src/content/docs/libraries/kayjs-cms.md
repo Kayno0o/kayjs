@@ -119,7 +119,9 @@ If the sign-in ends while an editor is typing, the save says the session ended i
 
 In edit mode, kay renders the editor at the end of every page, with the entries the page read, in the order the page shows them, so the forms stay in place as you type. The "Edit on page" links on the screens put an editor the guard admitted in edit mode. The editor's "Stop editing" button leaves it. With changes not saved, it asks first: Keep editing, or Drop them and stop.
 
-Each entry in the editor is titled by the entry itself, with its collection under it. Clicking a field on the page, or typing in one, collapses that entry's form to the field, and a row of buttons under the head jumps to another field. Show all fields brings the whole form back. Hidden fields keep what you typed in them, and Save writes all of them.
+When the page reads several entries, such as a menu or a footer every page shares, each one starts as a row with an Edit button and is read only when you open it, click one of its fields on the page, or have changes of it kept from an earlier visit. A page with one entry opens it at once.
+
+Each entry in the editor is titled by the entry itself, with its collection under it. Clicking a field on the page, or typing in one, collapses that entry's form to the field, and a row of buttons under the head jumps to another field. Clicking a field puts the caret in its input where you clicked, in a paragraph of the Markdown body too, when the text can be found in the source. Show all fields brings the whole form back. Hidden fields keep what you typed in them, and Save writes all of them.
 
 When the page reads several entries, Save all saves each one with changes, in the order the page shows them. An entry the server refuses stays unsaved with its message, and the others are saved.
 

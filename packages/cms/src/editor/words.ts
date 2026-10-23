@@ -38,6 +38,7 @@ export const AFTER_LOAD: readonly string[] = [
   'cms.entry.loading',
   'cms.entry.locale',
   'cms.entry.notRestored',
+  'cms.entry.open',
   'cms.entry.problem',
   'cms.entry.publish',
   'cms.entry.refusal',

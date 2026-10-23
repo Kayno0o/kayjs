@@ -277,6 +277,10 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
     entry(ref: EntryRef): DraftEntry | undefined {
       return current().get(entryKey(ref))
     },
+    // Whether the browser keeps edits of the entry from an earlier visit, which opening it brings back.
+    kept(ref: EntryRef): boolean {
+      return keep?.read(entryKey(ref)) !== undefined
+    },
     version(ref: EntryRef): string | undefined {
       return versions.get(entryKey(ref))
     },

@@ -241,6 +241,10 @@ test('names the fields of an entry the page does not let the editor click, and t
   server()
   mounted = await mountComponent(EDITOR, { entries: [ENTRY, { collection: 'posts', slug: 'other' }], unclickable: [{ ...ENTRY, path: 'title' }, { ...ENTRY, path: 'seo.title', frozen: true }, { collection: 'posts', slug: 'other', path: 'elsewhere' }] })
   await settle()
+  for (const idle of mounted.root.querySelectorAll<HTMLButtonElement>('.kcms-entry-idle button'))
+    idle.click()
+
+  await settle()
   await Bun.sleep(50)
 
   const hints = [...mounted.root.querySelectorAll('.kcms-entry-hint')].map(hint => hint.textContent)

@@ -133,31 +133,36 @@ export function allMarked(root: Node = document.body): MarkedField[] {
   return found
 }
 
+// What a marked field renders as a range: its element's contents, or for a comment pair what sits between the two comments.
+export function markedRange(field: MarkedField): Range {
+  const range = document.createRange()
+
+  if (!field.start) {
+    range.selectNodeContents(field.element)
+
+    return range
+  }
+
+  let end: Node | undefined
+
+  for (let sibling = field.start.nextSibling; sibling && !end; sibling = sibling.nextSibling) {
+    if (sibling.nodeType === Node.COMMENT_NODE && CLOSE_COMMENT.test((sibling as Comment).data.trim()))
+      end = sibling
+  }
+
+  range.setStartAfter(field.start)
+
+  if (end)
+    range.setEndBefore(end)
+  else
+    range.setEndAfter(field.start.parentNode?.lastChild ?? field.start)
+
+  return range
+}
+
 // Where a marked field shows on the page: its element's box, or for a comment pair the box around what sits between the two comments. None when nothing of it is shown.
 export function markedBox(field: MarkedField): DOMRect | undefined {
-  let box: DOMRect
-
-  if (field.start) {
-    const range = document.createRange()
-    let end: Node | undefined
-
-    for (let sibling = field.start.nextSibling; sibling && !end; sibling = sibling.nextSibling) {
-      if (sibling.nodeType === Node.COMMENT_NODE && CLOSE_COMMENT.test((sibling as Comment).data.trim()))
-        end = sibling
-    }
-
-    range.setStartAfter(field.start)
-
-    if (end)
-      range.setEndBefore(end)
-    else
-      range.setEndAfter(field.start.parentNode?.lastChild ?? field.start)
-
-    box = range.getBoundingClientRect()
-  }
-  else {
-    box = field.element.getBoundingClientRect()
-  }
+  const box = field.start ? markedRange(field).getBoundingClientRect() : field.element.getBoundingClientRect()
 
   return box.width > 0 && box.height > 0 ? box : undefined
 }

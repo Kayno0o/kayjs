@@ -76,7 +76,8 @@ async function until(done: () => unknown): Promise<void> {
 }
 
 // `at` is the locale a field's marker names, `@fr`.
-async function open(entries: object[] = [HELLO], at = '') {
+// `rows` leaves the entries of a page that reads several as the rows they start as; else each one is opened.
+async function open(entries: object[] = [HELLO], at = '', rows = false) {
   // The fields a visitor clicks on the page.
   for (const marker of [`posts:hello${at}:summary`, `posts:hello${at}:title`, `posts:hello${at}:tags`, `posts:hello${at}:seo.description`]) {
     const element = document.createElement('p')
@@ -91,6 +92,11 @@ async function open(entries: object[] = [HELLO], at = '') {
   mounted = await mountComponent(EDITOR, { entries, unclickable: [] })
 
   const root = mounted.root
+
+  if (!rows) {
+    for (const idle of root.querySelectorAll<HTMLButtonElement>('.kcms-entry-idle button'))
+      idle.click()
+  }
 
   await until(() => root.querySelectorAll('.kcms-entry-loading').length === 0 && root.querySelector('.kcms-entry') !== null && asked.some(path => path.includes('/can')))
   await settle()

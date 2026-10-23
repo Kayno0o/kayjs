@@ -31,9 +31,11 @@ import type { PageListWatch } from './page-lists'
 import { browserStorage, canSide, dockOf, readLayout, revealBy, writeLayout } from './dock'
 import { drafts } from './drafts'
 import { rebuilding, watchRebuild } from './rebuild'
+import { notePlace } from './caret'
+import { forgetOpened } from './opened'
 import { saveAll } from './save-all'
 import { shipWords } from './words'
-import EntryForm from './entry-form.kay'
+import EntrySlot from './entry-slot.kay'
 import PageListTools from './page-list-tools.kay'
 import './editor.css'
 
@@ -685,6 +687,7 @@ function edit(field: MarkedField, x?: number, y?: number, back?: HTMLElement): v
     return
   }
 
+  notePlace(field, x, y)
   focused = field.marker
   reveal(field.element, y)
 }
@@ -717,6 +720,7 @@ async function saveEverything(): Promise<void> {
 
 // Asks before the page, a link or a reload drops edits not saved.
 guardLeave(() => drafts.anyChanged(entries))
+onCleanup(forgetOpened)
 
 // Renders the page again as visitors see it, once kay forgot the edit mode.
 async function stopEditing(): Promise<void> {
@@ -814,7 +818,7 @@ SidePanel.kcms-editor(open={open()} modal={false} dock={dock() === 'bottom' ? 'b
     .kcms-editor-all
       Button(label={savingAll() ? wording('cms.entry.saving', 'Saving…') : wording('cms.editor.saveAll', 'Save all')} tone="accent" busy={savingAll()} disabled={savingAll() || !hasEdits()} onClick={saveEverything})
   for entry of entries key={entryKey(entry)}
-    EntryForm(entry={entry} focus={focusIn(entry)} typing={typingIn(entry)} unclickable={unclickable.filter(field => entryKey(field) === entryKey(entry))})
+    EntrySlot(entry={entry} alone={entries.length === 1} focus={focusIn(entry)} typing={typingIn(entry)} unclickable={unclickable.filter(field => entryKey(field) === entryKey(entry))})
   else
     p.kcms-editor-empty {wording('cms.editor.empty', 'Nothing on this page comes from a collection.')}
 // Keyed by the question, so a choice that asks another one mounts a menu that opens afresh.

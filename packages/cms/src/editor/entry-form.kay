@@ -14,12 +14,13 @@ import entriesApi from '../api/entries'
 import { collectionPath, collectionTitle, entryTitle, SINGLE_SLUG } from '../listing'
 import { entryKey } from '../markers'
 import { drafts } from './drafts'
-import { registerInline } from './inline'
+import { fieldAtPath, registerInline } from './inline'
 import { savedHandler } from './live'
 import { readReferrers } from './referrers'
 import { rebuildFinished, rebuildStarted } from './rebuild'
 import { unfoldAround } from './reorder'
 import { anchorsOf, keyOfPath, ownerOf } from './anchors'
+import { placeCaret } from './caret'
 import { registerSaver } from './save-all'
 import EntryFields from './entry-fields.kay'
 import { formScope } from '../form'
@@ -107,7 +108,10 @@ function reveal(path: string): void {
       unfoldAround(field)
 
     field?.scrollIntoView({ block: 'nearest' })
-    field?.querySelector<HTMLElement>('input, textarea, select')?.focus()
+    const control = field?.querySelector<HTMLElement>('input, textarea, select')
+
+    control?.focus()
+    placeCaret(control, entry, path, path === BODY_ID || fieldAtPath(fieldsOf(source.value()!.collection.schema), drafts.entry(entry)?.data, path)?.kind === 'markdown')
   })
 }
 

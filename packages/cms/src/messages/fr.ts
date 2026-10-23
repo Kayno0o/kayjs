@@ -155,6 +155,7 @@ export default defineMessages({
       loadFailure: 'Impossible de charger cette entrée : {message}',
       loading: 'Chargement…',
       locale: 'Langue',
+      open: 'Modifier {entry}',
       otherEditors: { one: '{count} autre personne modifie', other: '{count} autres personnes modifient' },
       problem: 'Le fichier de cette entrée est illisible : {problem}. Enregistrer écrira le formulaire par-dessus.',
       publish: 'Publier',

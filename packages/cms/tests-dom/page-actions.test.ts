@@ -351,6 +351,9 @@ test('Delete from the entry\'s own page, when leaving is declined over edits of 
 
   const root = mounted.root
 
+  for (const idle of root.querySelectorAll<HTMLButtonElement>('.kcms-entry-idle button'))
+    idle.click()
+
   await until(() => root.querySelectorAll('.kcms-entry-more').length === 2 && asked.some(path => path.includes('/can')))
 
   const other = root.querySelectorAll('.kcms-entry')[1]!.querySelector<HTMLInputElement>('input')!

@@ -1,0 +1,36 @@
+---
+import type { Unclickable } from 'kay/edit'
+import type { EntryRef } from '../kay/contract'
+import type { FieldPath } from '../markers'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import { untrack } from 'kay'
+import { wording } from 'kay/words'
+import { SINGLE_SLUG } from '../listing'
+import { drafts } from './drafts'
+import { isOpened, openEntry } from './opened'
+import EntryForm from './entry-form.kay'
+import './editor.css'
+
+// An entry of a page that reads several is a row until something asks for its form: a click on one of its fields, its Edit button, edits kept from an earlier visit, or being the page's only entry. Layout entries (a menu, a footer) are read by every page and are rarely edited, so their GET and form wait.
+const { entry, alone, focus, typing, unclickable = [] } = props<{ entry: EntryRef, alone: boolean, focus?: FieldPath | undefined, typing?: FieldPath | undefined, unclickable?: Unclickable[] }>()
+
+const wanted = memo(() => alone || focus !== undefined || typing !== undefined || isOpened(entry) || drafts.kept(entry))
+
+effect(() => {
+  if (wanted())
+    untrack(() => openEntry(entry))
+})
+
+const name = entry.slug === SINGLE_SLUG ? entry.collection : `${entry.collection}/${entry.slug}`
+---
+if wanted()
+  EntryForm(entry={entry} focus={focus} typing={typing} unclickable={unclickable})
+else
+  section.kcms-entry.kcms-entry-idle
+    header.kcms-entry-head
+      hgroup
+        h3.kcms-entry-title {name}
+        if entry.locale !== undefined
+          p.kcms-entry-collection {entry.locale}
+      .kcms-entry-actions
+        Button(label={wording('cms.entry.open', 'Edit {entry}', { entry: name })} onClick={() => openEntry(entry)})
