@@ -6,7 +6,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### `auth()` keeps its users in the app's database
 
-A bare `auth()` on a new app keeps its users in the database of the app's `store` in kay.config.ts (`sqliteData(path)`, `pgData(url)`) instead of `data/auth.db`, creating its `kay_*` tables there and leaving the others alone. An app whose `data/auth.db` exists keeps using it and logs once; nothing is lost, and moving the users into the app's database and setting `KAYJS_AUTH_DATABASE_URL` to it is optional. `KAYJS_AUTH_DATABASE_URL` and `auth({ store })` win over the app's store. A static export keeps users in memory and touches no database. No `kay check` lint can tell which database an app meant.
+A bare `auth()` on a new app keeps its users in the database of the app's `store` in kay.config.ts (`sqliteData(path)`, `pgData(url)`) instead of `data/auth.db`, creating its `kay_*` tables there and leaving the others alone. An app whose `data/auth.db` exists keeps using it and logs once; nothing is lost, and moving the users into the app's database and setting `KAYJS_AUTH_DATABASE_URL` to it is optional. `KAYJS_AUTH_DATABASE_URL` and `auth({ store })` win over the app's store. A static export keeps users in memory and touches no database. No `kay check` lint can tell which database an app meant. kayjs-auth needs pg-orm 7.1.2 or later (`bun update @kaynooo/pg-orm`), whose SQLite driver waits out a second process opening the same file, such as `kay auth create-user` beside the server.
 
 ### kay needs Bun 1.4.4
 

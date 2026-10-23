@@ -65,7 +65,7 @@
   },
   "peerDependencies": {
     "@kaynooo/kayjs-ui": "workspace:~",
-    "@kaynooo/pg-orm": "^7.0.0",
+    "@kaynooo/pg-orm": "^7.1.2",
     "elysia": "^1.4.30",
     "kay": "~1.71.0"
   },
@@ -84,7 +84,7 @@
     "@kaynooo/eslint": "^7.0.4",
     "@kaynooo/kayjs-mail": "workspace:~",
     "@kaynooo/kayjs-ui": "workspace:~",
-    "@kaynooo/pg-orm": "^7.1.1",
+    "@kaynooo/pg-orm": "^7.1.2",
     "@types/bun": "^1.4.3",
     "elysia": "^1.4.30",
     "typescript": "^6.0.3"

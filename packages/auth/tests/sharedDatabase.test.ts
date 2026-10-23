@@ -47,8 +47,7 @@ describe('the database of the app\'s store, shared with kayjs-auth', () => {
   })
 
   // Two processes on one SQLite file, as `kay auth create-user` runs beside the server.
-  // Skipped until pg-orm 7.1.2, whose wait on SQLITE_BUSY covers opening the file (#2020 box 3).
-  test.skip('two processes writing one SQLite file wait for each other instead of answering SQLITE_BUSY', async () => {
+  test('two processes writing one SQLite file wait for each other instead of answering SQLITE_BUSY', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'kayjs-auth-busy-'))
     const file = join(dir, 'shared.sqlite')
 
