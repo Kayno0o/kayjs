@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { log } from '../src/log'
-import { mailer, wasLogged } from '../src/mailer'
+import { mailer } from '../src/mailer'
 
 const SINK = Symbol.for('kay.log')
 
@@ -29,7 +29,7 @@ describe('the log', () => {
     expect(calls).toEqual([['error', '"Hi" was not sent', thrown, undefined, 'kayjs-mail']])
   })
 
-  it('throws a primitive a transport rejects with wrapped, so the caller sees it was logged', async () => {
+  it('throws a primitive a transport rejects with wrapped in an Error', async () => {
     const mail = mailer({ from: 'dev@example.com', transport: { send: refuse } })
     const global = globalThis as { [SINK]?: unknown }
     const sink = global[SINK]
@@ -48,7 +48,6 @@ describe('the log', () => {
 
       expect(thrown).toBeInstanceOf(Error)
       expect((thrown as Error).cause).toBe('refused')
-      expect(wasLogged(thrown)).toBe(true)
     }
     finally {
       global[SINK] = sink

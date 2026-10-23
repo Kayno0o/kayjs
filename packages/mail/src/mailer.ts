@@ -76,13 +76,6 @@ export interface MailerOptions {
   optional?: boolean | undefined
 }
 
-// The errors `send` has logged, so a caller logging what it catches skips them.
-const logged = new WeakSet<object>()
-
-export function wasLogged(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && logged.has(error)
-}
-
 // Thrown by an `optional` mailer while the environment lacks what it needs to send, so a form can tell the visitor another way to reach the site.
 export class MailNotConfiguredError extends Error {
   override readonly name = 'MailNotConfiguredError'
@@ -540,12 +533,8 @@ export function mailer(options: MailerOptions = {}): Mailer {
       catch (error) {
         log.error(`${described(mail)} to ${whom(recipientsOf(mail))} was not sent`, error)
 
-        // A primitive cannot be tracked, so it is thrown wrapped for the caller to recognise as logged.
-        const thrown = typeof error === 'object' && error !== null ? error : new Error(String(error), { cause: error })
-
-        logged.add(thrown)
-
-        throw thrown
+        // A primitive is thrown wrapped, so the caller always catches an Error.
+        throw typeof error === 'object' && error !== null ? error : new Error(String(error), { cause: error })
       }
     }),
     enqueue: async <P extends object>(message: MailMessage<P>, enqueueOptions?: EnqueueOptions) => inFlightWork(async () => {
