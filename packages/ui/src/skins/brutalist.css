@@ -3,22 +3,21 @@
  * Import it after theme.css in the app's stylesheet: its tokens are the app's `@theme`, so an override of yours after it wins.
  */
 @theme {
-  --color-kui-canvas: light-dark(#ffffff, #0a0a0a);
-  --color-kui-text: light-dark(#000000, #ffffff);
-  --color-kui-accent: light-dark(#0000cc, #ffd400);
-  --color-kui-success: light-dark(#006400, #7cfc9a);
-  --color-kui-warning: light-dark(#8a4b00, #ffb347);
-  --color-kui-info: light-dark(#00508a, #7cc4ff);
-  --color-kui-error: light-dark(#b00020, #ff7b8c);
-  --color-kui-field-border: light-dark(#4d4d4d, #9a9a9a);
+  --color-background: light-dark(#ffffff, #0a0a0a);
+  --color-foreground: light-dark(#000000, #ffffff);
+  --color-accent: light-dark(#0000cc, #ffd400);
+  --color-success: light-dark(#006400, #7cfc9a);
+  --color-warning: light-dark(#8a4b00, #ffb347);
+  --color-info: light-dark(#00508a, #7cc4ff);
+  --color-danger: light-dark(#b00020, #ff7b8c);
+  --color-input: light-dark(#4d4d4d, #9a9a9a);
 
   --border-width: 2px;
-  --radius-kui-card: 0px;
-  --radius-kui-sm: 0px;
-  --radius-kui-md: 0px;
-  --kui-label-case: uppercase;
-  --kui-label-font: var(--font-mono);
-  --kui-shadow-raised: 4px 4px 0 var(--color-foreground);
-  --kui-shadow-press: 3px 3px 0 var(--color-foreground);
-  --kui-press-travel: 3px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --font-label: var(--font-mono);
+  --shadow-raised: 4px 4px 0 var(--color-foreground);
+  --shadow-press: 3px 3px 0 var(--color-foreground);
+  --press-travel: 3px;
 }

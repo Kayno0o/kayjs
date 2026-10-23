@@ -5,25 +5,23 @@
 @theme {
   --font-sans: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
 
-  --color-kui-canvas: #0a0c13;
-  --color-kui-mantle: color-mix(in oklab, var(--color-background), black 55%);
-  --color-kui-text: #dfe4f0;
-  --color-kui-accent: #bcd4ff;
-  --color-kui-success: #7fd8a6;
-  --color-kui-warning: #e6c07b;
-  --color-kui-info: #7cc4e8;
-  --color-kui-error: #ff6b6b;
-  --color-kui-field-border: #667089;
-  --color-kui-surface0: color-mix(in oklab, var(--color-background), var(--color-foreground) 4.5%);
-  --color-kui-surface1: color-mix(in oklab, var(--color-background), var(--color-foreground) 8%);
-  --color-kui-surface2: color-mix(in srgb, var(--color-foreground) 7%, transparent);
-  --color-kui-overlay0: color-mix(in srgb, var(--color-foreground) 16%, transparent);
+  --color-background: #0a0c13;
+  --color-popover: color-mix(in oklab, var(--color-background), black 55%);
+  --color-foreground: #dfe4f0;
+  --color-accent: #bcd4ff;
+  --color-success: #7fd8a6;
+  --color-warning: #e6c07b;
+  --color-info: #7cc4e8;
+  --color-danger: #ff6b6b;
+  --color-input: #667089;
+  --color-surface: color-mix(in oklab, var(--color-background), var(--color-foreground) 4.5%);
+  --color-surface-strong: color-mix(in oklab, var(--color-background), var(--color-foreground) 8%);
+  --color-border: color-mix(in srgb, var(--color-foreground) 7%, transparent);
+  --color-border-strong: color-mix(in srgb, var(--color-foreground) 16%, transparent);
 
   --border-width: 0px;
-  --kui-label-case: none;
-  --tracking-kui-label: 0.02em;
-  --tracking-kui-section: 0.06em;
-  --tracking-kui-action: 0.02em;
+  --label-case: none;
+  --tracking-label: 0.02em;
 }
 
 /* One scheme, whatever the visitor's system or a data-theme asks for. */

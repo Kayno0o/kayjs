@@ -2,7 +2,6 @@ import { describe, expect, test } from 'bun:test'
 import { compileKay } from 'kay/compiler'
 import { compile } from 'tailwindcss'
 import { REMOVED_UI_CLASSES } from '../../../src/check/ui-classes'
-import { UI_TOKENS } from '../../../src/check/ui-tokens'
 import { MENU_FOOTER, MENU_ITEM } from '../src/menu-look'
 
 const ROOT = new URL('..', import.meta.url).pathname
@@ -94,14 +93,11 @@ function peeled(value: string): string {
   return next === undefined ? value : peeled(next)
 }
 
-// A skin that still sets the old, prefixed names, read under the names they became (the skins move to the new ones in #2080).
-const inNewNames = (css: string): string => css.replace(/(?<![\w-])--[\w-]*kui-[\w-]+/g, name => UI_TOKENS[name]?.to ?? name)
-
 const colourTokens: Tokens = new Map(colourDeclarations(theme.slice(0, theme.indexOf('@theme default inline reference'))))
 
 // The theme's colours under a skin's own declarations, `--color-name: value;`.
 function withSkin(skin: string): Tokens {
-  return new Map([...colourTokens, ...colourDeclarations(inNewNames(skin))])
+  return new Map([...colourTokens, ...colourDeclarations(skin)])
 }
 
 // The arguments of a function call, split at the commas outside any parenthesis.
@@ -323,8 +319,8 @@ describe('theme.css', () => {
 
   test('reads at the same contrast from a skin that sets the seeds alone, in both schemes', () => {
     const skins = [
-      '--color-background: light-dark(#fffdf7, #1a1814); --color-foreground: light-dark(#26211a, #ece6d8); --color-kui-accent: light-dark(#9a3412, #fb923c); --color-kui-success: light-dark(#3f6212, #a3e635); --color-kui-warning: light-dark(#854d0e, #facc15); --color-kui-info: light-dark(#1d4ed8, #93c5fd); --color-danger: light-dark(#b91c1c, #fca5a5); --color-input: light-dark(#85776a, #8a7e70);',
-      '--color-background: light-dark(#f3f6fa, #0b1220); --color-foreground: light-dark(#0f1b2d, #dbe4f0); --color-kui-accent: light-dark(#1d4ed8, #7aa2f7); --color-kui-success: light-dark(#166534, #86efac); --color-kui-warning: light-dark(#92400e, #fcd34d); --color-kui-info: light-dark(#0b5f78, #67e8f9); --color-danger: light-dark(#b91c1c, #fda4af); --color-input: light-dark(#6b7d94, #5f7390);',
+      '--color-background: light-dark(#fffdf7, #1a1814); --color-foreground: light-dark(#26211a, #ece6d8); --color-accent: light-dark(#9a3412, #fb923c); --color-success: light-dark(#3f6212, #a3e635); --color-warning: light-dark(#854d0e, #facc15); --color-info: light-dark(#1d4ed8, #93c5fd); --color-danger: light-dark(#b91c1c, #fca5a5); --color-input: light-dark(#85776a, #8a7e70);',
+      '--color-background: light-dark(#f3f6fa, #0b1220); --color-foreground: light-dark(#0f1b2d, #dbe4f0); --color-accent: light-dark(#1d4ed8, #7aa2f7); --color-success: light-dark(#166534, #86efac); --color-warning: light-dark(#92400e, #fcd34d); --color-info: light-dark(#0b5f78, #67e8f9); --color-danger: light-dark(#b91c1c, #fda4af); --color-input: light-dark(#6b7d94, #5f7390);',
     ]
 
     for (const skin of skins) {
@@ -341,7 +337,7 @@ describe('theme.css', () => {
   })
 
   test('reads from a skin of one scheme that writes its seeds once and pins color-scheme to it', () => {
-    const tokens = withSkin('--color-background: #ffffff; --color-foreground: #111111; --color-kui-accent: #a21caf; --color-kui-success: #166534; --color-kui-warning: #92400e; --color-kui-info: #1d4ed8; --color-danger: #b91c1c; --color-input: #767676;')
+    const tokens = withSkin('--color-background: #ffffff; --color-foreground: #111111; --color-accent: #a21caf; --color-success: #166534; --color-warning: #92400e; --color-info: #1d4ed8; --color-danger: #b91c1c; --color-input: #767676;')
 
     expect(failing(TEXT, 4.5, tokens, [0])).toEqual([])
     expect(failing(LINES, 3, tokens, [0])).toEqual([])
@@ -581,9 +577,9 @@ describe('theme.css', () => {
       expect(failing(TEXT, 4.5, tokens), name).toEqual([])
       expect(failing(LINES, 3, tokens), name).toEqual([])
 
-      for (const [, token] of inNewNames(skin).matchAll(/^\s*(--[\w-]+):/gm)) {
-        // The label font and the control line have no default: they fall back to inherit where it is read. --font-sans is Tailwind's own, and a knob under its old name is read by the recipe that kept it until the skin moves off it.
-        if (!token!.includes('kui-') && !token!.startsWith('--_') && token !== '--font-label' && token !== '--font-sans')
+      for (const [, token] of skin.matchAll(/^\s*(--[\w-]+):/gm)) {
+        // The label font has no default: it falls back to inherit where it is read. --font-sans is Tailwind's own.
+        if (!token!.startsWith('--_') && token !== '--font-label' && token !== '--font-sans')
           expect(theme, `${name} ${token}`).toContain(`${token}:`)
       }
 
@@ -595,22 +591,22 @@ describe('theme.css', () => {
       expect(await built(skin), name).toContain('--label-case:')
     }
 
-    expect(await built(await Bun.file(`${ROOT}src/skins/soft.css`).text())).toContain('--kui-label-case: none')
-    expect(await built(await Bun.file(`${ROOT}src/skins/soft.css`).text())).toContain('--radius-kui-md: 0.375rem')
-    expect(await built(await Bun.file(`${ROOT}src/skins/brutalist.css`).text())).toContain('--kui-label-font: var(--font-mono)')
+    expect(await built(await Bun.file(`${ROOT}src/skins/soft.css`).text())).toContain('--label-case: none')
+    expect(await built(await Bun.file(`${ROOT}src/skins/soft.css`).text())).toContain('--tracking-label: 0.02em')
+    expect(await built(await Bun.file(`${ROOT}src/skins/brutalist.css`).text())).toContain('--font-label: var(--font-mono)')
   })
 
   test('ships the space skin as one scheme with a starfield utility, keys, drawn checkboxes and themed selects, each overridable after it', async () => {
     const skin = await Bun.file(`${ROOT}src/skins/space.css`).text()
     const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
-    const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${theme}\n${skin}\n@theme { --color-kui-accent: red; }\n@tailwind utilities;`, { base: ROOT, loadStylesheet: async (_, base) => ({ path: tailwind, base, content: await Bun.file(tailwind).text() }) })
+    const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${theme}\n${skin}\n@theme { --color-accent: red; }\n@tailwind utilities;`, { base: ROOT, loadStylesheet: async (_, base) => ({ path: tailwind, base, content: await Bun.file(tailwind).text() }) })
     const css = compiler.build(['starfield'])
 
     expect(css).toMatch(/\.starfield \{[^}]*background-size: 97px 97px, 131px 131px, 173px 173px, 211px 211px/)
     expect(css).toMatch(/data-theme=.light.\][^{]*\{\s*color-scheme: dark/)
     expect(skin).toContain('--font-sans: \'Space Grotesk\'')
-    expect(css).toContain('--color-kui-accent: red')
-    expect(css).not.toContain('--color-kui-accent: #bcd4ff')
+    expect(css).toContain('--color-accent: red')
+    expect(css).not.toContain('--color-accent: #bcd4ff')
     expect(css).toContain('appearance: base-select')
     expect(css).toContain('linear-gradient(45deg')
     expect(css).toContain('clip-path: polygon(14% 44%')
@@ -619,7 +615,7 @@ describe('theme.css', () => {
     for (const [, name = ''] of skin.matchAll(/\.(kui-[\w-]+)/g))
       expect(classes, name).toContain(name)
 
-    expect(inNewNames(skin)).toMatch(/--color-popover: color-mix\(in oklab, var\(--color-background\), black/)
+    expect(skin).toMatch(/--color-popover: color-mix\(in oklab, var\(--color-background\), black/)
     expect(css).toContain('@media (forced-colors: active)')
     expect(css).toMatch(/\.kui-icon-btn\.kui-shell/)
     expect(css).toContain(':not([multiple], [size])')

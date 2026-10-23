@@ -1,14 +1,9 @@
 /*
- * A rounded skin: the default colours, 0.5rem corners, labels in sentence case and a faint shadow under raised boxes.
+ * A rounded skin: the default colours, Tailwind's corners, labels in sentence case and a faint shadow under raised boxes.
  * Import it after theme.css in the app's stylesheet: its tokens are the app's `@theme`, so an override of yours after it wins.
  */
 @theme {
-  --radius-kui-card: 0.5rem;
-  --radius-kui-sm: 0.25rem;
-  --radius-kui-md: 0.375rem;
-  --kui-label-case: none;
-  --tracking-kui-label: 0.02em;
-  --tracking-kui-section: 0.04em;
-  --tracking-kui-action: 0.01em;
-  --kui-shadow-raised: 0 1px 3px color-mix(in srgb, var(--color-foreground) 14%, transparent);
+  --label-case: none;
+  --tracking-label: 0.02em;
+  --shadow-raised: 0 1px 3px color-mix(in srgb, var(--color-foreground) 14%, transparent);
 }
