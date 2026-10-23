@@ -52,6 +52,7 @@ const SCENARIOS: Record<string, { uses: Feature[] }> = {
   organizations: { uses: ['password', 'organizations'] },
   admin: { uses: ['password', 'admin', 'erase'] },
   oauth: { uses: ['oauth'] },
+  oauthUnknownCallback: { uses: ['oauth'] },
   oauthServer: { uses: ['oauthServer'] },
 }
 

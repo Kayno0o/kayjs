@@ -344,6 +344,20 @@ describe('coming back from the provider', () => {
     expect((await visitor.fetch(`/auth/discord/callback?code=code-1&state=${state}`)).headers.get('location')).toBe('/login?error=oauth')
   })
 
+  test('a callback for a provider the app lacks refuses an expired flow and spends it', async () => {
+    providers({ 1: { id: '1', username: 'ada' } })
+    const { browser } = setup()
+    const visitor = browser()
+    const leaving = await visitor.fetch('/auth/discord?redirect=/account')
+    const state = new URL(leaving.headers.get('location')!).searchParams.get('state')!
+
+    setSystemTime(Date.now() + 11 * 60 * 1000)
+
+    expect((await visitor.fetch(`/auth/nope/callback?code=code-1&state=${state}`)).headers.get('location')).toBe('/login?error=oauth&redirect=%2Faccount')
+    setSystemTime()
+    expect((await visitor.fetch(`/auth/discord/callback?code=code-1&state=${state}`)).headers.get('location')).toBe('/login?error=oauth')
+  })
+
   test('says the visitor cancelled, or the provider was down', async () => {
     providers({}, { tokenStatus: 503 })
     const { browser } = setup()

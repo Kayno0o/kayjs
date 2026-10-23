@@ -97,6 +97,13 @@ const scenarios: Record<string, () => Promise<void>> = {
 
     await visitor.fetch('/auth/discord')
   },
+  // A pending flow met by a callback for a provider the app lacks, which spends it through the flow module.
+  async oauthUnknownCallback() {
+    const visitor = testApp({ url: SITE, oauth: { discord: { provider: discordProvider(), clientId: 'id', clientSecret: 'secret' } } }).browser()
+    const state = new URL((await visitor.fetch('/auth/discord')).headers.get('location')!).searchParams.get('state')!
+
+    await visitor.fetch(`/auth/nope/callback?code=code-1&state=${state}`)
+  },
   async oauthServer() {
     const visitor = testApp({ url: SITE, pages: authPages(), scopes: ['posts:read'] }).browser()
 
