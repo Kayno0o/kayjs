@@ -586,6 +586,7 @@ export function refuseRemoteDevTools(app: Elysia): void {
   app.onBeforeHandle(({ request, server }) => {
     const path = new URL(request.url).pathname
 
+    // Every dev route ending in `.js` serves a static script of the tool; a data route added later must not end in `.js`.
     if (!path.startsWith(DEV_PREFIX) || path === DEV_EVENTS || (request.method === 'GET' && path.endsWith('.js')))
       return
 
