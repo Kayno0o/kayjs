@@ -327,7 +327,7 @@ await mail.list().status(id) // how many were sent, failed and are still waiting
 
 `send` takes the message of `mail.send` without recipients. It is rendered once and handed to a queue of the mailer, which mails the confirmed subscribers 20 at a time, a minute apart. `pace: { batch, every }` in `mail.list(name, options)` changes it.
 
-A restart or a deploy in the middle carries on where it stopped, and nobody gets the mail twice: each recipient is marked before its mail goes. If a process dies inside the send of one mail, that recipient is counted `unsure` and is not mailed again. `list.test(message, address)` sends one preview to an editor.
+A restart or a deploy in the middle carries on where it stopped, and nobody gets the mail twice: each recipient is marked before its mail goes. A power cut can lose the last marks, and a transport that fails after the server took the mail is retried, so a rare repeat is possible there. If a process dies inside the send of one mail, that recipient is counted `unsure` and is not mailed again. `list.test(message, address)` sends one preview to an editor.
 
 Every mail ends with an unsubscribe link in the subscriber's language, and carries the `List-Unsubscribe` and `List-Unsubscribe-Post` headers, so Gmail and Yahoo show their one-click button. Opening the link only asks for confirmation, so a mail scanner unsubscribes no one. Unsubscribing needs no sign-in and deletes the address.
 

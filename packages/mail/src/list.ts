@@ -1,7 +1,8 @@
 import type { Elysia, TSchema } from 'elysia'
 import type { ActionContext, ActionProtect, ActionProtection, Duration, Failure, JSX } from 'kay'
-import type { Broadcast, BroadcastProgress, Lists, Subscriber } from './list-store'
+import type { BroadcastProgress, Lists, Subscriber } from './list-store'
 import type { Address, Mail, MailMessage } from './types'
+import { existsSync } from 'node:fs'
 import process from 'node:process'
 import { s } from 'kay'
 import { configError, durationSeconds, keyedDigest } from 'kay/library'
@@ -62,6 +63,8 @@ export interface MailingList {
   send: <P extends object>(message: ListMessage<P>) => Promise<{ id: string, recipients: number }>
   // Sends the message to one address now, as a preview of the list mail: its unsubscribe link does nothing.
   test: <P extends object>(message: ListMessage<P>, to: Address) => Promise<void>
+  // What a send would mail, rendered now with the footer of a list mail: its unsubscribe link does nothing.
+  preview: <P extends object>(message: ListMessage<P>) => Promise<{ subject: string, html: string | undefined, text: string }>
   // How far a broadcast got, undefined for one that is unknown or older than 30 days after it finished.
   status: (id: string) => Promise<BroadcastStatus | undefined>
   count: () => Promise<number>
@@ -96,7 +99,8 @@ interface StoredMessage {
 
 interface Entry {
   list: MailingList
-  lists: Lists
+  // Opened on first use, so building or checking an app makes no file.
+  readonly lists: Lists
   pace: { batch: number, every: Duration }
 }
 
@@ -124,7 +128,7 @@ async function footerOf(locale: string): Promise<{ html: string, text: string }>
 
 // Before the body ends when the document has one, else at the end.
 function withFooter(document: string, footer: string): string {
-  return BODY_CLOSE.test(document) ? document.replace(BODY_CLOSE, `${footer}</body>`) : document + footer
+  return BODY_CLOSE.test(document) ? document.replace(BODY_CLOSE, () => `${footer}</body>`) : document + footer
 }
 
 function personalise(message: StoredMessage, subscriber: Subscriber, list: string, footer: { html: string, text: string }): Mail {
@@ -141,7 +145,7 @@ function personalise(message: StoredMessage, subscriber: Subscriber, list: strin
     subject: message.subject,
     html: message.html === undefined ? undefined : withFooter(message.html, html),
     text: `${message.text}\n\n-- \n${text}\n`,
-    headers: { ...message.headers, 'List-Unsubscribe': `<${url}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
+    headers: { ...Object.fromEntries(Object.entries(message.headers).filter(([name]) => !name.toLowerCase().startsWith('list-unsubscribe'))), 'List-Unsubscribe': `<${url}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
     attachments: [],
   }
 }
@@ -168,11 +172,16 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun'>) 
     return lists
   }
 
+  // The default file once it exists, whichever list this process declared: a link in a mail outlives the code that declared its list.
+  const defaultFile = (): Lists | undefined => process.env.NODE_ENV !== 'test' && (files.has(LIST_FILE) || existsSync(LIST_FILE)) ? open(LIST_FILE) : undefined
+  const storeOf = (name: string): Lists | undefined => entries.get(name)?.lists ?? defaultFile()
+
   const make = (name: string, options: ListOptions): Entry => {
     if (!NAME.test(name))
       throw configError(`mail.list(${JSON.stringify(name)}): a list's name is letters, digits, dashes and underscores, at most 40 characters`)
 
-    const lists = open(options.file ?? (process.env.NODE_ENV === 'test' ? ':memory:' : LIST_FILE))
+    const file = options.file ?? (process.env.NODE_ENV === 'test' ? ':memory:' : LIST_FILE)
+    const lists = { get: () => open(file) }
     const pace = { batch: options.pace?.batch ?? 20, every: options.pace?.every ?? '1m' }
 
     if (!Number.isInteger(pace.batch) || pace.batch < 1)
@@ -211,13 +220,13 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun'>) 
             return undefined
 
           const locale = await renderLocale()
-          const subscriber = lists.ask(name, email, randomId(), locale)
+          const origin = siteOrigin()
+          const subscriber = lists.get().ask(name, email, randomId(), locale)
 
           // A listed address is told nothing and mailed nothing.
           if (subscriber.status !== 'pending')
             return undefined
 
-          const origin = siteOrigin()
           const url = `${origin}${LIST_PATH}/confirm?token=${signToken('confirm', { list: name, id: subscriber.id, locale })}`
           const site = new URL(origin).host
 
@@ -252,14 +261,29 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun'>) 
         return [schema, handler, protection]
       },
       async send(given) {
+        if (!host.configured())
+          throw new Error('kayjs-mail: the mailer cannot send yet, so a list mail cannot go out')
+
         const stored = await message(given, LIST_RECIPIENT)
+
+        // Rendered here once, so a missing `site` fails the send and not each recipient.
+        await footerOf(await renderLocale())
+
         const id = randomId()
         const kept: StoredMessage = { from: stored.from, replyTo: stored.replyTo, subject: stored.subject, html: stored.html, text: stored.text, headers: stored.headers }
 
-        lists.addBroadcast(id, name, JSON.stringify(kept))
-        await host.enqueueRun({ list: name, broadcast: id }, `broadcast:${id}`)
+        lists.get().addBroadcast(id, name, JSON.stringify(kept))
 
-        return { id, recipients: lists.count(name) }
+        try {
+          await host.enqueueRun({ list: name, broadcast: id }, `broadcast:${id}`)
+        }
+        catch (error) {
+          lists.get().finish(id)
+
+          throw error
+        }
+
+        return { id, recipients: lists.get().count(name) }
       },
       async test(given, to) {
         const { mail } = await message(given, to)
@@ -270,21 +294,30 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun'>) 
 
         await host.deliver({ ...personal, subject: `[Test] ${mail.subject}`, text: `${noted}\n\n${personal.text}` })
       },
-      async status(id) {
-        const found = lists.broadcast(id)
+      async preview(given) {
+        const { mail } = await message(given, LIST_RECIPIENT)
+        const locale = await renderLocale()
+        const personal = personalise({ ...mail }, { id: 'preview', list: name, email: LIST_RECIPIENT, status: 'confirmed', locale, createdAt: 0, confirmedAt: 0 }, name, await footerOf(locale))
 
-        return Promise.resolve(found?.list === name ? { id, done: found.finishedAt !== undefined, ...lists.progress(found) } : undefined)
+        return { subject: mail.subject, html: personal.html, text: personal.text }
       },
-      count: async () => Promise.resolve(lists.count(name)),
-      subscribers: async () => Promise.resolve(lists.subscribers(name).map(subscriber => ({ email: subscriber.email, confirmedAt: new Date(subscriber.confirmedAt ?? subscriber.createdAt) }))),
+      async status(id) {
+        const found = lists.get().broadcast(id)
+
+        return Promise.resolve(found?.list === name ? { id, done: found.finishedAt !== undefined, ...lists.get().progress(found) } : undefined)
+      },
+      count: async () => Promise.resolve(lists.get().count(name)),
+      subscribers: async () => Promise.resolve(lists.get().subscribers(name).map(subscriber => ({ email: subscriber.email, confirmedAt: new Date(subscriber.confirmedAt ?? subscriber.createdAt) }))),
       async unsubscribe(address) {
         const email = normalizeAddress(address)
 
-        return Promise.resolve(email !== undefined && lists.removeEmail(name, email))
+        return Promise.resolve(email !== undefined && lists.get().removeEmail(name, email))
       },
     }
 
-    return { list, lists, pace }
+    return { list, get lists() {
+      return open(file)
+    }, pace }
   }
 
   // One process of the broadcast: mails a batch, then asks to run again after the pace until nobody is left.
@@ -345,43 +378,56 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun'>) 
     connect(connected: Pick<ListHost, 'enqueueMail' | 'enqueueRun'>): void {
       queues = connected
     },
-    // Takes the address off every list of every file this process opened; how many rows went.
+    // Takes the address off every list of every file this process opened and of the default file when it exists, so an erase from a script or a route that declared no list still reaches it; how many rows went.
     erase(address: string): number {
       const email = normalizeAddress(address)
 
-      return email === undefined ? 0 : [...files.values()].reduce((total, lists) => total + lists.erase(email), 0)
+      if (email === undefined)
+        return 0
+
+      defaultFile()
+
+      return [...files.values()].reduce((total, lists) => total + lists.erase(email), 0)
     },
     // The route handlers.
-    confirm(token: unknown): { kind: 'confirmed' | 'invalid' | 'expired', locale?: string | undefined } {
+    confirm(token: unknown): { kind: 'confirmed' | 'invalid' | 'expired' | 'unavailable', locale?: string | undefined } {
       const checked = checkToken('confirm', token)
 
       if (!checked.ok)
         return { kind: checked.reason }
 
-      const entry = entries.get(checked.claims.list)
-      // A subscriber that is gone, unsubscribed or erased, answers as a link that does not work.
-      const exists = entry?.lists.confirm(checked.claims.list, checked.claims.id)
+      const store = storeOf(checked.claims.list)
 
-      return exists === true ? { kind: 'confirmed', locale: checked.claims.locale } : { kind: 'invalid', locale: checked.claims.locale }
+      if (store === undefined)
+        return { kind: 'unavailable', locale: checked.claims.locale }
+
+      // A subscriber that is gone, unsubscribed or erased, answers as a link that does not work.
+      return { kind: store.confirm(checked.claims.list, checked.claims.id) ? 'confirmed' : 'invalid', locale: checked.claims.locale }
     },
-    unsubscribe(token: unknown): { locale?: string | undefined, valid: boolean } {
+    unsubscribe(token: unknown): { locale?: string | undefined, valid: boolean, unavailable?: true } {
       const checked = checkToken('unsubscribe', token)
 
       if (!checked.ok)
         return { valid: false }
 
-      entries.get(checked.claims.list)?.lists.remove(checked.claims.list, checked.claims.id)
+      const store = storeOf(checked.claims.list)
+
+      // A valid link must never be answered as done when nothing was removed: the mail client retries a 503.
+      if (store === undefined)
+        return { valid: false, unavailable: true, locale: checked.claims.locale }
+
+      store.remove(checked.claims.list, checked.claims.id)
 
       return { valid: true, locale: checked.claims.locale }
     },
-    page: async (kind: 'confirmed' | 'invalid' | 'expired' | 'ask' | 'unsubscribed', locale: string | undefined, action?: string): Promise<Response> => {
+    page: async (kind: 'confirmed' | 'invalid' | 'expired' | 'ask' | 'unsubscribed', locale: string | undefined, action?: string, status = 200): Promise<Response> => {
       const page = await view<(props: { part?: 'title' | 'body', kind: typeof kind, action?: string | undefined }) => JSX.Element>('page')
       const [title, body] = await Promise.all([renderToString(page, { part: 'title', kind }, locale === undefined ? undefined : { locale }), renderToString(page, { kind, action }, locale === undefined ? undefined : { locale })])
       const lang = locale ?? await renderLocale()
 
       return new Response(`<!doctype html><html lang="${escapeAttribute(lang)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>${title.trim()}</title></head><body>${body}</body></html>`, {
-        status: 200,
-        headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff' },
+        status,
+        headers: { ...status === 503 && { 'retry-after': '60' }, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff' },
       })
     },
   }
@@ -400,7 +446,7 @@ export function mountListRoutes(plugin: Elysia, handle: () => ListsHandle): void
   plugin.get(`${LIST_PATH}/confirm`, async ({ query }) => {
     const result = handle().confirm(token(query))
 
-    return handle().page(result.kind, result.locale)
+    return result.kind === 'unavailable' ? handle().page('invalid', result.locale, undefined, 503) : handle().page(result.kind, result.locale)
   })
   plugin.get(`${LIST_PATH}/unsubscribe`, async ({ query }) => {
     const checked = checkToken('unsubscribe', token(query))
@@ -411,8 +457,6 @@ export function mountListRoutes(plugin: Elysia, handle: () => ListsHandle): void
   plugin.post(`${LIST_PATH}/unsubscribe`, async ({ query }) => {
     const result = handle().unsubscribe(token(query))
 
-    return handle().page(result.valid ? 'unsubscribed' : 'invalid', result.locale)
+    return handle().page(result.valid ? 'unsubscribed' : 'invalid', result.locale, undefined, result.unavailable ? 503 : 200)
   }, { parse: 'none' })
 }
-
-export type { Broadcast }

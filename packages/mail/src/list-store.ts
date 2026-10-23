@@ -61,6 +61,7 @@ export function openLists(path: string) {
   db.run('CREATE INDEX IF NOT EXISTS kay_mail_subscribers_email_only ON kay_mail_subscribers (email)')
   db.run('CREATE TABLE IF NOT EXISTS kay_mail_broadcasts (id TEXT PRIMARY KEY, list TEXT NOT NULL, created_at INTEGER NOT NULL, finished_at INTEGER, message TEXT NOT NULL)')
   db.run('CREATE TABLE IF NOT EXISTS kay_mail_deliveries (broadcast TEXT NOT NULL, subscriber TEXT NOT NULL, state TEXT NOT NULL, tries INTEGER NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (broadcast, subscriber))')
+  db.run('CREATE INDEX IF NOT EXISTS kay_mail_subscribers_pending ON kay_mail_subscribers (status, created_at)')
   db.run('CREATE INDEX IF NOT EXISTS kay_mail_deliveries_subscriber ON kay_mail_deliveries (subscriber)')
 
   const insertPending = db.query('INSERT OR IGNORE INTO kay_mail_subscribers (id, list, email, status, locale, created_at) VALUES (?1, ?2, ?3, \'pending\', ?4, ?5)')
@@ -122,10 +123,15 @@ export function openLists(path: string) {
     // The address's row on the list, made pending when it has none. The first call to find a row forgets confirmations nobody clicked.
     ask(list: string, email: string, id: string, locale: string, now = Date.now()): Subscriber {
       sweepPending.run(now - PENDING_KEPT_MS)
-      sweepBroadcasts(now - BROADCAST_KEPT_MS)
+      sweepBroadcasts.immediate(now - BROADCAST_KEPT_MS)
       insertPending.run(id, list, email, locale, now)
 
-      return subscriberOf(byEmail.get(list, email)!)
+      const row = byEmail.get(list, email)
+
+      if (row == null)
+        throw new Error('kayjs-mail: the subscriber row was removed while it was being added')
+
+      return subscriberOf(row)
     },
     find(list: string, id: string): Subscriber | undefined {
       const row = byId.get(list, id)
@@ -139,8 +145,9 @@ export function openLists(path: string) {
       return byId.get(list, id) != null
     },
     remove,
-    removeEmail,
-    erase,
+    // Immediate, as these read before they write and two processes may share the file.
+    removeEmail: removeEmail.immediate,
+    erase: erase.immediate,
     subscribers: (list: string): Subscriber[] => confirmed.all(list).map(subscriberOf),
     count: (list: string): number => count.get(list)!.total,
     addBroadcast(id: string, list: string, message: string, now = Date.now()): void {

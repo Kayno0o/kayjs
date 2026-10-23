@@ -30,7 +30,7 @@ export async function erase(userId: string) {
 }
 ```
 
-A site with a kayjs-mail mailing list also calls `await mailer.erase(email)`: it takes the address off every list and removes the queued mails.
+A site with a kayjs-mail mailing list also calls `await mail.erase(email)`: it takes the address off every list and removes the queued mails.
 
 ### Load a script only once the visitor agreed
 

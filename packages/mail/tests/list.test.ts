@@ -199,6 +199,22 @@ describe('the subscribe form', () => {
   it('renders the honeypot', async () => {
     expect((await site.visit('/subscribe')).html).toContain('name="website"')
   })
+
+  it('pretends to subscribe a bot that fills the honeypot, and mails nobody', async () => {
+    const email = fresh()
+    const sent = outbox.mails.length
+
+    const fields = new FormData()
+
+    fields.append('email', email)
+    fields.append('website', 'https://spam.example')
+
+    expect(await site.call(subscribe, fields as never)).toBeUndefined()
+    await site.runJobs()
+
+    expect(outbox.mails).toHaveLength(sent)
+    expect(outbox.to(email)).toHaveLength(0)
+  })
 })
 
 describe('the confirmation link', () => {
@@ -260,6 +276,15 @@ describe('unsubscribing', () => {
     expect(sent.headers['List-Unsubscribe']).toMatch(new RegExp(`^<https?://[^/]+/_kay/mail/list/unsubscribe\\?token=${token}>$`))
     expect(sent.headers['List-Unsubscribe-Post']).toBe(ONE_CLICK)
     expect(sent.text).toContain(`/_kay/mail/list/unsubscribe?token=${token}`)
+  })
+
+  it('never answers a valid link as done when its list is not declared in this process', async () => {
+    const token = signToken('unsubscribe', { list: 'declared-elsewhere', id: 'someone', locale: 'en' })
+    const response = await site.fetch(link(token), { method: 'POST', body: ONE_CLICK })
+
+    expect(response.status).toBe(503)
+    expect(response.headers.get('retry-after')).toBe('60')
+    expect(await response.text()).not.toContain('unsubscribed')
   })
 
   it('does not unsubscribe on a GET, which a mail scanner makes, and asks first', async () => {

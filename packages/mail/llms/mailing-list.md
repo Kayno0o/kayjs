@@ -4,7 +4,7 @@
 
 ### Let visitors subscribe
 
-`mail.list()` is the site's mailing list, kept in kay's own store with nothing to declare: `data/mail-list.sqlite` (in memory under `bun test`), created by the first call. `.form()` gives the arguments of `action`, as `contactForm` does:
+`mail.list()` is the site's mailing list, kept in kay's own store with nothing to declare: `data/mail-list.sqlite` (in memory under `bun test`), created by the first query, so building or checking an app makes no file. `.form()` gives the arguments of `action`, as `contactForm` does:
 
 ```kay
 --- server
@@ -33,8 +33,9 @@ await mail.list().status(id) // { done, sent, failed, retrying, unsure, waiting 
 - `send` takes a message as `mail.send` does, without recipients and attachments. It is rendered once, stored, and queued in the queue `<mail queue>-list` of the mailer (`mail-list`), which the server using the mailer runs.
 - Every mail carries the subscriber's own signed unsubscribe link in a footer (in the subscriber's language) and the `List-Unsubscribe` and `List-Unsubscribe-Post: List-Unsubscribe=One-Click` headers of RFC 8058.
 - `pace: { batch: 20, every: '1m' }` in `mail.list(name, options)` mails a batch, then waits: 1,200 an hour by default. `MAIL_RATE_LIMIT` still caps the SMTP connection.
-- Each recipient is claimed in the file before its mail goes, so a restart, a deploy or a retry never mails anyone twice. A mail the transport refuses is tried 3 times then marked `failed`; a process that dies inside the send leaves that one recipient `unsure`: not mailed again, as it may have left. Only subscribers confirmed before the broadcast get it; one who unsubscribed or was erased meanwhile is skipped. A broadcast and its rows are dropped 30 days after it finished.
+- Each recipient is claimed in the file before its mail goes, so a restart, a deploy or a crash of the process never mails anyone twice (a power cut can lose the last claims, and a transport that fails after the server took the mail may be retried). A mail the transport refuses is tried 3 times then marked `failed`; a process that dies inside the send leaves that one recipient `unsure`: not mailed again, as it may have left. Only subscribers confirmed before the broadcast get it; one who unsubscribed or was erased meanwhile is skipped. A broadcast and its rows are dropped 30 days after it finished.
 - `test(message, address)` sends one mail now to an address (an editor's), subject prefixed `[Test]`, without a broadcast; its unsubscribe link does nothing.
+- `preview(message)` renders what a send would mail, with the footer, and answers `{ subject, html, text }` without sending or queueing anything; kayjs-cms shows it before an editor sends an entry.
 
 ### Unsubscribe, count and erase
 
