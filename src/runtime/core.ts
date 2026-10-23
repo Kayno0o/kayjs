@@ -16,7 +16,7 @@ export interface Signal<T> {
   set: Setter<T>
 }
 
-// What `memo` makes: a prop typed `Memo<T>` takes the memo itself, read by calling it, as a signal is.
+// What `memo` makes.
 export type Memo<T> = () => T
 
 // A signal read as `count()` and written as `count.set(1)` or `count.set(c => c + 1)`.

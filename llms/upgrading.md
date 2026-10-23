@@ -14,6 +14,10 @@ kayjs-cms answers on `/_kay/cms` alone: the `/api/cms` path of 1.70 and before i
 
 kayjs-auth's `auth_*` tables are no longer `renamedFrom` their old names. A database still on `auth_*` tables must take 1.71 to 1.73 first, apply the migration `db.sync()` or `bunx pg-orm generate` writes there, and only then move to 1.74: from 1.74 the generator no longer renames them, so it would create the `kay_*` tables beside the old ones, empty.
 
+### Props typed `Signal<T>` or `Memo<T>` are plain values
+
+A prop typed `Signal<T>` or `Memo<T>` is a plain value of that type now, no longer read by calling it or assigned: type a prop the child writes `Bindable<T>`, read and assign it as `open`, and bind it with `bind:open={open}`; a `Memo<T>` prop is a `T`, passed as `value={memo()}`.
+
 ## 1.73.0
 
 ### kayjs-cms: the editor panel is kayjs-ui's docked `SidePanel`
@@ -26,7 +30,7 @@ An entry's head is a `PageSection` head: `.kcms-entry-head`, `.kcms-entry-title`
 
 ### The forms deprecated in 1.69 and 1.70 are gone
 
-`deprecated-identity-key` and every `since: '1.70'` lint go with the forms they reported: an app still on one gets a type error or an unknown option, bar a `JSX.Element` markup prop.
+`deprecated-identity-key` and fourteen of the `since: '1.70'` lints go with the forms they reported: an app still on one gets a type error or an unknown option, bar a `JSX.Element` markup prop.
 
 - `// kay-allow` comments and `lints` entries naming a removed lint are an unknown lint: delete them.
 - Config: `authPages`, `authExtension` and `mailExtension` are `auth({ module })` and `mail({ module })`; `bodyLimit` is `maxSize`; `kayjs-cms/postgres` is `kayjs-cms/pg`.
@@ -37,6 +41,5 @@ An entry's head is a `PageSection` head: `.kcms-entry-head`, `.kcms-entry-title`
 - kayjs-auth methods: `sessions`, `tokens`, `members` and the like are `listSessions`, `listTokens`, `listMembers`; `organization` and `invitation` are `getOrganization` and `getInvitation`; `endSession`, `removePasskey`, `removeMember`, `declineInvitation`, `setLocale` and the like are `revokeSession`, `revokePasskey`, `deleteMember`, `rejectInvitation`, `updateLocale`.
 - Tests: `mountComponent('src/components/toggle.kay')` takes the imported component; `ctx.failed(action)` and `ctx.succeeded(action)` are `action.failed()` and `action.succeeded()`; a `JSX.Element` markup prop is a `Snippet`, no longer reported.
 - Hooks take one event object (`onSignUp({ user, profile })`, `onError({ error, request })`): the positional shape is no longer read.
-- A prop typed `Signal<T>` or `Memo<T>` is a plain value of that type now, no longer read by calling it or assigned: type a prop the child writes `Bindable<T>`, read and assign it as `open`, and bind it with `bind:open={open}`; a `Memo<T>` prop is a `T`, passed as `value={memo()}`.
 
 Releases before 1.73 are in [Upgrading, older releases](upgrading-archive.md).

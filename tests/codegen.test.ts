@@ -1187,6 +1187,15 @@ describe('signal writes', () => {
     expect(imported.tsx).toContain('<button onClick={() => tone.set((KayCurrent) => KayCurrent + (\'!\'))}>{(void tone, __values.tone)}</button>')
   })
 
+  it('compiles a prop typed Signal as a plain value, read-only like any other prop', () => {
+    const source = '---\nimport type { Signal } from \'kay\'\nconst { open } = props<{ open: Signal<boolean> }>()\nfunction f() {\n  open = false\n}\n---\nbutton(onClick={f}) {open}'
+    const compiled = compileKay(source, 'test.kay', { output: 'dom' })
+
+    expect(compiled.tsx).not.toContain('open.set(')
+    expect(compiled.tsx).not.toContain('__values.open')
+    expect(compiled.diagnostics.map(d => d.message)).toEqual(['`open` is a prop, and props are read-only'])
+  })
+
   it('reject a write to a memo, a signal written by destructuring and a constant plainly holding no signal', () => {
     const source = '---\nimport { loud } from \'./theme\'\nconst count = signal(0)\nconst double = memo(() => count() * 2)\nconst plain = 1\nconst params = new URLSearchParams()\nconst cast = {} as never\nconst list = [1]\nconst sum = count() + 1\nlet free = 0\nfunction f() {\n  double = 3\n  loud++\n  plain += 1\n  params = new URLSearchParams()\n  cast = 1\n  list = []\n  sum ??= 2\n  free++\n  ;[count] = [signal(1)]\n}\n---\np x'
     const found = compileKay(source, 'test.kay', { importedSignals: { './theme': { loud: 'memo' } } }).diagnostics.map(d => [source.slice(d.start, d.end), d.message])
