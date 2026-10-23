@@ -34,7 +34,7 @@ import { configError, nameUser, overHttps, READ_METHODS, requestOfContext, stopp
 import { clientAddress, crossSiteRefused, crossSiteResponse, rateKey } from 'kay/server'
 import { protectedResourceMetadata, rootIsFixed, rootUsable, siteRoot } from './authorize/metadata'
 import { serveOAuthServer } from './authorize/routes'
-import { bearerRequest, bearerUser, createToken, issueToken, listTokens, revokeToken, tokenUser } from './bearer'
+import { bearerRequest, bearerToken } from './bearerHeader'
 import { admit, captchaChallenge, captchaRequired } from './captcha'
 import { backOf, banned, guardPageOf, homeOf, isNavigation, linkedProviders, linkedUser, newUserRecord, OFF, publicUser, unlinked, withBack, withQuery } from './core'
 import { auditEntries, report } from './events'
@@ -59,6 +59,7 @@ export type { AuthSessionData, BareUser, OAuthApp, Off, Profile, User } from './
 const load = {
   account: async () => import('./account'),
   admin: async () => import('./admin'),
+  bearer: async () => import('./bearer'),
   email: async () => import('./email'),
   erase: async () => import('./erase'),
   profile: async () => import('./profile'),
@@ -770,7 +771,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
   // A bearer token for a device or an API client of the signed-in user, shown this once; minted from a session only, never from another token.
   async createToken(proof: Proof, label: string, options: TokenOptions<Scope> = {}): Promise<CreateTokenResult> {
-    return createToken(this[STATE], proof, label, options)
+    return (await load.bearer()).createToken(this[STATE], proof, label, options)
   }
 
   // The scopes of the bearer token this request came with; null for a session, or a token with every scope.
@@ -1028,12 +1029,12 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
   // The signed-in user's bearer tokens, without the tokens themselves.
   async listTokens(): Promise<BearerToken[]> {
-    return listTokens(this[STATE])
+    return (await load.bearer()).listTokens(this[STATE])
   }
 
   // Revokes one of the signed-in user's bearer tokens, from a browser session only: `signed-out` through a token, `not-found` for one that is not theirs.
   async revokeBearerToken(id: string): Promise<{ ok: true } | { ok: false, error: 'signed-out' | 'not-found' }> {
-    return revokeToken(this[STATE], id)
+    return (await load.bearer()).revokeToken(this[STATE], id)
   }
 
   /** @deprecated Renamed `listSessions`, kept three minors. */
@@ -1203,7 +1204,8 @@ export class Auth<Scope extends string = string, Role extends string = string, O
       this.markBrowser(false)
     }
 
-    const owner = await bearerUser(this.core, this.request)
+    const token = bearerToken(this.request)
+    const owner = token === undefined ? undefined : await (await load.bearer()).tokenUser(this.core, token)
 
     const live = owner && !banned(owner.record) ? owner : null
 
@@ -1472,12 +1474,12 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
     // A bearer token for `userId` taking no proof and sending no mail, for a flow the app gates itself, such as pairing a device, or a script. `token` adopts one the app handed out before, so its devices keep working through a migration.
     async issueToken(userId: string, label: string, tokenOptions: TokenOptions<Scope> & { token?: string | undefined } = {}): Promise<IssueTokenResult> {
-      return issueToken(core, userId, label, tokenOptions)
+      return (await load.bearer()).issueToken(core, userId, label, tokenOptions)
     },
 
     // The user a bearer token belongs to, for a websocket handshake sending one in its first message; null for a banned one.
     async userFromToken(token: string): Promise<User | null> {
-      const owner = await tokenUser(core, token)
+      const owner = await (await load.bearer()).tokenUser(core, token)
 
       return owner && !banned(owner.record) ? linkedUser(core, owner.record) : null
     },

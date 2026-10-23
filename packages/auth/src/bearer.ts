@@ -4,6 +4,7 @@ import type { Proof, ProofFailure } from './proof'
 import type { RequestState } from './state'
 import type { BearerTokenRecord, UserRecord } from './store'
 import { durationSeconds } from 'kay/library'
+import { bearerToken } from './bearerHeader'
 import { banned, TOUCH_EVERY_MS } from './core'
 import { digest, randomToken } from './keys'
 import { notify } from './notify'
@@ -11,7 +12,6 @@ import { reprove } from './proof'
 import { plainName } from './text'
 
 const LABEL_MAX_LENGTH = 64
-const BEARER = /^Bearer\s+(\S+)$/i
 const TOKEN = /^\S{32,4096}$/
 const MIN_DISTINCT_CHARACTERS = 10
 const TOKEN_PREFIX = 'kat_'
@@ -166,13 +166,9 @@ export async function revokeToken(state: RequestState, id: string): Promise<{ ok
 }
 
 // Whether a request carries an `Authorization: Bearer` token, which no page can add to a cross-site request; a browser sends Basic credentials on its own.
-export function bearerRequest(request: Request): boolean {
-  return BEARER.test(request.headers.get('authorization') ?? '')
-}
-
 // The user a request's `Authorization: Bearer` token belongs to, with the token's scopes.
 export async function bearerUser(core: Core, request: Request): Promise<{ record: UserRecord, scopes: string[] | null } | undefined> {
-  const token = BEARER.exec(request.headers.get('authorization') ?? '')?.[1]
+  const token = bearerToken(request)
 
   return token === undefined ? undefined : tokenUser(core, token)
 }

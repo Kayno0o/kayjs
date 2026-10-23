@@ -5,6 +5,7 @@ interface Loaded {
   modules: string[]
 }
 
+// Not listed, as `createAuth` is sync and `index.ts` exports their config helpers as values: captcha, breached, mail, gate, forwardAuth, the OAuth client, providers and refresher, memoryStore, and the zero-import mount modules of authorize. Each is a few hundred lines on kay's own packages and loads no package of its own.
 // What each feature reads: its own modules, and the packages only it needs.
 const FEATURES = {
   password: { modules: ['password.ts'], packages: [] },
@@ -14,6 +15,7 @@ const FEATURES = {
   admin: { modules: ['admin.ts'], packages: [] },
   oauth: { modules: ['oauth/flow.ts'], packages: [] },
   oauthServer: { modules: ['authorize/clients.ts', 'authorize/grants.ts', 'authorize/register.ts', 'authorize/request.ts', 'authorize/token.ts'], packages: [] },
+  bearer: { modules: ['bearer.ts'], packages: [] },
   erase: { modules: ['erase.ts'], packages: [] },
 } as const
 
@@ -38,6 +40,7 @@ function loadsOf(result: Loaded, feature: Feature): boolean {
 const SCENARIOS: Record<string, { uses: Feature[] }> = {
   minimal: { uses: ['password'] },
   pages: { uses: [] },
+  bearer: { uses: ['password', 'bearer'] },
   passkeys: { uses: ['password', 'passkeys'] },
   twoFactor: { uses: ['password', 'twoFactor'] },
   organizations: { uses: ['password', 'organizations'] },
