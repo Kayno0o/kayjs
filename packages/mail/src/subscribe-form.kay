@@ -1,0 +1,25 @@
+---
+import type { Action } from 'kay'
+import { wording } from 'kay/words'
+
+// A form for the action `mail.list().form()` gives: an email field, a button and the answer. Unstyled apart from the `kmail-subscribe` classes, which a site styles; it posts without JavaScript.
+const { action, label = wording('mail.list.form.email', 'Email'), submitLabel = wording('mail.list.form.submit', 'Subscribe'), sentLabel = wording('mail.list.form.sent', 'Almost done: open the mail we just sent you and confirm your address.') } = props<{
+  action: Action<never, unknown>
+  label?: string | undefined
+  submitLabel?: string | undefined
+  // Shown once the post went through, whether or not the address was already listed.
+  sentLabel?: string | undefined
+}>()
+---
+form(class="kmail-subscribe" action={action} novalidate)
+  label(class="kmail-subscribe-field")
+    span(class="kmail-subscribe-label") {label}
+    input(field="email" type="email" autocomplete="email")
+  span(class="kmail-subscribe-issue" aria-live="polite")
+    if action.error('email') as issue
+      | {issue}
+  button(type="submit") {submitLabel}
+  if action.succeeded()
+    p(class="kmail-subscribe-sent" role="status") {sentLabel}
+  else if action.error() as message
+    p(class="kmail-subscribe-error" role="alert") {message}

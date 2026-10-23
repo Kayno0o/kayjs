@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - A tree-sitter grammar for `.kay` files colours them in Neovim, Helix and Zed, and a Zed extension starts the language server ([Check and tools](check-and-tools.md))
+- kayjs-mail runs a mailing list with `mail.list()`: a subscribe form with double opt-in, signed one-click unsubscribe links and headers, paced sending through the queue that resumes after a restart, and `mail.erase(address)` ([A mailing list](../packages/mail/llms/mailing-list.md)).
 - `metrics: true` serves `/metrics` for Prometheus: requests by route and status, durations, job runs, cache reads and live connections, read only from the machine or a private network, or with a bearer `KAY_METRICS_TOKEN` ([Metrics for a collector](production.md#metrics-for-a-collector)).
 - `kay/test/preload` keeps a variable an earlier preload pinned, so `preload = ["./tests/setup.ts", "kay/test/preload"]` reaches the modules `kay.config.ts` imports ([Test setup](testing-setup.md)).
 - kayjs-ui Avatar, Stat, PageHeader, PageSection, EmptyState, CardRow, Widget, Meter, Progress and Skeleton draw their look in recipe utilities too, and their part classes are gone (`deprecated-ui-class`, [Setup](../packages/ui/llms/setup.md)).

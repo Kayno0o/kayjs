@@ -1,0 +1,168 @@
+import type { Database } from 'bun:sqlite'
+import { openSqlite } from 'kay/library'
+
+// Where the production server keeps its mailing lists, next to the job store.
+export const LIST_FILE = 'data/mail-list.sqlite'
+
+export interface Subscriber {
+  id: string
+  list: string
+  email: string
+  status: 'pending' | 'confirmed'
+  locale: string
+  createdAt: number
+  confirmedAt: number | undefined
+}
+
+export interface Broadcast {
+  id: string
+  list: string
+  createdAt: number
+  finishedAt: number | undefined
+  // The mail as rendered once, a JSON text: each subscriber's is this with their own unsubscribe link.
+  message: string
+}
+
+export type DeliveryState = 'sending' | 'sent' | 'retry' | 'failed'
+
+export interface BroadcastProgress {
+  sent: number
+  failed: number
+  retrying: number
+  // Claimed and never settled: the process died inside the send, so the mail may or may not have left.
+  unsure: number
+  waiting: number
+}
+
+// A recipient is mailed this many times before it is given up on.
+export const DELIVERY_TRIES = 3
+// A confirmation nobody clicked is forgotten after this long.
+const PENDING_KEPT_MS = 7 * 24 * 3_600_000
+// A finished broadcast and its deliveries are kept this long.
+const BROADCAST_KEPT_MS = 30 * 24 * 3_600_000
+
+interface SubscriberRow { id: string, list: string, email: string, status: 'pending' | 'confirmed', locale: string, created_at: number, confirmed_at: number | null }
+interface BroadcastRow { id: string, list: string, created_at: number, finished_at: number | null, message: string }
+
+function subscriberOf(row: SubscriberRow): Subscriber {
+  return { id: row.id, list: row.list, email: row.email, status: row.status, locale: row.locale, createdAt: row.created_at, confirmedAt: row.confirmed_at ?? undefined }
+}
+
+function broadcastOf(row: BroadcastRow): Broadcast {
+  return { id: row.id, list: row.list, createdAt: row.created_at, finishedAt: row.finished_at ?? undefined, message: row.message }
+}
+
+// The lists in one SQLite file, shared by the processes of the machine opening it. Addresses are stored once per list, in the form `normalizeAddress` gives; the file is readable by the server's user alone.
+export function openLists(path: string) {
+  const db: Database = openSqlite(path)
+
+  db.run('CREATE TABLE IF NOT EXISTS kay_mail_subscribers (id TEXT PRIMARY KEY, list TEXT NOT NULL, email TEXT NOT NULL, status TEXT NOT NULL, locale TEXT NOT NULL, created_at INTEGER NOT NULL, confirmed_at INTEGER)')
+  db.run('CREATE UNIQUE INDEX IF NOT EXISTS kay_mail_subscribers_email ON kay_mail_subscribers (list, email)')
+  db.run('CREATE INDEX IF NOT EXISTS kay_mail_subscribers_email_only ON kay_mail_subscribers (email)')
+  db.run('CREATE TABLE IF NOT EXISTS kay_mail_broadcasts (id TEXT PRIMARY KEY, list TEXT NOT NULL, created_at INTEGER NOT NULL, finished_at INTEGER, message TEXT NOT NULL)')
+  db.run('CREATE TABLE IF NOT EXISTS kay_mail_deliveries (broadcast TEXT NOT NULL, subscriber TEXT NOT NULL, state TEXT NOT NULL, tries INTEGER NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (broadcast, subscriber))')
+  db.run('CREATE INDEX IF NOT EXISTS kay_mail_deliveries_subscriber ON kay_mail_deliveries (subscriber)')
+
+  const insertPending = db.query('INSERT OR IGNORE INTO kay_mail_subscribers (id, list, email, status, locale, created_at) VALUES (?1, ?2, ?3, \'pending\', ?4, ?5)')
+  const byEmail = db.query<SubscriberRow, [string, string]>('SELECT * FROM kay_mail_subscribers WHERE list = ?1 AND email = ?2')
+  const byId = db.query<SubscriberRow, [string, string]>('SELECT * FROM kay_mail_subscribers WHERE list = ?1 AND id = ?2')
+  const confirmRow = db.query('UPDATE kay_mail_subscribers SET status = \'confirmed\', confirmed_at = ?3 WHERE list = ?1 AND id = ?2 AND status = \'pending\'')
+  const deleteDeliveries = db.query('DELETE FROM kay_mail_deliveries WHERE subscriber = ?1')
+  const deleteSubscriber = db.query('DELETE FROM kay_mail_subscribers WHERE list = ?1 AND id = ?2')
+  const byEmailId = db.query<{ id: string }, [string, string]>('SELECT id FROM kay_mail_subscribers WHERE list = ?1 AND email = ?2')
+  const idsOfEmail = db.query<{ id: string }, [string]>('SELECT id FROM kay_mail_subscribers WHERE email = ?1')
+  const deleteEmail = db.query('DELETE FROM kay_mail_subscribers WHERE email = ?1')
+  const sweepPending = db.query('DELETE FROM kay_mail_subscribers WHERE status = \'pending\' AND created_at < ?1')
+  const confirmed = db.query<SubscriberRow, [string]>('SELECT * FROM kay_mail_subscribers WHERE list = ?1 AND status = \'confirmed\' ORDER BY confirmed_at, id')
+  const count = db.query<{ total: number }, [string]>('SELECT COUNT(*) AS total FROM kay_mail_subscribers WHERE list = ?1 AND status = \'confirmed\'')
+
+  const insertBroadcast = db.query('INSERT INTO kay_mail_broadcasts (id, list, created_at, message) VALUES (?1, ?2, ?3, ?4)')
+  const getBroadcast = db.query<BroadcastRow, [string]>('SELECT * FROM kay_mail_broadcasts WHERE id = ?1')
+  const finishBroadcast = db.query('UPDATE kay_mail_broadcasts SET finished_at = ?2 WHERE id = ?1 AND finished_at IS NULL')
+  const oldBroadcasts = db.query<{ id: string }, [number]>('SELECT id FROM kay_mail_broadcasts WHERE finished_at IS NOT NULL AND finished_at < ?1')
+  const deleteBroadcastDeliveries = db.query('DELETE FROM kay_mail_deliveries WHERE broadcast = ?1')
+  const deleteBroadcast = db.query('DELETE FROM kay_mail_broadcasts WHERE id = ?1')
+
+  // A subscriber still confirmed and not yet mailed this broadcast, or whose last try failed and may go again.
+  const next = db.query<SubscriberRow, [string, string, number, number]>('SELECT s.* FROM kay_mail_subscribers s LEFT JOIN kay_mail_deliveries d ON d.broadcast = ?1 AND d.subscriber = s.id WHERE s.list = ?2 AND s.status = \'confirmed\' AND s.confirmed_at <= ?3 AND (d.subscriber IS NULL OR d.state = \'retry\') ORDER BY s.id LIMIT ?4')
+  const claimRow = db.query('INSERT INTO kay_mail_deliveries (broadcast, subscriber, state, tries, at) SELECT ?1, ?2, \'sending\', 1, ?3 WHERE EXISTS (SELECT 1 FROM kay_mail_subscribers WHERE id = ?2 AND status = \'confirmed\') ON CONFLICT (broadcast, subscriber) DO UPDATE SET state = \'sending\', tries = tries + 1, at = ?3 WHERE kay_mail_deliveries.state = \'retry\' AND EXISTS (SELECT 1 FROM kay_mail_subscribers WHERE id = ?2 AND status = \'confirmed\')')
+  const settleRow = db.query('UPDATE kay_mail_deliveries SET state = ?3, at = ?4 WHERE broadcast = ?1 AND subscriber = ?2 AND state = \'sending\'')
+  const releaseRow = db.query(`UPDATE kay_mail_deliveries SET state = CASE WHEN tries >= ${DELIVERY_TRIES} THEN 'failed' ELSE 'retry' END, at = ?3 WHERE broadcast = ?1 AND subscriber = ?2 AND state = 'sending'`)
+  const states = db.query<{ state: DeliveryState, total: number }, [string]>('SELECT state, COUNT(*) AS total FROM kay_mail_deliveries WHERE broadcast = ?1 GROUP BY state')
+  const waitingFor = db.query<{ total: number }, [string, string, number]>('SELECT COUNT(*) AS total FROM kay_mail_subscribers s LEFT JOIN kay_mail_deliveries d ON d.broadcast = ?1 AND d.subscriber = s.id WHERE s.list = ?2 AND s.status = \'confirmed\' AND s.confirmed_at <= ?3 AND d.subscriber IS NULL')
+
+  const remove = db.transaction((list: string, id: string): boolean => {
+    deleteDeliveries.run(id)
+
+    return deleteSubscriber.run(list, id).changes > 0
+  })
+
+  const removeEmail = db.transaction((list: string, email: string): boolean => {
+    const found = byEmailId.get(list, email)
+
+    return found != null && remove(list, found.id)
+  })
+
+  const erase = db.transaction((email: string): number => {
+    for (const { id } of idsOfEmail.all(email))
+      deleteDeliveries.run(id)
+
+    return deleteEmail.run(email).changes
+  })
+
+  const sweepBroadcasts = db.transaction((before: number) => {
+    for (const { id } of oldBroadcasts.all(before)) {
+      deleteBroadcastDeliveries.run(id)
+      deleteBroadcast.run(id)
+    }
+  })
+
+  return {
+    close: () => db.close(),
+    // The address's row on the list, made pending when it has none. The first call to find a row forgets confirmations nobody clicked.
+    ask(list: string, email: string, id: string, locale: string, now = Date.now()): Subscriber {
+      sweepPending.run(now - PENDING_KEPT_MS)
+      sweepBroadcasts(now - BROADCAST_KEPT_MS)
+      insertPending.run(id, list, email, locale, now)
+
+      return subscriberOf(byEmail.get(list, email)!)
+    },
+    find(list: string, id: string): Subscriber | undefined {
+      const row = byId.get(list, id)
+
+      return row ? subscriberOf(row) : undefined
+    },
+    // Whether the subscriber exists after the call; one confirmed already stays as it is.
+    confirm(list: string, id: string, now = Date.now()): boolean {
+      confirmRow.run(list, id, now)
+
+      return byId.get(list, id) != null
+    },
+    remove,
+    removeEmail,
+    erase,
+    subscribers: (list: string): Subscriber[] => confirmed.all(list).map(subscriberOf),
+    count: (list: string): number => count.get(list)!.total,
+    addBroadcast(id: string, list: string, message: string, now = Date.now()): void {
+      insertBroadcast.run(id, list, now, message)
+    },
+    broadcast(id: string): Broadcast | undefined {
+      const row = getBroadcast.get(id)
+
+      return row ? broadcastOf(row) : undefined
+    },
+    finish: (id: string, now = Date.now()) => finishBroadcast.run(id, now),
+    next: (broadcast: Broadcast, limit: number): Subscriber[] => next.all(broadcast.id, broadcast.list, broadcast.createdAt, limit).map(subscriberOf),
+    // Claims the recipient before the mail goes, so a process that dies inside the send is never followed by one sending it again; false when it was claimed already or left the list.
+    claim: (broadcast: string, subscriber: string, now = Date.now()): boolean => claimRow.run(broadcast, subscriber, now).changes > 0,
+    sent: (broadcast: string, subscriber: string, now = Date.now()) => settleRow.run(broadcast, subscriber, 'sent', now),
+    release: (broadcast: string, subscriber: string, now = Date.now()) => releaseRow.run(broadcast, subscriber, now),
+    progress(broadcast: Broadcast): BroadcastProgress {
+      const counts = new Map(states.all(broadcast.id).map(row => [row.state, row.total]))
+
+      return { sent: counts.get('sent') ?? 0, failed: counts.get('failed') ?? 0, retrying: counts.get('retry') ?? 0, unsure: counts.get('sending') ?? 0, waiting: waitingFor.get(broadcast.id, broadcast.list, broadcast.createdAt)!.total }
+    },
+  }
+}
+
+export type Lists = ReturnType<typeof openLists>

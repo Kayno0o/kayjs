@@ -1,0 +1,18 @@
+---
+import type { ListConfirmProps } from './list'
+import { wording } from 'kay/words'
+import Button from './button.kay'
+import Heading from './heading.kay'
+import Layout from './layout.kay'
+import Link from './link.kay'
+import Paragraph from './paragraph.kay'
+
+// The default mail asking to confirm a subscription: `url` is the link whose click lists the address, `site` the site's origin.
+const { url, site } = props<ListConfirmProps>()
+---
+Layout(preheader={wording('mail.list.confirm.lead', 'One click and you are subscribed.')})
+  Heading {wording('mail.list.confirm.heading', 'Confirm your subscription')}
+  Paragraph {wording('mail.list.confirm.body', 'Someone asked to receive the mails of {site} at this address. If it was you, confirm it.', { site })}
+  Button(href={url}) {wording('mail.list.confirm.button', 'Confirm my subscription')}
+  Paragraph(muted) {wording('mail.list.confirm.orPaste', 'Or paste this link in your browser:')} #[Link(href={url}) {url}]
+  Paragraph(muted) {wording('mail.list.confirm.ending', 'If you did not ask for it, ignore this mail: nothing is subscribed until the link is opened, and it stops working in three days.')}

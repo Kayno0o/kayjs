@@ -297,6 +297,42 @@ The refusals read the `mail.contact` messages in the page's language, in English
 
 The schema's field messages (`mail.contact.errors`) and ContactForm's labels (`mail.contact.form`) follow the page's language too, with the same override. Set `errors: { name, email, message, consent }` to replace the field messages with a text or a function. ContactForm's label props replace its labels.
 
+## A mailing list
+
+`mail.list()` is the site's mailing list. It keeps its subscribers in kay's own store, the file `data/mail-list.sqlite`, so there is nothing to declare and no adapter to write. A site with several lists gives each a name, `mail.list('news')`.
+
+```kay
+--- server
+import { mail } from '../mail'
+import SubscribeForm from '@kaynooo/kayjs-mail/subscribe-form.kay'
+
+export const subscribe = action(...mail.list().form())
+---
+SubscribeForm(action={subscribe})
+```
+
+A visitor types an address and gets a mail with a link, valid for three days. The address joins the list only when the link is opened. Every visitor sees the same answer, whether the address is new, waiting, already listed or refused, so the form tells nothing about who subscribed. A confirmed address is mailed nothing.
+
+The form cannot be used to mail-bomb someone. Each IP may post 10 times every 10 minutes, a honeypot and a minimum time catch bots, and one address gets at most 3 confirmation mails an hour. Past that the answer stays the same and nothing is sent.
+
+Links in the mails are signed with the app secret (`KAY_SECRET`), hold a random id and never the address, and a link made for confirming cannot unsubscribe. A forged, expired, used or unknown link shows one page that says it does not work.
+
+### Sending to the list
+
+```ts
+const { id } = await mail.list().send({ subject: 'Spring news', view: News, props: { issue: 12 } })
+
+await mail.list().status(id) // how many were sent, failed and are still waiting
+```
+
+`send` takes the message of `mail.send` without recipients. It is rendered once and handed to a queue of the mailer, which mails the confirmed subscribers 20 at a time, a minute apart. `pace: { batch, every }` in `mail.list(name, options)` changes it.
+
+A restart or a deploy in the middle carries on where it stopped, and nobody gets the mail twice: each recipient is marked before its mail goes. If a process dies inside the send of one mail, that recipient is counted `unsure` and is not mailed again. `list.test(message, address)` sends one preview to an editor.
+
+Every mail ends with an unsubscribe link in the subscriber's language, and carries the `List-Unsubscribe` and `List-Unsubscribe-Post` headers, so Gmail and Yahoo show their one-click button. Opening the link only asks for confirmation, so a mail scanner unsubscribes no one. Unsubscribing needs no sign-in and deletes the address.
+
+To erase a person, call `mail.erase(address)`. It removes the address from every list and the mails still queued for it.
+
 ## Previewing
 
 Under `kay dev`, `/_kay/mail` lists the mails sent, each with its html at desktop or phone width, its text and its size.
@@ -379,3 +415,4 @@ The mails are kept in `.kay` for your checkout, the last 500, so they are still 
 Topics of the kayjs-mail reference the sections above do not link:
 
 - [The contact form, testing, development and kayjs-auth](/llms/kayjs-mail-contact-form-and-testing)
+- [A mailing list](/llms/kayjs-mail-mailing-list)

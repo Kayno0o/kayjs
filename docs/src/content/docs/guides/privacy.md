@@ -29,6 +29,7 @@ Under a `base`, `kay_flash`, `kay_locale` and `kay_preview` are set for that pat
 - **Sessions** with a store: until they expire or the visitor signs out. `sqliteStore` drops expired ones every hour.
 - **Rate limits**: counted by address in memory, or in `sqliteRates(path)` pseudonymised: each key is hashed under the app's secret once one is set, else under a random key kay keeps in a `.key` file beside the store, never in the store itself, so a copy of the store alone cannot be checked against a guessed address (a backup of the whole folder holds both, so set a secret to keep the key off the disk, and keep the `.key` file out of git). Windows are dropped once their window closes.
 - **Jobs**: a waiting job's payload until it runs, a failed one's for 30 days from when its last attempt was due, or what the queue's `keepFailed` says (7 days for kayjs-mail, without the body).
+- **Mailing lists** (kayjs-mail): a subscriber's address, language and the date of their confirmation, in `data/mail-list.sqlite`, until they unsubscribe or you call `mail.erase`; an address nobody confirmed is dropped after 7 days. A broadcast and who it was sent to (by a random id, not the address) are kept 30 days after it finished.
 - **Rooms**: a message 30 seconds in `sqliteRooms`.
 - **Uploads**: until the app deletes them, without the metadata a camera writes in a JPEG, PNG, WebP, AVIF or HEIC.
 - **Missing pages**: the paths visitors found nothing at, in `data/not-found.sqlite`, until 90 days after the last visit.
@@ -58,6 +59,8 @@ export async function erase(userId: string) {
   await mail.remove(job => job.userId === userId)
 }
 ```
+
+A site with a kayjs-mail mailing list also calls `await mailer.erase(user.email)`, which takes the address off every list and removes the mails queued for it.
 
 `files.delete` also deletes every resized variant of the file and every social card drawn on it.
 

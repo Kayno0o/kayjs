@@ -1,0 +1,10 @@
+---
+import { wording } from 'kay/words'
+
+// The footer every mail of a list carries: `url` is the subscriber's own unsubscribe link, `site` the site's origin.
+const { url, site } = props<{ url: string, site: string }>()
+---
+p(style="font-size:12px;line-height:1.5;margin:24px 0 0;color:#6b7280;text-align:center")
+  | {wording('mail.list.footer', 'You receive this mail because you subscribed to the mails of {site}.', { site })}{' '}
+  a(href={url} style="color:#6b7280") {wording('mail.list.unsubscribe', 'Unsubscribe')}
+  | : {url}

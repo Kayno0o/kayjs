@@ -1,4 +1,5 @@
 import type { EnqueueOptions, FailedJob, KayExtension, QueueOptions } from 'kay/server'
+import type { ListOptions, ListRun, MailingList } from './list'
 import type { Relayed } from './outbox'
 import type { Relay } from './preview'
 import type { SmtpOverrides } from './smtp'
@@ -11,6 +12,7 @@ import { defineEnv, queue, renderLocale, renderToString } from 'kay/server'
 import parseAddresses from 'nodemailer/lib/addressparser'
 import { attempt, deliveryAddress, messageOf } from './delivery'
 import { adoptLegacyEnv, defaultSender, parseMailUrl } from './env'
+import { createLists, mountListRoutes } from './list'
 import { log } from './log'
 import { addressOf, outbox, PREVIEW_ROUTES } from './outbox'
 import { checkKey, checkOptions, greetingOf, rateFromText, smtp } from './smtp'
@@ -107,6 +109,10 @@ export type Mailer = Elysia & {
   failed: () => Promise<FailedJob<Mail>[]>
   // Removes the queued mail of that id, every one, waiting or failed, sent to `{ recipient }` among its to, cc and bcc, a person's once they asked to be erased say, or every one `match` returns true for; resolves with how many went.
   remove: (match: string | { recipient: string } | ((mail: Mail) => boolean)) => Promise<number>
+  // A mailing list of the site, `default` when unnamed, made on the first call and the same afterwards. It keeps its subscribers in kay's own store (`data/mail-list.sqlite`), mounts the confirmation and unsubscribe links, and sends through this mailer's queue.
+  list: (name?: string, options?: ListOptions) => MailingList
+  // Erases a person: the address leaves every list and the mails queued for it are removed. Resolves with how many subscriptions and queued mails went.
+  erase: (address: string) => Promise<number>
 }
 
 // A mail given up keeps 7 days, its body and links dropped: who it was for and why it failed is what an app needs to see.
@@ -477,7 +483,16 @@ export function mailer(options: MailerOptions = {}): Mailer {
         await callHook(onFailed, { payload: mail, error }, [mail, error])
     },
   })
-  const plugin = new Elysia().use(jobs)
+  const lists = createLists({
+    configured: () => (configured?.missing() ?? []).length === 0 && !senderless(),
+    render,
+    deliver,
+  })
+  // The mails of a list are sent by a job of their own, a batch at a time, so a broadcast to a long list resumes after a restart where it stopped.
+  const listJobs = queue<ListRun>(`${name}-list`, async (run, signal) => lists.run(run, signal), defined({ store: queueOptions.store, attempts: queueOptions.attempts, backoff: queueOptions.backoff, lostAfter: queueOptions.lostAfter, idlePoll: queueOptions.idlePoll }))
+  const plugin = new Elysia().use(jobs).use(listJobs)
+
+  mountListRoutes(plugin, () => lists)
 
   // Checked as the server starts, once the site is set: a sender in production is the mailer's `from`, `MAIL_FROM`, or `noreply@` the site's host, since `kay@localhost` fails SPF and lands in spam without an error.
   if (delivering() === 'smtp' && options.optional !== true) {
@@ -534,7 +549,13 @@ export function mailer(options: MailerOptions = {}): Mailer {
       return jobs.enqueue(await render(message), enqueueOptions)
     }),
     render,
-    drain: jobs.drain,
+    list: (listName = 'default', listOptions?: ListOptions) => lists.list(listName, listOptions),
+    erase: async (address: string) => lists.erase(address) + await sending.remove({ recipient: address }),
+    drain: async () => {
+      const mails = await jobs.drain()
+
+      return mails + await listJobs.drain()
+    },
     failed: jobs.failed,
     remove: async (match: string | { recipient: string } | ((mail: Mail) => boolean)) => {
       if (typeof match !== 'object')
@@ -545,6 +566,8 @@ export function mailer(options: MailerOptions = {}): Mailer {
       return jobs.remove(mail => recipientsOf(mail).some(address => address.toLowerCase() === recipient))
     },
   })
+
+  lists.connect({ enqueueMail: async message => sending.enqueue(message), enqueueRun: async (run, key) => listJobs.enqueue(run, { key }) })
 
   // A getter, since `kay build` leaves a missing variable to throw where it is read.
   return Object.defineProperty(sending, 'configured', { get: () => (configured?.missing() ?? []).length === 0 && !senderless() }) as Mailer

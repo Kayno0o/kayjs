@@ -30,6 +30,8 @@ export async function erase(userId: string) {
 }
 ```
 
+A site with a kayjs-mail mailing list also calls `await mailer.erase(email)`: it takes the address off every list and removes the queued mails.
+
 ### Load a script only once the visitor agreed
 
 For a script that needs the visitor's browser, such as a tracker that sets cookies, an island keeps the answer in a persisted signal, loads the script once it is yes, and keeps a button that asks again, where refusing withdraws an earlier yes:
@@ -110,6 +112,7 @@ export async function archive(scan: File) {
 - Rate limits count by address in memory, or in `sqliteRates(path)`, which stores each key pseudonymised as an HMAC keyed by [the app secret](environment.md#the-app-secret) once one is set, else by a random key kept in `<path>.key` beside the store (the server's user alone, shared by every process opening it), never in the store, so a copy of the store file alone cannot be checked against a guessed address; a backup of the whole folder holds both, so set a secret to keep the key off the disk; a window is dropped once it closed.
 - A queue keeps a waiting job's payload until it runs and a failed one's for `keepFailed`, 30 days by default from when its last attempt was due, or for good with `false`.
 - `queue.remove(id)` removes one job, and `queue.remove(match)` every waiting or failed job whose payload `match` returns true for, resolving with how many went; an app's own `JobStore` takes a function only when it has `jobs(queue)`.
+- kayjs-mail's mailing lists keep each subscriber's address, language and confirmation date in `data/mail-list.sqlite` until they unsubscribe or `mail.erase(address)` (which also removes the mails queued for it); an address nobody confirmed is dropped after 7 days, a broadcast and its deliveries (random ids, no address) 30 days after it finished.
 - The paths a production server counted 404s at (`data/not-found.sqlite`) are forgotten 90 days after the last visit, with their referrers, checked on opening and at most hourly; the redirects stored beside them stay.
 - `sqliteRooms` from `kay/server` keeps a room's messages 30 seconds, for the processes sharing it to read.
 - The SQLite files `sqliteStore`, `sqliteRates`, `sqliteJobs`, `sqliteRooms` and `sqliteCache` create are readable by the server's user alone, and `sqliteStore`, `sqliteRates` and `sqliteRooms` create theirs on first use, so loading a config that names one to build or check makes no file.
