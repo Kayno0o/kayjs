@@ -331,6 +331,9 @@ describe('external-redirect', () => {
     expect(moduleChecks('export default guard(({ redirect, headers }) => redirect(headers.get("referer")))\n').map(d => d.code)).toEqual(['external-redirect'])
     expect(moduleChecks('export default guard(({ redirect, url }) => redirect(url.searchParams.get("r")))\n').map(d => d.code)).toEqual(['external-redirect'])
     expect(found('const url = "/home"\nredirect(build(url))')).toEqual([])
+    expect(found('const go = (headers) => redirect(headers.get("x"))')).toEqual([])
+    expect(found('function go(headers) {\n  return headers.href\n}\nredirect(go(a))')).toEqual([])
+    expect(found('const url = new URL("/a", base)\nredirect(url.href)')).toEqual([])
   })
 
   it('does not read a property name as a variable, trusts a checker\'s result and a call built from a posted form', () => {

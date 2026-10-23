@@ -482,11 +482,11 @@ function isSitePath(node: t.Node, constants: Scope, seen = new Set<readonly t.No
 
     seen.add(hit.inits)
 
-    const site = hit.inits.every(init => isSitePath(init, hit.scope, seen))
+    const holdsSite = hit.inits.every(init => isSitePath(init, hit.scope, seen))
 
     seen.delete(hit.inits)
 
-    return site
+    return holdsSite
   }
 
   if (node.type !== 'CallExpression' || node.callee.type !== 'Identifier')
@@ -504,6 +504,8 @@ function isSitePath(node: t.Node, constants: Scope, seen = new Set<readonly t.No
 class Scope {
   readonly inits = new Map<string, t.Node[]>()
   readonly unknown = new Set<string>()
+  // The unknown names a parameter or a declaration pulled out of an object, as `({ headers })` or `const { url } = ctx`.
+  readonly destructured = new Set<string>()
 
   constructor(readonly parent?: Scope, readonly isFunction = true) {}
 
@@ -515,6 +517,14 @@ class Scope {
     const inits = this.inits.get(name)
 
     return inits ? { inits, scope: this } : this.parent?.resolve(name)
+  }
+
+  // Whether a name is bound out of an object in the scope that declares it.
+  destructures(name: string): boolean {
+    if (this.unknown.has(name))
+      return this.destructured.has(name)
+
+    return !this.inits.has(name) && (this.parent?.destructures(name) ?? false)
   }
 
   declaring(name: string): Scope | undefined {
@@ -531,12 +541,14 @@ function opensScope(node: t.Node): boolean {
   return isFunction(node) || node.type === 'BlockStatement' || node.type === 'CatchClause' || node.type === 'ForStatement' || node.type === 'ForInStatement' || node.type === 'ForOfStatement' || node.type === 'SwitchStatement' || node.type === 'StaticBlock'
 }
 
-// The names a function's parameters or a catch clause's parameter bind.
-function boundNames(node: t.Node): string[] {
-  if (isFunction(node))
-    return node.params.flatMap(param => patternNames(param))
+// The names a function's parameters or a catch clause's parameter bind, each with whether an object pattern pulls it out.
+function boundNames(node: t.Node): [string, boolean][] {
+  if (node.type === 'CatchClause' && node.param)
+    return patternNames(node.param).map((name): [string, boolean] => [name, node.param!.type === 'ObjectPattern'])
 
-  return node.type === 'CatchClause' ? patternNames(node.param) : []
+  const patterns = isFunction(node) ? node.params : []
+
+  return patterns.flatMap(pattern => patternNames(pattern).map((name): [string, boolean] => [name, pattern.type === 'ObjectPattern']))
 }
 
 function declareIn(node: t.Node, scope: Scope, scopes: Map<t.Node, Scope>): void {
@@ -551,8 +563,12 @@ function declareIn(node: t.Node, scope: Scope, scopes: Map<t.Node, Scope>): void
     }
 
     if (inner === node) {
-      for (const name of boundNames(inner))
+      for (const [name, pulled] of boundNames(inner)) {
         scope.unknown.add(name)
+
+        if (pulled)
+          scope.destructured.add(name)
+      }
     }
     else if (inner.type === 'VariableDeclarator' && inner.id.type === 'Identifier' && inner.init) {
       const target = parent?.type === 'VariableDeclaration' && parent.kind === 'var' ? scope.hoist : scope
@@ -562,8 +578,12 @@ function declareIn(node: t.Node, scope: Scope, scopes: Map<t.Node, Scope>): void
     else if (inner.type === 'VariableDeclarator') {
       const target = parent?.type === 'VariableDeclaration' && parent.kind === 'var' ? scope.hoist : scope
 
-      for (const name of patternNames(inner.id))
+      for (const name of patternNames(inner.id)) {
         target.unknown.add(name)
+
+        if (inner.id.type === 'ObjectPattern')
+          target.destructured.add(name)
+      }
     }
     else if ((inner.type === 'FunctionDeclaration' || inner.type === 'ClassDeclaration') && inner.id) {
       scope.unknown.add(inner.id.name)
@@ -619,7 +639,7 @@ const REQUEST_ROOTS = new Set(['query', 'params', 'body', 'input', 'request', 's
 const DESTRUCTURED_ROOTS = new Set(['url', 'headers', 'cookies'])
 
 function isRoot(name: string, constants: Scope): boolean {
-  return REQUEST_ROOTS.has(name) || (DESTRUCTURED_ROOTS.has(name) && !constants.resolve(name))
+  return REQUEST_ROOTS.has(name) || (DESTRUCTURED_ROOTS.has(name) && constants.destructures(name))
 }
 
 // A call result is a value the callee made: a request member it was given taints it, the bare request object (an action's `input`) does not.
