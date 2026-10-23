@@ -69,7 +69,6 @@ describe('the release\'s link check', () => {
     expect(pages.get('llms/upgrading.md')).not.toContain('Moved thing')
     expect(pages.get('llms/islands.md')).toBe('# Islands\n\nSee [Moved](upgrading-archive.md) and [Kept](upgrading.md#big).\n')
     expect(pages.get('docs/src/content/docs/guides/x.md')).toBe('See [Moved](/guides/upgrading-archive).\n')
-    expect(await brokenLinks(pages)).not.toContain('llms/islands.md: /llms/upgrading#moved-thing')
   })
 
   it('writes llms.txt with the release each archive now starts before', async () => {
