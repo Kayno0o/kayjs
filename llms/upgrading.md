@@ -10,6 +10,9 @@ A token the OAuth server issued for a `resource` (the `/mcp` an MCP client asks 
 ### kayjs-mail's `contactForm` takes a mailer's `enqueue`, and ContactForm's consent box is a Checkbox
 
 `contactForm(mail)` queues its mail with `mail.enqueue` instead of sending it in the request, so it takes `Pick<Mailer, 'enqueue'>`: a real mailer needs no change, an object with only `send` (a test double) gets `enqueue` instead, and a test waits for the mail with `outbox.waitFor(address, { site })`. ContactForm draws its consent box as a `Checkbox`, so the parts `box`, `boxInput` and `boxLabel` in `src/ui.ts` are gone: restyle `Checkbox` for them. `kay check` reports the removed parts in `src/ui.ts`; nothing flags a `send`-only object.
+### kayjs-cms password guard is bound to the app secret
+
+`passwordGuard()` signs its cookie with a key that now includes the app's secret (`KAY_SECRET`) when `{ secret }` is not given, so editors signed in before the update sign in once more. In production a password shorter than 12 characters, or one shared by two roles, throws at start. Signing out is recorded in `store.rates` (the app's, else the process's memory), the cookie is `__Host-kay_editor_session` over https, and 100 wrong passwords from anyone in 15 minutes refuse every try with a 429. `PasswordOptions` gains `store`. No `kay check` lint can tell a password's length.
 
 ### kayjs-ui props take enum values: `variant`, `size` and `pixels`
 

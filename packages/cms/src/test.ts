@@ -6,7 +6,7 @@ import { apiUrl } from 'kay'
 import { configError } from 'kay/library'
 import entriesApi from './api/entries'
 import { HINT_COOKIE } from './page-link'
-import { activePasswords, LEGACY_SESSION_COOKIE, SESSION_COOKIE, sessionCookiesOf } from './password'
+import { activePasswords, HOST_SESSION_COOKIE, LEGACY_SESSION_COOKIE, SESSION_COOKIE, sessionCookiesOf } from './password'
 import { settings } from './settings'
 
 // The route file is imported by path, which the checker cannot follow into a .kay module.
@@ -56,8 +56,9 @@ export async function cmsSignInWith(site: Pick<TestSite, 'cookies' | 'fetch' | '
 // Signs a test site out of the cms, its other cookies kept.
 export function cmsSignOut(site: CookieSite): void {
   for (const value of sessionCookiesOf(site.cookies))
-    activePasswords()?.revoke(value)
+    activePasswords()?.revokeHere(value)
 
+  site.cookies.delete(HOST_SESSION_COOKIE)
   site.cookies.delete(SESSION_COOKIE)
   site.cookies.delete(LEGACY_SESSION_COOKIE)
   site.cookies.delete(HINT_COOKIE)

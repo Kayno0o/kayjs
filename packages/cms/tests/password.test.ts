@@ -1,6 +1,7 @@
 import type { GuardContext } from 'kay'
 import { describe, expect, test } from 'bun:test'
-import { LEGACY_SESSION_COOKIE, passwordGuard, Passwords, SESSION_COOKIE, signedInBy } from '../src/password'
+import { memoryRates } from 'kay/library'
+import { HOST_SESSION_COOKIE, LEGACY_SESSION_COOKIE, passwordGuard, Passwords, SESSION_COOKIE, sessionCookieOf, signedInBy } from '../src/password'
 
 class Denied {
   constructor(readonly status: number, readonly message?: string) {}
@@ -98,19 +99,19 @@ describe('the password guard\'s sign-in cookie', () => {
     expect(() => passwordGuard('x', { maxAge: 'soon' as never })).toThrow()
   })
 
-  test('signing out ends the sign-in for a copy of the cookie too, and only that one', () => {
+  test('signing out ends the sign-in for a copy of the cookie too, and only that one', async () => {
     const cookie = passwords.issue('editor', false).value
     const copy = cookie.slice()
     const other = passwords.issue('admin', false).value
 
     expect(passwords.read(copy)).toBe('editor')
-    passwords.revoke(cookie)
+    await passwords.revoke(cookie)
     expect(passwords.read(copy)).toBeUndefined()
     expect(passwords.read(other)).toBe('admin')
 
     // A forged or foreign value revokes nothing.
-    passwords.revoke('editor.9999999999999.forged')
-    passwords.revoke(undefined)
+    await passwords.revoke('editor.9999999999999.forged')
+    await passwords.revoke(undefined)
     expect(passwords.read(passwords.issue('editor', false).value)).toBe('editor')
   })
 
@@ -147,7 +148,7 @@ describe('the secret and the lazily loaded guard', () => {
 })
 
 describe('signing out', () => {
-  test('signing out ends a cookie under the name from before 1.70 and deletes both names', async () => {
+  test('signing out ends a cookie under the name from before 1.70 and deletes every name', async () => {
     const { configure } = await import('../src/settings')
     const { signOutOf } = await import('../src/access')
     const { activePasswords } = await import('../src/password')
@@ -160,8 +161,13 @@ describe('signing out', () => {
     const deleted: string[] = []
 
     ctx.cookies.delete = ((options: { name: string }) => void deleted.push(options.name)) as typeof ctx.cookies.delete
+
+    const expired: { name: string, maxAge: number | undefined, secure: boolean }[] = []
+
+    ctx.cookies.set = ((cookie: Bun.Cookie) => void expired.push({ name: cookie.name, maxAge: cookie.maxAge, secure: cookie.secure })) as typeof ctx.cookies.set
     await signOutOf(ctx)
     expect(deleted).toEqual([SESSION_COOKIE, LEGACY_SESSION_COOKIE])
+    expect(expired).toEqual([{ name: HOST_SESSION_COOKIE, maxAge: 0, secure: true }])
     expect(await statusOf(context(cookie, LEGACY_SESSION_COOKIE), guard)).toBe(401)
   })
 
@@ -298,5 +304,104 @@ describe('a guard the app wraps', () => {
     } })
 
     expect(await visit('/admin/collections', { auth })).toBe('/login?redirect=%2Fadmin%2Fcollections')
+  })
+})
+
+describe('a cookie copied before sign-out', () => {
+  test('is refused by another process sharing the store, and by a restart', async () => {
+    const store = memoryRates()
+    const first = new Passwords({ editor: 'pw-editor' }, '1h', 'one-secret', store)
+    const second = new Passwords({ editor: 'pw-editor' }, '1h', 'one-secret', store)
+    const cookie = first.issue('editor', false).value
+
+    expect(await second.current(cookie)).toBe('editor')
+    await first.revoke(cookie)
+    expect(await second.current(cookie)).toBeUndefined()
+    expect(await new Passwords({ editor: 'pw-editor' }, '1h', 'one-secret', store).current(cookie)).toBeUndefined()
+    expect(await second.current(second.issue('editor', false).value)).toBe('editor')
+  })
+
+  test('is refused when the store cannot say whether it was signed out', async () => {
+    const down = { hit: async () => Promise.reject(new Error('down')), peek: async () => Promise.reject(new Error('down')) }
+    const passwords = new Passwords({ editor: 'pw-editor' }, '1h', 's', down)
+
+    expect(await passwords.current(passwords.issue('editor', false).value)).toBeUndefined()
+  })
+})
+
+describe('the signing key', () => {
+  test('comes from the app secret when none is given, so another app secret refuses the cookie', async () => {
+    const before = process.env.KAY_SECRET
+
+    try {
+      process.env.KAY_SECRET = 'a'.repeat(40)
+
+      const cookie = new Passwords({ editor: 'pw-editor' }, '1h').issue('editor', false).value
+
+      expect(new Passwords({ editor: 'pw-editor' }, '1h').read(cookie)).toBe('editor')
+      process.env.KAY_SECRET = 'b'.repeat(40)
+      expect(new Passwords({ editor: 'pw-editor' }, '1h').read(cookie)).toBeUndefined()
+    }
+    finally {
+      if (before === undefined)
+        delete process.env.KAY_SECRET
+      else
+        process.env.KAY_SECRET = before
+    }
+  })
+})
+
+describe('in production', () => {
+  function inProduction(run: () => void): void {
+    const before = process.env.NODE_ENV
+
+    process.env.NODE_ENV = 'production'
+
+    try {
+      run()
+    }
+    finally {
+      process.env.NODE_ENV = before ?? 'test'
+    }
+  }
+
+  test('a short password is refused, and so are two roles sharing one', () => {
+    inProduction(() => {
+      expect(() => passwordGuard('short')).toThrow('at least 12')
+      expect(() => passwordGuard({ editor: 'a-long-enough-password', admin: 'a-long-enough-password' })).toThrow('the same password')
+      expect(() => passwordGuard({ editor: 'a-long-enough-password', admin: 'another-long-password' })).not.toThrow()
+    })
+  })
+
+  test('outside production they are accepted', () => {
+    expect(() => passwordGuard('short')).not.toThrow()
+    expect(() => passwordGuard({ editor: 'same', admin: 'same' })).not.toThrow()
+  })
+})
+
+describe('the cookie name', () => {
+  test('is __Host- prefixed over https and plain otherwise, and both are read', () => {
+    const passwords = new Passwords({ editor: 'pw-editor' }, '1h', 's')
+    const secure = passwords.issue('editor', true)
+
+    expect(secure.name).toBe(HOST_SESSION_COOKIE)
+    expect(secure.path).toBe('/')
+    expect(secure.secure).toBe(true)
+    expect(passwords.issue('editor', false).name).toBe(SESSION_COOKIE)
+    expect(sessionCookieOf(new Bun.CookieMap(`${HOST_SESSION_COOKIE}=a`))).toBe('a')
+    expect(sessionCookieOf(new Bun.CookieMap(`${SESSION_COOKIE}=b`))).toBe('b')
+  })
+})
+
+describe('wrong passwords from everyone', () => {
+  test('past the ceiling lock the sign-in until the window closes', async () => {
+    const passwords = new Passwords({ editor: 'pw-editor' }, '1h', 's', memoryRates())
+
+    for (let tried = 0; tried < 99; tried++)
+      await passwords.failed()
+
+    expect(await passwords.lockedOut()).toBe(false)
+    await passwords.failed()
+    expect(await passwords.lockedOut()).toBe(true)
   })
 })

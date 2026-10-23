@@ -1,35 +1,47 @@
-import type { Duration, Guard } from 'kay'
+import type { Duration, Guard, RateStore } from 'kay'
 import type { LazyGuard } from 'kay/library'
 import { createHash, createHmac, scryptSync, timingSafeEqual } from 'node:crypto'
 import { guard } from 'kay'
-import { configError, durationSeconds } from 'kay/library'
+import { appSecrets, appStore, configError, durationSeconds, keyedDigest, memoryRates } from 'kay/library'
 import { wording } from 'kay/words'
+import { log } from './log'
 
-// The cookie holding a password sign-in: `<role>.<expires>.<signature>`, signed with a key made from that role's password.
+// The cookie holding a password sign-in: `<role>.<expires>.<signature>`, signed with a key made from that role's password and the app's secret.
 export const SESSION_COOKIE = 'kay_editor_session'
+// Its name over https: the `__Host-` prefix makes a browser refuse it from a subdomain, and set it only secure, on the whole site and with no domain.
+export const HOST_SESSION_COOKIE = `__Host-${SESSION_COOKIE}`
 // The name before 1.70, still read so no editor is signed out by the rename; it is never set again.
 export const LEGACY_SESSION_COOKIE = 'kcms_session'
 
 // The sign-in cookie a request holds, under its name or the one before 1.70.
 // Both names, as a browser holding the two must have each copy ended.
 export function sessionCookiesOf(cookies: { get: (name: string) => string | null }): string[] {
-  return [cookies.get(SESSION_COOKIE), cookies.get(LEGACY_SESSION_COOKIE)].filter(value => value != null)
+  return [cookies.get(HOST_SESSION_COOKIE), cookies.get(SESSION_COOKIE), cookies.get(LEGACY_SESSION_COOKIE)].filter(value => value != null)
 }
 
 export function sessionCookieOf(cookies: { get: (name: string) => string | null }): string | undefined {
-  return cookies.get(SESSION_COOKIE) ?? cookies.get(LEGACY_SESSION_COOKIE) ?? undefined
+  return sessionCookiesOf(cookies)[0]
 }
 
 const DEFAULT_ROLE = 'editor'
 const DEFAULT_MAX_AGE = '14d'
 const ROLE = /^[\w-]+$/
 const KEY_SALT = 'kayjs-cms/password/v1:'
+// A password shorter than this is refused in production, where it is all that stands between the web and the admin.
+const MIN_PASSWORD_LENGTH = 12
+const REVOKED = 'cms:revoked\n'
+const FAILURES = 'cms:sign-in-failures'
+// Wrong passwords from anyone, every quarter of an hour, past which no sign-in is tried until the window closes: the per-visitor limit does not stop a guess spread over many addresses.
+const FAILURE_CEILING = 100
+const FAILURE_WINDOW = '15m'
 
 export interface PasswordOptions {
   // How long a sign-in lasts, `'14d'` by default.
   maxAge?: Duration | undefined
-  // Mixed into the key the cookie is signed with, so the same password on another site signs in nowhere else; the app's own secret from the environment.
+  // Mixed into the key the cookie is signed with, so the same password on another site signs in nowhere else; the app's own secret (`KAY_SECRET`) when left out.
   secret?: string | undefined
+  // Where signed-out cookies and wrong passwords are counted so every process sees them: the app's `store.rates`, else this process's memory.
+  store?: RateStore | undefined
 }
 
 // Who a password guard let a request in as, for the screens to name and the roles to read.
@@ -47,15 +59,18 @@ function same(a: Buffer, b: Buffer): boolean {
 export class Passwords {
   private readonly digests = new Map<string, Buffer>()
   private readonly keys = new Map<string, Buffer>()
-  // The signatures of cookies signed out, each kept until the cookie would have expired anyway; in this process only, so another process or a restart still takes a copied cookie.
+  private readonly given = new Map<string, string>()
+  // The signatures of cookies signed out in this process, each kept until the cookie would have expired anyway; the store holds the same for the other processes and a restart.
   private readonly revoked = new Map<string, number>()
   private readonly seconds: number
+  private readonly memory = memoryRates()
   private lastIssued = 0
 
-  constructor(passwords: Record<string, string>, maxAge: Duration, secret = '') {
+  constructor(passwords: Record<string, string>, maxAge: Duration, private readonly secret?: string, private readonly chosenStore?: RateStore) {
     this.seconds = durationSeconds(maxAge, '`passwordGuard({ maxAge })`')
 
     const entries = Object.entries(passwords)
+    const production = process.env.NODE_ENV === 'production'
 
     if (entries.length === 0)
       throw configError('`passwordGuard()` takes a password, or an object of passwords by role')
@@ -68,10 +83,44 @@ export class Passwords {
       if (typeof password !== 'string' || password.trim() === '')
         throw configError(`\`passwordGuard()\` has no password for ${JSON.stringify(role)}; check the environment variable it reads`)
 
+      if (production && password.length < MIN_PASSWORD_LENGTH)
+        throw configError(`\`passwordGuard()\` has a password of ${password.length} characters for ${JSON.stringify(role)}: in production it is at least ${MIN_PASSWORD_LENGTH}`)
+
+      if (production) {
+        const twin = [...this.given].find(([, other]) => other === password)
+
+        if (twin)
+          throw configError(`\`passwordGuard()\` gives ${JSON.stringify(twin[0])} and ${JSON.stringify(role)} the same password, which could only open the first; give each role its own`)
+      }
+
+      this.given.set(role, password)
       this.digests.set(role, digest(password))
-      // Slow on purpose: a cookie seen once must not let the password be guessed offline at hashing speed.
-      this.keys.set(role, scryptSync(password, KEY_SALT + secret, 32))
     }
+  }
+
+  private store(): RateStore {
+    return this.chosenStore ?? appStore()?.rates ?? this.memory
+  }
+
+  // Slow on purpose: a cookie seen once must not let the password be guessed offline at hashing speed. Made on first use, as the app's secret may be set up after the guard.
+  private keyOf(role: string): Buffer | undefined {
+    const password = this.given.get(role)
+
+    if (password === undefined)
+      return undefined
+
+    let key = this.keys.get(role)
+
+    if (!key) {
+      const secret = this.secret ?? appSecrets()?.[0] ?? ''
+
+      if (secret === '' && process.env.NODE_ENV === 'production')
+        log.warn('passwordGuard() has no secret: set KAY_SECRET so a sign-in cookie cannot be checked against a guessed password offline')
+
+      this.keys.set(role, key = scryptSync(password, KEY_SALT + secret, 32))
+    }
+
+    return key
   }
 
   // The roles the guard holds a password for.
@@ -92,6 +141,21 @@ export class Passwords {
     return found
   }
 
+  // Whether wrong passwords from all visitors have passed the ceiling, so no sign-in is tried until the window closes.
+  async lockedOut(): Promise<boolean> {
+    const window = await this.store().peek?.(FAILURES)
+
+    return (window?.count ?? 0) >= FAILURE_CEILING
+  }
+
+  // Counts a wrong password against the ceiling, logging the first one past it.
+  async failed(): Promise<void> {
+    const window = await this.store().hit(FAILURES, FAILURE_WINDOW)
+
+    if (window.count === FAILURE_CEILING)
+      log.warn(`${FAILURE_CEILING} wrong passwords in ${FAILURE_WINDOW}: the cms sign-in refuses every try until the window closes`)
+  }
+
   // The sign-in cookie for a role this password opened.
   issue(role: string, secure: boolean): Bun.Cookie {
     // Each sign-in gets a date of its own, so signing one out never ends another made in the same millisecond.
@@ -99,7 +163,7 @@ export class Passwords {
 
     const payload = `${role}.${this.lastIssued + this.seconds * 1000}`
 
-    return new Bun.Cookie(SESSION_COOKIE, `${payload}.${this.sign(role, payload)}`, { path: '/', maxAge: this.seconds, httpOnly: true, sameSite: 'lax', secure })
+    return new Bun.Cookie(secure ? HOST_SESSION_COOKIE : SESSION_COOKIE, `${payload}.${this.sign(role, payload)}`, { path: '/', maxAge: this.seconds, httpOnly: true, sameSite: 'lax', secure })
   }
 
   // The role a sign-in cookie holds, when this server signed it and it has not expired; any other value, a forged role or a changed date included, is none.
@@ -112,7 +176,7 @@ export class Passwords {
     const [role = '', expires = '', signature = ''] = parts
     const payload = `${role}.${expires}`
 
-    if (!this.keys.has(role) || !same(Buffer.from(signature), Buffer.from(this.sign(role, payload))))
+    if (!this.given.has(role) || !same(Buffer.from(signature), Buffer.from(this.sign(role, payload))))
       return undefined
 
     if (this.revoked.has(signature))
@@ -121,10 +185,31 @@ export class Passwords {
     return Number(expires) > Date.now() ? role : undefined
   }
 
-  // Ends the sign-in a cookie holds, so a copy of it stops working too; a value that is not a live sign-in of this server changes nothing.
-  revoke(value: string | null | undefined): void {
+  // Like `read`, and also refusing a cookie another process signed out, which the store knows.
+  async current(value: string | null | undefined): Promise<string | undefined> {
+    const role = this.read(value)
+
+    if (role === undefined)
+      return undefined
+
+    const signature = value?.split('.')[2] ?? ''
+
+    try {
+      const window = await this.store().peek?.(REVOKED + keyedDigest('cms-session', signature))
+
+      return window === undefined ? role : undefined
+    }
+    catch (error) {
+      log.error(`the store holding signed-out cookies did not answer, so no cookie is accepted: ${error instanceof Error ? error.message : String(error)}`)
+
+      return undefined
+    }
+  }
+
+  // Ends the sign-in a cookie holds in this process only, so a copy of it stops working here; a value that is not a live sign-in of this server changes nothing.
+  revokeHere(value: string | null | undefined): number | undefined {
     if (this.read(value) === undefined)
-      return
+      return undefined
 
     const [, expires = '', signature = ''] = value?.split('.') ?? []
     const now = Date.now()
@@ -135,10 +220,29 @@ export class Passwords {
     }
 
     this.revoked.set(signature, Number(expires))
+
+    return Number(expires) - now
+  }
+
+  // Ends the sign-in a cookie holds in every process sharing the store, so a copy of it stops working wherever it is sent.
+  async revoke(value: string | null | undefined): Promise<void> {
+    const left = this.revokeHere(value)
+
+    if (left === undefined)
+      return
+
+    const signature = value?.split('.')[2] ?? ''
+
+    try {
+      await this.store().hit(REVOKED + keyedDigest('cms-session', signature), `${Math.max(1, left)}ms`)
+    }
+    catch (error) {
+      log.error(`the store did not keep a signed-out cookie, so other processes still accept it until it expires: ${error instanceof Error ? error.message : String(error)}`)
+    }
   }
 
   private sign(role: string, payload: string): string {
-    return createHmac('sha256', this.keys.get(role) ?? Buffer.alloc(0)).update(payload).digest('base64url')
+    return createHmac('sha256', this.keyOf(role) ?? Buffer.alloc(0)).update(payload).digest('base64url')
   }
 }
 
@@ -184,14 +288,14 @@ export function trackPasswords(given: Guard | LazyGuard | undefined): Guard | La
 }
 
 // A guard for a site with no users: one password, or one per role, and a sign-in screen at the admin's `/sign-in`. `cms({ guard: passwordGuard(env.EDITOR_PASSWORD) })`; a lone password signs in as `editor`.
-export function passwordGuard(passwords: string | Record<string, string>, { maxAge = DEFAULT_MAX_AGE, secret }: PasswordOptions = {}): Guard {
-  const known = new Passwords(typeof passwords === 'string' ? { [DEFAULT_ROLE]: passwords } : passwords, maxAge, secret)
+export function passwordGuard(passwords: string | Record<string, string>, { maxAge = DEFAULT_MAX_AGE, secret, store }: PasswordOptions = {}): Guard {
+  const known = new Passwords(typeof passwords === 'string' ? { [DEFAULT_ROLE]: passwords } : passwords, maxAge, secret, store)
 
-  const checked = guard((ctx) => {
+  const checked = guard(async (ctx) => {
     // A guard the app wrapped is no key of `passwordsOf`, but it runs this one, which says so for the cms guard that called it.
     ranFor.set(ctx.request, known)
 
-    const role = known.read(sessionCookieOf(ctx.cookies))
+    const role = await known.current(sessionCookieOf(ctx.cookies))
 
     if (role === undefined)
       return ctx.deny(401, wording('cms.guard.signedOut', 'Sign in to continue'))

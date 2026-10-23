@@ -7,6 +7,7 @@ import { wording } from 'kay/words'
 import { probe, signInTarget } from '../access'
 import { adminTitle } from '../listing'
 import { hintCookie } from '../page-link'
+import { SESSION_COOKIE } from '../password'
 import { settings } from '../settings'
 
 // The one screen an anonymous visitor may open: the guard is the sign-in's own.
@@ -17,12 +18,25 @@ export const signIn = action(s.Object({
   redirect: s.Optional(s.String({ maxLength: 2000 })),
 }), async ({ password, redirect }, ctx) => {
   const { passwords } = await probe(ctx)
+
+  if (passwords && await passwords.lockedOut())
+    return ctx.fail(429, { message: wording('cms.signIn.locked', 'Too many wrong passwords just now. Try again in a few minutes.') })
+
   const role = passwords?.match(password)
 
-  if (!passwords || role === undefined)
-    return ctx.fail(401, { message: wording('cms.signIn.wrong', 'That is not the right password.') })
+  if (!passwords || role === undefined) {
+    await passwords?.failed()
 
-  ctx.cookies.set(passwords.issue(role, overHttps(ctx.request)))
+    return ctx.fail(401, { message: wording('cms.signIn.wrong', 'That is not the right password.') })
+  }
+
+  const secure = overHttps(ctx.request)
+
+  ctx.cookies.set(passwords.issue(role, secure))
+
+  // A cookie under the name before the prefix would still be read beside the new one.
+  if (secure)
+    ctx.cookies.delete({ name: SESSION_COOKIE, path: '/' })
 
   if (settings().pageLink)
     ctx.cookies.set(hintCookie(overHttps(ctx.request)))

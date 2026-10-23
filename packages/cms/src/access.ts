@@ -5,7 +5,7 @@ import { localPath } from 'kay'
 import { READ_METHODS } from 'kay/library'
 import { wording } from 'kay/words'
 import { authOf } from './auth-like'
-import { activePasswords, LEGACY_SESSION_COOKIE, SESSION_COOKIE, sessionCookiesOf, signedInBy } from './password'
+import { activePasswords, HOST_SESSION_COOKIE, LEGACY_SESSION_COOKIE, SESSION_COOKIE, sessionCookiesOf, signedInBy } from './password'
 import { screenPath } from './paths'
 import { ACTIONS } from './roles'
 import { settings } from './settings'
@@ -159,8 +159,10 @@ export function sendToSignIn(ctx: GuardContext, error: unknown): void {
 // Ends the sign-in: a password guard's cookie, else kayjs-auth's session.
 export async function signOutOf(ctx: GuardContext): Promise<void> {
   for (const value of sessionCookiesOf(ctx.cookies))
-    activePasswords()?.revoke(value)
+    await activePasswords()?.revoke(value)
 
+  // A browser deletes a `__Host-` cookie only from a secure, whole-site expiry.
+  ctx.cookies.set(new Bun.Cookie(HOST_SESSION_COOKIE, '', { path: '/', maxAge: 0, secure: true }))
   ctx.cookies.delete({ name: SESSION_COOKIE, path: '/' })
   ctx.cookies.delete({ name: LEGACY_SESSION_COOKIE, path: '/' })
   await authOf(ctx)?.signOut?.()
