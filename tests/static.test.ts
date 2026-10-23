@@ -135,7 +135,7 @@ describe('kay build --static', () => {
     expect(script.status).toBe(200)
     expect(script.text).toContain('"/repo/_kay/env.js"')
     expect(home).toContain('<link rel="modulepreload" href="/repo/_kay/env.js">')
-    expect((await get('/_kay/env.js')).text).toBe('export default {"KAY_TEST_STATIC_KEY":"static-key"}\n')
+    expect((await get('/_kay/env.js')).text).toBe('export default {"KAY_TEST_STATIC_LABEL":"static-label"}\n')
     expect((await get(stylesheet)).text).toContain('url(/repo/humans.txt)')
     expect((await get(image)).status).toBe(200)
 
