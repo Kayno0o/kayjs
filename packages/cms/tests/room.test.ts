@@ -1,10 +1,11 @@
 import { describe, expect, test } from 'bun:test'
 import { presence } from 'kay'
-import { editorsOf, entryRoom, watchRoom } from '../src/room'
+import { editorsOf, entryRoom, openRoom, watchRoom } from '../src/room'
 
 const nobody = { name: '' }
 const ada = { name: 'Ada' }
 const watcher = { name: '', watching: true as const }
+const onPage = { name: '', page: true as const }
 
 describe('entryRoom', () => {
   test('is the room an entry screen and an on-page editor share, and keeps room and member within what presence() takes, also through the room a list watches', () => {
@@ -18,11 +19,13 @@ describe('entryRoom', () => {
 
     expect(() => presence(long.room, long.member)).not.toThrow()
     expect(() => presence(watchRoom(long.room), long.member)).not.toThrow()
+    expect(() => presence(openRoom(long.room), onPage)).not.toThrow()
+    expect(() => presence(watchRoom(openRoom(long.room)), { ...long.member, page: true })).not.toThrow()
   })
 
   test('names the same room whoever is listed, also for a slug of characters JSON escapes', () => {
     for (const slug of ['"'.repeat(300), '\u0001'.repeat(300), 'a'.repeat(300)]) {
-      const rooms = [nobody, ada, watcher, { name: '\u0001'.repeat(60) }].map(member => entryRoom('posts', { slug }, member).room)
+      const rooms = [nobody, ada, watcher, onPage, { name: '\u0001'.repeat(60) }].map(member => entryRoom('posts', { slug }, member).room)
 
       expect(new Set(rooms).size).toBe(1)
     }

@@ -202,7 +202,7 @@ author: async ({ locals }) => {
 
 The screen of a saved entry says when someone else has the same entry open, so two editors do not overwrite each other. It names them when `author` gives a name, which is the name the other editor sees for you too, and only counts them when it does not: "1 other editor". The same editor in two tabs is not listed to themselves. A new entry shows nothing, as no one else can have it open.
 
-The editor on a page shows the same line above its form, in the warning colour. It asks no `author`, so it counts its editors. The entry list marks an entry "Being edited", by name when the editors have one.
+The editor on a page shows the same line above its form, in the warning colour. It asks no `author` and only counts the other editors, never naming them: an edit link opens it for someone who is not signed in, and a room is sent whole to whoever joins it, so the names stay in rooms only the screens join. The entry list marks an entry "Being edited", by name when the editors have one.
 
 A list watches through a room of its own, so it is no editor of the entry to anyone, and it marks the first 50 rows of a page. It also shows "Being edited" for your own other tab on the page editor. A named editor is told of editors without a name as "1 other editor". Every open tab on one of these holds a live connection, so a browser on HTTP/1 allows a host only a few.
 

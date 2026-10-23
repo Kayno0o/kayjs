@@ -41,8 +41,8 @@ const source = resource(entriesApi, '/:collection/:slug', {
 // A single collection's entry is the collection: no slug under its title, its locale still shown. Until the collection is known its slug is taken for a single one's when it is `index`, the only slug a single entry has, so that slug never flashes.
 const isSingle = () => { const loaded = source.value(); return loaded === undefined ? entry.slug === SINGLE_SLUG : loaded.collection.single === true }
 const subtitle = memo(() => isSingle() ? entry.locale : entry.locale === undefined ? entry.slug : `${entry.slug} (${entry.locale})`)
-// The page editor asks no author, so its editors are counted, and named ones are told of them.
-const room = entryRoom(entry.collection, entry, { name: '' })
+// The page editor asks no author and joins no room of names, as an edit link's holder opens it too: its editors are counted.
+const room = entryRoom(entry.collection, entry, { name: '', page: true })
 const saving = signal(false)
 // Set once the entry is deleted, which locks its form until the page has moved on.
 const removed = signal(false)

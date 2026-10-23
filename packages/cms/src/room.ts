@@ -9,15 +9,21 @@ const MEMBER_ROOM = 80
 // The most rows of a list that watch their entry, as every watched room is a key the page's live proof and watch carry.
 export const WATCHED_ROWS = 50
 
-// An editor, by the name `cms({ author })` gives. `watching` marks a list showing the entry, which is no editor of it.
+// An editor, by the name `cms({ author })` gives. `watching` marks a list showing the entry, which is no editor of it, and `page` the on-page editor, whose visitor the guard may not have admitted: it joins no room that holds a name.
 export interface Member {
   name: string
   watching?: true | undefined
+  page?: true | undefined
 }
 
 // The room a list watches an entry through: every editor of the entry is also listed in it, and the lists in it are known to no editor, so the editors' own room counts only editors.
 export function watchRoom(room: string): string {
   return `watch:${room}`
+}
+
+// The room every editor is also listed in with no name, the on-page editor's visitor included, who may hold an edit link and no account: a room is sent whole to whoever joins it, so the names stay in the rooms only the screens join.
+export function openRoom(room: string): string {
+  return `open:${room}`
 }
 
 // A hash of the whole text in plain JavaScript, as the room is also named in the browser, where there is no `Bun`: two 32-bit FNV-1a runs, the second seeded apart.
@@ -37,13 +43,13 @@ export function entryRoom(collection: string, entry: { slug: string, locale?: st
   const full = `cms:${collection}:${entry.slug}${entry.locale === undefined ? '' : `@${entry.locale}`}`
   const member = { ...listed }
   let room = full
-  const fits = () => JSON.stringify(watchRoom(room)).length <= MAX_KEY - MEMBER_ROOM
+  const fits = () => JSON.stringify(watchRoom(openRoom(room))).length <= MAX_KEY - MEMBER_ROOM
 
   // The room is cut as many times as its characters take escapes in JSON, and tells apart two slugs that only differ past the cut by a hash of the whole.
   for (let kept = MAX_ROOM; !fits() && kept >= 0; kept -= 10)
     room = `${full.slice(0, kept)}~${hashOf(full)}`
 
-  while (JSON.stringify([watchRoom(room), member]).length > MAX_KEY && member.name !== '')
+  while (JSON.stringify([watchRoom(openRoom(room)), member]).length > MAX_KEY && member.name !== '')
     member.name = member.name.slice(0, -1)
 
   return { room, member }

@@ -2,22 +2,31 @@
 import type { Member } from '../room'
 import { effect, memo, presence } from 'kay'
 import { wording } from 'kay/words'
-import { editorsOf, watchRoom } from '../room'
+import { editorsOf, openRoom, watchRoom } from '../room'
 
-// Who else has an entry open: their names when `cms({ author })` gives them, else how many they are. `room` and `member` come from `entryPresence`, or from `entryRoom` for the on-page editor, which asks no author.
-// `named` is false until the guard has said the visitor is signed in, and for an edit link's holder, who is shown how many are there and no names.
-const { room, member, named = true } = props<{ room: string, member: Member, named?: boolean }>()
-const here = presence(room, member)
-// Also listed in the room a list watches the entry through, which nothing here shows: a room is joined by reading it.
-const watchedBy = presence(watchRoom(room), member)
+// Who else has an entry open: their names when `cms({ author })` gives them, else how many they are. `room` and `member` come from `entryPresence`, or from `entryRoom` with `page: true` for the on-page editor, which asks no author.
+// The names live in rooms only the screens join, as a room is sent whole to whoever joins it and the on-page editor's visitor may hold an edit link and no account. The on-page editor joins the room every editor is listed in with no name, and so counts.
+const { room, member } = props<{ room: string, member: Member }>()
+const onPage = member.page === true
+const open = openRoom(room)
+const nameless: Member = onPage ? member : { name: '' }
+const everyone = presence(open, nameless)
+// Also listed in the rooms a list watches the entry through, which nothing here shows: a room is joined by reading it.
+const watchedBy = presence(watchRoom(open), nameless)
+const named = onPage ? undefined : presence(room, member)
+const namedWatchedBy = onPage ? undefined : presence(watchRoom(room), member)
 
 effect(() => void watchedBy.count())
-const editors = memo(() => editorsOf(here.others(), here.count(), member))
+effect(() => void namedWatchedBy?.count())
+
+const editors = memo(() => named === undefined ? { names: [], unnamed: 0 } : editorsOf(named.others(), named.count(), member))
+// An editor on the page is in no room of names, so it is told of the screens' editors and of the other editors on a page by their number.
+const paged = memo(() => everyone.others().some(other => other.page === true))
 const text = memo(() => {
-  if (editors().names.length > 0 && named)
+  if (editors().names.length > 0)
     return wording('cms.entry.alsoOpen', 'Also open: {names}', { names: editors().names.join(', ') })
 
-  const others = named ? editors().unnamed : here.count()
+  const others = onPage || member.name === '' ? everyone.count() : Math.max(editors().unnamed, paged() ? 1 : 0)
 
   return others > 0 ? wording('cms.entry.otherEditors', others === 1 ? '1 other editor' : '{count} other editors', { count: others }) : ''
 })

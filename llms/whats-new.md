@@ -10,6 +10,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - Stored values stale for a week are dropped by the next write, a throwing cache or rooms listener no longer stops the poll, a refused request (403, 429, 422) no longer makes a kept page render again, and a rooms file that cannot be watched backs off its 25 ms read ([Caching](rendering.md), [Rooms](rooms.md)).
 - Server and island render alike in small cases: a tag in capitals, the first newline of a `pre`, `listing` and `textarea`, a `script` holding JSON (`<` as `\u003c`), concurrent calls of one action (the last started shows), a prefetch made while a post was out ([Templates](templates-elements-slots-snippets.md), [Security](proxy-and-security.md)).
 - `kay check` and the language server stop waiting for a `kay.config.ts` that never settles after 30 seconds, and an effect loop stops after 1,000 rounds, naming the effect in development.
+- kayjs-cms sends no editor name to the on-page editor, which only counts the other editors, so an edit link's holder learns none ([Screens](../packages/cms/llms/screens-replacing.md)).
 - kayjs-ui roots write an app's `style` after their own declarations, so the app wins.
 - The Styles tab and LSP show a part's classes written as an imported constant.
 - kayjs-ui reads the app's own theme names (`--color-accent`, `--color-background`, `--density`), and the analytics consent banner now follows the app's `--color-accent`, `--color-surface`, `--color-foreground` and `--color-input` ([Setup](../packages/ui/llms/setup.md)).
