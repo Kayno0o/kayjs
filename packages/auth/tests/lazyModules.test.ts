@@ -42,7 +42,7 @@ const SCENARIOS: Record<string, { uses: Feature[] }> = {
   minimal: { uses: ['password'] },
   pages: { uses: [] },
   forwardAuth: { uses: ['forwardAuth'] },
-  bearer: { uses: ['password', 'bearer'] },
+  bearer: { uses: ['bearer'] },
   passkeys: { uses: ['password', 'passkeys'] },
   twoFactor: { uses: ['password', 'twoFactor'] },
   organizations: { uses: ['password', 'organizations'] },
