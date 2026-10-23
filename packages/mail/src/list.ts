@@ -101,7 +101,7 @@ export interface ListHost {
   configured: () => boolean
   render: <P extends object>(message: MailMessage<P>) => Promise<Mail>
   // Sends an already rendered mail now, logging a failure.
-  deliver: (mail: Mail) => Promise<unknown>
+  deliver: (mail: Mail, signal?: AbortSignal) => Promise<unknown>
   // Queues an already rendered mail.
   enqueueMail: (mail: Mail) => Promise<string>
   enqueueRun: (run: ListRun, key: string) => Promise<string>
@@ -477,7 +477,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
         if (!footer)
           footers.set(subscriber.locale, footer = await footerOf(subscriber.locale))
 
-        await host.deliver(personalise(message, subscriber, name, footer))
+        await host.deliver(personalise(message, subscriber, name, footer), signal)
       }
       catch (error) {
         await lists.release(id, subscriber.id)

@@ -21,7 +21,7 @@ describe('the outbox kept in a file', () => {
     const bytes = new Uint8Array([0, 255, 128, 7])
 
     await first.send(mail('Plain'))
-    await first.send(mail('Rich', { html: '<p>Hi</p>', cc: [{ name: 'Bob, Jr', address: 'bob@example.com' }], replyTo: 'visitor@example.com', headers: { 'X-Test': '1' }, attachments: [{ filename: 'a.bin', content: bytes, contentType: 'application/octet-stream' }, { filename: 'a.txt', content: 'text', cid: 'a' }] }), { to: 'me@example.com', error: 'refused' })
+    await first.send(mail('Rich', { html: '<p>Hi</p>', cc: [{ name: 'Bob, Jr', address: 'bob@example.com' }], replyTo: 'visitor@example.com', headers: { 'X-Test': '1' }, attachments: [{ filename: 'a.bin', content: bytes, contentType: 'application/octet-stream' }, { filename: 'a.txt', content: 'text', cid: 'a' }] }), undefined, { to: 'me@example.com', error: 'refused' })
 
     const second = createOutbox(path)
 

@@ -226,6 +226,10 @@ Every mail with html also goes out with a text part. Give `text` to write it you
 
 A failed send is retried, 5 times by default, each wait twice the last. A mail given up after its last attempt is logged. `queue.onFailed` is called with it as well, to alert someone.
 
+Two mailers can share a queue by using the same `name`. A mail is then sent, kept and given up to `onFailed` by the mailer that queued it, whichever of them picks it up.
+
+They must set `attempts`, `backoff`, `keepFailed`, `lostAfter`, `idlePoll` and `concurrency` alike, since the queue has one of each, and the server stops at boot naming the one that differs.
+
 ```ts
 export const mail = mailer({
   from: 'Site <contact@example.com>',
@@ -235,14 +239,16 @@ export const mail = mailer({
 
 ### Other transports
 
-By default mails go over SMTP, or to the outbox in development. `transport` takes any `{ send(mail) }` that resolves with a delivery, such as a provider's HTTP API.
+By default mails go over SMTP, or to the outbox in development. `transport` takes any `{ send(mail, signal) }` that resolves with a delivery, such as a provider's HTTP API.
+
+When the queue gives up on a queued mail, because it ran past `lostAfter` or the server is stopping, it aborts `signal`. Hand it to `fetch` so the request stops too. The SMTP transport stops waiting for the server.
 
 ```ts
 export const mail = mailer({
   from: 'Site <contact@example.com>',
   transport: {
-    async send(mail) {
-      const response = await fetch('https://api.example.com/send', { method: 'POST', body: JSON.stringify(mail) })
+    async send(mail, signal) {
+      const response = await fetch('https://api.example.com/send', { method: 'POST', body: JSON.stringify(mail), signal })
 
       return { messageId: await response.text(), accepted: [], rejected: [] }
     },

@@ -12,8 +12,8 @@ interface Session {
   reading: boolean
 }
 
-// An SMTP server answering just enough of the protocol for a client to hand it one message per transaction, kept in `received`, the names clients greeted it with in `greetings`, and how many connections opened and closed.
-export function startSmtp(port = 0): { received: Received[], greetings: string[], connections: { opened: number, closed: number }, port: number, stop: () => void } {
+// An SMTP server answering just enough of the protocol for a client to hand it one message per transaction (`stall` never answers the end of the message), kept in `received`, the names clients greeted it with in `greetings`, and how many connections opened and closed.
+export function startSmtp(port = 0, options: { stall?: boolean } = {}): { received: Received[], greetings: string[], connections: { opened: number, closed: number }, port: number, stop: () => void } {
   const received: Received[] = []
   const greetings: string[] = []
   const connections = { opened: 0, closed: 0 }
@@ -33,7 +33,7 @@ export function startSmtp(port = 0): { received: Received[], greetings: string[]
           const line = socket.data.buffer.slice(0, end)
 
           socket.data.buffer = socket.data.buffer.slice(end + 2)
-          answer(socket, line, received, greetings)
+          answer(socket, line, received, greetings, options.stall === true)
         }
       },
       close: () => {
@@ -45,7 +45,7 @@ export function startSmtp(port = 0): { received: Received[], greetings: string[]
   return { received, greetings, connections, port: listener.port, stop: () => listener.stop(true) }
 }
 
-function answer(socket: Socket<Session>, line: string, received: Received[], greetings: string[]): void {
+function answer(socket: Socket<Session>, line: string, received: Received[], greetings: string[], stall: boolean): void {
   const session = socket.data
 
   if (session.reading) {
@@ -53,7 +53,9 @@ function answer(socket: Socket<Session>, line: string, received: Received[], gre
       session.reading = false
       received.push(session.mail!)
       session.mail = undefined
-      socket.write('250 queued\r\n')
+
+      if (!stall)
+        socket.write('250 queued\r\n')
     }
     else {
       session.mail!.data += `${line.startsWith('..') ? line.slice(1) : line}\n`

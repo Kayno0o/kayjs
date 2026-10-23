@@ -119,13 +119,43 @@ export type Mailer = Elysia & {
 // A mail given up keeps 7 days, its body and links dropped: who it was for and why it failed is what an app needs to see.
 const FAILED_KEPT = '7d'
 
-// The mailers of this process by the id their queued mails carry, since mailers sharing a queue name share its jobs and any of their workers may claim one: it is delivered by the mailer that queued it.
-const MAILERS = new Map<string, WeakRef<(mail: Mail) => Promise<Delivery>>>()
+// What a queued job needs from the mailer that queued it: mailers sharing a queue name share its jobs and any of their workers may claim one, so the claimed job is run, redacted and given up by its own mailer.
+interface Owner {
+  deliver: (mail: Mail, signal?: AbortSignal) => Promise<Delivery>
+  run: (run: ListRun, signal: AbortSignal) => Promise<void>
+  redact: (mail: Queued) => Queued
+  failed: (mail: Mail, error: unknown) => Promise<void>
+}
+
+// The mailers of this process by the id their queued jobs carry.
+const MAILERS = new Map<string, WeakRef<Owner>>()
 // Drops the id of a mailer that was collected, so a process making many mailers does not keep their dead refs.
 const FORGOTTEN = new FinalizationRegistry<string>(via => MAILERS.delete(via))
 
+// The queue settings of the live mailers by job store and queue name: a queue has one set of retry and keep settings, whichever mailer's worker claims a job, so mailers sharing it must agree on them.
+const DEFAULT_STORE = {}
+const SETTINGS = new WeakMap<object, Map<string, { settings: Record<string, unknown>, owner: WeakRef<Owner> }>>()
+
+function agreeOnQueue(name: string, store: object | undefined, settings: Record<string, unknown>, owner: Owner): void {
+  const key = store ?? DEFAULT_STORE
+  const known = SETTINGS.get(key) ?? new Map<string, { settings: Record<string, unknown>, owner: WeakRef<Owner> }>()
+
+  SETTINGS.set(key, known)
+
+  const other = known.get(name)
+  const differing = other?.owner.deref() === undefined ? [] : Object.keys(settings).filter(setting => JSON.stringify(settings[setting]) !== JSON.stringify(other.settings[setting]))
+
+  // A `kay dev` reload makes the mailer again before the old one is gone, with options the developer just changed.
+  if (differing.length > 0 && !underKayDev())
+    throw configError(`mailer({ queue }) shares the queue "${name}" with another mailer that sets ${differing.join(', ')} differently; a queue has one set of retry and keep settings whichever mailer claims a job, so give each mailer its own queue \`name\` or the same settings`)
+
+  known.set(name, { settings, owner: new WeakRef(owner) })
+}
+
 // A queued mail, with the id of the mailer that queued it.
 type Queued = Mail & { via?: string | undefined }
+// A mailing list run, with the id of the mailer that queued it.
+type QueuedRun = ListRun & { via?: string | undefined }
 
 function withoutBody(mail: Queued): Queued {
   return { ...mail, html: undefined, text: '', headers: {}, attachments: [] }
@@ -458,9 +488,10 @@ export function mailer(options: MailerOptions = {}): Mailer {
     return { to, error }
   }
 
-  const deliver = async (mail: Mail): Promise<Delivery> => {
+  // `signal` is the queue's, aborted when it gives up on the run.
+  const deliver = async (mail: Mail, signal?: AbortSignal): Promise<Delivery> => {
     if (transport === outbox) {
-      const delivery = await outbox.send(mail, await relayed(mail))
+      const delivery = await outbox.send(mail, signal, await relayed(mail))
 
       if (underKayDev())
         log.info(`${quoted(mail.subject)} to ${recipientsOf(mail).join(', ')} kept in the outbox, shown at /_kay/mail`)
@@ -468,7 +499,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
       return delivery
     }
 
-    const delivery = await transport.send(mail)
+    const delivery = await transport.send(mail, signal)
     // A transport naming no recipient either way took them all.
     const accepted = delivery.accepted.length > 0 || delivery.rejected.length > 0 ? delivery.accepted : recipientsOf(mail)
 
@@ -482,36 +513,41 @@ export function mailer(options: MailerOptions = {}): Mailer {
     return delivery
   }
 
-  const { name = 'mail', onFailed, ...queueOptions } = options.queue ?? {}
-  const via = crypto.randomUUID()
-
-  MAILERS.set(via, new WeakRef(deliver))
-  FORGOTTEN.register(deliver, via)
-
-  // The id is dropped before delivery; a mail queued by a mailer this process no longer has (a restart) goes out by whichever worker claims it.
-  const deliverQueued = async ({ via: queuedBy, ...mail }: Queued): Promise<Delivery> => {
-    const owner = queuedBy === undefined || queuedBy === via ? deliver : MAILERS.get(queuedBy)?.deref() ?? deliver
-
-    return owner(mail)
-  }
-  const jobs = queue<Queued>(name, deliverQueued, {
-    ...queueOptions,
-    keepFailed: queueOptions.keepFailed ?? FAILED_KEPT,
-    redact: queueOptions.redact ?? withoutBody,
-    onFailed: async ({ payload: { via: _via, ...mail }, error }) => {
-      log.error(`${described(mail)} to ${whom(recipientsOf(mail))} is given up after its last attempt`, error)
-
-      if (onFailed)
-        await callHook(onFailed, { payload: mail, error }, [mail, error])
-    },
-  })
   const lists = createLists({
     configured: () => (configured?.missing() ?? []).length === 0 && !senderless(),
     render,
     deliver,
   }, { store: options.listStore })
+  const { name = 'mail', onFailed, ...queueOptions } = options.queue ?? {}
+  const via = crypto.randomUUID()
+  const redact = queueOptions.redact ?? withoutBody
+  const owner: Owner = {
+    deliver,
+    run: async (run, signal) => lists.run(run, signal),
+    redact,
+    failed: async (mail, error) => {
+      log.error(`${described(mail)} to ${whom(recipientsOf(mail))} is given up after its last attempt`, error)
+
+      if (onFailed)
+        await callHook(onFailed, { payload: mail, error }, [mail, error])
+    },
+  }
+
+  agreeOnQueue(name, queueOptions.store, { attempts: queueOptions.attempts, backoff: queueOptions.backoff, keepFailed: queueOptions.keepFailed, lostAfter: queueOptions.lostAfter, idlePoll: queueOptions.idlePoll, concurrency: queueOptions.concurrency }, owner)
+  MAILERS.set(via, new WeakRef(owner))
+  FORGOTTEN.register(owner, via)
+
+  // The id is dropped before delivery; a job queued by a mailer this process no longer has (a restart) goes to whichever worker claims it.
+  const ownerOf = (queuedBy: string | undefined): Owner => queuedBy === undefined || queuedBy === via ? owner : MAILERS.get(queuedBy)?.deref() ?? owner
+  const deliverQueued = async ({ via: queuedBy, ...mail }: Queued, signal: AbortSignal): Promise<Delivery> => ownerOf(queuedBy).deliver(mail, signal)
+  const jobs = queue<Queued>(name, deliverQueued, {
+    ...queueOptions,
+    keepFailed: queueOptions.keepFailed ?? FAILED_KEPT,
+    redact: queued => ownerOf(queued.via).redact(queued),
+    onFailed: async ({ payload: { via: queuedBy, ...mail }, error }) => ownerOf(queuedBy).failed(mail, error),
+  })
   // The mails of a list are sent by a job of their own, a batch at a time, so a broadcast to a long list resumes after a restart where it stopped. Its worker starts with the first `mail.list()`, so a mailer with no list runs no more queue than before lists.
-  const listJobs = queue<ListRun>(`${name}-list`, async (run, signal) => lists.run(run, signal), defined({ lazy: true, store: queueOptions.store, attempts: queueOptions.attempts, backoff: queueOptions.backoff, lostAfter: queueOptions.lostAfter, idlePoll: queueOptions.idlePoll }))
+  const listJobs = queue<QueuedRun>(`${name}-list`, async ({ via: queuedBy, ...run }, signal) => ownerOf(queuedBy).run(run, signal), defined({ lazy: true, store: queueOptions.store, attempts: queueOptions.attempts, backoff: queueOptions.backoff, lostAfter: queueOptions.lostAfter, idlePoll: queueOptions.idlePoll }))
   const plugin = new Elysia().use(jobs).use(listJobs)
 
   mountListRoutes(plugin, () => lists)
@@ -588,7 +624,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     },
   })
 
-  lists.connect({ enqueueMail: async mail => jobs.enqueue({ ...mail, via }), enqueueRun: async (run, key) => listJobs.enqueue(run, { key }), activate: () => listJobs.activate() })
+  lists.connect({ enqueueMail: async mail => jobs.enqueue({ ...mail, via }), enqueueRun: async (run, key) => listJobs.enqueue({ ...run, via }, { key }), activate: () => listJobs.activate() })
 
   // A getter, since `kay build` leaves a missing variable to throw where it is read.
   return Object.defineProperty(sending, 'configured', { get: () => (configured?.missing() ?? []).length === 0 && !senderless() }) as Mailer

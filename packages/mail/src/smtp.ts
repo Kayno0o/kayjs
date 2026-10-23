@@ -142,7 +142,8 @@ export function smtp(settings: SmtpSettings): Transport {
   let idle: ReturnType<typeof setTimeout> | undefined
 
   return {
-    send: async (mail: Mail): Promise<Delivery> => {
+    send: async (mail: Mail, signal?: AbortSignal): Promise<Delivery> => {
+      signal?.throwIfAborted()
       clearTimeout(idle)
       transporter ??= open(settings, wait)
 
@@ -164,7 +165,17 @@ export function smtp(settings: SmtpSettings): Transport {
           throw error
         }
 
-        const info = await current.sendMail(nodemailerMessage(mail))
+        signal?.throwIfAborted()
+
+        const info = await abortable(current.sendMail(nodemailerMessage(mail)), signal, () => {
+          // nodemailer cannot cut a message in flight: this send is no longer waited for, and a pool left to a lone send is dropped, its connection closing once the server answers or the timeout passes. A pool shared with other sends is kept, as closing it would end theirs.
+          if (sending === 1) {
+            if (transporter === pending)
+              transporter = undefined
+
+            current.close()
+          }
+        })
 
         return { messageId: info.messageId, accepted: info.accepted, rejected: info.rejected, response: info.response }
       }
@@ -204,6 +215,28 @@ function explained(error: unknown, settings: SmtpSettings, outcome = 'nothing wa
     return error
 
   return new Error(`kayjs-mail: ${settings.host}:${settings.port ?? DEFAULT_PORT} did not upgrade to TLS with STARTTLS, which kayjs-mail requires unless the connection is TLS from the start (port 465, or secure: true), so ${outcome}; a relay taking mail in clear, as on a private network, needs MAIL_INSECURE=true (smtp({ insecure: true })), which is ignored while a password is set, as a password never goes in clear`, { cause: error })
+}
+
+// Settles as `work` does, or rejects with the signal's reason once it aborts, after `onAbort` stopped what it could of the work.
+async function abortable<T>(work: Promise<T>, signal: AbortSignal | undefined, onAbort: () => void): Promise<T> {
+  if (signal === undefined)
+    return work
+
+  let listener: (() => void) | undefined
+  const aborted = new Promise<never>((_, reject) => {
+    listener = () => {
+      onAbort()
+      reject(signal.reason)
+    }
+    signal.addEventListener('abort', listener, { once: true })
+  })
+
+  try {
+    return await Promise.race([work, aborted])
+  }
+  finally {
+    signal.removeEventListener('abort', listener!)
+  }
 }
 
 async function closeOpened(pending: Promise<Awaited<ReturnType<typeof open>>>): Promise<void> {
