@@ -567,7 +567,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     },
   })
 
-  lists.connect({ enqueueMail: async message => sending.enqueue(message), enqueueRun: async (run, key) => listJobs.enqueue(run, { key }), activate: () => listJobs.activate() })
+  lists.connect({ enqueueMail: async mail => jobs.enqueue(mail), enqueueRun: async (run, key) => listJobs.enqueue(run, { key }), activate: () => listJobs.activate() })
 
   // A getter, since `kay build` leaves a missing variable to throw where it is read.
   return Object.defineProperty(sending, 'configured', { get: () => (configured?.missing() ?? []).length === 0 && !senderless() }) as Mailer

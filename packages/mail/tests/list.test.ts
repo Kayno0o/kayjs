@@ -464,3 +464,38 @@ describe('a link of a list this process does not declare', () => {
     check.close()
   })
 })
+
+describe('the subscribe form\'s queue insert', () => {
+  it('is off the response path for a new address, and absent for a listed one, so both answers take the same steps', async () => {
+    const file = join(await scratchDir('list-'), 'form.sqlite')
+    const store = openLists(file)
+    const known = fresh()
+
+    store.confirm('news', store.ask('news', known, 'known', 'en').id)
+    store.close()
+
+    const queued: string[] = []
+    const rendered: string[] = []
+    const lists = createLists({
+      configured: () => true,
+      render: async (message) => {
+        rendered.push(String(message.to))
+
+        return { to: [String(message.to)] } as never
+      },
+      deliver: async () => undefined,
+    })
+
+    // A queue that never answers: the form must not wait for it.
+    lists.connect({ enqueueMail: async (mail) => { queued.push(String(mail.to)); return new Promise<string>(() => undefined) }, enqueueRun: async () => '', activate: () => undefined })
+
+    const [, handler] = lists.list('news', { file }).form()
+    const ask = async (email: string) => handler({ email }, { fail: (status: number) => ({ status }) } as never)
+    const fresher = fresh()
+
+    expect(await ask(known)).toBeUndefined()
+    expect(await ask(fresher)).toBeUndefined()
+    expect(rendered).toEqual([known, fresher])
+    expect(queued).toEqual([fresher])
+  })
+})

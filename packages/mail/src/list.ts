@@ -5,7 +5,7 @@ import type { Address, Mail, MailMessage } from './types'
 import { existsSync } from 'node:fs'
 import process from 'node:process'
 import { s } from 'kay'
-import { configError, durationSeconds, keyedDigest } from 'kay/library'
+import { configError, durationSeconds, inFlightWork, keyedDigest } from 'kay/library'
 import { siteOrigin } from 'kay/seo'
 import { rateLimit, renderLocale, renderToString, retryLater } from 'kay/server'
 import { wording } from 'kay/words'
@@ -79,7 +79,8 @@ export interface ListHost {
   render: <P extends object>(message: MailMessage<P>) => Promise<Mail>
   // Sends an already rendered mail now, logging a failure.
   deliver: (mail: Mail) => Promise<unknown>
-  enqueueMail: <P extends object>(message: MailMessage<P>) => Promise<string>
+  // Queues an already rendered mail.
+  enqueueMail: (mail: Mail) => Promise<string>
   enqueueRun: (run: ListRun, key: string) => Promise<string>
   // Starts the list queue's worker, which waits for the first list.
   activate: () => void
@@ -209,6 +210,15 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
       return { mail, from: mail.from, replyTo: mail.replyTo, subject: mail.subject, html: mail.html, text: mail.text, headers: mail.headers }
     }
 
+    const queueConfirmation = async (mail: Mail): Promise<void> => {
+      try {
+        await host.enqueueMail(mail)
+      }
+      catch (error) {
+        log.error('the confirmation mail of a list could not be queued', error)
+      }
+    }
+
     const list: MailingList = {
       name,
       form() {
@@ -237,14 +247,14 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
           const confirmation: MailMessage<ListConfirmProps> = { to: email, subject: wording('mail.list.confirm.subject', 'Confirm your subscription to {site}', { site }), locale, view: options.view ?? await view<(props: ListConfirmProps) => JSX.Element>('confirm'), props: { url, site: origin } }
 
           try {
-            // A listed address is mailed nothing, but the mail is rendered all the same, so the answer takes the same steps whether the address is known or not.
+            // Rendered for a listed address too, and only a pending one is queued, off the response path, so the answer takes the same time whether the address is known or not.
+            const mail = await host.render<ListConfirmProps>(confirmation)
+
             if (subscriber.status === 'pending')
-              await host.enqueueMail<ListConfirmProps>(confirmation)
-            else
-              await host.render<ListConfirmProps>(confirmation)
+              void inFlightWork(async () => queueConfirmation(mail))
           }
           catch (error) {
-            log.error('the confirmation mail of a list could not be queued', error)
+            log.error('the confirmation mail of a list could not be rendered', error)
 
             return ctx.fail(502, wording('mail.list.sendFailed', 'Your subscription could not be started. Please try again later.'))
           }
