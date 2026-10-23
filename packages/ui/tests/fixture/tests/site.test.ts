@@ -512,7 +512,7 @@ describe('data', () => {
   test('Skeleton hides its bars from screen readers, shortens the last, and announces its label as a status', async () => {
     expect((await find('/data', '#skeleton [data-part=block]')).map(found => [attr(found, 'aria-hidden'), attr(found, 'data-last')])).toEqual([['true', null], ['true', null], ['true', '']])
     expect((await find('/data', '#skeleton [role="status"]')).map(found => found.text)).toEqual(['Loading'])
-    expect((await one('/data', '#avatar-skeleton .kui-skeleton')).attributes).toMatchObject({ 'data-shape': 'avatar', 'style': '--kui-skeleton-width: 4rem;' })
+    expect((await one('/data', '#avatar-skeleton .kui-skeleton')).attributes).toMatchObject({ 'data-shape': 'avatar', 'style': '--kui-skeleton-width: 4rem' })
     expect(await find('/data', '#avatar-skeleton [role="status"]')).toEqual([])
   })
 
