@@ -159,7 +159,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     await page.waitFor('[data-pending]', { gone: true })
 
     expect(done).toEqual([])
-    expect(await page.text('.kai-chat-approval-text')).toContain('add_note')
+    expect(await page.text('.kai-chat-approval-text')).toContain('add_note {"title":"Milk"}')
+    expect(await page.text('[role="status"]')).toContain('add_note: Needs your approval')
     expect(await page.text(`${turn} .kai-chat-call-status`)).toBe('Needs your approval')
 
     fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }] })

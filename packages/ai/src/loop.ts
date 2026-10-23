@@ -1,7 +1,7 @@
 import type { LibraryTool } from 'kay/library'
 import type { Confirm, Piece, Provider, ProviderMessage, ProviderRequest, ToolCall, ToolOutcome, ToolUse, Usage } from './types'
 import { logFrom } from 'kay'
-import { ticketAllows, ticketFor } from './approval'
+import { spend, ticketAllows, ticketFor } from './approval'
 import { ticketsIn } from './approval-marker'
 import { MAX_ARGUMENTS, MAX_CALLS_PER_STEP, MAX_STREAMED_CALLS } from './tool-limits'
 
@@ -68,6 +68,17 @@ function allowed(messages: ProviderMessage[]): Set<string> {
   return new Set(last?.role === 'user' && last.results === undefined ? ticketsIn(last.content) : [])
 }
 
+let warnedHeld = false
+
+// Said once: an app without Chat has nothing that lets a held call run but a `confirm` of its own.
+function warnHeld(): void {
+  if (warnedHeld)
+    return
+
+  warnedHeld = true
+  log.warn('a tool call was held for the visitor\'s approval; only Chat\'s Allow button or a `confirm` passed to ask() lets it run, and `tool: { readOnly: true }` marks an action that needs none')
+}
+
 async function run(tools: Map<string, LibraryTool>, use: ToolUse, input: Record<string, unknown>, request: Request, confirm: Confirm | false | undefined, tickets: Set<string>): Promise<Ran> {
   const tool = tools.get(use.name)
 
@@ -79,13 +90,16 @@ async function run(tools: Map<string, LibraryTool>, use: ToolUse, input: Record<
       if (await confirm({ name: use.name, input, request }) !== true)
         return failed('The visitor has not confirmed this call, so it did not run; ask them, then call it again')
     }
-    else if (confirm === undefined && tool.readOnly !== true) {
+    else if (confirm !== false && tool.readOnly !== true) {
       const ticket = [...tickets].find(given => ticketAllows(given, use.name, input))
 
-      if (ticket === undefined)
-        return { ...failed('This call changes something and needs the visitor\'s approval, so it did not run. The chat shows them an Allow button for it: say in a sentence what it will do and wait; their approval arrives as their next message, then call it again with the same arguments'), approval: ticketFor(use.name, input) }
+      tickets.delete(ticket ?? '')
 
-      tickets.delete(ticket)
+      if (ticket === undefined || !await spend(ticket)) {
+        warnHeld()
+
+        return { ...failed('This call changes something and needs the visitor\'s approval, so it did not run. The chat shows them an Allow button for it: say in a sentence what it will do and wait; their approval arrives as their next message, then call it again with the same arguments'), approval: ticketFor(use.name, input) }
+      }
     }
 
     const result = await tool.call(input, request)

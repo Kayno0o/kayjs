@@ -16,7 +16,6 @@ const DEFAULT_LIMIT: LimitOptions = { max: 20, window: '10m' }
 const DEFAULT_BUDGET: BudgetOptions = { tokens: 100_000, total: 2_000_000, window: '1d' }
 // How long a store may take to answer before the ask is refused as `unavailable`, or the count given up on.
 let storeTimeoutMs = 5000
-let warnedPeek = false
 
 // How many asks a visitor makes in a window.
 export interface LimitOptions {
@@ -77,6 +76,8 @@ interface Slot {
   memories: Map<string, RateStore>
   // The tokens held by the replies running in this process, by the key of the budget they count against.
   held: Map<string, number>
+  // Whether the app's store.rates without a peek was said to be passed over.
+  warnedPeek: boolean
 }
 
 // Releases nothing: the hold of an ask that holds none.
@@ -90,7 +91,7 @@ function slot(): Slot {
   if (!holder[SLOT]) {
     const memories = new Map<string, RateStore>()
 
-    holder[SLOT] = { settings: settingsOf({}, memories), memories, held: new Map() }
+    holder[SLOT] = { settings: settingsOf({}, memories), memories, held: new Map(), warnedPeek: false }
   }
 
   return holder[SLOT]
@@ -159,7 +160,6 @@ export function limitsInEffect(): { limit: { max: number, seconds: number } | nu
 
 // Forgets the counts kept in memory: for a test.
 export function forgetCounts(): void {
-  warnedPeek = false
   slot().memories.clear()
   slot().held.clear()
 }
@@ -180,8 +180,8 @@ function storeOf(counter: Counter, needsPeek: boolean): RateStore {
     return counter.memory
 
   if (needsPeek && shared.peek === undefined) {
-    if (!warnedPeek) {
-      warnedPeek = true
+    if (!slot().warnedPeek) {
+      slot().warnedPeek = true
       log.error('the app\'s store.rates has no peek(key), which the budget reads before an ask without counting it, so the budget counts in this process\'s memory; give ai({ budget: { store } }) a store with one')
     }
 

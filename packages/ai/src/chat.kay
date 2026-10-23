@@ -140,7 +140,7 @@ function announce(next: ToolCall[]) {
       continue
 
     told.set(call.id, call.status)
-    said.push({ id: nextId++, text: `${call.name}: ${statuses[call.status]}` })
+    said.push({ id: nextId++, text: `${call.name}: ${call.approval === undefined ? statuses[call.status] : approvalLabel}` })
   }
 
   if (said.length > 0)
@@ -372,15 +372,23 @@ function reset() {
 
 // The visitor's answer to a held tool call is their next message: the allowance carries the ticket the server issued for that very call.
 function decide(call: ToolCall, allowed: boolean) {
-  if (allowed && call.approval !== undefined)
-    void send(false, approvalMessage(`${allowedLabel} ${call.name} ${JSON.stringify(call.input)}`, call.approval))
-  else
+  if (!allowed)
     void send(false, `${deniedLabel} ${call.name}`)
+  else if (call.approval !== undefined)
+    void send(false, approvalMessage(`${allowedLabel} ${call.name} ${JSON.stringify(call.input)}`, call.approval))
 }
+
+const callKey = (call: ToolCall) => `${call.name}\n${JSON.stringify(call.input)}`
 
 // Only the calls of the last turn can still be allowed: a later message has moved on.
 function waitingFor(turn: Turn): ToolCall[] {
-  return !busy() && history().at(-1)?.id === turn.id ? (turn.calls ?? []).filter(call => call.approval !== undefined) : []
+  if (busy() || history().at(-1)?.id !== turn.id)
+    return []
+
+  const seen = new Set<string>()
+
+  // A model asking again for the same held call is one question.
+  return (turn.calls ?? []).filter(call => call.approval !== undefined && !seen.has(callKey(call)) && seen.add(callKey(call)))
 }
 
 function ask(question: string) {
@@ -455,7 +463,7 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
             Calls(calls={turn.calls} labels={toolLabels} details={toolDetails} runningLabel={runningLabel} doneLabel={doneLabel} failedLabel={failedLabel} argumentsLabel={argumentsLabel} resultLabel={resultLabel} approvalLabel={approvalLabel})
           for call of waitingFor(turn) key={call.id}
             div(part="approval" role="group" aria-label={`${call.name}: ${approvalLabel}`})
-              span(part="approvalText") {call.name} - {approvalLabel}
+              span(part="approvalText") {call.name} {JSON.stringify(call.input)} - {approvalLabel}
               button(part="allow" type="button" data-variant="solid" data-size="sm" onClick={() => decide(call, true)}) {allowLabel}
               button(part="deny" type="button" data-variant="ghost" data-size="sm" onClick={() => decide(call, false)}) {denyLabel}
           if turn.content !== ''

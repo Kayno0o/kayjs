@@ -1,13 +1,29 @@
-import { appSecrets, sameText } from 'kay/library'
+import process from 'node:process'
+import { logFrom } from 'kay'
+import { appSecrets, appStore, sameText } from 'kay/library'
+import { memoryRates } from 'kay/server'
 
-// How long a visitor has to allow a held call before its ticket is no good.
+const log = logFrom('kayjs-ai')
+// How long a visitor has to allow a held call before its ticket is no good, and how long a used one is remembered.
 const TICKET_MS = 10 * 60_000
-const MAX_TICKET = 4096
+const MAX_TICKET = 1024
 // Without an app secret a ticket is good in this process only.
 const PROCESS_SECRET = crypto.randomUUID()
+const used = memoryRates()
+let warnedSecret = false
 
 function secrets(): string[] {
-  return appSecrets() ?? [PROCESS_SECRET]
+  const found = appSecrets()
+
+  if (found)
+    return found
+
+  if (!warnedSecret && process.env.NODE_ENV === 'production') {
+    warnedSecret = true
+    log.warn('no app secret is set, so the tickets Chat\'s Allow button posts only work in the process that issued them; set KAY_SECRET to at least 32 random characters')
+  }
+
+  return [PROCESS_SECRET]
 }
 
 function sign(secret: string, payload: string): string {
@@ -26,9 +42,14 @@ function canonical(value: unknown): string {
   return JSON.stringify(value) ?? 'null'
 }
 
-// What the server gives the browser for a held call, which the visitor's Allow posts back: signed over the tool's name and exact arguments, so it allows that call and no other.
+// The call as the ticket vouches for it: its name and a digest of its exact arguments, so a ticket is short whatever the arguments are.
+function callDigest(name: string, input: Record<string, unknown>): string {
+  return new Bun.CryptoHasher('sha256').update(`${name}\0${canonical(input)}`).digest('base64url')
+}
+
+// What the server gives the browser for a held call, which the visitor's Allow posts back: signed over the tool's name and exact arguments, so it allows that call and no other. Each is unique, so spending one does not spend another.
 export function ticketFor(name: string, input: Record<string, unknown>, now = Date.now()): string {
-  const payload = Buffer.from(JSON.stringify({ n: name, i: canonical(input), e: now + TICKET_MS })).toString('base64url')
+  const payload = Buffer.from(JSON.stringify({ c: callDigest(name, input), e: now + TICKET_MS, n: crypto.randomUUID() })).toString('base64url')
 
   return `${payload}.${sign(secrets()[0]!, payload)}`
 }
@@ -47,11 +68,18 @@ export function ticketAllows(ticket: string, name: string, input: Record<string,
     return false
 
   try {
-    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as { n?: unknown, i?: unknown, e?: unknown }
+    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as { c?: unknown, e?: unknown }
 
-    return claims.n === name && claims.i === canonical(input) && typeof claims.e === 'number' && claims.e >= now
+    return claims.c === callDigest(name, input) && typeof claims.e === 'number' && claims.e >= now
   }
   catch {
     return false
   }
+}
+
+// Spends a ticket: true the first time it is asked, in the app's `store.rates` when it has one, so the same message posted again, a retry or a resend, cannot run the call twice.
+export async function spend(ticket: string): Promise<boolean> {
+  const window = await (appStore()?.rates ?? used).hit(`ai:approval\n${new Bun.CryptoHasher('sha256').update(ticket).digest('base64url')}`, `${TICKET_MS}ms`)
+
+  return window.count === 1
 }

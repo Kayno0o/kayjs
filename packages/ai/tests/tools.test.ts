@@ -1,4 +1,4 @@
-import type { Asked } from '../src'
+import type { Asked, ProviderMessage } from '../src'
 import type { Offered } from '../src/loop'
 import type { Outcome, Tools } from './helpers/tools'
 import { join } from 'node:path'
@@ -486,7 +486,7 @@ describe('the visitor\'s yes to a write', () => {
   const request = new Request('http://localhost/')
   const input = { slot: 'ten', who: { b: 1, a: 2 } }
 
-  function loop(messages: { role: 'user' | 'assistant', content: string }[], options: { readOnly?: boolean, confirm?: Parameters<typeof converse>[6] } = {}) {
+  function loop(messages: ProviderMessage[], options: { readOnly?: boolean, confirm?: Parameters<typeof converse>[6] } = {}) {
     let ran = 0
     const tool = { name: 'book', description: 'Books', inputSchema: {}, ...options.readOnly === undefined ? {} : { readOnly: options.readOnly }, call: async () => {
       ran++
@@ -568,6 +568,73 @@ describe('the visitor\'s yes to a write', () => {
 
       expect(ran()).toBe(0)
     }
+  })
+
+  it('allows a call whatever the length of its arguments, in a ticket of fixed size', async () => {
+    const long = { text: 'x'.repeat(10_000) }
+    const ticket = ticketFor('book', long)
+
+    expect(ticket.length).toBeLessThan(400)
+    expect(ticketAllows(ticket, 'book', long)).toBe(true)
+
+    fakeAi.reply({ calls: [{ name: 'book', input: long }] })
+    fakeAi.reply('done')
+
+    const { reply, ran } = loop(said(approvalMessage('Yes.', ticket)))
+
+    await reply
+
+    expect(ran()).toBe(1)
+  })
+
+  it('spends a ticket: the same message posted again, a retry or a resend, holds the call again', async () => {
+    const ticket = ticketFor('book', input)
+    const messages = said(approvalMessage('Yes.', ticket))
+    const ran: number[] = []
+
+    for (const attempt of [1, 2]) {
+      fakeAi.clear()
+      fakeAi.reply({ calls: [{ name: 'book', input }] })
+      fakeAi.reply('done')
+
+      const turn = loop(messages)
+
+      await turn.reply
+      ran.push(turn.ran())
+
+      if (attempt === 2)
+        expect((await turn.reply.calls)[0]).toMatchObject({ status: 'failed', approval: expect.any(String) })
+    }
+
+    expect(ran).toEqual([1, 0])
+  })
+
+  it('ignores an expired ticket and one sitting in a message that carries tool results', async () => {
+    const old = ticketFor('book', input, Date.now() - 11 * 60_000)
+    const fresh = ticketFor('book', input)
+
+    for (const messages of [said(approvalMessage('Yes.', old)), [{ role: 'user' as const, content: approvalMessage('Yes.', fresh), results: [] }]]) {
+      fakeAi.clear()
+      fakeAi.reply({ calls: [{ name: 'book', input }] })
+      fakeAi.reply('done')
+
+      const { reply, ran } = loop(messages)
+
+      await reply
+
+      expect(ran()).toBe(0)
+    }
+  })
+
+  it('holds a call under a confirm that is no function and not false', async () => {
+    fakeAi.reply({ calls: [{ name: 'book', input }] })
+    fakeAi.reply('done')
+
+    const { reply, ran } = loop(said('book it'), { confirm: true as unknown as false })
+
+    await reply
+
+    expect(ran()).toBe(0)
   })
 
   it('runs a read, a call a custom confirm answers true to, and every call under confirm: false, unasked', async () => {

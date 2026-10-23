@@ -111,7 +111,7 @@ Every text is looked up in the app's catalogs under an `ai.chat.<name>` key firs
 
 Every label is also a prop, which replaces the message: `placeholder`, `sendLabel`, `stopLabel`, `retryLabel`, `thinkingLabel`, `stoppedLabel`, `tableLabel` (a reply with several tables numbers them), `greeting` and `errorMessage`.
 
-The status of a tool call and the two parts it opens to are labels too: `runningLabel`, `doneLabel`, `failedLabel`, `argumentsLabel` and `resultLabel`.
+The status of a tool call and the two parts it opens to are labels too: `runningLabel`, `doneLabel`, `failedLabel`, `argumentsLabel` and `resultLabel`. A call held for the visitor's yes has `approvalLabel`, `allowLabel`, `denyLabel`, `allowedLabel` and `deniedLabel`.
 
 The line under the chat has its own prop, `disclosure`, [explained below](#personal-data-and-the-ai-notice).
 
@@ -246,11 +246,13 @@ A call that goes wrong is not an exception. The model is told what failed, such 
 
 A model can be talked into things by the text it reads, a visitor's message say. Offer only actions whose worst call you can accept from that visitor, and keep destructive ones out of `tools`.
 
-A tool that changes something does not run on the model's word. The model is told it needs the visitor's approval, and `Chat` shows Allow and Deny under the call. Allow sends the visitor's next message with a signed ticket for that exact call, which lets it run once; a ticket expires after 10 minutes and is read only from the visitor's last message, so text a tool returned cannot allow anything.
+A tool that changes something does not run on the model's word. The model is told it needs the visitor's approval, and `Chat` shows Allow and Deny under the call.
+
+The row shows the tool and its arguments, so the visitor sees what they allow. Allow sends the visitor's next message with a signed ticket for that exact call, which lets it run once: it expires after 10 minutes, is spent when used, and is read only from the visitor's last message, so text a tool returned cannot allow anything. Set `KAY_SECRET` so every process of the app can read a ticket.
 
 A tool that only reads says so, `tool: { description: 'Looks a note up', readOnly: true }`, and runs at once. Pass `confirm: false` to run every tool without asking, for an app that asks elsewhere.
 
-The ticket travels in the message, so leave room for it in the `content` your schema allows.
+The arguments travel in the message, so leave room for them in the `content` your schema allows.
 
 To decide what counts as a yes yourself, pass `confirm`: `ask(messages, { tools, confirm: ({ name, input, request }) => ... })`. It runs before each call, and only `true` lets the call run. Otherwise the model is told the visitor has not confirmed it, and can ask them first.
 
