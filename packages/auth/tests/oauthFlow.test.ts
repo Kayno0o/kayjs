@@ -331,6 +331,19 @@ describe('coming back from the provider', () => {
     expect((await visitor.fetch(`/auth/github/callback?code=code-1&state=${state}`)).headers.get('location')).toBe('/login?error=oauth')
   })
 
+  test('a callback for a provider the app lacks spends a pending flow its state matches and keeps its redirect, and leaves one it does not match', async () => {
+    providers({ 1: { id: '1', username: 'ada' } })
+    const { browser } = setup()
+    const visitor = browser()
+    const leaving = await visitor.fetch('/auth/discord?redirect=/account')
+    const state = new URL(leaving.headers.get('location')!).searchParams.get('state')!
+
+    expect((await visitor.fetch('/auth/nope/callback?code=code-1&state=forged')).headers.get('location')).toBe('/login?error=oauth')
+    expect((await visitor.fetch('/auth/nope/callback')).headers.get('location')).toBe('/login?error=oauth')
+    expect((await visitor.fetch(`/auth/nope/callback?code=code-1&state=${state}`)).headers.get('location')).toBe('/login?error=oauth&redirect=%2Faccount')
+    expect((await visitor.fetch(`/auth/discord/callback?code=code-1&state=${state}`)).headers.get('location')).toBe('/login?error=oauth')
+  })
+
   test('says the visitor cancelled, or the provider was down', async () => {
     providers({}, { tokenStatus: 503 })
     const { browser } = setup()
