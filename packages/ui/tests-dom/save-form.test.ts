@@ -1,5 +1,7 @@
 import type { Mounted } from 'kay/test'
+import type { IconChoice } from '../src/icon-picker'
 import { afterEach, describe, expect, test } from 'bun:test'
+import { trustHtml } from 'kay'
 import { mountComponent, settle } from 'kay/test'
 import { click } from './dom'
 
@@ -399,6 +401,50 @@ describe('SaveForm', () => {
     await settle()
 
     expect(searches()).toEqual(['', ''])
+  })
+})
+
+describe('SaveForm and the pick of a Combobox and an IconPicker', () => {
+  test('Discard after a save goes back to the pick saved, not the one the page started with', async () => {
+    const icon = (name: string): IconChoice => ({ name, icon: { 'viewBox': '0 0 24 24', 'width': '1em', 'height': '1em', 'aria-hidden': 'true', 'innerHTML': trustHtml(`<path data-icon="${name}"/>`) } })
+
+    mounted = await mountComponent('src/components/save-form-controls.kay', { find: async () => [icon('tabler:home'), icon('tabler:house')] })
+    await settle()
+
+    const root = mounted.root
+    const planet = root.querySelector<HTMLInputElement>('input[role="combobox"]')!
+    const iconValue = () => root.querySelector<HTMLInputElement>('input[name="icon"]')!.value
+    const pickPlanet = async (label: string) => {
+      planet.focus()
+      planet.value = label
+      planet.dispatchEvent(new Event('input', { bubbles: true }))
+      await settle()
+      click([...root.querySelectorAll('[role="option"]')].find(row => row.textContent === label) ?? null)
+      await settle()
+    }
+    const pickIcon = async (name: string) => {
+      click(root.querySelector(`.kui-icon-grid-option:has([data-icon="${name}"])`))
+      await settle()
+    }
+
+    await pickPlanet('Earth')
+    await pickIcon('tabler:house')
+    root.querySelector('form')!.requestSubmit()
+    await settle()
+
+    await pickPlanet('Mars')
+    await pickIcon('tabler:home')
+    expect(iconValue()).toBe('tabler:home')
+
+    click(buttons(root)[0]!)
+    await settle()
+    await settle()
+    await Bun.sleep(20)
+    await settle()
+
+    expect(planet.value).toBe('Earth')
+    expect(root.querySelector<HTMLInputElement>('input[name="planet"][type="hidden"]')?.value).toBe('earth')
+    expect(iconValue()).toBe('tabler:house')
   })
 })
 
