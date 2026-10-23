@@ -4,4 +4,4 @@ import SubscribeForm from '@kaynooo/kayjs-mail/subscribe-form.kay'
 
 export const subscribeNoticed = action(...mail.list('spring', { title: 'Spring news', privacy: '/privacy' }).form())
 ---
-SubscribeForm(action={subscribeNoticed} privacy="/privacy" noticeText="One mail a month about the spring season." wordingId="spring-v1")
+SubscribeForm(action={subscribeNoticed} noticeText="One mail a month about the spring season." wordingId="spring-v1")

@@ -313,7 +313,7 @@ SubscribeForm(action={subscribe})
 
 A visitor types an address and gets a mail with a link, valid for three days. Opening the link shows a page with one button, so a mail scanner that follows links subscribes no one. The address joins the list when the visitor presses the button.
 
-The form shows a line saying what the address is used for. Pass `privacy="/privacy"` to link your privacy page after it, and `noticeText` to write your own, with `wordingId` to name its version. The confirmation mail names the site and the list (`title` in `mail.list()`) and links the policy (`privacy` in `mail.list()`).
+The form shows a line saying what the address is used for. The form links the `privacy` of `mail.list()`; `privacy="/privacy"` on the form replaces it, and `noticeText` to write your own, with `wordingId` to name its version. The confirmation mail names the site and the list (`title` in `mail.list()`) and links the policy (`privacy` in `mail.list()`).
 
 The page the form was on and the id of the notice are kept with the confirmation date as the proof of consent.
 

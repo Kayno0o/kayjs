@@ -121,6 +121,8 @@ const FAILED_KEPT = '7d'
 
 // The mailers of this process by the id their queued mails carry, since mailers sharing a queue name share its jobs and any of their workers may claim one: it is delivered by the mailer that queued it.
 const MAILERS = new Map<string, WeakRef<(mail: Mail) => Promise<Delivery>>>()
+// Drops the id of a mailer that was collected, so a process making many mailers does not keep their dead refs.
+const FORGOTTEN = new FinalizationRegistry<string>(via => MAILERS.delete(via))
 
 // A queued mail, with the id of the mailer that queued it.
 type Queued = Mail & { via?: string | undefined }
@@ -484,6 +486,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
   const via = crypto.randomUUID()
 
   MAILERS.set(via, new WeakRef(deliver))
+  FORGOTTEN.register(deliver, via)
 
   // The id is dropped before delivery; a mail queued by a mailer this process no longer has (a restart) goes out by whichever worker claims it.
   const deliverQueued = async ({ via: queuedBy, ...mail }: Queued): Promise<Delivery> => {
@@ -512,6 +515,8 @@ export function mailer(options: MailerOptions = {}): Mailer {
   const plugin = new Elysia().use(jobs).use(listJobs)
 
   mountListRoutes(plugin, () => lists)
+  // A `kay dev` reload stops the app, so the sweep timers of this mailer end and the next one starts its own.
+  plugin.onStop(() => lists.stopSweeping())
 
   // Checked as the server starts, once the site is set: a sender in production is the mailer's `from`, `MAIL_FROM`, or `noreply@` the site's host, since `kay@localhost` fails SPF and lands in spam without an error.
   if (delivering() === 'smtp' && options.optional !== true) {

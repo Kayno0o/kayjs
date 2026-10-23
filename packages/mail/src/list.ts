@@ -54,7 +54,7 @@ export interface ListOptions {
   honeypot?: string | undefined
   // What the confirmation mail calls the list, its name by default.
   title?: string | undefined
-  // The page explaining what is done with the address, a path or a URL: the confirmation mail links it.
+  // The page explaining what is done with the address, a path or a URL: the confirmation mail and the subscribe form of this list link it, so an app declares it once.
   privacy?: string | undefined
 }
 
@@ -196,7 +196,7 @@ function personalise(message: StoredMessage, subscriber: Subscriber, list: strin
 }
 
 // `fallback` is where a list with no store of its own lives and a link of an undeclared list looks: the mailer's `listStore`, else the default SQLite file, which a test names as `file` since the default is skipped under `bun test`.
-export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 'activate'>, fallback: { file?: string | undefined, store?: ListStore | undefined } = {}) {
+export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 'activate'>, fallback: { file?: string | undefined, store?: ListStore | undefined, sweepAfter?: number, sweepEvery?: number } = {}) {
   // The queues are made after the lists, which they run: the mailer hands them over with `connect`.
   let queues: Pick<ListHost, 'enqueueMail' | 'enqueueRun' | 'activate'> | undefined
   const host: ListHost = {
@@ -291,7 +291,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
     const list: MailingList = {
       name,
       form() {
-        const schema = s.Object({ email: s.String({ format: 'email', maxLength: 254, error: emailError }), wording: s.Optional(s.String({ maxLength: 64 })) }) as unknown as SubscribeSchema
+        const schema = s.Object({ email: s.String({ format: 'email', maxLength: 254, error: emailError }), wording: s.Optional(s.String({ maxLength: 64 })) }, options.privacy === undefined ? undefined : { 'x-privacy': options.privacy }) as unknown as SubscribeSchema
 
         const handler = async (input: { email: string, wording?: string | undefined }, ctx: ActionContext): Promise<Failure<string> | undefined> => {
           if (!host.configured())
@@ -427,15 +427,24 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
       }
     }
   }
-  let sweeping = false
+  let first: ReturnType<typeof setTimeout> | undefined
+  let every: ReturnType<typeof setInterval> | undefined
 
   const startSweeping = (): void => {
-    if (sweeping)
+    if (every !== undefined)
       return
 
-    sweeping = true
-    setTimeout(() => void sweep(), FIRST_SWEEP_MS).unref()
-    setInterval(() => void sweep(), SWEEP_EVERY_MS).unref()
+    first = setTimeout(() => void sweep(), fallback.sweepAfter ?? FIRST_SWEEP_MS)
+    every = setInterval(() => void sweep(), fallback.sweepEvery ?? SWEEP_EVERY_MS)
+    first.unref()
+    every.unref()
+  }
+
+  // Ends the timers, which a `kay dev` reload does through the mailer's `onStop` so the app that follows starts its own and they do not stack.
+  const stopSweeping = (): void => {
+    clearTimeout(first)
+    clearInterval(every)
+    first = every = undefined
   }
 
   // One process of the broadcast: mails a batch, then asks to run again after the pace until nobody is left.
@@ -504,6 +513,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
     },
     run,
     sweep,
+    stopSweeping,
     connect(connected: Pick<ListHost, 'enqueueMail' | 'enqueueRun' | 'activate'>): void {
       queues = connected
     },

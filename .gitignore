@@ -20,3 +20,4 @@ codecs/avif/.cache
 
 docs/data/
 editors/vscode/LICENSE
+packages/mail/tests/fixture/data/

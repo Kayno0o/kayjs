@@ -18,7 +18,7 @@ import SubscribeForm from '@kaynooo/kayjs-ui/subscribe-form.kay'
 SubscribeForm(action={subscribe} privacy="/privacy")
 ```
 
-- A line under the field says what the address is used for. `noticeText` replaces it with the sender, the content and the frequency of your list, `privacy` links your privacy page after it, and `wordingId` names the version of the notice.
+- A line under the field says what the address is used for. `noticeText` replaces it with the sender, the content and the frequency of your list, `privacy` links your privacy page after it (left out, the form links the `privacy` of `mail.list(name, { privacy })`), and `wordingId` names the version of the notice.
 - The list keeps the page of the form and the id of the notice with the confirmation date, as the proof of consent.
 - `label`, `submitLabel` and `sentLabel` replace the texts, which read the `ui.subscribeForm.*` messages, then kayjs-mail's `mail.list.form` ones in the page's language (English and French).
 - The anti-spam fields the action asks for, the honeypot and the time stamp, are added by kay.

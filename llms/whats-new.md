@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- `SubscribeForm` links the `privacy` page its `mail.list(name, { privacy })` declares, so an app names it once; kayjs-mail's list sweep timers end when `kay dev` reloads.
 - kayjs-cms keeps its on-page drafts per signed-in person and forgets them at Sign out, closes the activity log to a role that may not `delete` (see Upgrading), and asks for a click before a link from another site opens edit mode ([Editor](../packages/cms/llms/editor.md)).
 - kayjs-ui roots write an app's `style` after their own declarations, so the app wins.
 - The Styles tab and LSP show a part's classes written as an imported constant.

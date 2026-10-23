@@ -196,7 +196,7 @@ describe('the subscribe form', () => {
 
   it('confirms only a sign-up asked before the link was made, so an old mail cannot confirm a later one', async () => {
     const email = fresh()
-    const page = async (token: string) => (await site.fetch(`/_kay/mail/list/confirm?token=${token}`)).text()
+    const page = async (token: string) => (await confirmPost(`/_kay/mail/list/confirm?token=${token}`)).text()
 
     await site.call(subscribe, { email })
 
@@ -521,6 +521,14 @@ describe('list names', () => {
       expect(() => mail.list(name)).toThrow('a list\'s name')
   })
 
+  it('refuses a privacy that is neither a path nor a URL, and accepts both', () => {
+    for (const privacy of ['http://', 'https://[nope'])
+      expect(() => mail.list('private', { privacy })).toThrow('privacy is ')
+
+    expect(() => mail.list('private-path', { privacy: '/privacy' })).not.toThrow()
+    expect(() => mail.list('private-url', { privacy: 'https://example.com/privacy' })).not.toThrow()
+  })
+
   it('gives the same list for the same name', () => {
     expect(mail.list('news')).toBe(mail.list('news'))
     expect(mail.list()).toBe(mail.list('default'))
@@ -624,6 +632,14 @@ describe('what the subscriber is told and what is kept', () => {
   })
 })
 
+// Polls until the timers did their work, so a loaded host only makes it slower.
+async function until(done: () => boolean): Promise<void> {
+  const deadline = Date.now() + 5000
+
+  while (!done() && Date.now() < deadline)
+    await Bun.sleep(10)
+}
+
 describe('the sweep of the lists', () => {
   const host = { configured: () => true, render: async () => ({}) as never, deliver: async () => undefined }
 
@@ -641,6 +657,26 @@ describe('the sweep of the lists', () => {
 
     expect(store.confirm('swept', 'pending')).toBe(false)
     expect(store.confirm('swept', 'kept')).toBe(true)
+    store.close()
+  })
+
+  it('sweeps on its timers, and ends them when stopped so a reload does not stack them', async () => {
+    const file = join(await scratchDir('list-'), 'timed.sqlite')
+    const store = openLists(file)
+    const lists = createLists(host, { sweepAfter: 10, sweepEvery: 30 })
+    const old = Date.now() - 8 * 24 * 3_600_000
+
+    store.ask('timed', 'first@example.com', 'first', 'en', old)
+    lists.list('timed', { file })
+    await until(() => !store.subscribers('timed').length && store.forEmail('first@example.com').length === 0)
+
+    store.ask('timed', 'second@example.com', 'second', 'en', old)
+    await until(() => store.forEmail('second@example.com').length === 0)
+
+    lists.stopSweeping()
+    store.ask('timed', 'third@example.com', 'third', 'en', old)
+    await Bun.sleep(80)
+    expect(store.confirm('timed', 'third')).toBe(true)
     store.close()
   })
 

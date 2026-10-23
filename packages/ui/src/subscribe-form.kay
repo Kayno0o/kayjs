@@ -20,13 +20,15 @@ const { action, noticeText, label = wording('ui.subscribeForm.email', wording('m
   // The line saying what the address is used for, shown by default; replace it with the sender, the content and the frequency of your list.
   noticeText?: string | undefined
   privacyLabel?: string | undefined
-  // Where the privacy page is, such as `/privacy`: linked after the notice.
+  // Where the privacy page is, such as `/privacy`: linked after the notice; the list's `privacy` option unless given here.
   privacy?: string | undefined
   // Names the wording of `noticeText`, kept with the subscription as the proof of what was agreed to; left out, the stock notice is recorded as `stock` and a replaced one as `custom`.
   wordingId?: string | undefined
 }>()
 
 const notice = noticeText ?? wording('ui.subscribeForm.notice', wording('mail.list.form.notice', 'We use your address to send you the mails of this site, until you unsubscribe with the link in each one.'))
+// The list's own `privacy`, which its form action carries; the prop replaces it.
+const policy = privacy ?? (action as { schema?: { 'x-privacy'?: string } }).schema?.['x-privacy']
 const shownWording = wordingId ?? (noticeText === undefined ? 'stock' : 'custom')
 ---
 // Posts without JavaScript; the honeypot, the time stamp and the refused email's message come from the action.
@@ -35,8 +37,8 @@ form(part="root" action={action} novalidate)
     input(field="email" type="email" autocomplete="email")
   p(part="notice")
     | {notice}{' '}
-    if privacy
-      a(href={privacy} target="_blank" rel="noopener") {privacyLabel}
+    if policy
+      a(href={policy} target="_blank" rel="noopener") {privacyLabel}
   input(type="hidden" name="wording" value={shownWording})
   Button(type="submit" tone="accent" label={submitLabel})
   if action.succeeded()

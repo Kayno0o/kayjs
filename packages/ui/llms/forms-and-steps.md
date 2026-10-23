@@ -76,7 +76,7 @@ FormField also works outside a dialog, in a plain form posting to an action:
 
 `SubscribeForm(action={subscribe})` is the same for the list action `mail.list().form()` from kayjs-mail builds (any action with an `email` field works): a required email in a FormField whose refusal is tied to the input by `aria-describedby`, a notice saying what the address is used for, a submit button and a `Notice` that the confirmation mail went (`sentLabel`) or why not. The labels read the `ui.subscribeForm.*` messages, then kayjs-mail's `mail.list.form` ones.
 
-- `noticeText` replaces the stock notice (say who writes, what and how often), `privacy="/privacy"` links the policy after it (`privacyLabel`), `wordingId` names the notice's version, which the list keeps with the confirmation as proof; `label`, `submitLabel`, `sentLabel` replace the other texts, `class` goes on the form. Parts: `root`, `notice`.
+- `noticeText` replaces the stock notice (say who writes, what and how often), `privacy="/privacy"` links the policy after it (`privacyLabel`; left out, the list's own `privacy` option, which the form reads off its action), `wordingId` names the notice's version, which the list keeps with the confirmation as proof; `label`, `submitLabel`, `sentLabel` replace the other texts, `class` goes on the form. Parts: `root`, `notice`.
 
 A GET filter form, whose every pick lands in the URL, submits as soon as a Select changes with `submit`, no ref to the form needed:
 
