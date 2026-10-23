@@ -103,6 +103,20 @@ describe('the production jobs page', () => {
     expect(html).not.toContain('<script')
   })
 
+  it('shows a due time outside the range of a date as it is', async () => {
+    const site = await app({ jobs: { guard: allow } })
+    const store = memoryJobs()
+    const jobs = queue<{ n: number }>(`page-range-${++counter}`, () => undefined, { store })
+
+    await store.add({ id: 'far', queue: `page-range-${counter}`, payload: '1', attempts: 0, runAt: 1e18 })
+
+    const response = await get(site, '/_kay/jobs')
+
+    expect(response.status).toBe(200)
+    expect(await response.text()).toContain(String(1e18))
+    expect(jobs).toBeDefined()
+  })
+
   it('retries and deletes a job, then goes back to the page', async () => {
     const site = await app({ jobs: { guard: allow }, base: '/shop' })
     const { name, id, state, jobs } = await failedJob('act')

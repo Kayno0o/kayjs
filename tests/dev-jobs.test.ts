@@ -178,6 +178,65 @@ describe.each(kinds)('the Jobs tab\'s queues on a $name store', ({ name, open })
   })
 })
 
+describe('a long queue', () => {
+  it('reads a cap of jobs from the store, not every job of the queue', async () => {
+    const memory = await kinds[0]!.open()
+    const read = { jobs: 0, failed: 0 }
+    const counting: JobStore = {
+      ...memory,
+      async jobs(name, options) {
+        const found = await memory.jobs!(name, options)
+
+        read.jobs = Math.max(read.jobs, found.length)
+
+        return found
+      },
+      async failed(name, limit) {
+        const found = await memory.failed(name, limit)
+
+        read.failed = Math.max(read.failed, found.length)
+
+        return found
+      },
+    }
+    const queued = queue<{ n: number }>('long', () => {
+      throw new Error('boom')
+    }, { store: counting, attempts: 1 })
+    const site = await app()
+
+    for (let n = 0; n < 250; n++)
+      await queued.enqueue({ n }, { delay: '1h' })
+
+    const view = (await listed(site)).find(found => found.name === 'long')!
+
+    expect(view.jobs).toHaveLength(100)
+    expect(view.truncated).toBe(true)
+    expect(read.jobs).toBeLessThanOrEqual(101)
+    expect(read.failed).toBeLessThanOrEqual(101)
+    forgetQueue(queued)
+  })
+})
+
+describe('a queue renamed during kay dev', () => {
+  it('leaves the tool when its module runs again', async () => {
+    process.env.KAY_DEV_CODE = '1'
+
+    try {
+      const { queueAdmins } = await import('../src/server/queue')
+      const { disposeOwned } = await import('../src/server/reload')
+      const queued = queue<{ n: number }>('renamed-away', () => undefined, { store: await kinds[0]!.open() })
+
+      expect(queueAdmins().some(admin => admin.name === 'renamed-away')).toBe(true)
+      await disposeOwned(new Set([import.meta.path]))
+      expect(queueAdmins().some(admin => admin.name === 'renamed-away')).toBe(false)
+      forgetQueue(queued)
+    }
+    finally {
+      delete process.env.KAY_DEV_CODE
+    }
+  })
+})
+
 describe('a queue on a store without revive or state', () => {
   it('shows its failed jobs and refuses a retry the store cannot do', async () => {
     const memory = (await kinds[0]!.open())

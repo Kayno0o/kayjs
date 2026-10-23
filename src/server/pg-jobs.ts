@@ -362,10 +362,10 @@ export function pgJobs(source: PgJobsSource): JobStore {
 
       return purged.length
     },
-    async failed(queue) {
+    async failed(queue, limit) {
       const db = await open()
 
-      return (await rowsOf<PgJobRow>(db`SELECT id, queue, payload, attempts, run_at, error, job_key, progress FROM kay_jobs WHERE queue = ${queue} AND failed ORDER BY run_at`)).map(toJob)
+      return (await rowsOf<PgJobRow>(db`SELECT id, queue, payload, attempts, run_at, error, job_key, progress FROM kay_jobs WHERE queue = ${queue} AND failed ORDER BY run_at LIMIT ${limit ?? null}`)).map(toJob)
     },
     async revive(id, runAt) {
       const db = await open()
@@ -381,10 +381,10 @@ export function pgJobs(source: PgJobsSource): JobStore {
         throw error
       }
     },
-    async jobs(queue) {
+    async jobs(queue, options) {
       const db = await open()
 
-      return (await rowsOf<PgJobRow>(db`SELECT id, queue, payload, attempts, run_at, error, job_key, progress FROM kay_jobs WHERE queue = ${queue} ORDER BY run_at`)).map(toJob)
+      return (await rowsOf<PgJobRow>(db`SELECT id, queue, payload, attempts, run_at, error, job_key, progress FROM kay_jobs WHERE queue = ${queue} AND (${options?.failed ?? null}::boolean IS NULL OR failed = ${options?.failed ?? null}::boolean) ORDER BY run_at LIMIT ${options?.limit ?? null}`)).map(toJob)
     },
     async nextRunAt(queue) {
       const db = await open()

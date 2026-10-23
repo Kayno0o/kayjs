@@ -45,7 +45,8 @@ export function jobsPageOf(setting: JobsConfig | undefined): JobsPage | undefine
   return { path, guards: list.map(check => ({ file: 'kay.config.ts', special: {}, check: check as Guard })) }
 }
 
-const time = (at: number) => new Date(at).toISOString()
+// A due time past the range of a Date (a store may hold any number) is shown as it is.
+const time = (at: number) => Number.isNaN(new Date(at).getTime()) ? String(at) : new Date(at).toISOString()
 
 function jobMarkup(queue: QueueView, job: JobView, action: (name: string) => string): string {
   const form = (name: 'retry' | 'delete', label: string) => `<form method="post" action="${escapeHtml(action(name))}"><input type="hidden" name="queue" value="${escapeHtml(queue.name)}"><input type="hidden" name="id" value="${escapeHtml(job.id)}"><button>${label}</button></form>`

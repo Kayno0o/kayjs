@@ -40,14 +40,15 @@ function view(job: StoredJob, status: StoredJobState['status']): JobView {
   return { id: job.id, status, attempts: job.attempts, runAt: job.runAt, ...job.error !== undefined && { error: job.error }, ...job.key !== undefined && { key: job.key }, payload: cut(job.payload), ...job.progress !== undefined && { progress: cut(job.progress) } }
 }
 
-// Every queue this process made, with its waiting, running and failed jobs: the live ones and the failed ones each capped, the live ones read one by one for whether a process holds them.
+// Every queue this process made, with its waiting, running and failed jobs: the live ones and the failed ones each capped in the store's query, the live ones read one by one for whether a process holds them.
 export async function jobOverview(): Promise<QueueView[]> {
   const found: QueueView[] = []
 
   for (const admin of queueAdmins()) {
     const store = admin.store()
-    const failed = await store.failed(admin.name)
-    const all = store.jobs === undefined ? undefined : await store.jobs(admin.name)
+    // One more than the cap tells whether the queue has more; a store ignoring the options is cut here instead.
+    const failed = await store.failed(admin.name, FAILED_LIMIT + 1)
+    const all = store.jobs === undefined ? undefined : await store.jobs(admin.name, { failed: false, limit: LIVE_LIMIT + 1 })
     const failedIds = new Set(failed.map(job => job.id))
     const live = (all ?? []).filter(job => !failedIds.has(job.id))
     const now = Date.now()

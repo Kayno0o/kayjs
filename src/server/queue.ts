@@ -65,11 +65,12 @@ export interface JobStore {
   fail: (id: string, error: string, payload?: string, until?: number) => Maybe<boolean | void>
   // Removes the failed jobs of the queue whose time came before `before`, and resolves with how many went; a store without it has them listed with `failed` and removed one by one.
   purge?: ((queue: string, before: number) => Maybe<number>) | undefined
-  failed: (queue: string) => Maybe<StoredJob[]>
+  // The failed jobs of the queue, oldest first, `limit` of them at most when it is given.
+  failed: (queue: string, limit?: number) => Maybe<StoredJob[]>
   // Puts a failed job back to wait, due at `runAt` with its attempts given back, for a retry from the dev tool or a jobs page; resolves with whether it did: false for a job that is not failed, or whose key a live job holds since.
   revive?: ((id: string, runAt: number) => Maybe<boolean>) | undefined
-  // Every job of the queue, waiting or failed, which `remove` looks through for a payload; a store without it removes jobs by id alone.
-  jobs?: ((queue: string) => Maybe<StoredJob[]>) | undefined
+  // Every job of the queue, waiting or failed, which `remove` looks through for a payload; a store without it removes jobs by id alone. The dev tool and the jobs page pass `failed: false` for the live ones and a `limit`, so a long queue is never read whole.
+  jobs?: ((queue: string, options?: { limit?: number, failed?: boolean }) => Maybe<StoredJob[]>) | undefined
   // When the queue's next job may run, so a worker sleeps until then.
   nextRunAt: (queue: string) => Maybe<number | undefined>
   // True for the first caller naming this lock and slot, in any process: a schedule's run happens once.
@@ -319,11 +320,13 @@ export function sqliteJobs(path: string): JobStore {
     purge(queue, before) {
       return open(false)?.purge.run(queue, before).changes ?? 0
     },
-    failed(queue) {
-      return open(false)?.failed.all(queue).map(toJob) ?? []
+    failed(queue, limit) {
+      return open(false)?.failed.all(queue, limit ?? -1).map(toJob) ?? []
     },
-    jobs(queue) {
-      return open(false)?.all.all(queue).map(toJob) ?? []
+    jobs(queue, options) {
+      const failed = options?.failed === undefined ? null : Number(options.failed)
+
+      return open(false)?.all.all(queue, failed, failed, options?.limit ?? -1).map(toJob) ?? []
     },
     revive(id, runAt) {
       try {
@@ -404,9 +407,9 @@ function prepareJobs(db: Database) {
   const byId = db.query<StateRow, [string, string]>(`SELECT ${JOB_COLUMNS}, failed, held_until FROM kay_jobs WHERE queue = ? AND id = ?`)
   const fail = db.query('UPDATE kay_jobs SET failed = 1, held_until = NULL, error = ?, payload = coalesce(?, payload) WHERE id = ? AND (? IS NULL OR held_until = ?)')
   const purge = db.query('DELETE FROM kay_jobs WHERE queue = ? AND failed = 1 AND run_at < ?')
-  const failed = db.query<JobRow, [string]>(`SELECT ${JOB_COLUMNS} FROM kay_jobs WHERE queue = ? AND failed = 1 ORDER BY run_at`)
+  const failed = db.query<JobRow, [string, number]>(`SELECT ${JOB_COLUMNS} FROM kay_jobs WHERE queue = ? AND failed = 1 ORDER BY run_at LIMIT ?`)
   const revive = db.query('UPDATE kay_jobs SET failed = 0, attempts = 0, run_at = ?, held_until = NULL WHERE id = ? AND failed = 1')
-  const all = db.query<JobRow, [string]>(`SELECT ${JOB_COLUMNS} FROM kay_jobs WHERE queue = ? ORDER BY run_at`)
+  const all = db.query<JobRow, [string, number | null, number | null, number]>(`SELECT ${JOB_COLUMNS} FROM kay_jobs WHERE queue = ? AND (? IS NULL OR failed = ?) ORDER BY run_at LIMIT ?`)
   // A held job counts from when its hold ends, as it runs again then if its process died.
   const next = db.query<{ at: number | null }, [string]>('SELECT min(max(run_at, coalesce(held_until, 0))) AS at FROM kay_jobs WHERE queue = ? AND failed = 0')
   const lock = db.query('INSERT OR IGNORE INTO kay_locks (name, slot) VALUES (?, ?)')
@@ -502,11 +505,11 @@ export function memoryJobs(): JobStore {
 
       return purged.length
     },
-    failed(queue) {
-      return [...jobs.values()].filter(job => job.queue === queue && job.failed).map(stored)
+    failed(queue, limit) {
+      return [...jobs.values()].filter(job => job.queue === queue && job.failed).slice(0, limit).map(stored)
     },
-    jobs(queue) {
-      return [...jobs.values()].filter(job => job.queue === queue).map(stored)
+    jobs(queue, options) {
+      return [...jobs.values()].filter(job => job.queue === queue && (options?.failed === undefined || (job.failed === true) === options.failed)).slice(0, options?.limit).map(stored)
     },
     revive(id, runAt) {
       const job = jobs.get(id)
@@ -1043,6 +1046,8 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
     },
     remove: async id => queued.remove(id),
   })
+  // A queue renamed or removed while `kay dev` runs is gone from the tool once its module runs again.
+  onReload(() => forgetQueue(queued))
 
   return queued
 }

@@ -116,6 +116,26 @@ describe.each(kinds)('job store contract, $name', ({ name, open }) => {
       expect(new Set(results.filter(Boolean)).size).toBe(1)
     })
 
+    it('lists live and failed jobs apart, cut to a limit in the store\'s own query', async () => {
+      const store = await open()
+      const added = Array.from({ length: 5 }, () => job())
+
+      for (const one of added)
+        await store.add(one)
+
+      const claimed = REQUIRED(await claimFor(store))
+
+      await store.fail(claimed.id, 'boom')
+
+      expect(await store.jobs?.('q')).toHaveLength(5)
+      expect(await store.jobs?.('q', { limit: 2 })).toHaveLength(2)
+      expect(await store.jobs?.('q', { failed: false })).toHaveLength(4)
+      expect(await store.jobs?.('q', { failed: true })).toMatchObject([{ id: claimed.id }])
+      expect(await store.jobs?.('q', { failed: false, limit: 3 })).toHaveLength(3)
+      expect(await store.failed('q', 0)).toEqual([])
+      expect(await store.failed('q', 1)).toHaveLength(1)
+    })
+
     it('keeps a key apart per queue, and never matches a job without one', async () => {
       const store = await open()
 
