@@ -509,6 +509,8 @@ function openRooms(path: string, askedMs: number | undefined): RoomStore {
         }, 0)
       }, () => {
         // A watcher failing later leaves the interval the only read, so it goes back to the short one.
+        watcher = undefined
+
         if (reading) {
           slowed = false
           idle = 0

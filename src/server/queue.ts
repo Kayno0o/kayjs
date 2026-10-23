@@ -161,6 +161,9 @@ const DEFAULT_KEEP_FAILED = 30 * 24 * 60 * 60
 const PURGE_MS = 60 * 60 * 1000
 // How soon an idle queue looks again after a job, the first wait of its backoff.
 const POLL_MS = 1000
+// A store that fails marking a finished job is asked this many times, waiting a little longer between each, before the job is left to be taken again.
+const COMPLETE_TRIES = 3
+const COMPLETE_RETRY_MS = 100
 // The longest an idle queue waits between looks unless `idlePoll` says otherwise: a job another process enqueued waits this at worst.
 const IDLE_POLL_S = 10
 // The longest a worker waits between looks at a store that keeps failing.
@@ -817,13 +820,25 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
       stopping?.removeEventListener('abort', stop)
     }
 
-    // Outside the try above: a store that fails here ran the handler to its end, so the run is not a failed one, and retrying it would run the handler twice. The job stays claimed, and another run takes it once its hold lapses.
+    // Outside the try above: a store that fails here ran the handler to its end, so the run is not a failed one, and retrying it would run the handler twice. Past a few tries the job stays claimed and is taken again once its hold lapses, counting an attempt.
     if (succeeded) {
-      try {
-        await store().complete(job.id, held)
-      }
-      catch (error) {
-        kayLog('error', `a job of queue('${name}') ran, but its store could not mark it finished: it is taken again once its hold lapses`, error)
+      for (let attempt = 1; ; attempt++) {
+        try {
+          await store().complete(job.id, held)
+
+          break
+        }
+        catch (error) {
+          if (attempt < COMPLETE_TRIES) {
+            await Bun.sleep(COMPLETE_RETRY_MS * attempt)
+
+            continue
+          }
+
+          kayLog('error', `a job of queue('${name}') ran, but its store could not mark it finished: it is taken again once its hold lapses`, error)
+
+          break
+        }
       }
     }
 

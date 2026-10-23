@@ -111,6 +111,7 @@ describe('countWrites', () => {
     server
       .post('/ok', () => 'saved')
       .post('/forbidden', () => new Response(null, { status: 403 }))
+      .post('/code', () => ({ code: 403 }))
       .post('/limited', ({ status }) => status(429, 'slow down'))
       .post('/invalid', () => 'unreachable', { body: t.Object({ name: t.String() }) })
       .post('/broken', () => {
@@ -129,6 +130,14 @@ describe('countWrites', () => {
     expect((await handle('/broken')).status).toBe(500)
     await settled()
     expect(writes.count).toBe(2)
+  })
+
+  it('counts a write answering 200 with a body that has a code field', async () => {
+    const { writes, handle } = app()
+
+    expect((await handle('/code')).status).toBe(200)
+    await settled()
+    expect(writes.count).toBe(1)
   })
 
   it('does not count a request a guard or the validation refused', async () => {

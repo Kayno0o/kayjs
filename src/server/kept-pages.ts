@@ -1,5 +1,6 @@
 import type { Elysia } from 'elysia'
 import type { ServedPage } from './render'
+import { ElysiaCustomStatusResponse } from 'elysia'
 import { kayLog } from '../runtime/log'
 import { withPageToken } from '../runtime/uid.server'
 import { pathOf, statusOf } from './log'
@@ -19,9 +20,7 @@ const REFUSED = new Set([400, 401, 403, 405, 413, 415, 422, 429])
 
 // The status of an answer: a `status()` a handler returned carries its code, which `set` only gets once the response is made.
 function answeredWith(responseValue: unknown, set: { status?: unknown }): number {
-  const code = typeof responseValue === 'object' && responseValue !== null && 'code' in responseValue ? responseValue.code : undefined
-
-  return typeof code === 'number' ? code : statusOf(responseValue, set)
+  return responseValue instanceof ElysiaCustomStatusResponse && typeof responseValue.code === 'number' ? responseValue.code : statusOf(responseValue, set)
 }
 
 // A path without its trailing slashes, found by a scan rather than a pattern, as a hostile path may be mostly slashes.
