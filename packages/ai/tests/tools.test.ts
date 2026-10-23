@@ -1,4 +1,4 @@
-import type { Asked, Piece, ProviderMessage } from '../src'
+import type { Asked, Piece, ProviderMessage, ProviderRequest } from '../src'
 import type { Offered } from '../src/loop'
 import type { Outcome, Tools } from './helpers/tools'
 import { join } from 'node:path'
@@ -348,7 +348,7 @@ describe('a visitor leaving mid-loop', () => {
           yield { text: 'x'.repeat(40) }
       },
     }
-    const base = { messages: [{ role: 'user' as const, content: 'y'.repeat(400) }], system: undefined, model: 'silent', maxTokens: 10, temperature: undefined, timeouts: { connect: '5000s', idle: '5000s' } }
+    const base: ProviderRequest = { messages: [{ role: 'user', content: 'y'.repeat(400) }], system: undefined, model: 'silent', maxTokens: 10, temperature: undefined, timeouts: { connect: '5000s', idle: '5000s' } }
     const usages: object[] = []
 
     for await (const piece of converse(silent, base, offered(async () => ({ content: [{ type: 'text', text: 'ok' }] })), 5, request, new AbortController().signal)) {
