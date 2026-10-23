@@ -541,14 +541,28 @@ function opensScope(node: t.Node): boolean {
   return isFunction(node) || node.type === 'BlockStatement' || node.type === 'CatchClause' || node.type === 'ForStatement' || node.type === 'ForInStatement' || node.type === 'ForOfStatement' || node.type === 'SwitchStatement' || node.type === 'StaticBlock'
 }
 
+// Whether a binding pattern pulls names out of an object, behind a default (`{ headers } = {}`) or inside an array pattern (`[{ url }]`).
+function pullsFromObject(node: t.Node | null): boolean {
+  if (!node)
+    return false
+
+  if (node.type === 'AssignmentPattern')
+    return pullsFromObject(node.left)
+
+  if (node.type === 'RestElement')
+    return pullsFromObject(node.argument)
+
+  return node.type === 'ArrayPattern' ? node.elements.some(pullsFromObject) : node.type === 'ObjectPattern'
+}
+
 // The names a function's parameters or a catch clause's parameter bind, each with whether an object pattern pulls it out.
 function boundNames(node: t.Node): [string, boolean][] {
   if (node.type === 'CatchClause' && node.param)
-    return patternNames(node.param).map((name): [string, boolean] => [name, node.param!.type === 'ObjectPattern'])
+    return patternNames(node.param).map((name): [string, boolean] => [name, pullsFromObject(node.param!)])
 
   const patterns = isFunction(node) ? node.params : []
 
-  return patterns.flatMap(pattern => patternNames(pattern).map((name): [string, boolean] => [name, pattern.type === 'ObjectPattern']))
+  return patterns.flatMap(pattern => patternNames(pattern).map((name): [string, boolean] => [name, pullsFromObject(pattern)]))
 }
 
 function declareIn(node: t.Node, scope: Scope, scopes: Map<t.Node, Scope>): void {
@@ -581,7 +595,7 @@ function declareIn(node: t.Node, scope: Scope, scopes: Map<t.Node, Scope>): void
       for (const name of patternNames(inner.id)) {
         target.unknown.add(name)
 
-        if (inner.id.type === 'ObjectPattern')
+        if (pullsFromObject(inner.id))
           target.destructured.add(name)
       }
     }
