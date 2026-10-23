@@ -213,6 +213,7 @@ function writtenMessages(source: string): WrittenMessage[] {
 
   const drafts = new Map((ast.comments ?? []).filter((comment): comment is t.CommentLine => comment.type === 'CommentLine' && DRAFT.test(comment.value)).map(comment => [comment.loc!.start.line, comment]))
   const found: WrittenMessage[] = []
+  const walked = new Set<t.ObjectProperty>()
   const walk = (node: t.ObjectExpression, prefix: string) => {
     for (const property of propertiesOf(node, bindings)) {
       if (property.type !== 'ObjectProperty')
@@ -234,11 +235,13 @@ function writtenMessages(source: string): WrittenMessage[] {
       }
 
       if (value.type === 'StringLiteral' || value.type === 'TemplateLiteral' || group) {
-        const line = property.loc!.start.line
-
-        // A const group spread or named twice is walked twice.
-        if (found.some(message => message.key === key && message.line === line))
+        // A const group named by two paths is one literal, edited once: only the first path lists its messages.
+        if (walked.has(property))
           continue
+
+        walked.add(property)
+
+        const line = property.loc!.start.line
 
         found.push({ key, line, draft: drafts.get(line) })
       }

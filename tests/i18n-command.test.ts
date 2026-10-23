@@ -122,6 +122,17 @@ describe('draft messages', () => {
     }
   })
 
+  it('treat a const group named by two paths as one literal: listed at the first path, written once', async () => {
+    const form = 'const table = {\n  a: \'A\',\n  b: \'B\', // draft\n}\nexport default { ui: { table }, other: { table } }'
+
+    expect(draftMessages(`${form}\n`)).toEqual([{ key: 'ui.table.b', line: 3 }])
+
+    const root = await project({ 'src/messages/fr.ts': `${form}\n` })
+
+    expect(await writeDraftMessages(root, { i18n }, 'fr', { 'ui.table.c': 'C', 'other.table.c': 'C' })).toEqual(['ui.table.c'])
+    expect((await Bun.file(join(root, 'src/messages/fr.ts')).text()).match(/c:/g)).toHaveLength(1)
+  })
+
   it('create the locale\'s file when it is missing, and the default export of an empty one', async () => {
     const root = await project({ 'src/messages/fr.ts': messages('{}') })
 

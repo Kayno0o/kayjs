@@ -4390,6 +4390,23 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports a const group named by two paths once, at the first, and renames it once', async () => {
+    const form = 'const table = { filterLabel: "a" }\nexport default { ui: { table }, cms: { table } }'
+    const root = await scratchProject({ 'src/routes/index.kay': 'p hi\n', 'src/messages/fr.ts': `${form}\n`, 'kay.config.ts': 'export default { i18n: { locales: [\'fr\'], defaultLocale: \'fr\' } }\n' })
+
+    try {
+      const { output } = await runCheck(root)
+
+      expect(output).toContain('`ui.table.filterLabel` is')
+      expect(output).not.toContain('`cms.table.filterLabel`')
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/messages/fr.ts')).text()).toBe(`${form.replace('filterLabel', 'filter')}\n`)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports but does not fix a shorthand key, and reads no reassigned let or multi-argument call', async () => {
     const cases: [string, number, boolean][] = [
       ['const filterLabel = "x"\nexport default { ui: { table: { filterLabel } } }', 1, false],
