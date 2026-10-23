@@ -704,7 +704,7 @@ Each tool runs its command in a child process, so a call costs what the command 
 
 `kay start` leaves out its warnings about a stale build, `kay render` its status line and `kay routes` the note about the routes the server adds when it starts.
 
-`--dry-run` lists what the command would write and writes nothing. `kay check --dry-run` counts the fixes `--fix` would apply, `kay fmt --dry-run` lists the files it would format and exits 0, and so do `kay new`, `kay add`, `kay generate`, `kay migrate`, `kay i18n accept`, `kay not-found --redirect` and `kay upgrade`.
+`--dry-run` lists what the command would write and writes nothing. `kay check --dry-run` counts the fixes `--fix` would apply, `kay fmt --dry-run` lists the files it would format and exits 0, and so do `kay new`, `kay add`, `kay generate`, `kay migrate`, `kay i18n accept`, `kay not-found --redirect`, `kay a11y` and `kay upgrade`.
 
 `kay fmt` refuses `--check` and `--dry-run` together. `kay fmt --check` stays the verify-only form: it fails when a file is not formatted.
 
