@@ -1,7 +1,7 @@
 import process from 'node:process'
 import { $, Glob } from 'bun'
 import { brokenLinks } from './links'
-import { ARCHIVES, INDEX, MAX_PAGE_BYTES, oversizedPages, releasePages, WHATS_NEW } from './whats-new'
+import { ARCHIVES, INDEX, LINKING, MAX_PAGE_BYTES, oversizedPages, releasePages, WHATS_NEW } from './whats-new'
 import { ZED_MANIFEST, zedReleasable, zedRelease } from './zed-release'
 
 // `bun scripts/version.ts patch|minor|major`: kay and every library under packages/ move to one version, committed as `v<version>` and tagged, as `bun pm version` does for one package.
@@ -44,8 +44,9 @@ if (missing.length > 0)
   throw new Error(`${missing.join(', ')}: no version or no peer on kay to move`)
 
 // What the release adds goes under its version, where the release notes read it, and the pages an agent reads whole stay short: their oldest releases move to the archive beside them. Computed first, so a link the move or the trim leaves dangling stops the release before it changes anything.
-const pageTexts = new Map(await Promise.all([...new Set([INDEX, ...WHATS_NEW, ...ARCHIVES.flat()])].map(async path => [path, await Bun.file(path).text()] as const)))
-const pages = releasePages(path => pageTexts.get(path)!, version)
+const linking = (await Promise.all(LINKING.map(async pattern => Array.fromAsync(new Glob(pattern).scan('.'))))).flat()
+const pageTexts = new Map(await Promise.all([...new Set([INDEX, ...WHATS_NEW, ...ARCHIVES.flat(), ...linking])].map(async path => [path, await Bun.file(path).text()] as const)))
+const pages = await releasePages(path => pageTexts.get(path)!, version, linking)
 const dangling = await brokenLinks(pages)
 
 if (dangling.length > 0)
@@ -66,7 +67,7 @@ try {
   await Bun.write(ZED_MANIFEST, zedRelease(zed, version))
   // bun.lock records each workspace's version and ranges, which the CI's frozen install compares against.
   await $`${process.execPath} install`.quiet()
-  await $`git add bun.lock ${manifests} ${ZED_MANIFEST} ${INDEX} ${ARCHIVES.flat()}`
+  await $`git add bun.lock ${manifests} ${ZED_MANIFEST} ${[...pages.keys()]}`
   await $`git commit -q -m ${tag}`
   await $`git tag ${tag}`
 }

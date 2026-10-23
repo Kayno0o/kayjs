@@ -51,7 +51,25 @@ describe('the release\'s link check', () => {
     const paths = [INDEX, ...ARCHIVES.flat()]
     const texts = new Map<string, string>(await Promise.all(paths.map(async path => [path, await read(path)] as const)))
 
-    expect(await brokenLinks(releasePages(path => texts.get(path)!, '9.9.9'))).toEqual([])
+    expect(await brokenLinks(await releasePages(path => texts.get(path)!, '9.9.9'))).toEqual([])
+  })
+
+  it('follows a link to an upgrade section the release moves to the archive, in any page that links it', async () => {
+    const paths = [INDEX, ...ARCHIVES.flat()]
+    const texts = new Map<string, string>(await Promise.all(paths.map(async path => [path, await read(path)] as const)))
+
+    // 1.71.0 moves to the archive as the page is over its limit, so the links at its section must follow it.
+    texts.set('llms/upgrading.md', `# Upgrading\n\n## 1.72.0\n\n### Big\n\n${'x'.repeat(21_000)}\n\n## 1.71.0\n\n### Moved thing\n\n- c\n\nReleases before 1.71 are in [Old](upgrading-archive.md).\n`)
+    texts.set('llms/upgrading-archive.md', '# Old\n\nWhat each release before 1.71 added.\n\n## 1.70.0\n\n- z\n')
+    texts.set('llms/islands.md', `# Islands\n\nSee [Moved](upgrading.md#moved-thing) and [Kept](upgrading.md#big).\n`)
+    texts.set('docs/src/content/docs/guides/x.md', 'See [Moved](/guides/upgrading#moved-thing).\n')
+    const linking = ['llms/islands.md', 'docs/src/content/docs/guides/x.md']
+    const pages = await releasePages(path => texts.get(path)!, '9.9.9', linking)
+
+    expect(pages.get('llms/upgrading.md')).not.toContain('Moved thing')
+    expect(pages.get('llms/islands.md')).toBe('# Islands\n\nSee [Moved](upgrading-archive.md) and [Kept](upgrading.md#big).\n')
+    expect(pages.get('docs/src/content/docs/guides/x.md')).toBe('See [Moved](/guides/upgrading-archive).\n')
+    expect(await brokenLinks(pages)).not.toContain('llms/islands.md: /llms/upgrading#moved-thing')
   })
 
   it('writes llms.txt with the release each archive now starts before', async () => {
@@ -61,7 +79,7 @@ describe('the release\'s link check', () => {
     // A page over its limit with an archive of its own, so a release moves 1.2.0 and 1.1.0 into the archive whatever the real pages hold.
     texts.set('llms/whats-new.md', `# New\n\n## Unreleased\n\n${'- aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n'.repeat(70)}\n## 1.2.0\n\n- b\n\n## 1.1.0\n\n- c\n\nReleases before 1.1 are in [Old](whats-new-archive.md).\n`)
     texts.set('llms/whats-new-archive.md', '# Old\n\nWhat each release before 1.1 added.\n\n## 1.0.0\n\n- z\n')
-    const pages = releasePages(path => texts.get(path)!, '9.9.9')
+    const pages = await releasePages(path => texts.get(path)!, '9.9.9')
     const before = (text: string) => (/before \d+\.\d+(?:\.\d+)?/).exec(text)![0]
     const line = (text: string, archive: string) => text.split('\n').find(line => line.includes(`(${archive})`))!
 

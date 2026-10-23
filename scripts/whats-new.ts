@@ -22,7 +22,7 @@ const CAP_DUE = 22_000
 const ARCHIVE_LIMIT = 24_000
 
 // The files whose links to a moved anchor follow it, by glob from the repo root.
-const LINKING = ['llms/*.md', 'llms.txt', 'packages/*/llms.txt', 'packages/*/llms/*.md', 'docs/src/content/docs/**/*.md']
+export const LINKING = ['llms/*.md', 'llms.txt', 'packages/*/llms.txt', 'packages/*/llms/*.md', 'docs/src/content/docs/**/*.md']
 
 const SECTION = /^(?=## )/m
 const BEFORE = /before \d+\.\d+(?:\.\d+)?/
@@ -214,8 +214,8 @@ export function oversizedPages(pages: Map<string, string>): string[] {
   return [...pages].filter(([path, text]) => path.startsWith('llms/') && Buffer.byteLength(text) > MAX_PAGE_BYTES).map(([path]) => path)
 }
 
-// The text of every page a release rewrites, by path: the unreleased section named after `version`, then the oldest releases moved to each archive, each archive trimmed and the index's line for it moved to the release it now starts before. Pure, so a release can check the result before it writes any of it.
-export function releasePages(read: (path: string) => string, version: string): Map<string, string> {
+// The text of every page a release rewrites, by path: the unreleased section named after `version`, then the oldest releases moved to each archive, each archive trimmed and the index's line for it moved to the release it now starts before. Every page of `linking` that links an anchor the move or the cut takes to an archive follows it, as `--cap` does, and is part of the result. Pure, so a release can check the result before it writes any of it.
+export async function releasePages(read: (path: string) => string, version: string, linking: readonly string[] = []): Promise<Map<string, string>> {
   const pages = new Map<string, string>()
   let index = read(INDEX)
 
@@ -225,7 +225,8 @@ export function releasePages(read: (path: string) => string, version: string): M
   for (const [page, archive] of ARCHIVES) {
     const limit = WHATS_NEW.includes(page) ? WHATS_NEW_LIMIT : PAGE_LIMIT
     const whatsNew = WHATS_NEW.includes(page)
-    const moved = archiveOldest(pages.get(page) ?? read(page), whatsNew ? stampUnreleased(read(archive), version) : read(archive), limit)
+    const before = pages.get(page) ?? read(page)
+    const moved = archiveOldest(before, whatsNew ? stampUnreleased(read(archive), version) : read(archive), limit)
     const capped = whatsNew ? capNewest(moved.page, moved.archive) : capNewest(moved.page, moved.archive, UPGRADING_CAP, '### ')
     const newest = whatsNew ? newestRelease(capped.page) : undefined
 
@@ -235,6 +236,19 @@ export function releasePages(read: (path: string) => string, version: string): M
     pages.set(page, capped.page)
     pages.set(archive, trimArchive(capped.archive))
     index = indexArchive(index, archive, trimArchive(capped.archive))
+
+    const texts = new Map(linking.map(path => [path, pages.get(path) ?? read(path)] as const))
+
+    texts.set(page, capped.page)
+    texts.set(archive, pages.get(archive)!)
+    texts.set(INDEX, index)
+
+    for (const [path, text] of await relinkMoved(texts, page, before, capped.page, archive)) {
+      if (path === INDEX)
+        index = text
+      else
+        pages.set(path, text)
+    }
   }
 
   pages.set(INDEX, index)

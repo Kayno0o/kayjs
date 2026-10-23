@@ -106,12 +106,12 @@ describe('what\'s new', () => {
     expect(archiveOldest(moved.page, moved.archive, 10)).toEqual(moved)
   })
 
-  it('lets a release whose own section outgrows the page limit through, moving every older one away, and names a page still over the hard limit', () => {
+  it('lets a release whose own section outgrows the page limit through, moving every older one away, and names a page still over the hard limit', async () => {
     const big = `- ${'x'.repeat(21_000)}`
     const page = `# New\n\nIntro.\n\n## 1.70.0\n\n${big}\n\n## 1.69.0\n\n- b\n\nReleases before 1.69 are in [Old](old.md).\n`
     const archive = '# Old\n\nWhat each release before 1.69 added.\n\n## 1.68.0\n\n- z\n'
     const files: Record<string, string> = { 'llms.txt': '- [Old](old.md): before 1.69\n', 'llms/whats-new.md': '# W\n', 'llms/whats-new-archive.md': '# WA\n', 'llms/upgrading.md': page, 'llms/upgrading-archive.md': archive }
-    const pages = releasePages(path => files[path]!, '1.70.0')
+    const pages = await releasePages(path => files[path]!, '1.70.0')
 
     expect(pages.get('llms/upgrading.md')).toBe(`# New\n\nIntro.\n\n## 1.70.0\n\n${big}\n\nReleases before 1.70 are in [Old](old.md).\n`)
     expect(pages.get('llms/upgrading-archive.md')).toContain('## 1.69.0\n\n- b')
@@ -153,7 +153,7 @@ describe('what\'s new', () => {
     expect(capUnreleased(page.replace('Unreleased', '1.70.0'), archive, 10)).toEqual({ page: page.replace('Unreleased', '1.70.0'), archive })
   })
 
-  it('names the continued section after the release, which then opens the notes whole, and a cut of the release joins it', () => {
+  it('names the continued section after the release, which then opens the notes whole, and a cut of the release joins it', async () => {
     const [a, b, c] = ['a', 'b', 'c'].map(letter => letter.repeat(60))
     const page = `# W\n\n## Unreleased\n\n- ${a}\n- ${b}\n\nThe rest of this release is in [Old](whats-new-archive.md).\n\nReleases before 1.69 are in [Old](whats-new-archive.md).\n`
     const archive = '# WA\n\nWhat each release before 1.69 added.\n\n## Unreleased (continued)\n\n- c\n\n## 1.68.0\n\n- z\n'
@@ -164,7 +164,7 @@ describe('what\'s new', () => {
       'llms/upgrading.md': '# U\n',
       'llms/upgrading-archive.md': '# UA\n\nWhat each release before 1.69 added.\n',
     }
-    const pages = releasePages(path => files[path]!, '1.70.0')
+    const pages = await releasePages(path => files[path]!, '1.70.0')
 
     expect(stampUnreleased(archive, '1.70.0')).toContain('## 1.70.0 (continued)\n\n- c')
     expect(pages.get('llms/whats-new.md')).toStartWith('# W\n\n## 1.70.0\n\n')
@@ -261,7 +261,7 @@ describe('what\'s new', () => {
     expect(capped.archive).not.toContain('not a bullet')
   })
 
-  it('refuses a release whose newest What\'s new section cannot be cut under its cap', () => {
+  it('refuses a release whose newest What\'s new section cannot be cut under its cap', async () => {
     const files: Record<string, string> = {
       'llms.txt': '- [Old](llms/whats-new-archive.md): before 1.69\n- [Up](llms/upgrading-archive.md): before 1.69\n',
       'llms/whats-new.md': `# W\n\n## Unreleased\n\n- ${'x'.repeat(NEWEST_CAP + 1)}\n\nReleases before 1.69 are in [Old](whats-new-archive.md).\n`,
@@ -270,11 +270,11 @@ describe('what\'s new', () => {
       'llms/upgrading-archive.md': '# UA\n\nWhat each release before 1.69 added.\n',
     }
 
-    expect(() => releasePages(path => files[path]!, '1.70.0')).toThrow('stays over its')
-    expect(() => releasePages(path => files[path]!.replace('Releases before 1.69 are in [Old](whats-new-archive.md).\n', ''), '1.70.0')).toThrow('stays over its')
+    await expect(releasePages(path => files[path]!, '1.70.0')).rejects.toThrow('stays over its')
+    await expect(releasePages(path => files[path]!.replace('Releases before 1.69 are in [Old](whats-new-archive.md).\n', ''), '1.70.0')).rejects.toThrow('stays over its')
   })
 
-  it('keeps What\'s new far enough under the hard limit for a batch of Unreleased lines whatever the newest release weighs', () => {
+  it('keeps What\'s new far enough under the hard limit for a batch of Unreleased lines whatever the newest release weighs', async () => {
     const bullets = (count: number) => Array.from({ length: count }, (_, index) => `- ${index} ${'x'.repeat(300)}\n`).join('')
     const files: Record<string, string> = {
       'llms.txt': '- [Old](llms/whats-new-archive.md): before 1.69\n- [Up](llms/upgrading-archive.md): before 1.69\n',
@@ -283,7 +283,7 @@ describe('what\'s new', () => {
       'llms/upgrading.md': '# U\n',
       'llms/upgrading-archive.md': '# UA\n\nWhat each release before 1.69 added.\n',
     }
-    const page = releasePages(path => files[path]!, '1.70.0').get('llms/whats-new.md')!
+    const page = (await releasePages(path => files[path]!, '1.70.0')).get('llms/whats-new.md')!
 
     expect(Buffer.byteLength(page)).toBeLessThan(NEWEST_CAP + 1000)
     expect(MAX_PAGE_BYTES - Buffer.byteLength(page)).toBeGreaterThan(10_000)
