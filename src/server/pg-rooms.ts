@@ -72,15 +72,24 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
   let closed = false
 
   // Runs work once the ones queued before it did, in the order they were made, and gives its result, or its error, to the caller: a state is read and changed after the members written before it.
-  const ordered = async <T>(work: (db: SQL) => Promise<T>): Promise<T> => {
+  // A caller waiting for the result gets it within one limit however many writes are queued before: `covering` has the limit run from the call, and the work given up on is cancelled as it starts. A write nobody awaits has its own limit once its turn comes.
+  const ordered = async <T>(work: (db: SQL) => Promise<T>, covering = false): Promise<T> => {
     const prior = tail
-    const run = (async () => {
-      await prior
+    const run = covering
+      ? limited('the rooms store', async () => {
+        await prior
 
-      return limited('the rooms store', async () => work(await pg.db()))
-    })()
+        return work(await pg.db())
+      })
+      : (async () => {
+        await prior
+
+        return limited('the rooms store', async () => work(await pg.db()))
+      })()
 
     tail = (async () => {
+      await prior
+
       try {
         await run
       }
@@ -367,7 +376,7 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
       })
     },
     async state(room) {
-      const [row] = await ordered(async db => query<{ state: string }>(db, 'SELECT state FROM kay_room_state WHERE room = $1', [escaped(room)]))
+      const [row] = await ordered(async db => query<{ state: string }>(db, 'SELECT state FROM kay_room_state WHERE room = $1', [escaped(room)]), true)
 
       return row?.state
     },
@@ -383,7 +392,7 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
         await query(tx, `INSERT INTO kay_room_state (room, state) SELECT $1, $2 WHERE EXISTS (SELECT 1 FROM kay_room_members m JOIN kay_room_processes p ON p.process = m.process WHERE m.room = $1 AND p.seen > ${NOW} - ${EXPIRY}) ON CONFLICT (room) DO UPDATE SET state = excluded.state`, [escaped(room), next])
 
         return next
-      }))
+      }), true)
     },
     members(room) {
       watch(room)

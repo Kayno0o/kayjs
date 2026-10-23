@@ -1,5 +1,5 @@
 import { kayLog } from '../runtime/log'
-import { timeLimited } from './pg-poll'
+import { timeLimited, TimeoutError } from './pg-poll'
 
 // How long a call of a store may take: inside the default shutdown timeout of 10 seconds, so a database that stopped answering fails a request, a worker's claim or a schedule's lock before it holds up a stop.
 export const STORE_TIMEOUT_MS = 8_000
@@ -7,21 +7,24 @@ export const STORE_TIMEOUT_MS = 8_000
 // How long the first call may take to find or create the tables, past the two minutes a replica waits for an index another one builds.
 export const READY_TIMEOUT_MS = 150_000
 
+// How long maintenance may take, a sweep, a purge or a listing that scans a table: as long as the first call, as a table can be large.
+export const MAINTENANCE_TIMEOUT_MS = READY_TIMEOUT_MS
+
 // Runs one store call under the time limit, a call given up on being logged before its error goes on to the caller.
 export async function limited<Result>(what: string, work: () => Promise<Result>, ms = STORE_TIMEOUT_MS): Promise<Result> {
   try {
     return await timeLimited(work, ms, what)
   }
   catch (error) {
-    if ((error as { timedOut?: boolean }).timedOut === true)
+    if (error instanceof TimeoutError)
       kayLog('error', `${what} was given up on; the database stopped answering`, error)
 
     throw error
   }
 }
 
-// Puts the listed async methods of a store under the time limit, in place. `ready` is awaited first under its own, longer limit: the first call creates the tables, which may take a while.
-export function limitedStore<Store extends object>(store: Store, what: string, methods: readonly (keyof Store & string)[], ready?: () => Promise<unknown>): Store {
+// Puts the listed async methods of a store under the time limit, in place. `ready` is awaited first under its own, longer limit: the first call creates the tables, which may take a while. The `slow` methods scan a table and have the maintenance limit.
+export function limitedStore<Store extends object>(store: Store, what: string, methods: readonly (keyof Store & string)[], ready?: () => Promise<unknown>, slow: readonly (keyof Store & string)[] = []): Store {
   let found = false
 
   for (const name of methods) {
@@ -33,7 +36,7 @@ export function limitedStore<Store extends object>(store: Store, what: string, m
         found = true
       }
 
-      return limited(`${what} ${name}`, async () => method.apply(store, args))
+      return limited(`${what} ${name}`, async () => method.apply(store, args), slow.includes(name) ? MAINTENANCE_TIMEOUT_MS : STORE_TIMEOUT_MS)
     }) as Store[typeof name]
   }
 

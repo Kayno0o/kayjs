@@ -12,6 +12,9 @@ export const DB_TIMEOUT_MS = 30_000
 // Ids this far behind the last one read are read again, as a transaction that began earlier may commit its event after a later one.
 export const OVERLAP = 100
 
+// What a call given up on by `timeLimited` fails with.
+export class TimeoutError extends Error {}
+
 // Gives up on `work` after `ms`, cancelling the statements it started that are still in flight so they free their connection; what else it does keeps running, its result ignored.
 export async function timeLimited<Result>(work: () => Promise<Result>, ms: number, what: string): Promise<Result> {
   const run = { statements: new Set<{ cancel: () => void }>(), over: false }
@@ -28,7 +31,7 @@ export async function timeLimited<Result>(work: () => Promise<Result>, ms: numbe
         for (const statement of run.statements)
           statement.cancel()
 
-        reject(Object.assign(new Error(`${what} took more than ${ms / 1000} seconds`), { timedOut: true }))
+        reject(new TimeoutError(`${what} took more than ${ms / 1000} seconds`))
       }, ms)
       timer.unref()
     })])

@@ -1,11 +1,16 @@
 import type { PgHandle } from '../src/server/pg-data'
 import { SQL } from 'bun'
 import { describe, expect, it } from 'bun:test'
+import { stringify } from 'devalue'
+import { Elysia } from 'elysia'
 import { logSink, setLogSink } from '../src/runtime/log'
+import { queue as makeQueue } from '../src/server'
 import { pgCache } from '../src/server/pg-cache'
-import { pgJobs } from '../src/server/pg-jobs'
+import { connectionOf, pgJobs } from '../src/server/pg-jobs'
 import { STORE_TIMEOUT_MS } from '../src/server/pg-limit'
+import { pgRooms } from '../src/server/pg-rooms'
 import { pgNotifications, pgRates, pgSessions } from '../src/server/pg-stores'
+import { forgetQueue } from '../src/server/queue'
 import { cleanUpAfterFile, freshPg, pgIt, postgres } from './job-stores'
 
 cleanUpAfterFile()
@@ -92,4 +97,83 @@ describe('the Postgres job store when its session is killed', () => {
 
     expect(claimed?.id).toBe('one')
   }, STORE_TIMEOUT_MS + 15_000)
+})
+describe('the rooms store under a database that does not answer', () => {
+  it('fails a state read within one limit however many writes are queued before it', async () => {
+    const store = pgRooms(silent)
+    const lines = await collecting(async () => {
+      for (let message = 0; message < 3; message++)
+        store.publish('hall', 'hi', {})
+
+      const started = performance.now()
+
+      await expect(store.state!('hall')).rejects.toThrow('took more than')
+      expect(performance.now() - started).toBeLessThan(STORE_TIMEOUT_MS + 2000)
+    })
+
+    expect(lines.some(line => line.includes('was given up on'))).toBe(true)
+  }, STORE_TIMEOUT_MS + 5000)
+})
+
+describe('the connections kay opens from a URL', () => {
+  it('time out connecting, close when idle and are replaced after a while', () => {
+    const { options } = connectionOf('postgres://kay@127.0.0.1:1/kay') as unknown as { options: Record<string, number> }
+
+    expect(options).toMatchObject({ connectionTimeout: 10_000, idleTimeout: 60_000, maxLifetime: 1_800_000 })
+  })
+})
+
+async function until(ready: () => boolean | Promise<boolean>, ms: number): Promise<void> {
+  for (let waited = 0; !await ready(); waited += 50) {
+    if (waited > ms)
+      throw new Error('timed out')
+
+    await Bun.sleep(50)
+  }
+}
+
+describe('a queue worker on Postgres when its session is killed', () => {
+  pgIt('logs the timeout, backs off and runs the next job', async () => {
+    await freshPg()
+
+    const { url } = await postgres()
+    const client = new SQL(url, { max: 2 })
+    const locker = new SQL(url, { max: 1 })
+    const admin = new SQL(url, { max: 1 })
+    const ran: string[] = []
+    const jobs = makeQueue<string>('limits-worker', (payload) => {
+      ran.push(payload)
+    }, { store: pgJobs(client) })
+
+    // Stored before the queue exists, so no worker has claimed it yet.
+    await pgJobs(admin).add({ id: 'one', queue: 'limits-worker', payload: stringify('first'), attempts: 0, runAt: 0 })
+
+    const holder = await locker.reserve()
+
+    await holder.unsafe('BEGIN')
+    await holder.unsafe('LOCK TABLE kay_jobs IN ACCESS EXCLUSIVE MODE')
+
+    let app: Elysia | undefined
+    const started = performance.now()
+    const lines = await collecting(async () => {
+      // The worker's claim waits behind the lock, and the server kills its session meanwhile.
+      app = new Elysia().use(jobs).listen(0)
+
+      // The worker's purge of failed jobs waits behind the lock first and is given up on, then its claim waits.
+      await until(async () => ((await admin.unsafe(`SELECT 1 FROM pg_stat_activity WHERE query LIKE 'UPDATE kay_jobs%' AND state = 'active'`)) as unknown[]).length > 0, STORE_TIMEOUT_MS + 5000)
+      await admin.unsafe(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE query LIKE 'UPDATE kay_jobs%' AND state = 'active' AND pid != pg_backend_pid()`)
+      await until(() => ran.length > 0 || performance.now() - started > STORE_TIMEOUT_MS + 3000, STORE_TIMEOUT_MS + 5000)
+
+      // The database answers again: the worker has backed off and now claims the job.
+      await holder.unsafe('ROLLBACK')
+      await until(() => ran.length > 0, 15_000)
+    })
+
+    await app?.stop()
+    forgetQueue(jobs)
+    await holder.release()
+    expect(ran).toEqual(['first'])
+    expect(lines.some(line => line.includes('was given up on'))).toBe(true)
+    expect(lines.some(line => line.includes('could not read its store'))).toBe(true)
+  }, STORE_TIMEOUT_MS * 3 + 30_000)
 })

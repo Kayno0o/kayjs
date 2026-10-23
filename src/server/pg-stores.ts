@@ -7,7 +7,8 @@ import { parse, stringify } from 'devalue'
 import { durationSeconds, legacyMs } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { rowsOf } from './pg-jobs'
-import { limited, limitedStore } from './pg-limit'
+import { limited, limitedStore, MAINTENANCE_TIMEOUT_MS } from './pg-limit'
+import { TimeoutError } from './pg-poll'
 import { NOW, query } from './pg-sql'
 import { onReload } from './reload'
 import { matchesSession } from './session'
@@ -35,10 +36,11 @@ export function pgSessions(pg: PgHandle): SessionStore & { deleteWhere: NonNulla
 
   const sweepLogged = async () => {
     try {
-      await limited('sweeping the sessions', sweep)
+      await limited('sweeping the sessions', sweep, MAINTENANCE_TIMEOUT_MS)
     }
     catch (error) {
-      kayLog('error', 'dropping the expired sessions failed; trying again in an hour', error)
+      if (!(error instanceof TimeoutError))
+        kayLog('error', 'dropping the expired sessions failed; trying again in an hour', error)
     }
   }
 
@@ -100,7 +102,7 @@ export function pgSessions(pg: PgHandle): SessionStore & { deleteWhere: NonNulla
         }
       }
     },
-  }, 'the sessions store', ['get', 'set', 'delete', 'deleteWhere'], pg.db)
+  }, 'the sessions store', ['get', 'set', 'delete', 'deleteWhere'], pg.db, ['deleteWhere'])
 }
 
 // Rate windows in Postgres, shared by every replica; a key is stored pseudonymised, by the app's secret or else by a random key every replica reads from the database.
@@ -195,10 +197,11 @@ export function pgNotifications(pg: PgHandle): NotificationStore {
 
   const sweep = async () => {
     try {
-      await limited('sweeping the notifications', async () => counted('DELETE FROM kay_notifications WHERE expires <= $1::bigint', [Date.now()]))
+      await limited('sweeping the notifications', async () => counted('DELETE FROM kay_notifications WHERE expires <= $1::bigint', [Date.now()]), MAINTENANCE_TIMEOUT_MS)
     }
     catch (error) {
-      kayLog('error', 'dropping the expired notifications failed; trying again in an hour', error)
+      if (!(error instanceof TimeoutError))
+        kayLog('error', 'dropping the expired notifications failed; trying again in an hour', error)
     }
   }
 
@@ -254,5 +257,5 @@ export function pgNotifications(pg: PgHandle): NotificationStore {
     async prune(now) {
       return counted('DELETE FROM kay_notifications WHERE expires <= $1::bigint', [now])
     },
-  }, 'the notifications store', ['add', 'list', 'unread', 'markRead', 'markAllRead', 'erase', 'prune'], pg.db)
+  }, 'the notifications store', ['add', 'list', 'unread', 'markRead', 'markAllRead', 'erase', 'prune'], pg.db, ['prune'])
 }
