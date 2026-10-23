@@ -2,11 +2,12 @@
 import { wording } from 'kay/words'
 
 // What the confirmation and unsubscribe links answer. `part` `title` is the page's title alone; `ask` is the unsubscribe page, a form posting to `action`.
-const { part = 'body', kind, action } = props<{ part?: 'title' | 'body', kind: 'confirmed' | 'invalid' | 'expired' | 'ask' | 'unsubscribed', action?: string | undefined }>()
+const { part = 'body', kind, action } = props<{ part?: 'title' | 'body', kind: 'confirmed' | 'invalid' | 'expired' | 'later' | 'ask' | 'unsubscribed', action?: string | undefined }>()
 const titles = {
   confirmed: wording('mail.list.page.confirmedTitle', 'Subscription confirmed'),
   invalid: wording('mail.list.page.invalidTitle', 'This link does not work'),
   expired: wording('mail.list.page.invalidTitle', 'This link does not work'),
+  later: wording('mail.list.page.laterTitle', 'This link cannot be served yet'),
   ask: wording('mail.list.page.askTitle', 'Unsubscribe'),
   unsubscribed: wording('mail.list.page.unsubscribedTitle', 'You are unsubscribed'),
 }
@@ -14,6 +15,7 @@ const texts = {
   confirmed: wording('mail.list.page.confirmed', 'Thank you, your address is now subscribed.'),
   invalid: wording('mail.list.page.invalid', 'This link is not valid, or was already used. If you want to subscribe, use the form again.'),
   expired: wording('mail.list.page.invalid', 'This link is not valid, or was already used. If you want to subscribe, use the form again.'),
+  later: wording('mail.list.page.later', 'This link is valid, but the site cannot act on it right now. Please try again later.'),
   ask: wording('mail.list.page.ask', 'Do you want to stop receiving these mails?'),
   unsubscribed: wording('mail.list.page.unsubscribed', 'You will not receive these mails any more.'),
 }

@@ -152,7 +152,8 @@ function personalise(message: StoredMessage, subscriber: Subscriber, list: strin
   }
 }
 
-export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 'activate'>) {
+// `defaultPath` is the file a link of an undeclared list falls back to, which a test names as the default file is skipped under `bun test`.
+export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 'activate'>, defaultPath?: string) {
   // The queues are made after the lists, which they run: the mailer hands them over with `connect`.
   let queues: Pick<ListHost, 'enqueueMail' | 'enqueueRun' | 'activate'> | undefined
   const host: ListHost = {
@@ -176,7 +177,11 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
   }
 
   // The default file once it exists, whichever list this process declared: a link in a mail outlives the code that declared its list.
-  const defaultFile = (): Lists | undefined => process.env.NODE_ENV !== 'test' && (files.has(LIST_FILE) || existsSync(LIST_FILE)) ? open(LIST_FILE) : undefined
+  const defaultFile = (): Lists | undefined => {
+    const fallbackFile = defaultPath ?? (process.env.NODE_ENV === 'test' ? undefined : LIST_FILE)
+
+    return fallbackFile !== undefined && (files.has(fallbackFile) || existsSync(fallbackFile)) ? open(fallbackFile) : undefined
+  }
   const storeOf = (name: string): Lists | undefined => entries.get(name)?.lists ?? defaultFile()
 
   const make = (name: string, options: ListOptions): Entry => {
@@ -427,7 +432,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
 
       return { valid: true, locale: checked.claims.locale }
     },
-    page: async (kind: 'confirmed' | 'invalid' | 'expired' | 'ask' | 'unsubscribed', locale: string | undefined, action?: string, status = 200): Promise<Response> => {
+    page: async (kind: 'confirmed' | 'invalid' | 'expired' | 'later' | 'ask' | 'unsubscribed', locale: string | undefined, action?: string, status = 200): Promise<Response> => {
       const page = await view<(props: { part?: 'title' | 'body', kind: typeof kind, action?: string | undefined }) => JSX.Element>('page')
       const [title, body] = await Promise.all([renderToString(page, { part: 'title', kind }, locale === undefined ? undefined : { locale }), renderToString(page, { kind, action }, locale === undefined ? undefined : { locale })])
       const lang = locale ?? await renderLocale()
@@ -453,7 +458,7 @@ export function mountListRoutes(plugin: Elysia, handle: () => ListsHandle): void
   plugin.get(`${LIST_PATH}/confirm`, async ({ query }) => {
     const result = handle().confirm(token(query))
 
-    return result.kind === 'unavailable' ? handle().page('invalid', result.locale, undefined, 503) : handle().page(result.kind, result.locale)
+    return result.kind === 'unavailable' ? handle().page('later', result.locale, undefined, 503) : handle().page(result.kind, result.locale)
   })
   plugin.get(`${LIST_PATH}/unsubscribe`, async ({ query }) => {
     const checked = checkToken('unsubscribe', token(query))
@@ -464,6 +469,6 @@ export function mountListRoutes(plugin: Elysia, handle: () => ListsHandle): void
   plugin.post(`${LIST_PATH}/unsubscribe`, async ({ query }) => {
     const result = handle().unsubscribe(token(query))
 
-    return handle().page(result.valid ? 'unsubscribed' : 'invalid', result.locale, undefined, result.unavailable ? 503 : 200)
+    return handle().page(result.valid ? 'unsubscribed' : result.unavailable ? 'later' : 'invalid', result.locale, undefined, result.unavailable ? 503 : 200)
   }, { parse: 'none' })
 }

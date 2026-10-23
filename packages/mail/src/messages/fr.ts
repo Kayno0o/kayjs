@@ -55,6 +55,8 @@ export default defineMessages({
         confirmed: 'Merci, votre adresse est maintenant abonnée.',
         invalidTitle: 'Ce lien ne fonctionne pas',
         invalid: 'Ce lien n\'est pas valable, ou a déjà servi. Pour vous abonner, utilisez de nouveau le formulaire.',
+        laterTitle: 'Ce lien ne peut pas être traité pour le moment',
+        later: 'Ce lien est valable, mais le site ne peut pas encore y donner suite. Merci de réessayer plus tard.',
         askTitle: 'Se désabonner',
         ask: 'Voulez-vous ne plus recevoir ces mails ?',
         askButton: 'Me désabonner',

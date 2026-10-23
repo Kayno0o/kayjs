@@ -1,8 +1,11 @@
 import type { Action } from 'kay'
 import process from 'node:process'
+import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
-import { testSite } from 'kay/test'
+import { scratchDir, testSite } from 'kay/test'
+import { createLists } from '../src/list'
 import { normalizeAddress } from '../src/list-address'
+import { openLists } from '../src/list-store'
 import { checkToken, signToken } from '../src/list-token'
 import { outbox } from '../src/outbox'
 
@@ -304,7 +307,11 @@ describe('unsubscribing', () => {
 
     expect(response.status).toBe(503)
     expect(response.headers.get('retry-after')).toBe('60')
-    expect(await response.text()).not.toContain('unsubscribed')
+    const body = await response.text()
+
+    expect(body).not.toContain('unsubscribed')
+    expect(body).not.toContain('does not work')
+    expect(body).toContain('try again later')
   })
 
   it('does not unsubscribe on a GET, which a mail scanner makes, and asks first', async () => {
@@ -414,5 +421,46 @@ describe('list names', () => {
   it('gives the same list for the same name', () => {
     expect(mail.list('news')).toBe(mail.list('news'))
     expect(mail.list()).toBe(mail.list('default'))
+  })
+})
+
+describe('a link of a list this process does not declare', () => {
+  const host = { configured: () => true, render: async () => ({}) as never, deliver: async () => undefined }
+
+  it('says to come back later in the link\'s locale, with the retry hint', async () => {
+    const lists = createLists(host)
+    const token = signToken('unsubscribe', { list: 'declared-elsewhere', id: 'someone', locale: 'fr' })
+    const result = lists.unsubscribe(token)
+
+    expect(result).toMatchObject({ valid: false, unavailable: true, locale: 'fr' })
+
+    const response = await lists.page('later', 'fr', undefined, 503)
+    const body = await response.text()
+
+    expect(response.status).toBe(503)
+    expect(response.headers.get('retry-after')).toBe('60')
+    expect(body).toContain('ne peut pas être traité pour le moment')
+    expect(body).not.toContain('ne fonctionne pas')
+    expect(await (await lists.page('later', 'en', undefined, 503)).text()).toContain('try again later')
+  })
+
+  it('confirms and unsubscribes through the default file when it exists', async () => {
+    const file = join(await scratchDir('list-'), 'default.sqlite')
+    const store = openLists(file)
+    const first = store.ask('elsewhere', 'a@example.com', 'first', 'en')
+    const second = store.ask('elsewhere', 'b@example.com', 'second', 'en')
+
+    store.confirm('elsewhere', second.id)
+    store.close()
+
+    const lists = createLists(host, file)
+
+    expect(lists.confirm(signToken('confirm', { list: 'elsewhere', id: first.id, locale: 'en' }))).toMatchObject({ kind: 'confirmed' })
+    expect(lists.unsubscribe(signToken('unsubscribe', { list: 'elsewhere', id: second.id, locale: 'en' }))).toMatchObject({ valid: true })
+
+    const check = openLists(file)
+
+    expect(check.subscribers('elsewhere').map(row => row.email)).toEqual(['a@example.com'])
+    check.close()
   })
 })

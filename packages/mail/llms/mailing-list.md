@@ -47,5 +47,5 @@ await mail.list().status(id) // { done, sent, failed, retrying, unsure, waiting 
 
 - `mail.list(name = 'default', options)` is made on its first call and the same after; a name is letters, digits, dashes and underscores, 40 at most. Several lists share a file, `file` names another.
 - `options`: `file`, `pace`, `view` (the confirmation mail's `.kay` component, given `{ url, site }`), `protection`, `honeypot`.
-- The routes `GET /_kay/mail/list/confirm`, `GET` and `POST /_kay/mail/list/unsubscribe` (query `token`) are served by the mailer, at the site's origin, whatever the `base`; the pages are worded in the subscriber's language (`mail.list.*` messages, English and French shipped) and sent `no-store`.
+- The routes `GET /_kay/mail/list/confirm`, `GET` and `POST /_kay/mail/list/unsubscribe` (query `token`) are served by the mailer, at the site's origin, whatever the `base`; the pages are worded in the subscriber's language (`mail.list.*` messages, English and French shipped) and sent `no-store`. A valid link whose list has no store in this process yet answers 503 with `retry-after: 60` and a "try again later" page (`mail.list.page.later`), never as done or as broken.
 - Tables: `kay_mail_subscribers`, `kay_mail_broadcasts`, `kay_mail_deliveries`. Replicas on several machines need the file shared; Postgres is not supported yet.
