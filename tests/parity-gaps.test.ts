@@ -109,6 +109,13 @@ describe('safeUrl', () => {
 
     expect(safeUrl('title', 'javascript:x')).toBe('javascript:x')
   })
+
+  it('lets an SVG data URL through only where it is drawn as an image', () => {
+    for (const name of ['src', 'SRC', 'poster'])
+      expect(safeUrl(name, 'data:image/svg+xml,<svg/>')).toBe('data:image/svg+xml,<svg/>')
+
+    expect(safeUrl('action', 'data:image/svg+xml;base64,AAA')).toBe('unsafe:data:image/svg+xml;base64,AAA')
+  })
 })
 
 describe('a script holding JSON', () => {
