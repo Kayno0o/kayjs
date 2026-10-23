@@ -171,6 +171,8 @@ export interface LibraryUpload {
   at: number | undefined
   // The entries mentioning it.
   usedIn: EntryRef[]
+  // Whether a kept revision or a trashed entry mentions it, undefined when they could not be read.
+  held: boolean | undefined
   // Whether the unused-uploads rules let it be deleted: no entry, revision or trashed entry mentions it and it is over a day old.
   deletable: boolean
 }
@@ -238,6 +240,7 @@ export async function libraryUploads(options: { page?: number | undefined, q?: s
       by: record?.by,
       at: record?.at ?? file.modified?.getTime(),
       usedIn,
+      held: read.held?.has(idOf(file.key)!),
       deletable: usedIn.length === 0 && read.held !== undefined && !read.held.has(idOf(file.key)!) && file.modified !== undefined && now - file.modified.getTime() >= GRACE,
     }
   }))

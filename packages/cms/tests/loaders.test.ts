@@ -5,7 +5,7 @@ import { SQL } from 'bun'
 import { Database } from 'bun:sqlite'
 import { afterAll, describe, expect, test } from 'bun:test'
 import { s } from 'kay'
-import { collection } from 'kay/content'
+import { collection, ContentChanged } from 'kay/content'
 import { scratchDir } from 'kay/test'
 import { pgLoader } from '../src/loaders/pg'
 import { sqliteLoader } from '../src/loaders/sqlite'
@@ -99,6 +99,26 @@ function contract(label: string, make: (options: { name: string, seed?: SeedEntr
       unserializable.self = unserializable
       await expect(loader.saveMany!([{ slug: 'a', data: { title: 'half', order: 9 } }, { slug: 'b', data: unserializable }])).rejects.toThrow()
       expect((await loader.get!('a', { preview: false }))!.data).toEqual({ title: 'A', order: 2 })
+    })
+
+    test2('writes only the field an entry expects, over a save of another process, and refuses and writes nothing when it no longer holds the number', async () => {
+      const mine = make({ name: 'posts', table: 'swap', seed })
+      const other = make({ name: 'posts', table: 'swap' })
+      const swap = [{ slug: 'a', data: { title: 'A', order: 2 }, expect: { field: 'order', was: 1 } }, { slug: 'b', data: { title: 'B', order: 1 }, expect: { field: 'order', was: 2 } }]
+
+      await mine.load({ preview: false })
+      // Another process saves a neighbour's title between the move's read and write.
+      await other.save!({ slug: 'a', data: { title: 'A edited', order: 1 }, body: 'edited body' })
+      await mine.saveMany!(swap)
+      expect(await mine.get!('a', { preview: false })).toEqual({ slug: 'a', data: { title: 'A edited', order: 2 }, body: 'edited body' })
+      expect((await mine.get!('b', { preview: false }))!.data).toEqual({ title: 'B', order: 1 })
+
+      // Another process moved them already: nothing of this move is written.
+      await expect(mine.saveMany!(swap)).rejects.toBeInstanceOf(ContentChanged)
+      expect((await mine.get!('a', { preview: false }))!.data).toEqual({ title: 'A edited', order: 2 })
+      await other.remove!({ slug: 'b' })
+      await expect(mine.saveMany!([{ slug: 'a', data: { title: 'A', order: 1 }, expect: { field: 'order', was: 2 } }, { slug: 'b', data: { title: 'B', order: 2 }, expect: { field: 'order', was: 1 } }])).rejects.toBeInstanceOf(ContentChanged)
+      expect((await mine.get!('a', { preview: false }))!.data).toEqual({ title: 'A edited', order: 2 })
     })
 
     test2('refuses a table that is not a plain identifier', () => {

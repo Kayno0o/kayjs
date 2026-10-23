@@ -43,6 +43,10 @@ let infoCalls: unknown[]
 let failing = false
 // Runs once, right after the next whole-group read of a collection, as another editor's save would.
 let afterGroupRead: (() => Promise<void>) | undefined
+// Set when the loader finds an entry of a batch no longer holding the order it was read at.
+let orderChanged = false
+// What the batches a loaded collection was handed whole expected of their entries.
+let expected: unknown[]
 // Whether the loader keeps what it is handed, as a database would.
 let keeping = false
 
@@ -95,6 +99,11 @@ const content: typeof Content = {
   },
   saveEntries: async (_collection, entries) => {
     batches.push(entries.length)
+    expected.push(...entries.map(entry => (entry as { expect?: unknown }).expect))
+
+    if (orderChanged)
+      return { changed: true }
+
     loaded.push(...entries)
 
     if (keeping) {
@@ -141,6 +150,8 @@ beforeEach(() => {
   loaded = []
   removed = []
   batches = []
+  expected = []
+  orderChanged = false
   infoCalls = []
   failing = false
   afterGroupRead = undefined
@@ -654,6 +665,17 @@ describe('moveEntry', () => {
     expect(await moveEntry({ collection: 'catalog', slug: 'c' }, 'up')).toHaveProperty('saved', true)
     expect(await neighbour).toHaveProperty('saved', true)
     expect((stored.catalog.find(row => row.slug === 'b')!.data as { title: string }).title).toBe('b edited')
+  })
+
+  test('hands a loaded collection each entry with the order it was read at, and refuses the move when the loader finds one changed', async () => {
+    stored.catalog = [place('catalog', 'a', 1), place('catalog', 'b', 2), place('catalog', 'c', 3)]
+
+    expect(await moveEntry({ collection: 'catalog', slug: 'b' }, 'up')).toHaveProperty('saved', true)
+    expect(expected).toEqual([{ field: 'order', was: 2 }, { field: 'order', was: 1 }])
+
+    orderChanged = true
+    expect(await moveEntry({ collection: 'catalog', slug: 'b' }, 'up')).toHaveProperty('issues.0.message', 'This entry was changed since you opened it, by another editor or by the app')
+    expect(loaded).toHaveLength(2)
   })
 
   test('writes a folder entry from the file as it is when the move reaches it, with the version read before it', async () => {

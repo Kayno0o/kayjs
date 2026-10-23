@@ -3,7 +3,7 @@ import type { LoaderOptions, Row, SavedEntry } from './shared'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { Database } from 'bun:sqlite'
-import { existsError, loadedOf, placeOf, scopeOf, seededKey, seedEntries, siblingName, tableOf, watcher } from './shared'
+import { existsError, loadedOf, placeOf, scopeOf, seededKey, seedEntries, siblingName, swappedData, tableOf, watcher } from './shared'
 
 export type { LoaderOptions, SeedEntry } from './shared'
 
@@ -79,6 +79,15 @@ export function sqliteLoader(options: SqliteLoaderOptions): ContentLoader {
 
   const upsert = (db: Database, entry: SavedEntry, create: boolean) => {
     const place = placeOf(entry)
+
+    if (entry.expect !== undefined) {
+      const stored = db.query<{ data: string }, [string, string]>(`SELECT data FROM ${table} WHERE collection = ? AND place = ?`).get(name, place)
+
+      db.query(`UPDATE ${table} SET data = ? WHERE collection = ? AND place = ?`).run(swappedData(name, stored?.data, { ...entry, expect: entry.expect }), name, place)
+
+      return
+    }
+
     const conflict = create ? 'DO NOTHING' : 'DO UPDATE SET data = excluded.data, body = excluded.body'
     const { changes } = db.query(`INSERT INTO ${table} (collection, place, data, body) VALUES (?, ?, ?, ?) ON CONFLICT (collection, place) ${conflict}`).run(name, place, JSON.stringify(entry.data), entry.body ?? null)
 
@@ -116,10 +125,11 @@ export function sqliteLoader(options: SqliteLoaderOptions): ContentLoader {
     saveMany: async (entries) => {
       const db = await database()
 
+      // Immediate, so the read of a swapped entry and its write see no commit between them.
       db.transaction(() => {
         for (const entry of entries)
           upsert(db, entry, false)
-      })()
+      }).immediate()
       await watching.settle()
     },
     remove: async (entry) => {

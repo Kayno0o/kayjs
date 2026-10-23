@@ -68,7 +68,7 @@ What is refreshed before the hook runs, with nothing to call:
 - `seed` is a list of `{ slug, locale?, data, body? }`, or a function returning one (processes starting together may each run it, one writing the result). It is written once per collection, when the table holds no seed marker for it, never again, so an entry an editor deleted stays deleted and a changed seed does not overwrite the editors' work. A collection with no `seed` starts empty.
 - `data` is stored as JSON, as `save` hands it: a date is its ISO text. In a localized collection an entry's place is `<locale>/<slug>`.
 - A save with `create: true` throws `<name>: <place> exists already` when the entry exists, so two editors creating one slug never overwrite each other.
-- A reorder, or any save of several entries, goes through `saveMany`: one transaction, so a failure leaves every entry as it was. `saveEntries(name, entries)` from `kay/content` is the call; a loader without `saveMany` gets the entries one `save` at a time.
+- A reorder, or any save of several entries, goes through `saveMany`: one transaction, so a failure leaves every entry as it was. `saveEntries(name, entries)` from `kay/content` is the call; a loader without `saveMany` gets the entries one `save` at a time. A reorder of the shipped loaders writes only each entry's order field, and only if it still holds the number the editor read, so a save or a move of another process in between refuses the reorder ("changed since you opened it") and is never undone; `expect` in [Loaders](../../../llms/content-cms.md) is how a loader of your own does the same.
 
 ### Other processes and edits made outside the CMS
 

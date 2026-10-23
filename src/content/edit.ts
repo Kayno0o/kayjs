@@ -18,7 +18,7 @@ import { kayLog } from '../runtime/log'
 import { html } from '../runtime/rendered'
 import { isDraft } from './drafts'
 import { entryPath } from './entry-route'
-import { contentKey } from './key'
+import { ContentChanged, contentKey } from './key'
 import { collectionFolder, contentPlace, entryFiles, entrySlug, markdownOf, parseEntry, slugOf, sourcePath, STAMP_SETTLED_MS, translationKey, writableFolder } from './load'
 import { compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
 import { migrateData } from './migrate'
@@ -167,7 +167,7 @@ export interface SourceEntry {
 }
 
 // An entry as an editor wrote it, which `entrySource` and `saveEntry` take.
-export type WrittenEntry = Omit<DraftEntry, 'collection'>
+export type WrittenEntry = Omit<DraftEntry, 'collection'> & { expect?: { field: string, was: number | undefined } | undefined }
 
 // The file a folder entry is read from or written to: its path relative to the project root, absolute and relative to the repository root; `absolute` is the server's, never for the editor's browser.
 export interface EntryPath {
@@ -837,7 +837,8 @@ export async function saveEntry(name: string, entry: WrittenEntry, options: { cr
 }
 
 // Hands several entries of a loaded collection to its loader's `saveMany` as one all-or-nothing write, a loader without it getting them one `save` at a time; or resolves the issues of the first entry the collection refuses, saving none.
-export async function saveEntries(name: string, written: WrittenEntry[]): Promise<{ issues?: DraftIssue[] }> {
+// An entry with `expect` is written as a compare-and-swap of that field (see `saveMany`), and `changed` answers that one no longer held the number it was read at, nothing written.
+export async function saveEntries(name: string, written: WrittenEntry[]): Promise<{ issues?: DraftIssue[], changed?: true }> {
   const collection = collectionNamed(name)
   const { loader } = collection
 
@@ -879,6 +880,12 @@ export async function saveEntries(name: string, written: WrittenEntry[]): Promis
       else {
         await saveMany(checked)
       }
+    }
+    catch (error) {
+      if (error instanceof ContentChanged)
+        return { changed: true }
+
+      throw error
     }
     finally {
       loading.delete(name)

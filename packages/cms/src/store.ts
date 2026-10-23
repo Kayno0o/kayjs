@@ -535,7 +535,7 @@ async function movePlan(ref: EntryRef, direction: 'up' | 'down', field: string):
 }
 
 // Moves an entry one place up or down in its collection's order, among the entries of its locale, by saving the `order` field of the one or the few entries that change: a loaded collection's as one write, a folder's file by file, stopping at the first that is refused.
-// A folder's file is written from the entry read after the version it commits against, so a save of a neighbour made meanwhile refuses the move, never undone; a loaded collection's group is read and written inside one turn, which keeps every save of this process, while a save of another process landing inside that read-to-write window is undone: the loader keeps no version to compare.
+// A folder's file is written from the entry read after the version it commits against, so a save of a neighbour made meanwhile refuses the move, never undone; a loaded collection's group is read and written inside one turn, which keeps every save of this process, and the loader writes only each entry's order field if it still holds the number it was read at (`expect`), so a save or a move of another process in between refuses the move and is never undone, with a loader that offers it.
 export async function moveEntry(ref: EntryRef, direction: 'up' | 'down', author?: Identity): Promise<SaveOutcome> {
   const collection = await collectionNamed(ref.collection)
   const field = collection.orderField
@@ -555,10 +555,13 @@ export async function moveEntry(ref: EntryRef, direction: 'up' | 'down', author?
       const written = changes.map((change) => {
         const entry = group.find(each => each.slug === change.slug)!
 
-        return { slug: entry.slug, locale: entry.locale, data: { ...entry.data, [field]: change.value }, body: entry.body }
+        return { slug: entry.slug, locale: entry.locale, data: { ...entry.data, [field]: change.value }, body: entry.body, expect: { field, was: orderValue(entry, field) } }
       })
 
-      const { issues } = await saveLoadedMany(collection.name, written)
+      const { issues, changed } = await saveLoadedMany(collection.name, written)
+
+      if (changed)
+        return refused(ref, wording('cms.store.changed', 'This entry was changed since you opened it, by another editor or by the app'))
 
       return issues !== undefined && issues.length > 0 ? { issues } : { saved: true, moved: written }
     })

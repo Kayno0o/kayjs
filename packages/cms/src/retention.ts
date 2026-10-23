@@ -7,8 +7,11 @@ import { placeOf, pruneRevisions } from './revisions'
 import { settings } from './settings'
 import { isRow, purge } from './trash'
 
-// How often a server drops what its trash, revisions and activity may no longer keep.
+// How often a server drops what its trash, revisions and activity may no longer keep, and how long after it starts the first sweep waits, so it is not on the boot path.
 const SWEEP_EVERY = 60 * 60 * 1000
+const FIRST_SWEEP = 5 * 60 * 1000
+// Every this many sweeps reads every history row, to find a revision left out of an index; the others read only the indexes of the entries.
+const FULL_EVERY = 24
 // What a forgotten editor's name is replaced by.
 const FORGOTTEN = 'Former editor'
 
@@ -26,8 +29,17 @@ async function loadedNames(): Promise<string[]> {
   return (await collections({ counts: false })).filter(collection => collection.kind === 'loaded').map(collection => collection.name)
 }
 
+// The places of the entries that can hold revisions: those the collection holds and those in its trash.
+async function revisionPlaces(name: string): Promise<string[]> {
+  const trash = hiddenOf(name, 'trash')
+  const trashed = trash === undefined ? [] : (await trash.load({ preview: true })).filter(row => isRow(row.data)).map(row => placeOf(row.data as EntryRef))
+
+  return [...new Set([...(await entries(name)).map(placeOf), ...trashed])]
+}
+
 // Drops what the trash and the history may no longer keep: the trash past `history.trash`, the revisions and activity past `history.maxAge`. Never throws.
-export async function sweepHistory(): Promise<void> {
+// `full` reads every history row, which finds a revision left out of its index; without it only the indexes of the entries the collection and its trash hold are read.
+export async function sweepHistory({ full = true }: { full?: boolean } = {}): Promise<void> {
   const history = settings().history
 
   if (history === undefined)
@@ -40,7 +52,7 @@ export async function sweepHistory(): Promise<void> {
       await purge(name)
 
       if (cutoff !== undefined) {
-        await pruneRevisions(name, cutoff)
+        await pruneRevisions(name, cutoff, full ? undefined : await revisionPlaces(name))
         await pruneActivity(name, cutoff)
       }
     }
@@ -50,15 +62,20 @@ export async function sweepHistory(): Promise<void> {
   }
 }
 
-let sweeping: ReturnType<typeof setInterval> | undefined
+let sweeping: ReturnType<typeof setTimeout> | undefined
 
-// Sweeps now and every hour from then on, on a timer that does not keep the process alive, so what expired goes whether or not anyone opens the trash.
+// Sweeps a few minutes after the server starts and every hour from then on, on timers that do not keep the process alive, so what expired goes whether or not anyone opens the trash.
 export function startSweeping(): void {
   if (sweeping !== undefined)
     return
 
-  void sweepHistory()
-  sweeping = setInterval(() => void sweepHistory(), SWEEP_EVERY)
+  let sweeps = 0
+  const sweep = () => void sweepHistory({ full: sweeps++ % FULL_EVERY === 0 })
+
+  sweeping = setTimeout(() => {
+    sweep()
+    setInterval(sweep, SWEEP_EVERY).unref()
+  }, FIRST_SWEEP)
   sweeping.unref()
 }
 

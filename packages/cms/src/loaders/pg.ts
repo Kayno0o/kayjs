@@ -1,7 +1,7 @@
 import type { ContentLoader } from 'kay/content'
 import type { LoaderOptions, Row, SavedEntry } from './shared'
 import { SQL } from 'bun'
-import { existsError, loadedOf, placeOf, scopeOf, seededKey, seedEntries, siblingName, tableOf, watcher } from './shared'
+import { existsError, loadedOf, placeOf, scopeOf, seededKey, seedEntries, siblingName, swappedData, tableOf, watcher } from './shared'
 
 export type { LoaderOptions, SeedEntry } from './shared'
 
@@ -96,6 +96,15 @@ export function pgLoader(options: PgLoaderOptions): ContentLoader {
 
   const upsert = async (run: Runner, entry: SavedEntry, create: boolean) => {
     const place = placeOf(entry)
+
+    if (entry.expect !== undefined) {
+      const [stored] = await run.unsafe<{ data: string }[]>(`SELECT data::text AS data FROM ${table} WHERE collection = $1 AND place = $2 FOR UPDATE`, [name, place])
+
+      await run.unsafe(`UPDATE ${table} SET data = $3::text::jsonb WHERE collection = $1 AND place = $2`, [name, place, swappedData(name, stored?.data, { ...entry, expect: entry.expect })])
+
+      return
+    }
+
     const conflict = create ? 'DO NOTHING' : 'DO UPDATE SET data = excluded.data, body = excluded.body'
     const written = await run.unsafe<unknown[]>(`INSERT INTO ${table} (collection, place, data, body) VALUES ($1, $2, $3::text::jsonb, $4) ON CONFLICT (collection, place) ${conflict} RETURNING place`, [name, place, JSON.stringify(entry.data), entry.body ?? null])
 
@@ -133,7 +142,8 @@ export function pgLoader(options: PgLoaderOptions): ContentLoader {
       const sql = await database()
 
       await sql.begin(async (tx) => {
-        for (const entry of entries)
+        // In one order, so two moves locking the same rows cannot wait for each other.
+        for (const entry of entries.toSorted((a, b) => placeOf(a) < placeOf(b) ? -1 : 1))
           await upsert(tx, entry, false)
       })
       await watching.settle()

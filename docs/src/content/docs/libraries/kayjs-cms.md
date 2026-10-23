@@ -434,7 +434,9 @@ In a site with two locales or more, an entry's screen lists its locales. A local
 
 Under a text still equal to the default locale's, or empty while the default has one, the field says so. The Translations screen at `<prefix>/translations` lists, per collection, the entries missing a locale and the texts not translated yet. A field with a `format`, or wrapped in `untranslated()`, is never asked for.
 
-Every upload goes to one folder shared by all collections, named by the hash of its file, so sending the same file twice stores it once. The media library at `<prefix>/media` lists them with a preview, the size, who sent it and the entries using it, and lets you rename one (the name shown there, never the file's address) or delete one nothing uses. It shows 48 uploads a page and has a search box for the name.
+Every upload goes to one folder shared by all collections, named by the hash of its file, so sending the same file twice stores it once. The media library at `<prefix>/media` lists them with a preview, the size, who sent it and the entries using it, and lets you rename one (the name shown there, never the file's address) or delete one nothing uses.
+
+An upload a kept version or a deleted entry in the trash still mentions is marked as kept by them in the library, and cannot be deleted. It shows 48 uploads a page and has a search box for the name.
 
 Uploads an older release kept in a folder per collection move over by themselves when the server starts: each one an entry names is copied into the shared folder, and the entries naming it are saved pointing at the copy, through the same saver as any edit (one commit per entry on Forgejo). Nothing changes in the app, though under `kay dev` the first start rewrites the content files that name an older upload.
 
@@ -524,7 +526,7 @@ export const news = collection({
 
 kayjs-cms calls them through `saveEntry` and `removeEntry` from `kay/content`, after checking the entry against the schema. Never call those two, nor `saveEntries`, from inside `save`, `saveMany` or `remove` of the same collection, as they wait for each other.
 
-A loader may also give `saveMany(entries)`, which writes the entries of one action together, all or none, such as the two a reorder swaps. Without it they go to `save` one at a time. [A live site with a database](#a-live-site-with-a-database) needs none of this written.
+A loader may also give `saveMany(entries)`, which writes the entries of one action together, all or none, such as the two a reorder swaps. Without it they go to `save` one at a time. The loaders kayjs-cms ships write only the order field in a reorder, and refuse it if another editor's save or move changed that field since, so two editors reordering one collection never undo each other. [A live site with a database](#a-live-site-with-a-database) needs none of this written.
 
 ## A live site with a database
 
@@ -573,7 +575,7 @@ A collection kept by `sqliteLoader` or `pgLoader` remembers what editors save. E
 
 You declare nothing for this. The versions sit in the same table as the entries, out of sight of your pages, lists and searches. The collection's list has a Trash button too: an entry you delete is kept there for 30 days, and Restore writes it back under its slug (a draft, for a role that may not publish). A restore is refused if someone saved the entry after you opened it, and a role that may not publish restores without publishing or unpublishing the entry.
 
-`cms({ history: { revisions: 100, trash: '7d' } })` keeps more or fewer saves, or the trash for another time (`trash: false` keeps none), and `cms({ history: false })` turns it off. The server drops the trash and the old versions by itself every hour, and `maxAge` (a year by default, `false` for no limit) says how old a version or an activity event may get.
+`cms({ history: { revisions: 100, trash: '7d' } })` keeps more or fewer saves, or the trash for another time (`trash: false` keeps none), and `cms({ history: false })` turns it off. The server drops the trash and the old versions by itself every hour, the first time a few minutes after it starts, and `maxAge` (a year by default, `false` for no limit) says how old a version or an activity event may get.
 
 To leave one collection out, give it `history: false` in `collections`: `cms({ collections: { notes: { history: false } } })` keeps no revisions and no trash for it.
 

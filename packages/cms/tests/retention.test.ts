@@ -5,7 +5,7 @@ import { registerCollections } from '../../../src/content/edit'
 import { activityOf } from '../src/activity'
 import { hiddenOf } from '../src/hidden'
 import { sqliteLoader } from '../src/loaders/sqlite'
-import { eraseHistory, forgetEditor, sweepHistory } from '../src/retention'
+import { eraseHistory, forgetEditor, startSweeping, sweepHistory } from '../src/retention'
 import { revisionsOf } from '../src/revisions'
 import { configure } from '../src/settings'
 import { deleteEntry, saveEntry } from '../src/store'
@@ -82,6 +82,37 @@ describe('sweepHistory', () => {
     await sweepHistory()
 
     expect((await history.load({ preview: true })).some(row => row.slug.endsWith('\u00011000'))).toBe(false)
+  })
+
+  test('reads only the indexes of the entries it holds on a light sweep, so a revision left out of an index waits for the full one', async () => {
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
+    await saveEntry({ ...ref, data: { title: 'Two' } })
+
+    const history = hiddenOf('notes', 'history', { anyway: true })!
+    const place = (await history.load({ preview: true })).find(row => !row.slug.includes('\u0001'))!.slug
+
+    await history.save!({ slug: `${place}\u00011000`, data: { verb: 'update', title: 'Lost' } })
+    setSystemTime(new Date(Date.now() + 400 * DAY))
+    await saveEntry({ ...ref, data: { title: 'Three' } })
+
+    await sweepHistory({ full: false })
+    expect((await revisionsOf(ref)).map(revision => revision.data.title)).toEqual(['Three'])
+    expect((await history.load({ preview: true })).some(row => row.slug.endsWith('\u00011000'))).toBe(true)
+    await sweepHistory()
+    expect((await history.load({ preview: true })).some(row => row.slug.endsWith('\u00011000'))).toBe(false)
+  })
+
+  test('sweeps the revisions of an entry in the trash on a light sweep too', async () => {
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
+    await saveEntry({ ...ref, data: { title: 'Two' } })
+    await saveEntry({ ...ref, data: { title: 'Three' } })
+    await deleteEntry(ref, ada)
+    configure({ history: { trash: '800d' } })
+    setSystemTime(new Date(Date.now() + 400 * DAY))
+    await sweepHistory({ full: false })
+
+    expect(await rowCount('trash')).toBe(1)
+    expect((await revisionsOf(ref)).map(revision => revision.data.title)).toEqual(['Three'])
   })
 
   test('keeps everything when maxAge is false', async () => {
@@ -168,5 +199,17 @@ describe('forgetEditor', () => {
 
       expect((row!.data as { author: string }).author).toBe('Ada')
     }
+  })
+})
+
+describe('startSweeping', () => {
+  test('leaves the first sweep for later, so it is not on the boot path', async () => {
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
+    await deleteEntry(ref, ada)
+    setSystemTime(new Date(Date.now() + 31 * DAY))
+    startSweeping()
+    await Bun.sleep(30)
+
+    expect(await rowCount('trash')).toBe(1)
   })
 })

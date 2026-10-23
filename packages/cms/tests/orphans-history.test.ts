@@ -72,7 +72,7 @@ test('keeps an upload that only a trashed entry mentions, until the trash lets i
 
   const library = await libraryUploads()
 
-  expect('uploads' in library && library.uploads.find(upload => upload.key === key)?.deletable).toBe(false)
+  expect('uploads' in library && library.uploads.find(upload => upload.key === key)).toMatchObject({ deletable: false, held: true })
 
   const [item] = await trashOf('notes')
 
@@ -102,7 +102,7 @@ test('an unreadable history blocks the cleanup and makes the library delete noth
 
   const before = await libraryUploads()
 
-  expect('uploads' in before && before.uploads.some(upload => upload.deletable)).toBe(true)
+  expect('uploads' in before && before.uploads.some(upload => upload.deletable && upload.held === false)).toBe(true)
 
   const spy = spyOn(hidden, 'hiddenOf').mockImplementation(() => ({ name: 'x', load: async () => {
     throw new Error('down')
@@ -114,7 +114,7 @@ test('an unreadable history blocks the cleanup and makes the library delete noth
     const library = await libraryUploads()
 
     expect('blocked' in library).toBe(false)
-    expect('uploads' in library && library.uploads.length > 0 && library.uploads.every(upload => !upload.deletable)).toBe(true)
+    expect('uploads' in library && library.uploads.length > 0 && library.uploads.every(upload => !upload.deletable && upload.held === undefined)).toBe(true)
   }
   finally {
     spy.mockRestore()

@@ -11,6 +11,7 @@ import { sqliteLoader } from '../packages/cms/src/loaders/sqlite'
 import { readClientSources } from '../src/build/client'
 import { blocks, collection, collectionInfo, collections, colorField, customField, entries, entryFile, entryPage, entrySource, fieldInput, fileField, findIcons, geoField, iconField, imageField, linkField, moneyField, reference, removeEntry, saveEntries, saveEntry, tagsField } from '../src/content'
 import { entryIssues, registerCollections, registerEditSite } from '../src/content/edit'
+import { ContentChanged } from '../src/content/key'
 import { contentPlace, parseEntry, setContentPlace } from '../src/content/load'
 import { MarkdownError } from '../src/content/markdown'
 import * as validate from '../src/content/validate'
@@ -1203,6 +1204,37 @@ describe('the collections a CMS edits', () => {
       expect(await saveEntries('single', [{ slug: 'a', data: { title: 'A' } }, { slug: 'b', data: { title: 'B' } }])).toEqual({})
       expect(singles).toEqual(['a', 'b'])
       expect(await rejection(saveEntries('bare', [{ slug: 'a', data: { title: 'A' } }]))).toMatchObject({ message: expect.stringContaining('declares no save') })
+    })
+  })
+
+  it('hands a saveMany its entries\' expect, and answers changed, reading again, when it throws ContentChanged', async () => {
+    const schema = t.Object({ title: t.String(), order: t.Optional(t.Number()) })
+    const given: unknown[] = []
+    let reads = 0
+    let moved = false
+    const swapped = collection({ name: 'swapped', load: () => {
+      reads++
+
+      return []
+    }, saveMany: (entries) => {
+      given.push(...entries.map(entry => entry.expect))
+
+      if (moved)
+        throw new ContentChanged('swapped: a was reordered since')
+    } }, { schema })
+
+    await exporting([['swapped', swapped]], async () => {
+      const written = [{ slug: 'a', data: { title: 'A', order: 2 }, expect: { field: 'order', was: 1 } }]
+
+      expect(await saveEntries('swapped', written)).toEqual({})
+      expect(given).toEqual([{ field: 'order', was: 1 }])
+      moved = true
+
+      const before = reads
+
+      expect(await saveEntries('swapped', written)).toEqual({ changed: true })
+      await swapped.all()
+      expect(reads).toBeGreaterThan(before)
     })
   })
 

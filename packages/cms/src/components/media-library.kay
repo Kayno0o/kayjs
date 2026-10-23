@@ -39,6 +39,17 @@ const columns: Column<LibraryUpload>[] = [
   { key: 'actions', header: wording('cms.table.actions', 'Actions'), align: 'end', cell: true },
 ]
 
+// Why the library will not delete an upload, in the order the cleanup checks.
+function reasonOf(upload: LibraryUpload): string {
+  if (upload.usedIn.length > 0)
+    return wording('cms.media.inUse', 'Used by an entry: remove it there first')
+
+  if (upload.held === undefined)
+    return wording('cms.media.unchecked', 'Revisions and the trash could not be read, so nothing is deletable')
+
+  return upload.held ? wording('cms.media.heldReason', 'Kept by a revision or a trashed entry: it goes when they do') : wording('cms.media.tooNew', 'Uploaded less than a day ago: a save the site has not rebuilt from may use it')
+}
+
 function startRename(upload: LibraryUpload): void {
   typed = upload.name
   renaming = upload.key
@@ -88,7 +99,7 @@ Table.kcms-media(columns={columns} rows={uploads} rowKey={upload => upload.key})
       span {row.size === undefined ? '' : sizeText(row.size)}
     else if column.key === 'usedIn'
       if row.usedIn.length === 0
-        span {wording('cms.media.unused', 'Not used')}
+        span {row.held === true ? wording('cms.media.held', 'Kept by a revision or the trash') : wording('cms.media.unused', 'Not used')}
       else
         ul.kcms-media-used
           for entry of row.usedIn.slice(0, NAMED) key={`${entry.collection}/${entry.slug}/${entry.locale ?? ''}`}
@@ -106,8 +117,8 @@ Table.kcms-media(columns={columns} rows={uploads} rowKey={upload => upload.key})
       if denied.delete !== undefined
         Refused(icon="delete" label={wording('cms.uploads.delete', 'Delete {key}', { key: row.name })} reason={denied.delete} size="sm" variant="ghost")
       else if row.deletable
-        ConfirmDelete(message={wording('cms.media.deleteOne', 'Delete {name}? Check that no page, unsaved form or older revision uses it: this cannot be undone.', { name: row.name })} label={wording('cms.uploads.delete', 'Delete {key}', { key: row.name })} failure={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={async () => { await remove(row) }})
+        ConfirmDelete(message={wording('cms.media.deleteOne', 'Delete {name}? Check that no page or unsaved form uses it: this cannot be undone.', { name: row.name })} label={wording('cms.uploads.delete', 'Delete {key}', { key: row.name })} failure={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={async () => { await remove(row) }})
       else
-        Refused(icon="delete" label={wording('cms.uploads.delete', 'Delete {key}', { key: row.name })} reason={row.usedIn.length > 0 ? wording('cms.media.inUse', 'Used by an entry: remove it there first') : wording('cms.media.tooNew', 'Uploaded less than a day ago: a save the site has not rebuilt from may use it')} size="sm" variant="ghost")
+        Refused(icon="delete" label={wording('cms.uploads.delete', 'Delete {key}', { key: row.name })} reason={reasonOf(row)} size="sm" variant="ghost")
   @empty
     EmptyState(title={wording('cms.media.empty', 'No uploads yet')} description={wording('cms.media.emptyHint', 'Files sent from an image or file field appear here.')})

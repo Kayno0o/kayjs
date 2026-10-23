@@ -1,5 +1,5 @@
 import type { ContentLoader, LoadedEntry } from 'kay/content'
-import { contentKey } from 'kay/content'
+import { ContentChanged, contentKey } from 'kay/content'
 import { configError, durationSeconds, invalidateLocally, onKeysInvalidated } from 'kay/library'
 
 // An entry a loader holds from its first start: the app's initial content.
@@ -29,6 +29,8 @@ export interface SavedEntry {
   locale?: string | undefined
   data: unknown
   body?: string | undefined
+  // Writes `data[field]` alone, while the stored entry still holds the number `was` there.
+  expect?: { field: string, was: number | undefined } | undefined
 }
 
 export interface Row {
@@ -71,6 +73,23 @@ export function loadedOf(row: Row): LoadedEntry {
 
 export async function seedEntries(seed: LoaderOptions['seed']): Promise<readonly SeedEntry[]> {
   return typeof seed === 'function' ? seed() : seed ?? []
+}
+
+// The stored data of an entry with its `expect.field` set to the saved entry's, every other field as stored; throws when the entry is gone or holds another number there, so a save of another process since the move was planned is never undone.
+export function swappedData(name: string, stored: string | undefined, entry: SavedEntry & { expect: NonNullable<SavedEntry['expect']> }): string {
+  const { field, was } = entry.expect
+  const place = placeOf(entry)
+
+  if (stored === undefined)
+    throw new ContentChanged(`${name}: ${place} was deleted since`)
+
+  const data = JSON.parse(stored) as Record<string, unknown>
+  const held = data[field]
+
+  if ((typeof held === 'number' && Number.isFinite(held) ? held : undefined) !== was)
+    throw new ContentChanged(`${name}: ${place} was reordered since`)
+
+  return JSON.stringify({ ...data, [field]: (entry.data as Record<string, unknown>)[field] })
 }
 
 export function existsError(name: string, place: string): Error {
