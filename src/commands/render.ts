@@ -1,32 +1,16 @@
 import type { KayConfig } from '../config'
 import type { Command } from './command'
-import { existsSync, rmSync } from 'node:fs'
-import { mkdtemp, readdir, rm } from 'node:fs/promises'
-import { constants, tmpdir } from 'node:os'
-import { basename, join, resolve } from 'node:path'
-import process from 'node:process'
-import { KAY_DIR, RENDER_OUTPUT } from '../build/assets'
 import { loadConfig } from '../config'
-import { environmentWithoutDotenv, PAGES_ENTRY } from '../dev/sources'
-import { projectPaths } from '../project'
+import { startRenderServer } from '../dev/render-server'
 import { basePath, routerPath } from '../server/base'
-import { alive } from '../server/lifecycle'
-import { START_COMMAND, START_PARENT } from '../server/parent'
 import { projectRoot } from './command'
 import { USAGES } from './usages'
 
-const SOCKET_PRELOAD = join(import.meta.dir, '..', 'dev', 'render-socket.ts')
 const SCHEME = /^https?:\/\//
-const STOPS = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const
 // An HTTP method is a token, as RFC 9110 writes it.
 const METHOD = /^[!#$%&'*+.^`|~\w-]+$/
 const BODILESS = new Set(['GET', 'HEAD'])
-// Long enough for a large app's first client build; a server that never listens is said to.
-const SERVE_TIMEOUT_MS = 60_000
-const STOP_WAIT_MS = 5000
 const REDIRECT_STATUS = new Set([301, 302, 303, 307, 308])
-const OWN_BUILD = /^render-(\d+)$/
-const OWN_SOCKET = /^kay-render-(\d+)-/
 
 // Answers one request as `kay dev` would serve it, the server entry and its plugins included, and prints the body: a server listening on a Unix socket of its own, gone once it answered.
 export const render: Command = {
@@ -79,50 +63,17 @@ export const render: Command = {
       headers.set('content-type', 'application/x-www-form-urlencoded')
 
     const config = await configOf(root)
-    const { entry } = projectPaths(root, config)
+    const started = await startRenderServer(root, 'render', config, { entry: typeof option === 'string' ? option : undefined })
 
-    await Promise.all([removeLeftovers(join(root, KAY_DIR), OWN_BUILD), removeLeftovers(tmpdir(), OWN_SOCKET)])
+    if (typeof started === 'string') {
+      console.error(`kay render: ${started}`)
 
-    const dir = await mkdtemp(join(tmpdir(), `kay-render-${process.pid}-`))
-    const socket = join(dir, 'server.sock')
-    const output = join(root, KAY_DIR, `render-${process.pid}`)
-    const env = await environmentWithoutDotenv(root)
-    let serving: (value: true) => void
-    const served = new Promise<true>((resolve) => {
-      serving = resolve
-    })
-    // The server's own output is a log, which goes beside the body rather than into it.
-    const defaultServer = existsSync(entry) ? entry : PAGES_ENTRY
-    const server = Bun.spawn([process.execPath, '--preload', SOCKET_PRELOAD, typeof option === 'string' ? resolve(option) : defaultServer], { cwd: root, env: { ...env, NODE_ENV: 'development', [START_PARENT]: String(process.pid), [START_COMMAND]: 'kay render', KAY_RENDER_SOCKET: socket, [RENDER_OUTPUT]: basename(output) }, stdin: 'ignore', stdout: 2, stderr: 'inherit', ipc: (message: { serving?: boolean }) => message.serving === true && serving(true) })
-
-    // Interrupted, it leaves no server or build behind.
-    const stops = STOPS.map(signal => [signal, () => {
-      server.kill()
-      rmSync(dir, { recursive: true, force: true })
-      rmSync(output, { recursive: true, force: true })
-      process.exit(128 + constants.signals[signal])
-    }] as const)
-
-    for (const [signal, stop] of stops)
-      process.once(signal, stop)
+      return 1
+    }
 
     try {
-      const outcome = await Promise.race([served, server.exited, Bun.sleep(SERVE_TIMEOUT_MS)])
-
-      if (outcome === undefined) {
-        console.error(`kay render: the server did not listen within ${SERVE_TIMEOUT_MS / 1000} s; its entry starts one through Elysia's \`listen()\` or \`Bun.serve\``)
-
-        return 1
-      }
-
-      if (outcome !== true) {
-        console.error(`kay render: the server exited with code ${server.exitCode ?? server.signalCode} before it served`)
-
-        return 1
-      }
-
       // Sent as the browser would, through the socket, with the host the URL names; a path under `base` loses it, as the proxy in front of such a server takes it off, so a link the page printed renders as it is.
-      const init: BunFetchRequestInit = { unix: socket, method: verb, headers, body: typeof body === 'string' ? body : null, redirect: 'manual' }
+      const init: BunFetchRequestInit = { unix: started.socket, method: verb, headers, body: typeof body === 'string' ? body : null, redirect: 'manual' }
       const response = await fetch(`http://${target.host}${routerPath(target.pathname, baseOf(config?.base))}${target.search}`, init)
       const location = response.headers.get('location')
 
@@ -139,45 +90,9 @@ export const render: Command = {
       return response.status >= 400 ? 1 : 0
     }
     finally {
-      for (const [signal, stop] of stops)
-        process.off(signal, stop)
-
-      // A server that drains, or ignores SIGTERM, is not waited on for long.
-      server.kill()
-
-      if (await Promise.race([server.exited, Bun.sleep(STOP_WAIT_MS)]) === undefined)
-        server.kill('SIGKILL')
-
-      await server.exited
-      await Promise.all([rm(dir, { recursive: true, force: true }), rm(output, { recursive: true, force: true })])
+      await started.stop()
     }
   },
-}
-
-// What a SIGKILLed kay render left, named after its pid; a running one's own is left alone.
-async function removeLeftovers(dir: string, own: RegExp): Promise<void> {
-  let names: string[]
-
-  try {
-    names = await readdir(dir)
-  }
-  // No `.kay` yet, as before a project's first build.
-  catch {
-    return
-  }
-
-  await Promise.all(names.map(async (name) => {
-    const pid = own.exec(name)?.[1]
-
-    if (pid === undefined || alive(Number(pid)))
-      return
-
-    try {
-      await rm(join(dir, name), { recursive: true, force: true })
-    }
-    // Another user's, in a shared temp directory.
-    catch {}
-  }))
 }
 
 // A config that does not load is the server's to report, as it boots.

@@ -3,7 +3,7 @@ import { realpathSync } from 'node:fs'
 import { resolve, sep } from 'node:path'
 import process from 'node:process'
 import { plugin } from 'bun'
-import { underKayDev } from '../build/assets'
+import { inspecting } from '../build/assets'
 import { SCRIPT_FILE, scriptLoader } from '../build/files'
 import { loadConfig } from '../config'
 import { projectPaths } from '../project'
@@ -174,5 +174,5 @@ export async function registerEarlyLoader(root: string): Promise<void> {
 async function register(project: Project, settings: Record<string, string>, placeholder: false | undefined): Promise<void> {
   const { kay } = await import('../build/plugin')
 
-  await plugin(scoped(project, kay({ target: 'ssr', root: project.root, cacheDir: projectPaths(project.root).cache, settings, placeholder, inspect: underKayDev(), componentFiles: process.env.NODE_ENV === 'test' })))
+  await plugin(scoped(project, kay({ target: 'ssr', root: project.root, cacheDir: projectPaths(project.root).cache, settings, placeholder, inspect: inspecting(), componentFiles: process.env.NODE_ENV === 'test' })))
 }

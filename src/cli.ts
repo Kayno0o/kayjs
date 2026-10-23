@@ -16,6 +16,7 @@ const COMMANDS: Record<keyof typeof USAGES, () => Promise<Command>> = {
   'start': async () => (await import('./commands/start')).start,
   'render': async () => (await import('./commands/render')).render,
   'screenshot': async () => (await import('./commands/screenshot')).screenshotCommand,
+  'a11y': async () => (await import('./commands/a11y')).a11y,
   'check': async () => (await import('./commands/check')).check,
   'upgrade': async () => (await import('./commands/upgrade')).upgrade,
   'routes': async () => (await import('./commands/routes')).routes,

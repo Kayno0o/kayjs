@@ -25,6 +25,7 @@ This needs Bun to know the registry first, see [Installation](/getting-started/i
 | `kay start [dir]` | Serve the last build as production does |
 | `kay render <url> [dir]` | Print what the server answers for one URL, without starting it on a port |
 | `kay screenshot <path> [dir]` | Shoot a page of the running `kay dev` in a headless Chrome |
+| `kay a11y [dir]` | Check every page of the site with axe-core and draft its accessibility statement |
 | `kay check [dir]` | Type-check the project, `.kay` files included |
 | `kay upgrade [dir] [--dry-run] [--quiet]` | Move kay and its libraries to the latest version and rewrite the old forms |
 | `kay routes [dir]` | List every route the project serves, and the file serving it |
@@ -371,6 +372,31 @@ A redirect prints `kay render: 302 Found, to /login` on stderr and exits 0. A st
 
 <ReadMore href="/llms/check-and-tools">Full URLs and hosts, `base`, the timeouts and how the temporary build is cleaned up.</ReadMore>
 
+## kay a11y
+
+```sh
+kay a11y
+kay a11y --standard wcag
+kay a11y --declaration docs/accessibility.md
+```
+
+`kay a11y` checks the accessibility of the whole site. It starts the project's server as `kay dev` does, opens every page in one headless Chrome or Chromium and runs axe-core on each. Chrome comes from `BUN_CHROME_PATH`, else the first one on the `PATH`. There is nothing to configure.
+
+It opens a page once for each locale, and a page with params once for each value listed in its `prerender` export, or its `sitemap` export when it has no `prerender`. `base` and `trailingSlash` apply. A page that redirects, as a sign-in does, or that answers 401, 403 or 404, is listed as not audited, and so is a page with params and no list. A page whose server fails, or that the browser cannot check, makes the run fail.
+
+The report groups the findings by rule, then by page. Each element comes with the `.kay` file, line and column it was written at, when the development build marked it. The command exits with 1 when it finds anything, so CI can run it.
+
+It also drafts the accessibility statement as Markdown, in `.kay/a11y/declaration.md` or the file `--declaration` names. It lists the pages audited and the pages left out. Every criterion is marked verified, failed or to review by hand. `--standard rgaa` lists the 106 criteria of RGAA 4.1 in French, and is the default when the default locale is French. `--standard wcag` lists the WCAG 2.1 success criteria in English.
+
+A criterion is verified only when axe-core fully decides it, which is the case of 8.3 (the page has a language) and 8.5 (the page has a title). A criterion fails when a rule that breaks it fails on a page. All the others stay to review: automatic checks find a part of the problems, and the declaration needs an audit by a person. What axe-core finds that no criterion takes in is listed apart.
+
+| Option | Effect |
+| --- | --- |
+| `--standard rgaa\|wcag` | The criteria the draft lists, RGAA by default for a French site |
+| `--declaration <file>` | Where the draft is written |
+| `--format text\|json` | One JSON document with the pages, the findings and the criteria |
+| `--quiet` | Do not print each page as it is opened |
+
 ## kay screenshot
 
 ```sh
@@ -693,7 +719,7 @@ Colour only goes to a terminal, and not under `NO_COLOR` or `TERM=dumb`. `FORCE_
 
 ## Output for tools
 
-`kay add`, `kay generate`, `kay new`, `kay types`, `kay build`, `kay routes`, `kay env`, `kay doctor`, `kay i18n missing`, `kay explain`, `kay fmt`, `kay migrate`, `kay not-found` and `kay screenshot` take `--format json`, as `kay check` does. Stdout then holds one JSON document on one line, and what the app's own code prints goes to stderr. The exit code is the one the text output gives.
+`kay add`, `kay generate`, `kay new`, `kay types`, `kay build`, `kay routes`, `kay env`, `kay doctor`, `kay i18n missing`, `kay explain`, `kay fmt`, `kay migrate`, `kay not-found`, `kay screenshot` and `kay a11y` take `--format json`, as `kay check` does. Stdout then holds one JSON document on one line, and what the app's own code prints goes to stderr. The exit code is the one the text output gives.
 
 | Command | Document |
 | --- | --- |

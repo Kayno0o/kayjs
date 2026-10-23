@@ -19,6 +19,11 @@ export function underKayDev(): boolean {
   return process.env.KAY_DEV_CODE !== undefined
 }
 
+// Whether the server's elements carry `data-kay-src`, their `.kay` file and position: under `kay dev`, for its inspector, and in the server `kay a11y` runs, to name the line of a finding.
+export function inspecting(): boolean {
+  return underKayDev() || process.env.KAY_INSPECT !== undefined
+}
+
 // Where kay keeps what it generates, under the project root.
 export const KAY_DIR = '.kay'
 

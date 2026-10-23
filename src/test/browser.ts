@@ -82,6 +82,8 @@ export interface A11yViolation {
   help: string
   // Where axe-core explains the rule and how to meet it.
   helpUrl: string
+  // The standards and success criteria axe-core files the rule under, such as `wcag2a` and `wcag111`.
+  tags: string[]
   // Each element's CSS selector and markup.
   nodes: { target: string, html: string }[]
 }
@@ -754,7 +756,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
         // Leaving out a dev server's dev tool.
         const results = await axe.run({ include: context === undefined ? document : [[context]], exclude: [['kay-dev']] }, { resultTypes: ['violations', 'incomplete'] })
 
-        return unreadable(results).map(({ id, impact, help, helpUrl, nodes }) => ({ id, impact, help, helpUrl, nodes: nodes.map(node => ({ target: node.target.map(part => Array.isArray(part) ? part.join(' >>> ') : part).join(' '), html: node.html })) }))
+        return unreadable(results).map(({ id, impact, help, helpUrl, tags, nodes }) => ({ id, impact, help, helpUrl, tags, nodes: nodes.map(node => ({ target: node.target.map(part => Array.isArray(part) ? part.join(' >>> ') : part).join(' '), html: node.html })) }))
       }, [withUnreadable, selector]))
 
       if (violations === null)
