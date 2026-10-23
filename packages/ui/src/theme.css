@@ -372,8 +372,10 @@
     @apply px-4 py-1.5 text-sm;
   }
 
-  /* The height of a text field, a select and a medium button beside one: its two borders, two paddings and a line of text. Written once, here, and read by the select recipe and the rules below. */
-  :where(.kui-field-input, .kui-form-field select, .kui-btn) {
+  /* The height of a text field, a select and a medium button beside one: its two borders, two paddings and a line of text. Written once, here, and read by the select recipe and the rules below; plain selectors, as pruning only sees a class outside parentheses. */
+  .kui-field-input,
+  .kui-form-field select,
+  .kui-btn {
     --_field-height: var(--spacing-kui-field-height, calc(2 * var(--kui-border-input, var(--kui-border-width, var(--border-width))) + 2 * var(--spacing-kui-field-y, calc(var(--spacing) * var(--density))) + var(--text-sm) * var(--text-sm--line-height)));
   }
 

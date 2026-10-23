@@ -266,11 +266,11 @@ async function utilitiesOf(candidates: string[]): Promise<string> {
 }
 
 // The theme as Tailwind compiles it, with a skin's own CSS after it, or before it.
-async function built(skin: string, where: 'after' | 'before' = 'after'): Promise<string> {
+async function built(skin: string, where: 'after' | 'before' = 'after', candidates: string[] = []): Promise<string> {
   const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
   const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${where === 'before' ? `${skin}\n${theme}` : `${theme}\n${skin}`}`, { base: ROOT, loadStylesheet: async (_, base) => ({ path: tailwind, base, content: await Bun.file(tailwind).text() }) })
 
-  return compiler.build([])
+  return compiler.build(candidates)
 }
 
 describe('theme.css', () => {
@@ -763,14 +763,17 @@ describe('the knobs folded in 1.72', () => {
 
   test('writes the height of a field once, in a private property the select recipe and the button row read', async () => {
     const select = await Bun.file(`${ROOT}src/select.kay`).text()
-    const line = '--text-sm--line-height'
+    const property = select.match(/min-h-\((--_[\w-]+)\)/)?.[1] ?? ''
+    const css = await built('', 'after', [`min-h-(${property})`])
+    const escaped = property.replaceAll('-', '\\-')
 
-    expect(theme.match(/--_field-height: /g)).toHaveLength(1)
-    expect(theme.match(/var\(--_field-height\)/g)).toHaveLength(2)
-    // The other is the old --spacing-kui-field-height alias, which goes in 1.75.
-    expect(theme.split(line).length - 1).toBe(2)
-    expect(select).toContain('min-h-(--_field-height)')
-    expect(select).not.toContain(line)
+    expect(property).not.toBe('')
+    // One definition, on the field, select and button selectors, none of them wrapped in :where() that pruning would skip.
+    expect(css.match(new RegExp(`${escaped}: var\\(`, 'g'))).toHaveLength(1)
+    expect(css).toMatch(new RegExp(`\\.kui-field-input,\\s*\\.kui-form-field select,\\s*\\.kui-btn \\{\\s*${escaped}: `))
+    // The select recipe and the button row read it.
+    expect(css).toMatch(new RegExp(`min-height: var\\(${escaped}\\)`))
+    expect(css).toMatch(new RegExp(`> \\.kui-btn[^{]*\\{\\s*height: var\\(${escaped}\\)`))
   })
 
   test('keeps the chart series colours in the build, an own override of one included', async () => {
