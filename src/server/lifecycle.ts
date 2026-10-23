@@ -109,7 +109,10 @@ export function stopOnSignal(app: Elysia, lifecycle: Lifecycle, wait: Duration =
         return
 
       lifecycle.draining = true
-      kayLog('info', `${why}; finishing open requests`)
+
+      // The server `kay render` and `kay a11y` run (named by START_COMMAND) is stopped with SIGTERM by its command once the page is read, which is no event for the command's stderr.
+      if (process.env[START_COMMAND] === undefined || why !== 'SIGTERM received')
+        kayLog('info', `${why}; finishing open requests`)
 
       const forced = setTimeout(() => {
         kayLog('error', `requests still open after ${timeout} s; closing them`)

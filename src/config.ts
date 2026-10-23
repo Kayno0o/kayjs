@@ -653,7 +653,7 @@ export async function loadConfigWithin(root: string, timeout = CONFIG_TIMEOUT): 
     return await Promise.race([
       loadConfig(root),
       new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`kay: ${CONFIG_FILE} did not load within ${timeout / 1000}s, so it awaits something that never settles`)), timeout)
+        timer = setTimeout(() => reject(new KayError('config-invalid', `kay: ${CONFIG_FILE} did not load within ${timeout / 1000}s, so it awaits something that never settles`)), timeout)
       }),
     ])
   }
