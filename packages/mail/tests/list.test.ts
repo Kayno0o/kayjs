@@ -10,10 +10,10 @@ import { checkToken, signToken } from '../src/list-token'
 import { mailer } from '../src/mailer'
 import { outbox } from '../src/outbox'
 
-interface Subscribe { email: string }
+interface Subscribe { email: string, wording?: string }
 
 const { subscribe, subscribeStrict, subscribeCounted } = await import(`${import.meta.dir}/fixture/src/routes/subscribe.kay`) as Record<'subscribe' | 'subscribeStrict' | 'subscribeCounted', Action<Subscribe, unknown>>
-const { subscribeNoticed } = await import(`${import.meta.dir}/fixture/src/routes/notice.kay`) as Record<'subscribeNoticed', Action<Subscribe & { wording?: string }, unknown>>
+const { subscribeNoticed } = await import(`${import.meta.dir}/fixture/src/routes/notice.kay`) as Record<'subscribeNoticed', Action<Subscribe, unknown>>
 const { rendered } = await import(`${import.meta.dir}/fixture/src/counter`) as typeof import('./fixture/src/counter')
 const { mail } = await import(`${import.meta.dir}/fixture/src/mail`) as typeof import('./fixture/src/mail')
 
