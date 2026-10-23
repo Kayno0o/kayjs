@@ -65,6 +65,16 @@ test('highlights a fenced block with the site\'s highlighter, keeping its colour
   expect(html).not.toMatch(/<pre>[0-9a-f-]{36}\d/)
 })
 
+test('leaves a loader entry\'s relative image as the page keeps it, while a folder entry\'s is read from its folder', async () => {
+  const markdown = '![a](./pic.png)'
+  const loader = await (await render(markdown, {}, { collection: 'products', slug: 'mug' })).json() as { html: string }
+  const folder = await (await render(markdown, {}, { collection: 'posts', slug: 'hello' })).json() as { html: string }
+
+  expect(loader.html).toContain('src="./pic.png"')
+  expect(loader.html).not.toContain('/image?')
+  expect(folder.html).toContain('/markdown/image?')
+})
+
 test('shows an image written as a path in the entry\'s folder from there, and leaves other sources alone', async () => {
   const { html } = await (await render('![a](./pic.png) ![b](/uploads/b.png) ![c](https://example.com/c.png) ![d](//example.com/d.png)', {}, { collection: 'posts', slug: 'hello' })).json() as { html: string }
 
