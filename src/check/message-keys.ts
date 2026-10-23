@@ -39,18 +39,68 @@ export async function renamedMessageKeys(root: string, options: CheckOptions): P
       continue
     }
 
-    for (const statement of ast.program.body) {
-      if (statement.type !== 'ExportDefaultDeclaration')
-        continue
+    const tree = defaultCatalog(ast.program)
 
-      const tree = statement.declaration.type === 'CallExpression' ? statement.declaration.arguments[0] : statement.declaration
-
-      if (tree?.type === 'ObjectExpression')
-        visit(tree, [], { file, source, level, found })
-    }
+    if (tree)
+      visit(tree, [], { file, source, level, found })
   }
 
   return found
+}
+
+const WRAPPERS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'TSTypeAssertion', 'ParenthesizedExpression'])
+
+// The object literal a catalog exports by default, through `defineMessages(...)`, `as const`, `satisfies`, or a top-level `const` exported later as `export default name` or `export { name as default }`.
+function defaultCatalog(program: t.Program): t.ObjectExpression | undefined {
+  const bindings = new Map<string, t.Expression>()
+  let exported: t.Node | null | undefined
+
+  for (const statement of program.body) {
+    const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
+
+    if (declaration?.type === 'VariableDeclaration') {
+      for (const declarator of declaration.declarations) {
+        if (declarator.id.type === 'Identifier' && declarator.init)
+          bindings.set(declarator.id.name, declarator.init)
+      }
+    }
+
+    if (statement.type === 'ExportDefaultDeclaration')
+      exported = statement.declaration
+
+    if (statement.type === 'ExportNamedDeclaration' && !statement.source) {
+      for (const specifier of statement.specifiers) {
+        if (specifier.type === 'ExportSpecifier' && (specifier.exported.type === 'Identifier' ? specifier.exported.name : specifier.exported.value) === 'default')
+          exported = specifier.local
+      }
+    }
+  }
+
+  return objectOf(exported, bindings, new Set())
+}
+
+// A nested group may be wrapped too (`{ ... } as const`), but a call there is a message value, not a group.
+function unwrapped(node: t.Node): t.ObjectExpression | undefined {
+  return WRAPPERS.has(node.type) ? unwrapped((node as t.TSAsExpression).expression) : node.type === 'ObjectExpression' ? node : undefined
+}
+
+function objectOf(node: t.Node | null | undefined, bindings: Map<string, t.Expression>, seen: Set<string>): t.ObjectExpression | undefined {
+  if (!node)
+    return undefined
+
+  if (node.type === 'ObjectExpression')
+    return node
+
+  if (WRAPPERS.has(node.type))
+    return objectOf((node as t.TSAsExpression).expression, bindings, seen)
+
+  if (node.type === 'CallExpression')
+    return objectOf(node.arguments[0], bindings, seen)
+
+  if (node.type === 'Identifier' && !seen.has(node.name))
+    return objectOf(bindings.get(node.name), bindings, new Set([...seen, node.name]))
+
+  return undefined
 }
 
 interface Context {
@@ -75,8 +125,10 @@ function visit(object: t.ObjectExpression, path: string[], context: Context): vo
     if (name === undefined)
       continue
 
-    if (property.value.type === 'ObjectExpression' && !pluralForms(property.value)) {
-      visit(property.value, [...path, name], context)
+    const value = unwrapped(property.value)
+
+    if (value && !pluralForms(value)) {
+      visit(value, [...path, name], context)
 
       continue
     }

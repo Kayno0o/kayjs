@@ -4343,6 +4343,28 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reads a message catalog wrapped in as const or satisfies, or bound to a const and exported later', async () => {
+    const forms = [
+      'export default defineMessages({ ui: { table: { filterLabel: "a" } } } as const)',
+      'export default { ui: { table: { filterLabel: "a" } } } satisfies Record<string, unknown>',
+      'const messages = { ui: { table: { filterLabel: "a" } } } as const\nexport default messages',
+      'export const messages = { ui: { table: { filterLabel: "a" } } }\nexport { messages as default }',
+    ]
+
+    for (const form of forms) {
+      const root = await scratchProject({ 'src/routes/index.kay': 'p hi\n', 'src/messages/fr.ts': `${form}\n`, 'kay.config.ts': 'export default { i18n: { locales: [\'fr\'], defaultLocale: \'fr\' } }\n' })
+
+      try {
+        expect((await runCheck(root)).output.match(/warning\[deprecated-message-key\]/g), form).toHaveLength(1)
+        await runCheck(root, '--fix')
+        expect(await Bun.file(join(root, 'src/messages/fr.ts')).text(), form).toBe(`${form.replace('filterLabel', 'filter')}\n`)
+      }
+      finally {
+        await rm(root, { recursive: true, force: true })
+      }
+    }
+  })
+
   it('reports the lifetimes renamed to maxAge and --fix writes the new form, leaving a call that gives both', async () => {
     const config = [
       'import { createAuth } from \'@kaynooo/kayjs-auth\'',
