@@ -1087,6 +1087,58 @@ process.exit(0)
     }
   }, 60_000)
 
+  it('starts another Chrome once pages were opened and closed one after another, as Chrome keeps the renderer of each page it closed', async () => {
+    const temp = await shortTemp()
+    const script = join(await scratchDir('recycle-'), 'run.ts')
+
+    await Bun.write(script, `import { readdirSync, readlinkSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+import process from 'node:process'
+import { browse } from ${JSON.stringify(resolve('src/test/browser.ts'))}
+
+${server}const chrome = () => readdirSync(tmpdir()).filter(name => name.startsWith('kay-chrome-')).flatMap(name => { try { return [Number(readlinkSync(join(tmpdir(), name, 'profile', 'SingletonLock')).split('-').pop())] } catch { return [] } })
+const alive = (pid) => { try { process.kill(pid, 0); return true } catch { return false } }
+const pids = []
+let kept
+
+for (let i = 0; i < 5; i++) {
+  const page = await browse(\`http://localhost:\${server.port}/\`, { path: process.argv[2] })
+
+  pids.push(chrome())
+  page.close()
+}
+
+// A page left open keeps the browser it is in, whatever it has served.
+kept = await browse(\`http://localhost:\${server.port}/\`, { path: process.argv[2] })
+const during = chrome()
+const other = await browse(\`http://localhost:\${server.port}/\`, { path: process.argv[2] })
+console.log(JSON.stringify({ pids, sameWhileOpen: JSON.stringify(chrome()) === JSON.stringify(during), firstGone: !alive(pids[0][0]) }))
+kept.close()
+other.close()
+await server.stop()
+process.exit(0)
+`)
+
+    try {
+      const child = Bun.spawn([process.execPath, script, path!], { env: { ...process.env, TMPDIR: temp }, stdout: 'pipe', stderr: 'pipe' })
+      const [out, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+      const result = JSON.parse(out.trim()) as { pids: number[][], sameWhileOpen: boolean, firstGone: boolean }
+      const [a, b, c, d, e] = result.pids.map(list => list[0])
+
+      expect({ code, errors }).toEqual({ code: 0, errors: '' })
+      // Three pages share a Chrome, the fourth starts the next, which the fifth shares.
+      expect([a, b, c].every(pid => pid === a)).toBe(true)
+      expect(d).not.toBe(a)
+      expect(e).toBe(d)
+      expect(result.sameWhileOpen).toBe(true)
+      expect(result.firstGone).toBe(true)
+    }
+    finally {
+      await rm(temp, { recursive: true, force: true })
+    }
+  }, 60_000)
+
   it('closes the browser after the tests of bun test, which runs no exit handler, a page left open included', async () => {
     const temp = await shortTemp()
     const dir = await scratchDir('profile-test-')

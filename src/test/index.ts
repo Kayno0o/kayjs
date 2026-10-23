@@ -46,6 +46,7 @@ import { proofOfWork, signWork } from '../server/work'
 import { browse } from './browser'
 import { testContent } from './content'
 import { cookieJar, withKept } from './cookies'
+import { checkOnly, lazyNativePlugins } from './lazy-plugins'
 import { NativeFetch, NativeFormData, NativeHeaders, NativeRequest, NativeURL, NativeWebSocket, withNatives } from './natives'
 import { readPage, settledHtml, sitemapUrls } from './page'
 import { testRoot } from './root'
@@ -317,12 +318,14 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   if (serving !== undefined && serving !== root)
     throw new Error(`kay: this test process already serves ${serving}, and a process serves one project; test ${root} in a process of its own: \`bun test --parallel\` runs each file apart, or run its tests on their own as \`KAY_ROOT=${relative(process.cwd(), root) || '.'} bun test <its test files>\``)
 
+  lazyNativePlugins(root)
+
   const loaded = await withConfig(root, options)
   // A site setting none is served where the visits go, so pages reading siteUrl() or siteOrigin() render as in production; files go to memory, fresh for each site, rather than to the store kay.config.ts names, and so do the sessions, jobs, rate counts, presence rooms, vitals and notifications of its `store` (sessions only when it keeps them), its cached and live values staying in the process.
   const config = { ...loaded, site: loaded.site ?? ORIGIN, storage: options.storage ?? memoryFiles(), store: options.store === undefined && loaded.store !== undefined ? { ...loaded.store.sessions && { sessions: memoryStore() }, jobs: memoryJobs(), rates: memoryRates(), rooms: memoryRooms(), vitals: memoryVitals(), notifications: memoryNotifications() } : loaded.store }
   const project = resolveProject(root, config, { dev: config.dev === true, prebuilt: false, underKayDev: false })
   const inBrowser = options.browser !== undefined && options.browser !== false
-  const wanted = inBrowser || options.islands !== false ? await islandsChecked(root, clientOptionsOf(config, PRODUCTION), inBrowser) : undefined
+  const wanted = inBrowser || options.islands !== false ? await islandsChecked(root, inBrowser ? clientOptionsOf(config, PRODUCTION) : checkOnly(clientOptionsOf(config, PRODUCTION)), inBrowser) : undefined
   // Without a browser the pages render their islands' markup and load no script, so the build was only a check.
   const client: ClientBuild = inBrowser && wanted ? wanted : { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: clientDir(root) }
   const browser = typeof options.browser === 'object' ? options.browser : {}

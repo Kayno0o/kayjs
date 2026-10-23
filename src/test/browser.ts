@@ -221,13 +221,15 @@ const STAT_PARENT = /^\) \S (\d+)/
 const EXIT_WAIT_MS = 5000
 // How long the browser outlives its last page, for the next test's and for a pause between a file's tests (a server booting in a beforeAll). Past it, a run that closes nothing after each file does not keep an idle Chrome to its end.
 const IDLE_MS = 5 * 60_000
+// How many pages a browser opens before the next one, once none is open, starts another: Chrome keeps the renderer of a page it closed for as long as it runs, from 80 MB for a light page to 800 MB for an admin screen, so a file opening a page per test holds them all, and a page that failed to load as well.
+const RECYCLE_AFTER = 3
 // The connections Chrome opens to one host over HTTP/1.1.
 const MAX_HOST_CONNECTIONS = 6
 // What a page's origin keeps in the browser, cleared before each page.
 const STORAGE_TYPES = 'cookies,local_storage,indexeddb,cache_storage,service_workers,file_systems,shared_storage,storage_buckets'
 
 // The browser of this process's pages. Bun runs one Chrome for every view and leaves the profile it gives it in the temp directory, so kay gives it one of its own and removes it once the browser closes.
-let browser: { dir: string, pages: number, ready: Promise<void>, idle?: Timer } | undefined
+let browser: { dir: string, pages: number, views: number, ready: Promise<void>, idle?: Timer } | undefined
 // The process of the Chrome the last close killed: Bun spawns another only once it reaped that one, and fails a view made sooner.
 let killed: number | undefined
 let exitHooked = false
@@ -856,16 +858,21 @@ function heldConnections(): string {
 
 // A share of the browser for a page, the directory kay owns for it, and whether this page starts the browser.
 async function claimBrowser(): Promise<{ dir: string, first: boolean }> {
+  // Nothing is open, so closing the browser costs no page, and frees the renderers of the pages it has closed.
+  if (browser && browser.pages === 0 && browser.views >= RECYCLE_AFTER)
+    closeBrowser()
+
   if (browser) {
     clearTimeout(browser.idle)
     browser.pages++
+    browser.views++
     await browser.ready
 
     return { dir: browser.dir, first: false }
   }
 
   sweepProfiles()
-  browser = { dir: mkdtempSync(join(tmpdir(), `kay-chrome-${process.pid}-`)), pages: 1, ready: killed === undefined ? Promise.resolve() : exited(killed) }
+  browser = { dir: mkdtempSync(join(tmpdir(), `kay-chrome-${process.pid}-`)), pages: 1, views: 1, ready: killed === undefined ? Promise.resolve() : exited(killed) }
   killed = undefined
 
   if (!exitHooked)

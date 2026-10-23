@@ -85,4 +85,5 @@ expect(await page.path()).toBe('/account')
 - Chrome runs on a profile kay makes in the temp directory and removes, with what Bun and Chrome leave beside it, when the browser closes.
 - Chrome stays open for five minutes after the last page closes, so a file pausing between pages (a server booting in a `beforeAll`) starts it once, and closes once the tests ran, as bun test runs no exit handler (after the run, or each file of a parallel one, with `kay/test/preload`; else after the file that loaded `kay/test` first), or at exit outside bun test.
 - The first page of a later run removes what a killed run left.
+- Chrome keeps the renderer of every page it closed, up to 800 MB for a heavy one, so once three pages were opened and none is open, the next page starts a fresh Chrome. A test holding a page open across its tests keeps the one browser.
 - Closing the browser closes every `Bun.WebView` of the process, one the test made itself included, and kills every process Chrome started, which Alpine's Chromium leaves running otherwise.

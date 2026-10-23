@@ -430,6 +430,6 @@ A page that does not settle in time fails `open()`, naming the files it could no
 
 The browser is `Bun.WebView` on Chrome. Kay finds Chrome on the `PATH`, or reads `BUN_CHROME_PATH`. Use `describe.skipIf(browserPath() === undefined)` to skip a suite when there is none.
 
-Chrome's profile lives in the temp directory while the browser runs. Chrome stays open for five minutes after the last page closes, so a file pausing between pages starts it once, and kay closes it after the run, when `kay/test/preload` kills every process Chrome started.
+Chrome's profile lives in the temp directory while the browser runs. Chrome stays open for five minutes after the last page closes, so a file pausing between pages starts it once, and kay closes it after the run, when `kay/test/preload` kills every process Chrome started. Chrome keeps the memory of each page it closes until it quits, so after three pages the next one, with none open, starts a fresh Chrome.
 
 <ReadMore href="/llms/testing">Running jobs, mounting one component with its props, how the browser is found and closed and every browser helper in detail are in the full testing reference.</ReadMore>
