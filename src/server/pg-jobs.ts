@@ -26,6 +26,7 @@ const LOST_KEY_TRIES = 3
 const INSUFFICIENT_PRIVILEGE = '42501'
 const DUPLICATE_RELATION = '42P07'
 const DEADLOCK_DETECTED = '40P01'
+const UNIQUE_VIOLATION = '23505'
 const INDEX_WAIT_MS = 120_000
 const INDEX_POLL_MS = 200
 
@@ -365,6 +366,20 @@ export function pgJobs(source: PgJobsSource): JobStore {
       const db = await open()
 
       return (await rowsOf<PgJobRow>(db`SELECT id, queue, payload, attempts, run_at, error, job_key, progress FROM kay_jobs WHERE queue = ${queue} AND failed ORDER BY run_at`)).map(toJob)
+    },
+    async revive(id, runAt) {
+      const db = await open()
+
+      try {
+        return (await rowsOf<{ id: string }>(db`UPDATE kay_jobs SET failed = false, attempts = 0, run_at = ${runAt}::bigint, held_until = NULL WHERE id = ${id} AND failed RETURNING id`)).length === 1
+      }
+      catch (error) {
+        // A live job took the key of the failed one since: the unique index refuses both being live.
+        if ((error as { errno?: string }).errno === UNIQUE_VIOLATION)
+          return false
+
+        throw error
+      }
     },
     async jobs(queue) {
       const db = await open()

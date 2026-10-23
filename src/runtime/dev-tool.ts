@@ -23,6 +23,7 @@ const FOOTPRINT_URL = '/_kay/dev/footprint'
 const NOT_FOUND_URL = '/_kay/dev/not-found'
 const STACK_URL = '/_kay/dev/stack'
 const DATA_TAB_URL = '/_kay/dev/tab/data.js'
+const JOBS_TAB_URL = '/_kay/dev/tab/jobs.js'
 // A stack frame in a chunk of the browser build, which the server can point at its `.kay` line.
 const CHUNK_FRAME = /\/_kay\/[\w.-]+\.js:\d+:\d+/
 // The navigations the Network tab keeps: the page's load, then each swap.
@@ -415,7 +416,7 @@ function worstTone(bad: string[]): 'error' | 'warn' | undefined {
 }
 
 // The tabs kay makes itself; those a library adds sit under a line.
-const CORE_TABS = new Set(['problems', 'request', 'network', 'head', 'screen-reader', 'env', 'images', 'performance', 'routes', 'i18n', 'islands', 'not-found', 'data'])
+const CORE_TABS = new Set(['problems', 'request', 'network', 'head', 'screen-reader', 'env', 'images', 'performance', 'routes', 'i18n', 'islands', 'not-found', 'data', 'jobs'])
 
 // A small rounded label, tinted by what it counts or says, with an icon before it when given.
 function pill(tool: Pick<DevTool, 'make' | 'icon'>, text: string, tone?: 'error' | 'warn' | 'ok' | 'accent', icon?: DevIconName): HTMLElement {
@@ -1283,6 +1284,7 @@ export function startDevTool(doc: Document = document): DevTool {
   i18nTab(doc, tool, missing, listening.signal)
   notFoundTab(doc, tool, listening.signal)
   lazyTab(tool, { id: 'data', label: 'Data', icon: 'database' }, DATA_TAB_URL)
+  lazyTab(tool, { id: 'jobs', label: 'Jobs', icon: 'list-checks' }, JOBS_TAB_URL)
   doc.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('button[data-kay-open],button[data-kay-copy]') : null
 

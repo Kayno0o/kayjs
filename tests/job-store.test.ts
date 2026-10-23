@@ -286,6 +286,46 @@ describe.each(kinds)('job store contract, $name', ({ name, open }) => {
       expect(await store.jobs?.('q')).toEqual([])
     })
   })
+
+  describe('revive', () => {
+    const failedJob = async (store: JobStore, overrides: Partial<StoredJob> = {}) => {
+      const added = job(overrides)
+
+      await store.add(added)
+      await store.fail(added.id, 'boom', undefined, heldOf(await claimFor(store)))
+
+      return added
+    }
+
+    it('puts a failed job back to wait with its attempts given back, keeping its payload and last error', async () => {
+      const store = await open()
+      const added = await failedJob(store, { payload: '["kept"]' })
+
+      expect(await store.revive!(added.id, 0)).toBe(true)
+      expect(await store.state!('q', { id: added.id }, clockNow())).toMatchObject({ status: 'waiting', attempts: 0, error: 'boom', payload: '["kept"]' })
+      expect(await store.failed('q')).toEqual([])
+      expect(heldOf(await claimFor(store))).toBeGreaterThan(0)
+    })
+
+    it('refuses a job that is not failed, or that no store holds', async () => {
+      const store = await open()
+      const waiting = job()
+
+      await store.add(waiting)
+      expect(await store.revive!(waiting.id, 0)).toBe(false)
+      expect(await store.revive!('nothing', 0)).toBe(false)
+      expect(await store.state!('q', { id: waiting.id }, clockNow())).toMatchObject({ status: 'waiting' })
+    })
+
+    it('refuses a failed job whose key a live job holds since, and leaves it failed', async () => {
+      const store = await open()
+      const failedOne = await failedJob(store, { key: 'same' })
+
+      await store.add(job({ key: 'same' }))
+      expect(await store.revive!(failedOne.id, 0)).toBe(false)
+      expect(await store.failed('q')).toMatchObject([{ id: failedOne.id }])
+    })
+  })
 })
 
 describe('a sqlite file made before keys and progress', () => {

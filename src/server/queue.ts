@@ -66,6 +66,8 @@ export interface JobStore {
   // Removes the failed jobs of the queue whose time came before `before`, and resolves with how many went; a store without it has them listed with `failed` and removed one by one.
   purge?: ((queue: string, before: number) => Maybe<number>) | undefined
   failed: (queue: string) => Maybe<StoredJob[]>
+  // Puts a failed job back to wait, due at `runAt` with its attempts given back, for a retry from the dev tool or a jobs page; resolves with whether it did: false for a job that is not failed, or whose key a live job holds since.
+  revive?: ((id: string, runAt: number) => Maybe<boolean>) | undefined
   // Every job of the queue, waiting or failed, which `remove` looks through for a payload; a store without it removes jobs by id alone.
   jobs?: ((queue: string) => Maybe<StoredJob[]>) | undefined
   // When the queue's next job may run, so a worker sleeps until then.
@@ -179,6 +181,25 @@ export function retryLater(wait: Duration, reason = 'it asked to run again later
 
 // What drains each queue made, for `kay/test` to run them all.
 const drains = new Set<() => Promise<number>>()
+
+// What the dev tool's Jobs tab and a jobs page need of a queue: where its jobs are and the calls that act on one.
+export interface QueueAdmin {
+  name: string
+  // The runs a job gets before it is kept as failed.
+  attempts: number
+  store: () => JobStore
+  drain: () => Promise<number>
+  // Puts a failed job back to wait, due now, and wakes the queue; false when the store has no `revive` or the job cannot be revived.
+  retry: (id: string) => Promise<boolean>
+  remove: (id: string) => Promise<number>
+}
+
+// The queues this process made, by name: a queue made again under the same name (a reload) replaces the earlier one.
+const admins = new Map<string, QueueAdmin>()
+
+export function queueAdmins(): QueueAdmin[] {
+  return [...admins.values()]
+}
 // Work a library started off a response's path, which `drainQueues` waits for before it looks at the queues.
 const detached = new Set<Promise<unknown>>()
 
@@ -304,6 +325,18 @@ export function sqliteJobs(path: string): JobStore {
     jobs(queue) {
       return open(false)?.all.all(queue).map(toJob) ?? []
     },
+    revive(id, runAt) {
+      try {
+        return open(false)?.revive.run(runAt, id).changes === 1
+      }
+      catch (error) {
+        // A live job took the key of the failed one since: the unique index refuses both being live.
+        if (error instanceof Error && error.message.includes('UNIQUE'))
+          return false
+
+        throw error
+      }
+    },
     nextRunAt(queue) {
       return open(false)?.next.get(queue)?.at ?? undefined
     },
@@ -372,13 +405,14 @@ function prepareJobs(db: Database) {
   const fail = db.query('UPDATE kay_jobs SET failed = 1, held_until = NULL, error = ?, payload = coalesce(?, payload) WHERE id = ? AND (? IS NULL OR held_until = ?)')
   const purge = db.query('DELETE FROM kay_jobs WHERE queue = ? AND failed = 1 AND run_at < ?')
   const failed = db.query<JobRow, [string]>(`SELECT ${JOB_COLUMNS} FROM kay_jobs WHERE queue = ? AND failed = 1 ORDER BY run_at`)
+  const revive = db.query('UPDATE kay_jobs SET failed = 0, attempts = 0, run_at = ?, held_until = NULL WHERE id = ? AND failed = 1')
   const all = db.query<JobRow, [string]>(`SELECT ${JOB_COLUMNS} FROM kay_jobs WHERE queue = ? ORDER BY run_at`)
   // A held job counts from when its hold ends, as it runs again then if its process died.
   const next = db.query<{ at: number | null }, [string]>('SELECT min(max(run_at, coalesce(held_until, 0))) AS at FROM kay_jobs WHERE queue = ? AND failed = 0')
   const lock = db.query('INSERT OR IGNORE INTO kay_locks (name, slot) VALUES (?, ?)')
   const pruneLocks = db.query('DELETE FROM kay_locks WHERE name = ? AND slot < ?')
 
-  return { insert, holder, claim, remove, retry, release, progress, byKey, byId, fail, purge, failed, all, next, lock, pruneLocks }
+  return { insert, holder, claim, remove, retry, release, progress, byKey, byId, fail, purge, failed, revive, all, next, lock, pruneLocks }
 }
 
 // Jobs kept in this process's memory, gone with it: what tests run on.
@@ -473,6 +507,17 @@ export function memoryJobs(): JobStore {
     },
     jobs(queue) {
       return [...jobs.values()].filter(job => job.queue === queue).map(stored)
+    },
+    revive(id, runAt) {
+      const job = jobs.get(id)
+
+      if (!job?.failed || (job.key !== undefined && waiting(job.queue).some(other => other.key === job.key)))
+        return false
+
+      Object.assign(job, { failed: false, attempts: 0, runAt })
+      delete job.heldUntil
+
+      return true
     },
     nextRunAt(queue) {
       const times = waiting(queue).map(job => Math.max(job.runAt, job.heldUntil ?? 0))
@@ -983,6 +1028,21 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
   }) as Queue<Payload, Progress>
 
   drains.add(queued.drain)
+  admins.set(name, {
+    name,
+    attempts,
+    store,
+    drain: queued.drain,
+    retry: async (id) => {
+      const revived = await store().revive?.(id, Date.now()) === true
+
+      if (revived)
+        wakePoller()
+
+      return revived
+    },
+    remove: async id => queued.remove(id),
+  })
 
   return queued
 }
@@ -1011,6 +1071,11 @@ async function sleep(ms: number, signal: AbortSignal, sleepers: Set<() => void>)
 // Takes a queue out of what `drainQueues` runs, for a test whose queue's store is gone.
 export function forgetQueue(queued: { drain: () => Promise<number> }): void {
   drains.delete(queued.drain)
+
+  for (const [name, admin] of admins) {
+    if (admin.drain === queued.drain)
+      admins.delete(name)
+  }
 }
 
 // Runs every due job of every queue in this process, until none is left: `kay/test`'s `runJobs`.

@@ -100,6 +100,14 @@ Below the rows, a box runs a query. It takes one `SELECT`, `WITH`, `VALUES` or `
 
 The tab and what it asks of the server exist under `kay dev` only. A production server has no route for them.
 
+## Jobs
+
+The Jobs tab lists the queues of your app ([Queues](/guides/background-jobs/#queues)) and the jobs in each: running, waiting and failed. A job shows how many attempts it has used out of the queue's `attempts`, its payload, and for a failed job the error of its last run. The count on the tab is the number of failed jobs.
+
+Retry puts a failed job back in its queue to run again from its first attempt. Delete removes a waiting or failed job. A job that is running is left to finish. Retry needs a store that can put a failed job back, which `sqliteJobs`, `memoryJobs` and `pgJobs` all can.
+
+Like the Data tab, it exists under `kay dev` only.
+
 ## Images
 
 The Images tab lists each image of the page. It shows the variant kay served, its format and size, and the size it is drawn at.

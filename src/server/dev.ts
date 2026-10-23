@@ -54,6 +54,9 @@ export const DEV_NOT_FOUND = '/_kay/dev/not-found'
 export const DEV_DATA = '/_kay/dev/data'
 export const DEV_DATA_ROWS = '/_kay/dev/data/rows'
 export const DEV_DATA_QUERY = '/_kay/dev/data/query'
+export const DEV_JOBS = '/_kay/dev/jobs'
+export const DEV_JOBS_RETRY = '/_kay/dev/jobs/retry'
+export const DEV_JOBS_DELETE = '/_kay/dev/jobs/delete'
 export const DEV_TAB = '/_kay/dev/tab/'
 
 // Reloads a page kay does not render, such as a library's own, once `kay dev` restarts the server for a changed file: its stream names the server it comes from first.
@@ -65,7 +68,7 @@ const A11Y_SOURCE = resolve(import.meta.dir, '../runtime/dev-a11y.ts')
 const STYLES_SOURCE = resolve(import.meta.dir, '../runtime/dev-styles.ts')
 
 // The tabs whose code the dev tool fetches when the tab first opens, served from `DEV_TAB`.
-export const DEV_TABS: Record<string, string> = { data: resolve(import.meta.dir, '../runtime/dev-tab-data.ts') }
+export const DEV_TABS: Record<string, string> = { data: resolve(import.meta.dir, '../runtime/dev-tab-data.ts'), jobs: resolve(import.meta.dir, '../runtime/dev-tab-jobs.ts') }
 // What the inspector sends, which a page of another site cannot without a preflight nothing answers.
 const OPEN_HEADER = 'x-kay-dev'
 const MAX_STACK_BYTES = 16 * 1024
