@@ -7,7 +7,7 @@ const matching = memo(() => planets.filter(
   planet => planet.toLowerCase().includes(query().trim().toLowerCase()),
 ))
 ---
-.flex.flex-col.gap-3.rounded-lg.border.border-kui-overlay1.bg-kui-surface0.p-4
+.flex.flex-col.gap-3.rounded-lg.border.border-muted.bg-surface.p-4
   input.kui-field-input(
     bind:value={query}
     placeholder="Filter planets"

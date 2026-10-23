@@ -10,7 +10,7 @@ const shown = signal('write')
 Tabs(tabs={tabs} value={shown()} label="Editor" onChange={shown.set})
   @panel(tab)
     if tab === 'write'
-      textarea.w-full.rounded-lg.border.border-kui-overlay1.bg-kui-surface0.p-2(
+      textarea.w-full.rounded-lg.border.border-muted.bg-surface.p-2(
         rows="3"
         aria-label="Draft"
         placeholder="Type here, switch tab, come back"

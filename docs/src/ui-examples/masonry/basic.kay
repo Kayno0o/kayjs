@@ -26,7 +26,7 @@ const shown = memo(() =>
 )
 ---
 .flex.flex-col.gap-3
-  input.rounded-lg.border.border-kui-overlay1.px-3.py-1(
+  input.rounded-lg.border.border-muted.px-3.py-1(
     type="search"
     aria-label="Filter notes"
     placeholder="Filter"
@@ -34,6 +34,6 @@ const shown = memo(() =>
   )
   Masonry(items={shown()} key={note => note.id} minWidth={180} gap={12})
     @tile(note)
-      .rounded-lg.bg-kui-surface0.p-3
+      .rounded-lg.bg-surface.p-3
         h3.font-semibold {note.title}
-        p.text-kui-subtext0 {note.body}
+        p.text-muted {note.body}

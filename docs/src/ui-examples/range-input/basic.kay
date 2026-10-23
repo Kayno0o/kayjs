@@ -13,4 +13,4 @@ const hours = signal<RangeValue>([2, null])
     value={hours()}
     onChange={hours.set}
   )
-  p.text-kui-subtext0 From {hours()[0] ?? 'any'} to {hours()[1] ?? 'any'}.
+  p.text-muted From {hours()[0] ?? 'any'} to {hours()[1] ?? 'any'}.

@@ -8,7 +8,7 @@ const more = () =>
     ...Array.from({ length: 4 }, (_, index) => current.length + index + 1),
   ])
 ---
-.h-48.overflow-y-auto.rounded-lg.border.border-kui-overlay1.bg-kui-surface0
+.h-48.overflow-y-auto.rounded-lg.border.border-muted.bg-surface
   for row of rows() key={row}
     p.px-3.py-1 Row {row}
   if rows().length < 40

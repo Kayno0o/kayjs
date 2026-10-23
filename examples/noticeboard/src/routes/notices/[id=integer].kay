@@ -9,5 +9,5 @@ head
   title {notice.title}
 Card(title={notice.title})
   p.whitespace-pre-line {notice.body}
-  p.mt-2.text-sm.text-kui-muted {notice.author}, {notice.posted_at.toLocaleDateString('en', { dateStyle: 'long' })}
+  p.mt-2.text-sm.text-muted {notice.author}, {notice.posted_at.toLocaleDateString('en', { dateStyle: 'long' })}
 a.mt-4.inline-block(href="/") Back to the board

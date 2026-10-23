@@ -12,4 +12,4 @@ const day = signal('')
     value={day()}
     onChange={day.set}
   )
-  p.text-kui-subtext0 {day() ? `Booked for ${day()}.` : 'Pick a day between 5 October and 20 November.'}
+  p.text-muted {day() ? `Booked for ${day()}.` : 'Pick a day between 5 October and 20 November.'}

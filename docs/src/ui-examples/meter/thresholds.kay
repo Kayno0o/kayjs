@@ -4,9 +4,9 @@ import Meter from '@kaynooo/kayjs-ui/meter.kay'
 const usage = signal(40)
 function fill() {
   if (usage() > 90)
-    return 'bg-kui-error'
+    return 'bg-danger'
 
-  return usage() > 70 ? 'bg-kui-warning' : undefined
+  return usage() > 70 ? 'bg-warning' : undefined
 }
 ---
 .flex.max-w-sm.flex-col.gap-3

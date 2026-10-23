@@ -21,4 +21,4 @@ const search = async (query: string, limit: number, offset: number) =>
 ---
 .flex.flex-col.items-start.gap-2
   IconPicker(search={search} value={picked()} onChange={picked.set})
-  p.text-kui-subtext0 Picked: {picked() || 'none'}.
+  p.text-muted Picked: {picked() || 'none'}.

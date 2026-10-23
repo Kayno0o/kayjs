@@ -24,4 +24,4 @@ function readers({ names, guests }: { names: string[], guests: number }): string
   return who.length === 0 ? 'Nobody is reading' : `Reading now: ${who.join(', ')}`
 }
 ---
-p.mt-2.text-sm.text-kui-muted(aria-live="polite") {live.status() === 'open' ? readers(present()) : 'Connecting...'}
+p.mt-2.text-sm.text-muted(aria-live="polite") {live.status() === 'open' ? readers(present()) : 'Connecting...'}

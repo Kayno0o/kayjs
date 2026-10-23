@@ -13,8 +13,8 @@ FileDrop(
   onFiles={files => previews.set(files.map(toPreview))}
 )
   @content(zone)
-    .rounded-lg.border.border-dashed.border-kui-overlay1(
-      class="bg-kui-surface0 p-6 text-center"
+    .rounded-lg.border.border-dashed.border-muted(
+      class="bg-surface p-6 text-center"
     )
       if zone.dragging()
         p Drop to preview

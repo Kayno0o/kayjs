@@ -9,7 +9,7 @@ const tiles = heights.map((height, id) => ({ id, height }))
   Masonry(items={tiles} key={tile => tile.id} minWidth={100} gap={8})
     @tile(tile)
       .flex.items-center.justify-center.rounded-lg(
-        class="bg-kui-surface0 text-kui-subtext0"
+        class="bg-surface text-muted"
         style={`height: ${tile.height}px`}
       )
         | {tile.id + 1}

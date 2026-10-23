@@ -17,4 +17,4 @@ const picked = signal(['mars'])
     value={picked()}
     onChange={picked.set}
   )
-  p.text-kui-subtext0 Picked: {picked().join(', ') || 'none'}.
+  p.text-muted Picked: {picked().join(', ') || 'none'}.

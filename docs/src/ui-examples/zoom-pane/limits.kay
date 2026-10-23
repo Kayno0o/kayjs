@@ -5,7 +5,7 @@ ZoomPane(
   label="Grid, up to 3 times"
   most={3}
   tools={false}
-  class="h-56 w-full rounded-lg border border-kui-overlay1 bg-kui-surface0"
+  class="h-56 w-full rounded-lg border border-muted bg-surface"
 )
   svg(viewBox="0 0 100 60" width="100%" height="100%")
     for column of [10, 20, 30, 40, 50, 60, 70, 80, 90]

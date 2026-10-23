@@ -7,7 +7,6 @@ export const PALETTES: { value: string, colours: Record<string, Pair> }[] = [
     'canvas': ['#f8fafc', '#17202e'],
     'surface0': ['#ffffff', '#1c2737'],
     'surface1': ['#e3e8ef', '#23314a'],
-    'overlay1': ['#5d6879', '#929dae'],
     'subtext0': ['#566173', '#9ba6b5'],
     'text': ['#17202e', '#eef2f7'],
     'accent': ['#1565a0', '#4cb3ea'],
@@ -17,8 +16,6 @@ export const PALETTES: { value: string, colours: Record<string, Pair> }[] = [
     'warning': ['#8a5a12', '#e8b46a'],
     'info': ['#2459b8', '#8fb8f0'],
     'error': ['#b03a2e', '#f2968c'],
-    'fill-hover': ['#e3e8ef', '#23314a'],
-    'fill-danger': ['#f1e7e7', '#3a333d'],
     'field-border': ['#838589', '#737a84'],
     'chart-3': ['#2459b8', '#7aa8f0'],
     'chart-4': ['#9c4a0a', '#f0954a'],
@@ -37,7 +34,6 @@ export const PALETTES: { value: string, colours: Record<string, Pair> }[] = [
     'canvas': ['#eff1f5', '#1e1e2e'],
     'surface0': ['#f7f8fa', '#262637'],
     'surface1': ['#dce0e8', '#2d2e40'],
-    'overlay1': ['#62636c', '#9399b2'],
     'subtext0': ['#5f6278', '#a6adc8'],
     'text': ['#4c4f69', '#cdd6f4'],
     'accent': ['#832fe5', '#cba6f7'],
@@ -47,8 +43,6 @@ export const PALETTES: { value: string, colours: Record<string, Pair> }[] = [
     'warning': ['#975200', '#f9e2af'],
     'info': ['#0e56e5', '#89b4fa'],
     'error': ['#c80034', '#f38ba8'],
-    'fill-hover': ['#dce0e8', '#2d2e40'],
-    'fill-danger': ['#ebd9e2', '#402f42'],
     'field-border': ['#7e7f85', '#737792'],
     'chart-3': ['#1e66f5', '#89b4fa'],
     'chart-4': ['#f25800', '#fab387'],
@@ -67,7 +61,6 @@ export const PALETTES: { value: string, colours: Record<string, Pair> }[] = [
     'canvas': ['#eceff4', '#2e3440'],
     'surface0': ['#f5f7fa', '#353b49'],
     'surface1': ['#d8dee9', '#3b4252'],
-    'overlay1': ['#576278', '#a6aebc'],
     'subtext0': ['#4c566a', '#b5bcc9'],
     'text': ['#2e3440', '#eceff4'],
     'accent': ['#43667d', '#88c0d0'],
@@ -77,8 +70,6 @@ export const PALETTES: { value: string, colours: Record<string, Pair> }[] = [
     'warning': ['#756000', '#ebcb8b'],
     'info': ['#43667d', '#91b1d1'],
     'error': ['#954c55', '#f3948a'],
-    'fill-hover': ['#d8dee9', '#3b4252'],
-    'fill-danger': ['#e3dfe4', '#4e434c'],
     'field-border': ['#7c7e82', '#868d9f'],
     'chart-3': ['#5e81ac', '#81a1c1'],
     'chart-4': ['#be7667', '#d08770'],
@@ -97,7 +88,6 @@ export const PALETTES: { value: string, colours: Record<string, Pair> }[] = [
     'canvas': ['#fbf1c7', '#282828'],
     'surface0': ['#f9f5d7', '#302e2e'],
     'surface1': ['#ebdbb2', '#383533'],
-    'overlay1': ['#6b5e53', '#ac9d87'],
     'subtext0': ['#665c54', '#bdae93'],
     'text': ['#3c3836', '#ebdbb2'],
     'accent': ['#ad3800', '#fe8019'],
@@ -107,8 +97,6 @@ export const PALETTES: { value: string, colours: Record<string, Pair> }[] = [
     'warning': ['#835900', '#fabd2f'],
     'info': ['#076678', '#83a598'],
     'error': ['#9d0006', '#ff715c'],
-    'fill-hover': ['#ebdbb2', '#383533'],
-    'fill-danger': ['#f2d9b4', '#4a3430'],
     'field-border': ['#817d6d', '#847e6d'],
     'chart-3': ['#076678', '#83a598'],
     'chart-4': ['#b57614', '#fabd2f'],
@@ -127,7 +115,6 @@ export const PALETTES: { value: string, colours: Record<string, Pair> }[] = [
     'canvas': ['#fdf6e3', '#002b36'],
     'surface0': ['#fefaee', '#04313c'],
     'surface1': ['#e6dfc9', '#073642'],
-    'overlay1': ['#50666e', '#889c9e'],
     'subtext0': ['#50666d', '#889c9e'],
     'text': ['#073642', '#93a1a1'],
     'accent': ['#0065ac', '#3a9fe6'],
@@ -137,8 +124,6 @@ export const PALETTES: { value: string, colours: Record<string, Pair> }[] = [
     'warning': ['#7c5f00', '#bf9317'],
     'info': ['#006e6f', '#32a9a0'],
     'error': ['#c41617', '#ff665f'],
-    'fill-hover': ['#e6dfc9', '#073642'],
-    'fill-danger': ['#f7e0cf', '#29343d'],
     'field-border': ['#78807d', '#607f86'],
     'chart-3': ['#268bd2', '#268bd2'],
     'chart-4': ['#cb4b16', '#cb4b16'],
@@ -157,7 +142,6 @@ export const PALETTES: { value: string, colours: Record<string, Pair> }[] = [
     'canvas': ['#faf4ed', '#232136'],
     'surface0': ['#fffaf3', '#2a273f'],
     'surface1': ['#ebe0d6', '#393552'],
-    'overlay1': ['#66636c', '#9b9ed2'],
     'subtext0': ['#666279', '#a29ebc'],
     'text': ['#575279', '#e0def4'],
     'accent': ['#8f545a', '#ea9a97'],
@@ -167,8 +151,6 @@ export const PALETTES: { value: string, colours: Record<string, Pair> }[] = [
     'warning': ['#945500', '#f6c177'],
     'info': ['#286983', '#5aabcc'],
     'error': ['#905168', '#f77b9e'],
-    'fill-hover': ['#ebe0d6', '#393552'],
-    'fill-danger': ['#efe4e0', '#452f47'],
     'field-border': ['#827f85', '#817fa1'],
     'chart-3': ['#907aa9', '#c4a7e7'],
     'chart-4': ['#c87b03', '#f6c177'],
@@ -187,7 +169,6 @@ export const PALETTES: { value: string, colours: Record<string, Pair> }[] = [
     'canvas': ['#e1e2e7', '#1a1b26'],
     'surface0': ['#e9e9ed', '#212433'],
     'surface1': ['#c4c8da', '#292e42'],
-    'overlay1': ['#4f5369', '#8595c6'],
     'subtext0': ['#435479', '#a9b1d6'],
     'text': ['#2d4cab', '#c0caf5'],
     'accent': ['#004db9', '#7aa2f7'],
@@ -197,8 +178,6 @@ export const PALETTES: { value: string, colours: Record<string, Pair> }[] = [
     'warning': ['#6b4f21', '#e0af68'],
     'info': ['#005c76', '#7dcfff'],
     'error': ['#a9003f', '#f7768e'],
-    'fill-hover': ['#c4c8da', '#292e42'],
-    'fill-danger': ['#dbcbd6', '#3d2a37'],
     'field-border': ['#686e83', '#717697'],
     'chart-3': ['#9854f1', '#bb9af7'],
     'chart-4': ['#b15c00', '#ff9e64'],
@@ -214,9 +193,23 @@ export const PALETTES: { value: string, colours: Record<string, Pair> }[] = [
   } },
 ]
 
-// A palette's tokens: kayjs-ui's as `--color-kui-<name>`, the syntax colours as the `--shiki-token-<name>` Shiki's CSS variables theme reads.
+// The names kayjs-ui reads for the colours whose theme name is not the palette's own: the rest keep theirs, `accent` and the like.
+const THEME_NAMES: Record<string, string> = {
+  'mantle': 'popover',
+  'canvas': 'background',
+  'surface0': 'surface',
+  'surface1': 'surface-strong',
+  'subtext0': 'muted',
+  'text': 'foreground',
+  'accent-hi': 'accent-hover',
+  'on-accent': 'accent-foreground',
+  'error': 'danger',
+  'field-border': 'input',
+}
+
+// A palette's tokens: kayjs-ui's as `--color-<name>` in the app's own theme names, the syntax colours as the `--shiki-token-<name>` Shiki's CSS variables theme reads.
 export function paletteTokens(colours: Record<string, Pair>): [string, string][] {
-  return Object.entries(colours).map(([name, [light, dark]]) => [name.startsWith('syntax-') ? `--shiki-token-${name.slice(7)}` : `--color-kui-${name}`, `light-dark(${light}, ${dark})`])
+  return Object.entries(colours).map(([name, [light, dark]]) => [name.startsWith('syntax-') ? `--shiki-token-${name.slice(7)}` : `--color-${THEME_NAMES[name] ?? name}`, `light-dark(${light}, ${dark})`])
 }
 
 // palettes.css: kay's palette on the root, every other under its `data-palette`.
@@ -230,5 +223,5 @@ export function paletteStylesheet(): string {
 export function themeCss(picked: string): string {
   const colours = (PALETTES.find(one => one.value === picked) ?? PALETTES[0]!).colours
 
-  return `@theme {\n${paletteTokens(colours).filter(([name]) => name.startsWith('--color-kui-')).map(([name, value]) => `  ${name}: ${value};`).join('\n')}\n}`
+  return `@theme {\n${paletteTokens(colours).filter(([name]) => name.startsWith('--color-')).map(([name, value]) => `  ${name}: ${value};`).join('\n')}\n}`
 }

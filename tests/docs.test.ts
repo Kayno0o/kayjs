@@ -278,7 +278,7 @@ describe('the documentation site', () => {
 
     const nord = PALETTES.find(one => one.value === 'nord')!.colours
 
-    expect(themeCss('nord')).toStartWith(`@theme {\n  --color-kui-mantle: light-dark(${nord.mantle![0]}, ${nord.mantle![1]});\n`)
+    expect(themeCss('nord')).toStartWith(`@theme {\n  --color-popover: light-dark(${nord.mantle![0]}, ${nord.mantle![1]});\n`)
     expect(themeCss('nord')).not.toContain('shiki')
   })
 
@@ -319,8 +319,8 @@ function contrast(a: string, b: string): number {
 }
 
 describe('the documentation\'s colours', () => {
-  const GROUNDS = ['mantle', 'canvas', 'surface0', 'surface1', 'fill-hover']
-  const TEXT = ['text', 'subtext0', 'overlay1', 'accent', 'error', 'success', 'warning', 'info']
+  const GROUNDS = ['mantle', 'canvas', 'surface0', 'surface1']
+  const TEXT = ['text', 'subtext0', 'accent', 'error', 'success', 'warning', 'info']
   const SYNTAX = Object.keys(PALETTES[0]!.colours).filter(name => name.startsWith('syntax-'))
   // Each pair under its minimum, as `palette: colour on ground (scheme): ratio`.
   const failing = (pairs: [string, string][], least: number) => PALETTES.flatMap(({ value, colours }) => pairs.flatMap(([fg, ground]) => [0, 1].map(scheme => [`${value}: ${fg} on ${ground} (${scheme === 0 ? 'light' : 'dark'})`, contrast(colours[fg]![scheme]!, colours[ground]![scheme]!)] as const)))

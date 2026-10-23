@@ -4,7 +4,7 @@ import SplitLayout from '@kaynooo/kayjs-ui/split-layout.kay'
 const moons = ['Io', 'Europa', 'Ganymede', 'Callisto']
 const picked = signal<string>()
 ---
-.h-64.overflow-hidden.rounded-lg.border.border-kui-surface2
+.h-64.overflow-hidden.rounded-lg.border.border-border
   SplitLayout(detailOpen={picked() !== undefined})
     @list
       for moon of moons key={moon}

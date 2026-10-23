@@ -11,4 +11,4 @@ const saved = signal('Moons of Jupiter')
     onChange={saved.set}
     aria-label="Title"
   )
-  p.text-kui-subtext0 Typed: {title()}. Saved on blur or Enter: {saved()}.
+  p.text-muted Typed: {title()}. Saved on blur or Enter: {saved()}.

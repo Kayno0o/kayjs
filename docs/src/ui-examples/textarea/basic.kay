@@ -12,4 +12,4 @@ const saved = signal('Pack the telescope.')
     rows={4}
     aria-label="Note"
   )
-  p.text-kui-subtext0 Saved on blur: {saved()}.
+  p.text-muted Saved on blur: {saved()}.

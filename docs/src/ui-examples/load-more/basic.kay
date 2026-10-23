@@ -16,7 +16,7 @@ async function page(offset: number) {
 
 const people = infiniteList(everyone.slice(0, SIZE), { pageSize: SIZE, key: person => person.id, load: ({ offset }) => page(offset) })
 ---
-.h-48.overflow-y-auto.rounded-lg.border.border-kui-surface2
+.h-48.overflow-y-auto.rounded-lg.border.border-border
   for person of people.rows() key={person.id}
     p.px-3.py-1 Person {person.id}
   LoadMore(list={people})

@@ -8,7 +8,7 @@ const links = [
 ]
 ---
 header.flex.items-center.gap-4.rounded.border(
-  class="border-kui-overlay1 bg-kui-surface0 px-3 py-2"
+  class="border-muted bg-surface px-3 py-2"
 )
   strong kay
   SiteNav(links={links} current="/guides/tutorial" label="Main")

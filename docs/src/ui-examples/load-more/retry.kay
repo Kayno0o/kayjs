@@ -18,7 +18,7 @@ async function page(offset: number) {
 
 const rows = infiniteList(Array.from({ length: SIZE }, (_, index) => ({ id: index + 1 })), { pageSize: SIZE, key: row => row.id, load: ({ offset }) => page(offset) })
 ---
-.h-48.overflow-y-auto.rounded-lg.border.border-kui-surface2
+.h-48.overflow-y-auto.rounded-lg.border.border-border
   for row of rows.rows() key={row.id}
     p.px-3.py-1 Row {row.id}
   LoadMore(list={rows} failureLabel="Could not load more rows.")

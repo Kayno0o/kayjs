@@ -14,7 +14,7 @@ const named = signal(true)
     | Show names
   ZoomPane(
     label="Map of Jupiter's moons"
-    class="h-64 w-full rounded-lg border border-kui-surface2"
+    class="h-64 w-full rounded-lg border border-border"
   )
     svg(viewBox="0 0 200 100" width="100%" height="100%")
       circle(cx="100" cy="50" r="12" fill="currentColor")

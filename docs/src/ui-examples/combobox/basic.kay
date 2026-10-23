@@ -19,4 +19,4 @@ const planet = signal('')
     placeholder="Type a planet"
     create
   )
-  p.text-kui-subtext0 Picked: {planet() || 'none'}.
+  p.text-muted Picked: {planet() || 'none'}.

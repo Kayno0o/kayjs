@@ -2,22 +2,22 @@
 @import '@kaynooo/kayjs-ui/theme.css';
 
 @theme {
-  --color-kui-accent: light-dark(#2f6496, #8fb8de);
-  --color-kui-accent-hi: light-dark(#24507a, #b0cde8);
+  --color-accent: light-dark(#2f6496, #8fb8de);
+  --color-accent-hover: light-dark(#24507a, #b0cde8);
 }
 
 @layer base {
   body {
-    @apply flex min-h-screen flex-col bg-kui-canvas font-sans text-kui-text;
+    @apply flex min-h-screen flex-col bg-background font-sans text-foreground;
   }
 
   a {
-    @apply text-kui-accent underline underline-offset-4 hover:text-kui-accent-hi;
+    @apply text-accent underline underline-offset-4 hover:text-accent-hover;
   }
 }
 
 @layer components {
   .skip-link {
-    @apply absolute top-0 left-0 z-100 -translate-y-full bg-kui-canvas px-2 py-1 transition-transform focus:translate-y-0;
+    @apply absolute top-0 left-0 z-100 -translate-y-full bg-background px-2 py-1 transition-transform focus:translate-y-0;
   }
 }

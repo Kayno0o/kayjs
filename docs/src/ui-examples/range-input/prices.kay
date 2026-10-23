@@ -28,6 +28,6 @@ const shown = memo(() =>
     value={range()}
     onChange={range.set}
   )
-  ul.text-kui-subtext0
+  ul.text-muted
     for item of shown() key={item.name}
       li {item.name}, {item.price} EUR

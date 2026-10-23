@@ -16,4 +16,4 @@ const kind = signal('')
     emptyOption="Any kind"
     aria-label="Kind"
   )
-  p.text-kui-subtext0 Kind: {kind() || 'any'}.
+  p.text-muted Kind: {kind() || 'any'}.

@@ -25,10 +25,10 @@ function remove(id: number) {
 ---
 Masonry(items={notes()} key={note => note.id} minWidth={180} gap={12})
   @tile(note)
-    .rounded-lg.border.border-kui-overlay1.bg-kui-surface0.p-3
+    .rounded-lg.border.border-muted.bg-surface.p-3
       h3.font-semibold {note.title}
-      p.text-kui-subtext0 {note.body}
-      button.mt-2.text-kui-subtext0.underline(
+      p.text-muted {note.body}
+      button.mt-2.text-muted.underline(
         type="button"
         onClick={() => remove(note.id)}
       )

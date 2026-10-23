@@ -5,4 +5,4 @@ const start = signal('09:30')
 ---
 .flex.flex-col.items-start.gap-2
   TimeInput(aria-label="Start time" value={start()} onChange={start.set})
-  p.text-kui-subtext0 Starts at {start() || 'no time'}.
+  p.text-muted Starts at {start() || 'no time'}.

@@ -7,7 +7,7 @@ const hovered = signal<{ element: Element, moons: number } | null>(null)
 ---
 .flex.gap-3.p-12
   for planet of planets
-    button.rounded-lg.border.border-kui-overlay1.px-3.py-1(
+    button.rounded-lg.border.border-muted.px-3.py-1(
       onPointerEnter={event => hovered.set({ element: event.currentTarget, moons: planet.moons })}
       onPointerLeave={() => hovered.set(null)}
       onFocus={event => hovered.set({ element: event.currentTarget, moons: planet.moons })}

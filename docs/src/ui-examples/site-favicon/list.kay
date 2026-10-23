@@ -11,7 +11,7 @@ const sites = [
 ul.flex.flex-col.gap-2.w-full.max-w-xs
   for site of sites key={site}
     li.flex.items-center.gap-2.rounded.border(
-      class="border-kui-overlay1 bg-kui-surface0 px-3 py-2"
+      class="border-muted bg-surface px-3 py-2"
     )
       SiteFavicon(name={site})
       span {site}
