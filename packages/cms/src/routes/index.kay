@@ -33,7 +33,7 @@ PageSection(title={wording('cms.admin.content', 'Content')} level={1})
       Refused(label={wording('cms.missing.title', 'Missing pages')} reason={reason})
     else
       Button(href={screenPath(prefix, '/not-found')} label={wording('cms.missing.title', 'Missing pages')})
-    if logged
+    if logged && denied.delete === undefined
       Button(href={activityPath(prefix)} label={wording('cms.activity.title', 'Activity')})
     Button(href={screenPath(prefix, '/media')} label={wording('cms.admin.media', 'Media')})
     Button(href={screenPath(prefix, '/uploads')} label={wording('cms.admin.uploads', 'Unused uploads')})

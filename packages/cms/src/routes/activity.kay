@@ -5,11 +5,16 @@ import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
 import { s } from 'kay'
 import { wording } from 'kay/words'
 import ActivityLog from '../components/activity-log.kay'
+import { forbidden, may } from '../access'
 import { adminTitle } from '../listing'
 import { screenPath } from '../paths'
 import { activityScreen } from '../screens'
 
 export const page = { query: s.Object({ page: s.Optional(s.Integer()) }) }
+
+// The log names every editor and what each did, the people the `delete` role may erase from the history.
+if (!await may(ctx, 'delete'))
+  forbidden(ctx, 'delete')
 
 const { prefix, rows, page: current, pages } = await activityScreen(ctx.query.page) ?? ctx.notFound()
 const url = ctx.url

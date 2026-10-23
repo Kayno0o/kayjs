@@ -82,6 +82,16 @@ test('signing out ends the sign-in: the screens send the visitor to sign in agai
   expect((await site.fetch('/_kay/cms/entries/posts/hello', { method: 'DELETE' })).status).toBe(401)
 })
 
+test('the activity log is for a role that may delete, as it names every editor', async () => {
+  await site.submit(signIn, { password: 'pw-editor' }, { from: '/admin/sign-in' })
+  expect((await site.fetch('/admin/activity')).status).toBe(403)
+  expect((await site.visit('/admin')).find('a[href="/admin/activity"]')).toHaveLength(0)
+  await site.submit(signOut, {}, { from: '/admin' })
+  await site.submit(signIn, { password: 'pw-admin' }, { from: '/admin/sign-in' })
+  expect((await site.fetch('/admin/activity')).status).toBe(200)
+  await site.submit(signOut, {}, { from: '/admin' })
+})
+
 test('a sign-in with the admin password carries the admin role', async () => {
   await site.submit(signIn, { password: 'pw-admin' }, { from: '/admin/sign-in' })
 
