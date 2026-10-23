@@ -110,7 +110,7 @@ describe('the Styles tab\'s endpoints', () => {
     expect(await ui()).toBe(`${head}  Badge: { parts: 'a' }, // after\n  Panel: { parts: { body: 'p-4' } }\n})\n`)
   })
 
-  it('keeps a block comment in a one-line empty object, and finds a trailing comma after a comment', async () => {
+  it('finds a trailing comma after a line or block comment, and keeps a block comment in a one-line object, empty or not', async () => {
     const head = 'import { defineUi } from \'kay\'\n\nexport default defineUi({\n'
 
     await put('src/ui.ts', `${head}  Panel: { parts: {\n    root: 'a' // c\n    ,\n  } },\n})\n`)

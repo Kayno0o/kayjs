@@ -118,13 +118,10 @@ function appendProperty(source: string, object: t.ObjectExpression, property: st
   const inline = !source.slice(start, object.end!).includes('\n')
 
   if (last === undefined && inline) {
+    // A block comment in the braces stays, the property goes after it.
     const kept = source.slice(start + 1, object.end! - 1).trim()
 
-    // A block comment in the braces stays, the property goes after it.
-    if (kept !== '')
-      return { at: start, remove: object.end! - start, text: `{ ${kept} ${property} }` }
-
-    return { at: start, remove: object.end! - start, text: `{ ${property} }` }
+    return { at: start, remove: object.end! - start, text: `{ ${kept === '' ? '' : `${kept} `}${property} }` }
   }
 
   if (last === undefined) {
@@ -167,6 +164,7 @@ function editFor(source: string, key: string, part: string, classes: string): Ed
     return 'src/ui.ts does not parse'
   }
 
+  const comments = ast.comments ?? []
   const root = exported(ast)
   const object = root === undefined ? undefined : unwrapped(root)
 
@@ -179,7 +177,7 @@ function editFor(source: string, key: string, part: string, classes: string): Ed
   const entry = entries.find(property => keyOf(property) === key)
 
   if (entry === undefined)
-    return appendProperty(source, object, `${keyText(key)}: { parts: { ${partText} } }`, ast.comments ?? [])
+    return appendProperty(source, object, `${keyText(key)}: { parts: { ${partText} } }`, comments)
 
   const value = unwrapped(entry.value)
 
@@ -189,7 +187,7 @@ function editFor(source: string, key: string, part: string, classes: string): Ed
   const parts = value.properties.find((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && keyOf(property) === 'parts')
 
   if (parts === undefined)
-    return appendProperty(source, value, `parts: { ${partText} }`, ast.comments ?? [])
+    return appendProperty(source, value, `parts: { ${partText} }`, comments)
 
   const body = unwrapped(parts.value)
 
@@ -202,7 +200,7 @@ function editFor(source: string, key: string, part: string, classes: string): Ed
   const existing = body.properties.find((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && keyOf(property) === part)
 
   if (existing === undefined)
-    return appendProperty(source, body, partText, ast.comments ?? [])
+    return appendProperty(source, body, partText, comments)
 
   const current = unwrapped(existing.value)
 
