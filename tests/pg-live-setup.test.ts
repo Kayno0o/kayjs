@@ -265,35 +265,55 @@ pgDescribe('closing a pgData store', () => {
     expect(await others(sql)).toBe(expected)
   }
 
-  // The reads of kay_events in this database, which only the polling of its cache makes; the server flushes its counters about a second after a read.
-  const reads = async (sql: SQL) => {
-    await Bun.sleep(1500)
+  // The connection, counting the statements sent through it.
+  function counted(sql: SQL): { db: SQL, sent: () => number } {
+    let sent = 0
 
-    const [row] = await sql.unsafe<{ reads: string }[]>(`SELECT coalesce(sum(coalesce(seq_scan, 0) + coalesce(idx_scan, 0)), 0)::text AS reads FROM pg_stat_user_tables WHERE relname = 'kay_events'`)
+    const db = new Proxy(sql, {
+      get(target, key) {
+        const value: unknown = Reflect.get(target, key)
 
-    return Number(row!.reads)
+        if (typeof value !== 'function')
+          return value
+
+        return (...args: unknown[]): unknown => {
+          sent++
+
+          return Reflect.apply(value, target, args)
+        }
+      },
+      apply(target, _this, args: unknown[]): unknown {
+        sent++
+
+        return Reflect.apply(target, undefined, args)
+      },
+    })
+
+    return { db, sent: () => sent }
   }
 
   pgIt('stops its polling', async () => {
     await withDatabase(async (database) => {
       const sql = new SQL(database, { max: 2 })
+      const { db, sent } = counted(sql)
 
       try {
-        const store = pgData(sql)
+        const store = pgData(db)
 
         store.cache.subscribe?.(() => undefined)
         await store.cache.get('key')
 
-        const first = await reads(sql)
+        const before = sent()
 
-        expect(await reads(sql)).toBeGreaterThan(first)
+        // A poll is due every half second.
+        await Bun.sleep(1200)
+        expect(sent()).toBeGreaterThan(before)
         await store.close()
-        // A read in flight at the close is counted a moment later.
-        await reads(sql)
 
-        const closed = await reads(sql)
+        const closed = sent()
 
-        expect(await reads(sql)).toBe(closed)
+        await Bun.sleep(1200)
+        expect(sent()).toBe(closed)
       }
       finally {
         await sql.close()
