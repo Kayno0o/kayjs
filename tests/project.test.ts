@@ -95,7 +95,7 @@ describe('modeOf', () => {
 
     try {
       process.env.NODE_ENV = 'development'
-      expect(modeOf()).toEqual({ dev: true, prebuilt: false, underKayDev: false })
+      expect(modeOf()).toEqual({ dev: true, prebuilt: false, underKayDev: false, devRoutes: false })
       expect(modeOf({ dev: false, prebuilt: true })).toEqual(PRODUCTION)
       process.env.NODE_ENV = 'production'
       expect(modeOf()).toEqual(PRODUCTION)
@@ -109,7 +109,7 @@ describe('modeOf', () => {
 
     const offline = { offline: true as const }
 
-    expect(renderOptionsOf(offline, { dev: true }, { head: undefined, maxDensity: 2 })).toMatchObject({ dev: true, serverTiming: true, offline: false })
+    expect(renderOptionsOf(offline, { dev: true, devRoutes: false }, { head: undefined, maxDensity: 2 })).toMatchObject({ dev: true, serverTiming: true, offline: false })
     expect(renderOptionsOf({ ...offline, base: '/docs/' }, PRODUCTION, { head: undefined, maxDensity: 2 })).toMatchObject({ dev: false, serverTiming: false, offline: true, base: '/docs', maxDensity: 2 })
     expect(offlineOf({}, PRODUCTION)).toBe(false)
   })

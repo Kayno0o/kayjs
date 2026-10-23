@@ -17,7 +17,7 @@ const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixt
 // Serves `options` with a client loader that only counts, answering how many builds the server started and what it refused with.
 async function refusal(options: PagesOptions, root = process.cwd()): Promise<{ builds: number, message: string }> {
   let builds = 0
-  const project = resolveProject(root, { routes, prebuilt: false, security: false, ...options }, { dev: false, prebuilt: false, underKayDev: false })
+  const project = resolveProject(root, { routes, prebuilt: false, security: false, ...options }, { dev: false, prebuilt: false, underKayDev: false, devRoutes: false })
   const loadClient = (): ClientBuild => {
     builds++
 

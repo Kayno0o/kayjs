@@ -212,7 +212,7 @@ describe('security headers', () => {
 
   it('allows the live-reload script in development, as the server\'s mode says whatever its config holds', async () => {
     const scriptSources = async (app: { handle: (request: Request) => Promise<Response> }) => directives((await app.handle(new Request('http://localhost/about'))).headers.get('content-security-policy')).get('script-src')
-    const dev = { dev: true, prebuilt: false, underKayDev: false }
+    const dev = { dev: true, prebuilt: false, underKayDev: false, devRoutes: true }
 
     expect(await scriptSources(await pages({ root: SEO, prebuilt: false, dev: true }))).toEqual(['\'self\'', ...inlineScriptHashes({ dev: true })])
     expect(await scriptSources(await servePages(resolveProject(SEO, { routes: 'src/routes' }, dev), async () => (await readClient(SEO))!))).toEqual(['\'self\'', ...inlineScriptHashes({ dev: true })])

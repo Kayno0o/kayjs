@@ -574,6 +574,29 @@ export function refuseForeignHosts(app: Elysia, site: string | undefined): void 
   })
 }
 
+const GUARDED_PATHS = [DEV_DATA, DEV_UI, DEV_JOBS, DEV_NOT_FOUND]
+const LOOPBACK = /^(?:127\.|::1$|::ffff:127\.)/
+
+// Under `kay dev`, the data, UI, jobs and not-found routes answer a peer on this machine only, as `kay dev --host` would otherwise let the network read the database and rewrite files; `KAY_DEV_REMOTE=1` lets any peer in.
+export function refuseRemoteDevTools(app: Elysia): void {
+  if (!underKayDev() || process.env.KAY_DEV_REMOTE === '1')
+    return
+
+  app.onBeforeHandle(({ request, server }) => {
+    const path = new URL(request.url).pathname
+
+    if (!GUARDED_PATHS.some(guarded => path === guarded || path.startsWith(`${guarded}/`)))
+      return
+
+    const address = server?.requestIP(request)?.address
+
+    if (address !== undefined && LOOPBACK.test(address))
+      return
+
+    return new Response('kay dev serves this tool to this machine only; set KAY_DEV_REMOTE=1 to open it to the network\n', { status: 403, headers: { 'content-type': 'text/plain; charset=utf-8' } })
+  })
+}
+
 // What a dev server serves when the project failed to boot: the errors on every page, until a fix restarts it.
 export function bootFailure(error: unknown, root: string): Elysia {
   // Told by its name: the class's module loads the compiler, which a production server never needs.

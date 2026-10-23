@@ -101,14 +101,16 @@ export interface Mode {
   dev: boolean
   prebuilt: boolean
   underKayDev: boolean
+  // Whether the dev tool's data, UI, jobs and other routes answer: under `kay dev`, or when the code passed `dev: true` itself, never because `NODE_ENV` says development.
+  devRoutes: boolean
 }
 
 // What `kay build` and the executable it compiles run as.
-export const PRODUCTION: Mode = { dev: false, prebuilt: true, underKayDev: false }
+export const PRODUCTION: Mode = { dev: false, prebuilt: true, underKayDev: false, devRoutes: false }
 
 // The mode a server takes from its options, or else from `NODE_ENV` and `kay dev`.
 export function modeOf(options: { dev?: boolean | undefined, prebuilt?: boolean | undefined } = {}): Mode {
-  return { dev: options.dev ?? process.env.NODE_ENV === 'development', prebuilt: options.prebuilt ?? process.env.NODE_ENV === 'production', underKayDev: underKayDev() }
+  return { dev: options.dev ?? process.env.NODE_ENV === 'development', prebuilt: options.prebuilt ?? process.env.NODE_ENV === 'production', underKayDev: underKayDev(), devRoutes: underKayDev() || options.dev === true }
 }
 
 // Whether pages register the service worker: never in development, which serves one unregistering itself instead.
@@ -129,8 +131,8 @@ function customWidths(widths: number[] | undefined): number[] | undefined {
 }
 
 // How every page renders, served or prerendered alike.
-export function renderOptionsOf(config: RenderConfig, mode: Pick<Mode, 'dev'>, built: { head: SeoHead | undefined, maxDensity: number, editor?: string | undefined, contexts?: string[] | undefined, fontCss?: string | undefined, islandPreloads?: RenderOptions['islandPreloads'] }): RenderOptions {
-  return { lang: config.lang, dev: mode.dev, serverTiming: config.serverTiming ?? mode.dev, prefetch: config.prefetch, saveData: config.saveData, sameTabLinks: config.links?.outside === 'same-tab', fontCss: config.saveData === false ? undefined : built.fontCss, islandPreloads: config.saveData === false ? undefined : built.islandPreloads, onError: config.onError, head: built.head, base: basePath(config.base), apiPath: config.apiPath, maxDensity: built.maxDensity, imageWidths: customWidths(config.images?.widths), resolvedImages: config.images?.resolve !== undefined, offline: offlineOf(config, mode), lateStyles: config.lateStyles, typography: config.typography, editor: built.editor, contexts: built.contexts }
+export function renderOptionsOf(config: RenderConfig, mode: Pick<Mode, 'dev' | 'devRoutes'>, built: { head: SeoHead | undefined, maxDensity: number, editor?: string | undefined, contexts?: string[] | undefined, fontCss?: string | undefined, islandPreloads?: RenderOptions['islandPreloads'] }): RenderOptions {
+  return { lang: config.lang, dev: mode.dev, devTools: mode.devRoutes, serverTiming: config.serverTiming ?? mode.dev, prefetch: config.prefetch, saveData: config.saveData, sameTabLinks: config.links?.outside === 'same-tab', fontCss: config.saveData === false ? undefined : built.fontCss, islandPreloads: config.saveData === false ? undefined : built.islandPreloads, onError: config.onError, head: built.head, base: basePath(config.base), apiPath: config.apiPath, maxDensity: built.maxDensity, imageWidths: customWidths(config.images?.widths), resolvedImages: config.images?.resolve !== undefined, offline: offlineOf(config, mode), lateStyles: config.lateStyles, typography: config.typography, editor: built.editor, contexts: built.contexts }
 }
 
 // A project as every entry point takes it: where it is, its config, where it keeps each part and how it runs.

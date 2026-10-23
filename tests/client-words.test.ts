@@ -31,7 +31,7 @@ const FRENCH = {
 }
 
 async function page(path: string, options: { dev?: boolean, i18n?: boolean, base?: string, trailingSlash?: 'always' } = {}): Promise<string> {
-  const app = await servePages(resolveProject(process.cwd(), { routes: `${FIXTURE}/src/routes`, security: false, ...options.base !== undefined && { base: options.base }, ...options.trailingSlash !== undefined && { trailingSlash: options.trailingSlash }, ...options.i18n !== false && { i18n } }, { dev: options.dev ?? false, prebuilt: false, underKayDev: false }), async () => client)
+  const app = await servePages(resolveProject(process.cwd(), { routes: `${FIXTURE}/src/routes`, security: false, ...options.base !== undefined && { base: options.base }, ...options.trailingSlash !== undefined && { trailingSlash: options.trailingSlash }, ...options.i18n !== false && { i18n } }, { dev: options.dev ?? false, prebuilt: false, underKayDev: false, devRoutes: false }), async () => client)
 
   return (await app.handle(new Request(`http://localhost${path}`))).text()
 }

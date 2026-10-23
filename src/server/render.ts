@@ -143,6 +143,8 @@ export interface RenderOptions {
   apiPath?: string | undefined
   // Shows thrown errors with their stack instead of a generic message.
   dev?: boolean | undefined
+  // Loads the dev tool's scripts, which the dev routes serve.
+  devTools?: boolean | undefined
   // Renders once at build time: what only a request carries throws instead of reading as empty.
   prerendering?: boolean | undefined
   onError?: KayConfig['onError'] | undefined
@@ -866,7 +868,7 @@ async function renderFailure(error: unknown, special: SpecialPages, rendering: R
   if (options.dev && !notFound && !denied) {
     rendering.headers.set('content-type', 'text/html; charset=utf-8')
 
-    return respond(rendering, errorPage(pageError) + errorPageScripts())
+    return respond(rendering, errorPage(pageError) + (options.devTools ? errorPageScripts() : ''))
   }
 
   rendering.headers.set('content-type', TEXT['content-type'])
@@ -1035,7 +1037,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const islandData = (hasIslands || (checked !== '' && words.size > 0) ? messagesScript(words, true, hasIslands && lang !== state?.locale) : '') + (hasIslands ? outcomeScript(rendering.carried()) + queryScript(rules) : '') + liveText
   const opening = `${htmlOpen(lang, head.root)}<head>${headStart(head)}`
   const sheets = stylesheets(client, styled)
-  const closing = `${headHtml}${scripts}${islandData}${kayMetas(options, hasIslands)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${speculationRules(options.prefetch, options.base, options.apiPath)}${rendering.guarded === true ? GUARDED_META : ''}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? devScripts(client, styled, options.lateStyles === true) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
+  const closing = `${headHtml}${scripts}${islandData}${kayMetas(options, hasIslands)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${speculationRules(options.prefetch, options.base, options.apiPath)}${rendering.guarded === true ? GUARDED_META : ''}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev && options.devTools ? devScripts(client, styled, options.lateStyles === true) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
   const written = opening + sheets + closing
   const start = marks === undefined ? written : placeFieldMarks(written, marks)
 

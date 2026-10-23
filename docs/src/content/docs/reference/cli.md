@@ -228,6 +228,8 @@ The dev server answers 421 to a request whose `Host` is not `localhost`, a `*.lo
 KAY_DEV_HOSTS=dev.example.com bunx kay dev --host
 ```
 
+The dev tool's routes, under `/_kay/dev/`, exist only in a server `kay dev` started. A server started with `NODE_ENV=development` any other way answers 404 on them and serves no dev tool. The Data, Styles, Jobs and not-found routes read the database or write files, so they answer a peer on this machine only, even under `--host`. Set `KAY_DEV_REMOTE=1` to let any peer reach them, on a network you trust.
+
 ### Events for tools
 
 Under `--format json`, each line is one JSON object on stdout with an `event` and a `time`. The server's own output goes to stderr.
