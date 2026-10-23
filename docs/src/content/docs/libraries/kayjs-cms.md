@@ -62,7 +62,9 @@ cms({ guard: passwordGuard({ editor: env.EDITOR_PASSWORD, admin: env.ADMIN_PASSW
 
 A lone password signs in as `editor`. The sign-in lasts 14 days unless `maxAge` says otherwise, and it is a signed cookie, so changing a password signs out everyone who used it. 
 
-The sign-in cookie is signed with a key made from the password and your app's secret (`KAY_SECRET`), so changing that secret signs everyone out. Pass `{ secret }` to use another one, and set kay's `proxy` option behind a proxy, as the ten tries are counted per client address. In production a password is at least 12 characters and no two roles share one, or the server refuses to start. Over https the cookie is named `__Host-kay_editor_session`, which a browser takes only from the site itself; the older name is still read. A store you give must have a `peek` method.
+The sign-in cookie is signed with a key made from the password and your app's secret (`KAY_SECRET`), so changing that secret signs everyone out. Pass `{ secret }` to use another one, and set kay's `proxy` option behind a proxy, as the ten tries are counted per client address.
+
+In production a password is at least 12 characters and no two roles share one, or the server refuses to start. Over https the cookie is named `__Host-kay_editor_session`, which a browser takes only from the site itself; the older name is still read. A store you give must have a `peek` method.
 
 Signing out deletes the cookie and ends it on the server, so a copy of it stops working too. That is kept in the app's `store.rates` (or `{ store }`, else the memory of the process), so every server process sharing it refuses the copy; without a shared store, another process or a restart still accepts it until it expires or the password changes. 
 
