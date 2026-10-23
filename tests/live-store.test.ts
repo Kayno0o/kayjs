@@ -589,11 +589,32 @@ describe('a live value with a lifetime', () => {
     const keyed = declareKeyedTtl(() => 0, { ttl: '300ms' }, 'test:ttl-all', 'ttlAll')
 
     expect([keyed('a'), keyed('b')]).toEqual([1, 2])
-    await Bun.sleep(10)
+    await Promise.resolve()
     expect(calls).toEqual([['test:ttl-all', 300]])
     await Bun.sleep(400)
     expect([keyed('a'), keyed('b')]).toEqual([0, 0])
     setLiveStore(undefined)
+  })
+
+  it('goes on when endAll throws or rejects', async () => {
+    const refused = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      for (const endAll of [(): void => {
+        throw new Error('the database is locked')
+      }, async (): Promise<void> => Promise.reject(new Error('the database is down'))]) {
+        setLiveStore({ entries: () => [['test:ttl-all-refused', 'a', '[1]']], set: () => undefined, endAll, delete: () => undefined, subscribe: () => undefined })
+
+        const keyed = declareKeyedTtl(() => 0, { ttl: '60s' }, 'test:ttl-all-refused', 'ttlAllRefused')
+
+        expect(keyed('a')).toBe(1)
+        await Bun.sleep(10)
+      }
+    }
+    finally {
+      refused.mockRestore()
+      setLiveStore(undefined)
+    }
   })
 
   it('goes on when the store refuses to keep the end', () => {

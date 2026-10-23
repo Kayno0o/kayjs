@@ -55,7 +55,7 @@ export function pgLive(pg: PgHandle): LiveStore {
   }
 
   // The row and its message go together, so a process that heard the message finds the row.
-  const write = async (what: string, id: string, key: string, change: (tx: SQL) => Promise<unknown>, eventKey = escaped(key)): Promise<void> => {
+  const write = async (what: string, id: string, eventKey: string, change: (tx: SQL) => Promise<unknown>): Promise<void> => {
     if (queued >= MAX_QUEUED) {
       if (!overflowing)
         kayLog('error', `${what} the live value ${id} failed: ${MAX_QUEUED} writes wait for the database, the ones after are dropped until it answers`)
@@ -159,6 +159,8 @@ export function pgLive(pg: PgHandle): LiveStore {
     }
 
     const wanted = [...changed]
+    // The keys with a write still to commit before the rows are read: one that commits during the read is not mistaken for settled.
+    const busy = new Set(pending.keys())
 
     const values = new Map<string, { value: string, expiresAt: number | undefined }>()
 
@@ -178,7 +180,7 @@ export function pgLive(pg: PgHandle): LiveStore {
       for (const row of rows) {
         const at = `${row.id}\0${row.key}`
 
-        if (pending.has(at))
+        if (busy.has(at) || pending.has(at))
           deferred.set(at, [row.id, row.key])
         else if (!changed.has(at))
           heard.push([unescaped(row.id), unescaped(row.key), row.value, Date.now() + Number(row.expires_at)])
@@ -252,7 +254,7 @@ export function pgLive(pg: PgHandle): LiveStore {
     },
     // The end is stored on the database's clock, as the remaining time, so replicas whose clocks disagree forget a value together; the rows give it back on the reader's.
     set: async (id, key, text, expiresAt) => {
-      await write('writing', id, key, async (tx) => {
+      await write('writing', id, escaped(key), async (tx) => {
         const remaining = expiresAt === undefined ? null : Math.max(0, Math.round(expiresAt - Date.now()))
 
         await query(tx, `INSERT INTO kay_live (id, key, value, expires_at) VALUES ($1, $2, $3, CASE WHEN $4::bigint IS NULL THEN NULL ELSE ${NOW} + $4::bigint END) ON CONFLICT (id, key) DO UPDATE SET value = excluded.value, expires_at = excluded.expires_at`, [escaped(id), escaped(key), text, remaining])
@@ -261,14 +263,14 @@ export function pgLive(pg: PgHandle): LiveStore {
       purge()
     },
     // Only where the row has no end: a text another replica set meanwhile is kept.
-    end: async (id, key, expiresAt) => write('dating', id, key, async (tx) => {
+    end: async (id, key, expiresAt) => write('dating', id, escaped(key), async (tx) => {
       await query(tx, `UPDATE kay_live SET expires_at = ${NOW} + $3::bigint WHERE id = $1 AND key = $2 AND expires_at IS NULL`, [escaped(id), escaped(key), Math.max(0, Math.round(expiresAt - Date.now()))])
     }),
     // One statement and one event for every row of the id still without an end.
-    endAll: async (id, ttl) => write('dating', id, '', async (tx) => {
+    endAll: async (id, ttl) => write('dating', id, WHOLE_ID, async (tx) => {
       await query(tx, `UPDATE kay_live SET expires_at = ${NOW} + $2::bigint WHERE id = $1 AND expires_at IS NULL`, [escaped(id), Math.max(0, Math.round(ttl))])
-    }, WHOLE_ID),
-    delete: async (id, key) => write('deleting', id, key, async tx => query(tx, 'DELETE FROM kay_live WHERE id = $1 AND key = $2', [escaped(id), escaped(key)])),
+    }),
+    delete: async (id, key) => write('deleting', id, escaped(key), async tx => query(tx, 'DELETE FROM kay_live WHERE id = $1 AND key = $2', [escaped(id), escaped(key)])),
     subscribe(listener) {
       listeners.add(listener)
 

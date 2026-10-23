@@ -388,6 +388,26 @@ pgDescribe('pgData live values', () => {
     other.stop?.()
   })
 
+  pgIt('keeps the keys * and \\* apart from the event of a whole id', async () => {
+    const sql = await fresh()
+    const [store, other] = twoReplicas()
+
+    await store.set('app:stars', '*', '[1]')
+    await store.set('app:stars', '\\*', '[2]')
+    await other.entries()
+
+    const heard: [string, string | undefined][] = []
+
+    other.subscribe((_id, key, text) => heard.push([key, text]))
+    await store.endAll!('app:stars', 60_000)
+    await waitFor(() => heard.length === 2, 'the other replica to hear both keys')
+
+    expect(heard.sort()).toEqual([['*', '[1]'], ['\\*', '[2]']])
+    expect(Number((await sql.unsafe<{ count: string }[]>('SELECT count(expires_at)::text AS count FROM kay_live'))[0]!.count)).toBe(2)
+    store.stop?.()
+    other.stop?.()
+  })
+
   pgIt('purges apart from the write, so a purge stuck on a locked row costs the write nothing', async () => {
     const sql = await fresh()
     const [store] = twoReplicas()

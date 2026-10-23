@@ -54,7 +54,7 @@ export interface LiveStore {
   set: (id: string, key: string, text: string, expiresAt?: number) => void | Promise<void>
   // Gives a value held with no end the end, leaving its text and any end it has; optional, a store without it has the value written again with the end, which can overwrite a text another process set meanwhile.
   end?: (id: string, key: string, expiresAt: number) => void | Promise<void>
-  // Gives every value of an id held with no end the end of now plus `ttl` milliseconds, in one write and one event; optional, a store without it has `end` called for each value, and one that only keeps `set` has each written again.
+  // Gives every value of an id held with no end the end of now plus `ttl` milliseconds, in one write and one event, including a row this process did not read, which only the other processes then hear dated; optional, a store without it has `end` called for each value, and one that only keeps `set` has each written again.
   endAll?: (id: string, ttl: number) => void | Promise<void>
   // Drops a key and tells the other processes.
   delete: (id: string, key: string) => void | Promise<void>
@@ -570,16 +570,18 @@ function stamped(slot: ServerSlot, key: string, text: string): number | undefine
 
   const expiresAt = Date.now() + slot.ttl
 
-  if (shared(slot) && state().store?.endAll !== undefined) {
-    datedTogether(slot.id)
-  }
-  else if (shared(slot)) {
-    try {
-      sendToStore(slot.id, key, (store): void | Promise<void> => store.end === undefined ? store.set(slot.id, key, text, expiresAt) : store.end(slot.id, key, expiresAt))
+  if (shared(slot)) {
+    if (state().store?.endAll !== undefined) {
+      datedTogether(slot.id)
     }
-    catch (error) {
-      // A store may refuse a write; the end stays local, and the next start tries again.
-      kayLog('error', `the end of the live value ${slot.id} could not be written to the store`, error)
+    else {
+      try {
+        sendToStore(slot.id, key, (store): void | Promise<void> => store.end === undefined ? store.set(slot.id, key, text, expiresAt) : store.end(slot.id, key, expiresAt))
+      }
+      catch (error) {
+        // A store may refuse a write; the end stays local, and the next start tries again.
+        kayLog('error', `the end of the live value ${slot.id} could not be written to the store`, error)
+      }
     }
   }
 
