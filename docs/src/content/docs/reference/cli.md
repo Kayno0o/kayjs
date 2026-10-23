@@ -388,7 +388,7 @@ The report groups the findings by rule, then by page. Each element comes with th
 
 It also drafts the accessibility statement as Markdown, in `.kay/a11y/declaration.md` or the file `--declaration` names. It lists the pages audited and the pages left out. Every criterion is marked verified, failed or to review by hand. `--standard rgaa` lists the 106 criteria of RGAA 4.1 in French, and is the default when the default locale is French. `--standard wcag` lists the WCAG 2.1 success criteria in English.
 
-A criterion is verified only when axe-core fully decides it, which is the case of 8.3 (the page has a language) and 8.5 (the page has a title). A criterion fails when a rule that breaks it fails on a page. All the others stay to review: automatic checks find a part of the problems, and the declaration needs an audit by a person. What axe-core finds that no criterion takes in is listed apart.
+A criterion is verified only when axe-core fully decides it and every page was audited, which is the case of 8.3 (the page has a language) and 8.5 (the page has a title) in RGAA, and of none in WCAG. The run fails when no page could be audited. A criterion fails when a rule that breaks it fails on a page. All the others stay to review: automatic checks find a part of the problems, and the declaration needs an audit by a person. What axe-core finds that no criterion takes in is listed apart.
 
 | Option | Effect |
 | --- | --- |
@@ -697,7 +697,7 @@ Each tool runs its command in a child process, so a call costs what the command 
 
 ## Quiet and plain output
 
-`kay add`, `kay build`, `kay check`, `kay dev`, `kay fmt`, `kay generate`, `kay migrate`, `kay new`, `kay render`, `kay routes`, `kay start`, `kay types` and `kay upgrade` take `--quiet`; every other command refuses it.
+`kay a11y`, `kay add`, `kay build`, `kay check`, `kay dev`, `kay fmt`, `kay generate`, `kay migrate`, `kay new`, `kay render`, `kay routes`, `kay start`, `kay types` and `kay upgrade` take `--quiet`; every other command refuses it.
 
 `--quiet` prints the problems and one summary line, without the size report or the files one by one. `kay types` prints nothing at all.
 

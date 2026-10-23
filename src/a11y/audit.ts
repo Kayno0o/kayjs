@@ -36,8 +36,8 @@ export interface Audit {
 }
 
 // A page gets this long to answer, to load and to hydrate.
-const PAGE_MS = '15s'
 const ANSWER_MS = 15_000
+const PAGE_MS = `${ANSWER_MS / 1000}s`
 const REDIRECTS = new Set([301, 302, 303, 307, 308])
 
 export class A11yRefusedError extends Error {}
@@ -62,11 +62,14 @@ export async function auditSite(root: string, config: KayConfig, progress: (path
     throw new A11yRefusedError(started)
 
   const origin = `http://127.0.0.1:${started.port}`
-  const mounted = base === '' ? undefined : mountedAt(origin, base)
-  const served = mounted?.origin ?? origin
+  let mounted: ReturnType<typeof mountedAt> | undefined
   let page: TestPage | undefined
 
   try {
+    mounted = base === '' ? undefined : mountedAt(origin, base)
+
+    const served = mounted?.origin ?? origin
+
     for (const target of targets) {
       const url = `${served}${joinBase(base, target.path)}`
 

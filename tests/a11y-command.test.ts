@@ -66,7 +66,7 @@ describe('what a scan decides', () => {
   const audit = { audited: [{ path: '/about', route: '/about', file: 'src/routes/about.kay', locale: undefined }], skipped: [], violations: [violation, unmapped] }
 
   it('marks a criterion failed by the rule that breaks it, verified only where rules decide it, and leaves the rest to a person', () => {
-    const byId = new Map(judge('rgaa', audit.violations, 1).map(each => [each.id, each]))
+    const byId = new Map(judge('rgaa', audit.violations, true).map(each => [each.id, each]))
 
     expect(byId.get('1.1')).toMatchObject({ status: 'failed', failures: [{ rule: 'image-alt', route: '/about' }] })
     expect(byId.get('8.5')?.status).toBe('verified')
@@ -75,15 +75,15 @@ describe('what a scan decides', () => {
     expect([...byId.values()].filter(each => each.status === 'verified')).toHaveLength(2)
   })
 
-  it('verifies nothing when no page was audited', () => {
-    expect(judge('rgaa', [], 0).every(each => each.status === 'review')).toBe(true)
+  it('verifies nothing when a page was left out or none audited', () => {
+    expect(judge('rgaa', [], false).every(each => each.status === 'review')).toBe(true)
   })
 
   it('files a failure under the success criterion its rule is tagged with, for WCAG', () => {
-    const byId = new Map(judge('wcag', audit.violations, 1).map(each => [each.id, each]))
+    const byId = new Map(judge('wcag', audit.violations, true).map(each => [each.id, each]))
 
     expect(byId.get('1.1.1')?.status).toBe('failed')
-    expect(byId.get('2.4.2')?.status).toBe('verified')
+    expect(byId.get('2.4.2')?.status).toBe('review')
     expect(byId.get('1.4.3')?.status).toBe('review')
   })
 
@@ -110,9 +110,10 @@ describe('what a scan decides', () => {
   it('fails the run for a finding or a page the site got wrong, not for a page left out', () => {
     const page = { path: '/admin', route: '/admin', file: 'src/routes/admin.kay', why: 'it answers 401' }
 
-    expect(failed({ violations: [], skipped: [{ ...page, failed: false }] })).toBe(false)
-    expect(failed({ violations: [], skipped: [{ ...page, failed: true }] })).toBe(true)
-    expect(failed({ violations: [violation], skipped: [] })).toBe(true)
+    expect(failed({ audited: audit.audited, violations: [], skipped: [{ ...page, failed: false }] })).toBe(false)
+    expect(failed({ audited: audit.audited, violations: [], skipped: [{ ...page, failed: true }] })).toBe(true)
+    expect(failed({ audited: [], violations: [], skipped: [] })).toBe(true)
+    expect(failed({ audited: audit.audited, violations: [violation], skipped: [] })).toBe(true)
     expect(formatReport(reportOf(audit, 'rgaa'))).toContain('img  src/routes/about.kay:4:3')
   })
 })

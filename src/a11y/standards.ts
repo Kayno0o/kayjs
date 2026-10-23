@@ -50,12 +50,7 @@ export const RGAA_DECIDED: Readonly<Record<string, readonly string[]>> = {
   8.5: ['document-title'],
 }
 
-// The same for WCAG 2.1, from the success criteria in the rules' own `wcagNNN` tags for what fails, and these for what is decided: 2.4.2 is a `<title>`, 3.1.1 a valid `lang` on the page.
-export const WCAG_DECIDED: Readonly<Record<string, readonly string[]>> = {
-  '2.4.2': ['document-title'],
-  '3.1.1': ['html-has-lang', 'html-lang-valid'],
-}
-
+// WCAG 2.1 takes what fails from the success criteria in the rules' own `wcagNNN` tags, and verifies none: 2.4.2 asks a title that describes the page and 3.1.1 the right language, which a rule cannot tell from a present one.
 const SC_TAG = /^wcag\d+$/
 const SC_BY_TAG = new Map(WCAG_CRITERIA.map(([id]) => [`wcag${id.replaceAll('.', '')}`, id]))
 
@@ -64,12 +59,12 @@ function successCriteria(tags: readonly string[]): string[] {
   return tags.flatMap(tag => SC_TAG.test(tag) ? SC_BY_TAG.get(tag) ?? [] : [])
 }
 
-// Every criterion of the standard with where it stands once `pages` routes were audited and `violations` found.
-export function judge(standard: Standard, violations: Violation[], audited: number): Criterion[] {
+// Every criterion of the standard with where it stands once the routes were audited and `violations` found; `complete` is whether every page was, as a criterion is verified for the site only when it held on all of them.
+export function judge(standard: Standard, violations: Violation[], complete: boolean): Criterion[] {
   const listed = standard === 'rgaa'
     ? RGAA_CRITERIA.map(([id, title]) => ({ id, title }))
     : WCAG_CRITERIA.map(([id, name, level]) => ({ id, title: `${name} (${level})` }))
-  const decided = standard === 'rgaa' ? RGAA_DECIDED : WCAG_DECIDED
+  const decided = standard === 'rgaa' ? RGAA_DECIDED : {}
   const failing = new Map<string, Violation[]>()
 
   for (const violation of violations) {
@@ -85,7 +80,7 @@ export function judge(standard: Standard, violations: Violation[], audited: numb
     if (found.length > 0)
       return { id, title, status: 'failed', failures: found.map(({ rule, route }) => ({ rule, route })) }
 
-    return { id, title, status: audited > 0 && decided[id] !== undefined ? 'verified' : 'review', failures: [] }
+    return { id, title, status: complete && decided[id] !== undefined ? 'verified' : 'review', failures: [] }
   })
 }
 

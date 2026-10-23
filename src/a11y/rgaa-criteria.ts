@@ -174,7 +174,7 @@ export const WCAG_CRITERIA: readonly (readonly [number: string, name: string, le
   ['3.2.4', 'Consistent Identification', 'AA'],
   ['3.3.1', 'Error Identification', 'A'],
   ['3.3.2', 'Labels or Instructions', 'A'],
-  ['3.3.3', 'Eror Suggestion', 'AA'],
+  ['3.3.3', 'Error Suggestion', 'AA'],
   ['3.3.4', 'Error Prevention (Legal, Financial, Data)', 'AA'],
   ['4.1.1', 'Parsing', 'A'],
   ['4.1.2', 'Name, Role, Value', 'A'],

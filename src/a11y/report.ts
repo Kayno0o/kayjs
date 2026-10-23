@@ -13,12 +13,12 @@ export interface A11yReport extends Audit {
 }
 
 export function reportOf(audit: Audit, standard: Standard): A11yReport {
-  return { ...audit, standard, criteria: judge(standard, audit.violations, audit.audited.length), unfiled: unfiled(standard, audit.violations) }
+  return { ...audit, standard, criteria: judge(standard, audit.violations, audit.audited.length > 0 && audit.skipped.length === 0), unfiled: unfiled(standard, audit.violations) }
 }
 
-// Whether the audit fails a CI run: any finding, or a page the site got wrong.
-export function failed(report: Pick<A11yReport, 'violations' | 'skipped'>): boolean {
-  return report.violations.length > 0 || report.skipped.some(page => page.failed)
+// Whether the audit fails a CI run: any finding, a page the site got wrong, or no page audited at all.
+export function failed(report: Pick<A11yReport, 'audited' | 'violations' | 'skipped'>): boolean {
+  return report.audited.length === 0 || report.violations.length > 0 || report.skipped.some(page => page.failed)
 }
 
 // Each rule with the pages it fails on and the elements, each with the `.kay` line it comes from where kay could map it.
