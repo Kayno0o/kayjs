@@ -60,7 +60,7 @@ async function edit(root: HTMLElement) {
   await settle()
 }
 
-const START = { agree: true, power: false, free: false, decks: ['films'], size: 'm', sort: null, level: 'b', tags: ['x', 'y'], title: 'Ada', bio: 'Hello', notes: '# Notes', range: [2, 8], icon: 'star', bare: 'star', heard: 'b', refd: true, form: 'x' }
+const START = { agree: true, power: false, free: false, decks: ['films'], size: 'm', sort: null, level: 'b', tags: ['x', 'y'], title: 'Ada', bio: 'Hello', notes: '# Notes', range: [2, 8], stay: ['2026-10-01', '2026-10-05'], icon: 'star', bare: 'star', heard: 'b', refd: true, form: 'x' }
 
 describe('a form reset', () => {
   test('puts every signal-driven control and the page signal behind it back on its start', async () => {
@@ -68,7 +68,7 @@ describe('a form reset', () => {
 
     expect(state(root)).toEqual(START)
     await edit(root)
-    expect(state(root)).toEqual({ agree: false, power: true, free: true, decks: ['games'], size: 'l', sort: 'l', level: 'c', tags: ['y', 'z'], title: 'Grace', bio: 'Bye', notes: '# Other', range: [4, 9], icon: 'moon', bare: 'moon', heard: 'a', refd: true, form: 'y' })
+    expect(state(root)).toEqual({ agree: false, power: true, free: true, decks: ['games'], size: 'l', sort: 'l', level: 'c', tags: ['y', 'z'], title: 'Grace', bio: 'Bye', notes: '# Other', range: [4, 9], stay: ['2026-10-01', '2026-10-05'], icon: 'moon', bare: 'moon', heard: 'a', refd: true, form: 'y' })
 
     click(root.querySelector('#reset'))
     await settle()
