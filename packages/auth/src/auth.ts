@@ -38,7 +38,7 @@ import { bearerRequest, bearerToken } from './bearerHeader'
 import { admit, captchaChallenge, captchaRequired } from './captcha'
 import { backOf, banned, guardPageOf, homeOf, isNavigation, linkedProviders, linkedUser, newUserRecord, OFF, publicUser, unlinked, withBack, withQuery } from './core'
 import { auditEntries, report } from './events'
-import { serveForwardAuth } from './forwardAuth'
+import { returnTarget } from './forwardAuth'
 import { createGate, scopeAllows } from './gate'
 import { acceptedLocales, validLocale } from './locale'
 import { noteSignIn, notify } from './notify'
@@ -1384,7 +1384,18 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     if (!rootUsable(core))
       throw configError('forwardAuth sends visitors to the sign-in page by its full URL: set `site` in kay.config.ts, SITE_URL or in createAuth')
 
-    serveForwardAuth(plugin as unknown as Elysia, core, core.forward, ctx => (ctx as { auth: Auth }).auth, (role, user) => isGranted(role, user.roles))
+    const forward = core.forward
+    const route = `${core.prefix}/forward`
+
+    // The route a reverse proxy asks before it lets a request through to a site it guards, and the one a sign-in comes back through to that site.
+    plugin
+      .get(route, async (ctx) => {
+        const answer = (await import('./forwardRoutes')).answerForward
+
+        return answer(ctx, core, forward, (ctx as unknown as { auth: Auth }).auth, (role, user) => isGranted(role, user.roles))
+      })
+      // Back from signing in to the guarded site, if it is on the domains the app allows, else home.
+      .get(`${route}/return`, ({ query, redirect }) => redirect(returnTarget(typeof query.to === 'string' ? query.to : undefined, forward.domains) ?? homeOf(core), 303))
   }
 
   const evaluate = async (user: BareUser, requirement: AuthRequirement<Role>, ctx: PolicyContext): Promise<boolean> => meetsRequirement(user, requirement, ctx, (grant) => {

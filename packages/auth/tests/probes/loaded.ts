@@ -32,17 +32,14 @@ const scenarios: Record<string, () => Promise<void>> = {
     await visitor.fetch('/auth/nope/callback')
     await visitor.fetch('/auth/nope')
   },
-  // A request with no bearer token, then one with a token issued for the user.
+  // A request carrying a bearer token loads the token code by itself, issuing none.
   async bearer() {
-    const app = testApp()
-    const visitor = await signedIn(app)
-    const { id } = await visitor.json('/me') as { id: string }
-    const issued = await app.auth.issueToken(id, 'Kitchen display')
+    await testApp().browser().fetch('/me', { headers: { authorization: 'Bearer unknown' } })
+  },
+  async forwardAuth() {
+    const visitor = testApp({ url: SITE, forwardAuth: 'example.test' }).browser()
 
-    if (!issued.ok)
-      throw new Error('no token')
-
-    await app.browser().fetch('/me', { headers: { authorization: `Bearer ${issued.token}` } })
+    await visitor.fetch('/auth/forward')
   },
   async passkeys() {
     const visitor = await signedIn(testApp({ url: SITE }))

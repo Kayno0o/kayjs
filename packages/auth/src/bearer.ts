@@ -4,7 +4,6 @@ import type { Proof, ProofFailure } from './proof'
 import type { RequestState } from './state'
 import type { BearerTokenRecord, UserRecord } from './store'
 import { durationSeconds } from 'kay/library'
-import { bearerToken } from './bearerHeader'
 import { banned, TOUCH_EVERY_MS } from './core'
 import { digest, randomToken } from './keys'
 import { notify } from './notify'
@@ -163,14 +162,6 @@ export async function revokeToken(state: RequestState, id: string): Promise<{ ok
     return { ok: false, error: 'signed-out' }
 
   return (await state.core.store.bearerTokens.delete(record.id, id)) ? { ok: true } : { ok: false, error: 'not-found' }
-}
-
-// Whether a request carries an `Authorization: Bearer` token, which no page can add to a cross-site request; a browser sends Basic credentials on its own.
-// The user a request's `Authorization: Bearer` token belongs to, with the token's scopes.
-export async function bearerUser(core: Core, request: Request): Promise<{ record: UserRecord, scopes: string[] | null } | undefined> {
-  const token = bearerToken(request)
-
-  return token === undefined ? undefined : tokenUser(core, token)
 }
 
 // The user a bearer token belongs to, as a websocket handshake checks one; an expired token is refused.
