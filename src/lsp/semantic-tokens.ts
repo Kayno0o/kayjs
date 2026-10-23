@@ -395,7 +395,7 @@ function skipLiteral(text: string, at: number, end = text.length): number {
   if (char === '/' && text[at + 1] === '/') {
     const lineEnd = text.indexOf('\n', at)
 
-    return lineEnd === -1 || lineEnd > end ? end : lineEnd
+    return lineEnd === -1 || lineEnd >= end ? -1 : lineEnd
   }
 
   if (char === '/' && text[at + 1] === '*') {
