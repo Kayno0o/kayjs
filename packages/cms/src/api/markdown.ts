@@ -1,6 +1,6 @@
 import { apiUrl, s, sanitizeHtml } from 'kay'
 import { api } from 'kay/server'
-import { bodyHtml, MarkdownError } from '../kay/content'
+import { bodyHtml, LOADED_HTML, MarkdownError } from '../kay/content'
 import { setCodeAside } from '../preview-code'
 import { folderImage, imagesFromFolder } from '../preview-images'
 import { collectionNamed, UnknownCollectionError } from '../store'
@@ -15,9 +15,6 @@ const MAX_MARKDOWN = '1mb'
 
 // What the editor's preview keeps besides formatted text: images, and tables as the pages show them.
 const KEPT = { tags: ['img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'], attributes: { img: ['src', 'alt', 'width', 'height'] } }
-
-// What the page keeps of a loader's body, which it sanitizes unless the collection is `trusted`: no image size, relative URLs kept.
-const LOADED = { tags: KEPT.tags, attributes: { img: ['src', 'alt', 'title'], th: ['align'], td: ['align'] }, relativeUrls: true }
 
 // Whether the page sanitizes the collection's bodies, so the preview shows only what it keeps.
 async function sanitizedOnPage(name: string | undefined): Promise<boolean> {
@@ -38,7 +35,7 @@ const markdown = api({ maxSize: MAX_MARKDOWN })
       const aside = await setCodeAside(html)
       const place = body.collection !== undefined && body.slug !== undefined ? { collection: body.collection, slug: body.slug, locale: body.locale } : undefined
       const loaded = await sanitizedOnPage(body.collection)
-      const safe = String(sanitizeHtml(place && !loaded ? imagesFromFolder(aside.html, place, apiUrl(request, '/image')) : aside.html, loaded ? LOADED : KEPT))
+      const safe = String(sanitizeHtml(place && !loaded ? imagesFromFolder(aside.html, place, apiUrl(request, '/image')) : aside.html, loaded ? LOADED_HTML : KEPT))
 
       return { html: aside.restore(safe.replace(HEADING_ANCHOR, '$1').replace(LINK, '<a target="_blank" data-new-tab ')) }
     }

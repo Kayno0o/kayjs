@@ -4,7 +4,7 @@ import type { CollectionInfo, SourceEntry } from '../src/kay/contract'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
-import { bodyHtml, MarkdownError } from 'kay/content'
+import { bodyHtml, LOADED_HTML, MarkdownError } from 'kay/content'
 import { scratchDir } from 'kay/test'
 import { countEntries } from '../src/counts'
 import { fileVersion, ForgeError, SaveConflictError } from '../src/files'
@@ -53,6 +53,7 @@ let keeping = false
 // kay's content API, answering from `stored` and recording what a loader was handed.
 const content: typeof Content = {
   bodyHtml,
+  LOADED_HTML,
   MarkdownError,
   collectionLoader: () => undefined,
   collections: async () => collectionList,

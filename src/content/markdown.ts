@@ -63,8 +63,9 @@ const INDENTED = /^(?: {4}|\t)/
 const BLANK = /^\s*$/
 const ATTRIBUTE_NAME = /^[A-Z_][\w:-]*/i
 const TAGS = /<[^>]*>/g
+
 // What a loader's HTML keeps beyond a user's: relative URLs, which carry no scheme to run.
-const LOADED_HTML: SanitizeOptions = { ...MARKDOWN_KEPT, relativeUrls: true }
+export const LOADED_HTML: SanitizeOptions = { ...MARKDOWN_KEPT, relativeUrls: true }
 // And for its Markdown, a heading's id for its anchor and a code block's language class, which the headings and the highlighter read.
 const LOADED: SanitizeOptions = { ...LOADED_HTML, attributes: { ...MARKDOWN_KEPT.attributes, h1: ['id'], h2: ['id'], h3: ['id'], h4: ['id'], h5: ['id'], h6: ['id'], code: ['class'] } }
 // A link the sanitizer wrote that stays on the site: its `href` names no http(s) URL.

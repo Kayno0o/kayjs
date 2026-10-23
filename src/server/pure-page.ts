@@ -107,6 +107,7 @@ export const CONTENT_EXPORTS: Record<string, 'free' | 'request' | 'folder'> = {
   blocks: 'free',
   renderMarkdown: 'free',
   bodyHtml: 'free',
+  LOADED_HTML: 'free',
   highlightCode: 'free',
   MarkdownError: 'free',
   paginate: 'free',
