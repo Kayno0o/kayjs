@@ -317,7 +317,7 @@ export function element(written: string, sources: readonly object[], content?: (
       }
 
       if (name === 'class')
-        markup += ` class="${className(value)}"`
+        markup += nonEmptyAttribute('class', className(value))
       else if (name === 'style')
         markup += ` style="${style(value)}"`
       else if (value === '')

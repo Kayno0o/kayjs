@@ -28,6 +28,8 @@ const files: Record<string, string> = {
   'wrapper.kay': '---\nimport Card from \'./card.kay\'\n---\nCard(title="w" part="root" class="from-wrapper") inside\n',
   'btn.kay': '---\nconst { onClick, class: className, ...rest } = props<{ onClick: () => void, class?: string, [key: string]: unknown }>()\n---\nbutton.btn.p-2({...rest} class={className} onClick={onClick})\n  slot\n',
   'island.kay': '---\nimport Btn from \'./btn.kay\'\nconst { title, items } = props<{ title: string, items: string[] }>()\nconst count = signal(0)\n---\nsection.card.p-4\n  header.p-2(part="head") {title}\n  if count > 0\n    p(part="shown") shown\n  for item of items\n    li(part="item") {item}\n  Btn(part="action" onClick={() => count++}) {count}\n',
+  'link.kay': '---\nconst { attrs } = props<{ attrs: Record<string, unknown> }>()\n---\na(part="link" href="/x" {...attrs}) go\n',
+  'link-class.kay': '---\nconst { attrs } = props<{ attrs: Record<string, unknown> }>()\n---\na.p-2(part="link" href="/x" {...attrs}) go\n',
   '_layout.kay': 'main.p-2(part="page") page\n',
   'client.kay': '--- client\nlet count = 0\n---\nsection.card\n  header(part="head") {count}\n',
   'node_modules/uilib/card.kay': '---\nconst { title } = props<{ title: string }>()\n---\nsection.card.p-4\n  header.p-2(part="head") {title}\n',
@@ -113,6 +115,16 @@ describe('a component with parts, on the server', () => {
     expect(await render('calls.kay')).toContain('<section class="card p-4 from-wrapper outer">')
   })
 
+  it('writes no class for a part with a spread that brings none, and merges the one it brings', async () => {
+    const attrs = { target: '_blank' }
+
+    expect(await render('link.kay', { attrs })).toBe('<a data-part="link" href="/x" target="_blank">go</a>')
+    expect(await render('link.kay', { attrs, class: { link: 'mt-4' } })).toBe('<a data-part="link" href="/x" target="_blank" class="mt-4">go</a>')
+    expect(await render('link.kay', { attrs: { class: 'brought' } })).toBe('<a data-part="link" href="/x" class="brought">go</a>')
+    expect(await render('link-class.kay', { attrs })).toBe('<a data-part="link" href="/x" target="_blank" class="p-2">go</a>')
+    expect(await render('link-class.kay', { attrs: { class: 'brought' }, class: { link: 'mt-4' } })).toBe('<a data-part="link" href="/x" class="p-2 brought mt-4">go</a>')
+  })
+
   it('renders the classes of a library component compiled from node_modules', async () => {
     expect(await render('calls.kay')).toContain('<section class="card p-4"><header class="p-6" data-part="head">lib</header></section>')
   })
@@ -133,22 +145,26 @@ describe('a component with parts, as an island', () => {
   let client!: (props: object) => unknown
   let hands!: (props: object) => unknown
   let handsShort!: (props: object) => unknown
+  let link!: (props: object) => unknown
+  let linkClass!: (props: object) => unknown
 
   beforeAll(async () => {
     GlobalRegistrator.register()
-    await Bun.write(join(scratch, 'entry.ts'), 'import { render } from \'kay/dom\'\nimport Client from \'./client.kay\'\nimport Hands from \'./hands.kay\'\nimport HandsShort from \'./hands-short.kay\'\nimport Island from \'./island.kay\'\n\nexport { Client, Hands, HandsShort, Island, render }\n')
+    await Bun.write(join(scratch, 'entry.ts'), 'import { render } from \'kay/dom\'\nimport Client from \'./client.kay\'\nimport Hands from \'./hands.kay\'\nimport HandsShort from \'./hands-short.kay\'\nimport Island from \'./island.kay\'\nimport Link from \'./link.kay\'\nimport LinkClass from \'./link-class.kay\'\n\nexport { Client, Hands, HandsShort, Island, Link, LinkClass, render }\n')
 
     const build = await Bun.build({ entrypoints: [join(scratch, 'entry.ts')], outdir: join(scratch, 'out'), target: 'browser', plugins: [kay()] })
 
     if (!build.success)
       throw new AggregateError(build.logs, 'client build failed')
 
-    const module = await import(build.outputs[0]!.path) as { Client: typeof client, Hands: typeof hands, HandsShort: typeof handsShort, Island: typeof island, render: typeof render }
+    const module = await import(build.outputs[0]!.path) as { Client: typeof client, Hands: typeof hands, HandsShort: typeof handsShort, Island: typeof island, Link: typeof link, LinkClass: typeof linkClass, render: typeof render }
 
     client = module.Client
     hands = module.Hands
     handsShort = module.HandsShort
     island = module.Island
+    link = module.Link
+    linkClass = module.LinkClass
     render = module.render
   }, 60_000)
 
@@ -197,6 +213,24 @@ describe('a component with parts, as an island', () => {
 
     expect(summary(root, 'button, span')).toEqual([['button', 'btn mt-4', 'root'], ['span', 'spin size-5', 'spinner']])
     stop()
+  })
+
+  it('writes no class for a part with a spread that brings none, and merges the one it brings', () => {
+    const attrs = { target: '_blank' }
+    const classOf = (component: (props: object) => unknown, props: object) => {
+      const { root, stop } = mount(component, props)
+      const value = root.querySelector('a')?.getAttribute('class')
+
+      stop()
+
+      return value
+    }
+
+    expect(classOf(link, { attrs })).toBeNull()
+    expect(classOf(link, { attrs, class: { link: 'mt-4' } })).toBe('mt-4')
+    expect(classOf(link, { attrs: { class: 'brought' } })).toBe('brought')
+    expect(classOf(linkClass, { attrs })).toBe('p-2')
+    expect(classOf(linkClass, { attrs: { class: 'brought' }, class: { link: 'mt-4' } })).toBe('p-2 brought mt-4')
   })
 
   it('follows a class the page builds from a signal', async () => {
