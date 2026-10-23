@@ -8,6 +8,6 @@ export default defineConfig({
   kay: true,
   filesTypeAware,
 }, {
-  // Emscripten's glue, as codecs/avif/build.ts writes it.
-  ignores: ['src/server/codec/avif-enc.js', 'tests/fixtures/**/*.kay'],
+  // Emscripten's glue, as codecs/avif/build.ts writes it, and a tree-sitter grammar, whose DSL functions are globals only its CLI defines.
+  ignores: ['src/server/codec/avif-enc.js', 'tests/fixtures/**/*.kay', 'editors/tree-sitter-kay/grammar.js'],
 }, kayRules)

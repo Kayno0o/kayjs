@@ -1,0 +1,11 @@
+{
+  "name": "tree-sitter-kay",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A tree-sitter grammar for kay's .kay files",
+  "license": "MIT",
+  "scripts": {
+    "generate": "TREE_SITTER_JS_RUNTIME=bun tree-sitter generate",
+    "sync-zed": "cp queries/*.scm ../zed/languages/kay/"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/config.schema.json",
+  "grammars": [
+    {
+      "name": "kay",
+      "camelcase": "Kay",
+      "title": "Kay",
+      "scope": "source.kay",
+      "path": ".",
+      "file-types": ["kay"],
+      "highlights": "queries/highlights.scm",
+      "injections": "queries/injections.scm",
+      "injection-regex": "^kay$"
+    }
+  ],
+  "metadata": {
+    "version": "0.0.0",
+    "license": "MIT",
+    "description": "A tree-sitter grammar for kay's .kay files",
+    "authors": [{ "name": "Kaynooo" }],
+    "links": { "repository": "https://github.com/Kayno0o/kayjs" }
+  },
+  "bindings": { "c": false, "go": false, "java": false, "node": false, "python": false, "rust": false, "swift": false, "zig": false }
+}
