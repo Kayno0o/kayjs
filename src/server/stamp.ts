@@ -15,12 +15,13 @@ const KEY_BYTES = 32
 type StampSource = 'process' | 'preview' | 'config' | 'session'
 // Each source takes over from the ones before it.
 const SOURCES: StampSource[] = ['process', 'preview', 'config', 'session']
-let secret: { key: Uint8Array, from: StampSource } = { key: crypto.getRandomValues(new Uint8Array(KEY_BYTES)), from: 'process' }
+// The first key signs and seals, and every one verifies and opens, so a secret rotated in through a list breaks nothing signed before it.
+let secret: { keys: Uint8Array[], from: StampSource } = { keys: [crypto.getRandomValues(new Uint8Array(KEY_BYTES))], from: 'process' }
 let warnOnProcessKey = false
 
-export function useStampSecret(value: string, from: Exclude<StampSource, 'process'>): void {
+export function useStampSecret(value: string | string[], from: Exclude<StampSource, 'process'>): void {
   if (SOURCES.indexOf(from) >= SOURCES.indexOf(secret.from))
-    secret = { key: new Uint8Array(nodeCrypto().hkdfSync('sha256', value, '', 'kay stamps', KEY_BYTES)), from }
+    secret = { keys: [value].flat().map(text => new Uint8Array(nodeCrypto().hkdfSync('sha256', text, '', 'kay stamps', KEY_BYTES))), from }
 }
 
 // What separates the secrets of a rotation list, in `secret` and in `KAY_SECRET`.
@@ -41,7 +42,7 @@ function refuseWeak(secrets: string[], where: string): void {
     throw new KayError('config-invalid', `kay: ${where} holds a secret ${weak.length} characters long: the app's secret signs form stamps, links to private files and the flash cookie, and seals sessions, so each is at least ${MIN_SECRET_LENGTH} random characters, commas separating a rotation list; generate one with ${GENERATE_SECRET}`)
 }
 
-// The app's own secret: `secret` in the config, else `KAY_SECRET`, an empty one counting as none in both, and a list rotating: the first signs, and only sessions and kayjs-auth open the others. A short one is refused.
+// The app's own secret: `secret` in the config, else `KAY_SECRET`, an empty one counting as none in both, and a list rotating: the first signs and seals, and every one verifies and opens. A short one is refused.
 export function setupStampSecret(configured: string | string[] | undefined): void {
   const fromConfig = listed(configured)
   const secrets = fromConfig ?? listed(process.env.KAY_SECRET)
@@ -52,7 +53,7 @@ export function setupStampSecret(configured: string | string[] | undefined): voi
     return
 
   refuseWeak(secrets, fromConfig === undefined ? 'KAY_SECRET' : '`secret` in kay.config.ts')
-  useStampSecret(secrets[0]!, 'config')
+  useStampSecret(secrets, 'config')
 }
 
 // The secrets the app has for what it seals and signs: the config's or `KAY_SECRET`, else in development and under test one derived for this checkout, else none. Read anywhere, before the server set up too, as `KAY_SECRET` is in the environment from the start.
@@ -83,35 +84,34 @@ export function warnOnStampKey(production: boolean): void {
   warnOnProcessKey = production
 }
 
-function stampKey(): Uint8Array {
+function stampKeys(): Uint8Array[] {
   if (warnOnProcessKey && secret.from === 'process') {
     warnOnProcessKey = false
     kayLog('warn', 'links to private files, form stamps and the flash cookie are signed with a key of this process, as no secret is set: a restart refuses what was signed before it, and other replicas refuse it too; set KAY_SECRET (or `secret` in kay.config.ts), or give session() a secret')
   }
 
-  return secret.key
+  return secret.keys
 }
 
 // A key for `use` derived from the session's, the app's or the preview's secret, which every replica shares, or undefined while none is set.
 export function sharedKey(use: string): Buffer | undefined {
-  return secret.from === 'process' ? undefined : derivedKey('kay-key', use, secret.key)
+  return secret.from === 'process' ? undefined : derivedKey('kay-key', use, secret.keys[0]!)
 }
 
 // Derived once per secret and use, as each is signed or sealed many a request.
-const derivedKeys = new Map<string, Buffer>()
-let derivedFrom: Uint8Array | undefined
+const derivedKeys = new WeakMap<Uint8Array, Map<string, Buffer>>()
 
 function derivedKey(kind: 'kay-key' | 'kay-seal', use: string, base: Uint8Array): Buffer {
-  if (derivedFrom !== base) {
-    derivedKeys.clear()
-    derivedFrom = base
-  }
+  let keys = derivedKeys.get(base)
+
+  if (!keys)
+    derivedKeys.set(base, keys = new Map<string, Buffer>())
 
   const label = `${kind}\0${use}`
-  let key = derivedKeys.get(label)
+  let key = keys.get(label)
 
   if (!key)
-    derivedKeys.set(label, key = new Bun.CryptoHasher('sha256', base).update(label).digest())
+    keys.set(label, key = new Bun.CryptoHasher('sha256', base).update(label).digest())
 
   return key
 }
@@ -133,27 +133,28 @@ export const WORK_OPEN = `<script type="application/json" ${WORK_SCRIPT}>`
 // A stamp's hole holds its action in the first group, the challenges script its JSON in the second, which holds no `<`, and a `workChallenge` field its mark in the third.
 export const STAMP_HOLE = new RegExp(`name="${STAMP_FIELD}" value="${STAMP_MARK}([^"]*)"|${WORK_OPEN}([^<]*)</script>|data-kay-work="${WORK_MARK}([^"]*)"`, 'g')
 
-// `use` keeps what one feature signs from passing for another's.
+function signWith(key: Uint8Array, use: string, text: string): string {
+  return new Bun.CryptoHasher('sha256', key).update(`${use}\0${text}`).digest('base64url')
+}
+
+// `use` keeps what one feature signs from passing for another's. The first key of the secret list signs.
 export function signText(use: string, text: string): string {
-  return new Bun.CryptoHasher('sha256', stampKey()).update(`${use}\0${text}`).digest('base64url')
+  return signWith(stampKeys()[0]!, use, text)
 }
 
+// Whether `given` is the signature of `text` under any key of the secret list, which is what rotating the secret keeps working.
 export function signedText(use: string, text: string, given: string): boolean {
-  return sameText(given, signText(use, text))
+  return stampKeys().reduce((found, key) => sameText(given, signWith(key, use, text)) || found, false)
 }
 
-function sealKey(use: string): Buffer {
-  return derivedKey('kay-seal', use, stampKey())
+// AES-256-GCM under a key of its own per `use`: what it seals can be neither read nor altered without the secret, nor passed off under another `context`, such as the cookie's name.
+export function sealText(use: string, text: string, context?: string): string {
+  return sealWith(derivedKey('kay-seal', use, stampKeys()[0]!), text, context)
 }
 
-// AES-256-GCM under a key of its own per `use`: what it seals can be neither read nor altered without the secret.
-export function sealText(use: string, text: string): string {
-  return sealWith(sealKey(use), text)
-}
-
-// The text `sealText` sealed for that `use`, or undefined for anything else, such as a value sealed before a restart changed the process's secret.
-export function openText(use: string, sealed: string): string | undefined {
-  return openWith([sealKey(use)], sealed)?.text
+// The text `sealText` sealed for that `use` and `context` under any key of the secret list, or undefined for anything else, such as a value sealed before a restart changed the process's secret.
+export function openText(use: string, sealed: string, context?: string): string | undefined {
+  return openWith(stampKeys().map(key => derivedKey('kay-seal', use, key)), sealed, context)?.text
 }
 
 function signature(action: string, at: string): string {

@@ -33,7 +33,10 @@ const SHARE_PARAM = 'kay_preview'
 const DEFAULT_MAX_AGE = 3600
 const DEFAULT_LINK_TTL = 3600
 // A path of the site, never `//host` nor `/\host`, which a browser reads as another site.
-const SITE_PATH = /^\/(?![/\\])\S*$/
+// A control character would break the `location` header it goes to, so it is no part of one.
+// eslint-disable-next-line no-control-regex -- control characters are what it refuses
+const SITE_PATH = /^\/(?![/\\])[^\s\0-\x1F\x7F]*$/
+const NON_ASCII = /[^\0-\x7F]+/g
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
 // Names the drafts `/_kay/draft` renders a page with, by an id no request from outside can guess.
 const DRAFT_HEADER = 'x-kay-draft'
@@ -47,7 +50,8 @@ const POSTED_HEADERS = ['content-type', 'content-length']
 export const DRAFT_BODY_LIMIT: BodyLimit = { refuse: () => new Response('Request body too large', { status: 413, headers: TEXT }) }
 
 interface PreviewSettings {
-  secret: string
+  // The first signs, and every one verifies, so rotating the app's secret keeps the links and cookies already out.
+  secrets: string[]
   maxAge: number
   base: string
 }
@@ -79,23 +83,27 @@ export function setupPreview(config: PreviewConfig | false | undefined, base: st
     return
   }
 
-  const secret: unknown = config.secret ?? appPreviewSecret()
+  const configured: unknown = config.secret
+  const secrets: unknown = configured ?? appPreviewSecrets()
+  const [secret] = [secrets].flat()
 
   if (typeof secret !== 'string' || secret.length < MIN_SECRET_LENGTH)
     throw new KayError('config-invalid', `kay: preview.secret in kay.config.ts is ${typeof secret === 'string' ? `${secret.length} characters long` : 'missing'}: it signs preview links and cookies, so it is at least ${MIN_SECRET_LENGTH} random characters, read from the environment`)
 
-  useStampSecret(secret, 'preview')
-  settings = { secret, maxAge: wholeSeconds(config.maxAge ?? DEFAULT_MAX_AGE, 'preview.maxAge'), base }
+  const all = [secrets].flat() as string[]
+
+  useStampSecret(all, 'preview')
+  settings = { secrets: all, maxAge: wholeSeconds(config.maxAge ?? DEFAULT_MAX_AGE, 'preview.maxAge'), base }
 }
 
 // A key of preview's own, derived from the app's secret so what signs a preview link never passes for the session's or the stamps'.
-function appPreviewSecret(): string {
+function appPreviewSecrets(): string[] {
   const secrets = appSecrets()
 
   if (secrets === undefined)
     throw noAppSecret('preview in kay.config.ts')
 
-  return Buffer.from(nodeCrypto().hkdfSync('sha256', secrets[0]!, '', 'kay preview', 32)).toString('base64url')
+  return secrets.map(secret => Buffer.from(nodeCrypto().hkdfSync('sha256', secret, '', 'kay preview', 32)).toString('base64url'))
 }
 
 // Renders for a visitor in preview mode, in edit mode too when `edit` is set, with the entries `drafts` holds standing in for theirs.
@@ -200,7 +208,7 @@ export function previewRequested(request: Request): PreviewMode | undefined {
   if (until === undefined || sig === undefined || (rest.length !== 1 && !edit) || !(Number(until) > Date.now() / 1000))
     return undefined
 
-  if (!sameText(sig, sign(settings, cookieText(until, edit))))
+  if (!signed(settings, cookieText(until, edit), sig))
     return undefined
 
   return edit ? 'edit' : 'preview'
@@ -359,7 +367,7 @@ export function sharedEntry(request: Request): PreviewScope | undefined {
   const url = requestUrl(request)
   const [until, entry, sig, ...extra] = url.searchParams.get(SHARE_PARAM)?.split('.') ?? []
 
-  if (until === undefined || entry === undefined || sig === undefined || extra.length > 0 || !(Number(until) > Date.now() / 1000) || !sameText(sig, sign(settings, shareText(until, entry, sharedPath(url.pathname)))))
+  if (until === undefined || entry === undefined || sig === undefined || extra.length > 0 || !(Number(until) > Date.now() / 1000) || !signed(settings, shareText(until, entry, sharedPath(url.pathname)), sig))
     return undefined
 
   try {
@@ -422,7 +430,7 @@ export function servePreview(app: Elysia): void {
     else
       return new Response('Not a valid preview link', { status: 403, headers: TEXT })
 
-    const headers = new Headers({ 'location': `${current.base}${path}`, 'cache-control': 'no-store' })
+    const headers = new Headers({ 'location': `${current.base}${path}`.toWellFormed().replace(NON_ASCII, encodeURI), 'cache-control': 'no-store' })
 
     for (const cookie of cookies.toSetCookieHeaders())
       headers.append('set-cookie', cookie)
@@ -432,7 +440,7 @@ export function servePreview(app: Elysia): void {
 }
 
 function validLink(current: PreviewSettings, path: string, edit: boolean, until: string | null, sig: string | null): boolean {
-  return until !== null && sig !== null && Number(until) > Date.now() / 1000 && sameText(sig, sign(current, linkText(path, until, edit)))
+  return until !== null && sig !== null && Number(until) > Date.now() / 1000 && signed(current, linkText(path, until, edit), sig)
 }
 
 // What a cookie and a link sign: edit mode is signed apart, so a preview link cannot be turned into an edit one.
@@ -460,6 +468,15 @@ function settingsFor(caller: string): PreviewSettings {
   return settings
 }
 
+function signWith(secret: string, text: string): string {
+  return nodeCrypto().createHmac('sha256', secret).update(text).digest('base64url')
+}
+
 function sign(current: PreviewSettings, text: string): string {
-  return nodeCrypto().createHmac('sha256', current.secret).update(text).digest('base64url')
+  return signWith(current.secrets[0]!, text)
+}
+
+// Whether `given` signs `text` under any of the secrets, every one being tried so the time tells nothing of which.
+function signed(current: PreviewSettings, text: string, given: string): boolean {
+  return current.secrets.reduce((found, secret) => sameText(given, signWith(secret, text)) || found, false)
 }

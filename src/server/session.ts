@@ -129,7 +129,7 @@ export function session<Data extends object = SessionData>(options: SessionOptio
 
   const keys = secrets.map(secret => nodeCrypto().createHash('sha256').update(secret).digest())
 
-  useStampSecret(secrets[0]!, 'session')
+  useStampSecret(secrets, 'session')
   const domain = options.domain?.trim().toLowerCase().replace(LEADING_DOT, '')
 
   if (domain !== undefined && !COOKIE_DOMAIN.test(domain))

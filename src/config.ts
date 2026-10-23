@@ -147,7 +147,7 @@ export interface KayConfig {
   publicEnv?: EnvSchema | undefined
   // The level of each lint `kay check`, `kay build`, `kay dev` and the editor report, or of each lint in a group, over its default: `{ 'positional-key': 'deny', 'seo': 'deny', 'unread-name': 'warn' }`. `kay explain` lists them.
   lints?: LintLevels | undefined
-  // The app's one secret, at least 32 random characters: it seals `session()`'s cookie, signs form stamps, links to private files and the flash cookie, and gives `preview` its key, each under a key derived for its use. `KAY_SECRET` alone does the same, so this is for a secret kept elsewhere than the environment. A list, or commas in `KAY_SECRET`, rotates it: the first seals and signs, every one opens sessions and kayjs-auth's sealed data; stamps, private-file links, the flash cookie and preview links use the first alone, so a rotation invalidates them. A `session()` called as a module loads reads `KAY_SECRET` only, as the config is not read yet, so a secret meant for sessions goes in `KAY_SECRET`. Development and tests derive one for the checkout; production without any refuses to boot a `session()`, and a server using none signs with a key of the process, which a restart changes and other replicas do not share.
+  // The app's one secret, at least 32 random characters: it seals `session()`'s cookie, signs form stamps, links to private files and the flash cookie, and gives `preview` its key, each under a key derived for its use. `KAY_SECRET` alone does the same, so this is for a secret kept elsewhere than the environment. A list, or commas in `KAY_SECRET`, rotates it: the first seals and signs, every one opens and verifies: sessions, kayjs-auth's sealed data, stamps, private-file links, the flash cookie and preview links, so a rotation breaks none of them. A `session()` called as a module loads reads `KAY_SECRET` only, as the config is not read yet, so a secret meant for sessions goes in `KAY_SECRET`. Development and tests derive one for the checkout; production without any refuses to boot a `session()`, and a server using none signs with a key of the process, which a restart changes and other replicas do not share.
   secret?: string | string[] | undefined
   // Lets an editor see drafts on the live site, `false` for none: a visitor in preview mode sees every draft, and pages render for them alone, past prerendered and cached copies.
   preview?: PreviewConfig | false | undefined
@@ -256,6 +256,8 @@ export interface SecurityConfig {
   reports?: true | string | undefined
   // Headers merged over kay's, one given `false` not sent: `{ 'strict-transport-security': 'max-age=63072000; includeSubDomains' }`.
   headers?: Record<string, string | false> | undefined
+  // Production answers 421 to a request whose `Host` is not the site's, one of the `i18n` locale hosts or listed here, against DNS rebinding: `true` allows those alone. Localhost and IP addresses always pass, as a health check reaches the server by them. Off by default, and under `kay dev`, which has `KAY_DEV_HOSTS`.
+  hosts?: string[] | true | undefined
 }
 
 // `hops` or `header`, not both, and with `key` alone one proxy is in front: read only from a request coming from this machine or a private network, so a client reaching the server directly cannot forge it.
@@ -266,6 +268,8 @@ export interface ProxyConfig {
   header?: string | undefined
   // The public address ranges the proxy reaches the server from, such as a CDN's published ones, `173.245.48.0/20`: trusted besides this machine and private networks.
   trusted?: string[] | undefined
+  // `false` trusts the `trusted` ranges alone, instead of this machine and private networks too: for a server whose private neighbours are not all its proxies. Goes with `trusted`.
+  trustPrivate?: false | undefined
   // The header the proxy sends with a key it shares with the server, such as `x-upstream-key`: a request without it, or with another value, is refused with 403, so a process or a container reaching the port directly skips nothing the proxy does. The key is read from `KAY_PROXY_KEY`, else from the file `KAY_PROXY_KEY_FILE` names, and compared in constant time. Off under `kay dev` and outside production without a key; a production server with none does not boot.
   key?: string | undefined
   // Paths, and what is under them, that need no key besides the health route: `['/api/push']`, read after the base is taken off.

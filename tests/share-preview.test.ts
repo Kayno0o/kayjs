@@ -178,3 +178,18 @@ describe('an entry-scoped preview link', () => {
     expect(() => previewUrl('/news/roadmap', { entry: roadmap, edit: true })).toThrow('does not open edit mode')
   })
 })
+
+describe('the preview route\'s exit', () => {
+  it('answers 400 to a path holding a control character, and 307 to the same path in text a header takes', async () => {
+    const app = await pages({ ...options, prebuilt: false })
+
+    for (const path of ['/%01', '/%00', '/%0d%0aset-cookie:x=1', '/%7f', '/%0a'])
+      expect((await visit(app, `/_kay/preview?exit&path=${path}`)).status).toBe(400)
+
+    const leaving = await visit(app, '/_kay/preview?exit&path=/%E6%97%A5')
+
+    expect(leaving.status).toBe(307)
+    expect(leaving.headers.get('location')).toBe('/%E6%97%A5')
+    expect((await visit(app, '/_kay/preview?exit&path=/news')).headers.get('location')).toBe('/news')
+  })
+})

@@ -49,4 +49,29 @@ console.log(JSON.stringify([
 
     expect(await isolated(script)).toEqual(['hello', null, null, true, 'again'])
   })
+
+  it('keep verifying and opening what an older key of the list signed and sealed, and sign with the first', async () => {
+    const script = `${HEAD}
+useStampSecret('old-secret-old-secret-old-secret-old-', 'config')
+const oldSignature = signText('use', 'text')
+const oldSealed = sealText('flash', 'hello', 'ctx')
+useStampSecret(['new-secret-new-secret-new-secret-new-', 'old-secret-old-secret-old-secret-old-'], 'session')
+console.log(JSON.stringify([
+  signedText('use', 'text', oldSignature),
+  signText('use', 'text') === createHmac('sha256', keyOf('new-secret-new-secret-new-secret-new-')).update('use\\0text').digest('base64url'),
+  openText('flash', oldSealed, 'ctx'),
+  openText('flash', oldSealed, 'other') ?? null,
+  openText('flash', oldSealed) ?? null,
+  openText('flash', sealText('flash', 'again', 'ctx'), 'ctx'),
+]))
+useStampSecret(['third-secret-third-secret-third-sec'], 'session')
+console.log(JSON.stringify([signedText('use', 'text', oldSignature), openText('flash', oldSealed, 'ctx') ?? null]))
+`
+
+    const run = Bun.spawn([process.execPath, '-e', script], { cwd: process.cwd(), stdout: 'pipe', stderr: 'pipe' })
+    const out = await new Response(run.stdout).text()
+
+    expect(await run.exited).toBe(0)
+    expect(out.trim().split('\n').map(line => JSON.parse(line) as unknown)).toEqual([[true, true, 'hello', null, null, 'again'], [false, null]])
+  })
 })
