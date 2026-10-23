@@ -24,7 +24,7 @@ const look = recipe({
   },
 })
 
-// The tiles sit in this many columns, so the up and down arrows step that far.
+// The tiles sit in this many columns (`grid-cols-3` of the grid part), so the up and down arrows step that far.
 const COLUMNS = 3
 const MOVES: Partial<Record<string, (index: number, count: number) => number>> = {
   ArrowLeft: (index, count) => stepIndex(index, -1, count),
@@ -76,7 +76,7 @@ function keyDown(event: KeyboardEvent) {
     return
 
   event.preventDefault()
-  all[move(all.indexOf(document.activeElement as HTMLAnchorElement), all.length)]?.focus()
+  all[move(Math.max(all.indexOf(document.activeElement as HTMLAnchorElement), 0), all.length)]?.focus()
 }
 
 const opensNew = (app: SwitcherApp) => app.newTab ?? newTab
