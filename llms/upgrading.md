@@ -11,6 +11,9 @@ With `cms({ roles })`, the activity screen answers 403 and its button is disable
 
 `VirtualList` is a focusable list and takes a `label` naming it: add one, or `kay check` fails the missing prop. `toast.error` and a failed `attempt` now stay until the reader dismisses them, as they asked to act; pass `{ duration: '10s' }` to `toast.error` for the old ten seconds.
 
+### A dynamic tag, a bound URL and a style object are stricter
+
+A tag held in a value refuses `script`, `style`, `iframe`, `object`, `embed`, `base`, `meta` and `link`, and throws as it does for a name that is no element: write the element in the template. A bound `href`, `src`, `action`, `formaction`, `xlink:href`, `poster` or `data` keeps only the schemes `http`, `https`, `mailto`, `tel`, `sms`, `blob`, `data:` image, audio and video (not SVG) and relative URLs; any other, `ftp:` or `geo:` say, goes out as `unsafe:...`, so build such a link as text in the template. A `style` object or `style:prop` value holding a `;`, `{` or `}` outside quotes and parentheses is left out. `kay check` cannot flag them, as the tag, the URL and the value are known only at render time.
 ### An OAuth token bound to a resource works only under it
 
 A token the OAuth server issued for a `resource` (the `/mcp` an MCP client asks for) now passes only on requests to that path or under it, within its scopes, and is a 401 on the rest of the app, where it used to pass. The calls kay's `/mcp` endpoint dispatches to your tools count as made to `/mcp`. A client that needs your API with the same token asks for a resource covering it, such as the site root. A token asked for no resource, and one stored before the binding, work everywhere as before. `userFromToken(token)` refuses a bound token unless given the handshake's address as a second argument.

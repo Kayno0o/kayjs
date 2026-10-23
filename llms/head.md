@@ -122,7 +122,7 @@ h1 {todo.title}
 - The page wins over its layouts: one `title`, and one `meta` per `name`, `property` or `http-equiv`.
 - A `link` is one per `rel` and `href`.
 - Head elements hold text only.
-- Their attributes take no handlers, a `javascript:` URL goes out as `unsafe:javascript:...`, and a script's text cannot end it or open a comment, whatever the server data in it.
+- Their attributes take no handlers, a URL of an unlisted scheme such as `javascript:` goes out as `unsafe:javascript:...`, and a script's text cannot end it or open a comment, whatever the server data in it.
 - The default charset and viewport tags can be replaced the same way.
 - A `link(rel="canonical")` is one per page, the page's replacing its layouts'.
 - `html(data-theme="light")` sets attributes on `<html>`, static or from server data, from the `head` block only.

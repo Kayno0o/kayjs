@@ -318,6 +318,10 @@ A module without `cors` refuses every other origin. The module's rule is the onl
 
 <ReadMore href="/llms/api-routes#cors">Credentials, preflight answers, exposed headers and the wildcard origin.</ReadMore>
 
+## Links built from data
+
+A URL bound to an `href`, `src`, `action`, `formaction`, `xlink:href`, `poster` or `data` keeps its scheme only when it is `http`, `https`, `mailto`, `tel`, `sms` or `blob`, a `data:` image, audio or video that is not SVG, or has none, as a path does. Any other, `javascript:` first, goes out as `unsafe:javascript:...`, which a browser does nothing with, on the server and in islands alike.
+
 ## A post from another site
 
 An action and an API route refuse a post another site sends, from its `Origin` or `Sec-Fetch-Site` header. The refusal is a 403 that says what it saw.

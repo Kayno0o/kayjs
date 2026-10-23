@@ -643,6 +643,25 @@ export async function loadConfig(root: string, fresh = false): Promise<KayConfig
   return withSiteUrl(withPublicFields(root, withExtensions(withLibraryMessages(root, await importConfig(root, fresh)))))
 }
 
+const CONFIG_TIMEOUT = 30_000
+
+// `loadConfig` for a command or an editor that must not hang on a config awaiting something that never comes, such as a database that does not answer: it fails after `timeout` ms, the import left to finish or not.
+export async function loadConfigWithin(root: string, timeout = CONFIG_TIMEOUT): Promise<KayConfig> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+
+  try {
+    return await Promise.race([
+      loadConfig(root),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`kay: ${CONFIG_FILE} did not load within ${timeout / 1000}s, so it awaits something that never settles`)), timeout)
+      }),
+    ])
+  }
+  finally {
+    clearTimeout(timer)
+  }
+}
+
 const SERVER_SPECIFIER = /(['"])kay\/server\1/g
 const SERVER_NAMES_IMPORT = /\bimport\s+(type\s+)?\{([^}]*)\}\s*from\s*(['"])kay\/server\3/g
 const TYPE_PREFIX = /^type\s/

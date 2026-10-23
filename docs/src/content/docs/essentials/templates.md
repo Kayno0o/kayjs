@@ -249,7 +249,7 @@ input(type="file" bind:files={picked})
 
 `bind:` and `style:` work next to a spread too: the binding sets the value after the spread's and writes back from the event, a handler the spread brings for that event running first, and the `style:` pairs merge into the `style` the spread brings. A `type` or `value` only the spread brings is not seen by `bind:`, so write them on the element.
 
-`style:color={color()}` sets one property of the `style` and `style:--gap={gap()}` a custom one, merged after the written `style` and left out while the value is `null`, `undefined` or `false`.
+`style:color={color()}` sets one property of the `style` and `style:--gap={gap()}` a custom one, merged after the written `style` and left out while the value is `null`, `undefined` or `false`. A value that would add a declaration of its own, such as `red;background:url(//x)`, is left out too, in a `style` object as well.
 
 A modifier after an event name calls an event method before the handler: `form(onSubmit|preventDefault={save})`, and `|stopPropagation`, which chain. In an island it replaces the `event.preventDefault()` line of the handler; the server renders no handler, so the form still posts natively without JavaScript.
 
@@ -307,6 +307,8 @@ svg.size-4({...ICONS[key]})
 ```
 
 A component held in a value is drawn by its capitalised name as the tag. The value can be a prop, a `const` in the script, a server value or a loop item. Type it `Component<Props>` from `kay`. To pick one by a key, look it up in a record of components. A `match` does the same when each case passes different props.
+
+A tag held in a value as text names an element, in any case, but never `script`, `style`, `iframe`, `object`, `embed`, `base`, `meta` or `link`: those throw, so write them in the template.
 
 ## Functions and rendered values
 

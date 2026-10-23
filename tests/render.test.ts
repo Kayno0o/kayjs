@@ -438,7 +438,7 @@ describe('static server output', () => {
   })
 
   it('escapes a style:prop value, and drops the handler of a modifier, which only an island runs', async () => {
-    expect(await renderKay('---\nconst bad = \'"><b>\'\n---\np(style:color={bad}) a')).toBe('<p style="color:&quot;>&lt;b>">a</p>')
+    expect(await renderKay('---\nconst bad = \'"x"><b>\'\n---\np(style:color={bad}) a')).toBe('<p style="color:&quot;x&quot;>&lt;b>">a</p>')
     expect(await renderKay('form(onSubmit|preventDefault={save}) x')).toContain('<form>x</form>')
   })
 

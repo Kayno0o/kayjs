@@ -14,6 +14,13 @@ const ATTRIBUTE_NAME = /^[^\0-\x20"'>/=\x7F]+$/
 const HANDLER = /^on/i
 // A tag name HTML reads as one, which a dynamic tag given as text must be.
 const ELEMENT_NAME = /^[a-z][^\0-\x20"'>/=\x7F]*$/i
+// The elements that load or run something, or change how the page reads, which a tag given as text never names.
+const UNSAFE_ELEMENTS = new Set(['base', 'embed', 'iframe', 'link', 'meta', 'object', 'script', 'style'])
+// A CSS property name, custom properties included.
+const PROPERTY_NAME = /^-{0,2}[a-z_][\w-]*$/i
+const CSS_STRING = /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g
+const CSS_GROUP = /\([^()]*\)/g
+const CSS_BREAK = /[;{}"'()\\]/
 // A whole document in a frame, which no spread sets.
 const DOCUMENT = /^srcdoc$/i
 
@@ -21,10 +28,13 @@ export function attributeName(name: string): boolean {
   return ATTRIBUTE_NAME.test(name)
 }
 
-// The tag a dynamic tag names, refused when HTML would read it as something else, such as `img src=x onerror=...`.
+// The tag a dynamic tag names, refused when HTML would read it as something else, such as `img src=x onerror=...`, or when it names an element that loads or runs something.
 export function elementName(tag: string): string {
   if (!ELEMENT_NAME.test(tag))
     throw new Error(`kay: ${JSON.stringify(tag)} is not an element name`)
+
+  if (UNSAFE_ELEMENTS.has(tag.toLowerCase()))
+    throw new Error(`kay: a dynamic tag cannot be ${JSON.stringify(tag)}, write the element in the template`)
 
   return tag
 }
@@ -225,17 +235,29 @@ export function partClass(props: unknown, part: string): unknown {
   return typeof entry === 'object' && entry !== null && !Array.isArray(entry) ? taggedParts(entry as Record<string, unknown>) : entry
 }
 
+// Whether a property and its value make one declaration: what is left of the value once its strings and parentheses are taken out holds no `;`, `{`, `}`, quote, parenthesis or backslash, which would add declarations or swallow the next.
+function declarationOf(name: string, value: unknown): boolean {
+  let rest = String(value).replace(CSS_STRING, '')
+
+  for (let before = ''; before !== rest;) {
+    before = rest
+    rest = rest.replace(CSS_GROUP, '')
+  }
+
+  return PROPERTY_NAME.test(name) && !CSS_BREAK.test(rest)
+}
+
 // A `style` value: a string, or an object of properties, each kept unless `null` or `undefined`; empty when it is falsy. The `style:prop` pairs follow it, each kept unless `null`, `undefined` or `false`.
 export function styleText(value: unknown, props?: readonly (readonly [string, unknown])[]): string {
   let result = typeof value === 'string' ? value : ''
 
   if (typeof value === 'object' && value !== null) {
     for (const [name, property] of Object.entries(value))
-      result += property != null ? `${result ? ';' : ''}${name}:${String(property)}` : ''
+      result += property != null && declarationOf(name, property) ? `${result ? ';' : ''}${name}:${String(property)}` : ''
   }
 
   for (const [name, property] of props ?? []) {
-    if (property != null && property !== false)
+    if (property != null && property !== false && declarationOf(name, property))
       result += `${result && !result.endsWith(';') ? ';' : ''}${name}:${String(property)}`
   }
 

@@ -1,6 +1,8 @@
 import type { AwaitNode, ElementNode, ElseBlock, ErrorMessages, ErrorNode, ForNode, IfNode, MatchNode, NamedAttribute, Node, Span, TemplateFacts, TryNode } from './ast'
 import type { DynamicItem, Item } from './items'
 import type { CodeBuilder } from './mapping'
+import type { ElementPlan } from './markup'
+import { DATA_SCRIPT } from '../runtime/head'
 import { mayLeaveSite } from '../runtime/outside'
 import { actionOf, FIELD_ELEMENTS, keyedByPosition, marksServerIsland, sectionOf, serverIslandOf, UNCHECKED_TYPES, UNREQUIRABLE_TYPES } from './ast'
 import { decodeEntities } from './expression'
@@ -13,14 +15,35 @@ const WRITTEN_AS = { image: 'src', selected: 'value' } as const
 // A number written in the template, `0` or `-1.5`, as an attribute's whole expression.
 const NUMBER_LITERAL = /^\s*-?\d+(?:\.\d+)?\s*$/
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
-const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'fieldDescribed', 'formConstraints', 'head', 'html', 'imageAttributes', 'innerMarkup', 'linkHref', 'localHref', 'loop', 'memo', 'merge', 'nonEmptyAttribute', 'omit', 'outsideLink', 'partClass', 'partHanded', 'partsClass', 'raw', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'spreadAttributes', 'spreadWith', 'style', 'untrack']
+const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'fieldDescribed', 'formConstraints', 'head', 'html', 'imageAttributes', 'innerMarkup', 'leadingNewline', 'linkHref', 'localHref', 'loop', 'memo', 'merge', 'nonEmptyAttribute', 'omit', 'outsideLink', 'partClass', 'partHanded', 'partsClass', 'raw', 'rawData', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'spreadAttributes', 'spreadWith', 'style', 'untrack']
 
 // The helper writing an element's content expression: `script` and `style` text escaped for raw text, an `innerHTML` as the markup it is, anything else as text.
-function contentHelper(content: { property: string, raw: boolean } | undefined): string {
+function contentHelper(content: { property: string, raw: boolean } | undefined, rawHelper: 'raw' | 'rawData'): string {
   if (content?.raw === true)
-    return 'raw'
+    return rawHelper
 
   return content?.property === 'innerHTML' ? 'innerMarkup' : 'child'
+}
+
+// The elements whose first newline HTML drops.
+const LEADING_NEWLINE = new Set(['listing', 'pre', 'textarea'])
+
+const NEWLINE_START = /^[\r\n]/
+
+// Whether an element's content may start with a newline: not when it is static or opens with an element or a text that does not.
+function mayStartWithNewline(children: Node[], fill: string | undefined, plan: ElementPlan): boolean {
+  if (fill === 'content' || fill === 'selected')
+    return true
+
+  if (children.length === 0)
+    return plan.staticContent === undefined ? plan.content !== undefined : NEWLINE_START.test(plan.staticContent)
+
+  const first = childItems(children)[0]
+
+  if (first === undefined || first.kind === 'element')
+    return false
+
+  return first.kind !== 'text' || NEWLINE_START.test(first.text)
 }
 
 export function htmlHelperImport(): string {
@@ -83,6 +106,9 @@ class Markup {
 export class HtmlTemplate extends TemplateWriter {
   // The names the `try` blocks being written give their `catch`, which an `await` without a `catch` inside falls back to: the runtime hands the function, or one rendering nothing, to the content of the `try`.
   private readonly catches: string[] = []
+
+  // The helper a raw text's expressions go through: a script holding JSON writes `<` as `\u003c`, where other raw text breaks it with a backslash.
+  private rawHelper: 'raw' | 'rawData' = 'raw'
 
   constructor(b: CodeBuilder, src: string, facts: TemplateFacts, private readonly options: HtmlOptions = {}) {
     super(b, src, facts)
@@ -157,7 +183,7 @@ export class HtmlTemplate extends TemplateWriter {
 
     switch (item.kind) {
       case 'expression':
-        b.add(`${helperName(raw ? 'raw' : 'child')}((`).addSource(item.node.expression).add('))')
+        b.add(`${helperName(raw ? this.rawHelper : 'child')}((`).addSource(item.node.expression).add('))')
 
         break
       case 'component':
@@ -719,52 +745,71 @@ export class HtmlTemplate extends TemplateWriter {
 
     this.honeypot(element, () => markup.dynamic(() => this.honeypotField(element)))
 
-    // A refused post's text takes the place of the textarea's static value.
-    const staticContent = field?.fill === 'content' && plan.valueText !== undefined ? undefined : plan.staticContent
+    const body = (markup: Markup): void => {
+      this.rawHelper = name === 'script' && type?.kind === 'text' && DATA_SCRIPT.test(type.text) ? 'rawData' : 'raw'
 
-    if (children.length > 0 && field?.fill === 'selected' && target) {
-      const own = selected
+      // A refused post's text takes the place of the textarea's static value.
+      const staticContent = field?.fill === 'content' && plan.valueText !== undefined ? undefined : plan.staticContent
 
+      if (children.length > 0 && field?.fill === 'selected' && target) {
+        const own = selected
+
+        markup.dynamic(() => {
+          b.add(`${helperName('refillOptions')}(KayFormValue((`).addSource(target).add(`), ${JSON.stringify(field.name)}), `)
+          this.markup(children, true)
+
+          if (own) {
+            b.add(', () => ')
+            own()
+          }
+
+          b.add(')')
+        })
+      }
+      else if (children.length > 0 && field?.fill === 'content' && target) {
+        markup.dynamic(() => {
+          b.add('((value) => value === undefined ? ')
+          this.markup(children, true)
+          b.add(` : ${helperName('child')}(value))(KayFormValue((`).addSource(target).add(`), ${JSON.stringify(field.name)}))`)
+        })
+      }
+      else if (children.length > 0 && selected) {
+        markup.dynamic(() => {
+          b.add(`${helperName('selectOptions')}(`)
+          selected()
+          b.add(', ')
+          this.markup(children, true)
+          b.add(')')
+        })
+      }
+      else if (children.length > 0) {
+        this.children(children, markup, RAW_ELEMENTS.has(name), true)
+      }
+      else if (staticContent !== undefined) {
+        markup.text(staticContent)
+      }
+      else if (content) {
+        markup.dynamic(() => {
+          b.add(`${helperName(contentHelper(plan.content, this.rawHelper))}(`)
+          content()
+          b.add(')')
+        })
+      }
+    }
+
+    // HTML drops the first newline of these, so the server writes one more when the content may start with one.
+    if (LEADING_NEWLINE.has(name) && mayStartWithNewline(children, field?.fill, plan)) {
       markup.dynamic(() => {
-        b.add(`${helperName('refillOptions')}(KayFormValue((`).addSource(target).add(`), ${JSON.stringify(field.name)}), `)
-        this.markup(children, true)
+        const inner = new Markup(b)
 
-        if (own) {
-          b.add(', () => ')
-          own()
-        }
-
+        b.add(`${helperName('leadingNewline')}(`)
+        body(inner)
+        inner.end()
         b.add(')')
       })
     }
-    else if (children.length > 0 && field?.fill === 'content' && target) {
-      markup.dynamic(() => {
-        b.add('((value) => value === undefined ? ')
-        this.markup(children, true)
-        b.add(` : ${helperName('child')}(value))(KayFormValue((`).addSource(target).add(`), ${JSON.stringify(field.name)}))`)
-      })
-    }
-    else if (children.length > 0 && selected) {
-      markup.dynamic(() => {
-        b.add(`${helperName('selectOptions')}(`)
-        selected()
-        b.add(', ')
-        this.markup(children, true)
-        b.add(')')
-      })
-    }
-    else if (children.length > 0) {
-      this.children(children, markup, RAW_ELEMENTS.has(name), true)
-    }
-    else if (staticContent !== undefined) {
-      markup.text(staticContent)
-    }
-    else if (content) {
-      markup.dynamic(() => {
-        b.add(`${helperName(contentHelper(plan.content))}(`)
-        content()
-        b.add(')')
-      })
+    else {
+      body(markup)
     }
 
     markup.text(`</${name}>`)

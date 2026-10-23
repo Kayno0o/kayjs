@@ -709,7 +709,9 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
     setInFlight(flying() + by)
     idle.check(flying())
   }
-  const called = (page: number, outcome: Outcome | null) => setLast({ page, outcome })
+  // The call started last owns the outcome, whichever finishes last.
+  let started = 0
+  const called = (page: number, outcome: Outcome | null, turn = started) => turn === started && setLast({ page, outcome })
   const outcome = () => {
     let found = requestOutcome?.()
     const own = last()
@@ -733,6 +735,8 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
     const left = () => navigation.visits !== visits
     // The island calling, from its setup or a handler, whose end ends a stream the call answers with; else the page, as long as no other path is shown.
     const caller: Caller = { owner: liveOwner(getOwner()), arrivals: navigation.arrivals }
+
+    const turn = ++started
 
     shift(1)
     called(page, null)
@@ -759,7 +763,7 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
 
       streaming = onStreamEnd(data, (status) => {
         if (status === 'done') {
-          called(page, { action: url(), succeeded: true, data: untrack((data as ActionStream<unknown>).last) })
+          called(page, { action: url(), succeeded: true, data: untrack((data as ActionStream<unknown>).last) }, turn)
           refreshPage()
         }
 
@@ -767,7 +771,7 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
       })
 
       if (!streaming) {
-        called(page, { action: url(), succeeded: true, data })
+        called(page, { action: url(), succeeded: true, data }, turn)
         refreshPage()
       }
 
@@ -783,7 +787,7 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
         refreshPage()
 
       if (error instanceof ActionError && !(error instanceof ActionRedirectError))
-        called(page, { action: url(), status: error.status, values: {}, errors: error.errors, data: error.data })
+        called(page, { action: url(), status: error.status, values: {}, errors: error.errors, data: error.data }, turn)
 
       throw error
     }
@@ -791,7 +795,8 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
       if (!streaming)
         shift(-1)
 
-      setProgress(undefined)
+      if (turn === started)
+        setProgress(undefined)
     }
   }
 
@@ -920,15 +925,22 @@ async function post<Output>(url: string, input: unknown, onProgress: (sent: numb
     return files && upload ? upload.uploaded('POST', withBase(url), headers, files, onProgress, signal) : fetch(withBase(url), { method: 'POST', headers, body, ...signal && { signal } })
   }
 
-  // A page holding a challenge for the action solves it from the moment one of its forms takes focus.
-  let response = await send(typeof document !== 'undefined' && document.querySelector(`script[${WORK_SCRIPT}]`) ? await (await import('./work.client')).spendWork(url) : undefined)
-  const challenge = response.status === 422 ? response.headers.get(WORK_HEADER) : null
+  let response: Response
 
-  // A call with no challenge to solve, or a stale one, is answered a fresh one, and goes again with its solution.
-  if (challenge !== null)
-    response = await send(await (await import('./work.client')).spendWork(url, challenge))
+  try {
+    // A page holding a challenge for the action solves it from the moment one of its forms takes focus.
+    response = await send(typeof document !== 'undefined' && document.querySelector(`script[${WORK_SCRIPT}]`) ? await (await import('./work.client')).spendWork(url) : undefined)
 
-  prefetched.clear()
+    const challenge = response.status === 422 ? response.headers.get(WORK_HEADER) : null
+
+    // A call with no challenge to solve, or a stale one, is answered a fresh one, and goes again with its solution.
+    if (challenge !== null)
+      response = await send(await (await import('./work.client')).spendWork(url, challenge))
+  }
+  finally {
+    // Pages prefetched while it was out, or once it ran whatever the answer, show what it changed no more than the ones before it.
+    prefetched.clear()
+  }
 
   void skew(response)
 

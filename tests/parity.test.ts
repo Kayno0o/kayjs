@@ -218,6 +218,15 @@ const FIXTURES: Record<string, Record<string, string | Blob>> = {
   'untrusted spread': {
     'main.kay': '---\nconst count = signal(0)\nconst data = { title: \'ok\', ONCLICK: \'alert(1)\', onmouseover: \'alert(1)\', \'x" onfocus="alert(1)\': 1, srcdoc: \'<script>alert(1)</script>\' }\n---\np {count()}\ndiv({...data})\niframe(title="frame" {...data})\n',
   },
+  'leading newlines': {
+    'main.kay': '---\nconst count = signal(0)\nconst text = \'\\nfirst\'\n---\np {count()}\npre {text}\ntextarea {text}\ntextarea(value={text})\npre\n  | static\n',
+  },
+  'style values': {
+    'main.kay': '---\nconst count = signal(0)\nconst hostile = \'red;background:url(//evil/x)\'\nconst fine = \'url("data:image/png;base64,AAA") no-repeat\'\n---\np {count()}\np(style={{ color: hostile, \'background\': fine, \'width};a\': \'1px\', \'--gap\': \'2px\' }}) object\np(style:color={hostile} style:height={\'3px\'}) pairs\n',
+  },
+  'allowed URL schemes': {
+    'main.kay': '---\nconst count = signal(0)\nconst schemes = [\'https://a.test/\', \'mailto:a@b.test\', \'tel:+33123\', \'sms:+33123\', \'/rel\', \'rel/x\', \'?q=1\', \'#top\', \'//cdn.test/x\', \'blob:https://a.test/1\', \'ftp://a.test/f\', \'foo:bar\', \'data:image/png;base64,AAA\', \'data:image/svg+xml,<svg/>\', \'java\\tscript:alert(1)\']\n---\np {count()}\nfor scheme of schemes key={scheme}\n  a(href={scheme}) link\n',
+  },
   'consts': {
     'main.kay': '---\nconst cents = signal(1250)\n---\nconst price = cents() / 100\np Price {price}\nconst { a, b } = { a: 1, b: 2 }\np {a} and {b}\n',
   },
@@ -230,6 +239,9 @@ const EXPECTED: Record<string, string> = {
   'template consts and match': '<p>2 products</p><li title="2.50">Tea: 2.50<b>only true</b></li><li title="9.00">Mug: 9.00</li><div class="box">1150</div><i>4</i><p>Live</p><p>Unknown</p>',
   'image loading': '<img alt="" class="lazy" decoding="async" loading="lazy" src="/a.png"></img><img alt="" class="hero" decoding="async" loading="eager" src="/a.png"></img><img alt="" class="spread" decoding="async" loading="lazy" src="/a.png"></img>',
   'ARIA states and bound URLs': '<button aria-expanded="false" aria-label="x" aria-pressed="false" aria-selected="false">x</button><div aria-busy="false"></div><div></div><p hidden="">shut</p><a href="/home">home</a><a href="unsafe: javascript:alert(1)">bad</a><img alt="" decoding="async" loading="lazy" src="unsafe: javascript:alert(1)"></img>',
+  'leading newlines': '<p>0</p><pre>\nfirst</pre><textarea .value="\nfirst"></textarea><textarea .value="\nfirst"></textarea><pre>static</pre>',
+  'style values': '<p>0</p><p style="background:url("data:image/png;base64,AAA") no-repeat;--gap:2px">object</p><p style="height:3px">pairs</p>',
+  'allowed URL schemes': '<p>0</p><a href="https://a.test/" rel="noopener" target="_blank">link</a><a href="mailto:a@b.test">link</a><a href="tel:+33123">link</a><a href="sms:+33123">link</a><a href="/rel">link</a><a href="rel/x">link</a><a href="?q=1">link</a><a href="#top">link</a><a href="//cdn.test/x" rel="noopener" target="_blank">link</a><a href="blob:https://a.test/1">link</a><a href="unsafe:ftp://a.test/f">link</a><a href="unsafe:foo:bar">link</a><a href="data:image/png;base64,AAA">link</a><a href="unsafe:data:image/svg+xml,<svg/>">link</a><a href="unsafe:java\tscript:alert(1)">link</a>',
   'merged classes': '<div class="a on"></div><div class="a b from-spread" id="spread"></div><div class="shorthand yes">box</div><div class="shorthand from-spread">box</div><p title="[a from-spread on]"></p><p title="[a z]"></p><p title="[from-spread]"></p><p title="[undefined]"></p>',
 }
 
@@ -242,6 +254,12 @@ function normalized(html: string): string {
   const template = document.createElement('template')
 
   template.innerHTML = html
+
+  // Happy DOM keeps the first newline of these, which a browser's parser drops.
+  for (const element of template.content.querySelectorAll('listing, pre, textarea')) {
+    if (element.firstChild?.nodeType === 3 && (element.firstChild as Text).data.startsWith('\n'))
+      (element.firstChild as Text).data = (element.firstChild as Text).data.slice(1)
+  }
 
   const first = template.content.firstElementChild
   const root = first?.matches('slot[data-component]') ? first : template.content

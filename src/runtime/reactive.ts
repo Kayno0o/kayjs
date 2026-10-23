@@ -100,7 +100,8 @@ let scheduled = false
 let batching = 0
 // Set while an island renders on the server, where nothing reacts afterwards: effects there never run.
 let serverRendering = 0
-const MAX_ROUNDS = 100_000
+// A chain of effects each setting off the next is a few rounds deep; an effect writing what it reads runs on to this many.
+const MAX_ROUNDS = 1000
 let interceptor: Interceptor | undefined
 let serverScope: (() => ServerScope | undefined) | undefined
 let reporter: (error: unknown, island?: string) => void = error => console.error(error)
@@ -108,6 +109,7 @@ let reporter: (error: unknown, island?: string) => void = error => console.error
 let hydrating = 0
 let afterHydration: (() => void)[] = []
 
+const WHITESPACE = /\s+/g
 const defaultEquals = <T>(previous: T, next: T) => previous === next
 
 export function createSignal<T>(value: T, options?: InternalSignalOptions<T>): [read: () => T, write: (next: T) => void] {
@@ -532,6 +534,11 @@ export function root<T>(fn: (dispose: () => void) => T): T {
   return runWithOwner(node, () => untrack(() => fn(() => dispose(node))))
 }
 
+// What names an effect in a report: its function's name, else the start of its source.
+function effectName(node: Computation): string {
+  return node.fn.name || node.fn.toString().replace(WHITESPACE, ' ').slice(0, 80)
+}
+
 // Runs every effect whose sources changed, now.
 export function flush(): void {
   scheduled = false
@@ -541,9 +548,12 @@ export function flush(): void {
   while (renderQueue.length > 0 || userQueue.length > 0) {
     // An effect writing what it reads, on every run, would never settle.
     if (++rounds > MAX_ROUNDS) {
+      // Production's names are minified, so only development reads them.
+      const looping = process.env.NODE_ENV === 'production' ? '' : `. Still queued: ${[...new Set([...renderQueue, ...userQueue].map(effectName))].slice(0, 5).join(', ')}`
+
       renderQueue = []
       userQueue = []
-      console.error(`[kay] effects still writing what they read after ${MAX_ROUNDS} rounds: stopped`)
+      console.error(`[kay] effects still writing what they read after ${MAX_ROUNDS} rounds: stopped${looping}`)
 
       return
     }

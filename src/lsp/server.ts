@@ -32,7 +32,7 @@ import { GENERATED_NAME } from '../compiler/names'
 import { nativeExe } from '../compiler/native-typescript'
 import { parseKay } from '../compiler/parser'
 import { analyzeScript, analyzeServer } from '../compiler/script'
-import { CONFIG_FILE, loadConfig } from '../config'
+import { CONFIG_FILE, loadConfigWithin } from '../config'
 import { tailwindSorter } from '../format/tailwind'
 import { projectPaths, projectRootOf, SHADOW_DIR } from '../project'
 import { routeMounts, scanRoutes } from '../server/routes'
@@ -1500,7 +1500,7 @@ export class KayLanguageServer {
 // A `kay.config.ts` that fails to load leaves the defaults rather than the editor without a language server.
 async function projectConfig(root: string): Promise<KayConfig> {
   try {
-    return await loadConfig(root)
+    return await loadConfigWithin(root)
   }
   catch (error) {
     console.error('kay lsp: kay.config.ts failed to load', error)

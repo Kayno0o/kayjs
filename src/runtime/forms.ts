@@ -181,6 +181,8 @@ async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: U
     return
   }
   finally {
+    // A page prefetched while the post was out shows what it changed no more than the ones before it.
+    prefetched.clear()
     busyForms.delete(form)
     form.removeAttribute('aria-busy')
     form.style.removeProperty('--kay-progress')

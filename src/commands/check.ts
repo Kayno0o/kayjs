@@ -10,7 +10,7 @@ import { realPath } from '../build/files'
 import { pruneCheckCache } from '../build/transform'
 import { applySafeFixes, check as checkTypes, configCheckOptions } from '../check'
 import { isLint, isLintGroup, LINT_GROUPS, LINTS, UPGRADE_FROM } from '../compiler/lints'
-import { CONFIG_FILE, loadConfig } from '../config'
+import { CONFIG_FILE, loadConfigWithin } from '../config'
 import { watchProject } from '../dev/sources'
 import { cacheDir } from '../project'
 import { buildingWithoutEnv } from '../server/env-state'
@@ -98,7 +98,7 @@ export const check: Command = {
 
         const code = await checkOnce(root, async () => {
           try {
-            return config ??= await loadConfig(root)
+            return config ??= await loadConfigWithin(root)
           }
           catch (error) {
             failed = true
@@ -116,7 +116,7 @@ export const check: Command = {
       return 0
     }
 
-    return checkOnce(root, async () => loadConfig(root), { project, entry, values, only, since, format, scope })
+    return checkOnce(root, async () => loadConfigWithin(root), { project, entry, values, only, since, format, scope })
   },
 }
 

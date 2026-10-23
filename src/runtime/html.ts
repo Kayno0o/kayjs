@@ -10,7 +10,7 @@ import { fieldDescription, fieldRequired } from './described'
 import { escape, escapeAttribute } from './escape'
 import { fieldMarks, markedAttribute, markedList, markedText, withFieldMarks } from './fields'
 import { nativeConstraints } from './form'
-import { headCheckpoint, restoreHead } from './head'
+import { DATA_SCRIPT, headCheckpoint, restoreHead } from './head'
 import { localizedLink } from './i18n'
 import { imageSource } from './image'
 import { islandCheckpoint } from './island.server'
@@ -37,6 +37,7 @@ export { componentClass, merge, omit, partClass, partHanded, partsClass, spreadW
 // Leads the markup of a `try` block the server rendered its `catch` block for.
 export const FAILED_MARKER = `<!--${FAILED}-->`
 const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'])
+const LEADING_NEWLINE = new Set(['listing', 'pre', 'textarea'])
 // Properties that set an element's content rather than an attribute.
 const CONTENT_PROPERTIES = new Set(['innerHTML', 'textContent', 'innerText', 'children'])
 // What ends a `script` or `style` early, or opens a comment that keeps a script running past its end tag.
@@ -102,6 +103,17 @@ export function raw(value: unknown): string {
 
   eachChild(value, (part) => {
     markup += typeof part === 'string' ? part.replace(RAW_TEXT_BREAK, match => match === '<!--' ? '<\\!--' : '<\\/') : rendered(part)
+  })
+
+  return markup
+}
+
+// Inside a `script` holding JSON, such as `application/ld+json`, where `\u003c` reads as `<` in a string and keeps the data valid, which `<\!--` would not.
+export function rawData(value: unknown): string {
+  let markup = ''
+
+  eachChild(value, (part) => {
+    markup += typeof part === 'string' ? part.replaceAll('<', '\\u003c') : rendered(part)
   })
 
   return markup
@@ -251,10 +263,12 @@ export function fieldDescribed(own?: unknown, type?: unknown, ownRequired?: unkn
 
 // An element whose attributes are only known at render time: spreads, or a component tag that names an element.
 // An attribute set by several sources takes the last one's value and place; `content`, the markup of the lines under the tag, wins over a `children` or `innerHTML` property.
-export function element(tag: string, sources: readonly object[], content?: () => string): Html {
+export function element(written: string, sources: readonly object[], content?: () => string): Html {
+  // HTML reads a tag in any case as its lowercase name.
+  const tag = written.toLowerCase()
   const isVoid = VOID_ELEMENTS.has(tag)
   const isRaw = tag === 'script' || tag === 'style'
-  let markup = `<${tag}`
+  let markup = `<${written}`
   let inner = content?.()
   let selected: unknown
   // A field takes the ids a component around it hands it, beside its own.
@@ -280,7 +294,7 @@ export function element(tag: string, sources: readonly object[], content?: () =>
 
       if (CONTENT_PROPERTIES.has(name)) {
         if (inner === undefined && !isVoid)
-          inner = contentOf(name, isRaw, value)
+          inner = tag === 'script' && DATA_SCRIPT.test(String(lastValue(sources, 'type') ?? '')) ? rawData(value) : contentOf(name, isRaw, value)
 
         continue
       }
@@ -327,7 +341,12 @@ export function element(tag: string, sources: readonly object[], content?: () =>
   if (tag === 'select' && selected !== undefined && inner !== undefined)
     inner = selectOptions(selected, inner)
 
-  return renderedHtml(`${markup}>${inner ?? ''}</${tag}>`)
+  return renderedHtml(`${markup}>${LEADING_NEWLINE.has(tag) ? leadingNewline(inner ?? '') : inner ?? ''}</${written}>`)
+}
+
+// The content of a `pre`, `listing` or `textarea` as HTML will read it back: a first newline is dropped by the parser, so one the content starts with is written twice.
+export function leadingNewline(markup: string): string {
+  return markup.startsWith('\n') || markup.startsWith('\r') ? `\n${markup}` : markup
 }
 
 // A component tag read off a prop or through a call: a string names an element, a function is the component.

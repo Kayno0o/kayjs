@@ -54,8 +54,9 @@ const SCRIPT_BREAK = /<(\/(?=script)|!(?=--))/gi
 // JSON holds `<` only inside strings, where `\u003c` reads the same, so no `<!--` or `</script` survives in it.
 const JSON_LT = /</g
 const JSON_TYPE = /json/i
+
 // Scripts holding JSON whatever their type says, where `\u003c` keeps them valid and `<\!` would not.
-const DATA_SCRIPT = /json|^(?:importmap|speculationrules)$/i
+export const DATA_SCRIPT = /json|^(?:importmap|speculationrules)$/i
 const ABSOLUTE_PATH = /^\/(?!\/)/
 const STYLE_END = /<\/(style)/gi
 // The meta page-title.ts reads, which stays a copy of its own so the island code is not reachable from the entry.

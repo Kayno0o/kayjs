@@ -174,7 +174,8 @@ const CHUNK_FILE = /^[^/\\:?#%]+\.js$/
 async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Promise<void> {
   const id = element.dataset.component ?? ''
   const file = element.dataset.chunk ?? ''
-  const load = registry[id] ?? (CHUNK_FILE.test(file) ? async () => import(new URL(file, import.meta.url).href) as ReturnType<IslandRegistry[string]> : undefined)
+  // Read as an own entry only, as an island's markup may come from content and name `constructor`.
+  const load = (Object.hasOwn(registry, id) && registry[id]) || (CHUNK_FILE.test(file) ? async () => import(new URL(file, import.meta.url).href) as ReturnType<IslandRegistry[string]> : undefined)
 
   // What was clicked on it is dropped, as it never hydrates.
   if (!load) {

@@ -28,7 +28,7 @@
 - A name the browser refuses to set, such as `@click`, is written by the server only.
 - A handler given as a function still attaches.
 - A spread sets `innerHTML` only when its value is a `SafeHtml`, which `sanitizeHtml`, `trustHtml` and an icon import return, and drops any other value, with a warning in development: `svg({...icon})` draws, `div({...record})` ignores a `record.innerHTML` that is a plain string.
-- A tag held in a value renders only when it is an element name, `img src=x onerror=...` throwing, and takes its props as a spread does.
+- A tag held in a value renders only when it is an element name, `img src=x onerror=...` throwing, and takes its props as a spread does. It cannot be `script`, `style`, `iframe`, `object`, `embed`, `base`, `meta` or `link` in any case: write those in the template.
 - Events are camelCase handlers: `onClick={save}`, `onInput={e => name.set(e.currentTarget.value)}`.
 - A lowercase `onclick` or `on:click` attaches nothing, and kay reports it.
 - A handler is read when the event fires, so one a prop, a signal or a loop item holds stays current: `button(onClick={onPress})`.
@@ -39,7 +39,7 @@
 - `bind:open={signal}` on `details` follows its toggling, on `dialog` its closing: `true` opens it non-modal, `false` closes it, a modal one too.
 - `bind:files={signal}` on `input(type="file")` holds the picked `FileList`, `null` clears it.
 - `bind:` next to a spread sets the value after the spread's; write a `type` or `value` on the element, as one only a spread brings is not seen.
-- `style:color={value}` sets one property of the `style`, `style:--gap={gap()}` a custom one, left out while the value is `null`, `undefined` or `false`; on an element only.
+- `style:color={value}` sets one property of the `style`, `style:--gap={gap()}` a custom one, left out while the value is `null`, `undefined` or `false`; on an element only. A value holding a `;`, `{` or `}` outside quotes and parentheses, or a property name that is no CSS name, is left out of a `style` object and of `style:prop` alike.
 - `onSubmit|preventDefault={save}` calls the event method first, `|stopPropagation` likewise, and the two chain; on an element only, so a form posts natively without JavaScript.
 - `ref={el => ...}` receives the DOM element, and may return a cleanup.
 - A function prop that is no handler, `class` or `style` (a slot or a formatter passed to a plain element) writes no attribute on the server either, as in the browser. Only what a component, an element or an island rendered counts as markup in `{}`: an object with a `t` string from JSON, such as a database column, renders nothing, like any other object.

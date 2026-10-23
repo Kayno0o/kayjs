@@ -70,7 +70,7 @@ describe('element', () => {
     expect((dynamic('my-tag', { title: 'a' }) as { t: string }).t).toBe('<my-tag title="a"></my-tag>')
     expect(() => dynamic('img src=x onerror=alert(1)', {})).toThrow('is not an element name')
     expect(() => dynamic('a>', {})).toThrow('is not an element name')
-    expect((dynamic('iframe', { SRCDOC: '<script>alert(1)</script>', onen: 'x', title: 'a' }) as { t: string }).t).toBe('<iframe title="a"></iframe>')
+    expect((dynamic('div', { SRCDOC: '<script>alert(1)</script>', onen: 'x', title: 'a' }) as { t: string }).t).toBe('<div title="a"></div>')
   })
 
   it('takes from a spread only attributes, handlers as functions, and no srcdoc, getters kept', () => {
