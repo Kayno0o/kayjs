@@ -262,6 +262,12 @@ describe('external-redirect', () => {
     expect(found('redirect("https://example.com/")')).toHaveLength(1)
   })
 
+  it('reports a path built from a bare slash and a value, as the value may start with another slash', () => {
+    expect(found('redirect("/" + ctx.query.next)')).toHaveLength(1)
+    expect(found('redirect(`/${ctx.query.next}`)')).toHaveLength(1)
+    expect(found('redirect("/" + a + "/b")')).toHaveLength(1)
+  })
+
   it('leaves a path of the site and localPath() alone', () => {
     expect(found('redirect("/login")')).toEqual([])
     expect(found('redirect(`/posts/${ctx.params.id}`)')).toEqual([])

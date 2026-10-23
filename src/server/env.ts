@@ -160,7 +160,7 @@ const SERVER_ONLY = /SECRET|PASSWORD|PASSWD|PRIVATE|TOKEN|CREDENTIAL|JWT|(?:^|_)
 
 // Any other name ending in KEY is refused too, unless it says it is meant for the browser: a map, analytics, captcha or publishable key is public by design.
 const KEY_NAME = /(?:^|_)KEY$/i
-const PUBLIC_KEY = /PUBLIC|PUBLISHABLE|MAPS?(?:_|$|BOX)|ANALYTICS|SITE|CAPTCHA|TURNSTILE|CLIENT/i
+const PUBLIC_KEY = /(?:^|_)(?:PUBLIC|PUBLISHABLE|MAPS?|MAPBOX|ANALYTICS|SITE|CAPTCHA|RECAPTCHA|TURNSTILE|CLIENT)_/i
 
 // An address that carries its own username and password, such as a database or a queue one.
 const CREDENTIAL_URL = /^[a-z][\d+.a-z-]*:\/\/[^\s/:@]*:[^\s/@]+@/i

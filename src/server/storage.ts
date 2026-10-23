@@ -12,6 +12,7 @@ import { dominantColor, imageColors } from './image-color'
 import { drawing, imageHeader, MAX_UPLOAD_PIXELS } from './image-format'
 import { holdsImageMetadata, stripImageMetadata } from './image-metadata'
 import { isPrivate, PRIVATE_DIR, writePrivate } from './private-dir'
+import { cacheKey } from './remote'
 import { requestUrl } from './request-url'
 import { headerCopies, ownedHeaders, ownHeaders, setSecurityHeaders } from './security'
 import { setupStampSecret, signedText, signText } from './stamp'
@@ -463,7 +464,7 @@ export async function storedImage(src: string): Promise<{ path: string, immutabl
 
 // How the image route's variants of a stored file start, so deleting the file finds them.
 function storedVariants(key: string): string {
-  return `stored-${Bun.hash(key).toString(36)}-`
+  return `stored-${cacheKey(key)}-`
 }
 
 function linkSigned(key: string, query: URLSearchParams): boolean {

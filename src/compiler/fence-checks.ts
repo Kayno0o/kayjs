@@ -16,6 +16,8 @@ const LINE_WITH_TEXT = /\n(?=[^\n])/g
 const NON_SPACE_OR_NEWLINE = /\S|\n/
 // A path of the site: one slash then anything but a second slash or a backslash.
 const SITE_PATH = /^\/(?![/\\])/
+// The start of a path built from a value: a slash and a character that is no slash, as a value of `/evil.example` after a bare `/` makes `//evil.example`.
+const BUILT_PATH = /^\/[^/\\]/
 
 // Settings exported under their own names, with a fix moving every one it can into `page` at once: each diagnostic carries the same fix, applied once.
 export function separatePageSettings(source: string, server: ServerAnalysis): Diagnostic[] {
@@ -431,16 +433,16 @@ export function asyncReplies(fence: ParsedFence): Diagnostic[] {
   return diagnostics
 }
 
-// Whether a redirect target is written as a path of this site: a literal starting with one slash, a template or a concatenation starting with one, or `localPath(...)`.
+// Whether a redirect target is written as a path of this site: a literal starting with one slash, a template or a concatenation whose text before the first value is `/` and a name (`/posts/`), or `localPath(...)`.
 function isSitePath(node: t.Node): boolean {
   if (node.type === 'StringLiteral')
     return SITE_PATH.test(node.value)
 
   if (node.type === 'TemplateLiteral')
-    return SITE_PATH.test(node.quasis[0]!.value.cooked ?? '')
+    return (node.expressions.length === 0 ? SITE_PATH : BUILT_PATH).test(node.quasis[0]!.value.cooked ?? '')
 
   if (node.type === 'BinaryExpression' && node.operator === '+')
-    return isSitePath(node.left)
+    return node.left.type === 'StringLiteral' ? BUILT_PATH.test(node.left.value) : isSitePath(node.left) && node.left.type === 'BinaryExpression'
 
   if (node.type === 'ConditionalExpression')
     return isSitePath(node.consequent) && isSitePath(node.alternate)

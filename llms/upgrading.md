@@ -62,6 +62,10 @@ A production server with no `KAY_SECRET` (or `secret` in kay.config.ts) refuses 
 
 Over https `kay_flash`, `kay_locale` and `kay_preview` are `__Host-kay_flash` and so on, `__Secure-` under a `base`; a plain-named one over https is no longer read, so a flash in flight, a returning visitor's locale choice and an open preview session are lost once. Code reading them by hand looks for the prefixed name. `kay_session` cookies sealed with the bare digest of the secret still open, and are sealed again under a derived key.
 
+### A public env refuses more names
+
+An `s.Public` field, or `publicEnv`, whose name ends in `_KEY` (other than a browser key such as `MAP_KEY` or `STRIPE_PUBLISHABLE_KEY`) or holds `DSN`, `JWT` or `CREDENTIAL`, or whose value is an address with a username and password, stops the boot; move it to `defineEnv` without `s.Public`. A custom `analytics` provider logs a warning at boot until `integrity: 'sha256-...'` pins its script, and `proxy.trustPrivate: false` lets `proxy.trusted` replace the private-range default.
+
 ### The OpenAPI document leaves out guarded routes for an unguarded reader
 
 `x-kay-guards`, which named guard files, is `x-kay-guarded: true`. The document and reference page served at `openapi.path` list a guarded route and action only where a guard covers the API directory; elsewhere they are left out (the MCP tool list is unchanged). Remote images and files kept in the image cache are keyed by a SHA-256 of their address or path, so the cache fills again once.

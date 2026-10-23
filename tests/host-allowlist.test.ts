@@ -44,6 +44,12 @@ describe('security.hosts', () => {
     expect((await answer(app, 'other.example')).status).toBe(421)
   })
 
+  it('refuses to boot when no host would be answered', async () => {
+    await expect(served({ security: { hosts: true } })).rejects.toThrow('security.hosts answers to no host name')
+    await expect(served({ security: { hosts: [] } })).rejects.toThrow('security.hosts answers to no host name')
+    expect((await answer(await served({ security: { hosts: ['shop.example'] } }), 'shop.example')).status).toBe(200)
+  })
+
   it('is off unless asked for', async () => {
     const app = await served({ site: 'https://shop.example' })
 

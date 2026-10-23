@@ -46,9 +46,9 @@ const ZONE = /%.*$/
 // An HTTP header name: the token characters.
 const HEADER_NAME = /^[\w!#$%&'*+.^`|~-]+$/
 const LEADING_ZEROS = /^0+(?=.)/
-// Loopback, private, shared (CGNAT, Tailscale) and link-local ranges, IPv4 ones mapped into IPv6 included: where a proxy in front of the server connects from.
 const BRACKETED_PORT = /^\[([^\]]+)\](:\d{1,5})?$/
 const V4_PORT = /^([\d.]+):\d{1,5}$/
+// Loopback, private, shared (CGNAT, Tailscale) and link-local ranges, IPv4 ones mapped into IPv6 included: where a proxy in front of the server connects from.
 const LOOPBACK_OR_PRIVATE = /^(?:(?:::ffff:)?(?:127\.|10\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.|100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|169\.254\.)|::1$|f[cd]|fe[89ab])/i
 // The proxy settings of the app each request reached, set as it arrives; `null` for an app setting none.
 const proxies = new WeakMap<Request, ProxyConfig | null>()

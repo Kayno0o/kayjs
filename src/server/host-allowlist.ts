@@ -1,4 +1,5 @@
 import type { Elysia } from 'elysia'
+import { KayError } from '../compiler/errors'
 import { nodeNet } from './builtins'
 
 const BRACKETS = /^\[|\]$/g
@@ -18,6 +19,9 @@ export function refuseUnknownHosts(app: Elysia, options: { site: string | undefi
 
   if (siteName !== undefined)
     allowed.add(siteName)
+
+  if (allowed.size === 0)
+    throw new KayError('config-invalid', 'kay: security.hosts answers to no host name, so every named host would get a 421: set `site` in kay.config.ts (or SITE_URL), or list the names in `security.hosts`')
 
   app.onRequest(({ request }) => {
     const host = request.headers.get('host')
