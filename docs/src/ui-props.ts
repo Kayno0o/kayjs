@@ -29,7 +29,7 @@ export function repeatedVariants(files: string[]): Map<string, string[]> {
 
   return new Map(files.map((file) => {
     const source = program.getSourceFile(`${file}.ts`)!
-    const declared = new Set(declaredProps(checker, source, false).map(prop => prop.name))
+    const declared = new Set(declaredProps(checker, source, false, file => !program.isSourceFileDefaultLibrary(file) && !file.fileName.includes('/node_modules/')).map(prop => prop.name))
 
     return [file, variantsOf(source).map(variant => variant.name).filter(name => declared.has(name))]
   }))
@@ -85,11 +85,12 @@ function typeParameters(generics: string | undefined): string {
   return (declared.typeParameters ?? []).map(parameter => `interface ${parameter.name.text} {}`).join('\n')
 }
 
-function declaredProps(checker: ts.TypeChecker, source: ts.SourceFile, withVariants = true): Prop[] {
+// `withVariants` adds the recipe's; `declaredIn` says which files a prop may be declared in, the component's own by default.
+function declaredProps(checker: ts.TypeChecker, source: ts.SourceFile, withVariants = true, declaredIn = (file: ts.SourceFile) => file === source): Prop[] {
   const call = find(source)
 
   if (call === undefined)
-    return []
+    return withVariants ? variantsOf(source) : []
 
   const declared = checker.getTypeFromTypeNode(call.typeArguments![0]!)
   const defaults = defaultsOf(call)
@@ -99,7 +100,7 @@ function declaredProps(checker: ts.TypeChecker, source: ts.SourceFile, withVaria
   for (const type of declared.isUnion() ? declared.types : [declared]) {
     for (const symbol of checker.getPropertiesOfType(type)) {
       // An intersection with an element's attributes, such as a link's `href` narrowed to a string, declares the prop both there and here.
-      const declaration = symbol.declarations?.find(candidate => candidate.getSourceFile() === source)
+      const declaration = symbol.declarations?.find(candidate => declaredIn(candidate.getSourceFile()))
 
       if (declaration === undefined)
         continue

@@ -12,12 +12,13 @@ import { PALETTES, paletteStylesheet, themeCss } from '../docs/src/palettes'
 import { loadReference } from '../docs/src/reference'
 import { partOf } from '../docs/src/sections'
 import { palette, pickTheme, scheme, THEME_SCRIPT, THEMES } from '../docs/src/theme'
-import { repeatedVariants } from '../docs/src/ui-props'
+import { propsOf, repeatedVariants } from '../docs/src/ui-props'
 import { brokenLinks, LINK } from '../scripts/links'
 import { compileKay, formatDiagnostic } from '../src/compiler'
 import { LINTS } from '../src/compiler/lints'
 import { formatKay } from '../src/format'
 import { sendValue } from '../src/runtime/send'
+import { scratchDir } from './scratch'
 
 const root = join(import.meta.dir, '..')
 // The CSS variable a highlighted token takes its colour from, and one the docs' stylesheet sets.
@@ -118,6 +119,22 @@ describe('the documentation site', () => {
     const repeated = [...repeatedVariants(files)].filter(([, names]) => names.length > 0).map(([file, names]) => `${file.slice(root.length + 1)}: ${names.join(', ')}`)
 
     expect(repeated).toEqual([])
+  })
+
+  // A variant taken through an imported type is declared twice just the same, and a component with a recipe alone still lists its variants.
+  it('sees a variant repeated through an imported type, and lists those of a recipe-only component', async () => {
+    const dir = await scratchDir('variants-')
+    const recipe = 'const look = recipe({ variants: { tone: { neutral: \'\', accent: \'\' } } })'
+
+    await Bun.write(join(dir, 'shared.ts'), 'export interface SharedProps { tone?: \'neutral\' | \'accent\', label?: string }\n')
+    await Bun.write(join(dir, 'imported.kay'), `---\nimport { recipe } from 'kay'\nimport type { SharedProps } from './shared'\n${recipe}\nconst { label } = props<SharedProps>()\n---\n`)
+    await Bun.write(join(dir, 'alone.kay'), `---\nimport { recipe } from 'kay'\n${recipe}\n---\n`)
+
+    const imported = join(dir, 'imported.kay')
+    const alone = join(dir, 'alone.kay')
+
+    expect(repeatedVariants([imported]).get(imported)).toEqual(['tone'])
+    expect(propsOf([alone]).get(alone)!.map(prop => prop.name)).toEqual(['tone'])
   })
 
   // The parts are read by the compiler; this reads `part="..."` again, so a page that lists others than its source writes fails.
