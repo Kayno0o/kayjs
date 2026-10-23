@@ -7,11 +7,11 @@ import { Database } from 'bun:sqlite'
 import { afterEach, beforeEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
 import { Elysia } from 'elysia'
+import { buildClient } from '../src/build/client'
 import { durationSeconds } from '../src/runtime/duration'
 import { configuredSite, setSite } from '../src/runtime/site'
 import { memoryStore, session, sqliteStore } from '../src/server'
 import { setupStore } from '../src/server/app-store'
-import { readClient } from '../src/server/client'
 import { renderPage } from '../src/server/render'
 import { scanRoutes } from '../src/server/routes'
 import { openWith, sealWith } from '../src/server/seal'
@@ -807,7 +807,7 @@ describe('a page read by who sent it', () => {
     const varied = await visit('/varied')
     const away = await visit('/away')
     const themed = (await scanRoutes(dir)).find(route => route.pattern === '/themed')!
-    const prerendered = await renderPage({ ...themed, guards: [] }, { request: new Request('http://localhost/themed') }, {}, (await readClient(process.cwd()))!, { prerendering: true })
+    const prerendered = await renderPage({ ...themed, guards: [] }, { request: new Request('http://localhost/themed') }, {}, await buildClient(dir), { prerendering: true })
 
     expect(own.get('cache-control')).toBe('public, max-age=60')
     expect(varied.get('cache-control')).toBe('private, no-cache')
