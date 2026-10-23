@@ -27,15 +27,18 @@ export interface PollLoop {
   stop: () => void
   // Back to the base rate, with the next read at most `every` away.
   wake: () => void
+  // While held, the base rate is kept however quiet the reads are: a watcher waits on the next change.
+  hold: (held: boolean) => void
 }
 
-// Calls `poll` every `every` ms, slower while it answers false; one that throws counts as heard nothing, its caller having logged it.
+// Calls `poll` every `every` ms, slower while it answers false and is not held; `poll` handles its own failures.
 export function pollLoop(every: number, poll: () => boolean | void): PollLoop {
   let quiet = 0
   let stopped = false
   let timer: unknown
   let due = 0
   let running = false
+  let held = false
 
   const arm = (ms: number) => {
     pollClock.clearTimeout(timer)
@@ -46,34 +49,35 @@ export function pollLoop(every: number, poll: () => boolean | void): PollLoop {
   function run() {
     running = true
 
-    let heard = false
-
-    try {
-      heard = poll() === true
-    }
-    catch {
-      // The poll logs its own failures.
-    }
+    const heard = poll() === true
 
     running = false
     quiet = heard ? 0 : quiet + 1
 
     if (!stopped)
-      arm(delayAfter(every, quiet))
+      arm(held ? every : delayAfter(every, quiet))
   }
 
   arm(every)
+
+  const wake = () => {
+    quiet = 0
+
+    if (!stopped && !running && due - pollClock.now() > every)
+      arm(every)
+  }
 
   return {
     stop() {
       stopped = true
       pollClock.clearTimeout(timer)
     },
-    wake() {
-      quiet = 0
+    wake,
+    hold(on) {
+      held = on
 
-      if (!stopped && !running && due - pollClock.now() > every)
-        arm(every)
+      if (on)
+        wake()
     },
   }
 }

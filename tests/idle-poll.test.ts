@@ -31,6 +31,12 @@ function virtualClock() {
 
   const timers = new Map<number, { at: number, run: () => void }>()
 
+  // Waits for the poll that just fired to end and arm the next, as a database answers in its own time.
+  const rearmed = async (expected: number) => {
+    for (let waited = 0; timers.size < expected && waited < 2000; waited += 5)
+      await Bun.sleep(5)
+  }
+
   pollClock.now = () => now
   pollClock.setTimeout = (run, ms) => {
     timers.set(++next, { at: now + ms, run })
@@ -43,9 +49,12 @@ function virtualClock() {
 
   return {
     fired: () => fired,
+    reset() {
+      fired = 0
+    },
     pending: () => timers.size,
-    // Fires the timers due within `ms`, in order, and waits `settle` after each for the database to answer.
-    async advance(ms: number, settle = 0) {
+    // Fires the timers due within `ms`, in order; with `slow`, waits after each (up to two seconds) for the poll to end and arm the next, as a database answers in its own time.
+    async advance(ms: number, slow = false) {
       const end = now + ms
 
       for (;;) {
@@ -54,11 +63,15 @@ function virtualClock() {
         if (due === undefined)
           break
 
+        const expected = timers.size
+
         timers.delete(due[0])
         now = Math.max(now, due[1].at)
         fired++
         due[1].run()
-        await Bun.sleep(settle)
+
+        if (slow)
+          await rearmed(expected)
       }
 
       now = end
@@ -70,6 +83,11 @@ let clock: ReturnType<typeof virtualClock>
 
 beforeEach(() => {
   clock = virtualClock()
+  const kept = Reflect.get(globalThis, Symbol.for('kay.live.state')) as { watchers: number } | undefined
+
+  if (kept !== undefined)
+    kept.watchers = 0
+
   // The declarations of the other cases would count as the app's own.
   ;(Reflect.get(globalThis, Symbol.for('kay.live')) as Map<string, unknown> | undefined)?.clear()
 })
@@ -98,6 +116,10 @@ function otherProcess(path: string) {
 
   return {
     publish: (message: string) => void db.run('INSERT INTO kay_events (origin, message, at) VALUES (?, ?, ?)', ['other', message, Date.now()]),
+    remove(id: string, key: string) {
+      db.run('DELETE FROM kay_live WHERE id = ? AND key = ?', [id, key])
+      db.run('INSERT INTO kay_live_events (origin, id, key, at) VALUES (?, ?, ?, ?)', ['other', id, key, Date.now()])
+    },
     set(id: string, key: string, text: string) {
       db.run('INSERT INTO kay_live (id, key, value) VALUES (?, ?, ?) ON CONFLICT (id, key) DO UPDATE SET value = excluded.value', [id, key, text])
       db.run('INSERT INTO kay_live_events (origin, id, key, at) VALUES (?, ?, ?, ?)', ['other', id, key, Date.now()])
@@ -120,15 +142,14 @@ describe('the poll backoff schedule', () => {
     expect([0, 1, 2, 3, 4].map(extra => delayAfter(500, QUIET_POLLS + extra))).toEqual([1000, 2000, 4000, MAX_IDLE_MS, MAX_IDLE_MS])
   })
 
-  it('polls about 25 times over an idle minute, not 120', async () => {
+  it('polls about 20 times over an idle minute, not 120', async () => {
     const path = await storePath()
     const store = sqliteCache(path)
 
     store.subscribe?.(() => undefined)
     store.set('a', '[1]', Date.now() + 60_000)
     await clock.advance(60_000)
-    expect(clock.fired()).toBeGreaterThanOrEqual(20)
-    expect(clock.fired()).toBeLessThanOrEqual(26)
+    expect(clock.fired()).toBe(20)
   })
 })
 
@@ -136,7 +157,7 @@ describe('an idle sqliteCache', () => {
   it('backs off even when the store is never used, as a prerendered page may be marked stale by it', async () => {
     sqliteCache(await storePath())
     await clock.advance(60_000)
-    expect(clock.fired()).toBeLessThanOrEqual(26)
+    expect(clock.fired()).toBeLessThanOrEqual(21)
   })
 
   it('hears an invalidation another store published after idling, within the idle cap', async () => {
@@ -219,6 +240,22 @@ describe('an idle sqliteLive', () => {
     expect(heard).toEqual(['test:idle:[1]', 'test:idle:[2]'])
   })
 
+  it('keeps the base rate while a page watches a value, and backs off again once none does', async () => {
+    const store = sqliteLive(await storePath())
+
+    setLiveStore(store)
+    declare(0, 'test:held', 'held')
+
+    const stop = watchSlot(liveSlot('test:held')!, '', () => undefined)
+
+    await clock.advance(30_000)
+    expect(clock.fired()).toBe(60)
+    stop()
+    clock.reset()
+    await clock.advance(60_000)
+    expect(clock.fired()).toBeLessThanOrEqual(21)
+  })
+
   it('stops while backed off', async () => {
     const store = sqliteLive(await storePath())
 
@@ -249,6 +286,20 @@ describe('an idle sqliteLive', () => {
     other.set('test:later', '', '[6]')
     await clock.advance(500)
     expect(later()).toBe(6)
+  })
+
+  it('does not show a value another process deleted while the store was not followed', async () => {
+    const path = await storePath()
+    const seed = sqliteLive(path)
+
+    await seed.set('test:gone', '', '[4]')
+    setLiveStore(sqliteLive(path))
+
+    const other = otherProcess(path)
+
+    other.remove('test:gone', '')
+    await clock.advance(60_000)
+    expect(declare(0, 'test:gone', 'gone')()).toBe(0)
   })
 
   it('does not follow a store for the ids kay keeps for itself', async () => {
@@ -296,7 +347,7 @@ function counted(sql: ReturnType<typeof replicas>[number]) {
 }
 
 pgDescribe('idle Postgres stores', () => {
-  pgIt('reach the database about 25 times over an idle minute, and never while unused', async () => {
+  pgIt('reach the database about 20 times over an idle minute, and never while unused', async () => {
     await freshTables()
 
     const [sql] = replicas(1)
@@ -313,7 +364,7 @@ pgDescribe('idle Postgres stores', () => {
     store.subscribe?.(() => undefined)
     values.subscribe(() => undefined)
     await store.get('x')
-    await clock.advance(60_000, 25)
+    await clock.advance(60_000, true)
     expect(unused.calls()).toBe(0)
     expect(cache.calls()).toBeLessThan(30)
     expect(cache.calls()).toBeGreaterThan(10)
@@ -335,19 +386,19 @@ pgDescribe('idle Postgres stores', () => {
     await firstLive.entries()
     await secondLive.entries()
     firstLive.subscribe((id, _key, text) => changes.push(`${id}:${text}`))
-    await clock.advance(30_000, 25)
+    await clock.advance(30_000, true)
     await publishedByOther(two!, '{"keys":["x"]}')
     await secondLive.set('app:idle', '', '[1]')
-    await clock.advance(MAX_IDLE_MS, 40)
+    await clock.advance(MAX_IDLE_MS, true)
     expect(heard).toEqual(['{"keys":["x"]}'])
     expect(changes).toEqual(['app:idle:[1]'])
 
-    await clock.advance(30_000, 25)
+    await clock.advance(30_000, true)
     await publishedByOther(two!, '{"keys":["y"]}')
     await secondLive.set('app:idle', '', '[2]')
     await first.get('x')
-    firstLive.wake?.()
-    await clock.advance(500, 80)
+    firstLive.hold?.(true)
+    await clock.advance(500, true)
     expect(heard).toEqual(['{"keys":["x"]}', '{"keys":["y"]}'])
     expect(changes).toEqual(['app:idle:[1]', 'app:idle:[2]'])
     firstLive.stop?.()
@@ -369,7 +420,7 @@ pgDescribe('idle Postgres stores', () => {
       store.subscribe?.(() => undefined)
       values.subscribe(() => undefined)
       await store.get('x')
-      await clock.advance(30_000, 25)
+      await clock.advance(30_000, true)
       expect(clock.pending()).toBeGreaterThan(0)
       values.stop?.()
       await disposeOwned(new Set([import.meta.path]))

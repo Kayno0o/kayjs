@@ -1,6 +1,7 @@
 import type { SQL } from 'bun'
 import type { CacheStore } from '../runtime/cache'
 import type { PgHandle } from './pg-data'
+import type { Stop } from './pg-poll'
 import { DEPS_PREFIX, PURGE_STALE_MS, readsOf, STALE_KEPT_MS, trackStore, untrackStore } from '../runtime/cache'
 import { kayLog } from '../runtime/log'
 import { rowsOf } from './pg-jobs'
@@ -17,7 +18,8 @@ export function pgCache(pg: PgHandle): CacheStore {
   const listeners: ((message: string) => void)[] = []
   // The writes still running, which a listing of the keys waits for so an `invalidate` never misses a row being written.
   const writing = new Set<Promise<unknown>>()
-  let polling: ReturnType<ReturnType<typeof pollerOf>['add']> | undefined
+  let polling: Stop | undefined
+  let used = false
   const events = eventWindow()
   let closed = false
   let purged = 0
@@ -72,6 +74,8 @@ export function pgCache(pg: PgHandle): CacheStore {
 
   // Started by the first call that needs the database, so only an app that reads, writes or invalidates a value connects; a later call brings a slowed poll back to its base rate.
   const start = () => {
+    used = true
+
     if (closed)
       return
 
@@ -80,6 +84,10 @@ export function pgCache(pg: PgHandle): CacheStore {
 
       return
     }
+
+    // Nothing to tell yet: the first listener starts it.
+    if (listeners.length === 0)
+      return
 
     polling = pollerOf(pg).add({ every: POLL_MS, backoff: true, wanted: () => listeners.length > 0, run: poll, failed: 'reading what the other processes invalidated failed' }, true)
   }
@@ -118,6 +126,8 @@ export function pgCache(pg: PgHandle): CacheStore {
       })())
     },
     async delete(key) {
+      start()
+
       await write((async () => {
         const db = await pg.db()
 
@@ -125,6 +135,8 @@ export function pgCache(pg: PgHandle): CacheStore {
       })())
     },
     async dependencies() {
+      start()
+
       const db = await pg.db()
       const rows = await rowsOf<{ key: string, reads: string }>(db`SELECT key, reads FROM kay_cache WHERE reads IS NOT NULL`)
 
@@ -148,6 +160,9 @@ export function pgCache(pg: PgHandle): CacheStore {
     },
     subscribe(listener) {
       listeners.push(listener)
+
+      if (used)
+        start()
     },
   }
 

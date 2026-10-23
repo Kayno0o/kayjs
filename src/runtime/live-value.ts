@@ -46,8 +46,8 @@ export interface LiveStore {
   subscribe: (listener: (id: string, key: string, text: string | undefined) => void) => void
   // Stops following the other processes, as when another store replaces this one; a later `subscribe` follows again.
   stop?: () => void
-  // Brings a poll that slowed down while nothing happened back to its pace, as a new watcher needs the next change at once.
-  wake?: () => void
+  // Told whether a page is watching a value: a store that slows its poll while nothing happens keeps its pace for as long as one is.
+  hold?: (held: boolean) => void
 }
 
 // The page's script of live values: the value of each as the server rendered it, with the signature that proves the page read those keys.
@@ -122,10 +122,20 @@ export function watchSlot(slot: ServerSlot, key: string, listener: () => void): 
     slot.listeners.set(key, set = new Set())
 
   set.add(listener)
-  // A store that slowed its poll while nothing happened polls at its pace again, as this watcher waits on the next change.
-  state().store?.wake?.()
+  // The watchers of the app's values keep a store that slows its poll at its pace, as they wait on the next change.
+  const kept = state()
+  const counted = shared(slot)
+
+  if (counted && ++kept.watchers === 1)
+    kept.store?.hold?.(true)
+
+  let watching = true
 
   return () => {
+    if (watching && counted && --kept.watchers === 0)
+      kept.store?.hold?.(false)
+
+    watching = false
     set.delete(listener)
 
     if (set.size === 0 && slot.listeners.get(key) === set)
@@ -150,6 +160,8 @@ interface ServerState {
   reading: Promise<void> | undefined
   // The store read at the start and not followed yet, as no module declared a value of the app.
   idle: LiveStore | undefined
+  // The watchers of the app's values, held by connections.
+  watchers: number
 }
 
 const STATE = Symbol.for('kay.live.state')
@@ -159,7 +171,7 @@ const UNDECLARED_ROWS = 10_000
 function state(): ServerState {
   const holder = globalThis as Record<symbol, ServerState | undefined>
 
-  return holder[STATE] ??= { store: undefined, subscribed: new WeakSet(), undeclared: new Map(), undeclaredRows: 0, startup: new Set(), checkWrite: undefined, written: undefined, reading: undefined, idle: undefined }
+  return holder[STATE] ??= { store: undefined, subscribed: new WeakSet(), undeclared: new Map(), undeclaredRows: 0, startup: new Set(), checkWrite: undefined, written: undefined, reading: undefined, idle: undefined, watchers: 0 }
 }
 
 // Installed by the server: refuses a value a browser could not be sent where it is set.
@@ -323,6 +335,9 @@ function follow(store: LiveStore): void {
     if (kept.store === store)
       hear(id, key, text)
   })
+
+  if (kept.watchers > 0)
+    store.hold?.(true)
 }
 
 // Reads a store again that was left unfollowed, then follows it: what the other processes set meanwhile is in its rows, and `entries` notes the last event before reading them so none is missed.
@@ -423,7 +438,15 @@ function serverLive(id: string, initial: unknown, name: string | undefined): Han
 
   if (!known) {
     const kept = state()
-    const idle = kept.idle
+    // The rows read at the start are older than the store: a late follow reads them again, so none of them is used and a key another process deleted since does not stay.
+    const idle = kept.idle !== undefined && kept.idle === kept.store && shared(slot) ? kept.idle : undefined
+
+    if (idle !== undefined) {
+      kept.undeclared.clear()
+      kept.startup.clear()
+      kept.undeclaredRows = 0
+    }
+
     const held = kept.undeclared.get(id)
 
     for (const [key, text] of held ?? []) {
@@ -440,7 +463,7 @@ function serverLive(id: string, initial: unknown, name: string | undefined): Han
         kept.undeclaredRows -= held.size
     }
 
-    if (idle !== undefined && idle === kept.store && shared(slot))
+    if (idle !== undefined)
       followLate(idle)
   }
 

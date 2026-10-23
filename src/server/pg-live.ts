@@ -1,6 +1,7 @@
 import type { SQL } from 'bun'
 import type { LiveStore } from '../runtime/live-value'
 import type { PgHandle } from './pg-data'
+import type { Stop } from './pg-poll'
 import { kayLog } from '../runtime/log'
 import { DB_TIMEOUT_MS, EVENT_TTL_MS, eventWindow, OVERLAP, POLL_MS, pollerOf, timeLimited } from './pg-poll'
 import { NOW, query } from './pg-sql'
@@ -22,7 +23,8 @@ export function pgLive(pg: PgHandle): LiveStore {
   const self = crypto.randomUUID()
   const listeners = new Set<Listener>()
   let tail: Promise<void> = Promise.resolve()
-  let polling: ReturnType<ReturnType<typeof pollerOf>['add']> | undefined
+  let polling: Stop | undefined
+  let held = false
   const events = eventWindow()
   let queued = 0
   let overflowing = false
@@ -189,7 +191,10 @@ export function pgLive(pg: PgHandle): LiveStore {
 
   return {
     stop,
-    wake: () => polling?.wake(),
+    hold(on) {
+      held = on
+      polling?.hold(on)
+    },
     // After the writes made before it, and noting the last event before the rows are read, so a set between the two is heard.
     async entries() {
       return ordered(async () => {
@@ -210,6 +215,9 @@ export function pgLive(pg: PgHandle): LiveStore {
         return
 
       polling = pollerOf(pg).add({ every: POLL_MS, backoff: true, wanted: () => listeners.size > 0 && !closed, run: poll, failed: 'reading the live values the other processes set failed' }, false)
+
+      if (held)
+        polling.hold(true)
     },
   }
 }

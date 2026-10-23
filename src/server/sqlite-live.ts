@@ -72,6 +72,7 @@ export function sqliteLive(path: string): LiveStore {
     opened?.db.close()
   })
 
+  let held = false
   const wake = () => {
     for (const poll of polls)
       poll.wake()
@@ -79,7 +80,12 @@ export function sqliteLive(path: string): LiveStore {
 
   return {
     stop,
-    wake,
+    hold(on) {
+      held = on
+
+      for (const poll of polls)
+        poll.hold(on)
+    },
     entries() {
       const live = open(false)
 
@@ -135,6 +141,7 @@ export function sqliteLive(path: string): LiveStore {
         return heard.length > 0
       })
 
+      poll.hold(held)
       polls.push(poll)
     },
   }

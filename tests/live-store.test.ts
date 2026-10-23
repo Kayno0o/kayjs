@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
-import { afterAll, describe, expect, it, spyOn } from 'bun:test'
+import { afterAll, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { live, liveSlot, liveStoreReady, setLiveStore, watchSlot } from '../src/runtime/live-value'
 import { setupStore } from '../src/server/app-store'
 import { sqliteLive } from '../src/server/sqlite-live'
@@ -13,6 +13,11 @@ const declare = live as unknown as (initial: number, id: string, name: string) =
 const dirs: string[] = []
 const VALUE = resolve('src/runtime/live-value.ts')
 const STORE = resolve('src/server/sqlite-live.ts')
+
+// A store is followed only once a value of the app is declared, so every case starts with one.
+beforeEach(() => {
+  declare(0, 'test:anchor', 'anchor')
+})
 
 afterAll(async () => {
   await Promise.all(dirs.map(async dir => rm(dir, { recursive: true, force: true })))

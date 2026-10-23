@@ -106,9 +106,11 @@ interface Entry {
   // The runs in a row that heard nothing, and when the last began.
   quiet: number
   began: number
+  // A held task keeps its base rate, as a watcher waits on its next change.
+  held: boolean
 }
 
-type Stop = (() => void) & { wake: () => void }
+export type Stop = (() => void) & { wake: () => void, hold: (held: boolean) => void }
 
 interface Poller {
   add: (task: PollTask, now: boolean) => Stop
@@ -157,7 +159,7 @@ function createPoller(pg: PgHandle): Poller {
         entry.quiet = outcome === 'heard' ? 0 : entry.quiet + 1
 
         if (entry.task.backoff)
-          entry.next = entry.began + delayAfter(entry.task.every, entry.quiet)
+          entry.next = entry.began + (entry.held ? entry.task.every : delayAfter(entry.task.every, entry.quiet))
       }
     }
     catch (error) {
@@ -198,19 +200,33 @@ function createPoller(pg: PgHandle): Poller {
 
   return {
     add(task, now) {
-      const entry: Entry = { task, next: now ? 0 : pollClock.now() + task.every, running: false, failing: false, quiet: 0, began: 0 }
+      const entry: Entry = { task, next: now ? 0 : pollClock.now() + task.every, running: false, failing: false, quiet: 0, began: 0, held: false }
 
       entries.add(entry)
       schedule()
+
+      const wake = () => {
+        entry.quiet = 0
+
+        const soonest = pollClock.now() + task.every
+
+        // A poll already due within its base rate needs no new timer.
+        if (entry.next > soonest) {
+          entry.next = soonest
+          schedule()
+        }
+      }
 
       return Object.assign(() => {
         entries.delete(entry)
         schedule()
       }, {
-        wake() {
-          entry.quiet = 0
-          entry.next = Math.min(entry.next, pollClock.now() + task.every)
-          schedule()
+        wake,
+        hold(held: boolean) {
+          entry.held = held
+
+          if (held)
+            wake()
         },
       })
     },
