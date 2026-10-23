@@ -52,7 +52,7 @@ bun run start   # kay start: the production server, after a build (server preset
 
 ## Editor
 
-The `.kay` extension for VS Code highlights `.kay` files and runs `kay lsp`. You get errors, hover, completion with auto-import, go-to-definition, references, rename, quick fixes, formatting, an outline, folding, links from imports and route paths, and imports updated when you rename or move a `.kay` file.
+The `.kay` extension for VS Code highlights `.kay` files and runs `kay lsp`. You get errors, hover, completion with auto-import, go-to-definition, references, rename, quick fixes, formatting a file or a selection, an outline, folding, links from imports and route paths, and imports updated when you rename or move a `.kay` file.
 
 Highlighting tells signals, props and server values apart, and inlay hints show inferred types and parameter names. Completion also offers element, attribute, prop and block names, route paths in `href`, `action` and `navigate()`, `t()` message keys and lint names after `// kay-allow`.
 

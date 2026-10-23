@@ -43,7 +43,7 @@ class Editor {
   }
 
   // What the server advertised.
-  advertised: { inlayHintProvider?: boolean, semanticTokensProvider?: { legend: { tokenTypes: string[], tokenModifiers: string[] } } } = {}
+  advertised: { documentRangeFormattingProvider?: boolean, inlayHintProvider?: boolean, semanticTokensProvider?: { legend: { tokenTypes: string[], tokenModifiers: string[] } } } = {}
 
   async start() {
     const { capabilities } = await this.connection.request<{ capabilities: Editor['advertised'] }>('initialize', { processId: process.pid, rootUri: this.fileUri(this.root), capabilities: this.capabilities })
@@ -1773,6 +1773,11 @@ const HINTS_PAGE = [
   '',
 ].join('\n')
 
+const FORMAT_FIRST = ['div', '    p( class = \'a\' ) one']
+const FORMAT_SECOND = ['section', '    p( class = \'b\' ) two😀', '        span( class = \'b\' ) é']
+const FORMAT_THIRD = ['ul', '    li( class = \'c\' ) three']
+const FORMAT_PAGE = ['---', 'const é = \'😀\'', '---', ...FORMAT_FIRST, '', '', '', ...FORMAT_SECOND, ...FORMAT_THIRD, ''].join('\n')
+
 const LINKS_PAGE = [
   'a(href="/about") About',
   'a(href="/posts/42/") Post',
@@ -1806,6 +1811,7 @@ describe('kay lsp editor features of an app under a base', () => {
       Bun.write(join(dir, 'src/store.ts'), 'import { signal } from \'kay\'\n\nexport const open = signal(false)\n'),
       Bun.write(join(dir, 'src/routes/tokens.kay'), TOKENS_PAGE),
       Bun.write(join(dir, 'src/routes/hints.kay'), HINTS_PAGE),
+      Bun.write(join(dir, 'src/routes/format.kay'), FORMAT_PAGE),
     ])
     editor = new Editor(dir)
     await editor.start()
@@ -1959,6 +1965,52 @@ describe('kay lsp editor features of an app under a base', () => {
 
       expect(await hintsOf('src/routes/broken.kay', 0, 10)).toEqual([])
       expect(await hintsOf('src/routes/empty.kay', 0, 10)).toEqual([])
+    })
+  })
+
+  describe('range formatting', () => {
+    const formatted = (text: string) => text.replaceAll(/ *\( class = '(\w)' \)/g, '(class="$1")').split('\n').map(line => ' '.repeat(((/^ */).exec(line)![0].length) / 2) + line.trimStart()).join('\n')
+    const format = async (start: [number, number], end: [number, number], path = 'src/routes/format.kay') => request<TextEdit[]>('textDocument/rangeFormatting', path, { range: { start: { line: start[0], character: start[1] }, end: { line: end[0], character: end[1] } }, options: { tabSize: 2, insertSpaces: true } })
+
+    it('formats the whole block a range inside it touches, and no other', async () => {
+      await editor.open('src/routes/format.kay')
+
+      // Line 10 is the second child of the second block, with a unicode run before its end.
+      const edits = await format([10, 3], [10, 6])
+
+      expect(applyEdits(FORMAT_PAGE, edits)).toBe(FORMAT_PAGE.replace(FORMAT_SECOND.join('\n'), formatted(FORMAT_SECOND.join('\n'))))
+    })
+
+    it('formats each block a range crosses, folding the blank lines between them as a whole file does', async () => {
+      expect(applyEdits(FORMAT_PAGE, await format([4, 0], [10, 3]))).toBe(['---', 'const é = \'😀\'', '---', formatted(FORMAT_FIRST.join('\n')), '', formatted(FORMAT_SECOND.join('\n')), ...FORMAT_THIRD, ''].join('\n'))
+    })
+
+    it('leaves a block the range only ends at the start of', async () => {
+      expect(applyEdits(FORMAT_PAGE, await format([3, 0], [8, 0]))).toBe(FORMAT_PAGE.replace(FORMAT_FIRST.join('\n'), formatted(FORMAT_FIRST.join('\n'))).replace('\n\n\n\n', '\n\n'))
+    })
+
+    it('gives the same text as formatting the whole file for a range over all of the template', async () => {
+      const [whole] = await request<TextEdit[]>('textDocument/formatting', 'src/routes/format.kay', { options: { tabSize: 2, insertSpaces: true } })
+
+      expect(applyEdits(FORMAT_PAGE, await format([0, 0], [14, 0]))).toBe(whole!.newText)
+    })
+
+    it('does nothing in a fence, in a formatted block, in a file with a syntax error or in an empty one', async () => {
+      expect(await format([1, 0], [1, 5])).toEqual([])
+
+      const text = applyEdits(FORMAT_PAGE, await format([0, 0], [14, 0]))
+
+      await editor.change('src/routes/format.kay', text, 2)
+      expect(await format([0, 0], [14, 0])).toEqual([])
+
+      await editor.open('src/routes/broken.kay')
+      await editor.open('src/routes/empty.kay')
+      expect(await format([0, 0], [3, 0], 'src/routes/broken.kay')).toEqual([])
+      expect(await format([0, 0], [3, 0], 'src/routes/empty.kay')).toEqual([])
+    })
+
+    it('advertises range formatting', () => {
+      expect(editor.advertised.documentRangeFormattingProvider).toBe(true)
     })
   })
 })

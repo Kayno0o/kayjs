@@ -37,6 +37,7 @@ import { componentInterface } from './component-props'
 import { islandLens } from './island-lens'
 import { documentSymbols, foldingRanges } from './outline'
 import { toOffset, toPosition } from './positions'
+import { formatRange } from './range-format'
 import { importEdits, importSpecifiers, moduleImportEdits } from './renames'
 import { routeLinks } from './route-links'
 import { Connection } from './rpc'
@@ -192,6 +193,7 @@ export class KayLanguageServer {
     client.onRequest<TextDocumentPositionParams>('textDocument/prepareRename', async params => this.prepareRename(params))
     client.onRequest<TextDocumentPositionParams & { newName: string }>('textDocument/rename', async params => this.rename(params))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/formatting', async ({ textDocument }) => this.format(textDocument.uri))
+    client.onRequest<{ textDocument: TextDocumentIdentifier, range: Range }>('textDocument/rangeFormatting', async params => this.formatSelection(params))
     client.onRequest<CodeActionParams>('textDocument/codeAction', async params => this.codeActions(params))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/documentSymbol', ({ textDocument }) => this.symbols(textDocument.uri))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/documentLink', async ({ textDocument }) => this.links(textDocument.uri))
@@ -253,6 +255,7 @@ export class KayLanguageServer {
         renameProvider: { prepareProvider: true },
         codeActionProvider: { codeActionKinds: [QUICK_FIX, FIX_ALL] },
         documentFormattingProvider: true,
+        documentRangeFormattingProvider: true,
         documentSymbolProvider: true,
         foldingRangeProvider: true,
         semanticTokensProvider: { legend: { tokenTypes: TOKEN_TYPES, tokenModifiers: TOKEN_MODIFIERS }, full: true },
@@ -1101,6 +1104,18 @@ export class KayLanguageServer {
       return []
 
     return [{ range: { start: { line: 0, character: 0 }, end: toPosition(document.source, document.source.length) }, newText: formatted.code }]
+  }
+
+  // The top-level blocks of the template the range touches, formatted whole.
+  private async formatSelection({ textDocument, range }: { textDocument: TextDocumentIdentifier, range: Range }): Promise<TextEdit[]> {
+    const document = this.documents.get(textDocument.uri)
+
+    if (!document)
+      return []
+
+    const edits = formatRange(document.source, { start: toOffset(document.source, range.start), end: toOffset(document.source, range.end) }, { sortClasses: await tailwindSorter(projectRootOf(document.file, this.root)) })
+
+    return edits.map(edit => ({ range: { start: toPosition(document.source, edit.start), end: toPosition(document.source, edit.end) }, newText: edit.text }))
   }
 
   private async definition(params: TextDocumentPositionParams): Promise<LocationLink[] | null> {
