@@ -1,6 +1,6 @@
 ---
 import type { PopoverPlacement } from './popover'
-import { call, navigate, recipe, resource } from 'kay'
+import { call, recipe, resource } from 'kay'
 import { wording } from 'kay/words'
 import inboxApi from './api/inbox'
 import IconButton from './icon-button.kay'
@@ -9,7 +9,7 @@ import Popover from './popover.kay'
 const look = recipe({
   parts: {
     root: 'kui-bell relative inline-flex',
-    count: 'kui-bell-count pointer-events-none absolute -end-1 -top-1 grid min-w-4 place-items-center rounded-full bg-kui-accent px-1 text-[0.625rem]/4 font-semibold text-kui-on-accent',
+    count: 'pointer-events-none absolute -end-1 -top-1 grid min-w-4 place-items-center rounded-full bg-kui-accent px-1 text-[0.625rem]/4 font-semibold text-kui-on-accent',
     menu: 'kui-menu',
     list: 'kui-menu-list',
     item: 'kui-menu-item',
@@ -47,19 +47,6 @@ async function send(id?: string) {
 
   inbox.refresh()
 }
-
-async function open(event: MouseEvent, note: { id: string, url?: string | undefined }) {
-  const url = linked(note.url)
-  const plain = url !== undefined && !external(url) && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey
-
-  if (plain)
-    event.preventDefault()
-
-  await send(note.id)
-
-  if (plain)
-    await navigate(url as '/')
-}
 ---
 span(part="root")
   Popover(placement={placement} part="menu")
@@ -70,13 +57,17 @@ span(part="root")
         p(part="empty") {wording('ui.bell.emptyLabel', 'No notifications')}
       for note of items() key={note.id}
         if linked(note.url) as url
-          a(part="item" href={url} target={external(url) ? '_blank' : undefined} rel={external(url) ? 'noopener' : undefined} onClick={(event: MouseEvent) => open(event, note)})
+          a(part="item" href={url} target={external(url) ? '_blank' : undefined} rel={external(url) ? 'noopener' : undefined} onClick={() => send(note.id)})
             span(part="dot" data-read={note.read ? '' : undefined} aria-hidden="true")
             span(part="title") {note.title}
+            if !note.read
+              span.sr-only {wording('ui.bell.unreadMark', '(unread)')}
         else
           button(part="item" type="button" onClick={() => send(note.id)})
             span(part="dot" data-read={note.read ? '' : undefined} aria-hidden="true")
             span(part="title") {note.title}
+            if !note.read
+              span.sr-only {wording('ui.bell.unreadMark', '(unread)')}
       if unread() > 0
         button(part="all" type="button" onClick={() => send()}) {wording('ui.bell.markAllLabel', 'Mark all as read')}
   if unread() > 0

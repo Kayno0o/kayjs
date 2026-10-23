@@ -88,7 +88,7 @@ export function safeNotificationUrl(url: unknown): string | undefined {
 }
 
 function checkedUser(user: unknown): string {
-  if (typeof user !== 'string' || user === '' || user.length > MAX_USER)
+  if (typeof user !== 'string' || user === '' || user.length > MAX_USER || user.includes('\0'))
     throw new RangeError(`kay: a notification's user is the user's id, 1 to ${MAX_USER} characters; got ${typeof user === 'string' ? `${user.length} characters` : typeof user}`)
 
   return user
@@ -267,7 +267,7 @@ function changed(user: string): void {
 // The store is the app's `store.notifications`, which `sqliteData` and `pgData` fill; with none it is this process's memory. A notification is dropped after `keep`, 90 days by default.
 export async function notify(user: string, { title, url, keep = DEFAULT_KEEP }: NotifyOptions): Promise<Notification> {
   const id = checkedUser(user)
-  const text = typeof title === 'string' ? title.trim() : ''
+  const text = typeof title === 'string' ? title.replaceAll('\0', '').trim() : ''
 
   if (text === '' || text.length > MAX_TITLE)
     throw new RangeError(`kay: a notification's title is 1 to ${MAX_TITLE} characters; got ${typeof title === 'string' ? `${text.length} characters` : typeof title}`)
@@ -302,7 +302,7 @@ export const notifications = {
   async inbox(user: string): Promise<Inbox> {
     const id = checkedUser(user)
 
-    return cached(inboxKey(id), '5m', async () => {
+    return cached(inboxKey(id), '1m', async () => {
       const store = notificationStore()
       const now = Date.now()
 

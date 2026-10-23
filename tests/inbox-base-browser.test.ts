@@ -48,15 +48,17 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('the Bell
   })
 
   it('links a path of the site under the base and the locale, and words the bell in the page\'s language', async () => {
-    await notify('ada', { title: 'Commande expédiée', url: '/orders/12' })
+    await notify('ada', { title: 'Commande expédiée', url: '/plain' })
 
     const page = await browse(`${front.url.origin}${base}/fr`, { path: chrome })
 
     try {
       await page.waitUntil(() => document.querySelector('.kui-bell button')?.getAttribute('aria-label') === 'Notifications, 1 non lue')
       await page.click('.kui-bell button')
-      expect(await page.evaluate(() => document.querySelector('.kui-menu-list a')?.getAttribute('href'))).toBe('/repo/orders/12')
+      expect(await page.evaluate(() => document.querySelector('.kui-menu-list a')?.getAttribute('href'))).toBe('/repo/fr/plain')
       expect(await page.text('.kui-menu-list button.kui-menu-item')).toBe('Tout marquer comme lu')
+      await page.click('.kui-menu-list a')
+      await page.waitUntil(() => location.pathname === '/repo/fr/plain')
       expect(page.errors).toEqual([])
     }
     finally {

@@ -62,13 +62,13 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('the Bell
 
     await first.waitFor('.kui-bell button')
     await second.waitFor('.kui-bell button')
-    expect(await first.count('.kui-bell-count')).toBe(0)
+    expect(await first.count('[data-part="count"]')).toBe(0)
 
     await notify('ada', { title: 'Order shipped', url: '/orders/12' })
     await notify('ada', { title: 'Invoice paid' })
     await first.waitUntil(() => document.querySelector('.kui-bell button')?.getAttribute('aria-label') === 'Notifications, 2 unread')
     await second.waitUntil(() => document.querySelector('.kui-bell button')?.getAttribute('aria-label') === 'Notifications, 2 unread')
-    expect(await first.text('.kui-bell-count')).toBe('2')
+    expect(await first.text('[data-part="count"]')).toBe('2')
 
     await first.click('.kui-bell button')
     await first.waitFor('.kui-menu-list a')

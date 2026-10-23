@@ -9,6 +9,7 @@ export default defineMessages({
       emptyLabel: 'Aucune notification',
       label: 'Notifications',
       markAllLabel: 'Tout marquer comme lu',
+      unreadMark: '(non lue)',
       unreadLabel: { one: '{label}, {count} non lue', other: '{label}, {count} non lues' },
     },
     carousel: {

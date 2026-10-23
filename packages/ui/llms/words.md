@@ -31,7 +31,7 @@ ui: { sidePanel: { closeLabel: 'Fermer' } }
 
 - `ui.barChart.*`: `emptyLabel` (`No data yet.`), `total` (`Total`)
 - `ui.barList.*`: `emptyLabel` (`No data yet.`)
-- `ui.bell.*`: `emptyLabel` (`No notifications`), `label` (`Notifications`), `markAllLabel` (`Mark all as read`), `unreadLabel` (`{label}, {count} unread`, `{label}, 1 unread` for one)
+- `ui.bell.*`: `emptyLabel` (`No notifications`), `label` (`Notifications`), `markAllLabel` (`Mark all as read`), `unreadMark` (`(unread)`, read by screen readers beside an unread item), `unreadLabel` (`{label}, {count} unread`, `{label}, 1 unread` for one)
 - `ui.carousel.*`: `dotLabel` (`Go to slide {n}`), `label` (`Carousel`), `nextLabel` (`Next slide`), `pauseLabel` (`Pause`), `playLabel` (`Play`), `previousLabel` (`Previous slide`), `slideLabel` (`Slide {n} of {count}`)
 - `ui.combobox.*`: `createLabel` (`Create "{text}"`), `emptyLabel` (`No match`), `failureLabel` (`Could not load the options`), `loadingLabel` (`Loading…`), `resultsLabel` (`{count} results`, `1 result` for one)
 - `ui.commandPalette.*`: `emptyLabel` (`No results`), `label` (`Search`), `placeholder` (`Search`), `recentLabel` (`Recent`), `resultsLabel` (`{count} results, `1 result` for one`), `siteSearchError` (`The pages could not be searched`), `siteSearchLabel` (`In the pages`), `siteSearchMore` (`{count} more matches`, `1 more match` for one)
