@@ -125,4 +125,16 @@ test('a person the guard lets in who only reads the page is told the names once 
   await reader.visit('/blog/hello')
   expect((await reader.fetch('/_kay/cms/entries/posts/hello')).status).toBe(200)
   expect(namesIn(await receives(reader, '/blog/hello', 'reader-page'))).toContain('Ann')
+
+  // A holder the guard turns away reads all the same, and is marked by nothing.
+  const holder = await testSite({ root: ROOT })
+
+  await holder.visit(previewUrl('/blog/hello', { edit: true }))
+  await holder.visit('/blog/hello')
+
+  const refused = await holder.fetch('/_kay/cms/entries/posts/hello', { headers: { 'x-deny': '1' } })
+
+  expect(refused.status).toBe(200)
+  expect(refused.headers.getSetCookie().join()).not.toContain('kay_preview_admitted')
+  expect(namesIn(await receives(holder, '/blog/hello', 'refused-holder'))).not.toContain('Ann')
 }, 30_000)

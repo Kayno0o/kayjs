@@ -4,7 +4,7 @@ import { apiUrl, guard } from 'kay'
 import { editSessionAdmitted, READ_METHODS, underKayDev } from 'kay/library'
 import { editedEntry, editRequested } from 'kay/server'
 import { wording } from 'kay/words'
-import { forbidden, may, memberOf, routePath } from '../access'
+import { forbidden, may, memberOf, refusalStatus, routePath } from '../access'
 import { authors, testAddresses } from '../authors'
 import { admitEditor } from '../editor-names'
 import { leavesPublication, restrain } from '../publishing'
@@ -101,7 +101,7 @@ function actionOf(method: string, path: string): Action | undefined {
   return method === 'POST' && (UPLOAD.test(path) || MEDIA_RENAME.test(path)) ? 'upload' : undefined
 }
 
-// Marks the edit cookie of a person the app's guard lets in who only reads: the guard is asked once, and an edit link's holder, whom it turns away, reads on all the same.
+// Marks the edit cookie of a person the app's guard lets in who only reads. An edit link's holder, whom it turns away, reads on all the same, and the guard is asked again at each of their reads.
 async function admitReader(ctx: GuardContext, admits: Guard | undefined): Promise<void> {
   if (!admits || editSessionAdmitted(ctx.request))
     return
@@ -110,8 +110,10 @@ async function admitReader(ctx: GuardContext, admits: Guard | undefined): Promis
     await admits(ctx)
     admitEditor(ctx)
   }
-  catch {
-    // Not a person the guard admits, which is no failure of the read.
+  catch (error) {
+    // A refusal is an answer; a fault of the guard is not.
+    if (refusalStatus(error) === undefined)
+      throw error
   }
 }
 
@@ -152,10 +154,14 @@ export default guard(async (ctx) => {
     if (method === 'POST' && LEAVING.test(ownPath(ctx.url.pathname, root)))
       return
 
-    if (READ_METHODS.has(method) ? mayRead(ctx, root) : !admits && underKayDev()) {
-      if (READ_METHODS.has(method))
+    if (READ_METHODS.has(method)) {
+      if (mayRead(ctx, root)) {
         await admitReader(ctx, admits)
 
+        return
+      }
+    }
+    else if (!admits && underKayDev()) {
       return
     }
   }

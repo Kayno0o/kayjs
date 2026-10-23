@@ -4,7 +4,12 @@ import * as server from 'kay/server'
 import { authors } from '../src/authors'
 import { configure, settings } from '../src/settings'
 
-class Refused extends Error {}
+// As kay's own, a refusal is no Error and carries its status.
+class Refused {
+  status = 403
+
+  constructor(readonly message?: string) {}
+}
 
 // An edit-mode request carries this header here, standing in for kay's signed cookie, and lists the entries its pages rendered as collection/slug, comma-separated.
 void mock.module('kay/server', () => ({
