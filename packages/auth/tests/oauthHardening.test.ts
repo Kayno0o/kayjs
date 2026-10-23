@@ -1,11 +1,13 @@
 import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
+import { Elysia } from 'elysia'
 import { documentUrl, fetchPublicDocument, plainName, privateAddress } from '../src/authorize/clients'
+import { underResource } from '../src/authorize/request'
 import { validRedirectUri, validRedirectUris } from '../src/authorize/uris'
 import { digest } from '../src/keys'
 import { memoryAuthStore } from '../src/memoryStore'
 import { authPages } from '../src/pages'
-import { testApp } from './helpers/app'
+import { browser as browserOf, testApp } from './helpers/app'
 
 const PASSWORD = 'correct horse battery'
 const REDIRECT = 'http://127.0.0.1:33418/callback'
@@ -671,5 +673,60 @@ describe('a route of the app at a document\'s path', () => {
 
     expect(await (await own.handle(new Request('http://localhost/.well-known/oauth-authorization-server'))).text()).toBe('mine')
     expect((await own.handle(new Request('http://localhost/.well-known/openid-configuration'))).status).toBe(200)
+  })
+})
+
+describe('a token bound to a resource passes only under it', () => {
+  test.each([
+    ['http://localhost/mcp', '/mcp', true],
+    ['http://localhost/mcp', '/mcp/', true],
+    ['http://localhost/mcp/', '/mcp', true],
+    ['http://localhost/mcp', '/mcp/tools/list', true],
+    ['http://localhost/mcp', '/mcpx', false],
+    ['http://localhost/mcp', '/api/posts', false],
+    ['http://localhost/mcp', '/', false],
+    ['http://localhost/mcp?tenant=1', '/mcp/x', true],
+    ['http://localhost/mcp?tenant=1', '/api', false],
+    ['http://localhost/app/mcp', '/app/mcp', true],
+    ['http://localhost/app/mcp', '/mcp', false],
+    ['http://localhost/app/mcp', '/app/api', false],
+    ['http://localhost/', '/anything', true],
+    ['http://localhost', '/anything', true],
+    ['http://localhost/mcp', '/mcp/../api', false],
+    ['not a url', '/mcp', false],
+  ])('%s covers %s: %p', (resource, path, covered) => {
+    expect(underResource(resource, `http://localhost${path}`)).toBe(covered)
+  })
+
+  async function bearerFor(resource: string | undefined) {
+    const app = server()
+    const { body } = await register(app)
+    const ada = await signedIn(app)
+    const answer = await ada.post('/call/oauthDecide', [params(body.client_id!, resource === undefined ? {} : { resource }), true]) as { ok: true, redirect: string }
+    const code = new URL(answer.redirect).searchParams.get('code')!
+    const reply = await token(app, { grant_type: 'authorization_code', code, code_verifier: VERIFIER, client_id: body.client_id!, redirect_uri: REDIRECT })
+
+    return { app, authorization: `Bearer ${reply.body.access_token}` }
+  }
+
+  async function statuses(resource: string | undefined) {
+    const { app, authorization } = await bearerFor(resource)
+    const gated = new Elysia().use(app.auth.gate()).get('/mcp', () => 'ok', { scope: false }).get('/mcp/tools', () => 'ok', { scope: false }).get('/api/posts', () => 'ok', { scope: false })
+    const device = browserOf(new Elysia().use(app.app).use(gated))
+    const get = async (path: string) => (await device.fetch(path, { headers: { authorization } })).status
+
+    return [await get('/mcp'), await get('/mcp/'), await get('/mcp/tools'), await get('/api/posts')]
+  }
+
+  test('works under the resource it was asked for and is a 401 elsewhere', async () => {
+    expect(await statuses('http://localhost/mcp')).toEqual([200, 200, 200, 401])
+  })
+
+  test('a resource with a query still binds to its path', async () => {
+    expect(await statuses('http://localhost/mcp?tenant=1')).toEqual([200, 200, 200, 401])
+  })
+
+  test('a token asked for no resource works everywhere', async () => {
+    expect(await statuses(undefined)).toEqual([200, 200, 200, 200])
   })
 })

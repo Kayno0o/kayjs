@@ -1205,7 +1205,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     }
 
     const token = bearerToken(this.request)
-    const owner = token === undefined ? undefined : await (await load.bearer()).tokenUser(this.core, token)
+    const owner = token === undefined ? undefined : await (await load.bearer()).tokenUser(this.core, token, this.request.url)
 
     const live = owner && !banned(owner.record) ? owner : null
 

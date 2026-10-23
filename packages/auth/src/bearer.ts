@@ -4,6 +4,7 @@ import type { Proof, ProofFailure } from './proof'
 import type { RequestState } from './state'
 import type { BearerTokenRecord, UserRecord } from './store'
 import { durationSeconds } from 'kay/library'
+import { underResource } from './authorize/request'
 import { banned, TOUCH_EVERY_MS } from './core'
 import { digest, randomToken } from './keys'
 import { notify } from './notify'
@@ -164,8 +165,8 @@ export async function revokeToken(state: RequestState, id: string): Promise<{ ok
   return (await state.core.store.bearerTokens.delete(record.id, id)) ? { ok: true } : { ok: false, error: 'not-found' }
 }
 
-// The user a bearer token belongs to, as a websocket handshake checks one; an expired token is refused.
-export async function tokenUser(core: Core, token: string): Promise<{ record: UserRecord, scopes: string[] | null } | undefined> {
+// The user a bearer token belongs to, as a websocket handshake checks one; an expired token is refused, and so is one bound to a resource when `url` is not under it.
+export async function tokenUser(core: Core, token: string, url?: string): Promise<{ record: UserRecord, scopes: string[] | null } | undefined> {
   const { bearerTokens, users } = core.store
   const hash = digest(token)
   // One query for the token and its user when the store has it, else two.
@@ -174,6 +175,11 @@ export async function tokenUser(core: Core, token: string): Promise<{ record: Us
   const now = new Date()
 
   if (!found || (found.expiresAt !== null && found.expiresAt <= now))
+    return undefined
+
+  const resource = found.oauth?.resource
+
+  if (url !== undefined && resource != null && resource !== '' && !underResource(resource, url))
     return undefined
 
   const record = joined ? joined.user : await users.get(found.userId)

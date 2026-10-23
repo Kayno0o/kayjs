@@ -12,6 +12,7 @@ import { redirectUriRegistered, withParams } from './uris'
 export const CODE_LIFETIME = 60
 const PARAM_MAX_LENGTH = 2048
 const CHALLENGE = /^[\w-]{43}$/
+const TRAILING_SLASHES = /\/+$/
 const WHITESPACE = /\s+/
 // Asked by clients that want a refresh token, which every client is given.
 const IMPLIED_SCOPES = new Set(['offline_access'])
@@ -138,6 +139,19 @@ async function check(state: RequestState, params: AuthorizeParams, root: string)
 export function sameResource(a: string, b: string): boolean {
   try {
     return new URL(a).href === new URL(b).href
+  }
+  catch {
+    return false
+  }
+}
+
+// Whether the request `url` is the resource or under its path (RFC 8707 audience), the query ignored and a trailing slash either way.
+export function underResource(resource: string, url: string): boolean {
+  try {
+    const bound = new URL(resource).pathname.replace(TRAILING_SLASHES, '')
+    const path = new URL(url).pathname
+
+    return path === bound || path.startsWith(`${bound}/`)
   }
   catch {
     return false
