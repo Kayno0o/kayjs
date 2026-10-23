@@ -74,8 +74,8 @@ describe('a websocket route with a body schema', () => {
     expect(await frames('/api/rooms', '{"type":"move","at":"x"}', '{"type":"move","at":1.5}', '{"type":"move"}', '{"type":"nope"}', '[]', 'null', '7')).toEqual([])
   })
 
-  it('drops frames that are not JSON, a binary one and an oversized one without closing the connection', async () => {
-    const big = JSON.stringify({ type: 'say', text: 'x'.repeat(2_000_000) })
+  it('drops frames that are not JSON, a binary one and a large one without closing the connection', async () => {
+    const big = JSON.stringify({ type: 'say', text: 'x'.repeat(900_000) })
 
     expect(await frames('/api/rooms', '{"type":', 'plain text', new Uint8Array([0, 1, 2]).buffer, '"say"')).toEqual([])
     expect((await frames('/api/rooms', big)).map(frame => frame.length > big.length)).toEqual([true])

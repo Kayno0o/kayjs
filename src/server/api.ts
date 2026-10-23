@@ -11,6 +11,7 @@ import type { LoadedGuard } from './guards'
 import type { MountedApi } from './openapi'
 import type { ApiRateLimit } from './protection'
 import type { Span } from './trace'
+import type { SocketLimits } from './ws-limits'
 import { Cookie, Elysia, ElysiaCustomStatusResponse, ElysiaFile, getSchemaValidator, StatusMap } from 'elysia'
 import { underKayDev } from '../build/assets'
 import { KayError } from '../compiler/errors'
@@ -34,6 +35,7 @@ import { apiRoutePath, withoutSlash } from './routes'
 import { VARY_COOKIE, wasReadPersonally } from './scope'
 import { carriedNames, carryContext } from './security'
 import { answered, failed, SERVER_SPAN, startSpan } from './trace'
+import { withSocketLimits } from './ws-limits'
 
 // What a body Elysia streams, awaits or asks for its response has: a generator, a thenable, an object with `toResponse()`.
 const STREAMED = ['next', 'then', 'toResponse']
@@ -611,6 +613,8 @@ declare module 'elysia' {
     rateLimit?: ApiRateLimit | ApiRateLimit[] | undefined
     // Offers the route to agents as an MCP tool when `mcp` is set in kay.config.ts: `true`, its description, or `{ name, description }`, as an action's `tool` is. A route without it is in the OpenAPI document and never offered.
     tool?: boolean | string | ActionTool | undefined
+    // On a websocket route: the most one message may weigh (`maxSize`, 1 MB by default) and how many a socket may send in a window (`rateLimit`, 100 a second by default). A socket over either is closed, with 1009 or 1008.
+    messages?: SocketLimits | undefined
   }
 }
 
@@ -649,7 +653,7 @@ export function api(options: ApiOptions = {}): Elysia<'', { decorator: Empty, st
   const socketRoute = instance.ws.bind(instance) as (path: string, options: SocketOptions) => unknown
 
   // `.ws()` returns the instance, so the chain goes on as it was written.
-  instance.ws = ((path: string, socketOptions: SocketOptions) => socketRoute(path, decoded(instance, path, socketOptions))) as typeof instance.ws
+  instance.ws = ((path: string, socketOptions: SocketOptions) => socketRoute(path, withSocketLimits(path, decoded(instance, path, socketOptions)))) as typeof instance.ws
 
   return instance as unknown as Elysia<'', { decorator: Empty, store: Empty, derive: Empty, resolve: ApiLocals }>
 }
@@ -668,6 +672,8 @@ function firstRefusal(validator: object, value: unknown): string {
 }
 
 interface SocketOptions {
+  beforeHandle?: unknown
+  detail?: unknown
   body?: unknown
   message?: (ws: unknown, message: unknown) => unknown
 }

@@ -278,6 +278,15 @@ A dropped connection reconnects by itself. It waits while the tab is hidden or o
 
 A socket a guard refuses keeps retrying, shown as `connecting`.
 
+A route takes 1 MB a message and 100 messages a second from one socket. A socket over either is closed, with code 1009 for a message too big and 1008 for too many. A route sets its own in `detail.messages`, counted for each socket:
+
+```ts
+.ws('/:room', {
+  detail: { messages: { maxSize: '4mb', rateLimit: { max: 30, window: '10s' } } },
+  message(ws, body) {},
+})
+```
+
 ## Notifications
 
 Tell a signed-in user that something happened with `notify`. It keeps the notification in the app's store, so you write no table.
