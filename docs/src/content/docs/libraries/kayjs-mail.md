@@ -331,7 +331,11 @@ A restart or a deploy in the middle carries on where it stopped, and nobody gets
 
 Every mail ends with an unsubscribe link in the subscriber's language, and carries the `List-Unsubscribe` and `List-Unsubscribe-Post` headers, so Gmail and Yahoo show their one-click button. Opening the link only asks for confirmation, so a mail scanner unsubscribes no one. Unsubscribing needs no sign-in and deletes the address.
 
-On Postgres, or on several servers, give the mailer a store: `mailer({ listStore: pgLists(db) })`, where `db` is what `pgData` takes. A single list can name its own with `mail.list('news', { store })`. The same three `kay_mail_*` tables are created when missing. If your database role cannot create tables, the owner runs `createMailListTables(db)` once, and you list `mailListTables` in pg-orm's `ignoreTables`. With `listStore` on the mailer, a link in a mail and `mail.erase` reach the store without any list being declared. Moving a site from SQLite to Postgres means copying the three tables over, or the links in mails already sent will not work.
+On Postgres, or on several servers, give the mailer a store: `mailer({ listStore: pgLists(db) })`, where `db` is what `pgData` takes. A single list can name its own with `mail.list('news', { store })`. The same three `kay_mail_*` tables are created when missing.
+
+If your database role cannot create tables, the owner runs `createMailListTables(db)` once, and you list `mailListTables` in pg-orm's `ignoreTables`.
+
+With `listStore` on the mailer, a link in a mail and `mail.erase` reach the store without any list being declared. Moving a site from SQLite to Postgres means copying the three tables over, or the links in mails already sent will not work.
 
 To erase a person, call `mail.erase(address)`. It removes the address from every list and the mails still queued for it.
 
