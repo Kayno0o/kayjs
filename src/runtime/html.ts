@@ -10,7 +10,7 @@ import { fieldDescription, fieldRequired } from './described'
 import { escape, escapeAttribute } from './escape'
 import { fieldMarks, markedAttribute, markedList, markedText, withFieldMarks } from './fields'
 import { nativeConstraints } from './form'
-import { DATA_SCRIPT, headCheckpoint, restoreHead } from './head'
+import { DATA_SCRIPT, headCheckpoint, LEADING_NEWLINE, restoreHead } from './head'
 import { localizedLink } from './i18n'
 import { imageSource } from './image'
 import { islandCheckpoint } from './island.server'
@@ -37,7 +37,6 @@ export { componentClass, merge, omit, partClass, partHanded, partsClass, spreadW
 // Leads the markup of a `try` block the server rendered its `catch` block for.
 export const FAILED_MARKER = `<!--${FAILED}-->`
 const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'])
-const LEADING_NEWLINE = new Set(['listing', 'pre', 'textarea'])
 // Properties that set an element's content rather than an attribute.
 const CONTENT_PROPERTIES = new Set(['innerHTML', 'textContent', 'innerText', 'children'])
 // What ends a `script` or `style` early, or opens a comment that keeps a script running past its end tag.
@@ -117,6 +116,11 @@ export function rawData(value: unknown): string {
   })
 
   return markup
+}
+
+// Inside a `script` whose type an expression gives: JSON data when the type names a JSON one at render time, raw text otherwise.
+export function rawTyped(type: unknown, value: unknown): string {
+  return DATA_SCRIPT.test(String(type ?? '')) ? rawData(value) : raw(value)
 }
 
 function contentOf(name: string, isRaw: boolean, value: unknown): string {

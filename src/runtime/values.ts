@@ -21,7 +21,8 @@ const PROPERTY_NAME = /^(?:--[\w-]+|-?[a-z_][\w-]*)$/i
 // A raw newline ends a string in CSS, so it is not part of one.
 const CSS_STRING = /"(?:[^"\\\n\r\f]|\\.)*"|'(?:[^'\\\n\r\f]|\\.)*'/g
 const CSS_GROUP = /\([^()]*\)/g
-const CSS_BREAK = /[;{}"'()\\]|\/\*/
+const CSS_BREAK = /[;{}"'()\\]/
+const CSS_COMMENT = /\/\*/
 // A whole document in a frame, which no spread sets.
 const DOCUMENT = /^srcdoc$/i
 
@@ -239,6 +240,10 @@ export function partClass(props: unknown, part: string): unknown {
 // Whether a property and its value make one declaration: what is left of the value once its strings and parentheses are taken out holds no `;`, `{`, `}`, quote, parenthesis, backslash or comment start, which would add declarations or swallow the next.
 function declarationOf(name: string, value: unknown): boolean {
   let rest = String(value).replace(CSS_STRING, '')
+
+  // A comment opened inside a group still swallows what follows the value.
+  if (CSS_COMMENT.test(rest))
+    return false
 
   for (let before = ''; before !== rest;) {
     before = rest

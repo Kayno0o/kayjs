@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
 import { compileKay } from '../src/compiler'
 import { loadConfigWithin } from '../src/config'
-import { dynamic as dynamicHtml, element, leadingNewline, rawData } from '../src/runtime/html'
+import { dynamic as dynamicHtml, element, leadingNewline, raw, rawData, rawTyped } from '../src/runtime/html'
 import { safeUrl } from '../src/runtime/url'
 import { elementName, styleText } from '../src/runtime/values'
 import { scratchDir } from './scratch'
@@ -93,6 +93,9 @@ describe('a style value', () => {
     expect(styleText({ color: 'red}', background: 'url(a;b)', content: '"a;b"', font: '"open' })).toBe('background:url(a;b);content:"a;b"')
     expect(styleText('top:1px', [['color', 'red;left:0'], ['width', '2px']])).toBe('top:1px;width:2px')
     expect(styleText({ content: '"x\n;position:fixed"', color: 'red /*', width: '1px' })).toBe('width:1px')
+    expect(styleText({ width: 'calc(1px /*)', height: '2px' })).toBe('height:2px')
+    expect(styleText({ width: 'calc(min(1px, 2px) /* x)', height: '2px', content: '"/*"' })).toBe('height:2px;content:"/*"')
+    expect(styleText('top:1px', [['width', 'calc(1px /*)'], ['height', '2px']])).toBe('top:1px;height:2px')
     expect(styleText({ '--2xl-gap': '1px', '-webkit-line-clamp': 2 })).toBe('--2xl-gap:1px;-webkit-line-clamp:2')
   })
 })
@@ -132,6 +135,24 @@ describe('a script holding JSON', () => {
     expect(compiled('script(type="application/ld+json") {json}')).toContain('RawData(')
     expect(compiled('script(type="importmap")\n  | {json}')).toContain('RawData(')
     expect(compiled('script {json}')).not.toContain('RawData(')
+  })
+
+  it('is told apart as it renders when the type is an expression', () => {
+    const render = (type: string) => {
+      const source = `---\nconst json = props<{ json: string }>().json\n---\nscript(type={${JSON.stringify(type)}}) {json}\n`
+      const { tsx } = compileKay(source, 'main.kay', { output: 'html' })
+
+      expect(tsx).toContain('RawTyped(')
+
+      return element('script', [{ type, children: json }]).t
+    }
+
+    expect(render('application/ld+json')).toBe(`<script type="application/ld+json">${rawData(json)}</script>`)
+    expect(render('module')).toBe(`<script type="module">${raw(json)}</script>`)
+
+    expect(JSON.parse(rawTyped('application/ld+json', json))).toEqual({ a: '</script><!--' })
+    expect(rawTyped('module', json)).toBe(raw(json))
+    expect(rawTyped(undefined, json)).toBe(raw(json))
   })
 })
 
@@ -225,6 +246,52 @@ describe('loading the config', () => {
     await mkdir(root)
     await Bun.write(join(root, 'kay.config.ts'), 'await Bun.sleep(5)\nexport default { site: \'https://a.test\' }\n')
     expect((await loadConfigWithin(root, 5000)).site).toBe('https://a.test')
+  })
+})
+
+describe('a page prefetched while a form post was out', () => {
+  it('is forgotten once the post finished', async () => {
+    const real = globalThis.XMLHttpRequest
+
+    class Posting {
+      responseType = ''
+      status = 200
+      response = new Blob([''])
+      upload = {}
+      onload: (() => void) | null = null
+      open = () => undefined
+      setRequestHeader = () => undefined
+      getAllResponseHeaders(): string {
+        return ''
+      }
+
+      send(): void {
+        swap.prefetch(new URL('http://localhost/next'), document.createElement('a'))
+        setTimeout(() => this.onload?.(), 5)
+      }
+    }
+
+    // The prefetch stays out, as a slow page does.
+    const answered = spyOn(globalThis, 'fetch').mockImplementation((async () => new Promise(() => undefined)) as unknown as typeof fetch)
+    const form = document.createElement('form')
+
+    document.body.append(form)
+    globalThis.XMLHttpRequest = Posting as unknown as typeof XMLHttpRequest
+
+    try {
+      try {
+        await (await import('../src/runtime/forms')).submit(form, null, new URL('http://localhost/post'))
+      }
+      catch {}
+
+      expect([...navigation.prefetched.keys()]).toEqual([])
+    }
+    finally {
+      globalThis.XMLHttpRequest = real
+      answered.mockRestore()
+      form.remove()
+      navigation.prefetched.clear()
+    }
   })
 })
 

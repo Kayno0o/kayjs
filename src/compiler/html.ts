@@ -2,7 +2,7 @@ import type { AwaitNode, ElementNode, ElseBlock, ErrorMessages, ErrorNode, ForNo
 import type { DynamicItem, Item } from './items'
 import type { CodeBuilder } from './mapping'
 import type { ElementPlan } from './markup'
-import { DATA_SCRIPT } from '../runtime/head'
+import { DATA_SCRIPT, LEADING_NEWLINE } from '../runtime/head'
 import { mayLeaveSite } from '../runtime/outside'
 import { actionOf, FIELD_ELEMENTS, keyedByPosition, marksServerIsland, sectionOf, serverIslandOf, UNCHECKED_TYPES, UNREQUIRABLE_TYPES } from './ast'
 import { decodeEntities } from './expression'
@@ -15,18 +15,15 @@ const WRITTEN_AS = { image: 'src', selected: 'value' } as const
 // A number written in the template, `0` or `-1.5`, as an attribute's whole expression.
 const NUMBER_LITERAL = /^\s*-?\d+(?:\.\d+)?\s*$/
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
-const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'fieldDescribed', 'formConstraints', 'head', 'html', 'imageAttributes', 'innerMarkup', 'leadingNewline', 'linkHref', 'localHref', 'loop', 'memo', 'merge', 'nonEmptyAttribute', 'omit', 'outsideLink', 'partClass', 'partHanded', 'partsClass', 'raw', 'rawData', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'spreadAttributes', 'spreadWith', 'style', 'untrack']
+const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'fieldDescribed', 'formConstraints', 'head', 'html', 'imageAttributes', 'innerMarkup', 'leadingNewline', 'linkHref', 'localHref', 'loop', 'memo', 'merge', 'nonEmptyAttribute', 'omit', 'outsideLink', 'partClass', 'partHanded', 'partsClass', 'raw', 'rawData', 'rawTyped', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'spreadAttributes', 'spreadWith', 'style', 'untrack']
 
-// The helper writing an element's content expression: `script` and `style` text escaped for raw text, an `innerHTML` as the markup it is, anything else as text.
-function contentHelper(content: { property: string, raw: boolean } | undefined, rawHelper: 'raw' | 'rawData'): string {
-  if (content?.raw === true)
-    return rawHelper
-
+// The helper writing an element's content expression that is not raw text: an `innerHTML` as the markup it is, anything else as text.
+function contentHelper(content: { property: string, raw: boolean } | undefined): string {
   return content?.property === 'innerHTML' ? 'innerMarkup' : 'child'
 }
 
-// The elements whose first newline HTML drops.
-const LEADING_NEWLINE = new Set(['listing', 'pre', 'textarea'])
+// How the expressions inside `script` and `style` text are written: a script holding JSON writes `<` as `\u003c`, where other raw text breaks it with a backslash, and a script whose type an expression gives decides as it renders.
+type RawText = 'raw' | 'rawData' | { typed: () => void }
 
 const NEWLINE_START = /^[\r\n]/
 
@@ -107,9 +104,6 @@ export class HtmlTemplate extends TemplateWriter {
   // The names the `try` blocks being written give their `catch`, which an `await` without a `catch` inside falls back to: the runtime hands the function, or one rendering nothing, to the content of the `try`.
   private readonly catches: string[] = []
 
-  // The helper a raw text's expressions go through: a script holding JSON writes `<` as `\u003c`, where other raw text breaks it with a backslash.
-  private rawHelper: 'raw' | 'rawData' = 'raw'
-
   constructor(b: CodeBuilder, src: string, facts: TemplateFacts, private readonly options: HtmlOptions = {}) {
     super(b, src, facts)
     this.mergesAtRuntime = options.classMerge === true
@@ -120,7 +114,7 @@ export class HtmlTemplate extends TemplateWriter {
     const markup = new Markup(this.b)
 
     this.b.add('(')
-    this.children(nodes, markup, false, inElement)
+    this.children(nodes, markup, undefined, inElement)
     markup.end()
     this.b.add(')')
   }
@@ -131,13 +125,13 @@ export class HtmlTemplate extends TemplateWriter {
     this.markup(nodes)
   }
 
-  private children(nodes: Node[], markup: Markup, raw: boolean, inElement: boolean): void {
+  private children(nodes: Node[], markup: Markup, raw: RawText | undefined, inElement: boolean): void {
     const items = childItems(nodes)
 
     this.items(items, markup, raw, this.options.hydratable === true && !(inElement && soleDynamic(items)))
   }
 
-  private items(items: Item[], markup: Markup, raw: boolean, markers: boolean): void {
+  private items(items: Item[], markup: Markup, raw: RawText | undefined, markers: boolean): void {
     for (const [index, item] of items.entries()) {
       if (isDeclaration(item)) {
         // The items after it render inside a function declaring it, so its name reaches them alone.
@@ -161,7 +155,7 @@ export class HtmlTemplate extends TemplateWriter {
       }
 
       if (item.kind === 'text') {
-        markup.text(raw ? item.text : escapeText(item.text))
+        markup.text(raw !== undefined ? item.text : escapeText(item.text))
       }
       else if (item.kind === 'element') {
         this.element(item.node, markup)
@@ -178,12 +172,30 @@ export class HtmlTemplate extends TemplateWriter {
     }
   }
 
-  private dynamic(item: DynamicItem, raw: boolean): void {
+  // Opens the call writing an expression as raw text, its argument and the closing parenthesis following.
+  private openRaw(raw: RawText): void {
+    if (typeof raw === 'string') {
+      this.b.add(`${helperName(raw)}(`)
+
+      return
+    }
+
+    this.b.add(`${helperName('rawTyped')}(`)
+    raw.typed()
+    this.b.add(', ')
+  }
+
+  private dynamic(item: DynamicItem, raw: RawText | undefined): void {
     const { b } = this
 
     switch (item.kind) {
       case 'expression':
-        b.add(`${helperName(raw ? this.rawHelper : 'child')}((`).addSource(item.node.expression).add('))')
+        if (raw !== undefined)
+          this.openRaw(raw)
+        else
+          b.add(`${helperName('child')}(`)
+
+        b.add('(').addSource(item.node.expression).add('))')
 
         break
       case 'component':
@@ -746,7 +758,18 @@ export class HtmlTemplate extends TemplateWriter {
     this.honeypot(element, () => markup.dynamic(() => this.honeypotField(element)))
 
     const body = (markup: Markup): void => {
-      this.rawHelper = name === 'script' && type?.kind === 'text' && DATA_SCRIPT.test(type.text) ? 'rawData' : 'raw'
+      let rawText: RawText | undefined
+
+      if (RAW_ELEMENTS.has(name)) {
+        if (name !== 'script' || !type)
+          rawText = 'raw'
+        else if (type.kind === 'text')
+          rawText = DATA_SCRIPT.test(type.text) ? 'rawData' : 'raw'
+        else if (type.kind === 'value')
+          rawText = { typed: read(type.expression, false) }
+        else
+          rawText = 'raw'
+      }
 
       // A refused post's text takes the place of the textarea's static value.
       const staticContent = field?.fill === 'content' && plan.valueText !== undefined ? undefined : plan.staticContent
@@ -783,14 +806,18 @@ export class HtmlTemplate extends TemplateWriter {
         })
       }
       else if (children.length > 0) {
-        this.children(children, markup, RAW_ELEMENTS.has(name), true)
+        this.children(children, markup, rawText, true)
       }
       else if (staticContent !== undefined) {
         markup.text(staticContent)
       }
       else if (content) {
         markup.dynamic(() => {
-          b.add(`${helperName(contentHelper(plan.content, this.rawHelper))}(`)
+          if (plan.content?.raw === true && rawText !== undefined)
+            this.openRaw(rawText)
+          else
+            b.add(`${helperName(contentHelper(plan.content))}(`)
+
           content()
           b.add(')')
         })

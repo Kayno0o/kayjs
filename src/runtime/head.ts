@@ -55,6 +55,9 @@ const SCRIPT_BREAK = /<(\/(?=script)|!(?=--))/gi
 const JSON_LT = /</g
 const JSON_TYPE = /json/i
 
+// The elements whose first newline HTML drops.
+export const LEADING_NEWLINE = new Set(['listing', 'pre', 'textarea'])
+
 // Scripts holding JSON whatever their type says, where `\u003c` keeps them valid and `<\!` would not.
 export const DATA_SCRIPT = /json|^(?:importmap|speculationrules)$/i
 const ABSOLUTE_PATH = /^\/(?!\/)/
