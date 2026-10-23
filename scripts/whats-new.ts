@@ -21,6 +21,9 @@ const CAP_DUE = 22_000
 // The size an archive is kept under by dropping its oldest releases: it only changes at a release, so it needs no room for the next one.
 const ARCHIVE_LIMIT = 24_000
 
+// The files whose links to a moved anchor follow it, by glob from the repo root.
+const LINKING = ['llms/*.md', 'llms.txt', 'packages/*/llms.txt', 'packages/*/llms/*.md', 'docs/src/content/docs/**/*.md']
+
 const SECTION = /^(?=## )/m
 const BEFORE = /before \d+\.\d+(?:\.\d+)?/
 const NOTE = /\n\n(Releases before [^\n]*)\n$/
@@ -247,7 +250,7 @@ if (import.meta.main) {
     throw new Error('usage: bun scripts/whats-new.ts --cap [--check]')
 
   const changed: string[] = []
-  const paths = await Array.fromAsync(new Bun.Glob('{llms/*.md,llms.txt,packages/*/llms.txt,packages/*/llms/*.md,docs/src/content/docs/**/*.md}').scan('.'))
+  const paths = (await Promise.all(LINKING.map(async pattern => Array.fromAsync(new Bun.Glob(pattern).scan('.'))))).flat()
   const texts = new Map<string, string>(await Promise.all(paths.map(async path => [path, await Bun.file(path).text()] as const)))
   const writes = new Map<string, string>()
 
