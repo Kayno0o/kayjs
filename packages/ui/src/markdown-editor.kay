@@ -258,7 +258,8 @@ async function upload(files: File[]): Promise<void> {
       const url = await attempt(async () => send(file), uploadFailure)
 
       // A failed upload takes the line break the placeholder came with, unless typing has parted them.
-      if (url === undefined)
+      // `attempt` answers `true` for a send that gave nothing back, which is no address to link to.
+      if (typeof url !== 'string')
         swap(text, '') || swap(placeholder, '')
       else
         swap(placeholder, `![](${escaped(url)})`)

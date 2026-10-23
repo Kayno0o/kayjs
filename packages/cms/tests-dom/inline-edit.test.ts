@@ -2,6 +2,7 @@ import type { Mounted } from 'kay/test'
 import { join } from 'node:path'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import { EDITOR_COOKIE } from '../src/page-link'
 
 const EDITOR = join(import.meta.dir, '../src/editor/editor.kay')
 let mounted: Mounted | undefined
@@ -17,6 +18,7 @@ afterEach(() => {
 
   mock.restore()
   localStorage.clear()
+  document.cookie = `${EDITOR_COOKIE}=; max-age=0`
 })
 
 const block = (type: string, properties: Record<string, unknown>) => ({ type: 'object', properties: { type: { const: type }, ...properties }, required: ['type'] })
@@ -45,6 +47,8 @@ const DATA = { title: 'Home', subtitle: 'Sub', tags: ['one', 'two'], sections: [
 interface Page { marker: string, tag?: string, text?: string, attribute?: string, html?: string }
 
 async function open(pages: Page[], entry: { collection: string, slug: string, locale?: string } = { collection: 'pages', slug: 'home' }, data: unknown = DATA) {
+  // The editor keeps drafts under the person the admin let in, so none is kept without its cookie.
+  document.cookie = `${EDITOR_COOKIE}=tester`
   spyOn(globalThis, 'fetch').mockImplementation((async () => Response.json({ collection: { name: entry.collection, title: 'Pages', schema: SCHEMA }, entry: { ...entry, data, version: 'v1' } })) as unknown as typeof fetch)
 
   const elements = pages.map((page) => {
@@ -75,7 +79,7 @@ async function open(pages: Page[], entry: { collection: string, slug: string, lo
   const draft = async (path: string) => {
     await Bun.sleep(220)
 
-    const kept = JSON.parse(localStorage.getItem(`kcms:draft:${entry.collection}:${entry.slug}${entry.locale === undefined ? '' : `@${entry.locale}`}`) ?? 'null') as { entry: { data: unknown } } | null
+    const kept = JSON.parse(localStorage.getItem(`kcms:draft:tester:${entry.collection}:${entry.slug}${entry.locale === undefined ? '' : `@${entry.locale}`}`) ?? 'null') as { entry: { data: unknown } } | null
 
     return path.split('.').reduce<unknown>((value, key) => (value as Record<string, unknown> | undefined)?.[key], kept?.entry.data)
   }

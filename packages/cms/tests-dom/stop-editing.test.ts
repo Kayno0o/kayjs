@@ -1,7 +1,8 @@
 import type { Mounted } from 'kay/test'
 import { join } from 'node:path'
-import { afterEach, expect, mock, spyOn, test } from 'bun:test'
+import { afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import { EDITOR_COOKIE } from '../src/page-link'
 
 const EDITOR = join(import.meta.dir, '../src/editor/editor.kay')
 const ENTRY = { collection: 'posts', slug: 'hello' }
@@ -10,7 +11,13 @@ let mounted: Mounted | undefined
 // happy-dom has no caret lookup, which the editor's click handler asks.
 Object.assign(document, { caretPositionFromPoint: () => null, elementsFromPoint: () => [] })
 
+// The editor keeps drafts under the person the admin let in, so none is kept without its cookie.
+beforeEach(() => {
+  document.cookie = `${EDITOR_COOKIE}=tester`
+})
+
 afterEach(() => {
+  document.cookie = `${EDITOR_COOKIE}=; max-age=0`
   mounted?.unmount()
   mounted = undefined
   mock.restore()
