@@ -107,6 +107,24 @@ export function raw(value: unknown): string {
   return markup
 }
 
+function contentOf(name: string, isRaw: boolean, value: unknown): string {
+  if (isRaw)
+    return raw(value)
+
+  return name === 'innerHTML' ? innerMarkup(value) : child(value)
+}
+
+// An `innerHTML` the app vouched for, written as it is: a comment, a `style` or a `script` inside it stays what the island sets.
+function innerMarkup(value: unknown): string {
+  let markup = ''
+
+  eachChild(value, (part) => {
+    markup += typeof part === 'string' ? part : rendered(part)
+  })
+
+  return markup
+}
+
 function rendered(value: object): string {
   return isRendered(value) ? value.t : ''
 }
@@ -262,7 +280,7 @@ export function element(tag: string, sources: readonly object[], content?: () =>
 
       if (CONTENT_PROPERTIES.has(name)) {
         if (inner === undefined && !isVoid)
-          inner = isRaw || name === 'innerHTML' ? raw(value) : child(value)
+          inner = contentOf(name, isRaw, value)
 
         continue
       }

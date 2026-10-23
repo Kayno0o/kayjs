@@ -84,6 +84,16 @@ describe('a spread onto an element', () => {
     expect(render(tag, { innerHTML: sanitizeHtml('<b>s</b><script>x</script>') })).toBe(`<${tag}><b>s</b></${tag}>`)
   })
 
+  it.each(['div', 'svg', 'math', 'span'])('writes vouched markup holding a comment, a style and a script as it is on a %s', (tag) => {
+    const body = '<p>a</p><!-- c --><style>b{}</style><script>if (a < b) x()</script>'
+
+    expect(render(tag, { innerHTML: trustHtml(body) })).toBe(`<${tag}>${body}</${tag}>`)
+  })
+
+  it('still escapes the content of a script and a style element', () => {
+    expect(element('style', [{ children: 'a<!--b</style>' }]).t).toBe('<style>a<\\!--b<\\/style></style>')
+  })
+
   it.each(['div', 'svg', 'math'])('drops a raw, a derived or a mistyped innerHTML on a %s, with a warning in development', (tag) => {
     const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
     const marked = trustHtml('<b>derived</b>')

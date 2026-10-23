@@ -171,6 +171,23 @@ describe('a spread onto an element in the browser', () => {
   })
 })
 
+describe('a vouched innerHTML in the browser', () => {
+  const mount3 = site({
+    'main.kay': '---\nimport { trustHtml } from \'kay\'\n\nconst body = trustHtml(\'<p>a</p><!-- c --><style>b{}</style><script>if (a < b) x()</script>\')\n---\ndiv.body({...{ innerHTML: body }})\n',
+  })
+
+  it('holds a comment, a style and a script, as the server writes them', async () => {
+    const { root, dispose } = await mount3()
+
+    try {
+      expect(root.querySelector('.body')!.innerHTML).toBe('<p>a</p><!-- c --><style>b{}</style><script>if (a < b) x()</script>')
+    }
+    finally {
+      await dispose()
+    }
+  })
+})
+
 describe('a spread onto an element in the browser, as it changes', () => {
   const mount2 = site({
     'main.kay': '---\nimport { persisted, signal, trustHtml } from \'kay\'\n\nconst safe = trustHtml(\'<b>live-dom-1</b>\')\nconst turn = signal(0)\nconst stored = persisted(\'forged\', \'\')\n---\ndiv.live({...{ get innerHTML() { return turn() === 0 ? safe : \'<i>live-raw-1</i>\' } }})\nbutton(onClick={() => turn.set(1)}) turn\ndiv.cookie({...{ innerHTML: stored() }})\n',
