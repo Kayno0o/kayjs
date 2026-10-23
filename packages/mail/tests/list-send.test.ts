@@ -1,6 +1,7 @@
 import type { Mail, Transport } from '../src/types'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import type { JobStore } from 'kay/server'
 import { memoryJobs } from 'kay/server'
 import { scratchDir, testSite } from 'kay/test'
 import { openLists } from '../src/list-store'
@@ -205,5 +206,55 @@ describe('a broadcast', () => {
 
     await expect(app.list('news', { file }).send({ subject: 'x', text: 'x', attachments: [] } as never)).rejects.toThrow('takes no attachments')
     expect(() => app.list('paced', { file, pace: { batch: 0 } })).toThrow('pace.batch')
+  })
+})
+
+describe('the list queue', () => {
+  // A job store counting the looks each queue makes at it.
+  function watched(): { store: JobStore, looks: Map<string, number> } {
+    const inner = memoryJobs()
+    const looks = new Map<string, number>()
+
+    return { looks, store: { ...inner, claim: async (queue, now, until) => {
+      looks.set(queue, (looks.get(queue) ?? 0) + 1)
+
+      return inner.claim(queue, now, until)
+    } } }
+  }
+
+  it('starts no worker until a list is declared', async () => {
+    const { store, looks } = watched()
+    const app = mailer({ from: 'a@fixture.test', queue: { store, name: 'watched' } })
+
+    app.listen(0)
+
+    try {
+      await sleep(150)
+      expect(looks.get('watched')).toBeGreaterThan(0)
+      expect(looks.get('watched-list')).toBeUndefined()
+
+      app.list('news', { file })
+      await sleep(150)
+      expect(looks.get('watched-list')).toBeGreaterThan(0)
+    }
+    finally {
+      await app.stop()
+    }
+  })
+
+  it('starts at once when a list is declared before the server', async () => {
+    const { store, looks } = watched()
+    const app = mailer({ from: 'a@fixture.test', queue: { store, name: 'early' } })
+
+    app.list('news', { file })
+    app.listen(0)
+
+    try {
+      await sleep(150)
+      expect(looks.get('early-list')).toBeGreaterThan(0)
+    }
+    finally {
+      await app.stop()
+    }
   })
 })

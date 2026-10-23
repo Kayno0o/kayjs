@@ -98,6 +98,8 @@ export interface QueueOptions<Payload> {
   redact?: ((payload: Payload) => Payload) | undefined
   // Gets a job that failed its last attempt, once it is kept as failed.
   onFailed?: ((event: { payload: Payload, error: unknown }) => unknown) | undefined
+  // Starts no worker with the server: the first `activate()` or `enqueue` does, so a queue an app may never use costs it no idle poll. A job already stored waits until then.
+  lazy?: boolean | undefined
 }
 
 export interface EnqueueOptions {
@@ -144,6 +146,8 @@ export type Queue<Payload, Progress = unknown> = Elysia & {
   // Runs every job whose time has come, here and now, until none is left and none a worker took is still running: for a test, or a script with no server.
   drain: () => Promise<number>
   failed: () => Promise<FailedJob<Payload>[]>
+  // Starts the workers of a `lazy` queue, at once when the server runs and else at its start; a queue that is not lazy has them already.
+  activate: () => void
   // Removes the job of that id, or every job, waiting or failed, whose payload `match` returns true for, such as a person's mails once they asked to be erased; resolves with how many went.
   remove: (match: string | ((payload: Payload) => boolean)) => Promise<number>
 }
@@ -924,17 +928,24 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
   }
 
   // Unnamed, so Elysia never takes two queues for one plugin.
+  let serving = false
+  let activated = options.lazy !== true
+  const startWorkers = () => {
+    if (controller || !serving || !activated)
+      return
+
+    const started = new AbortController()
+
+    controller = started
+    workers = Array.from({ length: concurrency }, async () => work(started.signal))
+  }
   const plugin = new Elysia()
     .onStart(() => {
-      if (controller)
-        return
-
-      const started = new AbortController()
-
-      controller = started
-      workers = Array.from({ length: concurrency }, async () => work(started.signal))
+      serving = true
+      startWorkers()
     })
     .onStop(async () => {
+      serving = false
       controller?.abort()
       await Promise.all(workers)
       controller = undefined
@@ -942,6 +953,10 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
     })
 
   const queued = Object.assign(plugin, {
+    activate: () => {
+      activated = true
+      startWorkers()
+    },
     enqueue: async (payload: Payload, enqueueOptions: EnqueueOptions = {}) => inFlightWork(async () => {
       const id = crypto.randomUUID()
       const delay = enqueueOptions.delay === undefined ? 0 : durationSeconds(enqueueOptions.delay, `queue('${name}')'s delay`) * 1000
@@ -954,6 +969,8 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
         throw new KayError('config-invalid', `kay: queue('${name}')'s store has no state(), so enqueue's key cannot be kept: add state() to the JobStore, or use sqliteJobs, memoryJobs or pgJobs`)
 
       const held = await store().add({ id, queue: name, payload: stringify(payload), attempts: 0, runAt: Date.now() + delay, ...key !== undefined && { key } })
+
+      queued.activate()
 
       // Another job holds the key: nothing was stored, so nobody needs waking.
       if (typeof held === 'string')

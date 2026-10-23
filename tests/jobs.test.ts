@@ -1526,6 +1526,74 @@ describe('queue', () => {
     }
   })
 
+  describe('lazy', () => {
+    function counted() {
+      const store = memoryJobs()
+      const claim = store.claim.bind(store)
+      const looks = { count: 0 }
+
+      store.claim = async (name, now, until) => {
+        looks.count++
+
+        return claim(name, now, until)
+      }
+
+      return { store, looks }
+    }
+
+    it('looks at the store only once activated', async () => {
+      const { store, looks } = counted()
+      const ran: string[] = []
+      const work = queue('lazy', (payload: string) => ran.push(payload), { store, lazy: true })
+      const app = new Elysia().use(work).listen(0)
+
+      try {
+        await Bun.sleep(50)
+        expect(looks.count).toBe(0)
+
+        work.activate()
+        await Bun.sleep(50)
+        expect(looks.count).toBeGreaterThan(0)
+      }
+      finally {
+        await shutdown(app)
+      }
+    })
+
+    it('starts with the first enqueue', async () => {
+      const { store } = counted()
+      const ran: string[] = []
+      const work = queue('lazy-enqueue', (payload: string) => ran.push(payload), { store, lazy: true })
+      const app = new Elysia().use(work).listen(0)
+
+      try {
+        await work.enqueue('a')
+        await Bun.sleep(100)
+        expect(ran).toEqual(['a'])
+      }
+      finally {
+        await shutdown(app)
+      }
+    })
+
+    it('starts with the server when activated before it', async () => {
+      const { store, looks } = counted()
+      const work = queue('lazy-early', () => undefined, { store, lazy: true })
+
+      work.activate()
+
+      const app = new Elysia().use(work).listen(0)
+
+      try {
+        await Bun.sleep(50)
+        expect(looks.count).toBeGreaterThan(0)
+      }
+      finally {
+        await shutdown(app)
+      }
+    })
+  })
+
   describe('on shutdown', () => {
     // A queue on a store two processes share, started like a server, its handler waiting on its signal.
     async function stopping(store: JobStore, handler: (signal: AbortSignal) => unknown) {

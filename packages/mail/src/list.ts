@@ -81,6 +81,8 @@ export interface ListHost {
   deliver: (mail: Mail) => Promise<unknown>
   enqueueMail: <P extends object>(message: MailMessage<P>) => Promise<string>
   enqueueRun: (run: ListRun, key: string) => Promise<string>
+  // Starts the list queue's worker, which waits for the first list.
+  activate: () => void
 }
 
 export interface ListRun {
@@ -150,13 +152,14 @@ function personalise(message: StoredMessage, subscriber: Subscriber, list: strin
   }
 }
 
-export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun'>) {
+export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 'activate'>) {
   // The queues are made after the lists, which they run: the mailer hands them over with `connect`.
-  let queues: Pick<ListHost, 'enqueueMail' | 'enqueueRun'> | undefined
+  let queues: Pick<ListHost, 'enqueueMail' | 'enqueueRun' | 'activate'> | undefined
   const host: ListHost = {
     ...base,
     enqueueMail: async message => queues!.enqueueMail(message),
     enqueueRun: async (run, key) => queues!.enqueueRun(run, key),
+    activate: () => queues?.activate(),
   }
 
   const entries = new Map<string, Entry>()
@@ -371,13 +374,15 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun'>) 
     list(name: string, options: ListOptions = {}): MailingList {
       let entry = entries.get(name)
 
-      if (!entry)
+      if (!entry) {
         entries.set(name, entry = make(name, options))
+        host.activate()
+      }
 
       return entry.list
     },
     run,
-    connect(connected: Pick<ListHost, 'enqueueMail' | 'enqueueRun'>): void {
+    connect(connected: Pick<ListHost, 'enqueueMail' | 'enqueueRun' | 'activate'>): void {
       queues = connected
     },
     // Takes the address off every list of every file this process opened and of the default file when it exists, so an erase from a script or a route that declared no list still reaches it; how many rows went.

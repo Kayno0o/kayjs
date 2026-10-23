@@ -488,8 +488,8 @@ export function mailer(options: MailerOptions = {}): Mailer {
     render,
     deliver,
   })
-  // The mails of a list are sent by a job of their own, a batch at a time, so a broadcast to a long list resumes after a restart where it stopped.
-  const listJobs = queue<ListRun>(`${name}-list`, async (run, signal) => lists.run(run, signal), defined({ store: queueOptions.store, attempts: queueOptions.attempts, backoff: queueOptions.backoff, lostAfter: queueOptions.lostAfter, idlePoll: queueOptions.idlePoll }))
+  // The mails of a list are sent by a job of their own, a batch at a time, so a broadcast to a long list resumes after a restart where it stopped. Its worker starts with the first `mail.list()`, so a mailer with no list runs no more queue than before lists.
+  const listJobs = queue<ListRun>(`${name}-list`, async (run, signal) => lists.run(run, signal), defined({ lazy: true, store: queueOptions.store, attempts: queueOptions.attempts, backoff: queueOptions.backoff, lostAfter: queueOptions.lostAfter, idlePoll: queueOptions.idlePoll }))
   const plugin = new Elysia().use(jobs).use(listJobs)
 
   mountListRoutes(plugin, () => lists)
@@ -567,7 +567,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     },
   })
 
-  lists.connect({ enqueueMail: async message => sending.enqueue(message), enqueueRun: async (run, key) => listJobs.enqueue(run, { key }) })
+  lists.connect({ enqueueMail: async message => sending.enqueue(message), enqueueRun: async (run, key) => listJobs.enqueue(run, { key }), activate: () => listJobs.activate() })
 
   // A getter, since `kay build` leaves a missing variable to throw where it is read.
   return Object.defineProperty(sending, 'configured', { get: () => (configured?.missing() ?? []).length === 0 && !senderless() }) as Mailer
