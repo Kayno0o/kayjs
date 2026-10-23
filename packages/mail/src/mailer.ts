@@ -550,7 +550,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     }),
     render,
     list: (listName = 'default', listOptions?: ListOptions) => lists.list(listName, listOptions),
-    erase: async (address: string) => lists.erase(address) + await sending.remove({ recipient: address }),
+    erase: async (address: string) => await lists.erase(address) + await sending.remove({ recipient: address }),
     drain: async () => {
       const mails = await jobs.drain()
 

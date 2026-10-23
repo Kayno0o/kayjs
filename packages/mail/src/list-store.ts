@@ -23,6 +23,32 @@ export interface Broadcast {
   message: string
 }
 
+// A store answers synchronously (SQLite) or with a promise (Postgres): callers await every call.
+type Maybe<T> = T | Promise<T>
+
+// What the mailing lists keep their data in; `openLists` is the SQLite one, `pgLists` the Postgres one, both with the same semantics: a delivery is claimed before its mail goes, and removing or erasing a subscriber takes its deliveries with it.
+export interface ListStore {
+  // The address's row on the list, made pending when it has none. The first call to find a row forgets confirmations nobody clicked.
+  ask: (list: string, email: string, id: string, locale: string, now?: number) => Maybe<Subscriber>
+  // Whether the subscriber exists after the call; one confirmed already stays as it is.
+  confirm: (list: string, id: string, now?: number) => Maybe<boolean>
+  remove: (list: string, id: string) => Maybe<boolean>
+  removeEmail: (list: string, email: string) => Maybe<boolean>
+  // Takes the address off every list of the store, with its deliveries; how many rows went.
+  erase: (email: string) => Maybe<number>
+  subscribers: (list: string) => Maybe<Subscriber[]>
+  count: (list: string) => Maybe<number>
+  addBroadcast: (id: string, list: string, message: string, now?: number) => Maybe<void>
+  broadcast: (id: string) => Maybe<Broadcast | undefined>
+  finish: (id: string, now?: number) => Maybe<unknown>
+  next: (broadcast: Broadcast, limit: number) => Maybe<Subscriber[]>
+  // Claims the recipient before the mail goes, so a process that dies inside the send is never followed by one sending it again; false when it was claimed already or left the list.
+  claim: (broadcast: string, subscriber: string, now?: number) => Maybe<boolean>
+  sent: (broadcast: string, subscriber: string, now?: number) => Maybe<unknown>
+  release: (broadcast: string, subscriber: string, now?: number) => Maybe<unknown>
+  progress: (broadcast: Broadcast) => Maybe<BroadcastProgress>
+}
+
 export type DeliveryState = 'sending' | 'sent' | 'retry' | 'failed'
 
 export interface BroadcastProgress {

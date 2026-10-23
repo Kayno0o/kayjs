@@ -331,6 +331,8 @@ A restart or a deploy in the middle carries on where it stopped, and nobody gets
 
 Every mail ends with an unsubscribe link in the subscriber's language, and carries the `List-Unsubscribe` and `List-Unsubscribe-Post` headers, so Gmail and Yahoo show their one-click button. Opening the link only asks for confirmation, so a mail scanner unsubscribes no one. Unsubscribing needs no sign-in and deletes the address.
 
+On Postgres, or on several servers, give the list a store: `mail.list('news', { store: pgLists(db) })`, where `db` is what `pgData` takes. The same three `kay_mail_*` tables are created when missing. If your database role cannot create tables, the owner runs `createMailListTables(db)` once, and you list `mailListTables` in pg-orm's `ignoreTables`. Pass the one `pgLists(db)` to every list. A link in a mail only finds its list once a page that declares it has loaded, so a Postgres site answers 503 for a moment after a start.
+
 To erase a person, call `mail.erase(address)`. It removes the address from every list and the mails still queued for it.
 
 ## Previewing

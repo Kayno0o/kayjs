@@ -48,4 +48,13 @@ await mail.list().status(id) // { done, sent, failed, retrying, unsure, waiting 
 - `mail.list(name = 'default', options)` is made on its first call and the same after; a name is letters, digits, dashes and underscores, 40 at most. Several lists share a file, `file` names another.
 - `options`: `file`, `pace`, `view` (the confirmation mail's `.kay` component, given `{ url, site }`), `protection`, `honeypot`.
 - The routes `GET /_kay/mail/list/confirm`, `GET` and `POST /_kay/mail/list/unsubscribe` (query `token`) are served by the mailer, at the site's origin, whatever the `base`; the pages are worded in the subscriber's language (`mail.list.*` messages, English and French shipped) and sent `no-store`. A valid link whose list has no store in this process yet answers 503 with `retry-after: 60` and a "try again later" page (`mail.list.page.later`), never as done or as broken.
-- Tables: `kay_mail_subscribers`, `kay_mail_broadcasts`, `kay_mail_deliveries`. Replicas on several machines need the file shared; Postgres is not supported yet.
+- Tables: `kay_mail_subscribers`, `kay_mail_broadcasts`, `kay_mail_deliveries`. Replicas on several machines need the SQLite file shared, or Postgres:
+
+```ts
+import { mailer, pgLists } from '@kaynooo/kayjs-mail'
+
+const store = pgLists(db) // a Bun SQL, a pg-orm Database or a connection URL, as pgData takes
+export const news = mailer().list('news', { store })
+```
+
+- `store` (not with `file`) keeps the same three tables in Postgres, created on first use; a role that may not create tables has the owner run `await createMailListTables(db)` and lists `mailListTables` in pg-orm's `ignoreTables`. Give every list the one `pgLists(db)`. Claiming a delivery, unsubscribing and `mail.erase` act the same on both stores. A link of a list this process does not declare finds its subscribers only in the default SQLite file, so a Postgres site declares its lists (any page importing them does) before a link is served; until then it answers 503.

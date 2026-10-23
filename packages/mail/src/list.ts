@@ -1,6 +1,6 @@
 import type { Elysia, TSchema } from 'elysia'
 import type { ActionContext, ActionProtect, ActionProtection, Duration, Failure, JSX } from 'kay'
-import type { BroadcastProgress, Lists, Subscriber } from './list-store'
+import type { BroadcastProgress, ListStore, Subscriber } from './list-store'
 import type { Address, Mail, MailMessage } from './types'
 import { existsSync } from 'node:fs'
 import process from 'node:process'
@@ -35,6 +35,8 @@ export interface ListConfirmProps {
 export interface ListOptions {
   // The SQLite file holding the lists, `data/mail-list.sqlite` unless given (in memory under `bun test`), shared by every list naming the same one.
   file?: string | undefined
+  // Keeps the lists elsewhere than in SQLite, such as `pgLists(db)` for a site on Postgres or on several servers; not with `file`.
+  store?: ListStore | undefined
   // How fast a broadcast goes out: `batch` mails, then a wait of `every` before the next batch. 20 mails every minute by default.
   pace?: { batch?: number | undefined, every?: Duration | undefined } | undefined
   // The confirmation mail's own `.kay` view, given `ListConfirmProps`, in place of kayjs-mail's.
@@ -103,7 +105,7 @@ interface StoredMessage {
 interface Entry {
   list: MailingList
   // Opened on first use, so building or checking an app makes no file.
-  readonly lists: Lists
+  readonly lists: ListStore
   pace: { batch: number, every: Duration }
 }
 
@@ -165,10 +167,12 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
   }
 
   const entries = new Map<string, Entry>()
-  const files = new Map<string, Lists>()
+  const files = new Map<string, ListStore>()
+  // The stores given to a list, which an erase reaches beside the files.
+  const given = new Set<ListStore>()
   const addressLimit = rateLimit('kmail-list-address', { max: 3, window: '1h' })
 
-  const open = (file: string): Lists => {
+  const open = (file: string): ListStore => {
     let lists = files.get(file)
 
     if (!lists)
@@ -178,19 +182,26 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
   }
 
   // The default file once it exists, whichever list this process declared: a link in a mail outlives the code that declared its list.
-  const defaultFile = (): Lists | undefined => {
+  const defaultFile = (): ListStore | undefined => {
     const fallbackFile = defaultPath ?? (process.env.NODE_ENV === 'test' ? undefined : LIST_FILE)
 
     return fallbackFile !== undefined && (files.has(fallbackFile) || existsSync(fallbackFile)) ? open(fallbackFile) : undefined
   }
-  const storeOf = (name: string): Lists | undefined => entries.get(name)?.lists ?? defaultFile()
+  const storeOf = (name: string): ListStore | undefined => entries.get(name)?.lists ?? defaultFile()
 
   const make = (name: string, options: ListOptions): Entry => {
     if (!NAME.test(name))
       throw configError(`mail.list(${JSON.stringify(name)}): a list's name is letters, digits, dashes and underscores, at most 40 characters`)
 
+    if (options.store !== undefined && options.file !== undefined)
+      throw configError(`mail.list(${JSON.stringify(name)}): give a store or a file, not both`)
+
     const file = options.file ?? (process.env.NODE_ENV === 'test' ? ':memory:' : LIST_FILE)
-    const lists = { get: () => open(file) }
+    const lists = { get: (): ListStore => options.store ?? open(file) }
+
+    if (options.store !== undefined)
+      given.add(options.store)
+
     const pace = { batch: options.pace?.batch ?? 20, every: options.pace?.every ?? '1m' }
 
     if (!Number.isInteger(pace.batch) || pace.batch < 1)
@@ -239,7 +250,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
 
           const locale = await renderLocale()
           const origin = siteOrigin()
-          const subscriber = lists.get().ask(name, email, randomId(), locale)
+          const subscriber = await lists.get().ask(name, email, randomId(), locale)
 
           const url = `${origin}${LIST_PATH}/confirm?token=${signToken('confirm', { list: name, id: subscriber.id, locale })}`
           const site = new URL(origin).host
@@ -292,18 +303,18 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
         const id = randomId()
         const kept: StoredMessage = { from: stored.from, replyTo: stored.replyTo, subject: stored.subject, html: stored.html, text: stored.text, headers: stored.headers }
 
-        lists.get().addBroadcast(id, name, JSON.stringify(kept))
+        await lists.get().addBroadcast(id, name, JSON.stringify(kept))
 
         try {
           await host.enqueueRun({ list: name, broadcast: id }, `broadcast:${id}`)
         }
         catch (error) {
-          lists.get().finish(id)
+          await lists.get().finish(id)
 
           throw error
         }
 
-        return { id, recipients: lists.get().count(name) }
+        return { id, recipients: await lists.get().count(name) }
       },
       async test(given, to) {
         const { mail } = await message(given, to)
@@ -322,21 +333,21 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
         return { subject: mail.subject, html: personal.html, text: personal.text }
       },
       async status(id) {
-        const found = lists.get().broadcast(id)
+        const found = await lists.get().broadcast(id)
 
-        return Promise.resolve(found?.list === name ? { id, done: found.finishedAt !== undefined, ...lists.get().progress(found) } : undefined)
+        return found?.list === name ? { id, done: found.finishedAt !== undefined, ...await lists.get().progress(found) } : undefined
       },
-      count: async () => Promise.resolve(lists.get().count(name)),
-      subscribers: async () => Promise.resolve(lists.get().subscribers(name).map(subscriber => ({ email: subscriber.email, confirmedAt: new Date(subscriber.confirmedAt ?? subscriber.createdAt) }))),
+      count: async () => lists.get().count(name),
+      subscribers: async () => (await lists.get().subscribers(name)).map(subscriber => ({ email: subscriber.email, confirmedAt: new Date(subscriber.confirmedAt ?? subscriber.createdAt) })),
       async unsubscribe(address) {
         const email = normalizeAddress(address)
 
-        return Promise.resolve(email !== undefined && lists.get().removeEmail(name, email))
+        return email !== undefined && await lists.get().removeEmail(name, email)
       },
     }
 
     return { list, get lists() {
-      return open(file)
+      return lists.get()
     }, pace }
   }
 
@@ -348,7 +359,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
     if (entry === undefined)
       throw retryLater('10s', `the list ${name} is not declared in this process yet`)
 
-    const stored = entry.lists.broadcast(id)
+    const stored = await entry.lists.broadcast(id)
 
     if (stored === undefined || stored.finishedAt !== undefined)
       return
@@ -357,11 +368,11 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
     const message = JSON.parse(stored.message) as StoredMessage
     const footers = new Map<string, { html: string, text: string }>()
 
-    for (const subscriber of lists.next(stored, pace.batch)) {
+    for (const subscriber of await lists.next(stored, pace.batch)) {
       signal?.throwIfAborted()
 
       // Claimed before the mail goes: a process dying inside the send is never followed by another sending it again.
-      if (!lists.claim(id, subscriber.id))
+      if (!await lists.claim(id, subscriber.id))
         continue
 
       try {
@@ -371,18 +382,18 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
           footers.set(subscriber.locale, footer = await footerOf(subscriber.locale))
 
         await host.deliver(personalise(message, subscriber, name, footer))
-        lists.sent(id, subscriber.id)
+        await lists.sent(id, subscriber.id)
       }
       catch (error) {
-        lists.release(id, subscriber.id)
+        await lists.release(id, subscriber.id)
         log.warn(`a mail of the list ${name} could not be sent to one subscriber: ${error instanceof Error ? error.message : String(error)}`)
       }
     }
 
-    if (lists.next(stored, 1).length > 0)
+    if ((await lists.next(stored, 1)).length > 0)
       throw retryLater(pace.every, `the list ${name} paces its mails`)
 
-    lists.finish(id)
+    await lists.finish(id)
   }
 
   return {
@@ -401,7 +412,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
       queues = connected
     },
     // Takes the address off every list of every file this process opened and of the default file when it exists, so an erase from a script or a route that declared no list still reaches it; how many rows went.
-    erase(address: string): number {
+    async erase(address: string): Promise<number> {
       const email = normalizeAddress(address)
 
       if (email === undefined)
@@ -409,10 +420,15 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
 
       defaultFile()
 
-      return [...files.values()].reduce((total, lists) => total + lists.erase(email), 0)
+      let total = 0
+
+      for (const lists of new Set([...files.values(), ...given]))
+        total += await lists.erase(email)
+
+      return total
     },
     // The route handlers.
-    confirm(token: unknown): { kind: 'confirmed' | 'invalid' | 'expired' | 'unavailable', locale?: string | undefined } {
+    async confirm(token: unknown): Promise<{ kind: 'confirmed' | 'invalid' | 'expired' | 'unavailable', locale?: string | undefined }> {
       const checked = checkToken('confirm', token)
 
       if (!checked.ok)
@@ -424,9 +440,9 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
         return { kind: 'unavailable', locale: checked.claims.locale }
 
       // A subscriber that is gone, unsubscribed or erased, answers as a link that does not work.
-      return { kind: store.confirm(checked.claims.list, checked.claims.id) ? 'confirmed' : 'invalid', locale: checked.claims.locale }
+      return { kind: await store.confirm(checked.claims.list, checked.claims.id) ? 'confirmed' : 'invalid', locale: checked.claims.locale }
     },
-    unsubscribe(token: unknown): { locale?: string | undefined, valid: boolean, unavailable?: true } {
+    async unsubscribe(token: unknown): Promise<{ locale?: string | undefined, valid: boolean, unavailable?: true }> {
       const checked = checkToken('unsubscribe', token)
 
       if (!checked.ok)
@@ -438,7 +454,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
       if (store === undefined)
         return { valid: false, unavailable: true, locale: checked.claims.locale }
 
-      store.remove(checked.claims.list, checked.claims.id)
+      await store.remove(checked.claims.list, checked.claims.id)
 
       return { valid: true, locale: checked.claims.locale }
     },
@@ -466,7 +482,7 @@ export function mountListRoutes(plugin: Elysia, handle: () => ListsHandle): void
   const token = (query: Record<string, unknown>) => query.token
 
   plugin.get(`${LIST_PATH}/confirm`, async ({ query }) => {
-    const result = handle().confirm(token(query))
+    const result = await handle().confirm(token(query))
 
     return result.kind === 'unavailable' ? handle().page('later', result.locale, undefined, 503) : handle().page(result.kind, result.locale)
   })
@@ -477,8 +493,10 @@ export function mountListRoutes(plugin: Elysia, handle: () => ListsHandle): void
   })
   // The one-click unsubscribe of RFC 8058 and the page's own form: both post to the link, the token being the proof.
   plugin.post(`${LIST_PATH}/unsubscribe`, async ({ query }) => {
-    const result = handle().unsubscribe(token(query))
+    const result = await handle().unsubscribe(token(query))
 
-    return handle().page(result.valid ? 'unsubscribed' : result.unavailable ? 'later' : 'invalid', result.locale, undefined, result.unavailable ? 503 : 200)
+    const unanswered = result.unavailable ? 'later' : 'invalid'
+
+    return handle().page(result.valid ? 'unsubscribed' : unanswered, result.locale, undefined, result.unavailable ? 503 : 200)
   }, { parse: 'none' })
 }

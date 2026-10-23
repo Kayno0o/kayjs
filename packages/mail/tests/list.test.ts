@@ -1,6 +1,6 @@
 import type { Action } from 'kay'
-import process from 'node:process'
 import { join } from 'node:path'
+import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { scratchDir, testSite } from 'kay/test'
 import { createLists } from '../src/list'
@@ -430,7 +430,7 @@ describe('a link of a list this process does not declare', () => {
   it('says to come back later in the link\'s locale, with the retry hint', async () => {
     const lists = createLists(host)
     const token = signToken('unsubscribe', { list: 'declared-elsewhere', id: 'someone', locale: 'fr' })
-    const result = lists.unsubscribe(token)
+    const result = await lists.unsubscribe(token)
 
     expect(result).toMatchObject({ valid: false, unavailable: true, locale: 'fr' })
 
@@ -455,8 +455,8 @@ describe('a link of a list this process does not declare', () => {
 
     const lists = createLists(host, file)
 
-    expect(lists.confirm(signToken('confirm', { list: 'elsewhere', id: first.id, locale: 'en' }))).toMatchObject({ kind: 'confirmed' })
-    expect(lists.unsubscribe(signToken('unsubscribe', { list: 'elsewhere', id: second.id, locale: 'en' }))).toMatchObject({ valid: true })
+    expect(await lists.confirm(signToken('confirm', { list: 'elsewhere', id: first.id, locale: 'en' }))).toMatchObject({ kind: 'confirmed' })
+    expect(await lists.unsubscribe(signToken('unsubscribe', { list: 'elsewhere', id: second.id, locale: 'en' }))).toMatchObject({ valid: true })
 
     const check = openLists(file)
 
@@ -487,7 +487,11 @@ describe('the subscribe form\'s queue insert', () => {
     })
 
     // A queue that never answers: the form must not wait for it.
-    lists.connect({ enqueueMail: async (mail) => { queued.push(String(mail.to)); return new Promise<string>(() => undefined) }, enqueueRun: async () => '', activate: () => undefined })
+    lists.connect({ enqueueMail: async (mail) => {
+      queued.push(String(mail.to))
+
+      return new Promise<string>(() => undefined)
+    }, enqueueRun: async () => '', activate: () => undefined })
 
     const [, handler] = lists.list('news', { file }).form()
     const ask = async (email: string) => handler({ email }, { fail: (status: number) => ({ status }) } as never)

@@ -6,6 +6,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 - A tree-sitter grammar for `.kay` files colours them in Neovim, Helix and Zed, and a Zed extension starts the language server ([Check and tools](check-and-tools.md))
 - kayjs-mail runs a mailing list with `mail.list()`: a subscribe form with double opt-in, signed one-click unsubscribe links and headers, paced sending through the queue that resumes after a restart, and `mail.erase(address)` ([A mailing list](../packages/mail/llms/mailing-list.md)).
+- `mail.list(name, { store: pgLists(db) })` keeps a kayjs-mail list in Postgres, and a subscribe form no longer answers faster for a new address than a listed one ([Mailing list](../packages/mail/llms/mailing-list.md)).
 - `cms({ newsletter })` lets an editor preview an entry as a list mail, test it to their own address and send it to a kayjs-mail list from the entry screen ([Sending an entry to a mailing list](../packages/cms/llms/newsletter.md)).
 - The language server formats a selection: the top-level template blocks it touches, each as `kay fmt` writes it ([Language server](editor-and-agent-commands.md)).
 - The language server shows inlay hints for inferred types and for the parameter names of calls given a literal ([Language server](editor-and-agent-commands.md)).

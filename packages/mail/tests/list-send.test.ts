@@ -1,7 +1,7 @@
+import type { JobStore } from 'kay/server'
 import type { Mail, Transport } from '../src/types'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
-import type { JobStore } from 'kay/server'
 import { memoryJobs } from 'kay/server'
 import { scratchDir, testSite } from 'kay/test'
 import { openLists } from '../src/list-store'
