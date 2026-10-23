@@ -4,7 +4,7 @@ import type { JSX } from 'kay'
 import { recipe, trustHtml } from 'kay'
 import { qrCodeDataUri, qrCodeSvg } from '@kaynooo/utils/tools/QrCode'
 
-const look = recipe({ parts: { root: 'kui-qr-code' } })
+const look = recipe({ parts: { root: 'kui-qr-code block h-auto max-w-full [&>svg]:block [&>svg]:h-auto [&>svg]:w-full' } })
 
 const { value, label, pixels, size, options, inline = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'] & JSX.IntrinsicElements['img'], 'class' | 'src' | 'alt' | 'width' | 'height' | 'children' | 'innerHTML'> & {
   // What the code holds, such as a URL.

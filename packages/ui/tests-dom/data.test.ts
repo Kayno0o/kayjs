@@ -20,7 +20,7 @@ async function data(src = '/favicon.png', copiedFor?: string) {
 describe('BarList', () => {
   test('makes each row a button handing back its row once the list takes onSelect', async () => {
     const root = await data()
-    const rows = root.querySelectorAll<HTMLButtonElement>('#bars button.kui-bar-list-row')
+    const rows = root.querySelectorAll<HTMLButtonElement>('#bars button[data-part="row"]')
 
     expect([...rows].map(row => row.type)).toEqual(['button', 'button'])
 
@@ -34,11 +34,11 @@ describe('SiteFavicon', () => {
   test('falls back to the globe once the image fails to load', async () => {
     const root = await data()
 
-    root.querySelector('.kui-site-favicon-img')!.dispatchEvent(new Event('error'))
+    root.querySelector('[data-part="img"]')!.dispatchEvent(new Event('error'))
     await settle()
 
-    expect(root.querySelector('.kui-site-favicon-img')).toBeNull()
-    expect(root.querySelector('svg.kui-site-favicon-icon')).not.toBeNull()
+    expect(root.querySelector('[data-part="img"]')).toBeNull()
+    expect(root.querySelector('svg[data-part="icon"]')).not.toBeNull()
   })
 })
 

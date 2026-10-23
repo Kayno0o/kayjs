@@ -61,9 +61,6 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     'kui-range-input-unit ml-1',
     'kui-menu-item py-3',
     'kui-menu-list min-w-48',
-    'kui-bar-list-row py-1',
-    'kui-bar-list-label font-medium',
-    'kui-bar-list-track h-2',
     'kui-collapsible-section-summary py-3',
     'kui-collapsible-section-body pt-2',
     'kui-popover shadow-xl',
@@ -81,32 +78,10 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     'kui-tree-view-item py-1',
     'kui-tree-view-label truncate',
     'kui-virtual-list h-96',
-    'kui-line-chart-plot h-72',
-    'kui-line-chart-legend gap-6',
-    'kui-line-chart-legend-item text-sm',
-    'kui-scatter-chart-plot aspect-video',
-    'kui-contribution-cell rounded-full',
-    'kui-contribution-month font-medium',
-    'kui-carousel-viewport rounded-3xl',
-    'kui-carousel-dot size-4',
-    'kui-masonry p-3',
-    'kui-media-gallery-stage rounded-3xl',
-    'kui-media-gallery-thumb opacity-80',
-    'kui-media-gallery-counter font-mono',
-    'kui-image-cropper-stage bg-black',
-    'kui-zoom-pane h-96',
-    'kui-zoom-tools gap-2',
-    'kui-qr-code rounded-lg',
-    'kui-site-favicon size-6',
     'kui-icon-grid gap-3',
     'kui-icon-grid-bar pt-2',
     'kui-markdown-grid gap-6',
     'kui-markdown-bar px-4',
-    'kui-bar-chart-plot h-64',
-    'kui-bar-chart-column px-px',
-    'kui-bar-chart-bar rounded-t-md',
-    'kui-bar-chart-axis-label font-mono',
-    'kui-bar-chart-legend-item gap-2',
     'kui-accordion gap-5',
     'kui-toaster z-50',
     'kui-toaster-live gap-2',
@@ -118,7 +93,6 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     'kui-when-visible min-h-4',
     'kui-icon kui-collapsible-section-chevron size-6',
     'kui-icon kui-tree-view-icon size-3',
-    'kui-site-favicon-img rounded-sm',
     'kui-load-more py-6',
     'kui-field-input h-11',
   ]
@@ -166,14 +140,15 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
   })
 
   test('an empty BarList and an empty MediaGallery take the classes of their root part', () => {
-    expect(html).toMatch(/<p class="kui-bar-list-empty kui-bar-list text-gray-500" data-part="root" id="bars-empty">/)
-    expect(html).toMatch(/<p class="kui-media-gallery-empty kui-media-gallery text-center"[^>]*id="gallery-empty"/)
+    expect(html).toMatch(/<p class="kui-bar-list-empty[^"]* kui-bar-list [^"]*text-gray-500" data-part="root" id="bars-empty">/)
+    expect(html).toMatch(/<p class="kui-media-gallery-empty[^"]* kui-media-gallery [^"]*text-center"[^>]*id="gallery-empty"/)
   })
 
   test('a component used as a part of another keeps the part name its caller hands it', () => {
     expect(html).toMatch(/<svg[^>]*data-part="spinner"/)
     expect(classesOfTag('data-part="step"', 'button').filter(name => name === 'kui-icon-btn')).toHaveLength(1)
-    expect(classesOfTag('data-part="step"', 'button')).toEqual(['kui-icon-btn', 'rounded-full', 'kui-carousel-step', 'size-12'])
+    expect(classesOfTag('data-part="step"', 'button').filter(name => name.startsWith('data-[side='))).toHaveLength(2)
+    expect(classesOfTag('data-part="step"', 'button').at(-1)).toBe('size-12')
     expect(html).toMatch(/<svg[^>]*data-part="sortIcon"/)
   })
 
@@ -191,6 +166,52 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
 
   test('a part nothing restyles keeps its kui class alone', () => {
     expect(html).toContain('class="kui-dialog-body"')
+  })
+})
+
+describe('the charts and media whose recipe holds their look', () => {
+  // The classes of every element carrying the part, in the order they are written.
+  const partsNamed = (part: string) => [...html.matchAll(new RegExp(`<[a-z0-9]+[^>]*data-part="${part}"[^>]*>`, 'g'))].map(([tag]) => (tag.match(/ class="([^"]*)"/)?.[1] ?? '').split(' '))
+
+  test.each([
+    ['row', 'grid', 'py-1'],
+    ['label', 'truncate', 'font-medium'],
+    ['track', 'col-span-2', 'h-2'],
+    ['plot', 'kui-line-chart-plot', 'h-72'],
+    ['legend', 'flex', 'gap-6'],
+    ['legendItem', 'items-center', 'text-sm'],
+    ['plot', 'col-start-2', 'aspect-video'],
+    ['cell', 'transition-transform', 'rounded-full'],
+    ['month', 'row-start-1', 'font-medium'],
+    ['viewport', 'bg-kui-surface0', 'rounded-3xl'],
+    ['dot', 'after:absolute', 'size-4'],
+    ['stage', 'touch-pan-y', 'rounded-3xl'],
+    ['thumb', 'aspect-video', 'opacity-80'],
+    ['counter', 'tabular-nums', 'font-mono'],
+    ['stage', 'cursor-crosshair', 'bg-black'],
+    ['tools', 'absolute', 'gap-2'],
+    ['img', 'object-contain', 'rounded-sm'],
+    ['plot', 'ml-10', 'h-64'],
+    ['column', 'items-end', 'px-px'],
+    ['bar', 'min-h-px', 'rounded-t-md'],
+    ['axisLabel', 'justify-center', 'font-mono'],
+    ['legendItem', 'items-center', 'gap-2'],
+  ] as const)('the %s part with %s draws what src/ui.ts sets after its base: %s', (part, base, restyle) => {
+    const found = partsNamed(part).filter(classes => classes.includes(base))
+
+    expect(found.length).toBeGreaterThan(0)
+    expect(found.some(classes => classes.at(-1) === restyle)).toBe(true)
+  })
+
+  test.each([
+    ['kui-masonry', 'p-3'],
+    ['kui-zoom-pane', 'h-96'],
+    ['kui-qr-code', 'rounded-lg'],
+    ['kui-site-favicon', 'size-6'],
+  ] as const)('the root %s draws what src/ui.ts sets after its base: %s', (root, restyle) => {
+    const found = [...html.matchAll(/<[a-z0-9][^>]*class="([^"]*)"[^>]*>/g)].map(([, classes]) => classes!.split(' ')).filter(classes => classes.includes(root))
+
+    expect(found.some(classes => classes.at(-1) === restyle)).toBe(true)
   })
 })
 

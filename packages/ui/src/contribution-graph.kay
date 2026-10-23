@@ -6,7 +6,14 @@ import { monthStarts } from './contribution'
 import { shade } from './shade'
 import { wording } from 'kay/words'
 
-const look = recipe({ parts: { root: 'kui-contribution-graph', month: 'kui-contribution-month', cell: 'kui-contribution-cell' } })
+const look = recipe({
+  parts: {
+    // With month labels the cells are placed by hand under a row of them, and fixed-width columns let a label run past its own week.
+    root: 'kui-contribution-graph grid w-fit grid-flow-col grid-rows-7 gap-[3px] data-months:auto-cols-[0.75rem] data-months:grid-flow-row data-months:grid-rows-[auto_repeat(7,0.75rem)]',
+    month: 'row-start-1 w-0 text-kui-2xs leading-none whitespace-nowrap text-kui-subtext0',
+    cell: 'size-3 rounded-[3px] bg-kui-surface0 transition-transform hover:scale-125 data-today:ring-1 data-today:ring-kui-accent data-today:ring-offset-1 data-today:ring-offset-kui-surface0',
+  },
+})
 
 const { days, color, today, label = wording('ui.contributionGraph.label', 'Contributions'), months = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   // Ascending days starting on a Monday, as `gridDays` from `@kaynooo/utils` lists them, each with how full its cell is.
@@ -32,7 +39,7 @@ const style = (day: ContributionDay, index: number) => {
 }
 ---
 // A year of days as a grid of weeks, each cell shaded by how full its day was.
-div(part="root" {...rest} role="group" aria-label={label} class={{ 'kui-contribution-graph-months': months }})
+div(part="root" {...rest} role="group" aria-label={label} data-months={months ? '' : undefined})
   if months
     for start of monthStarts(days.map(day => day.day)) key={start.column}
       span(part="month" aria-hidden="true" style={`grid-column: ${start.column + 1}`}) {start.label}

@@ -366,7 +366,7 @@ describe('content', () => {
       { 'aria-label': '1 sur 2', 'aria-hidden': 'true', 'inert': '' },
       { 'aria-label': '2 sur 2', 'aria-hidden': null, 'inert': null },
     ])
-    expect(await attributes('/content', '#carousel .kui-carousel-dot', ['aria-label', 'aria-current'])).toEqual([
+    expect(await attributes('/content', '#carousel [data-part="dot"]', ['aria-label', 'aria-current'])).toEqual([
       { 'aria-label': 'Aller à l\'image 1', 'aria-current': null },
       { 'aria-label': 'Aller à l\'image 2', 'aria-current': 'true' },
     ])
@@ -374,7 +374,7 @@ describe('content', () => {
 
   test('Carousel draws no controls for a single slide', async () => {
     expect(await attributes('/content', '#lone-slide [aria-label]', ['aria-label'])).toContainEqual({ 'aria-label': 'Slide 1 of 1' })
-    expect(await find('/content', '#lone-slide .kui-carousel-controls')).toEqual([])
+    expect(await find('/content', '#lone-slide [data-part="controls"]')).toEqual([])
   })
 
   test('Badge is neutral unless toned, drawn as a stamp when asked, and EmptyState says why there is nothing', async () => {
@@ -521,7 +521,7 @@ describe('data', () => {
   test('BarList measures each row against the largest, reads its display, and says when it has none', async () => {
     const bars = (await one('/data', '#bars')).html
 
-    expect([...bars.matchAll(/bar-list-value" data-part="value">([^<]*)<.*?width: (\d+)%/g)].map(match => [match[1], match[2]])).toEqual([['2', '100'], ['one', '50'], ['0', '0']])
+    expect([...bars.matchAll(/data-part="value">([^<]*)<.*?width: (\d+)%/g)].map(match => [match[1], match[2]])).toEqual([['2', '100'], ['one', '50'], ['0', '0']])
     expect(await find('/data', '#bars button')).toEqual([])
     expect((await find('/data', '#no-bars-label p')).map(found => found.text)).toEqual(['No visits'])
     expect((await find('/data', '#no-bars-default p')).map(found => found.text)).toEqual(['No data yet.'])
@@ -624,7 +624,7 @@ describe('charts', () => {
     expect((await one('/charts', '#line [aria-hidden="true"]')).html).toBe('')
     expect((await find('/charts', '#line caption, #line thead th, #line tbody th, #line tbody td')).map(found => found.text)).toEqual(['Visits', 'Visits', 'Sales', '2026-09-01', '3', '1', '2026-09-02', '-', '2', '2026-09-08', '5', '1'])
 
-    const keys = await find('/charts', '#line .kui-line-chart-legend-item')
+    const keys = await find('/charts', '#line [data-part="legendItem"]')
 
     expect(keys.map(item => item.text)).toEqual(['Visits', 'Sales'])
     // The second line is dashed so the two stay apart without their colours.
@@ -638,9 +638,9 @@ describe('charts', () => {
       ['Hades', 'Hades', 'left: 25%; bottom: 100%; --kui-dot-size: 1.75rem'],
       ['Celeste', 'Celeste, 30h', 'left: 75%; bottom: 0%; --kui-dot-size: 1.1875rem'],
     ])
-    expect(scatter).toContain('<span class="kui-scatter-chart-grid" data-part="grid" data-axis="x" style="left: 50%"><span class="kui-scatter-chart-tick" data-part="tick">20h</span></span><span class="kui-scatter-chart-guide" data-part="guide" data-axis="y" style="bottom: 50%"></span><span class="kui-scatter-chart-guide" data-part="guide" data-axis="x" style="left: 50%"></span><span class="kui-scatter-chart-corner" data-part="corner" data-corner="topRight">Long and loved</span>')
+    expect(scatter).toMatch(/<span class="[^"]*" data-part="grid" data-axis="x" style="left: 50%"><span class="[^"]*" data-part="tick" data-axis="x">20h<\/span><\/span><span class="[^"]*" data-part="guide" data-axis="y" style="bottom: 50%"><\/span><span class="[^"]*" data-part="guide" data-axis="x" style="left: 50%"><\/span><span class="[^"]*" data-part="corner" data-corner="topRight">Long and loved<\/span>/)
     expect(scatter).not.toContain('<button')
-    expect(await page('no-scatter-label')).toBe('<p class="kui-scatter-chart-empty kui-scatter-chart" data-part="root">No titles</p>')
+    expect(await page('no-scatter-label')).toMatch(/^<p class="kui-scatter-chart-empty [^"]*kui-scatter-chart [^"]*" data-part="root">No titles<\/p>$/)
   })
 
   test('BarChart draws a bar per positive reading, coloured by its own colour, and reads each column with its notes', async () => {
@@ -653,17 +653,17 @@ describe('charts', () => {
     expect([...bars.matchAll(/role="img" tabindex="(-?\d)"/g)].map(match => match[1])).toEqual(['-1', '-1', '0'])
     expect(bars).toContain('data-part="axis" aria-hidden="true"')
     expect([...bars.matchAll(/data-part="tick">([^<]*)</g)].map(match => match[1])).toEqual(['0', '4', '8'])
-    expect(bars).not.toContain('kui-bar-chart-legend')
+    expect(bars).not.toContain('data-part="legend"')
     expect([...stacked.matchAll(/aria-label="([^"]+)" data-tooltip/g)].map(match => match[1])).toEqual(['Mon: Ok 3, Failed 1, Total 4', 'Tue: Ok 1, Failed 2, Total 3'])
     expect([...stacked.matchAll(/style="height: ([\d.]+)%/g)].map(match => match[1])).toEqual(['75', '25', '25', '50'])
     expect(stacked).toContain('data-stacked=""')
-    expect(stacked).toContain('<li class="kui-bar-chart-legend-item" data-part="legendItem"><span class="kui-bar-chart-key" data-part="key" style="background-color: red"></span>Failed</li>')
-    expect(await page('no-bars')).toBe('<p class="kui-bar-chart-empty kui-bar-chart" data-part="root">No runs</p>')
+    expect(stacked).toMatch(/<li class="[^"]*" data-part="legendItem"><span class="[^"]*" data-part="key" style="background-color: red"><\/span>Failed<\/li>/)
+    expect(await page('no-bars')).toMatch(/^<p class="kui-bar-chart-empty [^"]*kui-bar-chart [^"]*" data-part="root">No runs<\/p>$/)
   })
 
   test('ContributionGraph shades each day by how full it was, says so in its name, marks today, and names the months over their weeks', async () => {
     const graph = await page('graph')
-    const cells = [...graph.matchAll(/<span class="kui-contribution-cell" data-part="cell" role="img" aria-label="([^"]+)"[^>]*?( data-today)? style="([^"]+)"/g)].map(match => [match[1], Boolean(match[2]), match[3]])
+    const cells = [...graph.matchAll(/<span class="[^"]*" data-part="cell" role="img" aria-label="([^"]+)"[^>]*?( data-today)? style="([^"]+)"/g)].map(match => [match[1], Boolean(match[2]), match[3]])
 
     expect(cells.slice(0, 3)).toEqual([
       ['3 commits · 2026-08-31', false, 'grid-row: 2; grid-column: 1'],
@@ -671,7 +671,7 @@ describe('charts', () => {
       ['100% · 2026-09-02', true, 'background-color: color-mix(in srgb, var(--color-kui-accent) 100%, transparent); grid-row: 4; grid-column: 1'],
     ])
     expect(cells.at(-1)?.[2]).toContain('grid-row: 8; grid-column: 3')
-    expect(graph).toMatch(/^<div data-part="root" role="group" aria-label="Contributions" class="kui-contribution-graph-months kui-contribution-graph"><span class="kui-contribution-month" data-part="month" aria-hidden="true" style="grid-column: 1">Sep\w*<\/span><span class="kui-contribution-cell"/)
+    expect(graph).toMatch(/^<div data-part="root" role="group" aria-label="Contributions" data-months class="kui-contribution-graph [^"]*"><span class="[^"]*" data-part="month" aria-hidden="true" style="grid-column: 1">Sep\w*<\/span><span class="[^"]*" data-part="cell"/)
   })
 })
 
@@ -727,7 +727,7 @@ describe('Pagination', () => {
 test('QrCode draws its value as an SVG image named for screen readers, drawn as its options say', async () => {
   const svg = async (id: string) => decodeURIComponent((/src="data:image\/svg\+xml,([^"]+)"/).exec(await element('/paging', id))![1]!)
 
-  expect(await element('/paging', 'qr')).toContain('alt="kaynooo.fr" width="160" height="160" class="kui-qr-code"')
+  expect(await element('/paging', 'qr')).toMatch(/alt="kaynooo.fr" width="160" height="160" class="kui-qr-code [^"]*"/)
   expect(await svg('qr')).toStartWith('<svg')
   expect(await svg('qr')).not.toBe(await svg('qr-other'))
   expect(await svg('qr-styled')).toContain('#7aa2f7')
@@ -738,7 +738,7 @@ test('QrCode with inline draws the SVG in the page, so CSS colours resolve, and 
   const inline = await element('/paging', 'qr-inline')
 
   expect(inline).not.toContain('<img')
-  expect(inline).toContain('<div data-part="root" role="img" aria-label="Inline" style="width: 120px; height: 120px" class="kui-qr-code"><svg')
+  expect(inline).toMatch(/<div data-part="root" role="img" aria-label="Inline" style="width: 120px; height: 120px" class="kui-qr-code [^"]*"><svg/)
   expect(inline).toContain('currentColor')
   expect(inline).toContain('var(--color-accent)')
   expect(await element('/paging', 'qr-decor')).toContain('alt aria-hidden="true"')
@@ -953,8 +953,8 @@ describe('the texts a component shows by default, in the app\'s catalogs', () =>
     const graph = (await visit('/fr/charts')).html
     const filtered = (await visit('/fr/table?q=a')).html
 
-    expect(graph).toMatch(/class="kui-contribution-month"[^>]*>sept\./)
-    expect((await visit('/charts')).html).toMatch(/class="kui-contribution-month"[^>]*>Sep/)
+    expect(graph).toMatch(/data-part="month"[^>]*>sept\./)
+    expect((await visit('/charts')).html).toMatch(/data-part="month"[^>]*>Sep/)
     expect(filtered).toContain('Filtrer')
     expect(filtered).toMatch(/class="sr-only" data-part="count" role="status">\d+ lignes?</)
   })

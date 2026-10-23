@@ -4,7 +4,7 @@ import { stringToHexColor } from '@kaynooo/utils/colors'
 import { effect, recipe, signal } from 'kay'
 import Icon from './icon.kay'
 
-const look = recipe({ parts: { root: 'kui-site-favicon', img: 'kui-site-favicon-img', icon: 'kui-site-favicon-icon' } })
+const look = recipe({ parts: { root: 'kui-site-favicon inline-flex size-5 shrink-0 items-center justify-center overflow-hidden', img: 'size-full object-contain', icon: 'size-full' } })
 
 const { src, name, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children'> & {
   src?: string | null | undefined

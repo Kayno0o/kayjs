@@ -4,7 +4,17 @@ import type { BarListRow } from './plot'
 import { memo, recipe } from 'kay'
 import { wording } from 'kay/words'
 
-const look = recipe({ parts: { root: 'kui-bar-list', row: 'kui-bar-list-row', label: 'kui-bar-list-label', value: 'kui-bar-list-value', track: 'kui-bar-list-track', fill: 'kui-bar-list-fill' } })
+const look = recipe({
+  parts: {
+    root: 'kui-bar-list flex flex-col gap-2',
+    // Label and value on one line, the bar spanning both under them, so a long label never squeezes the bar.
+    row: 'grid w-full grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-1 text-left text-sm data-interactive:cursor-pointer data-interactive:hover:text-kui-accent',
+    label: 'truncate text-kui-text',
+    value: 'text-xs text-kui-subtext0 tabular-nums',
+    track: 'col-span-2 block h-1.5 overflow-hidden bg-kui-surface1',
+    fill: 'block h-full bg-kui-accent',
+  },
+})
 
 const { rows, onSelect, emptyLabel, ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'onSelect'> & {
   rows: Row[]
@@ -23,7 +33,7 @@ const percent = (row: Row) => largest() > 0 ? Math.max(0, row.value) / largest()
 ---
 if rows.length === 0
   // The app's id and class stay on whichever element shows.
-  p.kui-bar-list-empty(part="root" id={rest.id}) {nothing()}
+  p.kui-bar-list-empty.text-xs.text-kui-subtext0(part="root" id={rest.id}) {nothing()}
 else
   ul(part="root" {...rest})
     for row of rows key={row.key}

@@ -36,10 +36,10 @@ async function carousel(autoplay?: DurationText) {
 
   return {
     section,
-    shown: () => [...root.querySelectorAll('.kui-carousel-slide')].filter(slide => !slide.hasAttribute('inert') && !slide.hasAttribute('aria-hidden')).map(slide => slide.getAttribute('aria-label')),
-    current: () => [...root.querySelectorAll('.kui-carousel-dot')].findIndex(dot => dot.getAttribute('aria-current') === 'true'),
-    step: (side: 'previous' | 'next') => click(root.querySelector(`.kui-carousel-step[data-side="${side}"]`)),
-    dot: (index: number) => click(root.querySelectorAll('.kui-carousel-dot')[index]!),
+    shown: () => [...root.querySelectorAll('[data-part="slide"]')].filter(slide => !slide.hasAttribute('inert') && !slide.hasAttribute('aria-hidden')).map(slide => slide.getAttribute('aria-label')),
+    current: () => [...root.querySelectorAll('[data-part="dot"]')].findIndex(dot => dot.getAttribute('aria-current') === 'true'),
+    step: (side: 'previous' | 'next') => click(root.querySelector(`[data-part="step"][data-side="${side}"]`)),
+    dot: (index: number) => click(root.querySelectorAll('[data-part="dot"]')[index]!),
     outside: root.querySelector<HTMLButtonElement>('#outside')!,
     jump: () => click(root.querySelector('#jump')),
   }
@@ -88,8 +88,8 @@ test('turns on its own, held while the pointer or the focus is on it, and stops 
   expect(turns).toEqual([])
 
   view.section.dispatchEvent(new PointerEvent('pointerleave'))
-  view.section.querySelector<HTMLButtonElement>('.kui-carousel-dot')!.focus()
-  view.section.querySelectorAll<HTMLButtonElement>('.kui-carousel-dot')[1]!.focus()
+  view.section.querySelector<HTMLButtonElement>('[data-part="dot"]')!.focus()
+  view.section.querySelectorAll<HTMLButtonElement>('[data-part="dot"]')[1]!.focus()
   await clock.settle()
   await clock.elapse(TWO_TURNS_MS)
 
@@ -115,7 +115,7 @@ test('throws on an autoplay that is a bare number, which was milliseconds', asyn
 
 test('stops for good from its pause button, which a carousel without autoplay leaves out', async () => {
   const view = await carousel(AUTOPLAY)
-  const pause = view.section.querySelector<HTMLButtonElement>('.kui-carousel-pause')!
+  const pause = view.section.querySelector<HTMLButtonElement>('[data-part="pause"]')!
 
   expect(pause.getAttribute('aria-label')).toBe('Pause')
 
@@ -140,7 +140,7 @@ test('stops for good from its pause button, which a carousel without autoplay le
   mounted = undefined
   clock.stop()
 
-  expect((await carousel()).section.querySelector('.kui-carousel-pause')).toBeNull()
+  expect((await carousel()).section.querySelector('[data-part="pause"]')).toBeNull()
 })
 
 test('never turns on its own for a visitor asking for reduced motion', async () => {

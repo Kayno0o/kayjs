@@ -74,21 +74,21 @@ describe('MediaGallery', () => {
   test('turns with its buttons and the arrows, wrapping, playing a video in place of the stage\'s image', async () => {
     const root = await media()
     const gallery = root.querySelector('#gallery')!
-    const counter = () => gallery.querySelector('.kui-media-gallery-counter')?.textContent
+    const counter = () => gallery.querySelector('[data-part="counter"]')?.textContent
 
     expect(counter()).toBe('1 / 3')
-    expect(gallery.querySelector('.kui-media-gallery-stage img')?.getAttribute('src')).toBe('/a.png')
-    expect(gallery.querySelector('.kui-media-gallery-thumb')?.getAttribute('aria-current')).toBe('true')
+    expect(gallery.querySelector('[data-part="stage"] img')?.getAttribute('src')).toBe('/a.png')
+    expect(gallery.querySelector('[data-part="thumb"]')?.getAttribute('aria-current')).toBe('true')
 
     click(gallery.querySelector('[data-side="next"]'))
     await settle()
 
     expect(counter()).toBe('2 / 3')
-    expect(gallery.querySelector<HTMLVideoElement>('.kui-media-gallery-stage video')?.src).toEndWith('/b.mp4')
-    expect(gallery.querySelector<HTMLTrackElement>('.kui-media-gallery-stage video track[kind="captions"]')?.getAttribute('src')).toBe('/b.vtt')
+    expect(gallery.querySelector<HTMLVideoElement>('[data-part="stage"] video')?.src).toEndWith('/b.mp4')
+    expect(gallery.querySelector<HTMLTrackElement>('[data-part="stage"] video track[kind="captions"]')?.getAttribute('src')).toBe('/b.vtt')
 
-    press(gallery.querySelector('.kui-media-gallery-thumb')!, 'ArrowLeft')
-    press(gallery.querySelector('.kui-media-gallery-thumb')!, 'ArrowLeft')
+    press(gallery.querySelector('[data-part="thumb"]')!, 'ArrowLeft')
+    press(gallery.querySelector('[data-part="thumb"]')!, 'ArrowLeft')
     await settle()
 
     expect(counter()).toBe('3 / 3')
@@ -97,21 +97,21 @@ describe('MediaGallery', () => {
 
   test('opens an image full size in a lightbox, closed by its button', async () => {
     const root = await media()
-    const lightbox = root.querySelector<HTMLDialogElement>('.kui-media-gallery-lightbox')!
+    const lightbox = root.querySelector<HTMLDialogElement>('[data-part="lightbox"]')!
 
-    click(root.querySelector('.kui-media-gallery-zoom'))
+    click(root.querySelector('[data-part="zoom"]'))
     await settle()
 
     expect(lightbox.open).toBe(true)
-    expect(lightbox.querySelector('img.kui-media-gallery-full')?.getAttribute('src')).toBe('/a-full.png')
+    expect(lightbox.querySelector('img[data-part="full"]')?.getAttribute('src')).toBe('/a-full.png')
 
     click(lightbox.querySelector('[data-side="previous"]'))
     await settle()
 
-    expect(lightbox.querySelector('img.kui-media-gallery-full')?.getAttribute('src')).toBe('/c.png')
+    expect(lightbox.querySelector('img[data-part="full"]')?.getAttribute('src')).toBe('/c.png')
     expect(lightbox.getAttribute('aria-label')).toBe('Media 3')
 
-    click(lightbox.querySelector('.kui-media-gallery-close'))
+    click(lightbox.querySelector('[data-part="close"]'))
     await settle()
 
     expect(lightbox.open).toBe(false)
@@ -120,10 +120,10 @@ describe('MediaGallery', () => {
   test('goes to either end with Home and End, turns on a horizontal swipe of a finger alone, and names untitled items', async () => {
     const root = await media()
     const gallery = root.querySelector('#gallery')!
-    const stage = gallery.querySelector('.kui-media-gallery-stage')!
+    const stage = gallery.querySelector('[data-part="stage"]')!
 
-    expect([...gallery.querySelectorAll('.kui-media-gallery-thumb')].map(thumb => thumb.getAttribute('aria-label'))).toEqual(['Mars', 'Media 2', 'Media 3'])
-    expect(gallery.querySelector('.kui-media-gallery-zoom')?.getAttribute('aria-label')).toBe('Open full size: Mars')
+    expect([...gallery.querySelectorAll('[data-part="thumb"]')].map(thumb => thumb.getAttribute('aria-label'))).toEqual(['Mars', 'Media 2', 'Media 3'])
+    expect(gallery.querySelector('[data-part="zoom"]')?.getAttribute('aria-label')).toBe('Open full size: Mars')
 
     press(stage, 'End')
     press(stage, 'Home')
@@ -246,7 +246,7 @@ describe('ZoomPane', () => {
 describe('ImageCropper', () => {
   test('centres a crop of its ratio once the image has loaded, moves it with the arrows, and resets it', async () => {
     const root = await media()
-    const image = root.querySelector<HTMLImageElement>('.kui-image-cropper-image')!
+    const image = root.querySelector<HTMLImageElement>('.kui-image-cropper [data-part="image"]')!
 
     Object.defineProperties(image, { naturalWidth: { value: 400 }, naturalHeight: { value: 300 } })
     image.dispatchEvent(new Event('load'))
@@ -254,7 +254,7 @@ describe('ImageCropper', () => {
 
     expect(seen.crops.at(-1)).toEqual({ x: 0, y: 50, w: 400, h: 200 })
 
-    press(root.querySelector('.kui-image-cropper-crop')!, 'ArrowUp')
+    press(root.querySelector('.kui-image-cropper [data-part="crop"]')!, 'ArrowUp')
     await settle()
 
     expect(seen.crops.at(-1)).toEqual({ x: 0, y: 46, w: 400, h: 200 })
@@ -266,15 +266,15 @@ describe('ImageCropper', () => {
 
   test('moves the crop by a drag, resizes it by a corner or Shift with an arrow, and reads it out', async () => {
     const root = await media()
-    const image = root.querySelector<HTMLImageElement>('.kui-image-cropper-image')!
-    const stage = root.querySelector('.kui-image-cropper-stage')!
+    const image = root.querySelector<HTMLImageElement>('.kui-image-cropper [data-part="image"]')!
+    const stage = root.querySelector('.kui-image-cropper [data-part="stage"]')!
 
     sized(stage, 400, 300)
     Object.defineProperties(image, { naturalWidth: { value: 400 }, naturalHeight: { value: 300 } })
     image.dispatchEvent(new Event('load'))
     await settle()
 
-    const crop = root.querySelector('.kui-image-cropper-crop')!
+    const crop = root.querySelector('.kui-image-cropper [data-part="crop"]')!
 
     expect([crop.getAttribute('aria-valuetext'), crop.getAttribute('aria-valuemin'), crop.getAttribute('aria-valuemax')]).toEqual(['400 by 200 pixels at 0, 50', '32', '400'])
 

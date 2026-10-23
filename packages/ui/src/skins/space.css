@@ -62,7 +62,7 @@
   }
 
   /* Overlays lose their line to a shadow that lifts them off the page. */
-  :is(.kui-dialog, .kui-command-palette, .kui-popover, .kui-hover-card, .kui-toast, .kui-tooltip, .kui-combobox-list, .kui-combobox [data-part='list'], .kui-side-panel, .kui-line-chart-tooltip, .kui-site-nav-list:popover-open, .kui-site-nav > [data-part='list']:popover-open) {
+  :is(.kui-dialog, .kui-command-palette, .kui-popover, .kui-hover-card, .kui-toast, .kui-tooltip, .kui-combobox-list, .kui-combobox [data-part='list'], .kui-side-panel, .kui-line-chart-tooltip, .kui-line-chart [data-part='tooltip'], .kui-site-nav-list:popover-open, .kui-site-nav > [data-part='list']:popover-open) {
     box-shadow: 0 1rem 3rem -0.75rem rgb(0 0 0 / 0.8);
   }
 

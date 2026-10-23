@@ -11,7 +11,24 @@ import { wording } from 'kay/words'
 // How far a finger moves sideways before a swipe turns the gallery.
 const SWIPE_PX = 48
 
-const look = recipe({ parts: { root: 'kui-media-gallery', stage: 'kui-media-gallery-stage', frame: 'kui-media-gallery-frame', zoom: 'kui-media-gallery-zoom', step: 'kui-media-gallery-step', counter: 'kui-media-gallery-counter', caption: 'kui-media-gallery-caption', strip: 'kui-media-gallery-strip', thumb: 'kui-media-gallery-thumb', thumbImage: 'kui-media-gallery-thumb-image', play: 'kui-media-gallery-play', lightbox: 'kui-media-gallery-lightbox', full: 'kui-media-gallery-full', close: 'kui-media-gallery-close' } })
+const look = recipe({
+  parts: {
+    root: 'kui-media-gallery flex flex-col gap-2 outline-none',
+    stage: 'relative w-full touch-pan-y overflow-hidden bg-black',
+    frame: 'size-full object-contain',
+    zoom: 'block size-full cursor-zoom-in',
+    step: 'absolute top-1/2 -translate-y-1/2 bg-black/50 text-white hover:bg-black/80 data-[side=next]:right-2 data-[side=next]:-rotate-90 data-[side=previous]:left-2 data-[side=previous]:rotate-90',
+    counter: 'pointer-events-none absolute top-2 left-2 bg-black/60 px-2 py-0.5 text-kui-2xs text-white tabular-nums',
+    caption: 'pointer-events-none absolute inset-x-0 bottom-0 truncate bg-linear-to-t from-black/70 to-transparent px-3 pt-6 pb-2 text-xs text-white',
+    strip: 'flex gap-1.5 overflow-x-auto pb-1',
+    thumb: 'relative aspect-video h-12 shrink-0 overflow-hidden border-2 border-transparent opacity-60 transition hover:opacity-100 aria-[current=true]:border-kui-accent aria-[current=true]:opacity-100',
+    thumbImage: 'size-full bg-black object-cover',
+    play: 'absolute inset-0 m-auto size-5 text-white',
+    lightbox: 'm-auto max-h-dvh max-w-dvw overflow-visible border-0 bg-transparent p-0 backdrop:bg-black/80',
+    full: 'max-h-[96dvh] max-w-[96vw] object-contain',
+    close: 'absolute top-2 right-2 bg-black/60 text-white hover:bg-black/80',
+  },
+})
 
 const { items, index = 0, onIndexChange, ratio = '16 / 9', emptyLabel, previousLabel = wording('ui.mediaGallery.previous', 'Previous'), nextLabel = wording('ui.mediaGallery.next', 'Next'), closeLabel = wording('ui.mediaGallery.close', 'Close'), openLabel = wording('ui.mediaGallery.open', 'Open full size'), itemLabel = wording('ui.mediaGallery.item', 'Media {n}'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   items: MediaItem[]
@@ -151,7 +168,7 @@ effect(() => {
 ---
 if !current()
   // The app's id and class stay on whichever element shows.
-  p.kui-media-gallery-empty(part="root" id={rest.id}) {nothing()}
+  p.kui-media-gallery-empty.text-xs.text-kui-subtext0(part="root" id={rest.id}) {nothing()}
 else
   // Arrows turn the gallery while focus is anywhere inside it, which a keyboard user reaches through its buttons.
   div(part="root" {...rest} onKeyDown={keyDown})

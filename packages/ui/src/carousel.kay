@@ -6,7 +6,21 @@ import { startRef } from './form-reset'
 import { stepIndex } from './cycle'
 import { wording } from 'kay/words'
 
-const look = recipe({ parts: { root: 'kui-carousel', viewport: 'kui-carousel-viewport', slide: 'kui-carousel-slide', image: 'kui-carousel-image', controls: 'kui-carousel-controls', step: 'kui-carousel-step', dot: 'kui-carousel-dot', pause: 'kui-carousel-pause' } })
+const look = recipe({
+  parts: {
+    root: 'kui-carousel flex flex-col gap-3',
+    viewport: 'relative w-full overflow-hidden bg-kui-surface0',
+    // Every slide sits over the viewport, moved a width aside per place it stands from the one shown.
+    slide: 'absolute inset-0 transition-transform duration-700 ease-in-out motion-reduce:transition-none',
+    image: 'size-full object-cover',
+    controls: 'flex items-center justify-center gap-4',
+    step: 'data-[side=next]:-rotate-90 data-[side=previous]:rotate-90',
+    // Apart from the controls of the slides, as it stops the carousel rather than moving it.
+    pause: 'ms-2',
+    // The dot is drawn small, and pressed through a margin around it wide enough for a finger.
+    dot: 'relative h-2 w-2 bg-kui-field-border transition-all after:absolute after:-inset-2 after:content-[""] hover:bg-kui-subtext0 aria-[current=true]:w-6 aria-[current=true]:bg-kui-accent',
+  },
+})
 
 const { slides, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = wording('ui.carousel.label', 'Carousel'), previousLabel = wording('ui.carousel.previous', 'Previous slide'), nextLabel = wording('ui.carousel.next', 'Next slide'), pauseLabel = wording('ui.carousel.pause', 'Pause'), playLabel = wording('ui.carousel.play', 'Play'), slideLabel = wording('ui.carousel.slide', 'Slide {n} of {count}'), dotLabel = wording('ui.carousel.dot', 'Go to slide {n}'), ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'children'> & {
   slides: readonly { src: string, alt: string }[]

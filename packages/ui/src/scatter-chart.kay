@@ -5,7 +5,19 @@ import { memo, recipe } from 'kay'
 import { axisExtent, axisPercent, dotSize } from './plot'
 import { wording } from 'kay/words'
 
-const look = recipe({ parts: { root: 'kui-scatter-chart', axisLabel: 'kui-scatter-chart-axis-label', plot: 'kui-scatter-chart-plot', grid: 'kui-scatter-chart-grid', tick: 'kui-scatter-chart-tick', guide: 'kui-scatter-chart-guide', corner: 'kui-scatter-chart-corner', dot: 'kui-scatter-chart-dot' } })
+const look = recipe({
+  parts: {
+    root: 'kui-scatter-chart m-0 grid grid-cols-[auto_minmax(0,1fr)] grid-rows-[minmax(0,1fr)_auto] gap-2',
+    axisLabel: 'text-center text-kui-2xs text-kui-subtext0 data-[axis=x]:col-start-2 data-[axis=y]:row-start-1 data-[axis=y]:rotate-180 data-[axis=y]:self-center data-[axis=y]:[writing-mode:vertical-rl]',
+    // Tick labels hang outside the plot, into the margin it keeps for them.
+    plot: 'relative col-start-2 mb-5 ml-8 h-[var(--kui-scatter-chart-height,18rem)] border-solid border-(length:--kui-border-width) border-kui-surface2',
+    grid: 'absolute bg-kui-surface2 data-[axis=x]:inset-y-0 data-[axis=x]:w-px data-[axis=y]:inset-x-0 data-[axis=y]:h-px',
+    tick: 'absolute text-kui-2xs whitespace-nowrap text-kui-overlay1 tabular-nums data-[axis=x]:top-full data-[axis=x]:mt-1 data-[axis=x]:-translate-x-1/2 data-[axis=y]:right-full data-[axis=y]:mr-2 data-[axis=y]:-translate-y-1/2',
+    guide: 'absolute bg-kui-overlay0 data-[axis=x]:inset-y-0 data-[axis=x]:w-px data-[axis=y]:inset-x-0 data-[axis=y]:h-px',
+    corner: 'pointer-events-none absolute text-kui-2xs text-kui-overlay1 data-[corner=bottomLeft]:bottom-1.5 data-[corner=bottomLeft]:left-2 data-[corner=bottomRight]:right-2 data-[corner=bottomRight]:bottom-1.5 data-[corner=topLeft]:top-1.5 data-[corner=topLeft]:left-2 data-[corner=topRight]:top-1.5 data-[corner=topRight]:right-2',
+    dot: 'absolute h-(--kui-dot-size) w-(--kui-dot-size) -translate-x-1/2 translate-y-1/2 rounded-full bg-kui-accent opacity-70 transition-opacity hover:z-10 hover:opacity-100 data-interactive:cursor-pointer data-interactive:focus-visible:opacity-100 data-interactive:focus-visible:outline-2 data-interactive:focus-visible:outline-kui-text',
+  },
+})
 
 const { points, x = {}, y = {}, quadrant, corners, onSelect, emptyLabel, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
   points: Point[]
@@ -33,7 +45,7 @@ const cornerEntries = () => Object.entries(corners ?? {}).filter(([, text]) => t
 ---
 if points.length === 0
   // The app's id and class stay on whichever element shows.
-  p.kui-scatter-chart-empty(part="root" id={rest.id}) {emptyLabel ?? wording('ui.scatterChart.empty', 'No data yet.')}
+  p.kui-scatter-chart-empty.text-xs.text-kui-subtext0(part="root" id={rest.id}) {emptyLabel ?? wording('ui.scatterChart.empty', 'No data yet.')}
 else
   figure(part="root" {...rest} aria-label={label})
     if y.label
@@ -41,10 +53,10 @@ else
     div(part="plot")
       for tick of y.ticks ?? [] key={tick.value}
         span(part="grid" data-axis="y" style={`bottom: ${axisPercent(tick.value, yExtent(), y.scale)}%`})
-          span(part="tick") {tick.label}
+          span(part="tick" data-axis="y") {tick.label}
       for tick of x.ticks ?? [] key={tick.value}
         span(part="grid" data-axis="x" style={`left: ${axisPercent(tick.value, xExtent(), x.scale)}%`})
-          span(part="tick") {tick.label}
+          span(part="tick" data-axis="x") {tick.label}
       if quadrant
         span(part="guide" data-axis="y" style={`bottom: ${axisPercent(quadrant.y, yExtent(), y.scale)}%`})
         span(part="guide" data-axis="x" style={`left: ${axisPercent(quadrant.x, xExtent(), x.scale)}%`})

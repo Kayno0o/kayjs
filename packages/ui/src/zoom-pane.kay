@@ -11,7 +11,14 @@ const SLOP = 3
 // How far one arrow press moves the plate, in pixels.
 const KEY_STEP = 40
 
-const look = recipe({ parts: { root: 'kui-zoom-pane', plate: 'kui-zoom-plate', tools: 'kui-zoom-tools' } })
+const look = recipe({
+  parts: {
+    root: 'kui-zoom-pane relative cursor-grab overflow-hidden select-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-kui-accent data-dragging:cursor-grabbing',
+    // Keeps its class for the rule stopping the native drag of a picture, which would take the pointer off the pan before it began.
+    plate: 'kui-zoom-plate size-full origin-top-left',
+    tools: 'absolute top-1 right-1 flex gap-1',
+  },
+})
 
 const { label, most = MOST, least = 1, onChange, tools = true, zoomInLabel = wording('ui.zoomPane.zoomIn', 'Zoom in'), zoomOutLabel = wording('ui.zoomPane.zoomOut', 'Zoom out'), fitLabel = wording('ui.zoomPane.fit', 'Fit'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'role' | 'tabindex' | 'onChange'> & {
   // Names the view for screen readers, since what it holds is a picture rather than words.
@@ -133,7 +140,7 @@ function drop(event: PointerEvent) {
 
 // A double click on the buttons is two presses of the button, which the pane must not take as its own zoom.
 function doubleClick(event: MouseEvent) {
-  if (event.target instanceof Element && event.target.closest('.kui-zoom-tools'))
+  if (event.target instanceof Element && event.target.closest('[data-part="tools"]'))
     return
 
   zoom(NOTCH_ZOOM ** 3, at(event))

@@ -11,7 +11,32 @@ import { wording } from 'kay/words'
 // Which attribute of each drawn part takes its series' colour.
 const PAINT: Record<string, string> = { line: 'stroke', point: 'stroke', area: 'fill' }
 
-const look = recipe({ parts: { root: 'kui-line-chart', frame: 'kui-line-chart-frame', plot: 'kui-line-chart-plot', cursor: 'kui-line-chart-cursor', dot: 'kui-line-chart-dot', band: 'kui-line-chart-band', overlay: 'kui-line-chart-overlay', tooltip: 'kui-line-chart-tooltip', tooltipLabel: 'kui-line-chart-tooltip-label', tooltipRow: 'kui-line-chart-tooltip-row', tooltipName: 'kui-line-chart-tooltip-name', tooltipValue: 'kui-line-chart-tooltip-value', swatch: 'kui-line-chart-swatch', data: 'kui-line-chart-data', hint: 'kui-line-chart-hint', legend: 'kui-line-chart-legend', legendItem: 'kui-line-chart-legend-item', key: 'kui-line-chart-key' } })
+const look = recipe({
+  parts: {
+    root: 'kui-line-chart flex flex-col gap-2',
+    frame: 'relative',
+    // chartist draws the plot, and the rules it needs from its own stylesheet stay on this class in theme.css.
+    plot: 'kui-line-chart-plot h-[var(--kui-line-chart-height,9rem)]',
+    cursor: 'pointer-events-none absolute w-px bg-kui-overlay0',
+    dot: 'pointer-events-none absolute size-2 -translate-1/2 border border-kui-canvas',
+    band: 'pointer-events-none absolute border-x border-kui-accent bg-kui-accent/10',
+    overlay: 'absolute inset-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kui-accent data-range:cursor-crosshair data-range:touch-pan-y data-range:select-none',
+    tooltip: 'pointer-events-none fixed top-0 left-0 z-50 flex w-max max-w-full flex-col gap-0.5 border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-surface1 px-3 py-2 text-xs',
+    tooltipLabel: 'mb-1 text-kui-text',
+    // The total sits under the series with no swatch, its name lined up with theirs.
+    tooltipRow: 'flex items-center gap-1.5 text-kui-subtext0 data-total:mt-0.5 data-total:border-t data-total:border-solid data-total:border-kui-overlay0 data-total:pt-1 data-total:pl-3.5 data-total:text-kui-text',
+    tooltipName: 'truncate',
+    tooltipValue: 'ml-auto pl-3 font-kui-mono text-kui-text tabular-nums',
+    swatch: 'size-2 shrink-0',
+    // What screen readers read in place of the drawing: every value, and how to pick a span from the keyboard.
+    data: 'sr-only',
+    hint: 'sr-only',
+    legend: 'flex flex-wrap gap-4 pl-1',
+    legendItem: 'flex items-center gap-1.5 text-xs text-kui-subtext0',
+    // A sample of the line of the series, dashed as it draws.
+    key: 'h-0.5 w-4 shrink-0',
+  },
+})
 
 const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.lineChart.total', 'Total'), legend, options, onRange, rangeHint = wording('ui.lineChart.rangeHint', 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it'), label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
   labels: string[]
@@ -393,7 +418,7 @@ div(part="root" {...rest} role="figure" aria-label={label})
           span(part="tooltipName") {item.name}
           span(part="tooltipValue") {reading(index)}
       if stacked
-        div.kui-line-chart-tooltip-total(part="tooltipRow")
+        div(part="tooltipRow" data-total)
           span(part="tooltipName") {totalLabel}
           span(part="tooltipValue") {totalText(hovered()!.index)}
   // A table box ignores the 1px size and clip of sr-only and would scroll the page by its full height, so the table sits in a block that carries them.

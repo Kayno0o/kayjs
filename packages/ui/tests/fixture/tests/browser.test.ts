@@ -320,21 +320,21 @@ inBrowser('LineChart tooltip', () => {
   const hover = async (page: { evaluate: (...args: never[]) => Promise<unknown>, waitFor: (selector: string) => Promise<void> }, id: string, at: { x: number | 'left' | 'right', y?: number }) => {
     await page.waitFor(`#${id} .kui-line-chart-plot svg`)
     await page.evaluate(((within: string, x: number | string, y: number | undefined) => {
-      const overlay = document.querySelector(`#${within} .kui-line-chart-overlay`)!
+      const overlay = document.querySelector(`#${within} [data-part="overlay"]`)!
       const edge = x === 'left' ? 1 : document.documentElement.clientWidth - 1
       const clientX = typeof x === 'string' ? edge : x
 
       overlay.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX, clientY: y ?? overlay.getBoundingClientRect().top + 40 }))
     }) as never, id as never, at.x as never, at.y as never)
-    await page.waitFor(`#${id} .kui-line-chart-tooltip`)
+    await page.waitFor(`#${id} [data-part="tooltip"]`)
     // The tooltip is placed once the observer has measured it.
     await page.evaluate((async () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))) as never)
 
     return await page.evaluate(((within: string) => {
-      const box = document.querySelector(`#${within} .kui-line-chart-tooltip`)!
+      const box = document.querySelector(`#${within} [data-part="tooltip"]`)!
       const rect = box.getBoundingClientRect()
 
-      return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, scroll: box.scrollWidth, wide: document.documentElement.clientWidth, high: document.documentElement.clientHeight, heading: box.querySelector('.kui-line-chart-tooltip-label')!.textContent, wraps: [...box.querySelectorAll('.kui-line-chart-tooltip-name')].some(name => name.scrollWidth > name.clientWidth) }
+      return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, scroll: box.scrollWidth, wide: document.documentElement.clientWidth, high: document.documentElement.clientHeight, heading: box.querySelector('[data-part="tooltipLabel"]')!.textContent, wraps: [...box.querySelectorAll('[data-part="tooltipName"]')].some(name => name.scrollWidth > name.clientWidth) }
     }) as never, id as never) as { left: number, right: number, top: number, bottom: number, width: number, scroll: number, wide: number, high: number, heading: string, wraps: boolean }
   }
 
@@ -411,18 +411,18 @@ inBrowser('LineChart stacked', () => {
 
     const read = async (x: number) => {
       await page.evaluate(((at: number) => {
-        const overlay = document.querySelector('#stacked .kui-line-chart-overlay')!
+        const overlay = document.querySelector('#stacked [data-part="overlay"]')!
 
         overlay.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: at, clientY: overlay.getBoundingClientRect().top + 40 }))
       }) as never, x as never)
-      await page.waitFor('#stacked .kui-line-chart-tooltip')
+      await page.waitFor('#stacked [data-part="tooltip"]')
 
-      return await page.evaluate(() => [...document.querySelectorAll('#stacked .kui-line-chart-tooltip-row')].map(row => row.textContent)) as string[]
+      return await page.evaluate(() => [...document.querySelectorAll('#stacked [data-part="tooltipRow"]')].map(row => row.textContent)) as string[]
     }
 
     expect(await read(1)).toEqual(['A1', 'B-', 'C2', 'Total3'])
-    expect(await page.evaluate(() => document.querySelector('#stacked .kui-line-chart-overlay')!.getAttribute('aria-valuetext'))).toEndWith('A 1, B -, C 2, Total 3')
-    expect(await page.evaluate(() => [...document.querySelectorAll('#stacked .kui-line-chart-data th[scope="col"]')].map(th => th.textContent))).toEqual(['A', 'B', 'C', 'Total'])
+    expect(await page.evaluate(() => document.querySelector('#stacked [data-part="overlay"]')!.getAttribute('aria-valuetext'))).toEndWith('A 1, B -, C 2, Total 3')
+    expect(await page.evaluate(() => [...document.querySelectorAll('#stacked [data-part="data"] th[scope="col"]')].map(th => th.textContent))).toEqual(['A', 'B', 'C', 'Total'])
     expect(page.errors).toEqual([])
   }, 120_000)
 })
@@ -444,13 +444,13 @@ inBrowser('LineChart stacked far above one series', () => {
     expect(labels.length).toBeLessThanOrEqual(15)
 
     await page.evaluate(() => {
-      const overlay = document.querySelector('#cores .kui-line-chart-overlay')!
+      const overlay = document.querySelector('#cores [data-part="overlay"]')!
 
       overlay.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 1, clientY: overlay.getBoundingClientRect().top + 40 }))
     })
-    await page.waitFor('#cores .kui-line-chart-tooltip')
+    await page.waitFor('#cores [data-part="tooltip"]')
 
-    const rows = await page.evaluate(() => [...document.querySelectorAll('#cores .kui-line-chart-tooltip-row')].map(row => row.textContent)) as string[]
+    const rows = await page.evaluate(() => [...document.querySelectorAll('#cores [data-part="tooltipRow"]')].map(row => row.textContent)) as string[]
 
     expect(await page.evaluate(() => [...document.querySelectorAll('#cores .ct-line')].map(line => line.getAttribute('style') ?? ''))).toSatisfy((styles: string[]) => styles.length === 12 && styles.every(style => !style.includes('stroke-dasharray')))
     expect(await page.evaluate(() => [...document.querySelectorAll('#seconds .ct-line')].map(line => line.getAttribute('style') ?? '').some(style => style.includes('stroke-dasharray')))).toBe(true)
@@ -533,14 +533,14 @@ inBrowser('LineChart in another timezone', () => {
       await page.goto('/chart-tooltip')
       await page.waitFor('#seconds .kui-line-chart-plot svg')
 
-      const valuetext = () => page.evaluate(() => document.querySelector('#seconds .kui-line-chart-overlay')!.getAttribute('aria-valuetext'))
+      const valuetext = () => page.evaluate(() => document.querySelector('#seconds [data-part="overlay"]')!.getAttribute('aria-valuetext'))
 
-      await page.waitUntil(() => !document.querySelector('#seconds .kui-line-chart-overlay')!.getAttribute('aria-valuetext')!.includes('UTC'))
+      await page.waitUntil(() => !document.querySelector('#seconds [data-part="overlay"]')!.getAttribute('aria-valuetext')!.includes('UTC'))
       expect(await valuetext()).toMatch(/^22 Oct 2026, 01:\d\d:\d\d: /)
 
-      await page.evaluate(() => document.querySelector('#hours .kui-line-chart-overlay')!.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 5, clientY: 300 })))
-      await page.waitFor('#hours .kui-line-chart-tooltip')
-      expect(await page.text('#hours .kui-line-chart-tooltip-label')).toMatch(/^21 Oct 2026, 09:00$/)
+      await page.evaluate(() => document.querySelector('#hours [data-part="overlay"]')!.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 5, clientY: 300 })))
+      await page.waitFor('#hours [data-part="tooltip"]')
+      expect(await page.text('#hours [data-part="tooltipLabel"]')).toMatch(/^21 Oct 2026, 09:00$/)
       expect(page.errors).toEqual([])
     }
     finally {

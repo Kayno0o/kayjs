@@ -23,7 +23,7 @@ async function charts() {
 describe('LineChart', () => {
   test('puts the data table in a block that is visually hidden, as a table box would scroll the page by its full height', async () => {
     const root = await charts()
-    const block = root.querySelector('#line .kui-line-chart-data')!
+    const block = root.querySelector('#line [data-part="data"]')!
     const table = block.querySelector(':scope > table')!
 
     expect(block.tagName).toBe('DIV')
@@ -53,7 +53,7 @@ describe('LineChart', () => {
     await press('Home')
     expect(slider.getAttribute('aria-valuenow')).toBe('0')
     expect(slider.getAttribute('aria-valuetext')).toBe('Mon: Visits -, Sales 1 v')
-    expect(root.querySelector('.kui-line-chart-tooltip-label')?.textContent).toBe('Mon')
+    expect(root.querySelector('[data-part="tooltipLabel"]')?.textContent).toBe('Mon')
 
     await press('ArrowRight', true)
     await press('ArrowRight', true)
@@ -100,7 +100,7 @@ describe('LineChart', () => {
     expect(slider.getAttribute('aria-valuemax')).toBe('1')
     expect(slider.getAttribute('aria-valuenow')).toBe('1')
     expect(slider.getAttribute('aria-valuetext')).toBe('Wed: Visits 5 v, Sales 1 v')
-    expect(root.querySelector('.kui-line-chart-tooltip')).toBeNull()
+    expect(root.querySelector('[data-part="tooltip"]')).toBeNull()
 
     await press('Home')
     expect(slider.getAttribute('aria-valuetext')).toBe('Tue: Visits 3 v, Sales 2 v')
@@ -115,26 +115,26 @@ describe('LineChart', () => {
 
   test('reads every series at the hovered point in its tooltip, a gap as a dash', async () => {
     const root = await charts()
-    const overlay = root.querySelector('#line .kui-line-chart-overlay')!
+    const overlay = root.querySelector('#line [data-part="overlay"]')!
 
     overlay.dispatchEvent(new PointerEvent('pointermove', { clientX: 0, clientY: 0, bubbles: true }))
     await settle()
 
-    const rows = () => [...root.querySelectorAll('.kui-line-chart-tooltip-row')].map(row => [row.querySelector('.kui-line-chart-tooltip-name')?.textContent, row.querySelector('.kui-line-chart-tooltip-value')?.textContent])
+    const rows = () => [...root.querySelectorAll('[data-part="tooltipRow"]')].map(row => [row.querySelector('[data-part="tooltipName"]')?.textContent, row.querySelector('[data-part="tooltipValue"]')?.textContent])
 
-    expect(root.querySelector('.kui-line-chart-tooltip-label')?.textContent).toBe('Mon')
+    expect(root.querySelector('[data-part="tooltipLabel"]')?.textContent).toBe('Mon')
     expect(rows()).toEqual([['Visits', '-'], ['Sales', '1 v']])
-    expect([...root.querySelectorAll<HTMLElement>('.kui-line-chart-dot')].map(dot => dot.style.backgroundColor)).toEqual(['red'])
+    expect([...root.querySelectorAll<HTMLElement>('#line [data-part="dot"]')].map(dot => dot.style.backgroundColor)).toEqual(['red'])
 
     overlay.dispatchEvent(new PointerEvent('pointerleave', { bubbles: true }))
     await settle()
 
-    expect(root.querySelector('.kui-line-chart-tooltip')).toBeNull()
+    expect(root.querySelector('[data-part="tooltip"]')).toBeNull()
   })
 
   test('hands over the span a drag covers, first point first, and nothing for a press in place', async () => {
     const root = await charts()
-    const overlay = root.querySelector('#line .kui-line-chart-overlay')!
+    const overlay = root.querySelector('#line [data-part="overlay"]')!
     const rect = root.querySelector('#line .kui-line-chart-plot')!.getBoundingClientRect()
     const pointer = (type: string, x: number) => overlay.dispatchEvent(new PointerEvent(type, { clientX: x, clientY: 0, button: 0, bubbles: true }))
 
@@ -142,7 +142,7 @@ describe('LineChart', () => {
     pointer('pointermove', 0)
     await settle()
 
-    expect(root.querySelector('#line .kui-line-chart-band')).not.toBeNull()
+    expect(root.querySelector('#line [data-part="band"]')).not.toBeNull()
 
     pointer('pointerup', 0)
     pointer('pointerdown', 0)
@@ -150,7 +150,7 @@ describe('LineChart', () => {
     await settle()
 
     expect(ranges).toEqual([[0, 2]])
-    expect(root.querySelector('#line .kui-line-chart-band')).toBeNull()
+    expect(root.querySelector('#line [data-part="band"]')).toBeNull()
   })
 })
 
@@ -158,7 +158,7 @@ describe('ScatterChart', () => {
   test('makes each dot a button handing back its point once the chart takes onSelect', async () => {
     const root = await charts()
 
-    click(root.querySelectorAll('#scatter button.kui-scatter-chart-dot')[1]!)
+    click(root.querySelectorAll('#scatter button[data-part="dot"]')[1]!)
 
     expect(selected).toEqual(['Celeste'])
   })
@@ -169,7 +169,7 @@ describe('BarChart', () => {
 
   test('is one tab stop on the latest column, the arrows and Home and End walking the others', async () => {
     const root = await charts()
-    const columns = () => [...root.querySelectorAll('#bars .kui-bar-chart-column')] as HTMLElement[]
+    const columns = () => [...root.querySelectorAll('#bars [data-part="column"]')] as HTMLElement[]
 
     expect(columns().map(column => column.tabIndex)).toEqual([-1, -1, 0])
 
@@ -186,9 +186,9 @@ describe('BarChart', () => {
 
   test('keeps a stub where a zero reading has a colour, so a failed run does not vanish', async () => {
     const root = await charts()
-    const second = root.querySelectorAll('#bars .kui-bar-chart-column')[1]!
+    const second = root.querySelectorAll('#bars [data-part="column"]')[1]!
 
-    expect(second.querySelectorAll('.kui-bar-chart-bar[data-stub]')).toHaveLength(1)
+    expect(second.querySelectorAll('[data-part="bar"][data-stub]')).toHaveLength(1)
     expect(second.getAttribute('data-tooltip')).toBe('Tue: Minutes 0')
   })
 })
