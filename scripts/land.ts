@@ -197,6 +197,8 @@ async function verify(): Promise<string> {
 
   // Main may have moved the lockfile under this branch.
   await step('bun install', [BUN, 'install', '--silent', '--frozen-lockfile'])
+  // The pages an agent reads whole keep room for the next lines: a section past its cap is cut by `--cap`, which edits the files, so a landing only reports it and the lander commits the cut.
+  await step('whats-new cap', [BUN, 'scripts/whats-new.ts', '--cap', '--check'])
   await step('lint', [BUN, 'run', 'lint'])
   await step('check', [BUN, 'run', 'check'])
   // On every landing, whatever it reaches: a page growing past the tolerance stops it here with the command accepting the growth.

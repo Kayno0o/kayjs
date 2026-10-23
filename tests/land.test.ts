@@ -118,6 +118,8 @@ async function landings(...names: string[]) {
   await Bun.write(join(seed, 'shared.txt'), 'one\n')
   // The eager JS sizes step, which a landing runs whatever its change reaches: it fails with a growth message while LAND_SIZES_FAIL is set.
   await Bun.write(join(seed, 'scripts/sizes.ts'), 'if (process.env.LAND_SIZES_FAIL) {\n  console.error(\'Eager JS grew past 100 B: static +200 B. run `bun scripts/sizes.ts --update`\')\n  process.exit(1)\n}\n')
+  // The cap step, which fails with the command to run while LAND_CAP_FAIL is set, as a page outgrowing its room does.
+  await Bun.write(join(seed, 'scripts/whats-new.ts'), 'if (process.env.LAND_CAP_FAIL) {\n  console.error(\'llms/whats-new.md outgrew the room: run `bun scripts/whats-new.ts --cap`\')\n  process.exit(1)\n}\n')
   await Bun.write(join(seed, 'lint.ts'), 'import { appendFileSync, existsSync } from \'node:fs\'\n\nappendFileSync(process.env.LAND_TRACE!, `${process.env.LAND_NAME}\\n`)\n\nif (process.env.LAND_LEAK)\n  Bun.spawn([\'setsid\', \'sleep\', \'30\'], { stdout: \'inherit\', stderr: \'inherit\' }).unref()\n\nwhile (process.env.LAND_GATE && !existsSync(process.env.LAND_GATE))\n  await Bun.sleep(20)\n\nif (process.env.LAND_FAIL)\n  process.exit(1)\n')
   await $`${process.execPath} install --silent`.cwd(seed).quiet()
   await git(seed, 'add', '-A')
@@ -313,6 +315,17 @@ describe('landing', () => {
     expect(out).toContain('eager JS sizes: exit 1')
     expect(err).toContain('static +200 B')
     expect(err).toContain('bun scripts/sizes.ts --update')
+    expect(await tree()).not.toContain('a.txt')
+  }, 60_000)
+
+  it('stops before lint on a page past its cap, naming the command that cuts it, which a landing never runs on the branch', async () => {
+    const { land, tree } = await landings('a')
+    const { code, out, err } = await land('a', { LAND_CAP_FAIL: '1' }).done()
+
+    expect(code).toBe(4)
+    expect(out).toContain('whats-new cap: exit 1')
+    expect(out).not.toContain('lint:')
+    expect(err).toContain('bun scripts/whats-new.ts --cap')
     expect(await tree()).not.toContain('a.txt')
   }, 60_000)
 

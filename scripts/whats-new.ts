@@ -1,3 +1,4 @@
+import process from 'node:process'
 // The page listing what each release adds, which the docs site renders too, keeping what is not released yet under `## Unreleased`.
 export const WHATS_NEW = ['llms/whats-new.md']
 // The index whose lines list each archive and the release it starts before.
@@ -12,6 +13,8 @@ export const NEWEST_CAP = 10_000
 export const PAGE_LIMIT = 20_000
 // The size tests/llms.test.ts allows a page under llms/: the newest release stays on its page however large, so the limit above is a target and this one a wall.
 export const MAX_PAGE_BYTES = 25_000
+// The size the newest minor of Upgrading is kept to, the `###` subsections past it moving to the archive as "continued".
+export const UPGRADING_CAP = 20_000
 // The size an archive is kept under by dropping its oldest releases: it only changes at a release, so it needs no room for the next one.
 const ARCHIVE_LIMIT = 24_000
 
@@ -26,15 +29,17 @@ const FENCE = /^\s*(?:```|~~~)/
 const NOTE_LINK = /\[[^\]]*\]\([^)]*\)/
 
 const UNRELEASED = /^## Unreleased$/m
+// The heading stamped at a release, which names a section left over from a cut too.
+const UNRELEASED_HEADING = /^## Unreleased(?=$| \(continued\)$)/m
 // The last line of an archive whose oldest releases were dropped.
 const RELEASES_NOTE = 'Releases before 0.0 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.'
 
 // A minor release is named by its minor, a patch one by its full version, so the line reads back to the release it stops at.
 const boundaryVersion = (version: string) => version.replace(PATCH_ZERO, '')
 
-// Names the `## Unreleased` section after the version being released; a page without one is left as it is.
+// Names the `## Unreleased` section after the version being released, and the `## Unreleased (continued)` an archive holds for it; a page without one is left as it is.
 export function stampUnreleased(text: string, version: string): string {
-  return text.replace(UNRELEASED, `## ${version}`)
+  return text.replace(UNRELEASED_HEADING, `## ${version}`)
 }
 
 // Moves the oldest releases of a page to the top of its archive while the page is over `limit` bytes, keeping its newest release, and moves the "before" version of the page's last line and the archive's intro up with them.
@@ -57,16 +62,20 @@ export function archiveOldest(page: string, archive: string, limit = PAGE_LIMIT)
     return { page, archive }
 
   const [archiveIntro, ...archived] = archive.split(SECTION)
+  // What a cut of the newest release left at the top of the archive stays above the releases moved beside it.
+  const continued = `${releases.find(section => VERSION_HEADING.test(section))?.split('\n')[0]} (continued)\n`
+  const own = archived.findIndex(section => !section.startsWith(continued))
+  const ownSections = archived.splice(0, own === -1 ? archived.length : own)
   const boundary = (text: string) => text.replace(BEFORE, `before ${boundaryVersion(oldestKept)}`)
 
   return {
     page: `${[intro, ...releases].join('').trimEnd()}\n\n${boundary(note)}\n`,
-    archive: `${boundary(archiveIntro!)}${moved.map(section => `${section.trimEnd()}\n\n`).join('')}${archived.join('')}`,
+    archive: `${boundary(archiveIntro!)}${ownSections.join('')}${moved.map(section => `${section.trimEnd()}\n\n`).join('')}${archived.join('')}`,
   }
 }
 
-// Where each top-level bullet of a section starts, a line inside a fenced code block not being one.
-function bulletStarts(section: string): number[] {
+// Where each top-level bullet (or, with `unit`, each line starting with it) of a section starts, a line inside a fenced code block not being one.
+function bulletStarts(section: string, unit = '- '): number[] {
   const starts: number[] = []
   let fenced = false
   let at = 0
@@ -74,7 +83,7 @@ function bulletStarts(section: string): number[] {
   for (const line of section.split('\n')) {
     if (FENCE.test(line))
       fenced = !fenced
-    else if (!fenced && line.startsWith('- '))
+    else if (!fenced && line.startsWith(unit))
       starts.push(at)
 
     at += line.length + 1
@@ -92,10 +101,10 @@ function newestRelease(page: string): string | undefined {
   return index === sections.length - 1 && note !== undefined ? sections[index]?.replace(`\n${note}\n`, '') : sections[index]
 }
 
-// Cuts the newest release of a page to `cap` bytes at a bullet, moving its remaining lines under `## <version> (continued)` at the top of the archive and ending the kept ones on a link to it, so the page keeps room for the next release's lines and nothing is lost. A release already under `cap` is left as it is.
-export function capNewest(page: string, archive: string, cap = NEWEST_CAP): { page: string, archive: string } {
+// Cuts the section of a page whose heading `pick` matches to `cap` bytes at a bullet, moving its remaining lines under `<heading> (continued)` at the top of the archive, after what a former cut of the same section left there, and ending the kept ones on a link to it, so the page keeps room for the next lines and nothing is lost. A section already under `cap` is left as it is.
+function capSection(page: string, archive: string, cap: number, pick: RegExp, unit = '- '): { page: string, archive: string } {
   const [intro, ...sections] = page.split(SECTION)
-  const index = sections.findIndex(section => VERSION_HEADING.test(section))
+  const index = sections.findIndex(section => pick.test(section))
   const note = sections.at(-1)?.match(NOTE)?.[1]
   const link = NOTE_LINK.exec(note ?? '')?.[0]
   // The page's last line belongs to the last section's text, so it is set aside and put back after it.
@@ -106,22 +115,32 @@ export function capNewest(page: string, archive: string, cap = NEWEST_CAP): { pa
 
   const pointer = `The rest of this release is in ${link}.\n`
   const heading = section.slice(0, section.indexOf('\n'))
-  const starts = bulletStarts(section)
-  const cut = starts.findLast(start => Buffer.byteLength(`${section.slice(0, start).trimEnd()}\n\n${pointer}\n`) <= cap)
+  // A section cut before ends on its pointer, which is written again below the lines kept now.
+  const body = `${section.replace(POINTER, '\n').trimEnd()}\n`
+  const starts = bulletStarts(body, unit)
+  const cut = starts.findLast(start => Buffer.byteLength(`${body.slice(0, start).trimEnd()}\n\n${pointer}\n`) <= cap)
 
-  // A release whose first bullet alone outgrows the cap has nowhere to be cut.
+  // A section whose first unit alone outgrows the cap has nowhere to be cut.
   if (cut === undefined || cut === starts[0])
     return { page, archive }
 
   const [archiveIntro, ...archived] = archive.split(SECTION)
-  const kept = `${section.slice(0, cut).trimEnd()}\n\n${pointer}${index === sections.length - 1 ? `\n${note}\n` : '\n'}`
-  const rest = `${heading} (continued)\n\n${section.slice(cut).trimEnd()}\n\n`
+  const continued = `${heading} (continued)`
+  const former = archived[0]?.startsWith(`${continued}\n`) ? archived.shift()!.slice(continued.length).trim() : ''
+  const kept = `${body.slice(0, cut).trimEnd()}\n\n${pointer}${index === sections.length - 1 ? `\n${note}\n` : '\n'}`
+  const rest = `${continued}\n\n${former === '' ? '' : `${former}\n\n`}${body.slice(cut).trimEnd()}\n\n`
 
   return {
     page: [intro, ...sections.map((value, position) => position === index ? kept : value)].join(''),
     archive: `${archiveIntro!}${rest}${archived.join('')}`,
   }
 }
+
+// Cuts the newest release of a page to `cap` bytes at a bullet, or at a line starting with `unit`, its remaining lines going under `## <version> (continued)` in the archive.
+export const capNewest = (page: string, archive: string, cap = NEWEST_CAP, unit = '- ') => capSection(page, archive, cap, VERSION_HEADING, unit)
+
+// Cuts `## Unreleased` to `cap` bytes between releases the same way, its remaining lines going under `## Unreleased (continued)`, which the release names after its version.
+export const capUnreleased = (page: string, archive: string, cap = NEWEST_CAP) => capSection(page, archive, cap, UNRELEASED)
 
 // Drops an archive's oldest releases while it is over `limit` bytes, keeping its newest, and ends it on where the dropped ones are read: each tag's release notes open with its What's new.
 export function trimArchive(archive: string, limit = ARCHIVE_LIMIT): string {
@@ -137,11 +156,13 @@ export function trimArchive(archive: string, limit = ARCHIVE_LIMIT): string {
   }
 
   const oldestKept = VERSION_HEADING.exec(releases.at(-1) ?? '')?.[1]
+  // An archive left with only the cut end of an unreleased section holds no version, so every release it listed is dropped: the line starts at the release its opening paragraph stops before.
+  const before = oldestKept === undefined ? BEFORE.exec(intro!)?.[0] : `before ${boundaryVersion(oldestKept)}`
 
-  if (!dropped || oldestKept === undefined)
+  if (!dropped || before === undefined)
     return archive
 
-  return `${[intro, ...releases].join('').trimEnd()}\n\n${RELEASES_NOTE.replace(BEFORE, `before ${boundaryVersion(oldestKept)}`)}\n`
+  return `${[intro, ...releases].join('').trimEnd()}\n\n${RELEASES_NOTE.replace(BEFORE, before)}\n`
 }
 
 // Rewrites the "before" version of the line listing an archive to the one its opening paragraph names, so the index says what the archive holds.
@@ -166,9 +187,10 @@ export function releasePages(read: (path: string) => string, version: string): M
 
   for (const [page, archive] of ARCHIVES) {
     const limit = WHATS_NEW.includes(page) ? WHATS_NEW_LIMIT : PAGE_LIMIT
-    const moved = archiveOldest(pages.get(page) ?? read(page), read(archive), limit)
-    const capped = WHATS_NEW.includes(page) ? capNewest(moved.page, moved.archive) : moved
-    const newest = WHATS_NEW.includes(page) ? newestRelease(capped.page) : undefined
+    const whatsNew = WHATS_NEW.includes(page)
+    const moved = archiveOldest(pages.get(page) ?? read(page), whatsNew ? stampUnreleased(read(archive), version) : read(archive), limit)
+    const capped = whatsNew ? capNewest(moved.page, moved.archive) : capNewest(moved.page, moved.archive, UPGRADING_CAP, '### ')
+    const newest = whatsNew ? newestRelease(capped.page) : undefined
 
     if (newest !== undefined && Buffer.byteLength(newest) > NEWEST_CAP)
       throw new Error(`${page}: the newest release is ${Buffer.byteLength(newest)} bytes and stays over its ${NEWEST_CAP} cap: it needs a link to its archive on the last line, and a bullet short enough to cut at`)
@@ -181,4 +203,35 @@ export function releasePages(read: (path: string) => string, version: string): M
   pages.set(INDEX, index)
 
   return pages
+}
+
+// `bun scripts/whats-new.ts --cap` cuts `## Unreleased` of What's new and the newest minor of Upgrading to their caps, moving their oldest lines to the top of each archive as "continued", whose own oldest releases are dropped to stay under the 25,000 bytes (`--check` only reports, exiting 1, which `just land` runs as it never writes to the branch it lands).
+if (import.meta.main) {
+  const check = process.argv.includes('--check')
+
+  if (!process.argv.includes('--cap'))
+    throw new Error('usage: bun scripts/whats-new.ts --cap [--check]')
+
+  const changed: string[] = []
+
+  for (const [page, archive] of ARCHIVES) {
+    const [pageText, archiveText] = await Promise.all([Bun.file(page).text(), Bun.file(archive).text()])
+    const capped = WHATS_NEW.includes(page) ? capUnreleased(pageText, archiveText) : capNewest(pageText, archiveText, UPGRADING_CAP, '### ')
+
+    if (capped.page === pageText)
+      continue
+
+    changed.push(page)
+
+    if (!check)
+      await Promise.all([Bun.write(page, capped.page), Bun.write(archive, trimArchive(capped.archive))])
+  }
+
+  if (check && changed.length > 0) {
+    console.error(`${changed.join(', ')} outgrew the room kept for the next lines: run \`bun scripts/whats-new.ts --cap\` and commit the result, then land again`)
+    process.exit(1)
+  }
+
+  if (changed.length > 0)
+    console.log(`capped ${changed.join(', ')}`)
 }

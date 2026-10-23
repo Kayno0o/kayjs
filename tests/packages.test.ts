@@ -1,6 +1,6 @@
 import { Glob } from 'bun'
 import { describe, expect, it } from 'bun:test'
-import { archiveOldest, capNewest, indexArchive, MAX_PAGE_BYTES, NEWEST_CAP, oversizedPages, releasePages, stampUnreleased, trimArchive } from '../scripts/whats-new'
+import { archiveOldest, capNewest, capUnreleased, indexArchive, MAX_PAGE_BYTES, NEWEST_CAP, oversizedPages, releasePages, stampUnreleased, trimArchive } from '../scripts/whats-new'
 
 interface Manifest {
   name: string
@@ -130,6 +130,78 @@ describe('what\'s new', () => {
     expect(capNewest(page, archive, 1000)).toEqual({ page, archive })
     // A first bullet that alone outgrows the cap has nowhere to be cut.
     expect(capNewest(page, archive, 5)).toEqual({ page, archive })
+  })
+
+  it('cuts `## Unreleased` between releases into `## Unreleased (continued)`, and a second cut joins that section instead of writing another', () => {
+    const [a, b, c, d] = ['a', 'b', 'c', 'd'].map(letter => letter.repeat(60))
+    const page = `# New\n\nIntro.\n\n## Unreleased\n\n- ${a}\n- ${b}\n- ${c}\n\nReleases before 1.70 are in [Old](old.md).\n`
+    const archive = '# Old\n\nWhat each release before 1.70 added.\n\n## 1.69.0\n\n- z\n'
+    const first = capUnreleased(page, archive, 200)
+
+    expect(first.page).toBe(`# New\n\nIntro.\n\n## Unreleased\n\n- ${a}\n- ${b}\n\nThe rest of this release is in [Old](old.md).\n\nReleases before 1.70 are in [Old](old.md).\n`)
+    expect(first.archive).toBe(`# Old\n\nWhat each release before 1.70 added.\n\n## Unreleased (continued)\n\n- ${c}\n\n## 1.69.0\n\n- z\n`)
+    expect(capUnreleased(first.page, first.archive, 200)).toEqual(first)
+
+    // Lines added since the first cut push the section over again: the pointer is not counted as a line, and the new tail follows the first in one continued section.
+    const grown = first.page.replace(`- ${b}\n`, `- ${b}\n- ${d}\n`)
+    const second = capUnreleased(grown, first.archive, 200)
+
+    expect(second.page).toBe(first.page)
+    expect(second.archive).toBe(`# Old\n\nWhat each release before 1.70 added.\n\n## Unreleased (continued)\n\n- ${c}\n\n- ${d}\n\n## 1.69.0\n\n- z\n`)
+    expect(second.archive.match(/## Unreleased \(continued\)/g)).toHaveLength(1)
+    // A page with a numbered release only, as after a release, has no Unreleased to cut.
+    expect(capUnreleased(page.replace('Unreleased', '1.70.0'), archive, 10)).toEqual({ page: page.replace('Unreleased', '1.70.0'), archive })
+  })
+
+  it('names the continued section after the release, which then opens the notes whole, and a cut of the release joins it', () => {
+    const [a, b, c] = ['a', 'b', 'c'].map(letter => letter.repeat(60))
+    const page = `# W\n\n## Unreleased\n\n- ${a}\n- ${b}\n\nThe rest of this release is in [Old](whats-new-archive.md).\n\nReleases before 1.69 are in [Old](whats-new-archive.md).\n`
+    const archive = '# WA\n\nWhat each release before 1.69 added.\n\n## Unreleased (continued)\n\n- c\n\n## 1.68.0\n\n- z\n'
+    const files: Record<string, string> = {
+      'llms.txt': '- [Old](llms/whats-new-archive.md): before 1.69\n- [Up](llms/upgrading-archive.md): before 1.69\n',
+      'llms/whats-new.md': page,
+      'llms/whats-new-archive.md': archive,
+      'llms/upgrading.md': '# U\n',
+      'llms/upgrading-archive.md': '# UA\n\nWhat each release before 1.69 added.\n',
+    }
+    const pages = releasePages(path => files[path]!, '1.70.0')
+
+    expect(stampUnreleased(archive, '1.70.0')).toContain('## 1.70.0 (continued)\n\n- c')
+    expect(pages.get('llms/whats-new.md')).toStartWith('# W\n\n## 1.70.0\n\n')
+    expect(pages.get('llms/whats-new-archive.md')).toContain('## 1.70.0 (continued)\n\n- c\n\n## 1.68.0')
+    expect(pages.get('llms/whats-new-archive.md')).not.toContain('Unreleased')
+
+    // The release itself is over its cap: the rest joins the continued section already at the top of the archive.
+    const joined = capNewest(pages.get('llms/whats-new.md')!.replace(`- ${b}\n`, `- ${b}\n- ${c}\n`), pages.get('llms/whats-new-archive.md')!, 200)
+
+    expect(joined.archive.match(/## 1\.70\.0 \(continued\)/g)).toHaveLength(1)
+    expect(joined.archive).toContain(`## 1.70.0 (continued)\n\n- c\n\n- ${c}\n\n## 1.68.0`)
+  })
+
+  it('keeps a continued section of the newest release above the older releases moved beside it', () => {
+    const page = '# New\n\nIntro.\n\n## 1.71.0\n\n- n\n\nThe rest of this release is in [Old](old.md).\n\n## 1.70.0\n\n- a\n\nReleases before 1.70 are in [Old](old.md).\n'
+    const archive = '# Old\n\nWhat each release before 1.70 added.\n\n## 1.71.0 (continued)\n\n- c\n\n## 1.69.0\n\n- z\n'
+    const moved = archiveOldest(page, archive, 10)
+
+    expect(moved.archive).toBe('# Old\n\nWhat each release before 1.71 added.\n\n## 1.71.0 (continued)\n\n- c\n\n## 1.70.0\n\n- a\n\n## 1.69.0\n\n- z\n')
+  })
+
+  it('cuts the newest minor of Upgrading at a `###` subsection, never inside one, and joins its continued section on a later cut', () => {
+    const [a, b, c] = ['a', 'b', 'c'].map(letter => letter.repeat(60))
+    const page = `# Up\n\n## 1.72.0\n\n### A\n\n- ${a}\n- not a subsection\n\n### B\n\n${b}\n\n### C\n\n${c}\n\nReleases before 1.72 are in [Old](old.md).\n`
+    const archive = '# Old\n\nWhat each minor release before 1.72 broke.\n\n## 1.71.0\n\n### Z\n'
+    const capped = capNewest(page, archive, 230, '### ')
+
+    expect(capped.page).toBe(`# Up\n\n## 1.72.0\n\n### A\n\n- ${a}\n- not a subsection\n\n### B\n\n${b}\n\nThe rest of this release is in [Old](old.md).\n\nReleases before 1.72 are in [Old](old.md).\n`)
+    expect(capped.archive).toBe(`# Old\n\nWhat each minor release before 1.72 broke.\n\n## 1.72.0 (continued)\n\n### C\n\n${c}\n\n## 1.71.0\n\n### Z\n`)
+    // A first subsection that alone outgrows the cap has nowhere to be cut.
+    expect(capNewest(page, archive, 20, '### ')).toEqual({ page, archive })
+  })
+
+  it('drops every release of an archive left with only the cut end of an unreleased section, and ends on the release its paragraph stops before', () => {
+    const archive = '# Old\n\nWhat each release before 1.72 added.\n\n## Unreleased (continued)\n\n- c\n\n## 1.71.0\n\n- aaaaaaaaaa\n'
+
+    expect(trimArchive(archive, 150)).toBe('# Old\n\nWhat each release before 1.72 added.\n\n## Unreleased (continued)\n\n- c\n\nReleases before 1.72 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.\n')
   })
 
   it('drops the pointer of a capped release when it moves to the archive beside its continuation', () => {
