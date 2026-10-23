@@ -161,6 +161,7 @@ export const AFTER_LOAD: readonly string[] = [
   'cms.save.saved',
   'cms.save.unpointed',
   'cms.save.unpublished',
+  'cms.save.unredirected',
   'cms.save.uploading',
   'cms.session.ended',
   'cms.session.signIn',

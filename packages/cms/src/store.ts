@@ -1,7 +1,7 @@
 import type { Commit, FileChange, FileMove, Identity } from './files'
 import type { CollectionInfo, DraftEntry, EntryRef, Issue, JsonSchema, ScreenCollection, SourceEntry, StoredEntry } from './kay/contract'
 import type { SaveEvent } from './settings'
-import { redirectMovedPage } from 'kay/library'
+import { redirectMovedPage, RedirectRefusedError } from 'kay/library'
 import { previewUrl } from 'kay/server'
 import { wording } from 'kay/words'
 import { recordActivity } from './activity'
@@ -666,8 +666,8 @@ async function pointings(collection: CollectionInfo, ref: EntryRef, slug: string
 }
 
 // Renames an entry's slug: a folder entry's file is moved, a loaded entry is saved under the new slug and removed from the old with its history kept, the entries naming it point at the new slug, and the page it had redirects to the page it has, without the app writing anything.
-// Refused when the new slug is taken, the collection holds one entry, the saver cannot move files, or an entry naming this one cannot be saved. `version` is the one the editor opened. `unpointed` names the entries naming this one that could not be saved after it.
-export async function renameEntry(ref: EntryRef, slug: string, options: { author?: Identity | undefined, version?: string | undefined } & VersionRule = {}): Promise<SaveOutcome & { slug?: string, unpointed?: string[] }> {
+// Refused when the new slug is taken, the collection holds one entry, the saver cannot move files, or an entry naming this one cannot be saved. `version` is the one the editor opened. `unpointed` names the entries naming this one that could not be saved after it, and `unredirected` the old address that will not redirect and why (the redirect set is full, or the address cannot be named).
+export async function renameEntry(ref: EntryRef, slug: string, options: { author?: Identity | undefined, version?: string | undefined } & VersionRule = {}): Promise<SaveOutcome & { slug?: string, unpointed?: string[], unredirected?: Unredirected }> {
   let outcome: Awaited<ReturnType<typeof renameOne>>
 
   try {
@@ -680,7 +680,7 @@ export async function renameEntry(ref: EntryRef, slug: string, options: { author
   return !('saved' in outcome) ? outcome : { ...outcome, slug }
 }
 
-async function renameOne(ref: EntryRef, slug: string, { author, version, required = false }: { author?: Identity | undefined, version?: string | undefined } & VersionRule): Promise<SaveOutcome & { unpointed?: string[] }> {
+async function renameOne(ref: EntryRef, slug: string, { author, version, required = false }: { author?: Identity | undefined, version?: string | undefined } & VersionRule): Promise<SaveOutcome & { unpointed?: string[], unredirected?: Unredirected }> {
   const collection = await collectionNamed(ref.collection)
 
   if (collection.single)
@@ -728,7 +728,7 @@ async function renameOne(ref: EntryRef, slug: string, { author, version, require
     return moved
 
   await saved({ collection: ref.collection, slug, ...ref.locale !== undefined && { locale: ref.locale }, verb: 'rename', from: ref.slug, ...author !== undefined && { author }, ...moved.commit !== undefined && { commit: moved.commit } })
-  await pointRedirect(existing, target, data)
+  const unredirected = await pointRedirect(existing, target, data)
 
   const apart = plan.filter(each => !joined.some(done => done.pointing === each))
   const unpointed: string[] = []
@@ -746,7 +746,7 @@ async function renameOne(ref: EntryRef, slug: string, { author, version, require
   if (unpointed.length > 0)
     log.warn(`${ref.collection}/${ref.slug} was renamed to ${slug}, but ${unpointed.join(', ')} could not be pointed at it`)
 
-  return unpointed.length > 0 ? { ...moved, unpointed } : moved
+  return { ...moved, ...unpointed.length > 0 && { unpointed }, ...unredirected !== undefined && { unredirected } }
 }
 
 // The files of the entries to point, to commit with the move; one whose new data the collection refuses is left to be saved on its own, which says why.
@@ -897,13 +897,23 @@ async function takeBack(target: EntryRef): Promise<void> {
   }
 }
 
-// Redirects the page the entry had to the page it has, which a site without that page, or a redirect refused for its paths, goes without: the rename stays.
-async function pointRedirect(existing: StoredEntry, target: EntryRef, data: Record<string, unknown>): Promise<void> {
+// The old address of a renamed entry that will not redirect to the new one, and why.
+export interface Unredirected {
+  from: string
+  reason: string
+}
+
+// Redirects the page the entry had to the page it has, which a site without that page, or a redirect refused for its paths or because the set is full, goes without: the rename stays. Returns the refusal, for the editor to be told.
+async function pointRedirect(existing: StoredEntry, target: EntryRef, data: Record<string, unknown>): Promise<Unredirected | undefined> {
   try {
     redirectMovedPage(existing.url, await entryPage(target.collection, { slug: target.slug, locale: target.locale, data }))
+
+    return undefined
   }
   catch (error) {
     log.warn(`${existing.slug}'s page could not be redirected to ${target.slug}'s`, error)
+
+    return error instanceof RedirectRefusedError && existing.url !== undefined ? { from: existing.url, reason: error.message } : undefined
   }
 }
 

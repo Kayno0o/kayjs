@@ -255,6 +255,11 @@ export async function renameSaved(ref: EntryRef, slug: string, version?: string 
   if (outcome && 'unpointed' in outcome && Array.isArray(outcome.unpointed) && outcome.unpointed.length > 0)
     toast.error(wording('cms.save.unpointed', 'Renamed, but {names} could not be pointed at the new slug: change them by hand', { names: outcome.unpointed.join(', ') }))
 
+  const unredirected = outcome && 'unredirected' in outcome ? outcome.unredirected as { from?: unknown, reason?: unknown } | undefined : undefined
+
+  if (typeof unredirected?.from === 'string' && typeof unredirected.reason === 'string')
+    toast.error(wording('cms.save.unredirected', 'Renamed, but {from} will not redirect to the new address: {reason}', { from: unredirected.from, reason: unredirected.reason }))
+
   if (!settled(outcome, wording('cms.save.renamed', 'Renamed'), wording('cms.save.notRenamed', 'Not renamed')))
     return undefined
 

@@ -441,6 +441,7 @@ export default defineMessages({
       renamed: 'Renommé',
       renameFailure: 'Renommage impossible',
       unpointed: 'Renommé, mais {names} n\'ont pas pu pointer vers le nouveau slug : modifiez-les à la main',
+      unredirected: 'Renommé, mais {from} ne redirigera pas vers la nouvelle adresse : {reason}',
     },
     session: {
       ended: 'Votre session a pris fin, donc rien n\'a été enregistré. Vos modifications sont conservées ici.',

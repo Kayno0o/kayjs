@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { s } from 'kay'
 import { blocks, collection, reference, unique } from 'kay/content'
-import { removeRuntimeRedirect, runtimeRedirects } from 'kay/library'
+import { addRuntimeRedirect, removeRuntimeRedirect, runtimeRedirects } from 'kay/library'
 import { scratchDir } from 'kay/test'
 import { registerCollections, registerEditSite } from '../../../src/content/edit'
 import { contentPlace, setContentPlace } from '../../../src/content/load'
@@ -165,6 +165,33 @@ describe('renaming a folder entry', () => {
 
     expect(await renameEntry({ collection: 'posts', slug: 'first' }, '*')).toMatchObject({ saved: true })
     expect(redirects()).toEqual([])
+  })
+
+  test('tells the caller the old address will not redirect when the set is full, the rename standing', async () => {
+    await make('posts', 'first')
+
+    for (let index = 0; index < 1000; index++)
+      addRuntimeRedirect(`/rn-full-${index}`, '/rn-target')
+
+    try {
+      expect(await renameEntry({ collection: 'posts', slug: 'first' }, 'second')).toMatchObject({ saved: true, slug: 'second', unredirected: { from: '/rn-blog/first', reason: expect.stringMatching(/1000/) } })
+      expect(redirects().filter(([from]) => from === '/rn-blog/first')).toEqual([])
+    }
+    finally {
+      for (let index = 0; index < 1000; index++)
+        removeRuntimeRedirect(`/rn-full-${index}`)
+    }
+  })
+
+  test('tells the caller about an address no redirect can name', async () => {
+    await make('posts', 'first')
+
+    expect(await renameEntry({ collection: 'posts', slug: 'first' }, '*')).toMatchObject({ saved: true, unredirected: { from: '/rn-blog/first' } })
+  })
+
+  test('says nothing of a redirect that was made', async () => {
+    await make('posts', 'first')
+    expect(await renameEntry({ collection: 'posts', slug: 'first' }, 'second')).not.toHaveProperty('unredirected')
   })
 
   test('refuses a saver that cannot move files', async () => {

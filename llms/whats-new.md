@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- A cms rename whose old address the full redirect set refuses toasts the editor why it will not redirect ([Rename](../packages/cms/llms/rename.md)).
 - kayjs-ui has an `AppSwitcher`, a grid of dots opening tiles that link sibling apps ([Navigation](../packages/ui/llms/tables-navigation-and-layout.md)).
 - A `store.rates` that hangs no longer holds kay's own routes (errors, live, analytics, vitals, MCP) past 8 seconds: they count in memory, logged once ([Queues](queues.md)).
 - kayjs-mail: a queued mail and a list broadcast are sent, redacted and given up to `onFailed` by the mailer that queued it, mailers sharing a queue must agree on its retry and keep options, and a transport's `send` gets the queue's abort signal ([Other transports](../packages/mail/llms/contact-form-and-testing.md)).

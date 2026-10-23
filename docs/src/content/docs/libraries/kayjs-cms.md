@@ -666,7 +666,7 @@ It writes `to`, then removes `from`; `forgejo()` does both in one commit. It thr
 
 The editor, the sidebar and the screens change entries through one API under `/_kay/cms/entries/:collection/:slug`. `GET` answers the collection and the entry with its `version`; add `?locale=` for a localized entry. A missing entry is a 404. `POST` saves, `DELETE` deletes, `POST` to `…/publish` publishes a draft and `POST` to `…/unpublish` makes a published one a draft. `POST` to `…/move?direction=up` or `down` reorders.
 
-`POST` to `…/rename` with `{ slug }` and the `?version=` renames the entry, and answers the `unpointed` entries it could not point. `POST` to `…/duplicate` saves a draft copy and answers its `slug`. `GET /_kay/cms/entries/:collection` lists the entries a reference can pick. `POST /_kay/cms/markdown` takes `{ markdown }` and answers the sanitized `{ html }` the editor's Preview shows, with the same guard as a save. kay checks the data against the schema before anything is written.
+`POST` to `…/rename` with `{ slug }` and the `?version=` renames the entry, and answers the `unpointed` entries it could not point and the `unredirected` old address when its redirect was refused. `POST` to `…/duplicate` saves a draft copy and answers its `slug`. `GET /_kay/cms/entries/:collection` lists the entries a reference can pick. `POST /_kay/cms/markdown` takes `{ markdown }` and answers the sanitized `{ html }` the editor's Preview shows, with the same guard as a save. kay checks the data against the schema before anything is written.
 
 ## Saves and conflicts
 
