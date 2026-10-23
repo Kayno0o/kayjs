@@ -1548,3 +1548,57 @@ inBrowser('a busy Slider', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 })
+
+inBrowser('the states of a Combobox option and a FileDrop', () => {
+  test('the picked Combobox option carries data-picked and its picked style', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/states')
+
+    await page.click('.kui-combobox input:not([type=hidden])')
+    await page.waitUntil((() => document.querySelectorAll('[role=option]').length === 1 && !document.querySelector<HTMLElement>('[role=listbox]')!.hidden) as never)
+
+    const seen = await page.evaluate((() => {
+      const option = document.querySelector<HTMLElement>('[role=option]')!
+      const probe = document.createElement('div')
+
+      probe.style.color = 'var(--color-accent)'
+      document.body.append(probe)
+
+      const accent = getComputedStyle(probe).color
+
+      probe.remove()
+
+      return { text: option.textContent.trim(), picked: option.dataset.picked, weight: getComputedStyle(option).fontWeight, colour: getComputedStyle(option).color, accent }
+    }) as never) as { text: string, picked?: string, weight: string, colour: string, accent: string }
+
+    expect([seen.text, seen.picked]).toEqual(['Mars', ''])
+    expect(seen.weight).toBe('500')
+    expect(seen.colour).toBe(seen.accent)
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
+  test('a disabled FileDrop carries aria-disabled and refuses a drop, while an enabled one takes it', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/states')
+
+    const attributes = await page.evaluate((() => ({ locked: document.querySelector('#locked')!.getAttribute('aria-disabled'), live: document.querySelector('#live')!.getAttribute('aria-disabled'), lockedData: document.querySelector('#locked')!.hasAttribute('data-disabled') })) as never)
+
+    expect(attributes).toEqual({ locked: 'true', live: null, lockedData: false })
+
+    // Drops the same file on each zone, the locked one first.
+    for (const zone of ['#locked', '#live']) {
+      await page.evaluate(((selector: string) => {
+        const files = new DataTransfer()
+
+        files.items.add(new File(['x'], 'a.txt'))
+        document.querySelector(selector)!.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: files }))
+      }) as never, zone as never)
+    }
+
+    await page.waitUntil((() => document.querySelector('#dropped')!.textContent === 'live') as never)
+    expect(await page.evaluate((() => document.querySelector('#dropped')!.textContent) as never)).toBe('live')
+    expect(page.errors).toEqual([])
+  }, 120_000)
+})
