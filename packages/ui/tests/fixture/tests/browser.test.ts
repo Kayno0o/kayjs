@@ -872,6 +872,24 @@ inBrowser('FormField in an island', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 
+  test('AppSwitcher closes on Escape and gives the focus back to its trigger', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/layout')
+    const trigger = '#app-switcher button[popovertarget="family"]'
+    const open = async () => page.evaluate(() => document.querySelector('#family')!.matches(':popover-open'))
+
+    expect(await open()).toBe(false)
+
+    await page.click(trigger)
+    expect(await open()).toBe(true)
+
+    await page.press('Escape')
+    expect(await open()).toBe(false)
+    expect(await page.evaluate((selector: string) => document.activeElement === document.querySelector(selector), trigger)).toBe(true)
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
   test('SiteNav shows the close icon while its menu is open, and closes it as a followed link swaps the next page in, the layout holding it kept', async () => {
     const site = await shared()
 
