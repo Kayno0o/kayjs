@@ -273,7 +273,7 @@ export const contact = action(...contactForm(mail, {
 
 The page shows it with [ContactForm](/ui/contact-form) from kayjs-ui, or with its own `form(action={contact})` and `input(field="name")`, `input(field="email")` and `textarea(field="message")`.
 
-The action checks a one-line `name`, an `email` and a `message` of at most 5000 characters, then the `fields` you add, whose schemas are yours. It mails them to `to`, or `MAIL_TO` when left out, with the visitor in `replyTo` and the message quoted.
+The action checks a one-line `name`, an `email` and a `message` of at most 5000 characters, then the `fields` you add, whose schemas are yours. It queues them as a mail to `to`, or `MAIL_TO` when left out, with the visitor in `replyTo` and the message quoted. The visitor sees success once the mail is queued: a slow or absent mail server never holds them up or loses the message, as the queue retries it. Only a mailer that is not configured refuses the post.
 
 Use `labels` to rename a field in the mail. Use `subject` and `view` to replace the subject and the mail's component, which gets `ContactMailProps`, with the site's origin as `site`.
 
@@ -311,7 +311,7 @@ export const subscribe = action(...mail.list().form())
 SubscribeForm(action={subscribe})
 ```
 
-A visitor types an address and gets a mail with a link, valid for three days. The address joins the list only when the link is opened. Every visitor sees the same answer, whether the address is new, waiting, already listed or refused, so the form tells nothing about who subscribed. A confirmed address is mailed nothing.
+A visitor types an address and gets a mail with a link, valid for three days. Opening the link shows a page with one button, so a mail scanner that follows links subscribes no one. The address joins the list when the visitor presses the button. Every visitor sees the same answer, whether the address is new, waiting, already listed or refused, so the form tells nothing about who subscribed. A confirmed address is mailed nothing.
 
 The form cannot be used to mail-bomb someone. Each IP may post 10 times every 10 minutes, a honeypot and a minimum time catch bots, and one address gets at most 3 confirmation mails an hour. Past that the answer stays the same and nothing is sent.
 
