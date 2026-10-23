@@ -36,7 +36,7 @@ async function open() {
   const page = document.createElement('main')
 
   page.dataset.page = ''
-  page.innerHTML = '<div data-kay-body="posts:hello"><p>First <strong>bold</strong> paragraph.</p><p>Second <a href="#x">one</a> here.</p></div><p data-kay-field="posts:hello:summary">Line one line two is longer</p>'
+  page.innerHTML = '<div data-kay-body="posts:hello"><p>First <strong>bold</strong> paragraph.<img alt=""></p><p>Second <a href="#x">one</a> here.<img alt=""></p></div><p data-kay-field="posts:hello:summary">Line one line two is longer<img alt=""></p>'
   document.body.append(page)
   mounted = await mountComponent(EDITOR, { entries: [{ collection: 'posts', slug: 'hello' }], unclickable: [] })
   await settle()
@@ -58,11 +58,12 @@ async function until(done: () => boolean) {
   throw new Error('the page never reached the state the test waits for')
 }
 
+// A paragraph holding an image is not typed in place, so its click brings up the form.
 test('a click in a paragraph of the body puts the caret at that place of the Markdown', async () => {
   const { root, page } = await open()
   const second = page.querySelectorAll('p')[1]!
 
-  caret = { node: second.lastChild!, offset: 3 }
+  caret = { node: second.childNodes[2]!, offset: 3 }
   second.click()
   await until(() => document.activeElement instanceof HTMLTextAreaElement)
 
