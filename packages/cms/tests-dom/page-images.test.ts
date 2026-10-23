@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import { sameBar } from '../src/editor/image-bar'
+import { EDITOR_LAYER } from '../src/editor/layer'
 import { OWN } from '../src/editor/own'
 import { EDITOR_COOKIE } from '../src/page-link'
 
@@ -139,7 +140,7 @@ test('the pointer over a marked image offers to replace it, and leaving it takes
   await until(() => bar(root) !== null)
   expect(bar(root)?.getAttribute('aria-label')).toBe('Replace Photo')
   expect(root.querySelector<HTMLElement>('[data-kcms-image-bar]')?.style.left).toBe('262px')
-  expect(root.querySelector<HTMLElement>('[data-kcms-image-bar]')?.style.zIndex).toBe('2147483000')
+  expect(root.querySelector<HTMLElement>('[data-kcms-image-bar]')?.style.zIndex).toBe(String(EDITOR_LAYER))
   expect(root.querySelector('[data-kcms-image-bar]')?.getAttribute('role')).toBe('group')
   expect(root.querySelector('[data-kcms-image-bar]')?.hasAttribute('data-floating')).toBe(true)
   expect(root.querySelector('[data-kcms-image-bar]')?.getAttribute('aria-label')).toBe('Photo')

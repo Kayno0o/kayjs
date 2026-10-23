@@ -9,6 +9,7 @@ import { checkField, fieldsOf, itemAt } from '../fields'
 import { allMarked, BODY, entryKey, markedRange, markersOf } from '../markers'
 import { joinPath, pathSegments, valueAt } from '../paths'
 import { plainText, sourceOffset, squeeze } from './caret'
+import { EDITOR_LAYER } from './layer'
 import { OWN } from './own'
 
 // What the editor asks of an entry's form to type in a field on the page: its collection once loaded, and whether a save holds the fields still.
@@ -219,6 +220,7 @@ function createIssueNote(element: HTMLElement): { show: (message: string | undef
   note.className = 'kcms-inline-issue'
   note.setAttribute('role', 'alert')
   note.hidden = true
+  note.style.zIndex = String(EDITOR_LAYER)
 
   const follow = new AbortController()
   const place = () => {

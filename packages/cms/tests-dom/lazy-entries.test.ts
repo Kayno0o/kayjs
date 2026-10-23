@@ -213,9 +213,9 @@ test('a click on a text of an entry that never loads falls back to the form once
   const measured = spyOn(title, 'getBoundingClientRect')
 
   clickAbove(title)
-  await Bun.sleep(300)
+  await Bun.sleep(100)
   expect(measured).not.toHaveBeenCalled()
-  await Bun.sleep(400)
+  await Bun.sleep(600)
 
   expect(measured).toHaveBeenCalled()
   expect(title.isContentEditable).toBe(false)

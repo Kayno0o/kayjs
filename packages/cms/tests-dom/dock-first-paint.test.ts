@@ -48,3 +48,39 @@ test('a narrow window docks the editor to the bottom from the first paint, never
 test('a wide window docks it to the side', async () => {
   expect(await mountedAt(1400)).toEqual(['right'])
 })
+
+test('the launcher is never in the document while the stored layout keeps the panel open', async () => {
+  localStorage.setItem('kcms-editor', JSON.stringify({ open: true }))
+
+  const seen: Element[] = []
+  const watcher = new MutationObserver((records) => {
+    for (const record of records) {
+      for (const node of record.addedNodes)
+        seen.push(...(node instanceof Element ? node.querySelectorAll('[data-part=launcher]') : []))
+    }
+  })
+
+  watcher.observe(document.body, { childList: true, subtree: true })
+
+  try {
+    mounted = await mountComponent(EDITOR, { entries: [], unclickable: [] })
+    await settle()
+    seen.push(...document.querySelectorAll('[data-part=launcher]'))
+  }
+  finally {
+    watcher.disconnect()
+  }
+
+  expect(seen).toHaveLength(0)
+})
+
+test('the launcher shows once the stored layout says the panel is closed', async () => {
+  localStorage.setItem('kcms-editor', JSON.stringify({ open: false }))
+  mounted = await mountComponent(EDITOR, { entries: [], unclickable: [] })
+  await settle()
+
+  const launcher = mounted.root.querySelector('[data-part=launcher]')
+
+  expect(launcher?.getAttribute('aria-controls')).toBe('kcms-editor')
+  expect(launcher?.getAttribute('aria-label')).toBe('Edit this page')
+})

@@ -31,6 +31,7 @@ import { addItem, blockChoices, emptyListAt, focusItem, itemsAround, itemsOf, li
 import type { PageListWatch } from './page-lists'
 import { browserStorage, canSide, dockOf, readLayout, revealBy, writeLayout } from './dock'
 import { drafts } from './drafts'
+import { EDITOR_LAYER } from './layer'
 import { rebuilding, watchRebuild } from './rebuild'
 import { notePlace } from './caret'
 import { forgetOpened, isOpened, openEntry } from './opened'
@@ -802,7 +803,7 @@ effect(() => {
 })
 
 ---
-SidePanel#kcms-editor.kcms-editor(open={open()} modal={false} dock={dock() === undefined ? undefined : dock() === 'bottom' ? 'bottom' : 'right'} size={dock() === 'side' ? side() : bottom()} onSizeChange={resized} resizeLabel={wording('cms.editor.resize', 'Resize the editor')} closeLabel={wording('cms.editor.hide', 'Hide the editor')} title={wording('cms.editor.title', 'Edit this page')} launcher={ready() ? wording('cms.editor.open', 'Edit this page') : undefined} launcherLayer={2147483000} style={`z-index: 2147483000${ready() ? '' : '; visibility: hidden'}`} onOpenChange={shown => open = shown})
+SidePanel#kcms-editor.kcms-editor(open={open()} modal={false} dock={dock() === undefined ? undefined : dock() === 'bottom' ? 'bottom' : 'right'} size={dock() === 'side' ? side() : bottom()} onSizeChange={resized} resizeLabel={wording('cms.editor.resize', 'Resize the editor')} closeLabel={wording('cms.editor.hide', 'Hide the editor')} title={wording('cms.editor.title', 'Edit this page')} launcher={ready() ? wording('cms.editor.open', 'Edit this page') : undefined} launcherLayer={EDITOR_LAYER} style={`z-index: ${EDITOR_LAYER}${ready() ? '' : '; visibility: hidden'}`} onOpenChange={shown => open = shown})
   @actions
     Button(label={leaving() ? wording('cms.editor.leaving', 'Leaving…') : wording('cms.editor.stop', 'Stop editing')} busy={leaving()} onClick={askStop})
     if dock() && canSide(room().width)

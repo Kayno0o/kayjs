@@ -10,9 +10,7 @@ import { wording } from 'kay/words'
 import type { ListBar } from './page-lists'
 import type { Direction } from './reorder'
 import './editor.css'
-
-// Above the outlines of the page and below the editor's menus.
-const LAYER = 2147483000
+import { EDITOR_LAYER } from './layer'
 
 // The buttons beside the item of a list under the pointer or the focus on the page, and the Add of an empty list.
 const { bars, onMove, onAdd, onRemove } = props<{ bars: ListBar[], onMove: (bar: ListBar, direction: Direction) => void, onAdd: (bar: ListBar, event: MouseEvent) => void, onRemove: (bar: ListBar) => void }>()
@@ -20,10 +18,10 @@ const { bars, onMove, onAdd, onRemove } = props<{ bars: ListBar[], onMove: (bar:
 .kcms-page-lists
   for bar of bars key={bar.key}
     if bar.index === undefined
-      Toolbar.kcms-list-start(floating role="group" label={wording('cms.pageList.add', 'Add to {list}', { list: bar.list })} style={`z-index: ${LAYER}; ${bar.style}`})
+      Toolbar.kcms-list-start(floating role="group" label={wording('cms.pageList.add', 'Add to {list}', { list: bar.list })} style={`z-index: ${EDITOR_LAYER}; ${bar.style}`})
         Button(label={wording('cms.pageList.add', 'Add to {list}', { list: bar.list })} icon="plus" size="sm" disabled={!bar.add} onClick={event => onAdd(bar, event)})
     else
-      Toolbar.kcms-list-bar(floating data-key={bar.key} style={`z-index: ${LAYER}; ${bar.style}`} label={wording('cms.pageList.item', '{item}, of {list}', { item: bar.item, list: bar.list })} caption={wording('cms.pageList.caption', '{list}: {item}', { list: bar.list, item: bar.item })})
+      Toolbar.kcms-list-bar(floating data-key={bar.key} style={`z-index: ${EDITOR_LAYER}; ${bar.style}`} label={wording('cms.pageList.item', '{item}, of {list}', { item: bar.item, list: bar.list })} caption={wording('cms.pageList.caption', '{list}: {item}', { list: bar.list, item: bar.item })})
         IconButton(icon={arrowUp} label={wording('cms.reorder.up', 'Move {item} up', { item: bar.item })} variant="ghost" size="sm" disabled={!bar.up} onClick={() => onMove(bar, 'up')})
         IconButton(icon={arrowDown} label={wording('cms.reorder.down', 'Move {item} down', { item: bar.item })} variant="ghost" size="sm" disabled={!bar.down} onClick={() => onMove(bar, 'down')})
         IconButton(icon={plus} label={wording('cms.pageList.addAfter', 'Add after {item}', { item: bar.item })} variant="ghost" size="sm" disabled={!bar.add} aria-haspopup={bar.blocks ? 'menu' : undefined} onClick={event => onAdd(bar, event)})

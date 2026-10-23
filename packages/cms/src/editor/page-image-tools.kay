@@ -5,9 +5,7 @@ import Toolbar from '@kaynooo/kayjs-ui/toolbar.kay'
 import { wording } from 'kay/words'
 import type { ImageBar } from './page-images'
 import './editor.css'
-
-// Above the outlines of the page and below the editor's menus.
-const LAYER = 2147483000
+import { EDITOR_LAYER } from './layer'
 
 // The button over the image of the page under the pointer or the focus, which picks a file to put in its place.
 const { bar, onPick } = props<{ bar: ImageBar | undefined, onPick: (bar: ImageBar, file: File) => void }>()
@@ -35,6 +33,6 @@ function picked(): void {
 ---
 .kcms-page-images
   if bar
-    Toolbar.kcms-image-bar(floating role="group" data-kcms-image-bar label={bar.label} style={`z-index: ${LAYER}; ${bar.style}`})
+    Toolbar.kcms-image-bar(floating role="group" data-kcms-image-bar label={bar.label} style={`z-index: ${EDITOR_LAYER}; ${bar.style}`})
       IconButton(icon={replace} label={wording('cms.pageImage.replace', 'Replace {field}', { field: bar.label })} variant="ghost" size="sm" onClick={choose})
   input(type="file" hidden accept={bar?.accept ?? chosen?.accept ?? 'image/*'} ref={element => picker = element} onChange={picked})
