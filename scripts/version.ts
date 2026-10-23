@@ -31,6 +31,14 @@ const libraries = await Array.fromAsync(new Glob('packages/*/package.json').scan
 // The editor extension is released at kay's version too, with no peer on kay: the kay it runs is the project's own.
 const EXTENSION = 'editors/vscode/package.json'
 const manifests = ['package.json', ...libraries, EXTENSION]
+// The Zed extension names the tag of its own release as the revision of the grammar it builds, which the release commit is tagged with.
+const ZED = 'editors/zed/extension.toml'
+const ZED_VERSION = /^version = "[^"]+"/m
+const ZED_REV = /^rev = "[^"]+"/m
+const zed = await Bun.file(ZED).text()
+
+if (!ZED_VERSION.test(zed) || !ZED_REV.test(zed))
+  throw new Error(`${ZED}: no version or rev to move`)
 
 const texts = await Promise.all(manifests.map(async path => ({ path, text: await Bun.file(path).text() })))
 const missing = texts.filter(({ path, text }) => !VERSION.test(text) || (path !== 'package.json' && path !== EXTENSION && !KAY_PEER.test(text))).map(({ path }) => path)
@@ -58,9 +66,10 @@ const tag = `v${version}`
 try {
   await Promise.all(texts.map(async ({ path, text }) => Bun.write(path, text.replace(VERSION, () => `"version": "${version}"`).replace(KAY_PEER, (_, head: string) => `${head}"${peer}"`))))
   await Promise.all([...pages].map(async ([path, text]) => Bun.write(path, text)))
+  await Bun.write(ZED, zed.replace(ZED_VERSION, () => `version = "${version}"`).replace(ZED_REV, () => `rev = "${tag}"`))
   // bun.lock records each workspace's version and ranges, which the CI's frozen install compares against.
   await $`${process.execPath} install`.quiet()
-  await $`git add bun.lock ${manifests} ${INDEX} ${ARCHIVES.flat()}`
+  await $`git add bun.lock ${manifests} ${ZED} ${INDEX} ${ARCHIVES.flat()}`
   await $`git commit -q -m ${tag}`
   await $`git tag ${tag}`
 }

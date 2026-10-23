@@ -8,7 +8,7 @@ repository = "https://github.com/Kayno0o/kayjs"
 
 [grammars.kay]
 repository = "https://github.com/Kayno0o/kayjs"
-rev = "main"
+rev = "unreleased"
 path = "editors/tree-sitter-kay"
 
 [language_servers.kay]

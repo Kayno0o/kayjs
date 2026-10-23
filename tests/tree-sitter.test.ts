@@ -75,6 +75,13 @@ describe.skipIf(treeSitter === null)('tree-sitter grammar', () => {
       expect(await Bun.file(join(copy, 'src', file)).text(), `src/${file} is stale, run \`bun run generate\` in editors/tree-sitter-kay`).toBe(await Bun.file(join(GRAMMAR, 'src', file)).text())
   }, 120_000)
 
+  it('has the Zed extension build the grammar from its folder at a release tag', async () => {
+    const manifest = await Bun.file(join(ROOT, 'editors/zed/extension.toml')).text()
+
+    expect(manifest).toContain('path = "editors/tree-sitter-kay"')
+    expect(manifest).toMatch(/^rev = "(?:v\d+\.\d+\.\d+|unreleased)"$/m)
+  })
+
   it('gives the Zed extension the same queries', async () => {
     const queries = (await readdir(join(GRAMMAR, 'queries'))).toSorted()
 

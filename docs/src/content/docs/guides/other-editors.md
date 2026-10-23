@@ -58,7 +58,7 @@ vim.api.nvim_create_autocmd('FileType', {
 })
 ```
 
-It installs the latest `main`: add `revision = '<commit or tag>'` to `install_info` to pin a version.
+Add `revision = 'v<version>'`, the tag of the kay release you use, to `install_info`: without it nvim-treesitter installs the latest `main`. The grammar is in releases after 1.71.0.
 
 ## Helix
 
@@ -82,10 +82,10 @@ grammar = "kay"
 
 [[grammar]]
 name = "kay"
-source = { git = "https://github.com/Kayno0o/kayjs", rev = "main", subpath = "editors/tree-sitter-kay" }
+source = { git = "https://github.com/Kayno0o/kayjs", rev = "v<version>", subpath = "editors/tree-sitter-kay" }
 ```
 
-Replace `rev = "main"` with a commit or a tag to pin the grammar. Helix reads queries from its runtime folder, so copy them from a checkout of the repository:
+Set `rev` to the tag of the kay release you use, or to a commit: Helix takes a commit hash or a tag, and the grammar is in releases after 1.71.0. Helix reads queries from its runtime folder, so copy them from a checkout of the repository:
 
 ```sh
 mkdir -p ~/.config/helix/runtime/queries/kay
@@ -96,7 +96,7 @@ cp editors/tree-sitter-kay/queries/*.scm ~/.config/helix/runtime/queries/kay/
 
 Zed runs a language server and highlights a language only through an extension, and kay has one in the `editors/zed` folder of the repository. It adds the `Kay` language with the grammar and its queries, and starts `kay lsp --stdio` from the `kay` on the PATH, or through `bunx` when there is none.
 
-In a checkout of the repository, run `zed: install dev extension` from the command palette and pick `editors/zed`. Rust installed through rustup is needed to build the extension, and Zed fetches the target and the wasi-sdk the grammar needs.
+In a checkout of the repository at the tag of the kay release you use (its `extension.toml` names that tag as the grammar's revision), run `zed: install dev extension` from the command palette and pick `editors/zed`. Rust installed through rustup is needed to build the extension, and Zed fetches the target and the wasi-sdk the grammar needs.
 
 This setting then formats the language with `kay fmt`:
 
