@@ -7,7 +7,7 @@ import { returnTarget } from './forwardAuth'
 const PLAIN_HEADER = /^[\u0020-\u007E]*$/
 
 // What the route reads of the request's `auth`.
-export interface ForwardUser {
+interface ForwardUser {
   bareUser: () => Promise<BareUser | null>
   via: () => Promise<'session' | 'bearer' | null>
 }
