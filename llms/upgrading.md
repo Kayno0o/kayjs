@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.72.0
 
+### kayjs-mail: mailers sharing a queue agree on its retry and keep options
+
+Two `mailer()`s with the same `queue.name` and `store` that set `attempts`, `backoff`, `keepFailed`, `lostAfter`, `idlePoll` or `concurrency` differently now stop the boot, since the queue has one of each: give them the same values or their own `queue.name`. `onFailed` and `redact` may differ, and run for the mails their own mailer queued. A custom `transport.send(mail, signal)` gets the queue's abort signal: pass it to `fetch`.
+
 ### kayjs-cms: the activity log needs the `delete` role
 
 With `cms({ roles })`, the activity screen answers 403 and its button is disabled for a person whose roles lack `delete`, as it names every editor. Add `delete` to the roles that read it. Drafts the on-page editor kept before are no longer offered, as they are kept per person now.

@@ -133,17 +133,20 @@ const MAILERS = new Map<string, WeakRef<Owner>>()
 const FORGOTTEN = new FinalizationRegistry<string>(via => MAILERS.delete(via))
 
 // The queue settings of the live mailers by job store and queue name: a queue has one set of retry and keep settings, whichever mailer's worker claims a job, so mailers sharing it must agree on them.
-const DEFAULT_STORE = {}
 const SETTINGS = new WeakMap<object, Map<string, { settings: Record<string, unknown>, owner: WeakRef<Owner> }>>()
 
 function agreeOnQueue(name: string, store: object | undefined, settings: Record<string, unknown>, owner: Owner): void {
-  const key = store ?? DEFAULT_STORE
+  // Mailers without a store each use the app's, which this cannot tell apart from another app's in the same process.
+  if (store === undefined)
+    return
+
+  const key = store
   const known = SETTINGS.get(key) ?? new Map<string, { settings: Record<string, unknown>, owner: WeakRef<Owner> }>()
 
   SETTINGS.set(key, known)
 
   const other = known.get(name)
-  const differing = other?.owner.deref() === undefined ? [] : Object.keys(settings).filter(setting => JSON.stringify(settings[setting]) !== JSON.stringify(other.settings[setting]))
+  const differing = other?.owner.deref() === undefined ? [] : Object.keys(settings).filter(setting => settings[setting] !== undefined && other.settings[setting] !== undefined && JSON.stringify(settings[setting]) !== JSON.stringify(other.settings[setting]))
 
   // A `kay dev` reload makes the mailer again before the old one is gone, with options the developer just changed.
   if (differing.length > 0 && !underKayDev())
@@ -306,7 +309,7 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
 
   return {
     transport: {
-      send: async mail => opened().send(mail),
+      send: async (mail, signal) => opened().send(mail, signal),
       verify: async () => opened().verify?.(),
     },
     get from() {

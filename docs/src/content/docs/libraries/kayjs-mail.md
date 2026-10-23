@@ -241,7 +241,7 @@ export const mail = mailer({
 
 By default mails go over SMTP, or to the outbox in development. `transport` takes any `{ send(mail, signal) }` that resolves with a delivery, such as a provider's HTTP API.
 
-When the queue gives up on a queued mail, because it ran past `lostAfter` or the server is stopping, it aborts `signal`. Hand it to `fetch` so the request stops too. The SMTP transport stops waiting for the server.
+When the queue gives up on a queued mail, because it ran past `lostAfter` or the server is stopping, it aborts `signal`. Hand it to `fetch` so the request stops too. The SMTP transport stops waiting for the server, though a message already with it may still arrive.
 
 ```ts
 export const mail = mailer({

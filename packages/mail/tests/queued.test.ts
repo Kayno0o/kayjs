@@ -93,10 +93,11 @@ describe('mailers sharing a queue', () => {
   it('refuse retry and keep options that differ, as a queue has one set of them', () => {
     const queue = shared()
 
-    mailer({ from: 'a@example.com', queue })
+    const first = mailer({ from: 'a@example.com', queue: { ...queue, keepFailed: '7d' } })
 
     expect(() => mailer({ from: 'b@example.com', queue: { ...queue, attempts: 3 } })).toThrow(/attempts/)
     expect(() => mailer({ from: 'b@example.com', queue: { ...queue, keepFailed: '30d' } })).toThrow(/keepFailed/)
+    expect(first).toBeDefined()
   })
 
   it('may differ in everything a job carries along', () => {
