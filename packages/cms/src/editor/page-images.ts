@@ -72,7 +72,7 @@ function barOf(found: MarkedField, label: string, accept: string | undefined): I
 }
 
 // Offers the replace button over the page's images while the editor is open, and takes a file dropped on one.
-export function watchImages(drafts: Drafts, show: (bar: ImageBar | undefined) => void, replace: (bar: ImageBar, file: File) => void): ImageWatch {
+export function watchImages(drafts: Drafts, show: (bar: ImageBar | undefined) => void, replace: (bar: ImageBar, file: File, watching: () => boolean) => void): ImageWatch {
   const follow = new AbortController()
   const { signal } = follow
   let current: { found: MarkedField, label: string, accept: string | undefined } | undefined
@@ -153,7 +153,7 @@ export function watchImages(drafts: Drafts, show: (bar: ImageBar | undefined) =>
 
     const bar = { entry: target.found.marker, path: target.found.marker.path as string, label: target.label, accept: target.accept, style: '' }
 
-    replace(bar, file)
+    replace(bar, file, () => !signal.aborted)
   }, { signal })
 
   return {
@@ -166,13 +166,17 @@ export function watchImages(drafts: Drafts, show: (bar: ImageBar | undefined) =>
   }
 }
 
-// Uploads a file where the image field's uploads go and sets it as the field's value, with the size beside it the schema keeps. A file the field does not take, a refusal and a session that ended are toasted in the editor's words, as the form shows them under the field. An entry still a row is opened and waited for first, and an image of a list item holds the entry's lists still until it has landed, so it lands in its item.
-export async function replaceImage(drafts: Drafts, bar: Pick<ImageBar, 'entry' | 'path' | 'label'>, file: File): Promise<void> {
+// Uploads a file where the image field's uploads go and sets it as the field's value, with the size beside it the schema keeps. A file the field does not take, a refusal and a session that ended are toasted in the editor's words, as the form shows them under the field. An entry still a row is opened and waited for first, until the editor closes, and an image of a list item holds the entry's lists still until it has landed, so it lands in its item.
+export async function replaceImage(drafts: Drafts, bar: Pick<ImageBar, 'entry' | 'path' | 'label'>, file: File, watching: () => boolean = () => true): Promise<void> {
   const marker: FieldMarker = { ...bar.entry, path: bar.path }
 
   if (!isLoaded(marker)) {
     openEntry(marker)
-    await untilSettled(marker)
+    await untilSettled(marker, watching)
+
+    // The editor closed while the entry loaded: the file goes nowhere, and nothing is said.
+    if (!watching())
+      return
   }
 
   const field = fieldOfMarker(marker, drafts)

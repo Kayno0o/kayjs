@@ -66,14 +66,14 @@ async function until(done: () => boolean): Promise<void> {
 
 const reads = () => asked.filter(path => path.includes('/entries/'))
 
-async function open(entries: object[]) {
+async function open(entries: object[], settleEvery?: number) {
   const element = document.createElement('p')
 
   element.dataset.page = ''
   element.setAttribute('data-kay-field', 'posts:hello:summary')
   element.innerHTML = 'S<em>hort</em>'
   document.body.append(element)
-  mounted = await mountComponent(EDITOR, { entries, unclickable: [] })
+  mounted = await mountComponent(EDITOR, { entries, unclickable: [], settleEvery })
   await settle()
   await Bun.sleep(30)
 
@@ -207,20 +207,20 @@ test('a click on a text of an entry whose read failed brings up the side form at
 test('a click on a text of an entry that never loads falls back to the form once the wait is over', async () => {
   server(0, 'hang')
 
-  const { root } = await open([NAV, HELLO])
+  const { root } = await open([NAV, HELLO], 10)
   const title = addTitle()
 
   const measured = spyOn(title, 'getBoundingClientRect')
 
   clickAbove(title)
-  await Bun.sleep(4000)
+  await Bun.sleep(300)
   expect(measured).not.toHaveBeenCalled()
-  await Bun.sleep(1800)
+  await Bun.sleep(400)
 
   expect(measured).toHaveBeenCalled()
   expect(title.isContentEditable).toBe(false)
   expect(root.querySelector('.kcms-entry-idle')).not.toBeNull()
-}, 15000)
+})
 
 test('a click on a text of the page\'s only entry types in place once it has loaded', async () => {
   server(150)

@@ -25,6 +25,8 @@ let uploads = 0
 let refuse = false
 // How long an upload takes, and the status a refused one answers.
 let slow = 0
+// How long the entry's read takes.
+let slowRead = 0
 let refusal = 415
 let asked: string[] = []
 
@@ -40,6 +42,7 @@ afterEach(async () => {
   localStorage.clear()
   refuse = false
   slow = 0
+  slowRead = 0
   refusal = 415
   document.cookie = `${EDITOR_COOKIE}=; max-age=0`
 })
@@ -68,6 +71,8 @@ function server(): void {
 
     if (init?.method === 'POST')
       return Response.json({})
+
+    await Bun.sleep(slowRead)
 
     return Response.json({ collection: POSTS, entry: { slug: 'hello', data: { title: 'Hello', photo: '/old.png', photoWidth: 10, photoHeight: 10, gallery: [{ image: '/a.png' }, { image: '/b.png' }] }, version: 'v1', url: '/posts/hello' } })
   }) as unknown as typeof fetch)
@@ -282,6 +287,22 @@ test('a file dropped on an image of an entry still a row is kept from the browse
   expect(uploads).toBe(1)
 })
 
+test('closing the editor ends the wait of an image dropped on an entry still a row, so nothing uploads when it opens again', async () => {
+  server()
+  slowRead = 300
+
+  const { root, image } = await open([OTHER, HELLO])
+
+  drop(image, [file()])
+  await Bun.sleep(30)
+  root.querySelector<HTMLElement>('[aria-label="Hide the editor"]')!.click()
+  await settle()
+  root.querySelector<HTMLElement>('[data-part=launcher]')!.click()
+  await Bun.sleep(1200)
+  expect(uploads).toBe(0)
+  expect(data().photo).toBeUndefined()
+})
+
 function gallery(): HTMLImageElement[] {
   const list = document.createElement('ul')
 
@@ -318,6 +339,23 @@ test('an image of a list item lands in its item, whose page bars cannot move it 
   keyDown(second!, 'Delete')
   await until(() => (data().gallery as { image: string }[] | undefined)?.[1]?.image === '/_kay/files/posts/new.png')
   expect(data().gallery).toEqual([{ image: '/a.png' }, { image: '/_kay/files/posts/new.png' }])
+})
+
+test('the side form\'s own list controls are held too while a list item\'s image uploads, and free once it has landed', async () => {
+  server()
+  slow = 200
+
+  const { root } = await open()
+  const [, second] = gallery()
+  const controls = () => [...root.querySelectorAll<HTMLButtonElement>('[data-kcms-path="gallery"] .kcms-item-controls button, [data-kcms-path="gallery"] .kcms-list-tools button')]
+
+  await until(() => controls().length > 0)
+  expect(controls().some(button => !button.disabled)).toBe(true)
+  drop(second!, [file()])
+  await Bun.sleep(50)
+  await until(() => controls().every(button => button.disabled))
+  await until(() => (data().gallery as { image: string }[] | undefined)?.[1]?.image === '/_kay/files/posts/new.png')
+  await until(() => controls().some(button => !button.disabled))
 })
 
 test('a list item moves again once its image has landed', async () => {

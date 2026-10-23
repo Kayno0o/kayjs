@@ -350,3 +350,16 @@ test('Escape in a body paragraph puts the page and the Markdown back', async () 
 
   expect(await page.text(BODY_PARAGRAPH)).toBe('Hi there.')
 }, 60_000)
+
+test('typing "# " at the start of a paragraph goes on in the heading it becomes across the real page swap, the caret kept', async () => {
+  const page = await open()
+
+  await page.click(BODY_PARAGRAPH)
+  await page.waitUntil((selector: string) => document.querySelector(selector)!.getAttribute('contenteditable') === 'plaintext-only', undefined, BODY_PARAGRAPH)
+  await page.press('Home')
+  await page.type('# ')
+  await page.waitUntil(() => document.querySelector('article h1[contenteditable=plaintext-only]') !== null && document.activeElement === document.querySelector('article h1'))
+  await page.type('X')
+  await page.waitUntil((selector: string) => (document.querySelector(selector) as HTMLTextAreaElement).value.includes('# XHi there.'), undefined, BODY_BOX)
+  expect(await page.evaluate(() => document.querySelector('article h1')?.textContent)).toBe('# XHi there.')
+}, 60_000)

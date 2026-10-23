@@ -3,6 +3,7 @@ import type { Field } from '../fields'
 import type { EntryRef, ScreenCollection } from '../kay/contract'
 import type { FieldMarker, FieldPath, MarkedField } from '../markers'
 import { announce } from '@kaynooo/kayjs-ui/announce'
+import { signal } from 'kay'
 import { wording } from 'kay/words'
 import { checkField, fieldsOf, itemAt } from '../fields'
 import { allMarked, BODY, entryKey, markedRange, markersOf } from '../markers'
@@ -300,28 +301,36 @@ function isSettled(marker: FieldMarker): boolean {
   return source !== undefined && (source.collection() !== undefined || source.failed())
 }
 
-// Waits for the entry's read to be over, loaded or failed, for up to about five seconds, as long as `keepWaiting` says so.
-export async function untilSettled(marker: FieldMarker, keepWaiting: () => boolean = () => true): Promise<void> {
+// Waits for the entry's read to be over, loaded or failed, for fifty looks `every` ms apart (about five seconds), as long as `keepWaiting` says so.
+export async function untilSettled(marker: FieldMarker, keepWaiting: () => boolean = () => true, every = 100): Promise<void> {
   for (let tries = 0; tries < 50 && !isSettled(marker) && keepWaiting(); tries++)
-    await new Promise(resolve => setTimeout(resolve, 100))
+    await new Promise(resolve => setTimeout(resolve, every))
 }
 
 // The entries an upload into a list item is on its way for, in which no list changes meanwhile: the upload lands at the item's place, and a move or a removal would have it land in another.
-const held = new Map<string, number>()
+const held = signal<ReadonlyMap<string, number>>(new Map())
 
 export function holdEntry(marker: FieldMarker): () => void {
   const key = entryKey(marker)
 
-  held.set(key, (held.get(key) ?? 0) + 1)
+  held.set(new Map(held()).set(key, (held().get(key) ?? 0) + 1))
 
   return () => {
-    const left = (held.get(key) ?? 1) - 1
+    const next = new Map(held())
+    const left = (next.get(key) ?? 1) - 1
 
     if (left > 0)
-      held.set(key, left)
+      next.set(key, left)
     else
-      held.delete(key)
+      next.delete(key)
+
+    held.set(next)
   }
+}
+
+// Whether an upload into a list item holds the entry's lists still, which the side form's own list controls follow as the page's do.
+export function isHeld(marker: EntryRef): boolean {
+  return held().has(entryKey(marker))
 }
 
 // Whether a save holds the entry's fields still.
@@ -331,7 +340,7 @@ export function isSaving(marker: FieldMarker): boolean {
 
 // Whether a save or an upload into a list item holds the entry's lists still.
 export function isBusy(marker: FieldMarker): boolean {
-  return held.has(entryKey(marker)) || isSaving(marker)
+  return isHeld(marker) || isSaving(marker)
 }
 
 // The name the form gives a marked field: its schema label, none while its form has not loaded or for the Markdown body.
@@ -680,6 +689,16 @@ export function startInline({ entry, path, field, label, element, busy, block }:
   element.addEventListener('blur', () => {
     if (document.activeElement === element && !document.hasFocus())
       return
+
+    // A browser blurs the element the page removes before it leaves the document, so a block that has been typed in waits one microtask to tell a removal, which goes on typing in the block the page renders, from a focus that moved.
+    if (block && edited) {
+      queueMicrotask(() => {
+        if (element.isConnected)
+          end()
+      })
+
+      return
+    }
 
     end()
   }, { signal })

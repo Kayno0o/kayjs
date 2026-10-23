@@ -22,6 +22,7 @@ import { blockOf, checkField, emptyBlock, emptyValue, htmlPattern, isCompact, it
 import { fieldId, joinPath, siblingPath } from '../paths'
 import { setImageSize } from './image-value'
 import { followFolds } from './folds'
+import { isHeld } from './inline'
 import { markdownOptions } from './markdown-options'
 import { previewMarkdown } from './preview'
 import { referenceChoices } from './references'
@@ -197,6 +198,8 @@ function digits(event: KeyboardEvent): void {
 
 const list = field.kind === 'list' ? field : undefined
 const count = () => items().length
+// An upload into a list item holds the list still, as it does the page's bars, so it lands in its item.
+const held = () => isHeld(entry)
 const atMax = () => list?.maxItems !== undefined && count() >= list.maxItems
 const atMin = () => list?.minItems !== undefined && count() <= list.minItems
 const foldedAt = (at: number) => folded()[at] === true
@@ -243,7 +246,7 @@ function fold(at: number): void {
 }
 
 function append(value: unknown): void {
-  if (atMax())
+  if (held() || atMax())
     return
 
   removed.set(undefined)
@@ -252,7 +255,7 @@ function append(value: unknown): void {
 }
 
 function prepend(type?: string): void {
-  if (atMax() || !list)
+  if (held() || atMax() || !list)
     return
 
   const block = list.blocks?.find(found => found.type === type)
@@ -280,7 +283,7 @@ function resetMenu(selector: string): void {
 }
 
 function duplicate(at: number): void {
-  if (atMax())
+  if (held() || atMax())
     return
 
   removed.set(undefined)
@@ -290,7 +293,7 @@ function duplicate(at: number): void {
 }
 
 function remove(at: number): void {
-  if (!list || atMin())
+  if (!list || held() || atMin())
     return
 
   const title = itemTitle(list, items()[at], at)
@@ -305,7 +308,7 @@ function remove(at: number): void {
 function undo(): void {
   const gone = removed()
 
-  if (!gone || atMax())
+  if (!gone || held() || atMax())
     return
 
   const at = Math.min(gone.at, count())
@@ -318,6 +321,9 @@ function undo(): void {
 
 // A move is said to a screen reader, whose focus follows the item but does not read where it landed. A numbered item is named by the place it left, as its number at the new place would read as the one it now holds.
 function moveItem(from: number, to: number): void {
+  if (held())
+    return
+
   const title = list ? itemTitle(list, items()[from], from) : ''
 
   removed.set(undefined)
@@ -417,9 +423,9 @@ function leaveJson(): void {
             .kcms-list-tools
               if !atMax()
                 if current.blocks
-                  Select(value="" options={blockOptions()} emptyOption={wording('cms.blocks.addFirst', 'Add at the top…')} aria-label={wording('cms.blocks.addFirstAria', 'Add a block at the top of {list}', { list: current.label })} data-kcms-block-menu onChange={(type) => { if (type !== '') { prepend(type); resetMenu('[data-kcms-block-menu]') } }})
+                  Select(value="" options={blockOptions()} emptyOption={wording('cms.blocks.addFirst', 'Add at the top…')} aria-label={wording('cms.blocks.addFirstAria', 'Add a block at the top of {list}', { list: current.label })} data-kcms-block-menu disabled={held()} onChange={(type) => { if (type !== '') { prepend(type); resetMenu('[data-kcms-block-menu]') } }})
                 else
-                  Button(label={wording('cms.list.addFirst', 'Add at the top')} icon="plus" variant="ghost" size="sm" onClick={() => prepend()})
+                  Button(label={wording('cms.list.addFirst', 'Add at the top')} icon="plus" variant="ghost" size="sm" disabled={held()} onClick={() => prepend()})
               if count() >= JUMP_FROM
                 Select(value="" options={titles()} emptyOption={wording('cms.list.jump', 'Go to item…')} data-kcms-jump aria-label={wording('cms.list.jumpAria', 'Go to an item of {list}', { list: current.label })} onChange={(at) => { if (at !== '') jump(at) }})
           .kcms-list-items(ref={element => rows = element})
@@ -431,9 +437,9 @@ function leaveJson(): void {
                 if isCompact(current)
                   FieldInput(drafts={drafts} entry={entry} field={itemAt(current, i)} path={joinPath(path, i)})
                   .kcms-item-controls
-                    Reorder(item={title} index={i} count={count()} onMove={to => moveItem(i, to)})
-                    IconButton(icon={copy} label={wording('cms.list.duplicate', 'Duplicate {item}', { item: title })} variant="ghost" size="sm" disabled={atMax()} data-kcms-item-control onClick={() => duplicate(i)})
-                    IconButton(icon="delete" label={wording('cms.field.removeItem', 'Remove {item}', { item: title, n: i + 1 })} variant="ghost" size="sm" disabled={atMin()} data-kcms-item-control onClick={() => remove(i)})
+                    Reorder(item={title} index={i} count={count()} disabled={held()} onMove={to => moveItem(i, to)})
+                    IconButton(icon={copy} label={wording('cms.list.duplicate', 'Duplicate {item}', { item: title })} variant="ghost" size="sm" disabled={held() || atMax()} data-kcms-item-control onClick={() => duplicate(i)})
+                    IconButton(icon="delete" label={wording('cms.field.removeItem', 'Remove {item}', { item: title, n: i + 1 })} variant="ghost" size="sm" disabled={held() || atMin()} data-kcms-item-control onClick={() => remove(i)})
                 else
                   .kcms-item-head
                     IconButton.kcms-fold(icon="chevron" data-kcms-fold label={foldedAt(i) ? wording('cms.list.expand', 'Expand {item}', { item: title }) : wording('cms.list.collapse', 'Collapse {item}', { item: title })} variant="ghost" size="sm" aria-expanded={foldedAt(i) ? 'false' : 'true'} data-kcms-item-control onClick={() => fold(i)})
@@ -441,9 +447,9 @@ function leaveJson(): void {
                     if foldedAt(i) && itemIssues(i).length > 0
                       span.kcms-item-issues {wording('cms.list.itemIssues', itemIssues(i).length === 1 ? '1 issue' : '{count} issues', { count: itemIssues(i).length })}
                     .kcms-item-controls
-                      Reorder(item={title} index={i} count={count()} onMove={to => moveItem(i, to)})
-                      IconButton(icon={copy} label={wording('cms.list.duplicate', 'Duplicate {item}', { item: title })} variant="ghost" size="sm" disabled={atMax()} data-kcms-item-control onClick={() => duplicate(i)})
-                      IconButton(icon="delete" label={wording('cms.field.removeItem', 'Remove {item}', { item: title, n: i + 1 })} variant="ghost" size="sm" disabled={atMin()} data-kcms-item-control onClick={() => remove(i)})
+                      Reorder(item={title} index={i} count={count()} disabled={held()} onMove={to => moveItem(i, to)})
+                      IconButton(icon={copy} label={wording('cms.list.duplicate', 'Duplicate {item}', { item: title })} variant="ghost" size="sm" disabled={held() || atMax()} data-kcms-item-control onClick={() => duplicate(i)})
+                      IconButton(icon="delete" label={wording('cms.field.removeItem', 'Remove {item}', { item: title, n: i + 1 })} variant="ghost" size="sm" disabled={held() || atMin()} data-kcms-item-control onClick={() => remove(i)})
                   .kcms-item-body(role="group" aria-label={title} hidden={foldedAt(i)})
                     if itemField.kind === 'group'
                       if drafts.issues(entry, joinPath(path, i))[0] as own
@@ -455,15 +461,15 @@ function leaveJson(): void {
           if removed() as gone
             p.kcms-item-removed
               span {wording('cms.list.removed', '{item} removed', { item: gone.title })}
-              Button(label={wording('cms.list.undo', 'Undo')} variant="inline" disabled={atMax()} onClick={undo})
+              Button(label={wording('cms.list.undo', 'Undo')} variant="inline" disabled={held() || atMax()} onClick={undo})
           if !atMax() && current.blocks
             .kcms-block-add(role="group" aria-label={wording('cms.blocks.add', 'Add a block to {list}', { list: current.label })})
               for block of current.blocks key={block.type}
-                Button(label={wording('cms.blocks.addType', 'Add {block}', { block: block.label })} icon="plus" data-kcms-add onClick={() => append(emptyBlock(block))})
+                Button(label={wording('cms.blocks.addType', 'Add {block}', { block: block.label })} icon="plus" data-kcms-add disabled={held()} onClick={() => append(emptyBlock(block))})
           else if !atMax()
             if current.item.kind === 'image' || current.item.kind === 'file'
               FileInput(value="" image={current.item.kind === 'image'} collection={entry.collection} upload={current.item.kind === 'image' || current.item.kind === 'file' ? current.item.upload : undefined} many onChange={path => append(path)})
-            Button(label={wording('cms.field.add', 'Add')} icon="plus" data-kcms-add onClick={() => append(emptyValue(current.item))})
+            Button(label={wording('cms.field.add', 'Add')} icon="plus" data-kcms-add disabled={held()} onClick={() => append(emptyValue(current.item))})
     when 'group'
       FormField.kcms-group(label={current.label} hint={current.hint} issue={issue()} required={starred()} group)
         for child of current.fields key={child.key}

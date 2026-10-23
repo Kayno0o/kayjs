@@ -50,7 +50,8 @@ const PINNED = new Set(['fixed', 'sticky'])
 const SETTLE_LIMIT = 4000
 
 // kay renders it at the end of the page in edit mode only, kept across page swaps, with the entries the page read.
-const { entries, unclickable } = props<EditorProps>()
+// `settleEvery` shortens the wait for an entry's read, which a test would otherwise sleep through.
+const { entries, unclickable, settleEvery } = props<EditorProps & { settleEvery?: number }>()
 
 // Looks up what the editor reads only once the page has loaded, so the page sends it.
 shipWords()
@@ -435,7 +436,7 @@ effect(() => {
   if (!open() || browsing())
     return
 
-  const watched = watchImages(drafts, found => imageBar = found, (bar, file) => void replaceImage(drafts, bar, file))
+  const watched = watchImages(drafts, found => imageBar = found, (bar, file, watching) => void replaceImage(drafts, bar, file, watching))
 
   onCleanup(watched.destroy)
 })
@@ -692,7 +693,7 @@ let waiting = 0
 async function editOnceLoaded(field: MarkedField, ticket: number, run: () => void): Promise<void> {
   const waits = () => ticket === waiting && open()
 
-  await untilSettled(field.marker, waits)
+  await untilSettled(field.marker, waits, settleEvery)
 
   if (waits())
     run()
