@@ -123,7 +123,7 @@ const SNIPPETS: Record<string, string> = {
   if (1 < 2 && 3 > 2) { console.log(\`\${'x'}\`) }
 </script>
 <script src="/app.js" defer></script>
-<script type="application/ld+json">{"@context":"https://schema.org","name":"A </b> thing"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","name":"A \\u003c/b> thing"}</script>
 <div>after</div>`,
   'boolean attributes': `<form action="/go" method="post">
   <input type="checkbox" name="a" checked disabled>

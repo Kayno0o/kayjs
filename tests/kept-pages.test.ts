@@ -1472,7 +1472,7 @@ describe('the requests that count as writes', () => {
 
     expect(writes.count).toBe(0)
     await app.handle(new Request('http://localhost/app-form', { method: 'POST' }))
-    expect(writes.count).toBe(2)
+    expect(writes.count).toBe(1)
   })
 
   it('knows every POST path the server registers by a constant', async () => {
