@@ -3,12 +3,15 @@ import type { EntryRef } from '../kay/contract'
 import type { FieldMarker, MarkedField } from '../markers'
 import { messageOf, toast } from '@kaynooo/kayjs-ui'
 import { announce } from '@kaynooo/kayjs-ui/announce'
+import { acceptsFile } from '@kaynooo/kayjs-ui/lib/accept'
 import { wording } from 'kay/words'
 import { entryKey, fieldsAt } from '../markers'
+import { notTaken } from '../upload-text'
 import { setImageSize } from './image-value'
-import { fieldOfMarker, isBusy } from './inline'
+import { fieldOfMarker, holdEntry, isBusy, isLoaded, untilSettled } from './inline'
+import { openEntry } from './opened'
 import { OWN } from './own'
-import { uploadDenied, uploadFile } from './upload'
+import { uploadDenied, uploadFile, uploadRules } from './upload'
 
 // The image under the pointer or the focus on the page, which the editor offers to replace: an element rendering an image field in an attribute (`<img src>` marked `data-kay-field-src`). A file dropped on it replaces it too.
 export interface ImageBar {
@@ -23,6 +26,8 @@ export interface ImageWatch {
   destroy: () => void
 }
 
+// A path through a list item, which a move or a removal of the page's list bars would shift.
+const IN_LIST = /(?:^|\.)\d+(?:\.|$)/
 const BAR = 'data-kcms-image-bar'
 const DROPPING = 'data-kcms-dropping'
 // The bar's box, which keeps it inside the image and the window.
@@ -42,6 +47,14 @@ function imageAt(node: Node | undefined, drafts: Drafts): { found: MarkedField, 
   }
 
   return undefined
+}
+
+// The marked image under a node whose entry has not loaded, which may be an image field: a drop on it is kept from the browser and replaces it once the entry has loaded.
+function pendingImageAt(node: Node | undefined): MarkedField | undefined {
+  if (!node || (node instanceof Element ? node : node.parentElement)?.closest(OWN))
+    return undefined
+
+  return fieldsAt(node).find(found => found.attribute === 'src' && found.element instanceof HTMLImageElement && typeof found.marker.path === 'string' && !isLoaded(found.marker))
 }
 
 function barOf(found: MarkedField, label: string, accept: string | undefined): ImageBar | undefined {
@@ -95,6 +108,11 @@ export function watchImages(drafts: Drafts, show: (bar: ImageBar | undefined) =>
     if (current)
       offer(current)
   }
+  const pendingTarget = (node: Node | undefined) => {
+    const found = pendingImageAt(node)
+
+    return found && { found, label: '', accept: undefined }
+  }
   const stopDrop = () => {
     dropping?.removeAttribute(DROPPING)
     dropping = undefined
@@ -106,7 +124,8 @@ export function watchImages(drafts: Drafts, show: (bar: ImageBar | undefined) =>
   addEventListener('scroll', refresh, { capture: true, passive: true, signal })
   addEventListener('resize', refresh, { passive: true, signal })
   document.addEventListener('dragover', (event) => {
-    const target = event.dataTransfer?.types.includes('Files') === true ? imageAt(event.target instanceof Node ? event.target : undefined, drafts) : undefined
+    const node = event.target instanceof Node ? event.target : undefined
+    const target = event.dataTransfer?.types.includes('Files') === true ? imageAt(node, drafts) ?? pendingTarget(node) : undefined
 
     if (!target) {
       stopDrop()
@@ -127,7 +146,8 @@ export function watchImages(drafts: Drafts, show: (bar: ImageBar | undefined) =>
       stopDrop()
   }, { signal })
   document.addEventListener('drop', (event) => {
-    const target = imageAt(event.target instanceof Node ? event.target : undefined, drafts)
+    const node = event.target instanceof Node ? event.target : undefined
+    const target = imageAt(node, drafts) ?? pendingTarget(node)
     const [file] = event.dataTransfer?.files ?? []
 
     stopDrop()
@@ -152,30 +172,49 @@ export function watchImages(drafts: Drafts, show: (bar: ImageBar | undefined) =>
   }
 }
 
-// Uploads a file where the image field's uploads go and sets it as the field's value, with the size beside it the schema keeps. A refusal is toasted in the editor's words, as the form shows it under the field.
+// Uploads a file where the image field's uploads go and sets it as the field's value, with the size beside it the schema keeps. A file the field does not take, a refusal and a session that ended are toasted in the editor's words, as the form shows them under the field. An entry still a row is opened and waited for first, and an image of a list item holds the entry's lists still until it has landed, so it lands in its item.
 export async function replaceImage(drafts: Drafts, bar: Pick<ImageBar, 'entry' | 'path' | 'label'>, file: File): Promise<void> {
   const marker: FieldMarker = { ...bar.entry, path: bar.path }
+
+  if (!isLoaded(marker)) {
+    openEntry(marker)
+    await untilSettled(marker)
+  }
+
   const field = fieldOfMarker(marker, drafts)
 
   if (field?.kind !== 'image' || isBusy(marker))
     return
 
-  const denied = await uploadDenied()
-
-  if (denied !== undefined) {
-    toast.error(denied)
-
-    return
-  }
+  const release = IN_LIST.test(bar.path) ? holdEntry(marker) : undefined
 
   try {
+    const denied = await uploadDenied()
+
+    if (denied !== undefined) {
+      toast.error(denied)
+
+      return
+    }
+
+    const accept = field.upload?.accept?.join(',') ?? (await uploadRules())?.images
+
+    if (accept !== undefined && !acceptsFile(accept, file)) {
+      toast.error(notTaken(file, accept))
+
+      return
+    }
+
     const landed = await uploadFile(bar.entry.collection, file, { limits: field.upload })
 
     drafts.set(bar.entry, bar.path, landed.path)
     setImageSize(drafts, bar.entry, bar.path, field, landed.path, landed.width !== undefined && landed.height !== undefined ? { width: landed.width, height: landed.height } : undefined)
-    announce(wording('cms.pageImage.replaced', '{field} replaced', { field: bar.label }))
+    announce(wording('cms.pageImage.replaced', '{field} replaced', { field: field.label }))
   }
   catch (error) {
     toast.error(messageOf(error, wording('cms.file.failure', 'Could not upload')))
+  }
+  finally {
+    release?.()
   }
 }

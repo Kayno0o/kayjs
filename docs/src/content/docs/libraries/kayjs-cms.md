@@ -133,7 +133,7 @@ If you decline to leave because other entries hold edits not saved, the form is 
 
 ### Replacing an image on the page
 
-While you edit, point at an image the page shows from an image field, or Tab to it, and a Replace button appears over its top right corner. It picks a file, uploads it as the field's own upload does and swaps it in the draft, with its width and height when the field keeps them. A file dragged from your computer onto the image does the same. A refused file is toasted with its reason and the image stays as it was. The page needs nothing: it renders the field as usual.
+While you edit, point at an image the page shows from an image field, or Tab to it, and a Replace button appears over its top right corner. It picks a file, uploads it as the field's own upload does and swaps it in the draft, with its width and height when the field keeps them. A file dragged from your computer onto the image does the same. A file the field does not accept, or one the server refuses, is toasted with its reason and the image stays as it was. A file dropped on an image of an entry the editor has not opened yet opens it first. While an image in a list uploads, the list's toolbar and keys on the page change nothing, so the image lands in its own item. The page needs nothing: it renders the field as usual.
 
 ### Typing on the page
 

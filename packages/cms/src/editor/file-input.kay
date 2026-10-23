@@ -6,7 +6,7 @@ import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import { guardLeave } from 'kay'
 import { sizeText, wording } from 'kay/words'
-import { atLeast, typeName } from '../upload-text'
+import { atLeast, notTaken, typeName } from '../upload-text'
 import { listUploads, uploadFile, uploadRefusal, uploadRules } from './upload'
 
 type Size = { width: number, height: number } | undefined
@@ -82,7 +82,7 @@ let leftOut: string | undefined
 
 // Dropped files the picker's types miss, which FileDrop would otherwise ignore without a word.
 function reject(files: File[]): void {
-  const told = files.map(file => wording('cms.file.rejected', '{name} is {type} that uploads here do not take: {accept}', { name: file.name || wording('cms.upload.theFile', 'The file'), type: file.type || wording('cms.file.someType', 'of a type'), accept: accept() ?? 'images' })).join('\n')
+  const told = files.map(file => notTaken(file, accept() ?? 'images')).join('\n')
 
   problem = told
   leftOut = told

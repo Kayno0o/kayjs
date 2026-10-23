@@ -16,6 +16,11 @@ export function tooLargeForServer(name: string, bytes: number): string {
   return wording('cms.upload.tooLargeForServer', '{name} is {size}, over what an upload may be', { name: fileName(name), size: sizeText(bytes) })
 }
 
+// What a file left out of an upload is told, for a type the field does not take.
+export function notTaken(file: Pick<File, 'name' | 'type'>, accept: string): string {
+  return wording('cms.file.rejected', '{name} is {type} that uploads here do not take: {accept}', { name: fileName(file.name), type: file.type || wording('cms.file.someType', 'of a type'), accept })
+}
+
 // The least pixels a field asks of an image, as a sentence.
 export function atLeast(width: number | undefined, height: number | undefined): string {
   if (width !== undefined && height !== undefined)

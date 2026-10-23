@@ -12,13 +12,20 @@ const SCHEMA = {
     photo: { 'type': 'string', 'x-kay': { kind: 'image', width: 'photoWidth', height: 'photoHeight' } },
     photoWidth: { type: 'number' },
     photoHeight: { type: 'number' },
+    logo: { 'type': 'string', 'x-kay': { kind: 'image', accept: ['image/png'] } },
+    gallery: { type: 'array', items: { type: 'object', properties: { image: { 'type': 'string', 'x-kay': { kind: 'image' } } } } },
   },
 }
 const POSTS = { name: 'posts', title: 'Posts', kind: 'folder', localized: false, components: [], schema: SCHEMA }
 const HELLO = { collection: 'posts', slug: 'hello' }
+const OTHER = { collection: 'posts', slug: 'other' }
 let mounted: Mounted | undefined
 let uploads = 0
 let refuse = false
+// How long an upload takes, and the status a refused one answers.
+let slow = 0
+let refusal = 415
+let asked: string[] = []
 
 Object.assign(document, { caretPositionFromPoint: () => null, elementsFromPoint: () => [] })
 
@@ -31,14 +38,19 @@ afterEach(async () => {
   mock.restore()
   localStorage.clear()
   refuse = false
+  slow = 0
+  refusal = 415
   document.cookie = `${EDITOR_COOKIE}=; max-age=0`
 })
 
 function server(): void {
   document.cookie = `${EDITOR_COOKIE}=tester`
   uploads = 0
+  asked = []
   spyOn(globalThis, 'fetch').mockImplementation((async (request: string | URL | Request, init?: RequestInit) => {
     const path = String(request)
+
+    asked.push(path)
 
     if (path.includes('/can'))
       return Response.json({ denied: {}, prefix: '/admin' })
@@ -48,14 +60,15 @@ function server(): void {
 
     if (init?.method === 'POST' && path.includes('/files/')) {
       uploads++
+      await Bun.sleep(slow)
 
-      return refuse ? Response.json({ error: 'Not an image' }, { status: 415 }) : Response.json({ path: '/_kay/files/posts/new.png', width: 640, height: 480 })
+      return refuse ? Response.json({ error: 'Not an image' }, { status: refusal }) : Response.json({ path: '/_kay/files/posts/new.png', width: 640, height: 480 })
     }
 
     if (init?.method === 'POST')
       return Response.json({})
 
-    return Response.json({ collection: POSTS, entry: { slug: 'hello', data: { title: 'Hello', photo: '/old.png', photoWidth: 10, photoHeight: 10 }, version: 'v1', url: '/posts/hello' } })
+    return Response.json({ collection: POSTS, entry: { slug: 'hello', data: { title: 'Hello', photo: '/old.png', photoWidth: 10, photoHeight: 10, gallery: [{ image: '/a.png' }, { image: '/b.png' }] }, version: 'v1', url: '/posts/hello' } })
   }) as unknown as typeof fetch)
 }
 
@@ -79,7 +92,7 @@ async function until(done: () => boolean): Promise<void> {
   throw new Error('the page never reached the state the test waits for')
 }
 
-async function open() {
+async function open(entries: object[] = [HELLO]) {
   const image = document.createElement('img')
   const title = document.createElement('h1')
 
@@ -90,7 +103,7 @@ async function open() {
   title.textContent = 'Hello'
   Object.assign(image, { getBoundingClientRect: () => ({ left: 10, top: 10, right: 310, bottom: 210, width: 300, height: 200 }) })
   document.body.append(image, title)
-  mounted = await mountComponent(EDITOR, { entries: [HELLO], unclickable: [] })
+  mounted = await mountComponent(EDITOR, { entries, unclickable: [] })
   await settle()
   await Bun.sleep(30)
 
@@ -207,4 +220,126 @@ test('a refused file changes no draft', async () => {
   await until(() => uploads === 1)
   await settle()
   expect(data().photo).toBeUndefined()
+})
+
+// Another image of the page, marked for a field of the entry.
+function markedImage(path: string, entry = 'hello'): HTMLImageElement {
+  const image = document.createElement('img')
+
+  image.dataset.page = ''
+  image.setAttribute('data-kay-field-src', `posts:${entry}:${path}`)
+  Object.assign(image, { getBoundingClientRect: () => ({ left: 10, top: 10, right: 310, bottom: 210, width: 300, height: 200 }) })
+  document.body.append(image)
+
+  return image
+}
+
+const gif = () => new File(['x'], 'new.gif', { type: 'image/gif' })
+
+test('a file the field does not accept is refused before the upload, in the form\'s words', async () => {
+  server()
+
+  const { root } = await open()
+  const logo = markedImage('logo')
+
+  drop(logo, [gif()])
+  await until(() => document.body.textContent.includes('new.gif is image/gif that uploads here do not take: image/png') || root.textContent.includes('new.gif is image/gif'))
+  expect(uploads).toBe(0)
+  expect(data().logo).toBeUndefined()
+  drop(logo, [file()])
+  await until(() => data().logo === '/_kay/files/posts/new.png')
+  expect(uploads).toBe(1)
+})
+
+test('a file the server\'s image types miss is refused before the upload when the field names none', async () => {
+  server()
+
+  const { image } = await open()
+
+  drop(image, [new File(['x'], 'doc.pdf', { type: 'application/pdf' })])
+  await until(() => document.body.textContent.includes('doc.pdf is application/pdf that uploads here do not take: image/*'))
+  expect(uploads).toBe(0)
+})
+
+test('a file dropped on an image of an entry still a row is kept from the browser, opens the entry and replaces the image once it has loaded', async () => {
+  server()
+
+  const { image } = await open([OTHER, HELLO])
+  const over = new Event('dragover', { bubbles: true, cancelable: true })
+
+  Object.assign(over, { dataTransfer: { files: [], types: ['Files'] } })
+  image.dispatchEvent(over)
+  expect(over.defaultPrevented).toBe(true)
+  expect(drop(image, [file()]).defaultPrevented).toBe(true)
+  await until(() => data().photo === '/_kay/files/posts/new.png')
+  expect(asked.filter(path => path.includes('/entries/') && path.includes('/posts/hello'))).toHaveLength(1)
+  expect(asked.some(path => path.includes('/posts/other'))).toBe(false)
+  expect(uploads).toBe(1)
+})
+
+function gallery(): HTMLImageElement[] {
+  const list = document.createElement('ul')
+
+  list.dataset.page = ''
+  list.setAttribute('data-kay-list', 'posts:hello:gallery')
+  document.body.append(list)
+
+  return ['gallery.0.image', 'gallery.1.image'].map((path) => {
+    const item = document.createElement('li')
+    const image = markedImage(path)
+
+    item.append(image)
+    list.append(item)
+
+    return image
+  })
+}
+
+function keyDown(target: Element, key: string): void {
+  target.dispatchEvent(new KeyboardEvent('keydown', { key, altKey: true, shiftKey: true, bubbles: true, cancelable: true }))
+}
+
+test('an image of a list item lands in its item, whose page bars cannot move it while the upload is under way', async () => {
+  server()
+  slow = 150
+
+  const { root } = await open()
+  const [, second] = gallery()
+
+  await settle()
+  drop(second!, [file()])
+  await Bun.sleep(30)
+  keyDown(second!, 'ArrowUp')
+  keyDown(second!, 'Delete')
+  await until(() => (data().gallery as { image: string }[] | undefined)?.[1]?.image === '/_kay/files/posts/new.png')
+  expect(data().gallery).toEqual([{ image: '/a.png' }, { image: '/_kay/files/posts/new.png' }])
+  expect(root).toBeDefined()
+})
+
+test('a list item moves again once its image has landed', async () => {
+  server()
+
+  await open()
+  const [, second] = gallery()
+
+  await settle()
+  drop(second!, [file()])
+  await until(() => (data().gallery as { image: string }[] | undefined)?.[1]?.image === '/_kay/files/posts/new.png')
+  keyDown(second!, 'ArrowUp')
+  await until(() => (data().gallery as { image: string }[] | undefined)?.[0]?.image === '/_kay/files/posts/new.png')
+})
+
+test('a session that ended during the upload of a list item\'s image toasts it and changes no draft', async () => {
+  server()
+  refuse = true
+  refusal = 401
+  slow = 50
+
+  const { root } = await open()
+  const [, second] = gallery()
+
+  await settle()
+  drop(second!, [file()])
+  await until(() => document.body.textContent.includes('Your session has ended') || root.textContent.includes('Your session has ended'))
+  expect(data().gallery).toBeUndefined()
 })

@@ -294,15 +294,39 @@ export function isLoaded(marker: FieldMarker): boolean {
 }
 
 // Whether the entry's read is over, loaded or failed, which a click waiting for it stops at.
-export function isSettled(marker: FieldMarker): boolean {
+function isSettled(marker: FieldMarker): boolean {
   const source = sources.get(entryKey(marker))
 
   return source !== undefined && (source.collection() !== undefined || source.failed())
 }
 
-// Whether a save holds the entry's fields still.
+// Waits for the entry's read to be over, loaded or failed, for up to about five seconds, as long as `keepWaiting` says so.
+export async function untilSettled(marker: FieldMarker, keepWaiting: () => boolean = () => true): Promise<void> {
+  for (let tries = 0; tries < 50 && !isSettled(marker) && keepWaiting(); tries++)
+    await new Promise(resolve => setTimeout(resolve, 100))
+}
+
+// The entries an upload into a list item is on its way for, in which no list changes meanwhile: the upload lands at the item's place, and a move or a removal would have it land in another.
+const held = new Map<string, number>()
+
+export function holdEntry(marker: FieldMarker): () => void {
+  const key = entryKey(marker)
+
+  held.set(key, (held.get(key) ?? 0) + 1)
+
+  return () => {
+    const left = (held.get(key) ?? 1) - 1
+
+    if (left > 0)
+      held.set(key, left)
+    else
+      held.delete(key)
+  }
+}
+
+// Whether a save or an upload into a list item holds the entry's fields still.
 export function isBusy(marker: FieldMarker): boolean {
-  return sources.get(entryKey(marker))?.busy() === true
+  return held.has(entryKey(marker)) || sources.get(entryKey(marker))?.busy() === true
 }
 
 // The name the form gives a marked field: its schema label, none while its form has not loaded or for the Markdown body.

@@ -24,7 +24,7 @@ import { call, guardLeave, listen, refresh, untrack } from 'kay'
 import { wording } from 'kay/words'
 import previewApi from '../api/preview'
 import { BODY, entryKey, fieldsAt, formatMarker, markersOf } from '../markers'
-import { blockTargetOf, inlineTargetOf, isBusy, isLoaded, isSettled, isTypingInline, markedLabel, reachMarked, startInline } from './inline'
+import { blockTargetOf, inlineTargetOf, isBusy, isLoaded, isTypingInline, markedLabel, reachMarked, startInline, untilSettled } from './inline'
 import { createMarks, readMarking, writeMarking } from './marks'
 import { MARKER_MENU, OWN } from './own'
 import { addItem, blockChoices, emptyListAt, focusItem, itemsAround, itemsOf, listFieldOf, movedWords, moveItem, removeItem, restoreItem, titleOf, watchLists } from './page-lists'
@@ -692,8 +692,7 @@ let waiting = 0
 async function editOnceLoaded(field: MarkedField, ticket: number, run: () => void): Promise<void> {
   const waits = () => ticket === waiting && open()
 
-  for (let tries = 0; tries < 50 && !isSettled(field.marker) && waits(); tries++)
-    await new Promise(resolve => setTimeout(resolve, 100))
+  await untilSettled(field.marker, waits)
 
   if (waits())
     run()
