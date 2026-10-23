@@ -179,7 +179,7 @@ function sortExpiry(slot: ServerSlot): void {
   if (slot.ordered)
     return
 
-  slot.expires = new Map([...slot.expires].toSorted((first, second) => first[1] - second[1]))
+  slot.expires = new Map([...slot.expires].sort((first, second) => first[1] - second[1]))
   slot.ordered = true
   slot.latest = [...slot.expires.values()].at(-1) ?? 0
 }
