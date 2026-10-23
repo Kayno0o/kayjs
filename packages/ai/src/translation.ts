@@ -175,7 +175,7 @@ function readReply(reply: string, pending: Unit[]): { texts: Map<string, unknown
   return { texts: new Map(Object.entries(parsed)) }
 }
 
-const WEB_ADDRESS = /https?:\/\/[^\s<>"')\]]+/g
+const WEB_ADDRESS = /https?:\/\/[^\s<>"')\]。，、！？；：）」』]*[^\s<>"')\]。，、！？；：）」』.,;:!?]/g
 const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g
 const DIGITS = /\d+/g
 

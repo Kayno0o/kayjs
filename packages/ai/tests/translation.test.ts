@@ -20,6 +20,7 @@ it('checks a text against its source', () => {
   expect(unitProblem(message('Hello'), 'Bonjour {who}')).toBe('invents {who}')
   expect(unitProblem(message('<b>Hi</b>'), 'Salut')).toBe('changes the tags of the source')
   expect(unitProblem(message('Visit our site'), 'Visitez https://evil.test/x')).toBe('invents a URL, https://evil.test/x')
+  expect(unitProblem(message('See https://x.com.'), '見て https://x.com。')).toBeUndefined()
   expect(unitProblem(message('Write to us'), 'Ecrivez a a@b.fr')).toBe('invents an email, a@b.fr')
   expect(unitProblem(message('Call 112 now'), 'Appelez le 113')).toBe('invents a number, 113')
   expect(unitProblem(message('Call 112 or mail a@b.fr, see https://k.test'), 'Appelez le 112 ou ecrivez a a@b.fr, voir https://k.test')).toBeUndefined()
