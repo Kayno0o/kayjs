@@ -520,7 +520,15 @@ export async function duplicateEntry(ref: EntryRef, author?: Identity): Promise<
   return 'issues' in outcome ? outcome : { ...outcome, slug }
 }
 
+// The entries of the moved one's group in their order and the order values that change when it moves: undefined changes for an entry already at the end it moves toward.
+async function movePlan(ref: EntryRef, direction: 'up' | 'down', field: string): Promise<{ group: SourceEntry[], changes: ReturnType<typeof moveChanges> }> {
+  const group = sortOrdered(movable(await entries(ref.collection, { locale: ref.locale }), ref.locale), field)
+
+  return { group, changes: moveChanges(group.map(entry => ({ slug: entry.slug, value: orderValue(entry, field) })), ref.slug, direction) }
+}
+
 // Moves an entry one place up or down in its collection's order, among the entries of its locale, by saving the `order` field of the one or the few entries that change: a loaded collection's as one write, a folder's file by file, stopping at the first that is refused.
+// Each entry is written from what is stored when its turn comes, and a folder's file from the version read before it, so a save of a neighbour made meanwhile is kept or refuses the move, never undone.
 export async function moveEntry(ref: EntryRef, direction: 'up' | 'down', author?: Identity): Promise<SaveOutcome> {
   const collection = await collectionNamed(ref.collection)
   const field = collection.orderField
@@ -528,39 +536,49 @@ export async function moveEntry(ref: EntryRef, direction: 'up' | 'down', author?
   if (field === undefined)
     return refused(ref, wording('cms.store.noOrderField', '{collection} names no order field to move entries by', { collection: collection.name }))
 
-  const group = sortOrdered(movable(await entries(collection.name, { locale: ref.locale }), ref.locale), field)
-  const changes = moveChanges(group.map(entry => ({ slug: entry.slug, value: orderValue(entry, field) })), ref.slug, direction)
-
-  if (changes === undefined)
-    return group.some(entry => entry.slug === ref.slug) ? { saved: true } : refused(ref, wording('cms.store.missing', '{slug} does not exist', { slug: ref.slug }), 'slug')
+  const missing = () => refused(ref, wording('cms.store.missing', '{slug} does not exist', { slug: ref.slug }), 'slug')
 
   if (collection.kind === 'loaded') {
-    const written = changes.map((change) => {
-      const entry = group.find(each => each.slug === change.slug)!
+    const moved = await inTurn<SaveOutcome & { moved?: { slug: string, locale: string | undefined }[] }>(collection.name, async () => {
+      const { group, changes } = await movePlan(ref, direction, field)
 
-      return { slug: entry.slug, locale: entry.locale, data: { ...entry.data, [field]: change.value }, body: entry.body }
-    })
+      if (changes === undefined)
+        return group.some(entry => entry.slug === ref.slug) ? { saved: true } : missing()
 
-    const moved = await inTurn<SaveOutcome>(collection.name, async () => {
+      const written = changes.map((change) => {
+        const entry = group.find(each => each.slug === change.slug)!
+
+        return { slug: entry.slug, locale: entry.locale, data: { ...entry.data, [field]: change.value }, body: entry.body }
+      })
+
       const { issues } = await saveLoadedMany(collection.name, written)
 
-      return issues !== undefined && issues.length > 0 ? { issues } : { saved: true }
+      return issues !== undefined && issues.length > 0 ? { issues } : { saved: true, moved: written }
     })
 
-    if ('saved' in moved) {
+    if ('saved' in moved && moved.moved) {
       // Together, so a hook that hangs holds the editor for one limit and not one per entry.
-      await Promise.all(written.map(async entry => saved({ collection: collection.name, slug: entry.slug, ...entry.locale !== undefined && { locale: entry.locale }, verb: 'move', ...author !== undefined && { author } })))
+      await Promise.all(moved.moved.map(async entry => saved({ collection: collection.name, slug: entry.slug, ...entry.locale !== undefined && { locale: entry.locale }, verb: 'move', ...author !== undefined && { author } })))
     }
 
-    return moved
+    return 'issues' in moved ? moved : { saved: true }
   }
+
+  const { group, changes } = await movePlan(ref, direction, field)
+
+  if (changes === undefined)
+    return group.some(entry => entry.slug === ref.slug) ? { saved: true } : missing()
 
   let outcome: SaveOutcome = { saved: true }
 
   for (const change of changes) {
-    const entry = group.find(each => each.slug === change.slug)!
-    const target = { collection: collection.name, slug: entry.slug, locale: entry.locale }
+    const target = { collection: collection.name, slug: change.slug, locale: group.find(each => each.slug === change.slug)!.locale }
+    // The version first and the entry after it, so a save landing between the two makes the commit refuse rather than lose it.
     const version = await versionOf(target)
+    const entry = (await entries(collection.name, { slug: target.slug, locale: target.locale }))[0]
+
+    if (entry?.data === undefined)
+      return refused(target, wording('cms.store.missing', '{slug} does not exist', { slug: target.slug }), 'slug')
 
     outcome = await saveEntry({ ...target, data: { ...entry.data, [field]: change.value }, body: entry.body }, { version, verb: 'move', author, bodyKept: true })
 

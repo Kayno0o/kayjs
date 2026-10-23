@@ -41,6 +41,8 @@ let batches: number[]
 let stored: Record<string, SourceEntry[]>
 let infoCalls: unknown[]
 let failing = false
+// Runs once, right after the next whole-group read of a collection, as another editor's save would.
+let afterGroupRead: (() => Promise<void>) | undefined
 // Whether the loader keeps what it is handed, as a database would.
 let keeping = false
 
@@ -57,7 +59,21 @@ const content: typeof Content = {
     return collectionList.find(collection => collection.name === name)
   },
   translations: async () => new Map(),
-  entries: async (collection, filter) => failing ? Promise.reject(new Error('kay: products\'s load threw: password for db.internal')) : (stored[collection] ?? []).filter(entry => (filter?.slug === undefined || entry.slug === filter.slug) && (filter?.locale === undefined || entry.locale === filter.locale)),
+  entries: async (collection, filter) => {
+    if (failing)
+      return Promise.reject(new Error('kay: products\'s load threw: password for db.internal'))
+
+    const found = (stored[collection] ?? []).filter(entry => (filter?.slug === undefined || entry.slug === filter.slug) && (filter?.locale === undefined || entry.locale === filter.locale))
+
+    if (filter?.slug === undefined && afterGroupRead) {
+      const run = afterGroupRead
+
+      afterGroupRead = undefined
+      await run()
+    }
+
+    return found
+  },
   entrySource: async (collection, slug, data, options) => options?.create && stored[collection]?.some(entry => entry.slug === slug)
     ? { issues: [{ collection, slug, path: '', key: 'slug', message: TAKEN }] }
     : validSource(collection, slug, data, options?.body),
@@ -80,6 +96,14 @@ const content: typeof Content = {
   saveEntries: async (_collection, entries) => {
     batches.push(entries.length)
     loaded.push(...entries)
+
+    if (keeping) {
+      for (const entry of entries) {
+        const kept: SourceEntry = { slug: entry.slug, locale: entry.locale, data: entry.data as SourceEntry['data'], body: entry.body, draft: false }
+
+        stored[_collection] = (stored[_collection] ?? []).map(row => row.slug === entry.slug && row.locale === entry.locale ? kept : row)
+      }
+    }
 
     return {}
   },
@@ -118,6 +142,7 @@ beforeEach(() => {
   batches = []
   infoCalls = []
   failing = false
+  afterGroupRead = undefined
   keeping = false
   stored = { posts: [{ slug: 'hello', path: 'content/posts/hello.md', data: { title: 'Hello', draft: true }, body: 'Hi', draft: true }], products: [{ slug: 'mug', data: { name: 'Mug' }, draft: false }] }
   configure({ files: { save: async (change) => {
@@ -571,6 +596,45 @@ describe('moveEntry', () => {
 
     expect(await moveEntry({ collection: 'catalog', slug: 'b', locale: 'fr' }, 'up')).toHaveProperty('saved', true)
     expect(loaded.map(entry => [entry.slug, entry.locale])).toEqual([['b', 'fr'], ['a', 'fr']])
+  })
+
+  test('keeps a neighbour\'s save made while the move runs, in a loaded collection', async () => {
+    keeping = true
+    stored.catalog = [place('catalog', 'a', 1), place('catalog', 'b', 2), place('catalog', 'c', 3)]
+
+    let neighbour: Promise<unknown> | undefined
+
+    // The save starts once the move has read its group and has time to finish, were it not queued behind the move.
+    afterGroupRead = async () => {
+      neighbour = saveEntry({ collection: 'catalog', slug: 'b', data: { title: 'b edited', order: 2 } })
+      await Bun.sleep(5)
+    }
+
+    expect(await moveEntry({ collection: 'catalog', slug: 'c' }, 'up')).toHaveProperty('saved', true)
+    expect(await neighbour).toHaveProperty('saved', true)
+    expect((stored.catalog.find(row => row.slug === 'b')!.data as { title: string }).title).toBe('b edited')
+  })
+
+  test('writes a folder entry from the file as it is when the move reaches it, with the version read before it', async () => {
+    const dir = await scratchDir('move-folder-')
+    const file = join(dir, 'b.md')
+
+    await Bun.write(file, '{"title":"b","order":2}\nabout b')
+    stored.shelf = [{ ...place('shelf', 'a', 1), path: join(dir, 'a.md') }, { ...place('shelf', 'b', 2), path: file }]
+    await Bun.write(join(dir, 'a.md'), '{"title":"a","order":1}\nabout a')
+
+    // Another editor saves b after the group was read: the move must neither lose that save nor write over it.
+    afterGroupRead = async () => {
+      await Bun.write(file, '{"title":"b edited","order":2}\nabout b')
+      stored.shelf = stored.shelf!.map(row => row.slug === 'b' ? { ...row, data: { title: 'b edited', order: 2 } } : row)
+    }
+
+    expect(await moveEntry({ collection: 'shelf', slug: 'b' }, 'up')).toHaveProperty('saved', true)
+
+    const writtenB = saved.find(change => change.repoPath === 'content/shelf/b.md')
+
+    expect(writtenB?.text).toBe('{"title":"b edited","order":1}\nabout b')
+    expect(writtenB?.base).toBe(fileVersion('{"title":"b edited","order":2}\nabout b'))
   })
 
   test('stops at the first save that is refused', async () => {
