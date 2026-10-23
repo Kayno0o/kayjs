@@ -60,11 +60,11 @@ const scenarios: Record<string, () => Promise<void>> = {
     const app = testApp({ url: SITE, passkeys: false, twoFactor: false, password: false, magicLink: false })
     const visitor = app.browser()
 
-    await visitor.call('signInWithPassword', { email: 'ada@example.com', password: PASSWORD })
+    await visitor.call('signInWithPassword', { identifier: 'ada@example.com', password: PASSWORD })
     await visitor.call('signInWithMagicLink', 'token')
     await visitor.call('setUpTwoFactor', { password: PASSWORD })
     await visitor.call('enableTwoFactor', '123456')
-    await visitor.call('signInWithPasskey', {})
+    await visitor.call('signInWithPasskey', {} as never)
     await visitor.call('changePassword', { password: PASSWORD }, PASSWORD)
   },
   async forwardAuth() {
