@@ -17,6 +17,7 @@ import { setPreviewScope } from '../runtime/preview'
 import { DRAFT_ROUTE } from '../runtime/swap'
 import { isCrossSite, overHttps } from './actions'
 import { nodeCrypto } from './builtins'
+import { cookieName, prefixedNames } from './cookie-names'
 import { requestCookies } from './cookies'
 import { requestUrl } from './request-url'
 import { MIN_SECRET_LENGTH, sameText } from './seal'
@@ -201,7 +202,7 @@ export function previewRequested(request: Request): PreviewMode | undefined {
   if (!settings)
     return undefined
 
-  const [until, ...rest] = requestCookies(request).get(PREVIEW_COOKIE)?.split('.') ?? []
+  const [until, ...rest] = previewCookie(request, settings)?.split('.') ?? []
   const edit = rest.length === 2 && rest[0] === EDIT
   const sig = rest.at(-1)
 
@@ -214,9 +215,14 @@ export function previewRequested(request: Request): PreviewMode | undefined {
   return edit ? 'edit' : 'preview'
 }
 
+// The preview cookie of the request, under the name its scheme and the site's base give it.
+function previewCookie(request: Request, current: PreviewSettings): string | undefined {
+  return requestCookies(request).get(cookieName(PREVIEW_COOKIE, overHttps(request), current.base)) ?? undefined
+}
+
 // The valid edit cookie of the request, which names its edit session.
 function editCookie(request: Request): string | undefined {
-  return previewRequested(request) !== 'edit' ? undefined : requestCookies(request).get(PREVIEW_COOKIE) ?? undefined
+  return previewRequested(request) !== 'edit' || !settings ? undefined : previewCookie(request, settings)
 }
 
 // Remembers the entries the page just rendered in edit mode read, for the edit cookie of its request: the editor opens those, and `editedEntry` lets an API serve no others.
@@ -276,7 +282,7 @@ export function enterPreview(ctx: { cookies: CookieMap, request: Request }, opti
   const until = String(Math.floor(Date.now() / 1000) + current.maxAge)
   const edit = options.edit === true
 
-  ctx.cookies.set(PREVIEW_COOKIE, [until, ...edit ? [EDIT] : [], sign(current, cookieText(until, edit))].join('.'), { httpOnly: true, sameSite: 'lax', secure: overHttps(ctx.request), path: current.base || '/', maxAge: current.maxAge })
+  ctx.cookies.set(cookieName(PREVIEW_COOKIE, overHttps(ctx.request), current.base), [until, ...edit ? [EDIT] : [], sign(current, cookieText(until, edit))].join('.'), { httpOnly: true, sameSite: 'lax', secure: overHttps(ctx.request), path: current.base || '/', maxAge: current.maxAge })
 }
 
 // Renders the page at `url` through `handle` in edit mode, as an editor's request would, and gives the entries it read; undefined when the app has no preview, or the page answered nothing.
@@ -287,12 +293,13 @@ export async function entriesReadAt(handle: (request: Request) => Promise<Respon
 
   const until = String(Math.floor(Date.now() / 1000) + PROBE_MAX_AGE)
   const id = crypto.randomUUID()
+  const name = cookieName(PREVIEW_COOKIE, overHttps(new Request(url)), settings.base)
   const reads: EntryRef[] = []
 
   probes.set(id, reads)
 
   try {
-    const headers = new Headers({ [PROBE_HEADER]: id, cookie: `${PREVIEW_COOKIE}=${[until, EDIT, sign(settings, cookieText(until, true))].join('.')}` })
+    const headers = new Headers({ [PROBE_HEADER]: id, cookie: `${name}=${[until, EDIT, sign(settings, cookieText(until, true))].join('.')}` })
 
     const response = await withinTimeout(timeout, async signal => probing.run(true, async () => handle(new Request(url, { headers: markInternal(headers), signal }))))
 
@@ -350,7 +357,11 @@ export function noteProbedEntries(request: Request, entries: Iterable<EntryRef>)
 }
 
 export function exitPreview(ctx: { cookies: CookieMap }): void {
-  ctx.cookies.delete({ name: PREVIEW_COOKIE, path: settingsFor('exitPreview()').base || '/' })
+  const path = settingsFor('exitPreview()').base || '/'
+
+  // The cookie is read under the name of the scheme it came over, so every name it may have is cleared.
+  for (const name of [PREVIEW_COOKIE, ...prefixedNames(PREVIEW_COOKIE)])
+    ctx.cookies.delete({ name, path })
 }
 
 // A share link's token taken out of a URL once kay has read it, so a page never sees it in `ctx.url` or `ctx.query`, nor copies it into its own links.

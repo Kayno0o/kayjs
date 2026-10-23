@@ -56,7 +56,7 @@ export const OPERATIONS: Operation[] = [
 
 // Starts an app's server in its own process and returns its URL; `env` adds to the environment it gets.
 export async function serve(app: AppName, env: Record<string, string> = {}): Promise<{ url: string, stop: () => void }> {
-  const child = Bun.spawn([process.execPath, join(import.meta.dir, 'serve.ts'), app], { stdout: 'pipe', stderr: 'inherit', env: { ...process.env, NODE_ENV: 'production', ...env } })
+  const child = Bun.spawn([process.execPath, join(import.meta.dir, 'serve.ts'), app], { stdout: 'pipe', stderr: 'inherit', env: { ...process.env, KAY_EPHEMERAL_SECRET: '1', NODE_ENV: 'production', ...env } })
   const reader = child.stdout.getReader()
   let output = ''
 

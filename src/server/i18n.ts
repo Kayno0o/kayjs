@@ -14,8 +14,10 @@ import { FILE_EXTENSION, flattenMessages, localePath, matchLinksWith, pathSegmen
 import { localeState } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
 import { acceptedLocales, LOCALE_TAG, matchLocale } from './accept-language'
+import { overHttps } from './actions'
 import { routerPath } from './base'
 import { importModule } from './bundle'
+import { cookieName, prefixedNames } from './cookie-names'
 import { requestCookies } from './cookies'
 import { renamedMessageKey } from './legacy-keys'
 import { compiledLinks, forgetLinks } from './links'
@@ -423,7 +425,9 @@ export function preferredLocale(settings: LocaleSettings, request: Request): str
 export function cookieLocale(request: Request): string | undefined {
   const cookies = requestCookies(request)
 
-  return cookies.get(LOCALE_COOKIE) ?? cookies.get(LEGACY_LOCALE_COOKIE) ?? undefined
+  const names = overHttps(request) ? prefixedNames(LOCALE_COOKIE) : [LOCALE_COOKIE]
+
+  return names.map(name => cookies.get(name)).find(value => value !== null) ?? cookies.get(LEGACY_LOCALE_COOKIE) ?? undefined
 }
 
 // The locale an action runs in: its host's, its page's, as the `Referer` or the form names it, or the visitor's preferred one.
@@ -453,7 +457,7 @@ export function acceptedLocale(locales: readonly string[], header: string | null
 
 // Remembers the locale a visitor went to, so an unprefixed path takes them back to it.
 export function localeCookie(locale: string, secure: boolean, base = ''): string {
-  return `${LOCALE_COOKIE}=${locale}; Path=${base || '/'}; Max-Age=${COOKIE_MAX_AGE}; SameSite=Lax${secure ? '; Secure' : ''}`
+  return `${cookieName(LOCALE_COOKIE, secure, base)}=${locale}; Path=${base || '/'}; Max-Age=${COOKIE_MAX_AGE}; SameSite=Lax${secure ? '; Secure' : ''}`
 }
 
 // A copy of a page path in one locale: the path it is served at, on its own host when locales go by domain, and the key its prerendered file goes by.

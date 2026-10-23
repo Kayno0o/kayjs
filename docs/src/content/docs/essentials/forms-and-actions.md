@@ -495,6 +495,6 @@ export const contact = action(schema, send, {
 
 `minTime` stamps are signed with a key made from the app's secret, `KAY_SECRET` or `secret` in `kay.config.ts` ([The app secret](/guides/sessions-and-guards#the-app-secret)), so an app with no `session()` needs no more.
 
-Without one, a production server signs with a key of its own process. A restart changes that key and other replicas do not share it, and the server says so once in its log.
+Without one, a production server refuses to start, as it would sign with a key of its own process. A restart changes that key and other replicas do not share it. `KAY_EPHEMERAL_SECRET=1` starts it anyway, for a single throwaway server that says so once in its log.
 
 <ReadMore href="/llms/action-protection">Your own proof of work check, shared rate limit stores, refusal messages and body limits.</ReadMore>

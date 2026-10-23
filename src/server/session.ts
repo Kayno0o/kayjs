@@ -14,7 +14,7 @@ import { nodeCrypto } from './builtins'
 import { requestCookies } from './cookies'
 import { onReload } from './reload'
 import { readPersonally } from './scope'
-import { GENERATE_SECRET, MIN_SECRET_LENGTH, openWith, sealWith, weakSecrets } from './seal'
+import { GENERATE_SECRET, MIN_SECRET_LENGTH, openWith, sealWith, warnLowEntropy, weakSecrets } from './seal'
 import { appSecrets, noAppSecret, useStampSecret } from './stamp'
 
 export type SessionData = Record<string, unknown>
@@ -127,7 +127,10 @@ export function session<Data extends object = SessionData>(options: SessionOptio
   if (secrets.some(secret => PUBLISHED_SECRETS.has(secret)))
     throw new KayError('config-invalid', `kay: the session secret is the placeholder an older \`kay new\` wrote to .env.example, which anyone can read; generate one with ${GENERATE_SECRET}`)
 
-  const keys = secrets.map(secret => nodeCrypto().createHash('sha256').update(secret).digest())
+  warnLowEntropy(secrets, 'a session secret')
+
+  // The key of each secret is derived for the cookie; the bare digest an older kay sealed under still opens, and a session read with it is sealed again under the derived one.
+  const keys = [...secrets.map(secret => Buffer.from(nodeCrypto().hkdfSync('sha256', secret, '', 'kay session cookie', 32))), ...secrets.map(secret => nodeCrypto().createHash('sha256').update(secret).digest())]
 
   useStampSecret(secrets, 'session')
   const domain = options.domain?.trim().toLowerCase().replace(LEADING_DOT, '')

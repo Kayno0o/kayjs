@@ -4,6 +4,7 @@ root = "./tests"
 preload = [
   "./tests/one-run.ts",
   "./tests/timeout.ts",
+  "./tests/ephemeral-secret.ts",
   "./src/test/browser.ts",
   "./src/test/sites.ts",
   "./tests/leaks.ts"

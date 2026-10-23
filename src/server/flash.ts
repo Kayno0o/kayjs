@@ -2,9 +2,10 @@ import type { CookieMap } from 'bun'
 import { isSecret } from '../runtime/form'
 import { kayLog } from '../runtime/log'
 import { decodeValue, encodeValue, unsendable } from '../runtime/wire'
+import { cookieName } from './cookie-names'
 import { openText, sealText } from './stamp'
 
-// A plain form post that succeeded goes back to its page through a redirect; this cookie carries what it returned, sealed, as it may be a secret shown once such as a new API token, for that one page render.
+// A plain form post that succeeded goes back to its page through a redirect; this cookie carries what it returned, sealed under its own name, as it may be a secret shown once such as a new API token, for that one page render.
 export const FLASH_COOKIE = 'kay_flash'
 
 export interface Flash {
@@ -56,9 +57,10 @@ export function writeSuccess(cookies: CookieMap, success: SuccessFlash, secure =
 // Sets the cookie, or says why it cannot: too big, or holding what has no encoding.
 function setFlash(cookies: CookieMap, value: SuccessFlash, secure: boolean, base: string): string | undefined {
   let encoded: string
+  const name = flashName(secure, base)
 
   try {
-    encoded = sealText(FLASH_COOKIE, encodeValue(value))
+    encoded = sealText(FLASH_COOKIE, encodeValue(value), name)
   }
   catch (error) {
     const reason = unsendable(error)
@@ -72,9 +74,14 @@ function setFlash(cookies: CookieMap, value: SuccessFlash, secure: boolean, base
   if (encoded.length > MAX_LENGTH)
     return `it takes ${encoded.length} bytes, over the ${MAX_LENGTH} it may`
 
-  cookies.set(FLASH_COOKIE, encoded, { httpOnly: true, sameSite: 'lax', maxAge: 60, path: flashPath(base), secure })
+  cookies.set(name, encoded, { httpOnly: true, sameSite: 'lax', maxAge: 60, path: flashPath(base), secure })
 
   return undefined
+}
+
+// The name the flash cookie goes out and is read under.
+export function flashName(secure: boolean, base: string): string {
+  return cookieName(FLASH_COOKIE, secure, base)
 }
 
 // The flash goes with the pages of the site, so under a `base` its cookie is that path's alone: another app on the host never meets it, nor deletes it.
@@ -83,9 +90,9 @@ export function flashPath(base: string): string {
 }
 
 // Its shape is checked before a page reads it all the same; one that does not open, forged or sealed before a restart changed the secret, reads as none.
-export function readFlash(cookies: CookieMap): SuccessFlash | undefined {
-  const value = cookies.get(FLASH_COOKIE)
-  const text = value === null || value === '' ? undefined : openText(FLASH_COOKIE, value)
+export function readFlash(cookies: CookieMap, name: string): SuccessFlash | undefined {
+  const value = cookies.get(name)
+  const text = value === null || value === '' ? undefined : openText(FLASH_COOKIE, value, name)
 
   if (text === undefined)
     return undefined

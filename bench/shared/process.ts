@@ -88,7 +88,7 @@ export async function loadNow(): Promise<number> {
 
 // A compiled bench server started, once it printed the port it listens on.
 export async function started(executable: string): Promise<{ server: Bun.Subprocess<'ignore', 'pipe', 'ignore'>, origin: string }> {
-  const server = Bun.spawn([executable], { stdout: 'pipe', stderr: 'ignore', env: { ...process.env, NODE_ENV: 'production' } })
+  const server = Bun.spawn([executable], { stdout: 'pipe', stderr: 'ignore', env: { ...process.env, KAY_EPHEMERAL_SECRET: '1', NODE_ENV: 'production' } })
   let output = ''
 
   for await (const chunk of server.stdout) {

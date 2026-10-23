@@ -140,7 +140,7 @@ export function pageResponder({ client, renderOptions, prerendered, settings, tr
       return render()
 
     // How a form post went is for the visitor who sent it.
-    if (hasFlash(context.request) || handedOverFlash(context.request))
+    if (hasFlash(context.request, renderOptions.base ?? '') || handedOverFlash(context.request))
       return forVisitor(render)
 
     const revalidating = revalidateStale(page, async () => prerender(route, params, url, key), error => reportServerError(error, context.request, renderOptions.onError))

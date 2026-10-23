@@ -42,7 +42,7 @@ export async function serverMarkup(path: string): Promise<string[]> {
 
 // The document an app serves for a path, rendered in a process of its own.
 export async function serverHtml(app: AppName, path: string): Promise<string> {
-  const child = Bun.spawn([process.execPath, join(import.meta.dir, 'render.ts'), app, path], { stdout: 'pipe', stderr: 'inherit', env: { ...process.env, NODE_ENV: 'production' } })
+  const child = Bun.spawn([process.execPath, join(import.meta.dir, 'render.ts'), app, path], { stdout: 'pipe', stderr: 'inherit', env: { ...process.env, KAY_EPHEMERAL_SECRET: '1', NODE_ENV: 'production' } })
   const [html, code] = await Promise.all([new Response(child.stdout).text(), child.exited])
 
   if (code !== 0)

@@ -1319,6 +1319,23 @@ describe('the collections a CMS edits', () => {
 })
 
 describe('preview mode', () => {
+  it('goes out as __Host-kay_preview over https, is read under that name alone and is cleared under every name', async () => {
+    const https = { 'x-forwarded-proto': 'https' }
+    const entered = await app.handle(new Request(`http://localhost${previewUrl('/news/roadmap')}`, { headers: https }))
+    const [, value] = (/^__Host-kay_preview=([^;]+); Path=\/;.*Secure/).exec(entered.headers.get('set-cookie') ?? '') ?? []
+    const read = async (cookie: string) => (await (await app.handle(new Request('http://localhost/news', { headers: { ...https, cookie } }))).text()).includes('Next year')
+
+    expect(value).toBeDefined()
+    expect(await read(`__Host-kay_preview=${value}`)).toBe(true)
+    // The plain name, which another host of the site may have set, and the other prefix are not read over https.
+    expect(await read(`kay_preview=${value}`)).toBe(false)
+    expect(await read(`__Secure-kay_preview=${value}`)).toBe(false)
+
+    const left = await app.handle(new Request('http://localhost/_kay/preview?exit&path=/news', { headers: https }))
+
+    expect(left.headers.getSetCookie().map(header => header.slice(0, header.indexOf('=')))).toEqual(['kay_preview', '__Host-kay_preview', '__Secure-kay_preview'])
+  })
+
   it('lets in a signed link, and refuses any other, one carrying the secret itself included', async () => {
     const link = previewUrl('/news/roadmap')
     const entered = await app.handle(new Request(`http://localhost${link}`))

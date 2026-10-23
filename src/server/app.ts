@@ -90,6 +90,7 @@ import { setupPages } from './setup'
 import { setSiteFacts } from './site-facts'
 import { serveSitemap } from './sitemap'
 import { markPageStale, trackPrerendered } from './stale-pages'
+import { refuseProcessKey } from './stamp'
 import { serveFiles } from './storage'
 import { answerUncaught } from './uncaught'
 import { serveViolationReports } from './violations'
@@ -469,10 +470,13 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     servePublicEnv(app, options.publicEnv, publicModules)
 
   // `kay dev` restarts the process on every change, so it has nothing to wait for.
-  if (mode.devRoutes)
+  if (mode.devRoutes) {
     serveDevRoutes(app, root, client, mode, base, options.extensions)
-  else
+  }
+  else {
+    app.onStart(refuseProcessKey)
     stopOnSignal(app, lifecycle, options.shutdownTimeout)
+  }
 
   // After kay's own hooks, so their routes are logged and compressed as the pages are, and before the pages, actions and API modules whose context they derive.
   const mountedByExtensions: OwnRoutes['extensions'] = []

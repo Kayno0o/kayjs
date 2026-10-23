@@ -28,7 +28,7 @@ Every cookie above but the persisted one, including `kay_analytics`, which only 
 
 `kay_user` only tells a script of the site that a person is signed in, and `kay_editor` that the browser is an editor's. `kay_editor_session` is `httpOnly`, and so is a `ksteps_<name>` draft, which holds what the visitor typed in the steps so far.
 
-Under a `base`, `kay_flash`, `kay_locale` and `kay_preview` are set for that path alone. Before 1.52 the locale cookie was `kay-locale`; kay still reads it.
+Over https those three go out as `__Host-kay_flash`, `__Host-kay_locale` and `__Host-kay_preview`, so no other host of the site can set them. Under a `base` they are set for that path alone and named `__Secure-`, as `__Host-` asks for the whole site. Before 1.52 the locale cookie was `kay-locale`; kay still reads it.
 
 ## Browser storage
 

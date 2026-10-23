@@ -56,6 +56,19 @@ Umami without a `host` (or with `https://cloud.umami.is`) now waits for the visi
 ### A loaded collection sanitizes its entries
 
 The `body` and `html` a loader gives are sanitized like a user's Markdown: scripts, handlers, styles, iframes, comments, `javascript:` links, and attributes such as `class`, `style` and `width` are dropped, and a link leaving the site gets `rel="nofollow ugc"`. Links to the site, relative URLs and heading anchors are kept. A loader returning content its author wrote, such as your own CMS's HTML, adds `trusted: true` to the collection's options to keep it as it was; `kay check` reports `trusted` on a folder collection.
+### A production server needs `KAY_SECRET`, and kay's cookies are prefixed
+
+A production server with no `KAY_SECRET` (or `secret` in kay.config.ts) refuses to start, as it signed form stamps, private-file links and the flash with a key of its process; set one, or `KAY_EPHEMERAL_SECRET=1` for a single throwaway server. `kay build --compile server --verify` sets it itself.
+
+Over https `kay_flash`, `kay_locale` and `kay_preview` are `__Host-kay_flash` and so on, `__Secure-` under a `base`; a plain-named one over https is no longer read, so a flash in flight, a returning visitor's locale choice and an open preview session are lost once. Code reading them by hand looks for the prefixed name. `kay_session` cookies sealed with the bare digest of the secret still open, and are sealed again under a derived key.
+
+### The OpenAPI document leaves out guarded routes for an unguarded reader
+
+`x-kay-guards`, which named guard files, is `x-kay-guarded: true`. The document and reference page served at `openapi.path` list a guarded route and action only where a guard covers the API directory; elsewhere they are left out (the MCP tool list is unchanged). Remote images and files kept in the image cache are keyed by a SHA-256 of their address or path, so the cache fills again once.
+
+### `external-redirect`, `security.hosts` and a metrics token
+
+`kay check` warns (`external-redirect`, group security) of `redirect()` given a value from the request; check the path with `startsWith('/')` and not `//`. A production server logs a warning at every boot while `KAY_METRICS_TOKEN` is unset. `security: { hosts: true }` answers 421 to a Host that is not the site's, and `mcp` routes answer 429 past 120 requests a minute per client (`mcp: { rateLimit }`).
 
 ### kayjs-ui props take enum values: `variant`, `size` and `pixels`
 

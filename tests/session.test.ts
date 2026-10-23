@@ -14,7 +14,7 @@ import { setupStore } from '../src/server/app-store'
 import { readClient } from '../src/server/client'
 import { renderPage } from '../src/server/render'
 import { scanRoutes } from '../src/server/routes'
-import { sealWith } from '../src/server/seal'
+import { openWith, sealWith } from '../src/server/seal'
 import { sqliteStoreAt } from '../src/server/session'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
@@ -427,6 +427,17 @@ describe('sessions', () => {
       process.env.NODE_ENV = env
       setSite(before?.origin, before?.slashed ? 'always' : undefined)
     }
+  })
+
+  it('opens a cookie sealed under the bare digest of the secret, as an older kay did, and seals it again under a key derived for the cookie', async () => {
+    const digest = new Bun.CryptoHasher('sha256').update(SECRET).digest()
+    const legacy = `kay_session=${sealWith(digest, stringify({ data: { count: 1 }, issued: Math.floor(Date.now() / 1000) }), 'kay_session')}`
+    const response = await counter().handle(new Request('http://localhost/peek', { headers: { cookie: legacy } }))
+    const resealed = COOKIE_VALUE.exec(response.headers.getSetCookie()[0]!)![1]!
+
+    expect(await response.text()).toBe('1')
+    expect(openWith([digest], resealed, 'kay_session')).toBeUndefined()
+    expect(await (await counter().handle(new Request('http://localhost/peek', { headers: { cookie: `kay_session=${resealed}` } }))).text()).toBe('1')
   })
 
   it('reads a cookie from before kay counted a session\'s start, counting it from when it was written', async () => {

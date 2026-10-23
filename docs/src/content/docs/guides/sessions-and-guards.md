@@ -113,7 +113,7 @@ A library that must follow the app's session reads `ctx.locals.session.settings`
 
 kay has one secret, `KAY_SECRET` (or `secret` in `kay.config.ts`, which wins), at least 32 random characters. Generate one with `bun -e "console.log(crypto.randomUUID() + crypto.randomUUID())"`. It serves everything kay seals or signs, each under a key of its own: the session cookie, kayjs-auth, form stamps, links to private files, the flash cookie and preview links. Nothing else needs a secret, so a site needs no `SESSION_SECRET`, `AUTH_SECRET` or `PREVIEW_SECRET`.
 
-Development and tests derive one for the checkout, so a fresh clone runs with nothing set. A production site without it refuses `session()` and `preview`, naming `KAY_SECRET`.
+Development and tests derive one for the checkout, so a fresh clone runs with nothing set. A production site without it refuses `session()` and `preview`, naming `KAY_SECRET`, and refuses to start at all. `KAY_EPHEMERAL_SECRET=1` starts a single throwaway server anyway. A secret of fewer than 10 different characters warns in production.
 
 `session()` reads it from the environment when it is called. Keep the secret in `KAY_SECRET`, or give `session({ secret })` yourself.
 
@@ -129,7 +129,7 @@ To keep a session secret apart from the app's, give it a list of its own: `sessi
 
 A cookie sealed by an older secret is sealed again with the first on its next use. Drop the old secret once those cookies have expired.
 
-Form stamps, links to private files and the flash cookie are signed with a key from the first secret too. A rotation refuses the ones already out.
+Form stamps, links to private files, the flash cookie and preview links are signed with a key from the first secret too, and every secret in the list verifies them, so a rotation breaks none of the ones already out.
 
 ### The cookie
 
@@ -275,6 +275,8 @@ export const env = defineEnv(s.Object({
 }))
 ```
 
-Nothing else of the environment reaches the browser. The server refuses to boot when an `s.Public` field names a variable that looks secret, such as `DATABASE_URL`, `API_KEY` or one with `SECRET`, `PASSWORD`, `PRIVATE` or `TOKEN` in its name. Every visitor reads those, so keep them in `defineEnv` without `s.Public`. The `publicEnv` key of `kay.config.ts` still works until 1.73; move its fields to `defineEnv`.
+Nothing else of the environment reaches the browser. The server refuses to boot when an `s.Public` field names a variable that looks secret, such as `DATABASE_URL`, `API_KEY`, `SIGNING_KEY` or `SENTRY_DSN`, or one with `SECRET`, `PASSWORD`, `PRIVATE`, `TOKEN`, `JWT` or `CREDENTIAL` in its name. Every visitor reads those, so keep them in `defineEnv` without `s.Public`.
+
+A value that is an address with a username and password in it is refused too. A key meant for the browser, such as `MAP_KEY` or `STRIPE_PUBLISHABLE_KEY`, passes. The `publicEnv` key of `kay.config.ts` still works until 1.73; move its fields to `defineEnv`.
 
 <ReadMore href="/llms/environment#environment">Required-in-production fields, empty variables, `kay env` and how a prerendered page sees public variables are in the full server reference.</ReadMore>

@@ -63,7 +63,7 @@ async function assertSameMarkup(browser: Browser) {
 }
 
 async function ssr(app: string): Promise<SsrResult> {
-  const child = Bun.spawn([process.execPath, join(import.meta.dir, 'ssr.ts'), app], { stdout: 'pipe', stderr: 'inherit', env: { ...process.env, NODE_ENV: 'production' } })
+  const child = Bun.spawn([process.execPath, join(import.meta.dir, 'ssr.ts'), app], { stdout: 'pipe', stderr: 'inherit', env: { ...process.env, KAY_EPHEMERAL_SECRET: '1', NODE_ENV: 'production' } })
   const [output, code] = await Promise.all([new Response(child.stdout).text(), child.exited])
 
   if (code !== 0)

@@ -155,8 +155,19 @@ export function describeEnv(schema: EnvSchemaRecord): EnvVariable[] {
   })
 }
 
-// Names a variable meant for the server alone goes by, which no visitor should read: a map or analytics key is public by design, a secret, a token, an API key or a database address never is.
-const SERVER_ONLY = /SECRET|PASSWORD|PASSWD|PRIVATE|TOKEN|(?:^|_)API_?KEY$|(?:^|_)(?:DATABASE|DB|POSTGRES|PG|MYSQL|REDIS|MONGO(?:DB)?)_URL$/i
+// Names a variable meant for the server alone goes by, which no visitor should read: a secret, a token, a credential, a JWT, a DSN, an API key, a signing or encryption key or a database address never is public.
+const SERVER_ONLY = /SECRET|PASSWORD|PASSWD|PRIVATE|TOKEN|CREDENTIAL|JWT|(?:^|_)DSN$|(?:^|_)API_?KEY$|(?:^|_)(?:DATABASE|DB|POSTGRES|PG|MYSQL|REDIS|MONGO(?:DB)?)_URL$/i
+
+// Any other name ending in KEY is refused too, unless it says it is meant for the browser: a map, analytics, captcha or publishable key is public by design.
+const KEY_NAME = /(?:^|_)KEY$/i
+const PUBLIC_KEY = /PUBLIC|PUBLISHABLE|MAPS?(?:_|$|BOX)|ANALYTICS|SITE|CAPTCHA|TURNSTILE|CLIENT/i
+
+// An address that carries its own username and password, such as a database or a queue one.
+const CREDENTIAL_URL = /^[a-z][\d+.a-z-]*:\/\/[^\s/:@]*:[^\s/@]+@/i
+
+function serverOnly(name: string): boolean {
+  return SERVER_ONLY.test(name) || (KEY_NAME.test(name) && !PUBLIC_KEY.test(name))
+}
 
 interface PublicDeclared {
   // The module that called `defineEnv`, so an app takes the values of its own modules alone when several boot in one process.
@@ -176,7 +187,7 @@ function publicOf(schema: EnvSchema, values: Record<string, unknown>, owner: str
   if (names.length === 0)
     return undefined
 
-  const exposed = names.filter(name => SERVER_ONLY.test(name) || (schema.properties[name] as { secret?: unknown }).secret === true)
+  const exposed = names.filter(name => serverOnly(name) || (schema.properties[name] as { secret?: unknown }).secret === true)
 
   if (exposed.length > 0)
     throw new KayError('config-invalid', `kay: ${owner} declares ${exposed.join(', ')}, which every visitor reads from ${PUBLIC_ENV_PATH}; keep a secret in defineEnv without s.Public, read on the server alone`)
@@ -186,10 +197,15 @@ function publicOf(schema: EnvSchema, values: Record<string, unknown>, owner: str
   for (const name of names) {
     const descriptor = Object.getOwnPropertyDescriptor(values, name)
 
-    if (descriptor?.get !== undefined)
+    if (descriptor?.get !== undefined) {
       found.unread.push(name)
-    else if (descriptor !== undefined && descriptor.value !== undefined)
+    }
+    else if (descriptor !== undefined && descriptor.value !== undefined) {
+      if (typeof descriptor.value === 'string' && CREDENTIAL_URL.test(descriptor.value))
+        throw new KayError('config-invalid', `kay: ${owner} declares ${name}, whose value is an address with a username and password in it, which every visitor reads from ${PUBLIC_ENV_PATH}; keep it in defineEnv without s.Public, read on the server alone`)
+
       found.values[name] = descriptor.value
+    }
   }
 
   return found

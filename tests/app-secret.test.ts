@@ -27,7 +27,7 @@ async function isolated(script: string, env: Record<string, string>, cwd?: strin
   const [out, err] = await Promise.all([new Response(run.stdout).text(), new Response(run.stderr).text()])
   const code = await run.exited
 
-  return { out: out.trim() === '' ? undefined : JSON.parse(out), err, code }
+  return { out: out.trim() === '' ? undefined : JSON.parse(out.trim().split('\n').at(-1)!), err, code }
 }
 
 describe('the app secret', () => {
@@ -39,6 +39,69 @@ console.log(JSON.stringify([await read(build(), sealed), await read(build('${FIR
 
     expect(err).not.toContain('error')
     expect(out).toEqual(['1', '1', 'none'])
+  })
+
+  it('warns in production of a secret long enough but of few different characters, in a session and in the config, and not of a random one', async () => {
+    const warned = (err: string) => err.includes('fewer than 10 different characters')
+    const weak = 'a'.repeat(40)
+    const random = 'f3a9c1d7-52b8-4e6a-9d04-7b1c8e2a5f60'
+
+    expect(warned((await isolated(`build('${weak}')`, { NODE_ENV: 'production' })).err)).toBe(true)
+    expect(warned((await isolated(`setupStampSecret('${weak}')`, { NODE_ENV: 'production' })).err)).toBe(true)
+    expect(warned((await isolated(`build('${random}')`, { NODE_ENV: 'production' })).err)).toBe(false)
+    expect(warned((await isolated(`build('${weak}')`, { NODE_ENV: 'development' })).err)).toBe(false)
+  })
+
+  it('refuses to start a production server on a key of its process, unless a secret is set or an ephemeral key is asked for', async () => {
+    const start = async (env: Record<string, string>, secret = '') => (await isolated(`
+import { refuseProcessKey, warnOnStampKey } from '${ROOT}/src/server/stamp'
+${secret}
+warnOnStampKey(true)
+try {
+  refuseProcessKey()
+  console.log(JSON.stringify('started'))
+}
+catch (error) {
+  console.log(JSON.stringify(error.message))
+}
+`, { NODE_ENV: 'production', KAY_EPHEMERAL_SECRET: '', ...env })).out as string
+
+    const refused = await start({})
+
+    expect(refused).toContain('KAY_SECRET')
+    expect(refused).toContain('KAY_EPHEMERAL_SECRET=1')
+    expect(await start({ KAY_EPHEMERAL_SECRET: '1' })).toBe('started')
+    expect(await start({}, `setupStampSecret('${FIRST}')`)).toBe('started')
+    expect(await start({ KAY_EPHEMERAL_SECRET: 'yes' })).toContain('KAY_EPHEMERAL_SECRET=1')
+  })
+
+  it('stops the listen of a production app with no secret, and lets one with a secret or an ephemeral key through', async () => {
+    const listen = async (env: Record<string, string>) => {
+      const script = `
+import { Elysia } from '${ROOT}/node_modules/elysia'
+import { pages } from '${ROOT}/src/server'
+const app = new Elysia().use(await pages({ root: '${ROOT}/tests/fixtures/production', prebuilt: false, security: false }))
+try {
+  app.listen(0)
+  console.log(JSON.stringify('listening'))
+  await app.stop()
+}
+catch (error) {
+  console.log(JSON.stringify(error.message))
+}
+process.exit(0)
+`
+      const run = Bun.spawn([process.execPath, '-e', script], { cwd: join(ROOT, 'tests/fixtures/production'), env: { ...process.env, KAY_SECRET: undefined, NODE_ENV: 'production', KAY_EPHEMERAL_SECRET: '', ...env }, stdout: 'pipe', stderr: 'ignore' })
+      const out = await new Response(run.stdout).text()
+
+      await run.exited
+
+      return JSON.parse(out.trim().split('\n').at(-1)!) as string
+    }
+
+    expect(await listen({})).toContain('KAY_EPHEMERAL_SECRET=1')
+    expect(await listen({ KAY_EPHEMERAL_SECRET: '1' })).toBe('listening')
+    expect(await listen({ KAY_SECRET: FIRST })).toBe('listening')
   })
 
   it('takes `secret` in kay.config.ts over KAY_SECRET', async () => {

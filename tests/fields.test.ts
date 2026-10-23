@@ -105,7 +105,7 @@ describe('servePublicEnv', () => {
   })
 
   it('refuses to boot with a variable named as a secret, a token, an API key or a database address', () => {
-    const names = ['KAY_TEST_STRIPE_SECRET', 'KAY_TEST_ACCESS_TOKEN', 'KAY_TEST_TOKEN_HASH', 'KAY_TEST_API_KEY', 'KAY_TEST_STRIPE_API_KEY', 'API_KEY', 'KAY_TEST_APIKEY', 'KAY_TEST_DATABASE_URL']
+    const names = ['KAY_TEST_STRIPE_SECRET', 'KAY_TEST_ACCESS_TOKEN', 'KAY_TEST_TOKEN_HASH', 'KAY_TEST_API_KEY', 'KAY_TEST_STRIPE_API_KEY', 'API_KEY', 'KAY_TEST_APIKEY', 'KAY_TEST_DATABASE_URL', 'KAY_TEST_SIGNING_KEY', 'KAY_TEST_ENCRYPTION_KEY', 'KAY_TEST_KEY', 'KAY_TEST_SENTRY_DSN', 'KAY_TEST_JWT', 'KAY_TEST_AUTH_JWT_SIGNER', 'KAY_TEST_AWS_CREDENTIALS', 'KAY_TEST_CREDENTIAL']
 
     Object.assign(process.env, { KAY_TEST_MAP_KEY: 'pk', ...Object.fromEntries(names.map(name => [name, 'sk'])) })
 
@@ -144,11 +144,22 @@ describe('s.Public', () => {
     }
   })
 
-  it('refuses a public field named as a secret, a token or a database address, and a secret one', () => {
-    for (const name of ['KAY_TEST_STRIPE_SECRET', 'KAY_TEST_ACCESS_TOKEN', 'KAY_TEST_API_KEY', 'KAY_TEST_DATABASE_URL'])
+  it('refuses a public field named as a secret, a token, a key, a DSN or a database address, and a secret one', () => {
+    for (const name of ['KAY_TEST_STRIPE_SECRET', 'KAY_TEST_ACCESS_TOKEN', 'KAY_TEST_API_KEY', 'KAY_TEST_DATABASE_URL', 'KAY_TEST_SIGNING_KEY', 'KAY_TEST_JWT_SIGNER', 'KAY_TEST_SENTRY_DSN', 'KAY_TEST_CLOUD_CREDENTIALS'])
       expect(() => defineEnv(s.Object({ [name]: s.Public(s.String()) }), { [name]: 'v' }), name).toThrow(`kay: s.Public declares ${name}, which every visitor reads`)
 
     expect(() => defineEnv(s.Object({ KAY_TEST_MAP_KEY: s.Public(s.Secret()) }), { NODE_ENV: 'test' })).toThrow('kay: s.Public declares KAY_TEST_MAP_KEY')
+  })
+
+  it('lets a key meant for the browser through, and refuses a value that is an address with a password in it', () => {
+    for (const name of ['KAY_TEST_MAP_KEY', 'KAY_TEST_MAPS_KEY', 'KAY_TEST_MAPBOX_KEY', 'KAY_TEST_STRIPE_PUBLISHABLE_KEY', 'KAY_TEST_PUBLIC_KEY', 'KAY_TEST_ANALYTICS_KEY', 'KAY_TEST_SITE_KEY', 'KAY_TEST_TURNSTILE_KEY'])
+      expect(() => defineEnv(s.Object({ [name]: s.Public(s.String()) }), { [name]: 'pk' }), name).not.toThrow()
+
+    for (const value of ['postgres://app:hunter2@db.example/app', 'https://user:pass@sentry.example/1', 'redis://:pw@cache'])
+      expect(() => defineEnv(s.Object({ KAY_TEST_BACKEND: s.Public(s.String()) }), { KAY_TEST_BACKEND: value }), value).toThrow('kay: s.Public declares KAY_TEST_BACKEND, whose value is an address with a username and password')
+
+    for (const value of ['https://api.example/v1', 'https://example.com/path?x=a:b@c', 'mailto:me@example.com'])
+      expect(() => defineEnv(s.Object({ KAY_TEST_BACKEND: s.Public(s.String()) }), { KAY_TEST_BACKEND: value }), value).not.toThrow()
   })
 
   it('serves the values of the modules each boot names, not those another boot of the process left', async () => {

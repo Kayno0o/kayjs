@@ -1,3 +1,5 @@
+import process from 'node:process'
+import { kayLog } from '../runtime/log'
 import { nodeCrypto } from './builtins'
 
 const IV_BYTES = 12
@@ -10,6 +12,15 @@ export const GENERATE_SECRET = '`bun -e "console.log(crypto.randomUUID() + crypt
 // Whether a list of secrets, the first writing and every one reading, is empty or holds one too short to resist guessing.
 export function weakSecrets(secrets: string[]): boolean {
   return secrets.length === 0 || secrets.some(secret => secret.length < MIN_SECRET_LENGTH)
+}
+
+// Fewer distinct characters than any random secret of the minimum length has, such as a repeated word or one character typed again and again.
+const MIN_DISTINCT = 10
+
+// Warns, in production, of a secret long enough that is still easy to guess, as `where` holds it.
+export function warnLowEntropy(secrets: string[], where: string): void {
+  if (process.env.NODE_ENV === 'production' && secrets.some(secret => new Set(secret).size < MIN_DISTINCT))
+    kayLog('warn', `${where} holds a secret of fewer than ${MIN_DISTINCT} different characters, which is easy to guess whatever its length: generate one with ${GENERATE_SECRET}`)
 }
 
 // AES-256-GCM: what it seals can be neither read nor altered without `key`, nor passed off under another `context`, such as another cookie's name or another row.

@@ -6,7 +6,7 @@ import { kayLog } from '../runtime/log'
 import { WORK_SCRIPT } from '../runtime/swap'
 import { nodeCrypto } from './builtins'
 import { devSecret } from './dev-secret'
-import { GENERATE_SECRET, MIN_SECRET_LENGTH, openWith, sameText, sealWith } from './seal'
+import { GENERATE_SECRET, MIN_SECRET_LENGTH, openWith, sameText, sealWith, warnLowEntropy } from './seal'
 
 const KEY_BYTES = 32
 
@@ -52,7 +52,10 @@ export function setupStampSecret(configured: string | string[] | undefined): voi
   if (secrets === undefined)
     return
 
-  refuseWeak(secrets, fromConfig === undefined ? 'KAY_SECRET' : '`secret` in kay.config.ts')
+  const where = fromConfig === undefined ? 'KAY_SECRET' : '`secret` in kay.config.ts'
+
+  refuseWeak(secrets, where)
+  warnLowEntropy(secrets, where)
   useStampSecret(secrets, 'config')
 }
 
@@ -79,9 +82,18 @@ export function noAppSecret(use: string): KayError {
   return new KayError('config-invalid', `kay: ${use} has no secret: set KAY_SECRET to at least ${MIN_SECRET_LENGTH} random characters; generate one with ${GENERATE_SECRET}`)
 }
 
+let productionServer = false
+
 // A production server says so the first time it signs with the process's own key, which no restart and no other replica shares.
 export function warnOnStampKey(production: boolean): void {
   warnOnProcessKey = production
+  productionServer = production
+}
+
+// A production server refuses to start on the key of its process, as a restart would sign out every session-less form and break every link it gave, and each replica would refuse the others' stamps: `KAY_EPHEMERAL_SECRET=1` asks for one anyway, for a single throwaway server.
+export function refuseProcessKey(): void {
+  if (productionServer && secret.from === 'process' && process.env.KAY_EPHEMERAL_SECRET !== '1')
+    throw new KayError('config-invalid', `kay: no secret is set, so form stamps, links to private files and the flash cookie would be signed with a key of this process, which a restart changes and other replicas do not share: set KAY_SECRET (or \`secret\` in kay.config.ts) to at least ${MIN_SECRET_LENGTH} random characters, generate one with ${GENERATE_SECRET}, or set KAY_EPHEMERAL_SECRET=1 for a single server that may lose them on restart`)
 }
 
 function stampKeys(): Uint8Array[] {

@@ -72,6 +72,7 @@ kay build --compile server --verify
 ```
 
 - It waits on the health route, polled every 50 ms, not a fixed sleep: a server that exits or is killed first, or within 250 ms of its first answer, fails at once, one that never answers fails after 30 s, each printing the last 40 lines of what it wrote (`executable-failed`).
+- It sets `KAY_EPHEMERAL_SECRET=1`, so an app whose `KAY_SECRET` lives on the deploy host starts: a production server without a secret refuses to start otherwise.
 - It runs the app's server entry, so a database or secret the entry needs must be in the build's environment: add it to the CI step that builds the image. A Dockerfile build stage has none, so `--verify-load` there only loads every module the executable carries, as `./server --load`, with the variables missing (a read fails the code using it) and the entry never run, and fails with the output of one that cannot load.
 - The `--health` run fails the build when it has not exited after 10 s.
 - A failed verify writes no record of the executable, so `kay start` runs the entry instead.

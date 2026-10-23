@@ -35,6 +35,7 @@ import { editing } from '../runtime/preview'
 import { BUILD_META } from '../runtime/swap'
 import { hasPageToken, withPageToken } from '../runtime/uid.server'
 import { encodeValue, unsendable } from '../runtime/wire'
+import { overHttps } from './actions'
 import { rebaseHtml } from './base'
 import { importModule, onForgetModules } from './bundle'
 import { INLINE_LIMIT, islandChunks } from './client'
@@ -45,7 +46,7 @@ import { A11Y_SCRIPT, DEV_BOOT, devToolScripts, errorPageScripts, liveReload, pr
 import { noteRedirect } from './dev-notes'
 import { dictionaryAsked } from './dictionary'
 import { entryHeadOf } from './entry-head'
-import { FLASH_COOKIE, flashPath, handedOverFlash, readFlash } from './flash'
+import { FLASH_COOKIE, flashName, flashPath, handedOverFlash, readFlash } from './flash'
 import { formsScript } from './forms'
 import { runGuards } from './guards'
 import { historyScript } from './history'
@@ -720,7 +721,7 @@ function createRendering(context: RequestContext, params: Record<string, unknown
 
     return jar.cookies
   }
-  const readOnce = () => flash ??= handedOverFlash(request) ?? (hasFlash(request) ? readFlash(personalCookies()) ?? null : null)
+  const readOnce = () => flash ??= handedOverFlash(request) ?? (hasFlash(request, base) ? readFlash(personalCookies(), flashName(overHttps(request), base)) ?? null : null)
   // A page asking how a form post went depends on the visitor's cookie, carried or not, so it is theirs either way.
   const asked = () => {
     readPersonally(request)
@@ -744,8 +745,11 @@ function createRendering(context: RequestContext, params: Record<string, unknown
     outcome: asked,
     carried: readOnce,
     writeCookies: () => {
-      if (hasFlash(request))
-        jar.cookies.delete({ name: FLASH_COOKIE, path: flashPath(base) })
+      if (hasFlash(request, base)) {
+        const name = flashName(overHttps(request), base)
+
+        jar.cookies.delete({ name, path: flashPath(base) })
+      }
 
       jar.writeTo(headers)
     },
@@ -802,11 +806,11 @@ function needsRequest(name: string): () => never {
 }
 
 // Whether the request carries the cookie a plain form post that went through leaves, for the page the browser went back to.
-export function hasFlash(request: Request): boolean {
+export function hasFlash(request: Request, base: string): boolean {
   const cookie = request.headers.get('cookie')
 
   // The substring first: most requests carry no such cookie, and parsing is for the few that might.
-  return cookie?.includes(FLASH_COOKIE) === true && requestCookies(request).has(FLASH_COOKIE)
+  return cookie?.includes(FLASH_COOKIE) === true && requestCookies(request).has(flashName(overHttps(request), base))
 }
 
 // A page under a mount point has its paths put under it as it goes out, unless they are already.
