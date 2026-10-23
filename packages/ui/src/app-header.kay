@@ -7,8 +7,8 @@ import SiteNav from './site-nav.kay'
 // 'kui-app-header' stays as the component's name for an app's CSS. A long brand or end area wraps inside its box rather than push the bar past the screen, and the nav comes after the brand in the tab order and on screen, so the menu button comes before the end area; with no end area it takes the far end.
 const look = recipe({
   parts: {
-    root: 'kui-app-header flex items-center gap-4 border-b border-kui-surface2 bg-kui-canvas px-4 py-2 data-sticky:sticky data-sticky:top-0 data-sticky:z-20',
-    brand: 'flex min-w-0 items-center gap-2 font-kui-heading text-kui-text [overflow-wrap:anywhere]',
+    root: 'kui-app-header flex items-center gap-4 border-b border-border bg-background px-4 py-2 data-sticky:sticky data-sticky:top-0 data-sticky:z-20',
+    brand: 'flex min-w-0 items-center gap-2 [font-weight:var(--font-weight-kui-heading,var(--font-weight-semibold))] text-foreground [overflow-wrap:anywhere]',
     nav: 'last:ml-auto lg:last:ml-0',
     end: 'ml-auto flex min-w-0 items-center gap-2 [overflow-wrap:anywhere]',
   },

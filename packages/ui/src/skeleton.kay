@@ -4,16 +4,16 @@ import type { JSX } from 'kay'
 
 const look = recipe({
   parts: {
-    root: 'kui-skeleton flex w-(--kui-skeleton-width,100%) flex-col gap-2',
-    block: 'block h-(--kui-skeleton-height,1em) w-full animate-pulse bg-kui-surface1 motion-reduce:animate-none data-last:w-3/5',
+    root: 'kui-skeleton flex w-(--_skeleton-width,100%) flex-col gap-2',
+    block: 'block h-(--_skeleton-height,1em) w-full animate-pulse bg-surface-strong motion-reduce:animate-none data-last:w-3/5',
     label: 'sr-only',
   },
   variants: {
     // `text` draws `lines` bars, the last one shorter; `avatar` a round block; `card` a block.
     shape: {
       text: '',
-      avatar: { root: 'w-(--kui-skeleton-width,2.5rem)', block: 'aspect-square h-auto rounded-kui-full' },
-      card: { block: 'h-(--kui-skeleton-height,8rem)' },
+      avatar: { root: 'w-(--_skeleton-width,2.5rem)', block: 'aspect-square h-auto rounded-[var(--radius-kui-full,calc(infinity*1px))]' },
+      card: { block: 'h-(--_skeleton-height,8rem)' },
     },
   },
   defaults: { shape: 'text' },
@@ -32,7 +32,7 @@ const { shape = 'text', lines = 1, width, height, label, style, ...rest } = prop
   label?: string | undefined
 }>()
 
-const own = () => [width ? `--kui-skeleton-width: ${width}` : undefined, height ? `--kui-skeleton-height: ${height}` : undefined].filter(Boolean).join('; ')
+const own = () => [width ? `--_skeleton-width: ${width}` : undefined, height ? `--_skeleton-height: ${height}` : undefined].filter(Boolean).join('; ')
 const count = () => shape === 'text' ? Number.isFinite(lines) ? Math.max(1, Math.floor(lines)) : 1 : 1
 ---
 div(part="root" {...rest} data-shape={shape} style={[own(), style].filter(Boolean).join('; ') || undefined})

@@ -7,7 +7,7 @@ import Icon from './icon.kay'
 
 const look = recipe({
   parts: {
-    root: 'kui-widget flex w-full flex-col gap-3 rounded-kui-card border-(length:--kui-border-width) border-solid border-kui-surface2 bg-kui-surface0 p-4 [box-shadow:var(--shadow-raised)]',
+    root: 'kui-widget flex w-full flex-col gap-3 rounded-lg border-[length:var(--kui-border-width,var(--border-width))] border-solid border-border bg-surface p-4 [box-shadow:var(--shadow-raised)]',
     head: 'flex items-center gap-2',
     title: 'min-w-0 flex-1',
   },

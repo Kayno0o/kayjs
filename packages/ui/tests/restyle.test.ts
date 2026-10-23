@@ -165,7 +165,7 @@ describe('the charts and media whose recipe holds their look', () => {
     ['plot', 'col-start-2', 'aspect-video'],
     ['cell', 'transition-transform', 'rounded-full'],
     ['month', 'row-start-1', 'font-medium'],
-    ['viewport', 'bg-kui-surface0', 'rounded-3xl'],
+    ['viewport', 'bg-surface', 'rounded-3xl'],
     ['dot', 'after:absolute', 'size-4'],
     ['stage', 'touch-pan-y', 'rounded-3xl'],
     ['thumb', 'aspect-video', 'opacity-80'],
@@ -211,16 +211,16 @@ describe('the buttons and fields whose recipe holds their look', () => {
 
   test.each([
     ['plain', undefined, 'inline-flex', 'bg-red-600'],
-    ['busy', undefined, 'gap-kui-inline', 'tracking-wide'],
-    ['text', undefined, 'px-kui-field-x', 'h-12'],
-    ['area', undefined, 'px-kui-field-x', 'min-h-32'],
-    ['select', undefined, 'pl-kui-field-x', 'pr-8'],
-    ['field', 'hint', 'text-kui-subtext0', 'text-xs'],
+    ['busy', undefined, 'gap-[var(--spacing-kui-inline,calc(var(--spacing)*1.25*var(--density)))]', 'tracking-wide'],
+    ['text', undefined, 'px-[var(--spacing-kui-field-x,calc(var(--spacing)*2.25*var(--density)))]', 'h-12'],
+    ['area', undefined, 'px-[var(--spacing-kui-field-x,calc(var(--spacing)*2.25*var(--density)))]', 'min-h-32'],
+    ['select', undefined, 'pl-[var(--spacing-kui-field-x,calc(var(--spacing)*2.25*var(--density)))]', 'pr-8'],
+    ['field', 'hint', 'text-muted', 'text-xs'],
     ['field', 'label', 'contents', 'gap-1'],
     ['field', 'head', 'order-first', undefined],
-    ['checkbox', 'input', 'accent-kui-accent', 'size-5'],
-    ['checkbox', 'hint', 'text-kui-subtext0', 'opacity-70'],
-    ['toggle', 'track', 'bg-kui-surface0', 'w-12'],
+    ['checkbox', 'input', 'accent-accent', 'size-5'],
+    ['checkbox', 'hint', 'text-muted', 'opacity-70'],
+    ['toggle', 'track', 'bg-surface', 'w-12'],
   ] as const)('%s %s draws its base, then what src/ui.ts sets after it', (id, part, base, restyle) => {
     const classes = classesOfPart(id, part)
 
@@ -253,7 +253,7 @@ describe('the buttons and fields whose recipe holds their look', () => {
     const dir = await scratchDir('restyle-merge-')
     const words = new Set(html.match(/ class="[^"]*"/g)?.flatMap(attribute => attribute.slice(8, -1).split(' ')))
 
-    await Bun.write(join(dir, 'src', 'app.css'), '@import "tailwindcss";\n@theme { --tracking-kui-action: 0.05em; }\n')
+    await Bun.write(join(dir, 'src', 'app.css'), '@import "tailwindcss";\n@theme { --tracking-label: 0.05em; }\n')
 
     try {
       installClassTable(await buildClassTable(dir, words, []))
@@ -265,7 +265,7 @@ describe('the buttons and fields whose recipe holds their look', () => {
         return (merged.slice(merged.lastIndexOf('<', start), merged.indexOf('>', start)).match(/ class="([^"]*)"/)?.[1] ?? '').split(' ')
       }
 
-      expect(classesOf('busy')).not.toContain('tracking-kui-action')
+      expect(classesOf('busy')).not.toContain('tracking-label')
       expect(classesOf('busy').at(-1)).toBe('tracking-wide')
       expect(classesOf('checkbox', 'input')).not.toContain('size-4')
       expect(classesOf('checkbox', 'input').at(-1)).toBe('size-5')
@@ -328,17 +328,17 @@ describe('a component whose recipe holds its look', () => {
     const card = classesOf('id="card"')
 
     expect(card[0]).toBe('kui-card')
-    expect(card).toContain('rounded-kui-card')
+    expect(card).toContain('rounded-lg')
     expect(card.at(-1)).toBe('rounded-xl')
-    expect(card.indexOf('rounded-kui-card')).toBeLessThan(card.indexOf('rounded-xl'))
-    expect(classesOf('id="badge"')).toEqual(expect.arrayContaining(['kui-badge', '[--kui-badge-color:var(--color-success)]', 'bg-green-100']))
-    expect(classesOf('id="notice"')).toEqual(expect.arrayContaining(['kui-notice', '[--kui-notice-tone:var(--color-danger)]', 'border-2']))
+    expect(card.indexOf('rounded-lg')).toBeLessThan(card.indexOf('rounded-xl'))
+    expect(classesOf('id="badge"')).toEqual(expect.arrayContaining(['kui-badge', '[--_badge-color:var(--color-success)]', 'bg-green-100']))
+    expect(classesOf('id="notice"')).toEqual(expect.arrayContaining(['kui-notice', '[--_notice-tone:var(--color-danger)]', 'border-2']))
   })
 
   test('sets no kui class on its other parts, which carry data-part to select them by', () => {
     expect(html).toMatch(/<div class="[^"]*\bp-6" data-part="head">/)
     expect(html).toMatch(/<h3 class="[^"]*\bitalic" data-part="title">/)
-    expect(html).toMatch(/<div class="p-kui-card p-9" data-part="body">/)
+    expect(html).toMatch(/<div class="p-\[var\(--spacing-kui-card,calc\(var\(--spacing\)\*2\.5\*var\(--density\)\)\)\] p-9" data-part="body">/)
     expect(html).not.toMatch(/kui-card-(?:head|title|body)|kui-badge-icon/)
   })
 })
@@ -354,26 +354,26 @@ describe('the remaining field and button components whose recipe holds their loo
 
   test.each([
     ['root', 'kui-date-input', 'gap-2'],
-    ['separator', 'text-kui-subtext0', 'mx-1'],
-    ['trigger', 'data-empty:text-kui-overlay1', 'min-w-40'],
+    ['separator', 'text-muted', 'mx-1'],
+    ['trigger', 'data-empty:text-[var(--color-kui-overlay1,var(--color-muted))]', 'min-w-40'],
     ['option', 'has-[[data-part=checkbox]:disabled]:opacity-50', 'py-2'],
-    ['action', 'hover:text-kui-text', 'underline'],
+    ['action', 'hover:text-foreground', 'underline'],
     ['option', 'group-aria-busy/segmented:cursor-progress', 'px-5'],
     ['icon', 'size-3.5', 'size-3'],
     ['stars', 'w-max', 'text-amber-500'],
     ['root', 'kui-file-drop', 'border-dotted'],
     ['root', 'kui-copy-btn', 'ring-2'],
     ['text', 'after:content-[attr(data-other)]', 'font-mono'],
-    ['label', '[font-family:var(--font-label,inherit)]', 'font-medium'],
-    ['value', 'text-kui-text', 'tabular-nums'],
+    ['label', '[font-family:var(--font-label,var(--font-kui-body,inherit))]', 'font-medium'],
+    ['value', 'text-foreground', 'tabular-nums'],
     ['label', 'text-xs', 'font-medium'],
     ['chip', 'group-aria-busy/chips:cursor-progress', 'rounded-full'],
     ['root', 'group/radios', 'gap-5'],
     ['choice', 'self-start', 'p-2'],
-    ['label', 'text-kui-text', 'font-medium'],
+    ['label', 'text-foreground', 'font-medium'],
     ['description', 'pl-6', 'text-xs'],
     ['root', 'kui-combobox', 'gap-2'],
-    ['option', 'aria-selected:bg-kui-row-hover', 'py-2'],
+    ['option', 'aria-selected:bg-hover', 'py-2'],
     ['status', 'sr-only', 'text-xs'],
   ] as const)('draws the %s part with %s, then what src/ui.ts sets: %s', (part, base, restyle) => {
     expect(drawn(part, base, restyle)).toBe(true)
@@ -411,26 +411,26 @@ describe('the display components whose recipe holds their look', () => {
   }
 
   test.each([
-    ['avatar', undefined, 'rounded-kui-full', undefined],
-    ['avatar', 'initial', 'font-kui-avatar', 'font-bold'],
-    ['stat', undefined, 'rounded-kui-card', undefined],
+    ['avatar', undefined, 'rounded-[var(--radius-kui-full,calc(infinity*1px))]', undefined],
+    ['avatar', 'initial', '[font-weight:var(--font-weight-kui-avatar,var(--font-weight-semibold))]', 'font-bold'],
+    ['stat', undefined, 'rounded-lg', undefined],
     ['stat', 'value', 'font-semibold', 'tabular-nums'],
     ['header', undefined, 'gap-2', undefined],
     ['header', 'title', 'text-xl', 'tracking-tight'],
     ['section', 'head', 'flex', 'mb-4'],
     ['empty', undefined, 'py-16', undefined],
-    ['empty', 'description', 'text-kui-overlay1', 'italic'],
+    ['empty', 'description', 'text-[var(--color-kui-overlay1,var(--color-muted))]', 'italic'],
     ['row', undefined, 'group/row', undefined],
     ['row', 'body', 'min-w-0', 'px-4'],
     ['widget', undefined, 'p-4', undefined],
     ['widget', 'head', 'flex', 'pb-2'],
     ['widget', 'title', 'min-w-0', 'text-sm'],
-    ['meter', undefined, 'bg-kui-surface0', undefined],
+    ['meter', undefined, 'bg-surface', undefined],
     ['meter', 'fill', 'bg-red-500', 'rounded-full'],
     ['skeleton', undefined, 'flex', 'opacity-60'],
     ['skeleton', 'block', 'animate-pulse', 'rounded-full'],
     ['progress', undefined, 'overflow-hidden', 'h-3'],
-    ['progress', 'fill', 'bg-kui-accent', 'bg-lime-500'],
+    ['progress', 'fill', 'bg-accent', 'bg-lime-500'],
   ] as const)('%s %s draws its base, then what src/ui.ts sets after it', (id, part, base, restyle) => {
     const classes = classesOfPart(id, part)
 
@@ -448,7 +448,7 @@ describe('the display components whose recipe holds their look', () => {
   })
 
   test('a Meter\'s fillClass comes after the accent it replaces', () => {
-    expect(classesOfPart('meter', 'fill').slice(0, 2)).toEqual(['bg-kui-accent', 'bg-red-500'])
+    expect(classesOfPart('meter', 'fill').slice(0, 2)).toEqual(['bg-accent', 'bg-red-500'])
   })
 })
 
@@ -465,7 +465,7 @@ describe('the tables and navigation whose recipe holds their look', () => {
     ['table', 'root', 'overflow-x-auto', 'gap-3'],
     ['table', 'table', 'border-collapse', 'text-sm'],
     ['table', 'headCell', 'px-3', 'uppercase'],
-    ['table', 'cell', 'text-kui-text', 'py-4'],
+    ['table', 'cell', 'text-foreground', 'py-4'],
     ['table', 'sortIcon', 'size-3.5', 'size-4'],
     ['table', 'filterInput', 'max-w-full', 'w-64'],
     ['table', 'count', 'sr-only', 'text-xs'],
@@ -474,17 +474,17 @@ describe('the tables and navigation whose recipe holds their look', () => {
     ['tabs', 'panel', 'pt-4', undefined],
     ['tabs', 'icon', 'shrink-0', 'size-3'],
     ['tabnav', 'link', 'border-b-2', 'font-semibold'],
-    ['sitenav', 'link', 'text-kui-subtext0', 'rounded-md'],
+    ['sitenav', 'link', 'text-muted', 'rounded-md'],
     ['sitenav', 'list', 'lg:flex', 'gap-3'],
     ['sitenav', 'menuIcon', 'group-has-[[data-part=list]:popover-open]/nav:hidden', 'size-6'],
     ['appheader', 'brand', 'min-w-0', 'text-lg'],
     ['appheader', 'end', 'min-w-0', 'ml-auto'],
     ['pager', 'step', 'min-w-9', 'px-4'],
-    ['pager', 'page', 'border-kui-surface2', 'min-w-10'],
-    ['pager', 'gap', 'text-kui-overlay1', 'opacity-50'],
+    ['pager', 'page', 'border-border', 'min-w-10'],
+    ['pager', 'gap', 'text-[var(--color-kui-overlay1,var(--color-muted))]', 'opacity-50'],
     ['breadcrumb', 'list', 'flex-wrap', 'gap-4'],
     ['breadcrumb', 'link', 'hover:underline', 'underline'],
-    ['breadcrumb', 'text', 'aria-[current=page]:text-kui-text', 'font-bold'],
+    ['breadcrumb', 'text', 'aria-[current=page]:text-foreground', 'font-bold'],
     ['steps', 'list', 'flex-wrap', 'gap-4'],
     ['steps', 'marker', 'rounded-full', 'size-8'],
     ['steps', 'state', 'sr-only', undefined],
@@ -535,14 +535,14 @@ describe('the overlays whose recipe holds their look', () => {
     ['dialog', 'body', 'overflow-y-auto', undefined],
     ['menu', 'list', 'flex-col', 'min-w-48'],
     ['menu', 'item', 'cursor-pointer', 'py-3'],
-    ['popover', undefined, 'bg-kui-mantle', 'shadow-xl'],
+    ['popover', undefined, 'bg-popover', 'shadow-xl'],
     ['side', undefined, 'h-dvh', undefined],
     ['side', 'head', 'border-b', 'px-6'],
     ['side', 'title', 'truncate', 'text-lg'],
     ['side', 'body', 'overflow-y-auto', 'px-6'],
     ['kui-command-palette', undefined, 'max-h-[min(70dvh,40rem)]', 'rounded-2xl'],
     ['kui-toaster', undefined, 'fixed', 'z-50'],
-    ['kui-tooltip', undefined, 'bg-kui-surface1', 'text-xs'],
+    ['kui-tooltip', undefined, 'bg-surface-strong', 'text-xs'],
     ['form-dialog', 'footer#2', 'items-center', 'pt-4'],
     ['form-dialog', 'actions', 'ml-auto', 'gap-3'],
   ] as const)('%s %s draws its base, then what src/ui.ts sets after it', (id, part, base, restyle) => {

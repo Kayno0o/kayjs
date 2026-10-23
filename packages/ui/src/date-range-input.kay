@@ -10,7 +10,7 @@ import { wording } from 'kay/words'
 const look = recipe({
   parts: {
     root: 'kui-date-range-input inline-flex items-center gap-1.5',
-    separator: 'text-xs text-kui-subtext0',
+    separator: 'text-xs text-muted',
   },
 })
 

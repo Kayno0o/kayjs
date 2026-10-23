@@ -17,9 +17,9 @@ const look = recipe({
     root: '',
     menu: 'kui-menu min-w-48',
     list: MENU_LIST,
-    separator: 'my-1 border-0 border-t border-kui-surface2',
+    separator: 'my-1 border-0 border-t border-border',
     icon: 'size-4 shrink-0',
-    item: `${MENU_ITEM} data-danger:text-kui-error disabled:cursor-default disabled:opacity-50`,
+    item: `${MENU_ITEM} data-danger:text-danger disabled:cursor-default disabled:opacity-50`,
   },
 })
 

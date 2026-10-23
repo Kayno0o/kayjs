@@ -28,10 +28,10 @@ describe('Popover', () => {
 
     expect(trigger.getAttribute('popovertarget')).toBe('menu')
     expect(trigger.getAttribute('aria-expanded')).toBe('false')
-    expect(trigger.getAttribute('style')).toBe('anchor-name: --kui-popover-menu')
+    expect(trigger.getAttribute('style')).toBe('anchor-name: --_popover-menu')
     expect(panel.getAttribute('popover')).toBe('auto')
     expect(panel.dataset.placement).toBe('top-end')
-    expect(panel.getAttribute('style')).toBe('position-anchor: --kui-popover-menu')
+    expect(panel.getAttribute('style')).toBe('position-anchor: --_popover-menu')
   })
 
   test('shows when the page asks, and follows the browser closing it, as on a click outside', async () => {
@@ -69,7 +69,7 @@ describe('TooltipHost', () => {
     expect(tooltip.textContent).toBe('Delete')
     expect(tooltip.matches(':popover-open')).toBe(true)
     expect(tooltip.style.getPropertyValue('position-area')).toBe('bottom')
-    expect(button.style.getPropertyValue('anchor-name')).toBe('--kui-tooltip-anchor')
+    expect(button.style.getPropertyValue('anchor-name')).toBe('--tooltip-anchor')
     expect(tooltip.id).toBe('kui-tooltip')
     // The tooltip repeats the button's own name, so it describes nothing more.
     expect(button.hasAttribute('aria-describedby')).toBe(false)

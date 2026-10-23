@@ -6,8 +6,8 @@ import { currentTab, keptHref } from './tab-nav'
 // 'kui-tab-nav' stays as the component's name for an app's CSS.
 const look = recipe({
   parts: {
-    root: 'kui-tab-nav flex gap-1 overflow-x-auto border-b border-kui-surface2 pb-px',
-    link: '-mb-px shrink-0 border-b-2 border-transparent px-4 py-2 text-sm text-kui-subtext0 transition-colors hover:text-kui-text aria-[current=page]:border-kui-accent aria-[current=page]:text-kui-accent',
+    root: 'kui-tab-nav flex gap-1 overflow-x-auto border-b border-border pb-px',
+    link: '-mb-px shrink-0 border-b-2 border-transparent px-4 py-2 text-sm text-muted transition-colors hover:text-foreground aria-[current=page]:border-accent aria-[current=page]:text-accent',
   },
 })
 

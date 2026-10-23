@@ -10,9 +10,9 @@ const look = recipe({
   parts: {
     root: 'kui-steps block',
     list: 'm-0 flex list-none flex-wrap gap-x-6 gap-y-2 p-0',
-    item: 'group/step flex items-center text-sm text-kui-subtext0 data-[state=current]:font-medium data-[state=current]:text-kui-text',
-    link: 'flex items-center gap-2 rounded-md no-underline [&:is(a)]:text-kui-text [&:is(a)]:hover:text-kui-accent',
-    marker: 'flex size-6 shrink-0 items-center justify-center rounded-full border border-kui-overlay0 text-xs group-data-[state=current]/step:border-kui-accent group-data-[state=current]/step:bg-kui-accent group-data-[state=current]/step:text-kui-on-accent group-data-[state=done]/step:border-kui-accent group-data-[state=done]/step:text-kui-accent',
+    item: 'group/step flex items-center text-sm text-muted data-[state=current]:font-medium data-[state=current]:text-foreground',
+    link: 'flex items-center gap-2 rounded-md no-underline [&:is(a)]:text-foreground [&:is(a)]:hover:text-accent',
+    marker: 'flex size-6 shrink-0 items-center justify-center rounded-full border border-border-strong text-xs group-data-[state=current]/step:border-accent group-data-[state=current]/step:bg-accent group-data-[state=current]/step:text-accent-foreground group-data-[state=done]/step:border-accent group-data-[state=done]/step:text-accent',
     label: 'min-w-0',
     state: 'sr-only',
   },

@@ -7,11 +7,11 @@ import BreadcrumbHead from './internal/breadcrumb-head.kay'
 const look = recipe({
   parts: {
     root: 'kui-breadcrumb block',
-    list: 'm-0 flex list-none flex-wrap items-center gap-x-2 gap-y-1 p-0 text-sm text-kui-subtext0',
+    list: 'm-0 flex list-none flex-wrap items-center gap-x-2 gap-y-1 p-0 text-sm text-muted',
     more: 'hidden max-sm:list-item',
     item: 'max-sm:data-[middle]:hidden',
-    link: 'text-kui-subtext0 underline-offset-2 hover:text-kui-text hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kui-accent',
-    text: 'aria-[current=page]:text-kui-text',
+    link: 'text-muted underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+    text: 'aria-[current=page]:text-foreground',
   },
 })
 

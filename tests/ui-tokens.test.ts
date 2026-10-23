@@ -101,12 +101,12 @@ describe('deprecated-ui-token', () => {
     try {
       expect(await after('src/routes/index.kay')).toBe([
         'div(class="bg-background hover:text-accent-hover md:rounded-lg -mt-[calc(var(--spacing)*3.5*var(--density))] border-border/50 [--density:2] bg-(--color-accent)" style="color: var(--color-foreground); --label-case: none") hi',
-        'p(class="bg-kui-fill-danger/50 px-1.5 font-[family-name:inherit] text-2xs tracking-label w-kui-field-height") x',
+        'p(class="bg-kui-fill-danger/50 px-1.5 font-[family-name:inherit] text-2xs tracking-label w-[calc(2*var(--border-width)_+_2*var(--spacing)*var(--density)_+_var(--text-sm)*var(--text-sm--line-height))]") x',
         'p(class="bg-card-kui-canvas not-bg-kui-canvasx") y',
         '',
       ].join('\n'))
       expect(await after('src/ui.ts')).toBe('export default { \'@kaynooo/kayjs-ui/card.kay\': { parts: { root: \'bg-popover border-border-strong text-muted\' } } }\n')
-      expect(found.filter(problem => problem.fixes === undefined).map(problem => (/^`[^`]+`/).exec(problem.message)?.[0])).toEqual(['`bg-kui-fill-danger`', '`w-kui-field-height`'])
+      expect(found.filter(problem => problem.fixes === undefined).map(problem => (/^`[^`]+`/).exec(problem.message)?.[0])).toEqual(['`bg-kui-fill-danger`'])
     }
     finally {
       await rm(root, { recursive: true, force: true })

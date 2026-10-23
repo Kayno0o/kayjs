@@ -7,7 +7,7 @@ import { effect, onCleanup, recipe, uid } from 'kay'
 // It never takes the pointer, so it cannot flicker the hover that shows it.
 const look = recipe({
   parts: {
-    root: 'kui-hover-card pointer-events-none inset-auto m-1 [position-try-fallbacks:flip-block,flip-inline] rounded-kui-card border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-mantle p-0 text-kui-text data-[placement=top]:[position-area:block-start] data-[placement=bottom]:[position-area:block-end] data-[placement=left]:[position-area:inline-start] data-[placement=right]:[position-area:inline-end] data-[placement=bottom-start]:[position-area:block-end_span-inline-end] data-[placement=bottom-end]:[position-area:block-end_span-inline-start] data-[placement=top-start]:[position-area:block-start_span-inline-end] data-[placement=top-end]:[position-area:block-start_span-inline-start]',
+    root: 'kui-hover-card pointer-events-none inset-auto m-1 [position-try-fallbacks:flip-block,flip-inline] rounded-lg border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-popover p-0 text-foreground data-[placement=top]:[position-area:block-start] data-[placement=bottom]:[position-area:block-end] data-[placement=left]:[position-area:inline-start] data-[placement=right]:[position-area:inline-end] data-[placement=bottom-start]:[position-area:block-end_span-inline-end] data-[placement=bottom-end]:[position-area:block-end_span-inline-start] data-[placement=top-start]:[position-area:block-start_span-inline-end] data-[placement=top-end]:[position-area:block-start_span-inline-start]',
     // Stands in for an SVG shape the card is anchored to, which the browser cannot anchor to itself: a box laid over the shape, never seen or hit.
     stand: 'pointer-events-none invisible fixed inset-auto m-0 size-0 overflow-visible border-0 p-0',
   },
@@ -25,7 +25,7 @@ const { id, anchor, placement = 'top', style, ...rest } = props<Omit<JSX.Intrins
 }>()
 
 const panelId = id ?? uid()
-const name = `--kui-hover-card-${panelId}`
+const name = `--_hover-card-${panelId}`
 let panel: HTMLDivElement | undefined
 let stand: HTMLSpanElement | undefined
 let frame = 0

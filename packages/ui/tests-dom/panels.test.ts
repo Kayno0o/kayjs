@@ -160,7 +160,7 @@ describe('SplitLayout', () => {
   test('resizes the list with the arrow keys within its bounds, and keeps the width for the next visit', async () => {
     let root = await panels('planets-width')
     const resizer = () => root.querySelector('.kui-split-layout-resizer')!
-    const width = () => [root.querySelector<HTMLElement>('#split')!.style.getPropertyValue('--kui-split-list-width'), resizer().getAttribute('aria-valuenow')]
+    const width = () => [root.querySelector<HTMLElement>('#split')!.style.getPropertyValue('--_split-list-width'), resizer().getAttribute('aria-valuenow')]
 
     expect(width()).toEqual(['260px', '260'])
 
@@ -185,7 +185,7 @@ describe('SplitLayout', () => {
   test('resizes the list by dragging its separator, a cancelled drag keeping the width it reached', async () => {
     let root = await panels('planets-drag')
     const resizer = () => root.querySelector('.kui-split-layout-resizer')!
-    const width = () => root.querySelector<HTMLElement>('#split')!.style.getPropertyValue('--kui-split-list-width')
+    const width = () => root.querySelector<HTMLElement>('#split')!.style.getPropertyValue('--_split-list-width')
     const pointer = (type: string, x: number) => resizer().dispatchEvent(new PointerEvent(type, { clientX: x, pointerId: 1, button: 0, bubbles: true, cancelable: true }))
 
     pointer('pointerdown', 100)

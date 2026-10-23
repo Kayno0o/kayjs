@@ -51,7 +51,7 @@ describe('the Styles tab\'s endpoints', () => {
     const view = await (await read(CARD_FILE)).json() as { name: string, tokens: { name: string }[] }
 
     expect(view.name).toBe('Card')
-    expect(view.tokens.map(token => token.name)).toContain('--kui-border-width')
+    expect(view.tokens.map(token => token.name)).toContain('--border-width')
   })
 
   it('has nothing for a component without parts, a page and a file that is not a component', async () => {

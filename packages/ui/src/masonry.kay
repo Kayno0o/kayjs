@@ -7,9 +7,9 @@ type Key = string | number
 
 const look = recipe({
   parts: {
-    root: 'kui-masonry grid grid-cols-[repeat(auto-fill,minmax(min(var(--kui-masonry-min),100%),1fr))] items-start gap-(--kui-masonry-gap) data-laid-out:relative data-laid-out:block',
+    root: 'kui-masonry grid grid-cols-[repeat(auto-fill,minmax(min(var(--_masonry-min),100%),1fr))] items-start gap-(--_masonry-gap) data-laid-out:relative data-laid-out:block',
     // A tile's place is its lane and offset once measured, and it stays invisible until its height is known.
-    tile: 'kui-masonry-item min-w-0 data-pending:invisible data-placed:absolute data-placed:top-(--kui-masonry-top) data-placed:left-[calc(var(--kui-masonry-lane)*(100%+var(--kui-masonry-gap))/var(--kui-masonry-lanes))] data-placed:w-[calc((100%-(var(--kui-masonry-lanes)-1)*var(--kui-masonry-gap))/var(--kui-masonry-lanes))]',
+    tile: 'kui-masonry-item min-w-0 data-pending:invisible data-placed:absolute data-placed:top-(--_masonry-top) data-placed:left-[calc(var(--_masonry-lane)*(100%_+_var(--_masonry-gap))/var(--_masonry-lanes))] data-placed:w-[calc((100%_-_(var(--_masonry-lanes)_-_1)_*_var(--_masonry-gap))/var(--_masonry-lanes))]',
   },
 })
 
@@ -79,7 +79,7 @@ function measure(node: HTMLElement, id: Key) {
 }
 ---
 // Tiles placed absolutely inside the layout's own box, so padding goes on a wrapper, never on the Masonry.
-div(part="root" {...rest} ref={element => { root = element; rootSize.ref(element) }} style={`--kui-masonry-min: ${minWidth}px; --kui-masonry-gap: ${gap}px; --kui-masonry-lanes: ${lanes()};${layout() ? ` height: ${layout()!.height}px;` : ''}${style ? ` ${style}` : ''}`} data-laid-out={layout() ? '' : undefined})
+div(part="root" {...rest} ref={element => { root = element; rootSize.ref(element) }} style={`--_masonry-min: ${minWidth}px; --_masonry-gap: ${gap}px; --_masonry-lanes: ${lanes()};${layout() ? ` height: ${layout()!.height}px;` : ''}${style ? ` ${style}` : ''}`} data-laid-out={layout() ? '' : undefined})
   for item, index of items key={key(item)}
-    div(part="tile" ref={element => measure(element, key(item))} style={place(index) ? `--kui-masonry-lane: ${place(index)!.lane}; --kui-masonry-top: ${place(index)!.top}px;` : undefined} data-placed={place(index) ? '' : undefined} data-pending={place(index) && !heights().has(key(item)) ? '' : undefined})
+    div(part="tile" ref={element => measure(element, key(item))} style={place(index) ? `--_masonry-lane: ${place(index)!.lane}; --_masonry-top: ${place(index)!.top}px;` : undefined} data-placed={place(index) ? '' : undefined} data-pending={place(index) && !heights().has(key(item)) ? '' : undefined})
       | {tile(item)}

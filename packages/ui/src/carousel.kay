@@ -9,7 +9,7 @@ import { wording } from 'kay/words'
 const look = recipe({
   parts: {
     root: 'kui-carousel flex flex-col gap-3',
-    viewport: 'relative w-full overflow-hidden bg-kui-surface0',
+    viewport: 'relative w-full overflow-hidden bg-surface',
     // Every slide sits over the viewport, moved a width aside per place it stands from the one shown.
     slide: 'absolute inset-0 transition-transform duration-700 ease-in-out motion-reduce:transition-none',
     image: 'size-full object-cover',
@@ -18,7 +18,7 @@ const look = recipe({
     // Apart from the controls of the slides, as it stops the carousel rather than moving it.
     pause: 'ms-2',
     // The dot is drawn small, and pressed through a margin around it wide enough for a finger.
-    dot: 'relative h-2 w-2 bg-kui-field-border transition-all after:absolute after:-inset-2 after:content-[""] hover:bg-kui-subtext0 aria-[current=true]:w-6 aria-[current=true]:bg-kui-accent',
+    dot: 'relative h-2 w-2 bg-input transition-all after:absolute after:-inset-2 after:content-[""] hover:bg-muted aria-[current=true]:w-6 aria-[current=true]:bg-accent',
   },
 })
 

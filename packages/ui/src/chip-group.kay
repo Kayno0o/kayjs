@@ -13,7 +13,7 @@ const look = recipe({
     root: 'kui-chip-group group/chips flex flex-wrap gap-2',
     chip: 'kui-chip relative cursor-pointer has-[input:disabled]:opacity-50 group-aria-busy/chips:cursor-progress group-not-aria-busy/chips:has-[input:disabled]:cursor-not-allowed',
     input: 'peer/chip absolute size-0 opacity-0',
-    label: 'inline-flex items-center gap-1 rounded-kui-md border-solid border-(length:--kui-border-width) bg-kui-surface0 px-2.5 py-1 text-xs text-kui-subtext0 transition-colors [border-color:var(--kui-control-line,var(--color-border))] hover:text-kui-text peer-checked/chip:border-kui-accent peer-checked/chip:bg-kui-accent peer-checked/chip:text-kui-on-accent peer-checked/chip:hover:text-kui-on-accent peer-focus-visible/chip:outline-2 peer-focus-visible/chip:outline-offset-2 peer-focus-visible/chip:outline-kui-accent',
+    label: 'inline-flex items-center gap-1 rounded-md border-solid border-[length:var(--kui-border-width,var(--border-width))] bg-surface px-2.5 py-1 text-xs text-muted transition-colors [border-color:var(--_control-line,var(--color-border))] hover:text-foreground peer-checked/chip:border-accent peer-checked/chip:bg-accent peer-checked/chip:text-accent-foreground peer-checked/chip:hover:text-accent-foreground peer-focus-visible/chip:outline-2 peer-focus-visible/chip:outline-offset-2 peer-focus-visible/chip:outline-accent',
     icon: 'size-3.5 shrink-0',
   },
 })

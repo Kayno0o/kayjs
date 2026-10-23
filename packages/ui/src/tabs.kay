@@ -20,11 +20,11 @@ const FLIPPED: Partial<Record<string, string>> = { ArrowLeft: 'ArrowRight', Arro
 const look = recipe({
   parts: {
     root: 'kui-tabs flex flex-col',
-    list: 'flex gap-1 overflow-x-auto border-b border-kui-surface2 pb-px',
-    tab: '-mb-px shrink-0 border-b-2 border-transparent px-4 py-2 text-sm text-kui-subtext0 transition-colors hover:text-kui-text inline-flex items-center gap-1 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-kui-subtext0 aria-selected:border-kui-accent aria-selected:text-kui-accent',
+    list: 'flex gap-1 overflow-x-auto border-b border-border pb-px',
+    tab: '-mb-px shrink-0 border-b-2 border-transparent px-4 py-2 text-sm text-muted transition-colors hover:text-foreground inline-flex items-center gap-1 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-muted aria-selected:border-accent aria-selected:text-accent',
     icon: 'size-3.5 shrink-0',
     // A hidden panel is hidden until found, which keeps its box with its content skipped: it takes no room.
-    panel: 'pt-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kui-accent [&[hidden]]:p-0',
+    panel: 'pt-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [&[hidden]]:p-0',
   },
 })
 

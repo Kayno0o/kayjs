@@ -13,7 +13,7 @@ const KEY_STEP = 40
 
 const look = recipe({
   parts: {
-    root: 'kui-zoom-pane relative cursor-grab overflow-hidden select-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-kui-accent data-dragging:cursor-grabbing',
+    root: 'kui-zoom-pane relative cursor-grab overflow-hidden select-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent data-dragging:cursor-grabbing',
     // Keeps its class for the rule stopping the native drag of a picture, which would take the pointer off the pan before it began.
     plate: 'kui-zoom-plate size-full origin-top-left',
     tools: 'absolute top-1 right-1 flex gap-1',
@@ -191,8 +191,8 @@ onMount(() => {
 ---
 // Fitted, the page still scrolls over it on a touch screen; taken in, the gestures are the pane's own. The group is focusable on purpose: the arrows and +/- are its own, and the buttons say the same for everyone else.
 div(part="root" {...rest} ref={element => pane = element} role="group" aria-label={label} tabindex="0" data-dragging={dragging() || undefined} style={`touch-action: ${plate().scale !== 1 ? 'none' : 'pan-y'}${style ? `; ${style}` : ''}`} onPointerDown={grab} onPointerMove={move} onPointerUp={drop} onPointerCancel={drop} onDblClick={doubleClick} onDragStart={event => event.preventDefault()} onKeyDown={keyDown})
-  // The scale is published too, so a mark standing on the plate can hold its own size with `calc(1 / var(--kui-zoom-scale))`.
-  div(part="plate" style={`--kui-zoom-scale: ${plate().scale}; transform: translate(${plate().x}px, ${plate().y}px) scale(${plate().scale})`})
+  // The scale is published too, so a mark standing on the plate can hold its own size with `calc(1 / var(--zoom-scale))`, and under its old name `--kui-zoom-scale` until 1.75.
+  div(part="plate" style={`--zoom-scale: ${plate().scale}; --kui-zoom-scale: ${plate().scale}; transform: translate(${plate().x}px, ${plate().y}px) scale(${plate().scale})`})
     slot
   if tools
     div(part="tools")

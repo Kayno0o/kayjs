@@ -3,13 +3,7 @@
  * Tokens are `@theme default`, so the app's own `@theme` overrides them wherever it sits, and components write no utility of their own except the recipes of those that hold their look (Card, Badge, Notice, Avatar, Stat, PageHeader, PageSection, EmptyState, CardRow, Widget, Meter, Progress and Skeleton), only the classes below: a rule of the app's on one of them restyles every instance, and a utility through `class` restyles one.
  */
 
-/* A keyline is a length: a registered property keeps a skin's `2px solid red`, which is no length, from making every keyline invalid. */
-@property --kui-border-width {
-  syntax: '<length>';
-  inherits: true;
-  initial-value: 1px;
-}
-
+/* A keyline is a length: a registered property keeps a skin's `2px solid red`, which is no length, from making every keyline invalid. The old --kui-border-width stays unregistered, so a frame reads it first and falls back to --border-width, and a subtree that sets it is followed. */
 @property --border-width {
   syntax: '<length>';
   inherits: true;
@@ -17,17 +11,17 @@
 }
 
 /* A tone of a Badge or a Notice is read by the colours of its own element alone: without inheritance, a Badge or a Notice inside a toned one keeps its neutral colours. */
-@property --kui-badge-color {
+@property --_badge-color {
   syntax: '*';
   inherits: false;
 }
 
-@property --kui-notice-tone {
+@property --_notice-tone {
   syntax: '*';
   inherits: false;
 }
 
-@property --kui-notice-ground {
+@property --_notice-ground {
   syntax: '*';
   inherits: false;
 }
@@ -66,13 +60,19 @@
   --color-chart-5: var(--color-kui-chart-5, light-dark(#6b4fa3, #b9a3de));
   --color-chart-6: var(--color-kui-chart-6, light-dark(#2a7d6c, #7fc8b8));
 
+  /* Tailwind's own radius steps and mono stack, the value an app that sets nothing gets, each reading the old name first until 1.75. kayjs-ui reads --radius-md for what is pressed, --radius-lg for boxes and --radius-sm for a thumb or a badge. */
+  --radius-sm: var(--radius-kui-sm, 0.25rem);
+  --radius-md: var(--radius-kui-md, var(--radius-kui-card, 0.375rem));
+  --radius-lg: var(--radius-kui-card, 0.5rem);
+  --font-mono: var(--font-kui-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace);
+
   --text-2xs: var(--text-kui-2xs, 0.6rem);
   --text-2xs--line-height: var(--text-kui-2xs--line-height, 1.4);
   --tracking-label: var(--tracking-kui-label, 0.15em);
   /* Density scales the card, inline and section gaps and the field insets: 1 by default, 0.75 packs them tighter and 1.25 looser. */
   --density: var(--kui-density, 1);
   /* The keyline of every framed box, a length: buttons, cards, card rows, widgets, notices, avatars, toasts, dialogs, side panels, tooltips, tables, boxed sections, save bars, segmented controls, file drops, pagination steps, the site nav, chart tooltips, chips, the icon grid, the scatter plot, the crop stage, toggles, the table's filter and selection bars and sort buttons, the palette and popovers. A value that is no length, such as a `2px solid red` shorthand, leaves it at 1px. */
-  --border-width: var(--kui-border-width);
+  --border-width: var(--kui-border-width, var(--kui-border-card));
 
   /* The case of labels, headings and table heads: uppercase unless a skin sets none. --font-label sets their font, the text's own unless set. */
   --label-case: var(--kui-label-case, uppercase);
@@ -120,65 +120,38 @@
   --kui-shadow-raised: var(--shadow-raised);
   --kui-shadow-press: var(--shadow-press);
   --kui-press-travel: var(--press-travel);
-}
-
-/* The names that fold into another, or into a Tailwind name, with their own value until the readers move to the new ones (#2080). */
-@theme default {
-  --color-kui-overlay1: color-mix(in oklab, var(--color-foreground), var(--color-background) 36%);
+  --color-kui-overlay1: var(--color-muted);
   --color-kui-fill-hover: var(--color-surface-strong);
-  --color-kui-fill-danger: color-mix(in oklab, var(--color-background), var(--color-danger) 9%);
-
-  --text-kui-micro: 0.5625rem;
-  --text-kui-micro--line-height: 1.4;
-  --font-weight-kui-heading: 600;
-  --font-weight-kui-label: 400;
-  --tracking-kui-section: 0.18em;
-  --tracking-kui-action: 0.16em;
-  --spacing-kui-card: calc(0.625rem * var(--density));
-  --spacing-kui-inline: calc(0.3125rem * var(--density));
-  --spacing-kui-section: calc(0.875rem * var(--density));
-  --kui-border-width: var(--kui-border-card);
-  --kui-border-card: 1px;
-  --kui-border-input: 1px;
-  --radius-kui-card: 0px;
-  /* The steps for what sits inside a framed box: sm for a badge or a toggle's thumb, md for a chip or a toggle's track, full for an avatar, which stays round unless a skin squares it. */
-  --radius-kui-sm: 0px;
-  --radius-kui-md: 0px;
-  --radius-kui-full: 9999px;
-
-  /* The text's font for what does not inherit it (labels and fields, unless --font-label is set), set by an app alone and the text's own otherwise, and the monospace of code, the markdown editor and stamps. */
-  --font-kui-mono: var(--font-mono);
-
-  /* A badge's box and type. Its font is the text's unless the app sets --kui-badge-font, such as to var(--font-kui-mono). */
-  --kui-border-badge: 1px;
-  --spacing-kui-badge-x: 0.375rem;
-  --spacing-kui-badge-y: 1px;
-  --text-kui-badge: 0.75rem;
-  --text-kui-badge--line-height: calc(1 / 0.75);
-  --tracking-kui-badge: normal;
-  --kui-badge-case: none;
-
-  /* A badge drawn as a stamp: its ink, its ground, and the ground while a .group holding it is hovered. */
   --color-kui-stamp: var(--color-foreground);
   --color-kui-stamp-fill: var(--color-background);
-  --color-kui-stamp-fill-hover: var(--color-kui-fill-hover);
-  --kui-border-stamp: 1px;
-
-  /* A text field's inset and its look while focused. Its border, the input seed above, which buttons, toggles, carousel dots and empty stars draw too, is solid at 3:1 on every surface: an app changing its background sets it to match, since the border-strong hairline reads under 3:1. */
-  --spacing-kui-field-x: calc(0.5625rem * var(--density));
-  --spacing-kui-field-y: calc(0.25rem * var(--density));
-  /* The height of a text field: its two borders, its two paddings and a line of its text. A medium Button beside a compact field takes it. */
-  --spacing-kui-field-height: calc(2 * var(--kui-border-input) + 2 * var(--spacing-kui-field-y) + var(--text-sm, 0.875rem) * var(--text-sm--line-height, calc(1.25 / 0.875)));
-  --kui-field-focus-shadow: none;
-
-  /* A Notice's frame and weight, the compact one taking the weight too. */
-  --kui-border-notice: var(--kui-border-width);
-  --font-weight-kui-notice: 400;
-
-  /* An Avatar's ring, and the weight of the initial it falls back to. */
-  --kui-border-avatar: var(--kui-border-width);
+  --color-kui-stamp-fill-hover: var(--color-surface-strong);
   --color-kui-avatar-ring: var(--color-border);
-  --font-weight-kui-avatar: 600;
+  --color-kui-fill-danger: color-mix(in oklab, var(--color-danger) 10%, transparent);
+  --text-kui-micro: var(--text-2xs);
+  --text-kui-micro--line-height: var(--text-2xs--line-height);
+  --text-kui-badge: var(--text-xs);
+  --text-kui-badge--line-height: var(--text-xs--line-height);
+  --font-weight-kui-heading: var(--font-weight-semibold);
+  --font-weight-kui-label: var(--font-weight-normal);
+  --font-weight-kui-notice: var(--font-weight-normal);
+  --font-weight-kui-avatar: var(--font-weight-semibold);
+  --tracking-kui-section: var(--tracking-label);
+  --tracking-kui-action: var(--tracking-label);
+  --tracking-kui-badge: var(--tracking-normal);
+  --font-kui-mono: var(--font-mono);
+  --font-kui-body: inherit;
+  --spacing-kui-card: calc(var(--spacing) * 2.5 * var(--density));
+  --spacing-kui-inline: calc(var(--spacing) * 1.25 * var(--density));
+  --spacing-kui-section: calc(var(--spacing) * 3.5 * var(--density));
+  --spacing-kui-field-x: calc(var(--spacing) * 2.25 * var(--density));
+  --spacing-kui-field-y: calc(var(--spacing) * var(--density));
+  --spacing-kui-field-height: calc(2 * var(--border-width) + 2 * var(--spacing) * var(--density) + var(--text-sm) * var(--text-sm--line-height));
+  --spacing-kui-badge-x: calc(var(--spacing) * 1.5);
+  --spacing-kui-badge-y: 1px;
+  --radius-kui-card: var(--radius-lg);
+  --radius-kui-sm: var(--radius-sm);
+  --radius-kui-md: var(--radius-md);
+  --radius-kui-full: calc(infinity * 1px);
 }
 
 /* Dark unless the visitor's system asks for light; `data-theme="light"` or `"dark"`, on the root or on any element, wins over both for what it holds. */
@@ -232,47 +205,51 @@
 }
 
 @layer components {
-  /* A rectangle drawn as a fill on the element and a hairline in ::before, so the line adds nothing to the box. Variants only redeclare --kui-shell-line and --kui-shell-fill. */
+  /* A rectangle drawn as a fill on the element and a hairline in ::before, so the line adds nothing to the box. Variants only redeclare --_shell-line and --_shell-fill. */
   .kui-shell,
   .kui-btn,
   .kui-stat-badge {
-    --kui-shell-line: var(--color-border-strong);
-    --kui-shell-fill: var(--color-surface);
+    --_shell-line: var(--color-border-strong);
+    --_shell-fill: var(--color-surface);
     position: relative;
-    background-color: var(--kui-shell-fill);
+    background-color: var(--_shell-fill);
   }
 
   :is(.kui-shell, .kui-btn, .kui-stat-badge)::before {
     content: '';
     position: absolute;
     inset: 0;
-    border: var(--kui-border-width) solid var(--kui-shell-line);
+    border: var(--kui-border-width,var(--border-width)) solid var(--_shell-line);
     border-radius: inherit;
     pointer-events: none;
   }
 
-  /* One radius, --radius-kui-card, for the boxes the library frames: buttons, cards, notices and the overlays over the page. Square by default; a docked side panel stays square. */
-  :is(.kui-shell, .kui-btn, .kui-stat-badge, .kui-card, .kui-card-row, .kui-widget, .kui-notice, .kui-toast, .kui-dialog, .kui-command-palette, .kui-popover, .kui-hover-card) {
-    @apply rounded-kui-card;
+  /* The app's radius scale: --radius-md for what is pressed, --radius-lg for the boxes the library frames and the overlays over the page. A docked side panel stays square. */
+  :is(.kui-shell, .kui-btn, .kui-stat-badge) {
+    @apply rounded-md;
+  }
+
+  :is(.kui-card, .kui-card-row, .kui-widget, .kui-notice, .kui-toast, .kui-dialog, .kui-command-palette, .kui-popover, .kui-hover-card) {
+    @apply rounded-lg;
   }
 
   /* :where() keeps these at one class, so the variants below still win. */
   :where(button, a, [role='button'], summary).kui-shell:hover,
   .kui-btn:hover {
-    --kui-shell-line: var(--color-muted);
-    --kui-shell-fill: var(--color-kui-fill-hover);
+    --_shell-line: var(--color-muted);
+    --_shell-fill: var(--color-kui-fill-hover, var(--color-surface-strong));
   }
 
   :where(button, a, [role='button'], summary).kui-shell:focus-visible,
   .kui-btn:focus-visible {
-    --kui-shell-line: var(--color-accent);
+    --_shell-line: var(--color-accent);
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
   }
 
   .kui-shell-danger:hover {
-    --kui-shell-line: var(--color-danger);
-    --kui-shell-fill: var(--color-kui-fill-danger);
+    --_shell-line: var(--color-danger);
+    --_shell-fill: var(--color-kui-fill-danger, color-mix(in oklab, var(--color-danger) 10%, transparent));
   }
 
   .kui-btn,
@@ -291,17 +268,17 @@
   }
 
   .kui-heading-section {
-    @apply text-kui-2xs font-kui-label tracking-kui-section text-kui-subtext0 [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
+    @apply text-2xs [font-weight:var(--font-weight-kui-label,var(--font-weight-normal))] [letter-spacing:var(--tracking-kui-section,var(--tracking-label))] text-muted [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
   }
 
   .kui-label-text {
-    @apply text-xs font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
+    @apply text-xs [font-weight:var(--font-weight-kui-label,var(--font-weight-normal))] tracking-label text-muted [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
   }
 
   .kui-btn {
-    --kui-shell-line: var(--color-input);
-    --kui-shell-fill: var(--color-background);
-    @apply inline-flex cursor-pointer items-center justify-center gap-kui-inline border-0 px-3 py-1 text-xs whitespace-nowrap font-kui-label tracking-kui-action text-kui-text [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)] transition-[color,translate,box-shadow] duration-150;
+    --_shell-line: var(--color-input);
+    --_shell-fill: var(--color-background);
+    @apply inline-flex cursor-pointer items-center justify-center gap-[var(--spacing-kui-inline,calc(var(--spacing)*1.25*var(--density)))] border-0 px-3 py-1 text-xs whitespace-nowrap [font-weight:var(--font-weight-kui-label,var(--font-weight-normal))] [letter-spacing:var(--tracking-kui-action,var(--tracking-label))] text-foreground [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)] transition-[color,translate,box-shadow] duration-150;
   }
 
   /* A submit button while its form's onSubmit is pending: a spinner drawn in CSS, the button being static markup. A Button given `busy` draws its own and is left alone. */
@@ -323,51 +300,51 @@
   }
 
   .kui-btn-accent {
-    --kui-shell-line: var(--color-accent);
-    --kui-shell-fill: var(--color-accent);
-    @apply text-kui-on-accent;
+    --_shell-line: var(--color-accent);
+    --_shell-fill: var(--color-accent);
+    @apply text-accent-foreground;
 
     &:hover {
-      --kui-shell-line: var(--color-accent-hover);
-      --kui-shell-fill: var(--color-accent-hover);
+      --_shell-line: var(--color-accent-hover);
+      --_shell-fill: var(--color-accent-hover);
     }
   }
 
   .kui-btn-success {
-    @apply text-kui-success;
+    @apply text-success;
 
     &:hover {
-      --kui-shell-line: var(--color-success);
+      --_shell-line: var(--color-success);
     }
   }
 
   .kui-btn-danger {
-    @apply text-kui-error;
+    @apply text-danger;
 
     &:hover {
-      --kui-shell-line: var(--color-danger);
-      --kui-shell-fill: var(--color-kui-fill-danger);
+      --_shell-line: var(--color-danger);
+      --_shell-fill: var(--color-kui-fill-danger, color-mix(in oklab, var(--color-danger) 10%, transparent));
     }
   }
 
   /* The form of a button besides the framed one: no line or fill until hovered, `inline` also reading as a link. Declared after the tones, so a ghost accent is an accent text and no filled button. */
   .kui-btn:where([data-variant='ghost'], [data-variant='inline']),
   .kui-btn-accent:where([data-variant='ghost'], [data-variant='inline']) {
-    --kui-shell-line: transparent;
-    --kui-shell-fill: transparent;
+    --_shell-line: transparent;
+    --_shell-fill: transparent;
     box-shadow: none;
 
     &:hover {
-      --kui-shell-line: transparent;
-      --kui-shell-fill: var(--color-hover);
+      --_shell-line: transparent;
+      --_shell-fill: var(--color-hover);
     }
   }
 
   .kui-btn-accent:where([data-variant='ghost'], [data-variant='inline']) {
-    @apply text-kui-accent;
+    @apply text-accent;
 
     &:hover {
-      @apply text-kui-accent-hi;
+      @apply text-accent-hover;
     }
   }
 
@@ -377,7 +354,7 @@
 
   /* Medium is the base; the others change the box and the type. An inline button keeps no padding at any size. */
   .kui-btn:where([data-size='xs']:not([data-variant='inline'])) {
-    @apply px-2 py-0.5 text-kui-2xs;
+    @apply px-2 py-0.5 text-2xs;
   }
 
   .kui-btn:where([data-size='sm']:not([data-variant='inline'])) {
@@ -390,12 +367,12 @@
 
   /* A medium button in a row of compact fields or bare single-line field controls (a Textarea not), an island's slot wrapper between the row and the field included is as tall as they are at any density; a rule here rather than a utility, so no other button carries the selector. */
   :where(:has(> .kui-form-field[data-compact], > .kui-field-input:not(textarea), > .kui-multi-select, > slot > .kui-form-field[data-compact], > slot > .kui-field-input:not(textarea), > slot > .kui-multi-select)) > .kui-btn:where([data-size=md]:not([data-variant=inline])) {
-    height: var(--spacing-kui-field-height);
+    height: var(--spacing-kui-field-height, calc(2 * var(--kui-border-input, var(--kui-border-width, var(--border-width))) + 2 * var(--spacing-kui-field-y, calc(var(--spacing) * var(--density))) + var(--text-sm) * var(--text-sm--line-height)));
   }
 
   /* A toggle button that is on: the keyline in the accent, after the variants and tones so it shows on each, and over the hover line. A filled accent button shows no difference, its fill being the accent already. */
   .kui-btn[aria-pressed='true'] {
-    --kui-shell-line: var(--color-accent);
+    --_shell-line: var(--color-accent);
   }
 
   /* A form field's own controls take this look with no class, all but the inputs a text box does not fit. */
@@ -406,18 +383,18 @@
       select,
       textarea
     ) {
-    @apply rounded-kui-card bg-kui-surface0 px-kui-field-x py-kui-field-y text-sm text-kui-text outline-none [font-family:var(--font-kui-body,inherit)];
-    border: var(--kui-border-input) solid var(--color-input);
+    @apply rounded-md bg-surface px-[var(--spacing-kui-field-x,calc(var(--spacing)*2.25*var(--density)))] py-[var(--spacing-kui-field-y,calc(var(--spacing)*var(--density)))] text-sm text-foreground outline-none [font-family:var(--font-kui-body,inherit)];
+    border: var(--kui-border-input,var(--kui-border-width,var(--border-width))) solid var(--color-input);
 
     &::placeholder {
-      @apply text-kui-overlay1;
+      @apply text-[var(--color-kui-overlay1,var(--color-muted))];
     }
 
     /* The outline doubles the accent border, so focus reads by more than a colour change. */
     &:focus {
-      @apply border-kui-field-focus;
+      @apply border-ring;
       outline: 1px solid var(--color-ring);
-      box-shadow: var(--kui-field-focus-shadow);
+      box-shadow: var(--kui-field-focus-shadow, none);
     }
 
     &:disabled {
@@ -426,7 +403,7 @@
   }
 
   .kui-stat-badge {
-    @apply inline-flex items-center gap-kui-inline px-2.25 py-0.75 text-xs;
+    @apply inline-flex items-center gap-[var(--spacing-kui-inline,calc(var(--spacing)*1.25*var(--density)))] px-2.25 py-0.75 text-xs;
   }
 
   /* An inline SVG drawing in currentColor, sized here rather than by the 1em its import gives it. */
@@ -458,23 +435,23 @@
     }
 
     &:where([data-variant='solid']) {
-      @apply text-kui-text;
+      @apply text-foreground;
     }
 
     &:where([data-variant='ghost']) {
-      @apply text-kui-subtext0 hover:bg-kui-surface0 hover:text-kui-text;
+      @apply text-muted hover:bg-surface hover:text-foreground;
     }
 
     &:where([data-variant='inline']) {
-      @apply text-kui-subtext0;
+      @apply text-[var(--color-kui-overlay1,var(--color-muted))];
     }
 
     &:where([data-tone='accent']) {
-      @apply text-kui-accent;
+      @apply text-accent;
     }
 
     &:where([data-tone='danger']) {
-      @apply text-kui-error;
+      @apply text-danger;
     }
   }
 
@@ -491,32 +468,32 @@
     @apply grid w-full grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-1 text-left text-sm;
 
     &:where([data-interactive]) {
-      @apply cursor-pointer hover:text-kui-accent;
+      @apply cursor-pointer hover:text-accent;
     }
   }
 
   .kui-bar-list-label {
-    @apply truncate text-kui-text;
+    @apply truncate text-foreground;
   }
 
   .kui-bar-list-value {
-    @apply text-xs text-kui-subtext0 tabular-nums;
+    @apply text-xs text-muted tabular-nums;
   }
 
   .kui-bar-list-track {
-    @apply col-span-2 block h-1.5 overflow-hidden bg-kui-surface1;
+    @apply col-span-2 block h-1.5 overflow-hidden bg-surface-strong;
   }
 
   .kui-bar-list-fill {
-    @apply block h-full bg-kui-accent;
+    @apply block h-full bg-accent;
   }
 
   .kui-bar-list-empty {
-    @apply text-xs text-kui-subtext0;
+    @apply text-xs text-[var(--color-kui-overlay1,var(--color-muted))];
   }
 
   .kui-card-row {
-    @apply flex items-center gap-3 border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-surface0 p-4;
+    @apply flex items-center gap-3 border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border bg-surface p-4;
   }
 
   .kui-card-row-body {
@@ -537,7 +514,7 @@
 
     /* Boxed, the summary is the card's header band and the body the card's padding, so a run of sections reads as separate blocks rather than as headings in one column. */
     &:where([data-boxed]) {
-      @apply border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-surface0;
+      @apply border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border bg-surface;
     }
   }
 
@@ -551,11 +528,11 @@
 
   /* The band and the body take the card's own padding, so a boxed section and a card side by side line their titles up. */
   :where(.kui-collapsible-section[data-boxed]) > .kui-collapsible-section-summary {
-    @apply px-kui-card py-1.5;
+    @apply px-[var(--spacing-kui-card,calc(var(--spacing)*2.5*var(--density)))] py-1.5;
   }
 
   :where(.kui-collapsible-section[data-boxed][open]) > .kui-collapsible-section-summary {
-    @apply border-b border-kui-surface2;
+    @apply border-b border-border;
   }
 
   .kui-collapsible-section-title {
@@ -563,11 +540,11 @@
   }
 
   .kui-collapsible-section-meta {
-    @apply shrink-0 text-kui-2xs text-kui-subtext0;
+    @apply shrink-0 text-2xs text-muted;
   }
 
   .kui-collapsible-section-chevron {
-    @apply shrink-0 text-kui-subtext0 transition-transform;
+    @apply shrink-0 text-muted transition-transform;
   }
 
   :where(.kui-collapsible-section[open]) .kui-collapsible-section-chevron {
@@ -579,7 +556,7 @@
   }
 
   :where(.kui-collapsible-section[data-boxed]) > .kui-collapsible-section-body {
-    @apply gap-4 p-kui-card;
+    @apply gap-4 p-[var(--spacing-kui-card,calc(var(--spacing)*2.5*var(--density)))];
   }
 
   /* Boxed sections stacked in an accordion share their borders. */
@@ -587,24 +564,24 @@
     @apply flex flex-col;
 
     & > :where(.kui-collapsible-section[data-boxed] + .kui-collapsible-section[data-boxed]) {
-      @apply -mt-[length:var(--kui-border-width)];
+      @apply -mt-[length:var(--kui-border-width,var(--border-width))];
     }
   }
 
   .kui-command-palette {
-    @apply mx-auto mt-[10vh] mb-auto flex max-h-[min(70dvh,40rem)] w-full max-w-[min(36rem,calc(100vw-2rem))] flex-col overflow-hidden border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-surface0 p-0 text-kui-text;
+    @apply mx-auto mt-[10vh] mb-auto flex max-h-[min(70dvh,40rem)] w-full max-w-[min(36rem,calc(100vw-2rem))] flex-col overflow-hidden border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-surface p-0 text-foreground;
   }
 
   .kui-command-palette-search {
-    @apply flex shrink-0 items-center gap-2 border-b border-kui-surface2 px-4;
+    @apply flex shrink-0 items-center gap-2 border-b border-border px-4;
   }
 
   .kui-command-palette-search :where(.kui-icon) {
-    @apply size-5 shrink-0 text-kui-overlay1;
+    @apply size-5 shrink-0 text-[var(--color-kui-overlay1,var(--color-muted))];
   }
 
   .kui-command-palette-input {
-    @apply h-11 min-w-0 flex-1 bg-transparent text-sm text-kui-text outline-none placeholder:text-kui-overlay1;
+    @apply h-11 min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-[var(--color-kui-overlay1,var(--color-muted))];
 
     &:focus-visible {
       outline: 2px solid var(--color-accent);
@@ -621,11 +598,11 @@
   }
 
   .kui-command-palette-option {
-    @apply flex h-11 w-full cursor-pointer items-center gap-3 px-4 text-left text-sm text-kui-text no-underline outline-none;
+    @apply flex h-11 w-full cursor-pointer items-center gap-3 px-4 text-left text-sm text-foreground no-underline outline-none;
 
     /* The tint alone is too faint to find, so an accent bar marks the option Enter opens; forced colours drop both and paint the transparent outline instead. */
     &:where([aria-selected='true']) {
-      @apply bg-kui-row-hover;
+      @apply bg-hover;
       box-shadow: inset 2px 0 0 var(--color-accent);
       outline: 2px solid transparent;
       outline-offset: -2px;
@@ -633,7 +610,7 @@
   }
 
   .kui-command-palette-option :where(.kui-icon) {
-    @apply size-5 shrink-0 text-kui-overlay1;
+    @apply size-5 shrink-0 text-[var(--color-kui-overlay1,var(--color-muted))];
   }
 
   .kui-command-palette-label {
@@ -641,7 +618,7 @@
   }
 
   .kui-command-palette-group {
-    @apply max-w-[40%] shrink-0 truncate text-xs text-kui-subtext0;
+    @apply max-w-[40%] shrink-0 truncate text-xs text-muted;
   }
 
   /* A section the site search found: its heading over the line it was found in, the words searched for in the accent colour in both. */
@@ -654,19 +631,19 @@
   }
 
   .kui-command-palette-snippet {
-    @apply line-clamp-2 text-xs text-kui-subtext0;
+    @apply line-clamp-2 text-xs text-muted;
   }
 
   .kui-command-palette-more {
-    @apply text-xs text-kui-subtext0;
+    @apply text-xs text-muted;
   }
 
   .kui-command-palette-text :where(mark) {
-    @apply bg-transparent font-semibold text-kui-accent;
+    @apply bg-transparent font-semibold text-accent;
   }
 
   .kui-command-palette-empty {
-    @apply px-4 py-6 text-center text-sm text-kui-subtext0;
+    @apply px-4 py-6 text-center text-sm text-muted;
   }
 
   .kui-command-palette-count {
@@ -696,11 +673,11 @@
   }
 
   .kui-checkbox-label {
-    @apply text-sm text-kui-text;
+    @apply text-sm text-foreground;
   }
 
   .kui-checkbox-hint {
-    @apply text-xs text-kui-subtext0;
+    @apply text-xs text-muted;
   }
 
   .kui-radio-group {
@@ -735,11 +712,11 @@
   }
 
   .kui-radio-label {
-    @apply text-sm text-kui-text;
+    @apply text-sm text-foreground;
   }
 
   .kui-radio-description {
-    @apply pl-6 text-xs text-kui-subtext0;
+    @apply pl-6 text-xs text-muted;
   }
 
   .kui-chip-group {
@@ -764,11 +741,11 @@
   }
 
   .kui-chip-label {
-    @apply inline-flex items-center gap-1 border-solid rounded-kui-md border-(length:--kui-border-width) border-kui-surface2 bg-kui-surface0 px-2.5 py-1 text-xs text-kui-subtext0 transition-colors hover:text-kui-text;
+    @apply inline-flex items-center gap-1 border-solid rounded-md border-[length:var(--kui-border-width,var(--border-width))] border-border bg-surface px-2.5 py-1 text-xs text-muted transition-colors hover:text-foreground;
   }
 
   :where(.kui-chip-input:checked) + .kui-chip-label {
-    @apply border-kui-accent bg-kui-accent text-kui-on-accent hover:text-kui-on-accent;
+    @apply border-accent bg-accent text-accent-foreground hover:text-accent-foreground;
   }
 
   :where(.kui-chip-input:focus-visible) + .kui-chip-label {
@@ -785,11 +762,11 @@
   }
 
   .kui-confirm-delete-link {
-    @apply cursor-pointer text-xs text-kui-subtext0 underline transition-colors hover:text-kui-text disabled:cursor-default disabled:opacity-40;
+    @apply cursor-pointer text-xs text-muted underline transition-colors hover:text-foreground disabled:cursor-default disabled:opacity-40;
   }
 
   .kui-confirm-delete-message {
-    @apply text-kui-muted;
+    @apply text-muted;
   }
 
   .kui-contribution-graph {
@@ -802,14 +779,14 @@
   }
 
   .kui-contribution-month {
-    @apply row-start-1 w-0 text-kui-2xs leading-none whitespace-nowrap text-kui-subtext0;
+    @apply row-start-1 w-0 text-2xs leading-none whitespace-nowrap text-muted;
   }
 
   .kui-contribution-cell {
-    @apply size-3 rounded-[3px] bg-kui-surface0 transition-transform hover:scale-125;
+    @apply size-3 rounded-[3px] bg-surface transition-transform hover:scale-125;
 
     &[data-today] {
-      @apply ring-1 ring-kui-accent ring-offset-1 ring-offset-kui-surface0;
+      @apply ring-1 ring-accent ring-offset-1 ring-offset-surface;
     }
   }
 
@@ -833,7 +810,7 @@
   }
 
   .kui-dialog {
-    @apply m-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-[min(42rem,calc(100vw-2rem))] flex-col overflow-hidden border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-surface0 p-0;
+    @apply m-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-[min(42rem,calc(100vw-2rem))] flex-col overflow-hidden border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-surface p-0;
   }
 
   /* The width, `md` being the base above; `full` fills the viewport minus the margin on both axes, `lg` being the widest that still reads as a dialog. */
@@ -850,7 +827,7 @@
   }
 
   .kui-dialog-title {
-    @apply shrink-0 border-b border-kui-surface2 px-5 py-4 text-lg font-kui-heading tracking-kui-label text-kui-text [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
+    @apply shrink-0 border-b border-border px-5 py-4 text-lg [font-weight:var(--font-weight-kui-heading,var(--font-weight-semibold))] tracking-label text-foreground [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
   }
 
   .kui-dialog-body {
@@ -862,7 +839,7 @@
   }
 
   .kui-dialog-footer {
-    @apply flex shrink-0 flex-wrap justify-end gap-2 border-t border-kui-surface2 px-5 py-4;
+    @apply flex shrink-0 flex-wrap justify-end gap-2 border-t border-border px-5 py-4;
   }
 
   .kui-empty-state {
@@ -870,11 +847,11 @@
   }
 
   .kui-empty-state-title {
-    @apply text-xs font-kui-heading tracking-kui-label text-kui-accent [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
+    @apply text-xs [font-weight:var(--font-weight-kui-heading,var(--font-weight-semibold))] tracking-label text-accent [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
   }
 
   .kui-empty-state-description {
-    @apply text-xs text-kui-overlay1;
+    @apply text-xs text-muted;
   }
 
   .kui-empty-state-actions {
@@ -882,10 +859,10 @@
   }
 
   .kui-file-drop {
-    @apply flex flex-col items-center justify-center gap-3 border-dashed border-(length:--kui-border-width) border-kui-surface2 p-6 text-center transition-colors;
+    @apply flex flex-col items-center justify-center gap-3 border-dashed border-[length:var(--kui-border-width,var(--border-width))] border-border p-6 text-center transition-colors;
 
     &:where([data-dragging]) {
-      @apply border-kui-accent bg-kui-accent/10;
+      @apply border-accent bg-accent/10;
     }
 
     &:where([data-disabled]) {
@@ -952,7 +929,7 @@
   /* A select draws its text a little lower than a text box does, so it takes the height of one. */
   select.kui-field-input,
   .kui-form-field :where(select) {
-    min-height: var(--spacing-kui-field-height);
+    min-height: var(--spacing-kui-field-height, calc(2 * var(--kui-border-input, var(--kui-border-width, var(--border-width))) + 2 * var(--spacing-kui-field-y, calc(var(--spacing) * var(--density))) + var(--text-sm) * var(--text-sm--line-height)));
   }
 
   /* A compact field is as wide as its select, which then fits its options, as in a filter bar. */
@@ -976,11 +953,11 @@
   }
 
   .kui-form-field-required {
-    @apply ml-0.5 text-kui-error;
+    @apply ml-0.5 text-danger;
   }
 
   .kui-form-field-hint {
-    @apply text-xs text-kui-subtext0;
+    @apply text-xs text-muted;
   }
 
   .kui-form-field-issues {
@@ -988,7 +965,7 @@
   }
 
   .kui-form-field-issue {
-    @apply text-xs text-kui-error;
+    @apply text-xs text-danger;
   }
 
   .kui-form-dialog-footer {
@@ -1005,15 +982,15 @@
   }
 
   .kui-save-bar {
-    @apply sticky bottom-0 z-10 flex flex-wrap items-center gap-2 border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-canvas px-3 py-2;
+    @apply sticky bottom-0 z-10 flex flex-wrap items-center gap-2 border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border bg-background px-3 py-2;
     padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
   }
 
   .kui-save-bar-status {
-    @apply m-0 text-sm text-kui-subtext0;
+    @apply m-0 text-sm text-muted;
 
     &:where([data-dirty]) {
-      @apply text-kui-warning;
+      @apply text-warning;
     }
   }
 
@@ -1022,14 +999,14 @@
   }
 
   .kui-icon-grid {
-    @apply grid max-h-48 grid-cols-8 gap-1 overflow-y-auto border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-mantle p-2;
+    @apply grid max-h-48 grid-cols-8 gap-1 overflow-y-auto border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border bg-popover p-2;
   }
 
   .kui-icon-grid-option {
-    @apply flex w-full items-center justify-center p-1.5 text-kui-text transition-colors hover:bg-kui-row-hover;
+    @apply flex w-full items-center justify-center p-1.5 text-foreground transition-colors hover:bg-hover;
 
     &[aria-pressed='true'] {
-      @apply bg-kui-accent text-kui-on-accent;
+      @apply bg-accent text-accent-foreground;
     }
   }
 
@@ -1038,15 +1015,15 @@
   }
 
   .kui-icon-grid-empty {
-    @apply col-span-full py-4 text-center text-xs text-kui-subtext0;
+    @apply col-span-full py-4 text-center text-xs text-muted;
   }
 
   .kui-icon-grid-bar {
-    @apply flex items-center justify-between text-xs text-kui-subtext0;
+    @apply flex items-center justify-between text-xs text-muted;
   }
 
   .kui-icon-grid-error {
-    @apply text-kui-error;
+    @apply text-danger;
   }
 
   .kui-icon-grid-selection {
@@ -1058,11 +1035,11 @@
   }
 
   .kui-icon-grid-clear {
-    @apply text-kui-overlay1 hover:text-kui-text;
+    @apply text-[var(--color-kui-overlay1,var(--color-muted))] hover:text-foreground;
   }
 
   .kui-icon-grid-more {
-    @apply ml-auto hover:text-kui-text;
+    @apply ml-auto hover:text-foreground;
   }
 
   .kui-carousel {
@@ -1070,7 +1047,7 @@
   }
 
   .kui-carousel-viewport {
-    @apply relative w-full overflow-hidden bg-kui-surface0;
+    @apply relative w-full overflow-hidden bg-surface;
   }
 
   /* Every slide sits over the viewport, moved a width aside per place it stands from the one shown. */
@@ -1103,16 +1080,16 @@
 
   /* The dot is drawn small, and pressed through a margin around it wide enough for a finger. */
   .kui-carousel-dot {
-    @apply relative h-2 w-2 bg-kui-field-border transition-all after:absolute after:-inset-2 after:content-[''] hover:bg-kui-subtext0;
+    @apply relative h-2 w-2 bg-input transition-all after:absolute after:-inset-2 after:content-[''] hover:bg-muted;
 
     &[aria-current='true'] {
-      @apply w-6 bg-kui-accent;
+      @apply w-6 bg-accent;
     }
   }
 
   /* The empty stars, with a copy of them over the top cut to the rating's share. */
   .kui-rating {
-    @apply relative inline-flex text-kui-field-border;
+    @apply relative inline-flex text-input;
   }
 
   .kui-rating-stars {
@@ -1120,7 +1097,7 @@
   }
 
   .kui-rating-fill {
-    @apply absolute inset-y-0 left-0 overflow-hidden text-kui-warning;
+    @apply absolute inset-y-0 left-0 overflow-hidden text-warning;
   }
 
   .kui-icon-picker {
@@ -1132,12 +1109,7 @@
   /* Tailwind emits a theme variable only where something reads it, and a series colour is read from script, so the palette is named here for the app's `--color-chart-*` to survive its build. */
   .kui-line-chart {
     @apply flex flex-col gap-2;
-    --kui-chart-1: var(--color-chart-1);
-    --kui-chart-2: var(--color-chart-2);
-    --kui-chart-3: var(--color-chart-3);
-    --kui-chart-4: var(--color-chart-4);
-    --kui-chart-5: var(--color-chart-5);
-    --kui-chart-6: var(--color-chart-6);
+    --_chart-palette: var(--color-chart-1) var(--color-chart-2) var(--color-chart-3) var(--color-chart-4) var(--color-chart-5) var(--color-chart-6);
   }
 
   .kui-line-chart-frame {
@@ -1148,12 +1120,12 @@
     height: var(--chart-height, var(--kui-line-chart-height, 9rem));
 
     & :where(.ct-grid) {
-      @apply stroke-kui-surface2;
+      @apply stroke-border;
       stroke-width: 1px;
       stroke-dasharray: 4px;
     }
     & :where(.ct-label) {
-      @apply flex fill-kui-overlay1 text-kui-2xs leading-none text-kui-overlay1;
+      @apply flex fill-[var(--color-kui-overlay1,var(--color-muted))] text-2xs leading-none text-[var(--color-kui-overlay1,var(--color-muted))];
     }
     & :where(.ct-label.ct-vertical.ct-start) {
       @apply items-end justify-end whitespace-nowrap text-right;
@@ -1196,32 +1168,32 @@
   }
 
   .kui-line-chart-band {
-    @apply pointer-events-none absolute border-x border-kui-accent bg-kui-accent/10;
+    @apply pointer-events-none absolute border-x border-accent bg-accent/10;
   }
 
   .kui-line-chart-cursor {
-    @apply pointer-events-none absolute w-px bg-kui-overlay0;
+    @apply pointer-events-none absolute w-px bg-border-strong;
   }
 
   .kui-line-chart-dot {
-    @apply pointer-events-none absolute size-2 -translate-1/2 border border-kui-canvas;
+    @apply pointer-events-none absolute size-2 -translate-1/2 border border-background;
   }
 
   .kui-line-chart-tooltip {
-    @apply pointer-events-none fixed top-0 left-0 z-50 flex w-max max-w-full flex-col gap-0.5 border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-surface1 px-3 py-2 text-xs;
+    @apply pointer-events-none fixed top-0 left-0 z-50 flex w-max max-w-full flex-col gap-0.5 border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-surface-strong px-3 py-2 text-xs;
   }
 
   .kui-line-chart-tooltip-label {
-    @apply mb-1 text-kui-text;
+    @apply mb-1 text-foreground;
   }
 
   .kui-line-chart-tooltip-row {
-    @apply flex items-center gap-1.5 text-kui-subtext0;
+    @apply flex items-center gap-1.5 text-muted;
   }
 
   /* The total sits under the series with no swatch, its name lined up with theirs. */
   .kui-line-chart-tooltip-total {
-    @apply mt-0.5 border-t border-solid border-kui-overlay0 pt-1 pl-3.5 text-kui-text;
+    @apply mt-0.5 border-t border-solid border-border-strong pt-1 pl-3.5 text-foreground;
   }
 
   .kui-line-chart-tooltip-name {
@@ -1229,7 +1201,7 @@
   }
 
   .kui-line-chart-tooltip-value {
-    @apply ml-auto pl-3 font-kui-mono text-kui-text tabular-nums;
+    @apply ml-auto pl-3 font-mono text-foreground tabular-nums;
   }
 
   .kui-line-chart-swatch {
@@ -1246,12 +1218,12 @@
   }
 
   .kui-line-chart-legend-item {
-    @apply flex items-center gap-1.5 text-xs text-kui-subtext0;
+    @apply flex items-center gap-1.5 text-xs text-muted;
   }
 
   /* Takes field-input's look beside its own class, so a text box and the editor stay one style. Grows with its text between about 12 lines and most of the screen, where browsers size a field by its content. */
   .kui-markdown-editor {
-    @apply max-h-[70dvh] min-h-[12lh] w-full resize-y font-kui-mono field-sizing-content;
+    @apply max-h-[70dvh] min-h-[12lh] w-full resize-y font-mono field-sizing-content;
 
     &:where([aria-busy='true']) {
       @apply cursor-progress;
@@ -1293,19 +1265,19 @@
     @apply ml-auto;
 
     &[aria-pressed='true'] {
-      @apply bg-kui-surface1 text-kui-text;
+      @apply bg-surface-strong text-foreground;
     }
   }
 
   .kui-markdown-preview {
-    @apply max-h-[70dvh] min-h-[12lh] overflow-auto border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-mantle p-3 text-sm;
+    @apply max-h-[70dvh] min-h-[12lh] overflow-auto border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border bg-popover p-3 text-sm;
 
     grid-area: view;
   }
 
   .kui-markdown-preview-failed,
   .kui-markdown-bar-failed {
-    @apply text-kui-error;
+    @apply text-danger;
   }
 
   /* Just enough to read the text's structure; the page's own styles are not the admin's. */
@@ -1335,7 +1307,7 @@
     }
 
     :where(a) {
-      @apply text-kui-accent underline;
+      @apply text-accent underline;
     }
 
     :where(img) {
@@ -1343,11 +1315,11 @@
     }
 
     :where(blockquote) {
-      @apply border-0 border-l-2 border-solid border-kui-surface2 pl-3 text-kui-subtext0;
+      @apply border-0 border-l-2 border-solid border-border pl-3 text-muted;
     }
 
     :where(code, pre) {
-      @apply bg-kui-surface0 font-kui-mono text-xs;
+      @apply bg-surface font-mono text-xs;
     }
 
     :where(pre) {
@@ -1379,11 +1351,11 @@
   }
 
   .kui-load-more-loading {
-    @apply py-2 text-sm text-kui-subtext0;
+    @apply py-2 text-sm text-muted;
   }
 
   .kui-load-more-failed {
-    @apply flex flex-wrap items-center gap-3 py-2 text-sm text-kui-error;
+    @apply flex flex-wrap items-center gap-3 py-2 text-sm text-danger;
   }
 
   /* A long list drawing the rows in view: the box scrolls, 70vh tall unless the app sets a height. */
@@ -1400,8 +1372,8 @@
 
   .kui-masonry {
     @apply grid items-start;
-    grid-template-columns: repeat(auto-fill, minmax(min(var(--kui-masonry-min), 100%), 1fr));
-    gap: var(--kui-masonry-gap);
+    grid-template-columns: repeat(auto-fill, minmax(min(var(--_masonry-min), 100%), 1fr));
+    gap: var(--_masonry-gap);
 
     &:where([data-laid-out]) {
       @apply relative block;
@@ -1413,9 +1385,9 @@
 
     &:where([data-placed]) {
       @apply absolute;
-      top: var(--kui-masonry-top);
-      left: calc(var(--kui-masonry-lane) * (100% + var(--kui-masonry-gap)) / var(--kui-masonry-lanes));
-      width: calc((100% - (var(--kui-masonry-lanes) - 1) * var(--kui-masonry-gap)) / var(--kui-masonry-lanes));
+      top: var(--_masonry-top);
+      left: calc(var(--_masonry-lane) * (100% + var(--_masonry-gap)) / var(--_masonry-lanes));
+      width: calc((100% - (var(--_masonry-lanes) - 1) * var(--_masonry-gap)) / var(--_masonry-lanes));
     }
 
     &:where([data-pending]) {
@@ -1452,7 +1424,7 @@
   }
 
   .kui-media-gallery-counter {
-    @apply pointer-events-none absolute top-2 left-2 bg-black/60 px-2 py-0.5 text-kui-2xs text-white tabular-nums;
+    @apply pointer-events-none absolute top-2 left-2 bg-black/60 px-2 py-0.5 text-2xs text-white tabular-nums;
   }
 
   .kui-media-gallery-caption {
@@ -1467,7 +1439,7 @@
     @apply relative aspect-video h-12 shrink-0 overflow-hidden border-2 border-transparent opacity-60 transition hover:opacity-100;
 
     &:where([aria-current='true']) {
-      @apply border-kui-accent opacity-100;
+      @apply border-accent opacity-100;
     }
   }
 
@@ -1496,7 +1468,7 @@
   }
 
   .kui-media-gallery-empty {
-    @apply text-xs text-kui-subtext0;
+    @apply text-xs text-muted;
   }
 
   .kui-menu {
@@ -1508,7 +1480,7 @@
   }
 
   .kui-menu-item {
-    @apply flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text-left text-sm text-kui-text outline-none hover:bg-kui-row-hover focus:bg-kui-row-hover;
+    @apply flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text-left text-sm text-foreground outline-none hover:bg-hover focus:bg-hover;
 
     /* The tint alone is too faint to find, so an accent bar marks the item the keyboard stands on; forced colours drop both and paint the transparent outline instead. */
     &:focus-visible {
@@ -1518,7 +1490,7 @@
     }
 
     &:where([data-danger]) {
-      @apply text-kui-error;
+      @apply text-danger;
     }
 
     &:disabled {
@@ -1531,7 +1503,7 @@
   }
 
   .kui-menu-separator {
-    @apply my-1 border-0 border-t border-kui-surface2;
+    @apply my-1 border-0 border-t border-border;
   }
 
   /* Combobox: the listbox opens under the input without taking focus, the row the arrows stand on marked by aria-selected. */
@@ -1540,7 +1512,7 @@
   }
 
   .kui-combobox-list {
-    @apply absolute inset-x-0 top-full z-20 m-0 mt-1 max-h-64 list-none overflow-y-auto border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-mantle p-1 text-sm text-kui-text;
+    @apply absolute inset-x-0 top-full z-20 m-0 mt-1 max-h-64 list-none overflow-y-auto border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-popover p-1 text-sm text-foreground;
 
     &:where([hidden]) {
       @apply hidden;
@@ -1548,17 +1520,17 @@
   }
 
   .kui-combobox-option {
-    @apply cursor-pointer px-2 py-1.5 hover:bg-kui-row-hover;
+    @apply cursor-pointer px-2 py-1.5 hover:bg-hover;
 
     &:where([aria-selected='true']) {
-      @apply bg-kui-row-hover;
+      @apply bg-hover;
       box-shadow: inset 2px 0 0 var(--color-accent);
       outline: 2px solid transparent;
       outline-offset: -2px;
     }
 
     &:where([data-selected]) {
-      @apply font-medium text-kui-accent;
+      @apply font-medium text-accent;
     }
 
     &:where([data-create]) {
@@ -1582,7 +1554,7 @@
     @apply flex w-full min-w-0 cursor-pointer items-center gap-2 text-left;
 
     &:where([data-empty]) {
-      @apply text-kui-overlay1;
+      @apply text-[var(--color-kui-overlay1,var(--color-muted))];
     }
   }
 
@@ -1591,7 +1563,7 @@
   }
 
   .kui-multi-select-chevron {
-    @apply size-4 shrink-0 text-kui-subtext0;
+    @apply size-4 shrink-0 text-muted;
   }
 
   .kui-multi-select-panel {
@@ -1604,11 +1576,11 @@
   }
 
   .kui-multi-select-bar {
-    @apply flex gap-3 border-b border-kui-surface2 px-3 py-1.5;
+    @apply flex gap-3 border-b border-border px-3 py-1.5;
   }
 
   .kui-multi-select-action {
-    @apply cursor-pointer text-kui-2xs tracking-kui-label text-kui-subtext0 [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)] hover:text-kui-text disabled:cursor-default disabled:opacity-40;
+    @apply cursor-pointer text-2xs tracking-label text-muted [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)] hover:text-foreground disabled:cursor-default disabled:opacity-40;
 
     &:focus-visible {
       outline: 2px solid var(--color-accent);
@@ -1621,11 +1593,11 @@
   }
 
   .kui-multi-select-option {
-    @apply flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm text-kui-text hover:bg-kui-row-hover;
+    @apply flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm text-foreground hover:bg-hover;
 
     /* The checkbox's own ring is too small to find, so the row the keyboard stands on takes the menu's tint and accent bar; forced colours paint the transparent outline instead. */
     &:has(.kui-multi-select-checkbox:focus-visible) {
-      @apply bg-kui-row-hover;
+      @apply bg-hover;
       box-shadow: inset 2px 0 0 var(--color-accent);
       outline: 2px solid transparent;
       outline-offset: -2px;
@@ -1641,7 +1613,7 @@
   }
 
   .kui-multi-select-checkbox {
-    @apply size-3.5 shrink-0 accent-kui-accent;
+    @apply size-3.5 shrink-0 accent-accent;
   }
 
   .kui-multi-select-label {
@@ -1649,7 +1621,7 @@
   }
 
   .kui-multi-select-empty {
-    @apply px-2 py-3 text-center text-xs text-kui-subtext0;
+    @apply px-2 py-3 text-center text-xs text-muted;
 
     /* Kept in the page while empty, so a screen reader hears it fill. */
     &:empty {
@@ -1659,24 +1631,24 @@
 
   .kui-meter,
   .kui-progress {
-    @apply h-2 w-full overflow-hidden bg-kui-surface0;
+    @apply h-2 w-full overflow-hidden bg-surface;
   }
 
   .kui-meter-fill,
   .kui-progress-fill {
-    @apply h-full bg-kui-accent transition-[width] motion-reduce:transition-none;
+    @apply h-full bg-accent transition-[width] motion-reduce:transition-none;
   }
 
   .kui-skeleton {
-    @apply flex w-(--kui-skeleton-width,100%) flex-col gap-2;
+    @apply flex w-(--_skeleton-width,100%) flex-col gap-2;
 
     &:where([data-shape='avatar']) {
-      @apply w-(--kui-skeleton-width,2.5rem);
+      @apply w-(--_skeleton-width,2.5rem);
     }
   }
 
   .kui-skeleton-block {
-    @apply block h-(--kui-skeleton-height,1em) w-full animate-pulse motion-reduce:animate-none bg-kui-surface1;
+    @apply block h-(--_skeleton-height,1em) w-full animate-pulse motion-reduce:animate-none bg-surface-strong;
 
     &:where([data-last]) {
       @apply w-3/5;
@@ -1684,11 +1656,11 @@
   }
 
   :where(.kui-skeleton[data-shape='avatar']) > .kui-skeleton-block {
-    @apply aspect-square h-auto rounded-kui-full;
+    @apply aspect-square h-auto rounded-[var(--radius-kui-full,calc(infinity*1px))];
   }
 
   :where(.kui-skeleton[data-shape='card']) > .kui-skeleton-block {
-    @apply h-(--kui-skeleton-height,8rem);
+    @apply h-(--_skeleton-height,8rem);
   }
 
   .kui-skeleton-label {
@@ -1709,23 +1681,23 @@
   }
 
   .kui-page-header-title {
-    @apply m-0 text-xl font-kui-heading tracking-kui-label text-kui-text [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
+    @apply m-0 text-xl [font-weight:var(--font-weight-kui-heading,var(--font-weight-semibold))] tracking-label text-foreground [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
   }
 
   .kui-page-header-meta {
-    @apply flex flex-wrap items-center gap-2 text-sm text-kui-subtext0;
+    @apply flex flex-wrap items-center gap-2 text-sm text-muted;
   }
 
   .kui-page-header-actions {
-    @apply flex flex-wrap items-center gap-2 border-l border-kui-surface2 pl-4;
+    @apply flex flex-wrap items-center gap-2 border-l border-border pl-4;
   }
 
   .kui-page-header-description {
-    @apply m-0 text-sm text-kui-subtext0;
+    @apply m-0 text-sm text-muted;
   }
 
   .kui-page-section {
-    @apply flex flex-col gap-kui-section;
+    @apply flex flex-col gap-[var(--spacing-kui-section,calc(var(--spacing)*3.5*var(--density)))];
   }
 
   .kui-page-section-head {
@@ -1738,7 +1710,7 @@
 
   /* A native popover, anchored to its trigger through CSS anchor positioning and flipped by the browser when it would overflow. */
   .kui-popover {
-    @apply border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-mantle p-0 text-kui-text;
+    @apply border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-popover p-0 text-foreground;
     inset: auto;
     margin: 0.25rem 0;
     position-try-fallbacks: flip-block, flip-inline;
@@ -1762,7 +1734,7 @@
 
   /* A card anchored to an element the page picks at run time, placed beside it through CSS anchor positioning and flipped by the browser when it would overflow. It never takes the pointer, so it cannot flicker the hover that shows it. */
   .kui-hover-card {
-    @apply border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-mantle p-0 text-kui-text;
+    @apply border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-popover p-0 text-foreground;
     inset: auto;
     margin: 0.25rem;
     pointer-events: none;
@@ -1819,7 +1791,7 @@
 
   .kui-range-input-separator,
   .kui-range-input-unit {
-    @apply text-xs text-kui-subtext0;
+    @apply text-xs text-muted;
   }
 
   .kui-date-input {
@@ -1831,7 +1803,7 @@
   }
 
   .kui-date-input-trigger {
-    @apply inline-flex shrink-0 cursor-pointer items-center justify-center rounded-kui-card p-1 text-kui-subtext0 hover:text-kui-text disabled:cursor-default disabled:opacity-40;
+    @apply inline-flex shrink-0 cursor-pointer items-center justify-center rounded-md p-1 text-muted hover:text-foreground disabled:cursor-default disabled:opacity-40;
 
     &:focus-visible {
       outline: 2px solid var(--color-accent);
@@ -1852,7 +1824,7 @@
   }
 
   .kui-date-input-step {
-    @apply inline-flex size-7 cursor-pointer items-center justify-center rounded-kui-card text-kui-subtext0 hover:bg-kui-row-hover hover:text-kui-text disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent;
+    @apply inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-muted hover:bg-hover hover:text-foreground disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent;
 
     &:focus-visible {
       outline: 2px solid var(--color-accent);
@@ -1878,22 +1850,22 @@
   }
 
   .kui-date-input-weekday {
-    @apply py-1 text-kui-2xs font-normal text-kui-subtext0 [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
+    @apply py-1 text-2xs font-normal text-muted [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
   }
 
   .kui-date-input-day {
-    @apply h-8 w-full cursor-pointer rounded-kui-card tabular-nums hover:bg-kui-row-hover disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent;
+    @apply h-8 w-full cursor-pointer rounded-md tabular-nums hover:bg-hover disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent;
 
     &:where([data-outside]) {
-      @apply text-kui-subtext0;
+      @apply text-muted;
     }
 
     &:where([data-today]) {
-      @apply font-semibold text-kui-accent;
+      @apply font-semibold text-accent;
     }
 
     &:where([data-selected]) {
-      @apply bg-kui-accent text-kui-on-accent hover:bg-kui-accent;
+      @apply bg-accent text-accent-foreground hover:bg-accent;
     }
 
     &:focus-visible {
@@ -1903,7 +1875,7 @@
   }
 
   .kui-date-input-today {
-    @apply mt-1 w-full cursor-pointer rounded-kui-card py-1 text-center text-kui-2xs tracking-kui-label text-kui-subtext0 [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)] hover:text-kui-text disabled:cursor-default disabled:opacity-40;
+    @apply mt-1 w-full cursor-pointer rounded-md py-1 text-center text-2xs tracking-label text-muted [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)] hover:text-foreground disabled:cursor-default disabled:opacity-40;
 
     &:focus-visible {
       outline: 2px solid var(--color-accent);
@@ -1916,7 +1888,7 @@
   }
 
   .kui-date-range-input-separator {
-    @apply text-xs text-kui-subtext0;
+    @apply text-xs text-muted;
   }
 
   .kui-scatter-chart {
@@ -1924,7 +1896,7 @@
   }
 
   .kui-scatter-chart-axis-label {
-    @apply text-center text-kui-2xs text-kui-subtext0;
+    @apply text-center text-2xs text-muted;
 
     &:where([data-axis='y']) {
       @apply row-start-1 rotate-180 self-center [writing-mode:vertical-rl];
@@ -1937,13 +1909,13 @@
 
   /* Tick labels hang outside the plot, into the margin it keeps for them. */
   .kui-scatter-chart-plot {
-    @apply relative col-start-2 mb-5 ml-8 border-solid border-(length:--kui-border-width) border-kui-surface2;
+    @apply relative col-start-2 mb-5 ml-8 border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border;
     height: var(--chart-height, var(--kui-scatter-chart-height, 18rem));
   }
 
   .kui-scatter-chart-grid,
   .kui-scatter-chart-guide {
-    @apply absolute bg-kui-surface2;
+    @apply absolute bg-border;
 
     &:where([data-axis='y']) {
       @apply inset-x-0 h-px;
@@ -1955,11 +1927,11 @@
   }
 
   .kui-scatter-chart-guide {
-    @apply bg-kui-overlay0;
+    @apply bg-border-strong;
   }
 
   .kui-scatter-chart-tick {
-    @apply absolute text-kui-2xs whitespace-nowrap text-kui-overlay1 tabular-nums;
+    @apply absolute text-2xs whitespace-nowrap text-[var(--color-kui-overlay1,var(--color-muted))] tabular-nums;
   }
 
   :where(.kui-scatter-chart-grid[data-axis='y']) .kui-scatter-chart-tick {
@@ -1971,7 +1943,7 @@
   }
 
   .kui-scatter-chart-corner {
-    @apply pointer-events-none absolute text-kui-2xs text-kui-overlay1;
+    @apply pointer-events-none absolute text-2xs text-[var(--color-kui-overlay1,var(--color-muted))];
 
     &:where([data-corner='topLeft']) {
       @apply top-1.5 left-2;
@@ -1991,17 +1963,17 @@
   }
 
   .kui-scatter-chart-dot {
-    @apply absolute -translate-x-1/2 translate-y-1/2 rounded-full bg-kui-accent opacity-70 transition-opacity hover:z-10 hover:opacity-100;
-    width: var(--kui-dot-size);
-    height: var(--kui-dot-size);
+    @apply absolute -translate-x-1/2 translate-y-1/2 rounded-full bg-accent opacity-70 transition-opacity hover:z-10 hover:opacity-100;
+    width: var(--_dot-size);
+    height: var(--_dot-size);
 
     &:where([data-interactive]) {
-      @apply cursor-pointer focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-kui-text;
+      @apply cursor-pointer focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-foreground;
     }
   }
 
   .kui-scatter-chart-empty {
-    @apply text-xs text-kui-subtext0;
+    @apply text-xs text-muted;
   }
 
   /* The plot leaves its left margin for the value labels, which hang outside it as ScatterChart's do. */
@@ -2010,16 +1982,16 @@
   }
 
   .kui-bar-chart-plot {
-    @apply relative ml-10 border-solid border-(length:--kui-border-width) border-kui-surface2 border-t-transparent border-r-transparent border-l-transparent;
+    @apply relative ml-10 border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border border-t-transparent border-r-transparent border-l-transparent;
     height: var(--chart-height, var(--kui-bar-chart-height, 12rem));
   }
 
   .kui-bar-chart-grid {
-    @apply absolute inset-x-0 h-px bg-kui-surface2;
+    @apply absolute inset-x-0 h-px bg-border;
   }
 
   .kui-bar-chart-tick {
-    @apply absolute right-full mr-2 -translate-y-1/2 text-kui-2xs whitespace-nowrap text-kui-overlay1 tabular-nums;
+    @apply absolute right-full mr-2 -translate-y-1/2 text-2xs whitespace-nowrap text-[var(--color-kui-overlay1,var(--color-muted))] tabular-nums;
   }
 
   .kui-bar-chart-columns {
@@ -2027,7 +1999,7 @@
   }
 
   .kui-bar-chart-column {
-    @apply flex min-w-0 flex-1 items-end gap-px outline-none hover:bg-kui-surface0 focus-visible:outline-2 focus-visible:outline-kui-text;
+    @apply flex min-w-0 flex-1 items-end gap-px outline-none hover:bg-surface focus-visible:outline-2 focus-visible:outline-foreground;
 
     &:where([data-stacked]) {
       @apply flex-col-reverse items-stretch justify-start gap-0;
@@ -2052,7 +2024,7 @@
   }
 
   .kui-bar-chart-axis-label {
-    @apply flex min-w-0 flex-1 justify-center text-kui-2xs whitespace-nowrap text-kui-overlay1;
+    @apply flex min-w-0 flex-1 justify-center text-2xs whitespace-nowrap text-[var(--color-kui-overlay1,var(--color-muted))];
   }
 
   .kui-bar-chart-legend {
@@ -2060,7 +2032,7 @@
   }
 
   .kui-bar-chart-legend-item {
-    @apply flex items-center gap-1.5 text-xs text-kui-subtext0;
+    @apply flex items-center gap-1.5 text-xs text-muted;
   }
 
   .kui-bar-chart-key {
@@ -2068,11 +2040,11 @@
   }
 
   .kui-bar-chart-empty {
-    @apply text-xs text-kui-subtext0;
+    @apply text-xs text-muted;
   }
 
   .kui-segmented {
-    @apply inline-flex border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-surface0;
+    @apply inline-flex border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border bg-surface;
   }
 
   .kui-segmented:where([data-orientation='vertical']) {
@@ -2102,11 +2074,11 @@
   }
 
   .kui-segmented-label {
-    @apply flex items-center gap-1 px-3 py-1.5 text-xs text-kui-subtext0 transition-colors hover:text-kui-text;
+    @apply flex items-center gap-1 px-3 py-1.5 text-xs text-muted transition-colors hover:text-foreground;
   }
 
   :where(.kui-segmented-input:checked) + .kui-segmented-label {
-    @apply bg-kui-accent text-kui-on-accent hover:text-kui-on-accent;
+    @apply bg-accent text-accent-foreground hover:text-accent-foreground;
   }
 
   :where(.kui-segmented-input:focus-visible) + .kui-segmented-label {
@@ -2119,11 +2091,11 @@
   }
 
   .kui-slider-label {
-    @apply text-xs font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
+    @apply text-xs [font-weight:var(--font-weight-kui-label,var(--font-weight-normal))] tracking-label text-muted [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
   }
 
   .kui-slider-value {
-    @apply text-xs text-kui-text tabular-nums;
+    @apply text-xs text-foreground tabular-nums;
   }
 
   /* The track and the thumb of both engines, drawn from the field and accent tokens. */
@@ -2131,19 +2103,19 @@
     @apply col-span-2 h-4 w-full cursor-pointer appearance-none bg-transparent;
 
     &::-webkit-slider-runnable-track {
-      @apply h-1 bg-kui-field-border;
+      @apply h-1 bg-input;
     }
 
     &::-moz-range-track {
-      @apply h-1 bg-kui-field-border;
+      @apply h-1 bg-input;
     }
 
     &::-webkit-slider-thumb {
-      @apply -mt-1.5 size-4 appearance-none rounded-kui-card border-0 bg-kui-accent;
+      @apply -mt-1.5 size-4 appearance-none rounded-sm border-0 bg-accent;
     }
 
     &::-moz-range-thumb {
-      @apply size-4 rounded-kui-card border-0 bg-kui-accent;
+      @apply size-4 rounded-sm border-0 bg-accent;
     }
 
     &:focus-visible {
@@ -2161,27 +2133,27 @@
   }
 
   .kui-color-input-label {
-    @apply text-xs font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)];
+    @apply text-xs [font-weight:var(--font-weight-kui-label,var(--font-weight-normal))] tracking-label text-muted [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
   }
 
   .kui-color-input-value {
-    @apply text-xs text-kui-text tabular-nums;
+    @apply text-xs text-foreground tabular-nums;
   }
 
   /* The swatch of both engines, with no native chrome around it, in the keyline and radius of the fields. */
   .kui-color-input-input {
-    @apply size-8 shrink-0 cursor-pointer appearance-none rounded-kui-card border-solid border-(length:--kui-border-width) border-kui-field-border bg-transparent p-0.5;
+    @apply size-8 shrink-0 cursor-pointer appearance-none rounded-md border-solid border-[length:var(--kui-border-width,var(--border-width))] border-input bg-transparent p-0.5;
 
     &::-webkit-color-swatch-wrapper {
       @apply p-0;
     }
 
     &::-webkit-color-swatch {
-      @apply rounded-kui-card border-0;
+      @apply rounded-md border-0;
     }
 
     &::-moz-color-swatch {
-      @apply rounded-kui-card border-0;
+      @apply rounded-md border-0;
     }
 
     &:focus-visible {
@@ -2199,7 +2171,7 @@
   }
 
   .kui-image-cropper-stage {
-    @apply relative cursor-crosshair touch-none overflow-hidden border-solid border-(length:--kui-border-width) border-kui-surface2 select-none;
+    @apply relative cursor-crosshair touch-none overflow-hidden border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border select-none;
   }
 
   .kui-image-cropper-image {
@@ -2210,7 +2182,7 @@
     @apply absolute cursor-move border-2 border-dashed border-white bg-no-repeat shadow-[0_0_0_9999px_rgba(0,0,0,0.55)] outline-none;
 
     &:focus-visible {
-      @apply border-solid border-kui-accent;
+      @apply border-solid border-accent;
     }
   }
 
@@ -2224,7 +2196,7 @@
 
   /* A 16px dot inside a 40px hit area, so a finger can grab a corner. */
   .kui-image-cropper-handle {
-    @apply absolute size-10 before:absolute before:inset-3 before:rounded-full before:border-2 before:border-white before:bg-kui-accent before:content-[""];
+    @apply absolute size-10 before:absolute before:inset-3 before:rounded-full before:border-2 before:border-white before:bg-accent before:content-[""];
 
     &:where([data-handle='nw']) {
       @apply -top-5 -left-5 cursor-nw-resize;
@@ -2242,7 +2214,7 @@
 
   /* A dialog along the right edge, modal unless `modal` is false, sliding in when it opens. */
   .kui-side-panel {
-    @apply inset-y-0 right-0 left-auto m-0 flex h-dvh max-h-dvh w-full max-w-[min(42rem,100vw)] flex-col overflow-hidden border-0 border-solid border-l-(length:--kui-border-width) border-kui-overlay0 bg-kui-surface0 p-0 text-kui-text;
+    @apply inset-y-0 right-0 left-auto m-0 flex h-dvh max-h-dvh w-full max-w-[min(42rem,100vw)] flex-col overflow-hidden border-0 border-solid border-l-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-surface p-0 text-foreground;
     transition:
       translate 0.2s ease-out,
       overlay 0.2s allow-discrete,
@@ -2274,11 +2246,11 @@
   }
 
   .kui-side-panel-head {
-    @apply flex shrink-0 items-center gap-2 border-b border-kui-surface2 px-5 py-3;
+    @apply flex shrink-0 items-center gap-2 border-b border-border px-5 py-3;
   }
 
   .kui-side-panel-title {
-    @apply min-w-0 flex-1 truncate text-lg font-kui-heading tracking-kui-label text-kui-text [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
+    @apply min-w-0 flex-1 truncate text-lg [font-weight:var(--font-weight-kui-heading,var(--font-weight-semibold))] tracking-label text-foreground [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
   }
 
   .kui-side-panel-body {
@@ -2286,7 +2258,7 @@
   }
 
   .kui-side-panel-footer {
-    @apply flex shrink-0 flex-wrap justify-end gap-2 border-t border-kui-surface2 px-5 py-4;
+    @apply flex shrink-0 flex-wrap justify-end gap-2 border-t border-border px-5 py-4;
   }
 
   .kui-site-favicon {
@@ -2303,23 +2275,23 @@
 
   /* One pane at a time below md, the detail replacing the list once open and the sidebar covering both; side by side from md up. */
   .kui-split-layout {
-    @apply relative grid h-full grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[var(--kui-split-list-width)_minmax(0,1fr)];
+    @apply relative grid h-full grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[var(--_split-list-width)_minmax(0,1fr)];
 
     &:where([data-sidebar]) {
-      @apply md:grid-cols-[13.75rem_var(--kui-split-list-width)_minmax(0,1fr)];
+      @apply md:grid-cols-[13.75rem_var(--_split-list-width)_minmax(0,1fr)];
     }
   }
 
   .kui-split-layout-sidebar {
-    @apply hidden min-h-0 flex-col overflow-hidden border-r border-kui-surface2 md:flex;
+    @apply hidden min-h-0 flex-col overflow-hidden border-r border-border md:flex;
   }
 
   :where(.kui-split-layout[data-sidebar-open]) .kui-split-layout-sidebar {
-    @apply absolute inset-0 z-20 flex bg-kui-canvas md:static md:z-auto md:bg-transparent;
+    @apply absolute inset-0 z-20 flex bg-background md:static md:z-auto md:bg-transparent;
   }
 
   .kui-split-layout-sidebar-head {
-    @apply flex shrink-0 items-center gap-2 border-b border-kui-surface2 px-3 py-2 md:hidden;
+    @apply flex shrink-0 items-center gap-2 border-b border-border px-3 py-2 md:hidden;
   }
 
   .kui-split-layout-sidebar-title {
@@ -2331,7 +2303,7 @@
   }
 
   .kui-split-layout-list {
-    @apply relative flex min-h-0 flex-col overflow-hidden border-r border-kui-surface2;
+    @apply relative flex min-h-0 flex-col overflow-hidden border-r border-border;
   }
 
   :where(.kui-split-layout[data-detail-open]) .kui-split-layout-list {
@@ -2340,7 +2312,7 @@
 
   .kui-split-layout-list-head,
   .kui-split-layout-detail-head {
-    @apply flex shrink-0 items-center gap-2 border-b border-kui-surface2 px-3 py-2;
+    @apply flex shrink-0 items-center gap-2 border-b border-border px-3 py-2;
   }
 
   .kui-split-layout-detail {
@@ -2352,7 +2324,7 @@
   }
 
   .kui-split-layout-resizer {
-    @apply absolute inset-y-0 right-0 z-10 hidden w-1.5 cursor-col-resize touch-none outline-none hover:bg-kui-surface2 focus-visible:bg-kui-accent md:block;
+    @apply absolute inset-y-0 right-0 z-10 hidden w-1.5 cursor-col-resize touch-none outline-none hover:bg-border focus-visible:bg-accent md:block;
   }
 
   .kui-stat-badge :where(.kui-icon) {
@@ -2360,45 +2332,45 @@
   }
 
   .kui-stat-value {
-    @apply font-semibold text-kui-text;
+    @apply font-semibold text-foreground;
   }
 
   .kui-stat-label {
-    @apply text-kui-subtext0;
+    @apply text-muted;
   }
 
   /* A tile fills its grid cell: the figure large above its label. */
   .kui-stat-badge:where([data-variant='tile']) {
-    @apply flex flex-col items-start gap-1 px-kui-field-x py-3;
+    @apply flex flex-col items-start gap-1 px-[var(--spacing-kui-field-x,calc(var(--spacing)*2.25*var(--density)))] py-3;
 
     & .kui-stat-value {
       @apply text-2xl/none;
     }
 
     & .kui-stat-label {
-      @apply text-kui-micro font-kui-label tracking-kui-label [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
+      @apply [font-size:var(--text-kui-micro,var(--text-2xs))] [line-height:var(--text-kui-micro--line-height,var(--text-2xs--line-height))] [font-weight:var(--font-weight-kui-label,var(--font-weight-normal))] tracking-label [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
     }
   }
 
   /* The figure alone takes the tone, so the label keeps its text colour. */
   .kui-stat-badge:where([data-tone='accent']) .kui-stat-value {
-    @apply text-kui-accent;
+    @apply text-accent;
   }
 
   .kui-stat-badge:where([data-tone='success']) .kui-stat-value {
-    @apply text-kui-success;
+    @apply text-success;
   }
 
   .kui-stat-badge:where([data-tone='warning']) .kui-stat-value {
-    @apply text-kui-warning;
+    @apply text-warning;
   }
 
   .kui-stat-badge:where([data-tone='danger']) .kui-stat-value {
-    @apply text-kui-error;
+    @apply text-danger;
   }
 
   .kui-stat-badge:where([data-tone='info']) .kui-stat-value {
-    @apply text-kui-info;
+    @apply text-info;
   }
 
   /* Below lg the links fold behind the toggle, a popover its popovertarget opens; from lg they sit in a row, the popover's frame undone and the toggle hidden. A browser without popovers shows the links as they are and hides the toggle. */
@@ -2437,15 +2409,15 @@
   :where(.kui-site-nav-list:popover-open, .kui-site-nav > [data-part='list']:popover-open) {
     position-area: block-end span-inline-end;
     position-try-fallbacks: flip-inline;
-    @apply m-0 mt-2 flex min-w-56 flex-col items-stretch border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-mantle p-2 text-kui-text;
+    @apply m-0 mt-2 flex min-w-56 flex-col items-stretch border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border bg-popover p-2 text-foreground;
     inset: auto;
   }
 
   .kui-site-nav-link {
-    @apply block px-3 py-2 text-sm text-kui-subtext0 transition-colors hover:text-kui-text;
+    @apply block px-3 py-2 text-sm text-muted transition-colors hover:text-foreground;
 
     &:where([aria-current]) {
-      @apply text-kui-accent;
+      @apply text-accent;
     }
   }
 
@@ -2458,7 +2430,7 @@
   }
 
   .kui-app-header {
-    @apply flex items-center gap-4 border-b border-kui-surface2 bg-kui-canvas px-4 py-2;
+    @apply flex items-center gap-4 border-b border-border bg-background px-4 py-2;
 
     &:where([data-sticky]) {
       @apply sticky top-0 z-20;
@@ -2467,7 +2439,7 @@
 
   /* A long brand or end area wraps inside its box rather than push the bar past the screen. */
   .kui-app-header-brand {
-    @apply flex min-w-0 items-center gap-2 font-kui-heading text-kui-text [overflow-wrap:anywhere];
+    @apply flex min-w-0 items-center gap-2 [font-weight:var(--font-weight-kui-heading,var(--font-weight-semibold))] text-foreground [overflow-wrap:anywhere];
   }
 
   /* After the brand in the tab order and on screen, so the menu button comes before the end area; with no end area it takes the far end. */
@@ -2485,20 +2457,20 @@
 
   .kui-pagination-page,
   .kui-pagination-step {
-    @apply min-w-9 border-solid border-(length:--kui-border-width) border-kui-surface2 px-3 py-1.5 text-center text-kui-subtext0 transition-colors hover:text-kui-text;
+    @apply min-w-9 border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border px-3 py-1.5 text-center text-muted transition-colors hover:text-foreground;
 
     &:where([aria-current='page']) {
-      @apply border-kui-accent text-kui-accent;
+      @apply border-accent text-accent;
     }
 
     /* Previous or Next at an end, drawn as text rather than a link. */
     &:where(span) {
-      @apply opacity-50 hover:text-kui-subtext0;
+      @apply opacity-50 hover:text-muted;
     }
   }
 
   .kui-pagination-gap {
-    @apply px-2 text-kui-overlay1;
+    @apply px-2 text-[var(--color-kui-overlay1,var(--color-muted))];
   }
 
   /* The code keeps its own light ground and dark modules, which scanners need, whatever the theme. */
@@ -2515,7 +2487,7 @@
   }
 
   .kui-breadcrumb-list {
-    @apply m-0 flex list-none flex-wrap items-center gap-x-2 gap-y-1 p-0 text-sm text-kui-subtext0;
+    @apply m-0 flex list-none flex-wrap items-center gap-x-2 gap-y-1 p-0 text-sm text-muted;
   }
 
   /* The separator is drawn here, with an empty alternative text, so a screen reader hears the list alone. */
@@ -2526,11 +2498,11 @@
   .kui-breadcrumb [data-part='list'] > [data-part='item'] + [data-part='more']::before,
   .kui-breadcrumb [data-part='list'] > [data-part='more'] + [data-part='item']::before {
     content: '/' / '';
-    @apply mr-2 text-kui-overlay1;
+    @apply mr-2 text-[var(--color-kui-overlay1,var(--color-muted))];
   }
 
   .kui-breadcrumb-link {
-    @apply text-kui-subtext0 underline-offset-2 hover:text-kui-text hover:underline;
+    @apply text-muted underline-offset-2 hover:text-foreground hover:underline;
 
     &:focus-visible {
       outline: 2px solid var(--color-accent);
@@ -2539,7 +2511,7 @@
   }
 
   .kui-breadcrumb-text:where([aria-current='page']) {
-    @apply text-kui-text;
+    @apply text-foreground;
   }
 
   .kui-breadcrumb-more {
@@ -2558,14 +2530,14 @@
   }
 
   .kui-tab-nav {
-    @apply flex gap-1 overflow-x-auto border-b border-kui-surface2 pb-px;
+    @apply flex gap-1 overflow-x-auto border-b border-border pb-px;
   }
 
   .kui-tab-nav-link {
-    @apply -mb-px shrink-0 border-b-2 border-transparent px-4 py-2 text-sm text-kui-subtext0 transition-colors hover:text-kui-text;
+    @apply -mb-px shrink-0 border-b-2 border-transparent px-4 py-2 text-sm text-muted transition-colors hover:text-foreground;
 
     &:where([aria-current='page']) {
-      @apply border-kui-accent text-kui-accent;
+      @apply border-accent text-accent;
     }
   }
 
@@ -2579,10 +2551,10 @@
   }
 
   .kui-steps-item {
-    @apply flex items-center text-sm text-kui-subtext0;
+    @apply flex items-center text-sm text-muted;
 
     &:where([data-state='current']) {
-      @apply font-medium text-kui-text;
+      @apply font-medium text-foreground;
     }
   }
 
@@ -2590,19 +2562,19 @@
     @apply flex items-center gap-2 rounded-md no-underline;
 
     &:where(a) {
-      @apply text-kui-text hover:text-kui-accent;
+      @apply text-foreground hover:text-accent;
     }
   }
 
   .kui-steps-marker {
-    @apply flex size-6 shrink-0 items-center justify-center rounded-full border border-kui-overlay0 text-xs;
+    @apply flex size-6 shrink-0 items-center justify-center rounded-full border border-border-strong text-xs;
 
     :where([data-state='current']) & {
-      @apply border-kui-accent bg-kui-accent text-kui-on-accent;
+      @apply border-accent bg-accent text-accent-foreground;
     }
 
     :where([data-state='done']) & {
-      @apply border-kui-accent text-kui-accent;
+      @apply border-accent text-accent;
     }
   }
 
@@ -2620,14 +2592,14 @@
   }
 
   .kui-tabs-list {
-    @apply flex gap-1 overflow-x-auto border-b border-kui-surface2 pb-px;
+    @apply flex gap-1 overflow-x-auto border-b border-border pb-px;
   }
 
   .kui-tabs-tab {
-    @apply -mb-px inline-flex shrink-0 items-center gap-1 border-b-2 border-transparent px-4 py-2 text-sm text-kui-subtext0 transition-colors hover:text-kui-text disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-kui-subtext0;
+    @apply -mb-px inline-flex shrink-0 items-center gap-1 border-b-2 border-transparent px-4 py-2 text-sm text-muted transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-muted;
 
     &:where([aria-selected='true']) {
-      @apply border-kui-accent text-kui-accent;
+      @apply border-accent text-accent;
     }
   }
 
@@ -2646,7 +2618,7 @@
   }
 
   .kui-table-wrap {
-    @apply w-full overflow-x-auto border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-surface0;
+    @apply w-full overflow-x-auto border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border bg-surface;
 
     &:where([data-narrow='stack']) {
       container: kui-table / inline-size;
@@ -2665,13 +2637,13 @@
     }
 
     & .kui-table-head-cell {
-      @apply sticky top-0 bg-kui-surface0;
+      @apply sticky top-0 bg-surface;
     }
   }
 
   /* Sticky, so it stays in view while a wide table scrolls under it. */
   .kui-table-filter {
-    @apply sticky left-0 flex items-center gap-2 border-solid border-b-(length:--kui-border-width) border-kui-surface2 px-3 py-2;
+    @apply sticky left-0 flex items-center gap-2 border-solid border-b-[length:var(--kui-border-width,var(--border-width))] border-border px-3 py-2;
   }
 
   .kui-table-filter-input {
@@ -2684,7 +2656,7 @@
 
   /* Sticky like the filter; the bulk actions sit beside the count. */
   .kui-table-selection {
-    @apply sticky left-0 flex flex-wrap items-center gap-3 border-solid border-b-(length:--kui-border-width) border-kui-surface2 px-3 py-2 text-sm;
+    @apply sticky left-0 flex flex-wrap items-center gap-3 border-solid border-b-[length:var(--kui-border-width,var(--border-width))] border-border px-3 py-2 text-sm;
   }
 
   /* The box is 1rem, so its label grows to the 1.5rem a finger needs. */
@@ -2719,7 +2691,7 @@
   }
 
   .kui-table-head-cell {
-    @apply border-b border-kui-surface2 px-3 py-2 text-left text-xs font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
+    @apply border-b border-border px-3 py-2 text-left text-xs [font-weight:var(--font-weight-kui-label,var(--font-weight-normal))] tracking-label text-muted [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
 
     &:where([data-align='center']) {
       @apply text-center;
@@ -2730,7 +2702,7 @@
     }
 
     &:where([aria-sort='ascending'], [aria-sort='descending']) {
-      @apply text-kui-accent;
+      @apply text-accent;
     }
   }
 
@@ -2747,16 +2719,16 @@
   }
 
   .kui-table-row {
-    @apply border-b border-kui-surface2;
+    @apply border-b border-border;
 
     &:hover,
     &:where([data-selected]) {
-      @apply bg-kui-row-hover;
+      @apply bg-hover;
     }
   }
 
   .kui-table-cell {
-    @apply px-3 py-1.5 text-kui-text;
+    @apply px-3 py-1.5 text-foreground;
 
     &:where([data-numeric]) {
       @apply tabular-nums;
@@ -2772,7 +2744,7 @@
   }
 
   .kui-table-empty-cell {
-    @apply px-3 py-8 text-center text-xs text-kui-subtext0;
+    @apply px-3 py-8 text-center text-xs text-muted;
   }
 
   /* Outside a narrow table, a cell holds its content alone: the label is the column header's job. */
@@ -2788,7 +2760,7 @@
   @container kui-table (width < 30rem) {
     /* The headers are one row of sort buttons in a block of their own, which is what stays on top. */
     .kui-table-wrap:where([data-virtual]) .kui-table thead {
-      @apply sticky top-0 z-1 bg-kui-surface0;
+      @apply sticky top-0 z-1 bg-surface;
     }
 
     .kui-table,
@@ -2798,7 +2770,7 @@
     }
 
     .kui-table :where(thead tr) {
-      @apply flex flex-wrap gap-2 border-solid border-b-(length:--kui-border-width) border-kui-surface2 px-3 py-2;
+      @apply flex flex-wrap gap-2 border-solid border-b-[length:var(--kui-border-width,var(--border-width))] border-border px-3 py-2;
     }
 
     .kui-table :where(thead:not(:has(.kui-table-sort-btn))) {
@@ -2814,7 +2786,7 @@
     }
 
     .kui-table-sort-btn {
-      @apply min-h-8 border-solid border-(length:--kui-border-width) border-kui-surface2 px-2 py-0.5;
+      @apply min-h-8 border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border px-2 py-0.5;
     }
 
     .kui-table-row {
@@ -2831,7 +2803,7 @@
     }
 
     .kui-table-cell-label {
-      @apply block text-left text-kui-micro font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
+      @apply block text-left [font-size:var(--text-kui-micro,var(--text-2xs))] [line-height:var(--text-kui-micro--line-height,var(--text-2xs--line-height))] [font-weight:var(--font-weight-kui-label,var(--font-weight-normal))] tracking-label text-muted [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
     }
 
     /* A long value with no space, such as a file path, breaks inside the card rather than widening it. */
@@ -2852,49 +2824,49 @@
     @apply pointer-events-none fixed inset-auto right-4 bottom-4 z-100 m-0 flex w-[calc(100%-2rem)] max-w-sm flex-col gap-2 overflow-visible border-0 bg-transparent p-0;
   }
 
-  /* --kui-toast-tone is the colour of the toast's tone, which its icon takes. */
+  /* --_toast-tone is the colour of the toast's tone, which its icon takes. */
   .kui-toast {
-    --kui-toast-tone: var(--color-accent);
-    @apply pointer-events-auto flex items-start gap-2 border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-surface0 px-3 py-2;
+    --_toast-tone: var(--color-accent);
+    @apply pointer-events-auto flex items-start gap-2 border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-surface px-3 py-2;
 
     &:where([data-tone='danger']) {
-      --kui-toast-tone: var(--color-danger);
+      --_toast-tone: var(--color-danger);
     }
 
     &:where([data-tone='success']) {
-      --kui-toast-tone: var(--color-success);
+      --_toast-tone: var(--color-success);
     }
 
     &:where([data-tone='info']) {
-      --kui-toast-tone: var(--color-info);
+      --_toast-tone: var(--color-info);
     }
   }
 
   .kui-toast-icon {
     @apply mt-0.5 size-4 shrink-0;
-    color: var(--kui-toast-tone);
+    color: var(--_toast-tone);
   }
 
   .kui-toast-message {
-    @apply min-w-0 flex-1 text-xs/snug text-kui-text;
+    @apply min-w-0 flex-1 text-xs/snug text-foreground;
   }
 
   .kui-toast-dismiss {
-    @apply shrink-0 text-kui-overlay1 hover:text-kui-text;
+    @apply shrink-0 text-[var(--color-kui-overlay1,var(--color-muted))] hover:text-foreground;
   }
 
   .kui-tree-view {
     @apply m-0 flex list-none flex-col p-0;
   }
 
-  /* Indented by its depth, which the row sets as --kui-tree-level. */
+  /* Indented by its depth, which the row sets as --_tree-level. */
   .kui-tree-view-item {
-    @apply flex cursor-pointer items-center gap-1 py-1 pr-2 text-sm text-kui-subtext0 transition-colors hover:bg-kui-row-hover hover:text-kui-text;
-    padding-left: calc(var(--kui-tree-level, 0) * 1rem + 0.25rem);
+    @apply flex cursor-pointer items-center gap-1 py-1 pr-2 text-sm text-muted transition-colors hover:bg-hover hover:text-foreground;
+    padding-left: calc(var(--_tree-level, 0) * 1rem + 0.25rem);
 
     /* After the hover, so a hovered selected row keeps its tint. */
     &[aria-selected='true'] {
-      @apply bg-kui-surface1 text-kui-text;
+      @apply bg-surface-strong text-foreground;
     }
 
     &:focus-visible {
@@ -2937,19 +2909,19 @@
   }
 
   .kui-toggle-track {
-    @apply relative inline-flex h-5 w-9 shrink-0 items-center rounded-kui-md border-solid border-(length:--kui-border-width) border-kui-field-border bg-kui-surface0 transition-colors;
+    @apply relative inline-flex h-5 w-9 shrink-0 items-center rounded-md border-solid border-[length:var(--kui-border-width,var(--border-width))] border-input bg-surface transition-colors;
 
     &::before {
       content: '';
-      @apply block size-3.5 translate-x-0.5 rounded-kui-sm bg-kui-subtext0 transition-transform;
+      @apply block size-3.5 translate-x-0.5 rounded-sm bg-muted transition-transform;
     }
   }
 
   :where(.kui-toggle-input:checked) ~ .kui-toggle-track {
-    @apply border-kui-accent bg-kui-accent;
+    @apply border-accent bg-accent;
 
     &::before {
-      @apply translate-x-4 bg-kui-on-accent;
+      @apply translate-x-4 bg-accent-foreground;
     }
   }
 
@@ -2959,18 +2931,18 @@
   }
 
   .kui-toggle-label {
-    @apply text-sm text-kui-text;
+    @apply text-sm text-foreground;
   }
 
-  /* Anchored to whichever element TooltipHost names --kui-tooltip-anchor. */
+  /* Anchored to whichever element TooltipHost names --tooltip-anchor. */
   .kui-tooltip {
-    @apply inset-auto m-1.5 max-w-xs overflow-visible border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-surface1 px-2 py-1 text-kui-2xs text-kui-text;
-    position-anchor: --kui-tooltip-anchor;
+    @apply inset-auto m-1.5 max-w-xs overflow-visible border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-surface-strong px-2 py-1 text-2xs text-foreground;
+    position-anchor: --tooltip-anchor;
     position-try-fallbacks: flip-block, flip-inline;
   }
 
   .kui-widget {
-    @apply flex w-full flex-col gap-3 border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-surface0 p-4;
+    @apply flex w-full flex-col gap-3 border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border bg-surface p-4;
   }
 
   .kui-widget-head {
@@ -3015,65 +2987,65 @@
   :where(button, a, [role='button']).kui-shell[aria-disabled='true'],
   .kui-btn:disabled,
   .kui-btn[aria-disabled='true'] {
-    --kui-shell-line: var(--color-border);
-    --kui-shell-fill: var(--color-background);
-    color: var(--color-kui-overlay1);
+    --_shell-line: var(--color-border);
+    --_shell-fill: var(--color-background);
+    color: var(--color-kui-overlay1, var(--color-muted));
     cursor: not-allowed;
     box-shadow: none;
     translate: none;
   }
 
   .kui-badge {
-    @apply inline-flex items-center gap-1 border-solid border-kui-surface2 bg-kui-surface0 px-kui-badge-x py-kui-badge-y text-kui-badge tracking-kui-badge whitespace-nowrap text-kui-subtext0;
-    border-width: var(--kui-border-badge);
-    --kui-badge-tone: var(--color-muted);
+    @apply inline-flex items-center gap-1 border-solid border-border bg-surface px-[var(--spacing-kui-badge-x,calc(var(--spacing)*1.5))] py-[var(--spacing-kui-badge-y,1px)] [font-size:var(--text-kui-badge,var(--text-xs))] [line-height:var(--text-kui-badge--line-height,var(--text-xs--line-height))] [letter-spacing:var(--tracking-kui-badge,var(--tracking-normal))] whitespace-nowrap text-muted;
+    border-width: var(--kui-border-badge, var(--kui-border-width, var(--border-width)));
+    --_badge-tone: var(--color-muted);
     font-family: var(--kui-badge-font, inherit);
-    text-transform: var(--kui-badge-case);
+    text-transform: var(--kui-badge-case, none);
 
     &:where([data-stamp]) {
-      @apply border-kui-stamp bg-kui-stamp-fill px-2.5 py-1 font-kui-mono text-[0.625rem]/[1.4] font-normal tracking-[0.14em] text-kui-stamp uppercase transition-colors duration-150;
-      border-width: var(--kui-border-stamp);
+      @apply border-[var(--color-kui-stamp,var(--color-foreground))] bg-[var(--color-kui-stamp-fill,var(--color-background))] px-2.5 py-1 font-mono text-[0.625rem]/[1.4] font-normal tracking-[0.14em] text-[var(--color-kui-stamp,var(--color-foreground))] uppercase transition-colors duration-150;
+      border-width: var(--kui-border-stamp, var(--kui-border-width, var(--border-width)));
     }
 
     &:where([data-tone='accent']) {
-      --kui-badge-tone: var(--color-accent);
-      @apply border-kui-accent text-kui-accent;
+      --_badge-tone: var(--color-accent);
+      @apply border-accent text-accent;
     }
 
     &:where([data-tone='success']) {
-      --kui-badge-tone: var(--color-success);
-      @apply border-kui-success text-kui-success;
+      --_badge-tone: var(--color-success);
+      @apply border-success text-success;
     }
 
     &:where([data-tone='warning']) {
-      --kui-badge-tone: var(--color-warning);
-      @apply border-kui-warning text-kui-warning;
+      --_badge-tone: var(--color-warning);
+      @apply border-warning text-warning;
     }
 
     &:where([data-tone='danger']) {
-      --kui-badge-tone: var(--color-danger);
-      @apply border-kui-error text-kui-error;
+      --_badge-tone: var(--color-danger);
+      @apply border-danger text-danger;
     }
 
     &:where([data-tone='info']) {
-      --kui-badge-tone: var(--color-info);
-      @apply border-kui-info text-kui-info;
+      --_badge-tone: var(--color-info);
+      @apply border-info text-info;
     }
 
-    /* Filled with its tone, the text in --kui-badge-solid-text, which a skin can set. */
+    /* Filled with its tone, the text in --color-accent-foreground, which a skin can set. */
     &:where([data-solid]) {
-      border-color: var(--kui-badge-tone);
-      background-color: var(--kui-badge-tone);
-      color: var(--kui-badge-solid-text, var(--color-accent-foreground));
+      border-color: var(--_badge-tone);
+      background-color: var(--_badge-tone);
+      color: var(--color-accent-foreground);
     }
   }
 
   :where(.kui-badge) {
-    @apply rounded-kui-sm;
+    @apply rounded-sm;
   }
 
   :where(.group:hover) .kui-badge:where([data-stamp]) {
-    @apply bg-kui-stamp-fill-hover;
+    @apply bg-[var(--color-kui-stamp-fill-hover,var(--color-kui-fill-hover,var(--color-surface-strong)))];
   }
 
   .kui-badge-icon {
@@ -3081,20 +3053,20 @@
   }
 
   .kui-notice {
-    @apply border-solid border-kui-overlay0 bg-kui-surface1 px-4 py-3 text-sm font-kui-notice text-kui-text;
-    border-width: var(--kui-border-notice);
+    @apply border-solid border-border-strong bg-surface-strong px-4 py-3 text-sm [font-weight:var(--font-weight-kui-notice,var(--font-weight-normal))] text-foreground;
+    border-width: var(--kui-border-notice, var(--kui-border-width, var(--border-width)));
 
     &:where([data-tone='success']) {
-      @apply border-kui-success text-kui-success;
+      @apply border-success text-success;
     }
 
     &:where([data-tone='warning']) {
-      @apply border-kui-warning text-kui-warning;
+      @apply border-warning text-warning;
     }
 
     /* `error` is the old name of `danger`, still written by markup that sets `data-tone` on a `.kui-notice` itself. */
     &:where([data-tone='danger'], [data-tone='error']) {
-      @apply border-kui-error bg-kui-canvas text-kui-error;
+      @apply border-danger bg-background text-danger;
     }
 
     &:where([data-compact]) {
@@ -3103,8 +3075,8 @@
   }
 
   .kui-avatar {
-    @apply inline-grid size-8 shrink-0 place-items-center overflow-hidden rounded-kui-full border-solid border-kui-avatar-ring bg-kui-surface1;
-    border-width: var(--kui-border-avatar);
+    @apply inline-grid size-8 shrink-0 place-items-center overflow-hidden rounded-[var(--radius-kui-full,calc(infinity*1px))] border-solid border-[var(--color-kui-avatar-ring,var(--color-border))] bg-surface-strong;
+    border-width: var(--kui-border-avatar, var(--kui-border-width, var(--border-width)));
 
     &:where([data-size='xs']) {
       @apply size-5;
@@ -3125,7 +3097,7 @@
 
   /* Its colours are set inline, seeded by the name. */
   .kui-avatar-initial {
-    @apply grid size-full place-items-center text-xs font-kui-avatar uppercase;
+    @apply grid size-full place-items-center text-xs [font-weight:var(--font-weight-kui-avatar,var(--font-weight-semibold))] uppercase;
   }
 
   :where(.kui-avatar[data-size='lg']) .kui-avatar-initial {
@@ -3133,19 +3105,19 @@
   }
 
   .kui-card {
-    @apply flex flex-col border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-surface0;
+    @apply flex flex-col border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border bg-surface;
   }
 
   .kui-card-head {
-    @apply flex items-center gap-3 border-solid border-b-(length:--kui-border-width) border-kui-surface2 px-3 py-2;
+    @apply flex items-center gap-3 border-solid border-b-[length:var(--kui-border-width,var(--border-width))] border-border px-3 py-2;
   }
 
   /* mr-auto rather than ml-auto on what follows: a head that is all control and no title reads from the left, like the body under it. */
   .kui-card-title {
-    @apply mr-auto text-kui-2xs font-kui-label tracking-kui-section text-kui-subtext0 [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
+    @apply mr-auto text-2xs [font-weight:var(--font-weight-kui-label,var(--font-weight-normal))] [letter-spacing:var(--tracking-kui-section,var(--tracking-label))] text-muted [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
   }
 
   .kui-card-body {
-    @apply p-kui-card;
+    @apply p-[var(--spacing-kui-card,calc(var(--spacing)*2.5*var(--density)))];
   }
 }

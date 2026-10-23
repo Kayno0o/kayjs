@@ -11,11 +11,11 @@ const frame = recipe({
   parts: {
     root: '',
     armed: 'inline-flex items-center gap-1',
-    message: 'text-kui-muted',
+    message: 'text-muted',
   },
   variants: {
     // An icon by default; `button` is a labelled danger button, for a dialog footer, and `link` a plain underlined text button, for a confirm inside running text.
-    trigger: { icon: '', button: '', link: 'cursor-pointer text-xs text-kui-subtext0 underline transition-colors hover:text-kui-text disabled:cursor-default disabled:opacity-40' },
+    trigger: { icon: '', button: '', link: 'cursor-pointer text-xs text-muted underline transition-colors hover:text-foreground disabled:cursor-default disabled:opacity-40' },
   },
 })
 

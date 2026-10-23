@@ -15,7 +15,7 @@ const look = recipe({
     menuIcon: 'group-has-[[data-part=list]:popover-open]/nav:hidden',
     closeIcon: 'hidden group-has-[[data-part=list]:popover-open]/nav:inline-block',
     list: 'gap-1 lg:static lg:m-0 lg:flex lg:min-w-0 lg:flex-row lg:items-center lg:overflow-visible lg:border-0 lg:bg-transparent lg:p-0 lg:text-inherit',
-    link: 'block px-3 py-2 text-sm text-kui-subtext0 transition-colors hover:text-kui-text aria-[current]:text-kui-accent has-[[data-part=icon]]:flex has-[[data-part=icon]]:items-center has-[[data-part=icon]]:gap-2',
+    link: 'block px-3 py-2 text-sm text-muted transition-colors hover:text-foreground aria-[current]:text-accent has-[[data-part=icon]]:flex has-[[data-part=icon]]:items-center has-[[data-part=icon]]:gap-2',
     icon: 'size-4 shrink-0',
   },
 })
@@ -34,7 +34,7 @@ const { id, links, current, label, menuLabel = wording('ui.siteNav.menu', 'Menu'
 }>()
 
 const listId = id ?? uid()
-const anchor = `--kui-site-nav-${listId}`
+const anchor = `--_site-nav-${listId}`
 
 // A path with a trailing slash is the same page as without one.
 const trimmed = (path: string) => path.length > 1 ? path.replace(TRAILING_SLASHES, '') : path

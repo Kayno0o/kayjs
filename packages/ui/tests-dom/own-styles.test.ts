@@ -17,7 +17,7 @@ async function styles() {
 test('a Popover writes the style an app gives it after its own declarations, so the app wins', async () => {
   const style = await styles()
 
-  expect(style('#menu')).toBe('position-anchor: --kui-popover-menu; color: red; position-anchor: --mine')
+  expect(style('#menu')).toBe('position-anchor: --_popover-menu; color: red; position-anchor: --mine')
 })
 
 test('a HoverCard writes the style an app gives it after its own declarations, so the app wins', async () => {
@@ -37,7 +37,7 @@ test('a QrCode, image or inline writes the style an app gives it after its own d
 test('a Skeleton writes the style an app gives it after its own declarations, so the app wins', async () => {
   const style = await styles()
 
-  expect(style('#skeleton')).toBe('--kui-skeleton-width: 50%; margin: 2px; --_skeleton-width: 9px')
+  expect(style('#skeleton')).toBe('--_skeleton-width: 50%; margin: 2px; --_skeleton-width: 9px')
   expect(style('#skeleton-bare')).toBe('margin: 2px')
 })
 

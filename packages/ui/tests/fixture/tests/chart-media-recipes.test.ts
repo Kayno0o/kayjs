@@ -50,7 +50,7 @@ inBrowser('chart and media recipes in the browser', () => {
 
     expect(await looks(page, '#line [data-part=root]', ['display', 'flex-direction', 'row-gap'])).toEqual({ 'display': 'flex', 'flex-direction': 'column', 'row-gap': '8px' })
     expect(await looks(page, '#line [data-part=frame]', ['position'])).toEqual({ position: 'relative' })
-    // The plot is 9rem high unless the app sets --kui-line-chart-height, and the overlay covers the frame exactly.
+    // The plot is 9rem high unless the app sets --chart-height, and the overlay covers the frame exactly.
     expect(plot.height).toBe(144)
     expect(overlay).toEqual(frame)
     expect(await looks(page, '#line [data-part=overlay]', ['position', 'cursor', 'touch-action', 'user-select'])).toEqual({ 'position': 'absolute', 'cursor': 'crosshair', 'touch-action': 'pan-y', 'user-select': 'none' })
@@ -94,7 +94,7 @@ inBrowser('chart and media recipes in the browser', () => {
     }
 
     const tip = await looks(page, '#line [data-part=tooltip]', ['position', 'pointer-events', 'z-index', 'width', 'display', 'flex-direction', 'padding-top', 'padding-left', 'font-size', 'border-top-width'])
-    const unit = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--kui-border-width').trim())
+    const unit = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--border-width').trim())
 
     expect(tip).toMatchObject({ 'position': 'fixed', 'pointer-events': 'none', 'z-index': '50', 'display': 'flex', 'flex-direction': 'column', 'padding-top': '8px', 'padding-left': '12px', 'font-size': '12px' })
     expect(tip['border-top-width']).toBe(unit)
@@ -129,7 +129,7 @@ inBrowser('chart and media recipes in the browser', () => {
       const computed = getComputedStyle(dot)
       const { width, height } = dot.getBoundingClientRect()
 
-      return { tag: dot.tagName, width, height, size: Number.parseFloat(dot.style.getPropertyValue('--kui-dot-size')) * 16, radius: computed.borderTopLeftRadius, opacity: computed.opacity, cursor: computed.cursor, position: computed.position, translate: computed.translate }
+      return { tag: dot.tagName, width, height, size: Number.parseFloat(dot.style.getPropertyValue('--_dot-size')) * 16, radius: computed.borderTopLeftRadius, opacity: computed.opacity, cursor: computed.cursor, position: computed.position, translate: computed.translate }
     }))
     const [heavy, light] = await read()
 

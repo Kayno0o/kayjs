@@ -6,13 +6,13 @@ import { claim } from './claim'
 // An element carries its tooltip as `data-tooltip`, and where it sits as `data-tooltip-placement`, a CSS `position-area`, `top` by default. `data-hint` is a tooltip for the pointer alone, for text the keyboard has no stop on.
 const CARRIER = '[data-tooltip], [data-hint]'
 // The anchor name theme.css's `.kui-tooltip` positions against.
-const ANCHOR = '--kui-tooltip-anchor'
+const ANCHOR = '--tooltip-anchor'
 const WHITESPACE = /\s+/
 // The id of the tooltip panel, which the element it shows for points at with `aria-describedby`.
 const PANEL_ID = 'kui-tooltip'
 
-// 'kui-tooltip' stays as the component's name for an app's CSS; theme.css still has its old rule until 1.74. Anchored to whichever element TooltipHost names --kui-tooltip-anchor.
-const look = recipe({ parts: { root: 'kui-tooltip inset-auto m-1.5 max-w-xs overflow-visible border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-surface1 px-2 py-1 text-kui-2xs text-kui-text [position-anchor:--kui-tooltip-anchor] [position-try-fallbacks:flip-block,flip-inline]' } })
+// 'kui-tooltip' stays as the component's name for an app's CSS; theme.css still has its old rule until 1.74. Anchored to whichever element TooltipHost names --tooltip-anchor.
+const look = recipe({ parts: { root: 'kui-tooltip inset-auto m-1.5 max-w-xs overflow-visible border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border-strong bg-surface-strong px-2 py-1 text-2xs text-foreground [position-anchor:--tooltip-anchor] [position-try-fallbacks:flip-block,flip-inline]' } })
 
 const { showDelay = '80ms', hideDelay = '150ms' } = props<{
   // How long the pointer or focus rests on an element before its tooltip shows.

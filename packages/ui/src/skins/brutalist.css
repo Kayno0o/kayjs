@@ -12,13 +12,12 @@
   --color-kui-error: light-dark(#b00020, #ff7b8c);
   --color-kui-field-border: light-dark(#4d4d4d, #9a9a9a);
 
-  --kui-border-width: 2px;
-  --kui-border-input: 2px;
+  --border-width: 2px;
   --radius-kui-card: 0px;
   --radius-kui-sm: 0px;
   --radius-kui-md: 0px;
   --kui-label-case: uppercase;
-  --kui-label-font: var(--font-kui-mono);
+  --kui-label-font: var(--font-mono);
   --kui-shadow-raised: 4px 4px 0 var(--color-foreground);
   --kui-shadow-press: 3px 3px 0 var(--color-foreground);
   --kui-press-travel: 3px;

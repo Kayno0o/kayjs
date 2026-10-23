@@ -8,29 +8,29 @@ import Icon from './icon.kay'
 const look = recipe({
   // 'kui-stat-badge' keeps the hairline and the fill of the shell it shares with buttons; the figure alone takes the tone, so the label keeps its text colour. A tile fills its grid cell, the figure large above its label.
   parts: {
-    root: 'kui-stat-badge inline-flex items-center gap-kui-inline rounded-kui-card px-2.25 py-0.75 text-xs',
+    root: 'kui-stat-badge inline-flex items-center gap-[var(--spacing-kui-inline,calc(var(--spacing)*1.25*var(--density)))] rounded-lg px-2.25 py-0.75 text-xs',
     icon: 'size-4 shrink-0',
-    value: 'font-semibold text-kui-text',
-    label: 'text-kui-subtext0',
+    value: 'font-semibold text-foreground',
+    label: 'text-muted',
   },
   variants: {
     // `inline` is the pill, figure and label side by side; `tile` is a framed box with the figure above its label, to stack in a grid.
     variant: {
       inline: '',
       tile: {
-        root: 'flex flex-col items-start gap-1 px-kui-field-x py-3',
+        root: 'flex flex-col items-start gap-1 px-[var(--spacing-kui-field-x,calc(var(--spacing)*2.25*var(--density)))] py-3',
         value: 'text-2xl/none',
-        label: 'text-kui-micro font-kui-label tracking-kui-label [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)]',
+        label: '[font-size:var(--text-kui-micro,var(--text-2xs))] [line-height:var(--text-kui-micro--line-height,var(--text-2xs--line-height))] [font-weight:var(--font-weight-kui-label,var(--font-weight-normal))] tracking-label [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)]',
       },
     },
     // Colours the figure, such as `danger` past a threshold; `neutral` keeps the text colour.
     tone: {
       neutral: '',
-      accent: { value: 'text-kui-accent' },
-      success: { value: 'text-kui-success' },
-      warning: { value: 'text-kui-warning' },
-      danger: { value: 'text-kui-error' },
-      info: { value: 'text-kui-info' },
+      accent: { value: 'text-accent' },
+      success: { value: 'text-success' },
+      warning: { value: 'text-warning' },
+      danger: { value: 'text-danger' },
+      info: { value: 'text-info' },
     },
   },
   defaults: { variant: 'inline', tone: 'neutral' },

@@ -8,14 +8,14 @@ import { wording } from 'kay/words'
 const look = recipe({
   parts: {
     root: 'kui-scatter-chart m-0 grid grid-cols-[auto_minmax(0,1fr)] grid-rows-[minmax(0,1fr)_auto] gap-2',
-    axisLabel: 'text-center text-kui-2xs text-kui-subtext0 data-[axis=x]:col-start-2 data-[axis=y]:row-start-1 data-[axis=y]:rotate-180 data-[axis=y]:self-center data-[axis=y]:[writing-mode:vertical-rl]',
+    axisLabel: 'text-center text-2xs text-muted data-[axis=x]:col-start-2 data-[axis=y]:row-start-1 data-[axis=y]:rotate-180 data-[axis=y]:self-center data-[axis=y]:[writing-mode:vertical-rl]',
     // Tick labels hang outside the plot, into the margin it keeps for them.
-    plot: 'relative col-start-2 mb-5 ml-8 h-[var(--chart-height,var(--kui-scatter-chart-height,18rem))] border-solid border-(length:--kui-border-width) border-kui-surface2',
-    grid: 'absolute bg-kui-surface2 data-[axis=x]:inset-y-0 data-[axis=x]:w-px data-[axis=y]:inset-x-0 data-[axis=y]:h-px',
-    tick: 'absolute text-kui-2xs whitespace-nowrap text-kui-overlay1 tabular-nums data-[axis=x]:top-full data-[axis=x]:mt-1 data-[axis=x]:-translate-x-1/2 data-[axis=y]:right-full data-[axis=y]:mr-2 data-[axis=y]:-translate-y-1/2',
-    guide: 'absolute bg-kui-overlay0 data-[axis=x]:inset-y-0 data-[axis=x]:w-px data-[axis=y]:inset-x-0 data-[axis=y]:h-px',
-    corner: 'pointer-events-none absolute text-kui-2xs text-kui-overlay1 data-[corner=bottomLeft]:bottom-1.5 data-[corner=bottomLeft]:left-2 data-[corner=bottomRight]:right-2 data-[corner=bottomRight]:bottom-1.5 data-[corner=topLeft]:top-1.5 data-[corner=topLeft]:left-2 data-[corner=topRight]:top-1.5 data-[corner=topRight]:right-2',
-    dot: 'absolute h-(--kui-dot-size) w-(--kui-dot-size) -translate-x-1/2 translate-y-1/2 rounded-full bg-kui-accent opacity-70 transition-opacity hover:z-10 hover:opacity-100 data-interactive:cursor-pointer data-interactive:focus-visible:opacity-100 data-interactive:focus-visible:outline-2 data-interactive:focus-visible:outline-kui-text',
+    plot: 'relative col-start-2 mb-5 ml-8 h-[var(--chart-height,var(--kui-scatter-chart-height,18rem))] border-solid border-[length:var(--kui-border-width,var(--border-width))] border-border',
+    grid: 'absolute bg-border data-[axis=x]:inset-y-0 data-[axis=x]:w-px data-[axis=y]:inset-x-0 data-[axis=y]:h-px',
+    tick: 'absolute text-2xs whitespace-nowrap text-[var(--color-kui-overlay1,var(--color-muted))] tabular-nums data-[axis=x]:top-full data-[axis=x]:mt-1 data-[axis=x]:-translate-x-1/2 data-[axis=y]:right-full data-[axis=y]:mr-2 data-[axis=y]:-translate-y-1/2',
+    guide: 'absolute bg-border-strong data-[axis=x]:inset-y-0 data-[axis=x]:w-px data-[axis=y]:inset-x-0 data-[axis=y]:h-px',
+    corner: 'pointer-events-none absolute text-2xs text-[var(--color-kui-overlay1,var(--color-muted))] data-[corner=bottomLeft]:bottom-1.5 data-[corner=bottomLeft]:left-2 data-[corner=bottomRight]:right-2 data-[corner=bottomRight]:bottom-1.5 data-[corner=topLeft]:top-1.5 data-[corner=topLeft]:left-2 data-[corner=topRight]:top-1.5 data-[corner=topRight]:right-2',
+    dot: 'absolute h-(--_dot-size) w-(--_dot-size) -translate-x-1/2 translate-y-1/2 rounded-full bg-accent opacity-70 transition-opacity hover:z-10 hover:opacity-100 data-interactive:cursor-pointer data-interactive:focus-visible:opacity-100 data-interactive:focus-visible:outline-2 data-interactive:focus-visible:outline-foreground',
   },
 })
 
@@ -39,7 +39,7 @@ const yExtent = memo(() => axisExtent(points.map(point => point.y), y))
 const heaviest = memo(() => Math.max(...points.map(point => point.weight ?? 1)))
 
 // Where a dot sits and how large it is, its area following its weight against the heaviest point.
-const place = (point: Point) => `left: ${axisPercent(point.x, xExtent(), x.scale)}%; bottom: ${axisPercent(point.y, yExtent(), y.scale)}%; --kui-dot-size: ${dotSize(point.weight ?? 1, heaviest())}rem`
+const place = (point: Point) => `left: ${axisPercent(point.x, xExtent(), x.scale)}%; bottom: ${axisPercent(point.y, yExtent(), y.scale)}%; --_dot-size: ${dotSize(point.weight ?? 1, heaviest())}rem`
 
 // The dot the keyboard stands at when the dots are not buttons, one tab stop in all: the first until it moves.
 const stop = signal(0)
@@ -67,7 +67,7 @@ const cornerEntries = () => Object.entries(corners ?? {}).filter(([, text]) => t
 ---
 if points.length === 0
   // The app's id and class stay on whichever element shows.
-  p.kui-scatter-chart-empty.text-xs.text-kui-subtext0(part="root" id={rest.id}) {emptyLabel ?? wording('ui.scatterChart.empty', 'No data yet.')}
+  p.kui-scatter-chart-empty.text-xs.text-muted(part="root" id={rest.id}) {emptyLabel ?? wording('ui.scatterChart.empty', 'No data yet.')}
 else
   figure(part="root" {...rest} aria-label={label})
     if y.label

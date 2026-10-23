@@ -6,7 +6,7 @@ import { startRef } from './form-reset'
 
 // 'kui-field-input' is the field's name for an app's CSS and the skins, and the hook of the rule that gives the raw controls of a FormField this look. The focus outline doubles the accent border, so focus reads by more than a colour change.
 const look = recipe({
-  parts: { root: 'kui-field-input rounded-kui-card bg-kui-surface0 px-kui-field-x py-kui-field-y text-sm text-kui-text outline-none [font-family:var(--font-kui-body,inherit)] [border:var(--kui-border-input)_solid_var(--color-input)] placeholder:text-kui-overlay1 focus:border-kui-field-focus focus:[outline:1px_solid_var(--color-ring)] focus:[box-shadow:var(--kui-field-focus-shadow)] disabled:cursor-default disabled:opacity-50' },
+  parts: { root: 'kui-field-input rounded-md bg-surface px-[var(--spacing-kui-field-x,calc(var(--spacing)*2.25*var(--density)))] py-[var(--spacing-kui-field-y,calc(var(--spacing)*var(--density)))] text-sm text-foreground outline-none [font-family:var(--font-kui-body,inherit)] [border:var(--kui-border-input,var(--kui-border-width,var(--border-width)))_solid_var(--color-input)] placeholder:text-[var(--color-kui-overlay1,var(--color-muted))] focus:border-ring focus:[outline:1px_solid_var(--color-ring)] focus:[box-shadow:var(--kui-field-focus-shadow,none)] disabled:cursor-default disabled:opacity-50' },
 })
 
 const { value, onInput, onChange, onBlur, writeFocused = false, ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onChange'> & {

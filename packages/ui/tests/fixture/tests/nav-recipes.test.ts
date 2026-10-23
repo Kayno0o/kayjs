@@ -53,7 +53,7 @@ inBrowser('navigation recipes in the browser', () => {
     expect(desktop.separators.slice(1).every(content => content !== 'none' && content !== 'normal')).toBe(true)
   }, 120_000)
 
-  test('Pagination draws its step in the control line of the space skin, at --kui-border-width, and dims a span step', async () => {
+  test('Pagination draws its step in the control line of the space skin, at --border-width, and dims a span step', async () => {
     const site = await shared()
 
     await using page = await site.open('/nav-recipes', { width: 1000 })
@@ -70,7 +70,7 @@ inBrowser('navigation recipes in the browser', () => {
 
       const probe = document.body.appendChild(document.createElement('i'))
 
-      probe.style.borderTop = '1px solid var(--color-kui-field-border)'
+      probe.style.borderTop = '1px solid var(--color-input)'
       const field = getComputedStyle(probe).borderTopColor
 
       probe.remove()
@@ -84,10 +84,10 @@ inBrowser('navigation recipes in the browser', () => {
     expect(plain.previous.width).toBe('1px')
     expect(plain.previous.opacity).toBe('0.5')
     expect(plain.next.opacity).toBe('1')
-    // Both steps draw the space skin's field border, which the skin also holds at 1px whatever --kui-border-width says.
+    // Both steps draw the space skin's field border, which the skin also holds at 1px whatever --border-width says.
     expect(plain.previous.colour).toBe(plain.next.colour)
     expect(plain.next.colour).toBe(plain.field)
-    expect((await read('--kui-border-width: 3px')).next.width).toBe('1px')
+    expect((await read('--border-width: 3px')).next.width).toBe('1px')
 
     // Hovering the link lights its text, and a span keeps the text colour it has.
     const before = await read('')

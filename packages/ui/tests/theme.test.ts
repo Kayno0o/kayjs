@@ -2,13 +2,14 @@ import { describe, expect, test } from 'bun:test'
 import { compileKay } from 'kay/compiler'
 import { compile } from 'tailwindcss'
 import { REMOVED_UI_CLASSES } from '../../../src/check/ui-classes'
+import { UI_TOKENS } from '../../../src/check/ui-tokens'
 import { MENU_FOOTER, MENU_ITEM } from '../src/menu-look'
 
 const ROOT = new URL('..', import.meta.url).pathname
 
-// These list today's families of token names, every one under `kui-` so no app's own token meets them: a class reaching for a new family needs it added here too.
-const COLOR = /\b(?:bg|text|border|ring|ring-offset|fill|stroke|outline|caret|accent)-(kui-(?:text|muted|mantle|canvas|surface\d|overlay\d|subtext\d|accent(?:-hi)?|on-accent|error|success|warning|info|row-hover|fill-hover|fill-danger|chart-\d|stamp(?:-fill(?:-hover)?)?|field-border|field-focus|avatar-ring))\b/g
-const SCALE = /\b(gap|p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr|text|font|tracking|rounded)-(kui-(?:section|inline|micro|2xs|heading|label|action|card|badge-[xy]|badge|field-[xy]|notice|avatar))\b/g
+// These list today's families of token names, the app's own words: a class reaching for a new family needs it added here too.
+const COLOR = /\b(?:bg|text|border|ring|ring-offset|fill|stroke|outline|caret|accent)-(background|foreground|popover|surface(?:-strong)?|muted|border(?:-strong)?|input|ring|accent(?:-hover|-foreground)?|success|warning|info|danger|hover|chart-\d)\b/g
+const SCALE = /\b(text|tracking)-(2xs|label)\b/g
 const DEFINED_TOKEN = /(--[\w-]+):/g
 const DEFINED_CLASS = /\.([a-z][\w-]*)/g
 // A `class` attribute: a quoted string, or an expression of strings, arrays and `{ name: condition }` objects.
@@ -21,9 +22,9 @@ const WHITESPACE = /\s+/
 const RECIPE_STRING = /'([^']+)'/g
 // A line comment of a recipe, whose apostrophe is no string quote.
 const LINE_COMMENT = /^\s*\/\/.*$/gm
-const COLOUR_TOKEN = /(--color-kui-[\w-]+): ([^;]+);/g
+const COLOUR_TOKEN = /(--color-[\w-]+): ([^;]+);/g
 // A colour holds a light and a dark value, or names another colour that does.
-const PAIRED = /^light-dark\(|^var\(--color-kui-[\w-]+\)$|^color-mix\(in (?:oklab|srgb), /
+const PAIRED = /^light-dark\(|^var\(--color-[\w-]+\)$|^color-mix\(in (?:oklab|srgb), /
 // A rule setting color-scheme, with its selector.
 const SCHEME = /([^{}\n]*[^{}\s])\s*\{\s*color-scheme: (\w+);/g
 // A quoted class name, as a script or a component's own script writes one: `classList.add('x')`, `{ 'x': on }`.
@@ -38,17 +39,14 @@ const BUILT_CLASS = /(?<![\w-])kui-[\w-]*(?:\$\{|['"`]\s*\+)/g
 
 const HEX = /^#[\da-f]{6}$/i
 const RGB_ALPHA = /^rgb\((\d+) (\d+) (\d+) \/ ([\d.]+)\)$/
-const VAR = /^var\((--color-kui-[\w-]+)\)$/
+const VAR = /^var\((--color-[\w-]+)(?:, (.*))?\)$/
 const MIX_ARGUMENT = /^(\S.*?)(?: ([\d.]+)%)?$/
-const GROUNDS = ['mantle', 'canvas', 'surface0', 'surface1', 'fill-hover']
-const TEXT = ['text', 'subtext0', 'overlay1', 'accent', 'error', 'success', 'warning', 'info']
-const LINES = ['field-border', 'field-focus']
+const GROUNDS = ['popover', 'background', 'surface', 'surface-strong']
+const TEXT = ['foreground', 'muted', 'accent', 'danger', 'success', 'warning', 'info']
+const LINES = ['input', 'ring']
 
 // The theme namespace a scale utility reads, by its prefix.
-const NAMESPACE: Record<string, string> = { text: 'text', font: 'font-weight', tracking: 'tracking', rounded: 'radius' }
-
-for (const prefix of ['gap', 'p', 'px', 'py', 'pt', 'pb', 'pl', 'pr', 'm', 'mx', 'my', 'mt', 'mb', 'ml', 'mr'])
-  NAMESPACE[prefix] = 'spacing'
+const NAMESPACE: Record<string, string> = { text: 'text', tracking: 'tracking' }
 
 const theme = await Bun.file(`${ROOT}src/theme.css`).text()
 const paths = await Array.fromAsync(new Bun.Glob('src/**/*.kay').scan({ cwd: ROOT }))
@@ -82,35 +80,28 @@ function writtenClasses(path: string, source: string): string[] {
 }
 
 // The seeds a skin sets alone; every other colour derives from them.
-const SEEDS = ['canvas', 'text', 'accent', 'success', 'warning', 'info', 'error', 'field-border']
+const SEEDS = ['background', 'foreground', 'accent', 'success', 'warning', 'info', 'danger', 'input']
 
 type Tokens = Map<string, string>
 
-// The colours the theme names with the app's own words read the old `--color-kui-` name first and fall back to their value, and the readers use the new names: this puts them back to one name per colour, so the contrast maths below reads values.
-const COLOUR_NAMES: Record<string, string> = { 'background': 'canvas', 'foreground': 'text', 'danger': 'error', 'input': 'field-border', 'popover': 'mantle', 'surface': 'surface0', 'surface-strong': 'surface1', 'border': 'surface2', 'border-strong': 'overlay0', 'accent-hover': 'accent-hi', 'accent-foreground': 'on-accent', 'hover': 'row-hover', 'ring': 'field-focus', 'accent': 'accent', 'success': 'success', 'warning': 'warning', 'info': 'info', 'muted': 'muted', ...Object.fromEntries([1, 2, 3, 4, 5, 6].map(n => [`chart-${n}`, `chart-${n}`])) }
-const NEW_COLOUR = new RegExp(String.raw`--color-(${Object.keys(COLOUR_NAMES).sort((a, b) => b.length - a.length).join('|')})(?![\w-])`, 'g')
-const FALLBACK_DECLARATION = /^(\s*)(--color-[\w-]+): var\((--color-kui-[\w-]+), (.*)\);$/gm
-const SEEDED = /^var\(--color-(?:base|text|error), (.*)\)$/
-const SUBTEXT = /^var\(--color-kui-subtext0, (.*)\)$/
+// The colour tokens of a block of CSS: the default block of the theme alone, before the old names it keeps as aliases.
+const colourDeclarations = (css: string): [string, string][] => [...css.matchAll(COLOUR_TOKEN)].map(([, token = '', value = '']) => [token, value.trim()])
 
-function legacyColours(css: string): string {
-  const named = css
-    .replace(/@theme default inline reference \{[^}]*\}/, '')
-    .replace(FALLBACK_DECLARATION, (_, indent: string, _name: string, old: string, fallback: string) => {
-      const value = SEEDED.exec(fallback)?.[1] ?? fallback
-      const subtext = SUBTEXT.exec(value)?.[1]
+// A colour once the old name and the template's own names it reads first are peeled off: what is left is its value, or the colour it names.
+function peeled(value: string): string {
+  const next = (/^var\(--color-[\w-]+, ([\s\S]*)\)$/).exec(value)?.[1]
 
-      return subtext === undefined ? `${indent}${old}: ${value};` : `${indent}--color-kui-subtext0: ${subtext};\n${indent}${old}: var(--color-kui-subtext0);`
-    })
-
-  return named.replace(NEW_COLOUR, (_, name: string) => `--color-kui-${COLOUR_NAMES[name]}`)
+  return next === undefined ? value : peeled(next)
 }
 
-const colourTokens: Tokens = new Map([...legacyColours(theme).matchAll(COLOUR_TOKEN)].map(([, token = '', value = '']) => [token, value.trim()]))
+// A skin that still sets the old, prefixed names, read under the names they became (the skins move to the new ones in #2080).
+const inNewNames = (css: string): string => css.replace(/(?<![\w-])--[\w-]*kui-[\w-]+/g, name => UI_TOKENS[name]?.to ?? name)
 
-// The theme's colours under a skin's own declarations, `--color-kui-name: value;`.
+const colourTokens: Tokens = new Map(colourDeclarations(theme.slice(0, theme.indexOf('@theme default inline reference'))))
+
+// The theme's colours under a skin's own declarations, `--color-name: value;`.
 function withSkin(skin: string): Tokens {
-  return new Map([...colourTokens, ...[...legacyColours(skin).matchAll(COLOUR_TOKEN)].map(([, token = '', value = '']) => [token, value.trim()] as const)])
+  return new Map([...colourTokens, ...colourDeclarations(inNewNames(skin))])
 }
 
 // The arguments of a function call, split at the commas outside any parenthesis.
@@ -172,8 +163,12 @@ function evaluate(expression: string, scheme: 0 | 1, tokens: Tokens): Colour {
   const text = expression.trim()
   const named = VAR.exec(text)
 
-  if (named)
-    return evaluate(tokens.get(named[1]!)!, scheme, tokens)
+  // A name the skin or the theme sets, else its fallback: the theme reads the old name and the template's first and ends on the value.
+  if (named) {
+    const value = tokens.get(named[1]!)
+
+    return evaluate(value ?? named[2]!, scheme, tokens)
+  }
 
   if (text.startsWith('light-dark('))
     return evaluate(splitArguments(text.slice('light-dark('.length, -1))[scheme]!, scheme, tokens)
@@ -211,7 +206,7 @@ function evaluate(expression: string, scheme: 0 | 1, tokens: Tokens): Colour {
 
 // A token's colour in one scheme, as [r, g, b] over the given ground when it is translucent.
 function colour(name: string, scheme: 0 | 1, ground?: number[], tokens: Tokens = colourTokens): number[] {
-  const { rgb, alpha } = evaluate(`var(--color-kui-${name})`, scheme, tokens)
+  const { rgb, alpha } = evaluate(`var(--color-${name})`, scheme, tokens)
 
   return rgb.map((channel, index) => alpha === 1 ? channel : channel * alpha + ground![index]! * (1 - alpha))
 }
@@ -288,51 +283,48 @@ describe('theme.css', () => {
     expect(failing(LINES, 3)).toEqual([])
 
     for (const scheme of [0, 1] as const) {
-      for (const fill of ['accent', 'accent-hi', 'error', 'success', 'warning', 'info', 'subtext0'])
-        expect(contrast(colour('on-accent', scheme), colour(fill, scheme))).toBeGreaterThanOrEqual(4.5)
+      for (const fill of ['accent', 'accent-hover', 'danger', 'success', 'warning', 'info', 'muted'])
+        expect(contrast(colour('accent-foreground', scheme), colour(fill, scheme))).toBeGreaterThanOrEqual(4.5)
 
       // A hovered accent button shows it is hovered.
-      expect(contrast(colour('accent', scheme), colour('accent-hi', scheme))).toBeGreaterThanOrEqual(1.4)
+      expect(contrast(colour('accent', scheme), colour('accent-hover', scheme))).toBeGreaterThanOrEqual(1.4)
     }
   })
 
   test('derives every colour but the seeds from them, so a skin sets eight colours and not twenty', () => {
-    const own = [...colourTokens].filter(([, value]) => !value.includes('var(--color-kui-') && !value.startsWith('color-mix('))
+    const own = [...colourTokens].filter(([, value]) => !peeled(value).includes('var(--color-'))
 
-    expect(own.map(([token]) => token.slice('--color-kui-'.length)).toSorted()).toEqual([...SEEDS, 'chart-5', 'chart-6'].toSorted())
+    expect(own.map(([token]) => token.slice('--color-'.length)).toSorted()).toEqual([...SEEDS, 'chart-5', 'chart-6'].toSorted())
   })
 
   test('keeps the look the literals gave, each derived colour within a few steps of its old value in both schemes', () => {
     // The palette before it derived: [light, dark], composited over the canvas where translucent; the accent's hover is the accent shaded.
     const WAS: Record<string, [number[], number[]]> = {
-      'mantle': [[0xEF, 0xEC, 0xE6], [0x0D, 0x0D, 0x0D]],
-      'surface0': [[0xF4, 0xF1, 0xEC], [0x16, 0x16, 0x16]],
-      'surface1': [[0xEC, 0xE8, 0xE1], [0x1B, 0x1B, 0x1B]],
-      'surface2': [[0xE1, 0xDF, 0xDB], [0x2B, 0x2B, 0x2B]],
-      'overlay0': [[0xC5, 0xC3, 0xBF], [0x45, 0x45, 0x45]],
-      'overlay1': [[0x6D, 0x68, 0x5F], [0x8A, 0x85, 0x7D]],
-      'subtext0': [[0x62, 0x5D, 0x55], [0x9C, 0x97, 0x8E]],
-      'accent-hi': [[0x7D, 0x2A, 0x22], [0xF8, 0xC0, 0xB8]],
-      'on-accent': [[0xFF, 0xFF, 0xFF], [0x1A, 0x0D, 0x0B]],
-      'fill-hover': [[0xEC, 0xE8, 0xE1], [0x1C, 0x1C, 0x1C]],
-      'fill-danger': [[0xF8, 0xE4, 0xE1], [0x24, 0x16, 0x15]],
-      'row-hover': [[0xF0, 0xEE, 0xEA], [0x1D, 0x1D, 0x1D]],
+      'popover': [[0xEF, 0xEC, 0xE6], [0x0D, 0x0D, 0x0D]],
+      'surface': [[0xF4, 0xF1, 0xEC], [0x16, 0x16, 0x16]],
+      'surface-strong': [[0xEC, 0xE8, 0xE1], [0x1B, 0x1B, 0x1B]],
+      'border': [[0xE1, 0xDF, 0xDB], [0x2B, 0x2B, 0x2B]],
+      'border-strong': [[0xC5, 0xC3, 0xBF], [0x45, 0x45, 0x45]],
+      'muted': [[0x62, 0x5D, 0x55], [0x9C, 0x97, 0x8E]],
+      'accent-hover': [[0x7D, 0x2A, 0x22], [0xF8, 0xC0, 0xB8]],
+      'accent-foreground': [[0xFF, 0xFF, 0xFF], [0x1A, 0x0D, 0x0B]],
+      'hover': [[0xF0, 0xEE, 0xEA], [0x1D, 0x1D, 0x1D]],
     }
 
     for (const [name, was] of Object.entries(WAS)) {
       for (const scheme of [0, 1] as const) {
-        const now = colour(name, scheme, colour('canvas', scheme))
+        const now = colour(name, scheme, colour('background', scheme))
         const furthest = Math.max(...now.map((channel, index) => Math.abs(channel - was[scheme][index]!)))
 
-        expect(furthest, `${name} ${scheme === 0 ? 'light' : 'dark'}`).toBeLessThanOrEqual(name === 'on-accent' ? 11 : 10)
+        expect(furthest, `${name} ${scheme === 0 ? 'light' : 'dark'}`).toBeLessThanOrEqual(name === 'accent-foreground' ? 11 : 10)
       }
     }
   })
 
   test('reads at the same contrast from a skin that sets the seeds alone, in both schemes', () => {
     const skins = [
-      '--color-kui-canvas: light-dark(#fffdf7, #1a1814); --color-kui-text: light-dark(#26211a, #ece6d8); --color-kui-accent: light-dark(#9a3412, #fb923c); --color-kui-success: light-dark(#3f6212, #a3e635); --color-kui-warning: light-dark(#854d0e, #facc15); --color-kui-info: light-dark(#1d4ed8, #93c5fd); --color-kui-error: light-dark(#b91c1c, #fca5a5); --color-kui-field-border: light-dark(#85776a, #8a7e70);',
-      '--color-kui-canvas: light-dark(#f3f6fa, #0b1220); --color-kui-text: light-dark(#0f1b2d, #dbe4f0); --color-kui-accent: light-dark(#1d4ed8, #7aa2f7); --color-kui-success: light-dark(#166534, #86efac); --color-kui-warning: light-dark(#92400e, #fcd34d); --color-kui-info: light-dark(#0b5f78, #67e8f9); --color-kui-error: light-dark(#b91c1c, #fda4af); --color-kui-field-border: light-dark(#6b7d94, #5f7390);',
+      '--color-background: light-dark(#fffdf7, #1a1814); --color-foreground: light-dark(#26211a, #ece6d8); --color-kui-accent: light-dark(#9a3412, #fb923c); --color-kui-success: light-dark(#3f6212, #a3e635); --color-kui-warning: light-dark(#854d0e, #facc15); --color-kui-info: light-dark(#1d4ed8, #93c5fd); --color-danger: light-dark(#b91c1c, #fca5a5); --color-input: light-dark(#85776a, #8a7e70);',
+      '--color-background: light-dark(#f3f6fa, #0b1220); --color-foreground: light-dark(#0f1b2d, #dbe4f0); --color-kui-accent: light-dark(#1d4ed8, #7aa2f7); --color-kui-success: light-dark(#166534, #86efac); --color-kui-warning: light-dark(#92400e, #fcd34d); --color-kui-info: light-dark(#0b5f78, #67e8f9); --color-danger: light-dark(#b91c1c, #fda4af); --color-input: light-dark(#6b7d94, #5f7390);',
     ]
 
     for (const skin of skins) {
@@ -342,52 +334,52 @@ describe('theme.css', () => {
       expect(failing(LINES, 3, tokens), skin).toEqual([])
 
       for (const scheme of [0, 1] as const) {
-        for (const fill of ['accent', 'accent-hi'])
-          expect(contrast(colour('on-accent', scheme, undefined, tokens), colour(fill, scheme, undefined, tokens)), `${skin} ${fill}`).toBeGreaterThanOrEqual(4.5)
+        for (const fill of ['accent', 'accent-hover'])
+          expect(contrast(colour('accent-foreground', scheme, undefined, tokens), colour(fill, scheme, undefined, tokens)), `${skin} ${fill}`).toBeGreaterThanOrEqual(4.5)
       }
     }
   })
 
   test('reads from a skin of one scheme that writes its seeds once and pins color-scheme to it', () => {
-    const tokens = withSkin('--color-kui-canvas: #ffffff; --color-kui-text: #111111; --color-kui-accent: #a21caf; --color-kui-success: #166534; --color-kui-warning: #92400e; --color-kui-info: #1d4ed8; --color-kui-error: #b91c1c; --color-kui-field-border: #767676;')
+    const tokens = withSkin('--color-background: #ffffff; --color-foreground: #111111; --color-kui-accent: #a21caf; --color-kui-success: #166534; --color-kui-warning: #92400e; --color-kui-info: #1d4ed8; --color-danger: #b91c1c; --color-input: #767676;')
 
     expect(failing(TEXT, 4.5, tokens, [0])).toEqual([])
     expect(failing(LINES, 3, tokens, [0])).toEqual([])
-    expect(contrast(colour('on-accent', 0, undefined, tokens), colour('accent-hi', 0, undefined, tokens))).toBeGreaterThanOrEqual(4.5)
+    expect(contrast(colour('accent-foreground', 0, undefined, tokens), colour('accent-hover', 0, undefined, tokens))).toBeGreaterThanOrEqual(4.5)
   })
 
   test('derives from whichever seeds a skin sets and keeps the default for the others', () => {
-    const tokens = withSkin('--color-kui-canvas: light-dark(#ffffff, #000000);')
+    const tokens = withSkin('--color-background: light-dark(#ffffff, #000000);')
 
-    expect(colour('surface0', 0, undefined, tokens)).not.toEqual(colour('surface0', 0))
-    expect(colour('surface0', 1, undefined, tokens).every(Number.isFinite)).toBe(true)
-    // Black is darker than the default canvas, so the dark surface sits between the two.
-    expect(colour('surface0', 1, undefined, tokens)[0]!).toBeLessThan(colour('surface0', 1)[0]!)
+    expect(colour('surface', 0, undefined, tokens)).not.toEqual(colour('surface', 0))
+    expect(colour('surface', 1, undefined, tokens).every(Number.isFinite)).toBe(true)
+    // Black is darker than the default background, so the dark surface sits between the two.
+    expect(colour('surface', 1, undefined, tokens)[0]!).toBeLessThan(colour('surface', 1)[0]!)
     expect(colour('accent', 0, undefined, tokens)).toEqual(colour('accent', 0))
   })
 
   test('lets a token the skin sets beat what derives it, in the compiled CSS wherever the skin sits', async () => {
     for (const where of ['after', 'before'] as const) {
-      const css = await built('@theme { --color-kui-canvas: #fff; --color-kui-surface0: red; }', where)
+      const css = await built('@theme { --color-background: #fff; --color-surface: red; }', where)
 
-      expect(css, where).toContain('--color-kui-surface0: red;')
-      expect(css, where).toContain('--color-kui-canvas: #fff;')
-      expect(css, where).not.toMatch(/--color-kui-surface0: color-mix/)
+      expect(css, where).toContain('--color-surface: red;')
+      expect(css, where).toContain('--color-background: #fff;')
+      expect(css, where).not.toMatch(/--color-surface: (?:var\([^)]*, )?color-mix/)
     }
   })
 
-  test('fills a solid badge with its tone, its text read from one token a skin can set', () => {
+  test('fills a solid badge with its tone, its text read from the accent\'s foreground', () => {
     const solid = theme.slice(theme.indexOf(':where([data-solid])'))
 
-    expect(solid.slice(0, solid.indexOf('}'))).toMatch(/background-color: var\(--kui-badge-tone\);[^}]*var\(--kui-badge-solid-text, var\(--color-accent-foreground\)\)/)
+    expect(solid.slice(0, solid.indexOf('}'))).toMatch(/background-color: var\(--_badge-tone\);[^}]*color: var\(--color-accent-foreground\)/)
 
     for (const tone of ['accent', 'success', 'warning', 'danger', 'info'])
-      expect(theme, tone).toContain(`[data-tone='${tone}']) {\n      --kui-badge-tone: var(--color-${tone});`)
+      expect(theme, tone).toContain(`[data-tone='${tone}']) {\n      --_badge-tone: var(--color-${tone});`)
   })
 
   test('draws the controls a hairline would leave under 3:1 with the field border', () => {
     for (const selector of ['.kui-carousel-dot', '.kui-rating', '.kui-toggle-track', '.kui-btn'])
-      expect(blockOf(theme, selector), selector).toMatch(/kui-field-border|color-input/)
+      expect(blockOf(theme, selector), selector).toMatch(/\b(?:bg|border|text)-input\b|color-input/)
   })
 
   test('defines every colour its classes paint with', () => {
@@ -424,7 +416,7 @@ describe('theme.css', () => {
   })
 
   test('gives every colour a light and a dark value, or names another colour', () => {
-    const colours = [...legacyColours(theme).matchAll(COLOUR_TOKEN)]
+    const colours = [...theme.slice(0, theme.indexOf('@theme default inline reference')).matchAll(COLOUR_TOKEN)].map(([whole = '', token = '', value = '']) => [whole, token, peeled(value.trim())] as const)
 
     expect(colours.length).toBeGreaterThan(0)
     expect(colours.filter(([, , value = '']) => !PAIRED.test(value)).map(([, token]) => token)).toEqual([])
@@ -438,13 +430,13 @@ describe('theme.css', () => {
   })
 
   test('declares its tokens as defaults, so the app\'s own @theme wins wherever it sits', async () => {
-    const skin = '@theme { --color-kui-accent: red; }'
+    const skin = '@theme { --color-accent: red; }'
 
     for (const where of ['after', 'before'] as const) {
       const css = await built(skin, where)
 
-      expect(css, where).toContain('--color-kui-accent: red;')
-      expect(css, where).not.toMatch(/--color-kui-accent: light-dark/)
+      expect(css, where).toContain('--color-accent: red;')
+      expect(css, where).not.toMatch(/--color-accent: (?:var\([^)]*, )?light-dark/)
     }
   })
 
@@ -484,9 +476,9 @@ describe('theme.css', () => {
     const css = await utilitiesOf(toast)
 
     for (const tone of ['danger', 'success', 'info'])
-      expect(css, tone).toMatch(new RegExp(String.raw`\[data-tone[=~]?"?${tone}"?\][^{]*\{[^}]*--kui-toast-tone: var\(--color-${tone}\)`))
+      expect(css, tone).toMatch(new RegExp(String.raw`\[data-tone[=~]?"?${tone}"?\][^{]*\{[^}]*--_toast-tone: var\(--color-${tone}\)`))
 
-    expect(css).toMatch(/--kui-toast-tone: var\(--color-accent\)/)
+    expect(css).toMatch(/--_toast-tone: var\(--color-accent\)/)
   })
 
   test('sizes a select by its options inside a compact field, and by the row inside any other', async () => {
@@ -518,65 +510,65 @@ describe('theme.css', () => {
     expect(blockOf(press ?? '', '&:active')).toContain('translate: 0 var(--press-travel);')
   })
 
-  test('rounds cards, buttons and overlays by --radius-kui-card, square unless a skin sets it', async () => {
-    const css = await built('@theme { --radius-kui-card: 0.5rem; }')
-    const rounded = [...css.matchAll(/([^{}]+)\{[^{}]*border-radius: var\(--radius-kui-card\)[^{}]*\}/g)].map(([, selectors]) => selectors).join(',')
+  test('rounds buttons by --radius-md and cards and overlays by --radius-lg, Tailwind\'s own steps unless the app sets them', async () => {
+    const css = await built('@theme { --radius-md: 4px; --radius-lg: 1rem; }')
+    const roundedBy = (token: string) => [...css.matchAll(new RegExp(String.raw`([^{}]+)\{[^{}]*border-radius: var\(${token}\)[^{}]*\}`, 'g'))].map(([, selectors]) => selectors).join(',')
 
-    for (const name of ['kui-btn', 'kui-shell', 'kui-stat-badge', 'kui-card', 'kui-card-row', 'kui-widget', 'kui-notice', 'kui-toast', 'kui-dialog', 'kui-command-palette', 'kui-popover'])
-      expect(rounded, name).toContain(`.${name}`)
+    for (const name of ['kui-btn', 'kui-shell', 'kui-stat-badge'])
+      expect(roundedBy('--radius-md'), name).toContain(`.${name}`)
 
-    expect(css).toContain('--radius-kui-card: 0.5rem')
-    expect(theme).toContain('--radius-kui-card: 0px;')
+    for (const name of ['kui-card', 'kui-card-row', 'kui-widget', 'kui-notice', 'kui-toast', 'kui-dialog', 'kui-command-palette', 'kui-popover'])
+      expect(roundedBy('--radius-lg'), name).toContain(`.${name}`)
+
+    expect(css).toContain('--radius-md: 4px')
+    expect(css).toContain('--radius-lg: 1rem')
+    // An app that sets nothing gets Tailwind\'s steps, and one that still sets the old name keeps its look until 1.75.
+    expect(theme).toContain('--radius-lg: var(--radius-kui-card, 0.5rem);')
+    expect(await built('@theme { --radius-kui-card: 0px; }')).toContain('--radius-kui-card: 0px')
     // The hairline drawn over a shell follows its corners.
     expect(blockOf(theme, ':is(.kui-shell, .kui-btn, .kui-stat-badge)::before')).toContain('border-radius: inherit;')
   })
 
-  test('steps the radius of what sits inside a box by --radius-kui-sm, -md and -full, square except full unless a skin sets them', async () => {
-    const css = await built('@theme { --radius-kui-sm: 2px; --radius-kui-md: 6px; --radius-kui-full: 0px; }')
+  test('steps the radius of what sits inside a box by --radius-sm and -md, and a round avatar by rounded-full, the old --radius-kui-full first', async () => {
+    const css = await built('@theme { --radius-sm: 2px; --radius-md: 6px; }')
 
-    expect(theme).toContain('--radius-kui-sm: 0px;')
-    expect(theme).toContain('--radius-kui-md: 0px;')
-    expect(theme).toContain('--radius-kui-full: 9999px;')
-    expect(css).toMatch(/--radius-kui-sm: 2px/)
-    expect(css).toMatch(/--radius-kui-md: 6px/)
-    expect(css).toMatch(/--radius-kui-full: 0px/)
-    expect(blockOf(theme, '.kui-chip-label')).toContain('rounded-kui-md')
-    expect(blockOf(theme, '.kui-toggle-track')).toContain('rounded-kui-md')
-    expect(blockOf(theme, '.kui-avatar')).toContain('rounded-kui-full')
-    expect(blockOf(theme, ':where(.kui-badge)')).toContain('rounded-kui-sm')
-    expect(blockOf(css, '.kui-avatar')).toContain('border-radius: var(--radius-kui-full)')
+    expect(theme).toContain('--radius-sm: var(--radius-kui-sm, 0.25rem);')
+    expect(theme).toContain('--radius-md: var(--radius-kui-md, var(--radius-kui-card, 0.375rem));')
+    expect(css).toMatch(/--radius-sm: 2px/)
+    expect(css).toMatch(/--radius-md: 6px/)
+    expect(blockOf(theme, '.kui-chip-label')).toContain('rounded-md')
+    expect(blockOf(theme, '.kui-toggle-track')).toContain('rounded-md')
+    expect(blockOf(theme, ':where(.kui-badge)')).toContain('rounded-sm')
+    expect(await Bun.file(`${ROOT}src/avatar.kay`).text()).toContain('rounded-[var(--radius-kui-full,calc(infinity*1px))]')
   })
 
-  test('reads the monospace from --font-kui-mono and the text font of labels and fields from --font-kui-body, the text\'s own unless set', async () => {
+  test('reads the monospace from --font-mono, the old --font-kui-mono first, and the text font of labels and fields as inherit', async () => {
     const css = await built('@theme { --font-kui-mono: Menlo; }')
 
-    expect(theme).not.toMatch(/(?<![-\w])font-mono\b/)
-    expect(theme).toContain('--font-kui-mono: var(--font-mono);')
-    expect(theme).not.toContain('--font-kui-body:')
-    expect(css).toContain('font-family: var(--font-kui-mono)')
+    expect(theme).toContain('--font-mono: var(--font-kui-mono, ui-monospace,')
+    expect(css).toContain('font-family: var(--font-mono)')
     expect(css).toContain('--font-kui-mono: Menlo')
-    expect(blockOf(theme, '.kui-btn')).toContain('--font-kui-body,inherit')
-    expect(theme).toContain('[font-family:var(--font-kui-body,inherit)]')
+    expect(theme).toContain('[font-family:var(--font-label,var(--font-kui-body,inherit))]')
   })
 
-  test('scales the card, inline and section gaps and the field insets by --kui-density, 1 unless set', async () => {
-    const css = await built('@theme { --kui-density: 0.75; }')
+  test('scales the card, inline and section gaps and the field insets by --density, 1 unless set', async () => {
+    const css = await built('@theme { --density: 0.75; }')
 
     expect(theme).toContain('--density: var(--kui-density, 1);')
-
-    for (const token of ['--spacing-kui-card', '--spacing-kui-inline', '--spacing-kui-section', '--spacing-kui-field-x', '--spacing-kui-field-y'])
-      expect(theme, token).toMatch(new RegExp(`${token}: calc\\([\\d.]+rem \\* var\\(--density\\)\\);`))
-
-    expect(css).toContain('--kui-density: 0.75')
+    expect(css).toContain('--density: 0.75')
+    expect(await built('@theme { --kui-density: 0.75; }')).toContain('--kui-density: 0.75')
+    expect(theme).toContain('px-[var(--spacing-kui-field-x,calc(var(--spacing)*2.25*var(--density)))]')
+    expect(theme).toContain('py-[var(--spacing-kui-field-y,calc(var(--spacing)*var(--density)))]')
   })
 
-  test('sets the case and font of labels, headings and table heads by --kui-label-case and --kui-label-font, uppercase unless a skin sets them', async () => {
-    const css = await built('@theme { --kui-label-case: none; --kui-label-font: var(--font-mono); }')
+  test('sets the case and font of labels, headings and table heads by --label-case and --font-label, uppercase unless a skin sets them', async () => {
+    const css = await built('@theme { --label-case: none; --font-label: var(--font-mono); }')
 
     expect(theme).toContain('--label-case: var(--kui-label-case, uppercase);')
     expect(blockOf(css, '.kui-btn')).toContain('text-transform: var(--label-case)')
     expect(blockOf(css, '.kui-btn')).toContain('font-family: var(--font-label,var(--font-kui-body,inherit))')
-    expect(css).toContain('--kui-label-case: none')
+    expect(css).toContain('--label-case: none')
+    expect(await built('@theme { --kui-label-case: none; }')).toContain('--kui-label-case: none')
     // Only the stamp badge, which has --kui-badge-case, and an avatar's initial keep their own case.
     expect(theme.match(/@apply [^\n]* uppercase/g)).toHaveLength(2)
   })
@@ -589,23 +581,23 @@ describe('theme.css', () => {
       expect(failing(TEXT, 4.5, tokens), name).toEqual([])
       expect(failing(LINES, 3, tokens), name).toEqual([])
 
-      for (const [, token] of skin.matchAll(/^\s*(--[\w-]+):/gm)) {
-        // The label font and the control line have no default: they fall back to inherit where it is read. --font-sans is Tailwind's own.
-        if (!token!.startsWith('--color-kui-') && token !== '--kui-label-font' && token !== '--kui-control-line' && token !== '--font-sans')
+      for (const [, token] of inNewNames(skin).matchAll(/^\s*(--[\w-]+):/gm)) {
+        // The label font and the control line have no default: they fall back to inherit where it is read. --font-sans is Tailwind's own, and a knob under its old name is read by the recipe that kept it until the skin moves off it.
+        if (!token!.includes('kui-') && !token!.startsWith('--_') && token !== '--font-label' && token !== '--font-sans')
           expect(theme, `${name} ${token}`).toContain(`${token}:`)
       }
 
       for (const scheme of [0, 1] as const) {
-        for (const fill of ['accent', 'accent-hi'])
-          expect(contrast(colour('on-accent', scheme, undefined, tokens), colour(fill, scheme, undefined, tokens)), `${name} ${fill}`).toBeGreaterThanOrEqual(4.5)
+        for (const fill of ['accent', 'accent-hover'])
+          expect(contrast(colour('accent-foreground', scheme, undefined, tokens), colour(fill, scheme, undefined, tokens)), `${name} ${fill}`).toBeGreaterThanOrEqual(4.5)
       }
 
-      expect(await built(skin), name).toContain('--kui-label-case:')
+      expect(await built(skin), name).toContain('--label-case:')
     }
 
     expect(await built(await Bun.file(`${ROOT}src/skins/soft.css`).text())).toContain('--kui-label-case: none')
     expect(await built(await Bun.file(`${ROOT}src/skins/soft.css`).text())).toContain('--radius-kui-md: 0.375rem')
-    expect(await built(await Bun.file(`${ROOT}src/skins/brutalist.css`).text())).toContain('--kui-label-font: var(--font-kui-mono)')
+    expect(await built(await Bun.file(`${ROOT}src/skins/brutalist.css`).text())).toContain('--kui-label-font: var(--font-mono)')
   })
 
   test('ships the space skin as one scheme with a starfield utility, keys, drawn checkboxes and themed selects, each overridable after it', async () => {
@@ -622,12 +614,12 @@ describe('theme.css', () => {
     expect(css).toContain('appearance: base-select')
     expect(css).toContain('linear-gradient(45deg')
     expect(css).toContain('clip-path: polygon(14% 44%')
-    expect(css).toMatch(/--kui-border-width: 0px/)
+    expect(css).toMatch(/--border-width: 0px/)
     // Every class its selectors name exists in the theme, and the mantle is a step under the canvas so boxes on it keep an edge.
     for (const [, name = ''] of skin.matchAll(/\.(kui-[\w-]+)/g))
       expect(classes, name).toContain(name)
 
-    expect(skin).toMatch(/--color-kui-mantle: color-mix\(in oklab, var\(--color-background\), black/)
+    expect(inNewNames(skin)).toMatch(/--color-popover: color-mix\(in oklab, var\(--color-background\), black/)
     expect(css).toContain('@media (forced-colors: active)')
     expect(css).toMatch(/\.kui-icon-btn\.kui-shell/)
     expect(css).toContain(':not([multiple], [size])')
@@ -639,10 +631,10 @@ describe('theme.css', () => {
     const skin = await Bun.file(`${ROOT}src/skins/space.css`).text()
     const source = async (name: string) => Bun.file(`${ROOT}src/${name}.kay`).text()
 
-    expect(skin).toMatch(/--kui-control-line: var\(--color-input\)/)
+    expect(skin).toMatch(/--_control-line: var\(--color-input\)/)
 
     for (const name of ['segmented', 'chip-group', 'file-drop'])
-      expect(await source(name), name).toContain('--kui-control-line')
+      expect(await source(name), name).toContain('--_control-line')
 
     // A part a skin selects by data-part is one the component still sets.
     expect(await source('combobox')).toMatch(/^ {4}list: /m)
@@ -651,26 +643,25 @@ describe('theme.css', () => {
     expect(skin).toContain(`.kui-multi-select [data-part='checkbox']`)
   })
 
-  test('sizes the keyline of every framed box by --kui-border-width, a length the old --kui-border-card still sets', () => {
+  test('sizes the keyline of every framed box by --border-width, a length the old --kui-border-width still sets', () => {
     for (const selector of ['.kui-card', '.kui-card-head', '.kui-card-row', '.kui-widget', '.kui-toast', '.kui-dialog', '.kui-command-palette', '.kui-popover', '.kui-side-panel', '.kui-tooltip', '.kui-table-wrap', '.kui-collapsible-section', '.kui-save-bar', '.kui-segmented', '.kui-file-drop', '.kui-pagination-step', ':where(.kui-site-nav-list:popover-open, .kui-site-nav > [data-part=\'list\']:popover-open)', '.kui-line-chart-tooltip'])
-      expect(blockOf(theme, selector), selector).toMatch(/border(?:-[bl])?-\(length:--kui-border-width\)/)
+      expect(blockOf(theme, selector), selector).toMatch(/border(?:-[bl])?-\[length:var\(--kui-border-width,var\(--border-width\)\)\]/)
 
-    expect(theme.match(/var\(--kui-border-card\)/g)).toHaveLength(1)
-    expect(theme).toContain('--kui-border-width: var(--kui-border-card);')
-    expect(theme).toMatch(/@property --kui-border-width \{\s*syntax: '<length>';/)
+    expect(theme).toContain('--border-width: var(--kui-border-width, var(--kui-border-card));')
+    expect(theme).not.toMatch(/@property --kui-border-width/)
   })
 
   test('draws the info toast in the info colour, the danger and success toasts in theirs', () => {
     const toast = blockOf(theme, '.kui-toast') ?? ''
 
-    expect(blockOf(toast, '&:where([data-tone=\'info\'])')).toContain('--kui-toast-tone: var(--color-info);')
-    expect(blockOf(toast, '&:where([data-tone=\'danger\'])')).toContain('--kui-toast-tone: var(--color-danger);')
-    expect(blockOf(toast, '&:where([data-tone=\'success\'])')).toContain('--kui-toast-tone: var(--color-success);')
+    expect(blockOf(toast, '&:where([data-tone=\'info\'])')).toContain('--_toast-tone: var(--color-info);')
+    expect(blockOf(toast, '&:where([data-tone=\'danger\'])')).toContain('--_toast-tone: var(--color-danger);')
+    expect(blockOf(toast, '&:where([data-tone=\'success\'])')).toContain('--_toast-tone: var(--color-success);')
   })
 
   // The recipes read these as a tone of their own element: inherited, a Badge or a Notice inside a toned one would take its colours, and a theme rule setting one would hide the recipe's neutral fallback.
   test('registers the tone variables of the recipes as not inherited, and leaves them out of the old rules', () => {
-    for (const name of ['--kui-badge-color', '--kui-notice-tone', '--kui-notice-ground']) {
+    for (const name of ['--_badge-color', '--_notice-tone', '--_notice-ground']) {
       expect(theme, name).toMatch(new RegExp(`@property ${name} \\{\\s*syntax: '\\*';\\s*inherits: false;\\s*\\}`))
       expect(theme.replace(/@property[^}]*\}/g, ''), name).not.toContain(name)
     }
@@ -701,8 +692,76 @@ describe('theme.css', () => {
     }
 
     expect(missing).toEqual([])
+    // Tailwind turns an underscore into a space, which a private name like --_x must not meet.
+    expect(css).not.toMatch(/-- [a-z]/)
+    expect(css).toMatch(/position-anchor: ?--tooltip-anchor/)
     // A tone sets a variable the colours of the base and of the stamp read, so it beats neither by the order of the classes.
-    expect(css).toContain('--kui-badge-color')
-    expect(css).toMatch(/\[data-stamp\]\s*\{[^}]*border-color: var\(--kui-badge-color,var\(--color-kui-stamp\)\)/)
+    expect(css).toContain('--_badge-color')
+    expect(css).toMatch(/\[data-stamp\]\s*\{[^}]*border-color: var\(--_badge-color,var\(--color-kui-stamp,var\(--color-foreground\)\)\)/)
+  })
+})
+
+// Every knob that folded into a recipe or a Tailwind step in 1.72, with a value of its own for an app to set.
+const FOLDED_KNOBS: Record<string, string> = {
+  '--kui-border-card': '3px',
+  '--kui-border-input': '3px',
+  '--kui-border-badge': '3px',
+  '--kui-border-notice': '3px',
+  '--kui-border-avatar': '3px',
+  '--kui-border-stamp': '3px',
+  '--kui-border-width': '3px',
+  '--spacing-kui-card': '9px',
+  '--spacing-kui-inline': '9px',
+  '--spacing-kui-section': '9px',
+  '--spacing-kui-field-x': '9px',
+  '--spacing-kui-field-y': '9px',
+  '--spacing-kui-field-height': '9px',
+  '--spacing-kui-badge-x': '9px',
+  '--spacing-kui-badge-y': '9px',
+  '--text-kui-badge': '9px',
+  '--text-kui-badge--line-height': '2',
+  '--text-kui-micro': '9px',
+  '--text-kui-micro--line-height': '2',
+  '--tracking-kui-badge': '0.3em',
+  '--tracking-kui-section': '0.3em',
+  '--tracking-kui-action': '0.3em',
+  '--font-weight-kui-heading': '800',
+  '--font-weight-kui-label': '800',
+  '--font-weight-kui-notice': '800',
+  '--font-weight-kui-avatar': '800',
+  '--font-kui-body': 'Georgia',
+  '--color-kui-stamp': 'red',
+  '--color-kui-stamp-fill': 'red',
+  '--color-kui-stamp-fill-hover': 'red',
+  '--color-kui-avatar-ring': 'red',
+  '--kui-field-focus-shadow': '0 0 0 3px red',
+  '--color-kui-overlay1': 'red',
+  '--color-kui-fill-hover': 'red',
+  '--color-kui-fill-danger': 'red',
+  '--radius-kui-full': '3px',
+  '--kui-badge-solid-text': 'red',
+}
+
+describe('the knobs folded in 1.72', () => {
+  const sources = [theme, ...components.map(component => component.source), ...scripts].join('\n')
+
+  test.each(Object.entries(FOLDED_KNOBS))('%s is still read as the first fallback of the look that replaced it', async (knob, value) => {
+    // The class strings of the recipes that read the knob, which Tailwind builds beside the theme's own rules.
+    const candidates = [...new Set([...sources.matchAll(new RegExp(`[^\\s'"\`]*var\\(${knob.replaceAll('-', '\\-')}[,)][^\\s'"\`]*`, 'g'))].map(([found = '']) => found))].filter(found => !found.startsWith('--') && !found.endsWith(';'))
+    const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
+    const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${theme}\n@tailwind utilities;\n@theme { ${knob}: ${value}; }`, { base: ROOT, loadStylesheet: async (_, base) => ({ path: tailwind, base, content: await Bun.file(tailwind).text() }) })
+    const css = compiler.build(candidates)
+
+    // Read somewhere with its replacement as the fallback, and written to the page where the app sets it.
+    expect(css, `${knob} is read`).toMatch(new RegExp(`var\\(${knob.replaceAll('-', '\\-')}[,)]`))
+    expect(css, `${knob} reaches the page`).toContain(`${knob}: ${value}`)
+  })
+
+  test('has no knob of the list read without a fallback that gives the look it had', () => {
+    // The width of a frame reads the card border as the fallback of the old width: the one place it is read alone.
+    for (const knob of Object.keys(FOLDED_KNOBS).filter(name => name !== '--kui-border-card')) {
+      for (const [, found = ''] of sources.matchAll(new RegExp(`var\\(${knob.replaceAll('-', '\\-')}\\)`, 'g')))
+        expect(found, `${knob} is read bare`).toBe('')
+    }
   })
 })

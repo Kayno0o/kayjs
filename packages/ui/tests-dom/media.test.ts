@@ -152,20 +152,20 @@ describe('ZoomPane', () => {
     press(pane, '+')
     await settle()
 
-    expect(pane.querySelector<HTMLElement>('.kui-zoom-plate')?.style.getPropertyValue('--kui-zoom-scale')).toBe('1.15')
+    expect(pane.querySelector<HTMLElement>('.kui-zoom-plate')?.style.getPropertyValue('--zoom-scale')).toBe('1.15')
     expect(fit().disabled).toBe(false)
 
     press(pane, '0')
     await settle()
 
-    expect(pane.querySelector<HTMLElement>('.kui-zoom-plate')?.style.getPropertyValue('--kui-zoom-scale')).toBe('1')
+    expect(pane.querySelector<HTMLElement>('.kui-zoom-plate')?.style.getPropertyValue('--zoom-scale')).toBe('1')
   })
 
   test('leaves the keys to a field typed in inside the pane, and takes them from the pane itself', async () => {
     const root = await media()
     const pane = root.querySelector('#zoom')!
     const field = pane.querySelector('#zoom-field')!
-    const scale = () => Number(pane.querySelector<HTMLElement>('.kui-zoom-plate')!.style.getPropertyValue('--kui-zoom-scale'))
+    const scale = () => Number(pane.querySelector<HTMLElement>('.kui-zoom-plate')!.style.getPropertyValue('--zoom-scale'))
 
     for (const typed of ['+', '=', '-', '0', 'ArrowLeft', 'ArrowDown'])
       expect(press(field, typed).defaultPrevented, typed).toBe(false)
@@ -182,7 +182,7 @@ describe('ZoomPane', () => {
   test('leaves Ctrl with + or 0 to the browser\'s zoom, and the wheel to the page while fitted unless Ctrl is held', async () => {
     const root = await media()
     const pane = root.querySelector('#zoom')!
-    const scale = () => Number(pane.querySelector<HTMLElement>('.kui-zoom-plate')!.style.getPropertyValue('--kui-zoom-scale'))
+    const scale = () => Number(pane.querySelector<HTMLElement>('.kui-zoom-plate')!.style.getPropertyValue('--zoom-scale'))
     const wheel = (init: WheelEventInit) => {
       const event = new WheelEvent('wheel', { deltaY: -100, bubbles: true, cancelable: true, ...init })
 
@@ -211,7 +211,7 @@ describe('ZoomPane', () => {
   test('steps by the buttons alone however fast they are clicked, never as a double click', async () => {
     const root = await media()
     const pane = root.querySelector('#zoom')!
-    const scale = () => Number(pane.querySelector<HTMLElement>('.kui-zoom-plate')!.style.getPropertyValue('--kui-zoom-scale'))
+    const scale = () => Number(pane.querySelector<HTMLElement>('.kui-zoom-plate')!.style.getPropertyValue('--zoom-scale'))
     const zoomIn = pane.querySelector<HTMLElement>('[aria-label="Zoom in"]')!
 
     sized(pane, 200, 100)
@@ -231,7 +231,7 @@ describe('ZoomPane', () => {
     pane.dispatchEvent(new MouseEvent('dblclick', { clientX: 100, clientY: 50, bubbles: true }))
     await settle()
 
-    expect(Number(plate().getPropertyValue('--kui-zoom-scale'))).toBeCloseTo(1.15 ** 3)
+    expect(Number(plate().getPropertyValue('--zoom-scale'))).toBeCloseTo(1.15 ** 3)
 
     const measured = spyOn(pane, 'getBoundingClientRect')
 
@@ -257,7 +257,7 @@ describe('ZoomPane', () => {
     pointer(pane, 'pointermove', 130, 50, { pointerId: 2, pointerType: 'touch' })
     await settle()
 
-    expect(Number(plate().getPropertyValue('--kui-zoom-scale'))).toBeCloseTo(2)
+    expect(Number(plate().getPropertyValue('--zoom-scale'))).toBeCloseTo(2)
   })
 })
 
@@ -329,8 +329,8 @@ describe('Masonry and WhenVisible', () => {
     heights.callback(tiles.map((tile, index) => ({ target: tile, borderBoxSize: [{ blockSize: [100, 40, 60][index] }] })))
     await settle()
 
-    expect(masonry.style.getPropertyValue('--kui-masonry-lanes')).toBe('2')
-    expect(tiles.map(tile => [tile.style.getPropertyValue('--kui-masonry-lane'), tile.style.getPropertyValue('--kui-masonry-top')])).toEqual([['0', '0px'], ['1', '0px'], ['1', '52px']])
+    expect(masonry.style.getPropertyValue('--_masonry-lanes')).toBe('2')
+    expect(tiles.map(tile => [tile.style.getPropertyValue('--_masonry-lane'), tile.style.getPropertyValue('--_masonry-top')])).toEqual([['0', '0px'], ['1', '0px'], ['1', '52px']])
     expect(masonry.style.height).toBe('112px')
   })
 

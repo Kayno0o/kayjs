@@ -109,7 +109,7 @@ export function steppedPoint(key: string, index: number, count: number): number 
 }
 
 // The colours a chart gives its series in turn, the `--color-chart-*` tokens.
-export const PALETTE = ['var(--kui-chart-1)', 'var(--kui-chart-2)', 'var(--kui-chart-3)', 'var(--kui-chart-4)', 'var(--kui-chart-5)', 'var(--kui-chart-6)']
+export const PALETTE = ['var(--color-chart-1)', 'var(--color-chart-2)', 'var(--color-chart-3)', 'var(--color-chart-4)', 'var(--color-chart-5)', 'var(--color-chart-6)']
 
 // One series of a `BarChart`.
 export interface BarSeries extends ChartSeries {

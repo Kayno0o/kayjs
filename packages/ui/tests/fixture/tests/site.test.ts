@@ -251,7 +251,7 @@ describe('recipe colours under Tailwind', () => {
     const card = (await served('card')).split(' ')
 
     expect(card).toContain('border-danger')
-    expect(card).not.toContain('border-kui-surface2')
+    expect(card).not.toContain('border-border')
   })
 
   test('a tone leaves nothing for the merge to drop: the root of the recipe is served whole', async () => {
@@ -263,8 +263,8 @@ describe('recipe colours under Tailwind', () => {
       expect(classes, id).toEqual(expect.arrayContaining(recipeRoot(text, name).split(' ')))
     }
 
-    expect(await served('badge')).toContain('[--kui-badge-color:var(--color-success)]')
-    expect(await served('notice')).toContain('[--kui-notice-tone:var(--color-danger)]')
+    expect(await served('badge')).toContain('[--_badge-color:var(--color-success)]')
+    expect(await served('notice')).toContain('[--_notice-tone:var(--color-danger)]')
   })
 
   test('an island drops them the same through the class table of its bundle, and keeps both without it', async () => {
@@ -274,9 +274,9 @@ describe('recipe colours under Tailwind', () => {
 
     const card = `${recipeRoot(text, 'kui-card')} border-danger`
 
-    expect(resolveClasses(card, table).split(' ')).not.toContain('border-kui-surface2')
+    expect(resolveClasses(card, table).split(' ')).not.toContain('border-border')
     expect(resolveClasses(card, table).split(' ')).toContain('border-danger')
-    expect(resolveClasses(card, { sets: [], classes: {} }).split(' ')).toEqual(expect.arrayContaining(['border-kui-surface2', 'border-danger']))
+    expect(resolveClasses(card, { sets: [], classes: {} }).split(' ')).toEqual(expect.arrayContaining(['border-border', 'border-danger']))
 
     // What the page served for a tone is what the island would render, and the table leaves it whole.
     for (const id of ['badge', 'notice']) {
@@ -306,10 +306,10 @@ describe('the display components whose recipe holds their look, under Tailwind',
     const stat = await classes('#stat')
 
     expect(stat).toEqual(expect.arrayContaining(['kui-stat-badge', 'flex', 'flex-col', 'px-9']))
-    expect(stat).not.toEqual(expect.arrayContaining(['px-kui-field-x']))
+    expect(stat).not.toEqual(expect.arrayContaining(['px-[calc(var(--spacing)*2.25*var(--density))]']))
     expect(stat).not.toContain('inline-flex')
-    expect(await classes('#stat [data-part=value]')).toEqual(expect.arrayContaining(['text-2xl/none', 'text-kui-error']))
-    expect(await classes('#stat [data-part=value]')).not.toContain('text-kui-text')
+    expect(await classes('#stat [data-part=value]')).toEqual(expect.arrayContaining(['text-2xl/none', 'text-danger']))
+    expect(await classes('#stat [data-part=value]')).not.toContain('text-foreground')
 
     expect(await classes('#progress')).toContain('h-3')
     expect(await classes('#progress')).not.toContain('h-2')
@@ -319,15 +319,15 @@ describe('the display components whose recipe holds their look, under Tailwind',
 
   test('a fillClass replaces the accent of the Meter\'s fill, and one that sets no colour keeps it', async () => {
     expect(await classes('#meter [data-part=fill]')).toContain('bg-danger')
-    expect(await classes('#meter [data-part=fill]')).not.toContain('bg-kui-accent')
-    expect(await classes('#meter-rounded [data-part=fill]')).toEqual(expect.arrayContaining(['bg-kui-accent', 'rounded-full']))
+    expect(await classes('#meter [data-part=fill]')).not.toContain('bg-accent')
+    expect(await classes('#meter-rounded [data-part=fill]')).toEqual(expect.arrayContaining(['bg-accent', 'rounded-full']))
   })
 
   test('the shape of a Skeleton replaces the height and the width of the text bars', async () => {
-    expect(await classes('#skeleton')).toContain('w-(--kui-skeleton-width,2.5rem)')
-    expect(await classes('#skeleton')).not.toContain('w-(--kui-skeleton-width,100%)')
-    expect(await classes('#skeleton [data-part=block]')).toEqual(expect.arrayContaining(['aspect-square', 'h-auto', 'rounded-kui-full']))
-    expect(await classes('#skeleton [data-part=block]')).not.toContain('h-(--kui-skeleton-height,1em)')
+    expect(await classes('#skeleton')).toContain('w-(--_skeleton-width,2.5rem)')
+    expect(await classes('#skeleton')).not.toContain('w-(--_skeleton-width,100%)')
+    expect(await classes('#skeleton [data-part=block]')).toEqual(expect.arrayContaining(['aspect-square', 'h-auto', 'rounded-[var(--radius-kui-full,calc(infinity*1px))]']))
+    expect(await classes('#skeleton [data-part=block]')).not.toContain('h-(--_skeleton-height,1em)')
   })
 })
 
@@ -512,7 +512,7 @@ describe('data', () => {
   test('Skeleton hides its bars from screen readers, shortens the last, and announces its label as a status', async () => {
     expect((await find('/data', '#skeleton [data-part=block]')).map(found => [attr(found, 'aria-hidden'), attr(found, 'data-last')])).toEqual([['true', null], ['true', null], ['true', '']])
     expect((await find('/data', '#skeleton [role="status"]')).map(found => found.text)).toEqual(['Loading'])
-    expect((await one('/data', '#avatar-skeleton .kui-skeleton')).attributes).toMatchObject({ 'data-shape': 'avatar', 'style': '--kui-skeleton-width: 4rem' })
+    expect((await one('/data', '#avatar-skeleton .kui-skeleton')).attributes).toMatchObject({ 'data-shape': 'avatar', 'style': '--_skeleton-width: 4rem' })
     expect(await find('/data', '#avatar-skeleton [role="status"]')).toEqual([])
   })
 
@@ -567,7 +567,7 @@ describe('inputs', () => {
 
     expect([...form.matchAll(/aria-label="(Hours \w+)" placeholder="(\d+)" min="0" max="24" value="(\d*)"/g)].map(match => match.slice(1))).toEqual([['Hours from', '0', '2'], ['Hours to', '24', '']])
     expect(form).toMatch(/data-part="summary">Mars</)
-    expect(form).toContain(`<input class="size-3.5 shrink-0 accent-kui-accent" data-part="checkbox" type="checkbox" checked><span class="min-w-0 truncate" data-part="label">Mars</span>`)
+    expect(form).toContain(`<input class="size-3.5 shrink-0 accent-accent" data-part="checkbox" type="checkbox" checked><span class="min-w-0 truncate" data-part="label">Mars</span>`)
     expect(form).not.toContain('data-part="search"')
     expect(form).toContain('<input type="hidden" name="planet" value="mars">')
   })
@@ -598,7 +598,7 @@ describe('drawn ids', () => {
     const target = (/popovertarget="([^"]+)"/).exec(select)![1]!
 
     expect(select).toContain(`id="${target}" popover="auto"`)
-    expect(select).toContain(`anchor-name: --kui-popover-${target}`)
+    expect(select).toContain(`anchor-name: --_popover-${target}`)
   })
 })
 
@@ -619,18 +619,18 @@ describe('charts', () => {
 
   // The exact-markup tests match a part's classes with `[^"]*`, so this one holds the utilities that draw each part.
   test.each([
-    ['scatter', 'grid', ['absolute', 'bg-kui-surface2', 'data-[axis=x]:inset-y-0', 'data-[axis=y]:h-px']],
-    ['scatter', 'tick', ['absolute', 'whitespace-nowrap', 'tabular-nums', 'text-kui-overlay1', 'data-[axis=x]:top-full']],
-    ['scatter', 'guide', ['absolute', 'bg-kui-overlay0', 'data-[axis=x]:w-px']],
-    ['scatter', 'corner', ['pointer-events-none', 'absolute', 'text-kui-overlay1']],
-    ['bars', 'plot', ['relative', 'ml-10', 'border-kui-surface2']],
+    ['scatter', 'grid', ['absolute', 'bg-border', 'data-[axis=x]:inset-y-0', 'data-[axis=y]:h-px']],
+    ['scatter', 'tick', ['absolute', 'whitespace-nowrap', 'tabular-nums', 'text-[var(--color-kui-overlay1,var(--color-muted))]', 'data-[axis=x]:top-full']],
+    ['scatter', 'guide', ['absolute', 'bg-border-strong', 'data-[axis=x]:w-px']],
+    ['scatter', 'corner', ['pointer-events-none', 'absolute', 'text-[var(--color-kui-overlay1,var(--color-muted))]']],
+    ['bars', 'plot', ['relative', 'ml-10', 'border-border']],
     ['bars', 'column', ['flex', 'items-end', 'data-stacked:flex-col-reverse']],
     ['bars', 'bar', ['min-h-px', 'flex-1', 'rounded-t-sm']],
     ['bars', 'axisLabel', ['justify-center', 'whitespace-nowrap']],
-    ['stacked-bars', 'legendItem', ['flex', 'items-center', 'text-kui-subtext0']],
+    ['stacked-bars', 'legendItem', ['flex', 'items-center', 'text-muted']],
     ['stacked-bars', 'key', ['size-2', 'shrink-0']],
-    ['graph', 'month', ['row-start-1', 'w-0', 'text-kui-subtext0']],
-    ['graph', 'cell', ['size-3', 'bg-kui-surface0', 'hover:scale-125', 'data-today:ring-kui-accent']],
+    ['graph', 'month', ['row-start-1', 'w-0', 'text-muted']],
+    ['graph', 'cell', ['size-3', 'bg-surface', 'hover:scale-125', 'data-today:ring-accent']],
   ] as const)('the %s chart draws its %s part with %j', async (id, part, utilities) => {
     const found = [...(await page(id)).matchAll(new RegExp(`<[a-z]+ class="([^"]*)" data-part="${part}"`, 'g'))].map(match => match[1]!.split(' '))
 
@@ -643,16 +643,16 @@ describe('charts', () => {
   // Parts named like another component's (row, fill, root) are found by the utilities that tell them apart, so one element of the page must hold them all.
   test.each([
     ['/data', 'root', ['kui-bar-list', 'flex', 'flex-col', 'gap-2']],
-    ['/data', 'row', ['grid', 'w-full', 'items-baseline', 'data-interactive:cursor-pointer', 'data-interactive:hover:text-kui-accent']],
-    ['/data', 'label', ['truncate', 'text-kui-text']],
-    ['/data', 'value', ['text-xs', 'text-kui-subtext0', 'tabular-nums']],
-    ['/data', 'track', ['col-span-2', 'overflow-hidden', 'bg-kui-surface1']],
-    ['/data', 'fill', ['block', 'h-full', 'bg-kui-accent']],
-    ['/data', 'root', ['kui-bar-list-empty', 'text-xs', 'text-kui-subtext0']],
-    ['/data', 'root', ['kui-media-gallery-empty', 'text-kui-subtext0', 'outline-none']],
+    ['/data', 'row', ['grid', 'w-full', 'items-baseline', 'data-interactive:cursor-pointer', 'data-interactive:hover:text-accent']],
+    ['/data', 'label', ['truncate', 'text-foreground']],
+    ['/data', 'value', ['text-xs', 'text-muted', 'tabular-nums']],
+    ['/data', 'track', ['col-span-2', 'overflow-hidden', 'bg-surface-strong']],
+    ['/data', 'fill', ['block', 'h-full', 'bg-accent']],
+    ['/data', 'root', ['kui-bar-list-empty', 'text-xs', 'text-muted']],
+    ['/data', 'root', ['kui-media-gallery-empty', 'text-muted', 'outline-none']],
     ['/data', 'root', ['kui-site-favicon', 'inline-flex', 'size-5', 'shrink-0', 'overflow-hidden']],
     ['/content', 'root', ['kui-carousel', 'flex', 'flex-col', 'gap-3']],
-    ['/content', 'viewport', ['relative', 'w-full', 'overflow-hidden', 'bg-kui-surface0']],
+    ['/content', 'viewport', ['relative', 'w-full', 'overflow-hidden', 'bg-surface']],
     ['/content', 'slide', ['absolute', 'inset-0', 'transition-transform', 'motion-reduce:transition-none']],
     ['/content', 'root', ['kui-qr-code', 'block', 'h-auto', 'max-w-full']],
   ] as const)('%s draws its %s part with %j', async (path, part, utilities) => {
@@ -682,8 +682,8 @@ describe('charts', () => {
     const scatter = await page('scatter')
 
     expect([...scatter.matchAll(/aria-label="(\w+)" data-tooltip="([^"]+)" style="([^"]+)"/g)].map(match => match.slice(1))).toEqual([
-      ['Hades', 'Hades', 'left: 25%; bottom: 100%; --kui-dot-size: 1.75rem'],
-      ['Celeste', 'Celeste, 30h', 'left: 75%; bottom: 0%; --kui-dot-size: 1.1875rem'],
+      ['Hades', 'Hades', 'left: 25%; bottom: 100%; --_dot-size: 1.75rem'],
+      ['Celeste', 'Celeste, 30h', 'left: 75%; bottom: 0%; --_dot-size: 1.1875rem'],
     ])
     expect(scatter).toMatch(/<span class="[^"]*" data-part="grid" data-axis="x" style="left: 50%"><span class="[^"]*" data-part="tick" data-axis="x">20h<\/span><\/span><span class="[^"]*" data-part="guide" data-axis="y" style="bottom: 50%"><\/span><span class="[^"]*" data-part="guide" data-axis="x" style="left: 50%"><\/span><span class="[^"]*" data-part="corner" data-corner="topRight">Long and loved<\/span>/)
     expect(scatter).not.toContain('<button')
@@ -834,7 +834,7 @@ describe('ContactForm', () => {
 
     const refused = await site.submit(contact, { name: 'Ada', email: 'nope', message: 'Bonjour' }, { from: '/fr/contact-words' })
 
-    expect(refused.html).toContain('<span class="text-xs text-kui-error" data-part="issue">Merci d\'écrire une adresse e-mail valide.</span>')
+    expect(refused.html).toContain('<span class="text-xs text-danger" data-part="issue">Merci d\'écrire une adresse e-mail valide.</span>')
   })
 
   test('draws the consent checkbox of an action asking for one, with the privacy link and the renamed honeypot, and no box without', async () => {
@@ -852,7 +852,7 @@ describe('ContactForm', () => {
 
     const refused = await site.submit(contact, { name: 'Ada', email: 'ada@example.com', message: 'Hi', consent: false } as never, { from: '/contact-consent' })
 
-    expect(refused.html).toContain('class="text-xs text-kui-error" data-part="issue">Please tick the box to send your message.</span>')
+    expect(refused.html).toContain('class="text-xs text-danger" data-part="issue">Please tick the box to send your message.</span>')
   })
 
   test('links the privacy page of a form without a consent box too, on its own line', async () => {
@@ -875,9 +875,9 @@ describe('ContactForm', () => {
     const { contact } = await import('../src/routes/contact.kay')
     const refused = await site.submit(contact, { name: 'A', email: 'nope', topic: 'quote', message: 'Hi' }, { from: '/contact' })
 
-    expect(refused.html).toContain('<span class="text-xs text-kui-error" data-part="issue">Tell us your name</span>')
-    expect(refused.html).toContain('<span class="text-xs text-kui-error" data-part="issue">Not an email address</span>')
-    expect(refused.html).toContain('<span class="text-xs text-kui-error" data-part="issue">A few words at least</span>')
+    expect(refused.html).toContain('<span class="text-xs text-danger" data-part="issue">Tell us your name</span>')
+    expect(refused.html).toContain('<span class="text-xs text-danger" data-part="issue">Not an email address</span>')
+    expect(refused.html).toContain('<span class="text-xs text-danger" data-part="issue">A few words at least</span>')
 
     const sent = await site.submit(contact, { name: 'Ada', email: 'ada@example.com', topic: 'quote', message: 'Hello there' }, { from: '/contact' })
 

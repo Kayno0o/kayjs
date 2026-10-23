@@ -19,9 +19,7 @@
   --color-kui-surface2: color-mix(in srgb, var(--color-foreground) 7%, transparent);
   --color-kui-overlay0: color-mix(in srgb, var(--color-foreground) 16%, transparent);
 
-  --kui-border-width: 0px;
-  --kui-border-notice: 1px;
-  --kui-border-avatar: 1px;
+  --border-width: 0px;
   --kui-label-case: none;
   --tracking-kui-label: 0.02em;
   --tracking-kui-section: 0.06em;
@@ -46,9 +44,9 @@
 }
 
 @layer components {
-  /* The framed boxes have no line, so the controls that need one draw it again. */
-  :is(.kui-btn, .kui-shell, .kui-segmented, .kui-pagination-step, .kui-pagination [data-part='step'], .kui-toggle-track, .kui-toggle [data-part='track'], .kui-chip, .kui-file-drop) {
-    --kui-border-width: 1px;
+  /* The framed boxes have no line, so the controls that need one draw it again: buttons, fields, notices and avatars among them. */
+  :is(.kui-btn, .kui-shell, .kui-segmented, .kui-pagination-step, .kui-pagination [data-part='step'], .kui-toggle-track, .kui-toggle [data-part='track'], .kui-chip, .kui-file-drop, .kui-badge, .kui-notice, .kui-avatar, .kui-field-input, .kui-form-field :is(input, select, textarea)) {
+    --border-width: 1px;
   }
 
   /* A checked chip and a file drop being dragged over keep the accent line the theme gives them. */
@@ -56,9 +54,9 @@
     border-color: var(--color-input);
   }
 
-  /* The same line for the recipes of Segmented, ChipGroup, FileDrop and Pagination, which read it from --kui-control-line. */
+  /* The same line for the recipes of Segmented, ChipGroup, FileDrop and Pagination, which read it from --_control-line. */
   :is(.kui-segmented, .kui-pagination [data-part='step'], .kui-chip [data-part='input']:not(:checked) + [data-part='label'], .kui-file-drop:not([data-dragging])) {
-    --kui-control-line: var(--color-input);
+    --_control-line: var(--color-input);
   }
 
   /* Overlays lose their line to a shadow that lifts them off the page. */
@@ -68,13 +66,13 @@
 
   /* A key, on a Button and a framed IconButton: a hairline on the canvas, lit in the accent while hovered. The tones, the ghost and inline forms and a pressed toggle keep their own. */
   :is(.kui-btn, .kui-icon-btn.kui-shell):where(:not(.kui-btn-accent, .kui-btn-success, .kui-btn-danger, .kui-shell-danger, [data-variant='ghost'], [data-variant='inline'], [aria-pressed='true'])) {
-    --kui-shell-line: var(--color-input);
-    --kui-shell-fill: transparent;
+    --_shell-line: var(--color-input);
+    --_shell-fill: transparent;
   }
 
   :is(.kui-btn, .kui-icon-btn.kui-shell):where(:not(.kui-btn-accent, .kui-btn-success, .kui-btn-danger, .kui-shell-danger, [data-variant='ghost'], [data-variant='inline'], [aria-pressed='true'])):hover {
-    --kui-shell-line: var(--color-accent);
-    --kui-shell-fill: transparent;
+    --_shell-line: var(--color-accent);
+    --_shell-fill: transparent;
     color: var(--color-accent);
   }
 
@@ -91,7 +89,7 @@
   @supports (appearance: base-select) {
     :is(select.kui-field-input, .kui-form-field select):not([multiple], [size]) {
       appearance: base-select;
-      padding-right: var(--spacing-kui-field-x);
+      padding-right: calc(var(--spacing) * 2.25 * var(--density));
       background-image: none;
 
       &::picker(select) {
@@ -99,7 +97,7 @@
         margin-top: 0.25rem;
         padding: 0.25rem;
         border: 1px solid var(--color-border-strong);
-        border-radius: var(--radius-kui-card);
+        border-radius: var(--radius-lg);
         background: var(--color-popover);
         color: var(--color-foreground);
         box-shadow: 0 1rem 3rem -0.75rem rgb(0 0 0 / 0.8);
@@ -110,8 +108,8 @@
       }
 
       & option {
-        padding: 0.25rem var(--spacing-kui-field-x);
-        border-radius: var(--radius-kui-card);
+        padding: 0.25rem calc(var(--spacing) * 2.25 * var(--density));
+        border-radius: var(--radius-md);
 
         &:hover,
         &:focus-visible {
@@ -131,7 +129,7 @@
     place-content: center;
     appearance: none;
     border: 1px solid var(--color-input);
-    border-radius: var(--radius-kui-card);
+    border-radius: var(--radius-sm);
     background: var(--color-surface);
     transition: background-color 150ms, border-color 150ms;
 

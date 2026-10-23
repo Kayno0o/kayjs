@@ -7,6 +7,7 @@ const ROOT = new URL('..', import.meta.url).pathname
 const TAILWIND = Bun.resolveSync('tailwindcss/theme.css', ROOT)
 
 const theme = await Bun.file(`${ROOT}src/theme.css`).text()
+const recipes = (await Promise.all([...new Bun.Glob('src/*.kay').scanSync({ cwd: ROOT })].map(async file => Bun.file(`${ROOT}${file}`).text()))).join('\n')
 const tailwindTheme = await Bun.file(TAILWIND).text()
 
 const BLOCK = /@theme([^{;]*)\{([^{}]*)\}/g
@@ -15,37 +16,6 @@ const COMMENT = /\/\*[\s\S]*?\*\//g
 const VAR_NAME = /var\((--[\w-]+)/g
 const ROOT_DECLARATION = /^\s{4}(--[\w-]+): (.+);$/gm
 const PROPERTY_AT_RULE = /@property\s+(--[\w-]+)/g
-
-// The old names theme.css does not alias yet: it still defines them itself as they fold into another name or into one of Tailwind's, or they are set per instance and have no default, until their readers move to the new ones (#2080 lane 4).
-const NOT_ALIASED = new Set([
-  '--color-kui-overlay1',
-  '--color-kui-fill-hover',
-  '--color-kui-stamp',
-  '--color-kui-stamp-fill',
-  '--color-kui-stamp-fill-hover',
-  '--color-kui-avatar-ring',
-  ...[1, 2, 3, 4, 5, 6].map(n => `--kui-chart-${n}`),
-  '--text-kui-micro',
-  '--text-kui-micro--line-height',
-  '--tracking-kui-section',
-  '--tracking-kui-action',
-  '--font-kui-mono',
-  '--radius-kui-sm',
-  '--radius-kui-md',
-  '--kui-border-width',
-  '--kui-border-card',
-  '--kui-border-input',
-  '--kui-border-badge',
-  '--kui-border-stamp',
-  '--kui-border-notice',
-  '--kui-border-avatar',
-  '--kui-table-height',
-  '--kui-line-chart-height',
-  '--kui-bar-chart-height',
-  '--kui-scatter-chart-height',
-  '--kui-zoom-scale',
-  '--kui-badge-solid-text',
-])
 
 interface Declared { name: string, value: string, reference: boolean, inline: boolean }
 
@@ -130,41 +100,35 @@ describe('the theme names', () => {
 
     expect([...tokens.values()].filter(token => token.deprecated).map(token => token.name).toSorted()).toEqual([...aliases.keys()].toSorted())
     expect(tokens.get('--color-accent')?.deprecated).toBeUndefined()
-    expect(tokens.get('--color-kui-overlay1')?.deprecated).toBeUndefined()
+    expect(tokens.get('--color-kui-overlay1')?.deprecated).toBe(true)
     expect(tokens.get('--color-kui-surface2')?.deprecated).toBe(true)
   })
 
-  test('maps every alias onto the name the lint table gives it, and every other renamed name stays defined until its readers move', () => {
+  test('maps every alias onto the name the lint table gives it, and leaves no other renamed name defined', () => {
     for (const [old, value] of aliases) {
       expect(UI_TOKENS[old], old).toBeDefined()
-      expect(value, old).toBe(`var(${UI_TOKENS[old]!.to})`)
+      expect(value, old).toBe(UI_TOKENS[old]!.to === undefined ? UI_TOKENS[old]!.value! : `var(${UI_TOKENS[old]!.to})`)
     }
 
     for (const [old, token] of Object.entries(UI_TOKENS)) {
-      if (token.to === undefined)
-        continue
+      // Every old name a utility reads still builds until 1.75, and no old name is defined by a default of its own: the app's own value, or none.
+      if ((token.to !== undefined || token.value !== undefined) && (token.kind !== 'var' || (old).endsWith('--line-height')))
+        expect(aliases.has(old), `${old} keeps building as a utility`).toBe(true)
 
-      if (aliases.has(old))
-        expect(NOT_ALIASED.has(old), old).toBe(false)
-      else
-        expect(NOT_ALIASED.has(old), `${old} is neither aliased nor listed as waiting for lane 4`).toBe(true)
-    }
-
-    // The ones kept are defined by theme.css itself, or are set per instance and have no default.
-    for (const old of NOT_ALIASED) {
-      if (!['--kui-table-height', '--kui-line-chart-height', '--kui-bar-chart-height', '--kui-scatter-chart-height', '--kui-zoom-scale', '--kui-badge-solid-text', ...[1, 2, 3, 4, 5, 6].map(n => `--kui-chart-${n}`)].includes(old))
-        expect(defaults.has(old), old).toBe(true)
+      expect(defaults.has(old), `${old} has no default of its own`).toBe(false)
     }
   })
 
   test('has the lint table say a declaration is renamed exactly where the new name reads the old one first', () => {
+    const sources = `${theme}\n${recipes}`
+
     for (const [old, token] of Object.entries(UI_TOKENS)) {
       if (token.to === undefined)
         continue
 
-      const reads = new RegExp(`^var\\(${old}[,)]`).test(defaults.get(token.to) ?? '')
+      const first = new RegExp(`^var\\(${old}[,)]`).test(defaults.get(token.to) ?? '') || new RegExp(`var\\(${token.to},\\s*var\\(${old}[,)]`).test(sources)
 
-      expect(token.declares === true, `${old} declares ${token.to}`).toBe(reads && !NOT_ALIASED.has(old))
+      expect(token.declares === true, `${old} declares ${token.to}`).toBe(first)
     }
   })
 
@@ -181,17 +145,25 @@ describe('the theme names', () => {
     expect(defaults.get('--color-danger')).toContain('var(--color-error,')
   })
 
-  test('registers --border-width as a length like the old name', () => {
-    expect([...theme.matchAll(PROPERTY_AT_RULE)].map(([, name]) => name)).toEqual(expect.arrayContaining(['--border-width', '--kui-border-width']))
+  test('registers --border-width as a length, and leaves the old name unregistered so a frame can fall back from it', () => {
+    expect([...theme.matchAll(PROPERTY_AT_RULE)].map(([, name]) => name)).toEqual(expect.arrayContaining(['--border-width']))
+    expect([...theme.matchAll(PROPERTY_AT_RULE)].map(([, name]) => name)).not.toContain('--kui-border-width')
   })
 
   test('never defines a name Tailwind ships', () => {
-    const shipped = new Set(declared(tailwindTheme).map(entry => entry.name))
+    const shipped = new Map([...tailwindTheme.replace(COMMENT, '').matchAll(/^ {2}(--[\w-]+): ?([^;]+);/gm)].map(([, name = '', value = '']) => [name, value.trim()]))
 
-    // The Tailwind names the old, prefixed names still fold into stay read, not redefined, until the folds land.
+    // The four steps the old, prefixed names folded into keep Tailwind's own value, each read through the old name until 1.75, so an app that sets nothing renders them as Tailwind does.
     const redefined = [...defaults.keys(), ...aliases.keys()].filter(name => shipped.has(name))
 
-    expect(redefined).toEqual([])
+    expect(redefined.toSorted()).toEqual(['--font-mono', '--radius-lg', '--radius-md', '--radius-sm'])
+
+    for (const name of redefined) {
+      const tailwind = shipped.get(name)!.replace(/\s+/g, ' ')
+
+      expect(defaults.get(name)!.replace(/\s+/g, ' '), name).toMatch(/^var\(--(?:radius|font)-kui-\w+, /)
+      expect(defaults.get(name)!.replace(/\s+/g, ' ').replace(/^(?:var\(--[\w-]*kui-[\w-]+, )+/, '').replace(/\)+$/, ''), name).toBe(tailwind)
+    }
   })
 
   test('still builds an old utility, which reads the new name', async () => {
@@ -202,8 +174,8 @@ describe('the theme names', () => {
     expect(css).toContain('border-color: var(--color-popover)')
     expect(css).toContain('font-size: var(--text-2xs)')
     expect(css).toContain('letter-spacing: var(--tracking-label)')
-    expect(css).toContain('border-radius: var(--radius-kui-card)')
-    expect(css).toContain('color: var(--color-kui-overlay1)')
+    expect(css).toContain('border-radius: var(--radius-lg)')
+    expect(css).toContain('color: var(--color-muted)')
   })
 
   test('writes no old name that an app did not set, nor forms a cycle with the new ones', async () => {

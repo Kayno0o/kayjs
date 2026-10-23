@@ -289,7 +289,7 @@ describe('CommandPalette with siteSearch', () => {
 
     const action = options().find(option => option.textContent?.includes('New moon'))!
 
-    expect([...action.querySelector('[data-part=icon]')?.classList ?? []]).toEqual(expect.arrayContaining(['size-5', 'text-kui-overlay1']))
+    expect([...action.querySelector('[data-part=icon]')?.classList ?? []]).toEqual(expect.arrayContaining(['size-5', 'text-[var(--color-kui-overlay1,var(--color-muted))]']))
     expect(options().some(option => option.hasAttribute('data-snippet'))).toBe(false)
 
     await search(input()!, 'table')
@@ -305,7 +305,7 @@ describe('CommandPalette with siteSearch', () => {
 
     expect(mark?.textContent).toBe('table')
     expect(mark?.tagName).toBe('MARK')
-    expect(mark?.classList).toContain('text-kui-accent')
+    expect(mark?.classList).toContain('text-accent')
   })
 
   test('marks the words found in a section\'s heading, and shows a heading with none found as it reads', async () => {

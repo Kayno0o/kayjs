@@ -5,8 +5,8 @@ import type { JSX } from 'kay'
 // Indeterminate, a bar slides across the track, held still and part-filled under reduced motion.
 const look = recipe({
   parts: {
-    root: 'kui-progress h-2 w-full overflow-hidden bg-kui-surface0',
-    fill: 'h-full bg-kui-accent transition-[width] motion-reduce:transition-none data-indeterminate:w-2/5 data-indeterminate:animate-[kui-progress-slide_1.4s_ease-in-out_infinite] data-indeterminate:motion-reduce:animate-none',
+    root: 'kui-progress h-2 w-full overflow-hidden bg-surface',
+    fill: 'h-full bg-accent transition-[width] motion-reduce:transition-none data-indeterminate:w-2/5 data-indeterminate:animate-[kui-progress-slide_1.4s_ease-in-out_infinite] data-indeterminate:motion-reduce:animate-none',
   },
 })
 

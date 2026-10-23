@@ -11,14 +11,14 @@ import Popover from './popover.kay'
 const look = recipe({
   parts: {
     root: 'kui-bell relative inline-flex',
-    count: 'pointer-events-none absolute -end-1 -top-1 grid min-w-4 place-items-center rounded-full bg-kui-accent px-1 text-[0.625rem]/4 font-semibold text-kui-on-accent',
+    count: 'pointer-events-none absolute -end-1 -top-1 grid min-w-4 place-items-center rounded-full bg-accent px-1 text-[0.625rem]/4 font-semibold text-accent-foreground',
     // The same look as the popover, list and items of a Menu.
     menu: 'kui-menu min-w-48',
     list: MENU_LIST,
     item: MENU_ITEM,
-    dot: 'size-2 shrink-0 rounded-full bg-kui-accent data-read:bg-transparent',
+    dot: 'size-2 shrink-0 rounded-full bg-accent data-read:bg-transparent',
     title: 'min-w-0 flex-1 truncate',
-    empty: 'px-2 py-1.5 text-sm text-kui-subtext0',
+    empty: 'px-2 py-1.5 text-sm text-muted',
     unread: 'sr-only',
     announce: 'sr-only',
     all: MENU_FOOTER,

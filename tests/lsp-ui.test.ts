@@ -83,7 +83,7 @@ describe('what a component offers src/ui.ts', () => {
     expect(info?.name).toBe('Card')
     expect(info?.recipe).toBe(true)
     expect(info?.parts.map(part => part.name).sort()).toEqual(['body', 'head', 'root', 'title'])
-    expect(info?.parts.find(part => part.name === 'body')?.classes).toBe('p-kui-card')
+    expect(info?.parts.find(part => part.name === 'body')?.classes).toBe('p-[var(--spacing-kui-card,calc(var(--spacing)*2.5*var(--density)))]')
   })
 
   it('reads a string parts as the root, and a template literal without holes', () => {
@@ -117,8 +117,8 @@ describe('what a component offers src/ui.ts', () => {
 
     expect(names).toContain('--color-background')
     expect(names).toContain('--color-kui-canvas')
-    expect(names).toContain('--kui-border-width')
-    expect(tokensNamedBy('p-kui-card border-(length:--kui-border-width) bg-kui-surface0 kui-card', tokens).map(token => token.name)).toEqual(expect.arrayContaining(['--kui-border-width', '--color-kui-surface0']))
+    expect(names).toContain('--border-width')
+    expect(tokensNamedBy('text-2xs border-(length:--border-width) bg-surface kui-card', tokens).map(token => token.name)).toEqual(expect.arrayContaining(['--border-width', '--color-surface', '--text-2xs']))
     expect(tokensNamedBy('kui-card flex', tokens).map(token => token.name)).not.toContain('--radius-kui-card')
   })
 })
@@ -233,7 +233,7 @@ describe('completion through the language server', () => {
     expect(await send('  Panel: { variants: { | } },', 4)).toEqual(['size'])
     expect(await send('  Panel: { variants: { size: { | } } },', 5)).toEqual(['sm', 'lg'])
     expect(await send('  Panel: { variants: { size: { sm: { | } } } },', 6)).toEqual(['root', 'body'])
-    expect(await send('  Card: { parts: { head: \'gap-2 --kui-border|\' } },', 7)).toContain('--kui-border-width')
+    expect(await send('  Card: { parts: { head: \'gap-2 --border|\' } },', 7)).toContain('--border-width')
     expect(await send('  Nothing: { parts: { | } },', 8)).toEqual([])
     expect(await send('  Plain: { | },', 9)).toEqual([])
   })
