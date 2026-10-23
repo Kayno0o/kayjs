@@ -1,9 +1,8 @@
 import type { Mounted } from 'kay/test'
-import { join } from 'node:path'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Editor from '../src/editor/editor.kay'
 
-const EDITOR = join(import.meta.dir, '../src/editor/editor.kay')
 let mounted: Mounted | undefined
 
 Object.assign(document, { caretPositionFromPoint: () => null, elementsFromPoint: () => [] })
@@ -28,7 +27,7 @@ async function mountedAt(width: number): Promise<string[]> {
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: width })
 
   try {
-    mounted = await mountComponent(EDITOR, { entries: [], unclickable: [] })
+    mounted = await mountComponent(Editor, { entries: [], unclickable: [] })
     await settle()
 
     const seen = [...olds, ...watcher.takeRecords().map(record => record.oldValue), root.dataset.kuiDock]
@@ -63,7 +62,7 @@ test('the launcher is never in the document while the stored layout keeps the pa
   watcher.observe(document.body, { childList: true, subtree: true })
 
   try {
-    mounted = await mountComponent(EDITOR, { entries: [], unclickable: [] })
+    mounted = await mountComponent(Editor, { entries: [], unclickable: [] })
     await settle()
     seen.push(...document.querySelectorAll('[data-part=launcher]'))
   }
@@ -76,7 +75,7 @@ test('the launcher is never in the document while the stored layout keeps the pa
 
 test('the launcher shows once the stored layout says the panel is closed', async () => {
   localStorage.setItem('kcms-editor', JSON.stringify({ open: false }))
-  mounted = await mountComponent(EDITOR, { entries: [], unclickable: [] })
+  mounted = await mountComponent(Editor, { entries: [], unclickable: [] })
   await settle()
 
   const launcher = mounted.root.querySelector('[data-part=launcher]')

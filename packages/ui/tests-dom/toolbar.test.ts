@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { mountComponent } from 'kay/test'
+import Toolbars from '../tests/fixture/src/components/toolbars.kay'
 
 let mounted: Mounted | undefined
 
@@ -9,7 +10,7 @@ afterEach(() => {
 })
 
 async function toolbars() {
-  mounted = await mountComponent('src/components/toolbars.kay', {})
+  mounted = await mountComponent(Toolbars, {})
 
   return mounted.root
 }
