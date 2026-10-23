@@ -95,18 +95,21 @@ export async function listedParams(route: Pick<Route, 'params' | 'optional' | 'c
 
   for (const params of list) {
     if (typeof params !== 'object' || params === null || route.params.some(param => !isPathPart(route, param, (params as Record<string, unknown>)[param])))
-      throw new KayError('export-needs-params', `kay: ${file} lists ${JSON.stringify(params)} in ${name}, which needs a string for each of ${route.params.join(', ')}, with no empty, . or .. segment${route.optional ? `; ${route.optional.join(', ')} may be left out` : ''}`)
+      throw new KayError('export-needs-params', `kay: ${file} lists ${JSON.stringify(params)} in ${name}, which needs a string for each of ${route.params.join(', ')}, with no empty, . or .. segment, and no slash (a catch-all aside), backslash or NUL${route.optional ? `; ${route.optional.join(', ')} may be left out` : ''}`)
   }
 
   return list as Record<string, string>[]
 }
 
+const FILE_BREAKERS = /[\\\0]/
+
 // A segment, or for a catch-all a slash-separated run of them, that names a file inside the prerendered pages; an optional param may be left out.
+// A plain param is one segment, so it holds no slash, and none holds a backslash or a NUL, which a file system reads as a separator or an end.
 function isPathPart(route: Pick<Route, 'optional' | 'catchAll'>, param: string, value: unknown): boolean {
   if (value === undefined && route.optional?.includes(param))
     return true
 
-  return typeof value === 'string' && (param === route.catchAll ? value.split('/') : [value]).every(segment => segment !== '' && segment !== '.' && segment !== '..')
+  return typeof value === 'string' && (param === route.catchAll ? value.split('/') : [value]).every(segment => segment !== '' && segment !== '.' && segment !== '..' && !segment.includes('/') && !FILE_BREAKERS.test(segment))
 }
 
 // Whether a listed page is served in a locale: always, unless it lists a localized entry neither that locale nor the default one holds, or a page of a list that locale has fewer pages of.

@@ -231,7 +231,7 @@ export const ERRORS = {
   },
   'export-output-dir': {
     group: 'export',
-    summary: 'A static export into a directory that is the project itself, or holds files it did not write.',
+    summary: 'A static export into a directory that is the project itself, or holds files it did not write, or a file whose path would land outside it.',
     fix: { file: 'llms/prerendering.md', heading: 'Static export' },
   },
   'export-page-error': {

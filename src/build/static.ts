@@ -42,6 +42,7 @@ const FILES_AT_ONCE = 16
 const SOURCE_MAP = /\.map$/
 const PARAM_OR_REST = /(?:^|\/)(?::|\*)/
 const REST = /\*/
+const LEADING_SLASHES = /^\/+/
 // Asked of the app to render its own 404 page; no page serves it.
 const MISSING = '/_kay-static-missing'
 
@@ -57,6 +58,16 @@ export function refuseStaticConfig(config: KayConfig): void {
 
   if (config.images?.resolve)
     throw new KayError('export-unsupported-config', 'kay: a static export has no image route to resize what images.resolve looks up on each request; drop images.resolve or deploy a server')
+}
+
+// The file a page or a static file is written to, which stays inside the output however its path decodes.
+function inside(out: string, name: string): string {
+  const file = resolve(out, name.replace(LEADING_SLASHES, ''))
+
+  if (file !== out && !file.startsWith(out + sep))
+    throw new KayError('export-output-dir', `kay: ${name} would be written outside the output folder ${out}`)
+
+  return file
 }
 
 // Writes the whole site to `outdir`, as any static host serves it: every prerendered page, the browser build under `/_kay/`, the public files, the sitemap, feeds and favicons, `404.html`, and a page for each redirect.
@@ -96,8 +107,10 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
     const source = join(pagesDir, `${page.file}${copy}`)
 
     if (existsSync(source)) {
-      await mkdir(dirname(join(out, `${target}${copy}`)), { recursive: true })
-      await cp(source, join(out, `${target}${copy}`))
+      const file = inside(out, `${target}${copy}`)
+
+      await mkdir(dirname(file), { recursive: true })
+      await cp(source, file)
     }
   })))))
 
@@ -108,7 +121,7 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
 
   for (const { staticFiles } of config.extensions ?? []) {
     for (const [path, text] of Object.entries(staticFiles ?? {})) {
-      const target = join(out, path)
+      const target = inside(out, path)
 
       await mkdir(dirname(target), { recursive: true })
       await Bun.write(target, text)
@@ -134,7 +147,7 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
     if (!response.ok)
       throw new KayError('export-page-status', `kay: ${path} answered ${response.status} while exporting it; the error is logged above`)
 
-    const file = join(out, decodeURIComponent(path))
+    const file = inside(out, decodeURIComponent(path))
 
     await Bun.write(file, await response.arrayBuffer())
 

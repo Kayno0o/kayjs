@@ -103,7 +103,7 @@ const post = await findPost(ctx.params.slug) ?? ctx.notFound()
 h1 {post.title}
 ```
 
-- Each value is a string with no empty, `.` or `..` segment, a catch-all's included with its slashes.
+- Each value is a string with no empty, `.` or `..` segment, a catch-all's included with its slashes; a plain param holds no `/`, and none holds a `\` or a NUL. The export also refuses a file whose path would land outside the output folder.
 - `prerender: false` prerenders nothing.
 - A list `paginate()` from `kay/content` split lists each of its pages, for a page whose one param is optional, `blog/[[page=integer]].kay` (see content).
 
