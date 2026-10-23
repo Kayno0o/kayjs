@@ -320,7 +320,7 @@ A module without `cors` refuses every other origin. The module's rule is the onl
 
 ## Links built from data
 
-A URL bound to an `href`, `src`, `action`, `formaction`, `xlink:href`, `poster` or `data` keeps its scheme only when it is `http`, `https`, `mailto`, `tel`, `sms` or `blob`, a `data:` image, audio or video that is not SVG, or has none, as a path does. Any other, `javascript:` first, goes out as `unsafe:javascript:...`, which a browser does nothing with, on the server and in islands alike.
+A URL bound to an `href`, `src`, `action`, `formaction`, `xlink:href`, `poster` or `data` keeps its scheme only when it is `http`, `https`, `mailto`, `tel`, `sms` or `blob`, a `data:` image, audio or video that is not SVG, or a `data:` plain text, CSV, PDF or JSON file, or has none, as a path does. Any other, `javascript:` first, goes out as `unsafe:javascript:...`, which a browser does nothing with, on the server and in islands alike.
 
 ## A post from another site
 

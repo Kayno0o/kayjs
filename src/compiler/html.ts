@@ -32,18 +32,18 @@ const NEWLINE_START = /^[\r\n]/
 
 // Whether an element's content may start with a newline: not when it is static or opens with an element or a text that does not.
 function mayStartWithNewline(children: Node[], fill: string | undefined, plan: ElementPlan): boolean {
-  if (fill === 'content' || fill === 'selected')
+  if (fill === 'content')
     return true
 
   if (children.length === 0)
-    return plan.staticContent === undefined ? plan.content !== undefined : NEWLINE_START.test(plan.staticContent)
+    return plan.staticContent === undefined ? plan.content !== undefined : NEWLINE_START.test(decodeEntities(plan.staticContent))
 
   const first = childItems(children)[0]
 
   if (first === undefined || first.kind === 'element')
     return false
 
-  return first.kind !== 'text' || NEWLINE_START.test(first.text)
+  return first.kind !== 'text' || NEWLINE_START.test(decodeEntities(first.text))
 }
 
 export function htmlHelperImport(): string {

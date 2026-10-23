@@ -55,6 +55,7 @@ describe('the first newline of a pre, a listing and a textarea', () => {
     expect(element('LISTING', [{ children: '\r\nx' }]).t).toBe('<LISTING>\n\r\nx</LISTING>')
     expect(element('textarea', [{ value: '\nx' }]).t).toBe('<textarea>\n\nx</textarea>')
     expect(element('textarea', [{ defaultValue: 'x\n' }]).t).toBe('<textarea>x\n</textarea>')
+    expect(element('listing', [], () => '\nx').t).toBe('<listing>\n\nx</listing>')
     expect(element('div', [{ children: '\nx' }]).t).toBe('<div>\nx</div>')
     expect(leadingNewline('x')).toBe('x')
   })
@@ -68,6 +69,7 @@ describe('the first newline of a pre, a listing and a textarea', () => {
     expect(compiled('pre\n  | static')).not.toContain('Newline(')
     expect(compiled('pre\n  code {text}')).not.toContain('Newline(')
     expect(compiled('div {text}')).not.toContain('Newline(')
+    expect(compiled('pre\n  | &#10;x')).toContain('Newline(')
   })
 })
 
@@ -90,12 +92,14 @@ describe('a style value', () => {
     expect(styleText({ 'width};a': '1px', '--gap': '2px', 'font-size': 'calc(1px + 2px)' })).toBe('--gap:2px;font-size:calc(1px + 2px)')
     expect(styleText({ color: 'red}', background: 'url(a;b)', content: '"a;b"', font: '"open' })).toBe('background:url(a;b);content:"a;b"')
     expect(styleText('top:1px', [['color', 'red;left:0'], ['width', '2px']])).toBe('top:1px;width:2px')
+    expect(styleText({ content: '"x\n;position:fixed"', color: 'red /*', width: '1px' })).toBe('width:1px')
+    expect(styleText({ '--2xl-gap': '1px', '-webkit-line-clamp': 2 })).toBe('--2xl-gap:1px;-webkit-line-clamp:2')
   })
 })
 
 describe('safeUrl', () => {
   it('lets through the web, mail, phone, message and blob schemes, a relative URL and a media data URL', () => {
-    for (const url of ['https://a.test/', 'HTTP://a.test', 'mailto:a@b.test', 'tel:+33123', 'sms:+33123', '/path', 'path:with/colon-after-slash'.replace('path:', '/'), '?q=1', '#top', '//cdn.test/x', 'blob:https://a.test/1', 'data:image/png;base64,AAA', 'data:audio/mp3;base64,AAA'])
+    for (const url of ['https://a.test/', 'HTTP://a.test', 'mailto:a@b.test', 'tel:+33123', 'sms:+33123', '/path', 'path:with/colon-after-slash'.replace('path:', '/'), '?q=1', '#top', '//cdn.test/x', 'blob:https://a.test/1', 'data:image/png;base64,AAA', 'data:audio/mp3;base64,AAA', 'data:text/csv,a%2Cb', 'data:application/pdf;base64,AAA'])
       expect(safeUrl('href', url)).toBe(url)
   })
 

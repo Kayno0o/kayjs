@@ -149,7 +149,7 @@ export default defineConfig({
 - The swap loads a page whose cross-origin isolation differs from the current one fully, so going to and from an isolated page needs no `data-reload`.
 - A static export has no server to send them: `kay build --static` writes the page without its `security` and `reload`, which the host's own headers stand in for.
 - `inlineScriptHashes({ prefetch, dev, base, offline })` from `kay/server` gives the hashes, for a policy written elsewhere, such as by a proxy.
-- Whatever the policy, a URL with any scheme but `http`, `https`, `mailto`, `tel`, `sms` and `blob` (and `data:` image, audio and video, not SVG), such as `javascript:`, bound to an `href`, `src`, `action`, `formaction`, `xlink:href`, `poster` or `data`, as a user-supplied link would be, goes out prefixed with `unsafe:`, on the server and in islands, so following it does nothing. A relative URL has no scheme and is kept.
+- Whatever the policy, a URL with any scheme but `http`, `https`, `mailto`, `tel`, `sms` and `blob` (and `data:` image, audio and video but not SVG, plain text, CSV, PDF and JSON), such as `javascript:`, bound to an `href`, `src`, `action`, `formaction`, `xlink:href`, `poster` or `data`, as a user-supplied link would be, goes out prefixed with `unsafe:`, on the server and in islands, so following it does nothing. A relative URL has no scheme and is kept.
 - One written out as text in the template is left as it is.
 
 ### Compression
