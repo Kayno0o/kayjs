@@ -261,9 +261,9 @@ describe('the dev tool\'s database endpoints', () => {
         expect(found.status, sql).toBe(400)
       }
 
-      const unescaped = await (await query(site, switching[2]!)).json() as { error: string }
+      const escaped = await (await query(site, switching[2]!)).json() as { error: string }
 
-      expect(unescaped.error).toContain('read-write')
+      expect(escaped.error).toContain('read-write')
 
       for (const sql of ['set transaction_read_only = off', 'set transaction read write'])
         expect((await query(site, sql)).status, sql).toBe(400)
@@ -272,7 +272,7 @@ describe('the dev tool\'s database endpoints', () => {
 
       expect(insert.status).toBe(400)
       expect(await admin.unsafe(`select count(*)::int as n from ${SCHEMA}.users`)).toEqual(expect.arrayContaining([expect.objectContaining({ n: 2 })]))
-      expect((await query(site, 'select pg_terminate_backend(1)')).status).toBe(400)
+      expect(((await (await query(site, 'select pg_terminate_backend(1)')).json()) as { error: string }).error).toContain('pg_terminate_backend')
     })
 
     it('gives up on a statement past the timeout and answers the next query', async () => {
