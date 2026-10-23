@@ -610,7 +610,11 @@ export function compileMatch(match: SessionMatch): { test: (data: SessionData) =
 
   for (const [, value] of fields) {
     // The value as devalue writes it inside the stored array, such as "abc" or 7.
-    if ((typeof value === 'number' && !Number.isFinite(value)) || Object.is(value, -0))
+    if (value !== null && !['string', 'number', 'boolean'].includes(typeof value))
+      throw new KayError('config-invalid', 'kay: deleteWhere takes a function or an object with a string, number, boolean or null for each field, such as { userId: 7 }')
+
+    // A stored -0 is written as a reference, so 0 and the numbers devalue writes otherwise are read whole.
+    if (typeof value === 'number' && (!Number.isFinite(value) || value === 0))
       continue
 
     needles.push(stringify(value).slice(1, -1))

@@ -366,9 +366,33 @@ pgDescribe('pgSessions', () => {
     await rows(sql, 'INSERT INTO kay_sessions (id, data, expires) VALUES (\'broken\', \'not devalue\', 9999999999999)')
     await rows(sql, `INSERT INTO kay_sessions (id, data, expires) SELECT 'bulk' || n, '${stringify({ user: 2 })}', 9999999999999 FROM generate_series(1, 1300) AS n`)
 
-    expect(await store.deleteWhere({ user: 1 })).toBe(1)
-    expect(await store.deleteWhere({ user: 'ada' })).toBe(1)
-    expect(await store.deleteWhere({ user: 2 })).toBe(1300)
+    const sink = globalThis as Record<symbol, unknown>
+    const key = Symbol.for('kay.log')
+    const previous = sink[key]
+    const logged: string[] = []
+
+    sink[key] = (level: string, message: string) => logged.push(`${level}: ${message}`)
+
+    try {
+      expect(await store.deleteWhere({ user: 1 })).toBe(1)
+      expect(await store.deleteWhere({ user: 'ada' })).toBe(1)
+      expect(await store.deleteWhere({ user: 2 })).toBe(1300)
+
+      const odd = 'a"b\\c \u{1F600}\n\uD800'
+
+      await store.set('odd', { user: odd, ok: true }, '1h')
+      await store.set('odd2', { user: odd, ok: false }, '1h')
+      await store.set('zero', { n: -0 }, '1h')
+      expect(await store.deleteWhere({ user: odd, ok: true })).toBe(1)
+      expect(await store.deleteWhere({ user: odd })).toBe(1)
+      expect(await store.deleteWhere({ n: 0 })).toBe(1)
+    }
+    finally {
+      sink[key] = previous
+    }
+
+    // Only the match on 0, which has no text to narrow by, read the row that is not devalue.
+    expect(logged).toEqual(['warn: a stored session does not parse; deleteWhere skipped it'])
     expect(await store.get('b')).toEqual({ user: '1' })
     expect(await rows(sql, 'SELECT 1 FROM kay_sessions')).toHaveLength(2)
     await expect((async () => store.deleteWhere({}))()).rejects.toThrow('deleteWhere takes')

@@ -69,7 +69,9 @@ To end every session of one person, call `deleteWhere` on `memoryStore()` or `sq
 await store.deleteWhere({ userId: id })
 ```
 
-The object names the fields a session holds equal, a string, number, boolean or null each. The Postgres and SQLite stores only read the sessions whose stored text holds those values, so one person's sessions are found without reading the rest. A function, `data => data.userId === id`, works too and reads every live session, 500 at a time. An empty object, or one with an `undefined` value, throws instead of ending every session.
+The object names the fields a session holds equal, a string, number, boolean or null each. The SQLite and Postgres stores only read the sessions whose stored text holds those values, which a string id or a long number narrows best. A function, `data => data.userId === id`, works too and reads every live session, 500 at a time.
+
+An empty object, or one with an `undefined` value, throws instead of ending every session.
 
 ### Your own store
 

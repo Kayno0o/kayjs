@@ -604,10 +604,27 @@ describe('sessions', () => {
       expect(await store.deleteWhere({ userId: '1' })).toBe(1)
     })
 
+    it(`finds ${name} a value with escapes, a zero stored as -0, a boolean, and a match on two fields`, async () => {
+      const odd = 'a"b\\c \u{1F600}\n\uD800'
+
+      await store.set('odd', { userId: odd, ok: true }, '60s')
+      await store.set('odd2', { userId: odd, ok: false }, '60s')
+      await store.set('zero', { n: -0 }, '60s')
+      await store.set('flag', { done: true, who: 'x' }, '60s')
+      await store.set('flag2', { done: true, who: 'y' }, '60s')
+
+      expect(await store.deleteWhere({ userId: odd, ok: true })).toBe(1)
+      expect(await store.deleteWhere({ userId: odd })).toBe(1)
+      expect(await store.deleteWhere({ n: 0 })).toBe(1)
+      expect(await store.deleteWhere({ done: true, who: 'y' })).toBe(1)
+      expect(await store.deleteWhere({ done: true })).toBe(1)
+    })
+
     it(`refuses an object match ${name} that is empty or holds undefined, which would end every session or none`, async () => {
       await store.set('a', { userId: 1 }, '60s')
       await expect((async () => store.deleteWhere({}))()).rejects.toThrow('deleteWhere takes')
       await expect((async () => store.deleteWhere({ userId: undefined } as never))()).rejects.toThrow('deleteWhere takes')
+      await expect((async () => store.deleteWhere({ userId: new Date(0) } as never))()).rejects.toThrow('deleteWhere takes')
       expect(await store.get('a')).toEqual({ userId: 1 })
     })
   }
@@ -630,6 +647,20 @@ describe('sessions', () => {
     })).toBe(1300)
     expect(seen).toBe(1301)
     expect(db.query('SELECT id FROM kay_sessions').all()).toEqual([{ id: 'seed' }])
+
+    // The first page is deleted before the second is read, so a match failing past it leaves the sessions before it gone.
+    db.run(`INSERT INTO kay_sessions (id, data, expires) SELECT 'bulk' || n, ?, ${Date.now() + 60_000} FROM (WITH RECURSIVE s(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM s WHERE n < 700) SELECT n FROM s)`, [stringify({ userId: 1 })])
+
+    let read = 0
+
+    await expect((async () => store.deleteWhere((data) => {
+      if (++read > 600)
+        throw new Error('stop')
+
+      return data.userId === 1
+    }))()).rejects.toThrow('stop')
+    expect(db.query('SELECT COUNT(*) AS n FROM kay_sessions').get()).toEqual({ n: 701 - 500 })
+    db.run('DELETE FROM kay_sessions WHERE id <> \'seed\'')
 
     // A row that does not hold the value is never read, so it is not parsed nor logged.
     db.run('INSERT INTO kay_sessions (id, data, expires) VALUES (?, ?, ?)', ['broken', '{not devalue', Date.now() + 60_000])
