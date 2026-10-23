@@ -109,7 +109,8 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `redirect-chain` | warn | seo | A redirect whose target redirects again |
 | `deprecated-library-registration` | warn | deprecated | `authPages`, `authExtension` or `mailExtension` in `kay.config.ts`, from the registration 1.70 replaced |
 | `deprecated-body-limit` | warn | deprecated | `bodyLimit` in the config, an action, `api()` or a route's `detail`, now `maxSize` |
-| `deprecated-ui-prop` | warn | deprecated | `loading` of kayjs-ui's `Select`, now `busy`; `onOpen` of `ConfirmDelete`, now `onOpenChange`; `onSidebarClose` of `SplitLayout`, now `onSidebarOpenChange` |
+| `deprecated-ui-prop` | warn | deprecated | `loading` of kayjs-ui's `Select`, now `busy` |
+| `deprecated-ui-callback` | warn | deprecated | `onOpen` of kayjs-ui's `ConfirmDelete`, now `onOpenChange`, and `onSidebarClose` of `SplitLayout`, now `onSidebarOpenChange` |
 | `deprecated-page-size` | warn | deprecated | `size` in the options of kayjs-ui's `infiniteList()`, now `pageSize` |
 | `deprecated-ctx-outcome` | warn | deprecated | `ctx.failed(action)` and `ctx.succeeded(action)`, now `action.failed()` and `action.succeeded()` |
 | `deprecated-auth-method` | warn | deprecated | A kayjs-auth method called on `auth` by its old name, such as `sessions()` for `listSessions()`, or `revokeToken()` for `revokeBearerToken()`, which answers `{ ok }` |

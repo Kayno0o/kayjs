@@ -4,7 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
-- kayjs-ui's `ConfirmDelete` and `SplitLayout` report their open state like Dialog: `onOpenChange(open)` and `onSidebarOpenChange(open)` replace `onOpen` and `onSidebarClose`, which work until 1.75 and which `deprecated-ui-prop` reports ([Upgrading](upgrading.md#kayjs-ui-reports-an-open-state-with-onopenchange)).
+- kayjs-ui's `ConfirmDelete` and `SplitLayout` report their open state like Dialog: `onOpenChange(open)` and `onSidebarOpenChange(open)` replace `onOpen` and `onSidebarClose`, which work until 1.75 and which `deprecated-ui-callback` reports ([Upgrading](upgrading.md#kayjs-ui-reports-an-open-state-with-onopenchange)).
 - `kay ui eject <component>` copies one kayjs-ui component into the app and rewrites its imports, and `kay ui diff` shows what the library changed in it since ([Copy a component](../packages/ui/llms/setup.md#copy-a-component-into-the-app)).
 - A message catalog written as a const exported later, or with a group or a spread bound to a const, is read alike by `deprecated-message-key` and by the draft messages kay writes into a catalog.
 - kayjs-ui and kayjs-cms message keys drop their `Label` suffix (`ui.table.filter`, not `ui.table.filterLabel`), an old key in an app's catalog keeps winning until 1.75 and `deprecated-message-key` renames it ([Texts and languages](../packages/ui/llms/words.md))

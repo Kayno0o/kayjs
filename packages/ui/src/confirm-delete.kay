@@ -26,7 +26,7 @@ const { message, onConfirm, onOpenChange, onOpen, failure, success, refused, ton
   onConfirm: () => unknown
   // Called with `true` when the trigger is pressed, for a message that is read then rather than at render, and with `false` once the dialog or the armed pair goes, as the `onOpenChange` of Dialog.
   onOpenChange?: ((open: boolean) => unknown) | undefined
-  // The name `onOpenChange` replaced in 1.72: runs when the trigger is pressed, and is dropped in 1.75.
+  // Replaced by `onOpenChange` in 1.72, dropped in 1.75: runs when the trigger is pressed.
   onOpen?: (() => unknown) | undefined
   // Toasted when `onConfirm` throws, which leaves the dialog open, unless the call carries a message of its own: see `attempt`.
   failure: string

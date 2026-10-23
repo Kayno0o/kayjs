@@ -31,7 +31,7 @@ A `ui.*` or `cms.*` key ended in `Label` (`ui.table.filterLabel`, `cms.admin.sea
 
 ### kayjs-ui reports an open state with `onOpenChange`
 
-`ConfirmDelete(onOpen)` is `onOpenChange`, called with `true` when the trigger is pressed and with `false` once the dialog or the armed pair goes, as Dialog's is, so `onOpen={ask}` becomes `onOpenChange={open => open && ask()}`. `SplitLayout(onSidebarClose)` is `onSidebarOpenChange`, called with `false` when the back button closes the sidebar. The old names work until 1.75, and `deprecated-ui-prop` reports them; `kay upgrade` renames `onSidebarClose` where the handler is written `() => ...`, and leaves `onOpen` to you, as `onOpenChange` is called on closing too.
+`ConfirmDelete(onOpen)` is `onOpenChange`, called with `true` when the trigger is pressed and with `false` once the dialog or the armed pair goes, as Dialog's is, so `onOpen={ask}` becomes `onOpenChange={open => open && ask()}`. `SplitLayout(onSidebarClose)` is `onSidebarOpenChange`, called with `false` when the back button closes the sidebar. The old names work until 1.75, and `deprecated-ui-callback` reports them; `kay upgrade` renames `onSidebarClose` where the handler is written `() => ...`, and leaves `onOpen` to you, as `onOpenChange` is called on closing too.
 
 ## 1.71.0
 

@@ -4279,7 +4279,7 @@ describe.concurrent('kay check, unused code', () => {
     const root = await scratchProject({ 'src/routes/index.kay': page })
 
     try {
-      expect((await runCheck(root)).output.match(/deprecated-ui-prop/g)).toHaveLength(5)
+      expect((await runCheck(root)).output.match(/deprecated-ui-callback/g)).toHaveLength(5)
       await runCheck(root, '--fix')
       expect(await Bun.file(join(root, 'src/routes/index.kay')).text()).toBe(page.replace('onSidebarClose={() => ask()})\nLayout(list={ask} detail={ask} onSidebarClose={ask})', 'onSidebarOpenChange={() => ask()})\nLayout(list={ask} detail={ask} onSidebarClose={ask})'))
     }

@@ -322,4 +322,22 @@ describe('ConfirmDelete', () => {
     await settle()
     expect(states()).toBe('inline-open,inline-closed')
   })
+
+  test('reports an inline ask closed by Escape, and by a delete that went through, once each', async () => {
+    const root = await dialogs()
+    const states = () => root.querySelector('#states')!.textContent
+    const trigger = () => root.querySelector('.kui-icon-btn[aria-label="Watched inline"]')
+
+    click(trigger())
+    await settle()
+    root.querySelector('[role=group]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await settle()
+    expect(states()).toBe('inline-open,inline-closed')
+
+    click(trigger())
+    await settle()
+    click(root.querySelector('[role=group] .kui-btn-danger'))
+    await settle()
+    expect(states()).toBe('inline-open,inline-closed,inline-open,inline-closed')
+  })
 })
