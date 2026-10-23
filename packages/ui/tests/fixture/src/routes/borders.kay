@@ -1,7 +1,12 @@
 ---
+import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
+import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
+import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
 import '../app.css'
+
+const choices = [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }]
 ---
-//- One of each box the keyline token sizes, written with its class whole so its rules ship.
+//- One of each box the keyline token sizes, the components drawn by their own recipe and the rest written with their class whole so its rules ship.
 main
   div#card.kui-card
     div#card-head.kui-card-head head
@@ -15,11 +20,13 @@ main
   div#table-wrap.kui-table-wrap table
   div#section.kui-collapsible-section(data-boxed) section
   div#save-bar.kui-save-bar bar
-  div#segmented.kui-segmented choices
-  div#file-drop.kui-file-drop drop
+  Segmented#segmented(label="Choices" options={choices} value="a")
+  FileDrop#file-drop(onFiles={() => undefined})
+    @content(zone)
+      | drop {zone.dragging()}
   div#step.kui-pagination-step step
   div#chart-tooltip.kui-line-chart-tooltip chart
-  span#chip-label.kui-chip-label chip
+  ChipGroup#chips(label="Chips" options={choices} value={['a']})
   ul#icon-grid.kui-icon-grid
   div#scatter-plot.kui-scatter-chart-plot plot
   div#cropper-stage.kui-image-cropper-stage stage

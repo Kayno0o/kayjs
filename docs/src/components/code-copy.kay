@@ -11,7 +11,7 @@ const said = signal('')
 async function copy(event: MouseEvent) {
   const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('[data-copy]') : null
   const code = button?.closest('.code')?.querySelector('code')
-  const label = button?.querySelector<HTMLElement>('.kui-copy-btn-text')
+  const label = button?.querySelector<HTMLElement>('[data-part=text]')
 
   if (!label || !code)
     return

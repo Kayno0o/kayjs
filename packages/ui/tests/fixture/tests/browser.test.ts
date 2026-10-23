@@ -647,7 +647,7 @@ inBrowser('FormField in an island', () => {
       fileDrop: ['#file-drop', 'trbl'],
       step: ['#step', 'trbl'],
       chartTooltip: ['#chart-tooltip', 'trbl'],
-      chipLabel: ['#chip-label', 'trbl'],
+      chipLabel: ['#chips [data-part=label]', 'trbl'],
       iconGrid: ['#icon-grid', 'trbl'],
       scatterPlot: ['#scatter-plot', 'trbl'],
       cropperStage: ['#cropper-stage', 'trbl'],
@@ -1209,6 +1209,58 @@ inBrowser('a non-modal SidePanel and the space skin on a served page', () => {
       expect(ring.focused && (ring.outline || ring.shadow), `${name} ${JSON.stringify(ring)}`).toBe(true)
 
     expect(await page.a11y()).toEqual([])
+    expect(page.errors).toEqual([])
+  }, 120_000)
+})
+
+inBrowser('the space skin on Segmented, ChipGroup and FileDrop', () => {
+  test('draws their line in the field border, keeping the accent on a checked chip and a zone files hover', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/space')
+
+    const lines = await page.evaluate(() => {
+      const line = (selector: string) => getComputedStyle(document.querySelector(selector)!).borderTopColor
+      const probe = (colour: string) => {
+        const element = document.createElement('div')
+
+        element.style.border = `1px solid ${colour}`
+        document.body.append(element)
+
+        const resolved = getComputedStyle(element).borderTopColor
+
+        element.remove()
+
+        return resolved
+      }
+
+      return {
+        field: probe('var(--color-kui-field-border)'),
+        accent: probe('var(--color-kui-accent)'),
+        segmented: line('#segmented'),
+        checkedChip: line('#chips [data-part=chip]:has(input:checked) [data-part=label]'),
+        uncheckedChip: line('#chips [data-part=chip]:has(input:not(:checked)) [data-part=label]'),
+        idle: line('#drop'),
+      }
+    })
+
+    expect(lines.accent).not.toBe(lines.field)
+    expect(lines.segmented).toBe(lines.field)
+    expect(lines.uncheckedChip).toBe(lines.field)
+    expect(lines.idle).toBe(lines.field)
+    expect(lines.checkedChip).toBe(lines.accent)
+
+    // Files held over the zone mark it, and the accent line comes back.
+    await page.evaluate(() => {
+      const files = new DataTransfer()
+
+      // The colour change is a transition, which a read right after it would catch halfway.
+      document.querySelector<HTMLElement>('#drop')!.style.transition = 'none'
+      files.items.add(new File(['x'], 'a.txt'))
+      document.querySelector('#drop')!.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: files }))
+    })
+    await page.waitUntil(() => document.querySelector('#drop')!.hasAttribute('data-dragging'))
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector('#drop')!).borderTopColor)).toBe(lines.accent)
     expect(page.errors).toEqual([])
   }, 120_000)
 })

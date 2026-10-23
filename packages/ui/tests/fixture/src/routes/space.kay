@@ -1,8 +1,11 @@
 ---
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
+import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
+import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
 import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
 import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
+import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
 import Select from '@kaynooo/kayjs-ui/select.kay'
 import '../space.css'
 
@@ -19,3 +22,8 @@ main.starfield.flex.flex-col.items-start.gap-4.p-8
   MultiSelect(label="Planets" options={kinds} value={['post']})
   Button#key(label="Key")
   IconButton#icon-key(icon="close" label="Close")
+  Segmented#segmented(label="Kind" options={kinds} value="post")
+  ChipGroup#chips(label="Kinds" options={kinds} value={['post']})
+  FileDrop#drop(aria-label="Files" onFiles={() => undefined})
+    @content(zone)
+      | {zone.dragging() ? 'Release' : 'Drop files'}
