@@ -1255,7 +1255,7 @@ describe('the dev tool', () => {
     const dir = await scratchDir('dev-tool-env-')
     const routes = 'routes'
     const names = ['KAY_TEST_ZOOM', 'KAY_TEST_MAP_KEY', 'KAY_TEST_SESSION', 'KAY_TEST_FEED', 'KAY_TEST_REGION', 'KAY_TEST_HEX', 'KAY_TEST_AWS', 'KAY_TEST_PUBLISHABLE_KEY'] as const
-    const given = { KAY_TEST_ZOOM: '12', KAY_TEST_MAP_KEY: 'pk.123', KAY_TEST_SESSION: 'q8Zr3VxK1mT9yB2nWd5LpC7aHs4JfE6u', KAY_TEST_FEED: 'postgres://app:hunter2@db.internal/app', KAY_TEST_REGION: 'eu-west-1', KAY_TEST_HEX: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08', KAY_TEST_AWS: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY1', KAY_TEST_PUBLISHABLE_KEY: 'pk_live_abc' }
+    const given = { KAY_TEST_ZOOM: '12', KAY_TEST_MAP_KEY: 'pk.123', KAY_TEST_SESSION: 'q8Zr3VxK1mT9yB2nWd5LpC7aHs4JfE6u', KAY_TEST_FEED: 'postgres://db.internal/app', KAY_TEST_REGION: 'eu-west-1', KAY_TEST_HEX: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08', KAY_TEST_AWS: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY1', KAY_TEST_PUBLISHABLE_KEY: 'pk_live_abc' }
 
     await Bun.write(join(dir, 'routes/index.kay'), 'p Home\n')
     Object.assign(process.env, given)
@@ -1268,7 +1268,10 @@ describe('the dev tool', () => {
     const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string) => {
       asked.push(url)
 
-      return app.handle(new Request(`http://localhost${url}`))
+      const answer = await app.handle(new Request(`http://localhost${url}`))
+
+      // The server refuses to send an address with a password in it, so a server that did (an older kay) is stood in for here.
+      return url === '/_kay/env.js' && answer.ok ? new Response((await answer.text()).replace('postgres://db.internal/app', 'postgres://app:hunter2@db.internal/app'), answer) : answer
     }) as unknown as typeof window.fetch)
     const flag = (row: Element) => {
       if (row.querySelector('.issue'))

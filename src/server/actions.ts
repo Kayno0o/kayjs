@@ -18,7 +18,6 @@ import { joinBase } from '../runtime/base'
 import { escapeAttribute } from '../runtime/escape'
 import { formInput } from '../runtime/form'
 import { localeState, runInLocale } from '../runtime/locale-state'
-import { kayLog } from '../runtime/log'
 import { configuredSite } from '../runtime/site'
 import { sizeText } from '../runtime/size-text'
 import { FAILURE_HEADER, NAVIGATE_HEADER, PAGE_HEADER, REDIRECT_HEADER } from '../runtime/swap'
@@ -37,7 +36,7 @@ import { answeringRequest } from './log'
 import { countSucceeded, isAgentCall, markChallenge, PRETEND, protectionRefusal, requestId } from './protection'
 import { sharedContext } from './render'
 import { reportServerError } from './report'
-import { requestUrl } from './request-url'
+import { overHttps, requestUrl } from './request-url'
 import { guardUrl } from './routes'
 import { fieldOf } from './schema-check'
 import { readPersonally } from './scope'
@@ -102,11 +101,6 @@ const TEXT = 'text/plain; charset=utf-8'
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 // What a post from the site's own pages carries in `Sec-Fetch-Site`; `none` is the user's own doing, such as a bookmark.
 const SAME_SITE_FETCH = new Set(['same-origin', 'none'])
-// The first proxy's `X-Forwarded-Proto` saying the browser came over https.
-const FORWARDED_HTTPS = /^\s*https\s*(?:,|$)/i
-// A server tried on this machine, which may well run over plain http.
-const LOCAL_HOST = /^(?:localhost|127\.\d+\.\d+\.\d+|\[::1\])$/
-let warnedScheme = false
 
 // What describes the post's body, or would have the page come back compressed or as a call.
 const POST_HEADERS = ['content-type', 'content-length', 'transfer-encoding', 'accept-encoding', 'x-kay-action', PAGE_HEADER, 'origin']
@@ -565,35 +559,6 @@ function crossSiteOnce(request: Request, site: string | undefined): boolean {
   crossSiteAnswers.set(request, { site, crossSite })
 
   return crossSite
-}
-
-// Over https, kay's cookies never travel in clear; behind a proxy, `X-Forwarded-Proto` says how the browser came, and without one, in production, an https `site` in kay.config.ts stands in, for a proxy that does not pass it on.
-export function overHttps(request: Request): boolean {
-  if (requestUrl(request).protocol === 'https:')
-    return true
-
-  const forwarded = request.headers.get('x-forwarded-proto')
-
-  if (forwarded !== null)
-    return FORWARDED_HTTPS.test(forwarded)
-
-  if (process.env.NODE_ENV !== 'production')
-    return false
-
-  const site = configuredSite()
-
-  if (!site)
-    warnUnknownScheme(request)
-
-  return site?.origin.startsWith('https:') === true
-}
-
-function warnUnknownScheme(request: Request): void {
-  if (warnedScheme || LOCAL_HOST.test(requestUrl(request).hostname))
-    return
-
-  warnedScheme = true
-  kayLog('warn', 'a request came over http with no X-Forwarded-Proto and kay.config.ts sets no site, so kay\'s cookies go out without Secure and the session\'s without __Host-; behind a proxy, have it pass X-Forwarded-Proto, or set site to the https address')
 }
 
 export function inLocale<T>(request: Request, options: ActionOptions, run: () => T): T {
