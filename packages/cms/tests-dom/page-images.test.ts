@@ -1,10 +1,10 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Editor from '../src/editor/editor.kay'
 import { sameBar } from '../src/editor/image-bar'
 import { EDITOR_LAYER } from '../src/editor/layer'
 import { OWN } from '../src/editor/own'
-import Editor from '../src/editor/editor.kay'
 import { EDITOR_COOKIE } from '../src/page-link'
 
 const SCHEMA = {
