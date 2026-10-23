@@ -74,14 +74,32 @@ export function keyOf(property: t.ObjectProperty): string | undefined {
   return property.key.type === 'NumericLiteral' ? String(property.key.value) : undefined
 }
 
-// The classes a literal gives: a string, or a template with nothing interpolated.
-export function classesOf(node: t.Node): string | undefined {
+// The classes a literal gives: a string, or a template whose expressions are all names `lookup` answers.
+export function classesOf(node: t.Node, lookup?: (name: string) => string | undefined): string | undefined {
   const value = unwrapped(node)
 
   if (value.type === 'StringLiteral')
     return value.value
 
-  return value.type === 'TemplateLiteral' && value.expressions.length === 0 ? value.quasis[0]?.value.cooked ?? undefined : undefined
+  if (value.type === 'Identifier')
+    return lookup?.(value.name)
+
+  if (value.type !== 'TemplateLiteral')
+    return undefined
+
+  let text = value.quasis[0]?.value.cooked ?? undefined
+
+  for (const [index, expression] of value.expressions.entries()) {
+    const part = classesOf(expression, lookup)
+    const after = value.quasis[index + 1]?.value.cooked
+
+    if (text === undefined || part === undefined || after === undefined || after === null)
+      return undefined
+
+    text += part + after
+  }
+
+  return text
 }
 
 // An object literal of properties named by plain keys, each handed to `each`; anything else is reported where it stands.

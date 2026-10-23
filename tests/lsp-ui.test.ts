@@ -13,6 +13,7 @@ import { scratchDir } from './scratch'
 const checkout = join(import.meta.dir, '..')
 const cli = join(checkout, 'src', 'cli.ts')
 const card = join(checkout, 'packages', 'ui', 'src', 'card.kay')
+const menu = join(checkout, 'packages', 'ui', 'src', 'menu.kay')
 
 describe('the cursor in an object literal', () => {
   it('finds the keys around it and whether it is at a key or in a string', () => {
@@ -89,6 +90,25 @@ describe('what a component offers src/ui.ts', () => {
     expect(recipeParts('--- \nconst look = recipe({ parts: \'a b\' })\n---\ndiv')).toEqual({ root: 'a b' })
     expect(recipeParts('---\nconst look = recipe({ parts: { root: `x y`, head: cx(\'z\') } })\n---\ndiv')).toEqual({ root: 'x y' })
     expect(recipeParts('---\nconst a = 1\n---\ndiv')).toEqual({})
+  })
+
+  it('follows a relative-imported string constant and a template made of constants and literals', async () => {
+    const dir = await scratchDir('ui-constants-')
+
+    await writeFile(join(dir, 'look.ts'), 'const BOX = \'flex gap-2\'\nexport const LIST = \'p-1\'\nexport const ITEM = `${BOX} text-sm`\n')
+
+    const source = '---\nimport { ITEM, LIST } from \'./look\'\nconst PICK = \'x\'\nconst look = recipe({ parts: { list: LIST, item: `${ITEM} ${PICK} y`, bad: MISSING, mixed: `${ITEM} ${call()}` } })\n---\ndiv'
+
+    expect(recipeParts(source, join(dir, 'a.kay'))).toEqual({ list: 'p-1', item: 'flex gap-2 text-sm x y' })
+    expect(recipeParts(source)).toEqual({})
+  })
+
+  it('reads the Menu list and item base classes from menu-look', () => {
+    const parts = styleInfo(menu)?.parts
+
+    expect(parts?.find(part => part.name === 'list')?.classes).toBe('flex flex-col gap-px p-1 outline-none')
+    expect(parts?.find(part => part.name === 'item')?.classes).toStartWith('flex w-full cursor-pointer')
+    expect(parts?.find(part => part.name === 'item')?.classes).toEndWith('data-danger:text-kui-error disabled:cursor-default disabled:opacity-50')
   })
 
   it('reads the theme tokens from the library and ties a component\'s classes to them', () => {

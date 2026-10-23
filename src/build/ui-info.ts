@@ -1,10 +1,11 @@
 import type * as t from '@babel/types'
 import type { KayLibrary } from './libraries'
-import { readFileSync, realpathSync, statSync } from 'node:fs'
-import { relative, sep } from 'node:path'
+import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
+import { dirname, relative, resolve, sep } from 'node:path'
 import { parse } from '@babel/parser'
 import { offered } from '../check/ui'
 import { componentName } from '../compiler'
+import { constBindings } from '../compiler/object-literal'
 import { parseKay } from '../compiler/parser'
 import { findKayFiles } from './files'
 import { classesOf, keyOf } from './ui'
@@ -163,8 +164,69 @@ function recipeConfig(node: t.Node | null | undefined): t.ObjectExpression | und
   return config?.type === 'ObjectExpression' ? config : undefined
 }
 
+const MODULE_ENDINGS = ['', '.ts', '/index.ts']
+// How many imports deep a constant is followed.
+const CONSTANT_DEPTH = 4
+
+// The string constants a module's names stand for: its own top-level consts, and the ones it imports from a relative module, read lazily.
+function constantsOf(program: t.Program, dir: string, depth: number): (name: string) => string | undefined {
+  const bindings = constBindings(program)
+  const imports = new Map<string, { from: string, name: string }>()
+  const seen = new Set<string>()
+
+  for (const statement of program.body) {
+    if (statement.type !== 'ImportDeclaration' || !statement.source.value.startsWith('.'))
+      continue
+
+    for (const specifier of statement.specifiers) {
+      if (specifier.type === 'ImportSpecifier')
+        imports.set(specifier.local.name, { from: statement.source.value, name: specifier.imported.type === 'Identifier' ? specifier.imported.name : specifier.imported.value })
+    }
+  }
+
+  const lookup = (name: string): string | undefined => {
+    const bound = bindings.get(name)
+
+    if (bound !== undefined) {
+      if (seen.has(name))
+        return undefined
+
+      seen.add(name)
+
+      try {
+        return classesOf(bound, lookup)
+      }
+      finally {
+        seen.delete(name)
+      }
+    }
+
+    const imported = imports.get(name)
+
+    if (imported === undefined || depth >= CONSTANT_DEPTH)
+      return undefined
+
+    const base = resolve(dir, imported.from)
+    const file = MODULE_ENDINGS.map(ending => base + ending).find(candidate => existsSync(candidate) && statSync(candidate).isFile())
+
+    if (file === undefined)
+      return undefined
+
+    try {
+      const module = parse(readFileSync(file, 'utf8'), { sourceType: 'module', plugins: ['typescript'], errorRecovery: true })
+
+      return constantsOf(module.program, dirname(file), depth + 1)(imported.name)
+    }
+    catch {
+      return undefined
+    }
+  }
+
+  return lookup
+}
+
 // The base classes of each part in the literal `recipe({ parts })` of a component's script: a string is the root's.
-export function recipeParts(source: string): Record<string, string> {
+export function recipeParts(source: string, file?: string): Record<string, string> {
   const script = parseKay(source).script
   const found: Record<string, string> = {}
 
@@ -180,6 +242,8 @@ export function recipeParts(source: string): Record<string, string> {
     return found
   }
 
+  const lookup = file === undefined ? undefined : constantsOf(ast.program, dirname(file), 0)
+
   for (const statement of ast.program.body) {
     if (statement.type !== 'VariableDeclaration')
       continue
@@ -191,7 +255,7 @@ export function recipeParts(source: string): Record<string, string> {
       if (parts === undefined)
         continue
 
-      const whole = classesOf(parts)
+      const whole = classesOf(parts, lookup)
 
       if (whole !== undefined) {
         found.root = whole
@@ -199,7 +263,7 @@ export function recipeParts(source: string): Record<string, string> {
       else if (parts.type === 'ObjectExpression') {
         for (const property of parts.properties) {
           const name = property.type === 'ObjectProperty' ? keyOf(property) : undefined
-          const classes = property.type === 'ObjectProperty' ? classesOf(property.value) : undefined
+          const classes = property.type === 'ObjectProperty' ? classesOf(property.value, lookup) : undefined
 
           if (name !== undefined && classes !== undefined)
             found[name] = classes
@@ -222,7 +286,7 @@ export function styleInfo(file: string): StyleInfo | undefined {
       return undefined
 
     const source = readFileSync(file, 'utf8')
-    const base = recipeParts(source)
+    const base = recipeParts(source, file)
     const script = parseKay(source).script
 
     return { name: componentName(file), file, parts: [...new Set([...found.parts, ...Object.keys(base)])].map(name => ({ name, classes: base[name] ?? '' })), variants: found.variants ?? {}, recipe: script !== undefined && RECIPE_CALL.test(source.slice(script.start, script.end)) }
