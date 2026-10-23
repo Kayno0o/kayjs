@@ -5,6 +5,7 @@ import process from 'node:process'
 import { $ } from 'bun'
 import { describe, expect, it } from 'bun:test'
 import { addedMarkers } from '../scripts/merge-markers'
+import { SOURCE_CHANGE, SOURCE_READERS, SOURCE_SCAN } from '../scripts/source-readers'
 import { subprocessTests } from '../scripts/subprocess-tests'
 import { scratchDir } from './scratch'
 
@@ -371,5 +372,26 @@ describe('tests running kay in a subprocess', () => {
 
   it('leave out a test whose own imports already reach the change', async () => {
     expect(await subprocessTests(ROOT, ['src/check/index.ts'])).not.toContain('tests/check.test.ts')
+  })
+})
+
+describe('tests scanning the sources as files', () => {
+  it('are all listed, so a landing changing a source runs them', async () => {
+    const scanning: string[] = []
+
+    for await (const test of new Bun.Glob('tests/*.test.ts').scan(ROOT)) {
+      if (SOURCE_SCAN.test(await Bun.file(join(ROOT, test)).text()))
+        scanning.push(test)
+    }
+
+    expect(scanning.toSorted()).toEqual([...SOURCE_READERS].toSorted())
+  })
+
+  it('are reached by a source of kay or of a library, and by nothing else', () => {
+    for (const path of ['src/server/preview.ts', 'src/runtime/dom.ts', 'packages/ui/src/button.kay', 'packages/cms/src/server/pg-store.ts'])
+      expect(SOURCE_CHANGE.test(path)).toBe(true)
+
+    for (const path of ['llms/lints.md', 'tests/land.test.ts', 'packages/ui/llms.txt', 'packages/ui/tests/button.test.ts', 'src/server/codec/avif-enc.wasm'])
+      expect(SOURCE_CHANGE.test(path)).toBe(false)
   })
 })

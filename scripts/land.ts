@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { $, Glob } from 'bun'
 import { addedMarkers } from './merge-markers'
+import { SOURCE_CHANGE, SOURCE_READERS } from './source-readers'
 import { subprocessTests } from './subprocess-tests'
 import { failedTests } from './test-failures'
 
@@ -27,6 +28,8 @@ const READERS: [RegExp, string[]][] = [
   [/^docs\//, ['tests/docs.test.ts', 'tests/examples.test.ts']],
   [/^examples\//, ['tests/examples.test.ts', 'tests/new.test.ts', 'tests/docs.test.ts']],
   [/^packages\//, ['tests/llms.test.ts', 'tests/packages.test.ts', 'tests/docs.test.ts', 'tests/examples.test.ts', 'tests/library.test.ts', 'tests/new.test.ts']],
+  // Tests globbing the kay and library sources.
+  [SOURCE_CHANGE, SOURCE_READERS],
   [/^tests\/fixtures\//, ['tests/format.test.ts']],
   // Greps every tracked file for the private forge domain.
   [/^/, ['tests/public-repo.test.ts']],
