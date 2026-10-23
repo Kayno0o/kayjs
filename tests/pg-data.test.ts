@@ -896,6 +896,8 @@ async function refusal(call: () => Promise<unknown>): Promise<Error | undefined>
   catch (error) {
     return error as Error
   }
+
+  return undefined
 }
 
 pgDescribe('pgData app identity', () => {

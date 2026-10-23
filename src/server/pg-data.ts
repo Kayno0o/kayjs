@@ -4,7 +4,7 @@ import type { PgIndex, PgJobsSource } from './pg-jobs'
 import type { DeletableSessionStore } from './session'
 import { appName, claimDatabase, DatabaseOwnedError } from './app-identity'
 import { pgCache } from './pg-cache'
-import { connectionOf, createJobTables, createMissingIndexes, indexStatement, jobTables, pgJobs, privilegeRefused, relationsMissing, withMissingIndexes } from './pg-jobs'
+import { connectionOf, createJobTables, createMissingIndexes, indexStatement, jobsAfter, jobTables, privilegeRefused, relationsMissing, withMissingIndexes } from './pg-jobs'
 import { pgLive } from './pg-live'
 import { pgRooms } from './pg-rooms'
 import { query } from './pg-sql'
@@ -174,5 +174,5 @@ export function pgData(source: PgJobsSource) {
 
   const handle = pgHandle(db)
 
-  return { sessions: pgSessions(handle), cache: pgCache(handle), jobs: pgJobs(db, async () => handle.db()), rates: pgRates(handle), rooms: pgRooms(handle), vitals: pgVitals(handle), live: pgLive(handle), ...typeof source === 'string' && { database: source }, notifications: pgNotifications(handle), ready: async () => refuseOwned(handle) } satisfies { [Kind in Exclude<keyof AppStore, 'database'>]-?: NonNullable<AppStore[Kind]> } & { sessions: DeletableSessionStore }
+  return { sessions: pgSessions(handle), cache: pgCache(handle), jobs: jobsAfter(db, async () => handle.db()), rates: pgRates(handle), rooms: pgRooms(handle), vitals: pgVitals(handle), live: pgLive(handle), ...typeof source === 'string' && { database: source }, notifications: pgNotifications(handle), ready: async () => refuseOwned(handle) } satisfies { [Kind in Exclude<keyof AppStore, 'database'>]-?: NonNullable<AppStore[Kind]> } & { sessions: DeletableSessionStore }
 }
