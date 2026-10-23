@@ -64,7 +64,9 @@ export const banner = live('', { ttl: '1h' })
 export const typing = live((room: string) => 0, { ttl: '10s' })
 ```
 
-Once the time passes, every process reads what the declaration gives again, as after a `delete`, and the tabs showing the value are told. A `set` starts the time again, even with the value it already holds, and each key of a keyed value has its own. A value stored before you gave the declaration a `ttl` is forgotten that long after the deploy that did. The memory, SQLite and Postgres stores all honour it. The options must be an object written in the declaration, so the build can name the value after it.
+Once the time passes, every process reads what the declaration gives again, as after a `delete`, and the tabs showing the value are told. A `set` starts the time again, even with the value it already holds, and each key of a keyed value has its own. The memory, SQLite and Postgres stores all honour it. The options must be an object written in the declaration, so the build can name the value after it.
+
+A value stored before you gave the declaration a `ttl` is forgotten that long after the deploy that did.
 
 A SQLite file or Postgres table made by an older version gains an `expires_at` column the first time the store opens it. When your Postgres role may not alter tables, run `createDataTables(db)` again as the owner.
 

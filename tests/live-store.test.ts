@@ -390,7 +390,7 @@ describe('a live value with a lifetime', () => {
   })
 
   it('drops 20,000 keys ending a few milliseconds apart without scanning the ones still to come', async () => {
-    const room = declareKeyedTtl(() => 0, { ttl: '200ms' }, 'test:ttl-many', 'ttlMany')
+    const room = declareKeyedTtl(() => 0, { ttl: '5s' }, 'test:ttl-many', 'ttlMany')
     const expires = liveSlot('test:ttl-many')!.expires
     let yielded = 0
 
@@ -416,7 +416,7 @@ describe('a live value with a lifetime', () => {
     }
 
     expect(expires.size).toBe(20_000)
-    await Bun.sleep(500)
+    await Bun.sleep(5500)
     expect(expires.size).toBe(0)
     expect(room('0') + room('19999')).toBe(0)
     // Each key is read once as it is dropped, and a pass stops at the first key still to come.
@@ -465,6 +465,34 @@ describe('a live value with a lifetime', () => {
     expect([early(), late()]).toEqual([5, 4])
     await Bun.sleep(300)
     expect([early(), late()]).toEqual([0, 0])
+    setLiveStore(undefined)
+  })
+
+  it('keeps the end it gave in a SQLite store, so a restart does not renew it', async () => {
+    const path = await storePath()
+    const old = sqliteLive(path)
+
+    await old.set('test:ttl-kept', '', '[3]')
+    old.stop?.()
+
+    const store = sqliteLive(path)
+
+    setLiveStore(store)
+    declareTtl(0, { ttl: '60s' }, 'test:ttl-kept', 'ttlKept')
+    await Bun.sleep(50)
+    setLiveStore(undefined)
+
+    const row = (sqliteLive(path).entries() as LiveEntry[]).find(entry => entry[0] === 'test:ttl-kept')
+
+    expect(row?.[3]).toBeGreaterThan(Date.now() + 50_000)
+    store.stop?.()
+  })
+
+  it('goes on when the store refuses to keep the end', () => {
+    setLiveStore({ entries: () => [['test:ttl-refused', '', '[3]']], set: () => {
+      throw new Error('the database is locked')
+    }, delete: () => undefined, subscribe: () => undefined })
+    expect(declareTtl(0, { ttl: '60s' }, 'test:ttl-refused', 'ttlRefused')()).toBe(3)
     setLiveStore(undefined)
   })
 

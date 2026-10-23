@@ -107,7 +107,7 @@ interface ServerSlot {
   ttl: number | undefined
   // When each value held with an end is forgotten, in milliseconds; a read past it gives what the declaration gives, and the timer drops it and tells the watchers.
   expires: Map<string, number>
-  // Whether `expires` is ordered by end, as local writes keep it, so the timer reads only its first keys; an end heard out of order clears it until the next pass sorts the map. `latest` is the highest end appended.
+  // Whether `expires` is ordered by end, as local writes keep it, so the timer reads only its first keys; an end heard out of order clears it until the next pass sorts the map. `latest` is an upper bound of the ends held.
   ordered: boolean
   latest: number
   timer: { handle: ReturnType<typeof setTimeout>, at: number } | undefined
@@ -186,12 +186,9 @@ function armExpiry(slot: ServerSlot, lowest?: number): void {
   if (slot.timer !== undefined || slot.expires.size === 0)
     return
 
-  if (lowest === undefined) {
-    sortExpiry(slot)
-    lowest = slot.expires.values().next().value!
-  }
+  sortExpiry(slot)
 
-  const next = lowest
+  const next = lowest ?? slot.expires.values().next().value!
   const handle = setTimeout(() => {
     slot.timer = undefined
     dropExpired(slot)
@@ -208,18 +205,26 @@ function dropExpired(slot: ServerSlot): void {
 
   sortExpiry(slot)
 
+  const gone: string[] = []
+
   for (const [key, at] of slot.expires) {
     // In order of end, so the first one still to come ends the pass.
     if (at > now)
       break
 
+    gone.push(key)
+  }
+
+  for (const key of gone)
     slot.expires.delete(key)
 
+  armExpiry(slot)
+
+  // After the map is settled, as a watcher may write a value of the slot.
+  for (const key of gone) {
     if (slot.values.delete(key))
       notify(slot, key)
   }
-
-  armExpiry(slot)
 }
 
 // Calls `listener` whenever the key changes; gives what stops it.
@@ -551,15 +556,22 @@ function hear(id: string, key: string, text: string | undefined, atStart = false
   notify(slot, key)
 }
 
-// The end of a value the store holds without one, though its declaration has a `ttl` now (it was stored before): the lifetime counts from the first time this process reads it, and the store keeps that end so a restart does not renew it. Only rows read at the start are given one, so a store that ignores the end cannot make processes rewrite a row at each other.
+// The end of a value the store holds without one, though its declaration has a `ttl` now (it was stored before): the lifetime counts from the first time this process reads it, and the store keeps that end so a restart does not renew it. Only rows read at the start, or heard before their declaration, are given one, so a store that ignores the end cannot make processes rewrite a row at each other. The write-back is the text read, so a value another replica sets in that instant is overwritten: a window open only on the first deploy giving the value a `ttl`.
 function stamped(slot: ServerSlot, key: string, text: string): number | undefined {
   if (slot.ttl === undefined)
     return undefined
 
   const expiresAt = Date.now() + slot.ttl
 
-  if (shared(slot))
-    sendToStore(slot.id, key, (store): void | Promise<void> => store.set(slot.id, key, text, expiresAt))
+  if (shared(slot)) {
+    try {
+      sendToStore(slot.id, key, (store): void | Promise<void> => store.set(slot.id, key, text, expiresAt))
+    }
+    catch (error) {
+      // A store may refuse a write; the end stays local, and the next start tries again.
+      kayLog('error', `the end of the live value ${slot.id} could not be written to the store`, error)
+    }
+  }
 
   return expiresAt
 }
