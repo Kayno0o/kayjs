@@ -824,6 +824,11 @@ describe('kay new', () => {
       // On the Bun that scaffolded it, rather than whatever is latest when it builds.
       expect(await Bun.file(join(dir, 'Dockerfile')).text()).toStartWith(`FROM oven/bun:${Bun.version} AS build\n`)
       expect(await Bun.file(join(dir, '.forgejo/workflows/test.yml')).text()).toContain(`bun-version: ${Bun.version}\n`)
+      // Base images by digest, and the app container with no capability nor privilege gain.
+      expect(await Bun.file(join(dir, 'Dockerfile')).text()).toMatch(/^FROM debian:bookworm-slim@sha256:[0-9a-f]{64}$/m)
+      expect(compose).toMatch(/image: postgres:18-alpine@sha256:[0-9a-f]{64}/)
+      expect(compose).toContain('cap_drop: [ALL]')
+      expect(compose).toContain('no-new-privileges:true')
       expect(await Bun.file(join(dir, '.env.example')).text()).toMatch(/\nKAY_SECRET=\nSITE_URL=\nPOSTGRES_PASSWORD=\nAPP_DB_PASSWORD=\n$/)
 
       await installKay(dir)
@@ -986,7 +991,7 @@ describe('kay new', () => {
 
           expect({ features, br: dockerfile.includes('-name \'*.br\' -delete'), include: dockerfile.includes('COPY --from=build /app/kay-headers.conf /etc/nginx/kay-headers.conf') }).toEqual({ features, br: true, include: true })
           // The container runs unprivileged: the image that does, on a port above 1024.
-          expect({ features, image: (/^FROM nginxinc\/nginx-unprivileged:\d/m).test(dockerfile), port: nginx.includes('listen 8080;') }).toEqual({ features, image: true, port: true })
+          expect({ features, image: (/^FROM nginxinc\/nginx-unprivileged:\d[^@\n]*@sha256:[0-9a-f]{64}$/m).test(dockerfile), port: nginx.includes('listen 8080;') }).toEqual({ features, image: true, port: true })
           // The 404 page the export writes comes from a `_404.kay`, which the starter or the container brings.
           expect({ features, notFound: nginx.includes('error_page 404 /404.html'), page: 'src/routes/_404.kay' in contents }).toEqual({ features, notFound: true, page: true })
         }

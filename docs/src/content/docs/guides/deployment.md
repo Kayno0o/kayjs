@@ -82,7 +82,7 @@ RUN bun install --frozen-lockfile
 COPY . .
 RUN bun run compile
 
-FROM debian:bookworm-slim
+FROM debian:bookworm-slim@sha256:7ff6ba31527b9e336162fa061746c366c4b2032f4d2cff2078bea43f78efe3f8
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates \
   && rm -rf /var/lib/apt/lists/*
@@ -95,7 +95,11 @@ HEALTHCHECK --interval=30s --timeout=6s CMD ["./server", "--health"]
 CMD ["./server"]
 ```
 
-Its `compose.prod.yaml` publishes the app on `127.0.0.1:3000` alone, for the reverse proxy serving it over HTTPS, and its `kay.config.ts` sets `proxy: true` so that rate limits count each visitor. The image has no curl, so `./server --health` checks the health route and exits with 0 or 1. It waits as long as `health.timeout` says, but the `HEALTHCHECK --timeout=6s` above cuts it off, so raise its `--timeout` yourself when you raise `health.timeout` past 5 s.
+The base images of the Dockerfile and the compose files are pinned by digest, so a build gets the bytes `kay new` reviewed. Refresh one with `docker buildx imagetools inspect <tag>`.
+
+Its `compose.prod.yaml` drops every Linux capability of the app and forbids a privilege gain (`cap_drop: [ALL]`, `no-new-privileges`). It publishes the app on `127.0.0.1:3000` alone, for the reverse proxy serving it over HTTPS, and its `kay.config.ts` sets `proxy: true` so that rate limits count each visitor.
+
+The image has no curl, so `./server --health` checks the health route and exits with 0 or 1. It waits as long as `health.timeout` says, but the `HEALTHCHECK --timeout=6s` above cuts it off, so raise its `--timeout` yourself when you raise `health.timeout` past 5 s.
 
 Its compose also requires `SITE_URL`, which `.env.example` lists. Without an https `SITE_URL` production sends no HSTS and writes no canonical URLs.
 

@@ -16,6 +16,11 @@ export interface ConfigSettings {
 // Where the project's repository is hosted, which decides the CI it is scaffolded with.
 export type Host = 'forgejo' | 'github'
 
+// Base images by tag and digest, so a build gets the bytes reviewed here whatever the tag moves to; refresh the digest with `docker buildx imagetools inspect <tag>`.
+const POSTGRES_IMAGE = 'postgres:18-alpine@sha256:898c60cb390d1085bc97bdd6a1ae968757421df394b071848b52b1c09c89d6a5'
+const RUNTIME_IMAGE = 'debian:bookworm-slim@sha256:7ff6ba31527b9e336162fa061746c366c4b2032f4d2cff2078bea43f78efe3f8'
+const NGINX_IMAGE = 'nginxinc/nginx-unprivileged:1.31-alpine@sha256:b5047b9b76845eac124358373c6852377c52e4b05834a47647e955dd91cb8f1e'
+
 // The runner label each host's jobs run on unless `kay new --runner` names another.
 export const DEFAULT_RUNNERS: Record<Host, string> = { forgejo: 'debian', github: 'ubuntu-latest' }
 
@@ -395,7 +400,7 @@ jobs:
       ? `
     services:
       postgres:
-        image: postgres:18-alpine
+        image: ${POSTGRES_IMAGE}
         env:
           POSTGRES_USER: app
           POSTGRES_PASSWORD: app
@@ -542,7 +547,7 @@ SQL
 // The app connects as app_rw, which reads and writes rows; the owner role stays with the migrations.
 const APP_COMPOSE = `services:
   db:
-    image: postgres:18-alpine
+    image: ${POSTGRES_IMAGE}
     restart: unless-stopped
     environment:
       POSTGRES_USER: app
@@ -576,6 +581,9 @@ const APP_COMPOSE = `services:
   app:
     build: .
     restart: unless-stopped
+    # The app needs no capability nor a privilege gain: it listens above 1024 as an unprivileged user.
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     # This machine alone: the reverse proxy in front serves the site over HTTPS.
     ports:
       - 127.0.0.1:3000:3000
@@ -598,6 +606,9 @@ const SQLITE_COMPOSE = `services:
   app:
     build: .
     restart: unless-stopped
+    # The app needs no capability nor a privilege gain: it listens above 1024 as an unprivileged user.
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     # This machine alone: the reverse proxy in front serves the site over HTTPS.
     ports:
       - 127.0.0.1:3000:3000
@@ -630,7 +641,7 @@ RUN bun install --frozen-lockfile
 COPY . .
 RUN bun run compile
 
-FROM debian:bookworm-slim
+FROM ${RUNTIME_IMAGE}
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /app/server ./server
@@ -647,6 +658,9 @@ CMD ["./server"]
   app:
     build: .
     restart: unless-stopped
+    # The app needs no capability nor a privilege gain: it listens above 1024 as an unprivileged user.
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     # This machine alone: the reverse proxy in front serves the site over HTTPS.
     ports:
       - 127.0.0.1:3000:3000
@@ -672,7 +686,7 @@ COPY . .
 RUN bun install --frozen-lockfile && bun run build && find dist -name '*.br' -delete && mv dist/headers.nginx.conf kay-headers.conf && rm -f dist/_headers
 
 # The unprivileged build runs as a user of its own and listens on 8080, so the container needs no root nor a port below 1024.
-FROM nginxinc/nginx-unprivileged:1.31-alpine
+FROM ${NGINX_IMAGE}
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY --from=build /app/kay-headers.conf /etc/nginx/kay-headers.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf
@@ -778,7 +792,7 @@ export default defineConfig({
     'compose.dev.yaml': `# The database for development and tests: \`docker compose up -d --wait\`, which .env points at this file. Tests copy a database per test file on it.
 services:
   db:
-    image: postgres:18-alpine
+    image: ${POSTGRES_IMAGE}
     restart: unless-stopped
     environment:
       POSTGRES_USER: app
