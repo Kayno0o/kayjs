@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-ui's `Combobox` list is named by the FormField label as its input is, and `ZoomPane` takes `+ - = 0` and the arrows only when the pane itself has focus, so a field inside it keeps them ([Media](../packages/ui/llms/charts-drag-and-media.md)).
 - kayjs-ui's `SplitLayout` on a phone makes the list and detail `inert` under the open sidebar overlay, focuses a pane when it opens and gives focus back when it closes ([Page layout](../packages/ui/llms/page-layout-palette-and-trees.md)).
 - kayjs-ui's `MarkdownEditor` preview puts the HTML it is given through `sanitizeHtml`, so a script, handler or `javascript:` link in the text never runs; `previewTrusted` keeps the old insert-as-is for a renderer that sanitizes already ([Forms](../packages/ui/llms/forms.md)).
 - kayjs-ui's `ConfirmDelete` and `SplitLayout` report their open state like Dialog: `onOpenChange(open)` and `onSidebarOpenChange(open)` replace `onOpen` and `onSidebarClose`, which work until 1.75 and which `deprecated-ui-callback` reports ([Upgrading](upgrading.md#kayjs-ui-reports-an-open-state-with-onopenchange)).

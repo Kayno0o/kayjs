@@ -348,6 +348,7 @@ test('keeps its status line and its rows out of the name a FormField gives the i
 
   expect(named.trim()).toBe('Planet')
   expect(root.querySelector('[role="status"]')?.textContent).toBe('3 results')
+  expect(root.querySelector('[role="listbox"]')?.getAttribute('aria-labelledby')).toBe(input.getAttribute('aria-labelledby'))
 })
 
 test('Escape on an open list with no row closes it and leaves the press to an enclosing dialog', async () => {

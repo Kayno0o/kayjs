@@ -160,6 +160,10 @@ const KEYS: Partial<Record<string, () => void>> = {
 }
 
 function keyDown(event: KeyboardEvent) {
+  // A field or a radio group inside the pane keeps its own keys.
+  if (event.target !== event.currentTarget)
+    return
+
   const action = KEYS[event.key]
 
   // Ctrl with + or 0 is the browser's own zoom, which a focused pane leaves alone.

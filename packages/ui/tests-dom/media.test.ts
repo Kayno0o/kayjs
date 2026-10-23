@@ -161,6 +161,24 @@ describe('ZoomPane', () => {
     expect(pane.querySelector<HTMLElement>('.kui-zoom-plate')?.style.getPropertyValue('--kui-zoom-scale')).toBe('1')
   })
 
+  test('leaves the keys to a field typed in inside the pane, and takes them from the pane itself', async () => {
+    const root = await media()
+    const pane = root.querySelector('#zoom')!
+    const field = pane.querySelector('#zoom-field')!
+    const scale = () => Number(pane.querySelector<HTMLElement>('.kui-zoom-plate')!.style.getPropertyValue('--kui-zoom-scale'))
+
+    for (const typed of ['+', '=', '-', '0', 'ArrowLeft', 'ArrowDown'])
+      expect(press(field, typed).defaultPrevented, typed).toBe(false)
+
+    await settle()
+
+    expect(scale()).toBe(1)
+    expect(press(pane, '+').defaultPrevented).toBe(true)
+    await settle()
+
+    expect(scale()).toBe(1.15)
+  })
+
   test('leaves Ctrl with + or 0 to the browser\'s zoom, and the wheel to the page while fitted unless Ctrl is held', async () => {
     const root = await media()
     const pane = root.querySelector('#zoom')!

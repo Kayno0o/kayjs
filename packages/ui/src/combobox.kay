@@ -87,7 +87,7 @@ effect(() => {
   enhanced.set(true)
 })
 
-// A FormField wraps the control in its label, so the status line and the rows would join the input's name: it is named by the label's own text instead.
+// A FormField wraps the control in its label, so the status line and the rows would join the input's name: it is named by the label's own text instead, and so is the list.
 effect(() => {
   if (!enhanced() || label !== undefined || rest['aria-labelledby'] !== undefined)
     return
@@ -99,6 +99,7 @@ effect(() => {
 
   labelText.id ||= uid()
   input?.setAttribute('aria-labelledby', labelText.id)
+  document.getElementById(listId)?.setAttribute('aria-labelledby', labelText.id)
 })
 
 // The option whose value goes in a hidden field of its own, once the browser runs: one posting its label alone is the input's text.
