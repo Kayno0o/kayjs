@@ -135,7 +135,13 @@ export async function entryOf(ref: EntryRef, bare?: CollectionInfo): Promise<Sto
 
   const version = await versionOf(ref)
 
-  return version === undefined ? entry : { ...entry, version }
+  if (version === undefined)
+    return entry
+
+  // Read again after the version, so a save landing between the two gives data newer than its version, which the next save then refuses, never data older than it.
+  const current = (await entries(ref.collection, { slug: ref.slug, locale: ref.locale }))[0]
+
+  return current && { ...current, version }
 }
 
 // The version of a folder entry's file as it lies on disk; undefined for a missing one.
@@ -528,7 +534,7 @@ async function movePlan(ref: EntryRef, direction: 'up' | 'down', field: string):
 }
 
 // Moves an entry one place up or down in its collection's order, among the entries of its locale, by saving the `order` field of the one or the few entries that change: a loaded collection's as one write, a folder's file by file, stopping at the first that is refused.
-// Each entry is written from what is stored when its turn comes, and a folder's file from the version read before it, so a save of a neighbour made meanwhile is kept or refuses the move, never undone.
+// A folder's file is written from the entry read after the version it commits against, so a save of a neighbour made meanwhile refuses the move, never undone; a loaded collection's group is read and written inside one turn, which keeps every save of this process, while a save of another process landing inside that read-to-write window is undone: the loader keeps no version to compare.
 export async function moveEntry(ref: EntryRef, direction: 'up' | 'down', author?: Identity): Promise<SaveOutcome> {
   const collection = await collectionNamed(ref.collection)
   const field = collection.orderField
@@ -577,8 +583,11 @@ export async function moveEntry(ref: EntryRef, direction: 'up' | 'down', author?
     const version = await versionOf(target)
     const entry = (await entries(collection.name, { slug: target.slug, locale: target.locale }))[0]
 
-    if (entry?.data === undefined)
+    if (entry === undefined)
       return refused(target, wording('cms.store.missing', '{slug} does not exist', { slug: target.slug }), 'slug')
+
+    if (entry.data === undefined)
+      return refused(target, wording('cms.store.parseFailure', '{slug}\'s file does not parse: {problem}', { slug: target.slug, problem: entry.problem ?? '' }))
 
     outcome = await saveEntry({ ...target, data: { ...entry.data, [field]: change.value }, body: entry.body }, { version, verb: 'move', author, bodyKept: true })
 
