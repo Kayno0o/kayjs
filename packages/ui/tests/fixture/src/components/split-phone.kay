@@ -1,0 +1,18 @@
+---
+import { signal } from 'kay'
+import SplitLayout from '@kaynooo/kayjs-ui/split-layout.kay'
+
+const sidebarOpen = signal(false)
+---
+button#open-sidebar(type="button" onClick={() => sidebarOpen.set(true)}) Menu
+.h-96
+  SplitLayout#split(sidebarOpen={sidebarOpen()} onSidebarOpenChange={open => sidebarOpen.set(open)} sidebarTitle="Planets")
+    @sidebar
+      nav
+        a#sidebar-link(href="#inner") Inner
+    @list
+      ul
+        li
+          button#list-item(type="button") Mars
+    @detail
+      button#detail-action(type="button") Edit

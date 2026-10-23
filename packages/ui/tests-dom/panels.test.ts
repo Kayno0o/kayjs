@@ -117,6 +117,20 @@ describe('SidePanel with modal={false}', () => {
   })
 })
 
+// Runs `run` with the viewport below `md`, whatever the test window's width.
+async function whenNarrow(run: () => Promise<void>) {
+  const media = window.matchMedia.bind(window)
+
+  window.matchMedia = (query: string) => ({ ...media(query), matches: query.includes('width <') })
+
+  try {
+    await run()
+  }
+  finally {
+    window.matchMedia = media
+  }
+}
+
 describe('SplitLayout', () => {
   test('renders its panes once, with the sidebar\'s and the detail\'s state for the narrow layout, and the sidebar\'s back button asks the parent to close it', async () => {
     const root = await panels()
@@ -179,5 +193,87 @@ describe('SplitLayout', () => {
     root = await panels('planets-drag')
 
     expect(width()).toBe('320px')
+  })
+})
+
+describe('SplitLayout on a phone', () => {
+  const inert = (root: Element) => [...root.querySelectorAll('.kui-split-layout-list, .kui-split-layout-detail')].map(pane => pane.hasAttribute('inert'))
+
+  test('makes the covered panes inert while the sidebar overlay is open, and only then', async () => {
+    await whenNarrow(async () => {
+      const root = await panels()
+
+      expect(inert(root)).toEqual([true, true])
+
+      click(root.querySelector('.kui-split-layout-sidebar-head .kui-icon-btn'))
+      await settle()
+
+      expect(inert(root)).toEqual([false, false])
+    })
+  })
+
+  test('leaves the panes reachable side by side from md up', async () => {
+    const root = await panels()
+
+    expect(inert(root)).toEqual([false, false])
+  })
+
+  test('focuses the sidebar when it opens and gives focus back to what opened it', async () => {
+    await whenNarrow(async () => {
+      const root = await panels()
+      const reopen = root.querySelector<HTMLElement>('#open-sidebar')!
+
+      click(root.querySelector('.kui-split-layout-sidebar-head .kui-icon-btn'))
+      await settle()
+      reopen.focus()
+      click(reopen)
+      await settle()
+      await Bun.sleep(0)
+
+      expect(document.activeElement).toBe(root.querySelector('.kui-split-layout-sidebar-head .kui-icon-btn'))
+
+      click(root.querySelector('.kui-split-layout-sidebar-head .kui-icon-btn'))
+      await settle()
+      await Bun.sleep(0)
+
+      expect(document.activeElement).toBe(reopen)
+    })
+  })
+
+  test('focuses the detail when it opens and gives focus back to the list control when it closes', async () => {
+    await whenNarrow(async () => {
+      const root = await panels()
+      const toggle = root.querySelector<HTMLElement>('#toggle-detail')!
+
+      click(root.querySelector('.kui-split-layout-sidebar-head .kui-icon-btn'))
+      await settle()
+      toggle.focus()
+      click(toggle)
+      await settle()
+      toggle.focus()
+      click(toggle)
+      await settle()
+      await Bun.sleep(0)
+
+      expect(document.activeElement).toBe(root.querySelector('#edit'))
+
+      click(toggle)
+      await settle()
+      await Bun.sleep(0)
+
+      expect(document.activeElement).toBe(toggle)
+    })
+  })
+
+  test('leaves focus alone on the first render and from md up', async () => {
+    const root = await panels()
+    const toggle = root.querySelector<HTMLElement>('#toggle-detail')!
+
+    toggle.focus()
+    click(toggle)
+    await settle()
+    await Bun.sleep(0)
+
+    expect(document.activeElement).toBe(toggle)
   })
 })

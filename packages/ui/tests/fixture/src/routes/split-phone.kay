@@ -1,0 +1,6 @@
+---
+import SplitPhone from '../components/split-phone.kay'
+import '../app.css'
+---
+main
+  SplitPhone

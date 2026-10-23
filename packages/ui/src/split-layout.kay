@@ -1,9 +1,12 @@
 ---
 import type { JSX, Snippet } from 'kay'
-import { onMount, recipe, signal } from 'kay'
+import { effect, onCleanup, onMount, recipe, signal, untrack } from 'kay'
 import IconButton from './icon-button.kay'
 import { wording } from 'kay/words'
 
+// Where the layout stops being side by side, `md` in Tailwind.
+const NARROW = '(width < 48rem)'
+const FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 const WIDTH = { default: 260, min: 180, max: 560, step: 20 }
 
 const look = recipe({ parts: { root: 'kui-split-layout', sidebar: 'kui-split-layout-sidebar', sidebarHead: 'kui-split-layout-sidebar-head', sidebarTitle: 'kui-split-layout-sidebar-title', sidebarBody: 'kui-split-layout-sidebar-body', list: 'kui-split-layout-list', listHead: 'kui-split-layout-list-head', resizer: 'kui-split-layout-resizer', detail: 'kui-split-layout-detail', detailHead: 'kui-split-layout-detail-head' } })
@@ -34,6 +37,59 @@ const { list, detail, listHead, detailHead, sidebar, sidebarTitle = '', detailOp
 }>()
 
 const listWidth = signal(WIDTH.default)
+const narrow = signal(false)
+let sidebarPane: HTMLElement | undefined
+let detailPane: HTMLElement | undefined
+
+effect(() => {
+  const query = matchMedia(NARROW)
+  const change = (event: MediaQueryListEvent) => narrow.set(event.matches)
+
+  narrow.set(query.matches)
+  query.addEventListener('change', change)
+  onCleanup(() => query.removeEventListener('change', change))
+})
+
+// Below `md` a pane that opens takes focus on its first control, and the control that opened it gets focus back when it closes; the first render and a wide layout leave focus alone.
+function followFocus(open: () => boolean, pane: () => HTMLElement | undefined) {
+  let was = untrack(open)
+  let opener: Element | null = null
+
+  effect(() => {
+    const now = open()
+    const small = narrow()
+
+    if (now === was)
+      return
+
+    was = now
+
+    if (!small)
+      return
+
+    if (now) {
+      opener = document.activeElement
+      queueMicrotask(() => {
+        const element = pane()
+        const first = element?.querySelector<HTMLElement>(FOCUSABLE)
+
+        if (first)
+          first.focus()
+        else
+          element?.focus()
+      })
+    }
+    else {
+      const back = opener
+
+      opener = null
+      queueMicrotask(() => back instanceof HTMLElement && back.isConnected && back.focus())
+    }
+  })
+}
+
+followFocus(() => sidebarOpen, () => sidebarPane)
+followFocus(() => detailOpen, () => detailPane)
 
 function closeSidebar() {
   onSidebarOpenChange?.(false)
@@ -108,13 +164,13 @@ function resizeByKey(event: KeyboardEvent) {
 // The sidebar is rendered once: from `md` up a column, below it the overlay `data-sidebar-open` shows.
 div(part="root" {...rest} style={`--kui-split-list-width: ${listWidth()}px;${style ? ` ${style}` : ''}`} data-sidebar={sidebar ? '' : undefined} data-sidebar-open={sidebarOpen ? '' : undefined} data-detail-open={detailOpen ? '' : undefined})
   if sidebar
-    aside(part="sidebar")
+    aside(part="sidebar" ref={element => sidebarPane = element})
       div(part="sidebarHead")
         IconButton(icon="back" label={backLabel} variant="ghost" size="lg" onClick={closeSidebar})
         span(part="sidebarTitle") {sidebarTitle}
       div(part="sidebarBody")
         | {sidebar}
-  section(part="list")
+  section(part="list" inert={narrow() && sidebarOpen})
     if listHead
       div(part="listHead")
         | {listHead}
@@ -122,7 +178,7 @@ div(part="root" {...rest} style={`--kui-split-list-width: ${listWidth()}px;${sty
     if resizableList
       // A focusable separator is a widget, moved with the arrow keys as well as dragged.
       div(part="resizer" role="separator" tabindex="0" aria-label={resizeLabel} aria-orientation="vertical" aria-valuenow={listWidth()} aria-valuemin={WIDTH.min} aria-valuemax={WIDTH.max} onPointerDown={startResize} onKeyDown={resizeByKey})
-  section(part="detail")
+  section(part="detail" tabindex="-1" inert={narrow() && sidebarOpen} ref={element => detailPane = element})
     if detailHead
       div(part="detailHead")
         | {detailHead}

@@ -1159,6 +1159,37 @@ inBrowser('a non-modal SidePanel and the space skin on a served page', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 
+  test('SplitLayout on a phone keeps Tab inside the open sidebar overlay, focuses it when it opens and returns focus to its opener when it closes', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/split-phone', { viewport: 'phone' })
+    const focused = () => page.evaluate(() => document.activeElement?.id || document.activeElement?.getAttribute('aria-label') || document.activeElement?.tagName)
+
+    await page.evaluate(() => document.querySelector<HTMLElement>('#open-sidebar')!.focus())
+    await page.press('Enter')
+    await page.waitFor('[data-sidebar-open]')
+
+    expect(await focused()).toBe('Back')
+
+    const visited = new Set<string>()
+
+    for (let tab = 0; tab < 6; tab++) {
+      await page.press('Tab')
+      visited.add(String(await focused()))
+    }
+
+    expect(visited.has('list-item')).toBe(false)
+    expect(visited.has('detail-action')).toBe(false)
+    expect(visited.has('sidebar-link')).toBe(true)
+
+    await page.evaluate(() => document.querySelector<HTMLElement>('.kui-split-layout-sidebar-head button')!.focus())
+    await page.press('Enter')
+    await page.waitFor('#split:not([data-sidebar-open])')
+
+    expect(await focused()).toBe('open-sidebar')
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
   test('draws the space skin: a tick in the checked box, one chevron on the select and a visible focus on every control', async () => {
     const site = await shared()
 
