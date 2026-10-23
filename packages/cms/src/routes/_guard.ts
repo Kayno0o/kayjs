@@ -1,7 +1,7 @@
 import { guard } from 'kay'
 import { overHttps } from 'kay/library'
-import { sendToSignIn } from '../access'
-import { hintCookie } from '../page-link'
+import { sendToSignIn, whoOf } from '../access'
+import { EDITOR_COOKIE, editorCookie, hintCookie } from '../page-link'
 import { settings } from '../settings'
 
 // The screens are the app's guard's to open; without one they stay closed. A visitor it turns away as anonymous goes to sign in and comes back to this page.
@@ -23,4 +23,10 @@ export default guard(async (ctx) => {
   // An editor the guard let in is marked for the pages they read next, which show them the link into edit mode.
   if (pageLink)
     ctx.cookies.set(hintCookie(overHttps(ctx.request)))
+
+  // Who is signed in, for the drafts the on-page editor keeps in this browser to be theirs alone.
+  const who = await whoOf(ctx)
+
+  if (ctx.cookies.get(EDITOR_COOKIE) !== who)
+    ctx.cookies.set(editorCookie(overHttps(ctx.request), who))
 })

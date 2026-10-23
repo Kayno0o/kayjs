@@ -1,4 +1,5 @@
 import type { DraftEntry } from './kay/contract'
+import { EDITOR_COOKIE } from './page-link'
 
 // What the browser keeps of an entry's unsaved edits: the entry as typed, the version of the file it was edited from, and when.
 export interface KeptDraft {
@@ -23,6 +24,17 @@ export interface DraftKeeper {
 export const KEEP_FOR = 7 * 24 * 60 * 60 * 1000
 
 const PREFIX = 'kcms:draft:'
+const EDITOR = new RegExp(`(?:^|; )${EDITOR_COOKIE}=([^;]*)`)
+
+// Who the admin let in on this browser, from the cookie it sets; undefined when it set none.
+export function editorOfBrowser(): string | undefined {
+  try {
+    return typeof document === 'undefined' ? undefined : EDITOR.exec(document.cookie)?.[1]
+  }
+  catch {
+    return undefined
+  }
+}
 
 function storageOf(): Storage | undefined {
   try {
@@ -42,8 +54,17 @@ function isKept(value: unknown): value is KeptDraft {
   return typeof at === 'number' && (base === undefined || typeof base === 'string') && (version === undefined || typeof version === 'string') && typeof entry === 'object' && entry !== null && typeof (entry as DraftEntry).collection === 'string' && typeof (entry as DraftEntry).slug === 'string' && typeof (entry as DraftEntry).data === 'object' && (entry as DraftEntry).data !== null
 }
 
-// Keeps drafts in the browser's `localStorage`, one item per entry. `get` and `now` are for a test to give.
-export function browserKeeper(get: () => Storage | undefined = storageOf, now: () => number = Date.now): DraftKeeper {
+// Keeps drafts in the browser's `localStorage`, one item per entry. `get` and `now` are for a test to give. With `who`, the person the drafts belong to, they are kept under that name and none is read or written while it is undefined, so a draft is never offered to another person.
+export function browserKeeper(get: () => Storage | undefined = storageOf, now: () => number = Date.now, who?: () => string | undefined): DraftKeeper {
+  const prefix = (): string | undefined => {
+    if (who === undefined)
+      return PREFIX
+
+    const person = who()
+
+    return person === undefined ? undefined : `${PREFIX}${person}:`
+  }
+
   // Every access can throw: storage blocked, full, or gone in a private window.
   function attempt<T>(run: (storage: Storage) => T): T | undefined {
     try {
@@ -57,13 +78,17 @@ export function browserKeeper(get: () => Storage | undefined = storageOf, now: (
   }
 
   function remove(key: string): void {
-    attempt(storage => storage.removeItem(PREFIX + key))
+    const at = prefix()
+
+    if (at !== undefined)
+      attempt(storage => storage.removeItem(at + key))
   }
 
   return {
     now,
     read(key) {
-      const text = attempt(storage => storage.getItem(PREFIX + key))
+      const at = prefix()
+      const text = at === undefined ? undefined : attempt(storage => storage.getItem(at + key))
 
       if (text === null || text === undefined)
         return undefined
@@ -85,7 +110,10 @@ export function browserKeeper(get: () => Storage | undefined = storageOf, now: (
       return undefined
     },
     write(key, kept) {
-      attempt(storage => storage.setItem(PREFIX + key, JSON.stringify(kept)))
+      const at = prefix()
+
+      if (at !== undefined)
+        attempt(storage => storage.setItem(at + key, JSON.stringify(kept)))
     },
     remove,
     clear() {

@@ -82,6 +82,13 @@ async function readMember(ctx: GuardContext): Promise<Member | undefined> {
   return { name: String(name ?? ''), held, email: typeof user.email === 'string' && user.email !== '' ? user.email : undefined }
 }
 
+// A digest naming the signed-in person, which tells two people on one browser apart without carrying their name or email; the same for every person a guard without a name admits.
+export async function whoOf(ctx: GuardContext): Promise<string> {
+  const member = await memberOf(ctx)
+
+  return new Bun.CryptoHasher('sha256').update(JSON.stringify([member?.name ?? '', member?.email ?? ''])).digest('hex').slice(0, 16)
+}
+
 // The actions the signed-in person may not do, each with the reason a disabled control gives; empty when the app lists no roles.
 export type Denials = Partial<Record<Action, string>>
 

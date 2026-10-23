@@ -267,6 +267,23 @@ describe('the screens\' guard', () => {
     expect(admitted.cookies.toSetCookieHeaders()[0]).toMatch(/^kay_editor=1; .*Path=\/.*SameSite=Lax/)
   })
 
+  test('names the person it lets in with a digest the editor keys its drafts by, new when another signs in', async () => {
+    configure({ guard: () => undefined, member: ({ request }) => ({ name: request.headers.get('x-name') ?? '', roles: [] }) })
+
+    const ann = screen('/admin', { 'x-name': 'Ann' })
+    const bob = screen('/admin', { 'x-name': 'Bob' })
+
+    await screenGuard(ann)
+    await screenGuard(bob)
+
+    const [first, second] = [ann.cookies.get('kcms_editor'), bob.cookies.get('kcms_editor')]
+
+    expect(first).toMatch(/^[0-9a-f]{16}$/)
+    expect(second).toMatch(/^[0-9a-f]{16}$/)
+    expect(first).not.toBe(second)
+    expect(first).not.toContain('Ann')
+  })
+
   test('sets the hint Secure behind a TLS-terminating proxy, and leaves it out with pageLink: false', async () => {
     configure({ guard: () => undefined })
 

@@ -178,6 +178,36 @@ describe('drafts kept in the browser', () => {
   })
 })
 
+describe('drafts of the person the admin let in', () => {
+  it('keeps them under that person, so another one on the browser meets none', () => {
+    const storage = memoryStorage()
+    let who: string | undefined = 'ann'
+    const keeper = browserKeeper(() => storage, Date.now, () => who)
+    const kept = { entry: post, version: 'v1', at: Date.now() }
+
+    keeper.write('posts:hello', kept)
+    expect(storage.getItem('kcms:draft:ann:posts:hello')).not.toBeNull()
+    expect(keeper.read('posts:hello')).toEqual(kept)
+    who = 'bob'
+    expect(keeper.read('posts:hello')).toBeUndefined()
+    who = undefined
+    keeper.write('posts:hello', kept)
+    expect(keeper.read('posts:hello')).toBeUndefined()
+    expect(storage.length).toBe(1)
+  })
+
+  it('forgets every draft of the browser, whoever kept it, and nothing else, when asked', () => {
+    const storage = memoryStorage()
+    const kept = { entry: post, version: 'v1', at: Date.now() }
+
+    browserKeeper(() => storage, Date.now, () => 'ann').write('posts:hello', kept)
+    browserKeeper(() => storage, Date.now, () => 'bob').write('posts:hello', kept)
+    storage.setItem('other', 'x')
+    browserKeeper(() => storage, Date.now, () => 'bob').clear()
+    expect(Array.from({ length: storage.length }, (_, at) => storage.key(at))).toEqual(['other'])
+  })
+})
+
 describe('kept drafts of an entry with no version', () => {
   it('restores the edits while the saved copy is the one they were made from, and drops them once it changed', () => {
     const storage = memoryStorage()

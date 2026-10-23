@@ -1,0 +1,10 @@
+---
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import { wording } from 'kay/words'
+import { browserKeeper } from '../draft-storage'
+import { signOut } from '../routes/_actions.kay'
+
+// The sign-out button: leaving forgets the drafts this browser kept, whoever's they were, so the next person on it finds none.
+---
+form(action={signOut} onSubmit={() => browserKeeper().clear()})
+  Button(type="submit" variant="ghost" size="sm" label={wording('cms.admin.signOut', 'Sign out')})

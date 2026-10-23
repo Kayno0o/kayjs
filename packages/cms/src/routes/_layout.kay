@@ -1,12 +1,11 @@
 --- server
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
-import Button from '@kaynooo/kayjs-ui/button.kay'
+import SignOut from '../components/sign-out.kay'
 import { localize } from 'kay/i18n'
 import { wording } from 'kay/words'
 import { denials, memberOf } from '../access'
 import { screenPath } from '../paths'
-import { signOut } from './_actions.kay'
 import look from '../look'
 import { adminLogo, settings } from '../settings'
 import './admin.css'
@@ -47,8 +46,7 @@ const inContent = SCREENS_OF_CONTENT.test(ctx.url.pathname)
     if member
       .kcms-admin-who
         span {wording('cms.admin.signedInAs', 'Signed in as {name}', { name: member.name })}
-        form(action={signOut})
-          Button(type="submit" variant="ghost" size="sm" label={wording('cms.admin.signOut', 'Sign out')})
+        SignOut
   main.kcms-admin-main#kcms-main(tabindex="-1")
     slot
 Toaster

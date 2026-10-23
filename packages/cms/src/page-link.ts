@@ -9,6 +9,8 @@ export const LEGACY_PAGE_LINK_ATTRIBUTE = 'data-cms-edit-page'
 // Where the guarded check and the public module are served, under the app's base and kay's own `/_kay`, whatever its `apiPath`.
 export const CHECK_PATH = '/_kay/cms/editor'
 export const MODULE_PATH = '/_kay/cms/editor/module.js'
+// The cookie naming who the admin let in, a digest and nothing else the browser could be asked for: the on-page editor keeps its drafts under it, so another person on the same browser does not meet them.
+export const EDITOR_COOKIE = 'kcms_editor'
 const HINT_AGE = 90 * 24 * 60 * 60
 
 // What the browser runs on a page read by a signed-in editor: asks the guard whether the editor is still signed in, then shows the "Edit this page" link.
@@ -127,4 +129,9 @@ export function pageLinkLoader(): string {
 // The cookie that marks the browser as an editor's, slid forward each time the guard lets the editor through.
 export function hintCookie(secure: boolean): Bun.Cookie {
   return new Bun.Cookie(HINT_COOKIE, '1', { path: '/', maxAge: HINT_AGE, sameSite: 'lax', secure })
+}
+
+// The cookie naming the person, readable by the editor's script.
+export function editorCookie(secure: boolean, who: string): Bun.Cookie {
+  return new Bun.Cookie(EDITOR_COOKIE, who, { path: '/', maxAge: HINT_AGE, sameSite: 'lax', secure })
 }
