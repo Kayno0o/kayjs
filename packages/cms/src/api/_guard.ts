@@ -110,12 +110,7 @@ function mayRead(ctx: GuardContext, root: string | undefined): boolean {
   if (collection === undefined || slug === undefined)
     return false
 
-  try {
-    return editedEntry(ctx.request, decodeURIComponent(collection), decodeURIComponent(slug))
-  }
-  catch {
-    return false
-  }
+  return editedEntry(ctx.request, decoded(collection), decoded(slug))
 }
 
 function refusal(editing: boolean, reading: boolean): string {

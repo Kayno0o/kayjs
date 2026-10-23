@@ -27,10 +27,11 @@ async function open(denied: Record<string, string> = {}): Promise<void> {
   await settle()
 }
 
-async function pause(): Promise<void> {
-  for (let wait = 0; wait < 10; wait++) {
-    await Bun.sleep(5)
+// Settles until the condition holds, so a slow run waits longer instead of failing.
+async function until(condition: () => boolean): Promise<void> {
+  for (let wait = 0; wait < 2000 && !condition(); wait++) {
     await settle()
+    await Bun.sleep(1)
   }
 }
 
@@ -59,20 +60,20 @@ test('a saved entry opens the dialog, which previews the mail and asks twice bef
 
   await open()
   labelled('Newsletter')!.click()
-  await pause()
+  await until(() => labelled('Send to the list')?.disabled === false)
 
   expect(document.body.textContent).toContain('Hello')
   expect(String(fetched.mock.calls[0]![0])).toContain('/preview')
   expect(labelled('Yes, send to 42 subscribers')).toBeUndefined()
 
   labelled('Send to the list')!.click()
-  await pause()
+  await until(() => labelled('Yes, send to 42 subscribers') !== undefined)
 
   expect(fetched.mock.calls.some(([url]) => String(url).endsWith('/send'))).toBe(false)
   expect(labelled('Yes, send to 42 subscribers')).toBeDefined()
 
   labelled('Yes, send to 42 subscribers')!.click()
-  await pause()
+  await until(() => fetched.mock.calls.some(([url]) => String(url).endsWith('/send')))
 
   expect(fetched.mock.calls.some(([url]) => String(url).endsWith('/send'))).toBe(true)
 })
@@ -82,7 +83,7 @@ test('a draft cannot be sent, with the reason, but can be tested', async () => {
   server()
   await open()
   labelled('Newsletter')!.click()
-  await pause()
+  await until(() => labelled('Send me a test')?.disabled === false)
 
   expect(refusedWith('Send to the list')?.getAttribute('data-tooltip')).toBe('Publish the entry before sending it to the list')
   expect(labelled('Send me a test')?.disabled).toBe(false)
