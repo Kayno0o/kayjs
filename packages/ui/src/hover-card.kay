@@ -29,11 +29,50 @@ const name = `--kui-hover-card-${panelId}`
 let panel: HTMLDivElement | undefined
 let stand: HTMLSpanElement | undefined
 let frame = 0
+// The anchor the card describes while it is open.
+let described: Element | undefined
 // Where the stand-in was last put, so a frame with nothing moved writes nothing.
 let placed = ''
 
+// The card's id is listed in the anchor's `aria-describedby` while it is open, beside whatever ids the app put there.
+function describe(target: Element) {
+  if (described === target)
+    return
+
+  undescribe()
+
+  const ids = (target.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean)
+
+  if (!ids.includes(panelId)) {
+    target.setAttribute('aria-describedby', [...ids, panelId].join(' '))
+    described = target
+  }
+}
+
+function undescribe() {
+  if (!described)
+    return
+
+  const ids = (described.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(id => id !== '' && id !== panelId)
+
+  if (ids.length > 0)
+    described.setAttribute('aria-describedby', ids.join(' '))
+  else
+    described.removeAttribute('aria-describedby')
+
+  described = undefined
+}
+
+// Escape dismisses the card without a pointer or focus move, and leaves the key to whatever else listens for it.
+function dismiss(event: KeyboardEvent) {
+  if (event.key === 'Escape')
+    close()
+}
+
 function unmark() {
   cancelAnimationFrame(frame)
+  document.removeEventListener('keydown', dismiss)
+  undescribe()
   placed = ''
   stand?.style.removeProperty('anchor-name')
 }
@@ -93,6 +132,8 @@ effect(() => {
   }
 
   follow(target)
+  describe(target)
+  document.addEventListener('keydown', dismiss)
 
   if (!panel.matches(':popover-open'))
     panel.showPopover()

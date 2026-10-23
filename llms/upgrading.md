@@ -7,6 +7,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### kayjs-cms: the activity log needs the `delete` role
 
 With `cms({ roles })`, the activity screen answers 403 and its button is disabled for a person whose roles lack `delete`, as it names every editor. Add `delete` to the roles that read it. Drafts the on-page editor kept before are no longer offered, as they are kept per person now.
+### kayjs-ui: `VirtualList` requires `label`, an error toast has no clock
+
+`VirtualList` is a focusable list and takes a `label` naming it: add one, or `kay check` fails the missing prop. `toast.error` and a failed `attempt` now stay until the reader dismisses them, as they asked to act; pass `{ duration: '10s' }` to `toast.error` for the old ten seconds.
 
 ### An OAuth token bound to a resource works only under it
 

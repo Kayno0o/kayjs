@@ -28,3 +28,13 @@ export function monthStarts(days: readonly string[]): { column: number, label: s
 
   return starts.filter((start, index) => (starts[index + 1]?.column ?? Infinity) - start.column >= LABEL_COLUMNS)
 }
+
+// Weeks run down the columns, so up and down step a day and left and right a week.
+const CELL_STEPS: Record<string, number> = { ArrowUp: -1, ArrowDown: 1, ArrowLeft: -7, ArrowRight: 7, Home: -Infinity, End: Infinity }
+
+// Where a key moves the keyboard from the cell at `index` among `count`; undefined for any other key.
+export function steppedCell(key: string, index: number, count: number): number | undefined {
+  const step = CELL_STEPS[key]
+
+  return step === undefined ? undefined : Math.min(Math.max(0, count - 1), Math.max(0, index + step))
+}

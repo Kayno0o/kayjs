@@ -295,7 +295,7 @@
   }
 
   .kui-label-text {
-    @apply text-kui-micro font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
+    @apply text-xs font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)];
   }
 
   .kui-btn {

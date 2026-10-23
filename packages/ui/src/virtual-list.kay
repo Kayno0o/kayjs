@@ -15,8 +15,8 @@ const { items, item, itemKey, estimate = 48, overscan = 4, label, ...rest } = pr
   estimate?: number | undefined
   // The rows drawn beyond the visible ones on each side.
   overscan?: number | undefined
-  // Names the list, which is read out when it takes the focus.
-  label?: string | undefined
+  // Names the list, which is read out when it takes the focus: a focusable list with no name is a stop a screen reader cannot place.
+  label: string
 }>()
 
 const keyOf = (row: Item, index: number) => itemKey === undefined ? index : itemKey(row, index)

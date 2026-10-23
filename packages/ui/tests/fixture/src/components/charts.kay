@@ -1,6 +1,7 @@
 ---
 import type { ScatterPoint } from '@kaynooo/kayjs-ui'
 import BarChart from '@kaynooo/kayjs-ui/bar-chart.kay'
+import ContributionGraph from '@kaynooo/kayjs-ui/contribution-graph.kay'
 import LineChart from '@kaynooo/kayjs-ui/line-chart.kay'
 import ScatterChart from '@kaynooo/kayjs-ui/scatter-chart.kay'
 import { signal } from 'kay'
@@ -24,3 +25,5 @@ function zoom(from: number, to: number) {
 LineChart#line(label="Visits" labels={DAYS.slice(...shown())} series={[{ name: 'Visits', values: VISITS.slice(...shown()) }, { name: 'Sales', values: SALES.slice(...shown()), color: 'red' }]} formatValue={value => `${value} v`} onRange={zoom})
 ScatterChart#scatter(label="Games" points={[{ key: 1, label: 'Hades', x: 10, y: 90 }, { key: 2, label: 'Celeste', x: 30, y: 70 }]} onSelect={onSelect})
 BarChart#bars(label="Runs" labels={DAYS} series={[{ name: 'Minutes', values: [4, 0, 8], colors: [undefined, 'red', undefined] }]})
+ScatterChart#dots(label="Plain games" points={[{ key: 1, label: 'Hades', x: 10, y: 90 }, { key: 2, label: 'Celeste', x: 30, y: 70 }, { key: 3, label: 'Tunic', x: 50, y: 50 }]})
+ContributionGraph#graph(label="Commits" color="green" today="2026-09-09" days={Array.from({ length: 14 }, (_, at) => ({ day: `2026-09-${String(at + 1).padStart(2, '0')}`, intensity: at / 14 }))})

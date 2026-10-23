@@ -1,6 +1,6 @@
 ---
 import type { PopoverPlacement } from './popover'
-import { call, recipe, resource } from 'kay'
+import { call, effect, recipe, resource, signal } from 'kay'
 import { wording } from 'kay/words'
 import inboxApi from './api/inbox'
 import IconButton from './icon-button.kay'
@@ -19,6 +19,7 @@ const look = recipe({
     title: 'min-w-0 flex-1 truncate',
     empty: 'px-2 py-1.5 text-sm text-kui-subtext0',
     unread: 'sr-only',
+    announce: 'sr-only',
     all: MENU_FOOTER,
   },
 })
@@ -38,6 +39,22 @@ const unread = () => inbox.value()?.unread ?? 0
 const items = () => inbox.value()?.items ?? []
 const linked = (url: string | undefined) => url !== undefined && LINKED.test(url) ? url : undefined
 const external = (url: string | undefined) => url !== undefined && WEB.test(url)
+
+// A live region naming a notification that arrives while the page is open; the first load announces nothing.
+const announced = signal('')
+let known: Set<string> | undefined
+
+effect(() => {
+  if (inbox.value() === undefined)
+    return
+
+  const fresh = items().find(note => !note.read && known !== undefined && !known.has(note.id))
+
+  known = new Set(items().map(note => note.id))
+
+  if (fresh)
+    announced.set(wording('ui.bell.new', 'New notification: {title}', { title: fresh.title }))
+})
 
 // A failed call changes nothing: the live update or the next visit shows how the inbox stands.
 async function send(id?: string) {
@@ -73,5 +90,6 @@ span(part="root")
               span(part="unread") {wording('ui.bell.unreadMark', '(unread)')}
       if unread() > 0
         button(part="all" type="button" onClick={() => send()}) {wording('ui.bell.markAll', 'Mark all as read')}
+  span(part="announce" role="status") {announced()}
   if unread() > 0
     span(part="count" aria-hidden="true") {unread() > 99 ? '99+' : unread()}

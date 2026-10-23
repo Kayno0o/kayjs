@@ -16,6 +16,6 @@ A row's height is its border box, so give its content padding or a gap rather th
 
 ## Keyboard, screen readers and find
 
-The list is `role="list"` named by `label`, and each row a `listitem` with its position among all, so a screen reader hears "3 of 10000". The box takes the focus to scroll by keyboard: arrows, Page Up and Down, Home and End.
+The list is `role="list"` named by `label`, which is required, and each row a `listitem` with its position among all, so a screen reader hears "3 of 10000". The box takes the focus to scroll by keyboard: arrows, Page Up and Down, Home and End.
 
 Find-in-page only sees the rows drawn, and a focused control in a row that scrolls out of view loses its focus. Give a long list a filter to find a row by.

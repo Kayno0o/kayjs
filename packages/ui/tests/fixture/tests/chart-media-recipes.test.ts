@@ -249,6 +249,10 @@ inBrowser('chart and media recipes in the browser', () => {
     // The shade around the crop is a spread shadow wide enough to cover any picture.
     expect(area['box-shadow']).toContain('9999px')
 
+    // Focused by the keyboard it gets an outline of its own beside the solid accent border.
+    await page.evaluate((() => document.querySelector<HTMLElement>('#cropper [data-part=crop]')!.focus({ preventScroll: true })) as never)
+    expect(await looks(page, '#cropper [data-part=crop]', ['outline-style', 'outline-width'])).toEqual({ 'outline-style': 'solid', 'outline-width': '2px' })
+
     const corners = { nw: ['left', 'top'], ne: ['right', 'top'], sw: ['left', 'bottom'], se: ['right', 'bottom'] } as const
 
     for (const [handle, [horizontal, vertical]] of Object.entries(corners)) {

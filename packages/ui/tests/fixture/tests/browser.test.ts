@@ -267,6 +267,30 @@ inBrowser('HoverCard and ZoomPane', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 
+  test('is listed in the anchor\'s aria-describedby while open, beside the app\'s own ids, and closes on Escape', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/hover-card')
+
+    const described = async () => page.evaluate((() => document.querySelector('#plain')!.getAttribute('aria-describedby')) as never)
+
+    await page.evaluate((() => document.querySelector('#plain')!.setAttribute('aria-describedby', 'mine')) as never)
+    await page.click('#plain')
+    await page.waitUntil((() => document.querySelector('#card')?.matches(':popover-open')) as never)
+    expect(await described()).toBe('mine card')
+    await page.press('Escape')
+    await page.waitUntil((() => !document.querySelector('#card')!.matches(':popover-open')) as never)
+    expect(await described()).toBe('mine')
+
+    await page.evaluate((() => document.querySelector('#own')!.dispatchEvent(new FocusEvent('focus'))) as never)
+    await page.waitUntil((() => document.querySelector('#card')?.matches(':popover-open')) as never)
+    expect(await page.evaluate((() => document.querySelector('#own')!.getAttribute('aria-describedby')) as never)).toBe('card')
+    await page.evaluate((() => document.querySelector('#own')!.dispatchEvent(new FocusEvent('blur'))) as never)
+    await page.waitUntil((() => !document.querySelector('#card')!.matches(':popover-open')) as never)
+    expect(await page.evaluate((() => document.querySelector('#own')!.hasAttribute('aria-describedby')) as never)).toBe(false)
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
   test('keeps an anchor-name of the app, and sits beside an anchor inside a transformed ancestor', async () => {
     const site = await shared()
 

@@ -139,7 +139,10 @@ effect(() => {
   // The element may describe itself already, so the tooltip adds its id to that list too, and takes only its own back out.
   const described = target.element.getAttribute('aria-describedby')
 
-  const added = !described?.split(WHITESPACE).includes(PANEL_ID)
+  // A tooltip repeating the name the element already has says nothing more, so it is not added as its description.
+  const name = (target.element.getAttribute('aria-label') ?? target.element.textContent ?? '').trim()
+
+  const added = !described?.split(WHITESPACE).includes(PANEL_ID) && target.text.trim() !== name
 
   if (added)
     target.element.setAttribute('aria-describedby', described ? `${described} ${PANEL_ID}` : PANEL_ID)

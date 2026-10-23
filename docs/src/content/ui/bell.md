@@ -14,4 +14,4 @@ A `Bell` has no `user` prop. It reads the signed-in user on the server, from the
 
 `label` names the button, `Notifications` by default, and with unread notifications it also says how many. `placement` is where the list opens from the button, `bottom-end` by default.
 
-A title is shown as text. A link is drawn only when it is a path of your site or an http or https address, and an outside address opens in a new tab.
+A notification that arrives while the page is open is announced to screen readers. A title is shown as text. A link is drawn only when it is a path of your site or an http or https address, and an outside address opens in a new tab.

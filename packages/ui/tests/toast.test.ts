@@ -50,9 +50,11 @@ describe('a toast\'s time', () => {
     jest.useRealTimers()
   })
 
-  test('runs out after six seconds, an error after ten', () => {
+  test('runs out after six seconds, an error staying until it is dismissed', () => {
     toast.info('Copied')
-    toast.error('Refused')
+
+    const refused = toast.error('Refused')
+
     jest.advanceTimersByTime(5999)
 
     expect(shown().map(item => item.message)).toEqual(['Copied', 'Refused'])
@@ -61,7 +63,10 @@ describe('a toast\'s time', () => {
 
     expect(shown().map(item => item.message)).toEqual(['Refused'])
 
-    jest.advanceTimersByTime(4000)
+    jest.advanceTimersByTime(600_000)
+
+    expect(shown().map(item => item.message)).toEqual(['Refused'])
+    dismissToast(refused)
 
     expect(shown()).toEqual([])
   })

@@ -80,6 +80,11 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('the Bell
       await using page = await browsing.open('/', { cookies: await authTest(browsing).sessionCookie(ada.id) })
 
       await page.waitUntil(() => document.querySelector('.kui-bell button')?.getAttribute('aria-label') === 'Notifications, 2 unread')
+      expect(await page.text('.kui-bell [data-part=announce]')).toBe('')
+
+      // One arriving while the page is open is announced in a live region.
+      await notify(ada.id, { title: 'Back in stock' })
+      await page.waitUntil(() => document.querySelector('.kui-bell [data-part=announce]')?.textContent === 'New notification: Back in stock')
       expect(page.errors).toEqual([])
 
       // A browser opened with no cookie is the signed-out visitor.

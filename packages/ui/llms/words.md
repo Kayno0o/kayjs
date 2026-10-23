@@ -33,7 +33,7 @@ ui: { sidePanel: { close: 'Fermer' } }
 
 - `ui.barChart.*`: `empty` (`No data yet.`), `total` (`Total`)
 - `ui.barList.*`: `empty` (`No data yet.`)
-- `ui.bell.*`: `empty` (`No notifications`), `label` (`Notifications`), `markAll` (`Mark all as read`), `unread` (`{label}, {count} unread`, `{label}, 1 unread` for one), `unreadMark` (`(unread)`, read by screen readers beside an unread item)
+- `ui.bell.*`: `empty` (`No notifications`), `label` (`Notifications`), `markAll` (`Mark all as read`), `unread` (`{label}, {count} unread`, `{label}, 1 unread` for one), `unreadMark` (`(unread)`, read by screen readers beside an unread item), `new` (`New notification: {title}`, announced when one arrives)
 - `ui.carousel.*`: `dot` (`Go to slide {n}`), `label` (`Carousel`), `next` (`Next slide`), `pause` (`Pause`), `play` (`Play`), `previous` (`Previous slide`), `slide` (`Slide {n} of {count}`)
 - `ui.combobox.*`: `create` (`Create "{text}"`), `empty` (`No match`), `failure` (`Could not load the options`), `loading` (`Loading…`), `results` (`{count} results`, `1 result` for one)
 - `ui.commandPalette.*`: `empty` (`No results`), `label` (`Search`), `placeholder` (`Search`), `recent` (`Recent`), `results` (`{count} results, `1 result` for one`), `siteSearchError` (`The pages could not be searched`), `siteSearch` (`In the pages`), `siteSearchMore` (`{count} more matches`, `1 more match` for one)
@@ -48,7 +48,7 @@ ui: { sidePanel: { close: 'Fermer' } }
 - `ui.iconPicker.*`: `clear` (`Clear icon selection`), `empty` (`No icons found.`), `error` (`The icons could not be loaded.`), `grid` (`Icons`), `more` (`Show more`), `placeholder` (`Search icons…`), `search` (`Search icons`), `searching` (`Searching…`)
 - `ui.imageCropper.*`: `crop` (`Crop area: arrows move it, Shift and the arrows resize it`), `cropText` (`{w} by {h} pixels at {x}, {y}`)
 - `ui.lineChart.*`: `rangeHint` (`Shift with the arrow keys picks a span, Enter applies it, Escape drops it`), `total` (`Total`)
-- `ui.loadMore.*`: `failure` (`Could not load more.`), `loading` (`Loading more…`), `retry` (`Try again`)
+- `ui.loadMore.*`: `failure` (`Could not load more.`), `loaded` (`{count} more loaded`, announced after a page), `loading` (`Loading more…`), `more` (`Load more`, the `button` form), `retry` (`Try again`)
 - `ui.markdownEditor.*`: `bold` (`Bold`), `bulletList` (`Bulleted list`), `heading` (`Heading`), `image` (`Image`), `italic` (`Italic`), `keysHint` (`Tab indents a list item; Escape then Tab leaves the field.`), `link` (`Link`), `numberedList` (`Numbered list`), `placeholder` (`Write markdown…`), `preview` (`Preview`), `previewFailure` (`The preview could not be shown`), `toolbarFailure` (`The toolbar could not be loaded`), `toolbar` (`Formatting`), `uploadFailure` (`Could not upload the image`)
 - `ui.mediaGallery.*`: `close` (`Close`), `empty` (`No media.`), `item` (`Media {n}`), `next` (`Next`), `open` (`Open full size`), `previous` (`Previous`)
 - `ui.multiSelect.*`: `all` (`All`), `empty` (`No match`), `none` (`None`), `placeholder` (`Any`), `search` (`Search`), `selected` (`{count} selected`)

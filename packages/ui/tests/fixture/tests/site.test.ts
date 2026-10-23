@@ -712,7 +712,7 @@ describe('charts', () => {
 
   test('ContributionGraph shades each day by how full it was, says so in its name, marks today, and names the months over their weeks', async () => {
     const graph = await page('graph')
-    const cells = [...graph.matchAll(/<span class="[^"]*" data-part="cell" role="img" aria-label="([^"]+)"[^>]*?( data-today)? style="([^"]+)"/g)].map(match => [match[1], Boolean(match[2]), match[3]])
+    const cells = [...graph.matchAll(/<span class="[^"]*" data-part="cell" role="img" tabindex="-?\d" aria-label="([^"]+)"[^>]*?( data-today)? style="([^"]+)"/g)].map(match => [match[1], Boolean(match[2]), match[3]])
 
     expect(cells.slice(0, 3)).toEqual([
       ['3 commits · 2026-08-31', false, 'grid-row: 2; grid-column: 1'],

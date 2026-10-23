@@ -1,8 +1,8 @@
 ---
-import { recipe } from 'kay'
+import { recipe, signal } from 'kay'
 import type { JSX } from 'kay'
 import type { ContributionDay } from './contribution'
-import { monthStarts } from './contribution'
+import { monthStarts, steppedCell } from './contribution'
 import { shade } from './shade'
 import { wording } from 'kay/words'
 
@@ -31,6 +31,28 @@ const { days, color, today, label = wording('ui.contributionGraph.label', 'Contr
 // A day without a description is read as how full it is, which its colour alone shows.
 const describe = (day: ContributionDay) => `${day.description ?? `${Math.round(day.intensity * 100)}%`} · ${day.day}`
 
+// The cell the keyboard stands at, one tab stop in all: today's until it moves.
+const stop = signal<number | null>(null)
+const current = () => Math.min(stop() ?? Math.max(0, days.findIndex(day => day.day === today)), Math.max(0, days.length - 1))
+
+// The arrows walk the cells, a day up and down and a week across, and Home and End reach either end, so each cell's details show on focus as they do under the pointer.
+function keyDown(event: KeyboardEvent) {
+  if (event.altKey || event.ctrlKey || event.metaKey)
+    return
+
+  const next = steppedCell(event.key, current(), days.length)
+
+  if (next === undefined || days.length === 0)
+    return
+
+  event.preventDefault()
+  stop.set(next)
+
+  const target = (event.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('[role="img"]')[next]
+
+  target?.focus()
+}
+
 const style = (day: ContributionDay, index: number) => {
   const fill = shade(color, day.intensity)
   const parts = [fill && `background-color: ${fill}`, months && `grid-row: ${index % 7 + 2}; grid-column: ${Math.floor(index / 7) + 1}`].filter(Boolean)
@@ -39,9 +61,9 @@ const style = (day: ContributionDay, index: number) => {
 }
 ---
 // A year of days as a grid of weeks, each cell shaded by how full its day was.
-div(part="root" {...rest} role="group" aria-label={label} data-months={months ? '' : undefined})
+div(part="root" {...rest} role="group" aria-label={label} onKeyDown={keyDown} data-months={months ? '' : undefined})
   if months
     for start of monthStarts(days.map(day => day.day)) key={start.column}
       span(part="month" aria-hidden="true" style={`grid-column: ${start.column + 1}`}) {start.label}
   for day, index of days key={day.day}
-    span(part="cell" role="img" aria-label={describe(day)} data-tooltip={describe(day)} data-today={day.day === today || undefined} style={style(day, index)})
+    span(part="cell" role="img" tabindex={index === current() ? '0' : '-1'} aria-label={describe(day)} data-tooltip={describe(day)} data-today={day.day === today || undefined} style={style(day, index)} onFocus={() => stop.set(index)})

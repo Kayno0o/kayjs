@@ -89,6 +89,41 @@ describe('LoadMore', () => {
     expect(root.querySelector('.kui-load-more-loading')?.textContent).toBe('')
   })
 
+  test('tells screen readers how many rows a page added, in a status of its own', async () => {
+    const root = await list()
+    const announced = () => root.querySelector('.kui-load-more [data-part="announced"]')
+
+    expect(announced()?.getAttribute('role')).toBe('status')
+    expect(announced()?.textContent).toBe('')
+
+    reach(root)
+    release[0]!([{ id: 3 }, { id: 4 }, { id: 5 }])
+    await settle()
+
+    expect(announced()?.textContent).toBe('2 more loaded')
+  })
+
+  test('loads the next page from a button under button, with no sentinel', async () => {
+    const root = await list({ button: true })
+
+    expect(root.querySelector('.kui-when-visible')).toBeNull()
+
+    const more = root.querySelector('.kui-load-more button')!
+
+    expect(more.textContent).toContain('Load more')
+    click(more)
+    await settle()
+
+    expect(asked).toEqual([3])
+    expect(root.querySelector('.kui-load-more button')?.getAttribute('aria-busy')).toBe('true')
+
+    release[0]!([{ id: 4 }, { id: 5 }, { id: 6 }])
+    await settle()
+
+    expect(ids(root)).toEqual(['1', '2', '3', '4', '5', '6'])
+    expect(root.querySelector('.kui-load-more button')?.getAttribute('aria-busy')).not.toBe('true')
+  })
+
   test('a sentinel firing twice at once loads one page', async () => {
     const root = await list()
 

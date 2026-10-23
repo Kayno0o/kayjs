@@ -17,13 +17,12 @@ export interface Toast {
 }
 
 export interface ToastOptions {
-  // How long it stays, such as `'3s'`: 6 seconds by default, 10 for an error. `false` keeps it until the reader dismisses it, or `dismissToast(id)` does.
+  // How long it stays, such as `'3s'`: 6 seconds by default, an error until the reader dismisses it, as it asks them to act. `false` keeps any toast until the reader dismisses it, or `dismissToast(id)` does.
   duration?: Duration | false | undefined
 }
 
-// Long enough to read a sentence, an error longer as the reader has something to do about it.
+// Long enough to read a sentence; an error has no clock, as a reader who needs longer than any limit must not lose it.
 const DURATION_MS = 6000
-const ERROR_DURATION_MS = 10_000
 
 // What keeps the toasts on screen past their time: the pointer resting on them, or focus inside them.
 export type ToastHold = 'pointer' | 'focus'
@@ -96,7 +95,7 @@ function push(message: string, type: ToastType, duration: Duration | false | und
   const id = nextId++
   const asked = askedMs(duration)
   const wanted = asked === undefined || Number.isNaN(asked) || asked < 0 ? undefined : asked
-  const timer: Timer = { remaining: wanted ?? (type === 'error' ? ERROR_DURATION_MS : DURATION_MS), started: Date.now() }
+  const timer: Timer = { remaining: wanted ?? (type === 'error' ? Number.POSITIVE_INFINITY : DURATION_MS), started: Date.now() }
 
   untrack(() => toasts.set(list => [...list, { id, message, tone: type === 'error' ? 'danger' : type, type }]))
   timers.set(id, timer)

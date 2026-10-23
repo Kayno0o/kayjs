@@ -8,7 +8,7 @@ const look = recipe({
   parts: {
     root: 'kui-color-input inline-flex items-center gap-2',
     input: 'size-8 shrink-0 cursor-pointer appearance-none rounded-kui-card border-solid border-(length:--kui-border-width) border-kui-field-border bg-transparent p-0.5 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-kui-card [&::-webkit-color-swatch]:border-0 [&::-moz-color-swatch]:rounded-kui-card [&::-moz-color-swatch]:border-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kui-accent disabled:cursor-default disabled:opacity-50',
-    label: 'text-kui-micro font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
+    label: 'text-xs font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
     value: 'text-xs text-kui-text tabular-nums',
   },
 })

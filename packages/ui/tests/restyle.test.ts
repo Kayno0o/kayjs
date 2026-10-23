@@ -366,7 +366,7 @@ describe('the remaining field and button components whose recipe holds their loo
     ['text', 'after:content-[attr(data-other)]', 'font-mono'],
     ['label', '[font-family:var(--font-label,inherit)]', 'font-medium'],
     ['value', 'text-kui-text', 'tabular-nums'],
-    ['label', 'text-kui-micro', 'font-medium'],
+    ['label', 'text-xs', 'font-medium'],
     ['chip', 'group-aria-busy/chips:cursor-progress', 'rounded-full'],
     ['root', 'group/radios', 'gap-5'],
     ['choice', 'self-start', 'p-2'],

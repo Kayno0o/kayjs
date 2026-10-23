@@ -23,3 +23,7 @@ A point has a `key`, a `label`, `x` and `y`, and a `weight` its dot's area follo
 ## Empty
 
 `emptyLabel` is what the chart reads with no points, `No data yet.` by default.
+
+## Keyboard
+
+Without `onSelect` the dots are one tab stop on the first. The arrows and Home and End walk them in the order of `points`, and each focused dot shows its tooltip. With `onSelect` every dot is a button.

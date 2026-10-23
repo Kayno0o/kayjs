@@ -19,3 +19,7 @@ A day can carry a `description`, shown with its date as the cell's tooltip and r
 The filled cells shade towards `color`, any CSS colour: a theme token keeps it in step with the theme, and an empty day stays unfilled.
 
 <Demo name="contribution-graph/colors" />
+
+## Keyboard
+
+The grid is one tab stop, on today's cell. The up and down arrows step a day, left and right a week, and Home and End reach the first and last day. Each focused cell shows its details like a hovered one.

@@ -164,6 +164,49 @@ describe('ScatterChart', () => {
   })
 })
 
+describe('ScatterChart without onSelect', () => {
+  const key = (dot: Element, name: string) => dot.dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true }))
+
+  test('is one tab stop on the first dot, the arrows and Home and End walking the others so each shows its tooltip on focus', async () => {
+    const root = await charts()
+    const dots = () => [...root.querySelectorAll('#dots [data-part="dot"]')] as HTMLElement[]
+
+    expect(dots().map(dot => dot.tabIndex)).toEqual([0, -1, -1])
+    key(dots()[0]!, 'ArrowRight')
+    await settle()
+    expect(dots().map(dot => dot.tabIndex)).toEqual([-1, 0, -1])
+    expect(document.activeElement).toBe(dots()[1]!)
+    key(dots()[1]!, 'End')
+    await settle()
+    expect(document.activeElement).toBe(dots()[2]!)
+    expect(dots()[2]!.dataset.tooltip).toBe('Tunic')
+  })
+})
+
+describe('ContributionGraph', () => {
+  const key = (cell: Element, name: string) => cell.dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true }))
+
+  test('is one tab stop on today, the arrows stepping a day up and down and a week across', async () => {
+    const root = await charts()
+    const cells = () => [...root.querySelectorAll('#graph [role="img"]')] as HTMLElement[]
+
+    expect(cells().map(cell => cell.tabIndex).indexOf(0)).toBe(8)
+    key(cells()[8]!, 'ArrowUp')
+    await settle()
+    expect(document.activeElement).toBe(cells()[7]!)
+    key(cells()[7]!, 'ArrowLeft')
+    await settle()
+    expect(document.activeElement).toBe(cells()[0]!)
+    key(cells()[0]!, 'ArrowRight')
+    await settle()
+    expect(document.activeElement).toBe(cells()[7]!)
+    key(cells()[7]!, 'End')
+    await settle()
+    expect(document.activeElement).toBe(cells()[13]!)
+    expect(cells().filter(cell => cell.tabIndex === 0)).toHaveLength(1)
+  })
+})
+
 describe('BarChart', () => {
   const key = (column: Element, name: string) => column.dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true }))
 

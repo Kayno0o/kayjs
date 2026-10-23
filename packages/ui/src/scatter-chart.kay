@@ -1,8 +1,8 @@
 --- <Point extends ScatterPoint>
 import type { JSX } from 'kay'
 import type { ScatterAxis, ScatterPoint } from './plot'
-import { memo, recipe } from 'kay'
-import { axisExtent, axisPercent, dotSize } from './plot'
+import { memo, recipe, signal } from 'kay'
+import { axisExtent, axisPercent, dotSize, steppedPoint } from './plot'
 import { wording } from 'kay/words'
 
 const look = recipe({
@@ -41,6 +41,28 @@ const heaviest = memo(() => Math.max(...points.map(point => point.weight ?? 1)))
 // Where a dot sits and how large it is, its area following its weight against the heaviest point.
 const place = (point: Point) => `left: ${axisPercent(point.x, xExtent(), x.scale)}%; bottom: ${axisPercent(point.y, yExtent(), y.scale)}%; --kui-dot-size: ${dotSize(point.weight ?? 1, heaviest())}rem`
 
+// The dot the keyboard stands at when the dots are not buttons, one tab stop in all: the first until it moves.
+const stop = signal(0)
+const current = () => Math.min(stop(), Math.max(0, points.length - 1))
+
+// The arrows walk the dots in the order of `points`, and Home and End reach either end.
+function keyDown(event: KeyboardEvent) {
+  if (event.altKey || event.ctrlKey || event.metaKey)
+    return
+
+  const next = steppedPoint(event.key, current(), points.length)
+
+  if (next === undefined)
+    return
+
+  event.preventDefault()
+  stop.set(next)
+
+  const target = (event.currentTarget as HTMLElement).parentElement?.querySelectorAll<HTMLElement>('[role="img"]')[next]
+
+  target?.focus()
+}
+
 const cornerEntries = () => Object.entries(corners ?? {}).filter(([, text]) => text)
 ---
 if points.length === 0
@@ -62,10 +84,10 @@ else
         span(part="guide" data-axis="x" style={`left: ${axisPercent(quadrant.x, xExtent(), x.scale)}%`})
       for entry of cornerEntries() key={entry[0]}
         span(part="corner" data-corner={entry[0]}) {entry[1]}
-      for point of points key={point.key}
+      for point, at of points key={point.key}
         if onSelect
           button(part="dot" type="button" data-interactive aria-label={point.label} data-tooltip={point.tooltip ?? point.label} style={place(point)} onClick={() => onSelect?.(point)})
         else
-          span(part="dot" role="img" aria-label={point.label} data-tooltip={point.tooltip ?? point.label} style={place(point)})
+          span(part="dot" role="img" tabindex={at === current() ? '0' : '-1'} aria-label={point.label} data-tooltip={point.tooltip ?? point.label} style={place(point)} onKeyDown={keyDown} onFocus={() => stop.set(at)})
     if x.label
       span(part="axisLabel" data-axis="x") {x.label}

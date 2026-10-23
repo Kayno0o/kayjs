@@ -58,7 +58,7 @@ header
   Bell
 ```
 
-- An icon button with the unread count of the signed-in visitor's in-app notifications and a menu listing the newest 20, stored by `notify(userId, { title, url })` from `kay/server` ([Notifications](../../../llms/notifications.md)). Opening an item marks it read and follows its link; "Mark all as read" marks the rest. It shows nothing to a visitor nobody is signed in as, and updates in every open tab.
+- An icon button with the unread count of the signed-in visitor's in-app notifications and a menu listing the newest 20, stored by `notify(userId, { title, url })` from `kay/server` ([Notifications](../../../llms/notifications.md)). Opening an item marks it read and follows its link; "Mark all as read" marks the rest. It shows nothing to a visitor nobody is signed in as, and updates in every open tab, announcing a notification that arrives while the page is open.
 - The visitor is the user the auth library names (kayjs-auth does), read on the server: `Bell` has no `user` prop. A page with a `Bell` is private and rendered per request, and `ui()` serves its `GET /_kay/ui/inbox` and `POST /_kay/ui/inbox/read`.
 - `label` (`Notifications`) names the button and `placement` is the menu's, as `Menu` takes it. The `bell` icon slot maps its icon ([Setup](setup.md)); `ui.bell.*` are its words ([Words](words.md)).
 - A title is text and a link is drawn only for a path of the site or an http(s) URL; an external one opens in a new tab.

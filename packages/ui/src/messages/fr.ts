@@ -11,6 +11,7 @@ export default defineMessages({
       markAll: 'Tout marquer comme lu',
       unread: { one: '{label}, {count} non lue', other: '{label}, {count} non lues' },
       unreadMark: '(non lue)',
+      new: 'Nouvelle notification : {title}',
     },
     carousel: {
       dot: 'Aller à la diapositive {n}',
@@ -75,7 +76,7 @@ export default defineMessages({
       cropText: '{w} sur {h} pixels en {x}, {y}',
     },
     lineChart: { rangeHint: 'Maj avec les flèches choisit une plage, Entrée l\'applique, Échap l\'abandonne', total: 'Total' },
-    loadMore: { failure: 'Impossible d\'en charger davantage.', loading: 'Chargement…', retry: 'Réessayer' },
+    loadMore: { failure: 'Impossible d\'en charger davantage.', loaded: { one: '{count} de plus chargé', other: '{count} de plus chargés' }, loading: 'Chargement…', more: 'Charger plus', retry: 'Réessayer' },
     markdownEditor: {
       bold: 'Gras',
       bulletList: 'Liste à puces',

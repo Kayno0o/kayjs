@@ -1,13 +1,13 @@
 ---
-import { recipe } from 'kay'
+import { effect, recipe, signal } from 'kay'
 import type { InfiniteList } from './infinite-list'
 import Button from './button.kay'
 import WhenVisible from './when-visible.kay'
 import { wording } from 'kay/words'
 
-const look = recipe({ parts: { root: 'kui-load-more', failed: 'kui-load-more-failed', loading: 'kui-load-more-loading' } })
+const look = recipe({ parts: { root: 'kui-load-more', failed: 'kui-load-more-failed', loading: 'kui-load-more-loading', announced: 'sr-only' } })
 
-const { list, margin, loadingLabel = wording('ui.loadMore.loading', 'Loading more…'), failureLabel = wording('ui.loadMore.failure', 'Could not load more.'), retryLabel = wording('ui.loadMore.retry', 'Try again') } = props<{
+const { list, margin, loadingLabel = wording('ui.loadMore.loading', 'Loading more…'), failureLabel = wording('ui.loadMore.failure', 'Could not load more.'), retryLabel = wording('ui.loadMore.retry', 'Try again'), button = false, moreLabel = wording('ui.loadMore.more', 'Load more'), loadedLabel } = props<{
   // The list this draws the end of, from `infiniteList`.
   list: InfiniteList<unknown>
   // How far outside the scroll box counts as in view already, in pixels: see WhenVisible.
@@ -15,9 +15,27 @@ const { list, margin, loadingLabel = wording('ui.loadMore.loading', 'Loading mor
   loadingLabel?: string | undefined
   failureLabel?: string | undefined
   retryLabel?: string | undefined
+  // Loads the next page when the reader presses a button instead of on scrolling to the end, for a page that must keep its footer within reach.
+  button?: boolean | undefined
+  moreLabel?: string | undefined
+  // What a screen reader hears once rows were added, from how many: "3 more loaded" by default.
+  loadedLabel?: ((count: number) => string) | undefined
 }>()
+
+// Rows added by the last page, told to screen readers beside the visible status.
+const added = signal(0)
+let seen = list.rows().length
+
+effect(() => {
+  const total = list.rows().length
+
+  added.set(total - seen)
+  seen = total
+})
+
+const loaded = () => added() > 0 ? (loadedLabel?.(added()) ?? wording('ui.loadMore.loaded', '{count} more loaded', { count: added() })) : ''
 ---
-// The end of an infinite list: the sentinel while there are more rows, a status while a page loads, and an alert with a retry once a page failed, which loads no other until it is pressed.
+// The end of an infinite list: the sentinel, or a button under `button`, while there are more rows, a status while a page loads, and an alert with a retry once a page failed, which loads no other until it is pressed.
 div(part="root")
   if !list.ended()
     if list.failed()
@@ -25,8 +43,12 @@ div(part="root")
         p {failureLabel}
         Button(label={retryLabel} busy={list.pending()} disabled={list.pending()} onClick={list.retry})
     else
-      WhenVisible(onVisible={list.more} margin={margin})
+      if button
+        Button(label={moreLabel} busy={list.pending()} disabled={list.pending()} onClick={list.more})
+      else
+        WhenVisible(onVisible={list.more} margin={margin})
       // An always-present status, so a screen reader hears the text appear; the text's element coming and going is also what makes WhenVisible look again where the list stands, as it watches its parent's children.
       p(part="loading" role="status")
         if list.pending()
           span {loadingLabel}
+  p(part="announced" role="status") {loaded()}
