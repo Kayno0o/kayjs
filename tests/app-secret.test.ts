@@ -68,6 +68,7 @@ catch (error) {
     expect((await preview(`'${'a'.repeat(40)}'`)).err).toContain('`preview.secret` in kay.config.ts holds a secret of fewer than 10 different characters')
     expect((await preview(`'${random}'`)).err).not.toContain('fewer than')
     expect((await preview(`['${random}', 'short']`)).out).toContain('lists a secret that is 5 characters long')
+    expect((await preview(`['${random}', 5]`)).out).toContain('lists a secret that is not a string')
   })
 
   it('refuses to start a production server on a key of its process, unless a secret is set or an ephemeral key is asked for', async () => {
