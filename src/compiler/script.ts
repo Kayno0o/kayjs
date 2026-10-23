@@ -902,7 +902,7 @@ function sharedWithExports(ast: ParseResult<t.File>, exported: t.Statement[], pe
   if (![...named].some(name => declaredBy.has(name)))
     return shared
 
-  loadTraverse()(ast, {
+  walkScope(ast, {
     Program(program) {
       const reads = new Map<t.Statement, StatementReads>()
       const readsOf = (statement: NodePath<t.Statement>): StatementReads => {
@@ -1299,6 +1299,23 @@ export function codeOf(text: string): string {
   return code.replaceAll(OBJECT_KEY, '$1')
 }
 
+// Walks the fence with Babel's scope, false when the scope refuses a name declared twice, as an import and a `const` an edit passes through. The half-built scope is dropped then: Babel marks a scope built before crawling it, so a later walk would read it as whole and not refuse the fence.
+function walkScope(ast: ParseResult<t.File>, visitor: Parameters<ReturnType<typeof loadTraverse>>[1]): boolean {
+  try {
+    loadTraverse()(ast, visitor)
+
+    return true
+  }
+  catch (error) {
+    if (!(error instanceof TypeError && error.message.startsWith('Duplicate declaration')))
+      throw error
+
+    loadTraverse().cache.clearScope()
+
+    return false
+  }
+}
+
 // Which of `kay`'s values, `declared` aside, the fence reads with nothing in it declaring or importing them, `typed` being the code of the statements that did not parse, where a mention counts as a read, and `read` the ones the template reads.
 function undeclared(ast: ParseResult<t.File>, code: string, declared: string[], typed: string, read: readonly string[]): string[] {
   // `ctx` in a fence is the request, which only a template reading it unimported gets from `kay`.
@@ -1311,19 +1328,18 @@ function undeclared(ast: ParseResult<t.File>, code: string, declared: string[], 
 
   const inTyped = new Set(typed.match(KAY_NAME) ?? [])
 
-  // Babel's scope refuses a name declared twice, as an import and a `const` an edit passes through: every name mentioned and not declared is then taken as read, and the half-built scope is dropped so a later walk refuses the fence too.
-  try {
-    loadTraverse()(ast, {
-      Program(path) {
-        found.push(...mentioned.filter(name => (name in path.scope.globals || inTyped.has(name) || read.includes(name)) && !path.scope.hasBinding(name)))
-        path.stop()
-      },
-    })
-  }
-  catch {
-    loadTraverse().cache.clearScope()
+  const walked = walkScope(ast, {
+    Program(path) {
+      found.push(...mentioned.filter(name => (name in path.scope.globals || inTyped.has(name) || read.includes(name)) && !path.scope.hasBinding(name)))
+      path.stop()
+    },
+  })
 
-    return mentioned
+  // A fence Babel's scope refuses takes as read every name it mentions outside its strings and comments.
+  if (!walked) {
+    const outside = new Set([...(codeOf(code).match(KAY_NAME) ?? []), ...inTyped, ...read])
+
+    return mentioned.filter(name => outside.has(name))
   }
 
   return found
@@ -1519,7 +1535,7 @@ function stylesRoot(call: t.CallExpression): boolean {
 
 // The names the fence declares that a recipe at module level reads, which exist only once the component runs.
 function reportRecipeReads(ast: ParseResult<t.File>, recipeStatements: ReadonlySet<t.Node>, kept: ReadonlySet<t.Node>, shift: (node: t.Node) => Span, diagnostics: Diagnostic[]): void {
-  loadTraverse()(ast, {
+  walkScope(ast, {
     Program(program) {
       program.traverse({
         Identifier(identifier) {
