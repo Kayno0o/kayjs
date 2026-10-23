@@ -79,7 +79,7 @@ export function plumbing(served: PlumbingServed, taken: (path: string, method: s
   return KNOWN.filter(known => known.when(served, files) && !taken(known.route ?? known.path, known.method)).map(({ method, path, purpose, docs }) => ({ method, path, purpose, docs }))
 }
 
-// The fixed paths kay answers a POST at itself, which no app code sees and so never changes what a page renders: kept pages are not checked against a request to them.
+// The fixed paths kay answers a POST at itself, none of which changes what a page renders: kept pages are not checked against a request to them.
 export function ownPostPaths(): string[] {
   return KNOWN.filter(known => known.method === 'POST' && !known.path.includes('<') && !known.path.includes('*')).map(known => known.path)
 }

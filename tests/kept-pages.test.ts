@@ -1484,7 +1484,7 @@ describe('the requests that count as writes', () => {
       const source = await Bun.file(join(import.meta.dir, '..', file)).text()
 
       for (const [, name] of source.matchAll(/\.post\(([A-Z][A-Z_]+),/g)) {
-        if (!name!.startsWith('DEV_') && !known.includes(name!))
+        if (!name!.startsWith('DEV_') && !new RegExp(`path: ${name}\\b`).test(known))
           missing.push(`${file}: ${name}`)
       }
     }

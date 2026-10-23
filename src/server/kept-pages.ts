@@ -11,7 +11,7 @@ export interface Writes {
   count: number
 }
 
-// What kay answers itself and no app code ever sees, taken from the list of its own endpoints: the beats, reports and drafts the browser posts.
+// What kay answers itself without changing what a page renders, taken from the list of its own endpoints: the beats, reports and drafts the browser posts.
 const KAY_ROUTES = ownPostPaths()
 const SLASH = 47
 

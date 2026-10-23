@@ -89,7 +89,8 @@ describe('markdownHtml', () => {
     for (const markdown of CORPUS) {
       const { html } = await renderMarkdown(markdown)
 
-      if (!html.includes('<h'))
+      // A task list's labels are written after the sanitizer, so only the unlabelled form round trips.
+      if (!html.includes('<h') && !html.includes('task-list-item'))
         expect(markdownHtml(markdown)).toBe(sanitizedMarkdown(html, href => leavesSite(href, undefined)))
     }
 
@@ -121,6 +122,9 @@ describe('markdownHtml', () => {
     // The best of three runs, so a pause under load does not count; eight times the input takes about eight times as long, where marked unbounded took sixty-four.
     const best = (markdown: string) => Math.min(...Array.from({ length: 3 }, () => {
       const started = performance.now()
+
+      markdownHtml('<li class="task-list-item"><label><input type="checkbox" class="task-list-item-checkbox" disabled>'.repeat(5000))
+      markdownHtml('- [ ] a\n  b\n'.repeat(5000))
 
       islandMarkdown(markdown)
 
@@ -189,14 +193,15 @@ describe('markdownHtml', () => {
 })
 
 describe('task list checkboxes', () => {
-  const TASKS = '- [x] done **bold**\n- [ ] next [link](/a)\n  - [ ] nested\n- plain\n\n- [ ] loose\n\n  more\n\n1. [ ] ordered `c`\n'
+  const TASKS = '- [x] done **bold**\n- [ ] wraps over\n  two lines\n- [ ] next [link](/a)\n  - [ ] nested\n- plain\n\n- [ ] loose\n\n  more\n\n1. [ ] ordered `c`\n'
 
   it('names each box by its item text on the server, in an island and in an entry body', async () => {
     const entry = (await renderMarkdown(TASKS)).html
 
     for (const html of [markdownHtml(TASKS), islandMarkdown(TASKS), entry]) {
-      expect(html.match(/<input/g)).toHaveLength(5)
-      expect(html.match(/<label><input/g)).toHaveLength(5)
+      expect(html.match(/<input/g)).toHaveLength(6)
+      expect(html.match(/<label><input/g)).toHaveLength(6)
+      expect(html).toContain('disabled>wraps over\ntwo lines</label>')
       expect(html).toContain('<label><input type="checkbox" class="task-list-item-checkbox" disabled checked>done <strong>bold</strong></label>')
       expect(html).toContain('<p><label><input type="checkbox" class="task-list-item-checkbox" disabled>loose</label></p>')
       expect(html).toContain('<li class="task-list-item"><label><input type="checkbox" class="task-list-item-checkbox" disabled>nested</label></li>')
@@ -224,6 +229,8 @@ describe('task list checkboxes', () => {
       expect(await violations('<ul><li><input type="checkbox" disabled>unnamed</li></ul>')).toBe(1)
     }
     finally {
+      window.close()
+
       for (const key of ['window', 'document', 'Node', 'Element'])
         Reflect.deleteProperty(scope, key)
     }
