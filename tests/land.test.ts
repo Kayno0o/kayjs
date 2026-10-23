@@ -5,7 +5,7 @@ import process from 'node:process'
 import { $ } from 'bun'
 import { describe, expect, it } from 'bun:test'
 import { addedMarkers } from '../scripts/merge-markers'
-import { readersOf, SOURCE_CHANGE, SOURCE_FILE_READ, SOURCE_READERS, SOURCE_SCAN, WHOLE_SUITE } from '../scripts/source-readers'
+import { readersOf, SOURCE_CHANGE, SOURCE_FILE_READ, SOURCE_READERS, SOURCE_SCAN, UI_THEME_USE, WHOLE_SUITE } from '../scripts/source-readers'
 import { subprocessTests } from '../scripts/subprocess-tests'
 import { scratchDir } from './scratch'
 
@@ -392,15 +392,29 @@ describe('tests scanning the sources as files', () => {
 
     for await (const test of new Bun.Glob('tests/*.test.ts').scan(ROOT)) {
       for (const [, path] of (await Bun.file(join(ROOT, test)).text()).matchAll(SOURCE_FILE_READ)) {
-        const source = path!.replace(/^(?:\.\.\/)+/, '')
+        // A path built from a variable stands for every file it can name.
+        const sources = path!.includes('${') ? await Array.fromAsync(new Bun.Glob(path!.replace(/^(?:\.\.\/)+/, '').replaceAll(/\$\{[^}]*\}/g, '*')).scan(ROOT)) : [path!.replace(/^(?:\.\.\/)+/, '')]
 
-        // A kay source other than a `.ts` already runs the whole suite.
-        if (!WHOLE_SUITE.test(source) && !readersOf(source).includes(test))
-          unreached.push(`${test} reads ${path}`)
+        for (const source of sources) {
+          // A kay source other than a `.ts` already runs the whole suite.
+          if (!WHOLE_SUITE.test(source) && !readersOf(source).includes(test))
+            unreached.push(`${test} reads ${source}`)
+        }
       }
     }
 
     expect(unreached.toSorted()).toEqual([])
+  })
+
+  it('list for the theme of the UI library the tests reading it or loading the UI extension, no more and no less', async () => {
+    const using: string[] = []
+
+    for await (const test of new Bun.Glob('tests/*.test.ts').scan(ROOT)) {
+      if (test !== 'tests/land.test.ts' && !test.includes('browser') && UI_THEME_USE.test(await Bun.file(join(ROOT, test)).text()))
+        using.push(test)
+    }
+
+    expect(readersOf('packages/ui/src/theme.css').filter(test => !SOURCE_READERS.includes(test) && !(/^tests\/(?:llms|packages|docs|examples|library|new|public-repo)\.test\.ts$/).test(test)).toSorted()).toEqual(using.toSorted())
   })
 
   it('run the tests reading the theme of the UI library for a change to it, and no browser one', () => {

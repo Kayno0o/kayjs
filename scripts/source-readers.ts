@@ -21,14 +21,17 @@ export const SOURCE_READERS = [
 // What marks a test as scanning sources: a quoted glob of `src/` or `packages/<library>/src/`, or a scan of the `SRC` folder.
 export const SOURCE_SCAN = /[`'"]\{?(?:src\/|packages\/[^`'"]*\/src\/)[^`'"]*\*[*.]|\.scan(?:Sync)?\(SRC\)/
 
-// Tests reading one source file through a fixed path, which neither an import graph nor `SOURCE_READERS` shows: a stylesheet or a component read as text, or loaded by a library's extension. Each runs only for a change to its file, as the slow and browser tests stay out.
+// Tests reading one source file through a fixed path, which neither an import graph nor `SOURCE_READERS` shows: a stylesheet or a component read as text, or loaded by a library's extension (`tests/land.test.ts` derives the `theme.css` list from `UI_THEME_USE`). Each runs only for a change to its file, as the slow and browser tests stay out.
 export const SOURCE_FILE_READERS: [RegExp, string[]][] = [
   [/^packages\/ui\/src\/theme\.css$/, ['tests/ui-tokens.test.ts', 'tests/apply-theme.test.ts', 'tests/format-tailwind.test.ts', 'tests/prune-styles.test.ts', 'tests/inbox.test.ts']],
   [/^packages\/ui\/src\/bell\.kay$/, ['tests/library-context-check.test.ts']],
 ]
 
 // What marks a test as reading one source file other than a `.ts`: a quoted path of a file in `src/` or `packages/<library>/src/` from the repo root (`../`, `packages/` or `resolve('src/`), on a line reading it.
-export const SOURCE_FILE_READ = /(?:Bun\.file|readFile(?:Sync)?)\([^\n]*?[`'"]((?:(?:\.\.\/)+src|(?:\.\.\/)*packages\/[\w-]+\/src|(?<=resolve\([`'"])src)\/[\w./-]*?\.(?!ts\b)[a-z]+)[`'"]/g
+export const SOURCE_FILE_READ = /(?:Bun\.file|readFile(?:Sync)?)\([^\n]*?[`'"]((?:(?:\.\.\/)+src|(?:\.\.\/)*packages\/[\w-]+\/src|(?<=resolve\([`'"])src)\/[^`'"]*?\.(?!ts\b)[a-z]+)[`'"]/g
+
+// What marks a test as depending on the stylesheet of the UI library: it reads it, loads the UI extension that references it, or imports it from a stylesheet. Browser tests are left out of `SOURCE_FILE_READERS`.
+export const UI_THEME_USE = /packages\/ui\/src\/(?:extension|theme\.css)|kayjs-ui\/theme\.css/
 
 // Tests reading these folders as files, which an import graph does not show.
 export const READERS: [RegExp, string[]][] = [
