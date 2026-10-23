@@ -1,6 +1,7 @@
 import { cp, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
+import { ZED_MANIFEST, zedReleasable, zedRelease } from '../scripts/zed-release'
 import { scratchDir } from './scratch'
 
 // Decisions:
@@ -38,6 +39,25 @@ async function kayFiles(): Promise<string[]> {
 
   return files.toSorted()
 }
+
+// Runs wherever the tests do: the release rewrites this file.
+describe('the Zed extension release', () => {
+  it('rewrites the extension version and grammar tag for a release, on a copy', async () => {
+    const dir = await scratchDir('zed-release-')
+    const copy = join(dir, 'extension.toml')
+
+    await cp(join(ROOT, ZED_MANIFEST), copy)
+    const manifest = await Bun.file(copy).text()
+    const released = zedRelease(manifest, '1.72.0')
+
+    expect(zedReleasable(manifest)).toBe(true)
+    expect(zedReleasable('id = "kay"')).toBe(false)
+    expect(released).toContain('version = "1.72.0"')
+    expect(released).toContain('rev = "v1.72.0"')
+    expect(released.replaceAll('1.72.0', '').replace(/^rev = "v"$/m, '')).toContain('path = "editors/tree-sitter-kay"')
+    expect(await Bun.file(join(ROOT, ZED_MANIFEST)).text()).not.toContain('1.72.0')
+  })
+})
 
 describe.skipIf(treeSitter === null)('tree-sitter grammar', () => {
   it('parses every .kay file of the fixtures and the examples without an error', async () => {
