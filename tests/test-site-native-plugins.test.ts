@@ -105,17 +105,21 @@ process.exit(0)
 it('a check build\'s empty stylesheets keep the class names of a stylesheet module', async () => {
   const dir = await scratchDir('native-module-')
 
-  await Bun.write(join(dir, 's.module.css'), '/* .gone */ .card { background: url(a.png) } .card-title, .x_y > .z:hover { margin: 0.5em; content: ".quoted" }\n')
+  await Bun.write(join(dir, 's.module.css'), '/* .gone */ .card { background: url(a.png) } .card-title, .x_y > .z:hover { margin: 0.5em; content: ".quoted" } .default, .new { color: red }\n')
   await Bun.write(join(dir, 'plain.css'), '@import "tailwindcss" source("..");\n')
-  await Bun.write(join(dir, 'entry.ts'), `import styles, { card, x_y } from './s.module.css'\nimport './plain.css'\nconsole.log(styles['card-title'], styles.z, card, x_y)\n`)
+  await Bun.write(join(dir, 'entry.ts'), `import styles, { card, x_y, new as fresh } from './s.module.css'\nimport './plain.css'\nglobalThis.seen = JSON.stringify({ ...styles, card, x_y, fresh })\n`)
 
   const result = await run(`import { checkOnly } from ${JSON.stringify(resolve('src/test/lazy-plugins'))}
 
 const options = checkOnly({ plugins: [{ name: '@tailwindcss/bun', kayNative: true, setup() {} }] } as never)
 const build = await Bun.build({ entrypoints: [${JSON.stringify(join(dir, 'entry.ts'))}], target: 'browser', plugins: options.plugins, throw: false })
 
-console.log(JSON.stringify({ success: build.success, logs: build.logs.map(String) }))
+console.log(JSON.stringify({ success: build.success, logs: build.logs.map(String), code: build.success ? await build.outputs[0]!.text() : '' }))
 `, dir)
 
-  expect(result).toEqual({ success: true, logs: [] })
+  const { success, logs, code } = result as { success: boolean, logs: string[], code: string }
+
+  expect({ success, logs }).toEqual({ success: true, logs: [] })
+  expect(['card-title', 'z', 'new', 'x_y'].filter(name => !code.includes(`"${name}"`))).toEqual([])
+  expect(code).not.toMatch(/gone|quoted|a\.png|"png"/)
 }, 60_000)
