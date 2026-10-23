@@ -195,6 +195,7 @@ describe('the charts and media whose recipe holds their look', () => {
     ['column', 'items-end', 'px-px'],
     ['bar', 'min-h-px', 'rounded-t-md'],
     ['axisLabel', 'justify-center', 'font-mono'],
+    ['tile', 'min-w-0', 'rounded-xl'],
     ['legendItem', 'items-center', 'gap-2'],
   ] as const)('the %s part with %s draws what src/ui.ts sets after its base: %s', (part, base, restyle) => {
     const found = partsNamed(part).filter(classes => classes.includes(base))

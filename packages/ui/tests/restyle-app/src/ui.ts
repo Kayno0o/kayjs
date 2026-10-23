@@ -56,7 +56,7 @@ export default defineUi({
   '@kaynooo/kayjs-ui/scatter-chart.kay': { parts: { plot: 'aspect-video', axisLabel: 'uppercase' } },
   '@kaynooo/kayjs-ui/contribution-graph.kay': { parts: { cell: 'rounded-full', month: 'font-medium' } },
   '@kaynooo/kayjs-ui/carousel.kay': { parts: { viewport: 'rounded-3xl', step: 'size-12', dot: 'size-4' } },
-  '@kaynooo/kayjs-ui/masonry.kay': { parts: 'p-3' },
+  '@kaynooo/kayjs-ui/masonry.kay': { parts: { root: 'p-3', tile: 'rounded-xl' } },
   '@kaynooo/kayjs-ui/media-gallery.kay': { parts: { root: 'text-center', stage: 'rounded-3xl', thumb: 'opacity-80', counter: 'font-mono' } },
   '@kaynooo/kayjs-ui/image-cropper.kay': { parts: { stage: 'bg-black', handle: 'size-4' } },
   '@kaynooo/kayjs-ui/zoom-pane.kay': { parts: { root: 'h-96', tools: 'gap-2' } },
