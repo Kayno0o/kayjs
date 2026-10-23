@@ -433,6 +433,16 @@ export function asyncReplies(fence: ParsedFence): Diagnostic[] {
   return diagnostics
 }
 
+// The values of a template that follow its first one with no text between: they extend the prefix, where later ones follow text the prefix already ended with.
+function adjacent(node: t.TemplateLiteral): t.Node[] {
+  const found: t.Node[] = []
+
+  for (let at = 1; at < node.expressions.length && (node.quasis[at]!.value.cooked ?? '') === ''; at++)
+    found.push(node.expressions[at]!)
+
+  return found
+}
+
 // The checkers that turn any value into a path of this site: kay's `localPath` and the auth library's `safeRedirect`.
 const SITE_CHECKERS = new Set(['localPath', 'safeRedirect'])
 
@@ -449,11 +459,11 @@ function isSitePath(node: t.Node, constants: ReadonlyMap<string, t.Node[]>, seen
     if (node.expressions.length === 0)
       return SITE_PATH.test(first)
 
-    return first === '' ? site(node.expressions[0]!) : BUILT_PATH.test(first)
+    return first === '' ? site(node.expressions[0]!) && adjacent(node).every(inner => !readsRequest(inner, constants, new Set())) : BUILT_PATH.test(first)
   }
 
   if (node.type === 'BinaryExpression' && node.operator === '+')
-    return node.left.type === 'StringLiteral' ? BUILT_PATH.test(node.left.value) : site(node.left) && (node.left.type === 'BinaryExpression' || node.left.type === 'CallExpression' || node.left.type === 'Identifier')
+    return node.left.type === 'StringLiteral' ? BUILT_PATH.test(node.left.value) : site(node.left) && (node.left.type === 'BinaryExpression' || node.left.type === 'CallExpression' || node.left.type === 'Identifier') && !readsRequest(node.right, constants, new Set())
 
   if (node.type === 'ConditionalExpression')
     return site(node.consequent) && site(node.alternate)
@@ -492,19 +502,25 @@ function constantsOf(fence: ParsedFence): Map<string, t.Node[]> {
   const unknown = new Set<string>()
 
   eachNode(fence.ast.program, (node) => {
-    if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier') {
-      if (node.init)
-        constants.set(node.id.name, [...constants.get(node.id.name) ?? [], node.init])
-      else
-        unknown.add(node.id.name)
+    if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier' && node.init) {
+      constants.set(node.id.name, [...constants.get(node.id.name) ?? [], node.init])
     }
-    else if (node.type === 'AssignmentExpression' && node.left.type === 'Identifier') {
-      unknown.add(node.left.name)
+    else if (node.type === 'VariableDeclarator') {
+      for (const name of patternNames(node.id))
+        unknown.add(name)
+    }
+    else if (node.type === 'AssignmentExpression') {
+      for (const name of patternNames(node.left))
+        unknown.add(name)
+    }
+    else if (node.type === 'CatchClause') {
+      for (const name of patternNames(node.param))
+        unknown.add(name)
     }
     else if (isFunction(node)) {
       for (const param of node.params) {
-        if (param.type === 'Identifier')
-          unknown.add(param.name)
+        for (const name of patternNames(param))
+          unknown.add(name)
       }
     }
   })
@@ -516,19 +532,29 @@ function constantsOf(fence: ParsedFence): Map<string, t.Node[]> {
 }
 
 const REQUEST_CONTEXT = new Set(['query', 'params', 'body', 'request', 'url', 'input', 'headers', 'cookies', 'form'])
+// What a visitor posts, which a call result built from it (a sign-in checking a form) is not followed back to.
+const POSTED = new Set(['input', 'body', 'form', 'formData'])
 const REQUEST_ROOTS = new Set(['query', 'params', 'body', 'input', 'request', 'searchParams', 'formData'])
 
-// A call result is a value the callee made, which is not followed back to what it was given.
+// A call result is a value the callee made: a request member it was given taints it, the bare request object (an action's `input`) does not.
 function isCall(node: t.Node): boolean {
   return node.type === 'AwaitExpression' ? isCall(node.argument) : node.type === 'CallExpression'
 }
 
-// Whether a node reads the request: \`ctx.query...\`, \`ctx.url...\`, a destructured \`query\` or a \`const\` holding one.
-function readsRequest(node: t.Node, constants: ReadonlyMap<string, t.Node[]>, seen: Set<string>): boolean {
+// Whether a node reads the request: `ctx.query...`, `ctx.url...`, a destructured `query` or a `const` holding one.
+function readsRequest(node: t.Node, constants: ReadonlyMap<string, t.Node[]>, seen: Set<string>, bare = true): boolean {
   let found = false
 
-  eachNode(node, (inner) => {
+  eachNode(node, (inner, parent) => {
     if (found)
+      return false
+
+    // A property name or an object key is no variable.
+    if (inner.type === 'Identifier' && parent !== undefined && ((parent.type === 'MemberExpression' && parent.property === inner && !parent.computed) || (parent.type === 'OptionalMemberExpression' && parent.property === inner && !parent.computed) || (parent.type === 'ObjectProperty' && parent.key === inner && !parent.computed && !parent.shorthand)))
+      return true
+
+    // What a checker returns is a path of the site, whatever it was given.
+    if (inner.type === 'CallExpression' && inner.callee.type === 'Identifier' && SITE_CHECKERS.has(inner.callee.name))
       return false
 
     if (inner.type === 'MemberExpression' || inner.type === 'OptionalMemberExpression') {
@@ -541,14 +567,14 @@ function readsRequest(node: t.Node, constants: ReadonlyMap<string, t.Node[]>, se
       }
 
       if (base.type === 'Identifier' && 'property' in first && first.property.type === 'Identifier')
-        found = base.name === 'ctx' ? REQUEST_CONTEXT.has(first.property.name) : REQUEST_ROOTS.has(base.name)
+        found = base.name === 'ctx' ? REQUEST_CONTEXT.has(first.property.name) && (bare || !POSTED.has(first.property.name)) : REQUEST_ROOTS.has(base.name) && (bare || !POSTED.has(base.name))
     }
-    else if (inner.type === 'Identifier' && REQUEST_ROOTS.has(inner.name)) {
+    else if (bare && inner.type === 'Identifier' && REQUEST_ROOTS.has(inner.name)) {
       found = true
     }
     else if (inner.type === 'Identifier' && constants.has(inner.name) && !seen.has(inner.name)) {
       seen.add(inner.name)
-      found = constants.get(inner.name)!.some(init => !isCall(init) && readsRequest(init, constants, seen))
+      found = constants.get(inner.name)!.some(init => readsRequest(init, constants, seen, bare && !isCall(init)))
     }
 
     return !found
@@ -558,7 +584,7 @@ function readsRequest(node: t.Node, constants: ReadonlyMap<string, t.Node[]>, se
 }
 
 // Whether a target that is not written as a site path may be any URL: a literal or text that is not a path, an unknown name, a member of the request, or a call fed the request.
-// A value a helper builds from the app's own values (\`organizationPage(features, org)\`, \`result.redirect\`) is left alone, as it does not come from the visitor.
+// A value a helper builds from the app's own values (`organizationPage(features, org)`, `result.redirect`) is left alone, as it does not come from the visitor.
 function leaks(node: t.Node, constants: ReadonlyMap<string, t.Node[]>, seen = new Set<string>()): boolean {
   const next = (inner: t.Node) => leaks(inner, constants, seen)
 
@@ -568,11 +594,11 @@ function leaks(node: t.Node, constants: ReadonlyMap<string, t.Node[]>, seen = ne
   if (node.type === 'TemplateLiteral') {
     const first = node.quasis[0]!.value.cooked ?? ''
 
-    return first === '' ? next(node.expressions[0]!) : !BUILT_PATH.test(first)
+    return first === '' ? next(node.expressions[0]!) || adjacent(node).some(inner => readsRequest(inner, constants, new Set())) : !BUILT_PATH.test(first)
   }
 
   if (node.type === 'BinaryExpression' && node.operator === '+')
-    return node.left.type === 'StringLiteral' ? !BUILT_PATH.test(node.left.value) : next(node.left)
+    return node.left.type === 'StringLiteral' ? !BUILT_PATH.test(node.left.value) : next(node.left) || readsRequest(node.right, constants, new Set())
 
   if (node.type === 'ConditionalExpression')
     return next(node.consequent) || next(node.alternate)
@@ -626,7 +652,7 @@ export function openRedirects(fence: ParsedFence): Diagnostic[] {
       code: 'external-redirect',
       checkOnly: true,
       message: 'This redirect goes where its value says, which may be any site',
-      note: 'a target read from the request, a store or a variable is an open redirect when it is a full URL: a link on your domain sends a visitor to a phishing page',
+      note: 'a target read from the request is an open redirect when it is a full URL: a link on your domain sends a visitor to a phishing page',
       help: 'wrap a `?next=` value in `localPath(value, fallback)`, or write `// kay-allow external-redirect` for a URL you chose',
     })
   })

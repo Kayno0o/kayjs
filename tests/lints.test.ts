@@ -297,6 +297,22 @@ describe('external-redirect', () => {
     expect(found('redirect(`${ctx.query.next}/a`)')).toHaveLength(1)
   })
 
+  it('follows the request through a call result, a bare slash prefix and a destructured name', () => {
+    expect(found('const a = decode(ctx.query.n)\nredirect(a.href)')).toHaveLength(1)
+    expect(found('const raw = String(ctx.query.next)\nredirect(new URL(raw).href)')).toHaveLength(1)
+    expect(found('const base = "/"\nredirect(base + ctx.query.next)')).toHaveLength(1)
+    expect(found('const base = "/"\nredirect(`${base}${ctx.query.next}`)')).toHaveLength(1)
+    expect(found('const to = "/a"\nconst go = ({ to }) => redirect(to)')).toHaveLength(1)
+    expect(found('const next = "/a"\nconst go = () => {\n  const { next } = ctx.query\n  redirect(next)\n}')).toHaveLength(1)
+  })
+
+  it('does not read a property name as a variable, trusts a checker\'s result and a call built from a posted form', () => {
+    expect(found('const redirect = localPath(ctx.url.searchParams.get("r"), "/")\nconst result = await go(1)\nctx.redirect(localize(result.redirect))')).toEqual([])
+    expect(found('const back = localPath(ctx.url.searchParams.get("r"), "/")\nredirect(signInTarget(ctx, back) ?? "/in")')).toEqual([])
+    expect(found('const result = await signIn(input.email)\nredirect(localize(result.redirect))')).toEqual([])
+    expect(found('const signIn = localize(page)\nredirect(`${signIn}x=${encodeURIComponent(ctx.params.id)}`)')).toEqual([])
+  })
+
   it('reads a plain module too', () => {
     const guard = 'export default guard(({ redirect, query }) => redirect(query.next))\n'
 

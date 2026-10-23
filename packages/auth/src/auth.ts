@@ -1348,6 +1348,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
       const outcome = await (await load.flow()).finishOAuth(auth[STATE], params.provider, { code: text(query.code), state: text(query.state), error: text(query.error), user: text(query.user) }, flow)
 
+      // kay-allow external-redirect: the flow's own redirect, checked when it started
       return redirect('error' in outcome ? failed(outcome.error, outcome.redirect) : outcome.redirect, 303)
     })
     // Apple, or any provider asked for `response_mode=form_post`, comes back with a cross-site POST, which a SameSite=Lax session cookie does not ride on: the GET it is turned into does.
