@@ -904,7 +904,7 @@ inBrowser('a form reset on a served page', () => {
     await page.click('#change')
     await page.waitUntil(() => document.querySelector<HTMLInputElement>('input[name="title"]')!.placeholder === 'b')
 
-    expect(await page.evaluate(() => (window as unknown as { refs: string[] }).refs.sort())).toEqual(['icon', 'markdown', 'plain-first', 'select', 'text', 'textarea'])
+    expect(await page.evaluate(() => (window as unknown as { refs: string[] }).refs.sort())).toEqual(['checkbox', 'colour', 'icon', 'markdown', 'plain-first', 'select', 'slider', 'text', 'textarea', 'toggle'])
   }, 120_000)
 })
 
