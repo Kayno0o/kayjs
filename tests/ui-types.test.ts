@@ -115,15 +115,17 @@ describe('the props of a component src/ui.ts adds a value to', () => {
 // Components the widening must keep working: an index signature in the props, a generic one, an island and a script naming what the compiler once emitted.
 const INDEXED = `---\nimport { recipe } from 'kay'\n\nconst indexed = recipe({ parts: { root: 'i' }, variants: { tone: { plain: '', danger: '' } } })\nconst { tone = 'plain' } = props<{ tone?: 'plain' | 'danger', [key: string]: unknown }>()\n---\np(data-tone={tone}) a\n`
 const GENERIC = `--- <T extends string>\nimport { recipe } from 'kay'\n\nconst generic = recipe({ parts: { root: 'g' }, variants: { tone: { plain: '', danger: '' } } })\nconst { item } = props<{ item: T }>()\n---\np(part="root") {item}\n`
+const GENERIC_ISLAND = `--- <T extends string>\nimport { recipe } from 'kay'\n\nconst gisland = recipe({ parts: { root: 'g' }, variants: { tone: { plain: '', danger: '' } } })\nconst { item } = props<{ item: T }>()\nconst count = signal(0)\n---\nbutton(part="root" onClick={() => count++}) {item}{count()}\n`
+const NUMERIC = `---\nimport { recipe } from 'kay'\n\nconst numeric = recipe({ parts: { root: 'n' }, variants: { tone: { plain: '', danger: '' } } })\nconst { tone = 'plain' } = props<{ tone?: 'plain' | 'danger', [key: number]: unknown }>()\n---\np(data-tone={tone}) a\n`
 const ISLAND = `---\nimport { recipe } from 'kay'\n\nconst island = recipe({ parts: { root: 'n' }, variants: { tone: { plain: '', danger: '' } } })\nconst count = signal(0)\n--- module\nconst KayExported = 'mine'\n---\nbutton(part="root" onClick={() => count++}) {KayExported}{count()}\n`
 
 describe('widening beside the shapes it must keep', () => {
   const ui = (entry: string) => `import { defineUi } from 'kay'\n\nexport default defineUi({ ${entry} })\n`
-  const entry = ['Indexed', 'Generic', 'Island'].map(name => `${name}: { variants: { tone: { brand: 'x' }${name === 'Indexed' ? ', cols: { 2: \'grid-cols-2\' }' : ''} } }`).join(', ')
-  const files = { 'src/indexed.kay': INDEXED, 'src/generic.kay': GENERIC, 'src/island.kay': ISLAND }
-  const imports = '---\nimport Indexed from \'./indexed.kay\'\nimport Generic from \'./generic.kay\'\nimport Island from \'./island.kay\'\n---\n'
+  const entry = ['Indexed', 'Generic', 'Island', 'GenericIsland', 'Numeric'].map(name => `${name}: { variants: { tone: { brand: 'x' }${name === 'Indexed' ? ', cols: { 2: \'grid-cols-2\' }' : ''} } }`).join(', ')
+  const files = { 'src/indexed.kay': INDEXED, 'src/generic.kay': GENERIC, 'src/island.kay': ISLAND, 'src/generic-island.kay': GENERIC_ISLAND, 'src/numeric.kay': NUMERIC }
+  const imports = '---\nimport Indexed from \'./indexed.kay\'\nimport Generic from \'./generic.kay\'\nimport Island from \'./island.kay\'\nimport GenericIsland from \'./generic-island.kay\'\nimport Numeric from \'./numeric.kay\'\n---\n'
   // Each component is called once, the one under test with the given call.
-  const run = async (name: string, call: string) => problems(ui(entry), undefined, { ...files, 'src/use2.kay': `${imports}${Object.entries({ Indexed: 'Indexed', Generic: 'Generic(item="a")', Island: 'Island' }).map(([key, plain]) => key === name ? call : plain).join('\n')}\n` })
+  const run = async (name: string, call: string) => problems(ui(entry), undefined, { ...files, 'src/use2.kay': `${imports}${Object.entries({ Indexed: 'Indexed', Generic: 'Generic(item="a")', Island: 'Island', GenericIsland: 'GenericIsland(item="a")', Numeric: 'Numeric' }).map(([key, plain]) => key === name ? call : plain).join('\n')}\n` })
 
   it('takes an added value on a props type with an index signature and keeps the declared ones', async () => {
     expect(await run('Indexed', 'Indexed(tone="brand" cols={2} other="x")')).toEqual([])
@@ -133,6 +135,12 @@ describe('widening beside the shapes it must keep', () => {
   it('takes an added value on a generic component, inferring its parameters', async () => {
     expect(await run('Generic', 'Generic(item="a" tone="brand")')).toEqual([])
     expect((await run('Generic', 'Generic(item="a" tone="nope")')).some(message => message.includes('"nope"'))).toBe(true)
+  })
+
+  it('takes an added value on a generic island and a numeric index signature', async () => {
+    expect(await run('GenericIsland', 'GenericIsland(item="a" tone="brand" hydrate="visible")')).toEqual([])
+    expect((await run('GenericIsland', 'GenericIsland(item="a" tone="nope")')).some(message => message.includes('"nope"'))).toBe(true)
+    expect(await run('Numeric', 'Numeric(tone="brand")')).toEqual([])
   })
 
   it('takes an added value on an island whose script names KayExported', async () => {
