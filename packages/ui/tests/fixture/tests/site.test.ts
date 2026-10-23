@@ -9,7 +9,6 @@ import { resolveClasses } from '../../../../../src/runtime/class-table'
 const ROOT = join(import.meta.dir, '..')
 // kay check prints this line on success since kay 1.18, nothing before.
 const CLEAN = /^(?:checked with no problems in \d+ ms\n)?$/
-const KUI_CLASS = /^kui-[\w-]+/
 const site = await testSite({ root: ROOT })
 
 // Each page is fetched once, whichever tests read it.
@@ -131,21 +130,21 @@ describe('Table on the server', () => {
   test('renders sorted from a static page, its sortable headers buttons and the rest text, stacked when narrow unless it scrolls', async () => {
     const head = (await find('/table', '#static th[scope="col"]')).map(found => [found.text, attr(found, 'aria-sort')])
 
-    expect((await find('/table', '#static .kui-table-cell-body')).map(cell => cell.text)).toEqual(['Earth', '1', 'Mars', '2', 'Venus', '0'])
+    expect((await find('/table', '#static [data-part="cellBody"]')).map(cell => cell.text)).toEqual(['Earth', '1', 'Mars', '2', 'Venus', '0'])
     expect(head).toEqual([['Name', 'ascending'], ['Moons', null]])
     expect((await find('/table', '#static th button')).map(button => button.text)).toEqual(['Name'])
 
     // Stacked, each cell is labelled by its header; scrolling, the table keeps its header row alone.
     expect((await attributes('/table', '#static .kui-table-wrap, #scrolling .kui-table-wrap', ['data-narrow']))).toEqual([{ 'data-narrow': 'stack' }, { 'data-narrow': 'scroll' }])
-    expect((await find('/table', '#static .kui-table-cell-label')).map(label => label.text)).toEqual(['Name', 'Moons', 'Name', 'Moons', 'Name', 'Moons'])
-    expect(await find('/table', '#scrolling .kui-table-cell-label')).toEqual([])
+    expect((await find('/table', '#static [data-part="cellLabel"]')).map(label => label.text)).toEqual(['Name', 'Moons', 'Name', 'Moons', 'Name', 'Moons'])
+    expect(await find('/table', '#scrolling [data-part="cellLabel"]')).toEqual([])
   })
 
   test('renders its selection: a box per row labelled by it, the picked ones marked, and the count over the select-all box', async () => {
     const rows = await find('/table', '#selectable tbody tr')
 
     expect((await visit('/table')).text('#selectable')).toContain('1 selected')
-    expect((await find('/table', '#selectable .kui-table-select-cell')).map(cell => cell.text)).toContain('Select all')
+    expect((await find('/table', '#selectable [data-part="selectHead"]')).map(cell => cell.text)).toContain('Select all')
     expect((await find('/table', '#selectable tbody input')).map(box => box.attributes['aria-label'])).toEqual(['Select Mars', 'Select Earth', 'Select Venus'])
     expect(rows.map(row => attr(row, 'data-selected'))).toEqual([null, '', null])
     expect((await attributes('/table', '#selectable tr[data-selected] input', ['aria-label', 'checked']))).toEqual([{ 'aria-label': 'Select Earth', 'checked': '' }])
@@ -155,7 +154,7 @@ describe('Table on the server', () => {
     const page = '/table?q=EAR'
 
     expect((await attributes(page, '#filtered input[type="search"]', ['value']))).toEqual([{ value: 'EAR' }])
-    expect((await find(page, '#filtered .kui-table-cell-body')).map(cell => cell.text).filter(text => (/\D/).test(text))).toEqual(['Earth'])
+    expect((await find(page, '#filtered [data-part="cellBody"]')).map(cell => cell.text).filter(text => (/\D/).test(text))).toEqual(['Earth'])
   })
 })
 
@@ -186,7 +185,7 @@ describe('breadcrumb', () => {
   })
 
   test('a trail of three items has no ellipsis, and only a structured one writes the BreadcrumbList', async () => {
-    expect((await find('/breadcrumb', '#short .kui-breadcrumb-more'))).toEqual([])
+    expect((await find('/breadcrumb', '#short [data-part="more"]'))).toEqual([])
 
     const scripts = await find('/breadcrumb', 'script[type="application/ld+json"]')
 
@@ -206,22 +205,22 @@ describe('breadcrumb', () => {
 
 describe('layout', () => {
   test('AppHeader is a header holding its brand, one named nav and its end area, sticky unless told not to', async () => {
-    expect((await find('/layout', '#app-header header > .kui-app-header-brand, #app-header header .kui-site-nav, #app-header header > .kui-app-header-end')).map(found => found.attributes.class?.match(KUI_CLASS)?.[0])).toEqual(['kui-app-header-brand', 'kui-site-nav', 'kui-app-header-end'])
+    expect((await find('/layout', '#app-header header > [data-part="brand"], #app-header header .kui-site-nav, #app-header header > [data-part="end"]')).map(found => found.attributes['data-part'])).toEqual(['brand', 'nav', 'end'])
     expect(await attributes('/layout', '#app-header header, #app-header-bare header', ['data-sticky'])).toEqual([{ 'data-sticky': '' }, { 'data-sticky': null }])
     expect(await attributes('/layout', '#app-header nav', ['aria-label'])).toEqual([{ 'aria-label': 'Site' }])
-    expect((await find('/layout', '#app-header-bare header .kui-app-header-brand, #app-header-bare header .kui-app-header-end'))).toEqual([])
+    expect((await find('/layout', '#app-header-bare header [data-part="brand"], #app-header-bare header [data-part="end"]'))).toEqual([])
   })
 
   test('SiteNav takes the URL as current, and Select marks itself busy by busy or by its old loading', async () => {
-    expect(await attributes('/layout', '#url-links .kui-site-nav-link', ['aria-current'])).toEqual([{ 'aria-current': null }, { 'aria-current': 'page' }])
+    expect(await attributes('/layout', '#url-links [data-part="link"]', ['aria-current'])).toEqual([{ 'aria-current': null }, { 'aria-current': 'page' }])
     expect(await attributes('/layout', '#busy-select select', ['id', 'aria-busy'])).toEqual([{ 'id': 'busy-new', 'aria-busy': 'false' }, { 'id': 'busy-new-plain', 'aria-busy': 'true' }, { 'id': 'busy-old', 'aria-busy': 'true' }, { 'id': 'idle', 'aria-busy': null }])
     expect((await find('/layout', '#busy-select option[disabled]')).length).toBe(3)
   })
 
   test('AppHeader marks the current link and draws a link\'s icon beside its escaped label', async () => {
-    expect(await attributes('/layout', '#app-header .kui-site-nav-link', ['href', 'aria-current'])).toEqual([{ 'href': '/', 'aria-current': null }, { 'href': '/data', 'aria-current': 'page' }])
-    expect((await find('/layout', '#app-header .kui-site-nav-link')).map(found => found.text)).toEqual(['Home', '<b>Data</b>'])
-    expect(await attributes('/layout', '#app-header .kui-site-nav-link svg', ['aria-hidden'])).toEqual([{ 'aria-hidden': 'true' }])
+    expect(await attributes('/layout', '#app-header [data-part="link"]', ['href', 'aria-current'])).toEqual([{ 'href': '/', 'aria-current': null }, { 'href': '/data', 'aria-current': 'page' }])
+    expect((await find('/layout', '#app-header [data-part="link"]')).map(found => found.text)).toEqual(['Home', '<b>Data</b>'])
+    expect(await attributes('/layout', '#app-header [data-part="link"] svg', ['aria-hidden'])).toEqual([{ 'aria-hidden': 'true' }])
   })
 })
 
@@ -957,7 +956,7 @@ describe('the texts a component shows by default, in the app\'s catalogs', () =>
     expect(graph).toMatch(/class="kui-contribution-month"[^>]*>sept\./)
     expect((await visit('/charts')).html).toMatch(/class="kui-contribution-month"[^>]*>Sep/)
     expect(filtered).toContain('Filtrer')
-    expect(filtered).toMatch(/class="kui-table-count" data-part="count" role="status">\d+ lignes?</)
+    expect(filtered).toMatch(/class="sr-only" data-part="count" role="status">\d+ lignes?</)
   })
 })
 

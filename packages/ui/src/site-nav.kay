@@ -7,7 +7,18 @@ import { wording } from 'kay/words'
 
 const TRAILING_SLASHES = /\/+$/
 
-const look = recipe({ parts: { root: 'kui-site-nav', toggle: 'kui-site-nav-toggle', menuIcon: 'kui-site-nav-toggle-menu', closeIcon: 'kui-site-nav-toggle-close', list: 'kui-site-nav-list', link: 'kui-site-nav-link', icon: 'kui-site-nav-icon' } })
+// 'kui-site-nav' stays as the component's name for an app's CSS. Below lg the links fold behind the toggle, a popover its popovertarget opens, and the open popover's frame is theme.css's; from lg they sit in a row, the toggle hidden.
+const look = recipe({
+  parts: {
+    root: 'kui-site-nav group/nav flex items-center',
+    toggle: 'lg:hidden',
+    menuIcon: 'group-has-[[data-part=list]:popover-open]/nav:hidden',
+    closeIcon: 'hidden group-has-[[data-part=list]:popover-open]/nav:inline-block',
+    list: 'gap-1 lg:static lg:m-0 lg:flex lg:min-w-0 lg:flex-row lg:items-center lg:overflow-visible lg:border-0 lg:bg-transparent lg:p-0 lg:text-inherit',
+    link: 'block px-3 py-2 text-sm text-kui-subtext0 transition-colors hover:text-kui-text aria-[current]:text-kui-accent has-[[data-part=icon]]:flex has-[[data-part=icon]]:items-center has-[[data-part=icon]]:gap-2',
+    icon: 'size-4 shrink-0',
+  },
+})
 
 const { id, links, current, label, menuLabel = wording('ui.siteNav.menu', 'Menu'), ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'id' | 'class' | 'children'> & {
   // The list's id, unique on the page; one is drawn when none is given.

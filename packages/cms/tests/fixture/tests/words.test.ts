@@ -36,7 +36,7 @@ test('an entry screen\'s crumbs are labelled in the page\'s locale', async () =>
 test('a message with parameters and a plural reads the locale\'s form, a key the app\'s catalog lacks reading the French the package ships', async () => {
   const page = await site.visit('/fr/admin/collections/posts')
 
-  expect(page.find('.kui-table th').map(header => header.text)).toEqual(expect.arrayContaining(['Titre', 'Actions']))
+  expect(page.find('.kui-table-wrap th').map(header => header.text)).toEqual(expect.arrayContaining(['Titre', 'Actions']))
   expect(page.find('.kcms-entries button').map(button => button.text)).toContain('Publier')
   expect((await site.visit('/fr/admin/collections/posts?q=zzz')).text('main')).toContain('Aucun résultat')
 })

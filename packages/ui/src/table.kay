@@ -9,25 +9,35 @@ import { cellText, drawnByBlock, exportHref, nextSort, resolvedColumn, rowKeyOf,
 import { virtualRows } from './virtual'
 import { wording } from 'kay/words'
 
+// 'kui-table-wrap' stays as the component's name for an app's CSS. The narrow form is a container named `table`, which its parts read with `@max-[30rem]/table:`; the name carries no `kui-` prefix so no old rule keeps its class alive.
 const look = recipe({
   parts: {
-    root: 'kui-table-wrap',
-    filter: 'kui-table-filter',
-    filterInput: 'kui-table-filter-input',
-    count: 'kui-table-count',
-    selection: 'kui-table-selection',
-    selected: 'kui-table-selected',
-    bulk: 'kui-table-bulk',
-    table: 'kui-table',
-    headCell: 'kui-table-head-cell',
-    selectText: 'kui-table-select-text',
-    sortButton: 'kui-table-sort-btn',
-    sortIcon: 'kui-table-sort-icon',
-    row: 'kui-table-row',
-    cell: 'kui-table-cell',
-    cellLabel: 'kui-table-cell-label',
-    cellBody: 'kui-table-cell-body',
-    emptyCell: 'kui-table-empty-cell',
+    root: 'kui-table-wrap group/table w-full overflow-x-auto border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-surface0 data-[narrow=stack]:@container/table data-virtual:overflow-y-auto data-virtual:max-h-[var(--kui-table-height,70vh)] data-virtual:[overflow-anchor:none] data-virtual:focus-visible:outline-2 data-virtual:focus-visible:-outline-offset-2 data-virtual:focus-visible:outline-kui-accent',
+    // Sticky, so the filter and the selection bar stay in view while a wide table scrolls under them.
+    filter: 'sticky left-0 flex items-center gap-2 border-solid border-b-(length:--kui-border-width) border-kui-surface2 px-3 py-2',
+    filterInput: 'w-56 max-w-full',
+    count: 'sr-only',
+    selection: 'sticky left-0 flex flex-wrap items-center gap-3 border-solid border-b-(length:--kui-border-width) border-kui-surface2 px-3 py-2 text-sm [&_.kui-checkbox]:min-h-6 [&_.kui-checkbox]:min-w-6',
+    selected: 'm-0',
+    bulk: 'flex flex-wrap items-center gap-2',
+    table: 'w-full border-collapse text-sm @max-[30rem]/table:block',
+    // Below 30rem of width the rows of a stacked table become cards and its headers one row of sort buttons, the only part of the head that stays.
+    head: '@max-[30rem]/table:has-[[data-part=sortButton]]:block @max-[30rem]/table:group-data-virtual/table:sticky @max-[30rem]/table:group-data-virtual/table:top-0 @max-[30rem]/table:group-data-virtual/table:z-1 @max-[30rem]/table:group-data-virtual/table:bg-kui-surface0 @max-[30rem]/table:not-has-[[data-part=sortButton]]:hidden',
+    headRow: '@max-[30rem]/table:flex @max-[30rem]/table:flex-wrap @max-[30rem]/table:gap-2 @max-[30rem]/table:border-solid @max-[30rem]/table:border-b-(length:--kui-border-width) @max-[30rem]/table:border-kui-surface2 @max-[30rem]/table:px-3 @max-[30rem]/table:py-2',
+    body: '@max-[30rem]/table:block',
+    headCell: 'border-b border-kui-surface2 px-3 py-2 text-left text-xs font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)] data-[align=center]:text-center data-[align=end]:text-right aria-[sort=ascending]:text-kui-accent aria-[sort=descending]:text-kui-accent group-data-virtual/table:sticky group-data-virtual/table:top-0 group-data-virtual/table:bg-kui-surface0 @max-[30rem]/table:border-0 @max-[30rem]/table:p-0 @max-[30rem]/table:not-has-[[data-part=sortButton]]:hidden',
+    selectHead: 'border-b border-kui-surface2 px-3 py-2 text-left text-xs font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)] data-[align=center]:text-center data-[align=end]:text-right aria-[sort=ascending]:text-kui-accent aria-[sort=descending]:text-kui-accent group-data-virtual/table:sticky group-data-virtual/table:top-0 group-data-virtual/table:bg-kui-surface0 @max-[30rem]/table:border-0 @max-[30rem]/table:p-0 @max-[30rem]/table:not-has-[[data-part=sortButton]]:hidden w-0 @max-[30rem]/table:w-auto',
+    selectText: 'sr-only',
+    sortButton: 'group/sort inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-inherit [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)] @max-[30rem]/table:min-h-8 @max-[30rem]/table:border-solid @max-[30rem]/table:border-(length:--kui-border-width) @max-[30rem]/table:border-kui-surface2 @max-[30rem]/table:px-2 @max-[30rem]/table:py-0.5',
+    sortIcon: 'size-3.5 group-data-[direction=asc]/sort:rotate-180',
+    row: 'border-b border-kui-surface2 hover:bg-kui-row-hover data-selected:bg-kui-row-hover @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-[fit-content(40%)_minmax(0,1fr)] @max-[30rem]/table:gap-x-4 @max-[30rem]/table:px-3 @max-[30rem]/table:py-2',
+    cell: 'px-3 py-1.5 text-kui-text data-[numeric]:tabular-nums data-[align=center]:text-center data-[align=end]:text-right @max-[30rem]/table:col-span-full @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-subgrid @max-[30rem]/table:items-baseline @max-[30rem]/table:px-0 @max-[30rem]/table:py-1 @max-[30rem]/table:data-[align]:text-left',
+    // The box is 1rem, so its label grows to the 1.5rem a finger needs.
+    selectCell: 'px-3 py-1.5 text-kui-text data-[numeric]:tabular-nums data-[align=center]:text-center data-[align=end]:text-right @max-[30rem]/table:col-span-full @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-subgrid @max-[30rem]/table:items-baseline @max-[30rem]/table:px-0 @max-[30rem]/table:py-1 @max-[30rem]/table:data-[align]:text-left w-0 @max-[30rem]/table:w-auto [&_.kui-checkbox]:min-h-6 [&_.kui-checkbox]:min-w-6 [&_.kui-checkbox]:justify-center',
+    // Outside a narrow table a cell holds its content alone: the column header names it.
+    cellLabel: 'hidden @max-[30rem]/table:block @max-[30rem]/table:text-left text-kui-micro font-kui-label tracking-kui-label text-kui-subtext0 [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)]',
+    cellBody: 'contents @max-[30rem]/table:block @max-[30rem]/table:min-w-0 @max-[30rem]/table:[overflow-wrap:anywhere] @max-[30rem]/table:first:col-span-full',
+    emptyCell: 'px-3 py-8 text-center text-xs text-kui-subtext0 @max-[30rem]/table:block',
   },
 })
 
@@ -202,10 +212,10 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
         else
           Button(label={exportLabel} variant="ghost" size="sm" onClick={download})
   table(part="table" aria-rowcount={virtual ? shown().length + 1 : undefined})
-    thead
-      tr(aria-rowindex={virtual ? 1 : undefined})
+    thead(part="head")
+      tr(part="headRow" aria-rowindex={virtual ? 1 : undefined})
         if selectable
-          th.kui-table-select-cell(part="headCell" scope="col")
+          th(part="selectHead" scope="col")
             span(part="selectText") {selectAllLabel}
         for column of columns() key={column.key}
           th(part="headCell" scope="col" data-align={column.align ?? 'start'} aria-sort={ariaSort(column)})
@@ -216,14 +226,14 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
                   Icon(icon="chevron" part="sortIcon")
             else
               | {column.header}
-    tbody(ref={element => body = element})
+    tbody(part="body" ref={element => body = element})
       if windowed && windowed.before() > 0
         tr(aria-hidden="true" style={`height: ${windowed.before()}px`})
           td(colspan={given.length + (selectable ? 1 : 0)} style="padding: 0; border: 0")
       for row, position of drawn() key={rowKeyOf(row, rowKey)}
         tr(part="row" data-virtual-index={windowed ? windowed.start() + position : undefined} aria-rowindex={windowed ? windowed.start() + position + 2 : undefined} data-selected={chosenSet().has(rowKeyOf(row, rowKey)) ? '' : undefined})
           if selectable
-            td.kui-table-select-cell(part="cell")
+            td(part="selectCell")
               div(part="cellBody")
                 Checkbox(checked={chosenSet().has(rowKeyOf(row, rowKey))} aria-label={(selectRowLabel ?? (item => wording('ui.table.selectRow', 'Select {row}', { row: rowLabel(item, columns(), rowKey) })))(row)} onChange={on => pick(rowKeyOf(row, rowKey), on)})
           for column of columns() key={column.key}

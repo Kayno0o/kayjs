@@ -12,7 +12,7 @@ afterEach(() => {
   mounted?.unmount()
 })
 
-const names = (root: HTMLElement) => [...root.querySelectorAll('tbody tr')].map(row => row.querySelector('.kui-table-cell-body')?.textContent)
+const names = (root: HTMLElement) => [...root.querySelectorAll('tbody tr')].map(row => row.querySelector('[data-part="cellBody"]')?.textContent)
 const header = (root: HTMLElement, index: number) => root.querySelectorAll('th')[index]!
 
 describe('Table', () => {
@@ -64,8 +64,8 @@ describe('Table', () => {
   test('shows its @empty block when there are no rows', async () => {
     mounted = await mountComponent('src/components/table.kay', { rows: [] })
 
-    expect(mounted.root.querySelector('.kui-table-empty-cell')?.getAttribute('colspan')).toBe('3')
-    expect(mounted.root.querySelector('.kui-table-empty-cell .nothing')?.textContent).toBe('No planets')
+    expect(mounted.root.querySelector('[data-part="emptyCell"]')?.getAttribute('colspan')).toBe('3')
+    expect(mounted.root.querySelector('[data-part="emptyCell"] .nothing')?.textContent).toBe('No planets')
   })
 })
 
@@ -78,7 +78,7 @@ describe('Table with a filter', () => {
   }
 
   function filter(root: HTMLElement, text: string) {
-    const input = root.querySelector<HTMLInputElement>('.kui-table-filter-input')!
+    const input = root.querySelector<HTMLInputElement>('[data-part="filterInput"]')!
 
     input.value = text
     input.dispatchEvent(new Event('input', { bubbles: true }))
@@ -87,7 +87,7 @@ describe('Table with a filter', () => {
   test('draws the columns through @cell without cell: true, a numeric one sorting largest first and a cell: false one as text', async () => {
     mounted = await mountComponent('src/components/filtered-table.kay', { rows: MOONS })
 
-    const cells = (row: number) => [...mounted!.root.querySelectorAll('tbody tr')[row]!.querySelectorAll('.kui-table-cell-body')].map(cell => cell.innerHTML.replaceAll(/<!--[^>]*-->/g, ''))
+    const cells = (row: number) => [...mounted!.root.querySelectorAll('tbody tr')[row]!.querySelectorAll('[data-part="cellBody"]')].map(cell => cell.innerHTML.replaceAll(/<!--[^>]*-->/g, ''))
 
     expect(cells(0)).toEqual(['<strong>Phobos</strong>', 'Mars', '11 km'])
     expect(header(mounted.root, 2).getAttribute('data-align')).toBe('end')
@@ -102,7 +102,7 @@ describe('Table with a filter', () => {
   test('keeps the rows whose named fields hold the typed text, whatever its case, says how many to screen readers, and when none does', async () => {
     mounted = await mountComponent('src/components/filtered-table.kay', { rows: MOONS })
 
-    expect(mounted.root.querySelector('.kui-table-filter')?.textContent).toBe('Filter moons')
+    expect(mounted.root.querySelector('[data-part="filter"]')?.textContent).toBe('Filter moons')
 
     filter(mounted.root, ' mars ')
     await settle()
@@ -113,7 +113,7 @@ describe('Table with a filter', () => {
     filter(mounted.root, 'titan')
     await settle()
 
-    expect(mounted.root.querySelector('.kui-table-empty-cell .no-match')?.textContent).toBe('No moon matches')
+    expect(mounted.root.querySelector('[data-part="emptyCell"] .no-match')?.textContent).toBe('No moon matches')
 
     filter(mounted.root, '')
     await settle()
@@ -127,7 +127,7 @@ describe('Table with a filter', () => {
     mounted = await mountComponent('src/components/filtered-table.kay', { rows: MOONS, filterParam: 'q' })
 
     expect(names(mounted.root)).toEqual(['Io'])
-    expect(mounted.root.querySelector<HTMLInputElement>('.kui-table-filter-input')?.value).toBe('io')
+    expect(mounted.root.querySelector<HTMLInputElement>('[data-part="filterInput"]')?.value).toBe('io')
 
     filter(mounted.root, 'deim')
     await settle()
@@ -139,15 +139,15 @@ describe('Table with a filter', () => {
   test('shows its @empty block, not the no-match one, when there are no rows at all', async () => {
     mounted = await mountComponent('src/components/filtered-table.kay', { rows: [] })
 
-    expect(mounted.root.querySelector('.kui-table-empty-cell .nothing')?.textContent).toBe('No moons')
+    expect(mounted.root.querySelector('[data-part="emptyCell"] .nothing')?.textContent).toBe('No moons')
   })
 })
 
 describe('Table with a selection', () => {
   const MOONS = [{ id: 1, name: 'Io', radius: 1822 }, { id: 2, name: 'Europa', radius: 1561 }, { id: 3, name: 'Amalthea', radius: 84 }]
   const boxes = (root: HTMLElement) => [...root.querySelectorAll<HTMLInputElement>('tbody .kui-checkbox [data-part="input"]')]
-  const all = (root: HTMLElement) => root.querySelector<HTMLInputElement>('.kui-table-selection .kui-checkbox [data-part="input"]')!
-  const toolbar = (root: HTMLElement) => root.querySelector('.kui-table-selection')!.textContent
+  const all = (root: HTMLElement) => root.querySelector<HTMLInputElement>('[data-part="selection"] .kui-checkbox [data-part="input"]')!
+  const toolbar = (root: HTMLElement) => root.querySelector('[data-part="selection"]')!.textContent
   const ticked = (root: HTMLElement) => boxes(root).map(box => box.checked)
 
   function toggle(box: HTMLInputElement) {
@@ -158,7 +158,7 @@ describe('Table with a selection', () => {
   test('draws no box without `selectable`', async () => {
     mounted = await mountComponent('src/components/table.kay', { rows: PLANETS })
 
-    expect(mounted.root.querySelector('.kui-checkbox, .kui-table-selection')).toBeNull()
+    expect(mounted.root.querySelector('.kui-checkbox, [data-part="selection"]')).toBeNull()
   })
 
   test('picks rows, counts them, and shows the select-all box unticked, indeterminate for some and ticked for all', async () => {
@@ -170,7 +170,7 @@ describe('Table with a selection', () => {
 
     expect(toolbar(root)).toBe('Select all')
     expect(all(root).indeterminate).toBe(false)
-    expect(root.querySelector('.kui-table-bulk')).toBeNull()
+    expect(root.querySelector('[data-part="bulk"]')).toBeNull()
 
     toggle(boxes(root)[1]!)
     await settle()
@@ -255,12 +255,12 @@ describe('Table with a selection', () => {
     toggle(boxes(root)[2]!)
     toggle(boxes(root)[0]!)
     await settle()
-    click(root.querySelector('.kui-table-selection .bulk-action'))
+    click(root.querySelector('[data-part="selection"] .bulk-action'))
     await settle()
 
     expect(acted).toEqual([[1, 3]])
     expect(ticked(root)).toEqual([false, false, false])
-    expect(root.querySelector('.kui-table-bulk')).toBeNull()
+    expect(root.querySelector('[data-part="bulk"]')).toBeNull()
   })
 
   test('labels each row box by its row, the select-all box and the column header, and takes the texts from the page', async () => {
@@ -325,7 +325,7 @@ describe('Table with a selection', () => {
     mounted = await mountComponent('src/components/selectable-table.kay', { rows: MOONS, filter: true, selected: [3] })
 
     const { root } = mounted
-    const input = root.querySelector<HTMLInputElement>('.kui-table-filter-input')!
+    const input = root.querySelector<HTMLInputElement>('[data-part="filterInput"]')!
 
     input.value = 'eur'
     input.dispatchEvent(new Event('input', { bubbles: true }))
@@ -357,7 +357,7 @@ describe('Table with a selection', () => {
     mounted = await mountComponent('src/components/selectable-table.kay', { rows: [] })
 
     expect(all(mounted.root).disabled).toBe(true)
-    expect(mounted.root.querySelector('.kui-table-empty-cell')?.getAttribute('colspan')).toBe('3')
+    expect(mounted.root.querySelector('[data-part="emptyCell"]')?.getAttribute('colspan')).toBe('3')
   })
 
   test('keeps the select-all box outside the table, so stacked cards have it too, and a box in each card without a label', async () => {
@@ -365,8 +365,8 @@ describe('Table with a selection', () => {
 
     const { root } = mounted
 
-    expect(root.querySelector('table .kui-table-selection')).toBeNull()
-    expect(root.querySelector('tbody tr td.kui-table-select-cell .kui-table-cell-label')).toBeNull()
+    expect(root.querySelector('table [data-part="selection"]')).toBeNull()
+    expect(root.querySelector('tbody tr td[data-part="selectCell"] [data-part="cellLabel"]')).toBeNull()
   })
 
   test('works with the rows of an infinite list: a page loaded later joins select-all and the picked rows stay picked', async () => {

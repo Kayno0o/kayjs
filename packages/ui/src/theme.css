@@ -163,7 +163,8 @@
 
 /* The same for a site nav's links, a popover below lg whatever a list rule of the app's, such as a prose style, gives its `ul`. */
 @media (width < theme(--breakpoint-lg)) {
-  .kui-site-nav-list:not(:popover-open) {
+  .kui-site-nav-list:not(:popover-open),
+  .kui-site-nav > [data-part='list']:not(:popover-open) {
     display: none;
   }
 }
@@ -2356,7 +2357,8 @@
   }
 
   @supports not selector(:popover-open) {
-    .kui-site-nav-toggle {
+    .kui-site-nav-toggle,
+    .kui-site-nav > [data-part='toggle'] {
       @apply hidden;
     }
   }
@@ -2366,7 +2368,7 @@
   }
 
   /* Anchored under the toggle wherever it sits in the header, and flipped by the browser when it would run off the screen. */
-  :where(.kui-site-nav-list:popover-open) {
+  :where(.kui-site-nav-list:popover-open, .kui-site-nav > [data-part='list']:popover-open) {
     position-area: block-end span-inline-end;
     position-try-fallbacks: flip-inline;
     @apply m-0 mt-2 flex min-w-56 flex-col items-stretch border-solid border-(length:--kui-border-width) border-kui-surface2 bg-kui-mantle p-2 text-kui-text;
@@ -2453,7 +2455,10 @@
   /* The separator is drawn here, with an empty alternative text, so a screen reader hears the list alone. */
   .kui-breadcrumb-item + .kui-breadcrumb-item::before,
   .kui-breadcrumb-item + .kui-breadcrumb-more::before,
-  .kui-breadcrumb-more + .kui-breadcrumb-item::before {
+  .kui-breadcrumb-more + .kui-breadcrumb-item::before,
+  .kui-breadcrumb [data-part='list'] > [data-part='item'] + [data-part='item']::before,
+  .kui-breadcrumb [data-part='list'] > [data-part='item'] + [data-part='more']::before,
+  .kui-breadcrumb [data-part='list'] > [data-part='more'] + [data-part='item']::before {
     content: '/' / '';
     @apply mr-2 text-kui-overlay1;
   }

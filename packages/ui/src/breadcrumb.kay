@@ -3,7 +3,17 @@ import { recipe } from 'kay'
 import type { JSX } from 'kay'
 import BreadcrumbHead from './internal/breadcrumb-head.kay'
 
-const look = recipe({ parts: { root: 'kui-breadcrumb', list: 'kui-breadcrumb-list', more: 'kui-breadcrumb-more', item: 'kui-breadcrumb-item', link: 'kui-breadcrumb-link', text: 'kui-breadcrumb-text' } })
+// 'kui-breadcrumb' stays as the component's name for an app's CSS; the separators between items are drawn by theme.css. On a phone the middle of a long trail gives way to an ellipsis.
+const look = recipe({
+  parts: {
+    root: 'kui-breadcrumb block',
+    list: 'm-0 flex list-none flex-wrap items-center gap-x-2 gap-y-1 p-0 text-sm text-kui-subtext0',
+    more: 'hidden max-sm:list-item',
+    item: 'max-sm:data-[middle]:hidden',
+    link: 'text-kui-subtext0 underline-offset-2 hover:text-kui-text hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kui-accent',
+    text: 'aria-[current=page]:text-kui-text',
+  },
+})
 
 const { items, label, structured = false, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & {
   // The trail, the top of the site first and the page on screen last. Every item but the last is a link when it has an `href`; the last is marked as the current page and never a link.

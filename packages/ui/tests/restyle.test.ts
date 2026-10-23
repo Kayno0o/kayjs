@@ -57,14 +57,6 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
   const restyled = [
     'kui-dialog-title text-xl',
     'kui-dialog-footer justify-end',
-    'kui-table-wrap gap-3',
-    'kui-table text-sm',
-    'kui-icon kui-table-sort-icon size-4',
-    'kui-field-input kui-table-filter-input w-64',
-    'kui-table-count text-xs',
-    'kui-table-selection mb-2',
-    'kui-table-head-cell uppercase',
-    'kui-table-cell py-4',
     'kui-field-input kui-range-input-box w-24',
     'kui-range-input-unit ml-1',
     'kui-menu-item py-3',
@@ -82,16 +74,6 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     'kui-save-bar-status italic',
     'kui-save-bar-actions gap-4',
     'kui-command-palette rounded-2xl',
-    'kui-tabs-tab px-5',
-    'kui-tabs-panel pt-4',
-    'kui-tab-nav-link font-semibold',
-    'kui-site-nav-link rounded-md',
-    'kui-site-nav-list gap-3',
-    'kui-site-nav kui-app-header-nav',
-    'kui-app-header-brand text-lg',
-    'kui-app-header-end ml-auto',
-    'kui-pagination-step px-4',
-    'kui-pagination-page min-w-10',
     'kui-split-layout-sidebar-head h-14',
     'kui-split-layout-list overflow-auto',
     'kui-split-layout-detail p-6',
@@ -126,9 +108,6 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     'kui-bar-chart-axis-label font-mono',
     'kui-bar-chart-legend-item gap-2',
     'kui-accordion gap-5',
-    'kui-breadcrumb-list gap-4',
-    'kui-breadcrumb-link underline',
-    'kui-breadcrumb-text font-bold',
     'kui-toaster z-50',
     'kui-toaster-live gap-2',
     'kui-tooltip text-xs',
@@ -138,16 +117,10 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     'kui-contact-form gap-7',
     'kui-when-visible min-h-4',
     'kui-icon kui-collapsible-section-chevron size-6',
-    'kui-icon kui-tabs-icon size-3',
-    'kui-icon kui-site-nav-toggle-menu size-6',
     'kui-icon kui-tree-view-icon size-3',
-    'kui-pagination-gap opacity-50',
     'kui-site-favicon-img rounded-sm',
     'kui-load-more py-6',
     'kui-field-input h-11',
-    'kui-steps-list gap-4',
-    'kui-steps-marker size-8',
-    'kui-steps-state sr-only',
   ]
 
   test.each(restyled)('draws class="%s"', (classes) => {
@@ -218,7 +191,6 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
 
   test('a part nothing restyles keeps its kui class alone', () => {
     expect(html).toContain('class="kui-dialog-body"')
-    expect(html).toContain('class="kui-table-row"')
   })
 })
 
@@ -473,5 +445,67 @@ describe('the display components whose recipe holds their look', () => {
 
   test('a Meter\'s fillClass comes after the accent it replaces', () => {
     expect(classesOfPart('meter', 'fill').slice(0, 2)).toEqual(['bg-kui-accent', 'bg-red-500'])
+  })
+})
+
+describe('the tables and navigation whose recipe holds their look', () => {
+  // The classes of the element a data-part under an id selects, in the order they are written.
+  const partClasses = (id: string, part: string) => {
+    const root = html.indexOf(`id="${id}"`)
+    const start = part === 'root' ? root : html.indexOf(`data-part="${part}"`, root)
+
+    return (html.slice(html.lastIndexOf('<', start), html.indexOf('>', start)).match(/ class="([^"]*)"/)?.[1] ?? '').split(' ')
+  }
+
+  test.each([
+    ['table', 'root', 'overflow-x-auto', 'gap-3'],
+    ['table', 'table', 'border-collapse', 'text-sm'],
+    ['table', 'headCell', 'px-3', 'uppercase'],
+    ['table', 'cell', 'text-kui-text', 'py-4'],
+    ['table', 'sortIcon', 'size-3.5', 'size-4'],
+    ['table', 'filterInput', 'max-w-full', 'w-64'],
+    ['table', 'count', 'sr-only', 'text-xs'],
+    ['table', 'selection', 'sticky', 'mb-2'],
+    ['tabs', 'tab', 'border-b-2', 'px-5'],
+    ['tabs', 'panel', 'pt-4', undefined],
+    ['tabs', 'icon', 'shrink-0', 'size-3'],
+    ['tabnav', 'link', 'border-b-2', 'font-semibold'],
+    ['sitenav', 'link', 'text-kui-subtext0', 'rounded-md'],
+    ['sitenav', 'list', 'lg:flex', 'gap-3'],
+    ['sitenav', 'menuIcon', 'group-has-[[data-part=list]:popover-open]/nav:hidden', 'size-6'],
+    ['appheader', 'brand', 'min-w-0', 'text-lg'],
+    ['appheader', 'end', 'min-w-0', 'ml-auto'],
+    ['pager', 'step', 'min-w-9', 'px-4'],
+    ['pager', 'page', 'border-kui-surface2', 'min-w-10'],
+    ['pager', 'gap', 'text-kui-overlay1', 'opacity-50'],
+    ['breadcrumb', 'list', 'flex-wrap', 'gap-4'],
+    ['breadcrumb', 'link', 'hover:underline', 'underline'],
+    ['breadcrumb', 'text', 'aria-[current=page]:text-kui-text', 'font-bold'],
+    ['steps', 'list', 'flex-wrap', 'gap-4'],
+    ['steps', 'marker', 'rounded-full', 'size-8'],
+    ['steps', 'state', 'sr-only', undefined],
+  ] as const)('%s %s draws its base, then what src/ui.ts sets after it', (id, part, base, restyle) => {
+    const classes = partClasses(id, part)
+
+    expect(classes).toContain(base)
+
+    if (restyle !== undefined)
+      expect(classes.at(-1)).toBe(restyle)
+  })
+
+  test('sets a kui class on a root alone, and none of the parts they dropped', () => {
+    expect(partClasses('table', 'root')[0]).toBe('kui-table-wrap')
+
+    for (const [id, part] of [['table', 'row'], ['table', 'cell'], ['table', 'table'], ['tabs', 'tab'], ['sitenav', 'list'], ['pager', 'step'], ['breadcrumb', 'item'], ['steps', 'marker']] as const)
+      expect(partClasses(id, part).filter(name => name.startsWith('kui-')), `${id} ${part}`).toEqual([])
+
+    expect(html).not.toMatch(REMOVED_CLASS)
+  })
+
+  test('a stacked Table reads its narrow form from a container named without the kui prefix', () => {
+    const root = partClasses('table', 'root')
+
+    expect(root).toContain('data-[narrow=stack]:@container/table')
+    expect(partClasses('table', 'row')).toContain('@max-[30rem]/table:grid')
   })
 })

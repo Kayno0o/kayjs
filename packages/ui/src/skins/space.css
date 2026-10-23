@@ -47,7 +47,7 @@
 
 @layer components {
   /* The framed boxes have no line, so the controls that need one draw it again. */
-  :is(.kui-btn, .kui-shell, .kui-segmented, .kui-pagination-step, .kui-toggle-track, .kui-toggle [data-part='track'], .kui-chip, .kui-file-drop) {
+  :is(.kui-btn, .kui-shell, .kui-segmented, .kui-pagination-step, .kui-pagination [data-part='step'], .kui-toggle-track, .kui-toggle [data-part='track'], .kui-chip, .kui-file-drop) {
     --kui-border-width: 1px;
   }
 
@@ -56,13 +56,13 @@
     border-color: var(--color-kui-field-border);
   }
 
-  /* The same line for the recipes of Segmented, ChipGroup and FileDrop, which read it from --kui-control-line. */
-  :is(.kui-segmented, .kui-chip [data-part='input']:not(:checked) + [data-part='label'], .kui-file-drop:not([data-dragging])) {
+  /* The same line for the recipes of Segmented, ChipGroup, FileDrop and Pagination, which read it from --kui-control-line. */
+  :is(.kui-segmented, .kui-pagination [data-part='step'], .kui-chip [data-part='input']:not(:checked) + [data-part='label'], .kui-file-drop:not([data-dragging])) {
     --kui-control-line: var(--color-kui-field-border);
   }
 
   /* Overlays lose their line to a shadow that lifts them off the page. */
-  :is(.kui-dialog, .kui-command-palette, .kui-popover, .kui-hover-card, .kui-toast, .kui-tooltip, .kui-combobox-list, .kui-combobox [data-part='list'], .kui-side-panel, .kui-line-chart-tooltip, .kui-site-nav-list:popover-open) {
+  :is(.kui-dialog, .kui-command-palette, .kui-popover, .kui-hover-card, .kui-toast, .kui-tooltip, .kui-combobox-list, .kui-combobox [data-part='list'], .kui-side-panel, .kui-line-chart-tooltip, .kui-site-nav-list:popover-open, .kui-site-nav > [data-part='list']:popover-open) {
     box-shadow: 0 1rem 3rem -0.75rem rgb(0 0 0 / 0.8);
   }
 

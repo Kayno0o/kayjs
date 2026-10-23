@@ -58,6 +58,10 @@ const classes = new Set([...theme.matchAll(DEFINED_CLASS)].map(([, name = '']) =
 // The components whose look is a recipe of utilities (#1885), each with its part classes in REMOVED_UI_CLASSES; theme.css keeps their old rules until 1.74.
 const RECIPE_COMPONENTS = new Set(['src/card.kay', 'src/badge.kay', 'src/notice.kay', 'src/avatar.kay', 'src/stat.kay', 'src/page-header.kay', 'src/page-section.kay', 'src/empty-state.kay', 'src/card-row.kay', 'src/widget.kay', 'src/meter.kay', 'src/progress.kay', 'src/skeleton.kay', 'src/button.kay', 'src/form-field.kay', 'src/checkbox.kay', 'src/toggle.kay', 'src/text-input.kay', 'src/textarea.kay', 'src/select.kay', 'src/contact-form.kay', 'src/radio-group.kay', 'src/segmented.kay', 'src/rating.kay', 'src/slider.kay', 'src/color-input.kay', 'src/date-input.kay', 'src/date-range-input.kay', 'src/combobox.kay', 'src/multi-select.kay', 'src/chip-group.kay', 'src/file-drop.kay', 'src/copy-button.kay', 'src/confirm-delete.kay'])
 
+// Tables and navigation (slice 5 of #1885).
+for (const path of ['table', 'tabs', 'tab-nav', 'breadcrumb', 'pagination', 'steps', 'site-nav', 'app-header'])
+  RECIPE_COMPONENTS.add(`src/${path}.kay`)
+
 // Every class a component writes: the `.class` shorthand, plain `class` attributes, and the names a `class` expression holds.
 function writtenClasses(path: string, source: string): string[] {
   const template = source.slice(source.lastIndexOf('\n---\n') + 1)
@@ -581,7 +585,7 @@ describe('theme.css', () => {
   })
 
   test('sizes the keyline of every framed box by --kui-border-width, a length the old --kui-border-card still sets', () => {
-    for (const selector of ['.kui-card', '.kui-card-head', '.kui-card-row', '.kui-widget', '.kui-toast', '.kui-dialog', '.kui-command-palette', '.kui-popover', '.kui-side-panel', '.kui-tooltip', '.kui-table-wrap', '.kui-collapsible-section', '.kui-save-bar', '.kui-segmented', '.kui-file-drop', '.kui-pagination-step', ':where(.kui-site-nav-list:popover-open)', '.kui-line-chart-tooltip'])
+    for (const selector of ['.kui-card', '.kui-card-head', '.kui-card-row', '.kui-widget', '.kui-toast', '.kui-dialog', '.kui-command-palette', '.kui-popover', '.kui-side-panel', '.kui-tooltip', '.kui-table-wrap', '.kui-collapsible-section', '.kui-save-bar', '.kui-segmented', '.kui-file-drop', '.kui-pagination-step', ':where(.kui-site-nav-list:popover-open, .kui-site-nav > [data-part=\'list\']:popover-open)', '.kui-line-chart-tooltip'])
       expect(blockOf(theme, selector), selector).toMatch(/border(?:-[bl])?-\(length:--kui-border-width\)/)
 
     expect(theme.match(/var\(--kui-border-card\)/g)).toHaveLength(1)

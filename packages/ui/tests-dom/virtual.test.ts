@@ -122,7 +122,7 @@ describe('Table with virtual', () => {
     mounted = await mountComponent('src/components/virtual-table.kay', { count: 5000 })
 
     const { root } = mounted
-    const rows = rowsOf(root, 'tbody tr.kui-table-row')
+    const rows = rowsOf(root, 'tbody tr[data-part="row"]')
 
     expect(rows.length).toBeLessThan(60)
     expect(root.querySelector('table')?.getAttribute('aria-rowcount')).toBe('5001')
@@ -136,7 +136,7 @@ describe('Table with virtual', () => {
 
     await scrollTo(root.querySelector('.kui-table-wrap')!, 48 * 2000)
 
-    const texts = rowsOf(root, 'tbody tr.kui-table-row .kui-table-cell-body').map(cell => cell.textContent)
+    const texts = rowsOf(root, 'tbody tr[data-part="row"] [data-part="cellBody"]').map(cell => cell.textContent)
 
     expect(texts).toContain('Row 2000')
     expect(texts).not.toContain('Row 0')
@@ -147,10 +147,10 @@ describe('Table with virtual', () => {
     mounted = await mountComponent('src/components/virtual-table.kay', { count: 30 })
 
     const { root } = mounted
-    const rowNamed = (name: string) => rowsOf(root, 'tbody tr.kui-table-row').find(row => row.textContent?.includes(name))
+    const rowNamed = (name: string) => rowsOf(root, 'tbody tr[data-part="row"]').find(row => row.textContent?.includes(name))
     const spacers = () => (rowsOf(root, 'tbody tr[aria-hidden]') as HTMLElement[]).reduce((sum, row) => sum + Number.parseFloat(row.style.height), 0)
     // The whole table's height as the estimate and the measures give it: the rows drawn at 48 but for the measured ones, and the room for the others.
-    const total = (measured: Record<string, number>) => spacers() + rowsOf(root, 'tbody tr.kui-table-row').reduce((sum, row) => sum + (measured[row.textContent?.match(/Row \d+/)?.[0] ?? ''] ?? 48), 0)
+    const total = (measured: Record<string, number>) => spacers() + rowsOf(root, 'tbody tr[data-part="row"]').reduce((sum, row) => sum + (measured[row.textContent?.match(/Row \d+/)?.[0] ?? ''] ?? 48), 0)
 
     Resize.made.at(-1)!.callback([{ target: rowNamed('Row 5'), borderBoxSize: [{ blockSize: 100 }] }])
     await settle()

@@ -27,7 +27,7 @@ inBrowser('in the browser', () => {
 
     await using page = await site.open('/stacked')
     // Where the text of each cell of a table's first row starts and ends, and where its cell's content box ends.
-    const edges = (selector: string) => page.evaluate((within: string) => [...document.querySelectorAll(`${within} .kui-table-row:first-child .kui-table-cell-body`)].map((body) => {
+    const edges = (selector: string) => page.evaluate((within: string) => [...document.querySelectorAll(`${within} [data-part="row"]:first-child [data-part="cellBody"]`)].map((body) => {
       const text = document.createRange()
       const cell = body.closest('td')!
 
@@ -91,10 +91,10 @@ inBrowser('in the browser', () => {
 
     await using page = await site.open('/stacked')
     const measured = await page.evaluate(() => {
-      const card = document.querySelector('#long .kui-table-row')!.getBoundingClientRect()
-      const value = document.querySelector('#long .kui-table-cell-body')!.getBoundingClientRect()
+      const card = document.querySelector('#long [data-part="row"]')!.getBoundingClientRect()
+      const value = document.querySelector('#long [data-part="cellBody"]')!.getBoundingClientRect()
 
-      return { cardEnd: card.right, valueEnd: value.right, sortHeight: document.querySelector('#long .kui-table-sort-btn')!.getBoundingClientRect().height, rem: Number.parseFloat(getComputedStyle(document.documentElement).fontSize) }
+      return { cardEnd: card.right, valueEnd: value.right, sortHeight: document.querySelector('#long [data-part="sortButton"]')!.getBoundingClientRect().height, rem: Number.parseFloat(getComputedStyle(document.documentElement).fontSize) }
     })
 
     expect(measured.valueEnd).toBeLessThanOrEqual(measured.cardEnd)
@@ -109,7 +109,7 @@ inBrowser('virtual Table', () => {
       document.querySelector(`${selector} .kui-table-wrap`)!.scrollTop = to
     }) as never, within as never, top as never)
     await page.waitUntil(((selector: string, to: number) => {
-      const first = document.querySelector(`${selector} .kui-table-row`)
+      const first = document.querySelector(`${selector} [data-part="row"]`)
 
       return first !== null && Number(first.getAttribute('data-virtual-index')) * 30 > to / 4
     }) as never, undefined as never, within as never, top as never)
@@ -119,9 +119,9 @@ inBrowser('virtual Table', () => {
       const thead = document.querySelector(`${selector} thead`)!
       const stack = getComputedStyle(thead).position
       // Wide, each header cell sticks; stacked, the block of sort buttons does.
-      const head = (stack === 'sticky' ? thead : document.querySelector(`${selector} .kui-table-head-cell`)!).getBoundingClientRect()
+      const head = (stack === 'sticky' ? thead : document.querySelector(`${selector} [data-part="headCell"]`)!).getBoundingClientRect()
 
-      return { head: head.top - box.top, headVisible: head.bottom > box.top, stack, rows: document.querySelectorAll(`${selector} .kui-table-row`).length }
+      return { head: head.top - box.top, headVisible: head.bottom > box.top, stack, rows: document.querySelectorAll(`${selector} [data-part="row"]`).length }
     }) as never, within as never) as { head: number, headVisible: boolean, stack: string, rows: number }
   }
 
@@ -131,7 +131,7 @@ inBrowser('virtual Table', () => {
     await using page = await site.open('/virtual')
 
     for (const within of ['#wide', '#sorted']) {
-      await page.waitFor(`${within} .kui-table-row`)
+      await page.waitFor(`${within} [data-part="row"]`)
       const moved = await scrolled(page as never, within, 5000)
 
       expect(moved.headVisible, within).toBe(true)
@@ -139,7 +139,7 @@ inBrowser('virtual Table', () => {
       expect(moved.rows, within).toBeLessThan(60)
     }
 
-    await page.waitFor('#narrow .kui-table-row')
+    await page.waitFor('#narrow [data-part="row"]')
     const stacked = await scrolled(page as never, '#narrow', 5000)
 
     // Stacked, the headers are one block of sort buttons, which is what stays.
@@ -153,12 +153,12 @@ inBrowser('virtual Table', () => {
 
     await using page = await site.open('/virtual')
 
-    await page.waitFor('#wide .kui-table-row')
+    await page.waitFor('#wide [data-part="row"]')
     await scrolled(page as never, '#wide', 6000)
     // Where a row sits against the box: the first by default, the one crossing the box's top edge, which the rows above it growing must not move.
     const placed = async (index: string | null) => page.evaluate(((wanted: string | null) => {
       const box = document.querySelector('#wide .kui-table-wrap')!.getBoundingClientRect()
-      const rows = [...document.querySelectorAll('#wide .kui-table-row')]
+      const rows = [...document.querySelectorAll('#wide [data-part="row"]')]
       const row = wanted === null ? rows.find(one => one.getBoundingClientRect().bottom > box.top + 1) : rows.find(one => one.getAttribute('data-virtual-index') === wanted)
 
       return row === undefined ? null : { index: row.getAttribute('data-virtual-index'), offset: row.getBoundingClientRect().top - box.top, height: row.getBoundingClientRect().height }
@@ -166,8 +166,8 @@ inBrowser('virtual Table', () => {
     const before = (await placed(null))!
 
     await page.click('#wide #grow')
-    await page.waitUntil((() => [...document.querySelectorAll('#wide .kui-table-row')].some(row => row.getBoundingClientRect().height > 80)) as never)
-    await page.waitUntil((() => document.querySelector('#wide .kui-table-wrap')!.scrollHeight > 0 && [...document.querySelectorAll('#wide .kui-table-row')].every(row => row.getBoundingClientRect().height > 80)) as never)
+    await page.waitUntil((() => [...document.querySelectorAll('#wide [data-part="row"]')].some(row => row.getBoundingClientRect().height > 80)) as never)
+    await page.waitUntil((() => document.querySelector('#wide .kui-table-wrap')!.scrollHeight > 0 && [...document.querySelectorAll('#wide [data-part="row"]')].every(row => row.getBoundingClientRect().height > 80)) as never)
     await page.evaluate((async () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))) as never)
     const after = await placed(before.index)
 
@@ -708,7 +708,7 @@ inBrowser('FormField in an island', () => {
     await using page = await site.open('/swap-a', { width: 600 })
     const state = async () => page.evaluate(() => ({
       open: document.querySelector('#swap-links')!.matches(':popover-open'),
-      icons: ['menu', 'close'].map(name => getComputedStyle(document.querySelector(`.kui-site-nav-toggle-${name}`)!).display !== 'none'),
+      icons: ['menu', 'close'].map(name => getComputedStyle(document.querySelector(`[data-part="${name}Icon"]`)!).display !== 'none'),
       kept: document.querySelector('#swap-header') === (window as { header?: Element }).header,
       current: [...document.querySelectorAll('#swap-links a')].map(link => link.getAttribute('aria-current')),
     }))

@@ -16,7 +16,17 @@ const MOVES: Partial<Record<string, (index: number, count: number) => number>> =
 
 const FLIPPED: Partial<Record<string, string>> = { ArrowLeft: 'ArrowRight', ArrowRight: 'ArrowLeft' }
 
-const look = recipe({ parts: { root: 'kui-tabs', list: 'kui-tabs-list', tab: 'kui-tabs-tab', icon: 'kui-tabs-icon', panel: 'kui-tabs-panel' } })
+// 'kui-tabs' stays as the component's name for an app's CSS. In-page tabs look like TabNav's, the shown one marked by aria-selected rather than aria-current.
+const look = recipe({
+  parts: {
+    root: 'kui-tabs flex flex-col',
+    list: 'flex gap-1 overflow-x-auto border-b border-kui-surface2 pb-px',
+    tab: '-mb-px shrink-0 border-b-2 border-transparent px-4 py-2 text-sm text-kui-subtext0 transition-colors hover:text-kui-text inline-flex items-center gap-1 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-kui-subtext0 aria-selected:border-kui-accent aria-selected:text-kui-accent',
+    icon: 'size-3.5 shrink-0',
+    // A hidden panel is hidden until found, which keeps its box with its content skipped: it takes no room.
+    panel: 'pt-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kui-accent [&[hidden]]:p-0',
+  },
+})
 
 const { tabs, value, label, onChange, panel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange'> & {
   // `icon` sits before the label; `disabled` keeps that tab from being shown, and the arrow keys skip it.

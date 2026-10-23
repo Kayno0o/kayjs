@@ -129,8 +129,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs a
 
       return {
         top: header.getBoundingClientRect().top,
-        row: box('.kui-app-header-brand').right <= box('.kui-site-nav-list').left && box('.kui-site-nav-list').right <= box('.kui-app-header-end').left,
-        folded: getComputedStyle(header.querySelector('.kui-site-nav-toggle')!).display === 'none',
+        row: box('.kui-app-header [data-part="brand"]').right <= box('.kui-app-header [data-part="list"]').left && box('.kui-app-header [data-part="list"]').right <= box('.kui-app-header [data-part="end"]').left,
+        folded: getComputedStyle(header.querySelector('.kui-app-header [data-part="toggle"]')!).display === 'none',
       }
     })
 
@@ -143,16 +143,16 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs a
 
       const closed = await narrow.evaluate(() => {
         const header = document.querySelector<HTMLElement>('.kui-app-header')!
-        const toggle = header.querySelector<HTMLElement>('.kui-site-nav-toggle')!
-        const end = header.querySelector<HTMLElement>('.kui-app-header-end')!
+        const toggle = header.querySelector<HTMLElement>('.kui-app-header [data-part="toggle"]')!
+        const end = header.querySelector<HTMLElement>('.kui-app-header [data-part="end"]')!
         const overflows = () => document.documentElement.scrollWidth > window.innerWidth
 
-        const list = getComputedStyle(header.querySelector('.kui-site-nav-list')!).display
+        const list = getComputedStyle(header.querySelector('.kui-app-header [data-part="list"]')!).display
         // The menu button comes before the end area on screen as in the tab order.
         const beforeEnd = toggle.getBoundingClientRect().right <= end.getBoundingClientRect().left
         const plain = overflows()
 
-        header.querySelector('.kui-app-header-brand')!.append('x'.repeat(300))
+        header.querySelector('.kui-app-header [data-part="brand"]')!.append('x'.repeat(300))
         end.append('y'.repeat(300))
 
         const long = overflows()
@@ -167,11 +167,11 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs a
 
       expect(closed).toEqual({ list: 'none', beforeEnd: true, plain: false, long: false, atFarEnd: true })
 
-      await narrow.click('.kui-app-header .kui-site-nav-toggle')
-      await narrow.waitUntil(() => document.querySelector('.kui-app-header .kui-site-nav-list:popover-open') !== null)
+      await narrow.click('.kui-app-header [data-part="toggle"]')
+      await narrow.waitUntil(() => document.querySelector('.kui-app-header [data-part="list"]:popover-open') !== null)
 
       expect(await narrow.evaluate(() => {
-        const list = document.querySelector('.kui-app-header .kui-site-nav-list')!.getBoundingClientRect()
+        const list = document.querySelector('.kui-app-header [data-part="list"]')!.getBoundingClientRect()
 
         return { shown: list.width > 0, onScreen: list.left >= 0 && list.right <= window.innerWidth }
       })).toEqual({ shown: true, onScreen: true })

@@ -17,16 +17,16 @@ async function header() {
     root,
     main: root.querySelector<HTMLElement>('#header')!,
     bare: root.querySelector<HTMLElement>('#bare')!,
-    link: (label: string) => [...root.querySelectorAll<HTMLAnchorElement>('#header .kui-site-nav-link')].find(link => link.textContent === label)!,
+    link: (label: string) => [...root.querySelectorAll<HTMLAnchorElement>('#header [data-part="link"]')].find(link => link.textContent === label)!,
   }
 }
 
 test('draws the brand, then the one nav, then the end area, and nothing for a slot left out', async () => {
   const view = await header()
 
-  expect([...view.main.children].map(child => child.classList[0])).toEqual(['kui-app-header-brand', 'kui-site-nav', 'kui-app-header-end'])
-  expect(view.main.querySelector('.kui-app-header-brand #brand')!.textContent).toBe('Moons')
-  expect(view.main.querySelector('.kui-app-header-end #user')!.textContent).toBe('Ada')
+  expect([...view.main.children].map(child => child.getAttribute('data-part'))).toEqual(['brand', 'nav', 'end'])
+  expect(view.main.querySelector('[data-part="brand"] #brand')!.textContent).toBe('Moons')
+  expect(view.main.querySelector('[data-part="end"] #user')!.textContent).toBe('Ada')
   expect([...view.bare.children].map(child => child.tagName)).toEqual(['NAV'])
   expect(view.main.querySelectorAll('nav')).toHaveLength(1)
   expect(view.main.querySelector('nav')!.getAttribute('aria-label')).toBe('Main')
@@ -51,8 +51,8 @@ test('marks the section holding the page as current, draws icons decoratively an
 
 test('folds its links into a popover the menu button opens', async () => {
   const view = await header()
-  const toggle = view.main.querySelector<HTMLButtonElement>('.kui-site-nav-toggle')!
-  const list = view.main.querySelector<HTMLElement>('.kui-site-nav-list')!
+  const toggle = view.main.querySelector<HTMLButtonElement>('.kui-site-nav [data-part="toggle"]')!
+  const list = view.main.querySelector<HTMLElement>('.kui-site-nav [data-part="list"]')!
 
   expect(list.hasAttribute('popover')).toBe(true)
   expect(toggle.getAttribute('popovertarget')).toBe(list.id)
