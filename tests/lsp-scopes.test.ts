@@ -4,7 +4,7 @@ import { formatKay } from '../src/compiler/format'
 import { SourceMap } from '../src/compiler/mapping'
 import { formatRange } from '../src/lsp/range-format'
 import { mentionsRoute, routeAt } from '../src/lsp/route-links'
-import { semanticTokens, TOKEN_MODIFIERS, TOKEN_TYPES } from '../src/lsp/semantic-tokens'
+import { semanticTokens, splitEntries, TOKEN_MODIFIERS, TOKEN_TYPES } from '../src/lsp/semantic-tokens'
 
 // Each token as the text it covers, its type and its modifiers.
 function tokens(text: string, imported = {}): string[] {
@@ -127,6 +127,23 @@ describe('semantic tokens of a broken import and of props read as text', () => {
     const text = page('---', 'const { a = `x, ${`}, `} }`, d } = props<{ a?: string }>()', 'const view = <b>{a}</b>', '---', 'p {a} {d}')
 
     expect(tokens(text)).toEqual(['1:8 a property declaration,prop', '1:29 d property declaration,prop', '4:3 a property prop', '4:7 d property prop'])
+  })
+
+  it('keeps the props list past a quote, a comma or a brace in a regex literal', () => {
+    const text = page('---', 'const { a = /["\',}]/, d } = props<{ a?: RegExp }>()', 'const view = <b>{a}</b>', '---', 'p {a} {d}')
+
+    expect(tokens(text)).toEqual(['1:8 a property declaration,prop', '1:22 d property declaration,prop', '4:3 a property prop', '4:7 d property prop'])
+  })
+
+  it('keeps a division in a default apart from a regex literal', () => {
+    const text = page('---', 'const { a = 4 / 2, b = x / 2, d } = props<{ a?: number }>()', 'const view = <b>{a}</b>', '---', 'p {a} {b} {d}')
+
+    expect(tokens(text)).toEqual(['1:8 a property declaration,prop', '1:19 b property declaration,prop', '1:30 d property declaration,prop', '4:3 a property prop', '4:7 b property prop', '4:11 d property prop'])
+  })
+
+  it('stops a literal at the end of the entries it splits', () => {
+    expect(splitEntries('a, "b, c', 0, 5)).toEqual([[0, 1], [2, 5]])
+    expect(splitEntries('a, /* b, c', 0, 5)).toEqual([[0, 1], [2, 5]])
   })
 
   it('knows the signals the script fence imports in a module fence it cannot parse', () => {

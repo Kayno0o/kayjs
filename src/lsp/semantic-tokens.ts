@@ -332,12 +332,47 @@ function looseDeclarations(source: string, region: Span, imported: ImportedSigna
   }
 }
 
-// The offset of the last character of the string, template, or comment starting at `at`, `at` itself when none starts there, and -1 when it never ends. A backslash escapes the next character, and a template substitution is scanned as code.
-function skipLiteral(text: string, at: number): number {
+// A `/` after one of these starts a regex literal, after anything else (a name, a number, a closing bracket) it divides.
+const WHITESPACE = /\s/
+const REGEX_PRECEDERS = '(,=:[!&|?{};+-*%<>~^'
+
+// The offset of the last character of the regex literal starting at `at`, `at` itself when the `/` divides or the literal ends its line unclosed.
+function skipRegex(text: string, at: number, end: number): number {
+  let before = at - 1
+
+  while (before >= 0 && WHITESPACE.test(text[before]!))
+    before--
+
+  if (before >= 0 && !REGEX_PRECEDERS.includes(text[before]!))
+    return at
+
+  let inClass = false
+
+  for (let i = at + 1; i < end; i++) {
+    const char = text[i]!
+
+    if (char === '\n')
+      return at
+
+    if (char === '\\')
+      i++
+    else if (char === '[')
+      inClass = true
+    else if (char === ']')
+      inClass = false
+    else if (char === '/' && !inClass)
+      return i
+  }
+
+  return at
+}
+
+// The offset of the last character of the string, template, comment or regex literal starting at `at`, `at` itself when none starts there, and -1 when it never ends before `end`. A backslash escapes the next character, and a template substitution is scanned as code.
+function skipLiteral(text: string, at: number, end = text.length): number {
   const char = text[at]!
 
   if (char === '"' || char === '\'' || char === '`') {
-    for (let i = at + 1; i < text.length; i++) {
+    for (let i = at + 1; i < end; i++) {
       if (text[i] === '\\') {
         i++
       }
@@ -345,12 +380,12 @@ function skipLiteral(text: string, at: number): number {
         return i
       }
       else if (char === '`' && text[i] === '$' && text[i + 1] === '{') {
-        const end = closing(text, i + 1)
+        const close = closing(text, i + 1, end)
 
-        if (end === undefined)
+        if (close === undefined)
           return -1
 
-        i = end
+        i = close
       }
     }
 
@@ -358,26 +393,26 @@ function skipLiteral(text: string, at: number): number {
   }
 
   if (char === '/' && text[at + 1] === '/') {
-    const end = text.indexOf('\n', at)
+    const lineEnd = text.indexOf('\n', at)
 
-    return end === -1 ? text.length : end
+    return lineEnd === -1 || lineEnd > end ? end : lineEnd
   }
 
   if (char === '/' && text[at + 1] === '*') {
-    const end = text.indexOf('*/', at + 2)
+    const close = text.indexOf('*/', at + 2)
 
-    return end === -1 ? -1 : end + 1
+    return close === -1 || close + 1 >= end ? -1 : close + 1
   }
 
-  return at
+  return char === '/' ? skipRegex(text, at, end) : at
 }
 
 // The offset of the bracket closing the one at `open`, past nested brackets, strings and comments; undefined when it never closes.
-function closing(text: string, open: number): number | undefined {
+function closing(text: string, open: number, end = text.length): number | undefined {
   let depth = 0
 
-  for (let at = open; at < text.length; at++) {
-    at = skipLiteral(text, at)
+  for (let at = open; at < end; at++) {
+    at = skipLiteral(text, at, end)
 
     if (at === -1)
       return undefined
@@ -394,16 +429,16 @@ function closing(text: string, open: number): number | undefined {
 }
 
 // The spans between the commas of a pattern that sit at its top level, so a default holding a call or a nested pattern stays one entry.
-function splitEntries(text: string, start: number, end: number): [number, number][] {
+export function splitEntries(text: string, start: number, end: number): [number, number][] {
   const entries: [number, number][] = []
   let from = start
   let depth = 0
 
   for (let at = start; at < end; at++) {
-    at = skipLiteral(text, at)
+    at = skipLiteral(text, at, end)
 
     if (at === -1)
-      return entries
+      break
 
     const char = text[at]!
 
