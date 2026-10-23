@@ -71,7 +71,7 @@ export interface CmsOptions {
   collections?: Record<string, GivenLayout> | undefined
   // `false` leaves out the hint cookie and the "Edit this page" link an editor's browser finds on every page, once the guard let it into the screens; a link of your own carries `data-kcms-edit-page` (`data-cms-edit-page` before 1.70 still works) and is shown in its place.
   pageLink?: false | undefined
-  // The collections whose entries an editor can send to a mailing list, by name: `{ posts: { list: mail.list('news'), message: entry => ({ subject: String(entry.data.title), view: Post, props: { entry } }) } }`. The entry screen then offers a preview of the mail, a test send to the editor's own address (from `author`) and the send itself, which needs the `publish` action of `roles`.
+  // The collections whose entries an editor can send to a mailing list, by name: `{ posts: { list: mail.list('news'), message: entry => ({ subject: String(entry.data?.title), view: Post, props: { entry } }) } }`. The entry screen then offers a preview of the mail, a test send to the editor's own address (from `author`) and the send itself, which needs the `publish` action of `roles`.
   newsletter?: Record<string, NewsletterOptions> | undefined
   // What each role may do beyond editing: `{ editor: [], publisher: ['publish'], admin: ['publish', 'delete', 'upload', 'redirects'] }`. A signed-in editor whose roles are not listed only edits. The roles are kayjs-auth's, else `passwordGuard()`'s; without this option everyone the guard admits may do all of it.
   roles?: Record<string, readonly Action[]> | undefined

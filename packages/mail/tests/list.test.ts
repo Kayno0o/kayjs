@@ -355,6 +355,19 @@ describe('a test send', () => {
     expect(sent!.text).toContain('This is a test send')
     expect(sent!.headers['List-Unsubscribe']).toBeDefined()
   })
+
+  it('previews what a send would mail, with the footer, and mails nobody', async () => {
+    const sent = outbox.mails.length
+    const preview = await mail.list().preview({ subject: 'Spring news', text: 'Hello', html: '<p>Hello</p>' })
+
+    expect(preview.subject).toBe('Spring news')
+    expect(preview.html).toContain('<p>Hello</p>')
+    expect(preview.html).toContain('/_kay/mail/list/unsubscribe')
+    expect(preview.text).toContain('Hello')
+
+    await site.runJobs()
+    expect(outbox.mails).toHaveLength(sent)
+  })
 })
 
 describe('erasing a person', () => {

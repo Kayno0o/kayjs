@@ -19,8 +19,7 @@ const open = signal(false)
 const preview = signal<MailPreview>()
 const busy = signal(false)
 const confirming = signal(false)
-const entry = form.stored
-const ref = () => ({ collection: form.collection.name, slug: entry?.slug ?? '', locale: entry?.locale })
+const ref = () => ({ collection: form.collection.name, slug: form.stored?.slug ?? '', locale: form.stored?.locale })
 const dirtyReason = () => form.dirty() ? wording('cms.share.dirty', 'Save or reset your edits first') : undefined
 
 async function render(): Promise<void> {

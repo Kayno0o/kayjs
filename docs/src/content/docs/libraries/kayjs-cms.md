@@ -585,7 +585,7 @@ With a [kayjs-mail mailing list](/libraries/kayjs-mail), an editor can mail an e
 
 ```ts
 newsletter: {
-  posts: { list: mail.list('news'), message: entry => ({ subject: String(entry.data.title), view: Post, props: { entry } }) },
+  posts: { list: mail.list('news'), message: entry => ({ subject: String(entry.data?.title), view: Post, props: { entry } }) },
 },
 ```
 

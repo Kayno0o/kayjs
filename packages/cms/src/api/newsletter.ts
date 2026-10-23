@@ -1,10 +1,10 @@
-import type { EntryRef, StoredEntry } from '../kay/contract'
+import type { EntryRef } from '../kay/contract'
 import { s } from 'kay'
 import { api } from 'kay/server'
 import { wording } from 'kay/words'
 import { authors } from '../authors'
 import { settings } from '../settings'
-import { collectionNamed, entryOf } from '../store'
+import { entryOf } from '../store'
 
 class Refused extends Error {
   constructor(readonly code: 400 | 404 | 409, message: string) {
@@ -14,7 +14,7 @@ class Refused extends Error {
 
 const locale = s.Object({ locale: s.Optional(s.String()) })
 
-// The entry versions already sent in this process, so a double click or a second editor cannot mail a list twice by accident.
+// The entry versions sent or being sent in this process, so a double click or a second editor cannot mail a list twice by accident. A folder entry outside a repository has no version, so its content stands for it.
 const sent = new Map<string, string>()
 
 async function loaded(ref: EntryRef) {
@@ -29,12 +29,6 @@ async function loaded(ref: EntryRef) {
     throw new Refused(404, wording('cms.store.noEntry', 'No entry {slug} in {collection}', { slug: ref.slug, collection: ref.collection }))
 
   return { options, entry, message: await options.message(entry) }
-}
-
-async function isDraft(collection: string, entry: StoredEntry): Promise<boolean> {
-  const { draftField } = await collectionNamed(collection)
-
-  return draftField !== undefined && entry.data?.[draftField] === true
 }
 
 const keyOf = (ref: EntryRef) => `${ref.collection}/${ref.slug}/${ref.locale ?? ''}`
@@ -62,18 +56,24 @@ export default api()
     const ref = { collection: params.collection, slug: params.slug, locale: query.locale }
     const { options, entry, message } = await loaded(ref)
 
-    if (await isDraft(ref.collection, entry))
+    if (entry.draft)
       throw new Refused(409, wording('cms.newsletter.draft', 'Publish the entry before sending it to the list'))
 
-    const version = entry.version ?? ''
+    const version = entry.version ?? Bun.hash(JSON.stringify([entry.data, entry.body])).toString()
     const key = keyOf(ref)
 
     if (sent.get(key) === version)
       throw new Refused(409, wording('cms.newsletter.again', 'This version of the entry was already sent to the list'))
 
-    const result = await options.list.send(message as never)
-
+    // Claimed before the send is awaited, so two requests at once cannot both pass.
     sent.set(key, version)
 
-    return result
+    try {
+      return await options.list.send(message as never)
+    }
+    catch (error) {
+      sent.delete(key)
+
+      throw error
+    }
   }, { query: locale })
