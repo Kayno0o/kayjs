@@ -879,7 +879,7 @@
       @apply border-accent bg-accent/10;
     }
 
-    &:where([data-disabled]) {
+    &:where([aria-disabled='true']) {
       @apply opacity-50;
     }
 
@@ -1546,7 +1546,7 @@
       outline-offset: -2px;
     }
 
-    &:where([data-selected]) {
+    &:where([data-picked]) {
       @apply font-medium text-accent;
     }
 

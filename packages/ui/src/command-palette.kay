@@ -210,7 +210,7 @@ dialog(part="root" ref={element => dialog = element} closedby="any" aria-label={
       input(part="input" value={query()} onInput={event => { query.set(event.currentTarget.value); selected.set(0) }} onKeyDown={keyDown} role="combobox" aria-label={label} aria-expanded="true" aria-controls={`${id}-list`} aria-autocomplete="list" aria-activedescendant={rows()[active()] ? optionId(active()) : undefined} autocomplete="off" spellcheck="false" placeholder={placeholder})
     div(part="list" id={`${id}-list`} role="listbox" aria-label={label})
       for section, sectionIndex of sections() key={sectionIndex}
-        div(part="group" role="group" aria-labelledby={section.group === null ? undefined : `${id}-group-${sectionIndex}`})
+        div(part="section" role="group" aria-labelledby={section.group === null ? undefined : `${id}-group-${sectionIndex}`})
           if section.group !== null
             div.kui-heading-section(part="heading" id={`${id}-group-${sectionIndex}`}) {section.group}
           for row of section.rows key={row.index}

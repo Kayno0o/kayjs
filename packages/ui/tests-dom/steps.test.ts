@@ -11,7 +11,7 @@ test('marks the current step, links the ones behind it and the done ones, and le
 
   const items = [...mounted.root.querySelectorAll('.kui-steps [data-part="item"]')]
 
-  expect(items.map(item => item.getAttribute('data-state'))).toEqual(['done', 'current', 'done'])
+  expect(items.map(item => item.getAttribute('data-step'))).toEqual(['done', 'current', 'done'])
   expect(items.map(item => item.querySelector('a')?.getAttribute('href'))).toEqual(['/signup?plan=pro&step=account', undefined, '/signup?plan=pro&step=review'])
   expect(items[1]!.querySelector('[aria-current="step"]')?.textContent).toContain('Details')
   expect(items[0]!.querySelector('[data-part="state"]')?.textContent).toBe('completed')

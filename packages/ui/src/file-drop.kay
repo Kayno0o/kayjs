@@ -6,7 +6,7 @@ import { acceptsFile } from './accept'
 // 'kui-file-drop' stays as the component's name for an app's CSS and the skins; the border colour reads --_control-line, which a skin sets.
 const look = recipe({
   parts: {
-    root: 'kui-file-drop flex flex-col items-center justify-center gap-3 border-dashed border-[length:var(--kui-border-width,var(--border-width))] p-6 text-center transition-colors [border-color:var(--_control-line,var(--color-border))] data-compact:flex-row data-compact:justify-start data-compact:p-3 data-compact:text-left data-disabled:opacity-50 data-dragging:border-accent data-dragging:bg-accent/10',
+    root: 'kui-file-drop flex flex-col items-center justify-center gap-3 border-dashed border-[length:var(--kui-border-width,var(--border-width))] p-6 text-center transition-colors [border-color:var(--_control-line,var(--color-border))] data-compact:flex-row data-compact:justify-start data-compact:p-3 data-compact:text-left aria-disabled:opacity-50 data-dragging:border-accent data-dragging:bg-accent/10',
     input: 'hidden',
   },
 })
@@ -109,6 +109,6 @@ function pasted(event: ClipboardEvent) {
 
 listen(() => paste ? window : undefined, 'paste', pasted)
 ---
-div(part="root" {...rest} role="group" data-compact={size === 'sm' || compact || undefined} data-dragging={dragging() || undefined} data-disabled={disabled || undefined} onDragOver={dragOver} onDragLeave={dragLeave} onDrop={drop})
+div(part="root" {...rest} role="group" data-compact={size === 'sm' || compact || undefined} data-dragging={dragging() || undefined} aria-disabled={disabled ? 'true' : undefined} onDragOver={dragOver} onDragLeave={dragLeave} onDrop={drop})
   input(part="input" ref={element => input = element} type="file" tabindex="-1" aria-hidden="true" accept={accept} multiple={multiple} disabled={disabled} onChange={picked})
   | {content(zone)}
