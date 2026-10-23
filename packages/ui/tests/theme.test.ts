@@ -18,6 +18,8 @@ const CLASS_IN_EXPRESSION = /([!=]==\s*)?'([a-z][\w-]*)'|\b([a-z][\w-]*)(?=\s*:)
 const KUI_NAME = /(?<![\w-])kui-[a-z][a-z0-9-]*(?![\w-])/g
 const WHITESPACE = /\s+/
 const RECIPE_STRING = /'([^']+)'/g
+// A line comment of a recipe, whose apostrophe is no string quote.
+const LINE_COMMENT = /^\s*\/\/.*$/gm
 const COLOUR_TOKEN = /(--color-kui-[\w-]+): ([^;]+);/g
 // A colour holds a light and a dark value, or names another colour that does.
 const PAIRED = /^light-dark\(|^var\(--color-kui-[\w-]+\)$|^color-mix\(in (?:oklab|srgb), /
@@ -56,10 +58,14 @@ const tokens = new Set([...theme.matchAll(DEFINED_TOKEN)].map(([, token]) => tok
 const classes = new Set([...theme.matchAll(DEFINED_CLASS)].map(([, name = '']) => name))
 
 // The components whose look is a recipe of utilities (#1885), each with its part classes in REMOVED_UI_CLASSES; theme.css keeps their old rules until 1.74.
-const RECIPE_COMPONENTS = new Set(['src/bar-list.kay', 'src/bar-chart.kay', 'src/scatter-chart.kay', 'src/contribution-graph.kay', 'src/line-chart.kay', 'src/carousel.kay', 'src/media-gallery.kay', 'src/image-cropper.kay', 'src/zoom-pane.kay', 'src/masonry.kay', 'src/qr-code.kay', 'src/site-favicon.kay', 'src/card.kay', 'src/badge.kay', 'src/notice.kay', 'src/avatar.kay', 'src/stat.kay', 'src/page-header.kay', 'src/page-section.kay', 'src/empty-state.kay', 'src/card-row.kay', 'src/widget.kay', 'src/meter.kay', 'src/progress.kay', 'src/skeleton.kay', 'src/button.kay', 'src/form-field.kay', 'src/checkbox.kay', 'src/toggle.kay', 'src/text-input.kay', 'src/textarea.kay', 'src/select.kay', 'src/contact-form.kay', 'src/radio-group.kay', 'src/segmented.kay', 'src/rating.kay', 'src/slider.kay', 'src/color-input.kay', 'src/date-input.kay', 'src/date-range-input.kay', 'src/combobox.kay', 'src/multi-select.kay', 'src/chip-group.kay', 'src/file-drop.kay', 'src/copy-button.kay', 'src/confirm-delete.kay'])
+const RECIPE_COMPONENTS = new Set(['src/card.kay', 'src/badge.kay', 'src/notice.kay', 'src/avatar.kay', 'src/stat.kay', 'src/page-header.kay', 'src/page-section.kay', 'src/empty-state.kay', 'src/card-row.kay', 'src/widget.kay', 'src/meter.kay', 'src/progress.kay', 'src/skeleton.kay', 'src/button.kay', 'src/form-field.kay', 'src/checkbox.kay', 'src/toggle.kay', 'src/text-input.kay', 'src/textarea.kay', 'src/select.kay', 'src/contact-form.kay', 'src/radio-group.kay', 'src/segmented.kay', 'src/rating.kay', 'src/slider.kay', 'src/color-input.kay', 'src/date-input.kay', 'src/date-range-input.kay', 'src/combobox.kay', 'src/multi-select.kay', 'src/chip-group.kay', 'src/file-drop.kay', 'src/copy-button.kay', 'src/confirm-delete.kay'])
 
 // Tables and navigation (slice 5 of #1885).
 for (const path of ['table', 'tabs', 'tab-nav', 'breadcrumb', 'pagination', 'steps', 'site-nav', 'app-header'])
+  RECIPE_COMPONENTS.add(`src/${path}.kay`)
+
+// Charts and media (slice 6).
+for (const path of ['bar-list', 'bar-chart', 'scatter-chart', 'contribution-graph', 'line-chart', 'carousel', 'media-gallery', 'image-cropper', 'zoom-pane', 'masonry', 'qr-code', 'site-favicon'])
   RECIPE_COMPONENTS.add(`src/${path}.kay`)
 
 // Every class a component writes: the `.class` shorthand, plain `class` attributes, and the names a `class` expression holds.
@@ -622,7 +628,7 @@ describe('theme.css', () => {
       const start = source.indexOf('recipe({')
       const recipe = source.slice(start, Math.min(...['defaults:', '\n})', '\n\nconst', '\n---'].map(end => source.indexOf(end, start)).filter(end => end !== -1)))
 
-      for (const name of new Set([...recipe.replaceAll('\'\'', '').matchAll(RECIPE_STRING)].flatMap(([, value = '']) => value.split(WHITESPACE)).filter(name => name !== '' && !name.startsWith('kui-') && !name.startsWith('group/') && !name.startsWith('peer/')))) {
+      for (const name of new Set([...recipe.replace(LINE_COMMENT, '').replaceAll('\'\'', '').matchAll(RECIPE_STRING)].flatMap(([, value = '']) => value.split(WHITESPACE)).filter(name => name !== '' && !name.startsWith('kui-') && !name.startsWith('group/') && !name.startsWith('peer/')))) {
         const next = compiler.build([name])
 
         if (next.length === css.length && !seen.has(name))

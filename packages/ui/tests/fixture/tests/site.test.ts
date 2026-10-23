@@ -617,6 +617,29 @@ describe('Tabs', () => {
 describe('charts', () => {
   const page = async (id: string) => (await one('/charts', `#${id}`)).html.replaceAll(/<!--[^>]*-->/g, '').replaceAll(/<\/?slot[^>]*>/g, '')
 
+  // The exact-markup tests below match the classes of a part with `[^"]*`, so this one holds the utilities the rules of theme.css used to draw: the look is a layout, a size and a token a skin recolours, and the browser tests read what they compute to.
+  test.each([
+    ['scatter', 'grid', ['absolute', 'bg-kui-surface2', 'data-[axis=x]:inset-y-0', 'data-[axis=y]:h-px']],
+    ['scatter', 'tick', ['absolute', 'whitespace-nowrap', 'tabular-nums', 'text-kui-overlay1', 'data-[axis=x]:top-full']],
+    ['scatter', 'guide', ['absolute', 'bg-kui-overlay0', 'data-[axis=x]:w-px']],
+    ['scatter', 'corner', ['pointer-events-none', 'absolute', 'text-kui-overlay1']],
+    ['bars', 'plot', ['relative', 'ml-10', 'border-kui-surface2']],
+    ['bars', 'column', ['flex', 'items-end', 'data-stacked:flex-col-reverse']],
+    ['bars', 'bar', ['min-h-px', 'flex-1', 'rounded-t-sm']],
+    ['bars', 'axisLabel', ['justify-center', 'whitespace-nowrap']],
+    ['stacked-bars', 'legendItem', ['flex', 'items-center', 'text-kui-subtext0']],
+    ['stacked-bars', 'key', ['size-2', 'shrink-0']],
+    ['graph', 'month', ['row-start-1', 'w-0', 'text-kui-subtext0']],
+    ['graph', 'cell', ['size-3', 'bg-kui-surface0', 'hover:scale-125', 'data-today:ring-kui-accent']],
+  ] as const)('the %s chart draws its %s part with %j', async (id, part, utilities) => {
+    const found = [...(await page(id)).matchAll(new RegExp(`<[a-z]+ class="([^"]*)" data-part="${part}"`, 'g'))].map(match => match[1]!.split(' '))
+
+    expect(found.length).toBeGreaterThan(0)
+
+    for (const classes of found)
+      expect(classes).toEqual(expect.arrayContaining([...utilities]))
+  })
+
   test('LineChart renders its frame, a table of its values for screen readers, a keyboard slider on the latest point and a legend dashing each line on the server, leaving the drawing to the browser', async () => {
     expect(await attributes('/charts', '#line [role="figure"], #line [aria-hidden="true"], #line [role="slider"]', ['aria-label', 'aria-valuenow', 'aria-valuemax', 'aria-valuetext', 'tabindex'])).toEqual([
       { 'aria-label': 'Visits', 'aria-valuenow': null, 'aria-valuemax': null, 'aria-valuetext': null, 'tabindex': null },
