@@ -82,7 +82,9 @@ export const welcomeMails = queue(
 
 The server runs it with `.use(welcomeMails)`. An action calls `await welcomeMails.enqueue({ to: email })`, or `enqueue(payload, { delay: '1h' })` to run it later.
 
-A job that throws is retried after a growing wait. One that runs out of attempts is kept as failed and passed to `onFailed` as `{ payload, error }`. So is a run outlasting `lostAfter`, 10 minutes by default, or one whose process died each time. Under `kay dev`, the dev tool's Jobs tab lists every queue's jobs and retries or deletes a failed one ([the dev tool](/guides/performance/#jobs)).
+A job that throws is retried after a growing wait. One that runs out of attempts is kept as failed and passed to `onFailed` as `{ payload, error }`. So is a run outlasting `lostAfter`, 10 minutes by default, or one whose process died each time.
+
+Under `kay dev`, the dev tool's Jobs tab lists every queue's jobs and retries or deletes a failed one ([the dev tool](/guides/performance/#jobs)). In production, `jobs: { guard }` in `kay.config.ts` serves that list at `/_kay/jobs`, behind the guard you give it: `jobs: { guard: ctx => ctx.locals.auth.requireAdmin() }` with kayjs-auth, or any guard. Without a guard the server does not start, and `jobs: { guard, path }` moves the page.
 
 Some failures are nobody's fault: a full disk, a service asking you to slow down. To try again later without spending an attempt, throw `retryLater` with how long to wait.
 

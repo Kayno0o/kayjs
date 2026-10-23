@@ -91,6 +91,8 @@ export interface KayConfig {
   health?: HealthConfig | false | undefined
   // Serves `/metrics` in the Prometheus text format for a collector: requests by method, route and status, their durations, scheduled runs, cache reads and live connections. Read only from this machine or a private network by a request no proxy forwarded, or from anywhere with the `Authorization: Bearer` token `KAY_METRICS_TOKEN` holds; `{ path }` moves it. Off by default, and under `kay dev`.
   metrics?: boolean | MetricsConfig | undefined
+  // Serves a page of the app's queues at `/_kay/jobs` in production: each queue's waiting, running and failed jobs with payload and error, and a button to retry or delete one. It mounts only with a `guard`, a kay guard or a list of them such as `ctx => ctx.locals.auth.requireAdmin()`, which runs on every request, and without one the boot stops. `{ path }` moves it. Off by default, and under `kay dev`, whose dev tool has a Jobs tab.
+  jobs?: JobsConfig | undefined
   // One line per request on stdout, on by default when NODE_ENV is production, `false` for none; `'json'` writes it and kay's own messages as one JSON object each instead, and a function receives them all.
   log?: Logger | undefined
   // A `Server-Timing` header on each page rendered per request, timing its guards, the import of its modules, its loads and its render for the browser's network panel: on in development, off otherwise unless set.
@@ -224,6 +226,11 @@ export interface LiveConfig {
   connections?: number | undefined
   // How many it may open in a minute, 120 by default.
   perMinute?: number | undefined
+}
+
+export interface JobsConfig {
+  guard: Guard | Guard[]
+  path?: string | undefined
 }
 
 export interface MetricsConfig {

@@ -54,6 +54,7 @@ import { FAVICON_DIR, faviconSource, MANIFEST, manifestJson, serveFavicons } fro
 import { loadGuard, loadGuards, requiredGuards } from './guards'
 import { refuseLocaleClashes } from './i18n'
 import { avifQuality, serveImages, webpQuality } from './image'
+import { jobsPageOf, serveJobsPage } from './jobs-page'
 import { countWrites } from './kept-pages'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { liveConnections, serveLive } from './live'
@@ -447,6 +448,12 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     serveHealth(app, lifecycle, () => served.holds(health), options.health === false ? undefined : options.health)
   }
 
+  // Read in development too, so a setting without a guard fails there; claimed, so an app file at the path stops the boot.
+  const jobsPage = jobsPageOf(options.jobs)
+
+  if (jobsPage && !mode.dev && !exported)
+    served.claim({ path: jobsPage.path, owner: 'the jobs page', kind: 'kay', method: 'ALL' }, taken => `kay: ${taken.owner} and the jobs page both serve ${jobsPage.path}: move one with \`jobs: { path }\``)
+
   if (metrics) {
     served.offer(metrics)
     serveMetrics(app, { path: metrics.path, base, proxy: checkProxy(options.proxy), health: health?.path, holds: () => served.holds(metrics), connections: liveConnections })
@@ -492,6 +499,10 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   apiMountsServed.push(...apiModules.map(module => module.mount))
 
   await serveEndpoints(app, endpoints, actionOptions)
+
+  // After the extensions, whose derived values the guards read through `ctx.locals`.
+  if (jobsPage && !mode.dev && !exported)
+    serveJobsPage(app, jobsPage, actionOptions)
 
   // The dev tool's Routes tab, once the endpoints and API modules are known, and its Head tab.
   if (mode.dev) {
