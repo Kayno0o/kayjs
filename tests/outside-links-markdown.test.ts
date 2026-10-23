@@ -35,6 +35,10 @@ describe('renderMarkdown', () => {
     expect(tag(html, 'https://other.example/raw2')).not.toContain('noopener')
     expect(tag(html, 'https://other.example/raw3')).toContain(OUT)
     expect(tag(html, 'https://other.example/raw4')).toContain(OUT)
+    // Only the links kay opened carry the mark the page's cue rule reads.
+    expect(tag(html, 'https://other.example/a')).toContain(' data-new-tab')
+    expect(tag(html, 'https://other.example/raw')).not.toContain('data-new-tab')
+    expect(tag(html, 'https://x.example/a')).not.toContain('data-new-tab')
   })
 
   it('takes any absolute link as outside while no site is known', async () => {

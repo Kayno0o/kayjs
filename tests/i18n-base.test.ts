@@ -55,7 +55,7 @@ describe('markdownHtml on a site with a path', () => {
 
       const html = markdownHtml('[away](https://other.example/app/a) [same](https://x.example/app/a) [other](https://x.example/elsewhere) [root](/app/a)')
 
-      expect(html, site).toContain('<a href="https://other.example/app/a" target="_blank" rel="nofollow ugc noopener">')
+      expect(html, site).toContain('<a href="https://other.example/app/a" target="_blank" rel="nofollow ugc noopener" data-new-tab>')
       expect(html, site).toContain('<a href="https://x.example/app/a" rel="nofollow ugc">')
       expect(html, site).toContain('<a href="https://x.example/elsewhere" rel="nofollow ugc">')
       expect(html, site).toContain('<a href="/app/a" rel="nofollow ugc">')

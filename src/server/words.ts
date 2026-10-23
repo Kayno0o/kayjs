@@ -7,6 +7,7 @@ export const KAY_ENGLISH = {
   'kay.action.invalidFile': 'Invalid file type',
   'kay.action.serverError': 'Something went wrong on our side; try again later',
   'kay.action.bodyLimit': 'Too large to send; {size} at most',
+  'kay.link.newTab': '(opens in a new tab)',
   'kay.offline.title': 'Offline',
   'kay.offline.text': 'This page needs a connection, and none is open.',
   'kay.entry.required': '{field} is required',

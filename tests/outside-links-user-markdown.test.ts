@@ -39,6 +39,7 @@ function expectSplit(html: string): void {
   // A raw tag's own target is dropped by the sanitizer, and its link is outside like the rest.
   expect(tag(html, 'https://other.example/raw')).toContain(OUT)
   expect(html.match(/target=/g)?.length).toBe(html.match(/target="_blank" rel="nofollow ugc noopener"/g)?.length)
+  expect(html.match(/ data-new-tab/g)?.length).toBe(html.match(/target=/g)?.length)
 }
 
 beforeAll(() => {

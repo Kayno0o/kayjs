@@ -20,7 +20,7 @@ const AMPERSAND = /&amp;/g
 
 // A link leaving the site opens in a new tab: `target="_blank"` and `noopener` besides the sanitizer's `rel`. `leaves` is told the link's `href` as written.
 function openLeavingLinks(html: string, leaves: (href: string) => boolean): string {
-  return html.replace(LINK, (link, href: string) => leaves(href.replace(AMPERSAND, '&')) ? `<a href="${href}" target="_blank" rel="nofollow ugc noopener">` : link)
+  return html.replace(LINK, (link, href: string) => leaves(href.replace(AMPERSAND, '&')) ? `<a href="${href}" target="_blank" rel="nofollow ugc noopener" data-new-tab>` : link)
 }
 
 // Markdown's HTML through `sanitizeHtml`, a task's checkbox held as a private character the user's own text cannot hold, and the links leaving the site opening in a new tab, each checkbox named by its item's text.

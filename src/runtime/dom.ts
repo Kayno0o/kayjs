@@ -802,12 +802,14 @@ export function leavesInBrowser(href: unknown): boolean {
 export function outside<T>(element: Element, href: T, ownRel = false): T {
   if (leavesInBrowser(href)) {
     element.setAttribute('target', '_blank')
+    element.setAttribute('data-new-tab', '')
 
     if (!ownRel)
       element.setAttribute('rel', 'noopener')
   }
   else {
     element.removeAttribute('target')
+    element.removeAttribute('data-new-tab')
 
     if (!ownRel)
       element.removeAttribute('rel')

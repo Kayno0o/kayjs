@@ -7,8 +7,10 @@ const LEAVING = /^[\0-\x20]*(?:[/\\][\t\n\r]*[/\\]|h[\t\n\r]*t[\t\n\r]*t[\t\n\r]
 // The unknown site's stand-in, where a relative href resolves to the origin an absolute one never has.
 const UNKNOWN = 'http://kay-site.invalid'
 
-export const OUTSIDE_ATTRIBUTES = ' target="_blank" rel="noopener"'
-export const OUTSIDE_TARGET = ' target="_blank"'
+// `data-new-tab` marks a link kay opened in a new tab, which the page's `a[data-new-tab]::after` rule says aloud to a screen reader; a link writing its own `target` is not marked.
+export const NEW_TAB_ATTRIBUTE = 'data-new-tab'
+export const OUTSIDE_ATTRIBUTES = ` target="_blank" rel="noopener" ${NEW_TAB_ATTRIBUTE}`
+export const OUTSIDE_TARGET = ` target="_blank" ${NEW_TAB_ATTRIBUTE}`
 
 // The meta a page writes under `links: { outside: 'same-tab' }`, for an island to read.
 const SAME_TAB_META = 'meta[name="kay-same-tab-links"]'

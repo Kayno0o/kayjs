@@ -98,6 +98,44 @@ describe('a link leaving the site, in templates', () => {
   })
 })
 
+async function page(options: Record<string, unknown>, path = '/'): Promise<string> {
+  const site = new Elysia().use(await pages({ root: 'tests/fixtures/outside-links', prebuilt: false, security: false, inlineStyles: false, ...options }))
+
+  return (await site.handle(new Request(`http://localhost${path}`))).text()
+}
+
+describe('the cue saying a link opens in a new tab', () => {
+  const RULE = 'a[data-new-tab]::after{content:"(opens in a new tab)";'
+
+  it('marks the links kay opens in a new tab, and the page carries the rule saying it aloud', async () => {
+    const html = await page({ site: 'https://x.example' })
+    const tags = await links({ site: 'https://x.example' })
+
+    for (const name of ['static', 'dynamic', 'spread', 'rel', 'dynamicRel', 'spreadRel'])
+      expect(tags[name], name).toContain(' data-new-tab')
+
+    expect(html).toContain(`<style>${RULE}`)
+    expect(html.match(/<style>a\[data-new-tab\]/g)).toHaveLength(1)
+  })
+
+  it('leaves a link that sets its own target, and any other, unmarked', async () => {
+    const tags = await links({ site: 'https://x.example' })
+
+    for (const name of ['target', 'empty', 'dynamicTarget', 'spreadTarget', 'spreadTargetAfter', 'same', 'root', 'hash', 'mail'])
+      expect(tags[name], name).not.toContain('data-new-tab')
+  })
+
+  it('words the rule in the locale of the page, and writes none under same-tab links', async () => {
+    const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/outside-links/src/messages') }
+
+    expect(await page({ site: 'https://x.example', i18n }, '/')).toContain('content:"(s\'ouvre dans un nouvel onglet)"')
+
+    const same = await page({ site: 'https://x.example', links: { outside: 'same-tab' } })
+
+    expect(same).not.toContain('data-new-tab')
+  })
+})
+
 describe('leavesSite', () => {
   const SITE = 'https://x.example'
 

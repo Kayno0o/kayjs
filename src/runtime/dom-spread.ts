@@ -9,7 +9,7 @@ function outsideProps(props: Record<string, unknown>): Record<string, unknown> {
   if (Object.hasOwn(props, 'target') || !leavesInBrowser(props.href))
     return props
 
-  return merge(props, Object.hasOwn(props, 'rel') ? { target: '_blank' } : { target: '_blank', rel: 'noopener' })
+  return merge(props, Object.hasOwn(props, 'rel') ? { 'target': '_blank', 'data-new-tab': '' } : { 'target': '_blank', 'rel': 'noopener', 'data-new-tab': '' })
 }
 
 // Attributes and handlers from objects only known at render time; with `content`, a `children`, `innerHTML` or `textContent` among them sets the element's content.

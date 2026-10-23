@@ -119,7 +119,7 @@ A link is a template link: `kay check` tests it, and it gets the `base` and the 
 
 A link to another site opens in a new tab, and a link inside yours stays in the same one. kay adds `target="_blank" rel="noopener"` to an `a` whose `href` is on another origin, in templates, in islands, in a `markdown` block, in `markdownHtml` and in the Markdown of a collection's entries or `renderMarkdown`. The server compares with the origin you set as `site`, an island with the page's own origin. Without a `site`, every absolute `http` or `https` link counts as another site.
 
-A path, a `#hash`, `mailto:` and `tel:` are left alone, and so is a link that writes its own `target`, even an empty one. A link writing its own `rel` keeps it, and only gets the `target`. To keep every link in the same tab, set `links: { outside: 'same-tab' }` in `kay.config.ts`.
+A path, a `#hash`, `mailto:` and `tel:` are left alone, and so is a link that writes its own `target`, even an empty one. A link writing its own `rel` keeps it, and only gets the `target`. Those links also carry `data-new-tab`, and the page says "(opens in a new tab)" for them to screen readers, in the page's language when your messages have `kay.link.newTab`. To show an icon, style `a[data-new-tab]`. To keep every link in the same tab, set `links: { outside: 'same-tab' }` in `kay.config.ts`.
 
 ## Conditions and lists
 

@@ -131,6 +131,12 @@ describe('a dynamic tag naming a link', () => {
     expect(attributesOf({ href: '/x' })).toEqual([null, null])
     expect(attributesOf({ href: 'https://other.example/x', target: '_self' })).toEqual(['_self', null])
     expect(attributesOf({ href: 'https://other.example/x', rel: 'author' })).toEqual(['_blank', 'author'])
+
+    const marked = (props: Record<string, unknown>) => (dynamic('a', props) as Element).hasAttribute('data-new-tab')
+
+    expect(marked({ href: 'https://other.example/x' })).toBe(true)
+    expect(marked({ href: '/x' })).toBe(false)
+    expect(marked({ href: 'https://other.example/x', target: '_self' })).toBe(false)
   })
 })
 
@@ -157,10 +163,12 @@ describe('a spread link whose href changes', () => {
     const state = () => [link.getAttribute('target'), link.getAttribute('rel')]
 
     expect(state()).toEqual(['_blank', 'noopener'])
+    expect(link.hasAttribute('data-new-tab')).toBe(true)
     expect(renders).toBe(1)
     href.set('/inside')
     await settle()
     expect(state()).toEqual([null, null])
+    expect(link.hasAttribute('data-new-tab')).toBe(false)
     href.set('https://other.example/y')
     await settle()
     expect(state()).toEqual(['_blank', 'noopener'])
