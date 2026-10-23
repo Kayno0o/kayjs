@@ -151,7 +151,7 @@ div(part="root" {...rest} ref={ref})
   input.kui-field-input(part="search" ref={element => searchBox = element} type="search" data-kui-search placeholder={placeholder} aria-label={searchLabel} value={typed()} onInput={event => typed.set(event.currentTarget.value)} onKeyDown={keepEnter})
   ul(part="grid" aria-label={gridLabel} aria-busy={pending() ? 'true' : undefined})
     for choice of icons() key={choice.name}
-      li
+      li(part="item")
         button(part="option" type="button" aria-label={nameOf(choice.name)} data-tooltip={nameOf(choice.name)} aria-pressed={picked() === choice.name ? 'true' : 'false'} onClick={() => choose(choice)})
           Icon(icon={choice.icon})
     if icons().length === 0

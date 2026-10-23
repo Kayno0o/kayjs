@@ -197,7 +197,7 @@ function ariaSort(column: Column<Row>): 'ascending' | 'descending' | undefined {
 div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={virtual ? '' : undefined} tabindex={virtual ? '0' : undefined})
   if filter
     label(part="filter")
-      span.kui-label-text {filterLabel}
+      span.kui-label-text(part="filterLabel") {filterLabel}
       input.kui-field-input(part="filterInput" type="search" value={typed()} placeholder={filterPlaceholder} autocomplete="off" onInput={event => typed.set(event.currentTarget.value)})
     p(part="count" role="status") {typed() ? counted(kept().length) : ''}
   if selectable || exportable

@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.72.0
 
+### kayjs-ui: a Steps item carries `data-step` and a picked Combobox option `data-picked`
+
+A Combobox option the value stands on sets `data-picked` where it set `data-selected`, which repeated the name of `aria-selected` for another meaning. A Steps item (`current`, `done` or `upcoming`) sets `data-step` where it set `data-state`, as a state that ARIA has no word for is a named attribute and never a generic `data-state`. A rule of the app on `[data-state='current']` inside a Steps becomes `[data-step='current']`. `kay check` cannot recognise it, as an attribute selector has no owner to match.
+
 ### kayjs-mail: mailers sharing a queue agree on its retry and keep options
 
 Two `mailer()`s with the same `queue.name` and `store` that set `attempts`, `backoff`, `keepFailed`, `lostAfter`, `idlePoll` or `concurrency` differently now stop the boot, since the queue has one of each: give them the same values or their own `queue.name`. `onFailed` and `redact` may differ, and run for the mails their own mailer queued. A custom `transport.send(mail, signal)` gets the queue's abort signal: pass it to `fetch`.

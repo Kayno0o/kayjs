@@ -37,7 +37,7 @@ if rows.length === 0
 else
   ul(part="root" {...rest})
     for row of rows key={row.key}
-      li
+      li(part="item")
         if onSelect
           button(part="row" type="button" data-interactive onClick={() => onSelect?.(row)})
             span(part="label") {row.label}

@@ -38,7 +38,7 @@ form(part="root" action={action} novalidate)
   p(part="notice")
     | {notice}{' '}
     if policy
-      a(href={policy} target="_blank" rel="noopener") {privacyLabel}
+      a(part="link" href={policy} target="_blank" rel="noopener") {privacyLabel}
   input(type="hidden" name="wording" value={shownWording})
   Button(type="submit" tone="accent" label={submitLabel})
   if action.succeeded()

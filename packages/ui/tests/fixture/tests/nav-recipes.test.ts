@@ -146,7 +146,7 @@ inBrowser('navigation recipes in the browser', () => {
       const marker = getComputedStyle(item.querySelector('[data-part=marker]')!)
       const label = getComputedStyle(item.querySelector('[data-part=label]')!)
 
-      return { state: item.getAttribute('data-state'), ground: marker.backgroundColor, border: marker.borderTopColor, text: marker.color, weight: label.fontWeight }
+      return { state: item.getAttribute('data-step'), ground: marker.backgroundColor, border: marker.borderTopColor, text: marker.color, weight: label.fontWeight }
     }))
     const [done, current, upcoming] = markers
 

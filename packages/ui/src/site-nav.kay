@@ -58,7 +58,7 @@ nav(part="root" {...rest} aria-label={label})
     Icon(icon="close" part="closeIcon")
   ul(part="list" id={listId} popover style={`position-anchor: ${anchor}`})
     for link of links key={link.href}
-      li
+      li(part="item")
         a(part="link" href={link.href} aria-current={marked(link.href)})
           if link.icon
             Icon(icon={link.icon} part="icon")

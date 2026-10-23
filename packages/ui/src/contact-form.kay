@@ -48,13 +48,13 @@ form(part="root" action={action} novalidate)
     div(part="consent")
       Checkbox(name="consent" label={consentLabel})
       if privacy
-        a(href={privacy} {...OUTSIDE}) {privacyLabel}
+        a(part="link" href={privacy} {...OUTSIDE}) {privacyLabel}
       span(part="issues" aria-live="polite" data-field="consent")
         if action.error('consent') as issue
           span(part="issue") {issue}
   else if privacy
     p(part="privacy")
-      a(href={privacy} {...OUTSIDE}) {privacyLabel}
+      a(part="link" href={privacy} {...OUTSIDE}) {privacyLabel}
   Button(type="submit" tone="accent" label={submitLabel})
   if action.succeeded()
     Notice(tone="success" size="sm") {sentLabel}

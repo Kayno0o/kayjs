@@ -2570,7 +2570,7 @@
   .kui-steps-item {
     @apply flex items-center text-sm text-muted;
 
-    &:where([data-state='current']) {
+    &:where([data-step='current']) {
       @apply font-medium text-foreground;
     }
   }
@@ -2586,11 +2586,11 @@
   .kui-steps-marker {
     @apply flex size-6 shrink-0 items-center justify-center rounded-full border border-border-strong text-xs;
 
-    :where([data-state='current']) & {
+    :where([data-step='current']) & {
       @apply border-accent bg-accent text-accent-foreground;
     }
 
-    :where([data-state='done']) & {
+    :where([data-step='done']) & {
       @apply border-accent text-accent;
     }
   }

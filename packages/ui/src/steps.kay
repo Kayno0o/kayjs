@@ -40,7 +40,7 @@ const state = (index: number, key: string) => key === current ? 'current' : inde
 nav(part="root" {...rest} aria-label={label})
   ol(part="list")
     for step, index of steps key={step.key}
-      li(part="item" data-state={state(index, step.key)})
+      li(part="item" data-step={state(index, step.key)})
         if state(index, step.key) === 'done'
           a(part="link" href={stepHref(url, step.key, param)})
             span(part="marker" aria-hidden="true") {index + 1}
