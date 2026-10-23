@@ -1334,7 +1334,7 @@ describe('prerendering', () => {
       { files: { 'notes/[slug].kay': '--- server\nexport const page = { prerender: \'yes\' }\n---\np {ctx.params.slug}\n' }, outcome: 'exports a prerender that is neither true, false' },
       { files: { 'index.kay': '--- server\nexport const page = { prerender: true }\n---\np Home\n', '[slug].kay': '--- server\nexport const page = { prerender: [{ slug: \'index\' }] }\nconst slug = ctx.params.slug\n---\np {slug}\n' }, outcome: 'kay: /index and / would both be prerendered to index.html' },
       { files: { 'plain.kay': '--- server\nexport const page = { prerender: true }\n---\np Plain\n' }, config: { preview: { secret: undefined as unknown as string } }, outcome: 1 },
-      { files: { 'broken.kay': '--- server\nexport const page = { prerender: true }\nconst fail = () => {\n  throw new Error(\'no database at build time\')\n}\n\nfail()\n---\np Broken\n' }, config: { onError: error => void reported.push(error) }, outcome: 'failed with 500' },
+      { files: { 'broken.kay': '--- server\nexport const page = { prerender: true }\nconst fail = () => {\n  throw new Error(\'no database at build time\')\n}\n\nfail()\n---\np Broken\n' }, config: { onError: ({ error }) => void reported.push(error) }, outcome: 'failed with 500' },
     ]
     const dirs: string[] = []
 

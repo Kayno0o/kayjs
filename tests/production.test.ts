@@ -337,7 +337,7 @@ describe('security headers', () => {
 
   it('logs each violation a browser reports once, in either format, and hands it to onError', async () => {
     const caught: unknown[] = []
-    const app = await pages({ root: SEO, prebuilt: false, security: { reports: true }, proxy: { header: 'x-real-ip' }, onError: error => void caught.push(error) })
+    const app = await pages({ root: SEO, prebuilt: false, security: { reports: true }, proxy: { header: 'x-real-ip' }, onError: ({ error }) => void caught.push(error) })
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
     const post = async (body: string, address = '10.0.0.1') => (await app.handle(new Request('http://localhost/_kay/csp', { method: 'POST', headers: { 'content-type': 'application/reports+json', 'x-real-ip': address }, body }))).status
     const batch = JSON.stringify([
@@ -384,7 +384,7 @@ describe('security headers', () => {
 
   it('answers a report about another origin without logging it or handing it to onError, once the site is known', async () => {
     const caught: unknown[] = []
-    const app = await pages({ root: SEO, prebuilt: false, security: { reports: true }, site: 'https://site.example', proxy: { header: 'x-real-ip' }, onError: error => void caught.push(error) })
+    const app = await pages({ root: SEO, prebuilt: false, security: { reports: true }, site: 'https://site.example', proxy: { header: 'x-real-ip' }, onError: ({ error }) => void caught.push(error) })
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
     const report = (url: string, directive = 'script-src-elem') => JSON.stringify({ 'csp-report': { 'document-uri': url, 'blocked-uri': 'inline', 'violated-directive': directive, 'disposition': 'enforce' } })
     const post = async (body: string) => (await app.handle(new Request('http://localhost/_kay/csp', { method: 'POST', headers: { 'content-type': 'application/csp-report', 'x-real-ip': '10.0.0.1' }, body }))).status
@@ -1092,7 +1092,7 @@ describe('compression', () => {
         controller.close()
     } }), { headers: { 'content-type': 'text/plain' } })
     const app = new Elysia()
-      .use(await pages({ root: PRODUCTION, prebuilt: false, compress: true, onError: error => void caught.push(error) }))
+      .use(await pages({ root: PRODUCTION, prebuilt: false, compress: true, onError: ({ error }) => void caught.push(error) }))
       .get('/api/stream', () => streamed)
     const fetch = async () => app.handle(new Request('http://localhost/api/stream', { headers: { 'accept-encoding': 'gzip' } }))
 

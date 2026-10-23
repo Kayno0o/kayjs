@@ -82,13 +82,6 @@ describe('Snippet', () => {
     })).toEqual([['src/routes/index.kay', 6, 'TS2339']])
   })
 
-  it('keeps the old JSX.Element types working beside it', async () => {
-    expect(await problems({
-      'src/routes/index.kay': '---\nimport Old from \'../old.kay\'\n---\nOld\n  @actions\n    b x\n  @row(name)\n    i {name}\n',
-      'src/old.kay': '---\nimport type { JSX } from \'kay\'\n\nconst { actions, row } = props<{ actions?: JSX.Element, row: (name: string) => JSX.Element }>()\n---\nslot actions\nslot row(\'a\')\n',
-    })).toEqual([['src/old.kay', 4, 'deprecated-markup-prop'], ['src/old.kay', 4, 'deprecated-markup-prop']])
-  })
-
   it('reports a slot calling a prop that is no Snippet, at its name', async () => {
     expect(await problems({
       'src/routes/index.kay': '---\nimport Card from \'../card.kay\'\n---\nCard(title="x" n={1})\n',

@@ -42,7 +42,7 @@ const TARGETS = [
   { name: 'a WebSocket upgrade', path: '/api/socket', headers: { upgrade: 'websocket', connection: 'Upgrade' } },
 ] as const
 
-async function served(options: { dev: boolean, base?: string, onError?: (error: unknown) => void, beforeKay?: boolean }) {
+async function served(options: { dev: boolean, base?: string, onError?: (event: { error: unknown }) => void, beforeKay?: boolean }) {
   const kay = await pages({ root: dir, routes: 'routes', api: 'api', publicDir: 'public', prebuilt: false, dev: options.dev, base: options.base ?? '', onError: options.onError, log: false })
   const app: AnyElysia = options.beforeKay === false ? new Elysia().use(kay).onRequest(hook) : new Elysia().onRequest(hook).use(kay)
 
@@ -88,7 +88,7 @@ describe('an onRequest hook that throws', () => {
       const reported: unknown[] = []
 
       try {
-        const app = await served({ dev: false, base, onError: error => void reported.push(error) })
+        const app = await served({ dev: false, base, onError: ({ error }) => void reported.push(error) })
 
         for (const target of TARGETS) {
           for (const thrown of THROWN.filter(kind => kind !== 'response')) {
@@ -356,7 +356,7 @@ describe('a hook kay runs itself that throws', () => {
     const reported: unknown[] = []
 
     try {
-      const app = await pages({ root: dir, routes: 'routes', prebuilt: false, dev: false, log: false, onError: error => void reported.push(error) })
+      const app = await pages({ root: dir, routes: 'routes', prebuilt: false, dev: false, log: false, onError: ({ error }) => void reported.push(error) })
       const response = await app.handle(new NativeRequest('http://localhost/items/explode'))
 
       expect(response.status).toBe(500)
@@ -374,7 +374,7 @@ describe('a hook kay runs itself that throws', () => {
     const reported: unknown[] = []
 
     try {
-      const app = await pages({ root: dir, routes: 'routes', prebuilt: false, dev: false, log: false, onError: error => void reported.push(error), rewrite: () => {
+      const app = await pages({ root: dir, routes: 'routes', prebuilt: false, dev: false, log: false, onError: ({ error }) => void reported.push(error), rewrite: () => {
         throw new Error(SECRET)
       } })
       const response = await app.handle(new NativeRequest('http://localhost/'))
@@ -412,7 +412,7 @@ describe('a hook kay runs itself that throws', () => {
 
     try {
       await Bun.write(join(dir, 'api/broken.ts'), `import { api } from 'kay/server'\n\nexport default api().get('/', () => {\n  throw new Error('${SECRET}')\n})\n`)
-      const app = await pages({ root: dir, routes: 'routes', api: 'api', prebuilt: false, dev: true, log: false, onError: error => void reported.push(error) })
+      const app = await pages({ root: dir, routes: 'routes', api: 'api', prebuilt: false, dev: true, log: false, onError: ({ error }) => void reported.push(error) })
       const response = await app.handle(new NativeRequest('http://localhost/api/broken'))
 
       expect(response.status).toBe(500)

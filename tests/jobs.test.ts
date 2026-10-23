@@ -1299,7 +1299,7 @@ describe('queue', () => {
     const seen: unknown[] = []
     const redacting = queue<{ to: string, body: string }>('redacted', () => {
       throw new Error('no such mailbox')
-    }, { store, attempts: 1, redact: ({ to }) => ({ to, body: '' }), onFailed: payload => void seen.push(payload) })
+    }, { store, attempts: 1, redact: ({ to }) => ({ to, body: '' }), onFailed: ({ payload }) => void seen.push(payload) })
     const throwing = queue<{ to: string, body: string }>('throwing', () => {
       throw new Error('no such mailbox')
     }, { store, attempts: 1, redact: () => {

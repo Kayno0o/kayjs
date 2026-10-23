@@ -2,7 +2,6 @@
 // `tests/llms.test.ts` holds this list to the exports of `kay`.
 export const KAY_VALUES: readonly string[] = [
   'ActionError',
-  'ActionRedirect',
   'ActionRedirectError',
   'ApiError',
   'action',

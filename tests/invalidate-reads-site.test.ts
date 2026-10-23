@@ -13,7 +13,7 @@ const TSCONFIG = JSON.stringify({
 const FILES: Record<string, string> = {
   'src/messages/en.ts': 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({})\n',
   'src/messages/fr.ts': 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({})\n',
-  'src/posts.ts': 'import { cache, cacheTag } from \'kay/cache\'\nimport { data } from \'./data\'\n\nexport const group = cacheTag()\nexport const posts = cache(() => data.value, { ttl: 600 })\nexport const tagged = cache(() => data.value, { ttl: 600, tags: [group] })\n',
+  'src/posts.ts': 'import { cache, cacheTag } from \'kay/cache\'\nimport { data } from \'./data\'\n\nexport const group = cacheTag()\nexport const posts = cache(() => data.value, { ttl: \'10m\' })\nexport const tagged = cache(() => data.value, { ttl: \'10m\', tags: [group] })\n',
   'src/routes/fn.kay': '--- server\nimport { posts } from \'../posts\'\n\nexport const page = { prerender: true }\n\nconst value = await posts()\n---\np.val {value}\n',
   'src/routes/tagged.kay': '--- server\nimport { tagged } from \'../posts\'\n\nexport const page = { prerender: true }\n\nconst value = await tagged()\n---\np.val {value}\n',
   'src/data.ts': 'export const data = { value: \'one\', renders: 0 }\n',
@@ -21,7 +21,7 @@ const FILES: Record<string, string> = {
   'src/content/notes/a.md': '---\ntitle: first\n---\nbody\n',
   'src/routes/notes.kay': '--- server\nimport { notes } from \'../content.config\'\nimport { data } from \'../data\'\n\nexport const page = { prerender: true }\n\nconst entries = await notes.all()\nconst renders = data.renders++\n---\nh1 {entries[0]!.data.title}:{renders}\n',
   // The value is read while the body streams, after the fence returned.
-  'src/routes/stream.kay': '--- server\nimport { cached } from \'kay/cache\'\nimport { data } from \'../data\'\n\nexport const page = { prerender: true }\n\nconst late = cached(\'late\', 600, async () => data.value)\n---\nawait late\n  p Loading\nthen value\n  p.val {value}\n',
+  'src/routes/stream.kay': '--- server\nimport { cached } from \'kay/cache\'\nimport { data } from \'../data\'\n\nexport const page = { prerender: true }\n\nconst late = cached(\'late\', \'10m\', async () => data.value)\n---\nawait late\n  p Loading\nthen value\n  p.val {value}\n',
 }
 
 // Serves what the build wrote, answering each path (a proxy takes the base off before it arrives) in each locale before and after the invalidations.

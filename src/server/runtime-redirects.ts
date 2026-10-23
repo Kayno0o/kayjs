@@ -21,11 +21,6 @@ const REGEX_SPECIALS = /[.*+?^${}()|[\]\\]/g
 // Why a redirect was not added, worded for the editor who asked: any other error is the store's, which they are not told.
 export class RedirectRefusedError extends Error {}
 
-/** @deprecated Renamed `RedirectRefusedError` in 1.70; the old name goes in 1.73. */
-export const RedirectRefused = RedirectRefusedError
-/** @deprecated Renamed `RedirectRefusedError` in 1.70; the old name goes in 1.73. */
-export type RedirectRefused = RedirectRefusedError
-
 // What a runtime row answers: a redirect's status, or 410 for a path that is gone for good, which has no target.
 export type RuntimeStatus = RedirectStatus | 410
 

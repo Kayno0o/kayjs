@@ -1,19 +1,15 @@
 // A length of time written with its unit, never a bare number: `'250ms'`, `'30s'`, `'5m'`, `'12h'`, `'30d'` or `'2w'`.
 export type Duration = `${number}${'ms' | keyof typeof UNIT_SECONDS}`
 
-// The name `Duration` replaced in 1.70, which took the string alone.
-/** @deprecated Use `Duration`. */
-export type DurationText = Duration
-
 const UNIT_SECONDS = { s: 1, m: 60, h: 3600, d: 86_400, w: 604_800 }
 
 export const DURATION_TEXT = /^(\d+(?:\.\d+)?)(ms|[smhdw])$/
 
 const ZERO_DURATION = /^0(?:\.0+)?(?:ms|[smhdw])$/
 
-// A zero, `'0s'`, which the options that take one read as "none"; the bare 0 is the form before 1.70.
+// A zero, `'0s'`, which the options that take one read as "none".
 export function isZeroDuration(value: unknown): boolean {
-  return value === 0 || (typeof value === 'string' && ZERO_DURATION.test(value))
+  return (typeof value === 'string' && ZERO_DURATION.test(value))
 }
 
 function inSeconds(amount: number, unit: string): number {
@@ -21,16 +17,15 @@ function inSeconds(amount: number, unit: string): number {
 }
 
 // The seconds a positive duration stands for; `what` names the option in the error anything else throws.
-// A bare number still reads as seconds until 1.73, the form `deprecated-bare-duration` rewrites; the type refuses it.
+// A bare number throws, as the type refuses it.
 export function durationSeconds(value: unknown, what: string): number {
   const text = typeof value === 'string' ? DURATION_TEXT.exec(value) : null
   const parsed = text ? inSeconds(Number(text[1]), text[2]!) : Number.NaN
-  const seconds = typeof value === 'number' ? value : parsed
 
-  if (!Number.isFinite(seconds) || seconds <= 0)
+  if (!Number.isFinite(parsed) || parsed <= 0)
     throw new Error(`kay: ${what} is ${typeof value === 'string' ? `'${value}'` : String(value)}; it takes a positive duration such as '250ms', '5m' or '30d'`)
 
-  return seconds
+  return parsed
 }
 
 // The same rounded up to whole seconds, for a header or a cookie that takes an integer: `'250ms'` is 1, never `0.25` nor 0.
@@ -57,9 +52,4 @@ export function optionMs(value: Duration, what: string): number {
   durationSeconds(value, what)
 
   return durationMs(value)
-}
-
-// The milliseconds of an option that took a number of them before 1.70, which still reads so until 1.73 though its type no longer allows it.
-export function legacyMs(value: Duration | number, what: string): number {
-  return typeof value === 'number' ? value : optionMs(value, what)
 }

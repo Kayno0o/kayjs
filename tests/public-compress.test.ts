@@ -17,7 +17,7 @@ const LARGE = 'lorem ipsum dolor sit amet\n'.repeat(40_000)
 
 let dir: string
 
-async function serve(options: { base?: string, dev?: boolean, trailingSlash?: 'always' | 'never', onError?: (error: unknown) => void } = {}) {
+async function serve(options: { base?: string, dev?: boolean, trailingSlash?: 'always' | 'never', onError?: (event: { error: unknown }) => void } = {}) {
   // `prebuilt: false` is what a test run means by default, spelled out so the client build is the one shared for the file.
   return pages({ root: 'tests/fixtures/site', prebuilt: false, publicDir: join(dir, 'public'), compress: true, log: false, ...options })
 }
@@ -265,7 +265,7 @@ describe('a public file changed under a running server', () => {
     for (const [name, content] of Object.entries(SERVED))
       await writeFile(join(dir, 'public', name), content)
 
-    const fresh = await serve({ onError: (error) => {
+    const fresh = await serve({ onError: ({ error }) => {
       errors.push(error)
     } })
 
@@ -530,7 +530,7 @@ describe('a deleted public file is a path nothing serves', () => {
 
     try {
       const errors: unknown[] = []
-      const app = await pages({ routes: join(root, 'src/routes'), publicDir: join(root, 'public'), compress: true, log: false, prebuilt: false, onError: (error) => {
+      const app = await pages({ routes: join(root, 'src/routes'), publicDir: join(root, 'public'), compress: true, log: false, prebuilt: false, onError: ({ error }) => {
         errors.push(error)
       } })
 
@@ -604,7 +604,7 @@ describe('a deleted public file is a path nothing serves', () => {
       await writeFile(path, MEDIUM)
 
       const errors: unknown[] = []
-      const app = await serve({ onError: (error) => {
+      const app = await serve({ onError: ({ error }) => {
         errors.push(error)
       } })
 
@@ -641,7 +641,7 @@ describe('a deleted public file is a path nothing serves', () => {
       for (const [name, content] of cases)
         await writeFile(join(dir, 'public', name), content)
 
-      const app = await serve({ onError: (error) => {
+      const app = await serve({ onError: ({ error }) => {
         errors.push(error)
       } })
       const server = new Elysia().use(app).listen({ port: 0, hostname: '127.0.0.1' })

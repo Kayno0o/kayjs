@@ -64,7 +64,7 @@ To keep one value in a store of its own, name it.
 import { cached, sqliteCache } from 'kay/cache'
 
 const disk = sqliteCache('data/cache.sqlite')
-const reviews = await cached('reviews', 86_400, fetchReviews, { store: disk })
+const reviews = await cached('reviews', '1d', fetchReviews, { store: disk })
 ```
 
 ### Your own store

@@ -55,7 +55,7 @@ describe('an action prop typed with the success output', () => {
     expect([output, input]).toHaveLength(2)
   })
 
-  it('keeps the failure data a page reads through ctx.failed', () => {
+  it('keeps the failure data a page reads from the action outcome', () => {
     const failure: FailureOf<typeof claim> = { status: 409, values: {}, errors: {}, data: { reason: 'taken' } }
     const success: SuccessOf<typeof claim> = { data: 'ok' }
 

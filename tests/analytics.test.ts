@@ -228,11 +228,11 @@ describe('the notice, its lifetime and what a visit carries', () => {
   it('remembers an answer 180 days by default, for the information line and the notice alike, and takes up to 13 months', async () => {
     expect(await page(plausible())).toContain('data-max-age="15552000"')
     expect(await page(plausible({ consent: true }))).toContain('data-max-age="15552000"')
-    expect(await page(plausible({ consent: { maxAge: 3600 } }))).toContain('data-max-age="3600"')
+    expect(await page(plausible({ consent: { maxAge: '3600s' } }))).toContain('data-max-age="3600"')
     expect(await page({ provider: 'fathom', siteId: 'ABCDEFGH' })).toContain('data-max-age="15552000"')
-    expect(() => analytics(plausible({ consent: { maxAge: 396 * 86_400 } }))).toThrow('maxAge')
-    expect(() => analytics(plausible({ consent: { maxAge: 0 } }))).toThrow('maxAge')
-    expect(() => analytics(plausible({ consent: { maxAge: 395 * 86_400 } }))).not.toThrow()
+    expect(() => analytics(plausible({ consent: { maxAge: '396d' } }))).toThrow('maxAge')
+    expect(() => analytics(plausible({ consent: { maxAge: '0s' } }))).toThrow('maxAge')
+    expect(() => analytics(plausible({ consent: { maxAge: '395d' } }))).not.toThrow()
   })
 
   it('carries the excluded paths and the titles opt-in to the tracker', async () => {

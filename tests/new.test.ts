@@ -30,6 +30,7 @@ const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL
 const SCAFFOLD_MS = 120_000
 const ACCENT_TEST = `import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { expect, it } from 'bun:test'
+import AccentPicker from '../src/components/accent-picker.kay'
 import { mountComponent, settle, testSite } from 'kay/test'
 import { encodeValue } from __WIRE__
 
@@ -46,7 +47,7 @@ it('changes the accent on a click', async () => {
   GlobalRegistrator.register({ url: 'http://localhost/' })
 
   try {
-    const { root, unmount } = await mountComponent('src/components/accent-picker.kay')
+    const { root, unmount } = await mountComponent(AccentPicker)
 
     root.querySelector<HTMLButtonElement>('[aria-label="mauve"]')!.click()
     await settle()

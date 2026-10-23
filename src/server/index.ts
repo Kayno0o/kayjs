@@ -63,7 +63,7 @@ export type { FileStore, PutOptions, StoredFile, UrlOptions } from './storage'
 export { diskFiles, files, memoryFiles, s3Files } from './storage'
 export type { RenderToStringOptions } from './string'
 export { renderLocale, renderToString } from './string'
-export { CspViolation, CspViolationError } from './violations'
+export { CspViolationError } from './violations'
 export type { VerifyWorkOptions, WorkChallengeOptions } from './work-scope'
 export { verifyWork, workChallenge } from './work-scope'
 

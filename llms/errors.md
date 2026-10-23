@@ -20,7 +20,7 @@ kay explain template-syntax
 - The codes are stable names, one for a group of messages with one cause.
 - No level applies to them, and no `// kay-allow` comment reaches them.
 - Errors kay raises while serving a request, and the app's own code, carry none.
-- Every error class kay exports ends in `Error`, as a library's does (`HydrationMismatchError` of `kay/dom`, `ActionRedirectError` from `kay`, `CspViolationError` from `kay/server`, `RedirectRefusedError` of `kay/library`, their `name` too); the old names stay `@deprecated` aliases three minors, and `kay upgrade` renames them.
+- Every error class kay exports ends in `Error`, as a library's does (`HydrationMismatchError` of `kay/dom`, `ActionRedirectError` from `kay`, `CspViolationError` from `kay/server`, `RedirectRefusedError` of `kay/library`, their `name` too).
 
 | Error | Group | Raised for | Fix |
 | --- | --- | --- | --- |

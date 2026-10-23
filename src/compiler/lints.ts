@@ -591,96 +591,6 @@ export const LINTS = {
     wrong: 'head\n  meta(name="robots" content="noindex")',
     right: '--- server\nexport const page = { noindex: true }\n---',
   },
-  'deprecated-identity-key': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.69',
-    site: true,
-    summary: 'A `// kay-allow identity-key` comment, or an `identity-key` entry in `lints`: the lint is gone in 1.69, as a `for` over objects with no `id` keeps its rows through immutable edits with no key. The fix removes the name, and the comment or the entry when it names nothing else. Found in the project\'s `.kay` files and in `kay.config.ts`.',
-    wrong: '// kay-allow identity-key\nfor post of posts\n  li {post.title}',
-    right: 'for post of posts\n  li {post.title}',
-  },
-  'deprecated-library-registration': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.70',
-    site: true,
-    summary: 'A library registered the old way in `kay.config.ts`: `authPages({ auth: () => import(\'./src/auth\') })` and `authExtension(...)` for kayjs-auth, `mailExtension(\'./src/mail\')` for kayjs-mail. Every library now registers with `x({ module })`: `auth({ module: \'./src/auth\' })` (`pages: false` where `authExtension` served no pages) and `mail({ module: \'./src/mail\' })`. The fix rewrites the calls and the import; a call it cannot rewrite safely is left to you: a function other than `() => import(\'path\')`, a module with no `export const auth`, `authPages` beside `authExtension` (merge them into one `auth({ module })`), or `auth` and `server` together. A bare `auth()` in an app whose `src/auth.ts` exports its own `auth` now builds a second auth of its own; the fix gives it `plugin: false`, which keeps the plugin mounted by hand.',
-    wrong: 'extensions: [authPages({ auth: () => import(\'./src/auth\') }), mailExtension(\'./src/mail\')]',
-    right: 'extensions: [auth({ module: \'./src/auth\' }), mail({ module: \'./src/mail\' })]',
-  },
-  'deprecated-rate-limit': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.70',
-    site: true,
-    summary: 'A rate limit option under its old name: kayjs-ai\'s `limit` and `visitor` in `ai({ ... })` (and `visitor` in `ask(messages, { ... })`), which are `rateLimit` and `key` since 1.70, kayjs-auth\'s `limits` in `createAuth({ ... })`, which is `rateLimit`, and a bare number in kayjs-mail\'s `smtp({ rateLimit })` or `mailer({ smtp: { rateLimit } })`, mails a second, which is `{ max, window: \'1s\' }`. The old forms still work for now. The calls are found by name where it is imported from the library, in the project\'s TypeScript files and `.kay` fences, and an object held in a variable is not read. The fix renames the key, unless the new name is given beside it, and writes the number as `{ max, window: \'1s\' }`.',
-    wrong: 'ai({ limit: { max: 10, window: \'1m\' }, visitor: request => request.headers.get(\'x-user\') ?? undefined })',
-    right: 'ai({ rateLimit: { max: 10, window: \'1m\' }, key: request => request.headers.get(\'x-user\') ?? undefined })',
-  },
-  'deprecated-site-name': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.70',
-    site: true,
-    summary: 'kayjs-auth\'s `createAuth({ ... })` written with `url` for the site\'s origin and `site` for its display name, which are `site` and `name` since 1.70, so `site` means the origin everywhere, as in kay.config.ts. The origin now defaults to kay\'s own site, so `url` is usually dropped. The old forms still work for now. A `site` is a name when it is a string literal that is no URL; the call is found by name where it is imported from the library, in the project\'s TypeScript files and `.kay` fences, and an object held in a variable is not read. The fix renames the keys, unless the new name is given beside the old one.',
-    wrong: 'createAuth({ url: \'https://example.com\', site: \'Example\' })',
-    right: 'createAuth({ site: \'https://example.com\', name: \'Example\' })',
-  },
-  'deprecated-renamed-export': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.70',
-    site: true,
-    summary: 'An import of an export kay or a library renamed in 1.70 so its error class ends in `Error`: `HydrationMismatch` of `kay/dom` is `HydrationMismatchError`, `SaveConflict` of kayjs-cms `SaveConflictError`, `MailNotConfigured` of kayjs-mail `MailNotConfiguredError`, and the exports that clashed across libraries: kayjs-auth\'s `memoryStore`, `Mailer` and `Mail` (`memoryAuthStore`, `AuthMailer`, `AuthMailMessage`), kayjs-mail\'s `Settings`, `defaults`, `Field` and `Message` (`MailSettings`, `mailDefaults`, `MailField`, `MailMessage`), kayjs-ui\'s `Settings` and `defaults` (`UiSettings`, `uiDefaults`) and kayjs-cms\'s `postgresLoader` of `/postgres` (`pgLoader` of `/pg`). The old name stays an alias three minors. The fix renames the import and its uses in the file, and moves the cms entry. Found in the project\'s `.kay` files and scripts.',
-    wrong: 'import { MailNotConfigured } from \'@kaynooo/kayjs-mail\'\n\nif (error instanceof MailNotConfigured) retry()',
-    right: 'import { MailNotConfiguredError } from \'@kaynooo/kayjs-mail\'\n\nif (error instanceof MailNotConfiguredError) retry()',
-  },
-  'deprecated-body-limit': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.70',
-    site: true,
-    summary: '`bodyLimit` in `kay.config.ts`, an action\'s options, `api()` or a route\'s `detail`, now `maxSize` like every size limit of kay and its libraries; the old name works three minors. The fix renames the key, and writes a shorthand `{ bodyLimit }` as `maxSize: bodyLimit`.',
-    wrong: 'action(schema, handler, { bodyLimit: \'20mb\' })',
-    right: 'action(schema, handler, { maxSize: \'20mb\' })',
-  },
-  'deprecated-mount-component': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.70',
-    site: true,
-    summary: '`mountComponent(\'src/components/toggle.kay\', props)` of `kay/test`, which takes the component a test imports since 1.70: `mountComponent(Toggle, props)` types the props and follows a rename. The string form works three minors. The fix imports the component under its name in Pascal case and passes it, unless the file uses that name already for something else.',
-    wrong: 'mountComponent(\'src/components/toggle.kay\', { label: \'Menu\' })',
-    right: 'import Toggle from \'../src/components/toggle.kay\'\n\nmountComponent(Toggle, { label: \'Menu\' })',
-  },
-  'deprecated-page-size': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.70',
-    site: true,
-    summary: '`size` in the options of kayjs-ui\'s `infiniteList()`, now `pageSize` like every list paged by number (`limit` and `offset` stay for a window onto a list); the old name works three minors. The fix renames the key.',
-    wrong: 'infiniteList(first, { size: 20, load })',
-    right: 'infiniteList(first, { pageSize: 20, load })',
-  },
-  'deprecated-ctx-outcome': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.70',
-    site: true,
-    summary: '`ctx.failed(action)` and `ctx.succeeded(action)`, now `action.failed()` and `action.succeeded()`, which read the same outcome in a page, a component and an island; the old form works three minors. The fix rewrites the call.',
-    wrong: 'const failure = ctx.failed(add)',
-    right: 'const failure = add.failed()',
-  },
-  'deprecated-auth-method': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.70',
-    site: true,
-    summary: 'A kayjs-auth method called on `auth` by its old name: `sessions()`, `passkeys()`, `tokens()`, `members()`, `organizations()`, `invitations()`, `oauthClients()`, `identities()` and `auditLog()` are `list*`, `organization()` and `invitation()` are `get*`, `removePasskey()` is `revokePasskey()`, `removeMember()` is `deleteMember()` and `endSession()` is `revokeSession()`, `revokeToken()` is `revokeBearerToken()`, `revokeOAuthClient()` is `revokeOAuthGrant()`, `renamePasskey()` is `updatePasskeyName()`, `declineInvitation()` is `rejectInvitation()` and `setLocale()` is `updateLocale()`, which answer `{ ok }`; the old names work three minors. The fix renames the call, and `await auth.endSession(id)` becomes `(await auth.revokeSession(id)).ok`; any other use of those names is reported with no fix.',
-    wrong: 'const open = await auth.sessions()',
-    right: 'const open = await auth.listSessions()',
-  },
   'deprecated-signal-prop': {
     level: 'warn',
     group: 'deprecated',
@@ -689,23 +599,6 @@ export const LINTS = {
     summary: 'A required prop typed `Signal<T>` or `Memo<T>`: from 1.70 a prop is always a value. A child writing its parent\'s state types it `Bindable<T>`, reads it as `open` and assigns it, and the parent passes `bind:open={open}`; a prop typed `Memo<T>` becomes a plain `T`, passed as `value={memo()}` and kept current. The fix rewrites the type, the reads in the component and every tag passing the prop in the project together, and is not offered, with the reason reported, when a tag spreads its props or passes an expression that is no name or property path, or the component uses the prop other than by calling it. An optional prop is not reported. Found in the project\'s own `.kay` files.',
     wrong: '---\nimport type { Signal } from \'kay\'\n\nconst { open } = props<{ open: Signal<boolean> }>()\n---\nbutton(onClick={() => open = !open()}) Toggle\n\n// parent\nToggle(open={open})',
     right: '---\nimport type { Bindable } from \'kay\'\n\nconst { open } = props<{ open: Bindable<boolean> }>()\n---\nbutton(onClick={() => open = !open}) Toggle\n\n// parent\nToggle(bind:open={open})',
-  },
-  'deprecated-markup-prop': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.70',
-    summary: 'A prop typed `JSX.Element`, or a function returning it, in the props type of a component: since 1.70 a markup prop is a `Snippet` from `kay`, `Snippet` for the children or a block with no parameters and `Snippet<[Item, number]>` for markup the component calls with values. The fix writes the new type, updates the import and drops `JSX` when nothing else uses it; a `JSX.Element[]` is a list of values and stays. Found in the props type of a `.kay` script and in the interfaces and aliases it names.',
-    wrong: '---\nimport type { JSX } from \'kay\'\n\nconst { actions, row } = props<{ actions?: JSX.Element, row: (item: string, index: number) => JSX.Element }>()\n---\nslot actions\nslot row(\'x\', 0)',
-    right: '---\nimport type { Snippet } from \'kay\'\n\nconst { actions, row } = props<{ actions?: Snippet, row: Snippet<[item: string, index: number]> }>()\n---\nslot actions\nslot row(\'x\', 0)',
-  },
-  'deprecated-option-name': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.70',
-    site: true,
-    summary: 'An option of a library function under its old name: kayjs-cms\'s `forgejo({ url })`, which is `baseUrl` since 1.70, as the address of a service API is named across kay\'s libraries, and kayjs-mail\'s `mailer({ lang })`, which is `locale` since 1.70, as a language an app writes or formats for is a locale. The old name still works for now. The calls are found by name where it is imported from the library, in the project\'s TypeScript files and `.kay` fences, and an object held in a variable is not read. The fix renames the key, unless the new name is given beside it.',
-    wrong: 'forgejo({ url: \'https://git.example.com\', repo: \'me/site\', token })',
-    right: 'forgejo({ baseUrl: \'https://git.example.com\', repo: \'me/site\', token })',
   },
   'deprecated-ui-prop': {
     level: 'warn',
@@ -724,33 +617,6 @@ export const LINTS = {
     summary: 'An open-state callback of a kayjs-ui component under its old name: `onOpen` of `ConfirmDelete` and `onSidebarClose` of `SplitLayout`, which are `onOpenChange` and `onSidebarOpenChange` since 1.72, called with the open state as Dialog\'s is. The old names work three minors. The tag is found through the default import of the component from `@kaynooo/kayjs-ui/` in the project\'s `.kay` files. `onOpen` is only reported, as `onOpenChange` is called on closing too; `onSidebarClose` is renamed where the handler is written `() => ...`, which ignores the argument, and reported otherwise.',
     wrong: 'ConfirmDelete(message="Delete it?" failure="Could not delete" onConfirm={remove} onOpen={ask})',
     right: 'ConfirmDelete(message="Delete it?" failure="Could not delete" onConfirm={remove} onOpenChange={open => open && ask()})',
-  },
-  'deprecated-cms-edit-page': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.70',
-    site: true,
-    summary: 'The `data-cms-edit-page` attribute on a link the app renders for kayjs-cms to fill in, which is `data-kcms-edit-page` since 1.70, as a library\'s data attributes are `data-k<library>-`. The module still matches the old name three minors. The fix renames the attribute, unless the new one is given beside it.',
-    wrong: 'a(data-cms-edit-page href="/admin") Edit this page',
-    right: 'a(data-kcms-edit-page href="/admin") Edit this page',
-  },
-  'deprecated-bare-duration': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.70',
-    typed: true,
-    summary: 'A bare number where a duration goes, the form before 1.70: a number of seconds in a kay or library option (`cached`\'s `ttl`, a session\'s `maxAge`, a `rateLimit`\'s `window`), milliseconds in a `kay/test` wait or a toast. Every duration is now a string with its unit, `\'250ms\'`, `\'30s\'`, `\'5m\'` or `\'7d\'`, so seconds and milliseconds are never mistaken. The number still works until 1.73; the fix writes a literal with the unit it stood for.',
-    wrong: 'export const profile = await cached("profile", 300, loadProfile)',
-    right: 'export const profile = await cached("profile", "5m", loadProfile)',
-  },
-  'deprecated-hook-shape': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.70',
-    site: true,
-    summary: 'An `on*` hook written with positional arguments, which keeps working until 1.73: `onSignUp`, `onDelete`, `onError` and a queue\'s `onFailed` take one event object, and `onExport` and `onProviderProfile` are `exportData` and `profileFields` now. The fix destructures the parameters by their old names and renames the option; a parameter with a type annotation or a default gets no fix. Found in the project\'s `.ts` files importing kayjs-auth, `kay/server` or kayjs-mail, and in `kay.config.ts`.',
-    wrong: 'auth({ onSignUp: (user, profile) => seed(user) })',
-    right: 'auth({ onSignUp: ({ user, profile }) => seed(user) })',
   },
   'deprecated-action-options': {
     level: 'warn',
@@ -792,14 +658,7 @@ export const LINTS = {
 
 export type LintName = keyof typeof LINTS
 
-// Lints that are gone, whose names `// kay-allow` and `lints` still take while `deprecated-identity-key` reports them.
-export const RETIRED_LINTS = ['identity-key'] as const
-
-export type LintLevels = Partial<Record<LintName | LintGroup | typeof RETIRED_LINTS[number], LintLevel>>
-
-export function isRetiredLint(name: string | undefined): boolean {
-  return (RETIRED_LINTS as readonly (string | undefined)[]).includes(name)
-}
+export type LintLevels = Partial<Record<LintName | LintGroup, LintLevel>>
 
 export const LEVELS: ReadonlySet<string> = new Set<LintLevel>(['allow', 'warn', 'deny'])
 
@@ -899,7 +758,7 @@ function unknownLints(source: string): Diagnostic[] {
     const listStart = comment.index + comment[0].length - comment[1]!.length
 
     for (const name of comment[1]!.matchAll(LINT_NAME)) {
-      if (!isLint(name[0]) && !isRetiredLint(name[0])) {
+      if (!isLint(name[0])) {
         const start = listStart + name.index
 
         unknown.push({ start, end: start + name[0].length, code: 'unknown-lint', message: `Unknown lint \`${name[0]}\``, help: `the lints are ${Object.keys(LINTS).map(lint => `\`${lint}\``).join(', ')}`, checkOnly: true })

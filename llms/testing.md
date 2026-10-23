@@ -197,7 +197,7 @@ Requests, jobs, sockets and sessions are in [Testing requests, jobs, sockets and
 ### Mounting a component
 
 - `mountComponent(Component, props)` from `kay/test` renders one component built for the browser, as an island renders, into `document`, and resolves with `{ root, unmount }` once its effects ran: for what handlers and effects do, such as a dialog opening on a click.
-- `Component` is the one the test imports, whose props are typed; the browser build is made from its file. The path of the `.kay` file relative to the project, `mountComponent('src/components/toggle.kay', props)`, works three minors and `kay upgrade` replaces it (`deprecated-mount-component`).
+- `Component` is the one the test imports, whose props are typed; the browser build is made from its file.
 - On a French site (a `lang` or locale of `fr`) it writes the non-breaking spaces an island does, once `document.documentElement.lang` is `fr`; the other client defines (`KAY_BROWSER`, `KAY_STATIC_EXPORT`) are left out.
 - Props may be functions, and the component runs on a kay of its own, so a signal of the test reaches it through a callback rather than as a prop.
 - A library's settings apply as `kay.config.ts` sets them.

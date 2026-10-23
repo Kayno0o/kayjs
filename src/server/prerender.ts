@@ -484,8 +484,8 @@ function unkeptBy(island: boolean, stamps: boolean, live: boolean): string {
 }
 
 // An `onError` for a render at build time that keeps the first read of a request it meets in `refusal`.
-function judged(refusal: { read?: RequestReadError }): (error: unknown) => void {
-  const handler = (error: unknown) => {
+function judged(refusal: { read?: RequestReadError }): (event: { error: unknown }) => void {
+  const handler = ({ error }: { error: unknown }) => {
     if (error instanceof RequestReadError)
       refusal.read ??= error
   }

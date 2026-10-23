@@ -1,6 +1,6 @@
 // What a `kay/test` page does with the network: the responses it received, requests a test answers or refuses, and going offline. Built on DevTools' Network and Fetch domains, through the view's `cdp()`.
 import type { Duration } from '../runtime/duration'
-import { legacyMs } from '../runtime/duration'
+import { optionMs } from '../runtime/duration'
 
 // A response the page received, its headers lowercased as the wire carried them.
 export interface PageResponse {
@@ -621,7 +621,7 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
       const found = () => responses.find(({ url, complete }) => test(new URL(url)) && (complete || options.complete === false))
       const { promise, resolve } = Promise.withResolvers<void>()
       const watcher = () => found() === undefined || resolve()
-      const wait = options.timeout === undefined ? timeout : legacyMs(options.timeout, 'timeout')
+      const wait = options.timeout === undefined ? timeout : optionMs(options.timeout, 'timeout')
 
       watchers.add(watcher)
 

@@ -1,4 +1,4 @@
-import type { DurationText } from '../runtime/duration'
+import type { Duration } from '../runtime/duration'
 import { KayError } from '../compiler/errors'
 import { durationSeconds as durationOf, optionMs as optionOf } from '../runtime/duration'
 
@@ -39,6 +39,6 @@ export function durationSeconds(value: unknown, what: string): number {
   return asConfigError(() => durationOf(value, what))
 }
 
-export function optionMs(value: DurationText, what: string): number {
+export function optionMs(value: Duration, what: string): number {
   return asConfigError(() => optionOf(value, what))
 }

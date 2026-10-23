@@ -18,7 +18,6 @@ import { islandMarker, markerMismatch } from './island-marker'
 import { applyLints, templateLints } from './lints'
 import { SourceMap } from './mapping'
 import { parseExpanded } from './markdown-block'
-import { markupProps } from './markup-props'
 import { SELF } from './names'
 import { findRewrites } from './rewrite'
 import { scopeAttribute } from './scoped-style'
@@ -290,7 +289,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     const browserScript = (island !== undefined || options.insideIsland === true) && !routeFile ? scriptFences(script) : []
     const unusedLints = broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, [file.script, file.module], found.findings)]
 
-    diagnostics.push(...unboundedFields(server), ...fenceLints, ...scriptFences(script).flatMap(fence => markupProps(fence)), ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...unusedLints, ...templateLints(file))
+    diagnostics.push(...unboundedFields(server), ...fenceLints, ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...unusedLints, ...templateLints(file))
   }
 
   const marker = checked ? islandMarker(source) : undefined

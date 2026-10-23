@@ -53,8 +53,6 @@ export interface PutOptions {
 export interface UrlOptions {
   // How long a link to a private file stays valid, an hour by default; it is rounded up so pages rendered minutes apart give the same link, which the browser keeps cached.
   maxAge?: Duration | undefined
-  /** @deprecated Since 1.70, dropped in 1.73: this is `maxAge`. */
-  expires?: Duration | undefined
 }
 
 const DEFAULT_DIR = 'data/files'
@@ -75,7 +73,7 @@ const IMAGE = /^image\//
 const RANGE = /^bytes=(\d*)-(\d*)$/
 const TRAILING_SLASHES = /\/+$/
 const IMMUTABLE = 'public, max-age=31536000, immutable'
-const DEFAULT_EXPIRES = 3600
+const DEFAULT_EXPIRES = '1h'
 // Links to private files expire on a multiple of this, at most.
 const EXPIRY_STEP = 600
 const SIGNING_USE = 'kay-file'
@@ -348,7 +346,7 @@ export const files = {
 
     readScriptSecret()
 
-    const seconds = durationSeconds(options.maxAge ?? options.expires ?? DEFAULT_EXPIRES, 'files.url()\'s maxAge')
+    const seconds = durationSeconds(options.maxAge ?? DEFAULT_EXPIRES, 'files.url()\'s maxAge')
     const step = Math.min(EXPIRY_STEP, seconds)
     const until = Math.ceil((Date.now() / 1000 + seconds) / step) * step
 

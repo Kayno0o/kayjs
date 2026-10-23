@@ -12,9 +12,9 @@ How kay and its libraries name the same idea, written before the renames land: a
 
 **Options**
 - `site` is a public origin and defaults to kay's `site`; `name` is a display name. An option holding the site's own origin is spelled `site` (kayjs-auth's, the contact mail view's prop); `publicUrl` of `s3Files` and the `host` of an analytics provider hold another address (a bucket's, a provider's), so they keep their names. A third-party service's API root is `baseUrl`, not `url` (#1758).
-- A duration is one `Duration` type, a string with its unit (`'250ms'`, `'5m'`), in every option, store argument and test helper of kay and the libraries: never a bare number, never a unit in a name (`timeoutMs`). The runtime still reads the old numbers until 1.73, and `kay check --fix` rewrites them (`deprecated-bare-duration`) (#1639).
-- How long something stays valid is `maxAge`, how long to wait is `timeout`, an absolute date is `expires`; never `expiresIn` or `lifetime`, and a second lifetime is a nested `maxAge`, not `rememberMaxAge` (#1685).
-- A size limit is `maxSize: ByteSize` (a number of bytes or `'2mb'`); `bodyLimit` and `maxBytes` go (#1686).
+- A duration is one `Duration` type, a string with its unit (`'250ms'`, `'5m'`), in every option, store argument and test helper of kay and the libraries: never a bare number, never a unit in a name (`timeoutMs`) (#1639).
+- How long something stays valid is `maxAge`, how long to wait is `timeout`, an absolute date is `expires`; never `expiresIn` or `lifetime`, and a second lifetime is a nested `maxAge` (#1685).
+- A size limit is `maxSize: ByteSize` (a number of bytes or `'2mb'`) (#1686).
 - A rate limit is `rateLimit: { max, window, store?, key?, count? }`, `key` naming who is counted (not `visitor`), and a library with several limits nests them: `rateLimit: { signIn: { max, window } }` (#1683).
 - Paging by page number takes `pageSize` and `page`; a window onto a list takes `limit` and `offset`. An API is one or the other (#1689).
 - Look goes in the library's settings module (`kay.settings`), behaviour in the call or extension options. A logo is `{ src, alt, width?, height?, href? }`, the `Logo` type of `kay/library`: mail and cms read theirs from the settings module, kayjs-ui and kayjs-auth have no logo of their own and kayjs-ai restyles through CSS properties (#1690).
@@ -25,7 +25,7 @@ How kay and its libraries name the same idea, written before the renames land: a
 
 **Errors**
 - A boot-time config problem throws `KayError('config-invalid', 'kay: <option> is <value>; it takes <what>')`, in a library too, through `configError(option, value, takes)` from `kay/library`, or `configError(message)` for a problem of another shape; a reader that also runs in the browser throws a plain `Error` and its server caller wraps it in `asConfigError(() => ...)`.
-- A runtime error class ends in `Error`, extends `Error`, and carries `code` (`AiError.kind` is also its `code`; an HTTP `status` stays beside it). A renamed export keeps its old name as an alias for three minors.
+- A runtime error class ends in `Error`, extends `Error`, and carries `code` (`AiError.kind` is also its `code`; an HTTP `status` stays beside it).
 
 **Prefixes**
 - Routes a library mounts for itself are `/_kay/<library>`, never under the app's `/api`; kayjs-cms's moved from `/api/cms/*` in 1.71, the old path answering three minors (`api.former`).

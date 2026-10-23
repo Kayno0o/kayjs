@@ -384,7 +384,7 @@ describe('the naming conventions', () => {
       ...(text.match(new RegExp(`data-k(?:${others})-[\\w-]*`, 'g')) ?? []).filter(attribute => !attribute.startsWith(`data-k${library}-`)),
     ]
 
-    expect(drift(find, [{ library: 'cms', match: /^data-cms-edit-page$/, issue: '#1691, the name before 1.70 kept three minors' }])).toEqual([])
+    expect(drift(find, [])).toEqual([])
   })
 
   it('mount a library\'s internal routes under /_kay/<library>, outside /api', () => {
@@ -421,25 +421,6 @@ describe('the naming conventions', () => {
     }
 
     expect(found).toEqual([])
-  })
-
-  it('keep the old name of a renamed error class as a @deprecated alias', async () => {
-    for (const [file, name] of [['src/runtime/dom.ts', 'HydrationMismatch'], ['src/runtime/action.ts', 'ActionRedirect'], ['src/server/violations.ts', 'CspViolation'], ['src/server/runtime-redirects.ts', 'RedirectRefused'], ['packages/cms/src/files.ts', 'SaveConflict'], ['packages/mail/src/mailer.ts', 'MailNotConfigured']] as const) {
-      const text = await Bun.file(file).text()
-
-      expect(text).toContain(`/** @deprecated Renamed \`${name}Error\``)
-      expect(text).toContain(`export const ${name} = ${name}Error\n`)
-      expect(text).toContain(`export type ${name} = ${name}Error\n`)
-    }
-  })
-
-  it('keep the old name of an export renamed to stop clashing across libraries as a @deprecated alias', async () => {
-    for (const [file, old, renamed] of [['packages/auth/src/memoryStore.ts', 'memoryStore', 'memoryAuthStore'], ['packages/auth/src/mail.ts', 'Mail', 'AuthMailMessage'], ['packages/auth/src/mail.ts', 'Mailer', 'AuthMailer'], ['packages/mail/src/defaults.ts', 'Settings', 'MailSettings'], ['packages/mail/src/defaults.ts', 'defaults', 'mailDefaults'], ['packages/mail/src/types.ts', 'Field', 'MailField'], ['packages/mail/src/types.ts', 'Message', 'MailMessage'], ['packages/ui/src/defaults.ts', 'Settings', 'UiSettings'], ['packages/ui/src/defaults.ts', 'defaults', 'uiDefaults'], ['packages/cms/src/loaders/postgres.ts', 'postgresLoader', 'pgLoader'], ['packages/cms/src/loaders/postgres.ts', 'PostgresLoaderOptions', 'PgLoaderOptions']] as const) {
-      const text = await Bun.file(file).text()
-
-      expect(text).toContain(`/** @deprecated Renamed \`${renamed}\` in 1.70`)
-      expect(text).toMatch(new RegExp(`export (?:const|type) ${old}(?:<[^>]*>)? = ${renamed}`))
-    }
   })
 
   it('give the error class a library exports a code, as kay\'s KayError carries one', () => {

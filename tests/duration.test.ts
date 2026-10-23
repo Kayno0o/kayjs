@@ -1,11 +1,11 @@
 import type { Duration } from '../src/runtime/duration'
 import { describe, expect, it } from 'bun:test'
-import { durationMs, durationSeconds, isZeroDuration, legacyMs, optionMs, wholeSeconds } from '../src/runtime/duration'
+import { durationMs, durationSeconds, isZeroDuration, optionMs, wholeSeconds } from '../src/runtime/duration'
 import { durationWords } from '../src/runtime/duration-words'
 
 describe('durations', () => {
-  it('reads seconds, or a number with its unit', () => {
-    expect(['30s', '5m', '1.5h', '30d', '2w', 90, 0.5].map(value => durationSeconds(value, 'ttl'))).toEqual([30, 300, 5400, 2_592_000, 1_209_600, 90, 0.5])
+  it('reads a number with its unit', () => {
+    expect(['30s', '5m', '1.5h', '30d', '2w'].map(value => durationSeconds(value, 'ttl'))).toEqual([30, 300, 5400, 2_592_000, 1_209_600])
   })
 
   it('reads a number of milliseconds with its unit, 250ms or 0.5ms', () => {
@@ -30,23 +30,17 @@ describe('durations', () => {
   })
 
   it('rounds up to whole seconds for a header or a cookie, so a sub-second duration is never 0 nor fractional', () => {
-    expect(['250ms', '1.5s', '0.4s', '1ms', '999ms', '1000ms', '1001ms', '2s', 0.2, 1.2, 90].map(value => wholeSeconds(value, 'maxAge'))).toEqual([1, 2, 1, 1, 1, 1, 2, 2, 1, 2, 90])
+    expect(['250ms', '1.5s', '0.4s', '1ms', '999ms', '1000ms', '1001ms', '2s', '90s'].map(value => wholeSeconds(value, 'maxAge'))).toEqual([1, 2, 1, 1, 1, 1, 2, 2, 90])
     expect(() => wholeSeconds('0ms', 'maxAge')).toThrow(/^kay: maxAge is '0ms'/)
   })
 
   it('refuses what is no positive duration, naming the option', () => {
-    for (const value of [0, -5, Number.NaN, Number.POSITIVE_INFINITY, '0m', '-5m', '5', '5 m', '5min', '5M', 'm', '', null, undefined])
+    for (const value of [0, -5, 90, 0.5, Number.NaN, Number.POSITIVE_INFINITY, '0m', '-5m', '5', '5 m', '5min', '5M', 'm', '', null, undefined])
       expect(() => durationSeconds(value, 'ttl')).toThrow(/^kay: ttl is .+; it takes a positive duration such as '250ms', '5m' or '30d'$/)
   })
 })
 
-describe('legacy numbers', () => {
-  it('keeps a number as milliseconds in legacyMs and as seconds in durationSeconds, until 1.73', () => {
-    expect(legacyMs(1500, 'wait')).toBe(1500)
-    expect(legacyMs('1500ms', 'wait')).toBe(1500)
-    expect(durationSeconds(90, 'ttl')).toBe(90)
-  })
-
+describe('zero durations', () => {
   it('tells a zero duration', () => {
     expect(isZeroDuration('0s')).toBe(true)
     expect(isZeroDuration('0ms')).toBe(true)
@@ -55,7 +49,7 @@ describe('legacy numbers', () => {
 })
 
 describe('a bare number where milliseconds were taken', () => {
-  // Never read as seconds, as durationSeconds does: an unfixed `every(3000, ...)` must not turn into 3000 seconds.
+  // Never read as seconds: an unfixed `every(3000, ...)` must not turn into 3000 seconds.
   it('is refused by durationMs and optionMs', () => {
     expect(() => durationMs(3000 as never)).toThrow('takes its unit')
     expect(() => optionMs(3000 as never, '`every` interval')).toThrow('`every` interval is 3000')

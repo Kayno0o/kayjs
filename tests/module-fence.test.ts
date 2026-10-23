@@ -123,20 +123,6 @@ describe('what the analyses read of a module fence', () => {
     }
   })
 
-  it('reads the renamed options of a library call in a module fence', async () => {
-    const { rateLimitNames } = await import('../src/check/rate-limit')
-    const root = await scratchDir('module-fence-options-')
-
-    try {
-      await Bun.write(join(root, 'src/part.kay'), '--- module\nimport { ai } from \'@kaynooo/kayjs-ai\'\nexport const model = ai({ limit: 5 })\n---\np x\n')
-
-      expect((await rateLimitNames(root, {})).map(diagnostic => diagnostic.message)).toEqual([expect.stringContaining('limit')])
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
   it('does not call an exported signal constant, as an importer may write it', () => {
     expect(found('--- module\nimport { signal } from \'kay\'\nexport const shown = signal(1)\nconst hidden = signal(2)\n---\np {shown()} {hidden()}\n')).toEqual(['constant-signal'])
   })

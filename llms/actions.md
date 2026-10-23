@@ -250,7 +250,7 @@ form(action={add})
 
 ### Reading the outcome
 
-- `add.failed()`, `add.succeeded()` and `add.error('title')` read the outcome from any template, layout, component or island, and from the server fence; `ctx.failed(add)` and `ctx.succeeded(add)` are the same, kept three minors (`deprecated-ctx-outcome`, which `kay upgrade` fixes).
+- `add.failed()`, `add.succeeded()` and `add.error('title')` read the outcome from any template, layout, component or island, and from the server fence.
 - `error()` without a field is the form-wide message, `errors['']`.
 - The field name is typed from the schema.
 - An island reads them in the browser too, as its server render did, but for `values`, which stay on the server, so no field the server cannot tell is a secret reaches the page's source: the fields hold what was sent.

@@ -1,5 +1,5 @@
 import { rm } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
@@ -14,6 +14,13 @@ beforeAll(() => {
 afterAll(async () => {
   await GlobalRegistrator.unregister()
 })
+
+// A .kay file the test names by path, loaded through the loader so mountComponent finds the file it was built from.
+async function imported(file: string): Promise<(props: Record<string, unknown>) => unknown> {
+  await registerLoader(process.cwd())
+
+  return ((await import(resolve(file))) as { default: (props: Record<string, unknown>) => unknown }).default
+}
 
 describe('mount', () => {
   it('mounts the component itself, imported through the loader, as it mounts its file', async () => {
@@ -33,13 +40,13 @@ describe('mount', () => {
   })
 
   it('refuses a function that is no component of the project', async () => {
-    await expect(mountComponent((() => undefined) as never)).rejects.toThrow('kay: mountComponent takes a .kay component imported in a test, or the path of its file')
+    await expect(mountComponent(() => undefined)).rejects.toThrow('kay: mountComponent takes a .kay component imported in a test')
   })
 
   it('renders a component built for the browser, runs its handlers and effects, and disposes of it', async () => {
     const changes: boolean[] = []
     let disposed = false
-    const { root, unmount } = await mountComponent('tests/fixtures/mount/toggle.kay', { label: 'Menu', onChange: (open: boolean) => changes.push(open), onDispose: () => disposed = true })
+    const { root, unmount } = await mountComponent(await imported('tests/fixtures/mount/toggle.kay'), { label: 'Menu', onChange: (open: boolean) => changes.push(open), onDispose: () => disposed = true })
 
     expect(root.innerHTML).toContain('<button class="toggle">Menu</button>')
     expect(root.querySelector('.panel')).toBeNull()
@@ -58,7 +65,7 @@ describe('mount', () => {
 
   it('focuses the first invalid field a write just revealed, its render flushed first', async () => {
     const focused: boolean[] = []
-    const { root, unmount } = await mountComponent('tests/fixtures/mount/refused.kay', { onFocused: (took: boolean) => focused.push(took) })
+    const { root, unmount } = await mountComponent(await imported('tests/fixtures/mount/refused.kay'), { onFocused: (took: boolean) => focused.push(took) })
 
     root.querySelector<HTMLButtonElement>('.save')!.click()
     await answered(focused)
@@ -71,7 +78,7 @@ describe('mount', () => {
   it('reveals an invalid field hidden until found as find-in-page does, innermost first, a closed details opened, then focuses it', async () => {
     const focused: boolean[] = []
     const matched: string[] = []
-    const { root, unmount } = await mountComponent('tests/fixtures/mount/until-found.kay', { onFocused: (took: boolean) => focused.push(took) })
+    const { root, unmount } = await mountComponent(await imported('tests/fixtures/mount/until-found.kay'), { onFocused: (took: boolean) => focused.push(took) })
 
     root.addEventListener('beforematch', event => matched.push((event.target as Element).className))
     root.querySelector<HTMLButtonElement>('.save')!.click()
@@ -94,7 +101,7 @@ describe('mount', () => {
 
   it('stops revealing where a beforematch listener hides the element again, shows it itself or opens a details above it, as the spec does', async () => {
     const focused: boolean[] = []
-    const { root, unmount } = await mountComponent('tests/fixtures/mount/until-found.kay', { onFocused: (took: boolean) => focused.push(took) })
+    const { root, unmount } = await mountComponent(await imported('tests/fixtures/mount/until-found.kay'), { onFocused: (took: boolean) => focused.push(took) })
 
     root.addEventListener('beforematch', event => (event.target as Element).setAttribute('hidden', ''))
     root.querySelector<HTMLButtonElement>('.save')!.click()
@@ -106,7 +113,7 @@ describe('mount', () => {
     unmount()
 
     // A tab list showing its panel on the event: the panels around it stay as they are.
-    const shown = await mountComponent('tests/fixtures/mount/until-found.kay', { onFocused: (took: boolean) => focused.push(took) })
+    const shown = await mountComponent(await imported('tests/fixtures/mount/until-found.kay'), { onFocused: (took: boolean) => focused.push(took) })
 
     shown.root.addEventListener('beforematch', event => (event.target as Element).removeAttribute('hidden'))
     shown.root.querySelector<HTMLButtonElement>('.save')!.click()
@@ -118,7 +125,7 @@ describe('mount', () => {
     shown.unmount()
 
     // An accordion opening its own section: the details found open ends the reveal, the panel around it left hidden.
-    const opened = await mountComponent('tests/fixtures/mount/until-found.kay', { onFocused: (took: boolean) => focused.push(took) })
+    const opened = await mountComponent(await imported('tests/fixtures/mount/until-found.kay'), { onFocused: (took: boolean) => focused.push(took) })
 
     opened.root.addEventListener('beforematch', (event) => {
       const details = (event.target as Element).closest('details')
@@ -156,7 +163,7 @@ describe('mount', () => {
     process.env.KAY_ROOT = join(import.meta.dir, 'fixtures/mount-api')
 
     try {
-      const { root, unmount } = await mountComponent('src/components/add-note.kay')
+      const { root, unmount } = await mountComponent(await imported(join(import.meta.dir, 'fixtures/mount-api/src/components/add-note.kay')))
 
       root.querySelector('button')!.click()
 
@@ -180,7 +187,7 @@ describe('mount', () => {
   it('reveals nothing for a field that cannot take focus', async () => {
     const focused: boolean[] = []
     const matched: string[] = []
-    const { root, unmount } = await mountComponent('tests/fixtures/mount/reveal-skips.kay', { onFocused: (took: boolean) => focused.push(took) })
+    const { root, unmount } = await mountComponent(await imported('tests/fixtures/mount/reveal-skips.kay'), { onFocused: (took: boolean) => focused.push(took) })
 
     root.addEventListener('beforematch', event => matched.push((event.target as Element).className))
     root.querySelector<HTMLButtonElement>('.save')!.click()
@@ -195,14 +202,14 @@ describe('mount', () => {
     try {
       writePersisted('favorites', ['first'])
 
-      const first = await mountComponent('tests/fixtures/mount/favorites.kay')
+      const first = await mountComponent(await imported('tests/fixtures/mount/favorites.kay'))
 
       expect(first.root.querySelector('.favorites')!.textContent).toBe('first')
       first.unmount()
 
       writePersisted('favorites', ['second'])
 
-      const second = await mountComponent('tests/fixtures/mount/favorites.kay')
+      const second = await mountComponent(await imported('tests/fixtures/mount/favorites.kay'))
 
       expect(second.root.querySelector('.favorites')!.textContent).toBe('second')
       second.root.querySelector('button')!.click()
@@ -222,13 +229,13 @@ describe('mount', () => {
     try {
       writePersisted('accent', 'purple')
 
-      const stale = await mountComponent('tests/fixtures/mount/accent.kay')
+      const stale = await mountComponent(await imported('tests/fixtures/mount/accent.kay'))
 
       expect(stale.root.querySelector('.accent')!.textContent).toBe('blue')
       stale.unmount()
       writePersisted('accent', 'green')
 
-      const kept = await mountComponent('tests/fixtures/mount/accent.kay')
+      const kept = await mountComponent(await imported('tests/fixtures/mount/accent.kay'))
 
       expect(kept.root.querySelector('.accent')!.textContent).toBe('green')
       kept.unmount()
@@ -239,7 +246,7 @@ describe('mount', () => {
   })
 
   it('shares only kay\'s own safe-html module with the test process, not any module of that name', async () => {
-    const { root, unmount } = await mountComponent('tests/fixtures/mount/own-safe-html.kay')
+    const { root, unmount } = await mountComponent(await imported('tests/fixtures/mount/own-safe-html.kay'))
 
     expect(root.querySelector('.own')!.textContent).toBe('its own copy')
     unmount()
@@ -256,7 +263,7 @@ describe('mount', () => {
         await Promise.all([Bun.write(join(project, 'kay.config.ts'), `export default ${config}\n`), Bun.write(join(project, 'src/box.kay'), component)])
         process.env.KAY_ROOT = project
 
-        const { root, unmount } = await mountComponent(join(project, 'src/box.kay'))
+        const { root, unmount } = await mountComponent(await imported(join(project, 'src/box.kay')))
         const text = ['.static', '.dynamic', '.code'].map(selector => root.querySelector(selector)!.textContent.replaceAll('\u00A0', '~'))
 
         unmount()
@@ -298,7 +305,7 @@ describe('mount', () => {
       let message = ''
 
       try {
-        await mountComponent(file)
+        await mountComponent(await imported(file))
       }
       catch (error) {
         message = (error as Error).message
@@ -317,17 +324,14 @@ describe('mount', () => {
     }
   })
 
-  it('reports a component that does not compile, and builds it again once fixed', async () => {
+  it('unmounts twice without harm', async () => {
     const dir = await scratchDir('mount-')
-    const file = join(dir, 'broken.kay')
+    const file = join(dir, 'fixed.kay')
 
     try {
-      await Bun.write(file, 'p {\n')
-      await expect(mountComponent(file)).rejects.toThrow('kay: bundling')
-
       await Bun.write(file, 'p.fixed Fixed\n')
 
-      const { root, unmount } = await mountComponent(file)
+      const { root, unmount } = await mountComponent(await imported(file))
 
       expect(root.innerHTML).toBe('<p class="fixed">Fixed</p>')
       unmount()

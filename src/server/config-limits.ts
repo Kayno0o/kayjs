@@ -7,7 +7,7 @@ import { durationSeconds } from '../runtime/duration'
 // The limits kay.config.ts may move, each read with its default and refused naming its option: kept apart from the server modules using them, so `kay check` and the language server validate them without loading Elysia.
 
 // A check slower than this fails unless `health.timeout` says otherwise, so a hung database never hangs the probe with it.
-const DEFAULT_CHECK_TIMEOUT = 5
+const DEFAULT_CHECK_TIMEOUT = '5s'
 
 export const MAX_TIMER_MS = 2 ** 31 - 1
 

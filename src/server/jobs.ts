@@ -37,7 +37,7 @@ export type EveryOptions = Omit<ScheduleOptions, 'tz'>
 
 // A lock slot is the minute a run is due, the finest a cron schedule goes: a run falls due at its first second, so the nearest minute names it for a process running it up to 30 s early or late, its clock skewed or its event loop busy.
 const SLOT_MS = 60_000
-const DEFAULT_TIMEOUT = 600
+const DEFAULT_TIMEOUT = '10m'
 // How far apart processes may start and still share one boot run; a start further apart is a restart and runs its own.
 const BOOT_WINDOW_MS = 60_000
 let warnedAutoLock = false

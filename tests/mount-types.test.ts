@@ -8,7 +8,6 @@ it('types the props of the component mountComponent takes, required when it has 
   const mounts = async () => {
     await mountComponent(Toggle, { label: 'Menu' })
     await mountComponent(Plain)
-    await mountComponent('src/components/toggle.kay', { anything: 1 })
 
     // @ts-expect-error a required prop is missing
     await mountComponent(Toggle, {})

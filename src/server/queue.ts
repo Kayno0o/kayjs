@@ -7,7 +7,6 @@ import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { KayError } from '../compiler/errors'
 import { durationSeconds } from '../runtime/duration'
-import { callHook } from '../runtime/hook'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { appStore } from './app-store'
@@ -154,9 +153,9 @@ export type Queue<Payload, Progress = unknown> = Elysia & {
 }
 
 const DEFAULT_ATTEMPTS = 5
-const DEFAULT_BACKOFF = 10
-const DEFAULT_LOST_AFTER = 600
-const DEFAULT_KEEP_FAILED = 30 * 24 * 60 * 60
+const DEFAULT_BACKOFF = '10s'
+const DEFAULT_LOST_AFTER = '10m'
+const DEFAULT_KEEP_FAILED = '30d'
 // How often a process's workers drop the failed jobs past `keepFailed`.
 const PURGE_MS = 60 * 60 * 1000
 // How soon an idle queue looks again after a job, the first wait of its backoff.
@@ -165,7 +164,7 @@ const POLL_MS = 1000
 const COMPLETE_TRIES = 3
 const COMPLETE_RETRY_MS = 100
 // The longest an idle queue waits between looks unless `idlePoll` says otherwise: a job another process enqueued waits this at worst.
-const IDLE_POLL_S = 10
+const DEFAULT_IDLE_POLL = '10s'
 // The longest a worker waits between looks at a store that keeps failing.
 const MAX_OUTAGE_MS = 60_000
 const DEFAULT_PATH = 'data/jobs.sqlite'
@@ -558,7 +557,7 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
   const backoff = durationSeconds(options.backoff ?? DEFAULT_BACKOFF, `queue('${name}')'s backoff`) * 1000
   const lostAfter = durationSeconds(options.lostAfter ?? DEFAULT_LOST_AFTER, `queue('${name}')'s lostAfter`) * 1000
   const concurrency = options.concurrency ?? 1
-  const idlePoll = durationSeconds(options.idlePoll ?? IDLE_POLL_S, `queue('${name}')'s idlePoll`) * 1000
+  const idlePoll = durationSeconds(options.idlePoll ?? DEFAULT_IDLE_POLL, `queue('${name}')'s idlePoll`) * 1000
   const keepFailed = options.keepFailed === false ? undefined : durationSeconds(options.keepFailed ?? DEFAULT_KEEP_FAILED, `queue('${name}')'s keepFailed`) * 1000
 
   if (!Number.isInteger(attempts) || attempts < 1)
@@ -606,7 +605,7 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
       if (options.onFailed) {
         const payload = parse(job.payload) as Payload
 
-        await callHook(options.onFailed, { payload, error }, [payload, error])
+        await options.onFailed({ payload, error })
       }
     }
     catch (failure) {

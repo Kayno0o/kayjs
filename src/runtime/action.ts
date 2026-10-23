@@ -27,7 +27,7 @@ declare const KAY_BROWSER: true | undefined
 export type { CallResult }
 
 const ACTION = Symbol.for('kay.action')
-const DAY = 86_400
+const DAY = '1d'
 const FAILURE = Symbol.for('kay.failure')
 
 // Who made a call: the island whose setup or handler did, and how many paths were shown by then.
@@ -115,7 +115,7 @@ export interface HoneypotOptions<Field extends string = string> {
 export type MinTimeRefusal = 'early' | 'expired'
 
 export interface MinTimeOptions {
-  // The least time between the page rendering the form and its post, seconds or a string such as '3s'.
+  // The least time between the page rendering the form and its post, a string such as '3s'.
   after: Duration
   // The most, past which a post is refused as sent from a page left open too long or a copied stamp: a day by default.
   maxAge?: Duration | undefined
@@ -151,7 +151,7 @@ export interface ActionTool {
 
 // The checks that keep scripts from an action: `action(schema, handler, { protect: { rateLimit, honeypot, minTime, proofOfWork } })`.
 export interface ActionProtect<Field extends string = never> {
-  // At most `max` posts from one client every `window`, seconds or a string such as '1m'; past that a post fails with 429 without reaching the handler. `store` shares the count between processes.
+  // At most `max` posts from one client every `window`, a string such as '1m'; past that a post fails with 429 without reaching the handler. `store` shares the count between processes.
   // Several limits all apply, such as one on every attempt and a tighter one on the posts that went through.
   rateLimit?: ActionRateLimit | ActionRateLimit[] | undefined
   // A field a form posting to the action renders out of sight by itself, which people leave empty and bots fill in; a post filling it fails with 422 without reaching the handler.
@@ -179,8 +179,6 @@ export interface ActionProtection<Field extends string = never> {
   minTime?: Duration | MinTimeOptions | undefined
   /** @deprecated The old place of `protect.proofOfWork`, kept three minors. */
   proofOfWork?: boolean | number | ProofOfWorkOptions | undefined
-  /** @deprecated The old name of `maxSize`, kept three minors. */
-  bodyLimit?: ByteSize | undefined
 }
 
 // An action's options once `protect` is read, the checks on a level with the rest: what the server reads.
@@ -191,7 +189,6 @@ export interface ResolvedProtection {
   minTime?: Duration | MinTimeOptions | undefined
   proofOfWork?: boolean | number | ProofOfWorkOptions | undefined
   maxSize?: ByteSize | undefined
-  bodyLimit?: ByteSize | undefined
   messages?: ProtectionMessages | undefined
 }
 
@@ -205,8 +202,6 @@ export interface ProtectionMessages {
   proofOfWork?: (string | ((reason: ProofOfWorkRefusal) => string)) | undefined
   // Given the most bytes a post may send.
   maxSize?: (string | ((bytes: number) => string)) | undefined
-  /** @deprecated The old name of `maxSize`, kept three minors. */
-  bodyLimit?: (string | ((bytes: number) => string)) | undefined
   // When the handler throws, a service it sends to being down say: the error is logged, and the visitor reads this instead. A function is given the error and the action's `ctx`, so it can read what is loaded per request (a setting, a collection entry) or the page's `ctx.locale`, and may be async; one that throws leaves kay's own message, both errors logged.
   serverError?: (string | ((error: unknown, ctx: ActionContext) => string | Promise<string>)) | undefined
 }
@@ -361,11 +356,6 @@ export class ActionRedirectError extends ActionError {
     super(status, `Redirected to ${location}`, {}, undefined, `Action redirected with ${status} to ${location}`)
   }
 }
-
-/** @deprecated Renamed `ActionRedirectError` in 1.70; the old name goes in 1.73. */
-export const ActionRedirect = ActionRedirectError
-/** @deprecated Renamed `ActionRedirectError` in 1.70; the old name goes in 1.73. */
-export type ActionRedirect = ActionRedirectError
 
 export function failure<Data>(status: number, data: Data): Failure<Data> {
   // A call reads a success status as the handler's result, so a failure must not carry one.

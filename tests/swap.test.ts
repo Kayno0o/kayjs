@@ -88,7 +88,7 @@ describe('page swap, on the server', () => {
   it('renders a try block\'s catch block when it throws, the error reported, marked for hydration to keep', async () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
     const caught: unknown[] = []
-    const reporting = await servePages(resolveProject(process.cwd(), { routes, security: false, onError: error => void caught.push(error) }), async () => client)
+    const reporting = await servePages(resolveProject(process.cwd(), { routes, security: false, onError: ({ error }) => void caught.push(error) }), async () => client)
     const page = await (await reporting.handle(new Request('http://localhost/fallback'))).text()
 
     logged.mockRestore()
@@ -107,7 +107,7 @@ describe('page swap, on the server', () => {
     // One segment on line 3, column 3, naming source 0 at line 11, column 6 (0-based).
     await Bun.write(join(dir, 'maps/chunk-abc.js.map.zst'), await Bun.zstdCompress(JSON.stringify({ sources: ['src/routes/cart.kay'], mappings: ';;GAWM' })))
 
-    const mapped = await servePages(resolveProject(process.cwd(), { routes, security: false, onError: error => void caught.push(error) }), async () => ({ ...client, dir: join(dir, 'dist') }))
+    const mapped = await servePages(resolveProject(process.cwd(), { routes, security: false, onError: ({ error }) => void caught.push(error) }), async () => ({ ...client, dir: join(dir, 'dist') }))
     const report = async (stack: string) => (await mapped.handle(new Request('http://localhost/_kay/error', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Error', message: 'x', stack, url: 'http://localhost/' }) }))).status
 
     try {
@@ -123,7 +123,7 @@ describe('page swap, on the server', () => {
   it('hands what a browser reports to onError, refusing another site\'s, a malformed one and a flood, and dropping control characters', async () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
     const caught: unknown[] = []
-    const reporting = await servePages(resolveProject(process.cwd(), { routes, security: false, onError: error => void caught.push(error) }), async () => client)
+    const reporting = await servePages(resolveProject(process.cwd(), { routes, security: false, onError: ({ error }) => void caught.push(error) }), async () => client)
     const report = async (body: string, headers: Record<string, string> = {}) => (await reporting.handle(new Request('http://localhost/_kay/error', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body }))).status
     const sent = JSON.stringify({ name: 'TypeError', message: 'x is undefined', stack: 'TypeError: x is undefined\n    at chunk.js:1:2', url: 'http://localhost/fallback' })
 

@@ -8,7 +8,7 @@ import { memoryRates } from './protection'
 import { WORK_MARK } from './stamp'
 import { challengeRefusal, SCOPED_WORK, signChallenge } from './work'
 
-const DAY = 86_400
+const DAY = '1d'
 const DEFAULT_DIFFICULTY = 100_000
 
 export interface WorkChallengeOptions {

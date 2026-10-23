@@ -44,7 +44,7 @@ export interface SessionOptions {
   secret?: string | string[] | undefined
   // Defaults to `kay_session`; over https and without `domain`, the cookie goes out as `__Host-kay_session`.
   cookie?: string | undefined
-  // How long a session lasts without being used, seconds or a string such as '30d', 30 days by default; one used past half of it is extended.
+  // How long a session lasts without being used, a string such as '30d', 30 days by default; one used past half of it is extended.
   maxAge?: Duration | undefined
   // How long a session lasts from its start or its last `regenerate()`, however much it is used, 90 days by default; no lifetime outlasts it.
   absoluteMaxAge?: Duration | undefined
@@ -66,10 +66,8 @@ export interface Session<Data extends object> {
   destroy: () => Promise<void>
   // Moves the data to a new id, for right after signing in, so an id planted before it is worth nothing.
   regenerate: () => Promise<void>
-  // This session's own maxAge in place of `maxAge`, kept until it is destroyed, for "remember me": seconds or a string such as '90d', or 'browser' for a cookie the browser drops on closing, lasting `browserMaxAge` without being used.
+  // This session's own maxAge in place of `maxAge`, kept until it is destroyed, for "remember me": a string such as '90d', or 'browser' for a cookie the browser drops on closing, lasting `browserMaxAge` without being used.
   maxAge: (maxAge: Duration | 'browser') => Promise<void>
-  /** @deprecated Since 1.70, dropped in 1.73: this is `maxAge()`. */
-  lifetime: (maxAge: Duration | 'browser') => Promise<void>
   // The lifetimes the plugin resolved, in seconds, defaults included: for a library that must agree with the app's session instead of asking for them again.
   readonly settings: SessionSettings
 }
@@ -88,7 +86,7 @@ interface Sealed {
   issued: number
   // When the session started or was last regenerated, in seconds since the epoch; a cookie from before kay wrote it counts from `issued`.
   started?: number
-  // A lifetime `lifetime()` set, in seconds, and whether the cookie dies with the browser.
+  // A lifetime `maxAge()` set, in seconds, and whether the cookie dies with the browser.
   maxAge?: number
   browser?: true
 }
@@ -262,10 +260,6 @@ class RequestSession<Data extends object> implements Session<Data> {
     await this.load()
     this.own = maxAge === 'browser' ? { maxAge: this.config.browserMaxAge, browser: true } : { maxAge: wholeSeconds(maxAge, 'a session maxAge') }
     this.changed = true
-  }
-
-  async lifetime(maxAge: Duration | 'browser'): Promise<void> {
-    await this.maxAge(maxAge)
   }
 
   // The Set-Cookie value to send, or undefined when the session needs none.

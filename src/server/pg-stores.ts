@@ -4,7 +4,7 @@ import type { PgHandle } from './pg-data'
 import type { DeletableSessionStore, SessionData } from './session'
 import type { VitalCount, VitalReading, VitalsStore } from './vitals-store'
 import { parse, stringify } from 'devalue'
-import { durationSeconds, legacyMs } from '../runtime/duration'
+import { durationSeconds, optionMs } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { rowsOf } from './pg-jobs'
 import { limited, limitedStore, MAINTENANCE_TIMEOUT_MS } from './pg-limit'
@@ -136,7 +136,7 @@ export function pgRates(pg: PgHandle): RateStore {
     async hit(key, window, weight = 1) {
       const hash = await hashed(key)
       const db = await pg.db()
-      const length = legacyMs(window, 'a rate window')
+      const length = optionMs(window, 'a rate window')
 
       if (Date.now() - swept > SWEEP_RATES_MS) {
         swept = Date.now()

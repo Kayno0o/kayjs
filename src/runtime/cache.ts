@@ -104,7 +104,7 @@ const DELETE_BATCH = 50
 // After a background refresh that failed, the longest a stale value is kept before the next call tries again.
 const RETRY_MS = 60_000
 
-// The value `load` gives for `key`, kept for `ttl`, seconds or a string such as '5m', for every request in this process. Concurrent misses share one load; past `ttl`, the next call still gets the stale value and refreshes it in the background.
+// The value `load` gives for `key`, kept for `ttl`, a string such as '5m', for every request in this process. Concurrent misses share one load; past `ttl`, the next call still gets the stale value and refreshes it in the background.
 // A first load that throws throws to its callers and keeps nothing; a refresh that throws is logged and keeps the stale value.
 export async function cached<T, const Ttl extends Duration = Duration>(key: string, ttl: Ttl & PositiveDuration<Ttl>, load: () => T | Promise<T>, options: CacheOptions = {}): Promise<T> {
   return cachedFor(key, ttl, load, options, renderingForVisitor())

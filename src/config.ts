@@ -75,8 +75,6 @@ export interface KayConfig {
   proxy?: ProxyConfig | number | boolean | undefined
   // The most a request with a body to any route may send (`maxSize`), bytes or a size such as `'4mb'`, 1 MB by default; an action or an `api()` module raises or lowers it for itself. A bigger one answers 413 before it is read.
   maxSize?: ByteSize | undefined
-  /** @deprecated The old name of `maxSize`, kept three minors. */
-  bodyLimit?: ByteSize | undefined
   // The most a request to a route of your own (`new Elysia().post()`) may send, by path: the route itself and what is under it, bytes or a size such as '50mb', in place of `maxSize`. The path is the one the server routes, without the `base`.
   maxSizes?: Record<string, ByteSize> | undefined
   // Every page, action, endpoint and API module of the app answers 403 unless a `_guard.ts` covers it or it sets `guards: false`, in its `page` or its `api()` options; `kay check` reports each such route. A library's routes keep the guards it gives them.
@@ -123,7 +121,7 @@ export interface KayConfig {
   content?: string | undefined
   // How every collection's Markdown compiles; a collection's own option of the same name wins.
   markdown?: MarkdownConfig | undefined
-  // How long a stopping server gives open requests and streams to finish before closing them, seconds or a string such as '30s'; 10 seconds by default.
+  // How long a stopping server gives open requests and streams to finish before closing them, a string such as '30s'; 10 seconds by default.
   shutdownTimeout?: Duration | undefined
   // Swaps the next page in place when a link or a form of the site is followed from a page with islands or forms posting to actions, so islands marked `persist` live on; on by default. `false` loads every page as a plain site does.
   navigation?: boolean | undefined
@@ -219,7 +217,7 @@ export interface RobotsConfig {
 export interface PreviewConfig {
   // Signs preview links and the preview cookie, never carried in a URL: at least 32 random characters, read from the environment. A key derived from the app's secret (`KAY_SECRET`) when left out.
   secret?: string | undefined
-  // How long a visitor stays in preview mode once in, seconds or a string such as '2h'; an hour by default.
+  // How long a visitor stays in preview mode once in, a string such as '2h'; an hour by default.
   maxAge?: Duration | undefined
 }
 
@@ -241,7 +239,7 @@ export interface MetricsConfig {
 
 export interface HealthConfig {
   path?: string | undefined
-  // How long `check` may take before the route fails with 503, and how long `--health` waits for the route: seconds or a string such as `'250ms'` or `'10s'`; 5 seconds by default.
+  // How long `check` may take before the route fails with 503, and how long `--health` waits for the route: a string such as `'250ms'` or `'10s'`; 5 seconds by default.
   timeout?: Duration | undefined
   // Fails the route with 503 when it returns false or throws, such as a database that does not answer.
   check?: (() => unknown) | undefined
@@ -364,7 +362,7 @@ export interface ImagesConfig {
   remote?: string[] | undefined
   // The most a remote original may weigh, bytes or a size such as `'10mb'`: a bigger one answers 413 and is not kept. 25 MB by default.
   remoteMaxSize?: ByteSize | undefined
-  // How long the image route waits for a remote host, redirects included, seconds or a string such as `'30s'`; 10 seconds by default. A slower host answers 502.
+  // How long the image route waits for a remote host, redirects included, a string such as `'30s'`; 10 seconds by default. A slower host answers 502.
   remoteTimeout?: Duration | undefined
   // WebP quality, 1 to 100. Defaults to 80. It also sets the quality of the share cards' JPEG, which `webp.quality` leaves alone; `image(src, { quality })` sets one image's variants.
   quality?: number | undefined

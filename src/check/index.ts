@@ -19,7 +19,6 @@ import { formatReport } from '../compiler/frame'
 import { lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { projectPaths } from '../project'
-import { bareDuration } from './bare-duration'
 import { diagnoseShadow, reportsTypeErrors, servedByTheApp, shownOutsideKay, unusedCodesOf } from './diagnose'
 import { unknownNameHelp } from './export-homes'
 import { CONTENT_CHECK, generatedProblem } from './generated'
@@ -213,15 +212,14 @@ async function runCheck(root: string, options: CheckOptions, probes?: ProbeMemor
     const mapped: CheckDiagnostic = shadow && diagnosed
       ? { ...diagnostic, file: shadow.file, ...positionAt(shadow.source, diagnosed.span?.start ?? 0), code: diagnosed.code ?? diagnostic.code, severity: diagnosed.severity, message: diagnosed.message, note: diagnosed.note, help: diagnosed.help }
       : { ...diagnostic, ...helped(diagnostic) }
-    const remapped = await bareDuration(mapped, options.lints)
-    const generated = generatedProblem(root, remapped, types, content)
+    const generated = generatedProblem(root, mapped, types, content)
 
     if (generated)
       diagnostics.push(generated)
-    else if (reportsTypeErrors(remapped.file, scope) && !servedByTheApp(remapped.file, remapped.message, mounts, locales) && !seen.has(JSON.stringify([remapped.file, remapped.line, remapped.column, remapped.code, remapped.message])))
-      diagnostics.push(remapped)
+    else if (reportsTypeErrors(mapped.file, scope) && !servedByTheApp(mapped.file, mapped.message, mounts, locales) && !seen.has(JSON.stringify([mapped.file, mapped.line, mapped.column, mapped.code, mapped.message])))
+      diagnostics.push(mapped)
 
-    seen.add(JSON.stringify([remapped.file, remapped.line, remapped.column, remapped.code, remapped.message]))
+    seen.add(JSON.stringify([mapped.file, mapped.line, mapped.column, mapped.code, mapped.message]))
   }
 
   diagnostics.push(...problems)

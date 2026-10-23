@@ -46,11 +46,6 @@ export class HydrationMismatchError extends Error {
   override name = 'HydrationMismatchError'
 }
 
-/** @deprecated Renamed `HydrationMismatchError` in 1.70; the old name goes in 1.73. */
-export const HydrationMismatch = HydrationMismatchError
-/** @deprecated Renamed `HydrationMismatchError` in 1.70; the old name goes in 1.73. */
-export type HydrationMismatch = HydrationMismatchError
-
 const TAG_END = /[\s>]/
 const VOID_PROPERTIES = new Set(['value', 'checked', 'selected', 'muted', 'indeterminate'])
 const CONTENT_PROPERTIES = new Set(['innerHTML', 'textContent', 'innerText'])

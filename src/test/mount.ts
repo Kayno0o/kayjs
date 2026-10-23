@@ -73,22 +73,21 @@ type MountArguments<Component> = Component extends (props: infer Props) => unkno
 const componentFiles = (): WeakMap<object, string> | undefined => (globalThis as Record<symbol, unknown>)[Symbol.for('kay.component-files')] as WeakMap<object, string> | undefined
 
 // Renders a component compiled for the browser, as an island renders, into the document a DOM such as happy-dom's registered: for testing what its handlers and effects do.
-// The component is the one a test imports, `import Toggle from '../src/components/toggle.kay'`, from which the browser build is made. The `.kay` file relative to the project still works, but is deprecated.
+// The component is the one a test imports, `import Toggle from '../src/components/toggle.kay'`, from which the browser build is made.
 export async function mountComponent<Component extends (props: never) => unknown>(component: Component, ...props: MountArguments<Component>): Promise<Mounted>
-export async function mountComponent(file: string, props?: Record<string, unknown>): Promise<Mounted>
-export async function mountComponent(source: string | ((props: never) => unknown), ...given: unknown[]): Promise<Mounted> {
+export async function mountComponent(source: (props: never) => unknown, ...given: unknown[]): Promise<Mounted> {
   if (typeof document === 'undefined')
     await registerDom()
 
   const root = testRoot()
-  const file = typeof source === 'string' ? source : componentFiles()?.get(source)
+  const file = componentFiles()?.get(source)
 
   if (file === undefined)
-    throw new TypeError('kay: mountComponent takes a .kay component imported in a test, or the path of its file; this function was not built from a .kay file the test loader loaded (the loader notes components under NODE_ENV=test, which `bun test` sets)')
+    throw new TypeError('kay: mountComponent takes a .kay component imported in a test; this function was not built from a .kay file the test loader loaded (the loader notes components under NODE_ENV=test, which `bun test` sets)')
 
   const props = (given[0] ?? {}) as Record<string, unknown>
   const path = resolve(root, file)
-  const key = `${path}\0${await fileVersion(path)}`
+  const key = `${root}\0${path}\0${await fileVersion(path)}`
   let bundled = bundles.get(key)
 
   if (!bundled)

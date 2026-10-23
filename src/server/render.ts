@@ -1,5 +1,5 @@
 import type { KayConfig } from '../config'
-import type { ErrorPageContext, FailureOf, Locals, PageContext, PageError, SuccessOf } from '../runtime'
+import type { ErrorPageContext, Locals, PageContext, PageError } from '../runtime'
 import type { Action, Outcome } from '../runtime/action'
 import type { PendingBlock } from '../runtime/await.server'
 import type { EditorProps } from '../runtime/edit'
@@ -775,16 +775,6 @@ function createRendering(context: RequestContext, params: Record<string, unknown
       },
       headers,
       ...stoppers(request),
-      failed: (action) => {
-        const read = asked()
-
-        return read?.action === action.url && !('succeeded' in read) ? { status: read.status, values: read.values, errors: read.errors, data: read.data } as FailureOf<typeof action> : undefined
-      },
-      succeeded: (action) => {
-        const read = asked()
-
-        return read?.action === action.url && 'succeeded' in read ? { data: read.data } as SuccessOf<typeof action> : undefined
-      },
     },
   }
 

@@ -136,7 +136,7 @@ describe('cached with a store', () => {
 
   // A process of its own, as a restart or a second server would be: what `cached` gives it, once a background refresh has landed in the store.
   async function inProcess(path: string, edition: number): Promise<{ edition: number, date: boolean }> {
-    const script = `import { cached, sqliteCache } from ${JSON.stringify(resolve('src/runtime/cache.server.ts'))}\nconst store = sqliteCache(${JSON.stringify(path)})\nconst value = await cached('reviews', 60, () => ({ edition: ${edition}, at: new Date(0) }), { store })\nfor (let wait = 0; store.get('reviews')!.freshUntil < Date.now() && wait < 200; wait++)\n  await Bun.sleep(10)\nconsole.log(JSON.stringify({ edition: value.edition, date: value.at instanceof Date }))\n`
+    const script = `import { cached, sqliteCache } from ${JSON.stringify(resolve('src/runtime/cache.server.ts'))}\nconst store = sqliteCache(${JSON.stringify(path)})\nconst value = await cached('reviews', '1m', () => ({ edition: ${edition}, at: new Date(0) }), { store })\nfor (let wait = 0; store.get('reviews')!.freshUntil < Date.now() && wait < 200; wait++)\n  await Bun.sleep(10)\nconsole.log(JSON.stringify({ edition: value.edition, date: value.at instanceof Date }))\n`
     const child = Bun.spawn([process.execPath, '-e', script], { stdout: 'pipe', stderr: 'inherit' })
     const [output] = await Promise.all([new Response(child.stdout).text(), child.exited])
 
@@ -319,7 +319,7 @@ describe('cached with a store', () => {
     const dir = await scratchDir('dom-')
 
     dirs.push(dir)
-    await Bun.write(join(dir, 'entry.ts'), 'import { cached } from \'kay/cache\'\n\nexport const posts = cached(\'posts\', 60, () => [])\n')
+    await Bun.write(join(dir, 'entry.ts'), 'import { cached } from \'kay/cache\'\n\nexport const posts = cached(\'posts\', \'1m\', () => [])\n')
 
     const build = await Bun.build({ entrypoints: [join(dir, 'entry.ts')], target: 'browser' })
 

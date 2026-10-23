@@ -53,7 +53,7 @@ Every page, action and guard can now read `ctx.locals.auth`, typed. A file of yo
 
 ### The createAuth form
 
-An app that keeps session data of its own, or wires its store by hand, writes the auth object itself and loads it with `auth({ module })`. The registrations before 1.70, `authPages({ auth })` and `authExtension(...)`, are deprecated until 1.73: `kay check` reports them and `kay upgrade` rewrites them.
+An app that keeps session data of its own, or wires its store by hand, writes the auth object itself and loads it with `auth({ module })`.
 
 `src/auth.ts` creates the auth object. `memoryAuthStore()` keeps users in the process, for trying it out.
 
@@ -69,7 +69,7 @@ export const auth = createAuth({
 })
 ```
 
-The site's public origin, which OAuth callbacks, mailed links and passkeys are built on, is the `site` of `kay.config.ts` (or `SITE_URL`): `createAuth` reads it, so it is set once. `site: 'https://example.com'` in `createAuth` overrides it. `name: 'Example'` is the name mails and authenticator apps show, the origin's host by default. Before 1.70 `url` was the origin and `site` the name; both still work until 1.73, and `kay check` reports them as `deprecated-site-name`.
+The site's public origin, which OAuth callbacks, mailed links and passkeys are built on, is the `site` of `kay.config.ts` (or `SITE_URL`): `createAuth` reads it, so it is set once. `site: 'https://example.com'` in `createAuth` overrides it. `name: 'Example'` is the name mails and authenticator apps show, the origin's host by default.
 
 The session takes kay's `KAY_SECRET`, and kayjs-auth takes its key from the session's secret, so one secret serves all three ([The app secret](/guides/sessions-and-guards#the-app-secret)).
 

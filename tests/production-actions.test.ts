@@ -897,13 +897,6 @@ describe('request body limits', () => {
     expect((await site.submit(note, { text: 'hello' }, { from: '/notes' })).html).toContain('<p class="sent">Sent 5</p>')
   })
 
-  it('still takes the config\'s bodyLimit, the old name of maxSize', async () => {
-    const site = await testSite({ root: FIXTURE, security: false, bodyLimit: '64kb' })
-    const { note } = await import(NOTES) as { note: Action<{ text: string }, number> }
-
-    expect((await site.submit(note, { text: 'a'.repeat(65 * 1024) }, { from: '/notes' })).html).toContain('413 Too large to send; 64 KB at most')
-  })
-
   it.each([0, -1, 1.5, '0kb', '-1kb', '1.5b', '1gb', 'big', ''])('refuses a limit of %p, as the server boots', async (maxSize) => {
     await expect(serve(maxSize as ByteSize)).rejects.toThrow('kay: maxSize')
   })

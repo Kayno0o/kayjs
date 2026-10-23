@@ -204,7 +204,7 @@ describe('kay test', () => {
 
     await Bun.write(join(dir, 'src', 'components', 'counter.kay'), COUNTER)
     await Bun.write(join(dir, 'tests', 'plain.test.ts'), `import { expect, it } from 'bun:test'\n\nit('has no document yet', () => { expect(typeof document).toBe('undefined') })\n`)
-    await Bun.write(join(dir, 'tests', 'mount.test.ts'), `import { expect, it } from 'bun:test'\nimport { mountComponent, settle } from 'kay/test'\n\nit('mounts', async () => {\n  const { root, unmount } = await mountComponent('src/components/counter.kay')\n\n  root.querySelector('button')!.click()\n  await settle()\n  expect(root.textContent).toContain('1')\n  unmount()\n})\n`)
+    await Bun.write(join(dir, 'tests', 'mount.test.ts'), `import { expect, it } from 'bun:test'\nimport Counter from '../src/components/counter.kay'\nimport { mountComponent, settle } from 'kay/test'\n\nit('mounts', async () => {\n  const { root, unmount } = await mountComponent(Counter)\n\n  root.querySelector('button')!.click()\n  await settle()\n  expect(root.textContent).toContain('1')\n  unmount()\n})\n`)
 
     const { code, report } = await kayTest(dir, ['tests/plain.test.ts', 'tests/mount.test.ts'])
 

@@ -40,7 +40,7 @@ const paragraphs = (topic: string, count = 30) => Array.from({ length: count }, 
 function files(config: string, i18n: boolean): Record<string, string> {
   return {
     // Rendered again in the background once a second old.
-    'src/routes/tick.kay': `--- server\nexport const page = { prerender: true, revalidate: 1 }\nconst stamp = Date.now()\n---\nh1 Tick\np tick-{stamp}\n${paragraphs('Tick')}\n`,
+    'src/routes/tick.kay': `--- server\nexport const page = { prerender: true, revalidate: '1s' }\nconst stamp = Date.now()\n---\nh1 Tick\np tick-{stamp}\n${paragraphs('Tick')}\n`,
     'tsconfig.json': tsconfig,
     'kay.config.ts': config,
     'src/routes/_layout.kay': layout('/'),

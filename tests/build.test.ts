@@ -1888,7 +1888,7 @@ import { pages } from 'kay/server'
 
 const logged: string[] = []
 const reported: string[] = []
-const app = new Elysia().use(await pages({ security: false, log: entry => entry.type === 'message' && entry.error?.stack !== undefined && logged.push(entry.error.stack), onError: error => reported.push((error as Error).stack ?? '') }))
+const app = new Elysia().use(await pages({ security: false, log: entry => entry.type === 'message' && entry.error?.stack !== undefined && logged.push(entry.error.stack), onError: ({ error }) => reported.push((error as Error).stack ?? '') }))
 const status = (await app.handle(new Request('http://localhost/boom', { headers: { 'x-boom': '1' } }))).status
 const island = await app.handle(new Request('http://localhost/_kay/error', { method: 'POST', headers: { 'content-type': 'application/json', 'origin': 'http://localhost' }, body: JSON.stringify({ name: 'TypeError', message: 'x', url: '/', stack: \`TypeError: x\\n\${process.env.FRAME}\\n    at https://h/_kay/gone.js:1:2\\n    at fn (https://h/_kay/..%2Fcounter.js:1:1)\` }) }))
 

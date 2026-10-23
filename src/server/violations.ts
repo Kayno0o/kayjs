@@ -45,11 +45,6 @@ export class CspViolationError extends Error {
   }
 }
 
-/** @deprecated Renamed `CspViolationError` in 1.70; the old name goes in 1.73. */
-export const CspViolation = CspViolationError
-/** @deprecated Renamed `CspViolationError` in 1.70; the old name goes in 1.73. */
-export type CspViolation = CspViolationError
-
 const seen = new Set<string>()
 
 // Takes the browser's violation reports, in the Reporting API's format or `report-uri`'s, logging each distinct one once per process, the enforced policy's apart from the report-only one's, and handing it to `onError`; a flood from one client or anything too big is refused, and a report about a page of neither the `site` nor the request's own origin is answered but dropped: noise filtering, not authentication, as a report can name any page.

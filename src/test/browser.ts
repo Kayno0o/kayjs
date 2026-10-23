@@ -8,7 +8,7 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { afterAll } from 'bun:test'
 import { withUnreadable } from '../runtime/dev-a11y'
-import { legacyMs } from '../runtime/duration'
+import { optionMs } from '../runtime/duration'
 import { ISLAND } from '../runtime/markers'
 import { createNetwork } from './network'
 
@@ -283,7 +283,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     throw new Error(given !== undefined && given !== '' ? `kay: no browser at ${given}` : 'kay: browser tests need Chrome or Chromium, and none was found; install one, or give its path as the `path` option or `BUN_CHROME_PATH`')
   }
 
-  const timeout = options.timeout === undefined ? TIMEOUT_MS : legacyMs(options.timeout, 'the browser timeout')
+  const timeout = options.timeout === undefined ? TIMEOUT_MS : optionMs(options.timeout, 'the browser timeout')
   const strict = options.strict ?? true
   const errors: string[] = []
   const warnings: string[] = []
@@ -408,7 +408,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   }
 
   // The milliseconds of a call's own `timeout`, undefined for the page's.
-  const waitMs = (value: Duration | undefined) => value === undefined ? undefined : legacyMs(value, 'timeout')
+  const waitMs = (value: Duration | undefined) => value === undefined ? undefined : optionMs(value, 'timeout')
 
   // Polls the page, reading an error as not yet: the page may be between two documents.
   const poll = async (expression: string, wanted: string, wait = timeout) => {

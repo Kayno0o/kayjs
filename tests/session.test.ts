@@ -499,17 +499,6 @@ describe('sessions', () => {
     expect((await visit('/peek')).text).toBe('none')
   })
 
-  it('reads lifetime() as maxAge(), its name before 1.70', async () => {
-    const app = new Elysia().use(session({ secret: SECRET })).get('/', async ({ session }) => {
-      await session.set('n', 1)
-      await session.lifetime('300s')
-
-      return 'ok'
-    })
-
-    expect((await app.handle(new Request('http://localhost/'))).headers.get('set-cookie')).toMatch(/Max-Age=300;/)
-  })
-
   it('gives a browser session a cookie without Max-Age, kept browserMaxAge unused, a store told so', async () => {
     const lifetimes: number[] = []
     const memory = memoryStore()

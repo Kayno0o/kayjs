@@ -1,6 +1,5 @@
 import type { CookieMap } from 'bun'
 import type { Static, TSchema } from 'elysia'
-import type { Action, FailureOf, SuccessOf } from './action'
 import type { Deferred, Locals, Redirect, RouteParams } from './checks'
 import type { Duration } from './duration'
 import type { Locale } from './i18n'
@@ -286,12 +285,6 @@ export interface PageContext<Params extends Record<string, unknown> = Record<str
   query: Query
   // The response status of the page being rendered.
   status: (code: number) => void
-  /** @deprecated Since 1.70: write `action.failed()`, which reads the same in a page, a component and an island; goes in 1.73. */
-  // Why the plain form post to `action` this page answers was refused, when it was.
-  failed: <Target extends Action<never, unknown>>(action: Target) => FailureOf<Target> | undefined
-  /** @deprecated Since 1.70: write `action.succeeded()`, which reads the same in a page, a component and an island; goes in 1.73. */
-  // What the last plain form post to `action` returned, when it succeeded; read once, on the page the browser went back to.
-  succeeded: <Target extends Action<never, unknown>>(action: Target) => SuccessOf<Target> | undefined
 }
 
 // A page `kay build` prerenders renders without a request, so what only a request carries is refused where it is read; a `prerender` computed as a plain `boolean` is checked when it renders.

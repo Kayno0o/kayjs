@@ -33,8 +33,8 @@ const EDIT = 'edit'
 
 // The query param of a share link, `until.entry.sig`.
 const SHARE_PARAM = 'kay_preview'
-const DEFAULT_MAX_AGE = 3600
-const DEFAULT_LINK_TTL = 3600
+const DEFAULT_MAX_AGE = '1h'
+const DEFAULT_LINK_TTL = '1h'
 // A path of the site, never `//host` nor `/\host`, which a browser reads as another site.
 // A control character would break the `location` header it goes to, so it is no part of one.
 // eslint-disable-next-line no-control-regex -- control characters are what it refuses
